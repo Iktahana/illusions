@@ -174,7 +174,10 @@ ipcMain.handle("get-chrome-version", () => {
 ipcMain.handle("open-file", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ["openFile"],
-    filters: [{ name: "MDI Document", extensions: ["mdi"] }],
+    filters: [
+      { name: "MDI Document", extensions: ["mdi"] },
+      { name: "All Files", extensions: ["*"] },
+    ],
   });
   if (canceled || !filePaths[0]) return null;
   const filePath = filePaths[0];
@@ -193,7 +196,10 @@ ipcMain.handle("save-file", async (
   let target = filePath;
   if (!target) {
     const result = await dialog.showSaveDialog({
-      filters: [{ name: "MDI Document", extensions: ["mdi"] }],
+      filters: [
+        { name: "MDI Document", extensions: ["mdi"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
       defaultPath: "untitled.mdi",
     });
     if (result.canceled || !result.filePath) return null;
