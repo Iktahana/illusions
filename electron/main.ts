@@ -29,11 +29,6 @@ const pkg = require("../package.json") as {
 
 const APP_NAME: string = pkg.build?.productName ?? pkg.name ?? "Illusions";
 
-const { touchRecentFile, getRecentFiles } = require("./recent-files-db.js") as {
-  touchRecentFile: (filePath: string) => Promise<void>;
-  getRecentFiles: () => Promise<{ path: string; name?: string; lastAccessed?: number }[]>;
-};
-
 const isDev =
   process.env.NODE_ENV === "development" || process.env.ELECTRON_DEV === "1";
 
@@ -46,6 +41,7 @@ app.commandLine.appendSwitch(
 
 let mainWindow: BrowserWindow | null = null;
 let currentFilePath: string | null = null;
+let isDirty = false;
 
 function basename(p: string): string {
   const normalized = p.replace(/\\/g, "/");
@@ -79,6 +75,34 @@ function createMainWindow(): void {
     updateWindowTitle();
   });
 
+  mainWindow.on("close", (event) => {
+    if (!isDirty) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (!mainWindow) return;
+
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: "question",
+      buttons: ["Save", "Don't Save", "Cancel"],
+      defaultId: 0,
+      title: "Unsaved Changes",
+      message: "Do you want to save changes before closing?",
+    });
+
+    if (choice === 0) {
+      // Save
+      mainWindow?.webContents.send("electron-request-save-before-close");
+    } else if (choice === 1) {
+      // Don't Save
+      isDirty = false;
+      mainWindow?.close();
+    }
+    // choice === 2: Cancel, do nothing
+  });
+
   if (isDev) {
     mainWindow.loadURL("http://localhost:3000");
     mainWindow.webContents.openDevTools({ mode: "detach" });
@@ -86,6 +110,8 @@ function createMainWindow(): void {
     mainWindow.loadFile(path.join(__dirname, "..", "out", "index.html"));
   }
 }
+
+// IPC handlers
 
 ipcMain.handle("get-chrome-version", () => {
   const v = process.versions.chrome ?? "0";
@@ -102,7 +128,7 @@ ipcMain.handle("open-file", async () => {
   const filePath = filePaths[0];
   const content = await fs.readFile(filePath, "utf-8");
   currentFilePath = filePath;
-  await touchRecentFile(filePath);
+  isDirty = false;
   updateWindowTitle();
   return { path: filePath, content };
 });
@@ -123,17 +149,21 @@ ipcMain.handle("save-file", async (
   }
   await fs.writeFile(target, content, "utf-8");
   currentFilePath = target;
-  await touchRecentFile(target);
+  isDirty = false;
   updateWindowTitle();
   return target;
 });
 
-ipcMain.handle("get-workspace-state", async () => {
-  const recentFiles = await getRecentFiles();
-  return {
-    hasOpenFile: Boolean(currentFilePath),
-    recentFiles,
-  };
+ipcMain.handle("set-dirty", (
+  _event: Electron.IpcMainInvokeEvent,
+  dirty: boolean
+) => {
+  isDirty = dirty;
+});
+
+ipcMain.handle("save-before-close-done", () => {
+  isDirty = false;
+  mainWindow?.close();
 });
 
 ipcMain.handle("check-model-exists", async (

@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "electron:dev": "concurrently \"next dev -p 3000\" \"wait-on http://localhost:3000 && env -u ELECTRON_RUN_AS_NODE electron .\"",
+    "electron:dev": "next build && concurrently \"next dev -p 3000\" \"wait-on http://localhost:3000 && env -u ELECTRON_RUN_AS_NODE electron .\"",
     "electron:build": "next build && electron-builder --publish never",
     "postinstall": "electron-builder install-app-deps"
   },

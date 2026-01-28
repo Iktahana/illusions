@@ -10,16 +10,59 @@ interface InspectorProps {
   className?: string;
   wordCount?: number;
   charCount?: number;
+  fileName?: string;
+  isDirty?: boolean;
+  isSaving?: boolean;
+  lastSavedTime?: number | null;
 }
 
-export default function Inspector({ className, wordCount = 0, charCount = 0 }: InspectorProps) {
+export default function Inspector({
+  className,
+  wordCount = 0,
+  charCount = 0,
+  fileName = "Untitled",
+  isDirty = false,
+  isSaving = false,
+  lastSavedTime = null,
+}: InspectorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("ai");
 
   // Calculate manuscript pages (400 characters per page in Japanese)
   const manuscriptPages = Math.ceil(charCount / 400);
 
+  const formatTime = (timestamp: number | null) => {
+    if (!timestamp) return "Never";
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+
+    if (diffSecs < 60) return "Just now";
+    if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}m ago`;
+    if (diffSecs < 86400) return `${Math.floor(diffSecs / 3600)}h ago`;
+    return date.toLocaleDateString();
+  };
+
   return (
     <aside className={clsx("w-80 bg-white border-l border-slate-200 flex flex-col", className)}>
+      {/* File Status Header */}
+      <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
+        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">
+          Current File
+        </p>
+        <p className="text-sm font-semibold text-slate-800 truncate">{fileName}</p>
+        <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
+          <span>
+            {isDirty && <span className="text-amber-600 font-medium">● Unsaved</span>}
+            {!isDirty && !isSaving && <span className="text-green-600 font-medium">✓ Saved</span>}
+            {isSaving && <span className="text-blue-600 font-medium">⟳ Saving...</span>}
+          </span>
+          {lastSavedTime && !isDirty && (
+            <span className="text-slate-500">{formatTime(lastSavedTime)}</span>
+          )}
+        </div>
+      </div>
+
       {/* Tab Navigation */}
       <div className="h-12 border-b border-slate-200 flex items-center">
         <button

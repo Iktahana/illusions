@@ -11,7 +11,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   saveFile: (filePath: string | null, content: string) =>
     ipcRenderer.invoke("save-file", filePath, content),
   getChromeVersion: () => ipcRenderer.invoke("get-chrome-version"),
-  getWorkspaceState: () => ipcRenderer.invoke("get-workspace-state"),
+  setDirty: (dirty: boolean) => ipcRenderer.invoke("set-dirty", dirty),
+  onSaveBeforeClose: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("electron-request-save-before-close", handler);
+  },
+  saveDoneAndClose: () => ipcRenderer.invoke("save-before-close-done"),
   ai: {
     checkModelExists: (modelName: string) =>
       ipcRenderer.invoke("check-model-exists", modelName),

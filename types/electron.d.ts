@@ -12,15 +12,24 @@ declare global {
       content: string
     ) => Promise<string | null>;
     getChromeVersion: () => Promise<number>;
-    getWorkspaceState?: () => Promise<unknown>;
+    setDirty: (dirty: boolean) => Promise<void>;
+    onSaveBeforeClose?: (callback: () => void) => void;
+    saveDoneAndClose?: () => Promise<void>;
+    ai?: {
+      checkModelExists?: (modelName: string) => Promise<boolean>;
+      listModels?: () => Promise<string[]>;
+      downloadModel?: (url: string, modelName: string) => Promise<{ success: boolean; path?: string; error?: string }>;
+      onDownloadProgress?: (callback: (data: { percent: number; modelName: string }) => void) => void;
+      initializeAI?: (modelName: string) => Promise<{ success: boolean; error?: string }>;
+      proofreadText?: (text: string) => Promise<{ success: boolean; result?: unknown; error?: string }>;
+    };
   }
 
   interface Window {
-    electronAPI?: ElectronAPI
+    electronAPI?: ElectronAPI;
     ai?: {
-      canCreateTextSession?: () => Promise<string>
-      createTextSession?: () => Promise<unknown>
-    }
+      canCreateTextSession?: () => Promise<string>;
+      createTextSession?: () => Promise<unknown>;
+    };
   }
 }
-
