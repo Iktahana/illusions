@@ -122,21 +122,30 @@ function MilkdownEditor({
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<string>(initialContent);
+  const onChangeRef = useRef(onChange);
 
   useEffect(() => {
     contentRef.current = initialContent;
   }, [initialContent]);
 
-  useEditor((root) => {
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  const { get } = useEditor((root) => {
     const value = contentRef.current;
     return Editor.make()
       .config(nord)
       .config((ctx) => {
         ctx.set(rootCtx, root);
         ctx.set(defaultValueCtx, value);
+      })
+      // Load listener plugin BEFORE accessing listenerCtx
+      .use(listener)
+      .config((ctx) => {
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
           contentRef.current = markdown;
-          onChange?.(markdown);
+          onChangeRef.current?.(markdown);
         });
       })
       .use(commonmark)
@@ -146,11 +155,25 @@ function MilkdownEditor({
         enableRuby: true,
         enableTcy: true,
       }))
-      .use(listener)
       .use(history)
       .use(clipboard)
       .use(cursor);
-  }, [initialContent, isVertical, onChange]);
+  }, [initialContent]);
+
+  // Handle vertical mode change without recreating the entire editor
+  useEffect(() => {
+    const editor = get();
+    if (!editor) return;
+    
+    const editorDom = editorRef.current?.querySelector('.milkdown .ProseMirror');
+    if (editorDom) {
+      if (isVertical) {
+        editorDom.classList.add('milkdown-japanese-vertical');
+      } else {
+        editorDom.classList.remove('milkdown-japanese-vertical');
+      }
+    }
+  }, [isVertical, get]);
 
   return (
     <div
