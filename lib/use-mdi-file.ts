@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { openMdiFile, saveMdiFile, type MdiFileDescriptor } from "./mdi-file";
 import { isElectronRenderer } from "./runtime-env";
+import { getStorageService } from "./storage-service";
 
 const DEFAULT_CONTENT = "";
 const AUTO_SAVE_INTERVAL = 5000; // 5 seconds
@@ -16,6 +17,7 @@ export interface UseMdiFileReturn {
   lastSavedTime: number | null;
   openFile: () => Promise<void>;
   saveFile: () => Promise<void>;
+  wasAutoRecovered?: boolean; // Web only - whether file was auto-recovered
 }
 
 export function useMdiFile(): UseMdiFileReturn {
@@ -27,6 +29,7 @@ export function useMdiFile(): UseMdiFileReturn {
   const [lastSavedContent, setLastSavedContent] = useState<string>(DEFAULT_CONTENT);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
+  const [wasAutoRecovered, setWasAutoRecovered] = useState(false);
 
   const contentRef = useRef<string>(content);
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -40,6 +43,46 @@ export function useMdiFile(): UseMdiFileReturn {
     if (!isElectron || !window.electronAPI?.setDirty) return;
     window.electronAPI.setDirty(isDirty);
   }, [isDirty, isElectron]);
+
+  // Initialize storage and try to restore previous file handle (Web only)
+  useEffect(() => {
+    const initializeStorage = async () => {
+      try {
+        const storage = getStorageService();
+        await storage.initialize();
+        
+        // Web environment: try to restore file handle from editor buffer
+        if (!isElectron) {
+          const buffer = await storage.loadEditorBuffer();
+          if (buffer?.fileHandle) {
+            try {
+              // Try to access the file directly to verify we still have permission
+              const file = await buffer.fileHandle.getFile();
+              const content = await file.text();
+              
+              setCurrentFile({
+                path: null,
+                handle: buffer.fileHandle,
+                name: file.name,
+              });
+              setContentState(content);
+              setLastSavedContent(content);
+              setLastSavedTime(Date.now());
+              setWasAutoRecovered(true);
+            } catch (error) {
+              console.warn("Could not restore previous file (permission may have been revoked):", error);
+              // Clear the stale handle
+              await storage.clearEditorBuffer();
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to initialize storage:", error);
+      }
+    };
+
+    void initializeStorage();
+  }, []);
 
   const setContent = useCallback((newContent: string) => {
     setContentState(newContent);
@@ -56,7 +99,27 @@ export function useMdiFile(): UseMdiFileReturn {
     setContentState(fileContent);
     setLastSavedContent(fileContent);
     setLastSavedTime(Date.now());
-  }, []);
+    
+    // Save the last opened file path or handle to storage
+    try {
+      const storage = getStorageService();
+      await storage.initialize();
+      
+      if (isElectron && descriptor.path) {
+        // Electron: save path
+        await storage.saveAppState({ lastOpenedMdiPath: descriptor.path });
+      } else if (!isElectron && descriptor.handle) {
+        // Web: save file handle in editor buffer for later recovery
+        await storage.saveEditorBuffer({
+          content: fileContent,
+          timestamp: Date.now(),
+          fileHandle: descriptor.handle,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to save file reference:", error);
+    }
+  }, [isElectron]);
 
   const saveFile = useCallback(async () => {
     if (isSaving) return;
@@ -73,13 +136,33 @@ export function useMdiFile(): UseMdiFileReturn {
         setCurrentFile(descriptor);
         setLastSavedContent(contentRef.current);
         setLastSavedTime(Date.now());
+        
+        // Save the last opened file path or handle to storage
+        try {
+          const storage = getStorageService();
+          await storage.initialize();
+          
+          if (isElectron && descriptor.path) {
+            // Electron: save path
+            await storage.saveAppState({ lastOpenedMdiPath: descriptor.path });
+          } else if (!isElectron && descriptor.handle) {
+            // Web: save file handle in editor buffer for later recovery
+            await storage.saveEditorBuffer({
+              content: contentRef.current,
+              timestamp: Date.now(),
+              fileHandle: descriptor.handle,
+            });
+          }
+        } catch (error) {
+          console.error("Failed to save file reference:", error);
+        }
       }
     } catch (error) {
       console.error("Failed to save file:", error);
     } finally {
       setIsSaving(false);
     }
-  }, [currentFile]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentFile, isElectron]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-save every 5 seconds if dirty and file is open.
   useEffect(() => {
@@ -164,6 +247,26 @@ export function useMdiFile(): UseMdiFileReturn {
           setCurrentFile(descriptor);
           setLastSavedContent(raw);
           setLastSavedTime(Date.now());
+          
+          // Save the last opened file path or handle to storage
+          try {
+            const storage = getStorageService();
+            await storage.initialize();
+            
+            if (descriptor.path) {
+              // Electron: save path
+              await storage.saveAppState({ lastOpenedMdiPath: descriptor.path });
+            } else if (descriptor.handle) {
+              // Web: save file handle in editor buffer for later recovery
+              await storage.saveEditorBuffer({
+                content: raw,
+                timestamp: Date.now(),
+                fileHandle: descriptor.handle,
+              });
+            }
+          } catch (error) {
+            console.error("Failed to save file reference:", error);
+          }
         }
       } catch (error) {
         console.error("Failed to save file as:", error);
@@ -197,5 +300,6 @@ export function useMdiFile(): UseMdiFileReturn {
     lastSavedTime,
     openFile,
     saveFile,
+    wasAutoRecovered,
   };
 }

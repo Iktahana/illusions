@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Explorer from "@/components/Explorer";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
 import AiStatusIndicator from "@/components/AiStatusIndicator";
 import { useMdiFile } from "@/lib/use-mdi-file";
+import { isElectronRenderer } from "@/lib/runtime-env";
 
 function chars(s: string) {
   return s.replace(/\s/g, "").length;
@@ -17,11 +18,25 @@ function words(s: string) {
 
 export default function EditorPage() {
   const mdiFile = useMdiFile();
-  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile, saveFile } =
+  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile, saveFile, wasAutoRecovered } =
     mdiFile;
 
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
+  const [dismissedRecovery, setDismissedRecovery] = useState(false);
+  
+  const isElectron = typeof window !== "undefined" && isElectronRenderer();
+
+  // Auto-dismiss recovery notification after 5 seconds
+  useEffect(() => {
+    if (wasAutoRecovered && !dismissedRecovery) {
+      const timer = setTimeout(() => {
+        setDismissedRecovery(true);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [wasAutoRecovered, dismissedRecovery]);
 
   contentRef.current = content;
 
@@ -76,6 +91,24 @@ export default function EditorPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
+      {/* Auto-recovery notification (Web only) - fixed position */}
+      {!isElectron && wasAutoRecovered && !dismissedRecovery && (
+        <div className="fixed left-0 top-0 right-0 z-50 bg-gradient-to-r from-emerald-50 to-teal-50 border-b-2 border-emerald-300 px-4 py-3 flex items-center justify-between animate-slide-in-down shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-emerald-500 rounded-full flex-shrink-0 animate-pulse-glow"></div>
+            <p className="text-sm text-emerald-900">
+              <span className="font-semibold">✓ Previously edited file recovered:</span> <span className="font-mono text-emerald-700">{currentFile?.name}</span>
+            </p>
+          </div>
+          <button
+            onClick={() => setDismissedRecovery(true)}
+            className="text-emerald-500 hover:text-emerald-700 hover:bg-emerald-100 text-lg font-medium flex-shrink-0 ml-4 w-8 h-8 rounded flex items-center justify-center transition-all duration-200 hover:scale-110"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+      
       <div className="flex-1 flex overflow-hidden">
         <Explorer content={content} onChapterClick={handleChapterClick} />
         <main className="flex-1 flex flex-col overflow-hidden">

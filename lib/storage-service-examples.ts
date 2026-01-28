@@ -121,7 +121,7 @@ export async function addFileToRecent(
 // Example 5: Auto-save editor buffer every 30 seconds
 // ============================================================================
 
-export function setupAutoSave(editorContent: string): void {
+export function setupAutoSave(editorContent: string): () => void {
   const storage = getStorageService();
   
   const autoSaveInterval = setInterval(async () => {

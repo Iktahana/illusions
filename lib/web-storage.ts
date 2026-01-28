@@ -28,6 +28,7 @@ interface StoredRecentFile {
 interface StoredEditorBuffer {
   id: string;
   data: EditorBuffer;
+  fileHandle?: FileSystemFileHandle; // Store file handle separately for better serialization
 }
 
 class WebStorageDatabase extends Dexie {
@@ -231,6 +232,7 @@ export class WebStorageProvider implements IStorageService {
       await this.db.editorBuffer.put({
         id: "editor_buffer",
         data: buffer,
+        fileHandle: buffer.fileHandle,
       });
     } catch (error) {
       console.error("Failed to save editor buffer:", error);
@@ -243,7 +245,14 @@ export class WebStorageProvider implements IStorageService {
 
     try {
       const stored = await this.db.editorBuffer.get("editor_buffer");
-      return stored?.data ?? null;
+      if (!stored?.data) return null;
+      
+      // Restore file handle if it exists
+      if (stored.fileHandle) {
+        stored.data.fileHandle = stored.fileHandle;
+      }
+      
+      return stored.data;
     } catch (error) {
       console.error("Failed to load editor buffer:", error);
       return null;

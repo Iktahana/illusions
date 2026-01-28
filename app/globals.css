@@ -35,6 +35,50 @@ body {
   animation: fade-out 2s ease-out forwards;
 }
 
+/* Notification banner animations */
+@keyframes slide-in-down {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-out-up {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+}
+
+.animate-slide-in-down {
+  animation: slide-in-down 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-slide-out-up {
+  animation: slide-out-up 0.3s cubic-bezier(0.4, 0, 1, 0.2);
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
+
 /* Japanese novel plugin styles (vertical, manuscript, ruby, tcy) */
 @import '../packages/milkdown-plugin-japanese-novel/styles/index.css';
 

@@ -16,6 +16,7 @@ import {
   listModels,
 } from "./model-manager.js";
 import { proofreadingEngine } from "./ai-engine.js";
+import ElectronStorageManager from "../lib/electron-storage-manager.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,6 +44,7 @@ let mainWindow: BrowserWindow | null = null;
 let currentFilePath: string | null = null;
 let isDirty = false;
 let filesToOpenOnStartup: string[] = [];
+let storageManager: ElectronStorageManager | null = null;
 
 // Handle single instance and file associations
 const gotTheLock = app.requestSingleInstanceLock();
@@ -83,6 +85,12 @@ async function openFileInWindow(filePath: string): Promise<void> {
     currentFilePath = filePath;
     isDirty = false;
     updateWindowTitle();
+    
+    // Save the last opened file path to storage
+    if (storageManager) {
+      storageManager.saveAppState({ lastOpenedMdiPath: filePath });
+    }
+    
     // Send file content to renderer
     mainWindow?.webContents.send("open-file-from-system", { path: filePath, content });
   } catch (error) {
@@ -291,6 +299,12 @@ ipcMain.handle("save-file", async (
   currentFilePath = target;
   isDirty = false;
   updateWindowTitle();
+  
+  // Save the last opened file path to storage
+  if (storageManager) {
+    storageManager.saveAppState({ lastOpenedMdiPath: target });
+  }
+  
   return target;
 });
 
@@ -304,6 +318,98 @@ ipcMain.handle("set-dirty", (
 ipcMain.handle("save-before-close-done", () => {
   isDirty = false;
   mainWindow?.close();
+});
+
+// Storage IPC handlers
+ipcMain.handle("storage:saveSession", (
+  _event: Electron.IpcMainInvokeEvent,
+  session: unknown
+) => {
+  if (storageManager) {
+    storageManager.saveSession(session as any);
+  }
+});
+
+ipcMain.handle("storage:loadSession", () => {
+  if (storageManager) {
+    return storageManager.loadSession();
+  }
+  return null;
+});
+
+ipcMain.handle("storage:saveAppState", (
+  _event: Electron.IpcMainInvokeEvent,
+  appState: unknown
+) => {
+  if (storageManager) {
+    storageManager.saveAppState(appState as any);
+  }
+});
+
+ipcMain.handle("storage:loadAppState", () => {
+  if (storageManager) {
+    return storageManager.loadAppState();
+  }
+  return null;
+});
+
+ipcMain.handle("storage:addToRecent", (
+  _event: Electron.IpcMainInvokeEvent,
+  file: unknown
+) => {
+  if (storageManager) {
+    storageManager.addToRecent(file as any);
+  }
+});
+
+ipcMain.handle("storage:getRecentFiles", () => {
+  if (storageManager) {
+    return storageManager.getRecentFiles();
+  }
+  return [];
+});
+
+ipcMain.handle("storage:removeFromRecent", (
+  _event: Electron.IpcMainInvokeEvent,
+  filePath: string
+) => {
+  if (storageManager) {
+    storageManager.removeFromRecent(filePath);
+  }
+});
+
+ipcMain.handle("storage:clearRecent", () => {
+  if (storageManager) {
+    storageManager.clearRecent();
+  }
+});
+
+ipcMain.handle("storage:saveEditorBuffer", (
+  _event: Electron.IpcMainInvokeEvent,
+  buffer: unknown
+) => {
+  if (storageManager) {
+    storageManager.saveEditorBuffer(buffer as any);
+  }
+});
+
+ipcMain.handle("storage:loadEditorBuffer", () => {
+  if (storageManager) {
+    return storageManager.loadEditorBuffer();
+  }
+  return null;
+});
+
+ipcMain.handle("storage:clearEditorBuffer", () => {
+  if (storageManager) {
+    storageManager.clearEditorBuffer();
+  }
+});
+
+ipcMain.handle("storage:clearAll", () => {
+  if (storageManager) {
+    storageManager.clearAll();
+  }
 });
 
 // Menu IPC handlers
@@ -369,6 +475,15 @@ ipcMain.handle("proofread-text", async (
 });
 
 app.whenReady().then(() => {
+  // Initialize storage manager
+  storageManager = new ElectronStorageManager();
+  
+  // Try to load the last opened file
+  const appState = storageManager.loadAppState();
+  if (appState?.lastOpenedMdiPath) {
+    filesToOpenOnStartup.push(appState.lastOpenedMdiPath);
+  }
+  
   // Ensure application name and About panel follow package.json configuration.
   try {
     // app.name is used for the menu bar name on most platforms.
@@ -404,5 +519,8 @@ app.on("open-file", (event, filePath) => {
 
 app.on("window-all-closed", () => {
   proofreadingEngine.dispose().catch(() => {});
+  if (storageManager) {
+    storageManager.close();
+  }
   if (process.platform !== "darwin") app.quit();
 });

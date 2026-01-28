@@ -22,10 +22,12 @@ export interface AppState {
 
 /**
  * Editor buffer containing unsaved draft content for crash recovery.
+ * For Web environment, can also store FileSystemFileHandle for auto-recovery.
  */
 export interface EditorBuffer {
   content: string;
   timestamp: number;
+  fileHandle?: FileSystemFileHandle; // Web only - file handle for continuing previous edit
 }
 
 /**

@@ -55,7 +55,7 @@ export class StorageServiceTestSuite {
 
     try {
       await this.testInitialize();
-      await this.testClearAll(); // Start fresh
+      await this.storage.clearAll(); // Start fresh
       await this.testAppState();
       await this.testRecentFiles();
       await this.testEditorBuffer();

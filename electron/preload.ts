@@ -34,6 +34,25 @@ contextBridge.exposeInMainWorld("electronAPI", {
     const handler = () => callback();
     ipcRenderer.on("menu-save-as-triggered", handler);
   },
+  storage: {
+    saveSession: (session: unknown) =>
+      ipcRenderer.invoke("storage:saveSession", session),
+    loadSession: () => ipcRenderer.invoke("storage:loadSession"),
+    saveAppState: (appState: unknown) =>
+      ipcRenderer.invoke("storage:saveAppState", appState),
+    loadAppState: () => ipcRenderer.invoke("storage:loadAppState"),
+    addToRecent: (file: unknown) =>
+      ipcRenderer.invoke("storage:addToRecent", file),
+    getRecentFiles: () => ipcRenderer.invoke("storage:getRecentFiles"),
+    removeFromRecent: (filePath: string) =>
+      ipcRenderer.invoke("storage:removeFromRecent", filePath),
+    clearRecent: () => ipcRenderer.invoke("storage:clearRecent"),
+    saveEditorBuffer: (buffer: unknown) =>
+      ipcRenderer.invoke("storage:saveEditorBuffer", buffer),
+    loadEditorBuffer: () => ipcRenderer.invoke("storage:loadEditorBuffer"),
+    clearEditorBuffer: () => ipcRenderer.invoke("storage:clearEditorBuffer"),
+    clearAll: () => ipcRenderer.invoke("storage:clearAll"),
+  },
   ai: {
     checkModelExists: (modelName: string) =>
       ipcRenderer.invoke("check-model-exists", modelName),

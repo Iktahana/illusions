@@ -6,7 +6,6 @@
 
 import * as path from "path";
 import { app } from "electron";
-import Database from "better-sqlite3";
 import type {
   StorageSession,
   AppState,
@@ -14,8 +13,25 @@ import type {
   EditorBuffer,
 } from "./storage-types";
 
+// Type definition for better-sqlite3
+interface DatabaseInstance {
+  prepare(sql: string): any;
+  exec(sql: string): void;
+  pragma(pragma: string): void;
+  close(): void;
+}
+
+// Dynamic import to avoid issues with optional dependency
+let DatabaseModule: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  DatabaseModule = require("better-sqlite3");
+} catch {
+  // better-sqlite3 may not be available in all environments
+}
+
 export class ElectronStorageManager {
-  private db: Database.Database | null = null;
+  private db: DatabaseInstance | null = null;
   private dbPath: string;
 
   constructor() {
@@ -25,14 +41,20 @@ export class ElectronStorageManager {
   /**
    * Initialize the database and create tables if they don't exist.
    */
-  private ensureInitialized(): Database.Database {
+  private ensureInitialized(): DatabaseInstance {
     if (this.db) return this.db;
 
-    this.db = new Database(this.dbPath);
-    this.db.pragma("journal_mode = WAL");
+    if (!DatabaseModule) {
+      throw new Error("better-sqlite3 module is not available");
+    }
+
+    this.db = new DatabaseModule(this.dbPath);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    this.db!.pragma("journal_mode = WAL");
 
     // Create tables if they don't exist
-    this.db.exec(`
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    this.db!.exec(`
       CREATE TABLE IF NOT EXISTS app_state (
         id TEXT PRIMARY KEY,
         data TEXT NOT NULL,
@@ -53,7 +75,8 @@ export class ElectronStorageManager {
       );
     `);
 
-    return this.db;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return this.db!;
   }
 
   /**
