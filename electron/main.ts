@@ -131,10 +131,6 @@ function buildApplicationMenu(): MenuItemConstructorOptions[] {
           if (!mainWindow) return;
           const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
             properties: ["openFile"],
-            filters: [
-              { name: "All Files", extensions: ["*"] },
-              { name: "MDI Document", extensions: ["mdi"] },
-            ],
           });
           if (!canceled && filePaths[0]) {
             await openFileInWindow(filePaths[0]);
@@ -256,10 +252,6 @@ ipcMain.handle("get-chrome-version", () => {
 ipcMain.handle("open-file", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ["openFile"],
-    filters: [
-      { name: "All Files", extensions: ["*"] },
-      { name: "MDI Document", extensions: ["mdi"] },
-    ],
   });
   if (canceled || !filePaths[0]) return null;
   const filePath = filePaths[0];
