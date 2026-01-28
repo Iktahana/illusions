@@ -42,6 +42,28 @@ app.commandLine.appendSwitch(
 let mainWindow: BrowserWindow | null = null;
 let currentFilePath: string | null = null;
 let isDirty = false;
+let filesToOpenOnStartup: string[] = [];
+
+// Handle single instance and file associations
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", (_event, _argv, _cwd, additionalData: unknown) => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+
+    // Handle file open from second instance
+    const data = additionalData as { file?: string } | null;
+    if (data?.file) {
+      void openFileInWindow(data.file);
+    }
+  });
+}
 
 function basename(p: string): string {
   const normalized = p.replace(/\\/g, "/");
@@ -53,6 +75,26 @@ function updateWindowTitle(): void {
   if (!mainWindow) return;
   const filePart = currentFilePath ? ` - ${basename(currentFilePath)}` : "";
   mainWindow.setTitle(`${APP_NAME}${filePart}`);
+}
+
+async function openFileInWindow(filePath: string): Promise<void> {
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+    currentFilePath = filePath;
+    isDirty = false;
+    updateWindowTitle();
+    // Send file content to renderer
+    mainWindow?.webContents.send("open-file-from-system", { path: filePath, content });
+  } catch (error) {
+    console.error("Failed to open file from system:", error);
+    if (mainWindow) {
+      void dialog.showMessageBox(mainWindow, {
+        type: "error",
+        title: "Error",
+        message: "Failed to open the file.",
+      });
+    }
+  }
 }
 
 function createMainWindow(): void {
@@ -109,6 +151,16 @@ function createMainWindow(): void {
   } else {
     mainWindow.loadFile(path.join(__dirname, "..", "out", "index.html"));
   }
+
+  // Handle files that should be opened on startup
+  mainWindow.webContents.on("did-finish-load", () => {
+    if (filesToOpenOnStartup.length > 0) {
+      const fileToOpen = filesToOpenOnStartup.shift();
+      if (fileToOpen) {
+        void openFileInWindow(fileToOpen);
+      }
+    }
+  });
 }
 
 // IPC handlers
@@ -241,6 +293,16 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
   });
+});
+
+// Handle open-file event (macOS)
+app.on("open-file", (event, filePath) => {
+  event.preventDefault();
+  if (mainWindow && mainWindow.isVisible()) {
+    void openFileInWindow(filePath);
+  } else {
+    filesToOpenOnStartup.push(filePath);
+  }
 });
 
 app.on("window-all-closed", () => {

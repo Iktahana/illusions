@@ -17,6 +17,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("electron-request-save-before-close", handler);
   },
   saveDoneAndClose: () => ipcRenderer.invoke("save-before-close-done"),
+  onOpenFileFromSystem: (
+    callback: (payload: { path: string; content: string }) => void
+  ) => {
+    const handler = (
+      _event: unknown,
+      payload: { path: string; content: string }
+    ) => callback(payload);
+    ipcRenderer.on("open-file-from-system", handler);
+  },
   ai: {
     checkModelExists: (modelName: string) =>
       ipcRenderer.invoke("check-model-exists", modelName),

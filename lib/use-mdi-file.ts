@@ -117,6 +117,23 @@ export function useMdiFile(): UseMdiFileReturn {
     });
   }, [isDirty, saveFile, isElectron]);
 
+  // Handle files opened from system (double-click .mdi file).
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI?.onOpenFileFromSystem) return;
+
+    window.electronAPI.onOpenFileFromSystem(({ path, content: fileContent }) => {
+      const now = Date.now();
+      setCurrentFile({
+        path,
+        handle: null,
+        name: path.split("/").pop() || "Untitled",
+      });
+      setContentState(fileContent);
+      setLastSavedContent(fileContent);
+      setLastSavedTime(now);
+    });
+  }, [isElectron]);
+
   // Handle Web beforeunload.
   useEffect(() => {
     if (isElectron) return;

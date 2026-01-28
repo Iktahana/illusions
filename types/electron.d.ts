@@ -15,6 +15,9 @@ declare global {
     setDirty: (dirty: boolean) => Promise<void>;
     onSaveBeforeClose?: (callback: () => void) => void;
     saveDoneAndClose?: () => Promise<void>;
+    onOpenFileFromSystem?: (
+      callback: (payload: { path: string; content: string }) => void
+    ) => void;
     ai?: {
       checkModelExists?: (modelName: string) => Promise<boolean>;
       listModels?: () => Promise<string[]>;

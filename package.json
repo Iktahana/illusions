@@ -60,7 +60,32 @@
       "out/**/*"
     ],
     "mac": {
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "fileAssociations": [
+        {
+          "ext": "mdi",
+          "name": "MDI Document",
+          "role": "Editor"
+        }
+      ]
+    },
+    "win": {
+      "fileAssociations": [
+        {
+          "ext": "mdi",
+          "name": "MDI Document",
+          "description": "Illusions MDI Document"
+        }
+      ]
+    },
+    "linux": {
+      "fileAssociations": [
+        {
+          "ext": "mdi",
+          "name": "MDI Document",
+          "description": "Illusions MDI Document"
+        }
+      ]
     }
   }
 }
