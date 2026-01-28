@@ -132,8 +132,8 @@ function buildApplicationMenu(): MenuItemConstructorOptions[] {
           const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
             properties: ["openFile"],
             filters: [
-              { name: "MDI Document", extensions: ["mdi"] },
               { name: "All Files", extensions: ["*"] },
+              { name: "MDI Document", extensions: ["mdi"] },
             ],
           });
           if (!canceled && filePaths[0]) {
@@ -257,8 +257,8 @@ ipcMain.handle("open-file", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ["openFile"],
     filters: [
-      { name: "MDI Document", extensions: ["mdi"] },
       { name: "All Files", extensions: ["*"] },
+      { name: "MDI Document", extensions: ["mdi"] },
     ],
   });
   if (canceled || !filePaths[0]) return null;
@@ -279,8 +279,8 @@ ipcMain.handle("save-file", async (
   if (!target) {
     const result = await dialog.showSaveDialog({
       filters: [
-        { name: "MDI Document", extensions: ["mdi"] },
         { name: "All Files", extensions: ["*"] },
+        { name: "MDI Document", extensions: ["mdi"] },
       ],
       defaultPath: "untitled.mdi",
     });
