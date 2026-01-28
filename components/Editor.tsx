@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Editor, rootCtx, defaultValueCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import { commonmark } from "@milkdown/preset-commonmark";
@@ -10,6 +10,7 @@ import { clipboard } from "@milkdown/plugin-clipboard";
 import { cursor } from "@milkdown/plugin-cursor";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
+import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
 import clsx from "clsx";
 import { Type, AlignLeft } from "lucide-react";
 
@@ -100,7 +101,7 @@ function EditorToolbar({
       </div>
 
       <div className="text-xs text-slate-500">
-        Markdown サポート
+        Illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
       </div>
     </div>
   );
@@ -120,39 +121,45 @@ function MilkdownEditor({
   lineHeight: number;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<string>(initialContent);
+
+  useEffect(() => {
+    contentRef.current = initialContent;
+  }, [initialContent]);
 
   useEditor((root) => {
+    const value = contentRef.current;
     return Editor.make()
+      .config(nord)
       .config((ctx) => {
         ctx.set(rootCtx, root);
-        ctx.set(defaultValueCtx, initialContent);
-        
-        // Listen to content changes
-        ctx.get(listenerCtx).markdownUpdated((ctx, markdown) => {
+        ctx.set(defaultValueCtx, value);
+        ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
+          contentRef.current = markdown;
           onChange?.(markdown);
         });
       })
-      .config(nord)
       .use(commonmark)
+      .use(japaneseNovel({
+        isVertical,
+        showManuscriptLine: false,
+        enableRuby: true,
+        enableTcy: true,
+      }))
       .use(listener)
       .use(history)
       .use(clipboard)
       .use(cursor);
-  }, [initialContent]);
+  }, [initialContent, isVertical, onChange]);
 
   return (
     <div
       ref={editorRef}
-      className={clsx(
-        "max-w-4xl mx-auto p-8",
-        isVertical ? "vertical-writing overflow-x-auto" : ""
-      )}
+      className="max-w-4xl mx-auto p-8"
       style={{
         fontSize: `${fontSize}px`,
         lineHeight: lineHeight,
-        fontFamily: isVertical
-          ? "'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif"
-          : "inherit",
+        fontFamily: "inherit",
       }}
     >
       <Milkdown />

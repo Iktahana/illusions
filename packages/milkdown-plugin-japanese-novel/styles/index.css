@@ -1,0 +1,9 @@
+/**
+ * milkdown-plugin-japanese-novel styles.
+ * Import via: import 'milkdown-plugin-japanese-novel/style.css'
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600;700&display=swap');
+
+@import './vertical.css';
+@import './manuscript.css';

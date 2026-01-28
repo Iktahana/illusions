@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -28,11 +26,17 @@ body {
   }
 }
 
-/* Vertical writing mode support */
-.vertical-writing {
-  writing-mode: vertical-rl;
-  text-orientation: upright;
+@keyframes fade-out {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
 }
+
+.animate-fade-out {
+  animation: fade-out 2s ease-out forwards;
+}
+
+/* Japanese novel plugin styles (vertical, manuscript, ruby, tcy) */
+@import '../packages/milkdown-plugin-japanese-novel/styles/index.css';
 
 /* Milkdown editor custom styles */
 .milkdown {

@@ -1,44 +1,68 @@
 "use client";
 
-import { FileText, Save, Check } from "lucide-react";
-import { useStorage } from "@/lib/storage-context";
+import { useEffect } from "react";
+import { FileText, Save, Check, FolderOpen } from "lucide-react";
 
 interface NavbarProps {
+  fileName: string | null;
   isSaving?: boolean;
-  lastSaved?: Date;
+  lastSaved?: Date | null;
+  saveSuccessAt?: number | null;
+  onClearSaveSuccess?: () => void;
+  onOpenFile?: () => void;
 }
 
-export default function Navbar({ isSaving = false, lastSaved }: NavbarProps) {
-  const { currentDocument } = useStorage();
+export default function Navbar({
+  fileName,
+  isSaving = false,
+  lastSaved,
+  saveSuccessAt,
+  onClearSaveSuccess,
+  onOpenFile,
+}: NavbarProps) {
+  useEffect(() => {
+    if (saveSuccessAt == null) return;
+    const t = setTimeout(() => {
+      onClearSaveSuccess?.();
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [saveSuccessAt, onClearSaveSuccess]);
 
-  const formatLastSaved = (date?: Date) => {
+  const formatLastSaved = (date?: Date | null) => {
     if (!date) return "";
     const now = new Date();
     const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
     if (diff < 60) return "保存済み";
     if (diff < 3600) return `${Math.floor(diff / 60)}分前に保存`;
     return date.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
   };
 
+  const showToast = saveSuccessAt != null;
+
   return (
-    <nav className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-4">
-      {/* Left: Logo */}
+    <nav className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-4 relative">
       <div className="flex items-center gap-3">
         <FileText className="w-6 h-6 text-slate-700" />
         <span className="text-lg font-semibold text-slate-800">Illusions</span>
+        {onOpenFile && (
+          <button
+            type="button"
+            onClick={onOpenFile}
+            className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            <FolderOpen className="w-4 h-4" />
+            開く
+          </button>
+        )}
       </div>
 
-      {/* Center: Document Title */}
       <div className="flex-1 flex items-center justify-center">
         <h1 className="text-sm text-slate-600 max-w-md truncate">
-          {currentDocument?.title || "無題の文書"}
+          {fileName ?? "無題の文書"}
         </h1>
       </div>
 
-      {/* Right: Save Status & Avatar */}
       <div className="flex items-center gap-4">
-        {/* Save Status */}
         <div className="flex items-center gap-2 text-sm text-slate-500">
           {isSaving ? (
             <>
@@ -52,12 +76,19 @@ export default function Navbar({ isSaving = false, lastSaved }: NavbarProps) {
             </>
           )}
         </div>
-
-        {/* User Avatar */}
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-medium">
           U
         </div>
       </div>
+
+      {showToast && (
+        <div
+          role="status"
+          className="fixed top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-slate-800 text-white text-sm rounded-lg shadow-lg animate-fade-out"
+        >
+          保存成功
+        </div>
+      )}
     </nav>
   );
 }

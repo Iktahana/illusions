@@ -11,6 +11,8 @@
   "dependencies": {
     "@milkdown/core": "^7.5.1",
     "@milkdown/ctx": "^7.5.1",
+    "@milkdown/utils": "^7.5.1",
+    "unist-util-visit": "^5.0.0",
     "@milkdown/plugin-clipboard": "^7.5.1",
     "@milkdown/plugin-cursor": "^7.5.1",
     "@milkdown/plugin-history": "^7.5.1",

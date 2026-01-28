@@ -1,0 +1,13 @@
+/**
+ * Manuscript-style (原稿用紙) grid.
+ * 20×20 grid, 400 chars per "page" when used with standard sizing.
+ */
+
+.manuscript-style {
+  background-image:
+    linear-gradient(to bottom, transparent 19px, #e5e7eb 20px),
+    linear-gradient(to right, transparent 19px, #e5e7eb 20px);
+  background-size: 20px 20px;
+  padding: 40px;
+  min-height: 120px;
+}

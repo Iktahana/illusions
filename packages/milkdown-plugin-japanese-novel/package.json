@@ -1,0 +1,32 @@
+{
+  "name": "milkdown-plugin-japanese-novel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": {
+      "import": "./index.ts",
+      "types": "./index.ts"
+    },
+    "./style.css": "./styles/index.css"
+  },
+  "sideEffects": [
+    "./styles/index.css"
+  ],
+  "peerDependencies": {
+    "@milkdown/core": "^7.5.1",
+    "@milkdown/ctx": "^7.5.1",
+    "@milkdown/prose": "^7.5.1",
+    "@milkdown/transformer": "^7.5.1",
+    "@milkdown/utils": "^7.5.1"
+  },
+  "dependencies": {
+    "unist-util-visit": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/mdast": "^4.0.0",
+    "typescript": "^5.7.2"
+  }
+}

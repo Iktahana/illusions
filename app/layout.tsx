@@ -1,10 +1,6 @@
-import type { Metadata } from "next";
-import "./globals.css";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Illusions - 日本語小説エディター",
-  description: "A professional Japanese novel editor with vertical writing support",
-};
+import "./globals.css";
 
 export default function RootLayout({
   children,
@@ -13,6 +9,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
+      <head>
+        <title>Illusions - 日本語小説エディター</title>
+        <meta name="description" content="A professional Japanese novel editor with vertical writing support" />
+      </head>
       <body className="antialiased">
         {children}
       </body>
