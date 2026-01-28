@@ -134,6 +134,50 @@ export function useMdiFile(): UseMdiFileReturn {
     });
   }, [isElectron]);
 
+  // Handle menu save command.
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI?.onMenuSave) return;
+
+    window.electronAPI.onMenuSave(async () => {
+      await saveFile();
+    });
+  }, [saveFile, isElectron]);
+
+  // Handle menu save-as command.
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI?.onMenuSaveAs) return;
+
+    window.electronAPI.onMenuSaveAs(async () => {
+      const raw = contentRef.current;
+      setIsSaving(true);
+      try {
+        const descriptor: MdiFileDescriptor | null = currentFile
+          ? {
+              path: null,
+              handle: null,
+              name: currentFile.name,
+            }
+          : null;
+
+        const result = await saveMdiFile({
+          descriptor,
+          content: raw,
+        });
+
+        if (result) {
+          const { descriptor } = result;
+          setCurrentFile(descriptor);
+          setLastSavedContent(raw);
+          setLastSavedTime(Date.now());
+        }
+      } catch (error) {
+        console.error("Failed to save file as:", error);
+      } finally {
+        setIsSaving(false);
+      }
+    });
+  }, [saveFile, isElectron, currentFile]);
+
   // Handle Web beforeunload.
   useEffect(() => {
     if (isElectron) return;

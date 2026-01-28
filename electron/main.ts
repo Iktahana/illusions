@@ -3,7 +3,7 @@
  * ESM module. Bundles model manager, AI engine, and IPC handlers.
  */
 
-import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, Menu, type MenuItemConstructorOptions } from "electron";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -97,6 +97,84 @@ async function openFileInWindow(filePath: string): Promise<void> {
   }
 }
 
+function buildApplicationMenu(): MenuItemConstructorOptions[] {
+  const isMac = process.platform === "darwin";
+
+  const template: MenuItemConstructorOptions[] = [];
+
+  // App menu (macOS only)
+  if (isMac) {
+    template.push({
+      label: APP_NAME,
+      submenu: [
+        { role: "about" },
+        { type: "separator" },
+        { role: "services" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    });
+  }
+
+  // File menu
+  template.push({
+    label: "File",
+    submenu: [
+      {
+        label: "Open...",
+        accelerator: "CmdOrCtrl+O",
+        click: async () => {
+          if (!mainWindow) return;
+          const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+            properties: ["openFile"],
+            filters: [
+              { name: "MDI Document", extensions: ["mdi"] },
+              { name: "All Files", extensions: ["*"] },
+            ],
+          });
+          if (!canceled && filePaths[0]) {
+            await openFileInWindow(filePaths[0]);
+          }
+        },
+      },
+      { type: "separator" },
+      {
+        label: "Save",
+        accelerator: "CmdOrCtrl+S",
+        click: () => {
+          mainWindow?.webContents.send("menu-save");
+        },
+      },
+      {
+        label: "Save As...",
+        accelerator: "Shift+CmdOrCtrl+S",
+        click: () => {
+          mainWindow?.webContents.send("menu-save-as");
+        },
+      },
+      ...(isMac ? [] : [{ type: "separator" as const }]),
+      ...(isMac ? [] : [{ role: "quit" as const }]),
+    ],
+  });
+
+  // Edit menu
+  template.push({ role: "editMenu" });
+
+  // View menu
+  template.push({ role: "viewMenu" });
+
+  // Window menu (macOS only)
+  if (isMac) {
+    template.push({ role: "windowMenu" });
+  }
+
+  return template;
+}
+
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -151,6 +229,10 @@ function createMainWindow(): void {
   } else {
     mainWindow.loadFile(path.join(__dirname, "..", "out", "index.html"));
   }
+
+  // Set up application menu
+  const menu = Menu.buildFromTemplate(buildApplicationMenu());
+  Menu.setApplicationMenu(menu);
 
   // Handle files that should be opened on startup
   mainWindow.webContents.on("did-finish-load", () => {
@@ -222,6 +304,15 @@ ipcMain.handle("set-dirty", (
 ipcMain.handle("save-before-close-done", () => {
   isDirty = false;
   mainWindow?.close();
+});
+
+// Menu IPC handlers
+ipcMain.on("menu-save", () => {
+  mainWindow?.webContents.send("menu-save-triggered");
+});
+
+ipcMain.on("menu-save-as", () => {
+  mainWindow?.webContents.send("menu-save-as-triggered");
 });
 
 ipcMain.handle("check-model-exists", async (

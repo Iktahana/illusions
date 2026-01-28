@@ -18,6 +18,8 @@ declare global {
     onOpenFileFromSystem?: (
       callback: (payload: { path: string; content: string }) => void
     ) => void;
+    onMenuSave?: (callback: () => void) => void;
+    onMenuSaveAs?: (callback: () => void) => void;
     ai?: {
       checkModelExists?: (modelName: string) => Promise<boolean>;
       listModels?: () => Promise<string[]>;

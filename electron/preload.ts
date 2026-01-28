@@ -26,6 +26,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ) => callback(payload);
     ipcRenderer.on("open-file-from-system", handler);
   },
+  onMenuSave: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu-save-triggered", handler);
+  },
+  onMenuSaveAs: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu-save-as-triggered", handler);
+  },
   ai: {
     checkModelExists: (modelName: string) =>
       ipcRenderer.invoke("check-model-exists", modelName),
