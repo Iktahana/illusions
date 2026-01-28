@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0f172a;
+    --foreground: #f8fafc;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Vertical writing mode support */
+.vertical-writing {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+}
+
+/* Milkdown editor custom styles */
+.milkdown {
+  @apply bg-transparent text-slate-800;
+}
+
+.milkdown .editor {
+  @apply outline-none min-h-full;
+}
+
+.milkdown p {
+  @apply mb-4;
+}
+
+.milkdown h1 {
+  @apply text-3xl font-bold mb-4;
+}
+
+.milkdown h2 {
+  @apply text-2xl font-bold mb-3;
+}
+
+.milkdown h3 {
+  @apply text-xl font-bold mb-2;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-slate-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400;
+}

@@ -1,0 +1,260 @@
+"use client";
+
+import { useState } from "react";
+import { Bot, AlertCircle, BarChart3, ChevronRight } from "lucide-react";
+import clsx from "clsx";
+
+type Tab = "ai" | "corrections" | "stats";
+
+interface InspectorProps {
+  className?: string;
+  wordCount?: number;
+  charCount?: number;
+}
+
+export default function Inspector({ className, wordCount = 0, charCount = 0 }: InspectorProps) {
+  const [activeTab, setActiveTab] = useState<Tab>("ai");
+
+  // Calculate manuscript pages (400 characters per page in Japanese)
+  const manuscriptPages = Math.ceil(charCount / 400);
+
+  return (
+    <aside className={clsx("w-80 bg-white border-l border-slate-200 flex flex-col", className)}>
+      {/* Tab Navigation */}
+      <div className="h-12 border-b border-slate-200 flex items-center">
+        <button
+          onClick={() => setActiveTab("ai")}
+          className={clsx(
+            "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
+            activeTab === "ai"
+              ? "text-slate-800 border-b-2 border-indigo-500"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <Bot className="w-4 h-4" />
+          AI
+        </button>
+        <button
+          onClick={() => setActiveTab("corrections")}
+          className={clsx(
+            "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
+            activeTab === "corrections"
+              ? "text-slate-800 border-b-2 border-indigo-500"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <AlertCircle className="w-4 h-4" />
+          校正
+        </button>
+        <button
+          onClick={() => setActiveTab("stats")}
+          className={clsx(
+            "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
+            activeTab === "stats"
+              ? "text-slate-800 border-b-2 border-indigo-500"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <BarChart3 className="w-4 h-4" />
+          統計
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {activeTab === "ai" && <AIPanel />}
+        {activeTab === "corrections" && <CorrectionsPanel />}
+        {activeTab === "stats" && <StatsPanel wordCount={wordCount} charCount={charCount} manuscriptPages={manuscriptPages} />}
+      </div>
+    </aside>
+  );
+}
+
+function AIPanel() {
+  return (
+    <div className="space-y-4">
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-100">
+        <div className="flex items-start gap-3 mb-3">
+          <Bot className="w-5 h-5 text-indigo-600 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-medium text-slate-800 mb-1">AI アシスタント</h3>
+            <p className="text-xs text-slate-600">
+              執筆をサポートします。質問や提案をお聞きください。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* AI Suggestions */}
+      <div className="space-y-2">
+        <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide">提案</h4>
+        <AISuggestion
+          title="次の展開を提案"
+          description="登場人物の心情を深掘りしませんか？"
+        />
+        <AISuggestion
+          title="文章の改善"
+          description="より自然な表現に書き換えます"
+        />
+      </div>
+
+      {/* Input Area */}
+      <div className="pt-4 border-t border-slate-200">
+        <textarea
+          placeholder="AI に質問や指示を入力..."
+          rows={3}
+          className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+        />
+        <button className="w-full mt-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700 transition-colors">
+          送信
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AISuggestion({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="flex items-start gap-2 p-3 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors border border-slate-200">
+      <ChevronRight className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-slate-700">{title}</p>
+        <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function CorrectionsPanel() {
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-medium text-slate-700">校正リスト</h3>
+      
+      <CorrectionItem
+        type="warning"
+        message="重複する文末表現"
+        context="「...だった。...だった。」"
+        line={23}
+      />
+      <CorrectionItem
+        type="info"
+        message="長い文章"
+        context="この文は100文字を超えています"
+        line={45}
+      />
+      <CorrectionItem
+        type="warning"
+        message="助詞の連続"
+        context="「...のの...」"
+        line={67}
+      />
+      
+      <div className="pt-4 text-center">
+        <p className="text-sm text-slate-500">その他の問題は見つかりませんでした</p>
+      </div>
+    </div>
+  );
+}
+
+function CorrectionItem({
+  type,
+  message,
+  context,
+  line,
+}: {
+  type: "warning" | "info";
+  message: string;
+  context: string;
+  line: number;
+}) {
+  return (
+    <div
+      className={clsx(
+        "p-3 rounded-lg border cursor-pointer hover:shadow-sm transition-shadow",
+        type === "warning"
+          ? "bg-amber-50 border-amber-200"
+          : "bg-blue-50 border-blue-200"
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <AlertCircle
+          className={clsx(
+            "w-4 h-4 mt-0.5 flex-shrink-0",
+            type === "warning" ? "text-amber-600" : "text-blue-600"
+          )}
+        />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-slate-800">{message}</p>
+          <p className="text-xs text-slate-600 mt-1">{context}</p>
+          <p className="text-xs text-slate-500 mt-1">行 {line}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatsPanel({
+  wordCount,
+  charCount,
+  manuscriptPages,
+}: {
+  wordCount: number;
+  charCount: number;
+  manuscriptPages: number;
+}) {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-medium text-slate-700">文書統計</h3>
+      
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard label="文字数" value={charCount.toLocaleString()} />
+        <StatCard label="単語数" value={wordCount.toLocaleString()} />
+        <StatCard label="原稿用紙" value={`${manuscriptPages}枚`} />
+        <StatCard label="段落数" value="12" />
+      </div>
+      
+      <div className="pt-4 border-t border-slate-200">
+        <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">
+          原稿用紙換算
+        </h4>
+        <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700">
+          <p className="mb-2">
+            400字詰め原稿用紙：<span className="font-semibold">{manuscriptPages}枚</span>
+          </p>
+          <p className="text-xs text-slate-500">
+            ※ 日本語小説の標準フォーマットで計算
+          </p>
+        </div>
+      </div>
+      
+      <div className="pt-4 border-t border-slate-200">
+        <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">
+          執筆ペース
+        </h4>
+        <div className="space-y-2 text-sm text-slate-600">
+          <div className="flex justify-between">
+            <span>今日</span>
+            <span className="font-medium">+320文字</span>
+          </div>
+          <div className="flex justify-between">
+            <span>今週</span>
+            <span className="font-medium">+1,240文字</span>
+          </div>
+          <div className="flex justify-between">
+            <span>平均/日</span>
+            <span className="font-medium">177文字</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+      <p className="text-xs text-slate-500 mb-1">{label}</p>
+      <p className="text-xl font-semibold text-slate-800">{value}</p>
+    </div>
+  );
+}
