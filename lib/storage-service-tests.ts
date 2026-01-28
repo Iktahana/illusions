@@ -455,7 +455,7 @@ export class StorageServiceTestSuite {
  */
 if (typeof window !== "undefined") {
   // Browser environment - expose for manual testing
-  (window as any).runStorageTests = async () => {
+  (window as Window & { runStorageTests?: () => Promise<void> }).runStorageTests = async () => {
     const suite = new StorageServiceTestSuite();
     await suite.runAll();
   };

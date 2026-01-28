@@ -82,7 +82,7 @@ export function useMdiFile(): UseMdiFileReturn {
     };
 
     void initializeStorage();
-  }, []);
+  }, [isElectron]);
 
   const setContent = useCallback((newContent: string) => {
     setContentState(newContent);
@@ -162,7 +162,7 @@ export function useMdiFile(): UseMdiFileReturn {
     } finally {
       setIsSaving(false);
     }
-  }, [currentFile, isElectron]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentFile, isElectron, isSaving]);
 
   // Auto-save every 5 seconds if dirty and file is open.
   useEffect(() => {

@@ -21,112 +21,97 @@ export class ElectronStorageProvider implements IStorageService {
     this.initialized = true;
   }
 
-  async saveSession(session: StorageSession): Promise<void> {
-    await this.initialize();
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.storage?.saveSession) {
+  private getElectronAPI() {
+    const electronAPI = (window as Window & { electronAPI?: { storage?: unknown } }).electronAPI;
+    if (!electronAPI?.storage) {
       throw new Error("Electron storage API not available");
     }
-    return electronAPI.storage.saveSession(session);
+    return electronAPI.storage as {
+      saveSession: (session: StorageSession) => Promise<void>;
+      loadSession: () => Promise<StorageSession | null>;
+      saveAppState: (appState: AppState) => Promise<void>;
+      loadAppState: () => Promise<AppState | null>;
+      addToRecent: (file: RecentFile) => Promise<void>;
+      getRecentFiles: () => Promise<RecentFile[]>;
+      removeFromRecent: (path: string) => Promise<void>;
+      clearRecent: () => Promise<void>;
+      saveEditorBuffer: (buffer: EditorBuffer) => Promise<void>;
+      loadEditorBuffer: () => Promise<EditorBuffer | null>;
+      clearEditorBuffer: () => Promise<void>;
+      clearAll: () => Promise<void>;
+    };
+  }
+
+  async saveSession(session: StorageSession): Promise<void> {
+    await this.initialize();
+    const api = this.getElectronAPI();
+    return api.saveSession(session);
   }
 
   async loadSession(): Promise<StorageSession | null> {
     await this.initialize();
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.storage?.loadSession) {
-      throw new Error("Electron storage API not available");
-    }
-    return electronAPI.storage.loadSession();
+    const api = this.getElectronAPI();
+    return api.loadSession();
   }
 
   async saveAppState(appState: AppState): Promise<void> {
     await this.initialize();
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.storage?.saveAppState) {
-      throw new Error("Electron storage API not available");
-    }
-    return electronAPI.storage.saveAppState(appState);
+    const api = this.getElectronAPI();
+    return api.saveAppState(appState);
   }
 
   async loadAppState(): Promise<AppState | null> {
     await this.initialize();
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.storage?.loadAppState) {
-      throw new Error("Electron storage API not available");
-    }
-    return electronAPI.storage.loadAppState();
+    const api = this.getElectronAPI();
+    return api.loadAppState();
   }
 
   async addToRecent(file: RecentFile): Promise<void> {
     await this.initialize();
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.storage?.addToRecent) {
-      throw new Error("Electron storage API not available");
-    }
-    return electronAPI.storage.addToRecent(file);
+    const api = this.getElectronAPI();
+    return api.addToRecent(file);
   }
 
   async getRecentFiles(): Promise<RecentFile[]> {
     await this.initialize();
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.storage?.getRecentFiles) {
-      throw new Error("Electron storage API not available");
-    }
-    return electronAPI.storage.getRecentFiles();
+    const api = this.getElectronAPI();
+    return api.getRecentFiles();
   }
 
   async removeFromRecent(path: string): Promise<void> {
     await this.initialize();
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.storage?.removeFromRecent) {
-      throw new Error("Electron storage API not available");
-    }
-    return electronAPI.storage.removeFromRecent(path);
+    const api = this.getElectronAPI();
+    return api.removeFromRecent(path);
   }
 
   async clearRecent(): Promise<void> {
     await this.initialize();
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.storage?.clearRecent) {
-      throw new Error("Electron storage API not available");
-    }
-    return electronAPI.storage.clearRecent();
+    const api = this.getElectronAPI();
+    return api.clearRecent();
   }
 
   async saveEditorBuffer(buffer: EditorBuffer): Promise<void> {
     await this.initialize();
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.storage?.saveEditorBuffer) {
-      throw new Error("Electron storage API not available");
-    }
-    return electronAPI.storage.saveEditorBuffer(buffer);
+    const api = this.getElectronAPI();
+    return api.saveEditorBuffer(buffer);
   }
 
   async loadEditorBuffer(): Promise<EditorBuffer | null> {
     await this.initialize();
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.storage?.loadEditorBuffer) {
-      throw new Error("Electron storage API not available");
-    }
-    return electronAPI.storage.loadEditorBuffer();
+    const api = this.getElectronAPI();
+    return api.loadEditorBuffer();
   }
 
   async clearEditorBuffer(): Promise<void> {
     await this.initialize();
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.storage?.clearEditorBuffer) {
-      throw new Error("Electron storage API not available");
-    }
-    return electronAPI.storage.clearEditorBuffer();
+    const api = this.getElectronAPI();
+    return api.clearEditorBuffer();
   }
 
   async clearAll(): Promise<void> {
     await this.initialize();
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.storage?.clearAll) {
-      throw new Error("Electron storage API not available");
-    }
-    return electronAPI.storage.clearAll();
+    const api = this.getElectronAPI();
+    return api.clearAll();
   }
 }
 

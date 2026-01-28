@@ -14,18 +14,29 @@ import type {
 } from "./storage-types";
 
 // Type definition for better-sqlite3
+interface StatementResult {
+  run(...params: unknown[]): void;
+  get(...params: unknown[]): unknown;
+  all(...params: unknown[]): unknown[];
+}
+
 interface DatabaseInstance {
-  prepare(sql: string): any;
+  prepare(sql: string): StatementResult;
   exec(sql: string): void;
   pragma(pragma: string): void;
   close(): void;
 }
 
+interface DatabaseConstructor {
+  new (path: string): DatabaseInstance;
+}
+
 // Dynamic import to avoid issues with optional dependency
-let DatabaseModule: any = null;
+let DatabaseModule: DatabaseConstructor | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  DatabaseModule = require("better-sqlite3");
+  // Dynamic require is necessary for optional electron dependency
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  DatabaseModule = require("better-sqlite3") as DatabaseConstructor;
 } catch {
   // better-sqlite3 may not be available in all environments
 }
@@ -140,7 +151,7 @@ export class ElectronStorageManager {
    * Load the complete session state.
    */
   loadSession(): StorageSession | null {
-    const db = this.ensureInitialized();
+    this.ensureInitialized();
 
     try {
       const appState = this.loadAppState();

@@ -5,7 +5,7 @@
  * across Web and Electron environments.
  */
 
-import type { StorageSession, RecentFile, AppState } from "@/lib/storage-types";
+import type { StorageSession, RecentFile } from "@/lib/storage-types";
 import { getStorageService } from "@/lib/storage-service";
 
 // ============================================================================
@@ -345,7 +345,7 @@ export class SessionManager {
     }
 
     if (session?.editorBuffer) {
-      const restored = await this.requestRestoreBuffer(session.editorBuffer.content);
+      const restored = await this.requestRestoreBuffer();
       if (restored) {
         this.editorContent = session.editorBuffer.content;
       }
@@ -355,7 +355,7 @@ export class SessionManager {
     this.startAutoSave();
   }
 
-  private async requestRestoreBuffer(content: string): Promise<boolean> {
+  private async requestRestoreBuffer(): Promise<boolean> {
     // In a real app, this would show a dialog
     console.log("Restore unsaved content? (Y/n)");
     return true; // Assume yes for this example

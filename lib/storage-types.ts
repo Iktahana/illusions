@@ -120,5 +120,5 @@ export interface IStorageService {
  */
 export function isElectronEnvironment(): boolean {
   if (typeof window === "undefined") return false;
-  return typeof (window as any).electronAPI !== "undefined";
+  return typeof (window as Window & { electronAPI?: unknown }).electronAPI !== "undefined";
 }
