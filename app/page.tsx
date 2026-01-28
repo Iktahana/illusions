@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Explorer from "@/components/Explorer";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
+import RecoveryModal from "@/components/RecoveryModal";
 import { useFileStorage } from "@/lib/use-file-storage";
 
 function chars(s: string) {
@@ -28,6 +29,10 @@ export default function EditorPage() {
     lastSaved,
     saveSuccessAt,
     clearSaveSuccess,
+    pendingRecovery,
+    restoreStash,
+    discardStash,
+    restoreRevision,
   } = storage;
   const contentRef = useRef<string>(content);
 
@@ -51,11 +56,19 @@ export default function EditorPage() {
     setContent(markdown);
   };
 
+  const handleDiscard = () => {
+    discardStash();
+  };
+
   const wordCount = words(content);
   const charCount = chars(content);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
+      {pendingRecovery && (
+        <RecoveryModal onRestore={restoreStash} onDiscard={handleDiscard} />
+      )}
+
       <Navbar
         fileName={fileName}
         isSaving={isSaving}
@@ -69,7 +82,7 @@ export default function EditorPage() {
         <Explorer />
         <main className="flex-1 flex flex-col overflow-hidden">
           <NovelEditor
-            key={fileName ?? "new"}
+            key={`${fileName ?? "new"}-${restoreRevision}`}
             initialContent={loadedContent}
             onChange={handleChange}
           />
