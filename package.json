@@ -5,12 +5,12 @@
   "main": "main.js",
   "scripts": {
     "type-check": "tsc --noEmit",
-    "dev": "type-check && next dev",
-    "build": "type-check && next build",
+    "dev": "npm run type-check && next dev",
+    "build": "npm run type-check && next build",
     "start": "next start",
     "lint": "next lint",
-    "electron:dev": "type-check && next build && concurrently \"next dev -p 3000\" \"wait-on http://localhost:3000 && env -u ELECTRON_RUN_AS_NODE electron .\"",
-    "electron:build": "type-check && next build && electron-builder --publish never",
+    "electron:dev": "npm run type-check && next build && concurrently \"next dev -p 3000\" \"wait-on http://localhost:3000 && env -u ELECTRON_RUN_AS_NODE electron .\"",
+    "electron:build": "npm run type-check && next build && electron-builder --publish never",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
