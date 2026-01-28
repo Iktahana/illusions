@@ -79,7 +79,7 @@ export function useMdiFile(): UseMdiFileReturn {
     } finally {
       setIsSaving(false);
     }
-  }, [currentFile]);
+  }, [currentFile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-save every 5 seconds if dirty and file is open.
   useEffect(() => {
