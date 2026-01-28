@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import Explorer from "@/components/Explorer";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
@@ -17,7 +17,7 @@ function words(s: string) {
 
 export default function EditorPage() {
   const mdiFile = useMdiFile();
-  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime } =
+  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile, saveFile } =
     mdiFile;
 
   const contentRef = useRef<string>(content);
@@ -33,6 +33,27 @@ export default function EditorPage() {
   const charCount = chars(content);
 
   const fileName = currentFile?.name ?? (isDirty ? "Untitled (unsaved)" : "Untitled");
+
+  // Handle Cmd+S / Ctrl+S keyboard shortcut to save file
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Cmd+S (macOS) or Ctrl+S (Windows/Linux)
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const isSaveShortcut = isMac
+        ? event.metaKey && event.key === "s"
+        : event.ctrlKey && event.key === "s";
+
+      if (isSaveShortcut) {
+        event.preventDefault(); // Prevent browser's default save dialog
+        void saveFile();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [saveFile]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -52,6 +73,7 @@ export default function EditorPage() {
           isDirty={isDirty}
           isSaving={isSaving}
           lastSavedTime={lastSavedTime}
+          onOpenFile={openFile}
         />
       </div>
 

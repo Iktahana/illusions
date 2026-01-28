@@ -121,19 +121,18 @@ function MilkdownEditor({
   lineHeight: number;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<string>(initialContent);
+  // Store initial content at mount time - this should only change when component remounts (file switch)
+  const initialContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
 
-  useEffect(() => {
-    contentRef.current = initialContent;
-  }, [initialContent]);
+  // Update onChange ref when it changes
 
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
 
   const { get } = useEditor((root) => {
-    const value = contentRef.current;
+    const value = initialContentRef.current;
     return Editor.make()
       .config(nord)
       .config((ctx) => {
@@ -144,7 +143,6 @@ function MilkdownEditor({
       .use(listener)
       .config((ctx) => {
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
-          contentRef.current = markdown;
           onChangeRef.current?.(markdown);
         });
       })
@@ -158,21 +156,30 @@ function MilkdownEditor({
       .use(history)
       .use(clipboard)
       .use(cursor);
-  }, [initialContent]);
+  }, [isVertical]); // Only recreate editor when isVertical changes
 
   // Handle vertical mode change without recreating the entire editor
   useEffect(() => {
-    const editor = get();
-    if (!editor) return;
-    
-    const editorDom = editorRef.current?.querySelector('.milkdown .ProseMirror');
-    if (editorDom) {
-      if (isVertical) {
-        editorDom.classList.add('milkdown-japanese-vertical');
-      } else {
-        editorDom.classList.remove('milkdown-japanese-vertical');
+    // Use a small delay to ensure the editor is fully initialized
+    const timer = setTimeout(() => {
+      try {
+        const editor = get();
+        if (!editor) return;
+        
+        const editorDom = editorRef.current?.querySelector('.milkdown .ProseMirror');
+        if (editorDom) {
+          if (isVertical) {
+            editorDom.classList.add('milkdown-japanese-vertical');
+          } else {
+            editorDom.classList.remove('milkdown-japanese-vertical');
+          }
+        }
+      } catch {
+        // Editor context not ready yet, ignore
       }
-    }
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [isVertical, get]);
 
   return (

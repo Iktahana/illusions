@@ -100,11 +100,6 @@ export function useMdiFile(): UseMdiFileReturn {
     };
   }, [isDirty, currentFile, saveFile]);
 
-  // Startup: open file picker on mount.
-  useEffect(() => {
-    void openFile();
-  }, [openFile]);
-
   // Handle Electron save-before-close request.
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onSaveBeforeClose) return;

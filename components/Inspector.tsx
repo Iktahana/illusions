@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, AlertCircle, BarChart3, ChevronRight } from "lucide-react";
+import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen } from "lucide-react";
 import clsx from "clsx";
 
 type Tab = "ai" | "corrections" | "stats";
@@ -14,6 +14,7 @@ interface InspectorProps {
   isDirty?: boolean;
   isSaving?: boolean;
   lastSavedTime?: number | null;
+  onOpenFile?: () => void;
 }
 
 export default function Inspector({
@@ -24,6 +25,7 @@ export default function Inspector({
   isDirty = false,
   isSaving = false,
   lastSavedTime = null,
+  onOpenFile,
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("ai");
 
@@ -47,9 +49,20 @@ export default function Inspector({
     <aside className={clsx("w-80 bg-white border-l border-slate-200 flex flex-col", className)}>
       {/* File Status Header */}
       <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
-        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">
-          Current File
-        </p>
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+            Current File
+          </p>
+          {onOpenFile && (
+            <button
+              onClick={onOpenFile}
+              className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+              title="Open File"
+            >
+              <FolderOpen className="w-4 h-4" />
+            </button>
+          )}
+        </div>
         <p className="text-sm font-semibold text-slate-800 truncate">{fileName}</p>
         <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
           <span>
