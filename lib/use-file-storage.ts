@@ -7,6 +7,7 @@ import {
   getStash,
   upsertStash,
 } from "./db";
+import { isElectronRenderer } from "./runtime-env";
 
 const DEFAULT_CONTENT = "# 新しい物語\n\nここから物語が始まります...";
 const DEBOUNCE_MS = 1000;
@@ -41,7 +42,7 @@ export interface PendingRecovery {
 
 export function useFileStorage() {
   const isElectron =
-    typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron);
+    typeof window !== "undefined" && isElectronRenderer();
 
   const [fileName, setFileName] = useState<string | null>(null);
   const [filePath, setFilePath] = useState<string | null>(null);
@@ -116,8 +117,8 @@ export function useFileStorage() {
       const [handle] = await window.showOpenFilePicker({
         types: [
           {
-            description: "Markdown",
-            accept: { "text/markdown": [".md"] },
+            description: "MDI Document",
+            accept: { "text/plain": [".mdi"] },
           },
         ],
         multiple: false,
@@ -175,11 +176,16 @@ export function useFileStorage() {
       try {
         let handle = fileHandle;
         if (!handle && hasShowSaveFilePicker(window)) {
+          const baseName = fileName ?? "untitled";
+          const suggestedName = baseName.toLowerCase().endsWith(".mdi")
+            ? baseName
+            : `${baseName}.mdi`;
           handle = await window.showSaveFilePicker({
+            suggestedName,
             types: [
               {
-                description: "Markdown",
-                accept: { "text/markdown": [".md"] },
+                description: "MDI Document",
+                accept: { "text/plain": [".mdi"] },
               },
             ],
           });

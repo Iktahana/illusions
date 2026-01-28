@@ -9,6 +9,7 @@ import RecoveryModal from "@/components/RecoveryModal";
 import AiStatusIndicator from "@/components/AiStatusIndicator";
 import ChromeVersionWarning from "@/components/ChromeVersionWarning";
 import { useFileStorage } from "@/lib/use-file-storage";
+import { isElectronRenderer } from "@/lib/runtime-env";
 
 function chars(s: string) {
   return s.replace(/\s/g, "").length;
@@ -19,7 +20,8 @@ function words(s: string) {
 }
 
 export default function EditorPage() {
-  const isElectron = typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron);
+  const isElectron =
+    typeof window !== "undefined" && isElectronRenderer();
   const [chromeVersionOk, setChromeVersionOk] = useState(true);
 
   const storage = useFileStorage();
