@@ -31,8 +31,12 @@ export function japaneseNovel(
     enableTcy,
   } = opts
 
-  const classes: string[] = []
-  if (isVertical) classes.push('milkdown-japanese-vertical')
+  const classes: string[] = ['milkdown-japanese-base']
+  if (isVertical) {
+    classes.push('milkdown-japanese-vertical')
+  } else {
+    classes.push('milkdown-japanese-horizontal')
+  }
   if (showManuscriptLine) classes.push('manuscript-style')
 
   const remarkRuby = $remark(

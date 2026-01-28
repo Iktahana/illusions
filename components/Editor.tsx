@@ -168,10 +168,14 @@ function MilkdownEditor({
         
         const editorDom = editorRef.current?.querySelector('.milkdown .ProseMirror');
         if (editorDom) {
+          // Remove both classes first to ensure clean state
+          editorDom.classList.remove('milkdown-japanese-vertical', 'milkdown-japanese-horizontal');
+          
+          // Add appropriate class based on mode
           if (isVertical) {
             editorDom.classList.add('milkdown-japanese-vertical');
           } else {
-            editorDom.classList.remove('milkdown-japanese-vertical');
+            editorDom.classList.add('milkdown-japanese-horizontal');
           }
         }
       } catch {

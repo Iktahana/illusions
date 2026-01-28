@@ -157,3 +157,38 @@ export function calculateStatistics(text: string): TextStatistics {
     hasJapanese: hasJapanese(text),
   };
 }
+
+/**
+ * Parse markdown headings to extract chapters
+ */
+export interface Chapter {
+  level: number;
+  title: string;
+  lineNumber: number;
+  charOffset: number;
+}
+
+export function parseMarkdownChapters(markdown: string): Chapter[] {
+  const lines = markdown.split('\n');
+  const chapters: Chapter[] = [];
+  let charOffset = 0;
+
+  lines.forEach((line, lineNumber) => {
+    // Match heading pattern: # Title, ## Title, etc.
+    const match = line.match(/^(#{1,6})\s+(.+)$/);
+    if (match) {
+      const level = match[1].length;
+      const title = match[2].trim();
+      
+      chapters.push({
+        level,
+        title,
+        lineNumber,
+        charOffset,
+      });
+    }
+    charOffset += line.length + 1; // +1 for newline
+  });
+
+  return chapters;
+}

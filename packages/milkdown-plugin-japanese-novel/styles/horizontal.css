@@ -1,0 +1,35 @@
+/**
+ * Horizontal writing (横書き) styles.
+ * Applied via .milkdown-japanese-horizontal on the editor root.
+ * Inherits base styles from .milkdown-japanese-base for consistency with vertical mode.
+ */
+
+.milkdown-japanese-horizontal {
+  writing-mode: horizontal-tb;
+  text-align: left;
+  overflow-wrap: break-word;
+  word-break: normal;
+  /* Unified typography settings matching vertical mode */
+  font-family: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-weight: 400;
+  font-size: 1em;
+  letter-spacing: 0.05em;
+  word-spacing: 0.1em;
+  -webkit-font-feature-settings: "palt" 1;
+  font-feature-settings: "palt" 1;
+}
+
+/* Tate-chu-yoko styling in horizontal mode (normally not used, but for completeness) */
+.milkdown-japanese-horizontal .tcy {
+  text-combine-upright: all;
+}
+
+/* Ruby (振仮名) base styling in horizontal mode */
+.milkdown-japanese-horizontal ruby {
+  ruby-align: center;
+}
+
+.milkdown-japanese-horizontal rt {
+  font-size: 0.5em;
+  letter-spacing: 0;
+}

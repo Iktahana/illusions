@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { openMdiFile, saveMdiFile, type MdiFileDescriptor } from "./mdi-file";
 import { isElectronRenderer } from "./runtime-env";
 
-const DEFAULT_CONTENT = "# 新しい物語\n\nここから物語が始まります...";
+const DEFAULT_CONTENT = "";
 const AUTO_SAVE_INTERVAL = 5000; // 5 seconds
 
 export interface UseMdiFileReturn {

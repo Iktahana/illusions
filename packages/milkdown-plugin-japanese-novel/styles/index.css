@@ -5,5 +5,32 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600;700&display=swap');
 
+/* Unified base styles for both horizontal and vertical writing */
+.milkdown-japanese-base {
+  font-family: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-weight: 400;
+  font-size: 1em;
+  letter-spacing: 0.05em;
+  word-spacing: 0.1em;
+  -webkit-font-feature-settings: "palt" 1;
+  font-feature-settings: "palt" 1;
+}
+
+/* Ruby (振仮名) unified base styling */
+.milkdown-japanese-base ruby {
+  ruby-align: center;
+}
+
+.milkdown-japanese-base rt {
+  font-size: 0.5em;
+  letter-spacing: 0;
+}
+
+/* Tate-chu-yoko: horizontal digits/punctuation */
+.milkdown-japanese-base .tcy {
+  text-combine-upright: all;
+}
+
 @import './vertical.css';
+@import './horizontal.css';
 @import './manuscript.css';

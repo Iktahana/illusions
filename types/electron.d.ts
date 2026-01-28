@@ -1,6 +1,8 @@
 // Electron preload API typings.
 // Comments in code must be in English.
 
+import type { StorageSession, AppState, RecentFile, EditorBuffer } from "@/lib/storage-types";
+
 export {}
 
 declare global {
@@ -27,6 +29,20 @@ declare global {
       onDownloadProgress?: (callback: (data: { percent: number; modelName: string }) => void) => void;
       initializeAI?: (modelName: string) => Promise<{ success: boolean; error?: string }>;
       proofreadText?: (text: string) => Promise<{ success: boolean; result?: unknown; error?: string }>;
+    };
+    storage?: {
+      saveSession: (session: StorageSession) => Promise<void>;
+      loadSession: () => Promise<StorageSession | null>;
+      saveAppState: (appState: AppState) => Promise<void>;
+      loadAppState: () => Promise<AppState | null>;
+      addToRecent: (file: RecentFile) => Promise<void>;
+      getRecentFiles: () => Promise<RecentFile[]>;
+      removeFromRecent: (filePath: string) => Promise<void>;
+      clearRecent: () => Promise<void>;
+      saveEditorBuffer: (buffer: EditorBuffer) => Promise<void>;
+      loadEditorBuffer: () => Promise<EditorBuffer | null>;
+      clearEditorBuffer: () => Promise<void>;
+      clearAll: () => Promise<void>;
     };
   }
 

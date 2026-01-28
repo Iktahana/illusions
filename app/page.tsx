@@ -21,12 +21,31 @@ export default function EditorPage() {
     mdiFile;
 
   const contentRef = useRef<string>(content);
+  const editorDomRef = useRef<HTMLDivElement>(null);
 
   contentRef.current = content;
 
   const handleChange = (markdown: string) => {
     contentRef.current = markdown;
     setContent(markdown);
+  };
+
+  const handleChapterClick = (lineNumber: number) => {
+    // Find the editor's ProseMirror container
+    const editor = editorDomRef.current?.querySelector('.milkdown .ProseMirror') as HTMLElement;
+    if (!editor) return;
+
+    // Get all lines in the editor
+    const lines = editor.querySelectorAll('p, h1, h2, h3, h4, h5, h6');
+    if (lineNumber < lines.length) {
+      const targetLine = lines[lineNumber] as HTMLElement;
+      
+      // Scroll the target line into view
+      targetLine.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      
+      // Optional: highlight or focus the element
+      targetLine.focus();
+    }
   };
 
   const wordCount = words(content);
@@ -58,13 +77,15 @@ export default function EditorPage() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       <div className="flex-1 flex overflow-hidden">
-        <Explorer />
+        <Explorer content={content} onChapterClick={handleChapterClick} />
         <main className="flex-1 flex flex-col overflow-hidden">
-          <NovelEditor
-            key={currentFile?.name ?? "new"}
-            initialContent={content}
-            onChange={handleChange}
-          />
+          <div ref={editorDomRef} className="flex-1">
+            <NovelEditor
+              key={currentFile?.name ?? "new"}
+              initialContent={content}
+              onChange={handleChange}
+            />
+          </div>
         </main>
         <Inspector 
           wordCount={wordCount} 

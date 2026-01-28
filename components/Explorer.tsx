@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { 
   FolderTree, 
   Settings, 
@@ -10,14 +10,17 @@ import {
   Plus
 } from "lucide-react";
 import clsx from "clsx";
+import { parseMarkdownChapters, type Chapter } from "@/lib/utils";
 
 type Tab = "chapters" | "settings" | "style";
 
 interface ExplorerProps {
   className?: string;
+  content?: string;
+  onChapterClick?: (lineNumber: number) => void;
 }
 
-export default function Explorer({ className }: ExplorerProps) {
+export default function Explorer({ className, content = "", onChapterClick }: ExplorerProps) {
   const [activeTab, setActiveTab] = useState<Tab>("chapters");
 
   return (
@@ -64,7 +67,7 @@ export default function Explorer({ className }: ExplorerProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {activeTab === "chapters" && <ChaptersPanel />}
+        {activeTab === "chapters" && <ChaptersPanel content={content} onChapterClick={onChapterClick} />}
         {activeTab === "settings" && <SettingsPanel />}
         {activeTab === "style" && <StylePanel />}
       </div>
@@ -72,7 +75,9 @@ export default function Explorer({ className }: ExplorerProps) {
   );
 }
 
-function ChaptersPanel() {
+function ChaptersPanel({ content, onChapterClick }: { content: string; onChapterClick?: (lineNumber: number) => void }) {
+  const chapters = useMemo(() => parseMarkdownChapters(content), [content]);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between mb-3">
@@ -84,9 +89,20 @@ function ChaptersPanel() {
       
       {/* Chapter List */}
       <div className="space-y-1">
-        <ChapterItem title="第一章：始まり" isActive />
-        <ChapterItem title="第二章：出会い" />
-        <ChapterItem title="第三章：別れ" />
+        {chapters.length > 0 ? (
+          chapters.map((chapter, index) => (
+            <ChapterItem
+              key={index}
+              chapter={chapter}
+              isActive={index === 0}
+              onClick={() => onChapterClick?.(chapter.lineNumber)}
+            />
+          ))
+        ) : (
+          <div className="text-xs text-slate-500 px-2 py-2">
+            コンテンツに見出しがありません
+          </div>
+        )}
       </div>
       
       <button className="w-full mt-4 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded border border-dashed border-slate-300">
@@ -96,19 +112,34 @@ function ChaptersPanel() {
   );
 }
 
-function ChapterItem({ title, isActive = false }: { title: string; isActive?: boolean }) {
+function ChapterItem({ 
+  chapter, 
+  isActive = false,
+  onClick
+}: { 
+  chapter: Chapter; 
+  isActive?: boolean;
+  onClick?: () => void;
+}) {
+  const indent = (chapter.level - 1) * 12; // Indent based on heading level
+  
   return (
     <div
+      onClick={onClick}
       className={clsx(
         "flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors",
         isActive
           ? "bg-indigo-50 text-indigo-700"
           : "hover:bg-slate-50 text-slate-600"
       )}
+      style={{ paddingLeft: `${8 + indent}px` }}
     >
-      <ChevronRight className="w-4 h-4" />
-      <FileText className="w-4 h-4" />
-      <span className="text-sm flex-1 truncate">{title}</span>
+      <ChevronRight className="w-4 h-4 flex-shrink-0" />
+      <FileText className="w-4 h-4 flex-shrink-0" />
+      <span className="text-sm flex-1 truncate">{chapter.title}</span>
+      <span className="text-xs text-slate-400 flex-shrink-0">
+        {chapter.level}
+      </span>
     </div>
   );
 }
