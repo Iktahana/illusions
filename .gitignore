@@ -12,6 +12,21 @@
 
 # production
 /build
+/dist*
+
+# electron
+/dist-electron/
+/*.dmg
+/*.dmg.blockmap
+/*.zip
+/*.zip.blockmap
+/*.AppImage
+/*.exe
+/*.msi
+/*.snap
+/*.deb
+/*.rpm
+/release/
 
 # misc
 .DS_Store

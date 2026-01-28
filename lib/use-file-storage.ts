@@ -11,6 +11,12 @@ import {
 const DEFAULT_CONTENT = "# 新しい物語\n\nここから物語が始まります...";
 const DEBOUNCE_MS = 1000;
 
+function basename(p: string): string {
+  const normalized = p.replace(/\\/g, "/");
+  const parts = normalized.split("/");
+  return parts[parts.length - 1] || p;
+}
+
 function hasShowOpenFilePicker(
   w: Window
 ): w is Window & {
@@ -34,7 +40,11 @@ export interface PendingRecovery {
 }
 
 export function useFileStorage() {
+  const isElectron =
+    typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron);
+
   const [fileName, setFileName] = useState<string | null>(null);
+  const [filePath, setFilePath] = useState<string | null>(null);
   const [content, setContent] = useState<string>(DEFAULT_CONTENT);
   const [loadedContent, setLoadedContent] = useState<string>(DEFAULT_CONTENT);
   const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
@@ -81,6 +91,23 @@ export function useFileStorage() {
   }, [runRecoveryCheck]);
 
   const openFile = useCallback(async () => {
+    if (isElectron && window.electronAPI) {
+      try {
+        const result = await window.electronAPI.openFile();
+        if (!result) return;
+        setFilePath(result.path);
+        setFileName(basename(result.path));
+        setContent(result.content);
+        setLoadedContent(result.content);
+        setFileLastModified(Date.now());
+        setLastSaved(null);
+        setPendingRecovery(null);
+        runRecoveryCheck(result.path, Date.now());
+      } catch (err) {
+        console.error("Failed to open file (Electron):", err);
+      }
+      return;
+    }
     if (typeof window === "undefined" || !hasShowOpenFilePicker(window)) {
       console.warn("File System Access API is not supported.");
       return;
@@ -100,6 +127,7 @@ export function useFileStorage() {
       const modified = file.lastModified;
       setFileHandle(handle);
       setFileName(file.name);
+      setFilePath(null);
       setContent(text);
       setLoadedContent(text);
       setFileLastModified(modified);
@@ -111,11 +139,33 @@ export function useFileStorage() {
         console.error("Failed to open file:", err);
       }
     }
-  }, [runRecoveryCheck]);
+  }, [isElectron, runRecoveryCheck]);
 
   const save = useCallback(
     async (getContent: () => string) => {
       if (typeof window === "undefined") return;
+      const raw = getContent();
+
+      if (isElectron && window.electronAPI) {
+        const idToClear = filePath ?? CACHE_ID_UNSAVED;
+        setIsSaving(true);
+        try {
+          const savedPath = await window.electronAPI.saveFile(filePath, raw);
+          if (!savedPath) return;
+          setFilePath(savedPath);
+          setFileName(basename(savedPath));
+          setFileLastModified(Date.now());
+          const now = new Date();
+          setLastSaved(now);
+          setSaveSuccessAt(now.getTime());
+          await deleteStash(idToClear);
+        } catch (err) {
+          console.error("Failed to save file (Electron):", err);
+        } finally {
+          setIsSaving(false);
+        }
+        return;
+      }
       if (!hasShowSaveFilePicker(window) && !fileHandle) {
         console.warn("File System Access API is not supported.");
         return;
@@ -141,7 +191,6 @@ export function useFileStorage() {
           setIsSaving(false);
           return;
         }
-        const raw = getContent();
         const writable = await handle.createWritable();
         await writable.write(raw);
         await writable.close();
@@ -157,7 +206,7 @@ export function useFileStorage() {
         setIsSaving(false);
       }
     },
-    [fileHandle, fileName]
+    [fileHandle, fileName, filePath, isElectron]
   );
 
   const clearSaveSuccess = useCallback(() => {
@@ -206,6 +255,7 @@ export function useFileStorage() {
 
   return {
     fileName,
+    filePath,
     content,
     setContent,
     loadedContent,

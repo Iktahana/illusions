@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Explorer from "@/components/Explorer";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
 import RecoveryModal from "@/components/RecoveryModal";
+import AiStatusIndicator from "@/components/AiStatusIndicator";
+import ChromeVersionWarning from "@/components/ChromeVersionWarning";
 import { useFileStorage } from "@/lib/use-file-storage";
 
 function chars(s: string) {
@@ -17,9 +19,13 @@ function words(s: string) {
 }
 
 export default function EditorPage() {
+  const isElectron = typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron);
+  const [chromeVersionOk, setChromeVersionOk] = useState(true);
+
   const storage = useFileStorage();
   const {
     fileName,
+    filePath,
     content,
     setContent,
     loadedContent,
@@ -35,6 +41,19 @@ export default function EditorPage() {
     restoreRevision,
   } = storage;
   const contentRef = useRef<string>(content);
+
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI?.getChromeVersion) return;
+    window.electronAPI
+      .getChromeVersion()
+      .then((v) => {
+        if (v < 127) setChromeVersionOk(false);
+      })
+      .catch(() => {
+        // If we cannot read the chrome version, keep UI usable but show offline AI.
+        setChromeVersionOk(true);
+      });
+  }, [isElectron]);
 
   useEffect(() => {
     contentRef.current = content;
@@ -65,30 +84,37 @@ export default function EditorPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
+      {!chromeVersionOk && (
+        <ChromeVersionWarning onDismiss={() => setChromeVersionOk(true)} />
+      )}
       {pendingRecovery && (
         <RecoveryModal onRestore={restoreStash} onDiscard={handleDiscard} />
       )}
 
-      <Navbar
-        fileName={fileName}
-        isSaving={isSaving}
-        lastSaved={lastSaved}
-        saveSuccessAt={saveSuccessAt}
-        onClearSaveSuccess={clearSaveSuccess}
-        onOpenFile={openFile}
-      />
+      {!isElectron && (
+        <Navbar
+          fileName={fileName}
+          isSaving={isSaving}
+          lastSaved={lastSaved}
+          saveSuccessAt={saveSuccessAt}
+          onClearSaveSuccess={clearSaveSuccess}
+          onOpenFile={openFile}
+        />
+      )}
 
       <div className="flex-1 flex overflow-hidden">
         <Explorer />
         <main className="flex-1 flex flex-col overflow-hidden">
           <NovelEditor
-            key={`${fileName ?? "new"}-${restoreRevision}`}
+            key={`${(filePath ?? fileName ?? "new")}-${restoreRevision}`}
             initialContent={loadedContent}
             onChange={handleChange}
           />
         </main>
         <Inspector wordCount={wordCount} charCount={charCount} />
       </div>
+
+      <AiStatusIndicator />
     </div>
   );
 }
