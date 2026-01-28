@@ -4,12 +4,13 @@
   "private": true,
   "main": "main.js",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "type-check": "tsc --noEmit",
+    "dev": "type-check && next dev",
+    "build": "type-check && next build",
     "start": "next start",
     "lint": "next lint",
-    "electron:dev": "next build && concurrently \"next dev -p 3000\" \"wait-on http://localhost:3000 && env -u ELECTRON_RUN_AS_NODE electron .\"",
-    "electron:build": "next build && electron-builder --publish never",
+    "electron:dev": "type-check && next build && concurrently \"next dev -p 3000\" \"wait-on http://localhost:3000 && env -u ELECTRON_RUN_AS_NODE electron .\"",
+    "electron:build": "type-check && next build && electron-builder --publish never",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
