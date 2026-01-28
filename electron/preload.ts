@@ -53,20 +53,4 @@ contextBridge.exposeInMainWorld("electronAPI", {
     clearEditorBuffer: () => ipcRenderer.invoke("storage:clearEditorBuffer"),
     clearAll: () => ipcRenderer.invoke("storage:clearAll"),
   },
-  ai: {
-    checkModelExists: (modelName: string) =>
-      ipcRenderer.invoke("check-model-exists", modelName),
-    listModels: () => ipcRenderer.invoke("list-models"),
-    downloadModel: (url: string, modelName: string) =>
-      ipcRenderer.invoke("download-model", url, modelName),
-    onDownloadProgress: (callback: (data: { percent: number; modelName: string }) => void) => {
-      const handler = (_: unknown, data: { percent: number; modelName: string }) =>
-        callback(data);
-      ipcRenderer.on("model-download-progress", handler);
-    },
-    initializeAI: (modelName: string) =>
-      ipcRenderer.invoke("initialize-ai", modelName),
-    proofreadText: (text: string) =>
-      ipcRenderer.invoke("proofread-text", text),
-  },
 });

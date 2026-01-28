@@ -9,18 +9,6 @@ const fs = require('fs/promises')
 const isDev =
   process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === '1'
 
-// Enable Chromium switches for built-in AI experiments.
-// Note: These switches do not guarantee availability; users may still need
-// chrome://flags settings and component downloads.
-app.commandLine.appendSwitch('enable-optimization-guide-on-device')
-app.commandLine.appendSwitch('prompt-api-for-gemini-nano')
-
-// Some builds may require enable-features as well.
-app.commandLine.appendSwitch(
-  'enable-features',
-  'PromptAPIForGeminiNano,OptimizationGuideOnDeviceModel'
-)
-
 let mainWindow = null
 
 function createMainWindow() {

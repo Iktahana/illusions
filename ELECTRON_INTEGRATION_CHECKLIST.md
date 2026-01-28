@@ -49,7 +49,7 @@ const storageManager = new ElectronStorageManager();
 
 ### 2.3 添加 IPC 處理器
 
-在現有 IPC 處理器之後 (例如 `ipcMain.handle("proofread-text", ...)` 之後) 添加所有 14 個處理器：
+在現有 IPC 處理器之後添加所有 14 個處理器：
 
 ```typescript
 // ========== Storage IPC Handlers ==========

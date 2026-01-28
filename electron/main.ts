@@ -1,6 +1,6 @@
 /**
  * Electron main process entry.
- * ESM module. Bundles model manager, AI engine, and IPC handlers.
+ * ESM module with IPC handlers.
  */
 
 import { app, BrowserWindow, ipcMain, dialog, Menu, type MenuItemConstructorOptions } from "electron";
@@ -9,13 +9,6 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { createRequire } from "module";
 
-import {
-  checkModelExists,
-  downloadModel,
-  getModelPath,
-  listModels,
-} from "./model-manager.js";
-import { proofreadingEngine } from "./ai-engine.js";
 import ElectronStorageManager from "../lib/electron-storage-manager.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,12 +26,6 @@ const APP_NAME: string = pkg.build?.productName ?? pkg.name ?? "Illusions";
 const isDev =
   process.env.NODE_ENV === "development" || process.env.ELECTRON_DEV === "1";
 
-app.commandLine.appendSwitch("enable-optimization-guide-on-device");
-app.commandLine.appendSwitch("prompt-api-for-gemini-nano");
-app.commandLine.appendSwitch(
-  "enable-features",
-  "PromptAPIForGeminiNano,OptimizationGuideOnDeviceModel"
-);
 
 let mainWindow: BrowserWindow | null = null;
 let currentFilePath: string | null = null;
@@ -421,59 +408,6 @@ ipcMain.on("menu-save-as", () => {
   mainWindow?.webContents.send("menu-save-as-triggered");
 });
 
-ipcMain.handle("check-model-exists", async (
-  _event: Electron.IpcMainInvokeEvent,
-  modelName: string
-) => checkModelExists(modelName));
-
-ipcMain.handle("list-models", async () => listModels());
-
-ipcMain.handle("download-model", async (
-  _event: Electron.IpcMainInvokeEvent,
-  url: string,
-  modelName: string
-) => {
-  try {
-    const modelPath = await downloadModel(url, modelName, (percent) => {
-      mainWindow?.webContents.send("model-download-progress", {
-        percent,
-        modelName,
-      });
-    });
-    return { success: true as const, path: modelPath };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { success: false as const, error: message };
-  }
-});
-
-ipcMain.handle("initialize-ai", async (
-  _event: Electron.IpcMainInvokeEvent,
-  modelName: string
-) => {
-  try {
-    const modelPath = getModelPath(modelName);
-    await proofreadingEngine.initialize(modelPath);
-    return { success: true as const };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { success: false as const, error: message };
-  }
-});
-
-ipcMain.handle("proofread-text", async (
-  _event: Electron.IpcMainInvokeEvent,
-  text: string
-) => {
-  try {
-    const result = await proofreadingEngine.proofread(text);
-    return { success: true as const, result };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { success: false as const, error: message };
-  }
-});
-
 app.whenReady().then(() => {
   // Initialize storage manager
   storageManager = new ElectronStorageManager();
@@ -518,7 +452,6 @@ app.on("open-file", (event, filePath) => {
 });
 
 app.on("window-all-closed", () => {
-  proofreadingEngine.dispose().catch(() => {});
   if (storageManager) {
     storageManager.close();
   }

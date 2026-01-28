@@ -59,7 +59,7 @@ const storageManager = new ElectronStorageManager();
 
 ### 3. 新增 IPC 處理器
 
-在現有的 IPC 處理器之後 (如在 `ipcMain.handle("proofread-text", ...)` 之後) 新增：
+在現有的 IPC 處理器之後新增：
 
 ```typescript
 // Storage IPC handlers

@@ -22,14 +22,6 @@ declare global {
     ) => void;
     onMenuSave?: (callback: () => void) => void;
     onMenuSaveAs?: (callback: () => void) => void;
-    ai?: {
-      checkModelExists?: (modelName: string) => Promise<boolean>;
-      listModels?: () => Promise<string[]>;
-      downloadModel?: (url: string, modelName: string) => Promise<{ success: boolean; path?: string; error?: string }>;
-      onDownloadProgress?: (callback: (data: { percent: number; modelName: string }) => void) => void;
-      initializeAI?: (modelName: string) => Promise<{ success: boolean; error?: string }>;
-      proofreadText?: (text: string) => Promise<{ success: boolean; result?: unknown; error?: string }>;
-    };
     storage?: {
       saveSession: (session: StorageSession) => Promise<void>;
       loadSession: () => Promise<StorageSession | null>;
