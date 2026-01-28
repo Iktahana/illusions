@@ -1,0 +1,97 @@
+name: Build and Release Electron App
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Compute build version
+        id: version
+        shell: bash
+        run: |
+          BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          echo "base=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building version: ${FULL_VERSION}"
+
+      - name: Update package.json version
+        run: npm version ${{ steps.version.outputs.full }} --no-git-tag-version
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Electron application
+        run: npm run electron:build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: illusions-${{ matrix.os }}-${{ steps.version.outputs.full }}
+          path: dist-electron/**
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Compute build version
+        id: version
+        shell: bash
+        run: |
+          BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          echo "base=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Releasing version: ${FULL_VERSION}"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-electron
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.full }}
+          name: Illusions v${{ steps.version.outputs.full }}
+          files: |
+            dist-electron/**/*
+          draft: false
+          prerelease: ${{ startsWith(github.ref, 'refs/heads/main') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
