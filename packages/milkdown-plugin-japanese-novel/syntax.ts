@@ -17,6 +17,15 @@ type RubyNode = { type: 'ruby'; base: string; text: string }
 type TcyNode = { type: 'tcy'; value: string }
 type InlineNode = TextNode | RubyNode | TcyNode
 
+type HeadingNode = {
+  type: 'heading'
+  depth?: number
+  children?: InlineNode[]
+  data?: Record<string, unknown>
+}
+
+const HEADING_ANCHOR_RE = /\s*\{#([a-z0-9-]+)\}\s*$/i
+
 function splitRuby(text: string): InlineNode[] {
   const segments: InlineNode[] = []
   let lastIndex = 0
@@ -87,6 +96,36 @@ export const remarkTcyPlugin: Plugin<[RemarkTcyOptions | undefined], Root> = (op
       if (segments.length <= 1) return
       const children = (parent as { children: unknown[] }).children
       children.splice(index, 1, ...segments)
+    })
+  }
+}
+
+export const remarkHeadingAnchorPlugin: Plugin<[], Root> = () => {
+  return (tree) => {
+    visit(tree, 'heading', (node) => {
+      const heading = node as HeadingNode
+      const children = heading.children
+      if (!children || children.length === 0) return
+
+      const lastChild = children[children.length - 1]
+      if (!lastChild || lastChild.type !== 'text') return
+
+      const match = lastChild.value.match(HEADING_ANCHOR_RE)
+      if (!match) return
+
+      const anchorId = match[1]
+      const cleaned = lastChild.value.replace(HEADING_ANCHOR_RE, '').trimEnd()
+
+      if (cleaned.length === 0) {
+        children.pop()
+      } else {
+        lastChild.value = cleaned
+      }
+
+      heading.data = {
+        ...(heading.data ?? {}),
+        anchorId,
+      }
     })
   }
 }

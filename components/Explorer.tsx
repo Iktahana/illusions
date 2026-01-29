@@ -155,13 +155,15 @@ function renderFormattedTitle(title: string): ReactNode {
 interface ExplorerProps {
   className?: string;
   content?: string;
-  onChapterClick?: (lineNumber: number) => void;
+  onChapterClick?: (anchorId: string) => void;
   onInsertText?: (text: string) => void;
   // Style settings
   fontScale?: number;
   onFontScaleChange?: (scale: number) => void;
   lineHeight?: number;
   onLineHeightChange?: (height: number) => void;
+  paragraphSpacing?: number;
+  onParagraphSpacingChange?: (spacing: number) => void;
   textIndent?: number;
   onTextIndentChange?: (indent: number) => void;
   fontFamily?: string;
@@ -179,6 +181,8 @@ export default function Explorer({
   onFontScaleChange,
   lineHeight = 1.8,
   onLineHeightChange,
+  paragraphSpacing = 0,
+  onParagraphSpacingChange,
   textIndent = 1,
   onTextIndentChange,
   fontFamily = 'Noto Serif JP',
@@ -240,6 +244,8 @@ export default function Explorer({
             onFontScaleChange={onFontScaleChange}
             lineHeight={lineHeight}
             onLineHeightChange={onLineHeightChange}
+            paragraphSpacing={paragraphSpacing}
+            onParagraphSpacingChange={onParagraphSpacingChange}
             textIndent={textIndent}
             onTextIndentChange={onTextIndentChange}
             fontFamily={fontFamily}
@@ -253,7 +259,7 @@ export default function Explorer({
   );
 }
 
-function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: string; onChapterClick?: (lineNumber: number) => void; onInsertText?: (text: string) => void }) {
+function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: string; onChapterClick?: (anchorId: string) => void; onInsertText?: (text: string) => void }) {
   const chapters = useMemo(() => parseMarkdownChapters(content), [content]);
   const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
 
@@ -269,14 +275,19 @@ function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: str
       {/* Chapter List */}
       <div className="space-y-1">
         {chapters.length > 0 ? (
-          chapters.map((chapter, index) => (
+            chapters.map((chapter, index) => (
             <ChapterItem
               key={index}
               chapter={chapter}
               isActive={index === 0}
-              onClick={() => onChapterClick?.(chapter.lineNumber)}
+              onClick={() => {
+                if (chapter.anchorId) {
+                  onChapterClick?.(chapter.anchorId);
+                }
+              }}
             />
           ))
+
         ) : (
           <div className="text-xs text-foreground-tertiary px-2 py-2">
             コンテンツに見出しがありません
@@ -389,12 +400,18 @@ function ChapterItem({
   onClick?: () => void;
 }) {
   const indent = (chapter.level - 1) * 12; // Indent based on heading level
+  const href = chapter.anchorId ? `#${chapter.anchorId}` : undefined;
   
   // Calculate font size based on heading level (h1 to h6)
   // CSS default sizes: h1=2em, h2=1.5em, h3=1.17em, h4=1em, h5=0.83em, h6=0.67em
   return (
-    <div
-      onClick={onClick}
+    <a
+      href={href}
+      onClick={(event) => {
+        if (!href) return;
+        event.preventDefault();
+        onClick?.();
+      }}
       className={clsx(
         "flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors",
         isActive
@@ -406,7 +423,7 @@ function ChapterItem({
       <ChevronRight className="w-4 h-4 flex-shrink-0" />
       <FileText className="w-4 h-4 flex-shrink-0" />
       <span className="text-sm flex-1 truncate">{renderFormattedTitle(chapter.title)}</span>
-    </div>
+    </a>
   );
 }
 
@@ -612,6 +629,8 @@ function StylePanel({
   onFontScaleChange,
   lineHeight = 1.8,
   onLineHeightChange,
+  paragraphSpacing = 0,
+  onParagraphSpacingChange,
   textIndent = 1,
   onTextIndentChange,
   fontFamily = 'Noto Serif JP',
@@ -623,6 +642,8 @@ function StylePanel({
   onFontScaleChange?: (scale: number) => void;
   lineHeight?: number;
   onLineHeightChange?: (height: number) => void;
+  paragraphSpacing?: number;
+  onParagraphSpacingChange?: (spacing: number) => void;
   textIndent?: number;
   onTextIndentChange?: (indent: number) => void;
   fontFamily?: string;
@@ -678,6 +699,26 @@ function StylePanel({
         <div className="flex justify-between text-xs text-foreground-tertiary mt-1">
           <span>狭い</span>
           <span>{lineHeight.toFixed(1)}</span>
+          <span>広い</span>
+        </div>
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">
+          段落間
+        </label>
+        <input
+          type="range"
+          min="0"
+          max="2"
+          step="0.1"
+          value={paragraphSpacing}
+          onChange={(e) => onParagraphSpacingChange?.(Number(e.target.value))}
+          className="w-full"
+        />
+        <div className="flex justify-between text-xs text-foreground-tertiary mt-1">
+          <span>なし</span>
+          <span>{paragraphSpacing.toFixed(1)}em</span>
           <span>広い</span>
         </div>
       </div>

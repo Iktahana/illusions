@@ -6,6 +6,20 @@ import clsx from "clsx";
 
 type Tab = "ai" | "corrections" | "stats";
 
+const MDI_EXTENSION = ".mdi";
+
+function getMdiExtension(name: string) {
+  if (name.toLowerCase().endsWith(MDI_EXTENSION)) {
+    return name.slice(name.length - MDI_EXTENSION.length);
+  }
+  return "";
+}
+
+function getBaseName(name: string) {
+  const extension = getMdiExtension(name);
+  return extension ? name.slice(0, -extension.length) : name;
+}
+
 interface InspectorProps {
   className?: string;
   wordCount?: number;
@@ -33,12 +47,15 @@ export default function Inspector({
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("ai");
   const [isEditingFileName, setIsEditingFileName] = useState(false);
-  const [editedFileName, setEditedFileName] = useState(fileName);
+  const [editedBaseName, setEditedBaseName] = useState(() => getBaseName(fileName));
   const inputRef = useRef<HTMLInputElement>(null);
+  const extension = getMdiExtension(fileName);
+  const baseName = getBaseName(fileName);
+  const displayBaseName = baseName || fileName;
 
-  // Update edited file name when fileName prop changes
+  // Update edited base name when fileName prop changes
   useEffect(() => {
-    setEditedFileName(fileName);
+    setEditedBaseName(getBaseName(fileName));
   }, [fileName]);
 
   // Focus input when entering edit mode
@@ -51,19 +68,22 @@ export default function Inspector({
 
   const handleStartEdit = () => {
     setIsEditingFileName(true);
-    setEditedFileName(fileName);
+    setEditedBaseName(baseName);
   };
 
   const handleSaveFileName = () => {
-    const trimmedName = editedFileName.trim();
-    if (trimmedName && trimmedName !== fileName) {
-      onFileNameChange?.(trimmedName);
+    const trimmedBase = editedBaseName.trim();
+    if (trimmedBase) {
+      const newName = extension ? `${trimmedBase}${extension}` : trimmedBase;
+      if (newName !== fileName) {
+        onFileNameChange?.(newName);
+      }
     }
     setIsEditingFileName(false);
   };
 
   const handleCancelEdit = () => {
-    setEditedFileName(fileName);
+    setEditedBaseName(baseName);
     setIsEditingFileName(false);
   };
 
@@ -116,13 +136,18 @@ export default function Inspector({
         {/* Editable File Name */}
         {isEditingFileName ? (
           <div className="flex items-center gap-1">
-            <input
-              ref={inputRef}
-              type="text"
-              value={editedFileName}
-              onChange={(e) => setEditedFileName(e.target.value)}
-              className="flex-1 text-sm font-semibold text-foreground px-2 py-1 border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background"
-            />
+            <div className="flex-1 min-w-0 flex items-center">
+              <input
+                ref={inputRef}
+                type="text"
+                value={editedBaseName}
+                onChange={(e) => setEditedBaseName(e.target.value)}
+                className="flex-1 min-w-0 text-sm font-semibold text-foreground px-2 py-1 border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background"
+              />
+              {extension && (
+                <span className="shrink-0 text-xs font-semibold text-foreground-tertiary whitespace-nowrap">{extension}</span>
+              )}
+            </div>
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={handleSaveFileName}
@@ -145,7 +170,12 @@ export default function Inspector({
             className="flex items-center gap-2 group cursor-pointer"
             onClick={handleStartEdit}
           >
-            <p className="text-sm font-semibold text-foreground truncate flex-1">{fileName}</p>
+            <div className="flex-1 min-w-0 flex items-center">
+              <p className="min-w-0 text-sm font-semibold text-foreground truncate">{displayBaseName}</p>
+              {extension && (
+                <span className="shrink-0 text-xs font-semibold text-foreground-tertiary whitespace-nowrap">{extension}</span>
+              )}
+            </div>
             {onFileNameChange && (
               <Edit2 className="w-3 h-3 text-foreground-muted opacity-0 group-hover:opacity-100 transition-opacity" />
             )}
@@ -333,15 +363,17 @@ function CorrectionItem({
       className={clsx(
         "p-3 rounded-lg border cursor-pointer hover:shadow-sm transition-shadow",
         type === "warning"
-          ? "bg-amber-50 border-amber-200"
-          : "bg-blue-50 border-blue-200"
+          ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50"
+          : "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50"
       )}
     >
       <div className="flex items-start gap-2">
         <AlertCircle
           className={clsx(
             "w-4 h-4 mt-0.5 flex-shrink-0",
-            type === "warning" ? "text-amber-600" : "text-blue-600"
+            type === "warning" 
+              ? "text-amber-600 dark:text-amber-500" 
+              : "text-blue-600 dark:text-blue-500"
           )}
         />
         <div className="flex-1 min-w-0">

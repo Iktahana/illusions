@@ -161,11 +161,71 @@ export function calculateStatistics(text: string): TextStatistics {
 /**
  * Parse markdown headings to extract chapters
  */
+const HEADING_ANCHOR_RE = /\s*\{#([a-z0-9-]+)\}\s*$/i;
+
 export interface Chapter {
   level: number;
   title: string;
   lineNumber: number;
   charOffset: number;
+  anchorId?: string;
+}
+
+export function extractHeadingAnchor(rawTitle: string): { title: string; anchorId?: string } {
+  const match = rawTitle.match(HEADING_ANCHOR_RE);
+  if (!match) {
+    return { title: rawTitle.trim() };
+  }
+
+  return {
+    title: rawTitle.replace(HEADING_ANCHOR_RE, '').trim(),
+    anchorId: match[1],
+  };
+}
+
+export function generateShortUuid(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+export function generateAnchorId(level: number): string {
+  return `h${level}-${generateShortUuid()}`;
+}
+
+export function ensureHeadingAnchors(markdown: string): { content: string; didAddAnchors: boolean } {
+  const lines = markdown.split('\n');
+  const usedAnchors = new Set<string>();
+  let didAddAnchors = false;
+
+  lines.forEach((line) => {
+    const match = line.match(/^(#{1,6})\s+(.+)$/);
+    if (!match) return;
+
+    const { anchorId } = extractHeadingAnchor(match[2]);
+    if (anchorId) {
+      usedAnchors.add(anchorId);
+    }
+  });
+
+  const updated = lines.map((line) => {
+    const match = line.match(/^(#{1,6})\s+(.+)$/);
+    if (!match) return line;
+
+    const level = match[1].length;
+    const rawTitle = match[2];
+    const { title, anchorId } = extractHeadingAnchor(rawTitle);
+
+    if (anchorId) return line;
+
+    didAddAnchors = true;
+    let newAnchorId = generateAnchorId(level);
+    while (usedAnchors.has(newAnchorId)) {
+      newAnchorId = generateAnchorId(level);
+    }
+    usedAnchors.add(newAnchorId);
+    return `${match[1]} ${title.trimEnd()} {#${newAnchorId}}`;
+  });
+
+  return { content: updated.join('\n'), didAddAnchors };
 }
 
 export function parseMarkdownChapters(markdown: string): Chapter[] {
@@ -178,13 +238,14 @@ export function parseMarkdownChapters(markdown: string): Chapter[] {
     const match = line.match(/^(#{1,6})\s+(.+)$/);
     if (match) {
       const level = match[1].length;
-      const title = match[2].trim();
+      const { title, anchorId } = extractHeadingAnchor(match[2].trim());
       
       chapters.push({
         level,
         title,
         lineNumber,
         charOffset,
+        anchorId,
       });
     }
     charOffset += line.length + 1; // +1 for newline

@@ -3,7 +3,7 @@
 import { RefObject, useEffect, useRef, useState } from "react";
 import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
-import { commonmark, toggleEmphasisCommand, toggleStrongCommand, toggleInlineCodeCommand, wrapInHeadingCommand, wrapInBlockquoteCommand, wrapInBulletListCommand, wrapInOrderedListCommand } from "@milkdown/preset-commonmark";
+import { commonmark, headingIdGenerator, toggleEmphasisCommand, toggleStrongCommand, toggleInlineCodeCommand, wrapInHeadingCommand, wrapInBlockquoteCommand, wrapInBulletListCommand, wrapInOrderedListCommand } from "@milkdown/preset-commonmark";
 import { gfm, toggleStrikethroughCommand } from "@milkdown/preset-gfm";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { history } from "@milkdown/plugin-history";
@@ -18,6 +18,7 @@ import { EditorView } from "@milkdown/prose/view";
 import BubbleMenu, { type FormatType } from "./BubbleMenu";
 import SearchDialog from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
+import { generateAnchorId } from "@/lib/utils";
 
 interface EditorProps {
   initialContent?: string;
@@ -26,6 +27,7 @@ interface EditorProps {
   className?: string;
   fontScale?: number;
   lineHeight?: number;
+  paragraphSpacing?: number;
   textIndent?: number;
   fontFamily?: string;
   charsPerLine?: number;
@@ -39,6 +41,7 @@ export default function NovelEditor({
   className,
   fontScale = 100,
   lineHeight = 1.8,
+  paragraphSpacing = 0,
   textIndent = 1,
   fontFamily = 'Noto Serif JP',
   charsPerLine = 40,
@@ -107,6 +110,7 @@ export default function NovelEditor({
               isVertical={isVertical}
               fontScale={fontScale}
               lineHeight={lineHeight}
+              paragraphSpacing={paragraphSpacing}
               textIndent={textIndent}
               fontFamily={fontFamily}
               charsPerLine={charsPerLine}
@@ -118,7 +122,7 @@ export default function NovelEditor({
 
         {/* Selection Counter - positioned relative to editor */}
         {editorViewInstance && (
-          <SelectionCounter editorView={editorViewInstance} />
+          <SelectionCounter editorView={editorViewInstance} isVertical={isVertical} />
         )}
       </div>
 
@@ -194,6 +198,7 @@ function MilkdownEditor({
   isVertical,
   fontScale,
   lineHeight,
+  paragraphSpacing,
   textIndent,
   fontFamily,
   charsPerLine,
@@ -206,6 +211,7 @@ function MilkdownEditor({
   isVertical: boolean;
   fontScale: number;
   lineHeight: number;
+  paragraphSpacing: number;
   textIndent: number;
   fontFamily: string;
   charsPerLine: number;
@@ -236,6 +242,12 @@ function MilkdownEditor({
       .config((ctx) => {
         ctx.set(rootCtx, root);
         ctx.set(defaultValueCtx, value);
+        ctx.set(headingIdGenerator.key, (node) => {
+          const existingId = node.attrs.id as string | undefined;
+          if (existingId) return existingId;
+          const level = typeof node.attrs.level === "number" ? node.attrs.level : 1;
+          return generateAnchorId(level);
+        });
       })
       // Load listener plugin BEFORE accessing listenerCtx
       .use(listener)
@@ -303,18 +315,32 @@ function MilkdownEditor({
     return () => clearTimeout(timer);
   }, [isVertical, get]);
 
+  // Track previous style values to avoid unnecessary animations
+  const prevStyleRef = useRef({ charsPerLine, isVertical, fontFamily, fontScale, lineHeight });
+  const isFirstRenderRef = useRef(true);
+
   // Apply character per line limit using JavaScript measurement
   useEffect(() => {
     const editorContainer = editorRef.current;
     const editorDom = editorContainer?.querySelector('.milkdown .ProseMirror') as HTMLElement;
     if (!editorDom) return;
 
-    // Fade out before making changes
-    editorDom.style.transition = 'opacity 0.15s ease-out';
-    editorDom.style.opacity = '0';
+    const prev = prevStyleRef.current;
+    const styleChanged =
+      prev.charsPerLine !== charsPerLine ||
+      prev.isVertical !== isVertical ||
+      prev.fontFamily !== fontFamily ||
+      prev.fontScale !== fontScale ||
+      prev.lineHeight !== lineHeight;
 
-    // Delay to ensure editor DOM is ready and fade out completes
-    const timer = setTimeout(() => {
+    // Update prev ref
+    prevStyleRef.current = { charsPerLine, isVertical, fontFamily, fontScale, lineHeight };
+
+    // Skip animation if styles haven't changed (e.g., just editor rebuild from save)
+    const shouldAnimate = styleChanged && !isFirstRenderRef.current;
+    isFirstRenderRef.current = false;
+
+    const applyStyles = () => {
       // Reset styles first
       editorDom.style.width = '';
       editorDom.style.maxWidth = '';
@@ -357,27 +383,50 @@ function MilkdownEditor({
           editorDom.style.margin = '0 auto'; // Center horizontally
         }
       }
-
-      // Fade in after changes are applied
-      requestAnimationFrame(() => {
-        editorDom.style.transition = 'opacity 0.25s ease-in';
-        editorDom.style.opacity = '1';
-        
-        // After fade in completes, scroll to right for vertical mode
-        if (isVertical && scrollContainerRef.current) {
-          setTimeout(() => {
-            const container = scrollContainerRef.current;
-            if (container) {
-              container.scrollLeft = container.scrollWidth;
-            }
-          }, 250); // Wait for fade in to complete
-        }
-      });
-    }, 150);
-
-    return () => {
-      clearTimeout(timer);
     };
+
+    if (shouldAnimate) {
+      // Fade out before making changes
+      editorDom.style.transition = 'opacity 0.15s ease-out';
+      editorDom.style.opacity = '0';
+
+      // Delay to ensure editor DOM is ready and fade out completes
+      const timer = setTimeout(() => {
+        applyStyles();
+
+        // Fade in after changes are applied
+        requestAnimationFrame(() => {
+          editorDom.style.transition = 'opacity 0.25s ease-in';
+          editorDom.style.opacity = '1';
+          
+          // After fade in completes, scroll to right for vertical mode
+          if (isVertical && scrollContainerRef.current) {
+            setTimeout(() => {
+              const container = scrollContainerRef.current;
+              if (container) {
+                container.scrollLeft = container.scrollWidth;
+              }
+            }, 250); // Wait for fade in to complete
+          }
+        });
+      }, 150);
+
+      return () => {
+        clearTimeout(timer);
+      };
+    } else {
+      // No animation, just apply styles immediately
+      applyStyles();
+      editorDom.style.opacity = '1';
+      
+      // Scroll to right for vertical mode on first render
+      if (isVertical && scrollContainerRef.current) {
+        const container = scrollContainerRef.current;
+        if (container) {
+          container.scrollLeft = container.scrollWidth;
+        }
+      }
+    }
   }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get]);
 
   // Convert vertical mouse wheel to horizontal scroll in vertical mode
@@ -490,6 +539,7 @@ function MilkdownEditor({
         <style jsx>{`
           div :global(.milkdown .ProseMirror p) {
             text-indent: ${textIndent}em;
+            margin-bottom: ${paragraphSpacing}em;
           }
           /* Don't apply indent to headings, lists, blockquotes, etc. */
           div :global(.milkdown .ProseMirror h1),

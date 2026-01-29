@@ -8,6 +8,7 @@
   writing-mode: vertical-rl;
   text-orientation: upright;
   text-align: justify;
+  vertical-align: bottom;
   line-break: strict;
   overflow-wrap: break-word;
   word-break: normal;

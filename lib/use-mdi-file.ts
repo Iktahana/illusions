@@ -4,9 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { openMdiFile, saveMdiFile, type MdiFileDescriptor } from "./mdi-file";
 import { isElectronRenderer } from "./runtime-env";
 import { getStorageService } from "./storage-service";
+import { persistAppState } from "./app-state-manager";
+import { ensureHeadingAnchors } from "./utils";
 
 const DEFAULT_CONTENT = "";
 const AUTO_SAVE_INTERVAL = 2000; // 2 seconds
+
+function applyHeadingAnchors(markdown: string) {
+  return ensureHeadingAnchors(markdown);
+}
 
 export interface UseMdiFileReturn {
   currentFile: MdiFileDescriptor | null;
@@ -40,6 +46,14 @@ export function useMdiFile(): UseMdiFileReturn {
 
   const isDirty = content !== lastSavedContent;
 
+  const persistLastOpenedPath = useCallback(async (path: string) => {
+    try {
+      await persistAppState({ lastOpenedMdiPath: path });
+    } catch (error) {
+      console.error("Failed to persist last opened path:", error);
+    }
+  }, []);
+
   // Notify Electron about dirty state.
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.setDirty) return;
@@ -61,14 +75,15 @@ export function useMdiFile(): UseMdiFileReturn {
               // Try to access the file directly to verify we still have permission
               const file = await buffer.fileHandle.getFile();
               const content = await file.text();
+              const { content: anchoredContent, didAddAnchors } = applyHeadingAnchors(content);
               
               setCurrentFile({
                 path: null,
                 handle: buffer.fileHandle,
                 name: file.name,
               });
-              setContentState(content);
-              setLastSavedContent(content);
+              setContentState(anchoredContent);
+              setLastSavedContent(didAddAnchors ? content : anchoredContent);
               setLastSavedTime(Date.now());
               setWasAutoRecovered(true);
             } catch (error) {
@@ -122,30 +137,29 @@ export function useMdiFile(): UseMdiFileReturn {
       return;
     }
     const { descriptor, content: fileContent } = result;
+    const { content: anchoredContent, didAddAnchors } = applyHeadingAnchors(fileContent);
     setCurrentFile(descriptor);
-    setContentState(fileContent);
-    setLastSavedContent(fileContent);
+    setContentState(anchoredContent);
+    setLastSavedContent(didAddAnchors ? fileContent : anchoredContent);
     setLastSavedTime(Date.now());
     
-    // Save the last opened file path or handle to storage
-    try {
-      const storage = getStorageService();
-      await storage.initialize();
-      
-      if (isElectron && descriptor.path) {
-        // Electron: save path
-        await storage.saveAppState({ lastOpenedMdiPath: descriptor.path });
-      } else if (!isElectron && descriptor.handle) {
-        // Web: save file handle in editor buffer for later recovery
-        await storage.saveEditorBuffer({
-          content: fileContent,
-          timestamp: Date.now(),
-          fileHandle: descriptor.handle,
-        });
+      // Save the last opened file path or handle to storage
+      try {
+        if (isElectron && descriptor.path) {
+          await persistLastOpenedPath(descriptor.path);
+        } else if (!isElectron && descriptor.handle) {
+          const storage = getStorageService();
+          await storage.initialize();
+          await storage.saveEditorBuffer({
+            content: anchoredContent,
+            timestamp: Date.now(),
+            fileHandle: descriptor.handle,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to save file reference:", error);
       }
-    } catch (error) {
-      console.error("Failed to save file reference:", error);
-    }
+
   }, [isElectron]);
 
   const saveFile = useCallback(async () => {
@@ -166,14 +180,11 @@ export function useMdiFile(): UseMdiFileReturn {
         
         // Save the last opened file path or handle to storage
         try {
-          const storage = getStorageService();
-          await storage.initialize();
-          
           if (isElectron && descriptor.path) {
-            // Electron: save path
-            await storage.saveAppState({ lastOpenedMdiPath: descriptor.path });
+            await persistLastOpenedPath(descriptor.path);
           } else if (!isElectron && descriptor.handle) {
-            // Web: save file handle in editor buffer for later recovery
+            const storage = getStorageService();
+            await storage.initialize();
             await storage.saveEditorBuffer({
               content: contentRef.current,
               timestamp: Date.now(),
@@ -228,13 +239,14 @@ export function useMdiFile(): UseMdiFileReturn {
 
     window.electronAPI.onOpenFileFromSystem(({ path, content: fileContent }) => {
       const now = Date.now();
+      const { content: anchoredContent, didAddAnchors } = applyHeadingAnchors(fileContent);
       setCurrentFile({
         path,
         handle: null,
         name: path.split("/").pop() || "Untitled",
       });
-      setContentState(fileContent);
-      setLastSavedContent(fileContent);
+      setContentState(anchoredContent);
+      setLastSavedContent(didAddAnchors ? fileContent : anchoredContent);
       setLastSavedTime(now);
     });
   }, [isElectron]);
@@ -281,10 +293,8 @@ export function useMdiFile(): UseMdiFileReturn {
             await storage.initialize();
             
             if (descriptor.path) {
-              // Electron: save path
-              await storage.saveAppState({ lastOpenedMdiPath: descriptor.path });
+              await persistLastOpenedPath(descriptor.path);
             } else if (descriptor.handle) {
-              // Web: save file handle in editor buffer for later recovery
               await storage.saveEditorBuffer({
                 content: raw,
                 timestamp: Date.now(),

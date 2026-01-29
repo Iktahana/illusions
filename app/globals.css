@@ -135,6 +135,37 @@ body {
   animation: pulse-glow 2s infinite;
 }
 
+/* Save success toast animation */
+@keyframes save-toast-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes save-toast-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+}
+
+.animate-save-toast-in {
+  animation: save-toast-in 0.2s ease-out forwards;
+}
+
+.animate-save-toast-out {
+  animation: save-toast-out 0.15s ease-in forwards;
+}
+
 /* Japanese novel plugin styles (vertical, manuscript, ruby, tcy) */
 @import '../packages/milkdown-plugin-japanese-novel/styles/index.css';
 
@@ -185,6 +216,45 @@ body {
   font-size: 0.9em;
   font-weight: bold;
   margin-bottom: 0.2em;
+}
+
+.milkdown h1[data-md-anchor],
+.milkdown h2[data-md-anchor],
+.milkdown h3[data-md-anchor],
+.milkdown h4[data-md-anchor],
+.milkdown h5[data-md-anchor],
+.milkdown h6[data-md-anchor] {
+  position: relative;
+}
+
+.milkdown h1[data-md-anchor]::after,
+.milkdown h2[data-md-anchor]::after,
+.milkdown h3[data-md-anchor]::after,
+.milkdown h4[data-md-anchor]::after,
+.milkdown h5[data-md-anchor]::after,
+.milkdown h6[data-md-anchor]::after {
+  content: attr(data-md-anchor);
+  position: absolute;
+  right: 0;
+  bottom: -1.2em;
+  opacity: 0;
+  font-size: 0.5em;
+  color: color-mix(in srgb, var(--foreground-tertiary) 50%, transparent);
+  background: transparent;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: none;
+  transition: opacity 0.15s ease-in-out;
+  pointer-events: none;
+}
+
+.milkdown h1[data-md-anchor]:hover::after,
+.milkdown h2[data-md-anchor]:hover::after,
+.milkdown h3[data-md-anchor]:hover::after,
+.milkdown h4[data-md-anchor]:hover::after,
+.milkdown h5[data-md-anchor]:hover::after,
+.milkdown h6[data-md-anchor]:hover::after {
+  opacity: 1;
 }
 
 /* Font preview select styling */

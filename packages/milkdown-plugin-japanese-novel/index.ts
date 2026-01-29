@@ -8,7 +8,8 @@ import { $prose, $remark } from '@milkdown/utils'
 import { Plugin, PluginKey } from '@milkdown/prose/state'
 import { rubySchema } from './nodes/ruby'
 import { tcySchema } from './nodes/tcy'
-import { remarkRubyPlugin, remarkTcyPlugin } from './syntax'
+import { headingAnchorSchema } from './nodes/heading-anchor'
+import { remarkHeadingAnchorPlugin, remarkRubyPlugin, remarkTcyPlugin } from './syntax'
 import {
   defaultJapaneseNovelOptions,
   type JapaneseNovelOptions,
@@ -49,6 +50,10 @@ export function japaneseNovel(
     () => (remarkTcyPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void),
     { enable: enableTcy }
   )
+  const remarkHeadingAnchor = $remark(
+    'japaneseNovelHeadingAnchor',
+    () => remarkHeadingAnchorPlugin
+  )
 
   const stylePlugin = $prose(() => {
     const classList = [...classes]
@@ -69,6 +74,8 @@ export function japaneseNovel(
   const plugins: MilkdownPlugin[] = [
     ...(enableRuby ? [remarkRuby, rubySchema] : []),
     ...(enableTcy ? [remarkTcy, tcySchema] : []),
+    remarkHeadingAnchor,
+    headingAnchorSchema,
     stylePlugin,
   ].flat()
 
