@@ -552,6 +552,11 @@ function MilkdownEditor({
           fontSize: `${fontScale}%`,
           fontFamily: `"${fontFamily}", serif`,
           lineHeight: lineHeight,
+          ...(isVertical && {
+            minHeight: '100%',
+            display: 'flex',
+            alignItems: 'center',
+          }),
         }}
       >
         <style jsx>{`
