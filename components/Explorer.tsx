@@ -234,7 +234,7 @@ export default function Explorer({
           )}
         >
           <Palette className="w-4 h-4" />
-          スタイル
+          段落
         </button>
       </div>
 

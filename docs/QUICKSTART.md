@@ -40,7 +40,7 @@ const [isVertical, setIsVertical] = useState(false);
 #### 左サイドバー（Explorer）
 - **章管理**: 章の追加・削除・並び替え（将来実装）
 - **小説設定**: タイトル、著者、あらすじ
-- **スタイル**: フォント、文字サイズ、行間の調整
+- **段落**: フォント、文字サイズ、行間の調整
 
 #### 中央（Editor）
 - Milkdown ベースの Markdown エディター
@@ -84,7 +84,7 @@ interface StorageAdapter {
 ```
 illusions/
 ├── app/
-│   ├── globals.css          # グローバルスタイル（縦書き CSS 含む）
+│   ├── globals.css          # グローバル段落（縦書き CSS 含む）
 │   ├── layout.tsx           # ルートレイアウト
 │   └── page.tsx             # メインページ（三カラムレイアウト）
 │
