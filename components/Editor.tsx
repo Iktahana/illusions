@@ -154,18 +154,13 @@ function EditorToolbar({
     <div className="h-12 border-b border-border bg-background flex items-center justify-between px-4">
       <div className="flex items-center gap-4">
         {/* Vertical Writing Toggle */}
-        <button
-          onClick={onToggleVertical}
-          className={clsx(
-            "flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors",
-            isVertical
-              ? "bg-active text-accent"
-              : "bg-background-tertiary text-foreground-secondary hover:bg-hover"
-          )}
-        >
-          <Type className="w-4 h-4" />
-          {isVertical ? "縦書き" : "横書き"}
-        </button>
+         <button
+           onClick={onToggleVertical}
+           className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+         >
+           <Type className="w-4 h-4" />
+           {isVertical ? "縦書き" : "横書き"}
+         </button>
 
         {/* Display current settings */}
         <div className="flex items-center gap-2 text-xs text-foreground-secondary">
