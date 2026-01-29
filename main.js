@@ -152,8 +152,27 @@ function buildApplicationMenu() {
     ],
   })
 
-  // Edit menu
-  template.push({ role: 'editMenu' })
+   // Edit menu
+   template.push({
+     label: '編集',
+     submenu: [
+       { role: 'undo' },
+       { role: 'redo' },
+       { type: 'separator' },
+       { role: 'cut' },
+       { role: 'copy' },
+       { role: 'paste' },
+       {
+         label: 'Paste as plain text',
+         accelerator: 'Shift+CmdOrCtrl+V',
+         click: () => {
+           mainWindow?.webContents.send('menu-paste-as-plaintext')
+         },
+       },
+       { type: 'separator' },
+       { role: 'selectAll' },
+     ],
+   })
 
   // View menu
   template.push({ role: 'viewMenu' })

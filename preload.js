@@ -41,5 +41,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('open-file-from-system', handler)
     return () => ipcRenderer.removeListener('open-file-from-system', handler)
   },
+  onPasteAsPlaintext: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-paste-as-plaintext', handler)
+    return () => ipcRenderer.removeListener('menu-paste-as-plaintext', handler)
+  },
 })
 

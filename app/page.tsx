@@ -130,16 +130,58 @@ export default function EditorPage() {
     });
   }, []);
 
-  // Auto-dismiss recovery notification after 5 seconds
-  useEffect(() => {
-    if (wasAutoRecovered && !dismissedRecovery) {
-      const timer = setTimeout(() => {
-        setDismissedRecovery(true);
-      }, 5000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [wasAutoRecovered, dismissedRecovery]);
+   // Auto-dismiss recovery notification after 5 seconds
+   useEffect(() => {
+     if (wasAutoRecovered && !dismissedRecovery) {
+       const timer = setTimeout(() => {
+         setDismissedRecovery(true);
+       }, 5000);
+       
+       return () => clearTimeout(timer);
+     }
+   }, [wasAutoRecovered, dismissedRecovery]);
+
+   // Handle plain text paste
+   const handlePasteAsPlaintext = useCallback(async () => {
+     try {
+       let text: string | null = null;
+       
+       if (isElectron && typeof window !== "undefined" && (window as any).electronAPI) {
+         // For Electron, add an IPC call to get clipboard content from main process
+         // For now, use the standard clipboard API if available
+         if (navigator.clipboard && navigator.clipboard.readText) {
+           text = await navigator.clipboard.readText();
+         }
+       } else {
+         // For web, use the clipboard API to get plain text
+         if (navigator.clipboard && navigator.clipboard.readText) {
+           text = await navigator.clipboard.readText();
+         }
+       }
+       
+       if (text) {
+         const currentContent = contentRef.current;
+         const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
+         setContent(newContent);
+         setEditorKey(prev => prev + 1);
+       }
+     } catch (error) {
+       console.error("Failed to paste as plain text:", error);
+     }
+   }, [isElectron]);
+
+   // Listen for menu paste event (Electron only)
+   useEffect(() => {
+     if (!isElectron || typeof window === "undefined") return;
+
+     const unsubscribe = (window as any).electronAPI?.onPasteAsPlaintext?.(() => {
+       void handlePasteAsPlaintext();
+     });
+
+     return () => {
+       unsubscribe?.();
+     };
+   }, [isElectron, handlePasteAsPlaintext]);
 
 
   contentRef.current = content;
@@ -192,12 +234,20 @@ export default function EditorPage() {
         ? event.metaKey && event.key === "f"
         : event.ctrlKey && event.key === "f";
 
+      // Check for Shift+Cmd+V (macOS) or Shift+Ctrl+V (Windows/Linux) - Paste as plain text
+      const isPasteAsPlaintextShortcut = isMac
+        ? event.shiftKey && event.metaKey && event.key === "v"
+        : event.shiftKey && event.ctrlKey && event.key === "v";
+
       if (isSaveShortcut) {
         event.preventDefault(); // Prevent browser's default save dialog
         void saveFile();
       } else if (isSearchShortcut) {
         event.preventDefault(); // Prevent browser's default find dialog
         setSearchOpenTrigger(prev => prev + 1); // Trigger search dialog
+      } else if (isPasteAsPlaintextShortcut) {
+        event.preventDefault(); // Prevent default paste behavior
+        void handlePasteAsPlaintext();
       }
     };
 
