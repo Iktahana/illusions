@@ -1,43 +1,44 @@
-# Storage Service Integration Guide
+# Storage Service 統合ガイド
 
-本指南說明如何將 `StorageService` 整合到現有的 Electron 和 Web 應用中。
+このガイドでは、`StorageService` を既存の Electron / Web アプリに統合する方法を説明します。
 
-## 概述
+## 概要
 
-`StorageService` 是一個環境感知的數據持久化抽象層，提供統一的 API：
+`StorageService` は実行環境（Electron / Web）を判定して、同じ API でデータ永続化を提供する抽象レイヤーです。
 
-- **Electron 環境**: 使用 SQLite (via `better-sqlite3`) 存儲在 `app.getPath('userData')`
-- **Web 環境**: 使用 IndexedDB (via Dexie) 存儲在瀏覽器
+- **Electron 環境**: SQLite（`better-sqlite3`）を利用し、`app.getPath('userData')` 配下へ保存
+- **Web 環境**: IndexedDB（Dexie）を利用し、ブラウザに保存
 
-## 檔案結構
+## ファイル構成
 
 ```
 lib/
-├── storage-types.ts          # 介面定義和類型
-├── web-storage.ts            # Web 實作 (IndexedDB)
-├── electron-storage.ts       # Electron 實作 (IPC 客戶端)
-├── electron-storage-manager.ts # Electron 主進程管理器
-└── storage-service.ts        # 工廠函式和單一實例
+├── storage-types.ts            # インターフェース/型定義
+├── web-storage.ts              # Web 実装（IndexedDB）
+├── electron-storage.ts         # Electron 実装（IPC クライアント）
+├── electron-storage-manager.ts # Electron メインプロセス側マネージャー
+└── storage-service.ts          # ファクトリ関数とシングルトン
 ```
 
-## 步驟 1: 安裝依賴
+## 手順 1: 依存関係のインストール
 
-### 已經安裝的依賴
-- `dexie@^4.2.1` - 用於 Web IndexedDB
+### 既に入っている依存
 
-### 需要安裝的依賴
+- `dexie@^4.2.1` - Web（IndexedDB）用
+
+### 追加で必要な依存
 
 ```bash
 npm install better-sqlite3 --save
-# 或使用 yarn
+# または yarn
 yarn add better-sqlite3
 ```
 
-## 步驟 2: 更新 Electron 主進程 (`electron/main.ts`)
+## 手順 2: Electron メインプロセスの更新（`electron/main.ts`）
 
-在 `electron/main.ts` 中新增以下程式碼：
+`electron/main.ts` に以下を追加します。
 
-### 1. 在檔案頂部匯入
+### 1. ファイル先頭で import
 
 ```typescript
 import ElectronStorageManager from "../lib/electron-storage-manager.js";
@@ -49,17 +50,17 @@ import type {
 } from "../lib/storage-types.js";
 ```
 
-### 2. 建立全域儲存管理器實例
+### 2. グローバルなストレージマネージャーを作成
 
-在 `let mainWindow: BrowserWindow | null = null;` 之後新增：
+`let mainWindow: BrowserWindow | null = null;` の後に追加します。
 
 ```typescript
 const storageManager = new ElectronStorageManager();
 ```
 
-### 3. 新增 IPC 處理器
+### 3. IPC ハンドラーを追加
 
-在現有的 IPC 處理器之後新增：
+既存の IPC ハンドラーに続けて追加します。
 
 ```typescript
 // Storage IPC handlers
@@ -127,9 +128,9 @@ ipcMain.handle("storage-clear-all", () => {
 });
 ```
 
-### 4. 在應用終止時清理
+### 4. アプリ終了時のクリーンアップ
 
-在 `app.on("window-all-closed", ...)` 之前新增：
+`app.on("window-all-closed", ...)` より前に追加します。
 
 ```typescript
 app.on("before-quit", () => {
@@ -137,9 +138,9 @@ app.on("before-quit", () => {
 });
 ```
 
-## 步驟 3: 更新 Electron 預載指令碼 (`electron/preload.ts`)
+## 手順 3: Electron preload の更新（`electron/preload.ts`）
 
-在 `contextBridge.exposeInMainWorld` 中新增 `storage` 物件：
+`contextBridge.exposeInMainWorld` に `storage` オブジェクトを追加します。
 
 ```typescript
 import type {
@@ -181,9 +182,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 });
 ```
 
-## 步驟 4: 在你的應用中使用
+## 手順 4: アプリ側で使う
 
-### 基本用法
+### 基本的な使い方
 
 ```typescript
 import { getStorageService } from "@/lib/storage-service";
@@ -191,10 +192,10 @@ import type { RecentFile } from "@/lib/storage-types";
 
 const storage = getStorageService();
 
-// 初始化 (第一次使用時自動進行)
+// 初期化（初回利用時に自動で行われます）
 await storage.initialize();
 
-// 儲存當前工作區狀態
+// 現在のワークスペース状態を保存
 await storage.saveSession({
   appState: {
     lastOpenedMdiPath: "/path/to/file.mdi",
@@ -206,13 +207,13 @@ await storage.saveSession({
   },
 });
 
-// 加載先前的狀態
+// 以前の状態を読み込み
 const session = await storage.loadSession();
 if (session) {
   console.log("Last opened file:", session.appState.lastOpenedMdiPath);
 }
 
-// 新增到最近使用列表
+// 最近使用に追加
 const recentFile: RecentFile = {
   name: "Document.mdi",
   path: "/path/to/Document.mdi",
@@ -221,24 +222,24 @@ const recentFile: RecentFile = {
 };
 await storage.addToRecent(recentFile);
 
-// 獲取最近使用的檔案
+// 最近使用ファイルの取得
 const recent = await storage.getRecentFiles();
 console.log("Recent files:", recent);
 
-// 保存編輯緩衝區 (用於崩潰恢復)
+// エディタバッファの保存（クラッシュ復旧用途）
 await storage.saveEditorBuffer({
   content: "unsaved work",
   timestamp: Date.now(),
 });
 
-// 在應用啟動時恢復
+// 起動時に復旧
 const buffer = await storage.loadEditorBuffer();
 if (buffer) {
   console.log("Restoring unsaved content:", buffer.content);
 }
 ```
 
-### 在元件中使用
+### コンポーネント内での例
 
 ```typescript
 "use client";
@@ -271,9 +272,9 @@ export function MyComponent() {
 }
 ```
 
-## 步驟 5: 更新 TypeScript 定義 (可選)
+## 手順 5: TypeScript 定義の更新（任意）
 
-如果你在 `types/electron.d.ts` 中有 Electron API 定義，可以新增：
+`types/electron.d.ts` に Electron API の型定義がある場合は、必要に応じて追記できます。
 
 ```typescript
 declare global {
@@ -299,12 +300,12 @@ declare global {
 }
 ```
 
-## 常見使用場景
+## よくある利用シナリオ
 
-### 場景 1: 應用啟動時恢復狀態
+### シナリオ 1: 起動時に状態を復元
 
 ```typescript
-// app/layout.tsx 或主要應用元件
+// app/layout.tsx または主要コンポーネント
 useEffect(() => {
   const storage = getStorageService();
 
@@ -312,12 +313,12 @@ useEffect(() => {
     const session = await storage.loadSession();
 
     if (session?.appState.lastOpenedMdiPath) {
-      // 自動開啟最後使用的檔案
+      // 最後に開いていたファイルを自動で開く
       await openFile(session.appState.lastOpenedMdiPath);
     }
 
     if (session?.editorBuffer) {
-      // 提示使用者恢復未保存的內容
+      // 未保存内容の復元をユーザーに提案
       showRestorePrompt(session.editorBuffer.content);
     }
   };
@@ -326,7 +327,7 @@ useEffect(() => {
 }, []);
 ```
 
-### 場景 2: 定期自動保存編輯緩衝區
+### シナリオ 2: エディタバッファを定期的に自動保存
 
 ```typescript
 useEffect(() => {
@@ -336,19 +337,19 @@ useEffect(() => {
       content: editorContent,
       timestamp: Date.now(),
     });
-  }, 30000); // 每 30 秒自動保存
+  }, 30000); // 30 秒ごとに自動保存
 
   return () => clearInterval(interval);
 }, [editorContent]);
 ```
 
-### 場景 3: 當使用者打開或保存檔案時更新最近使用列表
+### シナリオ 3: ファイルの open / save 時に最近使用を更新
 
 ```typescript
 async function openFile(filePath: string) {
   const storage = getStorageService();
 
-  // ... 打開檔案的邏輯 ...
+  // ... ファイルを開く処理 ...
 
   const fileName = path.basename(filePath);
   const snippet = getFirstNLines(content, 3);
@@ -362,28 +363,28 @@ async function openFile(filePath: string) {
 }
 ```
 
-## 資料庫位置
+## データベースの場所
 
-- **Electron**: `~/Library/Application Support/Illusions/illusions-storage.db` (macOS)
-  或 `%APPDATA%\Illusions\illusions-storage.db` (Windows)
-- **Web**: 瀏覽器 IndexedDB (需要瀏覽器開發者工具檢視)
+- **Electron**: `~/Library/Application Support/Illusions/illusions-storage.db`（macOS）
+  または `%APPDATA%\Illusions\illusions-storage.db`（Windows）
+- **Web**: ブラウザ IndexedDB（開発者ツールで確認）
 
-## 故障排除
+## トラブルシューティング
 
-### Electron 中出現 "Electron storage API not available" 錯誤
+### Electron で "Electron storage API not available" が出る
 
-確認：
-1. `electron/preload.ts` 已正確更新
-2. 預載指令碼已正確建立 (參考 `electron/main.ts` 中的 `webPreferences.preload`)
-3. IPC 處理器已在主進程中註冊
+確認項目：
+1. `electron/preload.ts` が正しく更新されている
+2. preload が正しく読み込まれている（`electron/main.ts` の `webPreferences.preload` を参照）
+3. IPC ハンドラーがメインプロセスに登録されている
 
-### Web 中 IndexedDB 無法初始化
+### Web で IndexedDB が初期化できない
 
-- 檢查瀏覽器是否允許 IndexedDB
-- 檢查瀏覽器控制台是否有錯誤訊息
-- 在隱私瀏覽模式下，IndexedDB 可能受限
+- ブラウザで IndexedDB が許可されているか
+- ブラウザのコンソールにエラーが出ていないか
+- シークレットモードでは制限される場合がある
 
-## API 參考
+## API リファレンス
 
 ### `StorageSession`
 
@@ -399,32 +400,32 @@ interface StorageSession {
 
 ```typescript
 interface RecentFile {
-  name: string;           // 檔案名稱
-  path: string;          // 檔案路徑或 Handle
-  lastModified: number;  // 時間戳 (毫秒)
-  snippet?: string;      // 檔案內容預覽
+  name: string;           // ファイル名
+  path: string;          // ファイルパスまたは Handle
+  lastModified: number;  // タイムスタンプ（ms）
+  snippet?: string;      // 内容のプレビュー
 }
 ```
 
-### 主要方法
+### 主なメソッド
 
-- `initialize()` - 初始化儲存服務
-- `saveSession(session)` - 保存完整工作區狀態
-- `loadSession()` - 加載完整工作區狀態
-- `saveAppState(appState)` - 保存應用狀態
-- `loadAppState()` - 加載應用狀態
-- `addToRecent(file)` - 新增到最近使用 (限制 10 筆)
-- `getRecentFiles()` - 獲取最近使用的檔案
-- `removeFromRecent(path)` - 從最近使用中移除
-- `clearRecent()` - 清除所有最近使用的檔案
-- `saveEditorBuffer(buffer)` - 保存編輯緩衝區
-- `loadEditorBuffer()` - 加載編輯緩衝區
-- `clearEditorBuffer()` - 清除編輯緩衝區
-- `clearAll()` - 清除所有資料
+- `initialize()` - ストレージサービスを初期化
+- `saveSession(session)` - ワークスペース全体を保存
+- `loadSession()` - ワークスペース全体を読み込み
+- `saveAppState(appState)` - アプリ状態を保存
+- `loadAppState()` - アプリ状態を読み込み
+- `addToRecent(file)` - 最近使用に追加（最大 10 件）
+- `getRecentFiles()` - 最近使用の取得
+- `removeFromRecent(path)` - 最近使用から削除
+- `clearRecent()` - 最近使用をクリア
+- `saveEditorBuffer(buffer)` - エディタバッファを保存
+- `loadEditorBuffer()` - エディタバッファを読み込み
+- `clearEditorBuffer()` - エディタバッファをクリア
+- `clearAll()` - すべてのデータをクリア
 
-## 性能考量
+## パフォーマンス考慮
 
-- **Electron**: `better-sqlite3` 提供同步 API，高效且可預測
-- **Web**: IndexedDB 操作是非同步的，所有 API 返回 Promise
-- 最近使用列表限制為 10 筆以保持效能
-- 編輯緩衝區應定期保存 (建議 30 秒)
+- **Electron**: `better-sqlite3` は同期 API で高速かつ予測可能
+- **Web**: IndexedDB は非同期で、API は Promise を返す
+- 最近使用の一覧は最大 10 件に制限して性能を維持
+- エディタバッファは定期的な保存（推奨 30 秒）が有効

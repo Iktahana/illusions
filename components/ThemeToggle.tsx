@@ -9,8 +9,8 @@ export default function ThemeToggle() {
     <button
       onClick={toggleTheme}
       className="p-2 rounded-lg hover:bg-hover transition-colors"
-      aria-label="切换主题"
-      title={theme === "light" ? "切换到暗色模式" : "切换到亮色模式"}
+      aria-label="テーマを切り替え"
+      title={theme === "light" ? "ダークモードに切り替え" : "ライトモードに切り替え"}
     >
       {theme === "light" ? (
         <svg

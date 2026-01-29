@@ -9,10 +9,10 @@ export default function ChromeVersionWarning({ onDismiss }: ChromeVersionWarning
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true">
       <div className="mx-4 w-full max-w-md rounded-xl bg-background-elevated p-6 shadow-xl border border-border">
         <h2 className="text-lg font-semibold text-foreground">
-          需要更新的組件支援 AI 功能
+          AI 機能の利用にはブラウザエンジンの更新が必要です
         </h2>
         <p className="mt-2 text-sm text-foreground-secondary">
-          本軟體需要更新的組件支援 AI 功能，請確保您的系統已安裝最新的 Chrome/Edge 核心（Chrome 127 以上）。
+          本アプリの AI 機能には最新の Chrome/Edge エンジン（Chrome 127 以上）が必要です。システムに最新の Chrome/Edge がインストールされているか確認してください。
         </p>
         <div className="mt-6 flex justify-end">
           <button
@@ -20,7 +20,7 @@ export default function ChromeVersionWarning({ onDismiss }: ChromeVersionWarning
             onClick={onDismiss}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover"
           >
-            我知道了
+            了解しました
           </button>
         </div>
       </div>

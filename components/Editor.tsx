@@ -95,12 +95,11 @@ export default function NovelEditor({
       {/* Editor Area */}
       <div
         ref={scrollContainerRef}
-        className={clsx(
-          "flex-1 bg-background-secondary relative min-h-0 pt-12",
-          isVertical 
-            ? "overflow-x-auto overflow-y-auto flex items-center justify-end" 
-            : "overflow-auto"
-        )}
+        className="flex-1 bg-background-secondary relative min-h-0 pt-12"
+        style={{
+          overflowX: 'auto',
+          overflowY: 'auto',
+        }}
       >
         <MilkdownProvider>
           <ProsemirrorAdapterProvider>
@@ -386,7 +385,6 @@ function MilkdownEditor({
           editorDom.style.height = `${targetHeight}px`;
           editorDom.style.maxHeight = `${targetHeight}px`;
           editorDom.style.minHeight = `${targetHeight}px`;
-          editorDom.style.overflow = 'visible';
         } else {
           // In horizontal mode, limit width (characters per line) and center horizontally
           const targetWidth = charSize * charsPerLine;
@@ -447,26 +445,33 @@ function MilkdownEditor({
     if (!container || !isVertical) return;
 
     const handleWheel = (event: WheelEvent) => {
-      // Detect if it's a touchpad (has deltaX and deltaY with fine precision)
-      // or a mouse wheel (usually only deltaY or coarse values)
-      const isTouchpad = Math.abs(event.deltaX) > 0 || 
-                         (Math.abs(event.deltaY) % 1 !== 0);
+      // Detect if it's a touchpad by checking:
+      // 1. Has both deltaX and deltaY (most touchpads support 2D scrolling)
+      // 2. Has fine-grained values (not coarse like 100, -100)
+      // 3. ctrlKey is not pressed (pinch zoom)
+      const hasBothAxes = Math.abs(event.deltaX) > 0 && Math.abs(event.deltaY) > 0;
+      const hasFineGrainedValues = 
+        (Math.abs(event.deltaY) < 50 && Math.abs(event.deltaY) > 0) ||
+        (Math.abs(event.deltaX) < 50 && Math.abs(event.deltaX) > 0);
+      const isTouchpad = hasBothAxes || (hasFineGrainedValues && !event.ctrlKey);
 
       if (isTouchpad) {
-        // Touchpad: swap X and Y axes
-        // horizontal gesture -> vertical scroll
-        // vertical gesture -> horizontal scroll
-        container.scrollLeft += event.deltaY;
-        container.scrollTop += event.deltaX;
+        // Touchpad: Keep natural scroll direction
+        // User swipes up/down -> content scrolls up/down
+        // User swipes left/right -> content scrolls left/right
+        container.scrollLeft += event.deltaX;
+        container.scrollTop += event.deltaY;
         event.preventDefault();
       } else {
-        // Mouse wheel: 
-        // vertical wheel -> horizontal scroll
-        // horizontal wheel -> vertical scroll
+        // Mouse wheel:
+        // - Vertical wheel (deltaY) -> horizontal scroll (for vertical text)
+        // - Horizontal wheel (deltaX) -> vertical scroll
         if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+          // Vertical wheel scroll
           container.scrollLeft += event.deltaY;
           event.preventDefault();
         } else if (Math.abs(event.deltaX) > 0) {
+          // Horizontal wheel scroll (rare, but some mice have it)
           container.scrollTop += event.deltaX;
           event.preventDefault();
         }

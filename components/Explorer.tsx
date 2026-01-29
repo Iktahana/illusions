@@ -210,7 +210,7 @@ export default function Explorer({
           )}
         >
           <FolderTree className="w-4 h-4" />
-          章節
+          章
         </button>
         <button
           onClick={() => setActiveTab("settings")}
@@ -234,7 +234,7 @@ export default function Explorer({
           )}
         >
           <Palette className="w-4 h-4" />
-          段落
+          スタイル
         </button>
       </div>
 
@@ -350,7 +350,7 @@ function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; o
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background-secondary">
           <h3 className="text-sm font-semibold text-foreground">
-            章節の見出しを追加
+            章の見出しを追加
           </h3>
           <button
             onClick={onClose}
@@ -396,7 +396,7 @@ function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; o
             <ul className="text-xs text-blue-700 space-y-1">
               <li>• 見出しの後には空行が必要です</li>
               <li>• # の数が多いほど、小さな見出しになります</li>
-              <li>• 見出しは章節の構造を表すのに使います</li>
+              <li>• 見出しは章の構造を表すのに使います</li>
             </ul>
           </div>
         </div>
@@ -430,7 +430,7 @@ function ChapterItem({
       className={clsx(
         "flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors",
         isActive
-          ? "bg-accent-light text-accent"
+          ? "bg-accent text-accent-foreground"
           : "hover:bg-hover text-foreground"
       )}
       style={{ paddingLeft: `${8 + indent}px` }}

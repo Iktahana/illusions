@@ -218,19 +218,21 @@ export function useMdiFile(): UseMdiFileReturn {
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onSaveBeforeClose) return;
 
-    window.electronAPI.onSaveBeforeClose(async () => {
+    const cleanup = window.electronAPI.onSaveBeforeClose(async () => {
       if (isDirty) {
         await saveFile();
       }
       await window.electronAPI?.saveDoneAndClose?.();
     });
+
+    return cleanup;
   }, [isDirty, saveFile, isElectron]);
 
   // Handle files opened from system (double-click .mdi file).
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onOpenFileFromSystem) return;
 
-    window.electronAPI.onOpenFileFromSystem(({ path, content: fileContent }) => {
+    const cleanup = window.electronAPI.onOpenFileFromSystem(({ path, content: fileContent }) => {
       const now = Date.now();
       setCurrentFile({
         path,
@@ -241,22 +243,26 @@ export function useMdiFile(): UseMdiFileReturn {
       setLastSavedContent(fileContent);
       setLastSavedTime(now);
     });
+
+    return cleanup;
   }, [isElectron]);
 
   // Handle menu save command.
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onMenuSave) return;
 
-    window.electronAPI.onMenuSave(async () => {
+    const cleanup = window.electronAPI.onMenuSave(async () => {
       await saveFile();
     });
+
+    return cleanup;
   }, [saveFile, isElectron]);
 
   // Handle menu save-as command.
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onMenuSaveAs) return;
 
-    window.electronAPI.onMenuSaveAs(async () => {
+    const cleanup = window.electronAPI.onMenuSaveAs(async () => {
       const raw = contentRef.current;
       setIsSaving(true);
       try {
@@ -303,24 +309,30 @@ export function useMdiFile(): UseMdiFileReturn {
         setIsSaving(false);
       }
     });
-  }, [saveFile, isElectron, currentFile]);
+
+    return cleanup;
+  }, [saveFile, isElectron, currentFile, persistLastOpenedPath]);
 
   // Handle menu new command.
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onMenuNew) return;
 
-    window.electronAPI.onMenuNew(() => {
+    const cleanup = window.electronAPI.onMenuNew(() => {
       newFile();
     });
+
+    return cleanup;
   }, [newFile, isElectron]);
 
   // Handle menu open command.
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onMenuOpen) return;
 
-    window.electronAPI.onMenuOpen(async () => {
+    const cleanup = window.electronAPI.onMenuOpen(async () => {
       await openFile();
     });
+
+    return cleanup;
   }, [openFile, isElectron]);
 
   // Handle Web beforeunload.

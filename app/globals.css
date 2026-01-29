@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent flash of white on initial load - default to dark theme */
+html {
+  background-color: #0a0a0a;
+  color-scheme: dark;
+}
+
 :root {
   /* Background colors */
   --background: #ffffff;
@@ -37,43 +43,50 @@
 }
 
 .dark {
-  /* Background colors */
-  --background: #171717;
-  --background-secondary: #262626;
-  --background-tertiary: #404040;
-  --background-elevated: #262626;
+  /* Background colors - darker for better contrast */
+  --background: #0a0a0a;
+  --background-secondary: #1a1a1a;
+  --background-tertiary: #2a2a2a;
+  --background-elevated: #1a1a1a;
   
-  /* Text colors */
-  --foreground: #f5f5f5;
-  --foreground-secondary: #d4d4d4;
-  --foreground-tertiary: #a3a3a3;
-  --foreground-muted: #737373;
+  /* Text colors - brighter for better contrast */
+  --foreground: #ffffff;
+  --foreground-secondary: #e5e5e5;
+  --foreground-tertiary: #b3b3b3;
+  --foreground-muted: #808080;
   
-  /* Border colors */
-  --border: #404040;
-  --border-secondary: #525252;
+  /* Border colors - more visible */
+  --border: #333333;
+  --border-secondary: #404040;
   
-  /* Accent colors */
-  --accent: #6366f1;
+  /* Accent colors - brighter and more vibrant */
+  --accent: #818cf8;
   --accent-foreground: #ffffff;
-  --accent-light: #312e81;
-  --accent-hover: #4f46e5;
+  --accent-light: #4338ca;
+  --accent-hover: #6366f1;
   
   /* Interactive states */
-  --hover: #262626;
-  --active: #312e81;
+  --hover: #1f1f1f;
+  --active: #4338ca;
   
-  /* Status colors */
-  --success: #10b981;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --info: #3b82f6;
+  /* Status colors - brighter for better visibility */
+  --success: #34d399;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --info: #60a5fa;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  transition: background-color 0s, color 0s; /* Prevent transition flash */
+}
+
+/* Override default background after theme is determined */
+html:not(.dark) {
+  background-color: #ffffff;
+  color-scheme: light;
 }
 
 @layer utilities {

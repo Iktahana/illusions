@@ -184,6 +184,14 @@ function createMainWindow() {
     mainWindow?.show()
   })
 
+  // Handle window close with unsaved changes check
+  mainWindow.on('close', (event) => {
+    if (mainWindow.isDocumentEdited()) {
+      event.preventDefault()
+      mainWindow.webContents.send('electron-request-save-before-close')
+    }
+  })
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000')
     mainWindow.webContents.openDevTools({ mode: 'detach' })
@@ -234,6 +242,20 @@ ipcMain.handle('save-file', async (_event, filePath, content) => {
   }
   await fs.writeFile(target, content, 'utf-8')
   return target
+})
+
+ipcMain.handle('set-dirty', (_event, dirty) => {
+  // Track dirty state for window close handling
+  if (mainWindow) {
+    mainWindow.setDocumentEdited(dirty)
+  }
+})
+
+ipcMain.handle('save-before-close-done', () => {
+  // Close window after save is complete
+  if (mainWindow) {
+    mainWindow.destroy()
+  }
 })
 
 app.whenReady().then(() => {

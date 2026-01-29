@@ -15,15 +15,15 @@ declare global {
     ) => Promise<string | null>;
     getChromeVersion: () => Promise<number>;
     setDirty: (dirty: boolean) => Promise<void>;
-    onSaveBeforeClose?: (callback: () => void) => void;
     saveDoneAndClose?: () => Promise<void>;
+    onSaveBeforeClose?: (callback: () => void) => (() => void) | void;
     onOpenFileFromSystem?: (
       callback: (payload: { path: string; content: string }) => void
-    ) => void;
-    onMenuNew?: (callback: () => void) => void;
-    onMenuOpen?: (callback: () => void) => void;
-    onMenuSave?: (callback: () => void) => void;
-    onMenuSaveAs?: (callback: () => void) => void;
+    ) => (() => void) | void;
+    onMenuNew?: (callback: () => void) => (() => void) | void;
+    onMenuOpen?: (callback: () => void) => (() => void) | void;
+    onMenuSave?: (callback: () => void) => (() => void) | void;
+    onMenuSaveAs?: (callback: () => void) => (() => void) | void;
     storage?: {
       saveSession: (session: StorageSession) => Promise<void>;
       loadSession: () => Promise<StorageSession | null>;
