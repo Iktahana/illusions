@@ -417,13 +417,6 @@ function ChapterItem({
       <ChevronRight className="w-4 h-4 flex-shrink-0" />
       <FileText className="w-4 h-4 flex-shrink-0" />
       <span className="text-sm flex-1 truncate">{renderFormattedTitle(chapter.title)}</span>
-      <span 
-        className="text-xs font-semibold flex-shrink-0 px-1.5 py-0.5 rounded bg-slate-100"
-        style={{ fontSize: `${fontSize}` }}
-        title={`見出しレベル ${chapter.level} (${fontSize})`}
-      >
-        {fontSize}
-      </span>
     </div>
   );
 }

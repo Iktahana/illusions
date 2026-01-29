@@ -17,6 +17,7 @@ import { Type, AlignLeft, Search } from "lucide-react";
 import { EditorView } from "@milkdown/prose/view";
 import BubbleMenu, { type FormatType } from "./BubbleMenu";
 import SearchDialog from "./SearchDialog";
+import SelectionCounter from "./SelectionCounter";
 
 interface EditorProps {
   initialContent?: string;
@@ -43,10 +44,22 @@ export default function NovelEditor({
   charsPerLine = 40,
   searchOpenTrigger = 0,
 }: EditorProps) {
-  const [isVertical, setIsVertical] = useState(false);
+  // Load initial vertical state from localStorage
+  const [isVertical, setIsVertical] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('illusions-writing-mode');
+      return saved === 'vertical';
+    }
+    return false;
+  });
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Save vertical state to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('illusions-writing-mode', isVertical ? 'vertical' : 'horizontal');
+  }, [isVertical]);
 
   const handleSearchOpen = () => {
     setIsSearchOpen(true);
@@ -75,7 +88,9 @@ export default function NovelEditor({
         ref={scrollContainerRef}
         className={clsx(
           "flex-1 bg-slate-50 relative min-h-0 pt-12",
-          isVertical ? "overflow-x-auto overflow-y-auto" : "overflow-auto"
+          isVertical 
+            ? "overflow-x-auto overflow-y-auto flex items-center" 
+            : "overflow-auto"
         )}
       >
         <MilkdownProvider>
@@ -103,6 +118,11 @@ export default function NovelEditor({
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
       />
+
+      {/* Selection Counter */}
+      {editorViewInstance && (
+        <SelectionCounter editorView={editorViewInstance} />
+      )}
     </div>
   );
 }
@@ -278,6 +298,76 @@ function MilkdownEditor({
     return () => clearTimeout(timer);
   }, [isVertical, get]);
 
+  // Apply character per line limit using JavaScript measurement
+  useEffect(() => {
+    // Delay to ensure editor DOM is ready
+    const timer = setTimeout(() => {
+      const editorContainer = editorRef.current;
+      const editorDom = editorContainer?.querySelector('.milkdown .ProseMirror') as HTMLElement;
+      if (!editorDom) return;
+
+      // Reset styles first
+      editorDom.style.width = '';
+      editorDom.style.maxWidth = '';
+      editorDom.style.height = '';
+      editorDom.style.maxHeight = '';
+      editorDom.style.margin = '';
+
+      if (charsPerLine <= 0) return;
+
+      // Create a measurement element to get the actual character size
+      // For vertical writing, we measure in horizontal mode and use width as the "height" of each char
+      const measureEl = document.createElement('span');
+      measureEl.style.cssText = `
+        position: absolute;
+        visibility: hidden;
+        white-space: nowrap;
+        font-family: "${fontFamily}", serif;
+        font-size: ${fontScale}%;
+        line-height: ${lineHeight};
+      `;
+      measureEl.textContent = '国'; // Use a full-width character for Japanese
+      document.body.appendChild(measureEl);
+      
+      // In both modes, we use the same character width measurement
+      // because Japanese characters are typically square
+      const charSize = measureEl.offsetWidth;
+      document.body.removeChild(measureEl);
+
+      // Apply the calculated size to the editor
+      if (isVertical) {
+        // In vertical mode, limit height (characters per column)
+        // Height in vertical mode = number of characters from top to bottom
+        const targetHeight = charSize * charsPerLine;
+        editorDom.style.height = `${targetHeight}px`;
+        editorDom.style.maxHeight = `${targetHeight}px`;
+        editorDom.style.minHeight = `${targetHeight}px`;
+        editorDom.style.overflow = 'visible';
+      } else {
+        // In horizontal mode, limit width (characters per line) and center horizontally
+        const targetWidth = charSize * charsPerLine;
+        editorDom.style.width = `${targetWidth}px`;
+        editorDom.style.maxWidth = `${targetWidth}px`;
+        editorDom.style.margin = '0 auto'; // Center horizontally
+      }
+    }, 200);
+
+    return () => {
+      clearTimeout(timer);
+      // Cleanup
+      const editorDom = editorRef.current?.querySelector('.milkdown .ProseMirror') as HTMLElement;
+      if (editorDom) {
+        editorDom.style.width = '';
+        editorDom.style.maxWidth = '';
+        editorDom.style.height = '';
+        editorDom.style.maxHeight = '';
+        editorDom.style.minHeight = '';
+        editorDom.style.margin = '';
+        editorDom.style.overflow = '';
+      }
+    };
+  }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, get]);
+
   // Convert vertical mouse wheel to horizontal scroll in vertical mode
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -374,16 +464,14 @@ function MilkdownEditor({
       <div
         ref={editorRef}
         className={clsx(
-          "mx-auto",
-          isVertical ? "px-16 py-16 min-w-fit h-full" : "p-8"
+          isVertical 
+            ? "px-16 py-8 min-w-fit" 
+            : "p-8 mx-auto"
         )}
         style={{
           fontSize: `${fontScale}%`,
           lineHeight: lineHeight,
           fontFamily: `"${fontFamily}", serif`,
-          // Apply text-indent to paragraphs only (not headings)
-          // This is done via CSS and doesn't add actual spaces to the content
-          ['--chars-per-line' as string]: charsPerLine,
         }}
       >
         <style jsx>{`
@@ -402,23 +490,7 @@ function MilkdownEditor({
             text-indent: 0;
           }
           
-          /* Character per line limit for horizontal mode */
-          ${charsPerLine > 0 ? `
-          div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal) {
-            max-width: ${charsPerLine}em !important;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-          }
-          ` : ''}
-          
-          /* Character per line limit for vertical mode */
-          ${charsPerLine > 0 ? `
-          div :global(.milkdown .ProseMirror.milkdown-japanese-vertical) {
-            height: ${charsPerLine}em !important;
-            max-height: ${charsPerLine}em !important;
-            overflow: visible;
-          }
-          ` : ''}
+
         `}</style>
         <Milkdown />
       </div>
