@@ -5,6 +5,7 @@ import Explorer from "@/components/Explorer";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
 import ResizablePanel from "@/components/ResizablePanel";
+import TitleUpdater from "@/components/TitleUpdater";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { isElectronRenderer } from "@/lib/runtime-env";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
@@ -257,10 +258,13 @@ export default function EditorPage() {
     };
   }, [saveFile]);
 
-  return (
-    <div className="h-screen flex flex-col overflow-hidden relative">
-      {/* Auto-recovery notification (Web only) - fixed position */}
-      {!isElectron && wasAutoRecovered && !dismissedRecovery && (
+   return (
+     <div className="h-screen flex flex-col overflow-hidden relative">
+       {/* Dynamic title updater */}
+       <TitleUpdater currentFile={currentFile} isDirty={isDirty} />
+
+       {/* Auto-recovery notification (Web only) - fixed position */}
+       {!isElectron && wasAutoRecovered && !dismissedRecovery && (
         <div className="fixed left-0 top-0 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between animate-slide-in-down shadow-lg">
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
