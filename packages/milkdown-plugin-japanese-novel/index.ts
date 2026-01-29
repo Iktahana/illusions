@@ -10,6 +10,7 @@ import { rubySchema } from './nodes/ruby'
 import { tcySchema } from './nodes/tcy'
 import { headingAnchorSchema } from './nodes/heading-anchor'
 import { remarkHeadingAnchorPlugin, remarkRubyPlugin, remarkTcyPlugin } from './syntax'
+import { createHeadingIdFixerPlugin } from './plugins/heading-id-fixer'
 import {
   defaultJapaneseNovelOptions,
   type JapaneseNovelOptions,
@@ -71,11 +72,22 @@ export function japaneseNovel(
     })
   })
 
+  const headingIdFixerPlugin = $prose((ctx) => {
+    // Import generateAnchorId - we need to get it from the context
+    // For now, use a simple generator
+    const generateId = (level: number) => {
+      const random = Math.random().toString(36).slice(2, 10)
+      return `h${level}-${random}`
+    }
+    return createHeadingIdFixerPlugin(generateId)
+  })
+
   const plugins: MilkdownPlugin[] = [
     ...(enableRuby ? [remarkRuby, rubySchema] : []),
     ...(enableTcy ? [remarkTcy, tcySchema] : []),
     remarkHeadingAnchor,
     headingAnchorSchema,
+    headingIdFixerPlugin,
     stylePlugin,
   ].flat()
 

@@ -51,7 +51,8 @@ export const headingAnchorSchema = $nodeSchema('heading', (ctx) => {
       },
     })),
     toDOM: (node) => {
-      const id = (node.attrs.id as string) || getId(node)
+      const existingId = node.attrs.id as string
+      const id = (existingId && existingId.trim()) ? existingId : getId(node)
       return [
         `h${node.attrs.level}`,
         {
@@ -75,7 +76,8 @@ export const headingAnchorSchema = $nodeSchema('heading', (ctx) => {
     toMarkdown: {
       match: (node) => node.type.name === 'heading',
       runner: (state, node) => {
-        const id = (node.attrs.id as string) || getId(node)
+        const existingId = node.attrs.id as string
+        const id = (existingId && existingId.trim()) ? existingId : getId(node)
         state.openNode('heading', undefined, { depth: node.attrs.level })
         serializeText(state, node)
         if (id) {

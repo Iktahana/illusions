@@ -15,6 +15,7 @@ import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
 import clsx from "clsx";
 import { Type, AlignLeft, Search } from "lucide-react";
 import { EditorView } from "@milkdown/prose/view";
+import { setBlockType } from "@milkdown/prose/commands";
 import BubbleMenu, { type FormatType } from "./BubbleMenu";
 import SearchDialog from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
@@ -494,7 +495,25 @@ function MilkdownEditor({
           break;
         case "heading":
           if (level) {
-            execute(wrapInHeadingCommand.key, level);
+            // Custom heading command that sets ID
+            editor.action((ctx) => {
+              const view = ctx.get(editorViewCtx);
+              const { state, dispatch } = view;
+              const { schema } = state;
+              const headingType = schema.nodes.heading;
+              
+              if (!headingType) {
+                execute(wrapInHeadingCommand.key, level);
+                return;
+              }
+              
+              // Generate new anchor ID for the heading
+              const id = generateAnchorId(level);
+              
+              // Apply the heading with ID
+              const command = setBlockType(headingType, { level, id });
+              command(state, dispatch);
+            });
           }
           break;
         case "blockquote":

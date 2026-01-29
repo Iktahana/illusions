@@ -6,7 +6,7 @@
 
 .milkdown-japanese-vertical {
   writing-mode: vertical-rl;
-  text-orientation: upright;
+  text-orientation: mixed;
   text-align: justify;
   vertical-align: bottom;
   line-break: strict;
