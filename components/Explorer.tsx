@@ -12,7 +12,7 @@ import {
   Check
 } from "lucide-react";
 import clsx from "clsx";
-import { parseMarkdownChapters, type Chapter } from "@/lib/utils";
+import { parseMarkdownChapters, getChaptersFromDOM, type Chapter } from "@/lib/utils";
 import { FEATURED_JAPANESE_FONTS, ALL_JAPANESE_FONTS, loadGoogleFont } from "@/lib/fonts";
 
 type Tab = "chapters" | "settings" | "style";
@@ -260,7 +260,16 @@ export default function Explorer({
 }
 
 function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: string; onChapterClick?: (anchorId: string) => void; onInsertText?: (text: string) => void }) {
-  const chapters = useMemo(() => parseMarkdownChapters(content), [content]);
+  // Try to get chapters from DOM first (more reliable), fallback to markdown parsing
+  const chapters = useMemo(() => {
+    const domChapters = getChaptersFromDOM();
+    // If we get chapters from DOM and they have anchor IDs, use them
+    if (domChapters.length > 0 && domChapters.some(ch => ch.anchorId)) {
+      return domChapters;
+    }
+    // Otherwise fall back to parsing markdown
+    return parseMarkdownChapters(content);
+  }, [content]);
   const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
 
   return (

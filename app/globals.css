@@ -218,43 +218,13 @@ body {
   margin-bottom: 0.2em;
 }
 
-.milkdown h1[data-md-anchor],
-.milkdown h2[data-md-anchor],
-.milkdown h3[data-md-anchor],
-.milkdown h4[data-md-anchor],
-.milkdown h5[data-md-anchor],
-.milkdown h6[data-md-anchor] {
+.milkdown h1,
+.milkdown h2,
+.milkdown h3,
+.milkdown h4,
+.milkdown h5,
+.milkdown h6 {
   position: relative;
-}
-
-.milkdown h1[data-md-anchor]::after,
-.milkdown h2[data-md-anchor]::after,
-.milkdown h3[data-md-anchor]::after,
-.milkdown h4[data-md-anchor]::after,
-.milkdown h5[data-md-anchor]::after,
-.milkdown h6[data-md-anchor]::after {
-  content: attr(data-md-anchor);
-  position: absolute;
-  right: 0;
-  bottom: -1.2em;
-  opacity: 0;
-  font-size: 0.5em;
-  color: color-mix(in srgb, var(--foreground-tertiary) 50%, transparent);
-  background: transparent;
-  padding: 2px 6px;
-  border-radius: 6px;
-  border: none;
-  transition: opacity 0.15s ease-in-out;
-  pointer-events: none;
-}
-
-.milkdown h1[data-md-anchor]:hover::after,
-.milkdown h2[data-md-anchor]:hover::after,
-.milkdown h3[data-md-anchor]:hover::after,
-.milkdown h4[data-md-anchor]:hover::after,
-.milkdown h5[data-md-anchor]:hover::after,
-.milkdown h6[data-md-anchor]:hover::after {
-  opacity: 1;
 }
 
 /* Font preview select styling */

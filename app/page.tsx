@@ -8,7 +8,6 @@ import ResizablePanel from "@/components/ResizablePanel";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { isElectronRenderer } from "@/lib/runtime-env";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
-import { ensureHeadingAnchors } from "@/lib/utils";
 
 function chars(s: string) {
   return s.replace(/\s/g, "").length;
@@ -47,6 +46,7 @@ export default function EditorPage() {
   // Wrap openFile and newFile to increment session ID
   const openFile = useCallback(async () => {
     await originalOpenFile();
+    
     fileSessionRef.current += 1;
     setEditorKey(prev => prev + 1);
   }, [originalOpenFile]);
@@ -141,8 +141,9 @@ export default function EditorPage() {
   const handleInsertText = (text: string) => {
     const currentContent = contentRef.current;
     const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
-    const { content: anchoredContent } = ensureHeadingAnchors(newContent);
-    setContent(anchoredContent);
+    // Note: Heading anchors are now managed by the markdown editor itself
+    // No need for additional processing here
+    setContent(newContent);
     // Force editor to remount with new content
     setEditorKey(prev => prev + 1);
   };

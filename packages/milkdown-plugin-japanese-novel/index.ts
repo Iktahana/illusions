@@ -72,14 +72,8 @@ export function japaneseNovel(
     })
   })
 
-  const headingIdFixerPlugin = $prose((ctx) => {
-    // Import generateAnchorId - we need to get it from the context
-    // For now, use a simple generator
-    const generateId = (level: number) => {
-      const random = Math.random().toString(36).slice(2, 10)
-      return `h${level}-${random}`
-    }
-    return createHeadingIdFixerPlugin(generateId)
+  const headingIdFixerPlugin = $prose(() => {
+    return createHeadingIdFixerPlugin()
   })
 
   const plugins: MilkdownPlugin[] = [

@@ -1,25 +1,9 @@
-# MDI Syntax Specification (MDI 1.0 Draft) {#h1-mdi10a01}
+# MDI Syntax Specification (MDI 1.0 Draft)
 
 MDI files are Markdown documents with Illusions-specific extensions for Japanese typography.
-This specification defines *inline* syntaxes that are difficult to express in standard Markdown (ruby, tate-chu-yoko, no-break, kerning), and a required heading anchor format.
+This specification defines *inline* syntaxes that are difficult to express in standard Markdown (ruby, tate-chu-yoko, no-break, kerning).
 
-## 1. Headings & Anchors {#h2-a1b2c3d4}
-
-- Every heading must include an anchor suffix.
-- Anchor format: `{#h<level>-<uuid>}`
-- `level` is the heading level (`1`-`6`).
-- `uuid` is an 8-character lowercase alphanumeric ID.
-- The anchor suffix must appear at the end of the heading line.
-
-Example:
-
-```markdown
-# 第一章 序幕 {#h1-a1b2c3d4}
-## 第一節 相遇 {#h2-e5f6g7h8}
-### 場面一 {#h3-i9j0k1l2}
-```
-
-## 2. Purpose & Assumptions {#h2-b4c5d6e7}
+## 1. Purpose & Assumptions
 
 MDI (Markdown for Document typesetting extensions) aims to provide concise, low-conflict markup for Japanese writing.
 
@@ -27,9 +11,9 @@ MDI (Markdown for Document typesetting extensions) aims to provide concise, low-
 - MDI focuses on *semantic annotation*; appearance is delegated to CSS.
 - MDI is designed to avoid collisions with common Markdown constructs (`*`, `**`, links, etc.).
 
-## 3. Parsing Rules (Recommended) {#h2-c8d9e0f1}
+## 2. Parsing Rules (Recommended)
 
-### 3.1 Processing Order {#h3-d2e3f4a5}
+### 2.1 Processing Order
 
 Implementations are recommended to apply MDI inline parsing before (or alongside) standard Markdown inline parsing, with a simple left-to-right scan.
 A recommended order is:
@@ -39,16 +23,16 @@ A recommended order is:
 3. Tate-chu-yoko: `^...^`
 4. Bracket macros: `[[no-break:...]]`, `[[kern:...:...]]`
 
-### 3.2 Escapes (Recommended) {#h3-e6f7a8b9}
+### 2.2 Escapes (Recommended)
 
 To write MDI delimiter characters literally, a backslash escape is recommended.
 
 - Escapable characters (recommended set): `\{`, `\}`, `\|`, `\^`, `\[`, `\]`, `\:`, `\.`
 - If escapes are not supported, the implementation may treat ambiguous sequences as plain text.
 
-## 4. Ruby (ルビ) {#h2-f0a1b2c3}
+## 3. Ruby (ルビ)
 
-### 4.1 Syntax {#h3-a4b5c6d7}
+### 3.1 Syntax
 
 `{親文字|ルビ}`
 
@@ -56,14 +40,14 @@ To write MDI delimiter characters literally, a backslash escape is recommended.
 - The right side is the ruby text (ルビ).
 - Within the ruby text, `.` (dot) may be used to indicate per-character mapping.
 
-### 4.2 Examples {#h3-b8c9d0e1}
+### 3.2 Examples
 
 ```markdown
 私は{雪女|ゆき.おんな}を見た。
 {東京|とう.きょう}は雨だった。
 ```
 
-### 4.3 Semantics {#h3-c2d3e4f5}
+### 3.3 Semantics
 
 - If the number of base characters equals the number of dot-separated ruby segments, treat as *split ruby*.
 - If they do not match, implementations may:
@@ -71,9 +55,9 @@ To write MDI delimiter characters literally, a backslash escape is recommended.
   - Fallback to plain text.
 - Okurigana (送り仮名) and punctuation may be included on the base side as-is.
 
-### 4.4 HTML Conversion (Recommended) {#h3-d6e7f8a9}
+### 3.4 HTML Conversion (Recommended)
 
-#### Split ruby example {#h4-e0f1a2b3}
+#### Split ruby example
 
 Input:
 
@@ -87,7 +71,7 @@ Output (example):
 <ruby class="mdi-ruby">東<rt>とう</rt>京<rt>きょう</rt></ruby>
 ```
 
-#### Group ruby example {#h4-f4a5b6c7}
+#### Group ruby example
 
 Input:
 
@@ -101,16 +85,16 @@ Output (example):
 <ruby class="mdi-ruby">東京<rt>とうきょう</rt></ruby>
 ```
 
-## 5. Tate-chu-yoko (縦中横) {#h2-a8b9c0d1}
+## 4. Tate-chu-yoko (縦中横)
 
-### 5.1 Syntax {#h3-b2c3d4e5}
+### 4.1 Syntax
 
 `^縦中横^`
 
 - Text enclosed by caret `^` is treated as tate-chu-yoko.
 - Intended for short sequences (numbers, brief Latin letters, punctuation).
 
-### 5.2 Examples {#h3-c6d7e8f9}
+### 4.2 Examples
 
 ```markdown
 第^12^話
@@ -118,7 +102,7 @@ Output (example):
 ^OK^
 ```
 
-### 5.3 HTML Conversion (Recommended) {#h3-d0e1f2a3}
+### 4.3 HTML Conversion (Recommended)
 
 Input:
 
@@ -132,27 +116,27 @@ Output (example):
 <span class="mdi-tcy">12</span>
 ```
 
-### 5.4 Notes {#h3-e4f5a6b7}
+### 4.4 Notes
 
 - Implementations may choose to only activate this feature inside vertical writing containers.
 - CSS is expected to apply `text-combine-upright` when appropriate.
 
-## 6. No-break (改行抑止) {#h2-f8a9b0c1}
+## 5. No-break (改行抑止)
 
 Japanese typography often requires preventing awkward line breaks inside proper nouns or fixed phrases.
 
-### 6.1 Syntax {#h3-a2b3c4d5}
+### 5.1 Syntax
 
 `[[no-break:文字列]]`
 
-### 6.2 Examples {#h3-b6c7d8e9}
+### 5.2 Examples
 
 ```markdown
 [[no-break:東京都新宿区]]
 [[no-break:被愛妄想罪]]
 ```
 
-### 6.3 HTML Conversion (Recommended) {#h3-c0d1e2f3}
+### 5.3 HTML Conversion (Recommended)
 
 Input:
 
@@ -166,7 +150,7 @@ Output (example):
 <span class="mdi-nobr">ここは改行させない</span>
 ```
 
-### 6.4 CSS Example {#h3-d4e5f6a7}
+### 5.4 CSS Example
 
 ```css
 .mdi-nobr {
@@ -175,23 +159,23 @@ Output (example):
 }
 ```
 
-## 7. Kerning / Letter-spacing (字間調整) {#h2-e8f9a0b1}
+## 6. Kerning / Letter-spacing (字間調整)
 
-### 7.1 Syntax {#h3-f2a3b4c5}
+### 6.1 Syntax
 
 `[[kern:<量>:<文字列>]]`
 
 - `<量>` is typically an `em` value, e.g. `-0.1em`, `+0.2em`, `0em`.
 - `<文字列>` is the affected text.
 
-### 7.2 Examples {#h3-a6b7c8d9}
+### 6.2 Examples
 
 ```markdown
 彼は[[kern:-0.1em:確実]]にそう言った。
 [[kern:+0.3em:沈黙]]が落ちた。
 ```
 
-### 7.3 HTML Conversion (Recommended) {#h3-b0c1d2e3}
+### 6.3 HTML Conversion (Recommended)
 
 To reduce CSS/HTML injection risk, using a CSS custom property is recommended.
 
@@ -207,7 +191,7 @@ Output (example):
 <span class="mdi-kern" style="--mdi-kern:-0.1em;">言葉</span>
 ```
 
-### 7.4 CSS Example {#h3-c4d5e6f7}
+### 6.4 CSS Example
 
 ```css
 .mdi-kern {
@@ -215,7 +199,7 @@ Output (example):
 }
 ```
 
-### 7.5 Validation (Recommended) {#h3-d8e9f0a1}
+### 6.5 Validation (Recommended)
 
 Implementations should validate `<量>`.
 A conservative rule is:
@@ -223,13 +207,13 @@ A conservative rule is:
 - Accept only `^[+-]?\d+(\.\d+)?em$`
 - If invalid, treat the whole macro as plain text (recommended) or fallback to `0em`.
 
-## 8. Design Notes {#h2-b2c3d4e5}
+## 7. Design Notes
 
 - MDI chooses delimiter forms that avoid common Markdown collisions.
 - Markup should remain human-readable: the meaning should be guessable from the text.
 - The final appearance is controlled by HTML + CSS; MDI provides semantics.
 
-## 9. Minimal Implementation Set {#h2-c6d7e8f9}
+## 8. Minimal Implementation Set
 
 At minimum, implementing the following significantly improves Japanese prose readability:
 
