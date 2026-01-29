@@ -19,6 +19,7 @@ export interface RecentFile {
 export interface AppState {
   lastOpenedMdiPath?: string;
   paragraphSpacing?: number;
+  showParagraphNumbers?: boolean;
 }
 
 /**

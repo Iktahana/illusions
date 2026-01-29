@@ -64,6 +64,7 @@ export default function EditorPage() {
   const [textIndent, setTextIndent] = useState(1);
   const [fontFamily, setFontFamily] = useState('Noto Serif JP');
   const [charsPerLine, setCharsPerLine] = useState(40); // 0 = no limit, default 40
+  const [showParagraphNumbers, setShowParagraphNumbers] = useState(false);
   
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
@@ -100,8 +101,11 @@ export default function EditorPage() {
         if (typeof appState.paragraphSpacing === "number") {
           setParagraphSpacing(appState.paragraphSpacing);
         }
+        if (typeof appState.showParagraphNumbers === "boolean") {
+          setShowParagraphNumbers(appState.showParagraphNumbers);
+        }
       } catch (error) {
-        console.error("Failed to load paragraph spacing:", error);
+        console.error("Failed to load settings:", error);
       }
     };
 
@@ -116,6 +120,13 @@ export default function EditorPage() {
     setParagraphSpacing(value);
     void persistAppState({ paragraphSpacing: value }).catch((error) => {
       console.error("Failed to persist paragraph spacing:", error);
+    });
+  }, []);
+
+  const handleShowParagraphNumbersChange = useCallback((value: boolean) => {
+    setShowParagraphNumbers(value);
+    void persistAppState({ showParagraphNumbers: value }).catch((error) => {
+      console.error("Failed to persist paragraph numbers setting:", error);
     });
   }, []);
 
@@ -234,6 +245,8 @@ export default function EditorPage() {
             onFontFamilyChange={setFontFamily}
             charsPerLine={charsPerLine}
             onCharsPerLineChange={setCharsPerLine}
+            showParagraphNumbers={showParagraphNumbers}
+            onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
           />
         </ResizablePanel>
         
@@ -251,13 +264,14 @@ export default function EditorPage() {
               fontFamily={fontFamily}
               charsPerLine={charsPerLine}
               searchOpenTrigger={searchOpenTrigger}
+              showParagraphNumbers={showParagraphNumbers}
             />
           </div>
           
           {/* Save success toast */}
           {showSaveToast && (
             <div 
-              className={`absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-background-elevated border border-border rounded-lg shadow-lg flex items-center gap-2 z-10 ${
+              className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-background-elevated border border-border rounded-lg shadow-lg flex items-center gap-2 z-50 ${
                 saveToastExiting ? 'animate-save-toast-out' : 'animate-save-toast-in'
               }`}
             >

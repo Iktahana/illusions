@@ -31,6 +31,7 @@ interface EditorProps {
   fontFamily?: string;
   charsPerLine?: number;
   searchOpenTrigger?: number;
+  showParagraphNumbers?: boolean;
 }
 
 export default function NovelEditor({ 
@@ -45,6 +46,7 @@ export default function NovelEditor({
   fontFamily = 'Noto Serif JP',
   charsPerLine = 40,
   searchOpenTrigger = 0,
+  showParagraphNumbers = false,
 }: EditorProps) {
   // Start with false to avoid hydration mismatch
   const [isVertical, setIsVertical] = useState(false);
@@ -115,6 +117,7 @@ export default function NovelEditor({
               charsPerLine={charsPerLine}
               scrollContainerRef={scrollContainerRef}
               onEditorViewReady={setEditorViewInstance}
+              showParagraphNumbers={showParagraphNumbers}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -203,6 +206,7 @@ function MilkdownEditor({
   charsPerLine,
   scrollContainerRef,
   onEditorViewReady,
+  showParagraphNumbers,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
@@ -216,6 +220,7 @@ function MilkdownEditor({
   charsPerLine: number;
   scrollContainerRef: RefObject<HTMLDivElement>;
   onEditorViewReady?: (view: EditorView) => void;
+  showParagraphNumbers: boolean;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
@@ -531,9 +536,25 @@ function MilkdownEditor({
         }}
       >
         <style jsx>{`
+          div :global(.milkdown .ProseMirror) {
+            ${showParagraphNumbers ? 'counter-reset: paragraph;' : ''}
+          }
           div :global(.milkdown .ProseMirror p) {
             text-indent: ${textIndent}em;
             margin-bottom: ${paragraphSpacing}em;
+            ${showParagraphNumbers ? 'counter-increment: paragraph;' : ''}
+            ${showParagraphNumbers ? 'position: relative;' : ''}
+          }
+          div :global(.milkdown .ProseMirror p::before) {
+            ${showParagraphNumbers ? `
+              content: counter(paragraph);
+              position: absolute;
+              left: -2em;
+              font-size: 0.7em;
+              opacity: 0.5;
+              color: currentColor;
+              user-select: none;
+            ` : 'content: none;'}
           }
           /* Don't apply indent to headings, lists, blockquotes, etc. */
           div :global(.milkdown .ProseMirror h1),

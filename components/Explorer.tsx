@@ -170,6 +170,8 @@ interface ExplorerProps {
   onFontFamilyChange?: (family: string) => void;
   charsPerLine?: number;
   onCharsPerLineChange?: (chars: number) => void;
+  showParagraphNumbers?: boolean;
+  onShowParagraphNumbersChange?: (show: boolean) => void;
 }
 
 export default function Explorer({ 
@@ -189,6 +191,8 @@ export default function Explorer({
   onFontFamilyChange,
   charsPerLine = 40,
   onCharsPerLineChange,
+  showParagraphNumbers = false,
+  onShowParagraphNumbersChange,
 }: ExplorerProps) {
   const [activeTab, setActiveTab] = useState<Tab>("chapters");
 
@@ -252,6 +256,8 @@ export default function Explorer({
             onFontFamilyChange={onFontFamilyChange}
             charsPerLine={charsPerLine}
             onCharsPerLineChange={onCharsPerLineChange}
+            showParagraphNumbers={showParagraphNumbers}
+            onShowParagraphNumbersChange={onShowParagraphNumbersChange}
           />
         )}
       </div>
@@ -646,6 +652,8 @@ function StylePanel({
   onFontFamilyChange,
   charsPerLine = 40,
   onCharsPerLineChange,
+  showParagraphNumbers = false,
+  onShowParagraphNumbersChange,
 }: {
   fontScale?: number;
   onFontScaleChange?: (scale: number) => void;
@@ -659,6 +667,8 @@ function StylePanel({
   onFontFamilyChange?: (family: string) => void;
   charsPerLine?: number;
   onCharsPerLineChange?: (chars: number) => void;
+  showParagraphNumbers?: boolean;
+  onShowParagraphNumbersChange?: (show: boolean) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -771,6 +781,29 @@ function StylePanel({
           {charsPerLine === 0 
             ? '0に設定すると制限なし'
             : '1行（縦書きの場合は1列）あたりの最大文字数'}
+        </p>
+      </div>
+      
+      <div>
+        <label className="flex items-center justify-between text-sm font-medium text-foreground-secondary mb-2">
+          <span>段落番号</span>
+          <button
+            onClick={() => onShowParagraphNumbersChange?.(!showParagraphNumbers)}
+            className={clsx(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2",
+              showParagraphNumbers ? "bg-accent" : "bg-border-secondary"
+            )}
+          >
+            <span
+              className={clsx(
+                "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
+                showParagraphNumbers ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </label>
+        <p className="text-xs text-foreground-tertiary mt-1">
+          段落の先頭に番号を表示します（小さく、50%透明）
         </p>
       </div>
     </div>

@@ -6,7 +6,7 @@ import { isElectronRenderer } from "./runtime-env";
 import { getStorageService } from "./storage-service";
 import { persistAppState } from "./app-state-manager";
 
-const DEFAULT_CONTENT = "";
+const DEFAULT_CONTENT = "# 錯覚\n\n物語はここから始めます。\n\n";
 const AUTO_SAVE_INTERVAL = 2000; // 2 seconds
 
 export interface UseMdiFileReturn {
