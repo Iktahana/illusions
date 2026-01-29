@@ -561,6 +561,7 @@ function MilkdownEditor({
       >
         <style jsx>{`
           div :global(.milkdown .ProseMirror) {
+            line-height: ${lineHeight};
             ${showParagraphNumbers ? 'counter-reset: paragraph;' : ''}
           }
           div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p) {
