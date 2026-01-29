@@ -27,6 +27,7 @@ interface EditorProps {
   lineHeight?: number;
   textIndent?: number;
   fontFamily?: string;
+  charsPerLine?: number;
   searchOpenTrigger?: number;
 }
 
@@ -39,6 +40,7 @@ export default function NovelEditor({
   lineHeight = 1.8,
   textIndent = 1,
   fontFamily = 'Noto Serif JP',
+  charsPerLine = 40,
   searchOpenTrigger = 0,
 }: EditorProps) {
   const [isVertical, setIsVertical] = useState(false);
@@ -72,8 +74,8 @@ export default function NovelEditor({
       <div
         ref={scrollContainerRef}
         className={clsx(
-          "flex-1 bg-slate-50 relative min-h-0",
-          isVertical ? "overflow-x-auto overflow-y-hidden" : "overflow-auto"
+          "flex-1 bg-slate-50 relative min-h-0 pt-12",
+          isVertical ? "overflow-x-auto overflow-y-auto" : "overflow-auto"
         )}
       >
         <MilkdownProvider>
@@ -87,6 +89,7 @@ export default function NovelEditor({
               lineHeight={lineHeight}
               textIndent={textIndent}
               fontFamily={fontFamily}
+              charsPerLine={charsPerLine}
               scrollContainerRef={scrollContainerRef}
               onEditorViewReady={setEditorViewInstance}
             />
@@ -168,6 +171,7 @@ function MilkdownEditor({
   lineHeight,
   textIndent,
   fontFamily,
+  charsPerLine,
   scrollContainerRef,
   onEditorViewReady,
 }: {
@@ -179,6 +183,7 @@ function MilkdownEditor({
   lineHeight: number;
   textIndent: number;
   fontFamily: string;
+  charsPerLine: number;
   scrollContainerRef: RefObject<HTMLDivElement>;
   onEditorViewReady?: (view: EditorView) => void;
 }) {
@@ -279,9 +284,29 @@ function MilkdownEditor({
     if (!container || !isVertical) return;
 
     const handleWheel = (event: WheelEvent) => {
-      if (Math.abs(event.deltaY) >= Math.abs(event.deltaX)) {
+      // Detect if it's a touchpad (has deltaX and deltaY with fine precision)
+      // or a mouse wheel (usually only deltaY or coarse values)
+      const isTouchpad = Math.abs(event.deltaX) > 0 || 
+                         (Math.abs(event.deltaY) % 1 !== 0);
+
+      if (isTouchpad) {
+        // Touchpad: swap X and Y axes
+        // horizontal gesture -> vertical scroll
+        // vertical gesture -> horizontal scroll
         container.scrollLeft += event.deltaY;
+        container.scrollTop += event.deltaX;
         event.preventDefault();
+      } else {
+        // Mouse wheel: 
+        // vertical wheel -> horizontal scroll
+        // horizontal wheel -> vertical scroll
+        if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+          container.scrollLeft += event.deltaY;
+          event.preventDefault();
+        } else if (Math.abs(event.deltaX) > 0) {
+          container.scrollTop += event.deltaX;
+          event.preventDefault();
+        }
       }
     };
 
@@ -348,13 +373,17 @@ function MilkdownEditor({
     <>
       <div
         ref={editorRef}
-        className="max-w-4xl mx-auto p-8"
+        className={clsx(
+          "mx-auto",
+          isVertical ? "px-16 py-16 min-w-fit h-full" : "p-8 max-w-4xl"
+        )}
         style={{
           fontSize: `${fontScale}%`,
           lineHeight: lineHeight,
           fontFamily: `"${fontFamily}", serif`,
           // Apply text-indent to paragraphs only (not headings)
           // This is done via CSS and doesn't add actual spaces to the content
+          ['--chars-per-line' as string]: charsPerLine,
         }}
       >
         <style jsx>{`
@@ -372,11 +401,33 @@ function MilkdownEditor({
           div :global(.milkdown .ProseMirror blockquote) {
             text-indent: 0;
           }
+          
+          /* Character per line limit for horizontal mode */
+          ${charsPerLine > 0 ? `
+          div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p),
+          div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal blockquote),
+          div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal li) {
+            max-width: ${charsPerLine}em;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+          }
+          ` : ''}
+          
+          /* Character per line limit for vertical mode */
+          ${charsPerLine > 0 ? `
+          div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p),
+          div :global(.milkdown .ProseMirror.milkdown-japanese-vertical blockquote),
+          div :global(.milkdown .ProseMirror.milkdown-japanese-vertical li) {
+            max-height: ${charsPerLine}em;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+          }
+          ` : ''}
         `}</style>
         <Milkdown />
       </div>
       {editorViewInstance && (
-        <BubbleMenu editorView={editorViewInstance} onFormat={handleFormat} />
+        <BubbleMenu editorView={editorViewInstance} onFormat={handleFormat} isVertical={isVertical} />
       )}
     </>
   );

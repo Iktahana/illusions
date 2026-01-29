@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useMemo, useState, useEffect } from "react";
+import { ReactNode, useMemo, useState, useEffect, useRef } from "react";
 import { 
   FolderTree, 
   Settings, 
@@ -8,7 +8,8 @@ import {
   ChevronRight,
   FileText,
   Plus,
-  X
+  X,
+  Check
 } from "lucide-react";
 import clsx from "clsx";
 import { parseMarkdownChapters, type Chapter } from "@/lib/utils";
@@ -165,6 +166,8 @@ interface ExplorerProps {
   onTextIndentChange?: (indent: number) => void;
   fontFamily?: string;
   onFontFamilyChange?: (family: string) => void;
+  charsPerLine?: number;
+  onCharsPerLineChange?: (chars: number) => void;
 }
 
 export default function Explorer({ 
@@ -180,6 +183,8 @@ export default function Explorer({
   onTextIndentChange,
   fontFamily = 'Noto Serif JP',
   onFontFamilyChange,
+  charsPerLine = 40,
+  onCharsPerLineChange,
 }: ExplorerProps) {
   const [activeTab, setActiveTab] = useState<Tab>("chapters");
 
@@ -239,6 +244,8 @@ export default function Explorer({
             onTextIndentChange={onTextIndentChange}
             fontFamily={fontFamily}
             onFontFamilyChange={onFontFamilyChange}
+            charsPerLine={charsPerLine}
+            onCharsPerLineChange={onCharsPerLineChange}
           />
         )}
       </div>
@@ -303,15 +310,9 @@ function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; o
     { syntax: "# 見出し", description: "レベル1の見出し", example: "# 第一章" },
     { syntax: "## 見出し", description: "レベル2の見出し", example: "## 第一節" },
     { syntax: "### 見出し", description: "レベル3の見出し", example: "### シーン1" },
-    { syntax: "**太字**", description: "太字テキスト", example: "**重要な内容**" },
-    { syntax: "*斜体*", description: "斜体テキスト", example: "*強調テキスト*" },
-    { syntax: "~~取り消し線~~", description: "取り消し線", example: "~~削除済み~~" },
-    { syntax: "> 引用", description: "引用テキスト", example: "> これは引用です" },
-    { syntax: "- 項目", description: "箇条書きリスト", example: "- 項目1\n- 項目2" },
-    { syntax: "1. 項目", description: "番号付きリスト", example: "1. 項目1\n2. 項目2" },
-    { syntax: "---", description: "区切り線", example: "---" },
-    { syntax: "`コード`", description: "インラインコード", example: "`console.log()`" },
-    { syntax: "[リンク](URL)", description: "ハイパーリンク", example: "[Google](https://google.com)" },
+    { syntax: "#### 見出し", description: "レベル4の見出し", example: "#### セクション" },
+    { syntax: "##### 見出し", description: "レベル5の見出し", example: "##### サブセクション" },
+    { syntax: "###### 見出し", description: "レベル6の見出し", example: "###### 詳細" },
   ];
 
   return (
@@ -323,7 +324,7 @@ function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; o
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
           <h3 className="text-sm font-semibold text-slate-800">
-            Markdown構文ガイド
+            章節の見出しを追加
           </h3>
           <button
             onClick={onClose}
@@ -362,9 +363,8 @@ function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; o
             <h4 className="text-xs font-semibold text-blue-800 mb-2">💡 ヒント</h4>
             <ul className="text-xs text-blue-700 space-y-1">
               <li>• 見出しの後には空行が必要です</li>
-              <li>• リスト項目間に空行は不要です</li>
-              <li>• 複数の書式を組み合わせることができます</li>
-              <li>• ルビ（振り仮名）構文もサポートしています</li>
+              <li>• # の数が多いほど、小さな見出しになります</li>
+              <li>• 見出しは章節の構造を表すのに使います</li>
             </ul>
           </div>
         </div>
@@ -444,6 +444,159 @@ function SettingsPanel() {
   );
 }
 
+function FontSelector({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (font: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Preload featured fonts
+  useEffect(() => {
+    FEATURED_JAPANESE_FONTS.forEach(font => {
+      loadGoogleFont(font.family);
+    });
+  }, []);
+
+  const handleSelect = (font: string) => {
+    onChange(font);
+    loadGoogleFont(font);
+    setIsOpen(false);
+    setSearchTerm('');
+  };
+
+  // Filter fonts based on search term
+  const filteredFonts = searchTerm
+    ? ALL_JAPANESE_FONTS.filter(font =>
+        font.family.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : ALL_JAPANESE_FONTS;
+
+  const featuredFiltered = FEATURED_JAPANESE_FONTS.filter(font =>
+    !searchTerm || font.family.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const otherFonts = filteredFonts.filter(
+    font => !FEATURED_JAPANESE_FONTS.find(f => f.family === font.family)
+  );
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      {/* Selected font display */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-left flex items-center justify-between"
+        style={{ fontFamily: `"${value}", serif` }}
+      >
+        <span>{value}</span>
+        <ChevronRight 
+          className={clsx(
+            "w-4 h-4 transition-transform",
+            isOpen ? "rotate-90" : "rotate-0"
+          )}
+        />
+      </button>
+
+      {/* Dropdown */}
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-slate-300 rounded-lg shadow-lg max-h-80 overflow-hidden flex flex-col">
+          {/* Search input */}
+          <div className="p-2 border-b border-slate-200">
+            <input
+              type="text"
+              placeholder="フォントを検索..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+
+          {/* Font list */}
+          <div className="overflow-y-auto">
+            {/* Featured fonts */}
+            {featuredFiltered.length > 0 && (
+              <>
+                <div className="px-3 py-1 text-xs font-semibold text-slate-500 bg-slate-50 sticky top-0">
+                  おすすめ
+                </div>
+                {featuredFiltered.map(font => (
+                  <button
+                    key={font.family}
+                    type="button"
+                    onClick={() => handleSelect(font.family)}
+                    className={clsx(
+                      "w-full px-3 py-2 text-sm text-left hover:bg-indigo-50 flex items-center justify-between transition-colors",
+                      value === font.family && "bg-indigo-50"
+                    )}
+                    style={{ fontFamily: `"${font.family}", serif` }}
+                  >
+                    <span>{font.family}</span>
+                    {value === font.family && (
+                      <Check className="w-4 h-4 text-indigo-600" />
+                    )}
+                  </button>
+                ))}
+              </>
+            )}
+
+            {/* All other fonts */}
+            {otherFonts.length > 0 && (
+              <>
+                {!searchTerm && (
+                  <div className="px-3 py-1 text-xs font-semibold text-slate-500 bg-slate-50 sticky top-0">
+                    すべてのフォント
+                  </div>
+                )}
+                {otherFonts.map(font => (
+                  <button
+                    key={font.family}
+                    type="button"
+                    onClick={() => handleSelect(font.family)}
+                    className={clsx(
+                      "w-full px-3 py-2 text-sm text-left hover:bg-indigo-50 flex items-center justify-between transition-colors",
+                      value === font.family && "bg-indigo-50"
+                    )}
+                    style={{ fontFamily: `"${font.family}", serif` }}
+                  >
+                    <span>{font.family}</span>
+                    {value === font.family && (
+                      <Check className="w-4 h-4 text-indigo-600" />
+                    )}
+                  </button>
+                ))}
+              </>
+            )}
+
+            {/* No results */}
+            {featuredFiltered.length === 0 && otherFonts.length === 0 && (
+              <div className="px-3 py-4 text-sm text-slate-500 text-center">
+                フォントが見つかりません
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StylePanel({
   fontScale = 100,
   onFontScaleChange,
@@ -453,6 +606,8 @@ function StylePanel({
   onTextIndentChange,
   fontFamily = 'Noto Serif JP',
   onFontFamilyChange,
+  charsPerLine = 40,
+  onCharsPerLineChange,
 }: {
   fontScale?: number;
   onFontScaleChange?: (scale: number) => void;
@@ -462,56 +617,19 @@ function StylePanel({
   onTextIndentChange?: (indent: number) => void;
   fontFamily?: string;
   onFontFamilyChange?: (family: string) => void;
+  charsPerLine?: number;
+  onCharsPerLineChange?: (chars: number) => void;
 }) {
-  // Preload featured fonts on mount
-  useEffect(() => {
-    FEATURED_JAPANESE_FONTS.forEach(font => {
-      loadGoogleFont(font.family);
-    });
-  }, []);
-
-  const handleFontChange = (newFont: string) => {
-    onFontFamilyChange?.(newFont);
-    loadGoogleFont(newFont);
-  };
-
   return (
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-2">
           フォント
         </label>
-        <select 
+        <FontSelector
           value={fontFamily}
-          onChange={(e) => handleFontChange(e.target.value)}
-          className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 font-preview-select"
-          style={{ fontFamily: `"${fontFamily}", serif` }}
-        >
-          <optgroup label="おすすめ">
-            {FEATURED_JAPANESE_FONTS.map(font => (
-              <option 
-                key={font.family} 
-                value={font.family}
-                style={{ fontFamily: `"${font.family}", serif` }}
-              >
-                {font.family}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="すべてのフォント">
-            {ALL_JAPANESE_FONTS
-              .filter(font => !FEATURED_JAPANESE_FONTS.find(f => f.family === font.family))
-              .map(font => (
-                <option 
-                  key={font.family} 
-                  value={font.family}
-                  style={{ fontFamily: `"${font.family}", serif` }}
-                >
-                  {font.family}
-                </option>
-              ))}
-          </optgroup>
-        </select>
+          onChange={(font) => onFontFamilyChange?.(font)}
+        />
       </div>
       
       <div>
@@ -571,6 +689,28 @@ function StylePanel({
         </div>
         <p className="text-xs text-slate-500 mt-1">
           段落の先頭にインデントを適用します
+        </p>
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-2">
+          1行あたりの文字数制限
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={charsPerLine}
+            onChange={(e) => onCharsPerLineChange?.(Number(e.target.value))}
+            className="w-20 px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          <span className="text-sm text-slate-600">字</span>
+        </div>
+        <p className="text-xs text-slate-500 mt-1">
+          {charsPerLine === 0 
+            ? '0に設定すると制限なし'
+            : '1行（縦書きの場合は1列）あたりの最大文字数'}
         </p>
       </div>
     </div>
