@@ -22,6 +22,7 @@
     "@milkdown/plugin-listener": "^7.5.1",
     "@milkdown/plugin-prism": "^7.5.1",
     "@milkdown/preset-commonmark": "^7.5.1",
+    "@milkdown/preset-gfm": "^7.18.0",
     "@milkdown/react": "^7.5.1",
     "@milkdown/theme-nord": "^7.5.1",
     "@milkdown/utils": "^7.5.1",

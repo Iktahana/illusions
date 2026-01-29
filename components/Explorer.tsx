@@ -84,7 +84,7 @@ function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: str
   return (
     <div className="space-y-2 relative">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-slate-700">章節管理</h3>
+        <h3 className="text-sm font-medium text-slate-700">目次</h3>
         <button className="p-1 hover:bg-slate-100 rounded">
           <Plus className="w-4 h-4 text-slate-600" />
         </button>

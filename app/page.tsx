@@ -39,6 +39,7 @@ export default function EditorPage() {
     }
   }, [wasAutoRecovered, dismissedRecovery]);
 
+
   contentRef.current = content;
 
   const handleChange = (markdown: string) => {
@@ -99,7 +100,7 @@ export default function EditorPage() {
   }, [saveFile]);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden relative">
       {/* Auto-recovery notification (Web only) - fixed position */}
       {!isElectron && wasAutoRecovered && !dismissedRecovery && (
         <div className="fixed left-0 top-0 right-0 z-50 bg-gradient-to-r from-emerald-50 to-teal-50 border-b-2 border-emerald-300 px-4 py-3 flex items-center justify-between animate-slide-in-down shadow-lg">
@@ -117,7 +118,7 @@ export default function EditorPage() {
           </button>
         </div>
       )}
-      
+
       <div className="flex-1 flex overflow-hidden">
         <Explorer content={content} onChapterClick={handleChapterClick} onInsertText={handleInsertText} />
         <main className="flex-1 flex flex-col overflow-hidden">

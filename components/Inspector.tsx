@@ -152,12 +152,28 @@ export default function Inspector({
           </div>
         )}
         
-        <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
+        <div className="mt-2 flex items-center justify-between text-xs">
           <span>
-            {isSaving && <span className="text-blue-600 font-medium">⟳ 保存中...</span>}
-            {!isSaving && isDirty && <span className="text-amber-600 font-medium">● 未保存</span>}
-            {!isSaving && !isDirty && lastSavedTime === null && <span className="text-slate-500 font-medium">待保存</span>}
-            {!isSaving && !isDirty && lastSavedTime !== null && <span className="text-green-600 font-medium">✓ 保存済み</span>}
+            {isSaving && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 animate-pulse">
+                <span className="mr-1">⟳</span> 保存中...
+              </span>
+            )}
+            {!isSaving && isDirty && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-orange-500 text-white">
+                <span className="mr-1">●</span> 未保存
+              </span>
+            )}
+            {!isSaving && !isDirty && lastSavedTime === null && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-gray-500 text-white">
+                <span className="mr-1">●</span> 待保存
+              </span>
+            )}
+            {!isSaving && !isDirty && lastSavedTime !== null && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-green-500 text-white">
+                <span className="mr-1">✓</span> 保存済み
+              </span>
+            )}
           </span>
           {lastSavedTime && !isDirty && (
             <span className="text-slate-500">{formatTime(lastSavedTime)}</span>
