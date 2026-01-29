@@ -98,7 +98,7 @@ export default function NovelEditor({
         className={clsx(
           "flex-1 bg-background-secondary relative min-h-0 pt-12",
           isVertical 
-            ? "overflow-x-auto overflow-y-auto flex items-center" 
+            ? "overflow-x-auto overflow-y-auto flex items-center justify-end" 
             : "overflow-auto"
         )}
       >
@@ -269,18 +269,32 @@ function MilkdownEditor({
 
   // Get editor view instance
   useEffect(() => {
-    const timer = setTimeout(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    const tryGetEditorView = () => {
+      attempts++;
       try {
         const editor = get();
-        if (editor) {
+        if (editor && editor.ctx) {
           const view = editor.ctx.get(editorViewCtx);
-          setEditorViewInstance(view);
-          onEditorViewReady?.(view);
+          if (view) {
+            setEditorViewInstance(view);
+            onEditorViewReady?.(view);
+            return;
+          }
         }
       } catch {
         // Editor not ready yet
       }
-    }, 100);
+      // Retry if not ready yet
+      if (attempts < maxAttempts) {
+        timer = setTimeout(tryGetEditorView, 100);
+      }
+    };
+    
+    timer = setTimeout(tryGetEditorView, 100);
 
     return () => clearTimeout(timer);
   }, [get, onEditorViewReady]);
@@ -531,17 +545,23 @@ function MilkdownEditor({
         )}
         style={{
           fontSize: `${fontScale}%`,
-          lineHeight: lineHeight,
           fontFamily: `"${fontFamily}", serif`,
+          lineHeight: lineHeight,
         }}
       >
         <style jsx>{`
           div :global(.milkdown .ProseMirror) {
             ${showParagraphNumbers ? 'counter-reset: paragraph;' : ''}
           }
-          div :global(.milkdown .ProseMirror p) {
+          div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p) {
             text-indent: ${textIndent}em;
             margin-bottom: ${paragraphSpacing}em;
+            ${showParagraphNumbers ? 'counter-increment: paragraph;' : ''}
+            ${showParagraphNumbers ? 'position: relative;' : ''}
+          }
+          div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p) {
+            text-indent: ${textIndent}em;
+            margin-left: ${paragraphSpacing}em;
             ${showParagraphNumbers ? 'counter-increment: paragraph;' : ''}
             ${showParagraphNumbers ? 'position: relative;' : ''}
           }
