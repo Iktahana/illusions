@@ -206,7 +206,7 @@ export default function Explorer({
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
             activeTab === "chapters"
               ? "text-foreground border-b-2 border-accent"
-              : "text-foreground-tertiary hover:text-foreground-secondary"
+              : "text-foreground hover:text-foreground"
           )}
         >
           <FolderTree className="w-4 h-4" />
@@ -218,7 +218,7 @@ export default function Explorer({
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
             activeTab === "settings"
               ? "text-foreground border-b-2 border-accent"
-              : "text-foreground-tertiary hover:text-foreground-secondary"
+              : "text-foreground hover:text-foreground"
           )}
         >
           <Settings className="w-4 h-4" />
@@ -230,7 +230,7 @@ export default function Explorer({
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
             activeTab === "style"
               ? "text-foreground border-b-2 border-accent"
-              : "text-foreground-tertiary hover:text-foreground-secondary"
+              : "text-foreground hover:text-foreground"
           )}
         >
           <Palette className="w-4 h-4" />
@@ -431,7 +431,7 @@ function ChapterItem({
         "flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors",
         isActive
           ? "bg-accent-light text-accent"
-          : "hover:bg-hover text-foreground-secondary"
+          : "hover:bg-hover text-foreground"
       )}
       style={{ paddingLeft: `${8 + indent}px` }}
     >
