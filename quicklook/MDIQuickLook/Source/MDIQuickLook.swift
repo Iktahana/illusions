@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 @_cdecl("GeneratePreviewForURL")
 public func GeneratePreviewForURL(
   _ thisInterface: UnsafeMutableRawPointer?,
-  _ preview: QLPreviewRequestRef,
+  _ preview: QLPreviewRequest,
   _ url: CFURL,
   _ contentTypeUTI: CFString,
   _ options: CFDictionary?
@@ -33,12 +33,21 @@ public func GeneratePreviewForURL(
       kQLPreviewPropertyTextEncodingNameKey: "UTF-8",
     ]
 
-    QLPreviewRequestSetDataRepresentation(
-      preview,
-      data as CFData,
-      UTType.html.identifier as CFString,
-      properties as CFDictionary
-    )
+    if #available(macOS 11.0, *) {
+      QLPreviewRequestSetDataRepresentation(
+        preview,
+        data as CFData,
+        UTType.html.identifier as CFString,
+        properties as CFDictionary
+      )
+    } else {
+      QLPreviewRequestSetDataRepresentation(
+        preview,
+        data as CFData,
+        "public.html" as CFString,
+        properties as CFDictionary
+      )
+    }
 
     return noErr
   }
@@ -47,7 +56,7 @@ public func GeneratePreviewForURL(
 @_cdecl("CancelPreviewGeneration")
 public func CancelPreviewGeneration(
   _ thisInterface: UnsafeMutableRawPointer?,
-  _ preview: QLPreviewRequestRef
+  _ preview: QLPreviewRequest
 ) {
   // Quick Look preview cancellation is best-effort; nothing to clean up here.
 }
@@ -55,7 +64,7 @@ public func CancelPreviewGeneration(
 @_cdecl("GenerateThumbnailForURL")
 public func GenerateThumbnailForURL(
   _ thisInterface: UnsafeMutableRawPointer?,
-  _ thumbnail: QLThumbnailRequestRef,
+  _ thumbnail: QLThumbnailRequest,
   _ url: CFURL,
   _ contentTypeUTI: CFString,
   _ options: CFDictionary?,
@@ -67,7 +76,7 @@ public func GenerateThumbnailForURL(
 @_cdecl("CancelThumbnailGeneration")
 public func CancelThumbnailGeneration(
   _ thisInterface: UnsafeMutableRawPointer?,
-  _ thumbnail: QLThumbnailRequestRef
+  _ thumbnail: QLThumbnailRequest
 ) {
   // No-op.
 }
