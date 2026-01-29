@@ -37,7 +37,7 @@ export default function Inspector({
   className,
   wordCount = 0,
   charCount = 0,
-  fileName = "Untitled",
+  fileName = "無題",
   isDirty = false,
   isSaving = false,
   lastSavedTime = null,

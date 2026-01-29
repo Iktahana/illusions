@@ -20,6 +20,8 @@ declare global {
     onOpenFileFromSystem?: (
       callback: (payload: { path: string; content: string }) => void
     ) => void;
+    onMenuNew?: (callback: () => void) => void;
+    onMenuOpen?: (callback: () => void) => void;
     onMenuSave?: (callback: () => void) => void;
     onMenuSaveAs?: (callback: () => void) => void;
     storage?: {

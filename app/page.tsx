@@ -175,7 +175,7 @@ export default function EditorPage() {
   const wordCount = words(content);
   const charCount = chars(content);
 
-  const fileName = currentFile?.name ?? (isDirty ? "Untitled (unsaved)" : "Untitled");
+  const fileName = currentFile?.name ?? (isDirty ? "無題（未保存）" : "無題");
 
   // Handle keyboard shortcuts: Cmd+S / Ctrl+S to save, Cmd+F / Ctrl+F to search
   useEffect(() => {
@@ -215,7 +215,7 @@ export default function EditorPage() {
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
             <p className="text-sm text-foreground">
-              <span className="font-semibold text-foreground">✓ Previously edited file recovered:</span> <span className="font-mono text-success">{currentFile?.name}</span>
+              <span className="font-semibold text-foreground">✓ 前回編集したファイルを復元しました：</span> <span className="font-mono text-success">{currentFile?.name}</span>
             </p>
           </div>
           <button

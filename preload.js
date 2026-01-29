@@ -9,5 +9,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFile: () => ipcRenderer.invoke('open-file'),
   saveFile: (filePath, content) => ipcRenderer.invoke('save-file', filePath, content),
   getChromeVersion: () => ipcRenderer.invoke('get-chrome-version'),
+  onMenuNew: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-new-triggered', handler)
+  },
+  onMenuOpen: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-open-triggered', handler)
+  },
+  onMenuSave: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-save-triggered', handler)
+  },
+  onMenuSaveAs: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-save-as-triggered', handler)
+  },
 })
 

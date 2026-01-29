@@ -235,7 +235,7 @@ export function useMdiFile(): UseMdiFileReturn {
       setCurrentFile({
         path,
         handle: null,
-        name: path.split("/").pop() || "Untitled",
+        name: path.split("/").pop() || "無題",
       });
       setContentState(fileContent);
       setLastSavedContent(fileContent);
@@ -304,6 +304,24 @@ export function useMdiFile(): UseMdiFileReturn {
       }
     });
   }, [saveFile, isElectron, currentFile]);
+
+  // Handle menu new command.
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI?.onMenuNew) return;
+
+    window.electronAPI.onMenuNew(() => {
+      newFile();
+    });
+  }, [newFile, isElectron]);
+
+  // Handle menu open command.
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI?.onMenuOpen) return;
+
+    window.electronAPI.onMenuOpen(async () => {
+      await openFile();
+    });
+  }, [openFile, isElectron]);
 
   // Handle Web beforeunload.
   useEffect(() => {

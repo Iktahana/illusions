@@ -2,7 +2,7 @@
 // Electron main process entry.
 // Comments in code must be in English.
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron')
 const path = require('path')
 const fs = require('fs/promises')
 const { autoUpdater } = require('electron-updater')
@@ -10,6 +10,8 @@ const log = require('electron-log')
 
 const isDev =
   process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === '1'
+
+const APP_NAME = 'Illusions'
 
 // Configure auto-updater logging
 autoUpdater.logger = log
@@ -81,6 +83,89 @@ function setupAutoUpdater() {
   autoUpdater.checkForUpdatesAndNotify()
 }
 
+function buildApplicationMenu() {
+  const isMac = process.platform === 'darwin'
+
+  const template = []
+
+  // App menu (macOS only)
+  if (isMac) {
+    template.push({
+      label: APP_NAME,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    })
+  }
+
+  // File menu
+  template.push({
+    label: 'ファイル',
+    submenu: [
+      {
+        label: '新規',
+        accelerator: 'CmdOrCtrl+N',
+        click: () => {
+          mainWindow?.webContents.send('menu-new-triggered')
+        },
+      },
+      {
+        label: '開く...',
+        accelerator: 'CmdOrCtrl+O',
+        click: () => {
+          mainWindow?.webContents.send('menu-open-triggered')
+        },
+      },
+      { type: 'separator' },
+      {
+        label: '保存',
+        accelerator: 'CmdOrCtrl+S',
+        click: () => {
+          mainWindow?.webContents.send('menu-save-triggered')
+        },
+      },
+      {
+        label: '別名で保存...',
+        accelerator: 'Shift+CmdOrCtrl+S',
+        click: () => {
+          mainWindow?.webContents.send('menu-save-as-triggered')
+        },
+      },
+      { type: 'separator' },
+      {
+        label: '閉じる',
+        accelerator: 'CmdOrCtrl+W',
+        click: () => {
+          mainWindow?.close()
+        },
+      },
+      ...(isMac ? [] : [{ type: 'separator' }]),
+      ...(isMac ? [] : [{ role: 'quit' }]),
+    ],
+  })
+
+  // Edit menu
+  template.push({ role: 'editMenu' })
+
+  // View menu
+  template.push({ role: 'viewMenu' })
+
+  // Window menu (macOS only)
+  if (isMac) {
+    template.push({ role: 'windowMenu' })
+  }
+
+  return template
+}
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -106,6 +191,10 @@ function createMainWindow() {
     // Next.js static export output.
     mainWindow.loadFile(path.join(__dirname, 'out', 'index.html'))
   }
+
+  // Set up application menu
+  const menu = Menu.buildFromTemplate(buildApplicationMenu())
+  Menu.setApplicationMenu(menu)
 }
 
 ipcMain.handle('get-chrome-version', () => {
