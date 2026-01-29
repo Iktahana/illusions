@@ -12,6 +12,13 @@
 
 # production
 /build
+!/build/
+!/build/icon.icns
+!/build/icon.ico
+!/build/icon.png
+!/build/mdi-icon.icns
+!/build/mdi-icon.ico
+!/build/mdi-icon.png
 /dist*
 
 # electron
