@@ -62,8 +62,9 @@ function basename(p: string): string {
 
 function updateWindowTitle(): void {
   if (!mainWindow) return;
-  const filePart = currentFilePath ? ` - ${basename(currentFilePath)}` : "";
-  mainWindow.setTitle(`${APP_NAME}${filePart}`);
+  const filePart = currentFilePath ? basename(currentFilePath) : "";
+  const title = filePart ? `${filePart} - ${APP_NAME}` : APP_NAME;
+  mainWindow.setTitle(title);
 }
 
 async function openFileInWindow(filePath: string): Promise<void> {

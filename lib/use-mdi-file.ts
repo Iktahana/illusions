@@ -6,7 +6,7 @@ import { isElectronRenderer } from "./runtime-env";
 import { getStorageService } from "./storage-service";
 
 const DEFAULT_CONTENT = "";
-const AUTO_SAVE_INTERVAL = 5000; // 5 seconds
+const AUTO_SAVE_INTERVAL = 2000; // 2 seconds
 
 export interface UseMdiFileReturn {
   currentFile: MdiFileDescriptor | null;

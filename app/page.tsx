@@ -5,6 +5,7 @@ import Explorer from "@/components/Explorer";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
 import AiStatusIndicator from "@/components/AiStatusIndicator";
+import ResizablePanel from "@/components/ResizablePanel";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { isElectronRenderer } from "@/lib/runtime-env";
 
@@ -120,9 +121,12 @@ export default function EditorPage() {
       )}
 
       <div className="flex-1 flex overflow-hidden">
-        <Explorer content={content} onChapterClick={handleChapterClick} onInsertText={handleInsertText} />
-        <main className="flex-1 flex flex-col overflow-hidden">
-          <div ref={editorDomRef} className="flex-1">
+        <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
+          <Explorer content={content} onChapterClick={handleChapterClick} onInsertText={handleInsertText} />
+        </ResizablePanel>
+        
+        <main className="flex-1 flex flex-col overflow-hidden min-h-0">
+          <div ref={editorDomRef} className="flex-1 min-h-0">
             <NovelEditor
               key={`${currentFile?.name ?? "new"}-${editorKey}`}
               initialContent={content}
@@ -131,17 +135,20 @@ export default function EditorPage() {
             />
           </div>
         </main>
-        <Inspector 
-          wordCount={wordCount} 
-          charCount={charCount}
-          fileName={fileName}
-          isDirty={isDirty}
-          isSaving={isSaving}
-          lastSavedTime={lastSavedTime}
-          onOpenFile={openFile}
-          onNewFile={newFile}
-          onFileNameChange={updateFileName}
-        />
+        
+        <ResizablePanel side="right" defaultWidth={256} minWidth={200} maxWidth={400}>
+          <Inspector 
+            wordCount={wordCount} 
+            charCount={charCount}
+            fileName={fileName}
+            isDirty={isDirty}
+            isSaving={isSaving}
+            lastSavedTime={lastSavedTime}
+            onOpenFile={openFile}
+            onNewFile={newFile}
+            onFileNameChange={updateFileName}
+          />
+        </ResizablePanel>
       </div>
 
       <AiStatusIndicator />

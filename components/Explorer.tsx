@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { ReactNode, useMemo, useState } from "react";
 import { 
   FolderTree, 
   Settings, 
@@ -15,6 +15,141 @@ import { parseMarkdownChapters, type Chapter } from "@/lib/utils";
 
 type Tab = "chapters" | "settings" | "style";
 
+const formattingMarkers = ["**", "__", "~~", "*", "_", "`", "["];
+
+function renderFormattedTitle(title: string): ReactNode {
+  let nodeCounter = 0;
+  const nextKey = () => `formatted-${nodeCounter++}`;
+
+  const findNextSpecial = (segment: string, start: number) => {
+    let next = segment.length;
+
+    formattingMarkers.forEach((marker) => {
+      const pos = segment.indexOf(marker, start + 1);
+      if (pos !== -1 && pos < next) {
+        next = pos;
+      }
+    });
+
+    return next;
+  };
+
+  const parseSegment = (segment: string): ReactNode[] => {
+    const nodes: ReactNode[] = [];
+    let idx = 0;
+
+    while (idx < segment.length) {
+      if (segment.startsWith("**", idx)) {
+        const end = segment.indexOf("**", idx + 2);
+        if (end > idx + 1) {
+          nodes.push(
+            <strong key={nextKey()} className="font-semibold text-slate-900">
+              {parseSegment(segment.slice(idx + 2, end))}
+            </strong>
+          );
+          idx = end + 2;
+          continue;
+        }
+      }
+
+      if (segment.startsWith("__", idx)) {
+        const end = segment.indexOf("__", idx + 2);
+        if (end > idx + 1) {
+          nodes.push(
+            <strong key={nextKey()} className="font-semibold text-slate-900">
+              {parseSegment(segment.slice(idx + 2, end))}
+            </strong>
+          );
+          idx = end + 2;
+          continue;
+        }
+      }
+
+      if (segment.startsWith("~~", idx)) {
+        const end = segment.indexOf("~~", idx + 2);
+        if (end > idx + 1) {
+          nodes.push(
+            <span key={nextKey()} className="text-slate-500 line-through">
+              {parseSegment(segment.slice(idx + 2, end))}
+            </span>
+          );
+          idx = end + 2;
+          continue;
+        }
+      }
+
+      if (segment.startsWith("*", idx) && !segment.startsWith("**", idx)) {
+        const end = segment.indexOf("*", idx + 1);
+        if (end > idx) {
+          nodes.push(
+            <em key={nextKey()} className="italic text-slate-700">
+              {parseSegment(segment.slice(idx + 1, end))}
+            </em>
+          );
+          idx = end + 1;
+          continue;
+        }
+      }
+
+      if (segment.startsWith("_", idx) && !segment.startsWith("__", idx)) {
+        const end = segment.indexOf("_", idx + 1);
+        if (end > idx) {
+          nodes.push(
+            <em key={nextKey()} className="italic text-slate-700">
+              {parseSegment(segment.slice(idx + 1, end))}
+            </em>
+          );
+          idx = end + 1;
+          continue;
+        }
+      }
+
+      if (segment.startsWith("`", idx)) {
+        const end = segment.indexOf("`", idx + 1);
+        if (end > idx) {
+          nodes.push(
+            <code key={nextKey()} className="font-mono text-xs text-slate-600 bg-slate-100 px-1 rounded-sm">
+              {segment.slice(idx + 1, end)}
+            </code>
+          );
+          idx = end + 1;
+          continue;
+        }
+      }
+
+      if (segment[idx] === "[") {
+        const closeBracket = segment.indexOf("]", idx + 1);
+        const openParen = closeBracket === -1 ? -1 : segment.indexOf("(", closeBracket + 1);
+        const closeParen = openParen === -1 ? -1 : segment.indexOf(")", openParen + 1);
+
+        if (closeBracket > idx && openParen === closeBracket + 1 && closeParen > openParen) {
+          const label = segment.slice(idx + 1, closeBracket);
+          nodes.push(
+            <strong key={nextKey()} className="font-semibold text-slate-900">
+              {parseSegment(label)}
+            </strong>
+          );
+          idx = closeParen + 1;
+          continue;
+        }
+      }
+
+      const nextSpecial = findNextSpecial(segment, idx);
+      const plainText = segment.slice(idx, nextSpecial);
+      if (plainText) {
+        nodes.push(
+          <span key={nextKey()}>{plainText}</span>
+        );
+      }
+      idx = nextSpecial;
+    }
+
+    return nodes;
+  };
+
+  return <>{parseSegment(title)}</>;
+}
+
 interface ExplorerProps {
   className?: string;
   content?: string;
@@ -26,7 +161,7 @@ export default function Explorer({ className, content = "", onChapterClick, onIn
   const [activeTab, setActiveTab] = useState<Tab>("chapters");
 
   return (
-    <aside className={clsx("w-64 bg-white border-r border-slate-200 flex flex-col", className)}>
+    <aside className={clsx("h-full bg-white border-r border-slate-200 flex flex-col", className)}>
       {/* Tab Navigation */}
       <div className="h-12 border-b border-slate-200 flex items-center">
         <button
@@ -228,7 +363,7 @@ function ChapterItem({
     >
       <ChevronRight className="w-4 h-4 flex-shrink-0" />
       <FileText className="w-4 h-4 flex-shrink-0" />
-      <span className="text-sm flex-1 truncate">{chapter.title}</span>
+      <span className="text-sm flex-1 truncate">{renderFormattedTitle(chapter.title)}</span>
       <span className="text-xs text-slate-400 flex-shrink-0">
         {chapter.level}
       </span>

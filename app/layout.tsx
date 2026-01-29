@@ -10,7 +10,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <head>
-        <title>Illusions - 日本語小説エディター</title>
+        <title>被愛妄想罪.mdi - Illusions</title>
         <meta name="description" content="A professional Japanese novel editor with vertical writing support" />
       </head>
       <body className="antialiased">

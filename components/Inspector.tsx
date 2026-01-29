@@ -84,7 +84,7 @@ export default function Inspector({
   };
 
   return (
-    <aside className={clsx("w-80 bg-white border-l border-slate-200 flex flex-col", className)}>
+    <aside className={clsx("h-full bg-white border-l border-slate-200 flex flex-col", className)}>
       {/* File Status Header */}
       <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
         <div className="flex items-center justify-between mb-1">

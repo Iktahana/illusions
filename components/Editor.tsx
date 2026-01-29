@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Editor, rootCtx, defaultValueCtx } from "@milkdown/core";
+import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
-import { commonmark } from "@milkdown/preset-commonmark";
+import { commonmark, toggleEmphasisCommand, toggleStrongCommand, toggleInlineCodeCommand, wrapInHeadingCommand, wrapInBlockquoteCommand, wrapInBulletListCommand, wrapInOrderedListCommand } from "@milkdown/preset-commonmark";
+import { gfm, toggleStrikethroughCommand } from "@milkdown/preset-gfm";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { history } from "@milkdown/plugin-history";
 import { clipboard } from "@milkdown/plugin-clipboard";
@@ -13,6 +14,7 @@ import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
 import clsx from "clsx";
 import { Type, AlignLeft } from "lucide-react";
+import BubbleMenu, { type FormatType } from "./BubbleMenu";
 
 interface EditorProps {
   initialContent?: string;
@@ -27,7 +29,7 @@ export default function NovelEditor({ initialContent = "", onChange, onInsertTex
   const [lineHeight, setLineHeight] = useState(1.8);
 
   return (
-    <div className={clsx("flex flex-col h-full", className)}>
+    <div className={clsx("flex flex-col h-full min-h-0", className)}>
       {/* Editor Toolbar */}
       <EditorToolbar
         isVertical={isVertical}
@@ -39,7 +41,7 @@ export default function NovelEditor({ initialContent = "", onChange, onInsertTex
       />
 
       {/* Editor Area */}
-      <div className="flex-1 overflow-auto bg-slate-50 relative">
+      <div className="flex-1 overflow-auto bg-slate-50 relative min-h-0">
         <MilkdownProvider>
           <ProsemirrorAdapterProvider>
             <MilkdownEditor
@@ -125,6 +127,7 @@ function MilkdownEditor({
   lineHeight: number;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const [editorViewInstance, setEditorViewInstance] = useState<any>(null);
   // Store initial content at mount time - this should only change when component remounts (file switch)
   const initialContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
@@ -156,6 +159,7 @@ function MilkdownEditor({
         });
       })
       .use(commonmark)
+      .use(gfm)
       .use(japaneseNovel({
         isVertical,
         showManuscriptLine: false,
@@ -166,6 +170,23 @@ function MilkdownEditor({
       .use(clipboard)
       .use(cursor);
   }, [isVertical]); // Only recreate editor when isVertical changes
+
+  // Get editor view instance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const editor = get();
+        if (editor) {
+          const view = editor.ctx.get(editorViewCtx);
+          setEditorViewInstance(view);
+        }
+      } catch {
+        // Editor not ready yet
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [get]);
 
   // Handle vertical mode change without recreating the entire editor
   useEffect(() => {
@@ -195,17 +216,73 @@ function MilkdownEditor({
     return () => clearTimeout(timer);
   }, [isVertical, get]);
 
+  // Handle format commands from BubbleMenu
+  const handleFormat = (format: FormatType, level?: number) => {
+    try {
+      const editor = get();
+      if (!editor) return;
+
+      const execute = (commandKey: any, payload?: unknown) => {
+        editor.action((ctx) => {
+          const commands = ctx.get(commandsCtx);
+          commands.call(commandKey, payload);
+        });
+      };
+
+      switch (format) {
+        case "bold":
+          execute(toggleStrongCommand.key);
+          break;
+        case "italic":
+          execute(toggleEmphasisCommand.key);
+          break;
+        case "strikethrough":
+          execute(toggleStrikethroughCommand.key);
+          break;
+        case "heading":
+          if (level) {
+            execute(wrapInHeadingCommand.key, level);
+          }
+          break;
+        case "blockquote":
+          execute(wrapInBlockquoteCommand.key);
+          break;
+        case "bulletList":
+          execute(wrapInBulletListCommand.key);
+          break;
+        case "orderedList":
+          execute(wrapInOrderedListCommand.key);
+          break;
+        case "code":
+          execute(toggleInlineCodeCommand.key);
+          break;
+        case "link":
+          execute(toggleStrongCommand.key);
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      console.error("Format command failed:", error);
+    }
+  };
+
   return (
-    <div
-      ref={editorRef}
-      className="max-w-4xl mx-auto p-8"
-      style={{
-        fontSize: `${fontSize}px`,
-        lineHeight: lineHeight,
-        fontFamily: "inherit",
-      }}
-    >
-      <Milkdown />
-    </div>
+    <>
+      <div
+        ref={editorRef}
+        className="max-w-4xl mx-auto p-8"
+        style={{
+          fontSize: `${fontSize}px`,
+          lineHeight: lineHeight,
+          fontFamily: "inherit",
+        }}
+      >
+        <Milkdown />
+      </div>
+      {editorViewInstance && (
+        <BubbleMenu editorView={editorViewInstance} onFormat={handleFormat} />
+      )}
+    </>
   );
 }
