@@ -8,6 +8,7 @@
 
 export interface FontInfo {
   family: string;
+  localizedName?: string; // Native language name (e.g., Japanese name for Japanese fonts)
   category: 'serif' | 'sans-serif' | 'display' | 'handwriting' | 'monospace';
   variants?: string[];
 }
@@ -16,11 +17,11 @@ export interface FontInfo {
  * Featured Japanese fonts (displayed at the top of the selector)
  */
 export const FEATURED_JAPANESE_FONTS: FontInfo[] = [
-  { family: 'Noto Serif JP', category: 'serif' },
-  { family: 'Noto Sans JP', category: 'sans-serif' },
-  { family: 'Shippori Mincho', category: 'serif' },
-  { family: 'Zen Kaku Gothic New', category: 'sans-serif' },
-  { family: 'M PLUS Rounded 1c', category: 'sans-serif' },
+  { family: 'Noto Serif JP', localizedName: 'Noto 明朝', category: 'serif' },
+  { family: 'Noto Sans JP', localizedName: 'Noto ゴシック', category: 'sans-serif' },
+  { family: 'Shippori Mincho', localizedName: 'しっぽり明朝', category: 'serif' },
+  { family: 'Zen Kaku Gothic New', localizedName: '禅角ゴシック New', category: 'sans-serif' },
+  { family: 'M PLUS Rounded 1c', localizedName: 'Mプラス 丸ゴシック 1c', category: 'sans-serif' },
 ];
 
 /**
@@ -35,98 +36,98 @@ export const FEATURED_JAPANESE_FONTS: FontInfo[] = [
  */
 export const ALL_JAPANESE_FONTS: FontInfo[] = [
   // Noto Family
-  { family: 'Noto Serif JP', category: 'serif' },
-  { family: 'Noto Sans JP', category: 'sans-serif' },
+  { family: 'Noto Serif JP', localizedName: 'Noto 明朝', category: 'serif' },
+  { family: 'Noto Sans JP', localizedName: 'Noto ゴシック', category: 'sans-serif' },
   
   // M PLUS Family
-  { family: 'M PLUS 1', category: 'sans-serif' },
-  { family: 'M PLUS 2', category: 'sans-serif' },
-  { family: 'M PLUS 1p', category: 'sans-serif' },
-  { family: 'M PLUS Rounded 1c', category: 'sans-serif' },
-  { family: 'M PLUS 1 Code', category: 'monospace' },
-  { family: 'M PLUS Code Latin', category: 'monospace' },
+  { family: 'M PLUS 1', localizedName: 'Mプラス 1', category: 'sans-serif' },
+  { family: 'M PLUS 2', localizedName: 'Mプラス 2', category: 'sans-serif' },
+  { family: 'M PLUS 1p', localizedName: 'Mプラス 1p', category: 'sans-serif' },
+  { family: 'M PLUS Rounded 1c', localizedName: 'Mプラス 丸ゴシック 1c', category: 'sans-serif' },
+  { family: 'M PLUS 1 Code', localizedName: 'Mプラス 1 コード', category: 'monospace' },
+  { family: 'M PLUS Code Latin', localizedName: 'Mプラス コード Latin', category: 'monospace' },
   
   // Zen Family
-  { family: 'Zen Kaku Gothic New', category: 'sans-serif' },
-  { family: 'Zen Kaku Gothic Antique', category: 'sans-serif' },
-  { family: 'Zen Maru Gothic', category: 'sans-serif' },
-  { family: 'Zen Old Mincho', category: 'serif' },
-  { family: 'Zen Antique', category: 'serif' },
-  { family: 'Zen Antique Soft', category: 'serif' },
-  { family: 'Zen Kurenaido', category: 'sans-serif' },
-  { family: 'Zen Tokyo Zoo', category: 'display' },
+  { family: 'Zen Kaku Gothic New', localizedName: '禅角ゴシック New', category: 'sans-serif' },
+  { family: 'Zen Kaku Gothic Antique', localizedName: '禅角ゴシック アンティーク', category: 'sans-serif' },
+  { family: 'Zen Maru Gothic', localizedName: '禅丸ゴシック', category: 'sans-serif' },
+  { family: 'Zen Old Mincho', localizedName: '禅オールド明朝', category: 'serif' },
+  { family: 'Zen Antique', localizedName: '禅アンティーク', category: 'serif' },
+  { family: 'Zen Antique Soft', localizedName: '禅アンティーク ソフト', category: 'serif' },
+  { family: 'Zen Kurenaido', localizedName: '禅紅藍', category: 'sans-serif' },
+  { family: 'Zen Tokyo Zoo', localizedName: '禅東京ズー', category: 'display' },
   
   // Shippori Family
-  { family: 'Shippori Mincho', category: 'serif' },
-  { family: 'Shippori Mincho B1', category: 'serif' },
-  { family: 'Shippori Antique', category: 'sans-serif' },
-  { family: 'Shippori Antique B1', category: 'sans-serif' },
+  { family: 'Shippori Mincho', localizedName: 'しっぽり明朝', category: 'serif' },
+  { family: 'Shippori Mincho B1', localizedName: 'しっぽり明朝 B1', category: 'serif' },
+  { family: 'Shippori Antique', localizedName: 'しっぽりアンティーク', category: 'sans-serif' },
+  { family: 'Shippori Antique B1', localizedName: 'しっぽりアンティーク B1', category: 'sans-serif' },
   
   // Sawarabi Family
-  { family: 'Sawarabi Mincho', category: 'serif' },
-  { family: 'Sawarabi Gothic', category: 'sans-serif' },
+  { family: 'Sawarabi Mincho', localizedName: 'さわらび明朝', category: 'serif' },
+  { family: 'Sawarabi Gothic', localizedName: 'さわらびゴシック', category: 'sans-serif' },
   
   // Kosugi Family
-  { family: 'Kosugi', category: 'sans-serif' },
-  { family: 'Kosugi Maru', category: 'sans-serif' },
+  { family: 'Kosugi', localizedName: '小杉ゴシック', category: 'sans-serif' },
+  { family: 'Kosugi Maru', localizedName: '小杉丸ゴシック', category: 'sans-serif' },
   
   // BIZ UD Family (Business & Education)
-  { family: 'BIZ UDPGothic', category: 'sans-serif' },
-  { family: 'BIZ UDGothic', category: 'sans-serif' },
-  { family: 'BIZ UDPMincho', category: 'serif' },
-  { family: 'BIZ UDMincho', category: 'serif' },
+  { family: 'BIZ UDPGothic', localizedName: 'BIZ UDPゴシック', category: 'sans-serif' },
+  { family: 'BIZ UDGothic', localizedName: 'BIZ UDゴシック', category: 'sans-serif' },
+  { family: 'BIZ UDPMincho', localizedName: 'BIZ UDP明朝', category: 'serif' },
+  { family: 'BIZ UDMincho', localizedName: 'BIZ UD明朝', category: 'serif' },
   
   // Kaisei Family
-  { family: 'Kaisei Decol', category: 'serif' },
-  { family: 'Kaisei Opti', category: 'serif' },
-  { family: 'Kaisei Tokumin', category: 'serif' },
-  { family: 'Kaisei HarunoUmi', category: 'serif' },
+  { family: 'Kaisei Decol', localizedName: '解星デコール', category: 'serif' },
+  { family: 'Kaisei Opti', localizedName: '解星オプティ', category: 'serif' },
+  { family: 'Kaisei Tokumin', localizedName: '解星特ミン', category: 'serif' },
+  { family: 'Kaisei HarunoUmi', localizedName: '解星ハルノウミ', category: 'serif' },
   
   // Yuji Family
-  { family: 'Yuji Syuku', category: 'serif' },
-  { family: 'Yuji Boku', category: 'serif' },
-  { family: 'Yuji Mai', category: 'serif' },
+  { family: 'Yuji Syuku', localizedName: '游字祝', category: 'serif' },
+  { family: 'Yuji Boku', localizedName: '游字墨', category: 'serif' },
+  { family: 'Yuji Mai', localizedName: '游字舞', category: 'serif' },
   
   // Mochiy Pop Family
-  { family: 'Mochiy Pop One', category: 'handwriting' },
-  { family: 'Mochiy Pop P One', category: 'handwriting' },
+  { family: 'Mochiy Pop One', localizedName: 'もちポップ One', category: 'handwriting' },
+  { family: 'Mochiy Pop P One', localizedName: 'もちポップ P One', category: 'handwriting' },
   
   // Klee Family
-  { family: 'Klee One', category: 'handwriting' },
+  { family: 'Klee One', localizedName: 'クレー One', category: 'handwriting' },
   
   // Potta Family
-  { family: 'Potta One', category: 'display' },
+  { family: 'Potta One', localizedName: 'ポッタ One', category: 'display' },
   
   // Display & Decorative Fonts
-  { family: 'Dela Gothic One', category: 'display' },
-  { family: 'Hachi Maru Pop', category: 'handwriting' },
-  { family: 'Kiwi Maru', category: 'sans-serif' },
-  { family: 'Yusei Magic', category: 'sans-serif' },
-  { family: 'Reggae One', category: 'display' },
-  { family: 'Stick', category: 'sans-serif' },
-  { family: 'RocknRoll One', category: 'sans-serif' },
-  { family: 'DotGothic16', category: 'display' },
-  { family: 'Rampart One', category: 'display' },
-  { family: 'Train One', category: 'display' },
-  { family: 'Yomogi', category: 'handwriting' },
-  { family: 'New Tegomin', category: 'serif' },
-  { family: 'Shizuru', category: 'display' },
-  { family: 'Murecho', category: 'sans-serif' },
-  { family: 'Hina Mincho', category: 'serif' },
-  { family: 'Stick No Bills', category: 'sans-serif' },
-  { family: 'Otomanopee One', category: 'display' },
-  { family: 'Slackside One', category: 'handwriting' },
-  { family: 'Darumadrop One', category: 'display' },
-  { family: 'Monomaniac One', category: 'display' },
-  { family: 'Palette Mosaic', category: 'display' },
-  { family: 'Cherry Bomb One', category: 'display' },
-  { family: 'Tsukimi Rounded', category: 'sans-serif' },
-  { family: 'Kaiso Next JP', category: 'sans-serif' },
-  { family: 'Nunito Sans', category: 'sans-serif' },
-  { family: 'Zen Dots', category: 'display' },
-  { family: 'Aubrey', category: 'handwriting' },
-  { family: 'Genkeki Gothic', category: 'sans-serif' },
-  { family: 'Sour Gummy', category: 'sans-serif' },
+  { family: 'Dela Gothic One', localizedName: 'デラゴシック One', category: 'display' },
+  { family: 'Hachi Maru Pop', localizedName: 'はち丸ポップ', category: 'handwriting' },
+  { family: 'Kiwi Maru', localizedName: 'キウイ丸', category: 'sans-serif' },
+  { family: 'Yusei Magic', localizedName: '油性マジック', category: 'sans-serif' },
+  { family: 'Reggae One', localizedName: 'レゲエ One', category: 'display' },
+  { family: 'Stick', localizedName: 'ステッキ', category: 'sans-serif' },
+  { family: 'RocknRoll One', localizedName: 'ロックンロール One', category: 'sans-serif' },
+  { family: 'DotGothic16', localizedName: 'ドットゴシック16', category: 'display' },
+  { family: 'Rampart One', localizedName: 'ランパート One', category: 'display' },
+  { family: 'Train One', localizedName: 'トレイン One', category: 'display' },
+  { family: 'Yomogi', localizedName: 'よもぎ', category: 'handwriting' },
+  { family: 'New Tegomin', localizedName: 'ニュー鉄ゴミン', category: 'serif' },
+  { family: 'Shizuru', localizedName: 'しずる', category: 'display' },
+  { family: 'Murecho', localizedName: 'ムレチョ', category: 'sans-serif' },
+  { family: 'Hina Mincho', localizedName: 'ひな明朝', category: 'serif' },
+  { family: 'Stick No Bills', localizedName: 'スティック ノービルズ', category: 'sans-serif' },
+  { family: 'Otomanopee One', localizedName: 'おとまのぴー One', category: 'display' },
+  { family: 'Slackside One', localizedName: 'スラックサイド One', category: 'handwriting' },
+  { family: 'Darumadrop One', localizedName: 'だるまどろっぷ One', category: 'display' },
+  { family: 'Monomaniac One', localizedName: 'モノマニアック One', category: 'display' },
+  { family: 'Palette Mosaic', localizedName: 'パレット モザイク', category: 'display' },
+  { family: 'Cherry Bomb One', localizedName: 'チェリーボム One', category: 'display' },
+  { family: 'Tsukimi Rounded', localizedName: '月見丸', category: 'sans-serif' },
+  { family: 'Kaiso Next JP', localizedName: '改装ネクスト', category: 'sans-serif' },
+  { family: 'Nunito Sans', localizedName: 'Nunito Sans', category: 'sans-serif' },
+  { family: 'Zen Dots', localizedName: '禅ドット', category: 'display' },
+  { family: 'Aubrey', localizedName: 'オーブリー', category: 'handwriting' },
+  { family: 'Genkeki Gothic', localizedName: '現劇ゴシック', category: 'sans-serif' },
+  { family: 'Sour Gummy', localizedName: 'サワーグミ', category: 'sans-serif' },
 ];
 
 /**

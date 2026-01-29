@@ -307,12 +307,12 @@ function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: str
 
 function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; onInsertText: (text: string) => void }) {
   const syntaxExamples = [
-    { syntax: "# 見出し", description: "レベル1の見出し", example: "# 第一章" },
-    { syntax: "## 見出し", description: "レベル2の見出し", example: "## 第一節" },
-    { syntax: "### 見出し", description: "レベル3の見出し", example: "### シーン1" },
-    { syntax: "#### 見出し", description: "レベル4の見出し", example: "#### セクション" },
-    { syntax: "##### 見出し", description: "レベル5の見出し", example: "##### サブセクション" },
-    { syntax: "###### 見出し", description: "レベル6の見出し", example: "###### 詳細" },
+    { syntax: "# 見出し", description: "レベル1の見出し", example: "# 第一章", fontSize: "2em" },
+    { syntax: "## 見出し", description: "レベル2の見出し", example: "## 第一節", fontSize: "1.5em" },
+    { syntax: "### 見出し", description: "レベル3の見出し", example: "### シーン1", fontSize: "1.17em" },
+    { syntax: "#### 見出し", description: "レベル4の見出し", example: "#### セクション", fontSize: "1em" },
+    { syntax: "##### 見出し", description: "レベル5の見出し", example: "##### サブセクション", fontSize: "0.83em" },
+    { syntax: "###### 見出し", description: "レベル6の見出し", example: "###### 詳細", fontSize: "0.67em" },
   ];
 
   return (
@@ -349,9 +349,15 @@ function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; o
                   </code>
                   <span className="text-xs text-slate-500">{item.description}</span>
                 </div>
-                <div className="text-xs text-slate-600 mt-2 pl-2 border-l-2 border-slate-300">
+                <div className="text-slate-600 mt-2 pl-2 border-l-2 border-slate-300">
                   {item.example.split('\n').map((line, i) => (
-                    <div key={i} className="font-mono">{line}</div>
+                    <div 
+                      key={i} 
+                      className="font-mono"
+                      style={{ fontSize: item.fontSize }}
+                    >
+                      {line}
+                    </div>
                   ))}
                 </div>
               </button>
@@ -384,6 +390,19 @@ function ChapterItem({
 }) {
   const indent = (chapter.level - 1) * 12; // Indent based on heading level
   
+  // Calculate font size based on heading level (h1 to h6)
+  // CSS default sizes: h1=2em, h2=1.5em, h3=1.17em, h4=1em, h5=0.83em, h6=0.67em
+  const fontSizes = {
+    1: '2em',
+    2: '1.5em',
+    3: '1.17em',
+    4: '1em',
+    5: '0.83em',
+    6: '0.67em',
+  };
+  
+  const fontSize = fontSizes[chapter.level as keyof typeof fontSizes] || '1em';
+  
   return (
     <div
       onClick={onClick}
@@ -398,8 +417,12 @@ function ChapterItem({
       <ChevronRight className="w-4 h-4 flex-shrink-0" />
       <FileText className="w-4 h-4 flex-shrink-0" />
       <span className="text-sm flex-1 truncate">{renderFormattedTitle(chapter.title)}</span>
-      <span className="text-xs text-slate-400 flex-shrink-0">
-        {chapter.level}
+      <span 
+        className="text-xs font-semibold flex-shrink-0 px-1.5 py-0.5 rounded bg-slate-100"
+        style={{ fontSize: `${fontSize}` }}
+        title={`見出しレベル ${chapter.level} (${fontSize})`}
+      >
+        {fontSize}
       </span>
     </div>
   );
@@ -480,15 +503,18 @@ function FontSelector({
     setSearchTerm('');
   };
 
-  // Filter fonts based on search term
+  // Filter fonts based on search term (search both family name and localized name)
   const filteredFonts = searchTerm
     ? ALL_JAPANESE_FONTS.filter(font =>
-        font.family.toLowerCase().includes(searchTerm.toLowerCase())
+        font.family.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (font.localizedName && font.localizedName.includes(searchTerm))
       )
     : ALL_JAPANESE_FONTS;
 
   const featuredFiltered = FEATURED_JAPANESE_FONTS.filter(font =>
-    !searchTerm || font.family.toLowerCase().includes(searchTerm.toLowerCase())
+    !searchTerm || 
+    font.family.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (font.localizedName && font.localizedName.includes(searchTerm))
   );
 
   const otherFonts = filteredFonts.filter(
@@ -504,7 +530,9 @@ function FontSelector({
         className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-left flex items-center justify-between"
         style={{ fontFamily: `"${value}", serif` }}
       >
-        <span>{value}</span>
+        <span>
+          {ALL_JAPANESE_FONTS.find(f => f.family === value)?.localizedName || value}
+        </span>
         <ChevronRight 
           className={clsx(
             "w-4 h-4 transition-transform",
@@ -547,7 +575,7 @@ function FontSelector({
                     )}
                     style={{ fontFamily: `"${font.family}", serif` }}
                   >
-                    <span>{font.family}</span>
+                    <span>{font.localizedName || font.family}</span>
                     {value === font.family && (
                       <Check className="w-4 h-4 text-indigo-600" />
                     )}
@@ -575,7 +603,7 @@ function FontSelector({
                     )}
                     style={{ fontFamily: `"${font.family}", serif` }}
                   >
-                    <span>{font.family}</span>
+                    <span>{font.localizedName || font.family}</span>
                     {value === font.family && (
                       <Check className="w-4 h-4 text-indigo-600" />
                     )}

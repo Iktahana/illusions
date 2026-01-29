@@ -375,7 +375,7 @@ function MilkdownEditor({
         ref={editorRef}
         className={clsx(
           "mx-auto",
-          isVertical ? "px-16 py-16 min-w-fit h-full" : "p-8 max-w-4xl"
+          isVertical ? "px-16 py-16 min-w-fit h-full" : "p-8"
         )}
         style={{
           fontSize: `${fontScale}%`,
@@ -404,10 +404,8 @@ function MilkdownEditor({
           
           /* Character per line limit for horizontal mode */
           ${charsPerLine > 0 ? `
-          div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p),
-          div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal blockquote),
-          div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal li) {
-            max-width: ${charsPerLine}em;
+          div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal) {
+            max-width: ${charsPerLine}em !important;
             word-wrap: break-word;
             overflow-wrap: break-word;
           }
@@ -415,12 +413,10 @@ function MilkdownEditor({
           
           /* Character per line limit for vertical mode */
           ${charsPerLine > 0 ? `
-          div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p),
-          div :global(.milkdown .ProseMirror.milkdown-japanese-vertical blockquote),
-          div :global(.milkdown .ProseMirror.milkdown-japanese-vertical li) {
-            max-height: ${charsPerLine}em;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
+          div :global(.milkdown .ProseMirror.milkdown-japanese-vertical) {
+            height: ${charsPerLine}em !important;
+            max-height: ${charsPerLine}em !important;
+            overflow: visible;
           }
           ` : ''}
         `}</style>
