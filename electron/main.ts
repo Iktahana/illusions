@@ -3,7 +3,7 @@
  * ESM module with IPC handlers.
  */
 
-import { app, BrowserWindow, ipcMain, dialog, Menu, type MenuItemConstructorOptions } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, Menu, nativeImage, type MenuItemConstructorOptions } from "electron";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -26,6 +26,9 @@ const APP_NAME: string = pkg.build?.productName ?? pkg.name ?? "Illusions";
 const isDev =
   process.env.NODE_ENV === "development" || process.env.ELECTRON_DEV === "1";
 
+const appIconPath = isDev
+  ? path.join(app.getAppPath(), "public", "icon", "illusions-512.png")
+  : path.join(app.getAppPath(), "out", "icon", "illusions-512.png");
 
 let mainWindow: BrowserWindow | null = null;
 let currentFilePath: string | null = null;
@@ -178,6 +181,7 @@ function createMainWindow(): void {
     show: false,
     backgroundColor: "#0f172a",
     title: APP_NAME,
+    icon: appIconPath,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -431,6 +435,9 @@ app.whenReady().then(() => {
         applicationName: APP_NAME,
         applicationVersion: app.getVersion(),
       });
+    }
+    if (process.platform === "darwin" && app.dock) {
+      app.dock.setIcon(nativeImage.createFromPath(appIconPath));
     }
   } catch {
     // Ignore if setting app metadata fails on some platforms.

@@ -29,6 +29,8 @@
     "@prosemirror-adapter/react": "^0.2.6",
     "clsx": "^2.1.1",
     "dexie": "^4.2.1",
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.7.3",
     "lucide-react": "^0.469.0",
     "next": "^15.1.4",
     "react": "^18.3.1",
@@ -56,35 +58,74 @@
     "directories": {
       "output": "dist-electron"
     },
+    "icon": "build/icon.png",
     "files": [
       "main.js",
       "preload.js",
       "out/**/*"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Iktahana",
+        "repo": "illusions"
+      }
+    ],
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "fileAssociations": [
         {
           "ext": "mdi",
           "name": "MDI Document",
+          "icon": "build/mdi-icon.icns",
           "role": "Editor"
         }
       ]
     },
     "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "fileAssociations": [
         {
           "ext": "mdi",
           "name": "MDI Document",
+          "icon": "build/mdi-icon.ico",
           "description": "Illusions MDI Document"
         }
       ]
     },
     "linux": {
+      "icon": "build/icon.png",
       "fileAssociations": [
         {
           "ext": "mdi",
           "name": "MDI Document",
+          "icon": "build/mdi-icon.png",
           "description": "Illusions MDI Document"
         }
       ]

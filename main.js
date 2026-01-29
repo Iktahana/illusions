@@ -5,11 +5,81 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
 const fs = require('fs/promises')
+const { autoUpdater } = require('electron-updater')
+const log = require('electron-log')
 
 const isDev =
   process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === '1'
 
+// Configure auto-updater logging
+autoUpdater.logger = log
+autoUpdater.logger.transports.file.level = 'info'
+
 let mainWindow = null
+
+// Setup auto-update event handlers
+function setupAutoUpdater() {
+  // Only check for updates in production
+  if (isDev) {
+    log.info('Auto-updater disabled in development mode')
+    return
+  }
+
+  // Event: Update available
+  autoUpdater.on('update-available', (info) => {
+    log.info('Update available:', info)
+    if (mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Update Available',
+        message: `Found new version ${info.version}`,
+        detail: 'Downloading update in the background...',
+        buttons: ['OK'],
+      })
+    }
+  })
+
+  // Event: Update downloaded
+  autoUpdater.on('update-downloaded', (info) => {
+    log.info('Update downloaded:', info)
+    if (mainWindow) {
+      dialog
+        .showMessageBox(mainWindow, {
+          type: 'info',
+          title: 'Update Ready',
+          message: 'Update downloaded successfully',
+          detail: 'The update will be installed when you restart. Restart now?',
+          buttons: ['Restart Now', 'Later'],
+          defaultId: 0,
+          cancelId: 1,
+        })
+        .then((result) => {
+          if (result.response === 0) {
+            // User clicked "Restart Now"
+            autoUpdater.quitAndInstall()
+          }
+        })
+    }
+  })
+
+  // Event: Error occurred
+  autoUpdater.on('error', (error) => {
+    log.error('Update error:', error)
+  })
+
+  // Event: Checking for update
+  autoUpdater.on('checking-for-update', () => {
+    log.info('Checking for updates...')
+  })
+
+  // Event: Update not available
+  autoUpdater.on('update-not-available', (info) => {
+    log.info('Update not available:', info)
+  })
+
+  // Check for updates
+  autoUpdater.checkForUpdatesAndNotify()
+}
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -71,6 +141,9 @@ ipcMain.handle('save-file', async (_event, filePath, content) => {
 
 app.whenReady().then(() => {
   createMainWindow()
+
+  // Initialize auto-updater after window is created
+  setupAutoUpdater()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
