@@ -7,7 +7,8 @@ import {
   Palette, 
   ChevronRight,
   FileText,
-  Plus
+  Plus,
+  X
 } from "lucide-react";
 import clsx from "clsx";
 import { parseMarkdownChapters, type Chapter } from "@/lib/utils";
@@ -18,9 +19,10 @@ interface ExplorerProps {
   className?: string;
   content?: string;
   onChapterClick?: (lineNumber: number) => void;
+  onInsertText?: (text: string) => void;
 }
 
-export default function Explorer({ className, content = "", onChapterClick }: ExplorerProps) {
+export default function Explorer({ className, content = "", onChapterClick, onInsertText }: ExplorerProps) {
   const [activeTab, setActiveTab] = useState<Tab>("chapters");
 
   return (
@@ -67,7 +69,7 @@ export default function Explorer({ className, content = "", onChapterClick }: Ex
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {activeTab === "chapters" && <ChaptersPanel content={content} onChapterClick={onChapterClick} />}
+        {activeTab === "chapters" && <ChaptersPanel content={content} onChapterClick={onChapterClick} onInsertText={onInsertText} />}
         {activeTab === "settings" && <SettingsPanel />}
         {activeTab === "style" && <StylePanel />}
       </div>
@@ -75,11 +77,12 @@ export default function Explorer({ className, content = "", onChapterClick }: Ex
   );
 }
 
-function ChaptersPanel({ content, onChapterClick }: { content: string; onChapterClick?: (lineNumber: number) => void }) {
+function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: string; onChapterClick?: (lineNumber: number) => void; onInsertText?: (text: string) => void }) {
   const chapters = useMemo(() => parseMarkdownChapters(content), [content]);
+  const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 relative">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-slate-700">章節管理</h3>
         <button className="p-1 hover:bg-slate-100 rounded">
@@ -105,9 +108,98 @@ function ChaptersPanel({ content, onChapterClick }: { content: string; onChapter
         )}
       </div>
       
-      <button className="w-full mt-4 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded border border-dashed border-slate-300">
+      <button 
+        onClick={() => setShowSyntaxHelp(true)}
+        className="w-full mt-4 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded border border-dashed border-slate-300"
+      >
         + 新しい章を追加
       </button>
+
+      {/* Markdown Syntax Help Panel */}
+      {showSyntaxHelp && (
+        <MarkdownSyntaxPanel 
+          onClose={() => setShowSyntaxHelp(false)}
+          onInsertText={(text) => {
+            onInsertText?.(text);
+            setShowSyntaxHelp(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; onInsertText: (text: string) => void }) {
+  const syntaxExamples = [
+    { syntax: "# 見出し", description: "レベル1の見出し", example: "# 第一章" },
+    { syntax: "## 見出し", description: "レベル2の見出し", example: "## 第一節" },
+    { syntax: "### 見出し", description: "レベル3の見出し", example: "### シーン1" },
+    { syntax: "**太字**", description: "太字テキスト", example: "**重要な内容**" },
+    { syntax: "*斜体*", description: "斜体テキスト", example: "*強調テキスト*" },
+    { syntax: "~~取り消し線~~", description: "取り消し線", example: "~~削除済み~~" },
+    { syntax: "> 引用", description: "引用テキスト", example: "> これは引用です" },
+    { syntax: "- 項目", description: "箇条書きリスト", example: "- 項目1\n- 項目2" },
+    { syntax: "1. 項目", description: "番号付きリスト", example: "1. 項目1\n2. 項目2" },
+    { syntax: "---", description: "区切り線", example: "---" },
+    { syntax: "`コード`", description: "インラインコード", example: "`console.log()`" },
+    { syntax: "[リンク](URL)", description: "ハイパーリンク", example: "[Google](https://google.com)" },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center" onClick={onClose}>
+      <div 
+        className="bg-white rounded-lg shadow-2xl border border-slate-200 w-[500px] max-h-[80vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+          <h3 className="text-sm font-semibold text-slate-800">
+            Markdown構文ガイド
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="space-y-2">
+            {syntaxExamples.map((item, index) => (
+              <button
+                key={index}
+                onClick={() => onInsertText(item.example)}
+                className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-colors text-left"
+              >
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <code className="text-sm font-mono text-indigo-600 bg-white px-2 py-0.5 rounded">
+                    {item.syntax}
+                  </code>
+                  <span className="text-xs text-slate-500">{item.description}</span>
+                </div>
+                <div className="text-xs text-slate-600 mt-2 pl-2 border-l-2 border-slate-300">
+                  {item.example.split('\n').map((line, i) => (
+                    <div key={i} className="font-mono">{line}</div>
+                  ))}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Additional Tips */}
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <h4 className="text-xs font-semibold text-blue-800 mb-2">💡 ヒント</h4>
+            <ul className="text-xs text-blue-700 space-y-1">
+              <li>• 見出しの後には空行が必要です</li>
+              <li>• リスト項目間に空行は不要です</li>
+              <li>• 複数の書式を組み合わせることができます</li>
+              <li>• ルビ（振り仮名）構文もサポートしています</li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

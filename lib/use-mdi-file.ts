@@ -17,6 +17,7 @@ export interface UseMdiFileReturn {
   lastSavedTime: number | null;
   openFile: () => Promise<void>;
   saveFile: () => Promise<void>;
+  newFile: () => void;
   wasAutoRecovered?: boolean; // Web only - whether file was auto-recovered
 }
 
@@ -86,6 +87,14 @@ export function useMdiFile(): UseMdiFileReturn {
 
   const setContent = useCallback((newContent: string) => {
     setContentState(newContent);
+  }, []);
+
+  const newFile = useCallback(() => {
+    setCurrentFile(null);
+    setContentState(DEFAULT_CONTENT);
+    setLastSavedContent(DEFAULT_CONTENT);
+    setLastSavedTime(null);
+    setWasAutoRecovered(false);
   }, []);
 
   const openFile = useCallback(async () => {
@@ -300,6 +309,7 @@ export function useMdiFile(): UseMdiFileReturn {
     lastSavedTime,
     openFile,
     saveFile,
+    newFile,
     wasAutoRecovered,
   };
 }

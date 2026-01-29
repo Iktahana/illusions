@@ -17,10 +17,11 @@ import { Type, AlignLeft } from "lucide-react";
 interface EditorProps {
   initialContent?: string;
   onChange?: (content: string) => void;
+  onInsertText?: (text: string) => void;
   className?: string;
 }
 
-export default function NovelEditor({ initialContent = "", onChange, className }: EditorProps) {
+export default function NovelEditor({ initialContent = "", onChange, onInsertText, className }: EditorProps) {
   const [isVertical, setIsVertical] = useState(false);
   const [fontSize, setFontSize] = useState(16);
   const [lineHeight, setLineHeight] = useState(1.8);
@@ -38,12 +39,13 @@ export default function NovelEditor({ initialContent = "", onChange, className }
       />
 
       {/* Editor Area */}
-      <div className="flex-1 overflow-auto bg-slate-50">
+      <div className="flex-1 overflow-auto bg-slate-50 relative">
         <MilkdownProvider>
           <ProsemirrorAdapterProvider>
             <MilkdownEditor
               initialContent={initialContent}
               onChange={onChange}
+              onInsertText={onInsertText}
               isVertical={isVertical}
               fontSize={fontSize}
               lineHeight={lineHeight}
@@ -110,12 +112,14 @@ function EditorToolbar({
 function MilkdownEditor({
   initialContent,
   onChange,
+  onInsertText,
   isVertical,
   fontSize,
   lineHeight,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
+  onInsertText?: (text: string) => void;
   isVertical: boolean;
   fontSize: number;
   lineHeight: number;
@@ -124,12 +128,17 @@ function MilkdownEditor({
   // Store initial content at mount time - this should only change when component remounts (file switch)
   const initialContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
+  const onInsertTextRef = useRef(onInsertText);
 
   // Update onChange ref when it changes
 
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
+
+  useEffect(() => {
+    onInsertTextRef.current = onInsertText;
+  }, [onInsertText]);
 
   const { get } = useEditor((root) => {
     const value = initialContentRef.current;

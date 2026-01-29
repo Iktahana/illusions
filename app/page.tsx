@@ -18,12 +18,13 @@ function words(s: string) {
 
 export default function EditorPage() {
   const mdiFile = useMdiFile();
-  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile, saveFile, wasAutoRecovered } =
+  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile, saveFile, newFile, wasAutoRecovered } =
     mdiFile;
 
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
+  const [editorKey, setEditorKey] = useState(0);
   
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
@@ -43,6 +44,14 @@ export default function EditorPage() {
   const handleChange = (markdown: string) => {
     contentRef.current = markdown;
     setContent(markdown);
+  };
+
+  const handleInsertText = (text: string) => {
+    const currentContent = contentRef.current;
+    const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
+    setContent(newContent);
+    // Force editor to remount with new content
+    setEditorKey(prev => prev + 1);
   };
 
   const handleChapterClick = (lineNumber: number) => {
@@ -110,13 +119,14 @@ export default function EditorPage() {
       )}
       
       <div className="flex-1 flex overflow-hidden">
-        <Explorer content={content} onChapterClick={handleChapterClick} />
+        <Explorer content={content} onChapterClick={handleChapterClick} onInsertText={handleInsertText} />
         <main className="flex-1 flex flex-col overflow-hidden">
           <div ref={editorDomRef} className="flex-1">
             <NovelEditor
-              key={currentFile?.name ?? "new"}
+              key={`${currentFile?.name ?? "new"}-${editorKey}`}
               initialContent={content}
               onChange={handleChange}
+              onInsertText={handleInsertText}
             />
           </div>
         </main>
@@ -128,6 +138,7 @@ export default function EditorPage() {
           isSaving={isSaving}
           lastSavedTime={lastSavedTime}
           onOpenFile={openFile}
+          onNewFile={newFile}
         />
       </div>
 

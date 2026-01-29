@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen } from "lucide-react";
+import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus } from "lucide-react";
 import clsx from "clsx";
 
 type Tab = "ai" | "corrections" | "stats";
@@ -15,6 +15,7 @@ interface InspectorProps {
   isSaving?: boolean;
   lastSavedTime?: number | null;
   onOpenFile?: () => void;
+  onNewFile?: () => void;
 }
 
 export default function Inspector({
@@ -26,6 +27,7 @@ export default function Inspector({
   isSaving = false,
   lastSavedTime = null,
   onOpenFile,
+  onNewFile,
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("ai");
 
@@ -53,15 +55,26 @@ export default function Inspector({
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
             Current File
           </p>
-          {onOpenFile && (
-            <button
-              onClick={onOpenFile}
-              className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-              title="Open File"
-            >
-              <FolderOpen className="w-4 h-4" />
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {onNewFile && (
+              <button
+                onClick={onNewFile}
+                className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                title="New File"
+              >
+                <FilePlus className="w-4 h-4" />
+              </button>
+            )}
+            {onOpenFile && (
+              <button
+                onClick={onOpenFile}
+                className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                title="Open File"
+              >
+                <FolderOpen className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
         <p className="text-sm font-semibold text-slate-800 truncate">{fileName}</p>
         <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
