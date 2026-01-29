@@ -3,7 +3,7 @@
 import { RefObject, useEffect, useRef, useState } from "react";
 import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
-import { commonmark, headingIdGenerator, toggleEmphasisCommand, toggleStrongCommand, toggleInlineCodeCommand, wrapInHeadingCommand, wrapInBlockquoteCommand, wrapInBulletListCommand, wrapInOrderedListCommand } from "@milkdown/preset-commonmark";
+import { commonmark, toggleEmphasisCommand, toggleStrongCommand, toggleInlineCodeCommand, wrapInHeadingCommand, wrapInBlockquoteCommand, wrapInBulletListCommand, wrapInOrderedListCommand } from "@milkdown/preset-commonmark";
 import { gfm, toggleStrikethroughCommand } from "@milkdown/preset-gfm";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { history } from "@milkdown/plugin-history";
@@ -15,11 +15,9 @@ import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
 import clsx from "clsx";
 import { Type, AlignLeft, Search } from "lucide-react";
 import { EditorView } from "@milkdown/prose/view";
-import { setBlockType } from "@milkdown/prose/commands";
 import BubbleMenu, { type FormatType } from "./BubbleMenu";
 import SearchDialog from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
-import { generateAnchorId } from "@/lib/utils";
 
 interface EditorProps {
   initialContent?: string;
@@ -243,12 +241,6 @@ function MilkdownEditor({
       .config((ctx) => {
         ctx.set(rootCtx, root);
         ctx.set(defaultValueCtx, value);
-        ctx.set(headingIdGenerator.key, (node) => {
-          const existingId = node.attrs.id as string | undefined;
-          if (existingId) return existingId;
-          const level = typeof node.attrs.level === "number" ? node.attrs.level : 1;
-          return generateAnchorId(level);
-        });
       })
       // Load listener plugin BEFORE accessing listenerCtx
       .use(listener)
@@ -495,25 +487,8 @@ function MilkdownEditor({
           break;
         case "heading":
           if (level) {
-            // Custom heading command that sets ID
-            editor.action((ctx) => {
-              const view = ctx.get(editorViewCtx);
-              const { state, dispatch } = view;
-              const { schema } = state;
-              const headingType = schema.nodes.heading;
-              
-              if (!headingType) {
-                execute(wrapInHeadingCommand.key, level);
-                return;
-              }
-              
-              // Generate new anchor ID for the heading
-              const id = generateAnchorId(level);
-              
-              // Apply the heading with ID
-              const command = setBlockType(headingType, { level, id });
-              command(state, dispatch);
-            });
+            // Use standard command - headingIdFixer plugin will add ID
+            execute(wrapInHeadingCommand.key, level);
           }
           break;
         case "blockquote":

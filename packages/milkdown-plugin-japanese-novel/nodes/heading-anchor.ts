@@ -1,7 +1,7 @@
 import type { Node } from '@milkdown/prose/model'
 import type { SerializerState } from '@milkdown/transformer'
 import { Fragment } from '@milkdown/prose/model'
-import { headingAttr, headingIdGenerator } from '@milkdown/preset-commonmark'
+import { headingAttr } from '@milkdown/preset-commonmark'
 import { $nodeSchema } from '@milkdown/utils'
 
 const headingIndex = Array(6)
@@ -26,8 +26,6 @@ function serializeText(state: SerializerState, node: Node) {
 }
 
 export const headingAnchorSchema = $nodeSchema('heading', (ctx) => {
-  const getId = ctx.get(headingIdGenerator.key)
-
   return {
     content: 'inline*',
     group: 'block',
@@ -51,8 +49,8 @@ export const headingAnchorSchema = $nodeSchema('heading', (ctx) => {
       },
     })),
     toDOM: (node) => {
-      const existingId = node.attrs.id as string
-      const id = (existingId && existingId.trim()) ? existingId : getId(node)
+      // ID should be set by headingIdFixer plugin via appendTransaction
+      const id = node.attrs.id as string
       return [
         `h${node.attrs.level}`,
         {
@@ -76,11 +74,11 @@ export const headingAnchorSchema = $nodeSchema('heading', (ctx) => {
     toMarkdown: {
       match: (node) => node.type.name === 'heading',
       runner: (state, node) => {
-        const existingId = node.attrs.id as string
-        const id = (existingId && existingId.trim()) ? existingId : getId(node)
+        // ID should be set by headingIdFixer plugin via appendTransaction
+        const id = node.attrs.id as string
         state.openNode('heading', undefined, { depth: node.attrs.level })
         serializeText(state, node)
-        if (id) {
+        if (id && id.trim()) {
           state.addNode('text', undefined, ` {#${id}}`)
         }
         state.closeNode()
