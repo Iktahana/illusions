@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useMemo, useState, useEffect } from "react";
 import { 
   FolderTree, 
   Settings, 
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { parseMarkdownChapters, type Chapter } from "@/lib/utils";
+import { FEATURED_JAPANESE_FONTS, ALL_JAPANESE_FONTS, loadGoogleFont } from "@/lib/fonts";
 
 type Tab = "chapters" | "settings" | "style";
 
@@ -155,9 +156,31 @@ interface ExplorerProps {
   content?: string;
   onChapterClick?: (lineNumber: number) => void;
   onInsertText?: (text: string) => void;
+  // Style settings
+  fontScale?: number;
+  onFontScaleChange?: (scale: number) => void;
+  lineHeight?: number;
+  onLineHeightChange?: (height: number) => void;
+  textIndent?: number;
+  onTextIndentChange?: (indent: number) => void;
+  fontFamily?: string;
+  onFontFamilyChange?: (family: string) => void;
 }
 
-export default function Explorer({ className, content = "", onChapterClick, onInsertText }: ExplorerProps) {
+export default function Explorer({ 
+  className, 
+  content = "", 
+  onChapterClick, 
+  onInsertText,
+  fontScale = 100,
+  onFontScaleChange,
+  lineHeight = 1.8,
+  onLineHeightChange,
+  textIndent = 1,
+  onTextIndentChange,
+  fontFamily = 'Noto Serif JP',
+  onFontFamilyChange,
+}: ExplorerProps) {
   const [activeTab, setActiveTab] = useState<Tab>("chapters");
 
   return (
@@ -198,7 +221,7 @@ export default function Explorer({ className, content = "", onChapterClick, onIn
           )}
         >
           <Palette className="w-4 h-4" />
-          スタイル
+          段落
         </button>
       </div>
 
@@ -206,7 +229,18 @@ export default function Explorer({ className, content = "", onChapterClick, onIn
       <div className="flex-1 overflow-y-auto p-4">
         {activeTab === "chapters" && <ChaptersPanel content={content} onChapterClick={onChapterClick} onInsertText={onInsertText} />}
         {activeTab === "settings" && <SettingsPanel />}
-        {activeTab === "style" && <StylePanel />}
+        {activeTab === "style" && (
+          <StylePanel 
+            fontScale={fontScale}
+            onFontScaleChange={onFontScaleChange}
+            lineHeight={lineHeight}
+            onLineHeightChange={onLineHeightChange}
+            textIndent={textIndent}
+            onTextIndentChange={onTextIndentChange}
+            fontFamily={fontFamily}
+            onFontFamilyChange={onFontFamilyChange}
+          />
+        )}
       </div>
     </aside>
   );
@@ -410,17 +444,73 @@ function SettingsPanel() {
   );
 }
 
-function StylePanel() {
+function StylePanel({
+  fontScale = 100,
+  onFontScaleChange,
+  lineHeight = 1.8,
+  onLineHeightChange,
+  textIndent = 1,
+  onTextIndentChange,
+  fontFamily = 'Noto Serif JP',
+  onFontFamilyChange,
+}: {
+  fontScale?: number;
+  onFontScaleChange?: (scale: number) => void;
+  lineHeight?: number;
+  onLineHeightChange?: (height: number) => void;
+  textIndent?: number;
+  onTextIndentChange?: (indent: number) => void;
+  fontFamily?: string;
+  onFontFamilyChange?: (family: string) => void;
+}) {
+  // Preload featured fonts on mount
+  useEffect(() => {
+    FEATURED_JAPANESE_FONTS.forEach(font => {
+      loadGoogleFont(font.family);
+    });
+  }, []);
+
+  const handleFontChange = (newFont: string) => {
+    onFontFamilyChange?.(newFont);
+    loadGoogleFont(newFont);
+  };
+
   return (
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-2">
           フォント
         </label>
-        <select className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          <option>Noto Serif JP</option>
-          <option>Yu Mincho</option>
-          <option>Hiragino Mincho</option>
+        <select 
+          value={fontFamily}
+          onChange={(e) => handleFontChange(e.target.value)}
+          className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 font-preview-select"
+          style={{ fontFamily: `"${fontFamily}", serif` }}
+        >
+          <optgroup label="おすすめ">
+            {FEATURED_JAPANESE_FONTS.map(font => (
+              <option 
+                key={font.family} 
+                value={font.family}
+                style={{ fontFamily: `"${font.family}", serif` }}
+              >
+                {font.family}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="すべてのフォント">
+            {ALL_JAPANESE_FONTS
+              .filter(font => !FEATURED_JAPANESE_FONTS.find(f => f.family === font.family))
+              .map(font => (
+                <option 
+                  key={font.family} 
+                  value={font.family}
+                  style={{ fontFamily: `"${font.family}", serif` }}
+                >
+                  {font.family}
+                </option>
+              ))}
+          </optgroup>
         </select>
       </div>
       
@@ -430,15 +520,17 @@ function StylePanel() {
         </label>
         <input
           type="range"
-          min="14"
-          max="24"
-          defaultValue="16"
+          min="50"
+          max="200"
+          step="5"
+          value={fontScale}
+          onChange={(e) => onFontScaleChange?.(Number(e.target.value))}
           className="w-full"
         />
         <div className="flex justify-between text-xs text-slate-500 mt-1">
-          <span>小</span>
-          <span>中</span>
-          <span>大</span>
+          <span>50%</span>
+          <span>{fontScale}%</span>
+          <span>200%</span>
         </div>
       </div>
       
@@ -451,14 +543,35 @@ function StylePanel() {
           min="1.5"
           max="2.5"
           step="0.1"
-          defaultValue="1.8"
+          value={lineHeight}
+          onChange={(e) => onLineHeightChange?.(Number(e.target.value))}
           className="w-full"
         />
         <div className="flex justify-between text-xs text-slate-500 mt-1">
           <span>狭い</span>
-          <span>普通</span>
+          <span>{lineHeight.toFixed(1)}</span>
           <span>広い</span>
         </div>
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-2">
+          字下げ
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min="0"
+            step="0.5"
+            value={textIndent}
+            onChange={(e) => onTextIndentChange?.(Number(e.target.value))}
+            className="w-20 px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          <span className="text-sm text-slate-600">字</span>
+        </div>
+        <p className="text-xs text-slate-500 mt-1">
+          段落の先頭にインデントを適用します
+        </p>
       </div>
     </div>
   );

@@ -71,15 +71,15 @@ export default function Inspector({
   const manuscriptPages = Math.ceil(charCount / 400);
 
   const formatTime = (timestamp: number | null) => {
-    if (!timestamp) return "Never";
+    if (!timestamp) return "未保存";
     const date = new Date(timestamp);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffSecs = Math.floor(diffMs / 1000);
 
-    if (diffSecs < 60) return "Just now";
-    if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}m ago`;
-    if (diffSecs < 86400) return `${Math.floor(diffSecs / 3600)}h ago`;
+    if (diffSecs < 60) return "たった今";
+    if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}分前`;
+    if (diffSecs < 86400) return `${Math.floor(diffSecs / 3600)}時間前`;
     return date.toLocaleDateString();
   };
 
@@ -89,14 +89,14 @@ export default function Inspector({
       <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
         <div className="flex items-center justify-between mb-1">
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-            Current File
+            現在のファイル
           </p>
           <div className="flex items-center gap-1">
             {onNewFile && (
               <button
                 onClick={onNewFile}
                 className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                title="New File"
+                title="新規ファイル"
               >
                 <FilePlus className="w-4 h-4" />
               </button>
@@ -105,7 +105,7 @@ export default function Inspector({
               <button
                 onClick={onOpenFile}
                 className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                title="Open File"
+                title="ファイルを開く"
               >
                 <FolderOpen className="w-4 h-4" />
               </button>

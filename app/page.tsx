@@ -27,6 +27,12 @@ export default function EditorPage() {
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
   
+  // Editor style settings
+  const [fontScale, setFontScale] = useState(100); // 100% = default size
+  const [lineHeight, setLineHeight] = useState(1.8);
+  const [textIndent, setTextIndent] = useState(1);
+  const [fontFamily, setFontFamily] = useState('Noto Serif JP');
+  
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
   // Auto-dismiss recovery notification after 5 seconds
@@ -122,7 +128,19 @@ export default function EditorPage() {
 
       <div className="flex-1 flex overflow-hidden">
         <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
-          <Explorer content={content} onChapterClick={handleChapterClick} onInsertText={handleInsertText} />
+          <Explorer 
+            content={content} 
+            onChapterClick={handleChapterClick} 
+            onInsertText={handleInsertText}
+            fontScale={fontScale}
+            onFontScaleChange={setFontScale}
+            lineHeight={lineHeight}
+            onLineHeightChange={setLineHeight}
+            textIndent={textIndent}
+            onTextIndentChange={setTextIndent}
+            fontFamily={fontFamily}
+            onFontFamilyChange={setFontFamily}
+          />
         </ResizablePanel>
         
         <main className="flex-1 flex flex-col overflow-hidden min-h-0">
@@ -132,6 +150,10 @@ export default function EditorPage() {
               initialContent={content}
               onChange={handleChange}
               onInsertText={handleInsertText}
+              fontScale={fontScale}
+              lineHeight={lineHeight}
+              textIndent={textIndent}
+              fontFamily={fontFamily}
             />
           </div>
         </main>

@@ -33,11 +33,12 @@ export interface NovelMetadata {
 }
 
 export interface EditorSettings {
-  fontSize: number;
+  fontScale: number; // Font scale in percentage (50-200, where 100 = 100%)
   lineHeight: number;
   fontFamily: string;
   isVertical: boolean;
   theme: 'light' | 'dark';
+  textIndent: number; // Text indent in em units (e.g., 1 = 1em)
 }
 
 export interface UserPreferences {

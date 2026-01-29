@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { RefObject, useEffect, useRef, useState } from "react";
 import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import { commonmark, toggleEmphasisCommand, toggleStrongCommand, toggleInlineCodeCommand, wrapInHeadingCommand, wrapInBlockquoteCommand, wrapInBulletListCommand, wrapInOrderedListCommand } from "@milkdown/preset-commonmark";
@@ -21,12 +21,24 @@ interface EditorProps {
   onChange?: (content: string) => void;
   onInsertText?: (text: string) => void;
   className?: string;
+  fontScale?: number;
+  lineHeight?: number;
+  textIndent?: number;
+  fontFamily?: string;
 }
 
-export default function NovelEditor({ initialContent = "", onChange, onInsertText, className }: EditorProps) {
+export default function NovelEditor({ 
+  initialContent = "", 
+  onChange, 
+  onInsertText, 
+  className,
+  fontScale = 100,
+  lineHeight = 1.8,
+  textIndent = 1,
+  fontFamily = 'Noto Serif JP',
+}: EditorProps) {
   const [isVertical, setIsVertical] = useState(false);
-  const [fontSize, setFontSize] = useState(16);
-  const [lineHeight, setLineHeight] = useState(1.8);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className={clsx("flex flex-col h-full min-h-0", className)}>
@@ -34,14 +46,18 @@ export default function NovelEditor({ initialContent = "", onChange, onInsertTex
       <EditorToolbar
         isVertical={isVertical}
         onToggleVertical={() => setIsVertical(!isVertical)}
-        fontSize={fontSize}
-        onFontSizeChange={setFontSize}
+        fontScale={fontScale}
         lineHeight={lineHeight}
-        onLineHeightChange={setLineHeight}
       />
 
       {/* Editor Area */}
-      <div className="flex-1 overflow-auto bg-slate-50 relative min-h-0">
+      <div
+        ref={scrollContainerRef}
+        className={clsx(
+          "flex-1 bg-slate-50 relative min-h-0",
+          isVertical ? "overflow-x-auto overflow-y-hidden" : "overflow-auto"
+        )}
+      >
         <MilkdownProvider>
           <ProsemirrorAdapterProvider>
             <MilkdownEditor
@@ -49,8 +65,11 @@ export default function NovelEditor({ initialContent = "", onChange, onInsertTex
               onChange={onChange}
               onInsertText={onInsertText}
               isVertical={isVertical}
-              fontSize={fontSize}
+              fontScale={fontScale}
               lineHeight={lineHeight}
+              textIndent={textIndent}
+              fontFamily={fontFamily}
+              scrollContainerRef={scrollContainerRef}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -62,15 +81,13 @@ export default function NovelEditor({ initialContent = "", onChange, onInsertTex
 function EditorToolbar({
   isVertical,
   onToggleVertical,
-  fontSize,
-  onFontSizeChange,
+  fontScale,
+  lineHeight,
 }: {
   isVertical: boolean;
   onToggleVertical: () => void;
-  fontSize: number;
-  onFontSizeChange: (size: number) => void;
+  fontScale: number;
   lineHeight: number;
-  onLineHeightChange: (height: number) => void;
 }) {
   return (
     <div className="h-12 border-b border-slate-200 bg-white flex items-center justify-between px-4">
@@ -89,18 +106,10 @@ function EditorToolbar({
           {isVertical ? "縦書き" : "横書き"}
         </button>
 
-        {/* Font Size Control */}
-        <div className="flex items-center gap-2">
+        {/* Display current settings */}
+        <div className="flex items-center gap-2 text-xs text-slate-600">
           <AlignLeft className="w-4 h-4 text-slate-500" />
-          <input
-            type="range"
-            min="14"
-            max="24"
-            value={fontSize}
-            onChange={(e) => onFontSizeChange(Number(e.target.value))}
-            className="w-24"
-          />
-          <span className="text-xs text-slate-600 w-12">{fontSize}px</span>
+          <span>{fontScale}% / {lineHeight.toFixed(1)}</span>
         </div>
       </div>
 
@@ -116,15 +125,21 @@ function MilkdownEditor({
   onChange,
   onInsertText,
   isVertical,
-  fontSize,
+  fontScale,
   lineHeight,
+  textIndent,
+  fontFamily,
+  scrollContainerRef,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
   onInsertText?: (text: string) => void;
   isVertical: boolean;
-  fontSize: number;
+  fontScale: number;
   lineHeight: number;
+  textIndent: number;
+  fontFamily: string;
+  scrollContainerRef: RefObject<HTMLDivElement>;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<any>(null);
@@ -216,6 +231,25 @@ function MilkdownEditor({
     return () => clearTimeout(timer);
   }, [isVertical, get]);
 
+  // Convert vertical mouse wheel to horizontal scroll in vertical mode
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !isVertical) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) >= Math.abs(event.deltaX)) {
+        container.scrollLeft += event.deltaY;
+        event.preventDefault();
+      }
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+    };
+  }, [isVertical, scrollContainerRef]);
+
   // Handle format commands from BubbleMenu
   const handleFormat = (format: FormatType, level?: number) => {
     try {
@@ -273,11 +307,29 @@ function MilkdownEditor({
         ref={editorRef}
         className="max-w-4xl mx-auto p-8"
         style={{
-          fontSize: `${fontSize}px`,
+          fontSize: `${fontScale}%`,
           lineHeight: lineHeight,
-          fontFamily: "inherit",
+          fontFamily: `"${fontFamily}", serif`,
+          // Apply text-indent to paragraphs only (not headings)
+          // This is done via CSS and doesn't add actual spaces to the content
         }}
       >
+        <style jsx>{`
+          div :global(.milkdown .ProseMirror p) {
+            text-indent: ${textIndent}em;
+          }
+          /* Don't apply indent to headings, lists, blockquotes, etc. */
+          div :global(.milkdown .ProseMirror h1),
+          div :global(.milkdown .ProseMirror h2),
+          div :global(.milkdown .ProseMirror h3),
+          div :global(.milkdown .ProseMirror h4),
+          div :global(.milkdown .ProseMirror h5),
+          div :global(.milkdown .ProseMirror h6),
+          div :global(.milkdown .ProseMirror li),
+          div :global(.milkdown .ProseMirror blockquote) {
+            text-indent: 0;
+          }
+        `}</style>
         <Milkdown />
       </div>
       {editorViewInstance && (
