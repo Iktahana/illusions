@@ -13,8 +13,10 @@ import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
 import clsx from "clsx";
-import { Type, AlignLeft } from "lucide-react";
+import { Type, AlignLeft, Search } from "lucide-react";
+import { EditorView } from "@milkdown/prose/view";
 import BubbleMenu, { type FormatType } from "./BubbleMenu";
+import SearchDialog from "./SearchDialog";
 
 interface EditorProps {
   initialContent?: string;
@@ -25,6 +27,7 @@ interface EditorProps {
   lineHeight?: number;
   textIndent?: number;
   fontFamily?: string;
+  searchOpenTrigger?: number;
 }
 
 export default function NovelEditor({ 
@@ -36,9 +39,23 @@ export default function NovelEditor({
   lineHeight = 1.8,
   textIndent = 1,
   fontFamily = 'Noto Serif JP',
+  searchOpenTrigger = 0,
 }: EditorProps) {
   const [isVertical, setIsVertical] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleSearchOpen = () => {
+    setIsSearchOpen(true);
+  };
+
+  // Listen for search open trigger from parent (keyboard shortcut)
+  useEffect(() => {
+    if (searchOpenTrigger > 0) {
+      handleSearchOpen();
+    }
+  }, [searchOpenTrigger]);
 
   return (
     <div className={clsx("flex flex-col h-full min-h-0", className)}>
@@ -48,6 +65,7 @@ export default function NovelEditor({
         onToggleVertical={() => setIsVertical(!isVertical)}
         fontScale={fontScale}
         lineHeight={lineHeight}
+        onSearchClick={handleSearchOpen}
       />
 
       {/* Editor Area */}
@@ -70,10 +88,18 @@ export default function NovelEditor({
               textIndent={textIndent}
               fontFamily={fontFamily}
               scrollContainerRef={scrollContainerRef}
+              onEditorViewReady={setEditorViewInstance}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
       </div>
+
+      {/* Search Dialog */}
+      <SearchDialog
+        editorView={editorViewInstance}
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+      />
     </div>
   );
 }
@@ -83,11 +109,13 @@ function EditorToolbar({
   onToggleVertical,
   fontScale,
   lineHeight,
+  onSearchClick,
 }: {
   isVertical: boolean;
   onToggleVertical: () => void;
   fontScale: number;
   lineHeight: number;
+  onSearchClick: () => void;
 }) {
   return (
     <div className="h-12 border-b border-slate-200 bg-white flex items-center justify-between px-4">
@@ -113,8 +141,19 @@ function EditorToolbar({
         </div>
       </div>
 
-      <div className="text-xs text-slate-500">
-        Illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
+      <div className="flex items-center gap-4">
+        <div className="text-xs text-slate-500">
+          Illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
+        </div>
+
+        {/* Search Button */}
+        <button
+          onClick={onSearchClick}
+          className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+          title="検索 (⌘F)"
+        >
+          <Search className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );
@@ -130,6 +169,7 @@ function MilkdownEditor({
   textIndent,
   fontFamily,
   scrollContainerRef,
+  onEditorViewReady,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
@@ -140,9 +180,10 @@ function MilkdownEditor({
   textIndent: number;
   fontFamily: string;
   scrollContainerRef: RefObject<HTMLDivElement>;
+  onEditorViewReady?: (view: EditorView) => void;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
-  const [editorViewInstance, setEditorViewInstance] = useState<any>(null);
+  const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   // Store initial content at mount time - this should only change when component remounts (file switch)
   const initialContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
@@ -194,6 +235,7 @@ function MilkdownEditor({
         if (editor) {
           const view = editor.ctx.get(editorViewCtx);
           setEditorViewInstance(view);
+          onEditorViewReady?.(view);
         }
       } catch {
         // Editor not ready yet
@@ -201,7 +243,7 @@ function MilkdownEditor({
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [get]);
+  }, [get, onEditorViewReady]);
 
   // Handle vertical mode change without recreating the entire editor
   useEffect(() => {
@@ -256,6 +298,7 @@ function MilkdownEditor({
       const editor = get();
       if (!editor) return;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const execute = (commandKey: any, payload?: unknown) => {
         editor.action((ctx) => {
           const commands = ctx.get(commandsCtx);

@@ -26,6 +26,7 @@ export default function EditorPage() {
   const editorDomRef = useRef<HTMLDivElement>(null);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
+  const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
   
   // Editor style settings
   const [fontScale, setFontScale] = useState(100); // 100% = default size
@@ -85,18 +86,27 @@ export default function EditorPage() {
 
   const fileName = currentFile?.name ?? (isDirty ? "Untitled (unsaved)" : "Untitled");
 
-  // Handle Cmd+S / Ctrl+S keyboard shortcut to save file
+  // Handle keyboard shortcuts: Cmd+S / Ctrl+S to save, Cmd+F / Ctrl+F to search
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Check for Cmd+S (macOS) or Ctrl+S (Windows/Linux)
       const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      
+      // Check for Cmd+S (macOS) or Ctrl+S (Windows/Linux) - Save file
       const isSaveShortcut = isMac
         ? event.metaKey && event.key === "s"
         : event.ctrlKey && event.key === "s";
 
+      // Check for Cmd+F (macOS) or Ctrl+F (Windows/Linux) - Search
+      const isSearchShortcut = isMac
+        ? event.metaKey && event.key === "f"
+        : event.ctrlKey && event.key === "f";
+
       if (isSaveShortcut) {
         event.preventDefault(); // Prevent browser's default save dialog
         void saveFile();
+      } else if (isSearchShortcut) {
+        event.preventDefault(); // Prevent browser's default find dialog
+        setSearchOpenTrigger(prev => prev + 1); // Trigger search dialog
       }
     };
 
@@ -154,6 +164,7 @@ export default function EditorPage() {
               lineHeight={lineHeight}
               textIndent={textIndent}
               fontFamily={fontFamily}
+              searchOpenTrigger={searchOpenTrigger}
             />
           </div>
         </main>

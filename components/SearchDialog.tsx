@@ -1,0 +1,289 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Search, X, ChevronUp, ChevronDown, Replace, ReplaceAll } from "lucide-react";
+import clsx from "clsx";
+import { EditorView } from "@milkdown/prose/view";
+import { TextSelection } from "@milkdown/prose/state";
+
+interface SearchDialogProps {
+  editorView: EditorView | null;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+interface SearchMatch {
+  from: number;
+  to: number;
+}
+
+export default function SearchDialog({ editorView, isOpen, onClose }: SearchDialogProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [replaceTerm, setReplaceTerm] = useState("");
+  const [matches, setMatches] = useState<SearchMatch[]>([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [showReplace, setShowReplace] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus search input when dialog opens
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+      searchInputRef.current.select();
+    }
+  }, [isOpen]);
+
+  // Search for matches in the document
+  useEffect(() => {
+    if (!editorView || !searchTerm) {
+      setMatches([]);
+      setCurrentMatchIndex(-1);
+      return;
+    }
+
+    const { state } = editorView;
+    const { doc } = state;
+    const foundMatches: SearchMatch[] = [];
+
+    // Get the entire document text
+    const docText = doc.textContent;
+    const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
+    const textToSearch = caseSensitive ? docText : docText.toLowerCase();
+
+    let searchIndex = 0;
+
+    // Search through the entire document
+    while (searchIndex < textToSearch.length) {
+      const matchIndex = textToSearch.indexOf(searchStr, searchIndex);
+      if (matchIndex === -1) break;
+
+      // Find the actual position in the document
+      const from = matchIndex + 1; // ProseMirror uses 1-based positions
+      const to = from + searchTerm.length;
+
+      foundMatches.push({ from, to });
+      searchIndex = matchIndex + 1;
+    }
+
+    setMatches(foundMatches);
+    setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1);
+  }, [searchTerm, caseSensitive, editorView]);
+
+  // Scroll to and highlight current match
+  useEffect(() => {
+    if (!editorView || currentMatchIndex === -1 || matches.length === 0) {
+      return;
+    }
+
+    const match = matches[currentMatchIndex];
+    if (!match) return;
+
+    // Set selection to the current match
+    const { state, dispatch } = editorView;
+    const tr = state.tr.setSelection(
+      TextSelection.create(state.doc, match.from, match.to)
+    );
+    dispatch(tr);
+
+    // Scroll into view
+    editorView.focus();
+    const coords = editorView.coordsAtPos(match.from);
+    if (coords) {
+      window.scrollTo({
+        top: coords.top - window.innerHeight / 2,
+        behavior: "smooth",
+      });
+    }
+  }, [currentMatchIndex, matches, editorView]);
+
+  const goToNextMatch = () => {
+    if (matches.length === 0) return;
+    setCurrentMatchIndex((prev) => (prev + 1) % matches.length);
+  };
+
+  const goToPreviousMatch = () => {
+    if (matches.length === 0) return;
+    setCurrentMatchIndex((prev) => (prev - 1 + matches.length) % matches.length);
+  };
+
+  const replaceCurrentMatch = () => {
+    if (!editorView || currentMatchIndex === -1 || matches.length === 0) return;
+
+    const match = matches[currentMatchIndex];
+    const { state, dispatch } = editorView;
+    
+    // Replace the text at the current match position
+    const tr = state.tr.replaceWith(
+      match.from,
+      match.to,
+      state.schema.text(replaceTerm)
+    );
+    dispatch(tr);
+
+    // Update search to find new matches
+    setSearchTerm(searchTerm + " "); // Trigger re-search
+    setTimeout(() => setSearchTerm(searchTerm.trim()), 0);
+  };
+
+  const replaceAllMatches = () => {
+    if (!editorView || matches.length === 0) return;
+
+    const { state, dispatch } = editorView;
+    let tr = state.tr;
+
+    // Replace all matches in reverse order to maintain positions
+    for (let i = matches.length - 1; i >= 0; i--) {
+      const match = matches[i];
+      tr = tr.replaceWith(
+        match.from,
+        match.to,
+        state.schema.text(replaceTerm)
+      );
+    }
+
+    dispatch(tr);
+
+    // Clear search
+    setSearchTerm("");
+    setReplaceTerm("");
+    setMatches([]);
+    setCurrentMatchIndex(-1);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      onClose();
+    } else if (e.key === "Enter") {
+      if (e.shiftKey) {
+        goToPreviousMatch();
+      } else {
+        goToNextMatch();
+      }
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed top-16 right-4 z-50 bg-white rounded-lg shadow-lg border border-slate-200 p-4 w-80"
+      onKeyDown={handleKeyDown}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Search className="w-4 h-4 text-slate-600" />
+          <h3 className="text-sm font-medium text-slate-700">検索</h3>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1 rounded hover:bg-slate-100 transition-colors"
+        >
+          <X className="w-4 h-4 text-slate-600" />
+        </button>
+      </div>
+
+      {/* Search Input */}
+      <div className="mb-2">
+        <div className="relative">
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="検索..."
+            className="w-full px-3 py-2 pr-20 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+          />
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {matches.length > 0 && (
+              <span className="text-xs text-slate-600 mr-1">
+                {currentMatchIndex + 1}/{matches.length}
+              </span>
+            )}
+            <button
+              onClick={goToPreviousMatch}
+              disabled={matches.length === 0}
+              className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="前へ (Shift+Enter)"
+            >
+              <ChevronUp className="w-4 h-4 text-slate-600" />
+            </button>
+            <button
+              onClick={goToNextMatch}
+              disabled={matches.length === 0}
+              className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="次へ (Enter)"
+            >
+              <ChevronDown className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Options */}
+      <div className="mb-3 flex items-center gap-4">
+        <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={caseSensitive}
+            onChange={(e) => setCaseSensitive(e.target.checked)}
+            className="rounded"
+          />
+          大文字小文字を区別
+        </label>
+        <button
+          onClick={() => setShowReplace(!showReplace)}
+          className="text-xs text-indigo-600 hover:text-indigo-700"
+        >
+          {showReplace ? "置換を非表示" : "置換"}
+        </button>
+      </div>
+
+      {/* Replace Section */}
+      {showReplace && (
+        <div className="space-y-2 pt-2 border-t border-slate-200">
+          <input
+            type="text"
+            value={replaceTerm}
+            onChange={(e) => setReplaceTerm(e.target.value)}
+            placeholder="置換後..."
+            className="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={replaceCurrentMatch}
+              disabled={currentMatchIndex === -1}
+              className={clsx(
+                "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors",
+                currentMatchIndex === -1
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+              )}
+            >
+              <Replace className="w-4 h-4" />
+              置換
+            </button>
+            <button
+              onClick={replaceAllMatches}
+              disabled={matches.length === 0}
+              className={clsx(
+                "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors",
+                matches.length === 0
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  : "bg-indigo-600 text-white hover:bg-indigo-700"
+              )}
+            >
+              <ReplaceAll className="w-4 h-4" />
+              すべて置換
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Shortcuts hint */}
+      <div className="mt-3 pt-2 border-t border-slate-200 text-xs text-slate-500">
+        <div>Enter: 次へ / Shift+Enter: 前へ / Esc: 閉じる</div>
+      </div>
+    </div>
+  );
+}

@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Bold, Italic, Strikethrough, Quote, List, ListOrdered, Heading1, Heading2, Heading3, Code, Link as LinkIcon } from "lucide-react";
 import clsx from "clsx";
+import { EditorView } from "@milkdown/prose/view";
 
 interface BubbleMenuProps {
-  editorView: any;
+  editorView: EditorView | null;
   onFormat: (format: FormatType, level?: number) => void;
 }
 
