@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, Check, X } from "lucide-react";
 import clsx from "clsx";
 
 type Tab = "ai" | "corrections" | "stats";
@@ -16,6 +16,7 @@ interface InspectorProps {
   lastSavedTime?: number | null;
   onOpenFile?: () => void;
   onNewFile?: () => void;
+  onFileNameChange?: (newName: string) => void;
 }
 
 export default function Inspector({
@@ -28,8 +29,43 @@ export default function Inspector({
   lastSavedTime = null,
   onOpenFile,
   onNewFile,
+  onFileNameChange,
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("ai");
+  const [isEditingFileName, setIsEditingFileName] = useState(false);
+  const [editedFileName, setEditedFileName] = useState(fileName);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Update edited file name when fileName prop changes
+  useEffect(() => {
+    setEditedFileName(fileName);
+  }, [fileName]);
+
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (isEditingFileName && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditingFileName]);
+
+  const handleStartEdit = () => {
+    setIsEditingFileName(true);
+    setEditedFileName(fileName);
+  };
+
+  const handleSaveFileName = () => {
+    const trimmedName = editedFileName.trim();
+    if (trimmedName && trimmedName !== fileName) {
+      onFileNameChange?.(trimmedName);
+    }
+    setIsEditingFileName(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditedFileName(fileName);
+    setIsEditingFileName(false);
+  };
 
   // Calculate manuscript pages (400 characters per page in Japanese)
   const manuscriptPages = Math.ceil(charCount / 400);
@@ -76,12 +112,52 @@ export default function Inspector({
             )}
           </div>
         </div>
-        <p className="text-sm font-semibold text-slate-800 truncate">{fileName}</p>
+        
+        {/* Editable File Name */}
+        {isEditingFileName ? (
+          <div className="flex items-center gap-1">
+            <input
+              ref={inputRef}
+              type="text"
+              value={editedFileName}
+              onChange={(e) => setEditedFileName(e.target.value)}
+              className="flex-1 text-sm font-semibold text-slate-800 px-2 py-1 border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleSaveFileName}
+              className="px-2 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded transition-colors"
+              title="保存"
+            >
+              OK
+            </button>
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleCancelEdit}
+              className="p-1 text-slate-500 hover:bg-slate-200 rounded transition-colors"
+              title="キャンセル"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div 
+            className="flex items-center gap-2 group cursor-pointer"
+            onClick={handleStartEdit}
+          >
+            <p className="text-sm font-semibold text-slate-800 truncate flex-1">{fileName}</p>
+            {onFileNameChange && (
+              <Edit2 className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            )}
+          </div>
+        )}
+        
         <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
           <span>
-            {isDirty && <span className="text-amber-600 font-medium">● Unsaved</span>}
-            {!isDirty && !isSaving && <span className="text-green-600 font-medium">✓ Saved</span>}
-            {isSaving && <span className="text-blue-600 font-medium">⟳ Saving...</span>}
+            {isSaving && <span className="text-blue-600 font-medium">⟳ 保存中...</span>}
+            {!isSaving && isDirty && <span className="text-amber-600 font-medium">● 未保存</span>}
+            {!isSaving && !isDirty && lastSavedTime === null && <span className="text-slate-500 font-medium">待保存</span>}
+            {!isSaving && !isDirty && lastSavedTime !== null && <span className="text-green-600 font-medium">✓ 保存済み</span>}
           </span>
           {lastSavedTime && !isDirty && (
             <span className="text-slate-500">{formatTime(lastSavedTime)}</span>

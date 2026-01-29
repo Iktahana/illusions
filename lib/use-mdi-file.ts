@@ -18,6 +18,7 @@ export interface UseMdiFileReturn {
   openFile: () => Promise<void>;
   saveFile: () => Promise<void>;
   newFile: () => void;
+  updateFileName: (newName: string) => void;
   wasAutoRecovered?: boolean; // Web only - whether file was auto-recovered
 }
 
@@ -96,6 +97,23 @@ export function useMdiFile(): UseMdiFileReturn {
     setLastSavedTime(null);
     setWasAutoRecovered(false);
   }, []);
+
+  const updateFileName = useCallback((newName: string) => {
+    if (!currentFile) {
+      // If no file is open, create a new file descriptor with the new name
+      setCurrentFile({
+        path: null,
+        handle: null,
+        name: newName,
+      });
+    } else {
+      // Update the existing file descriptor with the new name
+      setCurrentFile({
+        ...currentFile,
+        name: newName,
+      });
+    }
+  }, [currentFile]);
 
   const openFile = useCallback(async () => {
     const result = await openMdiFile();
@@ -310,6 +328,7 @@ export function useMdiFile(): UseMdiFileReturn {
     openFile,
     saveFile,
     newFile,
+    updateFileName,
     wasAutoRecovered,
   };
 }

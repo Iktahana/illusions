@@ -18,7 +18,7 @@ function words(s: string) {
 
 export default function EditorPage() {
   const mdiFile = useMdiFile();
-  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile, saveFile, newFile, wasAutoRecovered } =
+  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile, saveFile, newFile, updateFileName, wasAutoRecovered } =
     mdiFile;
 
   const contentRef = useRef<string>(content);
@@ -139,6 +139,7 @@ export default function EditorPage() {
           lastSavedTime={lastSavedTime}
           onOpenFile={openFile}
           onNewFile={newFile}
+          onFileNameChange={updateFileName}
         />
       </div>
 
