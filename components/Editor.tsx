@@ -360,6 +360,12 @@ function MilkdownEditor({
       editorDom.style.minHeight = '';
       editorDom.style.margin = '';
 
+      // Remove any existing spacer
+      const existingSpacer = editorContainer?.querySelector('.vertical-spacer');
+      if (existingSpacer) {
+        existingSpacer.remove();
+      }
+
       if (charsPerLine > 0) {
         // Create a measurement element to get the actual character size
         const measureEl = document.createElement('span');
@@ -392,6 +398,29 @@ function MilkdownEditor({
           editorDom.style.maxWidth = `${targetWidth}px`;
           editorDom.style.margin = '0 auto'; // Center horizontally
         }
+      }
+
+      // For vertical mode, ensure the editor fills the container width
+      // This prevents content from appearing stuck on the right when there's little text
+      if (isVertical && scrollContainerRef.current) {
+        // Use requestAnimationFrame to ensure DOM has been updated
+        requestAnimationFrame(() => {
+          const container = scrollContainerRef.current;
+          if (!container) return;
+          
+          const containerWidth = container.clientWidth;
+          // Calculate the padding (px-16 = 64px on each side)
+          const padding = 128; // 64px * 2
+          const minWidth = containerWidth - padding;
+          
+          // Set minimum width on the ProseMirror element
+          // In vertical-rl mode, content flows from right to left
+          // By ensuring min-width fills the container, content will start from the right edge
+          editorDom.style.minWidth = `${minWidth}px`;
+        });
+      } else {
+        // Remove min-width for horizontal mode
+        editorDom.style.minWidth = '';
       }
     };
 
