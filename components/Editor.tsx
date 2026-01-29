@@ -44,22 +44,57 @@ export default function NovelEditor({
   charsPerLine = 40,
   searchOpenTrigger = 0,
 }: EditorProps) {
-  // Load initial vertical state from localStorage
-  const [isVertical, setIsVertical] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('illusions-writing-mode');
-      return saved === 'vertical';
-    }
-    return false;
-  });
+  // Start with false to avoid hydration mismatch
+  const [isVertical, setIsVertical] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Load from localStorage after mounting (client-side only)
+  useEffect(() => {
+    setIsMounted(true);
+    const saved = localStorage.getItem('illusions-writing-mode');
+    if (saved === 'vertical') {
+      setIsVertical(true);
+    }
+  }, []);
+
   // Save vertical state to localStorage when it changes
   useEffect(() => {
+    if (!isMounted) return;
+    
     localStorage.setItem('illusions-writing-mode', isVertical ? 'vertical' : 'horizontal');
-  }, [isVertical]);
+    
+    // Scroll to the right when switching to vertical mode
+    if (isVertical && scrollContainerRef.current) {
+      // Function to scroll to the rightmost position
+      const scrollToRight = () => {
+        if (scrollContainerRef.current) {
+          const container = scrollContainerRef.current;
+          container.scrollLeft = container.scrollWidth;
+        }
+      };
+
+      // Try multiple times with increasing delays to ensure content is rendered
+      const timeouts = [50, 100, 200, 400];
+      timeouts.forEach(delay => {
+        setTimeout(scrollToRight, delay);
+      });
+
+      // Also observe when the scrollWidth changes (content fully rendered)
+      const observer = new ResizeObserver(() => {
+        scrollToRight();
+      });
+      
+      observer.observe(scrollContainerRef.current);
+      
+      // Cleanup observer after 1 second
+      setTimeout(() => {
+        observer.disconnect();
+      }, 1000);
+    }
+  }, [isVertical, isMounted]);
 
   const handleSearchOpen = () => {
     setIsSearchOpen(true);
@@ -73,7 +108,7 @@ export default function NovelEditor({
   }, [searchOpenTrigger]);
 
   return (
-    <div className={clsx("flex flex-col h-full min-h-0", className)}>
+    <div className={clsx("flex flex-col h-full min-h-0 relative", className)}>
       {/* Editor Toolbar */}
       <EditorToolbar
         isVertical={isVertical}
@@ -110,6 +145,11 @@ export default function NovelEditor({
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
+
+        {/* Selection Counter - positioned relative to editor */}
+        {editorViewInstance && (
+          <SelectionCounter editorView={editorViewInstance} />
+        )}
       </div>
 
       {/* Search Dialog */}
@@ -118,11 +158,6 @@ export default function NovelEditor({
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
       />
-
-      {/* Selection Counter */}
-      {editorViewInstance && (
-        <SelectionCounter editorView={editorViewInstance} />
-      )}
     </div>
   );
 }
@@ -300,71 +335,68 @@ function MilkdownEditor({
 
   // Apply character per line limit using JavaScript measurement
   useEffect(() => {
-    // Delay to ensure editor DOM is ready
-    const timer = setTimeout(() => {
-      const editorContainer = editorRef.current;
-      const editorDom = editorContainer?.querySelector('.milkdown .ProseMirror') as HTMLElement;
-      if (!editorDom) return;
+    const editorContainer = editorRef.current;
+    const editorDom = editorContainer?.querySelector('.milkdown .ProseMirror') as HTMLElement;
+    if (!editorDom) return;
 
+    // Fade out before making changes
+    editorDom.style.transition = 'opacity 0.15s ease-out';
+    editorDom.style.opacity = '0';
+
+    // Delay to ensure editor DOM is ready and fade out completes
+    const timer = setTimeout(() => {
       // Reset styles first
       editorDom.style.width = '';
       editorDom.style.maxWidth = '';
       editorDom.style.height = '';
       editorDom.style.maxHeight = '';
+      editorDom.style.minHeight = '';
       editorDom.style.margin = '';
 
-      if (charsPerLine <= 0) return;
+      if (charsPerLine > 0) {
+        // Create a measurement element to get the actual character size
+        const measureEl = document.createElement('span');
+        measureEl.style.cssText = `
+          position: absolute;
+          visibility: hidden;
+          white-space: nowrap;
+          font-family: "${fontFamily}", serif;
+          font-size: ${fontScale}%;
+          line-height: ${lineHeight};
+        `;
+        measureEl.textContent = '国'; // Use a full-width character for Japanese
+        document.body.appendChild(measureEl);
+        
+        // Japanese characters are typically square
+        const charSize = measureEl.offsetWidth;
+        document.body.removeChild(measureEl);
 
-      // Create a measurement element to get the actual character size
-      // For vertical writing, we measure in horizontal mode and use width as the "height" of each char
-      const measureEl = document.createElement('span');
-      measureEl.style.cssText = `
-        position: absolute;
-        visibility: hidden;
-        white-space: nowrap;
-        font-family: "${fontFamily}", serif;
-        font-size: ${fontScale}%;
-        line-height: ${lineHeight};
-      `;
-      measureEl.textContent = '国'; // Use a full-width character for Japanese
-      document.body.appendChild(measureEl);
-      
-      // In both modes, we use the same character width measurement
-      // because Japanese characters are typically square
-      const charSize = measureEl.offsetWidth;
-      document.body.removeChild(measureEl);
-
-      // Apply the calculated size to the editor
-      if (isVertical) {
-        // In vertical mode, limit height (characters per column)
-        // Height in vertical mode = number of characters from top to bottom
-        const targetHeight = charSize * charsPerLine;
-        editorDom.style.height = `${targetHeight}px`;
-        editorDom.style.maxHeight = `${targetHeight}px`;
-        editorDom.style.minHeight = `${targetHeight}px`;
-        editorDom.style.overflow = 'visible';
-      } else {
-        // In horizontal mode, limit width (characters per line) and center horizontally
-        const targetWidth = charSize * charsPerLine;
-        editorDom.style.width = `${targetWidth}px`;
-        editorDom.style.maxWidth = `${targetWidth}px`;
-        editorDom.style.margin = '0 auto'; // Center horizontally
+        // Apply the calculated size to the editor
+        if (isVertical) {
+          // In vertical mode, limit height (characters per column)
+          const targetHeight = charSize * charsPerLine;
+          editorDom.style.height = `${targetHeight}px`;
+          editorDom.style.maxHeight = `${targetHeight}px`;
+          editorDom.style.minHeight = `${targetHeight}px`;
+          editorDom.style.overflow = 'visible';
+        } else {
+          // In horizontal mode, limit width (characters per line) and center horizontally
+          const targetWidth = charSize * charsPerLine;
+          editorDom.style.width = `${targetWidth}px`;
+          editorDom.style.maxWidth = `${targetWidth}px`;
+          editorDom.style.margin = '0 auto'; // Center horizontally
+        }
       }
-    }, 200);
+
+      // Fade in after changes are applied
+      requestAnimationFrame(() => {
+        editorDom.style.transition = 'opacity 0.25s ease-in';
+        editorDom.style.opacity = '1';
+      });
+    }, 150);
 
     return () => {
       clearTimeout(timer);
-      // Cleanup
-      const editorDom = editorRef.current?.querySelector('.milkdown .ProseMirror') as HTMLElement;
-      if (editorDom) {
-        editorDom.style.width = '';
-        editorDom.style.maxWidth = '';
-        editorDom.style.height = '';
-        editorDom.style.maxHeight = '';
-        editorDom.style.minHeight = '';
-        editorDom.style.margin = '';
-        editorDom.style.overflow = '';
-      }
     };
   }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, get]);
 
@@ -464,6 +496,7 @@ function MilkdownEditor({
       <div
         ref={editorRef}
         className={clsx(
+          "editor-content-area",
           isVertical 
             ? "px-16 py-8 min-w-fit" 
             : "p-8 mx-auto"
@@ -489,8 +522,12 @@ function MilkdownEditor({
           div :global(.milkdown .ProseMirror blockquote) {
             text-indent: 0;
           }
-          
-
+        `}</style>
+        <style jsx global>{`
+          /* Start editor content transparent, JS will fade it in after layout */
+          .editor-content-area .milkdown .ProseMirror {
+            opacity: 0;
+          }
         `}</style>
         <Milkdown />
       </div>

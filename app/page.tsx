@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import Explorer from "@/components/Explorer";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
-import AiStatusIndicator from "@/components/AiStatusIndicator";
 import ResizablePanel from "@/components/ResizablePanel";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { isElectronRenderer } from "@/lib/runtime-env";
@@ -187,8 +186,6 @@ export default function EditorPage() {
           />
         </ResizablePanel>
       </div>
-
-      <AiStatusIndicator />
     </div>
   );
 }
