@@ -69,7 +69,7 @@ export default function EditorPage() {
   const [textIndent, setTextIndent] = useState(1);
   const [fontFamily, setFontFamily] = useState('Noto Serif JP');
   const [charsPerLine, setCharsPerLine] = useState(40); // 0 = no limit, default 40
-  const [showParagraphNumbers, setShowParagraphNumbers] = useState(false);
+  const [showParagraphNumbers, setShowParagraphNumbers] = useState(true);
   
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
@@ -222,7 +222,7 @@ export default function EditorPage() {
   const wordCount = words(content);
   const charCount = chars(content);
 
-  const fileName = currentFile?.name ?? (isDirty ? "無題（未保存）" : "無題");
+  const fileName = currentFile?.name ?? (isDirty ? "新規ファイル *" : "新規ファイル");
 
   // Handle keyboard shortcuts: Cmd+S / Ctrl+S to save, Cmd+F / Ctrl+F to search
   useEffect(() => {
@@ -334,7 +334,7 @@ export default function EditorPage() {
               }`}
             >
               <span className="text-success text-sm font-medium">✓</span>
-              <span className="text-foreground-secondary text-sm">保存しました</span>
+              <span className="text-foreground-secondary text-sm">保存完了</span>
             </div>
           )}
         </main>

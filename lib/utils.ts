@@ -51,10 +51,10 @@ export function formatRelativeTime(date: Date): string {
   const now = new Date();
   const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diff < 60) return '保存済み';
-  if (diff < 3600) return `${Math.floor(diff / 60)}分前に保存`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}時間前に保存`;
-  return `${Math.floor(diff / 86400)}日前に保存`;
+  if (diff < 60) return '今';
+  if (diff < 3600) return `${Math.floor(diff / 60)}分前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}時間前`;
+  return `${Math.floor(diff / 86400)}日前`;
 }
 
 /**

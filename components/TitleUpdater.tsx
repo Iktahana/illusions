@@ -10,7 +10,7 @@ interface TitleUpdaterProps {
 
 export default function TitleUpdater({ currentFile, isDirty }: TitleUpdaterProps) {
   useEffect(() => {
-    const fileName = currentFile?.name ?? (isDirty ? "無題（未保存）" : "無題");
+    const fileName = currentFile?.name ?? (isDirty ? "新規ファイル *" : "新規ファイル");
     const title = `${fileName} - Illusions`;
     document.title = title;
   }, [currentFile?.name, isDirty]);

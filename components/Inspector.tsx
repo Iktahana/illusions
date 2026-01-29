@@ -90,18 +90,18 @@ export default function Inspector({
   // Calculate manuscript pages (400 characters per page in Japanese)
   const manuscriptPages = Math.ceil(charCount / 400);
 
-  const formatTime = (timestamp: number | null) => {
-    if (!timestamp) return "未保存";
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSecs = Math.floor(diffMs / 1000);
+   const formatTime = (timestamp: number | null) => {
+     if (!timestamp) return "未保存";
+     const date = new Date(timestamp);
+     const now = new Date();
+     const diffMs = now.getTime() - date.getTime();
+     const diffSecs = Math.floor(diffMs / 1000);
 
-    if (diffSecs < 60) return "たった今";
-    if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}分前`;
-    if (diffSecs < 86400) return `${Math.floor(diffSecs / 3600)}時間前`;
-    return date.toLocaleDateString();
-  };
+     if (diffSecs < 60) return "今";
+     if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}分前`;
+     if (diffSecs < 86400) return `${Math.floor(diffSecs / 3600)}時間前`;
+     return date.toLocaleDateString();
+   };
 
   return (
     <aside className={clsx("h-full bg-background border-l border-border flex flex-col", className)}>
@@ -109,7 +109,7 @@ export default function Inspector({
       <div className="px-4 py-3 border-b border-border bg-background-secondary">
         <div className="flex items-center justify-between mb-1">
           <p className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide">
-            現在のファイル
+            ファイル情報
           </p>
           <div className="flex items-center gap-1">
             {onNewFile && (
@@ -184,26 +184,26 @@ export default function Inspector({
         
         <div className="mt-2 flex items-center justify-between text-xs">
           <span>
-            {isSaving && (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 animate-pulse">
-                <span className="mr-1">⟳</span> 保存中...
-              </span>
-            )}
-            {!isSaving && isDirty && (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-orange-500 text-white">
-                <span className="mr-1">●</span> 未保存
-              </span>
-            )}
-            {!isSaving && !isDirty && lastSavedTime === null && (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-gray-500 text-white">
-                <span className="mr-1">●</span> 待保存
-              </span>
-            )}
-            {!isSaving && !isDirty && lastSavedTime !== null && (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-green-500 text-white">
-                <span className="mr-1">✓</span> 保存済み
-              </span>
-            )}
+             {isSaving && (
+               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 animate-pulse">
+                 <span className="mr-1">⟳</span> 保存中
+               </span>
+             )}
+             {!isSaving && isDirty && (
+               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-orange-500 text-white">
+                 <span className="mr-1">●</span> 編集中
+               </span>
+             )}
+             {!isSaving && !isDirty && lastSavedTime === null && (
+               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-gray-500 text-white">
+                 <span className="mr-1">●</span> 新規
+               </span>
+             )}
+             {!isSaving && !isDirty && lastSavedTime !== null && (
+               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-green-500 text-white">
+                 <span className="mr-1">✓</span> 保存済み
+               </span>
+             )}
           </span>
           {lastSavedTime && !isDirty && (
             <span className="text-foreground-tertiary">{formatTime(lastSavedTime)}</span>
