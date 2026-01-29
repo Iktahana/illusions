@@ -12,7 +12,8 @@
   overflow-wrap: break-word;
   word-break: normal;
   overflow: visible;
-  height: 100%;
+  min-height: 100%;
+  width: max-content;
   /* Inherit all base typography settings */
   font-family: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
   font-weight: 400;

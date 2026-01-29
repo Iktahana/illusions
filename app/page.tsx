@@ -33,6 +33,7 @@ export default function EditorPage() {
   const [lineHeight, setLineHeight] = useState(1.8);
   const [textIndent, setTextIndent] = useState(1);
   const [fontFamily, setFontFamily] = useState('Noto Serif JP');
+  const [charsPerLine, setCharsPerLine] = useState(40); // 0 = no limit, default 40
   
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
@@ -150,6 +151,8 @@ export default function EditorPage() {
             onTextIndentChange={setTextIndent}
             fontFamily={fontFamily}
             onFontFamilyChange={setFontFamily}
+            charsPerLine={charsPerLine}
+            onCharsPerLineChange={setCharsPerLine}
           />
         </ResizablePanel>
         
@@ -164,6 +167,7 @@ export default function EditorPage() {
               lineHeight={lineHeight}
               textIndent={textIndent}
               fontFamily={fontFamily}
+              charsPerLine={charsPerLine}
               searchOpenTrigger={searchOpenTrigger}
             />
           </div>

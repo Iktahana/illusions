@@ -62,8 +62,15 @@ export async function openMdiFile(): Promise<OpenMdiResult | null> {
             "text/plain": [".mdi"],
           },
         },
+        {
+          description: "All Files",
+          accept: {
+            "*/*": [],
+          },
+        },
       ],
       multiple: false,
+      excludeAcceptAllOption: false,
     });
 
     const file = await handle.getFile();
@@ -146,6 +153,24 @@ export async function saveMdiFile(
 
     if (!handle) {
       return null;
+    }
+
+    // Check and request permission if needed (for persisted handles)
+    if (descriptor?.handle && "queryPermission" in handle) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const permission = await (handle as any).queryPermission({ mode: "readwrite" });
+        if (permission !== "granted") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const requestResult = await (handle as any).requestPermission({ mode: "readwrite" });
+          if (requestResult !== "granted") {
+            console.warn("Write permission not granted for file handle");
+            return null;
+          }
+        }
+      } catch (err) {
+        console.warn("Permission check failed, attempting to write anyway:", err);
+      }
     }
 
     const writable = await handle.createWritable();

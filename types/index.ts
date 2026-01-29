@@ -39,6 +39,7 @@ export interface EditorSettings {
   isVertical: boolean;
   theme: 'light' | 'dark';
   textIndent: number; // Text indent in em units (e.g., 1 = 1em)
+  charsPerLine: number; // Character limit per line/column (0 = no limit, 10-50)
 }
 
 export interface UserPreferences {

@@ -8,6 +8,7 @@ import { EditorView } from "@milkdown/prose/view";
 interface BubbleMenuProps {
   editorView: EditorView | null;
   onFormat: (format: FormatType, level?: number) => void;
+  isVertical?: boolean;
 }
 
 export type FormatType = 
@@ -21,7 +22,7 @@ export type FormatType =
   | "code"
   | "link";
 
-export default function BubbleMenu({ editorView, onFormat }: BubbleMenuProps) {
+export default function BubbleMenu({ editorView, onFormat, isVertical = false }: BubbleMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -48,14 +49,22 @@ export default function BubbleMenu({ editorView, onFormat }: BubbleMenuProps) {
       const start = editorView.coordsAtPos(from);
       const end = editorView.coordsAtPos(to);
 
-      // Calculate position above the selection
-      const left = (start.left + end.left) / 2;
-      const top = start.top;
-
-      setPosition({
-        left: left,
-        top: top - 50, // Position above the selection
-      });
+      if (isVertical) {
+        const top = (start.top + end.top) / 2;
+        const left = start.left - 56;
+        setPosition({
+          left,
+          top,
+        });
+      } else {
+        // Calculate position above the selection
+        const left = (start.left + end.left) / 2;
+        const top = start.top;
+        setPosition({
+          left: left,
+          top: top - 50, // Position above the selection
+        });
+      }
     };
 
     // Update position on selection change
@@ -71,7 +80,7 @@ export default function BubbleMenu({ editorView, onFormat }: BubbleMenuProps) {
       editorView.dom.removeEventListener("mouseup", handleUpdate);
       editorView.dom.removeEventListener("keyup", handleUpdate);
     };
-  }, [editorView]);
+  }, [editorView, isVertical]);
 
   // Close heading dropdown when clicking outside
   useEffect(() => {
@@ -111,11 +120,14 @@ export default function BubbleMenu({ editorView, onFormat }: BubbleMenuProps) {
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-white rounded-lg shadow-lg border border-slate-200 flex items-center gap-1 p-1"
+      className={clsx(
+        "fixed z-50 bg-white rounded-lg shadow-lg border border-slate-200 flex gap-1 p-1",
+        isVertical ? "flex-col items-center" : "items-center"
+      )}
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
-        transform: "translateX(-50%)",
+        transform: isVertical ? "translateY(-50%)" : "translateX(-50%)",
       }}
     >
       {/* Heading Dropdown */}
@@ -132,7 +144,12 @@ export default function BubbleMenu({ editorView, onFormat }: BubbleMenuProps) {
         </button>
 
         {showHeadingDropdown && (
-          <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[120px]">
+          <div
+            className={clsx(
+              "absolute bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[120px]",
+              isVertical ? "left-full top-0 ml-1" : "top-full left-0 mt-1"
+            )}
+          >
             {[1, 2, 3].map((level) => {
               const HeadingIcon = level === 1 ? Heading1 : level === 2 ? Heading2 : Heading3;
               return (
@@ -153,7 +170,7 @@ export default function BubbleMenu({ editorView, onFormat }: BubbleMenuProps) {
         )}
       </div>
 
-      <div className="w-px h-6 bg-slate-200" />
+      <div className={clsx(isVertical ? "h-px w-6" : "w-px h-6", "bg-slate-200")} />
 
       {/* Format Buttons */}
       {buttons.map(({ icon: Icon, label, format, shortcut }) => (
