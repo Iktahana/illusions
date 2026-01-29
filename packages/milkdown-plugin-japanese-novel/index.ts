@@ -8,8 +8,16 @@ import { $prose, $remark } from '@milkdown/utils'
 import { Plugin, PluginKey } from '@milkdown/prose/state'
 import { rubySchema } from './nodes/ruby'
 import { tcySchema } from './nodes/tcy'
+import { nobreakSchema } from './nodes/nobreak'
+import { kernSchema } from './nodes/kern'
 import { headingAnchorSchema } from './nodes/heading-anchor'
-import { remarkHeadingAnchorPlugin, remarkRubyPlugin, remarkTcyPlugin } from './syntax'
+import { 
+  remarkHeadingAnchorPlugin, 
+  remarkRubyPlugin, 
+  remarkTcyPlugin,
+  remarkNoBreakPlugin,
+  remarkKernPlugin,
+} from './syntax'
 import { createHeadingIdFixerPlugin } from './plugins/heading-id-fixer'
 import {
   defaultJapaneseNovelOptions,
@@ -31,6 +39,8 @@ export function japaneseNovel(
     showManuscriptLine,
     enableRuby,
     enableTcy,
+    enableNoBreak,
+    enableKern,
   } = opts
 
   const classes: string[] = ['milkdown-japanese-base']
@@ -50,6 +60,16 @@ export function japaneseNovel(
     'japaneseNovelTcy',
     () => (remarkTcyPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void),
     { enable: enableTcy }
+  )
+  const remarkNoBreak = $remark(
+    'japaneseNovelNoBreak',
+    () => (remarkNoBreakPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void),
+    { enable: enableNoBreak }
+  )
+  const remarkKern = $remark(
+    'japaneseNovelKern',
+    () => (remarkKernPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void),
+    { enable: enableKern }
   )
   const remarkHeadingAnchor = $remark(
     'japaneseNovelHeadingAnchor',
@@ -79,6 +99,8 @@ export function japaneseNovel(
   const plugins: MilkdownPlugin[] = [
     ...(enableRuby ? [remarkRuby, rubySchema] : []),
     ...(enableTcy ? [remarkTcy, tcySchema] : []),
+    ...(enableNoBreak ? [remarkNoBreak, nobreakSchema] : []),
+    ...(enableKern ? [remarkKern, kernSchema] : []),
     remarkHeadingAnchor,
     headingAnchorSchema,
     headingIdFixerPlugin,

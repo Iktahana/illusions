@@ -31,6 +31,17 @@
   text-combine-upright: all;
 }
 
+/* No-break: prevent line breaks in proper nouns */
+.milkdown-japanese-base .mdi-nobr {
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+/* Kerning: adjust letter spacing */
+.milkdown-japanese-base .mdi-kern {
+  letter-spacing: var(--mdi-kern, 0em);
+}
+
 @import './vertical.css';
 @import './horizontal.css';
 @import './manuscript.css';

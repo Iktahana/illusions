@@ -31,7 +31,8 @@ export const tcySchema = $nodeSchema('tcy', () => ({
   toMarkdown: {
     match: (node) => node.type.name === 'tcy',
     runner: (state, node) => {
-      state.addNode('text', undefined, node.attrs.value as string)
+      const value = node.attrs.value as string
+      state.addNode('text', undefined, `^${value}^`)
     },
   },
 }))

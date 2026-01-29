@@ -7,10 +7,14 @@ export interface JapaneseNovelOptions {
   isVertical?: boolean
   /** Show manuscript-style grid lines (原稿用紙). */
   showManuscriptLine?: boolean
-  /** Enable tate-chu-yoko (縦中横) for digits and punctuation. */
+  /** Enable tate-chu-yoko (縦中横) with ^...^ syntax. */
   enableTcy?: boolean
   /** Enable Ruby (振仮名) syntax {base|ruby}. */
   enableRuby?: boolean
+  /** Enable no-break [[no-break:text]] syntax. */
+  enableNoBreak?: boolean
+  /** Enable kerning [[kern:amount:text]] syntax. */
+  enableKern?: boolean
 }
 
 export const defaultJapaneseNovelOptions: Required<JapaneseNovelOptions> = {
@@ -18,4 +22,6 @@ export const defaultJapaneseNovelOptions: Required<JapaneseNovelOptions> = {
   showManuscriptLine: false,
   enableTcy: true,
   enableRuby: true,
+  enableNoBreak: true,
+  enableKern: true,
 }
