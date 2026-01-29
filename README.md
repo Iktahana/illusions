@@ -2,6 +2,12 @@
 
 A professional-grade Japanese novel editor built with Next.js, Milkdown, and Tailwind CSS.
 
+Web(Only work on latest version Chrome):
+https://illusions.iktahana.com/
+
+MacOS/Windows:
+[Latest](https://github.com/Iktahana/illusions/releases/latest)
+
 ## Features
 
 ### 📝 Core Editor
