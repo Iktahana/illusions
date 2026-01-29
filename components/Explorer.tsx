@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { parseMarkdownChapters, getChaptersFromDOM, type Chapter } from "@/lib/utils";
-import { FEATURED_JAPANESE_FONTS, ALL_JAPANESE_FONTS, loadGoogleFont } from "@/lib/fonts";
+import { FEATURED_JAPANESE_FONTS, ALL_JAPANESE_FONTS, loadGoogleFont, type FontInfo } from "@/lib/fonts";
 
 type Tab = "chapters" | "settings" | "style";
 
@@ -505,7 +505,7 @@ function FontSelector({
 
   // Preload featured fonts
   useEffect(() => {
-    FEATURED_JAPANESE_FONTS.forEach(font => {
+    FEATURED_JAPANESE_FONTS.forEach((font: FontInfo) => {
       loadGoogleFont(font.family);
     });
   }, []);
@@ -519,20 +519,20 @@ function FontSelector({
 
   // Filter fonts based on search term (search both family name and localized name)
   const filteredFonts = searchTerm
-    ? ALL_JAPANESE_FONTS.filter(font =>
+    ? ALL_JAPANESE_FONTS.filter((font: FontInfo) =>
         font.family.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (font.localizedName && font.localizedName.includes(searchTerm))
       )
     : ALL_JAPANESE_FONTS;
 
-  const featuredFiltered = FEATURED_JAPANESE_FONTS.filter(font =>
+  const featuredFiltered = FEATURED_JAPANESE_FONTS.filter((font: FontInfo) =>
     !searchTerm || 
     font.family.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (font.localizedName && font.localizedName.includes(searchTerm))
   );
 
   const otherFonts = filteredFonts.filter(
-    font => !FEATURED_JAPANESE_FONTS.find(f => f.family === font.family)
+    (font: FontInfo) => !FEATURED_JAPANESE_FONTS.find((f: FontInfo) => f.family === font.family)
   );
 
   return (
