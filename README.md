@@ -99,6 +99,24 @@ illusions/
 - **Tailwind CSS 3** - Styling
 - **Lucide React** - Icon library
 
+## macOS Quick Look (MDI Preview)
+
+The macOS build bundles a Quick Look plugin so Finder can preview `.mdi` files as Markdown.
+On first launch, the app installs the plugin to `~/Library/QuickLook/MDIQuickLook.qlgenerator`
+and refreshes Quick Look automatically.
+
+If Finder previews do not appear, run:
+
+```bash
+qlmanage -r
+```
+
+If you build locally, you can generate the plugin with:
+
+```bash
+npm run build:quicklook
+```
+
 ## Vertical Writing Mode
 
 The editor supports Japanese vertical writing (縦書き) through the `isVertical` state:

@@ -5,8 +5,13 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron')
 const path = require('path')
 const fs = require('fs/promises')
+const os = require('os')
+const { execFile } = require('child_process')
+const { promisify } = require('util')
 const { autoUpdater } = require('electron-updater')
 const log = require('electron-log')
+
+const execFileAsync = promisify(execFile)
 
 const isDev =
   process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === '1'
@@ -313,6 +318,56 @@ function createMainWindow() {
   Menu.setApplicationMenu(menu)
 }
 
+async function installQuickLookPluginIfNeeded() {
+  if (process.platform !== 'darwin') {
+    return
+  }
+
+  if (!app.isPackaged) {
+    return
+  }
+
+  const markerPath = path.join(
+    app.getPath('userData'),
+    `quicklook-installed-${app.getVersion()}`
+  )
+
+  try {
+    await fs.stat(markerPath)
+    return
+  } catch {
+    // Continue with install.
+  }
+
+  const sourcePath = path.join(
+    process.resourcesPath,
+    'Library',
+    'QuickLook',
+    'MDIQuickLook.qlgenerator'
+  )
+
+  try {
+    await fs.stat(sourcePath)
+  } catch (error) {
+    log.warn('Quick Look plugin missing in app resources:', error)
+    return
+  }
+
+  const destDir = path.join(os.homedir(), 'Library', 'QuickLook')
+  const destPath = path.join(destDir, 'MDIQuickLook.qlgenerator')
+
+  try {
+    await fs.mkdir(destDir, { recursive: true })
+    await fs.rm(destPath, { recursive: true, force: true })
+    await fs.cp(sourcePath, destPath, { recursive: true })
+    await execFileAsync('/usr/bin/qlmanage', ['-r'])
+    await fs.writeFile(markerPath, new Date().toISOString())
+    log.info('Quick Look plugin installed.')
+  } catch (error) {
+    log.warn('Quick Look install failed:', error)
+  }
+}
+
 ipcMain.handle('get-chrome-version', () => {
   const v = process.versions.chrome || '0'
   const major = Number.parseInt(String(v).split('.')[0] || '0', 10)
@@ -368,6 +423,7 @@ ipcMain.handle('save-before-close-done', () => {
 
 app.whenReady().then(() => {
   createMainWindow()
+  installQuickLookPluginIfNeeded()
 
   // Initialize auto-updater after window is created
   setupAutoUpdater()
@@ -385,4 +441,3 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
-

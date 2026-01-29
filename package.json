@@ -9,8 +9,10 @@
     "build": "npm run type-check && next build",
     "start": "next start",
     "lint": "next lint",
+    "download:fonts": "node scripts/download-local-fonts.mjs",
     "electron:dev": "npm run type-check && next build && concurrently \"next dev -p 3000\" \"wait-on http://localhost:3000 && env -u ELECTRON_RUN_AS_NODE electron .\"",
     "electron:build": "npm run type-check && next build && electron-builder --publish never",
+    "build:quicklook": "bash scripts/build-quicklook.sh",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
@@ -74,6 +76,12 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "build/icon.icns",
+      "extraFiles": [
+        {
+          "from": "build/quicklook/MDIQuickLook.qlgenerator",
+          "to": "Library/QuickLook/MDIQuickLook.qlgenerator"
+        }
+      ],
       "target": [
         {
           "target": "dmg",

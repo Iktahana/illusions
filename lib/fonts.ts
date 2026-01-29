@@ -13,6 +13,12 @@ export interface FontInfo {
   variants?: string[];
 }
 
+export type SystemFontPlatform = 'mac' | 'windows';
+
+export interface SystemFontInfo extends FontInfo {
+  platforms: SystemFontPlatform[];
+}
+
 /**
  * Featured Japanese fonts (displayed at the top of the selector)
  */
@@ -23,6 +29,93 @@ export const FEATURED_JAPANESE_FONTS: FontInfo[] = [
   { family: 'Zen Kaku Gothic New', localizedName: '禅角ゴシック New', category: 'sans-serif' },
   { family: 'M PLUS Rounded 1c', localizedName: 'Mプラス 丸ゴシック 1c', category: 'sans-serif' },
 ];
+
+export const LOCAL_SYSTEM_FONTS: SystemFontInfo[] = [
+  {
+    family: 'Hiragino Mincho ProN',
+    localizedName: 'ヒラギノ明朝 ProN',
+    category: 'serif',
+    platforms: ['mac'],
+  },
+  {
+    family: 'Hiragino Kaku Gothic ProN',
+    localizedName: 'ヒラギノ角ゴ ProN',
+    category: 'sans-serif',
+    platforms: ['mac'],
+  },
+  {
+    family: 'Yu Mincho',
+    localizedName: '游明朝',
+    category: 'serif',
+    platforms: ['mac', 'windows'],
+  },
+  {
+    family: 'Yu Gothic',
+    localizedName: '游ゴシック',
+    category: 'sans-serif',
+    platforms: ['mac', 'windows'],
+  },
+  {
+    family: 'Tsukushi Mincho',
+    localizedName: '筑紫明朝',
+    category: 'serif',
+    platforms: ['mac'],
+  },
+  {
+    family: 'Tsukushi A Round Gothic',
+    localizedName: '筑紫A丸ゴシック',
+    category: 'sans-serif',
+    platforms: ['mac'],
+  },
+  {
+    family: 'Meiryo',
+    localizedName: 'メイリオ',
+    category: 'sans-serif',
+    platforms: ['windows'],
+  },
+  {
+    family: 'MS Mincho',
+    localizedName: 'MS 明朝',
+    category: 'serif',
+    platforms: ['windows'],
+  },
+  {
+    family: 'MS Gothic',
+    localizedName: 'MS ゴシック',
+    category: 'sans-serif',
+    platforms: ['windows'],
+  },
+  {
+    family: 'BIZ UDGothic',
+    localizedName: 'BIZ UDゴシック',
+    category: 'sans-serif',
+    platforms: ['windows'],
+  },
+  {
+    family: 'BIZ UDPGothic',
+    localizedName: 'BIZ UDPゴシック',
+    category: 'sans-serif',
+    platforms: ['windows'],
+  },
+  {
+    family: 'BIZ UDMincho',
+    localizedName: 'BIZ UD明朝',
+    category: 'serif',
+    platforms: ['windows'],
+  },
+  {
+    family: 'BIZ UDPMincho',
+    localizedName: 'BIZ UDP明朝',
+    category: 'serif',
+    platforms: ['windows'],
+  },
+];
+
+const LOCAL_FONT_FAMILY_SET = new Set<string>([
+  ...FEATURED_JAPANESE_FONTS.map((f) => f.family),
+  ...LOCAL_SYSTEM_FONTS.map((f) => f.family),
+  'Fira Code',
+]);
 
 /**
  * Complete list of Japanese fonts available on Google Fonts
@@ -135,6 +228,10 @@ export const ALL_JAPANESE_FONTS: FontInfo[] = [
  * @param fontFamily - The font family name (e.g., "Noto Serif JP")
  */
 export function loadGoogleFont(fontFamily: string): void {
+  if (LOCAL_FONT_FAMILY_SET.has(fontFamily)) {
+    return;
+  }
+
   // Check if font is already loaded
   const fontUrl = fontFamily.replace(/\s+/g, '+');
   const existingLink = document.querySelector(`link[href*="${fontUrl}"]`);
@@ -148,6 +245,36 @@ export function loadGoogleFont(fontFamily: string): void {
   link.rel = 'stylesheet';
   link.href = `https://fonts.googleapis.com/css2?family=${fontUrl}:wght@400;700&display=swap`;
   document.head.appendChild(link);
+}
+
+export function isElectronRuntime(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const win = window as typeof window & {
+    process?: { versions?: { electron?: string } };
+  };
+
+  return Boolean(win.process?.versions?.electron) || window.navigator.userAgent.includes('Electron');
+}
+
+export async function ensureLocalFontAvailable(fontFamily: string): Promise<void> {
+  if (typeof document === 'undefined' || !document.fonts) {
+    return;
+  }
+
+  try {
+    await document.fonts.load(`16px "${fontFamily}"`);
+    const available = document.fonts.check(`16px "${fontFamily}"`);
+    if (!available) {
+      // eslint-disable-next-line no-console
+      console.error(`[fonts] Local font unavailable: ${fontFamily}`);
+    }
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(`[fonts] Failed to check local font: ${fontFamily}`, error);
+  }
 }
 
 /**

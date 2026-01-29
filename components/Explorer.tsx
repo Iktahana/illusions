@@ -13,7 +13,16 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { parseMarkdownChapters, getChaptersFromDOM, type Chapter } from "@/lib/utils";
-import { FEATURED_JAPANESE_FONTS, ALL_JAPANESE_FONTS, loadGoogleFont, type FontInfo } from "@/lib/fonts";
+import {
+  FEATURED_JAPANESE_FONTS,
+  ALL_JAPANESE_FONTS,
+  LOCAL_SYSTEM_FONTS,
+  ensureLocalFontAvailable,
+  isElectronRuntime,
+  loadGoogleFont,
+  type FontInfo,
+  type SystemFontInfo,
+} from "@/lib/fonts";
 
 type Tab = "chapters" | "settings" | "style";
 
@@ -491,6 +500,44 @@ function FontSelector({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isElectron = useMemo(() => isElectronRuntime(), []);
+  const platform = useMemo(() => {
+    if (typeof navigator === 'undefined') {
+      return null;
+    }
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes('mac')) {
+      return 'mac';
+    }
+    if (ua.includes('win')) {
+      return 'windows';
+    }
+    return null;
+  }, []);
+
+  const systemFonts = useMemo(() => {
+    if (!isElectron) {
+      return [];
+    }
+    if (!platform) {
+      return LOCAL_SYSTEM_FONTS;
+    }
+    return LOCAL_SYSTEM_FONTS.filter((font: SystemFontInfo) =>
+      font.platforms.includes(platform)
+    );
+  }, [isElectron, platform]);
+
+  const systemFontFamilies = useMemo(
+    () => new Set(systemFonts.map((font) => font.family)),
+    [systemFonts]
+  );
+
+  const selectedFont = useMemo(
+    () =>
+      systemFonts.find((font) => font.family === value) ||
+      ALL_JAPANESE_FONTS.find((font) => font.family === value),
+    [systemFonts, value]
+  );
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -512,7 +559,11 @@ function FontSelector({
 
   const handleSelect = (font: string) => {
     onChange(font);
-    loadGoogleFont(font);
+    if (systemFontFamilies.has(font)) {
+      void ensureLocalFontAvailable(font);
+    } else {
+      loadGoogleFont(font);
+    }
     setIsOpen(false);
     setSearchTerm('');
   };
@@ -531,6 +582,12 @@ function FontSelector({
     (font.localizedName && font.localizedName.includes(searchTerm))
   );
 
+  const systemFiltered = systemFonts.filter((font: SystemFontInfo) =>
+    !searchTerm ||
+    font.family.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (font.localizedName && font.localizedName.includes(searchTerm))
+  );
+
   const otherFonts = filteredFonts.filter(
     (font: FontInfo) => !FEATURED_JAPANESE_FONTS.find((f: FontInfo) => f.family === font.family)
   );
@@ -545,7 +602,7 @@ function FontSelector({
         style={{ fontFamily: `"${value}", serif` }}
       >
         <span>
-          {ALL_JAPANESE_FONTS.find(f => f.family === value)?.localizedName || value}
+          {selectedFont?.localizedName || value}
         </span>
         <ChevronRight 
           className={clsx(
@@ -572,6 +629,34 @@ function FontSelector({
 
           {/* Font list */}
           <div className="overflow-y-auto">
+            {/* System fonts (Electron only) */}
+            {systemFiltered.length > 0 && (
+              <>
+                {!searchTerm && (
+                  <div className="px-3 py-1 text-xs font-semibold text-foreground-tertiary bg-background-secondary sticky top-0">
+                    ローカル
+                  </div>
+                )}
+                {systemFiltered.map(font => (
+                  <button
+                    key={font.family}
+                    type="button"
+                    onClick={() => handleSelect(font.family)}
+                    className={clsx(
+                      "w-full px-3 py-2 text-sm text-left hover:bg-active flex items-center justify-between transition-colors text-foreground",
+                      value === font.family && "bg-accent-light"
+                    )}
+                    style={{ fontFamily: `"${font.family}", serif` }}
+                  >
+                    <span>{font.localizedName || font.family}</span>
+                    {value === font.family && (
+                      <Check className="w-4 h-4 text-accent" />
+                    )}
+                  </button>
+                ))}
+              </>
+            )}
+
             {/* Featured fonts */}
             {featuredFiltered.length > 0 && (
               <>
@@ -627,7 +712,7 @@ function FontSelector({
             )}
 
             {/* No results */}
-            {featuredFiltered.length === 0 && otherFonts.length === 0 && (
+            {systemFiltered.length === 0 && featuredFiltered.length === 0 && otherFonts.length === 0 && (
               <div className="px-3 py-4 text-sm text-foreground-tertiary text-center">
                 フォントが見つかりません
               </div>
