@@ -23,7 +23,7 @@ export default function SelectionCounter({ editorView }: SelectionCounterProps) 
       // Update position if mouse event is provided
       if (event && event instanceof MouseEvent) {
         // Get the editor container's bounding rect
-        const editorContainer = editorView.dom.closest('.flex-1.bg-slate-50') as HTMLElement;
+        const editorContainer = editorView.dom.closest('.flex-1.bg-background-secondary') as HTMLElement;
         if (editorContainer) {
           const rect = editorContainer.getBoundingClientRect();
           // Position relative to viewport, but calculate based on editor container
@@ -62,7 +62,7 @@ export default function SelectionCounter({ editorView }: SelectionCounterProps) 
       setTimeout(() => updateSelectionCount(e), 10);
     };
 
-    const handleKeyUp = (e: KeyboardEvent) => {
+    const handleKeyUp = () => {
       // For keyboard selections, use the last known position
       setTimeout(() => updateSelectionCount(), 10);
     };
@@ -72,16 +72,16 @@ export default function SelectionCounter({ editorView }: SelectionCounterProps) 
       setTimeout(() => updateSelectionCount(), 10);
     };
     
-    editorDom.addEventListener("mouseup", handleMouseUp as any);
-    editorDom.addEventListener("keyup", handleKeyUp as any);
+    editorDom.addEventListener("mouseup", handleMouseUp);
+    editorDom.addEventListener("keyup", handleKeyUp);
     document.addEventListener("selectionchange", handleSelectionChange);
 
     // Initial check
     updateSelectionCount();
 
     return () => {
-      editorDom.removeEventListener("mouseup", handleMouseUp as any);
-      editorDom.removeEventListener("keyup", handleKeyUp as any);
+      editorDom.removeEventListener("mouseup", handleMouseUp);
+      editorDom.removeEventListener("keyup", handleKeyUp);
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
   }, [editorView]);
@@ -93,7 +93,7 @@ export default function SelectionCounter({ editorView }: SelectionCounterProps) 
 
   return (
     <div 
-      className={`fixed z-30 px-2 py-1 text-sm text-slate-600 pointer-events-none transition-opacity duration-300 ${
+      className={`fixed z-30 px-2 py-1 text-sm text-foreground-tertiary pointer-events-none transition-opacity duration-300 ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
       style={{ 

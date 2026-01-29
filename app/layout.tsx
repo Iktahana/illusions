@@ -1,6 +1,7 @@
 "use client";
 
 import "./globals.css";
+import { ThemeProvider } from "../contexts/ThemeContext";
 
 export default function RootLayout({
   children,
@@ -14,7 +15,7 @@ export default function RootLayout({
         <meta name="description" content="A professional Japanese novel editor with vertical writing support" />
       </head>
       <body className="antialiased">
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

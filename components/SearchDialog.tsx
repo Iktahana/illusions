@@ -167,19 +167,19 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
 
   return (
     <div
-      className="fixed top-16 right-4 z-50 bg-white rounded-lg shadow-lg border border-slate-200 p-4 w-80"
+      className="fixed top-16 right-4 z-50 bg-background-elevated rounded-lg shadow-lg border border-border p-4 w-80"
       onKeyDown={handleKeyDown}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Search className="w-4 h-4 text-slate-600" />
-          <h3 className="text-sm font-medium text-slate-700">検索</h3>
+          <Search className="w-4 h-4 text-foreground-secondary" />
+          <h3 className="text-sm font-medium text-foreground">検索</h3>
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded hover:bg-slate-100 transition-colors"
+          className="p-1 rounded hover:bg-hover transition-colors"
         >
-          <X className="w-4 h-4 text-slate-600" />
+          <X className="w-4 h-4 text-foreground-secondary" />
         </button>
       </div>
 
@@ -192,29 +192,29 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="検索..."
-            className="w-full px-3 py-2 pr-20 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+            className="w-full px-3 py-2 pr-20 border border-border-secondary bg-background text-foreground rounded focus:outline-none focus:ring-2 focus:ring-accent text-sm"
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             {matches.length > 0 && (
-              <span className="text-xs text-slate-600 mr-1">
+              <span className="text-xs text-foreground-tertiary mr-1">
                 {currentMatchIndex + 1}/{matches.length}
               </span>
             )}
             <button
               onClick={goToPreviousMatch}
               disabled={matches.length === 0}
-              className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-1 rounded hover:bg-hover disabled:opacity-50 disabled:cursor-not-allowed"
               title="前へ (Shift+Enter)"
             >
-              <ChevronUp className="w-4 h-4 text-slate-600" />
+              <ChevronUp className="w-4 h-4 text-foreground-secondary" />
             </button>
             <button
               onClick={goToNextMatch}
               disabled={matches.length === 0}
-              className="p-1 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-1 rounded hover:bg-hover disabled:opacity-50 disabled:cursor-not-allowed"
               title="次へ (Enter)"
             >
-              <ChevronDown className="w-4 h-4 text-slate-600" />
+              <ChevronDown className="w-4 h-4 text-foreground-secondary" />
             </button>
           </div>
         </div>
@@ -222,7 +222,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
 
       {/* Options */}
       <div className="mb-3 flex items-center gap-4">
-        <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+        <label className="flex items-center gap-2 text-xs text-foreground-secondary cursor-pointer">
           <input
             type="checkbox"
             checked={caseSensitive}
@@ -233,7 +233,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
         </label>
         <button
           onClick={() => setShowReplace(!showReplace)}
-          className="text-xs text-indigo-600 hover:text-indigo-700"
+          className="text-xs text-accent hover:text-accent-hover"
         >
           {showReplace ? "置換を非表示" : "置換"}
         </button>
@@ -241,13 +241,13 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
 
       {/* Replace Section */}
       {showReplace && (
-        <div className="space-y-2 pt-2 border-t border-slate-200">
+        <div className="space-y-2 pt-2 border-t border-border">
           <input
             type="text"
             value={replaceTerm}
             onChange={(e) => setReplaceTerm(e.target.value)}
             placeholder="置換後..."
-            className="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+            className="w-full px-3 py-2 border border-border-secondary bg-background text-foreground rounded focus:outline-none focus:ring-2 focus:ring-accent text-sm"
           />
           <div className="flex gap-2">
             <button
@@ -256,8 +256,8 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
               className={clsx(
                 "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors",
                 currentMatchIndex === -1
-                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                  : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                  ? "bg-background-secondary text-foreground-muted cursor-not-allowed"
+                  : "bg-accent-light text-accent hover:bg-active"
               )}
             >
               <Replace className="w-4 h-4" />
@@ -269,8 +269,8 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
               className={clsx(
                 "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors",
                 matches.length === 0
-                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                  : "bg-indigo-600 text-white hover:bg-indigo-700"
+                  ? "bg-background-secondary text-foreground-muted cursor-not-allowed"
+                  : "bg-accent text-accent-foreground hover:bg-accent-hover"
               )}
             >
               <ReplaceAll className="w-4 h-4" />
@@ -281,7 +281,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
       )}
 
       {/* Shortcuts hint */}
-      <div className="mt-3 pt-2 border-t border-slate-200 text-xs text-slate-500">
+      <div className="mt-3 pt-2 border-t border-border text-xs text-foreground-tertiary">
         <div>Enter: 次へ / Shift+Enter: 前へ / Esc: 閉じる</div>
       </div>
     </div>

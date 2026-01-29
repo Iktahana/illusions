@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, Check, X } from "lucide-react";
+import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, X } from "lucide-react";
 import clsx from "clsx";
 
 type Tab = "ai" | "corrections" | "stats";
@@ -84,18 +84,18 @@ export default function Inspector({
   };
 
   return (
-    <aside className={clsx("h-full bg-white border-l border-slate-200 flex flex-col", className)}>
+    <aside className={clsx("h-full bg-background border-l border-border flex flex-col", className)}>
       {/* File Status Header */}
-      <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
+      <div className="px-4 py-3 border-b border-border bg-background-secondary">
         <div className="flex items-center justify-between mb-1">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+          <p className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide">
             現在のファイル
           </p>
           <div className="flex items-center gap-1">
             {onNewFile && (
               <button
                 onClick={onNewFile}
-                className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                className="p-1 text-foreground-tertiary hover:text-accent hover:bg-active rounded transition-colors"
                 title="新規ファイル"
               >
                 <FilePlus className="w-4 h-4" />
@@ -104,7 +104,7 @@ export default function Inspector({
             {onOpenFile && (
               <button
                 onClick={onOpenFile}
-                className="p-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                className="p-1 text-foreground-tertiary hover:text-accent hover:bg-active rounded transition-colors"
                 title="ファイルを開く"
               >
                 <FolderOpen className="w-4 h-4" />
@@ -121,7 +121,7 @@ export default function Inspector({
               type="text"
               value={editedFileName}
               onChange={(e) => setEditedFileName(e.target.value)}
-              className="flex-1 text-sm font-semibold text-slate-800 px-2 py-1 border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="flex-1 text-sm font-semibold text-foreground px-2 py-1 border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background"
             />
             <button
               onMouseDown={(e) => e.preventDefault()}
@@ -134,7 +134,7 @@ export default function Inspector({
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={handleCancelEdit}
-              className="p-1 text-slate-500 hover:bg-slate-200 rounded transition-colors"
+              className="p-1 text-foreground-tertiary hover:bg-hover rounded transition-colors"
               title="キャンセル"
             >
               <X className="w-4 h-4" />
@@ -145,9 +145,9 @@ export default function Inspector({
             className="flex items-center gap-2 group cursor-pointer"
             onClick={handleStartEdit}
           >
-            <p className="text-sm font-semibold text-slate-800 truncate flex-1">{fileName}</p>
+            <p className="text-sm font-semibold text-foreground truncate flex-1">{fileName}</p>
             {onFileNameChange && (
-              <Edit2 className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Edit2 className="w-3 h-3 text-foreground-muted opacity-0 group-hover:opacity-100 transition-opacity" />
             )}
           </div>
         )}
@@ -176,20 +176,20 @@ export default function Inspector({
             )}
           </span>
           {lastSavedTime && !isDirty && (
-            <span className="text-slate-500">{formatTime(lastSavedTime)}</span>
+            <span className="text-foreground-tertiary">{formatTime(lastSavedTime)}</span>
           )}
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="h-12 border-b border-slate-200 flex items-center">
+      <div className="h-12 border-b border-border flex items-center">
         <button
           onClick={() => setActiveTab("ai")}
           className={clsx(
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
             activeTab === "ai"
-              ? "text-slate-800 border-b-2 border-indigo-500"
-              : "text-slate-500 hover:text-slate-700"
+              ? "text-foreground border-b-2 border-accent"
+              : "text-foreground-tertiary hover:text-foreground-secondary"
           )}
         >
           <Bot className="w-4 h-4" />
@@ -200,8 +200,8 @@ export default function Inspector({
           className={clsx(
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
             activeTab === "corrections"
-              ? "text-slate-800 border-b-2 border-indigo-500"
-              : "text-slate-500 hover:text-slate-700"
+              ? "text-foreground border-b-2 border-accent"
+              : "text-foreground-tertiary hover:text-foreground-secondary"
           )}
         >
           <AlertCircle className="w-4 h-4" />
@@ -212,8 +212,8 @@ export default function Inspector({
           className={clsx(
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
             activeTab === "stats"
-              ? "text-slate-800 border-b-2 border-indigo-500"
-              : "text-slate-500 hover:text-slate-700"
+              ? "text-foreground border-b-2 border-accent"
+              : "text-foreground-tertiary hover:text-foreground-secondary"
           )}
         >
           <BarChart3 className="w-4 h-4" />
@@ -234,12 +234,12 @@ export default function Inspector({
 function AIPanel() {
   return (
     <div className="space-y-4">
-      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-100">
+      <div className="bg-accent-light rounded-lg p-4 border border-border">
         <div className="flex items-start gap-3 mb-3">
-          <Bot className="w-5 h-5 text-indigo-600 mt-0.5" />
+          <Bot className="w-5 h-5 text-accent mt-0.5" />
           <div>
-            <h3 className="text-sm font-medium text-slate-800 mb-1">AI アシスタント</h3>
-            <p className="text-xs text-slate-600">
+            <h3 className="text-sm font-medium text-foreground mb-1">AI アシスタント</h3>
+            <p className="text-xs text-foreground-secondary">
               執筆をサポートします。質問や提案をお聞きください。
             </p>
           </div>
@@ -248,7 +248,7 @@ function AIPanel() {
 
       {/* AI Suggestions */}
       <div className="space-y-2">
-        <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide">提案</h4>
+        <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide">提案</h4>
         <AISuggestion
           title="次の展開を提案"
           description="登場人物の心情を深掘りしませんか？"
@@ -260,13 +260,13 @@ function AIPanel() {
       </div>
 
       {/* Input Area */}
-      <div className="pt-4 border-t border-slate-200">
+      <div className="pt-4 border-t border-border">
         <textarea
           placeholder="AI に質問や指示を入力..."
           rows={3}
-          className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+          className="w-full px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent resize-none bg-background text-foreground"
         />
-        <button className="w-full mt-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700 transition-colors">
+        <button className="w-full mt-2 px-4 py-2 bg-accent text-white text-sm font-medium rounded hover:bg-accent-hover transition-colors">
           送信
         </button>
       </div>
@@ -276,11 +276,11 @@ function AIPanel() {
 
 function AISuggestion({ title, description }: { title: string; description: string }) {
   return (
-    <div className="flex items-start gap-2 p-3 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors border border-slate-200">
-      <ChevronRight className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+      <div className="flex items-start gap-2 p-3 rounded-lg hover:bg-hover cursor-pointer transition-colors border border-border">
+      <ChevronRight className="w-4 h-4 text-foreground-muted mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-700">{title}</p>
-        <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+        <p className="text-sm font-medium text-foreground-secondary">{title}</p>
+        <p className="text-xs text-foreground-tertiary mt-0.5">{description}</p>
       </div>
     </div>
   );
@@ -289,7 +289,7 @@ function AISuggestion({ title, description }: { title: string; description: stri
 function CorrectionsPanel() {
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-medium text-slate-700">校正リスト</h3>
+      <h3 className="text-sm font-medium text-foreground-secondary">校正リスト</h3>
       
       <CorrectionItem
         type="warning"
@@ -311,7 +311,7 @@ function CorrectionsPanel() {
       />
       
       <div className="pt-4 text-center">
-        <p className="text-sm text-slate-500">その他の問題は見つかりませんでした</p>
+        <p className="text-sm text-foreground-tertiary">その他の問題は見つかりませんでした</p>
       </div>
     </div>
   );
@@ -345,9 +345,9 @@ function CorrectionItem({
           )}
         />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-slate-800">{message}</p>
-          <p className="text-xs text-slate-600 mt-1">{context}</p>
-          <p className="text-xs text-slate-500 mt-1">行 {line}</p>
+          <p className="text-sm font-medium text-foreground">{message}</p>
+          <p className="text-xs text-foreground-secondary mt-1">{context}</p>
+          <p className="text-xs text-foreground-tertiary mt-1">行 {line}</p>
         </div>
       </div>
     </div>
@@ -365,7 +365,7 @@ function StatsPanel({
 }) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium text-slate-700">文書統計</h3>
+      <h3 className="text-sm font-medium text-foreground-secondary">文書統計</h3>
       
       <div className="grid grid-cols-2 gap-3">
         <StatCard label="文字数" value={charCount.toLocaleString()} />
@@ -374,25 +374,25 @@ function StatsPanel({
         <StatCard label="段落数" value="12" />
       </div>
       
-      <div className="pt-4 border-t border-slate-200">
-        <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">
+      <div className="pt-4 border-t border-border">
+        <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
           原稿用紙換算
         </h4>
-        <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700">
+        <div className="bg-background-secondary rounded-lg p-3 text-sm text-foreground-secondary">
           <p className="mb-2">
             400字詰め原稿用紙：<span className="font-semibold">{manuscriptPages}枚</span>
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-foreground-tertiary">
             ※ 日本語小説の標準フォーマットで計算
           </p>
         </div>
       </div>
       
-      <div className="pt-4 border-t border-slate-200">
-        <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">
+      <div className="pt-4 border-t border-border">
+        <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
           執筆ペース
         </h4>
-        <div className="space-y-2 text-sm text-slate-600">
+        <div className="space-y-2 text-sm text-foreground-secondary">
           <div className="flex justify-between">
             <span>今日</span>
             <span className="font-medium">+320文字</span>
@@ -413,9 +413,9 @@ function StatsPanel({
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-      <p className="text-xs text-slate-500 mb-1">{label}</p>
-      <p className="text-xl font-semibold text-slate-800">{value}</p>
+    <div className="bg-background-secondary rounded-lg p-3 border border-border">
+      <p className="text-xs text-foreground-tertiary mb-1">{label}</p>
+      <p className="text-xl font-semibold text-foreground">{value}</p>
     </div>
   );
 }

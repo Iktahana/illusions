@@ -45,7 +45,7 @@ function renderFormattedTitle(title: string): ReactNode {
         const end = segment.indexOf("**", idx + 2);
         if (end > idx + 1) {
           nodes.push(
-            <strong key={nextKey()} className="font-semibold text-slate-900">
+            <strong key={nextKey()} className="font-semibold text-foreground">
               {parseSegment(segment.slice(idx + 2, end))}
             </strong>
           );
@@ -58,7 +58,7 @@ function renderFormattedTitle(title: string): ReactNode {
         const end = segment.indexOf("__", idx + 2);
         if (end > idx + 1) {
           nodes.push(
-            <strong key={nextKey()} className="font-semibold text-slate-900">
+            <strong key={nextKey()} className="font-semibold text-foreground">
               {parseSegment(segment.slice(idx + 2, end))}
             </strong>
           );
@@ -71,7 +71,7 @@ function renderFormattedTitle(title: string): ReactNode {
         const end = segment.indexOf("~~", idx + 2);
         if (end > idx + 1) {
           nodes.push(
-            <span key={nextKey()} className="text-slate-500 line-through">
+            <span key={nextKey()} className="text-foreground-tertiary line-through">
               {parseSegment(segment.slice(idx + 2, end))}
             </span>
           );
@@ -84,7 +84,7 @@ function renderFormattedTitle(title: string): ReactNode {
         const end = segment.indexOf("*", idx + 1);
         if (end > idx) {
           nodes.push(
-            <em key={nextKey()} className="italic text-slate-700">
+            <em key={nextKey()} className="italic text-foreground-secondary">
               {parseSegment(segment.slice(idx + 1, end))}
             </em>
           );
@@ -97,7 +97,7 @@ function renderFormattedTitle(title: string): ReactNode {
         const end = segment.indexOf("_", idx + 1);
         if (end > idx) {
           nodes.push(
-            <em key={nextKey()} className="italic text-slate-700">
+            <em key={nextKey()} className="italic text-foreground-secondary">
               {parseSegment(segment.slice(idx + 1, end))}
             </em>
           );
@@ -110,7 +110,7 @@ function renderFormattedTitle(title: string): ReactNode {
         const end = segment.indexOf("`", idx + 1);
         if (end > idx) {
           nodes.push(
-            <code key={nextKey()} className="font-mono text-xs text-slate-600 bg-slate-100 px-1 rounded-sm">
+            <code key={nextKey()} className="font-mono text-xs text-foreground-secondary bg-background-tertiary px-1 rounded-sm">
               {segment.slice(idx + 1, end)}
             </code>
           );
@@ -127,7 +127,7 @@ function renderFormattedTitle(title: string): ReactNode {
         if (closeBracket > idx && openParen === closeBracket + 1 && closeParen > openParen) {
           const label = segment.slice(idx + 1, closeBracket);
           nodes.push(
-            <strong key={nextKey()} className="font-semibold text-slate-900">
+            <strong key={nextKey()} className="font-semibold text-foreground">
               {parseSegment(label)}
             </strong>
           );
@@ -189,16 +189,16 @@ export default function Explorer({
   const [activeTab, setActiveTab] = useState<Tab>("chapters");
 
   return (
-    <aside className={clsx("h-full bg-white border-r border-slate-200 flex flex-col", className)}>
+    <aside className={clsx("h-full bg-background border-r border-border flex flex-col", className)}>
       {/* Tab Navigation */}
-      <div className="h-12 border-b border-slate-200 flex items-center">
+      <div className="h-12 border-b border-border flex items-center">
         <button
           onClick={() => setActiveTab("chapters")}
           className={clsx(
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
             activeTab === "chapters"
-              ? "text-slate-800 border-b-2 border-indigo-500"
-              : "text-slate-500 hover:text-slate-700"
+              ? "text-foreground border-b-2 border-accent"
+              : "text-foreground-tertiary hover:text-foreground-secondary"
           )}
         >
           <FolderTree className="w-4 h-4" />
@@ -209,8 +209,8 @@ export default function Explorer({
           className={clsx(
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
             activeTab === "settings"
-              ? "text-slate-800 border-b-2 border-indigo-500"
-              : "text-slate-500 hover:text-slate-700"
+              ? "text-foreground border-b-2 border-accent"
+              : "text-foreground-tertiary hover:text-foreground-secondary"
           )}
         >
           <Settings className="w-4 h-4" />
@@ -221,8 +221,8 @@ export default function Explorer({
           className={clsx(
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
             activeTab === "style"
-              ? "text-slate-800 border-b-2 border-indigo-500"
-              : "text-slate-500 hover:text-slate-700"
+              ? "text-foreground border-b-2 border-accent"
+              : "text-foreground-tertiary hover:text-foreground-secondary"
           )}
         >
           <Palette className="w-4 h-4" />
@@ -260,9 +260,9 @@ function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: str
   return (
     <div className="space-y-2 relative">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-slate-700">目次</h3>
-        <button className="p-1 hover:bg-slate-100 rounded">
-          <Plus className="w-4 h-4 text-slate-600" />
+        <h3 className="text-sm font-medium text-foreground-secondary">目次</h3>
+        <button className="p-1 hover:bg-hover rounded">
+          <Plus className="w-4 h-4 text-foreground-secondary" />
         </button>
       </div>
       
@@ -278,7 +278,7 @@ function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: str
             />
           ))
         ) : (
-          <div className="text-xs text-slate-500 px-2 py-2">
+          <div className="text-xs text-foreground-tertiary px-2 py-2">
             コンテンツに見出しがありません
           </div>
         )}
@@ -286,7 +286,7 @@ function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: str
       
       <button 
         onClick={() => setShowSyntaxHelp(true)}
-        className="w-full mt-4 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded border border-dashed border-slate-300"
+        className="w-full mt-4 py-2 text-sm text-foreground-secondary hover:text-foreground hover:bg-hover rounded border border-dashed border-border-secondary"
       >
         + 新しい章を追加
       </button>
@@ -318,17 +318,17 @@ function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; o
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center" onClick={onClose}>
       <div 
-        className="bg-white rounded-lg shadow-2xl border border-slate-200 w-[500px] max-h-[80vh] overflow-hidden flex flex-col"
+        className="bg-background rounded-lg shadow-2xl border border-border w-[500px] max-h-[80vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
-          <h3 className="text-sm font-semibold text-slate-800">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background-secondary">
+          <h3 className="text-sm font-semibold text-foreground">
             章節の見出しを追加
           </h3>
           <button
             onClick={onClose}
-            className="p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded transition-colors"
+            className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -341,15 +341,15 @@ function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; o
               <button
                 key={index}
                 onClick={() => onInsertText(item.example)}
-                className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-colors text-left"
+                className="w-full p-3 bg-background-secondary rounded-lg border border-border hover:border-accent hover:bg-active transition-colors text-left"
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
-                  <code className="text-sm font-mono text-indigo-600 bg-white px-2 py-0.5 rounded">
+                  <code className="text-sm font-mono text-accent bg-background px-2 py-0.5 rounded">
                     {item.syntax}
                   </code>
-                  <span className="text-xs text-slate-500">{item.description}</span>
+                  <span className="text-xs text-foreground-tertiary">{item.description}</span>
                 </div>
-                <div className="text-slate-600 mt-2 pl-2 border-l-2 border-slate-300">
+                <div className="text-foreground-secondary mt-2 pl-2 border-l-2 border-border-secondary">
                   {item.example.split('\n').map((line, i) => (
                     <div 
                       key={i} 
@@ -392,25 +392,14 @@ function ChapterItem({
   
   // Calculate font size based on heading level (h1 to h6)
   // CSS default sizes: h1=2em, h2=1.5em, h3=1.17em, h4=1em, h5=0.83em, h6=0.67em
-  const fontSizes = {
-    1: '2em',
-    2: '1.5em',
-    3: '1.17em',
-    4: '1em',
-    5: '0.83em',
-    6: '0.67em',
-  };
-  
-  const fontSize = fontSizes[chapter.level as keyof typeof fontSizes] || '1em';
-  
   return (
     <div
       onClick={onClick}
       className={clsx(
         "flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors",
         isActive
-          ? "bg-indigo-50 text-indigo-700"
-          : "hover:bg-slate-50 text-slate-600"
+          ? "bg-accent-light text-accent"
+          : "hover:bg-hover text-foreground-secondary"
       )}
       style={{ paddingLeft: `${8 + indent}px` }}
     >
@@ -425,35 +414,35 @@ function SettingsPanel() {
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">
           小説タイトル
         </label>
         <input
           type="text"
           placeholder="無題の小説"
-          className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground"
         />
       </div>
       
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">
           著者名
         </label>
         <input
           type="text"
           placeholder="作者名"
-          className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground"
         />
       </div>
       
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">
           あらすじ
         </label>
         <textarea
           placeholder="小説の概要を入力..."
           rows={4}
-          className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+          className="w-full px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent resize-none bg-background text-foreground"
         />
       </div>
     </div>
@@ -520,7 +509,7 @@ function FontSelector({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-left flex items-center justify-between"
+        className="w-full px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground text-left flex items-center justify-between"
         style={{ fontFamily: `"${value}", serif` }}
       >
         <span>
@@ -536,15 +525,15 @@ function FontSelector({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-slate-300 rounded-lg shadow-lg max-h-80 overflow-hidden flex flex-col">
+        <div className="absolute z-50 mt-1 w-full bg-background border border-border-secondary rounded-lg shadow-lg max-h-80 overflow-hidden flex flex-col">
           {/* Search input */}
-          <div className="p-2 border-b border-slate-200">
+          <div className="p-2 border-b border-border">
             <input
               type="text"
               placeholder="フォントを検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-2 py-1 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground"
               onClick={(e) => e.stopPropagation()}
             />
           </div>
@@ -554,7 +543,7 @@ function FontSelector({
             {/* Featured fonts */}
             {featuredFiltered.length > 0 && (
               <>
-                <div className="px-3 py-1 text-xs font-semibold text-slate-500 bg-slate-50 sticky top-0">
+                  <div className="px-3 py-1 text-xs font-semibold text-foreground-tertiary bg-background-secondary sticky top-0">
                   おすすめ
                 </div>
                 {featuredFiltered.map(font => (
@@ -563,14 +552,14 @@ function FontSelector({
                     type="button"
                     onClick={() => handleSelect(font.family)}
                     className={clsx(
-                      "w-full px-3 py-2 text-sm text-left hover:bg-indigo-50 flex items-center justify-between transition-colors",
-                      value === font.family && "bg-indigo-50"
+                      "w-full px-3 py-2 text-sm text-left hover:bg-active flex items-center justify-between transition-colors text-foreground",
+                      value === font.family && "bg-accent-light"
                     )}
                     style={{ fontFamily: `"${font.family}", serif` }}
                   >
                     <span>{font.localizedName || font.family}</span>
                     {value === font.family && (
-                      <Check className="w-4 h-4 text-indigo-600" />
+                      <Check className="w-4 h-4 text-accent" />
                     )}
                   </button>
                 ))}
@@ -581,7 +570,7 @@ function FontSelector({
             {otherFonts.length > 0 && (
               <>
                 {!searchTerm && (
-                  <div className="px-3 py-1 text-xs font-semibold text-slate-500 bg-slate-50 sticky top-0">
+                <div className="px-3 py-1 text-xs font-semibold text-foreground-tertiary bg-background-secondary sticky top-0">
                     すべてのフォント
                   </div>
                 )}
@@ -591,14 +580,14 @@ function FontSelector({
                     type="button"
                     onClick={() => handleSelect(font.family)}
                     className={clsx(
-                      "w-full px-3 py-2 text-sm text-left hover:bg-indigo-50 flex items-center justify-between transition-colors",
-                      value === font.family && "bg-indigo-50"
+                      "w-full px-3 py-2 text-sm text-left hover:bg-active flex items-center justify-between transition-colors text-foreground",
+                      value === font.family && "bg-accent-light"
                     )}
                     style={{ fontFamily: `"${font.family}", serif` }}
                   >
                     <span>{font.localizedName || font.family}</span>
                     {value === font.family && (
-                      <Check className="w-4 h-4 text-indigo-600" />
+                      <Check className="w-4 h-4 text-accent" />
                     )}
                   </button>
                 ))}
@@ -607,7 +596,7 @@ function FontSelector({
 
             {/* No results */}
             {featuredFiltered.length === 0 && otherFonts.length === 0 && (
-              <div className="px-3 py-4 text-sm text-slate-500 text-center">
+              <div className="px-3 py-4 text-sm text-foreground-tertiary text-center">
                 フォントが見つかりません
               </div>
             )}
@@ -644,7 +633,7 @@ function StylePanel({
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">
           フォント
         </label>
         <FontSelector
@@ -654,7 +643,7 @@ function StylePanel({
       </div>
       
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">
           文字サイズ
         </label>
         <input
@@ -666,7 +655,7 @@ function StylePanel({
           onChange={(e) => onFontScaleChange?.(Number(e.target.value))}
           className="w-full"
         />
-        <div className="flex justify-between text-xs text-slate-500 mt-1">
+        <div className="flex justify-between text-xs text-foreground-tertiary mt-1">
           <span>50%</span>
           <span>{fontScale}%</span>
           <span>200%</span>
@@ -674,7 +663,7 @@ function StylePanel({
       </div>
       
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">
           行間
         </label>
         <input
@@ -686,7 +675,7 @@ function StylePanel({
           onChange={(e) => onLineHeightChange?.(Number(e.target.value))}
           className="w-full"
         />
-        <div className="flex justify-between text-xs text-slate-500 mt-1">
+        <div className="flex justify-between text-xs text-foreground-tertiary mt-1">
           <span>狭い</span>
           <span>{lineHeight.toFixed(1)}</span>
           <span>広い</span>
@@ -694,7 +683,7 @@ function StylePanel({
       </div>
       
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">
           字下げ
         </label>
         <div className="flex items-center gap-2">
@@ -704,17 +693,17 @@ function StylePanel({
             step="0.5"
             value={textIndent}
             onChange={(e) => onTextIndentChange?.(Number(e.target.value))}
-            className="w-20 px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-20 px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground"
           />
-          <span className="text-sm text-slate-600">字</span>
+          <span className="text-sm text-foreground-secondary">字</span>
         </div>
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs text-foreground-tertiary mt-1">
           段落の先頭にインデントを適用します
         </p>
       </div>
       
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">
           1行あたりの文字数制限
         </label>
         <div className="flex items-center gap-2">
@@ -724,11 +713,11 @@ function StylePanel({
             step="1"
             value={charsPerLine}
             onChange={(e) => onCharsPerLineChange?.(Number(e.target.value))}
-            className="w-20 px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-20 px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground"
           />
-          <span className="text-sm text-slate-600">字</span>
+          <span className="text-sm text-foreground-secondary">字</span>
         </div>
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs text-foreground-tertiary mt-1">
           {charsPerLine === 0 
             ? '0に設定すると制限なし'
             : '1行（縦書きの場合は1列）あたりの最大文字数'}

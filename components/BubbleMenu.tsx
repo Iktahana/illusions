@@ -121,7 +121,7 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
     <div
       ref={menuRef}
       className={clsx(
-        "fixed z-50 bg-white rounded-lg shadow-lg border border-slate-200 flex gap-1 p-1",
+        "fixed z-50 bg-background-elevated rounded-lg shadow-lg border border-border flex gap-1 p-1",
         isVertical ? "flex-col items-center" : "items-center"
       )}
       style={{
@@ -135,18 +135,18 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
         <button
           onClick={() => setShowHeadingDropdown(!showHeadingDropdown)}
           className={clsx(
-            "p-2 rounded hover:bg-slate-100 transition-colors",
-            showHeadingDropdown && "bg-slate-100"
+            "p-2 rounded hover:bg-hover transition-colors",
+            showHeadingDropdown && "bg-hover"
           )}
           title="見出し"
         >
-          <Heading1 className="w-4 h-4 text-slate-700" />
+          <Heading1 className="w-4 h-4 text-foreground-secondary" />
         </button>
 
         {showHeadingDropdown && (
           <div
             className={clsx(
-              "absolute bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[120px]",
+              "absolute bg-background-elevated rounded-lg shadow-lg border border-border py-1 min-w-[120px]",
               isVertical ? "left-full top-0 ml-1" : "top-full left-0 mt-1"
             )}
           >
@@ -159,10 +159,10 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
                     onFormat("heading", level);
                     setShowHeadingDropdown(false);
                   }}
-                  className="w-full px-3 py-2 flex items-center gap-2 hover:bg-slate-100 transition-colors text-left"
+                  className="w-full px-3 py-2 flex items-center gap-2 hover:bg-hover transition-colors text-left"
                 >
-                  <HeadingIcon className="w-4 h-4 text-slate-700" />
-                  <span className="text-sm text-slate-700">見出し {level}</span>
+                  <HeadingIcon className="w-4 h-4 text-foreground-secondary" />
+                  <span className="text-sm text-foreground-secondary">見出し {level}</span>
                 </button>
               );
             })}
@@ -170,19 +170,19 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
         )}
       </div>
 
-      <div className={clsx(isVertical ? "h-px w-6" : "w-px h-6", "bg-slate-200")} />
+      <div className={clsx(isVertical ? "h-px w-6" : "w-px h-6", "bg-border")} />
 
       {/* Format Buttons */}
       {buttons.map(({ icon: Icon, label, format, shortcut }) => (
         <button
           key={format}
           onClick={() => onFormat(format)}
-          className="p-2 rounded hover:bg-slate-100 transition-colors group relative"
+          className="p-2 rounded hover:bg-hover transition-colors group relative"
           title={label}
         >
-          <Icon className="w-4 h-4 text-slate-700" />
+          <Icon className="w-4 h-4 text-foreground-secondary" />
           {shortcut && (
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-foreground text-background text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
               {shortcut}
             </span>
           )}

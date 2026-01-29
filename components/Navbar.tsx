@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { FileText, Save, Check, FolderOpen } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
 
 interface NavbarProps {
   fileName: string | null;
@@ -40,15 +41,15 @@ export default function Navbar({
   const showToast = saveSuccessAt != null;
 
   return (
-    <nav className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-4 relative">
+    <nav className="h-14 border-b border-border bg-background flex items-center justify-between px-4 relative">
       <div className="flex items-center gap-3">
-        <FileText className="w-6 h-6 text-slate-700" />
-        <span className="text-lg font-semibold text-slate-800">Illusions</span>
+        <FileText className="w-6 h-6 text-foreground-secondary" />
+        <span className="text-lg font-semibold text-foreground">Illusions</span>
         {onOpenFile && (
           <button
             type="button"
             onClick={onOpenFile}
-            className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium text-foreground-secondary hover:bg-hover transition-colors"
           >
             <FolderOpen className="w-4 h-4" />
             開く
@@ -57,12 +58,12 @@ export default function Navbar({
       </div>
 
       <div className="flex-1 flex items-center justify-center">
-        <h1 className="text-sm text-slate-600 max-w-md truncate">
+        <h1 className="text-sm text-foreground-secondary max-w-md truncate">
           {fileName ?? "無題の文書"}
         </h1>
       </div>
 
-      <div className="flex items-center gap-2 text-sm text-slate-500">
+      <div className="flex items-center gap-3 text-sm text-foreground-tertiary">
         {isSaving ? (
           <>
             <Save className="w-4 h-4 animate-pulse" />
@@ -70,16 +71,17 @@ export default function Navbar({
           </>
         ) : (
           <>
-            <Check className="w-4 h-4 text-green-600" />
+            <Check className="w-4 h-4 text-success" />
             <span>{formatLastSaved(lastSaved)}</span>
           </>
         )}
+        <ThemeToggle />
       </div>
 
       {showToast && (
         <div
           role="status"
-          className="fixed top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-slate-800 text-white text-sm rounded-lg shadow-lg animate-fade-out"
+          className="fixed top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-background-elevated text-foreground text-sm rounded-lg shadow-lg animate-fade-out border border-border"
         >
           保存成功
         </div>

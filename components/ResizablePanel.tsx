@@ -81,7 +81,7 @@ export default function ResizablePanel({
       {/* Resize Handle */}
       <div
         className={clsx(
-          "absolute top-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-indigo-400 transition-all cursor-col-resize z-10 group",
+          "absolute top-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-accent transition-all cursor-col-resize z-10 group",
           side === "left" ? "right-0" : "left-0"
         )}
         onMouseDown={handleMouseDown}
@@ -89,7 +89,7 @@ export default function ResizablePanel({
         {/* Visual indicator when hovering */}
         <div
           className={clsx(
-            "absolute top-1/2 -translate-y-1/2 w-1 h-12 bg-slate-300 rounded-full opacity-0 group-hover:opacity-100 transition-opacity",
+            "absolute top-1/2 -translate-y-1/2 w-1 h-12 bg-border-secondary rounded-full opacity-0 group-hover:opacity-100 transition-opacity",
             side === "left" ? "right-0" : "left-0"
           )}
         />

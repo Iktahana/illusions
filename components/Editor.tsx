@@ -63,37 +63,7 @@ export default function NovelEditor({
   // Save vertical state to localStorage when it changes
   useEffect(() => {
     if (!isMounted) return;
-    
     localStorage.setItem('illusions-writing-mode', isVertical ? 'vertical' : 'horizontal');
-    
-    // Scroll to the right when switching to vertical mode
-    if (isVertical && scrollContainerRef.current) {
-      // Function to scroll to the rightmost position
-      const scrollToRight = () => {
-        if (scrollContainerRef.current) {
-          const container = scrollContainerRef.current;
-          container.scrollLeft = container.scrollWidth;
-        }
-      };
-
-      // Try multiple times with increasing delays to ensure content is rendered
-      const timeouts = [50, 100, 200, 400];
-      timeouts.forEach(delay => {
-        setTimeout(scrollToRight, delay);
-      });
-
-      // Also observe when the scrollWidth changes (content fully rendered)
-      const observer = new ResizeObserver(() => {
-        scrollToRight();
-      });
-      
-      observer.observe(scrollContainerRef.current);
-      
-      // Cleanup observer after 1 second
-      setTimeout(() => {
-        observer.disconnect();
-      }, 1000);
-    }
   }, [isVertical, isMounted]);
 
   const handleSearchOpen = () => {
@@ -122,7 +92,7 @@ export default function NovelEditor({
       <div
         ref={scrollContainerRef}
         className={clsx(
-          "flex-1 bg-slate-50 relative min-h-0 pt-12",
+          "flex-1 bg-background-secondary relative min-h-0 pt-12",
           isVertical 
             ? "overflow-x-auto overflow-y-auto flex items-center" 
             : "overflow-auto"
@@ -176,7 +146,7 @@ function EditorToolbar({
   onSearchClick: () => void;
 }) {
   return (
-    <div className="h-12 border-b border-slate-200 bg-white flex items-center justify-between px-4">
+    <div className="h-12 border-b border-border bg-background flex items-center justify-between px-4">
       <div className="flex items-center gap-4">
         {/* Vertical Writing Toggle */}
         <button
@@ -184,8 +154,8 @@ function EditorToolbar({
           className={clsx(
             "flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors",
             isVertical
-              ? "bg-indigo-100 text-indigo-700"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              ? "bg-active text-accent"
+              : "bg-background-tertiary text-foreground-secondary hover:bg-hover"
           )}
         >
           <Type className="w-4 h-4" />
@@ -193,21 +163,21 @@ function EditorToolbar({
         </button>
 
         {/* Display current settings */}
-        <div className="flex items-center gap-2 text-xs text-slate-600">
-          <AlignLeft className="w-4 h-4 text-slate-500" />
+        <div className="flex items-center gap-2 text-xs text-foreground-secondary">
+          <AlignLeft className="w-4 h-4 text-foreground-tertiary" />
           <span>{fontScale}% / {lineHeight.toFixed(1)}</span>
         </div>
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="text-xs text-slate-500">
+        <div className="text-xs text-foreground-tertiary">
           Illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
         </div>
 
         {/* Search Button */}
         <button
           onClick={onSearchClick}
-          className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
           title="検索 (⌘F)"
         >
           <Search className="w-4 h-4" />
@@ -392,13 +362,23 @@ function MilkdownEditor({
       requestAnimationFrame(() => {
         editorDom.style.transition = 'opacity 0.25s ease-in';
         editorDom.style.opacity = '1';
+        
+        // After fade in completes, scroll to right for vertical mode
+        if (isVertical && scrollContainerRef.current) {
+          setTimeout(() => {
+            const container = scrollContainerRef.current;
+            if (container) {
+              container.scrollLeft = container.scrollWidth;
+            }
+          }, 250); // Wait for fade in to complete
+        }
       });
     }, 150);
 
     return () => {
       clearTimeout(timer);
     };
-  }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, get]);
+  }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get]);
 
   // Convert vertical mouse wheel to horizontal scroll in vertical mode
   useEffect(() => {
