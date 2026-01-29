@@ -590,6 +590,7 @@ function MilkdownEditor({
       >
         <style jsx>{`
           div :global(.milkdown .ProseMirror) {
+            font-family: "${fontFamily}", serif;
             line-height: ${lineHeight};
             ${showParagraphNumbers ? 'counter-reset: paragraph;' : ''}
           }
@@ -605,7 +606,7 @@ function MilkdownEditor({
             ${showParagraphNumbers ? 'counter-increment: paragraph;' : ''}
             ${showParagraphNumbers ? 'position: relative;' : ''}
           }
-          div :global(.milkdown .ProseMirror p::before) {
+          div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p::before) {
             ${showParagraphNumbers ? `
               content: counter(paragraph);
               position: absolute;
@@ -614,6 +615,21 @@ function MilkdownEditor({
               opacity: 0.5;
               color: currentColor;
               user-select: none;
+              font-family: 'Fira Code', monospace;
+            ` : 'content: none;'}
+          }
+          div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p::before) {
+            ${showParagraphNumbers ? `
+              content: counter(paragraph);
+              position: absolute;
+              top: -2em;
+              right: 0;
+              font-size: 0.7em;
+              opacity: 0.5;
+              color: currentColor;
+              user-select: none;
+              font-family: 'Fira Code', monospace;
+              writing-mode: horizontal-tb;
             ` : 'content: none;'}
           }
           /* Don't apply indent to headings, lists, blockquotes, etc. */

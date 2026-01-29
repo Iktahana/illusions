@@ -47,9 +47,13 @@ export default function EditorPage() {
   // Wrap openFile and newFile to increment session ID
   const openFile = useCallback(async () => {
     await originalOpenFile();
-    
-    fileSessionRef.current += 1;
-    setEditorKey(prev => prev + 1);
+
+    // Ensure content state update is processed before remounting editor
+    // Use setTimeout to allow React to process state updates from originalOpenFile
+    setTimeout(() => {
+      fileSessionRef.current += 1;
+      setEditorKey(prev => prev + 1);
+    }, 0);
   }, [originalOpenFile]);
 
   const newFile = useCallback(() => {

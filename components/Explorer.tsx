@@ -803,7 +803,7 @@ function StylePanel({
           </button>
         </label>
         <p className="text-xs text-foreground-tertiary mt-1">
-          段落の先頭に番号を表示します（小さく、50%透明）
+          段落の先頭に番号を表示します
         </p>
       </div>
     </div>
