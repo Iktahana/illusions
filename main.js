@@ -18,6 +18,7 @@ autoUpdater.logger = log
 autoUpdater.logger.transports.file.level = 'info'
 
 let mainWindow = null
+let isManualUpdateCheck = false
 
 // Setup auto-update event handlers
 function setupAutoUpdater() {
@@ -31,13 +32,18 @@ function setupAutoUpdater() {
   autoUpdater.on('update-available', (info) => {
     log.info('Update available:', info)
     if (mainWindow) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Update Available',
-        message: `Found new version ${info.version}`,
-        detail: 'Downloading update in the background...',
-        buttons: ['OK'],
-      })
+      dialog
+        .showMessageBox(mainWindow, {
+          type: 'info',
+          title: 'アップデート可能',
+          message: `新しいバージョン ${info.version} が見つかりました`,
+          detail: 'バックグラウンドでアップデートをダウンロードしています...',
+          buttons: ['OK'],
+        })
+        .then(() => {
+          // Start downloading the update
+          autoUpdater.downloadUpdate()
+        })
     }
   })
 
@@ -48,10 +54,10 @@ function setupAutoUpdater() {
       dialog
         .showMessageBox(mainWindow, {
           type: 'info',
-          title: 'Update Ready',
-          message: 'Update downloaded successfully',
-          detail: 'The update will be installed when you restart. Restart now?',
-          buttons: ['Restart Now', 'Later'],
+          title: 'アップデート準備完了',
+          message: 'アップデートのダウンロードが完了しました',
+          detail: 'アプリを再起動してインストールしますか？',
+          buttons: ['今すぐ再起動', '後で'],
           defaultId: 0,
           cancelId: 1,
         })
@@ -67,6 +73,16 @@ function setupAutoUpdater() {
   // Event: Error occurred
   autoUpdater.on('error', (error) => {
     log.error('Update error:', error)
+    if (isManualUpdateCheck && mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'error',
+        title: 'アップデートエラー',
+        message: 'アップデートの確認中にエラーが発生しました',
+        detail: error.message || '不明なエラー',
+        buttons: ['OK'],
+      })
+    }
+    isManualUpdateCheck = false
   })
 
   // Event: Checking for update
@@ -77,10 +93,42 @@ function setupAutoUpdater() {
   // Event: Update not available
   autoUpdater.on('update-not-available', (info) => {
     log.info('Update not available:', info)
+    if (isManualUpdateCheck && mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'アップデート',
+        message: '最新バージョンです',
+        detail: `現在のバージョン: ${app.getVersion()}`,
+        buttons: ['OK'],
+      })
+    }
+    isManualUpdateCheck = false
   })
 
-  // Check for updates
-  autoUpdater.checkForUpdatesAndNotify()
+  // Event: Download progress
+  autoUpdater.on('download-progress', (progressObj) => {
+    const logMessage = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`
+    log.info(logMessage)
+  })
+}
+
+// Check for updates (manual or automatic)
+function checkForUpdates(manual = false) {
+  if (isDev) {
+    if (manual && mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'アップデート',
+        message: '開発モード',
+        detail: '開発モードではアップデート機能は無効です。',
+        buttons: ['OK'],
+      })
+    }
+    return
+  }
+
+  isManualUpdateCheck = manual
+  autoUpdater.checkForUpdates()
 }
 
 function buildApplicationMenu() {
@@ -93,15 +141,15 @@ function buildApplicationMenu() {
     template.push({
       label: APP_NAME,
       submenu: [
-        { role: 'about' },
+        { role: 'about', label: `${APP_NAME}について` },
         { type: 'separator' },
-        { role: 'services' },
+        { role: 'services', label: 'サービス' },
         { type: 'separator' },
-        { role: 'hide' },
-        { role: 'hideOthers' },
-        { role: 'unhide' },
+        { role: 'hide', label: `${APP_NAME}を隠す` },
+        { role: 'hideOthers', label: '他を隠す' },
+        { role: 'unhide', label: 'すべてを表示' },
         { type: 'separator' },
-        { role: 'quit' },
+        { role: 'quit', label: `${APP_NAME}を終了` },
       ],
     })
   }
@@ -148,7 +196,7 @@ function buildApplicationMenu() {
         },
       },
       ...(isMac ? [] : [{ type: 'separator' }]),
-      ...(isMac ? [] : [{ role: 'quit' }]),
+      ...(isMac ? [] : [{ role: 'quit', label: '終了' }]),
     ],
   })
 
@@ -156,31 +204,72 @@ function buildApplicationMenu() {
    template.push({
      label: '編集',
      submenu: [
-       { role: 'undo' },
-       { role: 'redo' },
+       { role: 'undo', label: '元に戻す' },
+       { role: 'redo', label: 'やり直す' },
        { type: 'separator' },
-       { role: 'cut' },
-       { role: 'copy' },
-       { role: 'paste' },
+       { role: 'cut', label: '切り取り' },
+       { role: 'copy', label: 'コピー' },
+       { role: 'paste', label: '貼り付け' },
        {
-         label: 'Paste as plain text',
+         label: 'プレーンテキストとして貼り付け',
          accelerator: 'Shift+CmdOrCtrl+V',
          click: () => {
            mainWindow?.webContents.send('menu-paste-as-plaintext')
          },
        },
        { type: 'separator' },
-       { role: 'selectAll' },
+       { role: 'selectAll', label: 'すべて選択' },
      ],
    })
 
   // View menu
-  template.push({ role: 'viewMenu' })
+  template.push({
+    label: '表示',
+    submenu: [
+      { role: 'reload', label: '再読み込み' },
+      { role: 'forceReload', label: '強制再読み込み' },
+      { role: 'toggleDevTools', label: '開発者ツールを切り替え' },
+      { type: 'separator' },
+      { role: 'resetZoom', label: '実際のサイズ' },
+      { role: 'zoomIn', label: '拡大' },
+      { role: 'zoomOut', label: '縮小' },
+      { type: 'separator' },
+      { role: 'togglefullscreen', label: '全画面表示を切り替え' },
+    ],
+  })
 
   // Window menu (macOS only)
   if (isMac) {
-    template.push({ role: 'windowMenu' })
+    template.push({
+      label: 'ウィンドウ',
+      submenu: [
+        { role: 'minimize', label: '最小化' },
+        { role: 'zoom', label: '拡大/縮小' },
+        { type: 'separator' },
+        { role: 'front', label: 'すべてを手前に移動' },
+        { type: 'separator' },
+        { role: 'window', label: 'ウィンドウ' },
+      ],
+    })
   }
+
+  // Help menu
+  template.push({
+    label: 'ヘルプ',
+    submenu: [
+      {
+        label: 'アップデートを確認',
+        click: () => {
+          checkForUpdates(true)
+        },
+      },
+      { type: 'separator' },
+      {
+        label: `バージョン ${app.getVersion()}`,
+        enabled: false,
+      },
+    ],
+  })
 
   return template
 }
@@ -282,6 +371,11 @@ app.whenReady().then(() => {
 
   // Initialize auto-updater after window is created
   setupAutoUpdater()
+
+  // Auto-check for updates on startup (after a short delay)
+  setTimeout(() => {
+    checkForUpdates(false)
+  }, 3000)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
