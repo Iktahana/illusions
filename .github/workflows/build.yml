@@ -122,10 +122,15 @@ jobs:
           tag_name: v${{ steps.version.outputs.full }}
           name: Illusions v${{ steps.version.outputs.full }}
           files: |
-            dist-electron/**/*
+            dist-electron/**/latest*.yml
+            dist-electron/**/Illusions Setup *.exe
+            dist-electron/**/Illusions Setup *.exe.blockmap
+            dist-electron/**/Illusions-*.dmg
+            dist-electron/**/Illusions-*.dmg.blockmap
+            dist-electron/**/Illusions-*-mac.zip
+            dist-electron/**/Illusions-*-mac.zip.blockmap
           draft: false
           prerelease: ${{ startsWith(github.ref, 'refs/heads/main') }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
