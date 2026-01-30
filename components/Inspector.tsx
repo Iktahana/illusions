@@ -760,15 +760,15 @@ function StatsPanel({
                   <span className="text-xs text-foreground-tertiary">/100</span>
                 </div>
               </div>
-              <div className="w-full h-2 bg-background rounded-full overflow-hidden">
-                <div
-                  className="h-full transition-all"
-                  style={{
-                    width: `${readabilityAnalysis.score}%`,
-                    backgroundColor: `hsl(${50 + (readabilityAnalysis.score / 100) * 70} 85% 50%)`,
-                  }}
-                />
-              </div>
+               <div className="w-full h-2 bg-background rounded-full overflow-hidden border border-border-secondary">
+                 <div
+                   className="h-full transition-all"
+                   style={{
+                     width: `${readabilityAnalysis.score}%`,
+                     backgroundColor: `var(--progress-readability)`,
+                   }}
+                 />
+               </div>
               <div className="flex justify-between items-baseline gap-2">
                 <div className="flex items-center gap-1 min-w-0">
                   <InfoTooltip
@@ -939,58 +939,70 @@ function StatsPanel({
               )}
                {/* 文字種の分布バー */}
               <div className="pt-1 space-y-1">
-               <div className="h-6 flex rounded-md overflow-hidden bg-background border border-border-secondary">
-                 {charTypeAnalysis.total > 0 && (
-                   <>
-                     {charTypeAnalysis.kanji > 0 && (
-                       <div 
-                         className="bg-error/70 flex items-center justify-center text-white text-xs font-semibold"
-                         style={{ width: `${(charTypeAnalysis.kanji / charTypeAnalysis.total) * 100}%` }}
-                         title={`漢字: ${charTypeAnalysis.kanji}`}
-                       />
-                     )}
-                     {charTypeAnalysis.hiragana > 0 && (
-                       <div 
-                         className="bg-info/70 flex items-center justify-center text-white text-xs font-semibold"
-                         style={{ width: `${(charTypeAnalysis.hiragana / charTypeAnalysis.total) * 100}%` }}
-                         title={`ひらがな: ${charTypeAnalysis.hiragana}`}
-                       />
-                     )}
-                     {charTypeAnalysis.katakana > 0 && (
-                       <div 
-                         className="bg-success/70 flex items-center justify-center text-white text-xs font-semibold"
-                         style={{ width: `${(charTypeAnalysis.katakana / charTypeAnalysis.total) * 100}%` }}
-                         title={`カタカナ: ${charTypeAnalysis.katakana}`}
-                       />
-                     )}
-                     {charTypeAnalysis.other > 0 && (
-                       <div 
-                         className="bg-foreground-muted/70 flex items-center justify-center text-white text-xs font-semibold"
-                         style={{ width: `${(charTypeAnalysis.other / charTypeAnalysis.total) * 100}%` }}
-                         title={`その他: ${charTypeAnalysis.other}`}
-                       />
-                     )}
-                   </>
-                 )}
-               </div>
-               <div className="grid grid-cols-4 gap-2 text-xs">
-                 <div className="flex items-center gap-1">
-                   <div className="w-2 h-2 rounded-full bg-error/70" />
-                   <span className="text-foreground-tertiary">漢字</span>
-                 </div>
-                 <div className="flex items-center gap-1">
-                   <div className="w-2 h-2 rounded-full bg-info/70" />
-                   <span className="text-foreground-tertiary">ひらがな</span>
-                 </div>
-                 <div className="flex items-center gap-1">
-                   <div className="w-2 h-2 rounded-full bg-success/70" />
-                   <span className="text-foreground-tertiary">カタカナ</span>
-                 </div>
-                 <div className="flex items-center gap-1">
-                   <div className="w-2 h-2 rounded-full bg-foreground-muted/70" />
-                   <span className="text-foreground-tertiary">その他</span>
-                 </div>
-               </div>
+                <div className="h-6 flex rounded-md overflow-hidden bg-background border border-border-secondary">
+                  {charTypeAnalysis.total > 0 && (
+                    <>
+                      {charTypeAnalysis.kanji > 0 && (
+                        <div 
+                          className="flex items-center justify-center text-white text-xs font-semibold"
+                          style={{ 
+                            width: `${(charTypeAnalysis.kanji / charTypeAnalysis.total) * 100}%`,
+                            backgroundColor: `var(--progress-kanji)`
+                          }}
+                          title={`漢字: ${charTypeAnalysis.kanji}`}
+                        />
+                      )}
+                      {charTypeAnalysis.hiragana > 0 && (
+                        <div 
+                          className="flex items-center justify-center text-white text-xs font-semibold"
+                          style={{ 
+                            width: `${(charTypeAnalysis.hiragana / charTypeAnalysis.total) * 100}%`,
+                            backgroundColor: `var(--progress-hiragana)`
+                          }}
+                          title={`ひらがな: ${charTypeAnalysis.hiragana}`}
+                        />
+                      )}
+                      {charTypeAnalysis.katakana > 0 && (
+                        <div 
+                          className="flex items-center justify-center text-white text-xs font-semibold"
+                          style={{ 
+                            width: `${(charTypeAnalysis.katakana / charTypeAnalysis.total) * 100}%`,
+                            backgroundColor: `var(--progress-katakana)`
+                          }}
+                          title={`カタカナ: ${charTypeAnalysis.katakana}`}
+                        />
+                      )}
+                      {charTypeAnalysis.other > 0 && (
+                        <div 
+                          className="flex items-center justify-center text-white text-xs font-semibold"
+                          style={{ 
+                            width: `${(charTypeAnalysis.other / charTypeAnalysis.total) * 100}%`,
+                            backgroundColor: `var(--progress-other)`
+                          }}
+                          title={`その他: ${charTypeAnalysis.other}`}
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-xs">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: `var(--progress-kanji)` }} />
+                    <span className="text-foreground-tertiary">漢字</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: `var(--progress-hiragana)` }} />
+                    <span className="text-foreground-tertiary">ひらがな</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: `var(--progress-katakana)` }} />
+                    <span className="text-foreground-tertiary">カタカナ</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: `var(--progress-other)` }} />
+                    <span className="text-foreground-tertiary">その他</span>
+                  </div>
+                </div>
              </div>
            </div>
          </div>
@@ -1079,24 +1091,25 @@ function StatsPanel({
 
         {/* 6. 問題検出 */}
         {particleAnalysis && particleAnalysis.duplicates.length > 0 && !isSelection && (
-         <div className="bg-warning/10 rounded-lg p-4 border border-warning/30">
-           <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-              ⚠️ 要チェック
+         <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4 border border-amber-200 dark:border-amber-800/50">
+           <h4 className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+              <span>⚠️</span>
+              <span>要チェック</span>
            </h4>
            <div className="space-y-2">
              {particleAnalysis.duplicates.map((item, idx) => (
-               <div key={idx} className="text-sm">
-                 <span className="text-foreground-secondary">助詞の重複：</span>
-                 <span className="text-warning font-medium">{item.particle}</span>
-                 <span className="text-foreground-tertiary"> ×{item.count}</span>
+               <div key={idx} className="text-sm text-foreground-secondary dark:text-foreground-secondary">
+                 <span>助詞の重複：</span>
+                 <span className="text-amber-700 dark:text-amber-400 font-semibold">{item.particle}</span>
+                 <span className="text-foreground-tertiary dark:text-foreground-tertiary"> ×{item.count}</span>
                </div>
              ))}
-              <p className="text-xs text-foreground-tertiary mt-2">
+              <p className="text-xs text-foreground-tertiary dark:text-foreground-tertiary mt-2 leading-relaxed">
                 例：「のの」「にに」は文法エラーの可能性があります
               </p>
            </div>
          </div>
-       )}
+        )}
 
 
      </div>

@@ -98,25 +98,50 @@ export default function NovelEditor({
     }
   }, [searchOpenTrigger]);
 
-  // 模式切換時計算並保存滾動進度（鏡像映射）
+  // 儲存切換前的滾動進度（0-1）
+  const savedScrollProgressRef = useRef<number>(0);
+  
+  // 模式切換時保存當前滾動進度
   const handleToggleVertical = useCallback(() => {
     const container = scrollContainerRef.current;
     if (container) {
-      const maxScroll = container.scrollWidth - container.clientWidth;
+      let maxScroll = 0;
+      let currentScroll = 0;
       let progress = 0;
       
-      if (maxScroll > 0) {
-        if (isVertical) {
-          // 從豎排切換到橫排：計算當前豎排進度
-          progress = Math.abs(container.scrollLeft) / maxScroll;
-        } else {
-          // 從橫排切換到豎排：計算當前橫排進度
-          progress = container.scrollLeft / maxScroll;
-        }
-        
-        // 鏡像映射：目標模式下的進度 = 1 - 當前進度
-        setTargetScrollProgress(1 - progress);
+      if (isVertical) {
+        // 豎排：使用 scrollLeft（橫向滾動條）
+        maxScroll = container.scrollWidth - container.clientWidth;
+        currentScroll = Math.abs(container.scrollLeft);
+      } else {
+        // 橫排：使用 scrollTop（豎向滾動條）
+        maxScroll = container.scrollHeight - container.clientHeight;
+        currentScroll = container.scrollTop;
       }
+      
+      if (maxScroll > 0) {
+        progress = currentScroll / maxScroll;
+      }
+      
+      // 保存進度
+      savedScrollProgressRef.current = progress;
+      
+      console.log('[DEBUG] Toggle - Save progress:', {
+        mode: isVertical ? '豎→橫' : '橫→豎',
+        isVertical,
+        scrollLeft: container.scrollLeft,
+        scrollTop: container.scrollTop,
+        scrollWidth: container.scrollWidth,
+        scrollHeight: container.scrollHeight,
+        clientWidth: container.clientWidth,
+        clientHeight: container.clientHeight,
+        maxScroll,
+        currentScroll,
+        progress
+      });
+      
+      // 標記需要恢復滾動位置
+      setTargetScrollProgress(0.5); // 使用任意非null值觸發滾動邏輯
     }
     
     setIsVertical(!isVertical);
@@ -166,6 +191,7 @@ export default function NovelEditor({
               showParagraphNumbers={showParagraphNumbers}
               targetScrollProgress={targetScrollProgress}
               onScrollRestored={handleScrollRestored}
+              savedScrollProgressRef={savedScrollProgressRef}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -253,6 +279,7 @@ function MilkdownEditor({
   showParagraphNumbers,
   targetScrollProgress,
   onScrollRestored,
+  savedScrollProgressRef,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
@@ -270,6 +297,7 @@ function MilkdownEditor({
   showParagraphNumbers: boolean;
   targetScrollProgress?: number | null;
   onScrollRestored?: () => void;
+  savedScrollProgressRef: RefObject<number>;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
@@ -576,21 +604,50 @@ function MilkdownEditor({
           editorDom.style.transition = 'opacity 0.25s ease-in';
           editorDom.style.opacity = '1';
           
-          // フェードイン後、排版完成を待って目標位置へスクロール
+          // フェードイン後、排版完成を待って目標位置へスクロール（鏡像映射）
           if (shouldScrollToHeadRef.current && scrollContainerRef.current) {
             setTimeout(() => {
               const container = scrollContainerRef.current;
               if (container && targetScrollProgress !== null && targetScrollProgress !== undefined) {
-                const maxScroll = container.scrollWidth - container.clientWidth;
+                const savedProgress = savedScrollProgressRef.current || 0;
+                // 鏡像進度：1 - savedProgress
+                const mirroredProgress = 1 - savedProgress;
                 
-                if (maxScroll > 0) {
+                let newMaxScroll = 0;
+                let newScrollValue = 0;
+                
+                if (isVertical) {
+                  // 切換到豎排：使用 scrollLeft（橫向滾動條）
+                  newMaxScroll = container.scrollWidth - container.clientWidth;
+                  newScrollValue = -(mirroredProgress * newMaxScroll); // 負數
+                } else {
+                  // 切換到橫排：使用 scrollTop（豎向滾動條）
+                  newMaxScroll = container.scrollHeight - container.clientHeight;
+                  newScrollValue = mirroredProgress * newMaxScroll; // 正數
+                }
+                
+                console.log('[DEBUG] Apply scroll:', {
+                  isVertical,
+                  savedProgress,
+                  mirroredProgress,
+                  newMaxScroll,
+                  newScrollValue,
+                  scrollWidth: container.scrollWidth,
+                  scrollHeight: container.scrollHeight,
+                  clientWidth: container.clientWidth,
+                  clientHeight: container.clientHeight
+                });
+                
+                if (newMaxScroll > 0) {
                   if (isVertical) {
-                    // 豎排：scrollLeft 為負數（Chrome）
-                    container.scrollLeft = -(targetScrollProgress * maxScroll);
+                    container.scrollLeft = newScrollValue;
                   } else {
-                    // 橫排：scrollLeft 為正數
-                    container.scrollLeft = targetScrollProgress * maxScroll;
+                    container.scrollTop = newScrollValue;
                   }
+                  console.log('[DEBUG] After scroll:', {
+                    scrollLeft: container.scrollLeft,
+                    scrollTop: container.scrollTop
+                  });
                 }
                 
                 shouldScrollToHeadRef.current = false;
@@ -609,20 +666,49 @@ function MilkdownEditor({
       applyStyles();
       editorDom.style.opacity = '1';
       
-      // 初回レンダー時、排版完成を待って目標位置へスクロール
+      // 初回レンダー時、排版完成を待って目標位置へスクロール（鏡像映射）
       if (shouldScrollToHeadRef.current && scrollContainerRef.current) {
         const container = scrollContainerRef.current;
         if (container && targetScrollProgress !== null && targetScrollProgress !== undefined) {
-          const maxScroll = container.scrollWidth - container.clientWidth;
+          const savedProgress = savedScrollProgressRef.current || 0;
+          // 鏡像進度：1 - savedProgress
+          const mirroredProgress = 1 - savedProgress;
           
-          if (maxScroll > 0) {
+          let newMaxScroll = 0;
+          let newScrollValue = 0;
+          
+          if (isVertical) {
+            // 切換到豎排：使用 scrollLeft（橫向滾動條）
+            newMaxScroll = container.scrollWidth - container.clientWidth;
+            newScrollValue = -(mirroredProgress * newMaxScroll); // 負數
+          } else {
+            // 切換到橫排：使用 scrollTop（豎向滾動條）
+            newMaxScroll = container.scrollHeight - container.clientHeight;
+            newScrollValue = mirroredProgress * newMaxScroll; // 正數
+          }
+          
+          console.log('[DEBUG] Apply scroll (no anime):', {
+            isVertical,
+            savedProgress,
+            mirroredProgress,
+            newMaxScroll,
+            newScrollValue,
+            scrollWidth: container.scrollWidth,
+            scrollHeight: container.scrollHeight,
+            clientWidth: container.clientWidth,
+            clientHeight: container.clientHeight
+          });
+          
+          if (newMaxScroll > 0) {
             if (isVertical) {
-              // 豎排：scrollLeft 為負數（Chrome）
-              container.scrollLeft = -(targetScrollProgress * maxScroll);
+              container.scrollLeft = newScrollValue;
             } else {
-              // 橫排：scrollLeft 為正數
-              container.scrollLeft = targetScrollProgress * maxScroll;
+              container.scrollTop = newScrollValue;
             }
+            console.log('[DEBUG] After scroll:', {
+              scrollLeft: container.scrollLeft,
+              scrollTop: container.scrollTop
+            });
           }
           
           shouldScrollToHeadRef.current = false;
