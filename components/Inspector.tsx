@@ -832,27 +832,27 @@ function StatsPanel({
         {/* 5. 読了時間（目安） */}
         <div className="bg-background-secondary rounded-lg p-4 border border-border">
           <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-            読了時間（目安）
+             読了時間
           </h4>
           <div className="space-y-1.5">
             <div className="flex justify-between items-baseline">
               <span className="text-sm text-foreground-secondary flex items-center">
                 速読時
-                <InfoTooltip content="速読時の目安（分速900字で計算）" />
+                <InfoTooltip content="分速900字で計算" />
               </span>
               <span className="text-base font-medium text-foreground">{fastReadTime}</span>
             </div>
             <div className="flex justify-between items-baseline">
               <span className="text-sm text-foreground-secondary flex items-center">
                 通常時
-                <InfoTooltip content="通常の読書速度（分速500字、日本語の平均的な速度）" />
+                <InfoTooltip content="分速500字で計算（日本語の平均的な速度）" />
               </span>
               <span className="text-base font-medium text-accent">{normalReadTime}</span>
             </div>
             <div className="flex justify-between items-baseline">
               <span className="text-sm text-foreground-secondary flex items-center">
                 精読時
-                <InfoTooltip content="じっくり読む速度（分速250字で計算）" />
+                <InfoTooltip content="分速250字で計算" />
               </span>
               <span className="text-base font-medium text-foreground">{deepReadTime}</span>
             </div>

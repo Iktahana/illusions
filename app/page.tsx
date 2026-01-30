@@ -9,6 +9,13 @@ import TitleUpdater from "@/components/TitleUpdater";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { isElectronRenderer } from "@/lib/runtime-env";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
+import {
+  countSentences,
+  analyzeCharacterTypes,
+  calculateCharacterUsageRates,
+  calculateReadabilityScore,
+  analyzeParticleUsage,
+} from "@/lib/utils";
 
 function chars(s: string) {
   return s.replace(/\s/g, "").length;
@@ -220,13 +227,20 @@ export default function EditorPage() {
     target.focus();
   };
 
-  const wordCount = words(content);
-  const charCount = chars(content);
+   const wordCount = words(content);
+   const charCount = chars(content);
 
-  // 計算段落數（以換行符分隔）
-  const paragraphCount = content ? content.split(/\n\n+/).filter(p => p.trim().length > 0).length : 0;
+   // 計算段落數（以換行符分隔）
+   const paragraphCount = content ? content.split(/\n\n+/).filter(p => p.trim().length > 0).length : 0;
 
-  const fileName = currentFile?.name ?? (isDirty ? "新規ファイル *" : "新規ファイル");
+   // Calculate advanced Japanese text statistics
+   const sentenceCount = countSentences(content);
+   const charTypeAnalysis = analyzeCharacterTypes(content);
+   const charUsageRates = calculateCharacterUsageRates(charTypeAnalysis);
+   const readabilityAnalysis = calculateReadabilityScore(content);
+   const particleAnalysis = analyzeParticleUsage(content);
+
+   const fileName = currentFile?.name ?? (isDirty ? "新規ファイル *" : "新規ファイル");
 
   // Handle keyboard shortcuts: Cmd+S / Ctrl+S to save, Cmd+F / Ctrl+F to search
   useEffect(() => {
@@ -344,21 +358,26 @@ export default function EditorPage() {
           )}
         </main>
         
-        <ResizablePanel side="right" defaultWidth={256} minWidth={200} maxWidth={400}>
-          <Inspector
-            wordCount={wordCount}
-            charCount={charCount}
-            selectedCharCount={selectedCharCount}
-            paragraphCount={paragraphCount}
-            fileName={fileName}
-            isDirty={isDirty}
-            isSaving={isSaving}
-            lastSavedTime={lastSavedTime}
-            onOpenFile={openFile}
-            onNewFile={newFile}
-            onFileNameChange={updateFileName}
-          />
-        </ResizablePanel>
+         <ResizablePanel side="right" defaultWidth={256} minWidth={200} maxWidth={400}>
+           <Inspector
+             wordCount={wordCount}
+             charCount={charCount}
+             selectedCharCount={selectedCharCount}
+             paragraphCount={paragraphCount}
+             fileName={fileName}
+             isDirty={isDirty}
+             isSaving={isSaving}
+             lastSavedTime={lastSavedTime}
+             onOpenFile={openFile}
+             onNewFile={newFile}
+             onFileNameChange={updateFileName}
+             sentenceCount={sentenceCount}
+             charTypeAnalysis={charTypeAnalysis}
+             charUsageRates={charUsageRates}
+             readabilityAnalysis={readabilityAnalysis}
+             particleAnalysis={particleAnalysis}
+           />
+         </ResizablePanel>
       </div>
     </div>
   );
