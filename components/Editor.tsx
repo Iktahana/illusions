@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, useEffect, useRef, useState } from "react";
+import { RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import { commonmark, toggleEmphasisCommand, toggleStrongCommand, toggleInlineCodeCommand, wrapInHeadingCommand, wrapInBlockquoteCommand, wrapInBulletListCommand, wrapInOrderedListCommand } from "@milkdown/preset-commonmark";
@@ -15,6 +15,8 @@ import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
 import clsx from "clsx";
 import { Type, AlignLeft, Search } from "lucide-react";
 import { EditorView } from "@milkdown/prose/view";
+import { Plugin, PluginKey } from "@milkdown/prose/state";
+import { $prose } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "./BubbleMenu";
 import SearchDialog from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
@@ -243,6 +245,32 @@ function MilkdownEditor({
     onSelectionChangeRef.current = onSelectionChange;
   }, [onSelectionChange]);
 
+  // 縦書き用のスクロール制御プラグインを作成
+  // isVertical と scrollContainerRef の参照を保持
+  const isVerticalRef = useRef(isVertical);
+  const scrollContainerRefLocal = scrollContainerRef;
+  
+  // isVertical の変更を追跡
+  useEffect(() => {
+    isVerticalRef.current = isVertical;
+  }, [isVertical]);
+  
+  // 縦書き時は完全にスクロール動作を禁止（ユーザーが手動でスクロールする）
+  const verticalScrollPlugin = useMemo(() => $prose(() => new Plugin({
+    key: new PluginKey('verticalScrollControl'),
+    props: {
+      handleScrollToSelection(view) {
+        // 縦書きモードではスクロール動作を完全に無視
+        if (isVerticalRef.current) {
+          return true; // デフォルトのスクロールを完全に禁止
+        }
+        
+        // 横書き時はデフォルトの動作を使用
+        return false;
+      },
+    },
+  })), [scrollContainerRefLocal]);
+
   const { get } = useEditor((root) => {
     const value = initialContentRef.current;
     return Editor.make()
@@ -268,8 +296,9 @@ function MilkdownEditor({
       }))
       .use(history)
       .use(clipboard)
-      .use(cursor);
-  }, [isVertical]); // isVertical が変わったときのみ作り直す
+      .use(cursor)
+      .use(verticalScrollPlugin);
+  }, [isVertical, verticalScrollPlugin]); // isVertical が変わったときのみ作り直す
 
   // EditorView インスタンスを取得する
   useEffect(() => {
@@ -491,15 +520,16 @@ function MilkdownEditor({
           editorDom.style.transition = 'opacity 0.25s ease-in';
           editorDom.style.opacity = '1';
           
-          // フェードイン後、縦書きは右端へスクロール
-          if (isVertical && scrollContainerRef.current) {
-            setTimeout(() => {
-              const container = scrollContainerRef.current;
-              if (container) {
-                container.scrollLeft = container.scrollWidth;
-              }
-            }, 250); // フェードイン完了を待つ
-          }
+           // フェードイン後、縦書きは右端へスクロール
+           // 【禁止】縦書きモードではスクロール動作を完全に禁止
+           // if (isVertical && scrollContainerRef.current) {
+           //   setTimeout(() => {
+           //     const container = scrollContainerRef.current;
+           //     if (container) {
+           //       container.scrollLeft = container.scrollWidth;
+           //     }
+           //   }, 250); // フェードイン完了を待つ
+           // }
         });
       }, 150);
 
@@ -511,13 +541,14 @@ function MilkdownEditor({
       applyStyles();
       editorDom.style.opacity = '1';
       
-      // 初回レンダー時、縦書きは右端へスクロール
-      if (isVertical && scrollContainerRef.current) {
-        const container = scrollContainerRef.current;
-        if (container) {
-          container.scrollLeft = container.scrollWidth;
-        }
-      }
+       // 初回レンダー時、縦書きは右端へスクロール
+       // 【禁止】縦書きモードではスクロール動作を完全に禁止
+       // if (isVertical && scrollContainerRef.current) {
+       //   const container = scrollContainerRef.current;
+       //   if (container) {
+       //     container.scrollLeft = container.scrollWidth;
+       //   }
+       // }
     }
   }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get]);
 

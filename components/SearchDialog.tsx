@@ -87,14 +87,15 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
     dispatch(tr);
 
     // 表示位置へスクロール
+    // 【禁止】自動スクロール機能を無効化
     editorView.focus();
-    const coords = editorView.coordsAtPos(match.from);
-    if (coords) {
-      window.scrollTo({
-        top: coords.top - window.innerHeight / 2,
-        behavior: "smooth",
-      });
-    }
+    // const coords = editorView.coordsAtPos(match.from);
+    // if (coords) {
+    //   window.scrollTo({
+    //     top: coords.top - window.innerHeight / 2,
+    //     behavior: "smooth",
+    //   });
+    // }
   }, [currentMatchIndex, matches, editorView]);
 
   const goToNextMatch = () => {

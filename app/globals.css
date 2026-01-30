@@ -333,3 +333,81 @@ html:not(.dark) {
     opacity: 1;
   }
 }
+
+/* 拉動條樣式 (Input Range) */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 5px;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+}
+
+/* Webkit 瀏覽器 (Chrome, Safari, Edge) - 軌道 */
+input[type="range"]::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 5px;
+  background: var(--border);
+  cursor: pointer;
+}
+
+/* Webkit 瀏覽器 (Chrome, Safari, Edge) - 滑塊 */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  margin-top: -5px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+
+/* Firefox - 軌道 */
+input[type="range"]::-moz-range-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 5px;
+  background: var(--border);
+  border: none;
+  cursor: pointer;
+}
+
+/* Firefox - 滑塊 */
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+input[type="range"]::-moz-range-thumb:active {
+  transform: scale(1.05);
+}
+
+/* Firefox - 進度條 */
+input[type="range"]::-moz-range-progress {
+  background-color: var(--accent);
+}

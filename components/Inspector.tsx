@@ -253,7 +253,7 @@ export default function Inspector({
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={handleSaveFileName}
-              className="px-2 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded transition-colors"
+              className="px-2 py-1 text-xs font-medium bg-success text-white hover:opacity-90 rounded transition-opacity"
               title="保存"
             >
               OK
@@ -286,23 +286,23 @@ export default function Inspector({
         
         <div className="mt-2 flex items-center justify-between text-xs">
           <span>
-             {isSaving && (
-               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 animate-pulse">
+              {isSaving && (
+               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-info/20 text-info animate-pulse">
                  <span className="mr-1">⟳</span> 保存中
                </span>
              )}
              {!isSaving && isDirty && (
-               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-orange-500 text-white">
+               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-warning text-white">
                  <span className="mr-1">●</span> 編集中
                </span>
              )}
              {!isSaving && !isDirty && lastSavedTime === null && (
-               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-gray-500 text-white">
+               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-foreground-muted text-white">
                  <span className="mr-1">●</span> 新規
                </span>
              )}
              {!isSaving && !isDirty && lastSavedTime !== null && (
-               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-green-500 text-white">
+               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-success text-white">
                  <span className="mr-1">✓</span> 保存済み
                </span>
              )}
@@ -478,8 +478,8 @@ function CorrectionItem({
       className={clsx(
         "p-3 rounded-lg border cursor-pointer hover:shadow-sm transition-shadow",
         type === "warning"
-          ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50"
-          : "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50"
+          ? "bg-warning/10 border-warning/30"
+          : "bg-info/10 border-info/30"
       )}
     >
       <div className="flex items-start gap-2">
@@ -487,8 +487,8 @@ function CorrectionItem({
           className={clsx(
             "w-4 h-4 mt-0.5 flex-shrink-0",
             type === "warning" 
-              ? "text-amber-600 dark:text-amber-500" 
-              : "text-blue-600 dark:text-blue-500"
+              ? "text-warning" 
+              : "text-info"
           )}
         />
         <div className="flex-1 min-w-0">
@@ -641,27 +641,27 @@ function StatsPanel({
   if (avgParagraphLength >= 300) {
     paragraphWarning =
         '一段落に含まれる情報量がやや多いようです。内容のまとまりごとに区切ると、読みやすさが向上するかもしれません。';
-    paragraphWarningColor = 'text-amber-600 dark:text-amber-500';
+    paragraphWarningColor = 'text-warning';
 
   } else if (avgParagraphLength >= 200) {
     paragraphWarning =
         '読み応えのある段落構成です。公的文書や解説文としては安定していますが、スマホでは少し長く感じられる場合があります。';
-    paragraphWarningColor = 'text-slate-600 dark:text-slate-400';
+    paragraphWarningColor = 'text-foreground-secondary';
 
   } else if (avgParagraphLength >= 120) {
     paragraphWarning =
         '段落の長さは標準的で、エッセイや一般的な文章に適した構成です。落ち着いて読み進められます。';
-    paragraphWarningColor = 'text-slate-600 dark:text-slate-400';
+    paragraphWarningColor = 'text-foreground-secondary';
 
   } else if (avgParagraphLength >= 80) {
     paragraphWarning =
         '小説向きの自然な段落長です。文章のリズムと情報量のバランスが保たれています。';
-    paragraphWarningColor = 'text-green-600 dark:text-green-500';
+    paragraphWarningColor = 'text-success';
 
   } else if (avgParagraphLength > 0) {
     paragraphWarning =
         '段落がコンパクトで、テンポよく読めます。会話やスマホでの読書に向いた構成です。';
-    paragraphWarningColor = 'text-green-600 dark:text-green-500';
+    paragraphWarningColor = 'text-success';
   }
 
   // 3. 読了時間（シーン別の目安）
@@ -687,11 +687,11 @@ function StatsPanel({
    const getReadabilityLevelColor = (level?: string) => {
      switch (level) {
        case 'easy':
-         return 'text-green-600 dark:text-green-500';
+         return 'text-success';
        case 'normal':
-         return 'text-blue-600 dark:text-blue-500';
+         return 'text-info';
        case 'difficult':
-         return 'text-amber-600 dark:text-amber-500';
+         return 'text-warning';
        default:
          return 'text-foreground';
      }
@@ -937,35 +937,35 @@ function StatsPanel({
                   <span className="text-sm font-medium text-foreground">{charTypeAnalysis.other}字</span>
                 </div>
               )}
-              {/* 文字種の分布バー */}
+               {/* 文字種の分布バー */}
               <div className="pt-1 space-y-1">
                <div className="h-6 flex rounded-md overflow-hidden bg-background border border-border-secondary">
                  {charTypeAnalysis.total > 0 && (
                    <>
                      {charTypeAnalysis.kanji > 0 && (
                        <div 
-                         className="bg-red-500/70 flex items-center justify-center text-white text-xs font-semibold"
+                         className="bg-error/70 flex items-center justify-center text-white text-xs font-semibold"
                          style={{ width: `${(charTypeAnalysis.kanji / charTypeAnalysis.total) * 100}%` }}
                          title={`漢字: ${charTypeAnalysis.kanji}`}
                        />
                      )}
                      {charTypeAnalysis.hiragana > 0 && (
                        <div 
-                         className="bg-blue-500/70 flex items-center justify-center text-white text-xs font-semibold"
+                         className="bg-info/70 flex items-center justify-center text-white text-xs font-semibold"
                          style={{ width: `${(charTypeAnalysis.hiragana / charTypeAnalysis.total) * 100}%` }}
                          title={`ひらがな: ${charTypeAnalysis.hiragana}`}
                        />
                      )}
                      {charTypeAnalysis.katakana > 0 && (
                        <div 
-                         className="bg-green-500/70 flex items-center justify-center text-white text-xs font-semibold"
+                         className="bg-success/70 flex items-center justify-center text-white text-xs font-semibold"
                          style={{ width: `${(charTypeAnalysis.katakana / charTypeAnalysis.total) * 100}%` }}
                          title={`カタカナ: ${charTypeAnalysis.katakana}`}
                        />
                      )}
                      {charTypeAnalysis.other > 0 && (
                        <div 
-                         className="bg-gray-500/70 flex items-center justify-center text-white text-xs font-semibold"
+                         className="bg-foreground-muted/70 flex items-center justify-center text-white text-xs font-semibold"
                          style={{ width: `${(charTypeAnalysis.other / charTypeAnalysis.total) * 100}%` }}
                          title={`その他: ${charTypeAnalysis.other}`}
                        />
@@ -975,19 +975,19 @@ function StatsPanel({
                </div>
                <div className="grid grid-cols-4 gap-2 text-xs">
                  <div className="flex items-center gap-1">
-                   <div className="w-2 h-2 rounded-full bg-red-500/70" />
+                   <div className="w-2 h-2 rounded-full bg-error/70" />
                    <span className="text-foreground-tertiary">漢字</span>
                  </div>
                  <div className="flex items-center gap-1">
-                   <div className="w-2 h-2 rounded-full bg-blue-500/70" />
+                   <div className="w-2 h-2 rounded-full bg-info/70" />
                    <span className="text-foreground-tertiary">ひらがな</span>
                  </div>
                  <div className="flex items-center gap-1">
-                   <div className="w-2 h-2 rounded-full bg-green-500/70" />
+                   <div className="w-2 h-2 rounded-full bg-success/70" />
                    <span className="text-foreground-tertiary">カタカナ</span>
                  </div>
                  <div className="flex items-center gap-1">
-                   <div className="w-2 h-2 rounded-full bg-gray-500/70" />
+                   <div className="w-2 h-2 rounded-full bg-foreground-muted/70" />
                    <span className="text-foreground-tertiary">その他</span>
                  </div>
                </div>
@@ -1079,7 +1079,7 @@ function StatsPanel({
 
         {/* 6. 問題検出 */}
         {particleAnalysis && particleAnalysis.duplicates.length > 0 && !isSelection && (
-         <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-4 border border-amber-200 dark:border-amber-900/50">
+         <div className="bg-warning/10 rounded-lg p-4 border border-warning/30">
            <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
               ⚠️ 要チェック
            </h4>
@@ -1087,7 +1087,7 @@ function StatsPanel({
              {particleAnalysis.duplicates.map((item, idx) => (
                <div key={idx} className="text-sm">
                  <span className="text-foreground-secondary">助詞の重複：</span>
-                 <span className="text-amber-700 dark:text-amber-400 font-medium">{item.particle}</span>
+                 <span className="text-warning font-medium">{item.particle}</span>
                  <span className="text-foreground-tertiary"> ×{item.count}</span>
                </div>
              ))}
