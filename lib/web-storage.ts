@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Web Storage Provider using IndexedDB via Dexie.
- * Suitable for browser environments and PWAs.
+ * Dexie（IndexedDB）を使った Web ストレージ実装。
+ * ブラウザ環境/PWA 向け。
  */
 
 import Dexie, { type Table } from "dexie";
@@ -28,7 +28,7 @@ interface StoredRecentFile {
 interface StoredEditorBuffer {
   id: string;
   data: EditorBuffer;
-  fileHandle?: FileSystemFileHandle; // Store file handle separately for better serialization
+  fileHandle?: FileSystemFileHandle; // シリアライズ性のため、ハンドルは別フィールドで保持
 }
 
 class WebStorageDatabase extends Dexie {
@@ -57,11 +57,11 @@ export class WebStorageProvider implements IStorageService {
   async initialize(): Promise<void> {
     if (this.initialized) return;
     try {
-      // Test database connectivity
+      // DB 接続確認
       await this.db.open();
       this.initialized = true;
     } catch (error) {
-      console.error("Failed to initialize WebStorageProvider:", error);
+      console.error("WebStorageProvider の初期化に失敗しました:", error);
       throw error;
     }
   }
@@ -70,7 +70,7 @@ export class WebStorageProvider implements IStorageService {
     await this.initialize();
 
     try {
-      // Save all components in parallel
+      // すべてを並列で保存
       await Promise.all([
         this.saveAppState(session.appState),
         this.saveRecentFiles(session.recentFiles),
@@ -79,7 +79,7 @@ export class WebStorageProvider implements IStorageService {
           : this.clearEditorBuffer(),
       ]);
     } catch (error) {
-      console.error("Failed to save session:", error);
+      console.error("セッションの保存に失敗しました:", error);
       throw error;
     }
   }
@@ -94,7 +94,7 @@ export class WebStorageProvider implements IStorageService {
         this.loadEditorBuffer(),
       ]);
 
-      // Return null if nothing is stored
+      // 何も保存されていない場合は null
       if (!appState && recentFiles.length === 0 && !editorBuffer) {
         return null;
       }
@@ -105,7 +105,7 @@ export class WebStorageProvider implements IStorageService {
         editorBuffer,
       };
     } catch (error) {
-      console.error("Failed to load session:", error);
+      console.error("セッションの読み込みに失敗しました:", error);
       return null;
     }
   }
@@ -119,7 +119,7 @@ export class WebStorageProvider implements IStorageService {
         data: appState,
       });
     } catch (error) {
-      console.error("Failed to save app state:", error);
+      console.error("アプリ状態の保存に失敗しました:", error);
       throw error;
     }
   }
@@ -131,7 +131,7 @@ export class WebStorageProvider implements IStorageService {
       const stored = await this.db.appState.get("app_state");
       return stored?.data ?? null;
     } catch (error) {
-      console.error("Failed to load app state:", error);
+      console.error("アプリ状態の読み込みに失敗しました:", error);
       return null;
     }
   }
@@ -140,21 +140,20 @@ export class WebStorageProvider implements IStorageService {
     await this.initialize();
 
     try {
-      // Remove if already exists
+      // 既存があれば削除
       await this.db.recentFiles.delete(`recent_${file.path}`);
 
-      // Add the new file
+      // 新規追加
       await this.db.recentFiles.put({
         id: `recent_${file.path}`,
         path: file.path,
         data: file,
       });
 
-      // Get all files and trim to 10
+      // 全件取得して 10 件に丸める
       const allFiles = await this.db.recentFiles.toArray();
       if (allFiles.length > 10) {
-        // Sort by most recent (assumes data.lastModified is descending)
-        // Remove oldest entries
+        // 新しい順に並べ、古いものを削除
         const sorted = allFiles.sort(
           (a, b) => b.data.lastModified - a.data.lastModified
         );
@@ -162,7 +161,7 @@ export class WebStorageProvider implements IStorageService {
         await this.db.recentFiles.bulkDelete(toDelete.map((f) => f.id));
       }
     } catch (error) {
-      console.error("Failed to add to recent files:", error);
+      console.error("最近使ったファイルへの追加に失敗しました:", error);
       throw error;
     }
   }
@@ -171,10 +170,10 @@ export class WebStorageProvider implements IStorageService {
     await this.initialize();
 
     try {
-      // Clear existing recent files
+      // 既存の一覧をクリア
       await this.db.recentFiles.clear();
 
-      // Add new files
+      // 追加
       const records = files.map((file) => ({
         id: `recent_${file.path}`,
         path: file.path,
@@ -183,7 +182,7 @@ export class WebStorageProvider implements IStorageService {
 
       await this.db.recentFiles.bulkPut(records);
     } catch (error) {
-      console.error("Failed to save recent files:", error);
+      console.error("最近使ったファイルの保存に失敗しました:", error);
       throw error;
     }
   }
@@ -198,7 +197,7 @@ export class WebStorageProvider implements IStorageService {
         .slice(0, 10)
         .map((f) => f.data);
     } catch (error) {
-      console.error("Failed to get recent files:", error);
+      console.error("最近使ったファイルの取得に失敗しました:", error);
       return [];
     }
   }
@@ -209,7 +208,7 @@ export class WebStorageProvider implements IStorageService {
     try {
       await this.db.recentFiles.delete(`recent_${path}`);
     } catch (error) {
-      console.error("Failed to remove from recent files:", error);
+      console.error("最近使ったファイルからの削除に失敗しました:", error);
       throw error;
     }
   }
@@ -220,7 +219,7 @@ export class WebStorageProvider implements IStorageService {
     try {
       await this.db.recentFiles.clear();
     } catch (error) {
-      console.error("Failed to clear recent files:", error);
+      console.error("最近使ったファイルの全削除に失敗しました:", error);
       throw error;
     }
   }
@@ -235,7 +234,7 @@ export class WebStorageProvider implements IStorageService {
         fileHandle: buffer.fileHandle,
       });
     } catch (error) {
-      console.error("Failed to save editor buffer:", error);
+      console.error("エディタバッファの保存に失敗しました:", error);
       throw error;
     }
   }
@@ -247,14 +246,14 @@ export class WebStorageProvider implements IStorageService {
       const stored = await this.db.editorBuffer.get("editor_buffer");
       if (!stored?.data) return null;
       
-      // Restore file handle if it exists
+      // fileHandle があれば復元する
       if (stored.fileHandle) {
         stored.data.fileHandle = stored.fileHandle;
       }
       
       return stored.data;
     } catch (error) {
-      console.error("Failed to load editor buffer:", error);
+      console.error("エディタバッファの読み込みに失敗しました:", error);
       return null;
     }
   }
@@ -265,7 +264,7 @@ export class WebStorageProvider implements IStorageService {
     try {
       await this.db.editorBuffer.delete("editor_buffer");
     } catch (error) {
-      console.error("Failed to clear editor buffer:", error);
+      console.error("エディタバッファの削除に失敗しました:", error);
       throw error;
     }
   }
@@ -280,7 +279,7 @@ export class WebStorageProvider implements IStorageService {
         this.db.editorBuffer.clear(),
       ]);
     } catch (error) {
-      console.error("Failed to clear all storage:", error);
+      console.error("ストレージの全削除に失敗しました:", error);
       throw error;
     }
   }
