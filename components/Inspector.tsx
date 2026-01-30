@@ -3,8 +3,32 @@
 import { useState, useRef, useEffect, ReactNode } from "react";
 import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, X } from "lucide-react";
 import clsx from "clsx";
+import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
 
 type Tab = "ai" | "corrections" | "stats";
+
+const rightTabStorageKey = "illusions:rightTab";
+const isValidTab = (value: string | null): value is Tab =>
+  value === "ai" || value === "corrections" || value === "stats";
+
+const readStoredTab = (): Tab | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const savedTab = window.localStorage.getItem(rightTabStorageKey);
+    return isValidTab(savedTab) ? savedTab : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeStoredTab = (tab: Tab) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(rightTabStorageKey, tab);
+  } catch (error) {
+    console.error("Failed to persist right tab:", error);
+  }
+};
 
 const MDI_EXTENSION = ".mdi";
 
@@ -76,19 +100,45 @@ export default function Inspector({
   readabilityAnalysis,
   particleAnalysis,
 }: InspectorProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("ai");
+  const [activeTab, setActiveTab] = useState<Tab>(() => readStoredTab() ?? "ai");
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const savedTab = window.localStorage.getItem("illusions:rightTab");
-    if (savedTab === "ai" || savedTab === "corrections" || savedTab === "stats") {
-      setActiveTab(savedTab);
-    }
+    let mounted = true;
+
+    const loadTab = async () => {
+      try {
+        const storedTab = readStoredTab();
+        if (storedTab) {
+          setActiveTab(storedTab);
+          return;
+        }
+        const appState = await fetchAppState();
+        if (mounted && isValidTab(appState?.inspectorTab ?? null)) {
+          setActiveTab(appState?.inspectorTab ?? "ai");
+        }
+      } catch (error) {
+        console.error("Failed to load right tab:", error);
+      } finally {
+        if (mounted) {
+          hasLoadedRef.current = true;
+        }
+      }
+    };
+
+    void loadTab();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("illusions:rightTab", activeTab);
+    if (!hasLoadedRef.current) return;
+    writeStoredTab(activeTab);
+    void persistAppState({ inspectorTab: activeTab }).catch((error) => {
+      console.error("Failed to persist right tab:", error);
+    });
   }, [activeTab]);
   const [isEditingFileName, setIsEditingFileName] = useState(false);
   const [editedBaseName, setEditedBaseName] = useState(() => getBaseName(fileName));
@@ -97,12 +147,12 @@ export default function Inspector({
   const baseName = getBaseName(fileName);
   const displayBaseName = baseName || fileName;
 
-  // Update edited base name when fileName prop changes
+  // fileName の変更に合わせて編集用のベース名も更新する
   useEffect(() => {
     setEditedBaseName(getBaseName(fileName));
   }, [fileName]);
 
-  // Focus input when entering edit mode
+  // 編集モードに入ったら入力欄へフォーカスする
   useEffect(() => {
     if (isEditingFileName && inputRef.current) {
       inputRef.current.focus();
@@ -131,7 +181,7 @@ export default function Inspector({
     setIsEditingFileName(false);
   };
 
-  // Calculate manuscript pages (400 characters per page in Japanese)
+  // 原稿用紙換算（400字/枚）
   const manuscriptPages = Math.ceil(charCount / 400);
 
    const formatTime = (timestamp: number | null) => {
@@ -149,7 +199,7 @@ export default function Inspector({
 
   return (
     <aside className={clsx("h-full bg-background border-l border-border flex flex-col", className)}>
-      {/* File Status Header */}
+      {/* ファイル状態 */}
       <div className="px-4 py-3 border-b border-border bg-background-secondary">
         <div className="flex items-center justify-between mb-1">
           <p className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide">
@@ -177,7 +227,7 @@ export default function Inspector({
           </div>
         </div>
         
-        {/* Editable File Name */}
+        {/* ファイル名（編集可） */}
         {isEditingFileName ? (
           <div className="flex items-center gap-1">
             <div className="flex-1 min-w-0 flex items-center">
@@ -255,7 +305,7 @@ export default function Inspector({
         </div>
       </div>
 
-      {/* Tab Navigation */}
+      {/* タブ */}
       <div className="h-12 border-b border-border flex items-center">
         <button
           onClick={() => setActiveTab("ai")}
@@ -295,7 +345,7 @@ export default function Inspector({
         </button>
       </div>
 
-       {/* Content */}
+       {/* 本文 */}
        <div className="flex-1 overflow-y-auto p-4">
          {activeTab === "ai" && <AIPanel />}
          {activeTab === "corrections" && <CorrectionsPanel />}
@@ -333,7 +383,7 @@ function AIPanel() {
         </div>
       </div>
 
-      {/* AI Suggestions */}
+      {/* AI 提案 */}
       <div className="space-y-2">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide">提案</h4>
         <AISuggestion
@@ -346,7 +396,7 @@ function AIPanel() {
         />
       </div>
 
-      {/* Input Area */}
+      {/* 入力欄 */}
       <div className="pt-4 border-t border-border">
         <textarea
           placeholder="AI に質問や指示を入力..."
@@ -443,7 +493,7 @@ function CorrectionItem({
   );
 }
 
-// Tooltip component for info icons
+// 情報アイコン用のツールチップ
 function InfoTooltip({ content, className, children }: { content: string; className?: string; children: ReactNode }) {
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0, placement: 'top' as 'top' | 'bottom' });
@@ -552,14 +602,14 @@ function StatsPanel({
     duplicates: Array<{ particle: string; count: number }>;
   };
 }) {
-  // 判斷是否為選中片段分析
+  // 選択範囲の分析かどうか
   const isSelection = selectedCharCount > 0;
   const activeCharCount = isSelection ? selectedCharCount : charCount;
 
-  // 1. 字數深度統計
-  // 計算純文字數（剔除空白、標點符號等）
-  // 注意：這裡簡化處理，實際應該從編輯器獲取原始文本進行處理
-  // 假設標點符號約佔 10-15%
+  // 1. 文字数の詳細（概算）
+  // 本文文字数を概算（空白・約物などを除外）
+  // 注意: ここでは簡易推定。厳密にはエディタの生テキストを用いる
+  // 約物は全体の 10-15% 程度と仮定
   const estimatedPunctuation = Math.floor(activeCharCount * 0.12);
   const pureTextCount = activeCharCount - estimatedPunctuation;
   const punctuationRatio = activeCharCount > 0 ? (estimatedPunctuation / activeCharCount * 100).toFixed(1) : '0.0';
@@ -575,7 +625,7 @@ function StatsPanel({
      styleHint = 'バランス型';
    }
 
-  // 2. 段落結構分析
+  // 2. 段落構成
   const avgParagraphLength = paragraphCount > 0 ? Math.floor(activeCharCount / paragraphCount) : 0;
 
   let paragraphWarning = '';
@@ -606,7 +656,7 @@ function StatsPanel({
     paragraphWarningColor = 'text-green-600 dark:text-green-500';
   }
 
-  // 3. 多場景閱讀時間計算
+  // 3. 読了時間（シーン別の目安）
   const calculateReadTime = (charsPerMinute: number) => {
     if (activeCharCount === 0) return '0秒';
     const minutes = Math.floor(activeCharCount / charsPerMinute);
@@ -621,11 +671,11 @@ function StatsPanel({
     }
   };
 
-  const fastReadTime = calculateReadTime(900);    // 快速掃讀
-  const normalReadTime = calculateReadTime(500);  // 常規閱讀
-  const deepReadTime = calculateReadTime(250);    // 深度研讀
+  const fastReadTime = calculateReadTime(900);    // 速読
+  const normalReadTime = calculateReadTime(500);  // 通常読書
+  const deepReadTime = calculateReadTime(250);    // 精読
 
-   // Get readability level color
+   // 読みやすさレベルの色
    const getReadabilityLevelColor = (level?: string) => {
      switch (level) {
        case 'easy':
@@ -642,11 +692,11 @@ function StatsPanel({
     const getReadabilityLevelLabel = (level?: string) => {
       switch (level) {
         case 'easy':
-          return '平易';
+          return 'やさしい';
         case 'normal':
           return '標準';
         case 'difficult':
-          return '難読';
+          return '難しい';
         default:
           return '未分析';
       }
@@ -669,7 +719,7 @@ function StatsPanel({
           </div>
         )}
 
-        {/* 標題：動態顯示分析範囲 */}
+        {/* 見出し: 分析対象を動的に表示 */}
         <div className="flex items-center justify-between">
           <h3 className="stats-header">
             {isSelection ? '選択範囲の分析' : '全体の統計'}
@@ -879,7 +929,7 @@ function StatsPanel({
                   <span className="text-sm font-medium text-foreground">{charTypeAnalysis.other}字</span>
                 </div>
               )}
-              {/* Character distribution bar */}
+              {/* 文字種の分布バー */}
               <div className="pt-1 space-y-1">
                <div className="h-6 flex rounded-md overflow-hidden bg-background border border-border-secondary">
                  {charTypeAnalysis.total > 0 && (
@@ -969,9 +1019,9 @@ function StatsPanel({
            {paragraphWarning && (
              <div className="mt-2">
                <div className="h-px bg-border" />
-               <small className="mt-2 block text-[10px] text-foreground/50">
-                 Tips: {paragraphWarning}
-               </small>
+                <small className="mt-2 block text-[10px] text-foreground/50">
+                  補足: {paragraphWarning}
+                </small>
              </div>
            )}
          </div>
@@ -1019,7 +1069,7 @@ function StatsPanel({
           </div>
         </div>
 
-        {/* 6. 問題検出 (Issue Detection) */}
+        {/* 6. 問題検出 */}
         {particleAnalysis && particleAnalysis.duplicates.length > 0 && !isSelection && (
          <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-4 border border-amber-200 dark:border-amber-900/50">
            <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
