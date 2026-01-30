@@ -24,7 +24,7 @@ const db = new AutoSaveDb();
 export const CACHE_ID_UNSAVED = "unsaved_draft";
 
 /**
- * Upsert a stash entry. Overwrites existing row with same id.
+ * 下書きキャッシュを upsert する（同一IDは上書き）
  */
 export async function upsertStash(id: string, content: string): Promise<void> {
   const last_updated = Date.now();
@@ -32,7 +32,7 @@ export async function upsertStash(id: string, content: string): Promise<void> {
 }
 
 /**
- * Get a stash entry by id, or null if not found.
+ * ID で下書きキャッシュを取得する（なければ null）
  */
 export async function getStash(id: string): Promise<AutoSaveCacheEntry | null> {
   const row = await db.auto_save_cache.get(id);
@@ -40,7 +40,7 @@ export async function getStash(id: string): Promise<AutoSaveCacheEntry | null> {
 }
 
 /**
- * Delete a stash entry by id.
+ * ID で下書きキャッシュを削除する
  */
 export async function deleteStash(id: string): Promise<void> {
   await db.auto_save_cache.delete(id);
