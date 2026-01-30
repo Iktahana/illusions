@@ -36,7 +36,7 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
       const { selection } = state;
       const { from, to } = selection;
 
-      // Only show menu if there's a non-empty selection
+      // 選択があるときだけ表示
       if (from === to) {
         setIsVisible(false);
         setShowHeadingDropdown(false);
@@ -45,7 +45,7 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
 
       setIsVisible(true);
 
-      // Get the DOM coordinates of the selection
+      // 選択範囲の座標を取得
       const start = editorView.coordsAtPos(from);
       const end = editorView.coordsAtPos(to);
 
@@ -57,22 +57,22 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
           top,
         });
       } else {
-        // Calculate position above the selection
+        // 選択範囲の上に配置
         const left = (start.left + end.left) / 2;
         const top = start.top;
         setPosition({
           left: left,
-          top: top - 50, // Position above the selection
+          top: top - 50, // 選択範囲の上
         });
       }
     };
 
-    // Update position on selection change
+    // 選択変更で位置を更新
     const handleUpdate = () => {
       updatePosition();
     };
 
-    // Listen to editor updates
+    // エディタ更新を購読
     editorView.dom.addEventListener("mouseup", handleUpdate);
     editorView.dom.addEventListener("keyup", handleUpdate);
 
@@ -82,7 +82,7 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
     };
   }, [editorView, isVertical]);
 
-  // Close heading dropdown when clicking outside
+  // 外側クリックで見出しドロップダウンを閉じる
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -130,7 +130,7 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
         transform: isVertical ? "translateY(-50%)" : "translateX(-50%)",
       }}
     >
-      {/* Heading Dropdown */}
+      {/* 見出し */}
       <div className="relative">
         <button
           onClick={() => setShowHeadingDropdown(!showHeadingDropdown)}
@@ -172,7 +172,7 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
 
       <div className={clsx(isVertical ? "h-px w-6" : "w-px h-6", "bg-border")} />
 
-      {/* Format Buttons */}
+      {/* 書式 */}
       {buttons.map(({ icon: Icon, label, format, shortcut }) => (
         <button
           key={format}
