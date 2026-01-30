@@ -1,38 +1,38 @@
 /**
- * Utility functions for the Illusions editor
+ * Illusions エディタ用のユーティリティ
  */
 
 /**
- * Calculate manuscript pages (原稿用紙) from character count
- * Standard Japanese manuscript paper: 400 characters per page
+ * 文字数から原稿用紙枚数を算出する
+ * 原稿用紙: 400字/枚
  */
 export function calculateManuscriptPages(charCount: number): number {
   return Math.ceil(charCount / 400);
 }
 
 /**
- * Count words in text (handles both Japanese and English)
+ * 単語数を数える（日本語/英語の混在を想定）
  */
 export function countWords(text: string): number {
-  // Remove markdown syntax
+  // Markdown記法をざっくり除去
   const plainText = text
     .replace(/[#*_~`\[\]()]/g, '')
     .trim();
   
-  // Split by whitespace and filter empty strings
+  // 空白で分割し、空要素を除外
   const words = plainText.split(/\s+/).filter(Boolean);
   return words.length;
 }
 
 /**
- * Count characters excluding whitespace
+ * 空白を除いた文字数を数える
  */
 export function countCharacters(text: string): number {
   return text.replace(/\s/g, '').length;
 }
 
 /**
- * Format date for display (Japanese locale)
+ * 表示用に日付を整形する（日本語ロケール）
  */
 export function formatDate(date: Date): string {
   return date.toLocaleString('ja-JP', {
@@ -45,7 +45,7 @@ export function formatDate(date: Date): string {
 }
 
 /**
- * Format relative time (e.g., "3分前")
+ * 相対時間を整形する（例: "3分前"）
  */
 export function formatRelativeTime(date: Date): string {
   const now = new Date();
@@ -58,7 +58,7 @@ export function formatRelativeTime(date: Date): string {
 }
 
 /**
- * Debounce function for auto-save
+ * 自動保存などに使うデバウンス
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function debounce<T extends (...args: any[]) => any>(
@@ -81,21 +81,21 @@ export function debounce<T extends (...args: any[]) => any>(
 }
 
 /**
- * Generate unique ID for documents
+ * 文書用のユニークIDを生成する
  */
 export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /**
- * Check if text contains Japanese characters
+ * 日本語（ひらがな/カタカナ/漢字）を含むか判定する
  */
 export function hasJapanese(text: string): boolean {
   return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
 }
 
 /**
- * Validate document title
+ * タイトルを検証する
  */
 export function validateTitle(title: string): { valid: boolean; error?: string } {
   if (!title || title.trim().length === 0) {
@@ -108,31 +108,31 @@ export function validateTitle(title: string): { valid: boolean; error?: string }
 }
 
 /**
- * Clean markdown for character counting
+ * 文字数カウント用にMarkdownを整形する
  */
 export function cleanMarkdown(markdown: string): string {
   return markdown
-    // Remove code blocks
+    // コードブロックを除去
     .replace(/```[\s\S]*?```/g, '')
-    // Remove inline code
+    // インラインコードを除去
     .replace(/`[^`]+`/g, '')
-    // Remove links but keep text
+    // リンクはテキストだけ残す
     .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
-    // Remove images
+    // 画像を除去
     .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '')
-    // Remove headers
+    // 見出し記号を除去
     .replace(/^#{1,6}\s+/gm, '')
-    // Remove bold/italic markers
+    // 強調記号を除去
     .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, '$1')
-    // Remove blockquotes
+    // 引用記号を除去
     .replace(/^>\s+/gm, '')
-    // Remove horizontal rules
+    // 罫線を除去
     .replace(/^[-*_]{3,}$/gm, '')
     .trim();
 }
 
 /**
- * Character types analysis result
+ * 文字種別の分析結果
  */
 export interface CharacterTypeAnalysis {
   kanji: number;        // 漢字
@@ -143,7 +143,7 @@ export interface CharacterTypeAnalysis {
 }
 
 /**
- * Character usage rates
+ * 文字種別の使用率
  */
 export interface CharacterUsageRates {
   kanjiRate: number;    // 漢字使用率（%）
@@ -152,17 +152,17 @@ export interface CharacterUsageRates {
 }
 
 /**
- * Readability analysis result
+ * 読みやすさ分析の結果
  */
 export interface ReadabilityAnalysis {
   score: number;        // スコア（0-100）
   level: string;        // レベル（easy/normal/difficult）
   avgSentenceLength: number;     // 平均文長
-  avgPunctuationSpacing: number; // 平均句讀点間隔
+  avgPunctuationSpacing: number; // 平均句読点間隔
 }
 
 /**
- * Advanced statistics for Japanese text
+ * 日本語テキスト向けの詳細統計
  */
 export interface AdvancedStatistics {
   sentenceCount: number;      // 文数
@@ -175,7 +175,7 @@ export interface AdvancedStatistics {
 }
 
 /**
- * Export statistics
+ * テキスト統計
  */
 export interface TextStatistics {
   wordCount: number;
@@ -193,7 +193,7 @@ export function calculateStatistics(text: string): TextStatistics {
   const manuscriptPages = calculateManuscriptPages(charCount);
   const paragraphCount = text.split(/\n\n+/).filter(Boolean).length;
   
-  // Calculate advanced statistics for Japanese text
+  // 日本語テキスト向けの詳細統計
   const advanced: AdvancedStatistics = {
     sentenceCount: countSentences(cleanedText),
     characterTypeAnalysis: analyzeCharacterTypes(cleanedText),
@@ -213,20 +213,20 @@ export function calculateStatistics(text: string): TextStatistics {
 }
 
 /**
- * Generate heading ID from title content using URL encoding
+ * 見出しの内容からアンカーIDを生成する（URLエンコード）
  */
 export function generateHeadingId(title: string): string {
-  // Remove markdown formatting and trim
+  // Markdown記法を除去して整形
   const cleanTitle = title
     .replace(/[*_~`\[\]()]/g, '')
     .trim();
   
-  // URL encode the title
+  // URLエンコード
   return encodeURIComponent(cleanTitle);
 }
 
 /**
- * Parse markdown headings to extract chapters
+ * Markdownの見出しから章情報を抽出する
  */
 export interface Chapter {
   level: number;
@@ -242,7 +242,7 @@ export function parseMarkdownChapters(markdown: string): Chapter[] {
   let charOffset = 0;
 
   lines.forEach((line, lineNumber) => {
-    // Match heading pattern: # Title, ## Title, etc.
+    // 見出しパターン: # タイトル, ## タイトル ...
     const match = line.match(/^(#{1,6})\s+(.+)$/);
     if (match) {
       const level = match[1].length;
@@ -257,15 +257,15 @@ export function parseMarkdownChapters(markdown: string): Chapter[] {
         anchorId,
       });
     }
-    charOffset += line.length + 1; // +1 for newline
+    charOffset += line.length + 1; // 改行分（+1）
   });
 
   return chapters;
 }
 
 /**
- * Count sentences in Japanese text
- * Detects 。！？ as sentence endings
+ * 日本語の文数を数える
+ * 文末: 。！？
  */
 export function countSentences(text: string): number {
   // 日本語の句点で文を分割：。！？のいずれか
@@ -275,12 +275,12 @@ export function countSentences(text: string): number {
 }
 
 /**
- * Analyze character types in text (Japanese characters classification)
+ * 文字種別を分析する（日本語向け）
  */
 export function analyzeCharacterTypes(text: string): CharacterTypeAnalysis {
-  let kanji = 0;      // 漢字: CJK Unified Ideographs
-  let hiragana = 0;   // ひらがな: Hiragana
-  let katakana = 0;   // カタカナ: Katakana
+  let kanji = 0;      // 漢字
+  let hiragana = 0;   // ひらがな
+  let katakana = 0;   // カタカナ
   let other = 0;      // その他
 
   for (const char of text) {
@@ -316,7 +316,7 @@ export function analyzeCharacterTypes(text: string): CharacterTypeAnalysis {
 }
 
 /**
- * Calculate character usage rates (percentages)
+ * 文字種別の使用率を算出する（%）
  */
 export function calculateCharacterUsageRates(analysis: CharacterTypeAnalysis): CharacterUsageRates {
   const total = analysis.total || 1;
@@ -329,8 +329,8 @@ export function calculateCharacterUsageRates(analysis: CharacterTypeAnalysis): C
 }
 
 /**
- * Calculate average spacing between punctuation marks
- * 平均句讀点間隔
+ * 句読点間隔の平均を算出する
+ * 平均句読点間隔
  */
 export function calculateAveragePunctuationSpacing(text: string): number {
   const punctuationIndices: number[] = [];
@@ -356,9 +356,9 @@ export function calculateAveragePunctuationSpacing(text: string): number {
 }
 
 /**
- * Calculate readability score
- * 訪み易さ: Based on sentence length, character types, and punctuation usage
- * Returns score 0-100, where higher is easier to read
+ * 読みやすさスコアを算出する
+ * 文の長さ、文字種別、句読点の使い方などから推定する
+ * 0〜100点（高いほど読みやすい）
  */
 export function calculateReadabilityScore(text: string): ReadabilityAnalysis {
   const sentenceCount = countSentences(text);
@@ -370,7 +370,7 @@ export function calculateReadabilityScore(text: string): ReadabilityAnalysis {
     ? Math.round((totalChars / sentenceCount) * 10) / 10 
     : 0;
 
-  // 平均句讀点間隔を計算
+  // 平均句読点間隔を計算
   const avgPunctuationSpacing = calculateAveragePunctuationSpacing(text);
 
   // スコア計算（複数の要因に基づく）
@@ -386,7 +386,7 @@ export function calculateReadabilityScore(text: string): ReadabilityAnalysis {
     score += 5; // ボーナス
   }
 
-  // 2. 句讀点間隔に基づく減点（間隔が長すぎるのは読みにくい）
+  // 2. 句読点間隔に基づく減点（間隔が長すぎると読みにくい）
   // 理想的な間隔：8-12字
   if (avgPunctuationSpacing > 20) {
     score -= 15;
@@ -438,8 +438,8 @@ export function calculateReadabilityScore(text: string): ReadabilityAnalysis {
 }
 
 /**
- * Analyze particle usage to detect duplicates
- * E.g., のの (no-no) is grammatically incorrect
+ * 助詞の重複を検出する
+ * 例: 「のの」「にに」は不自然/誤りの可能性がある
  */
 export function analyzeParticleUsage(text: string): { duplicates: Array<{ particle: string; count: number }> } {
   const particles = ['の', 'に', 'を', 'が', 'は', 'や', 'と', 'で', 'から', 'まで'];
@@ -460,13 +460,13 @@ export function analyzeParticleUsage(text: string): { duplicates: Array<{ partic
 }
 
 /**
- * Extract chapters from editor DOM
- * This is more reliable than parsing markdown as it gets actual IDs from rendered elements
+ * エディタのDOMから章情報を抽出する
+ * レンダリング後の実IDが取れるため、Markdown解析より確実
  */
 export function getChaptersFromDOM(): Chapter[] {
   const chapters: Chapter[] = [];
   
-  // Check if we're in a browser environment
+  // ブラウザ環境のみ
   if (typeof document === 'undefined') {
     return chapters;
   }
@@ -475,7 +475,7 @@ export function getChaptersFromDOM(): Chapter[] {
   
   if (!editorContent) return chapters;
   
-  // Find all headings with id
+  // 見出し要素を列挙する
   const headings = editorContent.querySelectorAll('h1, h2, h3, h4, h5, h6');
   
   headings.forEach((heading, index) => {
@@ -494,4 +494,3 @@ export function getChaptersFromDOM(): Chapter[] {
   
   return chapters;
 }
-
