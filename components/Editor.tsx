@@ -249,10 +249,15 @@ function MilkdownEditor({
   // isVertical と scrollContainerRef の参照を保持
   const isVerticalRef = useRef(isVertical);
   const scrollContainerRefLocal = scrollContainerRef;
+  const shouldScrollToHeadRef = useRef(false); // 排版完成後に右端へスクロールするかどうか
   
   // isVertical の変更を追跡
   useEffect(() => {
     isVerticalRef.current = isVertical;
+    // 縦書きモードに切り替わったら、排版完成後に右端へスクロール
+    if (isVertical) {
+      shouldScrollToHeadRef.current = true;
+    }
   }, [isVertical]);
   
   // 縦書き時は完全にスクロール動作を禁止（ユーザーが手動でスクロールする）
@@ -260,7 +265,7 @@ function MilkdownEditor({
     key: new PluginKey('verticalScrollControl'),
     props: {
       handleScrollToSelection(view) {
-        // 縦書きモードではスクロール動作を完全に無視
+        // 縦書きモードではスクロール動作を完全に無視（排版完成後の明示的なスクロール以外）
         if (isVerticalRef.current) {
           return true; // デフォルトのスクロールを完全に禁止
         }
@@ -520,16 +525,16 @@ function MilkdownEditor({
           editorDom.style.transition = 'opacity 0.25s ease-in';
           editorDom.style.opacity = '1';
           
-           // フェードイン後、縦書きは右端へスクロール
-           // 【禁止】縦書きモードではスクロール動作を完全に禁止
-           // if (isVertical && scrollContainerRef.current) {
-           //   setTimeout(() => {
-           //     const container = scrollContainerRef.current;
-           //     if (container) {
-           //       container.scrollLeft = container.scrollWidth;
-           //     }
-           //   }, 250); // フェードイン完了を待つ
-           // }
+          // フェードイン後、排版完成を待てば右端へスクロール
+          if (isVertical && shouldScrollToHeadRef.current && scrollContainerRef.current) {
+            setTimeout(() => {
+              const container = scrollContainerRef.current;
+              if (container) {
+                container.scrollLeft = container.scrollWidth;
+                shouldScrollToHeadRef.current = false; // 実行済みなので次回は実行しない
+              }
+            }, 250); // フェードイン完了を待つ
+          }
         });
       }, 150);
 
@@ -541,14 +546,14 @@ function MilkdownEditor({
       applyStyles();
       editorDom.style.opacity = '1';
       
-       // 初回レンダー時、縦書きは右端へスクロール
-       // 【禁止】縦書きモードではスクロール動作を完全に禁止
-       // if (isVertical && scrollContainerRef.current) {
-       //   const container = scrollContainerRef.current;
-       //   if (container) {
-       //     container.scrollLeft = container.scrollWidth;
-       //   }
-       // }
+      // 初回レンダー時、排版完成を待れば右端へスクロール
+      if (isVertical && shouldScrollToHeadRef.current && scrollContainerRef.current) {
+        const container = scrollContainerRef.current;
+        if (container) {
+          container.scrollLeft = container.scrollWidth;
+          shouldScrollToHeadRef.current = false; // 実行済みなので次回は実行しない
+        }
+      }
     }
   }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get]);
 
