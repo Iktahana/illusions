@@ -38,12 +38,12 @@ export default function EditorPage() {
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [saveToastExiting, setSaveToastExiting] = useState(false);
   const [selectedCharCount, setSelectedCharCount] = useState(0);
-  // Stable file session ID - only changes when opening/creating a new file
+  // ファイルセッションID（ファイルの新規作成/切り替え時のみ更新）
   const fileSessionRef = useRef(0);
   const prevLastSavedTimeRef = useRef<number | null>(null);
   const hasAutoRecoveredRef = useRef(false);
 
-  // Remount editor when file is auto-recovered (page refresh)
+  // 自動復元（ページ再読み込み）時はエディタを再マウントする
   useEffect(() => {
     if (wasAutoRecovered && !hasAutoRecoveredRef.current) {
       hasAutoRecoveredRef.current = true;
@@ -52,12 +52,12 @@ export default function EditorPage() {
     }
   }, [wasAutoRecovered]);
 
-  // Wrap openFile and newFile to increment session ID
+  // openFile/newFile をラップしてセッションIDを進める
   const openFile = useCallback(async () => {
     await originalOpenFile();
 
-    // Ensure content state update is processed before remounting editor
-    // Use setTimeout to allow React to process state updates from originalOpenFile
+    // content の状態更新を反映してからエディタを再マウントする
+    // setTimeout で originalOpenFile 由来の状態更新を React に先に処理させる
     setTimeout(() => {
       fileSessionRef.current += 1;
       setEditorKey(prev => prev + 1);
@@ -70,21 +70,21 @@ export default function EditorPage() {
     setEditorKey(prev => prev + 1);
   }, [originalNewFile]);
   
-  // Editor style settings
-  const [fontScale, setFontScale] = useState(100); // 100% = default size
+  // エディタ表示設定
+  const [fontScale, setFontScale] = useState(100); // 100% = 標準サイズ
   const [lineHeight, setLineHeight] = useState(1.8);
-  const [paragraphSpacing, setParagraphSpacing] = useState(0); // 0em = no spacing
+  const [paragraphSpacing, setParagraphSpacing] = useState(0); // 0em = 間隔なし
   const [textIndent, setTextIndent] = useState(1);
   const [fontFamily, setFontFamily] = useState('Noto Serif JP');
-  const [charsPerLine, setCharsPerLine] = useState(40); // 0 = no limit, default 40
+  const [charsPerLine, setCharsPerLine] = useState(40); // 0 = 制限なし（既定 40）
   const [showParagraphNumbers, setShowParagraphNumbers] = useState(true);
   
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
-  // Show save toast when lastSavedTime changes (file saved)
+  // lastSavedTime が更新されたら「保存完了」トーストを表示する
   useEffect(() => {
     if (lastSavedTime && prevLastSavedTimeRef.current !== lastSavedTime) {
-      // Only show if this is not the first load
+      // 初回読み込みでは表示しない
       if (prevLastSavedTimeRef.current !== null) {
         setShowSaveToast(true);
         setSaveToastExiting(false);
@@ -94,7 +94,7 @@ export default function EditorPage() {
           setTimeout(() => {
             setShowSaveToast(false);
             setSaveToastExiting(false);
-          }, 150); // Match animation duration
+          }, 150); // アニメーション時間に合わせる
         }, 1200);
 
         prevLastSavedTimeRef.current = lastSavedTime;
@@ -118,7 +118,7 @@ export default function EditorPage() {
           setShowParagraphNumbers(appState.showParagraphNumbers);
         }
       } catch (error) {
-        console.error("Failed to load settings:", error);
+        console.error("設定の読み込みに失敗しました:", error);
       }
     };
 
@@ -132,18 +132,18 @@ export default function EditorPage() {
   const handleParagraphSpacingChange = useCallback((value: number) => {
     setParagraphSpacing(value);
     void persistAppState({ paragraphSpacing: value }).catch((error) => {
-      console.error("Failed to persist paragraph spacing:", error);
+      console.error("段落間隔の保存に失敗しました:", error);
     });
   }, []);
 
   const handleShowParagraphNumbersChange = useCallback((value: boolean) => {
     setShowParagraphNumbers(value);
     void persistAppState({ showParagraphNumbers: value }).catch((error) => {
-      console.error("Failed to persist paragraph numbers setting:", error);
+      console.error("段落番号の設定保存に失敗しました:", error);
     });
   }, []);
 
-   // Auto-dismiss recovery notification after 5 seconds
+   // 復元通知は5秒後に自動で閉じる
    useEffect(() => {
      if (wasAutoRecovered && !dismissedRecovery) {
        const timer = setTimeout(() => {
@@ -154,23 +154,23 @@ export default function EditorPage() {
      }
    }, [wasAutoRecovered, dismissedRecovery]);
 
-   // Handle plain text paste
+   // プレーンテキストとして貼り付け
    const handlePasteAsPlaintext = useCallback(async () => {
      try {
        let text: string | null = null;
        
        if (isElectron && typeof window !== "undefined" && (window as any).electronAPI) {
-         // For Electron, add an IPC call to get clipboard content from main process
-         // For now, use the standard clipboard API if available
-         if (navigator.clipboard && navigator.clipboard.readText) {
-           text = await navigator.clipboard.readText();
-         }
-       } else {
-         // For web, use the clipboard API to get plain text
-         if (navigator.clipboard && navigator.clipboard.readText) {
-           text = await navigator.clipboard.readText();
-         }
-       }
+          // Electron: 将来的にはメインプロセス経由でクリップボード取得（IPC）も検討
+          // ひとまず標準のクリップボードAPIが使える場合はそれを利用する
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            text = await navigator.clipboard.readText();
+          }
+        } else {
+          // Web: クリップボードAPIでプレーンテキストを取得する
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            text = await navigator.clipboard.readText();
+          }
+        }
        
        if (text) {
          const currentContent = contentRef.current;
@@ -178,12 +178,12 @@ export default function EditorPage() {
          setContent(newContent);
          setEditorKey(prev => prev + 1);
        }
-     } catch (error) {
-       console.error("Failed to paste as plain text:", error);
-     }
-   }, [isElectron]);
+      } catch (error) {
+        console.error("プレーンテキストとして貼り付けできませんでした:", error);
+      }
+    }, [isElectron]);
 
-   // Listen for menu paste event (Electron only)
+   // メニューの「プレーンテキストで貼り付け」を受け取る（Electronのみ）
    useEffect(() => {
      if (!isElectron || typeof window === "undefined") return;
 
@@ -207,10 +207,9 @@ export default function EditorPage() {
   const handleInsertText = (text: string) => {
     const currentContent = contentRef.current;
     const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
-    // Note: Heading anchors are now managed by the markdown editor itself
-    // No need for additional processing here
+    // 見出しアンカーはエディタ側で管理するため、ここでの追加処理は不要
     setContent(newContent);
-    // Force editor to remount with new content
+    // 新しい内容で確実に反映させるため、エディタを再マウントする
     setEditorKey(prev => prev + 1);
   };
 
@@ -220,20 +219,20 @@ export default function EditorPage() {
     const target = document.getElementById(anchorId) as HTMLElement | null;
     if (!target) return;
 
-    // Scroll the target line into view
+    // 対象行を表示位置へスクロール
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     
-    // Optional: highlight or focus the element
+    // 任意: フォーカスして視線誘導
     target.focus();
   };
 
    const wordCount = words(content);
    const charCount = chars(content);
 
-   // 計算段落數（以換行符分隔）
+   // 段落数を計算（空行で区切る）
    const paragraphCount = content ? content.split(/\n\n+/).filter(p => p.trim().length > 0).length : 0;
 
-   // Calculate advanced Japanese text statistics
+   // 日本語テキストの詳細統計を算出
    const sentenceCount = countSentences(content);
    const charTypeAnalysis = analyzeCharacterTypes(content);
    const charUsageRates = calculateCharacterUsageRates(charTypeAnalysis);
@@ -242,37 +241,37 @@ export default function EditorPage() {
 
    const fileName = currentFile?.name ?? (isDirty ? "新規ファイル *" : "新規ファイル");
 
-  // Handle keyboard shortcuts: Cmd+S / Ctrl+S to save, Cmd+F / Ctrl+F to search
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-      
-      // Check for Cmd+S (macOS) or Ctrl+S (Windows/Linux) - Save file
-      const isSaveShortcut = isMac
-        ? event.metaKey && event.key === "s"
-        : event.ctrlKey && event.key === "s";
+   // キーボードショートカット: Cmd/Ctrl+S=保存、Cmd/Ctrl+F=検索
+   useEffect(() => {
+     const handleKeyDown = (event: KeyboardEvent) => {
+       const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+       
+       // Cmd+S（macOS）/ Ctrl+S（Windows/Linux）: 保存
+       const isSaveShortcut = isMac
+         ? event.metaKey && event.key === "s"
+         : event.ctrlKey && event.key === "s";
 
-      // Check for Cmd+F (macOS) or Ctrl+F (Windows/Linux) - Search
-      const isSearchShortcut = isMac
-        ? event.metaKey && event.key === "f"
-        : event.ctrlKey && event.key === "f";
+       // Cmd+F（macOS）/ Ctrl+F（Windows/Linux）: 検索
+       const isSearchShortcut = isMac
+         ? event.metaKey && event.key === "f"
+         : event.ctrlKey && event.key === "f";
 
-      // Check for Shift+Cmd+V (macOS) or Shift+Ctrl+V (Windows/Linux) - Paste as plain text
-      const isPasteAsPlaintextShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "v"
-        : event.shiftKey && event.ctrlKey && event.key === "v";
+       // Shift+Cmd+V（macOS）/ Shift+Ctrl+V（Windows/Linux）: プレーンテキスト貼り付け
+       const isPasteAsPlaintextShortcut = isMac
+         ? event.shiftKey && event.metaKey && event.key === "v"
+         : event.shiftKey && event.ctrlKey && event.key === "v";
 
-      if (isSaveShortcut) {
-        event.preventDefault(); // Prevent browser's default save dialog
-        void saveFile();
-      } else if (isSearchShortcut) {
-        event.preventDefault(); // Prevent browser's default find dialog
-        setSearchOpenTrigger(prev => prev + 1); // Trigger search dialog
-      } else if (isPasteAsPlaintextShortcut) {
-        event.preventDefault(); // Prevent default paste behavior
-        void handlePasteAsPlaintext();
-      }
-    };
+       if (isSaveShortcut) {
+         event.preventDefault(); // ブラウザ既定の保存ダイアログを抑止
+         void saveFile();
+       } else if (isSearchShortcut) {
+         event.preventDefault(); // ブラウザ既定の検索ダイアログを抑止
+         setSearchOpenTrigger(prev => prev + 1); // 検索ダイアログを開く
+       } else if (isPasteAsPlaintextShortcut) {
+         event.preventDefault(); // 既定の貼り付け動作を抑止
+         void handlePasteAsPlaintext();
+       }
+     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
@@ -282,10 +281,10 @@ export default function EditorPage() {
 
    return (
      <div className="h-screen flex flex-col overflow-hidden relative">
-       {/* Dynamic title updater */}
+        {/* 動的なタイトル更新 */}
        <TitleUpdater currentFile={currentFile} isDirty={isDirty} />
 
-       {/* Auto-recovery notification (Web only) - fixed position */}
+        {/* 自動復元の通知（Webのみ・固定表示） */}
        {!isElectron && wasAutoRecovered && !dismissedRecovery && (
         <div className="fixed left-0 top-0 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between animate-slide-in-down shadow-lg">
           <div className="flex items-center gap-3">
@@ -345,7 +344,7 @@ export default function EditorPage() {
             />
           </div>
           
-          {/* Save success toast */}
+           {/* 保存完了トースト */}
           {showSaveToast && (
             <div 
               className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-background-elevated border border-border rounded-lg shadow-lg flex items-center gap-2 z-50 ${
