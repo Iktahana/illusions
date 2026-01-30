@@ -1,10 +1,10 @@
 /**
- * Storage abstraction layer types and interfaces.
- * Provides a unified API for Web (IndexedDB) and Electron (SQLite) storage.
+ * ストレージ抽象レイヤの型・インターフェース。
+ * Web（IndexedDB）/ Electron（SQLite）を共通のAPIで扱う。
  */
 
 /**
- * Represents a recent file entry.
+ * 最近使ったファイルの項目。
  */
 export interface RecentFile {
   name: string;
@@ -14,7 +14,7 @@ export interface RecentFile {
 }
 
 /**
- * Application state that needs to persist across sessions.
+ * セッションをまたいで保持したいアプリ状態。
  */
 export interface AppState {
   lastOpenedMdiPath?: string;
@@ -24,17 +24,17 @@ export interface AppState {
 }
 
 /**
- * Editor buffer containing unsaved draft content for crash recovery.
- * For Web environment, can also store FileSystemFileHandle for auto-recovery.
+ * クラッシュ復旧のための、未保存の下書きバッファ。
+ * Web環境では FileSystemFileHandle を保存して自動復元に使う。
  */
 export interface EditorBuffer {
   content: string;
   timestamp: number;
-  fileHandle?: FileSystemFileHandle; // Web only - file handle for continuing previous edit
+  fileHandle?: FileSystemFileHandle; // Webのみ: 前回の編集を継続するためのハンドル
 }
 
 /**
- * Storage session representing all persistent application state.
+ * 永続化するアプリ状態一式。
  */
 export interface StorageSession {
   appState: AppState;
@@ -43,83 +43,83 @@ export interface StorageSession {
 }
 
 /**
- * Core storage service interface that abstracts platform differences.
- * Implementations should handle both Web (IndexedDB) and Electron (SQLite) environments.
+ * プラットフォーム差分を吸収するストレージサービスの中核インターフェース。
+ * 実装は Web（IndexedDB）/ Electron（SQLite）双方を扱う。
  */
 export interface IStorageService {
   /**
-   * Initialize the storage service.
-   * Must be called before any other operations.
+   * ストレージサービスを初期化する。
+   * ほかの操作の前に必ず呼ぶ。
    */
   initialize(): Promise<void>;
 
   /**
-   * Save the complete session state.
-   * This persists app state, recent files, and editor buffer all at once.
+   * セッション状態をまとめて保存する。
+   * appState / recentFiles / editorBuffer を一括で永続化する。
    */
   saveSession(session: StorageSession): Promise<void>;
 
   /**
-   * Load the complete session state.
-   * Returns null if no session exists yet.
+   * セッション状態をまとめて読み込む。
+   * まだ存在しない場合は null を返す。
    */
   loadSession(): Promise<StorageSession | null>;
 
   /**
-   * Save the application state (e.g., last opened file path).
+   * アプリ状態を保存する（例: 最後に開いたファイルパス）。
    */
   saveAppState(appState: AppState): Promise<void>;
 
   /**
-   * Load the application state.
+   * アプリ状態を読み込む。
    */
   loadAppState(): Promise<AppState | null>;
 
   /**
-   * Add a file to the recent files list.
-   * If the file already exists, it will be updated and moved to the front.
-   * The list is kept to a maximum of 10 items.
+   * 最近使ったファイルへ追加する。
+   * 既存なら更新して先頭へ移動する。
+   * リストは最大10件に保つ。
    */
   addToRecent(file: RecentFile): Promise<void>;
 
   /**
-   * Get the list of recent files (up to 10 items).
+   * 最近使ったファイル一覧を取得する（最大10件）。
    */
   getRecentFiles(): Promise<RecentFile[]>;
 
   /**
-   * Remove a file from the recent files list by path.
+   * パスを指定して最近使ったファイルから削除する。
    */
   removeFromRecent(path: string): Promise<void>;
 
   /**
-   * Clear all recent files.
+   * 最近使ったファイルを全削除する。
    */
   clearRecent(): Promise<void>;
 
   /**
-   * Save the editor buffer (unsaved draft content).
+   * エディタバッファ（未保存下書き）を保存する。
    */
   saveEditorBuffer(buffer: EditorBuffer): Promise<void>;
 
   /**
-   * Load the editor buffer.
+   * エディタバッファを読み込む。
    */
   loadEditorBuffer(): Promise<EditorBuffer | null>;
 
   /**
-   * Clear the editor buffer.
+   * エディタバッファを削除する。
    */
   clearEditorBuffer(): Promise<void>;
 
   /**
-   * Clear all data. Use with caution.
+   * すべてのデータを削除する。取り扱い注意。
    */
   clearAll(): Promise<void>;
 }
 
 /**
- * Type guard to determine if we're in Electron environment.
+ * Electron環境かどうかを判定する型ガード。
  */
 export function isElectronEnvironment(): boolean {
   if (typeof window === "undefined") return false;
