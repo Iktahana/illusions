@@ -7,7 +7,7 @@ import {
   Palette, 
   ChevronRight,
   FileText,
-  Plus,
+  RefreshCw,
   X,
   Check
 } from "lucide-react";
@@ -288,6 +288,7 @@ export default function Explorer({
 }
 
 function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: string; onChapterClick?: (anchorId: string) => void; onInsertText?: (text: string) => void }) {
+  const [refreshToken, setRefreshToken] = useState(0);
   // まずDOMから章情報を取得し（より確実）、なければMarkdown解析にフォールバック
   const chapters = useMemo(() => {
     const domChapters = getChaptersFromDOM();
@@ -297,15 +298,24 @@ function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: str
     }
     // それ以外はMarkdownを解析して章情報を作る
     return parseMarkdownChapters(content);
-  }, [content]);
+  }, [content, refreshToken]);
   const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
 
   return (
     <div className="space-y-2 relative">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-foreground-secondary">目次</h3>
-        <button className="p-1 hover:bg-hover rounded">
-          <Plus className="w-4 h-4 text-foreground-secondary" />
+        <button
+          type="button"
+          className="p-1 hover:bg-hover rounded"
+          title="目次を更新"
+          aria-label="目次を更新"
+          onClick={() => {
+            setShowSyntaxHelp(false);
+            setRefreshToken((v) => v + 1);
+          }}
+        >
+          <RefreshCw className="w-4 h-4 text-foreground-secondary" />
         </button>
       </div>
       
