@@ -76,8 +76,15 @@ export function useMdiFile(): UseMdiFileReturn {
       try {
         const storage = getStorageService();
         await storage.initialize();
+        const session = await storage.loadSession();
         const appState = await storage.loadAppState();
         const hasSeenDemo = appState?.hasSeenDemo ?? false;
+        const hasSessionData = Boolean(
+          session &&
+          (Object.keys(session.appState || {}).length > 0 ||
+            session.recentFiles.length > 0 ||
+            session.editorBuffer)
+        );
 
         // Web environment: try to restore file handle from editor buffer
         if (!isElectron) {
@@ -109,8 +116,7 @@ export function useMdiFile(): UseMdiFileReturn {
           }
         }
 
-        const hasLastOpenedPath = Boolean(appState?.lastOpenedMdiPath);
-        if (!hasSeenDemo && !hasLastOpenedPath) {
+        if (!hasSeenDemo && !hasSessionData) {
           const demoContent = await loadDemoContent();
           if (demoContent) {
             setCurrentFile({
