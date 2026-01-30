@@ -98,13 +98,16 @@ export function setScrollProgress(
       progress: clampedProgress,
       maxScroll,
       newScrollLeft,
-      before: container.scrollLeft
+      beforeScrollLeft: container.scrollLeft,
+      scrollWidth: container.scrollWidth,
+      clientWidth: container.clientWidth
     });
     
     container.scrollLeft = newScrollLeft;
     
-    console.debug('[ScrollProgress] After set:', {
-      scrollLeft: container.scrollLeft
+    console.debug('[ScrollProgress] After set (vertical):', {
+      scrollLeft: container.scrollLeft,
+      actualProgress: 1 - (container.scrollLeft / maxScroll)
     });
     
     return true;
@@ -121,13 +124,16 @@ export function setScrollProgress(
       progress: clampedProgress,
       maxScroll,
       newScrollTop,
-      before: container.scrollTop
+      beforeScrollTop: container.scrollTop,
+      scrollHeight: container.scrollHeight,
+      clientHeight: container.clientHeight
     });
     
     container.scrollTop = newScrollTop;
     
-    console.debug('[ScrollProgress] After set:', {
-      scrollTop: container.scrollTop
+    console.debug('[ScrollProgress] After set (horizontal):', {
+      scrollTop: container.scrollTop,
+      actualProgress: container.scrollTop / maxScroll
     });
     
     return true;

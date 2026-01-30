@@ -584,32 +584,37 @@ function MilkdownEditor({
           editorDom.style.transition = 'opacity 0.25s ease-in';
           editorDom.style.opacity = '1';
           
-          // フェードイン後、排版完成を待って目標位置へスクロール（保持相同進度）
-          if (shouldScrollToHeadRef.current && scrollContainerRef.current) {
-            setTimeout(() => {
-              const container = scrollContainerRef.current;
-              if (container && targetScrollProgress !== null && targetScrollProgress !== undefined) {
-                const savedProgress = savedScrollProgressRef.current || 0;
-                
-                console.log('[DEBUG] Apply scroll (animated):', {
-                  isVertical,
-                  savedProgress
-                });
-                
-                // 使用抽象層設置進度（不鏡像，直接使用相同進度）
-                const success = setScrollProgress({ container, isVertical }, savedProgress);
-                
-                if (success) {
-                  console.log('[DEBUG] Scroll applied successfully');
-                } else {
-                  console.log('[DEBUG] No scrollbar, skip scroll');
-                }
-                
-                shouldScrollToHeadRef.current = false;
-                onScrollRestored?.();
-              }
-            }, 250);
-          }
+           // フェードイン後、排版完成を待って目標位置へスクロール（保持相同進度）
+           if (shouldScrollToHeadRef.current && scrollContainerRef.current) {
+             setTimeout(() => {
+               // 再次等待，確保「行間字數」排版完全完成
+               requestAnimationFrame(() => {
+                 requestAnimationFrame(() => {
+                   const container = scrollContainerRef.current;
+                   if (container && targetScrollProgress !== null && targetScrollProgress !== undefined) {
+                     const savedProgress = savedScrollProgressRef.current || 0;
+                     
+                     console.log('[DEBUG] Apply scroll (animated):', {
+                       isVertical,
+                       savedProgress
+                     });
+                     
+                     // 使用抽象層設置進度（不鏡像，直接使用相同進度）
+                     const success = setScrollProgress({ container, isVertical }, savedProgress);
+                     
+                     if (success) {
+                       console.log('[DEBUG] Scroll applied successfully');
+                     } else {
+                       console.log('[DEBUG] No scrollbar, skip scroll');
+                     }
+                     
+                     shouldScrollToHeadRef.current = false;
+                     onScrollRestored?.();
+                   }
+                 });
+               });
+             }, 250);
+           }
         });
       }, 150);
 
@@ -621,35 +626,37 @@ function MilkdownEditor({
       applyStyles();
       editorDom.style.opacity = '1';
       
-      // 等待 DOM 布局完成後再執行滾動
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          // 初回レンダー時、排版完成を待って目標位置へスクロール（保持相同進度）
-          if (shouldScrollToHeadRef.current && scrollContainerRef.current) {
-            const container = scrollContainerRef.current;
-            if (container && targetScrollProgress !== null && targetScrollProgress !== undefined) {
-              const savedProgress = savedScrollProgressRef.current || 0;
-              
-              console.log('[DEBUG] Apply scroll (no anime):', {
-                isVertical,
-                savedProgress
-              });
-              
-              // 使用抽象層設置進度（不鏡像，直接使用相同進度）
-              const success = setScrollProgress({ container, isVertical }, savedProgress);
-              
-              if (success) {
-                console.log('[DEBUG] Scroll applied successfully');
-              } else {
-                console.log('[DEBUG] No scrollbar, skip scroll');
-              }
-              
-              shouldScrollToHeadRef.current = false;
-              onScrollRestored?.();
-            }
-          }
-        });
-      });
+       // 等待 DOM 布局完成後再執行滾動（多次等待確保「行間字數」排版完成）
+       requestAnimationFrame(() => {
+         requestAnimationFrame(() => {
+           requestAnimationFrame(() => {
+             // 初回レンダー時、排版完成を待って目標位置へスクロール（保持相同進度）
+             if (shouldScrollToHeadRef.current && scrollContainerRef.current) {
+               const container = scrollContainerRef.current;
+               if (container && targetScrollProgress !== null && targetScrollProgress !== undefined) {
+                 const savedProgress = savedScrollProgressRef.current || 0;
+                 
+                 console.log('[DEBUG] Apply scroll (no anime):', {
+                   isVertical,
+                   savedProgress
+                 });
+                 
+                 // 使用抽象層設置進度（不鏡像，直接使用相同進度）
+                 const success = setScrollProgress({ container, isVertical }, savedProgress);
+                 
+                 if (success) {
+                   console.log('[DEBUG] Scroll applied successfully');
+                 } else {
+                   console.log('[DEBUG] No scrollbar, skip scroll');
+                 }
+                 
+                 shouldScrollToHeadRef.current = false;
+                 onScrollRestored?.();
+               }
+             }
+           });
+         });
+       });
     }
   }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get, targetScrollProgress, onScrollRestored, savedScrollProgressRef]);
 
