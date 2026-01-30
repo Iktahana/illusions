@@ -1,6 +1,6 @@
 /**
  * milkdown-plugin-japanese-novel
- * Japanese novel support: vertical writing, Ruby, tate-chu-yoko, manuscript style.
+ * 日本語小説向け: 縦書き、ルビ、縦中横、原稿用紙風スタイル
  */
 
 import type { MilkdownPlugin } from '@milkdown/ctx'
@@ -28,7 +28,7 @@ export type { JapaneseNovelOptions } from './config'
 export { calculateManuscriptPages, countCharacters } from './utils'
 
 /**
- * Japanese novel plugin. Use with .use(japaneseNovel({ isVertical, ... })).
+ * 日本語小説向けプラグイン。`.use(japaneseNovel({ isVertical, ... }))` で利用する。
  */
 export function japaneseNovel(
   options: JapaneseNovelOptions = {}
