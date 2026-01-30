@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, X, HelpCircle } from "lucide-react";
+import { useState, useRef, useEffect, ReactNode } from "react";
+import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, X } from "lucide-react";
 import clsx from "clsx";
 
 type Tab = "ai" | "corrections" | "stats";
@@ -77,6 +77,19 @@ export default function Inspector({
   particleAnalysis,
 }: InspectorProps) {
   const [activeTab, setActiveTab] = useState<Tab>("ai");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedTab = window.localStorage.getItem("illusions:rightTab");
+    if (savedTab === "ai" || savedTab === "corrections" || savedTab === "stats") {
+      setActiveTab(savedTab);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("illusions:rightTab", activeTab);
+  }, [activeTab]);
   const [isEditingFileName, setIsEditingFileName] = useState(false);
   const [editedBaseName, setEditedBaseName] = useState(() => getBaseName(fileName));
   const inputRef = useRef<HTMLInputElement>(null);
@@ -431,45 +444,71 @@ function CorrectionItem({
 }
 
 // Tooltip component for info icons
-function InfoTooltip({ content }: { content: string }) {
+function InfoTooltip({ content, className, children }: { content: string; className?: string; children: ReactNode }) {
   const [isVisible, setIsVisible] = useState(false);
-  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0, placement: 'top' as 'top' | 'bottom' });
   const ref = useRef<HTMLSpanElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   
   const handleMouseEnter = () => {
     if (ref.current) {
       const rect = ref.current.getBoundingClientRect();
       setTooltipPos({
-        top: rect.top - 8, // 8px above the icon
+        top: rect.top - 8,
         left: rect.left + rect.width / 2,
+        placement: 'top',
       });
     }
     setIsVisible(true);
   };
+
+  useEffect(() => {
+    if (!isVisible || !tooltipRef.current || !ref.current) return;
+    const tooltipRect = tooltipRef.current.getBoundingClientRect();
+    const iconRect = ref.current.getBoundingClientRect();
+    const margin = 8;
+
+    let left = iconRect.left + iconRect.width / 2;
+    const minLeft = margin + tooltipRect.width / 2;
+    const maxLeft = window.innerWidth - margin - tooltipRect.width / 2;
+    if (left < minLeft) left = minLeft;
+    if (left > maxLeft) left = maxLeft;
+
+    let top = iconRect.top - 8;
+    let placement: 'top' | 'bottom' = 'top';
+    if (top - tooltipRect.height < margin) {
+      top = iconRect.bottom + 8;
+      placement = 'bottom';
+    }
+
+    setTooltipPos({ top, left, placement });
+  }, [isVisible]);
   
   return (
-    <>
-      <span 
-        ref={ref}
-        className="info-tooltip-wrapper"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={() => setIsVisible(false)}
-      >
-        <HelpCircle className="w-3.5 h-3.5 ml-1 text-foreground-tertiary/50 hover:text-accent hover:opacity-100 transition-colors cursor-help" />
-      </span>
+    <span 
+      ref={ref}
+      className={clsx("info-tooltip-wrapper cursor-help", className)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setIsVisible(false)}
+    >
+      {children}
       {isVisible && (
-        <div 
+        <span 
+          ref={tooltipRef}
           className="info-tooltip-content"
           style={{
             position: 'fixed',
             top: `${tooltipPos.top}px`,
             left: `${tooltipPos.left}px`,
+            transform: tooltipPos.placement === 'top'
+              ? 'translateX(-50%) translateY(-100%)'
+              : 'translateX(-50%) translateY(0)'
           }}
         >
           {content}
-        </div>
+        </span>
       )}
-    </>
+    </span>
   );
 }
 
@@ -541,11 +580,29 @@ function StatsPanel({
 
   let paragraphWarning = '';
   let paragraphWarningColor = 'text-foreground-tertiary';
-  if (avgParagraphLength > 150) {
-     paragraphWarning = '⚠️ 段落が長めです。改行を増やすとスマホで読みやすくなります';
+  if (avgParagraphLength >= 300) {
+    paragraphWarning =
+        '一段落に含まれる情報量がやや多いようです。内容のまとまりごとに区切ると、読みやすさが向上するかもしれません。';
     paragraphWarningColor = 'text-amber-600 dark:text-amber-500';
-  } else if (avgParagraphLength > 0 && avgParagraphLength < 50) {
-    paragraphWarning = '✓ テンポが良く、スマホでの読書に適しています';
+
+  } else if (avgParagraphLength >= 200) {
+    paragraphWarning =
+        '読み応えのある段落構成です。公的文書や解説文としては安定していますが、スマホでは少し長く感じられる場合があります。';
+    paragraphWarningColor = 'text-slate-600 dark:text-slate-400';
+
+  } else if (avgParagraphLength >= 120) {
+    paragraphWarning =
+        '段落の長さは標準的で、エッセイや一般的な文章に適した構成です。落ち着いて読み進められます。';
+    paragraphWarningColor = 'text-slate-600 dark:text-slate-400';
+
+  } else if (avgParagraphLength >= 80) {
+    paragraphWarning =
+        '小説向きの自然な段落長です。文章のリズムと情報量のバランスが保たれています。';
+    paragraphWarningColor = 'text-green-600 dark:text-green-500';
+
+  } else if (avgParagraphLength > 0) {
+    paragraphWarning =
+        '段落がコンパクトで、テンポよく読めます。会話やスマホでの読書に向いた構成です。';
     paragraphWarningColor = 'text-green-600 dark:text-green-500';
   }
 
@@ -596,18 +653,19 @@ function StatsPanel({
     };
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 stats-panel">
         {/* 0. 原稿用紙枚数（全体のみ表示、トップに配置） */}
         {!isSelection && (
           <div className="bg-background-secondary rounded-lg p-3 border border-border flex items-center justify-between">
             <div>
               <p className="text-xs text-foreground-tertiary font-medium mb-1 flex items-center">
-                 原稿用紙
-                 <InfoTooltip content="400字詰め原稿用紙（縦書き標準）に換算した枚数" />
+                <InfoTooltip content="400字詰め原稿用紙に換算した枚数">
+                  原稿用紙
+                </InfoTooltip>
               </p>
-              <p className="text-xs text-foreground-tertiary">400字詰（縦書き標準）</p>
+              <p className="text-xs text-foreground-tertiary">400字詰原稿用紙</p>
             </div>
-            <span className="text-3xl font-bold text-accent">{manuscriptPages}枚</span>
+            <span className="text-sm font-bold text-foreground">{manuscriptPages}枚</span>
           </div>
         )}
 
@@ -632,43 +690,64 @@ function StatsPanel({
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-sm text-foreground-secondary whitespace-nowrap">スコア</span>
-                  <InfoTooltip content="文章の読みやすさを100点満点で評価。文の長さや句読点の配置から算出" />
+                  <InfoTooltip
+                    content="文章の読みやすさを100点満点で評価。文の長さや句読点の配置から算出"
+                    className="text-sm text-foreground-secondary whitespace-nowrap"
+                  >
+                    スコア
+                  </InfoTooltip>
                 </div>
                 <div className="flex items-baseline gap-1 flex-shrink-0">
-                  <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{readabilityAnalysis.score}</span>
+                  <span className="text-xl font-bold text-foreground">{readabilityAnalysis.score}</span>
                   <span className="text-xs text-foreground-tertiary">/100</span>
                 </div>
               </div>
               <div className="w-full h-2 bg-background rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-amber-500 to-green-500 transition-all"
-                  style={{ width: `${readabilityAnalysis.score}%` }}
+                <div
+                  className="h-full transition-all"
+                  style={{
+                    width: `${readabilityAnalysis.score}%`,
+                    backgroundColor: `hsl(${50 + (readabilityAnalysis.score / 100) * 70} 85% 50%)`,
+                  }}
                 />
               </div>
               <div className="flex justify-between items-baseline gap-2">
                 <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-sm text-foreground-secondary whitespace-nowrap">難易度</span>
-                  <InfoTooltip content="80点以上：やさしい｜50-79点：普通｜50点未満：難しい" />
+                  <InfoTooltip
+                    content={`80点以上：やさしい
+50-79点：普通
+50点未満：難しい`}
+                    className="text-sm text-foreground-secondary whitespace-nowrap"
+                  >
+                    難易度
+                  </InfoTooltip>
                 </div>
-                <span className={`text-sm font-semibold flex-shrink-0 ${getReadabilityLevelColor(readabilityAnalysis.level)}`}>
+                <span className="text-sm font-semibold text-foreground flex-shrink-0">
                   {getReadabilityLevelLabel(readabilityAnalysis.level)}
                 </span>
               </div>
               <div className="pt-1 border-t border-border space-y-1">
                 <div className="flex justify-between items-baseline text-xs gap-2">
                   <div className="flex items-center gap-1 min-w-0">
-                    <span className="text-foreground-tertiary whitespace-nowrap">一文平均</span>
-                    <InfoTooltip content="1文あたりの平均文字数。40字以上は長め、20字以下は短めの文章" />
+                    <InfoTooltip
+                      content="1文あたりの平均文字数。40字以上は長め、20字以下は短めの文章"
+                      className="text-foreground-tertiary whitespace-nowrap"
+                    >
+                      一文平均
+                    </InfoTooltip>
                   </div>
-                  <span className="text-foreground flex-shrink-0">{readabilityAnalysis.avgSentenceLength}字/文</span>
+                  <span className="text-foreground flex-shrink-0 text-sm">{readabilityAnalysis.avgSentenceLength}字/文</span>
                 </div>
                 <div className="flex justify-between items-baseline text-xs gap-2">
                   <div className="flex items-center gap-1 min-w-0">
-                    <span className="text-foreground-tertiary whitespace-nowrap">句読点間隔</span>
-                    <InfoTooltip content="句読点（、。）の間の平均文字数。15字以下が読みやすい" />
+                    <InfoTooltip
+                      content="句読点（、。）の間の平均文字数。15字以下が読みやすい"
+                      className="text-foreground-tertiary whitespace-nowrap"
+                    >
+                      句読点間隔
+                    </InfoTooltip>
                   </div>
-                  <span className="text-foreground flex-shrink-0">{readabilityAnalysis.avgPunctuationSpacing}字</span>
+                  <span className="text-foreground flex-shrink-0 text-sm">{readabilityAnalysis.avgPunctuationSpacing}字</span>
                 </div>
               </div>
             </div>
@@ -683,43 +762,65 @@ function StatsPanel({
           <div className="space-y-1.5">
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex items-center gap-1 min-w-0">
-                <span className="text-sm text-foreground-secondary whitespace-nowrap">総字数</span>
-                <InfoTooltip content="空白・改行を含むすべての文字数（原稿用紙換算の基準）" />
+                <InfoTooltip
+                  content="空白・改行を含むすべての文字数（原稿用紙換算の基準）"
+                  className="text-sm text-foreground-secondary whitespace-nowrap"
+                >
+                  総字数
+                </InfoTooltip>
               </div>
-              <span className="text-lg font-semibold text-foreground flex-shrink-0">{activeCharCount.toLocaleString()}</span>
+              <span className="text-base font-semibold text-foreground flex-shrink-0">{activeCharCount.toLocaleString()}</span>
             </div>
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex items-center gap-1 min-w-0">
-                <span className="text-sm text-foreground-secondary whitespace-nowrap">文章数</span>
-                <InfoTooltip content="文末の句点（。）で区切られる文の数" />
+                <InfoTooltip
+                  content="文末の句点（。）で区切られる文の数"
+                  className="text-sm text-foreground-secondary whitespace-nowrap"
+                >
+                  文章数
+                </InfoTooltip>
               </div>
-              <span className="text-base font-medium text-foreground flex-shrink-0">{sentenceCount}文</span>
+              <span className="text-sm font-medium text-foreground flex-shrink-0">{sentenceCount}文</span>
             </div>
             {sentenceCount > 0 && (
               <div className="flex justify-between items-baseline gap-2">
                 <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-sm text-foreground-secondary whitespace-nowrap">一文平均</span>
-                  <InfoTooltip content="1文あたりの平均文字数。短いほど読みやすい" />
+                  <InfoTooltip
+                    content="1文あたりの平均文字数。短いほど読みやすい"
+                    className="text-sm text-foreground-secondary whitespace-nowrap"
+                  >
+                    一文平均
+                  </InfoTooltip>
                 </div>
-                <span className="text-base font-medium text-foreground flex-shrink-0">
+                <span className="text-sm font-medium text-foreground flex-shrink-0">
                   {readabilityAnalysis ? `${readabilityAnalysis.avgSentenceLength}字/文` : '-'}
                 </span>
               </div>
             )}
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex items-center gap-1 min-w-0">
-                <span className="text-sm text-foreground-secondary whitespace-nowrap">本文字数</span>
-                <InfoTooltip content="句読点・記号を除いた本文のみの文字数" />
+                <InfoTooltip
+                  content="句読点・記号を除いた本文のみの文字数"
+                  className="text-sm text-foreground-secondary whitespace-nowrap"
+                >
+                  本文字数
+                </InfoTooltip>
               </div>
-              <span className="text-base font-medium text-foreground flex-shrink-0">{pureTextCount.toLocaleString()}</span>
+              <span className="text-sm font-medium text-foreground flex-shrink-0">{pureTextCount.toLocaleString()}</span>
             </div>
             <div className="flex justify-between items-baseline gap-2">
-              <div className="flex items-center gap-1 min-w-0">
-                <span className="text-sm text-foreground-secondary whitespace-nowrap">約物比率</span>
-                <span className="text-xs text-foreground-tertiary">({styleHint})</span>
-                <InfoTooltip content="記号・句読点の割合。15%超：会話文中心、8%未満：地の文中心" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-1">
+                  <InfoTooltip
+                    content="記号・句読点の割合。15%超：会話文中心、8%未満：地の文中心"
+                    className="text-sm text-foreground-secondary whitespace-nowrap"
+                  >
+                    約物比率
+                  </InfoTooltip>
+                </div>
+                <div className="text-xs text-foreground-tertiary">({styleHint})</div>
               </div>
-              <span className="text-base font-medium text-foreground flex-shrink-0">
+              <span className="text-sm font-medium text-foreground flex-shrink-0">
                 {punctuationRatio}%
               </span>
             </div>
@@ -735,35 +836,47 @@ function StatsPanel({
             <div className="space-y-1.5">
               <div className="flex justify-between items-baseline gap-2">
                 <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-sm text-foreground-secondary whitespace-nowrap">漢字</span>
-                  <InfoTooltip content="漢字の使用数と割合。一般的に20-30%が読みやすい" />
+                  <InfoTooltip
+                    content="漢字の使用数と割合。一般的に20-30%が読みやすい"
+                    className="text-sm text-foreground-secondary whitespace-nowrap"
+                  >
+                    漢字
+                  </InfoTooltip>
                 </div>
-                <span className="text-base font-medium text-foreground flex-shrink-0">
+                <span className="text-sm font-medium text-foreground flex-shrink-0">
                   {charTypeAnalysis.kanji} 字 {charUsageRates ? `(${charUsageRates.kanjiRate.toFixed(1)}%)` : ''}
                 </span>
               </div>
               <div className="flex justify-between items-baseline gap-2">
                 <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-sm text-foreground-secondary whitespace-nowrap">ひらがな</span>
-                  <InfoTooltip content="ひらがなの使用数と割合。通常50-70%程度" />
+                  <InfoTooltip
+                    content="ひらがなの使用数と割合。通常50-70%程度"
+                    className="text-sm text-foreground-secondary whitespace-nowrap"
+                  >
+                    ひらがな
+                  </InfoTooltip>
                 </div>
-                <span className="text-base font-medium text-foreground flex-shrink-0">
+                <span className="text-sm font-medium text-foreground flex-shrink-0">
                   {charTypeAnalysis.hiragana} 字 {charUsageRates ? `(${charUsageRates.hiraganaRate.toFixed(1)}%)` : ''}
                 </span>
               </div>
               <div className="flex justify-between items-baseline gap-2">
                 <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-sm text-foreground-secondary whitespace-nowrap">カタカナ</span>
-                  <InfoTooltip content="カタカナの使用数と割合。外来語や擬音語に使用" />
+                  <InfoTooltip
+                    content="カタカナの使用数と割合。外来語や擬音語に使用"
+                    className="text-sm text-foreground-secondary whitespace-nowrap"
+                  >
+                    カタカナ
+                  </InfoTooltip>
                 </div>
-                <span className="text-base font-medium text-foreground flex-shrink-0">
+                <span className="text-sm font-medium text-foreground flex-shrink-0">
                   {charTypeAnalysis.katakana} 字 {charUsageRates ? `(${charUsageRates.katakanaRate.toFixed(1)}%)` : ''}
                 </span>
               </div>
               {charTypeAnalysis.other > 0 && (
                 <div className="flex justify-between items-baseline">
                   <span className="text-sm text-foreground-secondary">その他</span>
-                  <span className="text-base font-medium text-foreground">{charTypeAnalysis.other}字</span>
+                  <span className="text-sm font-medium text-foreground">{charTypeAnalysis.other}字</span>
                 </div>
               )}
               {/* Character distribution bar */}
@@ -833,21 +946,32 @@ function StatsPanel({
           <div className="space-y-1.5">
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex items-center gap-1 min-w-0">
-                <span className="text-sm text-foreground-secondary whitespace-nowrap">段落数</span>
-                <InfoTooltip content="改行で区切られる段落の総数" />
+                <InfoTooltip
+                  content="改行で区切られる段落の総数"
+                  className="text-sm text-foreground-secondary whitespace-nowrap"
+                >
+                  段落数
+                </InfoTooltip>
               </div>
-              <span className="text-lg font-semibold text-foreground flex-shrink-0">{paragraphCount}</span>
+              <span className="text-base font-semibold text-foreground flex-shrink-0">{paragraphCount}</span>
             </div>
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex items-center gap-1 min-w-0">
-                <span className="text-sm text-foreground-secondary whitespace-nowrap">一段落平均</span>
-                <InfoTooltip content="1段落あたりの平均文字数。150字超：長め、50字未満：短め" />
+                <InfoTooltip
+                  content="段落構成の傾向を見るための指標です。良し悪しを示すものではなく、文章設計を振り返るための参考値です。"
+                  className="text-sm text-foreground-secondary whitespace-nowrap"
+                >
+                  一段落平均
+                </InfoTooltip>
               </div>
-              <span className="text-base font-medium text-foreground flex-shrink-0">{avgParagraphLength}字/段</span>
+              <span className="text-sm font-medium text-foreground flex-shrink-0">{avgParagraphLength}字/段</span>
             </div>
            {paragraphWarning && (
-             <div className={`text-xs mt-2 p-2 rounded bg-background border border-border ${paragraphWarningColor}`}>
-               {paragraphWarning}
+             <div className="mt-2">
+               <div className="h-px bg-border" />
+               <small className="mt-2 block text-[10px] text-foreground/50">
+                 Tips: {paragraphWarning}
+               </small>
              </div>
            )}
          </div>
@@ -861,24 +985,36 @@ function StatsPanel({
           <div className="space-y-1.5">
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex items-center gap-1 min-w-0">
-                <span className="text-sm text-foreground-secondary whitespace-nowrap">速読時</span>
-                <InfoTooltip content="分速900字で計算" />
+                <InfoTooltip
+                  content="分速900字で計算"
+                  className="text-sm text-foreground-secondary whitespace-nowrap"
+                >
+                  速読時
+                </InfoTooltip>
               </div>
-              <span className="text-base font-medium text-foreground flex-shrink-0">{fastReadTime}</span>
+              <span className="text-sm font-medium text-foreground flex-shrink-0">{fastReadTime}</span>
             </div>
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex items-center gap-1 min-w-0">
-                <span className="text-sm text-foreground-secondary whitespace-nowrap">通常時</span>
-                <InfoTooltip content="通常の読書速度（分速500字、日本語の平均的な速度）" />
+                <InfoTooltip
+                  content="通常の読書速度（分速500字、日本語の平均的な速度）"
+                  className="text-sm text-foreground-secondary whitespace-nowrap"
+                >
+                  通常時
+                </InfoTooltip>
               </div>
-              <span className="text-base font-medium text-accent flex-shrink-0">{normalReadTime}</span>
+              <span className="text-sm font-medium text-foreground flex-shrink-0">{normalReadTime}</span>
             </div>
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex items-center gap-1 min-w-0">
-                <span className="text-sm text-foreground-secondary whitespace-nowrap">精読時</span>
-                <InfoTooltip content="じっくり読む速度（分速250字で計算）" />
+                <InfoTooltip
+                  content="じっくり読む速度（分速250字で計算）"
+                  className="text-sm text-foreground-secondary whitespace-nowrap"
+                >
+                  精読時
+                </InfoTooltip>
               </div>
-              <span className="text-base font-medium text-foreground flex-shrink-0">{deepReadTime}</span>
+              <span className="text-sm font-medium text-foreground flex-shrink-0">{deepReadTime}</span>
             </div>
           </div>
         </div>

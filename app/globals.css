@@ -283,15 +283,6 @@ html:not(.dark) {
   color: var(--foreground-secondary);
 }
 
-.stats-header::before,
-.stats-header::after {
-  content: '【';
-  color: var(--foreground-tertiary);
-}
-
-.stats-header::after {
-  content: '】';
-}
 
 /* Tooltip styles for info icons */
 .info-tooltip-wrapper {
@@ -300,9 +291,19 @@ html:not(.dark) {
   align-items: center;
 }
 
+/* Statistics panel text opacity */
+.stats-panel {
+  --stats-text: color-mix(in srgb, var(--foreground) 80%, transparent);
+}
+
+.stats-panel,
+.stats-panel * {
+  color: var(--stats-text) !important;
+}
+
+
 .info-tooltip-content {
   position: fixed;
-  transform: translateX(-50%) translateY(-100%);
   padding: 8px 12px;
   background: var(--background-elevated);
   border: 1px solid var(--border);
@@ -311,7 +312,10 @@ html:not(.dark) {
   font-size: 12px;
   line-height: 1.5;
   color: var(--foreground);
-  white-space: nowrap;
+  max-width: 240px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   pointer-events: none;
   z-index: 9999;
   animation: tooltip-fade-in 0.2s ease-out forwards;
@@ -324,10 +328,8 @@ html:not(.dark) {
 @keyframes tooltip-fade-in {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-90%);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(-100%);
   }
 }

@@ -205,6 +205,19 @@ export default function Explorer({
 }: ExplorerProps) {
   const [activeTab, setActiveTab] = useState<Tab>("chapters");
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedTab = window.localStorage.getItem("illusions:leftTab");
+    if (savedTab === "chapters" || savedTab === "settings" || savedTab === "style") {
+      setActiveTab(savedTab);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("illusions:leftTab", activeTab);
+  }, [activeTab]);
+
   return (
     <aside className={clsx("h-full bg-background border-r border-border flex flex-col", className)}>
       {/* Tab Navigation */}
