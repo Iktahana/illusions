@@ -21,24 +21,24 @@ export default function SelectionCounter({ editorView, isVertical = false }: Sel
       const { selection } = state;
       const { from, to } = selection;
 
-      // Update position if mouse event is provided
+      // マウスイベントがある場合は表示位置も更新する
       if (event && event instanceof MouseEvent) {
-        // Get the editor container's bounding rect
+        // エディタ領域の位置を取得
         const editorContainer = editorView.dom.closest('.flex-1') as HTMLElement;
         if (editorContainer) {
           const rect = editorContainer.getBoundingClientRect();
           
           if (isVertical) {
-            // In vertical mode, position based on X axis (horizontal position in vertical text)
-            // Show at the bottom of the screen, aligned with mouse X position
+            // 縦書き: X軸（横方向）基準で位置を決める
+            // 画面下部に固定し、マウスのX位置に合わせる
             setPosition({
-              bottom: 16, // 16px from bottom edge of viewport
-              left: event.clientX, // Follow horizontal mouse position
+              bottom: 16, // ビューポート下端から 16px
+              left: event.clientX, // マウスの横位置に追従
             });
           } else {
-            // In horizontal mode, position based on X/Y as before
+            // 横書き: 従来通りX/Y基準
             const topPosition = event.clientY;
-            const rightPosition = window.innerWidth - rect.right + 16; // 16px from editor's right edge
+            const rightPosition = window.innerWidth - rect.right + 16; // エディタ右端から 16px
             
             setPosition({
               top: topPosition,
@@ -48,38 +48,38 @@ export default function SelectionCounter({ editorView, isVertical = false }: Sel
         }
       }
 
-      // Only show count when there's a selection
+      // 選択がない場合は非表示
       if (from === to) {
         setIsVisible(false);
-        // Delay clearing the count to allow fade out animation
+        // フェードアウトのため、少し遅らせてカウントを消す
         setTimeout(() => setSelectionCount(0), 300);
         return;
       }
 
-      // Get selected text
+      // 選択文字列を取得
       const selectedText = state.doc.textBetween(from, to);
       
-      // Count characters (excluding whitespace, matching the app's char counting logic)
+      // 文字数を数える（空白除外。アプリのカウント方法に合わせる）
       const count = selectedText.replace(/\s/g, "").length;
       setSelectionCount(count);
       setIsVisible(true);
     };
 
-    // Listen to selection changes
+    // 選択変更を購読
     const editorDom = editorView.dom;
     
     const handleMouseUp = (e: MouseEvent) => {
-      // Use setTimeout to ensure selection is finalized
+      // 選択確定を待つ
       setTimeout(() => updateSelectionCount(e), 10);
     };
 
     const handleKeyUp = () => {
-      // For keyboard selections, use the last known position
+      // キーボード選択は直近の位置を使う
       setTimeout(() => updateSelectionCount(), 10);
     };
 
     const handleSelectionChange = () => {
-      // Handle native selection change events (for click-drag, triple-click, etc.)
+      // ネイティブの selectionchange（ドラッグ/三連クリック等）を扱う
       setTimeout(() => updateSelectionCount(), 10);
     };
     
@@ -87,7 +87,7 @@ export default function SelectionCounter({ editorView, isVertical = false }: Sel
     editorDom.addEventListener("keyup", handleKeyUp);
     document.addEventListener("selectionchange", handleSelectionChange);
 
-    // Initial check
+    // 初期値
     updateSelectionCount();
 
     return () => {
@@ -97,7 +97,7 @@ export default function SelectionCounter({ editorView, isVertical = false }: Sel
     };
   }, [editorView]);
 
-  // Don't render if no selection
+  // 選択がない場合は描画しない
   if (selectionCount === 0 && !isVisible) {
     return null;
   }
