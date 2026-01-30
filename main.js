@@ -1,6 +1,5 @@
 /* eslint-disable no-console */
-// Electron main process entry.
-// Comments in code must be in English.
+// Electron のメインプロセス入口
 
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron')
 const path = require('path')
@@ -18,24 +17,24 @@ const isDev =
 
 const APP_NAME = 'Illusions'
 
-// Configure auto-updater logging
+// auto-updater のログ設定
 autoUpdater.logger = log
 autoUpdater.logger.transports.file.level = 'info'
 
 let mainWindow = null
 let isManualUpdateCheck = false
 
-// Setup auto-update event handlers
+// auto-updater のイベントハンドラ設定
 function setupAutoUpdater() {
-  // Only check for updates in production
+  // 開発モードではアップデート確認をしない
   if (isDev) {
-    log.info('Auto-updater disabled in development mode')
+    log.info('開発モードのため auto-updater は無効です')
     return
   }
 
-  // Event: Update available
+  // イベント: アップデートあり
   autoUpdater.on('update-available', (info) => {
-    log.info('Update available:', info)
+    log.info('アップデートが見つかりました:', info)
     if (mainWindow) {
       dialog
         .showMessageBox(mainWindow, {
@@ -46,15 +45,15 @@ function setupAutoUpdater() {
           buttons: ['OK'],
         })
         .then(() => {
-          // Start downloading the update
+          // ダウンロード開始
           autoUpdater.downloadUpdate()
         })
     }
   })
 
-  // Event: Update downloaded
+  // イベント: ダウンロード完了
   autoUpdater.on('update-downloaded', (info) => {
-    log.info('Update downloaded:', info)
+    log.info('アップデートのダウンロードが完了しました:', info)
     if (mainWindow) {
       dialog
         .showMessageBox(mainWindow, {
@@ -68,16 +67,16 @@ function setupAutoUpdater() {
         })
         .then((result) => {
           if (result.response === 0) {
-            // User clicked "Restart Now"
+            // 「今すぐ再起動」
             autoUpdater.quitAndInstall()
           }
         })
     }
   })
 
-  // Event: Error occurred
+  // イベント: エラー
   autoUpdater.on('error', (error) => {
-    log.error('Update error:', error)
+    log.error('アップデートでエラーが発生しました:', error)
     if (isManualUpdateCheck && mainWindow) {
       dialog.showMessageBox(mainWindow, {
         type: 'error',
@@ -90,14 +89,14 @@ function setupAutoUpdater() {
     isManualUpdateCheck = false
   })
 
-  // Event: Checking for update
+  // イベント: 確認中
   autoUpdater.on('checking-for-update', () => {
-    log.info('Checking for updates...')
+    log.info('アップデートを確認しています...')
   })
 
-  // Event: Update not available
+  // イベント: アップデートなし
   autoUpdater.on('update-not-available', (info) => {
-    log.info('Update not available:', info)
+    log.info('アップデートはありません:', info)
     if (isManualUpdateCheck && mainWindow) {
       dialog.showMessageBox(mainWindow, {
         type: 'info',
@@ -110,14 +109,14 @@ function setupAutoUpdater() {
     isManualUpdateCheck = false
   })
 
-  // Event: Download progress
+  // イベント: ダウンロード進捗
   autoUpdater.on('download-progress', (progressObj) => {
-    const logMessage = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`
+    const logMessage = `ダウンロード速度: ${progressObj.bytesPerSecond} - 進捗: ${progressObj.percent}%`
     log.info(logMessage)
   })
 }
 
-// Check for updates (manual or automatic)
+// アップデート確認（手動/自動）
 function checkForUpdates(manual = false) {
   if (isDev) {
     if (manual && mainWindow) {
@@ -141,7 +140,7 @@ function buildApplicationMenu() {
 
   const template = []
 
-  // App menu (macOS only)
+  // アプリ（macOSのみ）
   if (isMac) {
     template.push({
       label: APP_NAME,
@@ -159,7 +158,7 @@ function buildApplicationMenu() {
     })
   }
 
-  // File menu
+  // ファイル
   template.push({
     label: 'ファイル',
     submenu: [
@@ -205,8 +204,8 @@ function buildApplicationMenu() {
     ],
   })
 
-   // Edit menu
-   template.push({
+  // 編集
+  template.push({
      label: '編集',
      submenu: [
        { role: 'undo', label: '元に戻す' },
@@ -227,7 +226,7 @@ function buildApplicationMenu() {
      ],
    })
 
-  // View menu
+  // 表示
   template.push({
     label: '表示',
     submenu: [
@@ -243,7 +242,7 @@ function buildApplicationMenu() {
     ],
   })
 
-  // Window menu (macOS only)
+  // ウィンドウ（macOSのみ）
   if (isMac) {
     template.push({
       label: 'ウィンドウ',
@@ -258,7 +257,7 @@ function buildApplicationMenu() {
     })
   }
 
-  // Help menu
+  // ヘルプ
   template.push({
     label: 'ヘルプ',
     submenu: [
@@ -297,7 +296,7 @@ function createMainWindow() {
     mainWindow?.show()
   })
 
-  // Handle window close with unsaved changes check
+  // 未保存の変更がある場合は終了前に保存を促す
   mainWindow.on('close', (event) => {
     if (mainWindow.isDocumentEdited()) {
       event.preventDefault()
@@ -309,11 +308,11 @@ function createMainWindow() {
     mainWindow.loadURL('http://localhost:3000')
     mainWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
-    // Next.js static export output.
+    // Next.js の静的出力
     mainWindow.loadFile(path.join(__dirname, 'out', 'index.html'))
   }
 
-  // Set up application menu
+  // アプリメニューを設定
   const menu = Menu.buildFromTemplate(buildApplicationMenu())
   Menu.setApplicationMenu(menu)
 }
@@ -336,7 +335,7 @@ async function installQuickLookPluginIfNeeded() {
     await fs.stat(markerPath)
     return
   } catch {
-    // Continue with install.
+    // インストール処理を続行
   }
 
   const sourcePath = path.join(
@@ -349,7 +348,7 @@ async function installQuickLookPluginIfNeeded() {
   try {
     await fs.stat(sourcePath)
   } catch (error) {
-    log.warn('Quick Look plugin missing in app resources:', error)
+    log.warn('アプリリソース内に Quick Look プラグインが見つかりません:', error)
     return
   }
 
@@ -362,9 +361,9 @@ async function installQuickLookPluginIfNeeded() {
     await fs.cp(sourcePath, destPath, { recursive: true })
     await execFileAsync('/usr/bin/qlmanage', ['-r'])
     await fs.writeFile(markerPath, new Date().toISOString())
-    log.info('Quick Look plugin installed.')
+    log.info('Quick Look プラグインをインストールしました')
   } catch (error) {
-    log.warn('Quick Look install failed:', error)
+    log.warn('Quick Look のインストールに失敗しました:', error)
   }
 }
 
@@ -378,9 +377,9 @@ ipcMain.handle('open-file', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ['openFile'],
     filters: [
-      { name: 'MDI Document', extensions: ['mdi'] },
+      { name: 'MDI 文書', extensions: ['mdi'] },
       { name: 'Markdown', extensions: ['md'] },
-      { name: 'All Files', extensions: ['*'] },
+      { name: 'すべてのファイル', extensions: ['*'] },
     ],
   })
   if (canceled || !filePaths[0]) return null
@@ -394,9 +393,9 @@ ipcMain.handle('save-file', async (_event, filePath, content) => {
   if (!target) {
     const result = await dialog.showSaveDialog({
       filters: [
-        { name: 'MDI Document', extensions: ['mdi'] },
+        { name: 'MDI 文書', extensions: ['mdi'] },
         { name: 'Markdown', extensions: ['md'] },
-        { name: 'All Files', extensions: ['*'] },
+        { name: 'すべてのファイル', extensions: ['*'] },
       ],
       defaultPath: 'untitled.mdi',
     })
@@ -408,14 +407,14 @@ ipcMain.handle('save-file', async (_event, filePath, content) => {
 })
 
 ipcMain.handle('set-dirty', (_event, dirty) => {
-  // Track dirty state for window close handling
+  // ウィンドウ終了時の判定用に dirty 状態を保持する
   if (mainWindow) {
     mainWindow.setDocumentEdited(dirty)
   }
 })
 
 ipcMain.handle('save-before-close-done', () => {
-  // Close window after save is complete
+  // 保存完了後にウィンドウを閉じる
   if (mainWindow) {
     mainWindow.destroy()
   }
@@ -425,10 +424,10 @@ app.whenReady().then(() => {
   createMainWindow()
   installQuickLookPluginIfNeeded()
 
-  // Initialize auto-updater after window is created
+  // ウィンドウ作成後に auto-updater を初期化
   setupAutoUpdater()
 
-  // Auto-check for updates on startup (after a short delay)
+  // 起動時に自動でアップデート確認（少し遅らせる）
   setTimeout(() => {
     checkForUpdates(false)
   }, 3000)
