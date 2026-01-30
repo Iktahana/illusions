@@ -433,20 +433,43 @@ function CorrectionItem({
 // Tooltip component for info icons
 function InfoTooltip({ content }: { content: string }) {
   const [isVisible, setIsVisible] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+  const ref = useRef<HTMLSpanElement>(null);
+  
+  const handleMouseEnter = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setTooltipPos({
+        top: rect.top - 8, // 8px above the icon
+        left: rect.left + rect.width / 2,
+      });
+    }
+    setIsVisible(true);
+  };
   
   return (
-    <span 
-      className="info-tooltip-wrapper"
-      onMouseEnter={() => setIsVisible(true)}
-      onMouseLeave={() => setIsVisible(false)}
-    >
-      <HelpCircle className="w-3.5 h-3.5 ml-1 text-foreground-tertiary hover:text-accent transition-colors cursor-help" />
+    <>
+      <span 
+        ref={ref}
+        className="info-tooltip-wrapper"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setIsVisible(false)}
+      >
+        <HelpCircle className="w-3.5 h-3.5 ml-1 text-foreground-tertiary/50 hover:text-accent hover:opacity-100 transition-colors cursor-help" />
+      </span>
       {isVisible && (
-        <span className="info-tooltip-content">
+        <div 
+          className="info-tooltip-content"
+          style={{
+            position: 'fixed',
+            top: `${tooltipPos.top}px`,
+            left: `${tooltipPos.left}px`,
+          }}
+        >
           {content}
-        </span>
+        </div>
       )}
-    </span>
+    </>
   );
 }
 

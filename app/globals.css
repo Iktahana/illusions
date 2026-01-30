@@ -301,11 +301,8 @@ html:not(.dark) {
 }
 
 .info-tooltip-content {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 8px;
+  position: fixed;
+  transform: translateX(-50%) translateY(-100%);
   padding: 8px 12px;
   background: var(--background-elevated);
   border: 1px solid var(--border);
@@ -316,17 +313,21 @@ html:not(.dark) {
   color: var(--foreground);
   white-space: nowrap;
   pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.2s, visibility 0.2s;
   z-index: 9999;
+  animation: tooltip-fade-in 0.2s ease-out forwards;
 }
 
 .dark .info-tooltip-content {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
 }
 
-.info-tooltip-wrapper:hover .info-tooltip-content {
-  opacity: 1;
-  visibility: visible;
+@keyframes tooltip-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-90%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-100%);
+  }
 }
