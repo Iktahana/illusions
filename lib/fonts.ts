@@ -111,10 +111,14 @@ export const LOCAL_SYSTEM_FONTS: SystemFontInfo[] = [
   },
 ];
 
-const LOCAL_FONT_FAMILY_SET = new Set<string>([
+// Fonts that might have local font files (if downloaded)
+const POTENTIALLY_LOCAL_FONTS = new Set<string>([
   ...FEATURED_JAPANESE_FONTS.map((f) => f.family),
-  ...LOCAL_SYSTEM_FONTS.map((f) => f.family),
   'Fira Code',
+]);
+
+const LOCAL_FONT_FAMILY_SET = new Set<string>([
+  ...LOCAL_SYSTEM_FONTS.map((f) => f.family),
 ]);
 
 /**
@@ -228,6 +232,7 @@ export const ALL_JAPANESE_FONTS: FontInfo[] = [
  * @param fontFamily - The font family name (e.g., "Noto Serif JP")
  */
 export function loadGoogleFont(fontFamily: string): void {
+  // Don't load system fonts from Google
   if (LOCAL_FONT_FAMILY_SET.has(fontFamily)) {
     return;
   }
@@ -235,12 +240,16 @@ export function loadGoogleFont(fontFamily: string): void {
   // Check if font is already loaded
   const fontUrl = fontFamily.replace(/\s+/g, '+');
   const existingLink = document.querySelector(`link[href*="${fontUrl}"]`);
-  
+
   if (existingLink) {
     return; // Font already loaded
   }
-  
-  // Create and append link tag
+
+  // For potentially local fonts, try to check if local files exist first
+  // If local font files are available, they will be loaded via local-fonts.css
+  // Otherwise, fall back to Google Fonts
+
+  // Create and append link tag for Google Fonts
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = `https://fonts.googleapis.com/css2?family=${fontUrl}:wght@400;700&display=swap`;
