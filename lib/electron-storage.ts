@@ -1,6 +1,6 @@
 /**
- * Electron Storage Provider using IPC to communicate with main process.
- * Used in renderer process to access SQLite storage managed by main process.
+ * Electron 用ストレージ実装（IPC 経由でメインプロセスと通信）。
+ * レンダラ側から、メインプロセスが管理する SQLite ストレージへアクセスする。
  */
 
 import type {
@@ -16,15 +16,14 @@ export class ElectronStorageProvider implements IStorageService {
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
-    // IPC-based storage doesn't require explicit initialization
-    // since the main process handles database setup
+    // IPC 経由のため、明示的な初期化は不要（DB準備はメインプロセス側で行う）
     this.initialized = true;
   }
 
   private getElectronAPI() {
     const electronAPI = (window as Window & { electronAPI?: { storage?: unknown } }).electronAPI;
     if (!electronAPI?.storage) {
-      throw new Error("Electron storage API not available");
+      throw new Error("Electron の storage API が利用できません");
     }
     return electronAPI.storage as {
       saveSession: (session: StorageSession) => Promise<void>;
