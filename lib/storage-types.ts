@@ -21,6 +21,8 @@ export interface AppState {
   paragraphSpacing?: number;
   showParagraphNumbers?: boolean;
   hasSeenDemo?: boolean;
+  sidebarTab?: "chapters" | "settings" | "style";
+  inspectorTab?: "ai" | "corrections" | "stats";
 }
 
 /**
