@@ -5,15 +5,15 @@ import { headingAttr } from '@milkdown/preset-commonmark'
 import { $nodeSchema } from '@milkdown/utils'
 
 /**
- * Generate heading ID from title content using URL encoding
+ * 見出しの内容からアンカーIDを生成する（URLエンコード）
  */
 function generateHeadingIdFromTitle(title: string): string {
-  // Remove markdown formatting and trim
+  // Markdown記法を除去して整形
   const cleanTitle = title
     .replace(/[*_~`\[\]()]/g, '')
     .trim();
   
-  // URL encode the title
+  // URLエンコード
   return encodeURIComponent(cleanTitle);
 }
 
@@ -63,7 +63,7 @@ export const headingAnchorSchema = $nodeSchema('heading', (ctx) => {
       },
     })),
     toDOM: (node) => {
-      // ID should be set by headingIdFixer plugin via appendTransaction
+      // ID は headingIdFixer が appendTransaction 経由で設定する
       const id = node.attrs.id as string
       return [
         `h${node.attrs.level}`,
@@ -79,7 +79,7 @@ export const headingAnchorSchema = $nodeSchema('heading', (ctx) => {
       runner: (state, node, type) => {
         const depth = node.depth as number
         
-        // Extract text content from heading to generate ID
+        // 見出しの本文からID生成用テキストを抽出
         let textContent = ''
         if (node.children && Array.isArray(node.children)) {
           textContent = node.children
@@ -87,7 +87,7 @@ export const headingAnchorSchema = $nodeSchema('heading', (ctx) => {
             .join('')
         }
         
-        // Generate ID from heading text content
+        // 見出しテキストからIDを生成
         const id = generateHeadingIdFromTitle(textContent)
         
         state.openNode(type, { level: depth, id })
@@ -98,7 +98,7 @@ export const headingAnchorSchema = $nodeSchema('heading', (ctx) => {
     toMarkdown: {
       match: (node) => node.type.name === 'heading',
       runner: (state, node) => {
-        // Simply serialize heading without any ID suffix
+        // ID などの付加情報なしで見出しをシリアライズ
         state.openNode('heading', undefined, { depth: node.attrs.level })
         serializeText(state, node)
         state.closeNode()
