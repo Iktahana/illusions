@@ -26,7 +26,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
   const [showReplace, setShowReplace] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Focus search input when dialog opens
+  // ダイアログ表示時に検索入力へフォーカスする
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
       searchInputRef.current.focus();
@@ -34,7 +34,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
     }
   }, [isOpen]);
 
-  // Search for matches in the document
+  // 文書内の一致箇所を検索する
   useEffect(() => {
     if (!editorView || !searchTerm) {
       setMatches([]);
@@ -46,20 +46,20 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
     const { doc } = state;
     const foundMatches: SearchMatch[] = [];
 
-    // Get the entire document text
+    // 文書全体の文字列
     const docText = doc.textContent;
     const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
     const textToSearch = caseSensitive ? docText : docText.toLowerCase();
 
     let searchIndex = 0;
 
-    // Search through the entire document
+    // 文書全体を走査
     while (searchIndex < textToSearch.length) {
       const matchIndex = textToSearch.indexOf(searchStr, searchIndex);
       if (matchIndex === -1) break;
 
-      // Find the actual position in the document
-      const from = matchIndex + 1; // ProseMirror uses 1-based positions
+      // ProseMirror 上の位置に変換
+      const from = matchIndex + 1; // ProseMirror は 1 始まり
       const to = from + searchTerm.length;
 
       foundMatches.push({ from, to });
@@ -70,7 +70,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
     setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1);
   }, [searchTerm, caseSensitive, editorView]);
 
-  // Scroll to and highlight current match
+  // 現在の一致箇所へ移動し、選択表示する
   useEffect(() => {
     if (!editorView || currentMatchIndex === -1 || matches.length === 0) {
       return;
@@ -79,14 +79,14 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
     const match = matches[currentMatchIndex];
     if (!match) return;
 
-    // Set selection to the current match
+    // 一致箇所を選択
     const { state, dispatch } = editorView;
     const tr = state.tr.setSelection(
       TextSelection.create(state.doc, match.from, match.to)
     );
     dispatch(tr);
 
-    // Scroll into view
+    // 表示位置へスクロール
     editorView.focus();
     const coords = editorView.coordsAtPos(match.from);
     if (coords) {
@@ -113,7 +113,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
     const match = matches[currentMatchIndex];
     const { state, dispatch } = editorView;
     
-    // Replace the text at the current match position
+    // 現在の一致箇所を置換
     const tr = state.tr.replaceWith(
       match.from,
       match.to,
@@ -121,7 +121,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
     );
     dispatch(tr);
 
-    // Update search to find new matches
+    // 再検索して一致箇所を更新
     setSearchTerm(searchTerm + " "); // Trigger re-search
     setTimeout(() => setSearchTerm(searchTerm.trim()), 0);
   };
@@ -132,7 +132,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
     const { state, dispatch } = editorView;
     let tr = state.tr;
 
-    // Replace all matches in reverse order to maintain positions
+    // 位置ずれを避けるため、後ろから順に置換する
     for (let i = matches.length - 1; i >= 0; i--) {
       const match = matches[i];
       tr = tr.replaceWith(
@@ -144,7 +144,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
 
     dispatch(tr);
 
-    // Clear search
+    // 検索状態をクリア
     setSearchTerm("");
     setReplaceTerm("");
     setMatches([]);
@@ -183,7 +183,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
         </button>
       </div>
 
-      {/* Search Input */}
+      {/* 検索入力 */}
       <div className="mb-2">
         <div className="relative">
           <input
@@ -220,7 +220,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
         </div>
       </div>
 
-      {/* Options */}
+      {/* オプション */}
       <div className="mb-3 flex items-center gap-4">
         <label className="flex items-center gap-2 text-xs text-foreground-secondary cursor-pointer">
           <input
@@ -239,7 +239,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
         </button>
       </div>
 
-      {/* Replace Section */}
+      {/* 置換 */}
       {showReplace && (
         <div className="space-y-2 pt-2 border-t border-border">
           <input
@@ -280,7 +280,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
         </div>
       )}
 
-      {/* Shortcuts hint */}
+      {/* ショートカット */}
       <div className="mt-3 pt-2 border-t border-border text-xs text-foreground-tertiary">
         <div>Enter: 次へ / Shift+Enter: 前へ / Esc: 閉じる</div>
       </div>
