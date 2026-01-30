@@ -12,7 +12,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Initialize theme from what's already set in the DOM to avoid flash
+  // ちらつきを避けるため、DOMの状態を初期値として使う
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === "undefined") return "light";
     return document.documentElement.classList.contains("dark") ? "dark" : "light";
@@ -21,12 +21,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
-    // Sync state with what's already in the DOM (set by inline script)
+    // inline script が設定済みの値と状態を同期する
     const stored = localStorage.getItem("theme") as Theme | null;
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const initialTheme = stored || (prefersDark ? "dark" : "light");
     setTheme(initialTheme);
-    // DOM class is already set by inline script, no need to set again
+    // DOM class は inline script 側で設定済みのため、ここでは再設定しない
   }, []);
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    throw new Error("useTheme must be used within a ThemeProvider");
+    throw new Error("useTheme は ThemeProvider の内側で使用してください");
   }
   return context;
 }
