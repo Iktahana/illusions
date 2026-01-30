@@ -166,7 +166,7 @@ interface ExplorerProps {
   content?: string;
   onChapterClick?: (anchorId: string) => void;
   onInsertText?: (text: string) => void;
-  // Style settings
+  // 表示設定
   fontScale?: number;
   onFontScaleChange?: (scale: number) => void;
   lineHeight?: number;
@@ -220,7 +220,7 @@ export default function Explorer({
 
   return (
     <aside className={clsx("h-full bg-background border-r border-border flex flex-col", className)}>
-      {/* Tab Navigation */}
+      {/* タブ */}
       <div className="h-12 border-b border-border flex items-center">
         <button
           onClick={() => setActiveTab("chapters")}
@@ -260,7 +260,7 @@ export default function Explorer({
         </button>
       </div>
 
-      {/* Content */}
+      {/* 内容 */}
       <div className="flex-1 overflow-y-auto p-4">
         {activeTab === "chapters" && <ChaptersPanel content={content} onChapterClick={onChapterClick} onInsertText={onInsertText} />}
         {activeTab === "settings" && <SettingsPanel />}
@@ -288,14 +288,14 @@ export default function Explorer({
 }
 
 function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: string; onChapterClick?: (anchorId: string) => void; onInsertText?: (text: string) => void }) {
-  // Try to get chapters from DOM first (more reliable), fallback to markdown parsing
+  // まずDOMから章情報を取得し（より確実）、なければMarkdown解析にフォールバック
   const chapters = useMemo(() => {
     const domChapters = getChaptersFromDOM();
-    // If we get chapters from DOM and they have anchor IDs, use them
+    // DOM側でアンカーIDが取れるなら、それを優先して使う
     if (domChapters.length > 0 && domChapters.some(ch => ch.anchorId)) {
       return domChapters;
     }
-    // Otherwise fall back to parsing markdown
+    // それ以外はMarkdownを解析して章情報を作る
     return parseMarkdownChapters(content);
   }, [content]);
   const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
@@ -309,7 +309,7 @@ function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: str
         </button>
       </div>
       
-      {/* Chapter List */}
+      {/* 章リスト */}
       <div className="space-y-1">
         {chapters.length > 0 ? (
             chapters.map((chapter, index) => (
@@ -339,7 +339,7 @@ function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: str
         + 新しい章を追加
       </button>
 
-      {/* Markdown Syntax Help Panel */}
+      {/* Markdown 記法ヘルプ */}
       {showSyntaxHelp && (
         <MarkdownSyntaxPanel 
           onClose={() => setShowSyntaxHelp(false)}
@@ -369,7 +369,7 @@ function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; o
         className="bg-background rounded-lg shadow-2xl border border-border w-[500px] max-h-[80vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* ヘッダー */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background-secondary">
           <h3 className="text-sm font-semibold text-foreground">
             章の見出しを追加
@@ -382,7 +382,7 @@ function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; o
           </button>
         </div>
 
-        {/* Content */}
+        {/* 内容 */}
         <div className="flex-1 overflow-y-auto p-4">
           <div className="space-y-2">
             {syntaxExamples.map((item, index) => (
@@ -412,7 +412,7 @@ function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; o
             ))}
           </div>
 
-          {/* Additional Tips */}
+          {/* 補足 */}
           <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
             <h4 className="text-xs font-semibold text-blue-800 mb-2">💡 ヒント</h4>
             <ul className="text-xs text-blue-700 space-y-1">
@@ -436,11 +436,11 @@ function ChapterItem({
   isActive?: boolean;
   onClick?: () => void;
 }) {
-  const indent = (chapter.level - 1) * 12; // Indent based on heading level
+  const indent = (chapter.level - 1) * 12; // 見出しレベルに応じてインデント
   const href = chapter.anchorId ? `#${chapter.anchorId}` : undefined;
   
-  // Calculate font size based on heading level (h1 to h6)
-  // CSS default sizes: h1=2em, h2=1.5em, h3=1.17em, h4=1em, h5=0.83em, h6=0.67em
+  // 見出しレベル（h1〜h6）に応じたフォントサイズ
+  // CSS既定: h1=2em, h2=1.5em, h3=1.17em, h4=1em, h5=0.83em, h6=0.67em
   return (
     <a
       href={href}
@@ -484,7 +484,7 @@ function SettingsPanel() {
         </label>
         <input
           type="text"
-          placeholder="作者名"
+          placeholder="著者名"
           className="w-full px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground"
         />
       </div>
@@ -552,7 +552,7 @@ function FontSelector({
     [systemFonts, value]
   );
 
-  // Close dropdown when clicking outside
+  // 外側クリックでドロップダウンを閉じる
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -563,7 +563,7 @@ function FontSelector({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Preload featured fonts
+  // おすすめフォントを先読み
   useEffect(() => {
     FEATURED_JAPANESE_FONTS.forEach((font: FontInfo) => {
       loadGoogleFont(font.family);
@@ -581,7 +581,7 @@ function FontSelector({
     setSearchTerm('');
   };
 
-  // Filter fonts based on search term (search both family name and localized name)
+  // 検索語でフォントを絞り込む（family と localizedName の両方を対象）
   const filteredFonts = searchTerm
     ? ALL_JAPANESE_FONTS.filter((font: FontInfo) =>
         font.family.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -607,7 +607,7 @@ function FontSelector({
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Selected font display */}
+      {/* 選択中のフォント */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -625,10 +625,10 @@ function FontSelector({
         />
       </button>
 
-      {/* Dropdown */}
+      {/* ドロップダウン */}
       {isOpen && (
         <div className="absolute z-50 mt-1 w-full bg-background border border-border-secondary rounded-lg shadow-lg max-h-80 overflow-hidden flex flex-col">
-          {/* Search input */}
+          {/* 検索 */}
           <div className="p-2 border-b border-border">
             <input
               type="text"
@@ -640,9 +640,9 @@ function FontSelector({
             />
           </div>
 
-          {/* Font list */}
+          {/* フォント一覧 */}
           <div className="overflow-y-auto">
-            {/* System fonts (Electron only) */}
+            {/* システムフォント（Electronのみ） */}
             {systemFiltered.length > 0 && (
               <>
                 {!searchTerm && (
@@ -670,7 +670,7 @@ function FontSelector({
               </>
             )}
 
-            {/* Featured fonts */}
+            {/* おすすめ */}
             {featuredFiltered.length > 0 && (
               <>
                   <div className="px-3 py-1 text-xs font-semibold text-foreground-tertiary bg-background-secondary sticky top-0">
@@ -696,7 +696,7 @@ function FontSelector({
               </>
             )}
 
-            {/* All other fonts */}
+            {/* そのほか */}
             {otherFonts.length > 0 && (
               <>
                 {!searchTerm && (
@@ -724,7 +724,7 @@ function FontSelector({
               </>
             )}
 
-            {/* No results */}
+            {/* 該当なし */}
             {systemFiltered.length === 0 && featuredFiltered.length === 0 && otherFonts.length === 0 && (
               <div className="px-3 py-4 text-sm text-foreground-tertiary text-center">
                 フォントが見つかりません
