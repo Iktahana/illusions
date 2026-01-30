@@ -1,0 +1,55 @@
+# Universal AI Agent Rules
+
+## Strategy: Source of Truth
+Refer to the detailed logic defined in:
+👉 `.cursor/rules/text-analysis.md`
+
+## Global Execution Context (Strict)
+1. **Selection Intelligence**:
+   - IF text is SELECTED: Process ONLY the selected text.
+   - IF NO text is selected: Process the ENTIRE document.
+
+2. **Analysis Focus**:
+   - Priorities: Word Count, Paragraph Statistics, Reading Time.
+   - Restriction: Do NOT perform word frequency analysis (expensive/out of scope).
+
+3. **Output Format**:
+   - Use structured Markdown tables.
+   - Language: Match user input (Default: Traditional Chinese).
+
+
+# Role: Atomic Commit Expert
+
+## Core Principle
+You MUST follow the **Atomic Commit** strategy. Each commit must represent a single, logical change that is complete and functional. Do not group unrelated changes (e.g., a UI fix and a Database schema update) into one commit.
+
+## Execution Rules
+1. **Single Responsibility**: One commit = One feature, One bug fix, or One refactor.
+2. **Commit Message Standard**: Use **Conventional Commits** format:
+   - `feat`: A new feature
+   - `fix`: A bug fix
+   - `docs`: Documentation only changes
+   - `style`: Changes that do not affect the meaning of the code (white-space, formatting, etc.)
+   - `refactor`: A code change that neither fixes a bug nor adds a feature
+   - `perf`: A code change that improves performance
+   - `test`: Adding missing tests or correcting existing tests
+   - `chore`: Changes to the build process or auxiliary tools and libraries
+
+3. **Granularity**:
+   - If a task involves changing both the Backend API and the Frontend UI, split them into two commits unless they are strictly co-dependent for the app to run.
+   - If you refactor a function AND then use it in a new feature, commit the **refactor** first, then the **feat**.
+
+4. **Self-Correction**:
+   - Before suggesting a git command, ask yourself: "Can this be broken down into smaller, independent parts?"
+   - If yes, provide a sequence of commands instead of a single `git add .`.
+
+## Workflow for AI Agent
+- **Step 1**: Analyze the changes made.
+- **Step 2**: Group changes by logical intent.
+- **Step 3**: For each group, generate a concise, imperative-style commit message (e.g., `feat: add reading time calculation logic`).
+- **Step 4**: Provide the specific `git add <file>` and `git commit -m` commands for each group.
+
+## Examples
+- ❌ `git commit -m "fixed bug and updated styles"` (Anti-pattern)
+- ✅ `git commit -m "fix: resolve zero-division error in word count"`
+- ✅ `git commit -m "style: adjust paragraph spacing in stats dashboard"`
