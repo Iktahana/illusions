@@ -1,7 +1,7 @@
 /**
- * Electron Storage Module for Main Process.
- * Uses better-sqlite3 for synchronous, high-performance database access.
- * Must be integrated into electron/main.ts via IPC handlers.
+ * Electron メインプロセス向けストレージモジュール。
+ * better-sqlite3 を使い、同期かつ高性能にDBアクセスする。
+ * IPC ハンドラ経由で組み込む前提。
  */
 
 import * as path from "path";
@@ -13,7 +13,7 @@ import type {
   EditorBuffer,
 } from "./storage-types";
 
-// Type definition for better-sqlite3
+// better-sqlite3 用の型定義
 interface StatementResult {
   run(...params: unknown[]): void;
   get(...params: unknown[]): unknown;
@@ -31,14 +31,14 @@ interface DatabaseConstructor {
   new (path: string): DatabaseInstance;
 }
 
-// Dynamic import to avoid issues with optional dependency
+// optional 依存による問題を避けるための動的 import
 let DatabaseModule: DatabaseConstructor | null = null;
 try {
-  // Dynamic require is necessary for optional electron dependency
+  // optional 依存のため動的 require が必要
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   DatabaseModule = require("better-sqlite3") as DatabaseConstructor;
 } catch {
-  // better-sqlite3 may not be available in all environments
+  // 環境によっては better-sqlite3 が存在しない
 }
 
 export class ElectronStorageManager {
@@ -50,20 +50,20 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Initialize the database and create tables if they don't exist.
+   * DB を初期化し、必要ならテーブルを作成する
    */
   private ensureInitialized(): DatabaseInstance {
     if (this.db) return this.db;
 
     if (!DatabaseModule) {
-      throw new Error("better-sqlite3 module is not available");
+      throw new Error("better-sqlite3 モジュールが利用できません");
     }
 
     this.db = new DatabaseModule(this.dbPath);
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.db!.pragma("journal_mode = WAL");
 
-    // Create tables if they don't exist
+    // 必要ならテーブルを作成
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.db!.exec(`
       CREATE TABLE IF NOT EXISTS app_state (
@@ -91,7 +91,7 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Save the complete session state.
+   * セッション状態を一括で保存する
    */
   saveSession(session: StorageSession): void {
     const db = this.ensureInitialized();
@@ -100,14 +100,14 @@ export class ElectronStorageManager {
     try {
       db.exec("BEGIN TRANSACTION");
 
-      // Save app state
+      // appState
       const saveAppState = db.prepare(`
         INSERT OR REPLACE INTO app_state (id, data, updated_at)
         VALUES (?, ?, ?)
       `);
       saveAppState.run("app_state", JSON.stringify(session.appState), now);
 
-      // Clear and save recent files
+      // recentFiles
       const deleteRecent = db.prepare("DELETE FROM recent_files");
       deleteRecent.run();
 
@@ -124,7 +124,7 @@ export class ElectronStorageManager {
         );
       }
 
-      // Save editor buffer
+      // editorBuffer
       if (session.editorBuffer) {
         const insertBuffer = db.prepare(`
           INSERT OR REPLACE INTO editor_buffer (id, data, updated_at)
@@ -148,7 +148,7 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Load the complete session state.
+   * セッション状態を一括で読み込む
    */
   loadSession(): StorageSession | null {
     this.ensureInitialized();
@@ -168,13 +168,13 @@ export class ElectronStorageManager {
         editorBuffer,
       };
     } catch (error) {
-      console.error("Failed to load session:", error);
+      console.error("セッションの読み込みに失敗しました:", error);
       return null;
     }
   }
 
   /**
-   * Save the application state.
+   * アプリ状態を保存する
    */
   saveAppState(appState: AppState): void {
     const db = this.ensureInitialized();
@@ -186,7 +186,7 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Load the application state.
+   * アプリ状態を読み込む
    */
   loadAppState(): AppState | null {
     const db = this.ensureInitialized();
@@ -196,7 +196,7 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Add a file to recent files (max 10).
+   * 最近使ったファイルへ追加する（最大10件）
    */
   addToRecent(file: RecentFile): void {
     const db = this.ensureInitialized();
@@ -204,11 +204,11 @@ export class ElectronStorageManager {
     try {
       db.exec("BEGIN TRANSACTION");
 
-      // Remove if already exists
+      // 既存があれば削除
       const deleteStmt = db.prepare("DELETE FROM recent_files WHERE path = ?");
       deleteStmt.run(file.path);
 
-      // Insert new entry
+      // 新規追加
       const insertStmt = db.prepare(`
         INSERT INTO recent_files (id, path, data, updated_at)
         VALUES (?, ?, ?, ?)
@@ -220,7 +220,7 @@ export class ElectronStorageManager {
         Date.now()
       );
 
-      // Trim to 10 most recent
+      // 10件に丸める
       const countStmt = db.prepare("SELECT COUNT(*) as count FROM recent_files");
       const countResult = countStmt.get() as { count: number };
 
@@ -243,7 +243,7 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Get all recent files.
+   * 最近使ったファイル一覧を取得する
    */
   getRecentFiles(): RecentFile[] {
     const db = this.ensureInitialized();
@@ -255,7 +255,7 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Remove a file from recent files.
+   * 最近使ったファイルから削除する
    */
   removeFromRecent(filePath: string): void {
     const db = this.ensureInitialized();
@@ -264,7 +264,7 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Clear all recent files.
+   * 最近使ったファイルを全削除する
    */
   clearRecent(): void {
     const db = this.ensureInitialized();
@@ -273,7 +273,7 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Save editor buffer.
+   * エディタバッファを保存する
    */
   saveEditorBuffer(buffer: EditorBuffer): void {
     const db = this.ensureInitialized();
@@ -285,7 +285,7 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Load editor buffer.
+   * エディタバッファを読み込む
    */
   loadEditorBuffer(): EditorBuffer | null {
     const db = this.ensureInitialized();
@@ -295,7 +295,7 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Clear editor buffer.
+   * エディタバッファを削除する
    */
   clearEditorBuffer(): void {
     const db = this.ensureInitialized();
@@ -304,7 +304,7 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Clear all data.
+   * すべてのデータを削除する
    */
   clearAll(): void {
     const db = this.ensureInitialized();
@@ -316,7 +316,7 @@ export class ElectronStorageManager {
   }
 
   /**
-   * Close the database connection.
+   * DB 接続を閉じる
    */
   close(): void {
     if (this.db) {
