@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import { commonmark, toggleEmphasisCommand, toggleStrongCommand, toggleInlineCodeCommand, wrapInHeadingCommand, wrapInBlockquoteCommand, wrapInBulletListCommand, wrapInOrderedListCommand } from "@milkdown/preset-commonmark";
@@ -58,6 +58,10 @@ export default function NovelEditor({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  // 模式切換時保持滾動位置：保存目標滾動進度（0-1）
+  const [targetScrollProgress, setTargetScrollProgress] = useState<number | null>(null);
+  const prevInitialContentRef = useRef(initialContent);
 
   // マウント後に localStorage から読み込む（クライアントのみ）
   useEffect(() => {
@@ -74,6 +78,15 @@ export default function NovelEditor({
     localStorage.setItem('illusions-writing-mode', isVertical ? 'vertical' : 'horizontal');
   }, [isVertical, isMounted]);
 
+  // 檢測新文件打開：initialContent 變化時跳到對應模式的起點
+  useEffect(() => {
+    if (prevInitialContentRef.current !== initialContent) {
+      // 新文件：橫排跳到 0%（頂部），豎排跳到 100%（右端/頁頭）
+      setTargetScrollProgress(isVertical ? 1.0 : 0);
+      prevInitialContentRef.current = initialContent;
+    }
+  }, [initialContent, isVertical]);
+
   const handleSearchOpen = () => {
     setIsSearchOpen(true);
   };
@@ -85,12 +98,41 @@ export default function NovelEditor({
     }
   }, [searchOpenTrigger]);
 
+  // 模式切換時計算並保存滾動進度（鏡像映射）
+  const handleToggleVertical = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      const maxScroll = container.scrollWidth - container.clientWidth;
+      let progress = 0;
+      
+      if (maxScroll > 0) {
+        if (isVertical) {
+          // 從豎排切換到橫排：計算當前豎排進度
+          progress = Math.abs(container.scrollLeft) / maxScroll;
+        } else {
+          // 從橫排切換到豎排：計算當前橫排進度
+          progress = container.scrollLeft / maxScroll;
+        }
+        
+        // 鏡像映射：目標模式下的進度 = 1 - 當前進度
+        setTargetScrollProgress(1 - progress);
+      }
+    }
+    
+    setIsVertical(!isVertical);
+  }, [isVertical, scrollContainerRef]);
+
+  // 滾動恢復完成後的回調
+  const handleScrollRestored = useCallback(() => {
+    setTargetScrollProgress(null);
+  }, []);
+
   return (
     <div className={clsx("flex flex-col h-full min-h-0 relative", className)}>
       {/* ツールバー */}
       <EditorToolbar
         isVertical={isVertical}
-        onToggleVertical={() => setIsVertical(!isVertical)}
+        onToggleVertical={handleToggleVertical}
         fontScale={fontScale}
         lineHeight={lineHeight}
         onSearchClick={handleSearchOpen}
@@ -122,6 +164,8 @@ export default function NovelEditor({
               scrollContainerRef={scrollContainerRef}
               onEditorViewReady={setEditorViewInstance}
               showParagraphNumbers={showParagraphNumbers}
+              targetScrollProgress={targetScrollProgress}
+              onScrollRestored={handleScrollRestored}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -207,6 +251,8 @@ function MilkdownEditor({
   scrollContainerRef,
   onEditorViewReady,
   showParagraphNumbers,
+  targetScrollProgress,
+  onScrollRestored,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
@@ -222,6 +268,8 @@ function MilkdownEditor({
   scrollContainerRef: RefObject<HTMLDivElement>;
   onEditorViewReady?: (view: EditorView) => void;
   showParagraphNumbers: boolean;
+  targetScrollProgress?: number | null;
+  onScrollRestored?: () => void;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
@@ -249,16 +297,19 @@ function MilkdownEditor({
   // isVertical と scrollContainerRef の参照を保持
   const isVerticalRef = useRef(isVertical);
   const scrollContainerRefLocal = scrollContainerRef;
-  const shouldScrollToHeadRef = useRef(false); // 排版完成後に右端へスクロールするかどうか
+  const shouldScrollToHeadRef = useRef(false); // 排版完成後にスクロールするかどうか
   
-  // isVertical の変更を追跡
+  // isVertical の変更を追跡（変更のみ、スクロールフラグは設定しない）
   useEffect(() => {
     isVerticalRef.current = isVertical;
-    // 縦書きモードに切り替わったら、排版完成後に右端へスクロール
-    if (isVertical) {
+  }, [isVertical]);
+  
+  // targetScrollProgress が設定されたらスクロールフラグを立てる
+  useEffect(() => {
+    if (targetScrollProgress !== null && targetScrollProgress !== undefined) {
       shouldScrollToHeadRef.current = true;
     }
-  }, [isVertical]);
+  }, [targetScrollProgress]);
   
   // 縦書き時は完全にスクロール動作を禁止（ユーザーが手動でスクロールする）
   const verticalScrollPlugin = useMemo(() => $prose(() => new Plugin({
@@ -525,13 +576,25 @@ function MilkdownEditor({
           editorDom.style.transition = 'opacity 0.25s ease-in';
           editorDom.style.opacity = '1';
           
-          // フェードイン後、排版完成を待てば右端へスクロール
-          if (isVertical && shouldScrollToHeadRef.current && scrollContainerRef.current) {
+          // フェードイン後、排版完成を待って目標位置へスクロール
+          if (shouldScrollToHeadRef.current && scrollContainerRef.current) {
             setTimeout(() => {
               const container = scrollContainerRef.current;
-              if (container) {
-                container.scrollLeft = container.scrollWidth;
-                shouldScrollToHeadRef.current = false; // 実行済みなので次回は実行しない
+              if (container && targetScrollProgress !== null && targetScrollProgress !== undefined) {
+                const maxScroll = container.scrollWidth - container.clientWidth;
+                
+                if (maxScroll > 0) {
+                  if (isVertical) {
+                    // 豎排：scrollLeft 為負數（Chrome）
+                    container.scrollLeft = -(targetScrollProgress * maxScroll);
+                  } else {
+                    // 橫排：scrollLeft 為正數
+                    container.scrollLeft = targetScrollProgress * maxScroll;
+                  }
+                }
+                
+                shouldScrollToHeadRef.current = false;
+                onScrollRestored?.(); // 通知父組件完成
               }
             }, 250); // フェードイン完了を待つ
           }
@@ -546,16 +609,28 @@ function MilkdownEditor({
       applyStyles();
       editorDom.style.opacity = '1';
       
-      // 初回レンダー時、排版完成を待れば右端へスクロール
-      if (isVertical && shouldScrollToHeadRef.current && scrollContainerRef.current) {
+      // 初回レンダー時、排版完成を待って目標位置へスクロール
+      if (shouldScrollToHeadRef.current && scrollContainerRef.current) {
         const container = scrollContainerRef.current;
-        if (container) {
-          container.scrollLeft = container.scrollWidth;
-          shouldScrollToHeadRef.current = false; // 実行済みなので次回は実行しない
+        if (container && targetScrollProgress !== null && targetScrollProgress !== undefined) {
+          const maxScroll = container.scrollWidth - container.clientWidth;
+          
+          if (maxScroll > 0) {
+            if (isVertical) {
+              // 豎排：scrollLeft 為負數（Chrome）
+              container.scrollLeft = -(targetScrollProgress * maxScroll);
+            } else {
+              // 橫排：scrollLeft 為正數
+              container.scrollLeft = targetScrollProgress * maxScroll;
+            }
+          }
+          
+          shouldScrollToHeadRef.current = false;
+          onScrollRestored?.(); // 通知父組件完成
         }
       }
     }
-  }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get]);
+  }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get, targetScrollProgress, onScrollRestored]);
 
   // 縦書き時: マウスホイールの縦スクロールを横スクロールへ変換する
   useEffect(() => {
