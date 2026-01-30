@@ -7,7 +7,7 @@ import { getStorageService } from "./storage-service";
 import { persistAppState } from "./app-state-manager";
 
 const DEFAULT_CONTENT = "# 錯覚\n\n物語はここから始めます。\n\n";
-const AUTO_SAVE_INTERVAL = 2000; // 2 seconds
+const AUTO_SAVE_INTERVAL = 2000; // 2秒
 const DEMO_FILE_NAME = "鏡地獄.mdi";
 
 async function loadDemoContent(): Promise<string | null> {
@@ -19,7 +19,7 @@ async function loadDemoContent(): Promise<string | null> {
     if (!response.ok) return null;
     return await response.text();
   } catch (error) {
-    console.warn("Failed to load demo document:", error);
+    console.warn("デモ文書の読み込みに失敗しました:", error);
     return null;
   }
 }
@@ -35,7 +35,7 @@ export interface UseMdiFileReturn {
   saveFile: () => Promise<void>;
   newFile: () => void;
   updateFileName: (newName: string) => void;
-  wasAutoRecovered?: boolean; // Web only - whether file was auto-recovered
+  wasAutoRecovered?: boolean; // Webのみ: 自動復元されたかどうか
 }
 
 export function useMdiFile(): UseMdiFileReturn {
@@ -60,17 +60,17 @@ export function useMdiFile(): UseMdiFileReturn {
     try {
       await persistAppState({ lastOpenedMdiPath: path });
     } catch (error) {
-      console.error("Failed to persist last opened path:", error);
+      console.error("最後に開いたパスの保存に失敗しました:", error);
     }
   }, []);
 
-  // Notify Electron about dirty state.
+  // Dirty 状態を Electron 側へ通知する
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.setDirty) return;
     window.electronAPI.setDirty(isDirty);
   }, [isDirty, isElectron]);
 
-  // Initialize storage and try to restore previous file handle (Web only)
+  // ストレージ初期化と、前回のファイルハンドル復元（Webのみ）
   useEffect(() => {
     const initializeStorage = async () => {
       try {
@@ -86,12 +86,12 @@ export function useMdiFile(): UseMdiFileReturn {
             session.editorBuffer)
         );
 
-        // Web environment: try to restore file handle from editor buffer
+        // Web: エディタバッファからファイルハンドルの復元を試みる
         if (!isElectron) {
           const buffer = await storage.loadEditorBuffer();
           if (buffer?.fileHandle) {
             try {
-              // Try to access the file directly to verify we still have permission
+              // 実ファイルへアクセスし、権限が残っているか確認する
               const file = await buffer.fileHandle.getFile();
               const content = await file.text();
 
@@ -109,8 +109,8 @@ export function useMdiFile(): UseMdiFileReturn {
               }
               return;
             } catch (error) {
-              console.warn("Could not restore previous file (permission may have been revoked):", error);
-              // Clear the stale handle
+              console.warn("前回のファイルを復元できませんでした（権限が失効している可能性があります）:", error);
+              // 古いハンドルを破棄する
               await storage.clearEditorBuffer();
             }
           }
@@ -132,7 +132,7 @@ export function useMdiFile(): UseMdiFileReturn {
           }
         }
       } catch (error) {
-        console.error("Failed to initialize storage:", error);
+        console.error("ストレージの初期化に失敗しました:", error);
       }
     };
 
@@ -153,14 +153,14 @@ export function useMdiFile(): UseMdiFileReturn {
 
   const updateFileName = useCallback((newName: string) => {
     if (!currentFile) {
-      // If no file is open, create a new file descriptor with the new name
+      // ファイル未選択なら、新しい名前でディスクリプタを作る
       setCurrentFile({
         path: null,
         handle: null,
         name: newName,
       });
     } else {
-      // Update the existing file descriptor with the new name
+      // 既存ディスクリプタの名前だけ更新する
       setCurrentFile({
         ...currentFile,
         name: newName,
@@ -171,7 +171,7 @@ export function useMdiFile(): UseMdiFileReturn {
   const openFile = useCallback(async () => {
     const result = await openMdiFile();
     if (!result) {
-      // User canceled or error - keep current state
+      // キャンセル/エラー時は現状維持
       return;
     }
     const { descriptor, content: fileContent } = result;
@@ -180,7 +180,7 @@ export function useMdiFile(): UseMdiFileReturn {
     setLastSavedContent(fileContent);
     setLastSavedTime(Date.now());
     
-      // Save the last opened file path or handle to storage
+      // 最後に開いたファイルの参照（パス/ハンドル）を保存する
       try {
         if (isElectron && descriptor.path) {
           await persistLastOpenedPath(descriptor.path);
@@ -194,7 +194,7 @@ export function useMdiFile(): UseMdiFileReturn {
           });
         }
       } catch (error) {
-        console.error("Failed to save file reference:", error);
+        console.error("ファイル参照の保存に失敗しました:", error);
       }
 
   }, [isElectron, persistLastOpenedPath]);
@@ -215,7 +215,7 @@ export function useMdiFile(): UseMdiFileReturn {
         setLastSavedContent(contentRef.current);
         setLastSavedTime(Date.now());
         
-        // Save the last opened file path or handle to storage
+        // 最後に開いたファイルの参照（パス/ハンドル）を保存する
         try {
           if (isElectron && descriptor.path) {
             await persistLastOpenedPath(descriptor.path);
@@ -229,17 +229,17 @@ export function useMdiFile(): UseMdiFileReturn {
             });
           }
         } catch (error) {
-          console.error("Failed to save file reference:", error);
+          console.error("ファイル参照の保存に失敗しました:", error);
         }
       }
     } catch (error) {
-      console.error("Failed to save file:", error);
+      console.error("保存に失敗しました:", error);
     } finally {
       setIsSaving(false);
     }
   }, [currentFile, isElectron, isSaving]);
 
-  // Auto-save every 5 seconds if dirty and file is open.
+  // Dirty かつファイル選択中なら、一定間隔で自動保存する
   useEffect(() => {
     const autoSave = async () => {
       if (isDirty && currentFile) {
@@ -258,7 +258,7 @@ export function useMdiFile(): UseMdiFileReturn {
     };
   }, [isDirty, currentFile, saveFile]);
 
-  // Handle Electron save-before-close request.
+  // Electron の「終了前に保存」要求を処理する
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onSaveBeforeClose) return;
 
@@ -272,7 +272,7 @@ export function useMdiFile(): UseMdiFileReturn {
     return cleanup;
   }, [isDirty, saveFile, isElectron]);
 
-  // Handle files opened from system (double-click .mdi file).
+  // システムから開かれたファイル（.mdi のダブルクリック等）を処理する
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onOpenFileFromSystem) return;
 
@@ -291,7 +291,7 @@ export function useMdiFile(): UseMdiFileReturn {
     return cleanup;
   }, [isElectron]);
 
-  // Handle menu save command.
+  // メニューの保存を処理する
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onMenuSave) return;
 
@@ -302,7 +302,7 @@ export function useMdiFile(): UseMdiFileReturn {
     return cleanup;
   }, [saveFile, isElectron]);
 
-  // Handle menu save-as command.
+  // メニューの「名前を付けて保存」を処理する
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onMenuSaveAs) return;
 
@@ -329,7 +329,7 @@ export function useMdiFile(): UseMdiFileReturn {
           setLastSavedContent(raw);
           setLastSavedTime(Date.now());
           
-          // Save the last opened file path or handle to storage
+          // 最後に開いたファイルの参照（パス/ハンドル）を保存する
           try {
             const storage = getStorageService();
             await storage.initialize();
@@ -344,11 +344,11 @@ export function useMdiFile(): UseMdiFileReturn {
               });
             }
           } catch (error) {
-            console.error("Failed to save file reference:", error);
+            console.error("ファイル参照の保存に失敗しました:", error);
           }
         }
       } catch (error) {
-        console.error("Failed to save file as:", error);
+        console.error("名前を付けて保存に失敗しました:", error);
       } finally {
         setIsSaving(false);
       }
@@ -357,7 +357,7 @@ export function useMdiFile(): UseMdiFileReturn {
     return cleanup;
   }, [saveFile, isElectron, currentFile, persistLastOpenedPath]);
 
-  // Handle menu new command.
+  // メニューの新規作成を処理する
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onMenuNew) return;
 
@@ -368,7 +368,7 @@ export function useMdiFile(): UseMdiFileReturn {
     return cleanup;
   }, [newFile, isElectron]);
 
-  // Handle menu open command.
+  // メニューの「開く」を処理する
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onMenuOpen) return;
 
@@ -379,7 +379,7 @@ export function useMdiFile(): UseMdiFileReturn {
     return cleanup;
   }, [openFile, isElectron]);
 
-  // Handle Web beforeunload.
+  // Web の beforeunload を処理する
   useEffect(() => {
     if (isElectron) return;
 
