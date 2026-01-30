@@ -1,5 +1,4 @@
-// Electron preload API typings.
-// Comments in code must be in English.
+// Electron preload API の型定義
 
 import type { StorageSession, AppState, RecentFile, EditorBuffer } from "@/lib/storage-types";
 
