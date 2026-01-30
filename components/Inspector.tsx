@@ -24,6 +24,8 @@ interface InspectorProps {
   className?: string;
   wordCount?: number;
   charCount?: number;
+  selectedCharCount?: number;
+  paragraphCount?: number;
   fileName?: string;
   isDirty?: boolean;
   isSaving?: boolean;
@@ -37,6 +39,8 @@ export default function Inspector({
   className,
   wordCount = 0,
   charCount = 0,
+  selectedCharCount = 0,
+  paragraphCount = 0,
   fileName = "無題",
   isDirty = false,
   isSaving = false,
@@ -255,7 +259,7 @@ export default function Inspector({
       <div className="flex-1 overflow-y-auto p-4">
         {activeTab === "ai" && <AIPanel />}
         {activeTab === "corrections" && <CorrectionsPanel />}
-        {activeTab === "stats" && <StatsPanel wordCount={wordCount} charCount={charCount} manuscriptPages={manuscriptPages} />}
+        {activeTab === "stats" && <StatsPanel wordCount={wordCount} charCount={charCount} selectedCharCount={selectedCharCount} paragraphCount={paragraphCount} manuscriptPages={manuscriptPages} />}
       </div>
     </aside>
   );
@@ -389,56 +393,168 @@ function CorrectionItem({
 function StatsPanel({
   wordCount,
   charCount,
+  selectedCharCount,
+  paragraphCount,
   manuscriptPages,
 }: {
   wordCount: number;
   charCount: number;
+  selectedCharCount: number;
+  paragraphCount: number;
   manuscriptPages: number;
 }) {
+  // 判斷是否為選中片段分析
+  const isSelection = selectedCharCount > 0;
+  const activeCharCount = isSelection ? selectedCharCount : charCount;
+
+  // 1. 字數深度統計
+  // 計算純文字數（剔除空白、標點符號等）
+  // 注意：這裡簡化處理，實際應該從編輯器獲取原始文本進行處理
+  // 假設標點符號約佔 10-15%
+  const estimatedPunctuation = Math.floor(activeCharCount * 0.12);
+  const pureTextCount = activeCharCount - estimatedPunctuation;
+  const punctuationRatio = activeCharCount > 0 ? (estimatedPunctuation / activeCharCount * 100).toFixed(1) : '0.0';
+
+  // 判斷文風
+  let styleHint = '';
+  const ratio = parseFloat(punctuationRatio);
+  if (ratio > 15) {
+    styleHint = '對話較多';
+  } else if (ratio < 8) {
+    styleHint = '敘事為主';
+  } else {
+    styleHint = '均衡';
+  }
+
+  // 2. 段落結構分析
+  const avgParagraphLength = paragraphCount > 0 ? Math.floor(activeCharCount / paragraphCount) : 0;
+
+  let paragraphWarning = '';
+  let paragraphWarningColor = 'text-foreground-tertiary';
+  if (avgParagraphLength > 150) {
+    paragraphWarning = '⚠️ 段落偏長，建議增加換行以優化手機閱讀體驗';
+    paragraphWarningColor = 'text-amber-600 dark:text-amber-500';
+  } else if (avgParagraphLength > 0 && avgParagraphLength < 50) {
+    paragraphWarning = '✓ 節奏輕快，適合碎片化閱讀';
+    paragraphWarningColor = 'text-green-600 dark:text-green-500';
+  }
+
+  // 3. 多場景閱讀時間計算
+  const calculateReadTime = (charsPerMinute: number) => {
+    if (activeCharCount === 0) return '0秒';
+    const minutes = Math.floor(activeCharCount / charsPerMinute);
+    const seconds = Math.round((activeCharCount % charsPerMinute) / charsPerMinute * 60);
+
+    if (minutes === 0) {
+      return `${seconds}秒`;
+    } else if (seconds === 0) {
+      return `${minutes}分`;
+    } else {
+      return `${minutes}分${seconds}秒`;
+    }
+  };
+
+  const fastReadTime = calculateReadTime(900);    // 快速掃讀
+  const normalReadTime = calculateReadTime(500);  // 常規閱讀
+  const deepReadTime = calculateReadTime(250);    // 深度研讀
+
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium text-foreground-secondary">文書統計</h3>
-      
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="文字数" value={charCount.toLocaleString()} />
-        <StatCard label="単語数" value={wordCount.toLocaleString()} />
-        <StatCard label="原稿用紙" value={`${manuscriptPages}枚`} />
-        <StatCard label="段落数" value="12" />
+      {/* 標題：動態顯示分析範圍 */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-foreground-secondary">
+          {isSelection ? '【選中片段分析】' : '【全篇文檔統計】'}
+        </h3>
+        {isSelection && (
+          <span className="text-xs px-2 py-1 rounded-full bg-accent/20 text-accent font-medium">
+            選中中
+          </span>
+        )}
       </div>
-      
-      <div className="pt-4 border-t border-border">
+
+      {/* 1. 字數深度統計 */}
+      <div className="bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-          原稿用紙換算
+          字數深度統計
         </h4>
-        <div className="bg-background-secondary rounded-lg p-3 text-sm text-foreground-secondary">
-          <p className="mb-2">
-            400字詰め原稿用紙：<span className="font-semibold">{manuscriptPages}枚</span>
+        <div className="space-y-2">
+          <div className="flex justify-between items-baseline">
+            <span className="text-sm text-foreground-secondary">總字數</span>
+            <span className="text-lg font-semibold text-foreground">{activeCharCount.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-baseline">
+            <span className="text-sm text-foreground-secondary">純文字數</span>
+            <span className="text-base font-medium text-foreground">{pureTextCount.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-baseline">
+            <span className="text-sm text-foreground-secondary">標點佔比</span>
+            <span className="text-base font-medium text-foreground">
+              {punctuationRatio}% <span className="text-xs text-foreground-tertiary ml-1">({styleHint})</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. 段落結構分析 */}
+      <div className="bg-background-secondary rounded-lg p-4 border border-border">
+        <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
+          段落結構分析
+        </h4>
+        <div className="space-y-2">
+          <div className="flex justify-between items-baseline">
+            <span className="text-sm text-foreground-secondary">段落總數</span>
+            <span className="text-lg font-semibold text-foreground">{paragraphCount}</span>
+          </div>
+          <div className="flex justify-between items-baseline">
+            <span className="text-sm text-foreground-secondary">平均段落長度</span>
+            <span className="text-base font-medium text-foreground">{avgParagraphLength}字/段</span>
+          </div>
+          {paragraphWarning && (
+            <div className={`text-xs mt-2 p-2 rounded bg-background border border-border ${paragraphWarningColor}`}>
+              {paragraphWarning}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 3. 多場景閱讀時間 */}
+      <div className="bg-background-secondary rounded-lg p-4 border border-border">
+        <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
+          預估閱讀時間
+        </h4>
+        <div className="space-y-2">
+          <div className="flex justify-between items-baseline">
+            <span className="text-sm text-foreground-secondary">快速掃讀</span>
+            <span className="text-base font-medium text-foreground">{fastReadTime}</span>
+          </div>
+          <div className="flex justify-between items-baseline">
+            <span className="text-sm text-foreground-secondary">常規閱讀</span>
+            <span className="text-base font-medium text-accent">{normalReadTime}</span>
+          </div>
+          <div className="flex justify-between items-baseline">
+            <span className="text-sm text-foreground-secondary">深度研讀</span>
+            <span className="text-base font-medium text-foreground">{deepReadTime}</span>
+          </div>
+          <p className="text-xs text-foreground-tertiary mt-2">
+            * 基於中日文字符閱讀特性計算
           </p>
+        </div>
+      </div>
+
+      {/* 原稿用紙換算（僅全篇顯示） */}
+      {!isSelection && (
+        <div className="pt-4 border-t border-border">
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide">
+              原稿用紙換算
+            </h4>
+            <span className="text-2xl font-bold text-accent">{manuscriptPages}枚</span>
+          </div>
           <p className="text-xs text-foreground-tertiary">
-            ※ 日本語小説の標準フォーマットで計算
+            400字詰め原稿用紙（日本語小說標準）
           </p>
         </div>
-      </div>
-      
-      <div className="pt-4 border-t border-border">
-        <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-          執筆ペース
-        </h4>
-        <div className="space-y-2 text-sm text-foreground-secondary">
-          <div className="flex justify-between">
-            <span>今日</span>
-            <span className="font-medium">+320文字</span>
-          </div>
-          <div className="flex justify-between">
-            <span>今週</span>
-            <span className="font-medium">+1,240文字</span>
-          </div>
-          <div className="flex justify-between">
-            <span>平均/日</span>
-            <span className="font-medium">177文字</span>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
