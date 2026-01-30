@@ -14,8 +14,7 @@ import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
 import { 
   getScrollProgress, 
-  setScrollProgress, 
-  getMirroredProgress,
+  setScrollProgress,
 } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import clsx from "clsx";
 import { Type, AlignLeft, Search } from "lucide-react";
@@ -585,22 +584,20 @@ function MilkdownEditor({
           editorDom.style.transition = 'opacity 0.25s ease-in';
           editorDom.style.opacity = '1';
           
-          // フェードイン後、排版完成を待って目標位置へスクロール（鏡像映射）
+          // フェードイン後、排版完成を待って目標位置へスクロール（保持相同進度）
           if (shouldScrollToHeadRef.current && scrollContainerRef.current) {
             setTimeout(() => {
               const container = scrollContainerRef.current;
               if (container && targetScrollProgress !== null && targetScrollProgress !== undefined) {
                 const savedProgress = savedScrollProgressRef.current || 0;
-                const mirroredProgress = getMirroredProgress(savedProgress);
                 
                 console.log('[DEBUG] Apply scroll (animated):', {
                   isVertical,
-                  savedProgress,
-                  mirroredProgress
+                  savedProgress
                 });
                 
-                // 使用抽象層設置進度
-                const success = setScrollProgress({ container, isVertical }, mirroredProgress);
+                // 使用抽象層設置進度（不鏡像，直接使用相同進度）
+                const success = setScrollProgress({ container, isVertical }, savedProgress);
                 
                 if (success) {
                   console.log('[DEBUG] Scroll applied successfully');
@@ -627,21 +624,19 @@ function MilkdownEditor({
       // 等待 DOM 布局完成後再執行滾動
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          // 初回レンダー時、排版完成を待って目標位置へスクロール（鏡像映射）
+          // 初回レンダー時、排版完成を待って目標位置へスクロール（保持相同進度）
           if (shouldScrollToHeadRef.current && scrollContainerRef.current) {
             const container = scrollContainerRef.current;
             if (container && targetScrollProgress !== null && targetScrollProgress !== undefined) {
               const savedProgress = savedScrollProgressRef.current || 0;
-              const mirroredProgress = getMirroredProgress(savedProgress);
               
               console.log('[DEBUG] Apply scroll (no anime):', {
                 isVertical,
-                savedProgress,
-                mirroredProgress
+                savedProgress
               });
               
-              // 使用抽象層設置進度
-              const success = setScrollProgress({ container, isVertical }, mirroredProgress);
+              // 使用抽象層設置進度（不鏡像，直接使用相同進度）
+              const success = setScrollProgress({ container, isVertical }, savedProgress);
               
               if (success) {
                 console.log('[DEBUG] Scroll applied successfully');
