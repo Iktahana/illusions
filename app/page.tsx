@@ -30,6 +30,7 @@ export default function EditorPage() {
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [saveToastExiting, setSaveToastExiting] = useState(false);
+  const [selectedCharCount, setSelectedCharCount] = useState(0);
   // Stable file session ID - only changes when opening/creating a new file
   const fileSessionRef = useRef(0);
   const prevLastSavedTimeRef = useRef<number | null>(null);
@@ -222,6 +223,9 @@ export default function EditorPage() {
   const wordCount = words(content);
   const charCount = chars(content);
 
+  // 計算段落數（以換行符分隔）
+  const paragraphCount = content ? content.split(/\n\n+/).filter(p => p.trim().length > 0).length : 0;
+
   const fileName = currentFile?.name ?? (isDirty ? "新規ファイル *" : "新規ファイル");
 
   // Handle keyboard shortcuts: Cmd+S / Ctrl+S to save, Cmd+F / Ctrl+F to search
@@ -315,6 +319,7 @@ export default function EditorPage() {
               initialContent={content}
               onChange={handleChange}
               onInsertText={handleInsertText}
+              onSelectionChange={setSelectedCharCount}
               fontScale={fontScale}
               lineHeight={lineHeight}
               paragraphSpacing={paragraphSpacing}
@@ -340,9 +345,11 @@ export default function EditorPage() {
         </main>
         
         <ResizablePanel side="right" defaultWidth={256} minWidth={200} maxWidth={400}>
-          <Inspector 
-            wordCount={wordCount} 
+          <Inspector
+            wordCount={wordCount}
             charCount={charCount}
+            selectedCharCount={selectedCharCount}
+            paragraphCount={paragraphCount}
             fileName={fileName}
             isDirty={isDirty}
             isSaving={isSaving}
