@@ -1,4 +1,5 @@
-@import './local-fonts.css';
+/* Local fonts are loaded conditionally - see lib/fonts.ts */
+/* If local font files don't exist, Google Fonts will be used as fallback */
 
 @tailwind base;
 @tailwind components;
@@ -271,4 +272,61 @@ html:not(.dark) {
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-border;
+}
+
+/* Statistics section header styles */
+.stats-header {
+  position: relative;
+  display: inline-block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--foreground-secondary);
+}
+
+.stats-header::before,
+.stats-header::after {
+  content: '【';
+  color: var(--foreground-tertiary);
+}
+
+.stats-header::after {
+  content: '】';
+}
+
+/* Tooltip styles for info icons */
+.info-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.info-tooltip-content {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: var(--background-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--foreground);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  z-index: 9999;
+}
+
+.dark .info-tooltip-content {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+
+.info-tooltip-wrapper:hover .info-tooltip-content {
+  opacity: 1;
+  visibility: visible;
 }
