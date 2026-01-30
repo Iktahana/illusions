@@ -107,7 +107,7 @@
       "fileAssociations": [
         {
           "ext": "mdi",
-          "name": "MDI Document",
+          "name": "MDI 文書",
           "icon": "build/mdi-icon.icns",
           "role": "Editor"
         }
@@ -127,9 +127,9 @@
       "fileAssociations": [
         {
           "ext": "mdi",
-          "name": "MDI Document",
+          "name": "MDI 文書",
           "icon": "build/mdi-icon.ico",
-          "description": "Illusions MDI Document"
+          "description": "Illusions の MDI 文書"
         }
       ]
     },
@@ -138,9 +138,9 @@
       "fileAssociations": [
         {
           "ext": "mdi",
-          "name": "MDI Document",
+          "name": "MDI 文書",
           "icon": "build/mdi-icon.png",
-          "description": "Illusions MDI Document"
+          "description": "Illusions の MDI 文書"
         }
       ]
     }
