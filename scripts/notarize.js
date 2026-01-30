@@ -12,11 +12,12 @@ exports.default = async function notarizing(context) {
 
   const appleId = process.env.APPLE_ID;
   const appleIdPassword = process.env.APPLE_ID_PASSWORD;
-  const teamId = process.env.TEAM_ID;
+  const teamId = process.env.TEAM_ID || process.env.APPLE_TEAM_ID;
 
   if (!appleId || !appleIdPassword || !teamId) {
-    console.warn('Skipping notarization: APPLE_ID, APPLE_ID_PASSWORD, or TEAM_ID not set');
-    return;
+    throw new Error(
+      'Missing notarization env: APPLE_ID, APPLE_ID_PASSWORD, or TEAM_ID/APPLE_TEAM_ID'
+    );
   }
 
   console.log(`Notarizing ${appPath}...`);

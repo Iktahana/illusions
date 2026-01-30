@@ -13,13 +13,18 @@ permissions:
   id-token: write
 
 jobs:
-  build:
-    name: Build (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
+  build-macos:
+    name: Build (macOS)
+    runs-on: macos-latest
+    environment: Apple
+    env:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      TEAM_ID: ${{ vars.TEAM_ID }}
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
     steps:
       - name: Checkout repository
@@ -50,8 +55,23 @@ jobs:
         run: npm run download:fonts
 
       - name: Build Quick Look plugin
-        if: runner.os == 'macOS'
         run: npm run build:quicklook
+
+      - name: Verify Apple signing env
+        shell: bash
+        run: |
+          missing=()
+          [ -z "$APPLE_ID" ] && missing+=("APPLE_ID")
+          [ -z "$APPLE_ID_PASSWORD" ] && missing+=("APPLE_ID_PASSWORD")
+          if [ -z "$TEAM_ID" ] && [ -z "$APPLE_TEAM_ID" ]; then
+            missing+=("TEAM_ID/APPLE_TEAM_ID")
+          fi
+          [ -z "$CSC_LINK" ] && missing+=("CSC_LINK")
+          [ -z "$CSC_KEY_PASSWORD" ] && missing+=("CSC_KEY_PASSWORD")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing required signing env: ${missing[*]}"
+            exit 1
+          fi
 
       - name: Build Electron application
         run: npm run electron:build
@@ -59,7 +79,48 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: illusions-${{ matrix.os }}-${{ steps.version.outputs.full }}
+          name: illusions-macos-${{ steps.version.outputs.full }}
+          path: dist-electron/**
+
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Compute build version
+        id: version
+        shell: bash
+        run: |
+          BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          echo "base=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building version: ${FULL_VERSION}"
+
+      - name: Update package.json version
+        run: npm version ${{ steps.version.outputs.full }} --no-git-tag-version
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Download local fonts
+        run: npm run download:fonts
+
+      - name: Build Electron application
+        run: npm run electron:build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: illusions-windows-${{ steps.version.outputs.full }}
           path: dist-electron/**
 
   build-pages:
@@ -99,7 +160,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: build
+    needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
 
     steps:

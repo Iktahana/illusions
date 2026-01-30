@@ -159,7 +159,7 @@ function EditorToolbar({
         {/* 縦書き/横書き */}
          <button
            onClick={onToggleVertical}
-           className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+           className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-accent text-accent-foreground hover:bg-accent-hover transition-colors"
          >
            <Type className="w-4 h-4" />
            {isVertical ? "縦書き" : "横書き"}
