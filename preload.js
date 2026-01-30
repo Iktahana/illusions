@@ -1,6 +1,5 @@
-// Electron preload script.
-// Expose a minimal, safe API surface to the renderer.
-// Comments in code must be in English.
+// Electron の preload スクリプト
+// レンダラへ最小限かつ安全なAPIだけを公開する
 
 const { contextBridge, ipcRenderer } = require('electron')
 
@@ -47,4 +46,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('menu-paste-as-plaintext', handler)
   },
 })
-
