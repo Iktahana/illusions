@@ -519,7 +519,7 @@ function StatsPanel({
   let paragraphWarning = '';
   let paragraphWarningColor = 'text-foreground-tertiary';
   if (avgParagraphLength > 150) {
-    paragraphWarning = '⚠️ 段落が長めです。改行を増やすとモバイルでの読みやすさが向上します';
+     paragraphWarning = '⚠️ 段落が長めです。改行を増やすとスマホで読みやすくなります';
     paragraphWarningColor = 'text-amber-600 dark:text-amber-500';
   } else if (avgParagraphLength > 0 && avgParagraphLength < 50) {
     paragraphWarning = '✓ テンポが良く、スマホでの読書に適しています';
@@ -579,8 +579,8 @@ function StatsPanel({
           <div className="bg-background-secondary rounded-lg p-3 border border-border flex items-center justify-between">
             <div>
               <p className="text-xs text-foreground-tertiary font-medium mb-1 flex items-center">
-                原稿用紙枚数
-                <InfoTooltip content="400字詰め原稿用紙（縦書き標準）に換算した枚数。出版業界の標準単位" />
+                 原稿用紙
+                 <InfoTooltip content="400字詰め原稿用紙（縦書き標準）に換算した枚数" />
               </p>
               <p className="text-xs text-foreground-tertiary">400字詰（縦書き標準）</p>
             </div>
@@ -863,7 +863,7 @@ function StatsPanel({
         {particleAnalysis && particleAnalysis.duplicates.length > 0 && !isSelection && (
          <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-4 border border-amber-200 dark:border-amber-900/50">
            <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-             ⚠️ 文字使用上の注意
+              ⚠️ 要チェック
            </h4>
            <div className="space-y-2">
              {particleAnalysis.duplicates.map((item, idx) => (
@@ -873,9 +873,9 @@ function StatsPanel({
                  <span className="text-foreground-tertiary"> ×{item.count}</span>
                </div>
              ))}
-             <p className="text-xs text-foreground-tertiary mt-2">
-               例：「のの」「にに」は文法的に誤りの可能性があります
-             </p>
+              <p className="text-xs text-foreground-tertiary mt-2">
+                例：「のの」「にに」は文法エラーの可能性があります
+              </p>
            </div>
          </div>
        )}
