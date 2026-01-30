@@ -716,10 +716,11 @@ function StatsPanel({
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex items-center gap-1 min-w-0">
                 <span className="text-sm text-foreground-secondary whitespace-nowrap">約物比率</span>
+                <span className="text-xs text-foreground-tertiary">({styleHint})</span>
                 <InfoTooltip content="記号・句読点の割合。15%超：会話文中心、8%未満：地の文中心" />
               </div>
               <span className="text-base font-medium text-foreground flex-shrink-0">
-                {punctuationRatio}% <span className="text-xs text-foreground-tertiary ml-1">({styleHint})</span>
+                {punctuationRatio}%
               </span>
             </div>
           </div>
