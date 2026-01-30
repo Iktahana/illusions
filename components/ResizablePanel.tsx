@@ -39,7 +39,7 @@ export default function ResizablePanel({
         newWidth = rect.right - e.clientX;
       }
 
-      // Clamp width between min and max
+      // 幅を min/max の範囲に収める
       newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
       setWidth(newWidth);
     };
@@ -53,7 +53,7 @@ export default function ResizablePanel({
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
 
-    // Prevent text selection while resizing
+    // リサイズ中のテキスト選択を防ぐ
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
 
@@ -78,7 +78,7 @@ export default function ResizablePanel({
     >
       {children}
 
-      {/* Resize Handle */}
+      {/* リサイズハンドル */}
       <div
         className={clsx(
           "absolute top-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-accent transition-all cursor-col-resize z-10 group",
@@ -86,7 +86,7 @@ export default function ResizablePanel({
         )}
         onMouseDown={handleMouseDown}
       >
-        {/* Visual indicator when hovering */}
+        {/* ホバー時の視覚インジケータ */}
         <div
           className={clsx(
             "absolute top-1/2 -translate-y-1/2 w-1 h-12 bg-border-secondary rounded-full opacity-0 group-hover:opacity-100 transition-opacity",
@@ -95,7 +95,7 @@ export default function ResizablePanel({
         />
       </div>
 
-      {/* Overlay during resize to prevent pointer events issues */}
+      {/* リサイズ中の操作を安定させるためのオーバーレイ */}
       {isResizing && (
         <div className="fixed inset-0 z-50 cursor-col-resize" />
       )}
