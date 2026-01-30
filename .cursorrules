@@ -4,6 +4,23 @@
 Refer to the detailed logic defined in:
 👉 `.cursor/rules/text-analysis.md`
 
+## Token Usage Optimization (Critical)
+1. **Read Files Selectively**:
+   - ❌ DO NOT read entire codebase or directory tree without specific need
+   - ✅ Only read files that are directly relevant to the current task
+   - ✅ Use `Grep` to search for specific patterns before reading files
+   - ✅ Use `offset` and `limit` parameters when reading large files
+
+2. **Tool Selection**:
+   - Prefer `Grep` over reading multiple files to find specific code
+   - Use `Glob` to find files by pattern, then selectively read
+   - Avoid using `Read` on generated files (dist/, out/, node_modules/, .next/)
+
+3. **Context Management**:
+   - Only include necessary context in responses
+   - Avoid uploading unchanged code snippets back to user
+   - Be concise in explanations unless user asks for details
+
 ## Global Execution Context (Strict)
 1. **Selection Intelligence**:
    - IF text is SELECTED: Process ONLY the selected text.
