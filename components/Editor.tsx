@@ -50,14 +50,14 @@ export default function NovelEditor({
   searchOpenTrigger = 0,
   showParagraphNumbers = false,
 }: EditorProps) {
-  // Start with false to avoid hydration mismatch
+  // ハイドレーション不整合を避けるため、初期値は false にする
   const [isVertical, setIsVertical] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Load from localStorage after mounting (client-side only)
+  // マウント後に localStorage から読み込む（クライアントのみ）
   useEffect(() => {
     setIsMounted(true);
     const saved = localStorage.getItem('illusions-writing-mode');
@@ -66,7 +66,7 @@ export default function NovelEditor({
     }
   }, []);
 
-  // Save vertical state to localStorage when it changes
+  // 変更時に縦書き状態を localStorage に保存する
   useEffect(() => {
     if (!isMounted) return;
     localStorage.setItem('illusions-writing-mode', isVertical ? 'vertical' : 'horizontal');
@@ -76,7 +76,7 @@ export default function NovelEditor({
     setIsSearchOpen(true);
   };
 
-  // Listen for search open trigger from parent (keyboard shortcut)
+  // 親からのトリガーで検索ダイアログを開く（ショートカット）
   useEffect(() => {
     if (searchOpenTrigger > 0) {
       handleSearchOpen();
@@ -85,7 +85,7 @@ export default function NovelEditor({
 
   return (
     <div className={clsx("flex flex-col h-full min-h-0 relative", className)}>
-      {/* Editor Toolbar */}
+      {/* ツールバー */}
       <EditorToolbar
         isVertical={isVertical}
         onToggleVertical={() => setIsVertical(!isVertical)}
@@ -94,7 +94,7 @@ export default function NovelEditor({
         onSearchClick={handleSearchOpen}
       />
 
-      {/* Editor Area */}
+      {/* エディタ領域 */}
       <div
         ref={scrollContainerRef}
         className="flex-1 bg-background-secondary relative min-h-0 pt-12"
@@ -124,13 +124,13 @@ export default function NovelEditor({
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
 
-        {/* Selection Counter - positioned relative to editor */}
+        {/* 選択文字数（エディタ基準で配置） */}
         {editorViewInstance && (
           <SelectionCounter editorView={editorViewInstance} isVertical={isVertical} />
         )}
       </div>
 
-      {/* Search Dialog */}
+      {/* 検索ダイアログ */}
       <SearchDialog
         editorView={editorViewInstance}
         isOpen={isSearchOpen}
@@ -156,7 +156,7 @@ function EditorToolbar({
   return (
     <div className="h-12 border-b border-border bg-background flex items-center justify-between px-4">
       <div className="flex items-center gap-4">
-        {/* Vertical Writing Toggle */}
+        {/* 縦書き/横書き */}
          <button
            onClick={onToggleVertical}
            className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
@@ -165,7 +165,7 @@ function EditorToolbar({
            {isVertical ? "縦書き" : "横書き"}
          </button>
 
-        {/* Display current settings */}
+        {/* 現在の設定 */}
         <div className="flex items-center gap-2 text-xs text-foreground-secondary">
           <AlignLeft className="w-4 h-4 text-foreground-tertiary" />
           <span>{fontScale}% / {lineHeight.toFixed(1)}</span>
@@ -177,7 +177,7 @@ function EditorToolbar({
           Illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
         </div>
 
-        {/* Search Button */}
+        {/* 検索 */}
         <button
           onClick={onSearchClick}
           className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
@@ -223,13 +223,13 @@ function MilkdownEditor({
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
-  // Store initial content at mount time - this should only change when component remounts (file switch)
+  // 初期内容はマウント時に固定（ファイル切り替えでコンポーネントが再マウントされたときだけ変わる）
   const initialContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
   const onInsertTextRef = useRef(onInsertText);
   const onSelectionChangeRef = useRef(onSelectionChange);
 
-  // Update refs when they change
+  // コールバックが変わったら ref を更新する
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -251,7 +251,7 @@ function MilkdownEditor({
         ctx.set(rootCtx, root);
         ctx.set(defaultValueCtx, value);
       })
-      // Load listener plugin BEFORE accessing listenerCtx
+      // listenerCtx 参照より先に listener を読み込む
       .use(listener)
       .config((ctx) => {
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
@@ -269,9 +269,9 @@ function MilkdownEditor({
       .use(history)
       .use(clipboard)
       .use(cursor);
-  }, [isVertical]); // Only recreate editor when isVertical changes
+  }, [isVertical]); // isVertical が変わったときのみ作り直す
 
-  // Get editor view instance
+  // EditorView インスタンスを取得する
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     let attempts = 0;
@@ -290,9 +290,9 @@ function MilkdownEditor({
           }
         }
       } catch {
-        // Editor not ready yet
+        // まだ準備中
       }
-      // Retry if not ready yet
+      // 取得できるまでリトライ
       if (attempts < maxAttempts) {
         timer = setTimeout(tryGetEditorView, 100);
       }
@@ -303,7 +303,7 @@ function MilkdownEditor({
     return () => clearTimeout(timer);
   }, [get, onEditorViewReady]);
 
-  // Track selection changes
+  // 選択範囲の変更を追跡する
   useEffect(() => {
     if (!editorViewInstance) return;
 
@@ -312,19 +312,19 @@ function MilkdownEditor({
       const { selection } = state;
       const { from, to } = selection;
 
-      // Only count when there's a selection
+      // 選択がない場合は 0
       if (from === to) {
         onSelectionChangeRef.current?.(0);
         return;
       }
 
-      // Get selected text and count characters (excluding whitespace)
+      // 選択文字列の文字数を数える（空白は除外）
       const selectedText = state.doc.textBetween(from, to);
       const count = selectedText.replace(/\s/g, "").length;
       onSelectionChangeRef.current?.(count);
     };
 
-    // Listen to selection changes
+    // 選択変更を購読
     const editorDom = editorViewInstance.dom;
 
     const handleMouseUp = () => {
@@ -343,7 +343,7 @@ function MilkdownEditor({
     editorDom.addEventListener("keyup", handleKeyUp);
     document.addEventListener("selectionchange", handleSelectionChange);
 
-    // Initial check
+    // 初期値
     updateSelectionCount();
 
     return () => {
@@ -353,9 +353,9 @@ function MilkdownEditor({
     };
   }, [editorViewInstance]);
 
-  // Handle vertical mode change without recreating the entire editor
+  // エディタ全体を作り直さずに縦書き/横書きを切り替える
   useEffect(() => {
-    // Use a small delay to ensure the editor is fully initialized
+    // 初期化完了を待つため少し遅延する
     const timer = setTimeout(() => {
       try {
         const editor = get();
@@ -363,10 +363,10 @@ function MilkdownEditor({
         
         const editorDom = editorRef.current?.querySelector('.milkdown .ProseMirror');
         if (editorDom) {
-          // Remove both classes first to ensure clean state
+          // まず両方のクラスを外して状態をリセットする
           editorDom.classList.remove('milkdown-japanese-vertical', 'milkdown-japanese-horizontal');
           
-          // Add appropriate class based on mode
+          // モードに応じてクラスを付与
           if (isVertical) {
             editorDom.classList.add('milkdown-japanese-vertical');
           } else {
@@ -374,18 +374,18 @@ function MilkdownEditor({
           }
         }
       } catch {
-        // Editor context not ready yet, ignore
+        // まだ準備中なら無視
       }
     }, 100);
     
     return () => clearTimeout(timer);
   }, [isVertical, get]);
 
-  // Track previous style values to avoid unnecessary animations
+  // 不要なアニメーションを避けるため、直前のスタイル値を保持する
   const prevStyleRef = useRef({ charsPerLine, isVertical, fontFamily, fontScale, lineHeight });
   const isFirstRenderRef = useRef(true);
 
-  // Apply character per line limit using JavaScript measurement
+  // 1行あたりの文字数制限を、実測値を使って適用する
   useEffect(() => {
     const editorContainer = editorRef.current;
     const editorDom = editorContainer?.querySelector('.milkdown .ProseMirror') as HTMLElement;
@@ -399,15 +399,15 @@ function MilkdownEditor({
       prev.fontScale !== fontScale ||
       prev.lineHeight !== lineHeight;
 
-    // Update prev ref
+    // 直前値を更新
     prevStyleRef.current = { charsPerLine, isVertical, fontFamily, fontScale, lineHeight };
 
-    // Skip animation if styles haven't changed (e.g., just editor rebuild from save)
+    // スタイルが変わっていない場合はアニメーションをしない（保存による再構築など）
     const shouldAnimate = styleChanged && !isFirstRenderRef.current;
     isFirstRenderRef.current = false;
 
     const applyStyles = () => {
-      // Reset styles first
+      // まずスタイルをリセット
       editorDom.style.width = '';
       editorDom.style.maxWidth = '';
       editorDom.style.height = '';
@@ -415,14 +415,14 @@ function MilkdownEditor({
       editorDom.style.minHeight = '';
       editorDom.style.margin = '';
 
-      // Remove any existing spacer
+      // 既存のスペーサーを削除
       const existingSpacer = editorContainer?.querySelector('.vertical-spacer');
       if (existingSpacer) {
         existingSpacer.remove();
       }
 
       if (charsPerLine > 0) {
-        // Create a measurement element to get the actual character size
+        // 実際の文字サイズを測るための要素を作る
         const measureEl = document.createElement('span');
         measureEl.style.cssText = `
           position: absolute;
@@ -432,75 +432,73 @@ function MilkdownEditor({
           font-size: ${fontScale}%;
           line-height: ${lineHeight};
         `;
-        measureEl.textContent = '国'; // Use a full-width character for Japanese
+        measureEl.textContent = '国'; // 全角文字で測定
         document.body.appendChild(measureEl);
         
-        // Japanese characters are typically square
+        // 和文の全角文字は概ね正方形に近い
         const charSize = measureEl.offsetWidth;
         document.body.removeChild(measureEl);
 
-        // Apply the calculated size to the editor
+        // 計算したサイズをエディタへ適用
         if (isVertical) {
-          // In vertical mode, limit height (characters per column)
+          // 縦書き: 高さを制限（1列あたりの文字数）
           const targetHeight = charSize * charsPerLine;
           editorDom.style.height = `${targetHeight}px`;
           editorDom.style.maxHeight = `${targetHeight}px`;
           editorDom.style.minHeight = `${targetHeight}px`;
         } else {
-          // In horizontal mode, limit width (characters per line) and center horizontally
+          // 横書き: 幅を制限（1行あたりの文字数）し、中央寄せ
           const targetWidth = charSize * charsPerLine;
           editorDom.style.width = `${targetWidth}px`;
           editorDom.style.maxWidth = `${targetWidth}px`;
-          editorDom.style.margin = '0 auto'; // Center horizontally
+          editorDom.style.margin = '0 auto'; // 中央寄せ
         }
       }
 
-      // For vertical mode, ensure the editor fills the container width
-      // This prevents content from appearing stuck on the right when there's little text
+      // 縦書き: コンテナ幅を埋める最小幅を設定し、短文でも右側に寄り切るのを防ぐ
       if (isVertical && scrollContainerRef.current) {
-        // Use requestAnimationFrame to ensure DOM has been updated
+        // DOM更新後に計算する
         requestAnimationFrame(() => {
           const container = scrollContainerRef.current;
           if (!container) return;
           
           const containerWidth = container.clientWidth;
-          // Calculate the padding (px-16 = 64px on each side)
+          // パディング（px-16 = 左右 64px）
           const padding = 128; // 64px * 2
           const minWidth = containerWidth - padding;
           
-          // Set minimum width on the ProseMirror element
-          // In vertical-rl mode, content flows from right to left
-          // By ensuring min-width fills the container, content will start from the right edge
+          // ProseMirror に最小幅を設定
+          // vertical-rl では右→左へ流れるため、最小幅を確保すると開始位置が右端に揃う
           editorDom.style.minWidth = `${minWidth}px`;
         });
       } else {
-        // Remove min-width for horizontal mode
+        // 横書きでは最小幅を解除
         editorDom.style.minWidth = '';
       }
     };
 
     if (shouldAnimate) {
-      // Fade out before making changes
+      // 変更前にフェードアウト
       editorDom.style.transition = 'opacity 0.15s ease-out';
       editorDom.style.opacity = '0';
 
-      // Delay to ensure editor DOM is ready and fade out completes
+      // DOMの準備とフェードアウト完了を待って適用
       const timer = setTimeout(() => {
         applyStyles();
 
-        // Fade in after changes are applied
+        // 適用後にフェードイン
         requestAnimationFrame(() => {
           editorDom.style.transition = 'opacity 0.25s ease-in';
           editorDom.style.opacity = '1';
           
-          // After fade in completes, scroll to right for vertical mode
+          // フェードイン後、縦書きは右端へスクロール
           if (isVertical && scrollContainerRef.current) {
             setTimeout(() => {
               const container = scrollContainerRef.current;
               if (container) {
                 container.scrollLeft = container.scrollWidth;
               }
-            }, 250); // Wait for fade in to complete
+            }, 250); // フェードイン完了を待つ
           }
         });
       }, 150);
@@ -509,11 +507,11 @@ function MilkdownEditor({
         clearTimeout(timer);
       };
     } else {
-      // No animation, just apply styles immediately
+      // アニメーションなしで即時適用
       applyStyles();
       editorDom.style.opacity = '1';
       
-      // Scroll to right for vertical mode on first render
+      // 初回レンダー時、縦書きは右端へスクロール
       if (isVertical && scrollContainerRef.current) {
         const container = scrollContainerRef.current;
         if (container) {
@@ -523,16 +521,16 @@ function MilkdownEditor({
     }
   }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get]);
 
-  // Convert vertical mouse wheel to horizontal scroll in vertical mode
+  // 縦書き時: マウスホイールの縦スクロールを横スクロールへ変換する
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || !isVertical) return;
 
     const handleWheel = (event: WheelEvent) => {
-      // Detect if it's a touchpad by checking:
-      // 1. Has both deltaX and deltaY (most touchpads support 2D scrolling)
-      // 2. Has fine-grained values (not coarse like 100, -100)
-      // 3. ctrlKey is not pressed (pinch zoom)
+      // トラックパッド判定:
+      // 1) deltaX と deltaY の両方が出る（2Dスクロール）
+      // 2) 値が細かい（100/-100のように粗くない）
+      // 3) ctrlKey が押されていない（ピンチズーム除外）
       const hasBothAxes = Math.abs(event.deltaX) > 0 && Math.abs(event.deltaY) > 0;
       const hasFineGrainedValues = 
         (Math.abs(event.deltaY) < 50 && Math.abs(event.deltaY) > 0) ||
@@ -540,22 +538,20 @@ function MilkdownEditor({
       const isTouchpad = hasBothAxes || (hasFineGrainedValues && !event.ctrlKey);
 
       if (isTouchpad) {
-        // Touchpad: Keep natural scroll direction
-        // User swipes up/down -> content scrolls up/down
-        // User swipes left/right -> content scrolls left/right
+        // トラックパッド: 自然なスクロールを維持
         container.scrollLeft += event.deltaX;
         container.scrollTop += event.deltaY;
         event.preventDefault();
       } else {
-        // Mouse wheel:
-        // - Vertical wheel (deltaY) -> horizontal scroll (for vertical text)
-        // - Horizontal wheel (deltaX) -> vertical scroll
+        // マウスホイール:
+        // - 縦回転（deltaY）→ 横スクロール（縦書きの読み進め方向）
+        // - 横回転（deltaX）→ 縦スクロール
         if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
-          // Vertical wheel scroll
+          // 縦回転
           container.scrollLeft += event.deltaY;
           event.preventDefault();
         } else if (Math.abs(event.deltaX) > 0) {
-          // Horizontal wheel scroll (rare, but some mice have it)
+          // 横回転（対応マウスのみ）
           container.scrollTop += event.deltaX;
           event.preventDefault();
         }
@@ -569,7 +565,7 @@ function MilkdownEditor({
     };
   }, [isVertical, scrollContainerRef]);
 
-  // Handle format commands from BubbleMenu
+  // BubbleMenu からの書式コマンドを処理する
   const handleFormat = (format: FormatType, level?: number) => {
     try {
       const editor = get();
@@ -595,7 +591,7 @@ function MilkdownEditor({
           break;
         case "heading":
           if (level) {
-            // Use standard command - headingIdFixer plugin will add ID
+            // 標準コマンドを使用（headingIdFixer がIDを付与する）
             execute(wrapInHeadingCommand.key, level);
           }
           break;
@@ -618,7 +614,7 @@ function MilkdownEditor({
           break;
       }
     } catch (error) {
-      console.error("Format command failed:", error);
+      console.error("書式コマンドの実行に失敗しました:", error);
     }
   };
 
@@ -687,7 +683,7 @@ function MilkdownEditor({
               writing-mode: horizontal-tb;
             ` : 'content: none;'}
           }
-          /* Don't apply indent to headings, lists, blockquotes, etc. */
+          /* 見出し・リスト・引用などには字下げを適用しない */
           div :global(.milkdown .ProseMirror h1),
           div :global(.milkdown .ProseMirror h2),
           div :global(.milkdown .ProseMirror h3),
@@ -700,7 +696,7 @@ function MilkdownEditor({
           }
         `}</style>
         <style jsx global>{`
-          /* Start editor content transparent, JS will fade it in after layout */
+          /* 初期表示は透明にし、レイアウト確定後にJSでフェードインする */
           .editor-content-area .milkdown .ProseMirror {
             opacity: 0;
           }
