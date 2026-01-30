@@ -26,7 +26,7 @@ const writeStoredTab = (tab: Tab) => {
   try {
     window.localStorage.setItem(rightTabStorageKey, tab);
   } catch (error) {
-    console.error("Failed to persist right tab:", error);
+    console.error("右サイドのタブ状態を保存できませんでした:", error);
   }
 };
 
@@ -100,8 +100,9 @@ export default function Inspector({
   readabilityAnalysis,
   particleAnalysis,
 }: InspectorProps) {
-  const [activeTab, setActiveTab] = useState<Tab>(() => readStoredTab() ?? "ai");
+  const [activeTab, setActiveTab] = useState<Tab>("ai");
   const hasLoadedRef = useRef(false);
+  const [isTabReady, setIsTabReady] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -118,10 +119,11 @@ export default function Inspector({
           setActiveTab(appState?.inspectorTab ?? "ai");
         }
       } catch (error) {
-        console.error("Failed to load right tab:", error);
+        console.error("右サイドのタブ状態を読み込めませんでした:", error);
       } finally {
         if (mounted) {
           hasLoadedRef.current = true;
+          setIsTabReady(true);
         }
       }
     };
@@ -136,8 +138,8 @@ export default function Inspector({
   useEffect(() => {
     if (!hasLoadedRef.current) return;
     writeStoredTab(activeTab);
-    void persistAppState({ inspectorTab: activeTab }).catch((error) => {
-      console.error("Failed to persist right tab:", error);
+    void persistAppState({ inspectorTab: activeTab }).catch((error: unknown) => {
+      console.error("右サイドのタブ状態を保存できませんでした:", error);
     });
   }, [activeTab]);
   const [isEditingFileName, setIsEditingFileName] = useState(false);
@@ -198,7 +200,13 @@ export default function Inspector({
    };
 
   return (
-    <aside className={clsx("h-full bg-background border-l border-border flex flex-col", className)}>
+    <aside
+      className={clsx(
+        "h-full bg-background border-l border-border flex flex-col transition-opacity duration-150",
+        !isTabReady && "opacity-0 pointer-events-none",
+        className
+      )}
+    >
       {/* ファイル状態 */}
       <div className="px-4 py-3 border-b border-border bg-background-secondary">
         <div className="flex items-center justify-between mb-1">
