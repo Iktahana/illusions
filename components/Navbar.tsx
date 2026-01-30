@@ -83,7 +83,7 @@ export default function Navbar({
           role="status"
           className="fixed top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-background-elevated text-foreground text-sm rounded-lg shadow-lg animate-fade-out border border-border"
         >
-          保存成功
+          保存しました
         </div>
       )}
     </nav>
