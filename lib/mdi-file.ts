@@ -1,14 +1,13 @@
-// Cross-platform .mdi file open/save abstraction.
-// Comments in code must be in English.
+// クロスプラットフォームな .mdi ファイルの開閉/保存
 
 import { getRuntimeEnvironment, isBrowser } from "./runtime-env";
 
 export interface MdiFileDescriptor {
-  /** Absolute path on disk (Electron) or null when using browser file handles. */
+  /** 絶対パス（Electron）/ ブラウザのファイルハンドル利用時は null */
   path: string | null;
-  /** FileSystemAccessAPI handle in browsers, null in Electron. */
+  /** ブラウザでは File System Access API のハンドル / Electron では null */
   handle: FileSystemFileHandle | null;
-  /** File name (basename only). */
+  /** ファイル名（ベース名のみ） */
   name: string;
 }
 
@@ -23,7 +22,7 @@ export interface SaveMdiParams {
 }
 
 /**
- * Open a .mdi document, using Electron IPC or the File System Access API.
+ * .mdi 文書を開く（Electron IPC / File System Access API）
  */
 export async function openMdiFile(): Promise<OpenMdiResult | null> {
   const env = getRuntimeEnvironment();
@@ -43,13 +42,13 @@ export async function openMdiFile(): Promise<OpenMdiResult | null> {
         content,
       };
     } catch (error) {
-      console.error("Failed to open .mdi file via Electron IPC:", error);
+      console.error("Electron IPC 経由で .mdi を開けませんでした:", error);
       return null;
     }
   }
 
   if (!isBrowser() || !hasShowOpenFilePicker(window)) {
-    console.warn("File System Access API is not supported in this environment.");
+    console.warn("この環境では File System Access API を利用できません。");
     return null;
   }
 
@@ -57,13 +56,13 @@ export async function openMdiFile(): Promise<OpenMdiResult | null> {
     const [handle] = await window.showOpenFilePicker({
       types: [
         {
-          description: "MDI Document",
+          description: "MDI 文書",
           accept: {
             "text/plain": [".mdi"],
           },
         },
         {
-          description: "All Files",
+          description: "すべてのファイル",
           accept: {
             "*/*": [],
           },
@@ -86,15 +85,15 @@ export async function openMdiFile(): Promise<OpenMdiResult | null> {
     };
   } catch (error) {
     if ((error as { name?: string }).name !== "AbortError") {
-      console.error("Failed to open .mdi file via File System Access API:", error);
+      console.error("File System Access API 経由で .mdi を開けませんでした:", error);
     }
     return null;
   }
 }
 
 /**
- * Save a .mdi document, reusing the existing descriptor when possible.
- * For new files, this will prompt the user with a "Save As" style dialog.
+ * .mdi 文書を保存する（可能なら既存ディスクリプタを再利用）
+ * 新規の場合は「名前を付けて保存」相当のダイアログを出す
  */
 export async function saveMdiFile(
   params: SaveMdiParams
@@ -119,18 +118,18 @@ export async function saveMdiFile(
         content,
       };
     } catch (error) {
-      console.error("Failed to save .mdi file via Electron IPC:", error);
+      console.error("Electron IPC 経由で .mdi を保存できませんでした:", error);
       return null;
     }
   }
 
   if (!isBrowser()) {
-    console.warn("Cannot save .mdi file outside of a browser or Electron renderer.");
+    console.warn("ブラウザ/Electron レンダラ以外では .mdi を保存できません。");
     return null;
   }
 
   if (!descriptor?.handle && !hasShowSaveFilePicker(window)) {
-    console.warn("File System Access API is not supported for saving .mdi.");
+    console.warn("この環境では File System Access API による .mdi 保存ができません。");
     return null;
   }
 
@@ -142,7 +141,7 @@ export async function saveMdiFile(
         suggestedName: ensureMdiExtension(descriptor?.name ?? "untitled.mdi"),
         types: [
           {
-            description: "MDI Document",
+            description: "MDI 文書",
             accept: {
               "text/plain": [".mdi"],
             },
@@ -155,7 +154,7 @@ export async function saveMdiFile(
       return null;
     }
 
-    // Check and request permission if needed (for persisted handles)
+    // 永続化されたハンドルの場合、必要なら権限確認/要求を行う
     if (descriptor?.handle && "queryPermission" in handle) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -164,12 +163,12 @@ export async function saveMdiFile(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const requestResult = await (handle as any).requestPermission({ mode: "readwrite" });
           if (requestResult !== "granted") {
-            console.warn("Write permission not granted for file handle");
+            console.warn("ファイルハンドルの書き込み権限が許可されませんでした");
             return null;
           }
         }
       } catch (err) {
-        console.warn("Permission check failed, attempting to write anyway:", err);
+        console.warn("権限確認に失敗しました（可能ならそのまま書き込みを試みます）:", err);
       }
     }
 
@@ -189,7 +188,7 @@ export async function saveMdiFile(
     };
   } catch (error) {
     if ((error as { name?: string }).name !== "AbortError") {
-      console.error("Failed to save .mdi file via File System Access API:", error);
+      console.error("File System Access API 経由で .mdi を保存できませんでした:", error);
     }
     return null;
   }
@@ -223,4 +222,3 @@ function hasShowSaveFilePicker(
 } {
   return "showSaveFilePicker" in w;
 }
-
