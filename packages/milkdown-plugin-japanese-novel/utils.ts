@@ -1,28 +1,28 @@
 /**
- * Utility functions for Japanese novel plugin: character count, manuscript pages.
+ * 日本語小説向けプラグイン用ユーティリティ（文字数/原稿用紙枚数）
  */
 
 const RUBY_PATTERN = /\{([^|]+)\|([^}]+)\}/g
 const MARKDOWN_SYNTAX = /[#*_\[\]()`!\\>-]/g
 
 /**
- * Strip Ruby syntax, keeping only base text. Used for character count.
+ * ルビ記法を除去し、本文（base）だけ残す（文字数カウント用）
  */
 function stripRuby(text: string): string {
   return text.replace(RUBY_PATTERN, '$1')
 }
 
 /**
- * Strip common Markdown syntax for a rough character count.
- * Does not parse full Markdown (e.g. links, images).
+ * 文字数の概算用に Markdown 記法をざっくり除去する
+ * リンク/画像などの完全な解析はしない
  */
 function stripMarkdownSyntax(text: string): string {
   return text.replace(MARKDOWN_SYNTAX, '').trim()
 }
 
 /**
- * Count characters (including CJK) for manuscript calculation.
- * Uses Array.from to count grapheme clusters / Unicode code points correctly.
+ * 原稿用紙換算のための文字数を数える（CJK を含む）
+ * Array.from でコードポイント単位に数える
  */
 export function countCharacters(text: string): number {
   const cleaned = stripMarkdownSyntax(stripRuby(text))
@@ -30,8 +30,8 @@ export function countCharacters(text: string): number {
 }
 
 /**
- * Calculate 400-character manuscript pages (400字詰原稿用紙).
- * Standard Japanese manuscript format: 20×20 characters per page.
+ * 400字詰原稿用紙の枚数を算出する
+ * 標準: 20×20（400字/枚）
  */
 export function calculateManuscriptPages(text: string): number {
   const n = countCharacters(text)
