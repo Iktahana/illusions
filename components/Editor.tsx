@@ -23,6 +23,7 @@ interface EditorProps {
   initialContent?: string;
   onChange?: (content: string) => void;
   onInsertText?: (text: string) => void;
+  onSelectionChange?: (charCount: number) => void;
   className?: string;
   fontScale?: number;
   lineHeight?: number;
@@ -34,10 +35,11 @@ interface EditorProps {
   showParagraphNumbers?: boolean;
 }
 
-export default function NovelEditor({ 
-  initialContent = "", 
-  onChange, 
-  onInsertText, 
+export default function NovelEditor({
+  initialContent = "",
+  onChange,
+  onInsertText,
+  onSelectionChange,
   className,
   fontScale = 100,
   lineHeight = 1.8,
@@ -107,6 +109,7 @@ export default function NovelEditor({
               initialContent={initialContent}
               onChange={onChange}
               onInsertText={onInsertText}
+              onSelectionChange={onSelectionChange}
               isVertical={isVertical}
               fontScale={fontScale}
               lineHeight={lineHeight}
@@ -191,6 +194,7 @@ function MilkdownEditor({
   initialContent,
   onChange,
   onInsertText,
+  onSelectionChange,
   isVertical,
   fontScale,
   lineHeight,
@@ -205,6 +209,7 @@ function MilkdownEditor({
   initialContent: string;
   onChange?: (content: string) => void;
   onInsertText?: (text: string) => void;
+  onSelectionChange?: (charCount: number) => void;
   isVertical: boolean;
   fontScale: number;
   lineHeight: number;
@@ -222,8 +227,9 @@ function MilkdownEditor({
   const initialContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
   const onInsertTextRef = useRef(onInsertText);
+  const onSelectionChangeRef = useRef(onSelectionChange);
 
-  // Update onChange ref when it changes
+  // Update refs when they change
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -232,6 +238,10 @@ function MilkdownEditor({
   useEffect(() => {
     onInsertTextRef.current = onInsertText;
   }, [onInsertText]);
+
+  useEffect(() => {
+    onSelectionChangeRef.current = onSelectionChange;
+  }, [onSelectionChange]);
 
   const { get } = useEditor((root) => {
     const value = initialContentRef.current;
@@ -266,7 +276,7 @@ function MilkdownEditor({
     let timer: ReturnType<typeof setTimeout>;
     let attempts = 0;
     const maxAttempts = 10;
-    
+
     const tryGetEditorView = () => {
       attempts++;
       try {
@@ -287,11 +297,61 @@ function MilkdownEditor({
         timer = setTimeout(tryGetEditorView, 100);
       }
     };
-    
+
     timer = setTimeout(tryGetEditorView, 100);
 
     return () => clearTimeout(timer);
   }, [get, onEditorViewReady]);
+
+  // Track selection changes
+  useEffect(() => {
+    if (!editorViewInstance) return;
+
+    const updateSelectionCount = () => {
+      const { state } = editorViewInstance;
+      const { selection } = state;
+      const { from, to } = selection;
+
+      // Only count when there's a selection
+      if (from === to) {
+        onSelectionChangeRef.current?.(0);
+        return;
+      }
+
+      // Get selected text and count characters (excluding whitespace)
+      const selectedText = state.doc.textBetween(from, to);
+      const count = selectedText.replace(/\s/g, "").length;
+      onSelectionChangeRef.current?.(count);
+    };
+
+    // Listen to selection changes
+    const editorDom = editorViewInstance.dom;
+
+    const handleMouseUp = () => {
+      setTimeout(updateSelectionCount, 10);
+    };
+
+    const handleKeyUp = () => {
+      setTimeout(updateSelectionCount, 10);
+    };
+
+    const handleSelectionChange = () => {
+      setTimeout(updateSelectionCount, 10);
+    };
+
+    editorDom.addEventListener("mouseup", handleMouseUp);
+    editorDom.addEventListener("keyup", handleKeyUp);
+    document.addEventListener("selectionchange", handleSelectionChange);
+
+    // Initial check
+    updateSelectionCount();
+
+    return () => {
+      editorDom.removeEventListener("mouseup", handleMouseUp);
+      editorDom.removeEventListener("keyup", handleKeyUp);
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [editorViewInstance]);
 
   // Handle vertical mode change without recreating the entire editor
   useEffect(() => {
