@@ -1,21 +1,21 @@
 /**
- * Remark plugins for Japanese novel syntax: Ruby {base|ruby} and TCY (tate-chu-yoko).
+ * 日本語小説向けの記法（ルビ/縦中横など）を扱う Remark プラグイン
  */
 
 import type { Root } from 'mdast'
 import type { Plugin } from 'unified'
 import { visit } from 'unist-util-visit'
 
-/** Ruby pattern: {base|ruby} */
+/** ルビ: {base|ruby} */
 const RUBY_RE = /\{([^|]+)\|([^}]+)\}/g
 
-/** TCY: ^text^ for tate-chu-yoko (縦中横). */
+/** 縦中横: ^text^ */
 const TCY_RE = /\^([^^]+)\^/g
 
-/** No-break pattern: [[no-break:text]] */
+/** 改行禁止: [[no-break:text]] */
 const NO_BREAK_RE = /\[\[no-break:([^\]]+)\]\]/g
 
-/** Kerning pattern: [[kern:amount:text]] with validation */
+/** カーニング: [[kern:amount:text]]（amount は検証する） */
 const KERN_RE = /\[\[kern:([+-]?\d+(?:\.\d+)?em):([^\]]+)\]\]/g
 const KERN_AMOUNT_VALID_RE = /^[+-]?\d+(\.\d+)?em$/
 
@@ -137,11 +137,11 @@ function splitKern(text: string): InlineNode[] {
     const amount = m[1]!
     const kernText = m[2]!
     
-    // Validate amount format for security
+    // セキュリティのため amount の形式を検証する
     if (KERN_AMOUNT_VALID_RE.test(amount)) {
       segments.push({ type: 'kern', amount, text: kernText })
     } else {
-      // Invalid format, keep as plain text
+      // 不正な形式はプレーンテキストとして扱う
       segments.push({ type: 'text', value: m[0] })
     }
     lastIndex = m.index + m[0].length
@@ -192,7 +192,7 @@ export const remarkKernPlugin: Plugin<[RemarkKernOptions | undefined], Root> = (
 
 export const remarkHeadingAnchorPlugin: Plugin<[], Root> = () => {
   return (tree) => {
-    // No longer need to process heading anchors
-    // IDs are generated from heading content directly
+    // 見出しアンカーはここでは処理しない
+    // ID は見出しの内容から直接生成される
   }
 }
