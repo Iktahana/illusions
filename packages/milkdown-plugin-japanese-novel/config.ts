@@ -1,19 +1,19 @@
 /**
- * Plugin configuration options for milkdown-plugin-japanese-novel.
+ * milkdown-plugin-japanese-novel の設定オプション
  */
 
 export interface JapaneseNovelOptions {
-  /** Enable vertical writing mode (縦書き). */
+  /** 縦書きを有効化する */
   isVertical?: boolean
-  /** Show manuscript-style grid lines (原稿用紙). */
+  /** 原稿用紙風の罫線を表示する */
   showManuscriptLine?: boolean
-  /** Enable tate-chu-yoko (縦中横) with ^...^ syntax. */
+  /** 縦中横を有効化する（^...^ 記法） */
   enableTcy?: boolean
-  /** Enable Ruby (振仮名) syntax {base|ruby}. */
+  /** ルビを有効化する（{base|ruby} 記法） */
   enableRuby?: boolean
-  /** Enable no-break [[no-break:text]] syntax. */
+  /** 改行禁止を有効化する（[[no-break:text]] 記法） */
   enableNoBreak?: boolean
-  /** Enable kerning [[kern:amount:text]] syntax. */
+  /** カーニング指定を有効化する（[[kern:amount:text]] 記法） */
   enableKern?: boolean
 }
 
