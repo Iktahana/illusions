@@ -1,14 +1,14 @@
 /**
- * Google Fonts Japanese Font Management
- * 
- * This module manages Japanese fonts from Google Fonts.
- * The font list is hardcoded and should be manually updated periodically.
- * Last updated: 2024-01-29
+ * Google Fonts 日本語フォント管理
+ *
+ * Google Fonts の日本語フォントを扱うためのモジュール。
+ * フォント一覧はハードコードしているため、定期的に手動で更新する。
+ * 最終更新: 2024-01-29
  */
 
 export interface FontInfo {
   family: string;
-  localizedName?: string; // Native language name (e.g., Japanese name for Japanese fonts)
+  localizedName?: string; // 表示名（例: 日本語フォントの日本語表記）
   category: 'serif' | 'sans-serif' | 'display' | 'handwriting' | 'monospace';
   variants?: string[];
 }
@@ -20,7 +20,7 @@ export interface SystemFontInfo extends FontInfo {
 }
 
 /**
- * Featured Japanese fonts (displayed at the top of the selector)
+ * おすすめフォント（セレクタ上部に表示）
  */
 export const FEATURED_JAPANESE_FONTS: FontInfo[] = [
   { family: 'Noto Serif JP', localizedName: 'Noto 明朝', category: 'serif' },
@@ -111,7 +111,7 @@ export const LOCAL_SYSTEM_FONTS: SystemFontInfo[] = [
   },
 ];
 
-// Fonts that might have local font files (if downloaded)
+// ローカルにフォントファイルがある可能性があるもの（ダウンロード済み等）
 const POTENTIALLY_LOCAL_FONTS = new Set<string>([
   ...FEATURED_JAPANESE_FONTS.map((f) => f.family),
   'Fira Code',
@@ -122,21 +122,21 @@ const LOCAL_FONT_FAMILY_SET = new Set<string>([
 ]);
 
 /**
- * Complete list of Japanese fonts available on Google Fonts
- * Source: https://fonts.google.com/?subset=japanese
- * 
- * Categories:
- * - serif: 明朝体 (Mincho/Ming)
- * - sans-serif: ゴシック体 (Gothic)
- * - display: デザイン書体 (Display/Decorative)
- * - handwriting: 手書き風 (Handwriting style)
+ * Google Fonts で利用できる日本語フォント一覧
+ * 出典: https://fonts.google.com/?subset=japanese
+ *
+ * category:
+ * - serif: 明朝体
+ * - sans-serif: ゴシック体
+ * - display: デザイン書体
+ * - handwriting: 手書き風
  */
 export const ALL_JAPANESE_FONTS: FontInfo[] = [
-  // Noto Family
+  // Noto 系
   { family: 'Noto Serif JP', localizedName: 'Noto 明朝', category: 'serif' },
   { family: 'Noto Sans JP', localizedName: 'Noto ゴシック', category: 'sans-serif' },
   
-  // M PLUS Family
+  // M PLUS 系
   { family: 'M PLUS 1', localizedName: 'Mプラス 1', category: 'sans-serif' },
   { family: 'M PLUS 2', localizedName: 'Mプラス 2', category: 'sans-serif' },
   { family: 'M PLUS 1p', localizedName: 'Mプラス 1p', category: 'sans-serif' },
@@ -144,7 +144,7 @@ export const ALL_JAPANESE_FONTS: FontInfo[] = [
   { family: 'M PLUS 1 Code', localizedName: 'Mプラス 1 コード', category: 'monospace' },
   { family: 'M PLUS Code Latin', localizedName: 'Mプラス コード Latin', category: 'monospace' },
   
-  // Zen Family
+  // Zen 系
   { family: 'Zen Kaku Gothic New', localizedName: '禅角ゴシック New', category: 'sans-serif' },
   { family: 'Zen Kaku Gothic Antique', localizedName: '禅角ゴシック アンティーク', category: 'sans-serif' },
   { family: 'Zen Maru Gothic', localizedName: '禅丸ゴシック', category: 'sans-serif' },
@@ -154,48 +154,48 @@ export const ALL_JAPANESE_FONTS: FontInfo[] = [
   { family: 'Zen Kurenaido', localizedName: '禅紅藍', category: 'sans-serif' },
   { family: 'Zen Tokyo Zoo', localizedName: '禅東京ズー', category: 'display' },
   
-  // Shippori Family
+  // しっぽり 系
   { family: 'Shippori Mincho', localizedName: 'しっぽり明朝', category: 'serif' },
   { family: 'Shippori Mincho B1', localizedName: 'しっぽり明朝 B1', category: 'serif' },
   { family: 'Shippori Antique', localizedName: 'しっぽりアンティーク', category: 'sans-serif' },
   { family: 'Shippori Antique B1', localizedName: 'しっぽりアンティーク B1', category: 'sans-serif' },
   
-  // Sawarabi Family
+  // さわらび 系
   { family: 'Sawarabi Mincho', localizedName: 'さわらび明朝', category: 'serif' },
   { family: 'Sawarabi Gothic', localizedName: 'さわらびゴシック', category: 'sans-serif' },
   
-  // Kosugi Family
+  // 小杉 系
   { family: 'Kosugi', localizedName: '小杉ゴシック', category: 'sans-serif' },
   { family: 'Kosugi Maru', localizedName: '小杉丸ゴシック', category: 'sans-serif' },
   
-  // BIZ UD Family (Business & Education)
+  // BIZ UD 系（ビジネス/教育向け）
   { family: 'BIZ UDPGothic', localizedName: 'BIZ UDPゴシック', category: 'sans-serif' },
   { family: 'BIZ UDGothic', localizedName: 'BIZ UDゴシック', category: 'sans-serif' },
   { family: 'BIZ UDPMincho', localizedName: 'BIZ UDP明朝', category: 'serif' },
   { family: 'BIZ UDMincho', localizedName: 'BIZ UD明朝', category: 'serif' },
   
-  // Kaisei Family
+  // 解星 系
   { family: 'Kaisei Decol', localizedName: '解星デコール', category: 'serif' },
   { family: 'Kaisei Opti', localizedName: '解星オプティ', category: 'serif' },
   { family: 'Kaisei Tokumin', localizedName: '解星特ミン', category: 'serif' },
   { family: 'Kaisei HarunoUmi', localizedName: '解星ハルノウミ', category: 'serif' },
   
-  // Yuji Family
+  // 游字 系
   { family: 'Yuji Syuku', localizedName: '游字祝', category: 'serif' },
   { family: 'Yuji Boku', localizedName: '游字墨', category: 'serif' },
   { family: 'Yuji Mai', localizedName: '游字舞', category: 'serif' },
   
-  // Mochiy Pop Family
+  // もちポップ 系
   { family: 'Mochiy Pop One', localizedName: 'もちポップ One', category: 'handwriting' },
   { family: 'Mochiy Pop P One', localizedName: 'もちポップ P One', category: 'handwriting' },
   
-  // Klee Family
+  // クレー 系
   { family: 'Klee One', localizedName: 'クレー One', category: 'handwriting' },
   
-  // Potta Family
+  // ポッタ 系
   { family: 'Potta One', localizedName: 'ポッタ One', category: 'display' },
   
-  // Display & Decorative Fonts
+  // デザイン/装飾系
   { family: 'Dela Gothic One', localizedName: 'デラゴシック One', category: 'display' },
   { family: 'Hachi Maru Pop', localizedName: 'はち丸ポップ', category: 'handwriting' },
   { family: 'Kiwi Maru', localizedName: 'キウイ丸', category: 'sans-serif' },
@@ -228,28 +228,27 @@ export const ALL_JAPANESE_FONTS: FontInfo[] = [
 ];
 
 /**
- * Load a Google Font dynamically by adding a <link> tag to the document head
- * @param fontFamily - The font family name (e.g., "Noto Serif JP")
+ * Google Fonts を動的に読み込む（head に <link> を追加）
+ * @param fontFamily - フォントファミリ名（例: "Noto Serif JP"）
  */
 export function loadGoogleFont(fontFamily: string): void {
-  // Don't load system fonts from Google
+  // システムフォントは Google Fonts から読み込まない
   if (LOCAL_FONT_FAMILY_SET.has(fontFamily)) {
     return;
   }
 
-  // Check if font is already loaded
+  // すでに読み込み済みか確認
   const fontUrl = fontFamily.replace(/\s+/g, '+');
   const existingLink = document.querySelector(`link[href*="${fontUrl}"]`);
 
   if (existingLink) {
-    return; // Font already loaded
+    return; // 読み込み済み
   }
 
-  // For potentially local fonts, try to check if local files exist first
-  // If local font files are available, they will be loaded via local-fonts.css
-  // Otherwise, fall back to Google Fonts
+  // ローカルにフォントがある可能性がある場合は、local-fonts.css 側での読み込みを優先する
+  // それ以外は Google Fonts にフォールバックする
 
-  // Create and append link tag for Google Fonts
+  // Google Fonts 用の link タグを作成して追加
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = `https://fonts.googleapis.com/css2?family=${fontUrl}:wght@400;700&display=swap`;
@@ -278,16 +277,16 @@ export async function ensureLocalFontAvailable(fontFamily: string): Promise<void
     const available = document.fonts.check(`16px "${fontFamily}"`);
     if (!available) {
       // eslint-disable-next-line no-console
-      console.error(`[fonts] Local font unavailable: ${fontFamily}`);
+      console.error(`[fonts] ローカルフォントが利用できません: ${fontFamily}`);
     }
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error(`[fonts] Failed to check local font: ${fontFamily}`, error);
+    console.error(`[fonts] ローカルフォントの確認に失敗しました: ${fontFamily}`, error);
   }
 }
 
 /**
- * Preload featured fonts on application start
+ * アプリ起動時におすすめフォントを先読みする
  */
 export function preloadFeaturedFonts(): void {
   FEATURED_JAPANESE_FONTS.forEach(font => {
@@ -296,7 +295,7 @@ export function preloadFeaturedFonts(): void {
 }
 
 /**
- * Get font fallback based on category
+ * category に応じたフォールバックを返す
  */
 export function getFontFallback(category: FontInfo['category']): string {
   switch (category) {
@@ -315,7 +314,7 @@ export function getFontFallback(category: FontInfo['category']): string {
 }
 
 /**
- * Get complete font-family CSS value with fallbacks
+ * フォールバック込みの font-family CSS を返す
  */
 export function getFontFamilyCSS(fontFamily: string): string {
   const font = ALL_JAPANESE_FONTS.find(f => f.family === fontFamily);
