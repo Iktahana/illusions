@@ -415,15 +415,15 @@ function StatsPanel({
   const pureTextCount = activeCharCount - estimatedPunctuation;
   const punctuationRatio = activeCharCount > 0 ? (estimatedPunctuation / activeCharCount * 100).toFixed(1) : '0.0';
 
-  // 判斷文風
+  // 文体の判定
   let styleHint = '';
   const ratio = parseFloat(punctuationRatio);
   if (ratio > 15) {
-    styleHint = '對話較多';
+    styleHint = '会話多め';
   } else if (ratio < 8) {
-    styleHint = '敘事為主';
+    styleHint = '地の文中心';
   } else {
-    styleHint = '均衡';
+    styleHint = 'バランス型';
   }
 
   // 2. 段落結構分析
@@ -432,10 +432,10 @@ function StatsPanel({
   let paragraphWarning = '';
   let paragraphWarningColor = 'text-foreground-tertiary';
   if (avgParagraphLength > 150) {
-    paragraphWarning = '⚠️ 段落偏長，建議增加換行以優化手機閱讀體驗';
+    paragraphWarning = '⚠️ 段落が長めです。改行を増やすとモバイルでの読みやすさが向上します';
     paragraphWarningColor = 'text-amber-600 dark:text-amber-500';
   } else if (avgParagraphLength > 0 && avgParagraphLength < 50) {
-    paragraphWarning = '✓ 節奏輕快，適合碎片化閱讀';
+    paragraphWarning = '✓ テンポが良く、スマホでの読書に適しています';
     paragraphWarningColor = 'text-green-600 dark:text-green-500';
   }
 
@@ -460,34 +460,34 @@ function StatsPanel({
 
   return (
     <div className="space-y-4">
-      {/* 標題：動態顯示分析範圍 */}
+      {/* 標題：動態顯示分析範囲 */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-foreground-secondary">
-          {isSelection ? '【選中片段分析】' : '【全篇文檔統計】'}
+          {isSelection ? '【選択範囲の分析】' : '【文書全体の統計】'}
         </h3>
         {isSelection && (
           <span className="text-xs px-2 py-1 rounded-full bg-accent/20 text-accent font-medium">
-            選中中
+            選択中
           </span>
         )}
       </div>
 
-      {/* 1. 字數深度統計 */}
+      {/* 1. 文字数詳細統計 */}
       <div className="bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-          字數深度統計
+          文字数詳細統計
         </h4>
         <div className="space-y-2">
           <div className="flex justify-between items-baseline">
-            <span className="text-sm text-foreground-secondary">總字數</span>
+            <span className="text-sm text-foreground-secondary">総文字数</span>
             <span className="text-lg font-semibold text-foreground">{activeCharCount.toLocaleString()}</span>
           </div>
           <div className="flex justify-between items-baseline">
-            <span className="text-sm text-foreground-secondary">純文字數</span>
+            <span className="text-sm text-foreground-secondary">純文字数</span>
             <span className="text-base font-medium text-foreground">{pureTextCount.toLocaleString()}</span>
           </div>
           <div className="flex justify-between items-baseline">
-            <span className="text-sm text-foreground-secondary">標點佔比</span>
+            <span className="text-sm text-foreground-secondary">記号の割合</span>
             <span className="text-base font-medium text-foreground">
               {punctuationRatio}% <span className="text-xs text-foreground-tertiary ml-1">({styleHint})</span>
             </span>
@@ -495,18 +495,18 @@ function StatsPanel({
         </div>
       </div>
 
-      {/* 2. 段落結構分析 */}
+      {/* 2. 段落構造分析 */}
       <div className="bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-          段落結構分析
+          段落構造分析
         </h4>
         <div className="space-y-2">
           <div className="flex justify-between items-baseline">
-            <span className="text-sm text-foreground-secondary">段落總數</span>
+            <span className="text-sm text-foreground-secondary">段落数</span>
             <span className="text-lg font-semibold text-foreground">{paragraphCount}</span>
           </div>
           <div className="flex justify-between items-baseline">
-            <span className="text-sm text-foreground-secondary">平均段落長度</span>
+            <span className="text-sm text-foreground-secondary">平均段落長</span>
             <span className="text-base font-medium text-foreground">{avgParagraphLength}字/段</span>
           </div>
           {paragraphWarning && (
@@ -517,31 +517,31 @@ function StatsPanel({
         </div>
       </div>
 
-      {/* 3. 多場景閱讀時間 */}
+      {/* 3. 読了時間の目安 */}
       <div className="bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-          預估閱讀時間
+          読了時間の目安
         </h4>
         <div className="space-y-2">
           <div className="flex justify-between items-baseline">
-            <span className="text-sm text-foreground-secondary">快速掃讀</span>
+            <span className="text-sm text-foreground-secondary">速読</span>
             <span className="text-base font-medium text-foreground">{fastReadTime}</span>
           </div>
           <div className="flex justify-between items-baseline">
-            <span className="text-sm text-foreground-secondary">常規閱讀</span>
+            <span className="text-sm text-foreground-secondary">通常読み</span>
             <span className="text-base font-medium text-accent">{normalReadTime}</span>
           </div>
           <div className="flex justify-between items-baseline">
-            <span className="text-sm text-foreground-secondary">深度研讀</span>
+            <span className="text-sm text-foreground-secondary">精読</span>
             <span className="text-base font-medium text-foreground">{deepReadTime}</span>
           </div>
           <p className="text-xs text-foreground-tertiary mt-2">
-            * 基於中日文字符閱讀特性計算
+            ※ 日本語の平均読書速度に基づく
           </p>
         </div>
       </div>
 
-      {/* 原稿用紙換算（僅全篇顯示） */}
+      {/* 原稿用紙換算（全体のみ表示） */}
       {!isSelection && (
         <div className="pt-4 border-t border-border">
           <div className="flex justify-between items-center mb-2">
@@ -551,7 +551,7 @@ function StatsPanel({
             <span className="text-2xl font-bold text-accent">{manuscriptPages}枚</span>
           </div>
           <p className="text-xs text-foreground-tertiary">
-            400字詰め原稿用紙（日本語小說標準）
+            400字詰め原稿用紙（日本語小説の標準）
           </p>
         </div>
       )}
