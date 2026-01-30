@@ -1,151 +1,146 @@
 # Storage Service Rule
 
-## 概述
+## 概要
 
-此項目已實現 **Web/Electron 通用的數據持久化抽象層 (StorageService)**。
+本プロジェクトには、Web/Electron 共通で使えるデータ永続化の抽象層（StorageService）があります。
+保存処理を各所で独自実装せず、必ずこの統一サービスを利用してください。
 
-提醒所有開發人員使用這個統一的存儲服務，而不是自己實現存儲邏輯。
-
-## 核心位置
+## コア位置
 
 ```
 lib/
-├── storage-types.ts              # 核心介面定義
-├── storage-service.ts            # 工廠函式 (getStorageService)
-├── web-storage.ts                # Web 實作 (IndexedDB)
-├── electron-storage.ts           # Electron 實作 (IPC)
-├── electron-storage-manager.ts   # Electron 主進程
-├── storage-service-examples.ts   # 使用示例
-└── storage-service-tests.ts      # 測試套件
+├── storage-types.ts              # 中核インターフェース定義
+├── storage-service.ts            # ファクトリ関数（getStorageService）
+├── web-storage.ts                # Web 実装（IndexedDB）
+├── electron-storage.ts           # Electron 実装（IPC）
+├── electron-storage-manager.ts   # Electron メインプロセス側
+├── storage-service-examples.ts   # 使用例
+└── storage-service-tests.ts      # テストスイート
 ```
 
-文檔:
-- `STORAGE_INDEX.md` - 快速導航（必讀！）
-- `STORAGE_INTEGRATION.md` - 集成指南
-- `STORAGE_ARCHITECTURE.md` - 架構詳解
-- `STORAGE_QUICK_REFERENCE.md` - API 查詢
-- `ELECTRON_INTEGRATION_CHECKLIST.md` - 集成檢清單
+関連ドキュメント:
+- `docs/STORAGE_INDEX.md` - 早見ナビ（推奨）
+- `docs/STORAGE_INTEGRATION.md` - 組み込み手順
+- `docs/STORAGE_ARCHITECTURE.md` - アーキテクチャ
+- `docs/STORAGE_QUICK_REFERENCE.md` - API 早見表
+- `docs/ELECTRON_INTEGRATION_CHECKLIST.md` - Electron 組み込みチェック
 
-## 快速使用
+## すぐ使う
 
-### 基本用法
+### 基本
 
-```typescript
+```ts
 import { getStorageService } from "@/lib/storage-service";
 
 const storage = getStorageService();
 
-// 保存會話
+// セッションを保存
 await storage.saveSession({
   appState: { lastOpenedMdiPath: "/path/to/file.mdi" },
   recentFiles: [],
-  editorBuffer: { content: "...", timestamp: Date.now() }
+  editorBuffer: { content: "...", timestamp: Date.now() },
 });
 
-// 加載會話
+// セッションを読み込み
 const session = await storage.loadSession();
 ```
 
-### 最近文件管理
+### 最近使ったファイル
 
-```typescript
-// 新增到最近使用 (自動限制 10 項)
+```ts
 await storage.addToRecent({
   name: "Document.mdi",
   path: "/path/to/Document.mdi",
   lastModified: Date.now(),
-  snippet: "Content preview"
+  snippet: "Content preview",
 });
 
-// 獲取列表
 const recent = await storage.getRecentFiles();
 ```
 
-### 自動保存
+### 自動保存（下書きバッファ）
 
-```typescript
+```ts
 useEffect(() => {
   const interval = setInterval(async () => {
     await storage.saveEditorBuffer({
       content: editorContent,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
-  }, 30000); // 每 30 秒
+  }, 30000); // 30秒ごと
 
   return () => clearInterval(interval);
 }, [editorContent]);
 ```
 
-## 核心功能
+## API（12メソッド）
 
-### 12 個 API 方法
+| メソッド | 用途 |
+|---|---|
+| `initialize()` | 初期化 |
+| `saveSession()` | セッション一括保存 |
+| `loadSession()` | セッション一括読込 |
+| `saveAppState()` | アプリ状態の保存 |
+| `loadAppState()` | アプリ状態の読込 |
+| `addToRecent()` | 最近使ったファイルへ追加 |
+| `getRecentFiles()` | 最近使ったファイル一覧 |
+| `removeFromRecent()` | 最近使ったファイルから削除 |
+| `clearRecent()` | 最近使ったファイルを全削除 |
+| `saveEditorBuffer()` | 下書きバッファ保存 |
+| `loadEditorBuffer()` | 下書きバッファ読込 |
+| `clearEditorBuffer()` | 下書きバッファ削除 |
 
-| 方法 | 用途 |
-|------|------|
-| `initialize()` | 初始化 |
-| `saveSession()` | 保存完整會話 |
-| `loadSession()` | 加載完整會話 |
-| `saveAppState()` | 保存應用狀態 |
-| `loadAppState()` | 加載應用狀態 |
-| `addToRecent()` | 新增到最近文件 |
-| `getRecentFiles()` | 獲取最近文件 |
-| `removeFromRecent()` | 移除最近文件 |
-| `clearRecent()` | 清除最近文件 |
-| `saveEditorBuffer()` | 保存編輯緩衝區 |
-| `loadEditorBuffer()` | 加載編輯緩衝區 |
-| `clearEditorBuffer()` | 清除編輯緩衝區 |
-
-## 數據結構
+## データ構造
 
 ### StorageSession
 
-```typescript
+```ts
 {
   appState: { lastOpenedMdiPath?: string },
-  recentFiles: RecentFile[],  // 最多 10 項
-  editorBuffer: EditorBuffer | null
+  recentFiles: RecentFile[],  // 最大 10 件
+  editorBuffer: EditorBuffer | null,
 }
 ```
 
 ### RecentFile
 
-```typescript
+```ts
 {
-  name: string;              // 檔案名稱
-  path: string;             // 檔案路徑
-  lastModified: number;     // 時間戳
-  snippet?: string;         // 內容預覽
+  name: string;          // ファイル名
+  path: string;          // ファイルパス
+  lastModified: number;  // タイムスタンプ
+  snippet?: string;      // 内容プレビュー
 }
 ```
 
 ### EditorBuffer
 
-```typescript
+```ts
 {
-  content: string;          // 編輯內容
-  timestamp: number;        // 時間戳
+  content: string;       // 下書き本文
+  timestamp: number;     // タイムスタンプ
 }
 ```
 
-## 環境差異
+## 環境差分
 
 ### Electron
-- 存儲: SQLite (via `better-sqlite3`)
+- 方式: SQLite（`better-sqlite3`）
 - 位置: `~/Library/Application Support/Illusions/illusions-storage.db`
-- 操作: 同步（在主進程）
-- 通訊: IPC (ipcRenderer.invoke / ipcMain.handle)
+- 実行: メインプロセスで同期処理
+- 通信: IPC（ipcRenderer.invoke / ipcMain.handle）
 
 ### Web
-- 存儲: IndexedDB (via Dexie)
-- 操作: 異步 (Promises)
-- 配額: ~50MB
-- 位置: 瀏覽器存儲
+- 方式: IndexedDB（Dexie）
+- 実行: 非同期（Promise）
+- 目安: ~50MB
+- 位置: ブラウザストレージ
 
-## 常見模式
+## よくあるパターン
 
-### 模式 1: 應用啟動恢復
+### パターン1: 起動時の復元
 
-```typescript
+```ts
 useEffect(() => {
   const restore = async () => {
     const storage = getStorageService();
@@ -160,162 +155,88 @@ useEffect(() => {
     }
   };
 
-  restore();
+  void restore();
 }, []);
 ```
 
-### 模式 2: 保存時更新
+### パターン2: 保存時に状態更新
 
-```typescript
+```ts
 async function saveFile(path: string, content: string) {
   const storage = getStorageService();
 
-  // 保存到檔案系統
+  // ファイルシステムへ保存
   // ...
 
-  // 更新最近使用
+  // 最近使ったファイルを更新
   await storage.addToRecent({
-    name: path.split("/").pop(),
+    name: path.split("/").pop()!,
     path,
     lastModified: Date.now(),
-    snippet: content.substring(0, 100)
+    snippet: content.substring(0, 100),
   });
 
-  // 更新應用狀態
+  // アプリ状態を更新
   await storage.saveAppState({ lastOpenedMdiPath: path });
 
-  // 清除緩衝區
+  // 下書きバッファを削除
   await storage.clearEditorBuffer();
 }
 ```
 
-### 模式 3: React 組件
+## やってはいけないこと
 
-```typescript
-"use client";
+- 独自の保存ロジックを各所で実装しない
+- Electron で localStorage を永続化の主軸にしない
+- IndexedDB を直接触らない
+- SQLite を直接管理しない
 
-import { useEffect, useState } from "react";
-import { getStorageService } from "@/lib/storage-service";
-import type { StorageSession } from "@/lib/storage-types";
+## 代わりにやること
 
-export function MyComponent() {
-  const [session, setSession] = useState<StorageSession | null>(null);
+- 常に `getStorageService()` を使う
+- 統一APIで読み書きする
+- 環境判定はサービスに任せる
+- 下書きバッファは定期的に保存する
 
-  useEffect(() => {
-    const load = async () => {
-      const storage = getStorageService();
-      const loaded = await storage.loadSession();
-      setSession(loaded);
-    };
+## Electron 組み込みチェック
 
-    load();
-  }, []);
+Electron で利用する場合の確認:
 
-  return (
-    <div>
-      {session?.appState.lastOpenedMdiPath && (
-        <p>Last opened: {session.appState.lastOpenedMdiPath}</p>
-      )}
-    </div>
-  );
-}
-```
+- [ ] `better-sqlite3` をインストール: `npm install better-sqlite3`
+- [ ] メイン側の IPC ハンドラを更新
+- [ ] preload で storage API を公開
+- [ ] `types/electron.d.ts` を更新
+- [ ] アプリ層から `getStorageService()` を呼べる
 
-## 不要做什麼 ❌
-
-- ❌ 不要實現自己的存儲邏輯
-- ❌ 不要直接使用 localStorage (在 Electron 中)
-- ❌ 不要直接操作 IndexedDB
-- ❌ 不要手動管理 SQLite 數據庫
-
-要做什麼 ✅
-
-- ✅ 始終使用 `getStorageService()`
-- ✅ 使用統一的 API
-- ✅ 依賴自動環境檢測
-- ✅ 定期保存狀態
-
-## 集成檢清單 (Electron Only)
-
-如果需要在 Electron 中使用，確認：
-
-- [ ] 已安裝 `better-sqlite3`: `npm install better-sqlite3`
-- [ ] `electron/main.ts` 已更新 IPC 處理器
-- [ ] `electron/preload.ts` 已暴露 storage API
-- [ ] `types/electron.d.ts` 已更新 (已完成 ✓)
-- [ ] 應用層可以調用 `getStorageService()`
-
-參考: `ELECTRON_INTEGRATION_CHECKLIST.md`
-
-## 文檔
-
-快速查詢:
-
-| 需求 | 文檔 |
-|------|------|
-| 快速導航 | `STORAGE_INDEX.md` |
-| 集成步驟 | `ELECTRON_INTEGRATION_CHECKLIST.md` |
-| API 查詢 | `STORAGE_QUICK_REFERENCE.md` |
-| 架構詳解 | `STORAGE_ARCHITECTURE.md` |
-| 詳細說明 | `STORAGE_IMPLEMENTATION.md` |
-| 代碼示例 | `lib/storage-service-examples.ts` |
-| 運行測試 | `lib/storage-service-tests.ts` |
-
-## 測試
-
-運行完整測試套件：
-
-```typescript
-import { StorageServiceTestSuite } from "@/lib/storage-service-tests";
-
-const suite = new StorageServiceTestSuite();
-await suite.runAll();
-```
-
-或在瀏覽器控制台：
-
-```javascript
-await window.runStorageTests();
-```
+参照: `docs/ELECTRON_INTEGRATION_CHECKLIST.md`
 
 ## 設計原則
 
-1. **統一 API** - 相同代碼在 Electron 和 Web 中運行
-2. **自動環境檢測** - 無需手動配置
-3. **類型安全** - 完整 TypeScript 支援
-4. **高效能** - Electron 同步，Web 異步
-5. **易於使用** - 簡單直觀的 API
-6. **可靠** - 完整的錯誤處理
-7. **可擴展** - 易於添加新功能
+1. 同一API: Electron と Web で同じコードが動く
+2. 自動判定: 手動設定を最小化
+3. 型安全: TypeScript 前提
+4. 性能: Electron は同期、Web は非同期
+5. 使いやすさ: 単純で直感的
+6. 信頼性: 例外/失敗を握りつぶさない
+7. 拡張性: 機能追加がしやすい
 
-## 性能考量
+## FAQ
 
-- 最近文件自動限制為 10 項
-- 編輯緩衝區應定期保存 (建議 30 秒)
-- 批量操作使用 `saveSession()` 而非個別保存
-- Electron: ~2-5ms 每操作
-- Web: ~10-20ms 每操作
+**Q: initialize() はいつ呼べばいい？**
+A: 実装方針により異なりますが、原則は利用前に 1 回です（多くの場合は初回利用時に内部で呼び出します）。
 
-## 常見問題
+**Q: 下書きバッファは暗号化されている？**
+A: 前提はローカル利用です。必要ならアプリ側で暗号化を追加してください。
 
-**Q: 我應該在何時調用 initialize()?**
-A: 不需要顯式調用，第一次使用時自動調用。
+**Q: 複数インスタンスで競合する？**
+A: Electron は WAL を利用して競合を抑えます。Web は IndexedDB のロック特性に依存します。
 
-**Q: 編輯緩衝區是加密的嗎?**
-A: 否，假設本地使用。需要時自行實現加密。
+**Q: 最近使ったファイルの上限を変えたい**
+A: 該当実装内の定数を調整してください。
 
-**Q: 多個應用實例會衝突嗎?**
-A: Electron 使用 WAL 模式避免衝突，Web 使用 IndexedDB 鎖定。
+## バージョン情報
 
-**Q: 我可以改變最近文件限制嗎?**
-A: 可以，編輯相關實作中的常數。
-
-**Q: 如何遷移舊的存儲?**
-A: 需要編寫遷移指令碼讀取舊數據並使用新 API 保存。
-
-## 版本信息
-
-- **版本**: 1.0.0
-- **狀態**: 生產就緒
-- **最後更新**: 2026-01-28
-- **依賴**: `better-sqlite3` (Electron), `dexie@^4.2.1` (Web)
+- バージョン: 1.0.0
+- 状態: Production Ready
+- 最終更新: 2026-01-28
+- 依存: `better-sqlite3`（Electron）, `dexie@^4.2.1`（Web）
