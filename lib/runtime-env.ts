@@ -1,18 +1,17 @@
-// Runtime environment detection helpers.
-// Comments in code must be in English.
+// 実行環境判定のヘルパー
 
 export type RuntimeEnvironment = "browser" | "electron-renderer" | "unknown";
 
 /**
- * Detect whether code is running in a browser-like environment.
+ * ブラウザ相当の環境で動いているか判定する
  */
 export function isBrowser(): boolean {
   return typeof window !== "undefined" && typeof document !== "undefined";
 }
 
 /**
- * Detect whether code is running inside an Electron renderer process.
- * This relies on the preload script exposing `window.electronAPI`.
+ * Electron のレンダラプロセスで動いているか判定する
+ * preload が `window.electronAPI` を公開している前提
  */
 export function isElectronRenderer(): boolean {
   return (
@@ -23,7 +22,7 @@ export function isElectronRenderer(): boolean {
 }
 
 /**
- * Get the current runtime environment as a discriminated union.
+ * 現在の実行環境を判別可能な union として返す
  */
 export function getRuntimeEnvironment(): RuntimeEnvironment {
   if (isElectronRenderer()) {
@@ -34,4 +33,3 @@ export function getRuntimeEnvironment(): RuntimeEnvironment {
   }
   return "unknown";
 }
-
