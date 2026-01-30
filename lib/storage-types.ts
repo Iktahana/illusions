@@ -20,6 +20,7 @@ export interface AppState {
   lastOpenedMdiPath?: string;
   paragraphSpacing?: number;
   showParagraphNumbers?: boolean;
+  hasSeenDemo?: boolean;
 }
 
 /**

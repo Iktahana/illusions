@@ -8,6 +8,21 @@ import { persistAppState } from "./app-state-manager";
 
 const DEFAULT_CONTENT = "# 錯覚\n\n物語はここから始めます。\n\n";
 const AUTO_SAVE_INTERVAL = 2000; // 2 seconds
+const DEMO_FILE_NAME = "鏡地獄.mdi";
+
+async function loadDemoContent(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const url = new URL("demo/鏡地獄.mdi", window.location.href);
+    const response = await fetch(url.toString());
+    if (!response.ok) return null;
+    return await response.text();
+  } catch (error) {
+    console.warn("Failed to load demo document:", error);
+    return null;
+  }
+}
 
 export interface UseMdiFileReturn {
   currentFile: MdiFileDescriptor | null;
@@ -61,7 +76,9 @@ export function useMdiFile(): UseMdiFileReturn {
       try {
         const storage = getStorageService();
         await storage.initialize();
-        
+        const appState = await storage.loadAppState();
+        const hasSeenDemo = appState?.hasSeenDemo ?? false;
+
         // Web environment: try to restore file handle from editor buffer
         if (!isElectron) {
           const buffer = await storage.loadEditorBuffer();
@@ -70,7 +87,7 @@ export function useMdiFile(): UseMdiFileReturn {
               // Try to access the file directly to verify we still have permission
               const file = await buffer.fileHandle.getFile();
               const content = await file.text();
-              
+
               setCurrentFile({
                 path: null,
                 handle: buffer.fileHandle,
@@ -80,11 +97,32 @@ export function useMdiFile(): UseMdiFileReturn {
               setLastSavedContent(content);
               setLastSavedTime(Date.now());
               setWasAutoRecovered(true);
+              if (!hasSeenDemo) {
+                await persistAppState({ hasSeenDemo: true });
+              }
+              return;
             } catch (error) {
               console.warn("Could not restore previous file (permission may have been revoked):", error);
               // Clear the stale handle
               await storage.clearEditorBuffer();
             }
+          }
+        }
+
+        const hasLastOpenedPath = Boolean(appState?.lastOpenedMdiPath);
+        if (!hasSeenDemo && !hasLastOpenedPath) {
+          const demoContent = await loadDemoContent();
+          if (demoContent) {
+            setCurrentFile({
+              path: null,
+              handle: null,
+              name: DEMO_FILE_NAME,
+            });
+            setContentState(demoContent);
+            setLastSavedContent(demoContent);
+            setLastSavedTime(null);
+            setWasAutoRecovered(false);
+            await persistAppState({ hasSeenDemo: true });
           }
         }
       } catch (error) {
