@@ -377,7 +377,7 @@ ipcMain.handle('open-file', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ['openFile'],
     filters: [
-      { name: 'MDI 文書', extensions: ['mdi'] },
+      { name: 'illusions MDI Document', extensions: ['mdi'] },
       { name: 'Markdown', extensions: ['md'] },
       { name: 'すべてのファイル', extensions: ['*'] },
     ],
@@ -393,7 +393,7 @@ ipcMain.handle('save-file', async (_event, filePath, content) => {
   if (!target) {
     const result = await dialog.showSaveDialog({
       filters: [
-        { name: 'MDI 文書', extensions: ['mdi'] },
+        { name: 'illusions MDI Document', extensions: ['mdi'] },
         { name: 'Markdown', extensions: ['md'] },
         { name: 'すべてのファイル', extensions: ['*'] },
       ],

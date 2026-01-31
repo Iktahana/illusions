@@ -22,7 +22,7 @@ export interface SaveMdiParams {
 }
 
 /**
- * .mdi 文書を開く（Electron IPC / File System Access API）
+ * .illusions MDI Documentを開く（Electron IPC / File System Access API）
  */
 export async function openMdiFile(): Promise<OpenMdiResult | null> {
   const env = getRuntimeEnvironment();
@@ -56,7 +56,7 @@ export async function openMdiFile(): Promise<OpenMdiResult | null> {
     const [handle] = await window.showOpenFilePicker({
       types: [
         {
-          description: "MDI 文書",
+          description: "illusions MDI Document",
           accept: {
             "text/plain": [".mdi"],
           },
@@ -92,7 +92,7 @@ export async function openMdiFile(): Promise<OpenMdiResult | null> {
 }
 
 /**
- * .mdi 文書を保存する（可能なら既存ディスクリプタを再利用）
+ * .illusions MDI Documentを保存する（可能なら既存ディスクリプタを再利用）
  * 新規の場合は「名前を付けて保存」相当のダイアログを出す
  */
 export async function saveMdiFile(
@@ -141,7 +141,7 @@ export async function saveMdiFile(
         suggestedName: ensureMdiExtension(descriptor?.name ?? "untitled.mdi"),
         types: [
           {
-            description: "MDI 文書",
+            description: "illusions MDI Document",
             accept: {
               "text/plain": [".mdi"],
             },
