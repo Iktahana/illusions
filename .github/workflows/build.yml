@@ -61,7 +61,7 @@ jobs:
         run: |
           missing=()
           [ -z "$APPLE_ID" ] && missing+=("APPLE_ID")
-          [ -z "$APPLE_ID_PASSWORD" ] && missing+=("APPLE_ID_PASSWORD")
+          [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] && missing+=("APPLE_APP_SPECIFIC_PASSWORD")
           if [ -z "$TEAM_ID" ] && [ -z "$APPLE_TEAM_ID" ]; then
             missing+=("TEAM_ID/APPLE_TEAM_ID")
           fi
