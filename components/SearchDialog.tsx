@@ -45,26 +45,25 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
     const { state } = editorView;
     const { doc } = state;
     const foundMatches: SearchMatch[] = [];
-
-    // 文書全体の文字列
-    const docText = doc.textContent;
     const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
-    const textToSearch = caseSensitive ? docText : docText.toLowerCase();
 
-    let searchIndex = 0;
+    doc.descendants((node, pos) => {
+      if (!node.isText || !node.text) return;
 
-    // 文書全体を走査
-    while (searchIndex < textToSearch.length) {
-      const matchIndex = textToSearch.indexOf(searchStr, searchIndex);
-      if (matchIndex === -1) break;
+      const text = caseSensitive ? node.text : node.text.toLowerCase();
+      let searchIndex = 0;
 
-      // ProseMirror 上の位置に変換
-      const from = matchIndex + 1; // ProseMirror は 1 始まり
-      const to = from + searchTerm.length;
+      while (searchIndex < text.length) {
+        const matchIndex = text.indexOf(searchStr, searchIndex);
+        if (matchIndex === -1) break;
 
-      foundMatches.push({ from, to });
-      searchIndex = matchIndex + 1;
-    }
+        const from = pos + matchIndex;
+        const to = from + searchTerm.length;
+
+        foundMatches.push({ from, to });
+        searchIndex = matchIndex + 1;
+      }
+    });
 
     setMatches(foundMatches);
     setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1);
@@ -81,22 +80,13 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
 
     // 一致箇所を選択
     const { state, dispatch } = editorView;
-    const tr = state.tr.setSelection(
-      TextSelection.create(state.doc, match.from, match.to)
-    );
+    const tr = state.tr
+      .setSelection(TextSelection.create(state.doc, match.from, match.to))
+      .scrollIntoView();
     dispatch(tr);
 
     // 表示位置へスクロール
-    // 【禁止】自動スクロール機能を無効化
     editorView.focus();
-    console.debug('[AutoScroll] Jumped to match in editor', { from: match.from, to: match.to });
-    // const coords = editorView.coordsAtPos(match.from);
-    // if (coords) {
-    //   window.scrollTo({
-    //     top: coords.top - window.innerHeight / 2,
-    //     behavior: "smooth",
-    //   });
-    // }
   }, [currentMatchIndex, matches, editorView]);
 
   const goToNextMatch = () => {
