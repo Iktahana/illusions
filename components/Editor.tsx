@@ -12,7 +12,7 @@ import { cursor } from "@milkdown/plugin-cursor";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
-import { 
+import {
   getScrollProgress, 
   setScrollProgress,
 } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
@@ -65,7 +65,6 @@ export default function NovelEditor({
   
   // 模式切換時保持滾動位置：保存目標滾動進度（0-1）
   const [targetScrollProgress, setTargetScrollProgress] = useState<number | null>(null);
-  const prevInitialContentRef = useRef(initialContent);
 
   // マウント後に localStorage から読み込む（クライアントのみ）
   useEffect(() => {
@@ -82,14 +81,12 @@ export default function NovelEditor({
     localStorage.setItem('illusions-writing-mode', isVertical ? 'vertical' : 'horizontal');
   }, [isVertical, isMounted]);
 
-  // 檢測新文件打開：initialContent 變化時跳到對應模式的起點
-  useEffect(() => {
-    if (prevInitialContentRef.current !== initialContent) {
-      // 新文件：橫排跳到 0%（頂部），豎排跳到 100%（右端/頁頭）
-      setTargetScrollProgress(isVertical ? 1.0 : 0);
-      prevInitialContentRef.current = initialContent;
-    }
-  }, [initialContent, isVertical]);
+  // 注意：不再需要這個 effect，因為：
+  // 1. 新文件打開時，父組件會通過 key 屬性重新掛載整個 NovelEditor 組件
+  // 2. 編輯內容時，initialContent 會改變，但我們不應該重置滾動位置
+  // 3. 模式切換時，handleToggleVertical 會負責保存和恢復滾動位置
+  // 
+  // 如果將來需要在不重新掛載的情況下切換文件，可以添加一個明確的 fileId prop 來追蹤
 
   const handleSearchOpen = () => {
     setIsSearchOpen(true);
@@ -150,6 +147,8 @@ export default function NovelEditor({
         style={{
           overflowX: 'auto',
           overflowY: 'auto',
+          // 禁用瀏覽器的滾動錨定行為，避免在豎排模式下 DOM 更新時自動調整滾動位置
+          overflowAnchor: 'none',
         }}
       >
         <MilkdownProvider>
@@ -347,7 +346,27 @@ function MilkdownEditor({
       .use(listener)
       .config((ctx) => {
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
+          // 【調試用】在 markdown 更新前記錄滾動位置
+          const container = scrollContainerRefLocal.current;
+          const beforeScrollLeft = container?.scrollLeft;
+          const beforeScrollTop = container?.scrollTop;
+          
           onChangeRef.current?.(markdown);
+          
+          // 【調試用】在 markdown 更新後檢查滾動位置是否變化
+          requestAnimationFrame(() => {
+            if (container && isVerticalRef.current) {
+              const afterScrollLeft = container.scrollLeft;
+              const afterScrollTop = container.scrollTop;
+              if (Math.abs((afterScrollLeft ?? 0) - (beforeScrollLeft ?? 0)) > 10) {
+                console.warn('[AutoScroll] Scroll changed during markdownUpdated!', {
+                  beforeScrollLeft,
+                  afterScrollLeft,
+                  delta: (afterScrollLeft ?? 0) - (beforeScrollLeft ?? 0)
+                });
+              }
+            }
+          });
         });
       })
       .use(commonmark)
@@ -580,30 +599,47 @@ function MilkdownEditor({
     let onLayoutCompleteCallback: (() => void) | null = null;
 
     // 滾動處理函數：在排版完成後執行
+    // 注意：只有在「模式切換」時才需要恢復滾動位置
     const handleScrollAfterLayout = () => {
-      if (shouldScrollToHeadRef.current && scrollContainerRef.current) {
-        const container = scrollContainerRef.current;
-        if (container && targetScrollProgress !== null && targetScrollProgress !== undefined) {
-          const savedProgress = savedScrollProgressRef.current || 0;
-          
-          console.log('[DEBUG] Apply scroll after layout:', {
-            isVertical,
-            savedProgress
-          });
-          
-          // 使用抽象層設置進度（不鏡像，直接使用相同進度）
-          const success = setScrollProgress({ container, isVertical }, savedProgress);
-          
-          if (success) {
-            console.log('[DEBUG] Scroll applied successfully');
-          } else {
-            console.log('[DEBUG] No scrollbar, skip scroll');
-          }
-          
-          shouldScrollToHeadRef.current = false;
-          onScrollRestored?.();
-        }
+      // 檢查是否真的需要滾動恢復（只有模式切換時會設置這個標記）
+      if (!shouldScrollToHeadRef.current) {
+        // 正常情況：編輯內容時不需要恢復滾動
+        return;
       }
+      
+      const container = scrollContainerRef.current;
+      if (!container) {
+        console.debug('[DEBUG] handleScrollAfterLayout: skip (no container)');
+        shouldScrollToHeadRef.current = false;
+        return;
+      }
+      
+      // 只有在 targetScrollProgress 被明確設置為 0.5（模式切換觸發值）時才執行滾動
+      if (targetScrollProgress !== 0.5) {
+        console.debug('[DEBUG] handleScrollAfterLayout: skip (not mode switch)', { targetScrollProgress });
+        shouldScrollToHeadRef.current = false;
+        onScrollRestored?.();
+        return;
+      }
+      
+      const savedProgress = savedScrollProgressRef.current ?? 0;
+      
+      console.log('[DEBUG] Apply scroll after layout (mode switch):', {
+        isVertical,
+        savedProgress
+      });
+      
+      // 使用保存的進度設置滾動位置
+      const success = setScrollProgress({ container, isVertical }, savedProgress);
+      
+      if (success) {
+        console.log('[DEBUG] Scroll applied successfully');
+      } else {
+        console.log('[DEBUG] No scrollbar, skip scroll');
+      }
+      
+      shouldScrollToHeadRef.current = false;
+      onScrollRestored?.();
     };
     
     // 設置排版完成回調
@@ -654,20 +690,43 @@ function MilkdownEditor({
 
       if (isTouchpad) {
         // トラックパッド: 自然なスクロールを維持
+        const beforeLeft = container.scrollLeft;
+        const beforeTop = container.scrollTop;
         container.scrollLeft += event.deltaX;
         container.scrollTop += event.deltaY;
+        console.debug('[AutoScroll] touchpad scroll', {
+          beforeLeft,
+          deltaX: event.deltaX,
+          afterLeft: container.scrollLeft,
+          beforeTop,
+          deltaY: event.deltaY,
+          afterTop: container.scrollTop,
+        });
         event.preventDefault();
       } else {
         // マウスホイール:
         // - 縦回転（deltaY）→ 横スクロール（縦書きの読み進め方向）
         // - 横回転（deltaX）→ 縦スクロール
+        // 横/縦のスクロール量を補正しつつ、操作を追跡ログを出す
         if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
-          // 縦回転
+          // 縦回転 → 横スクロール
+          const beforeLeft = container.scrollLeft;
           container.scrollLeft += event.deltaY;
+          console.debug('[AutoScroll] wheel vertical-scroll (deltaY)', {
+            beforeLeft,
+            deltaY: event.deltaY,
+            afterLeft: container.scrollLeft,
+          });
           event.preventDefault();
         } else if (Math.abs(event.deltaX) > 0) {
-          // 横回転（対応マウスのみ）
+          // 横回転 → 縦スクロール
+          const beforeTop = container.scrollTop;
           container.scrollTop += event.deltaX;
+          console.debug('[AutoScroll] wheel horizontal-scroll (deltaX)', {
+            beforeTop,
+            deltaX: event.deltaX,
+            afterTop: container.scrollTop,
+          });
           event.preventDefault();
         }
       }
@@ -677,6 +736,46 @@ function MilkdownEditor({
 
     return () => {
       container.removeEventListener("wheel", handleWheel);
+    };
+  }, [isVertical, scrollContainerRef]);
+
+  // 【調試用】監聽所有 scroll 事件，追蹤滾動來源
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !isVertical) return;
+
+    let lastScrollLeft = container.scrollLeft;
+    let lastScrollTop = container.scrollTop;
+
+    const handleScroll = () => {
+      const currentScrollLeft = container.scrollLeft;
+      const currentScrollTop = container.scrollTop;
+      
+      // 只有在滾動位置有明顯變化時才輸出日誌（避免太多噪音）
+      const deltaLeft = Math.abs(currentScrollLeft - lastScrollLeft);
+      const deltaTop = Math.abs(currentScrollTop - lastScrollTop);
+      
+      if (deltaLeft > 10 || deltaTop > 10) {
+        console.debug('[AutoScroll] scroll event detected', {
+          beforeLeft: lastScrollLeft,
+          afterLeft: currentScrollLeft,
+          deltaLeft,
+          beforeTop: lastScrollTop,
+          afterTop: currentScrollTop,
+          deltaTop,
+          // 嘗試獲取調用堆棧
+          stack: new Error().stack?.split('\n').slice(1, 5).join('\n')
+        });
+      }
+      
+      lastScrollLeft = currentScrollLeft;
+      lastScrollTop = currentScrollTop;
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
     };
   }, [isVertical, scrollContainerRef]);
 

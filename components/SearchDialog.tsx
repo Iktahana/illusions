@@ -89,6 +89,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
     // 表示位置へスクロール
     // 【禁止】自動スクロール機能を無効化
     editorView.focus();
+    console.debug('[AutoScroll] Jumped to match in editor', { from: match.from, to: match.to });
     // const coords = editorView.coordsAtPos(match.from);
     // if (coords) {
     //   window.scrollTo({

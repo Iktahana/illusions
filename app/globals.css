@@ -43,6 +43,13 @@ html {
   --warning: #f59e0b;
   --error: #ef4444;
   --info: #3b82f6;
+  
+  /* Progress bar colors for light mode */
+  --progress-readability: #6366f1;
+  --progress-kanji: #ef4444;
+  --progress-hiragana: #3b82f6;
+  --progress-katakana: #10b981;
+  --progress-other: #71717a;
 }
 
 .dark {

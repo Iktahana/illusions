@@ -213,16 +213,18 @@ export default function EditorPage() {
     setEditorKey(prev => prev + 1);
   };
 
-  const handleChapterClick = (anchorId: string) => {
+   const handleChapterClick = (anchorId: string) => {
     if (!anchorId) return;
 
     const target = document.getElementById(anchorId) as HTMLElement | null;
     if (!target) return;
 
     // 対象行を表示位置へスクロール
+    console.debug('[AutoScroll] Scroll target into view', { anchorId, options: { behavior: 'smooth', block: 'start' } });
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     
     // 任意: フォーカスして視線誘導
+    console.debug('[AutoScroll] Focus target after scroll', { anchorId });
     target.focus();
   };
 
