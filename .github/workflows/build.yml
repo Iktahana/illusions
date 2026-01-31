@@ -73,7 +73,9 @@ jobs:
           fi
 
       - name: Build Electron application
-        run: npm run electron:build -- --debug
+        run: npm run electron:build
+        env:
+          DEBUG: electron-builder
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
