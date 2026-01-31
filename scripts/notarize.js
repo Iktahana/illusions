@@ -20,7 +20,7 @@ exports.default = async function notarizing(context) {
     );
   }
 
-  console.log(`Notarizing ${appPath}...`);
+  console.debug(`Notarizing ${appPath}...`);
 
   try {
     await notarize({
@@ -29,7 +29,7 @@ exports.default = async function notarizing(context) {
       appleIdPassword,
       teamId,
     });
-    console.log('Notarization successful!');
+    console.debug('Notarization successful!');
   } catch (error) {
     console.error('Notarization failed:', error);
     throw error;

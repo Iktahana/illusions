@@ -220,11 +220,11 @@ export default function EditorPage() {
     if (!target) return;
 
     // 対象行を表示位置へスクロール
-    console.debug('[AutoScroll] Scroll target into view', { anchorId, options: { behavior: 'smooth', block: 'start' } });
+    // console.debug('[AutoScroll] Scroll target into view', { anchorId, options: { behavior: 'smooth', block: 'start' } });
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     
     // 任意: フォーカスして視線誘導
-    console.debug('[AutoScroll] Focus target after scroll', { anchorId });
+    // console.debug('[AutoScroll] Focus target after scroll', { anchorId });
     target.focus();
   };
 

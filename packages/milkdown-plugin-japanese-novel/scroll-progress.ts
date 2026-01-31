@@ -36,13 +36,13 @@ export function getScrollProgress({ container, isVertical }: ScrollProgressOptio
     
     const progress = 1 - (container.scrollLeft / maxScroll);
     
-    console.debug('[ScrollProgress] Get (vertical):', {
-      scrollLeft: container.scrollLeft,
-      maxScroll,
-      progress,
-      scrollWidth: container.scrollWidth,
-      clientWidth: container.clientWidth
-    });
+    // console.debug('[ScrollProgress] Get (vertical):', {
+    //   scrollLeft: container.scrollLeft,
+    //   maxScroll,
+    //   progress,
+    //   scrollWidth: container.scrollWidth,
+    //   clientWidth: container.clientWidth
+    // });
     
     return progress;
   } else {
@@ -54,13 +54,13 @@ export function getScrollProgress({ container, isVertical }: ScrollProgressOptio
     
     const progress = container.scrollTop / maxScroll;
     
-    console.debug('[ScrollProgress] Get (horizontal):', {
-      scrollTop: container.scrollTop,
-      maxScroll,
-      progress,
-      scrollHeight: container.scrollHeight,
-      clientHeight: container.clientHeight
-    });
+    // console.debug('[ScrollProgress] Get (horizontal):', {
+    //   scrollTop: container.scrollTop,
+    //   maxScroll,
+    //   progress,
+    //   scrollHeight: container.scrollHeight,
+    //   clientHeight: container.clientHeight
+    // });
     
     return progress;
   }
@@ -94,21 +94,21 @@ export function setScrollProgress(
     
     const newScrollLeft = (1 - clampedProgress) * maxScroll;
     
-    console.debug('[ScrollProgress] Set (vertical):', {
-      progress: clampedProgress,
-      maxScroll,
-      newScrollLeft,
-      beforeScrollLeft: container.scrollLeft,
-      scrollWidth: container.scrollWidth,
-      clientWidth: container.clientWidth
-    });
+    // console.debug('[ScrollProgress] Set (vertical):', {
+    //   progress: clampedProgress,
+    //   maxScroll,
+    //   newScrollLeft,
+    //   beforeScrollLeft: container.scrollLeft,
+    //   scrollWidth: container.scrollWidth,
+    //   clientWidth: container.clientWidth
+    // });
     
     container.scrollLeft = newScrollLeft;
     
-    console.debug('[ScrollProgress] After set (vertical):', {
-      scrollLeft: container.scrollLeft,
-      actualProgress: 1 - (container.scrollLeft / maxScroll)
-    });
+    // console.debug('[ScrollProgress] After set (vertical):', {
+    //   scrollLeft: container.scrollLeft,
+    //   actualProgress: 1 - (container.scrollLeft / maxScroll)
+    // });
     
     return true;
   } else {
@@ -120,21 +120,21 @@ export function setScrollProgress(
     
     const newScrollTop = clampedProgress * maxScroll;
     
-    console.debug('[ScrollProgress] Set (horizontal):', {
-      progress: clampedProgress,
-      maxScroll,
-      newScrollTop,
-      beforeScrollTop: container.scrollTop,
-      scrollHeight: container.scrollHeight,
-      clientHeight: container.clientHeight
-    });
+    // console.debug('[ScrollProgress] Set (horizontal):', {
+    //   progress: clampedProgress,
+    //   maxScroll,
+    //   newScrollTop,
+    //   beforeScrollTop: container.scrollTop,
+    //   scrollHeight: container.scrollHeight,
+    //   clientHeight: container.clientHeight
+    // });
     
     container.scrollTop = newScrollTop;
     
-    console.debug('[ScrollProgress] After set (horizontal):', {
-      scrollTop: container.scrollTop,
-      actualProgress: container.scrollTop / maxScroll
-    });
+    // console.debug('[ScrollProgress] After set (horizontal):', {
+    //   scrollTop: container.scrollTop,
+    //   actualProgress: container.scrollTop / maxScroll
+    // });
     
     return true;
   }
@@ -188,7 +188,7 @@ export function hasScrollbar({ container, isVertical }: ScrollProgressOptions): 
  * @returns 是否成功
  */
 export function scrollToStart({ container, isVertical }: ScrollProgressOptions): boolean {
-  console.debug('[ScrollProgress] Scroll to start');
+  // console.debug('[ScrollProgress] Scroll to start');
   return setScrollProgress({ container, isVertical }, 0);
 }
 
@@ -200,7 +200,7 @@ export function scrollToStart({ container, isVertical }: ScrollProgressOptions):
  * @returns 是否成功
  */
 export function scrollToEnd({ container, isVertical }: ScrollProgressOptions): boolean {
-  console.debug('[ScrollProgress] Scroll to end');
+  // console.debug('[ScrollProgress] Scroll to end');
   return setScrollProgress({ container, isVertical }, 1);
 }
 
@@ -223,11 +223,11 @@ export function scrollByPercent(
   const currentProgress = getScrollProgress({ container, isVertical });
   const newProgress = currentProgress + delta;
   
-  console.debug('[ScrollProgress] Scroll by percent:', {
-    currentProgress,
-    delta,
-    newProgress
-  });
+  // console.debug('[ScrollProgress] Scroll by percent:', {
+  //   currentProgress,
+  //   delta,
+  //   newProgress
+  // });
   
   return setScrollProgress({ container, isVertical }, newProgress);
 }
