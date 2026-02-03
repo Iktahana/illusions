@@ -5,7 +5,7 @@
 
 import { $prose } from '@milkdown/utils';
 import { createPosHighlightPlugin, posHighlightKey } from './decoration-plugin';
-import { tokenizerClient } from './tokenizer-client';
+import { simpleTokenizer } from './tokenizer-simple';
 import { DEFAULT_POS_COLORS } from './pos-colors';
 import type { EditorView } from '@milkdown/prose/view';
 import type { PosColorConfig, PosHighlightSettings } from './types';
@@ -45,7 +45,7 @@ export function posHighlight(options: PosHighlightOptions = {}) {
   // トークナイザーを事前初期化（有効な場合のみ）
   if (enabled && !isInitialized) {
     isInitialized = true;
-    tokenizerClient.init(dicPath).catch((err) => {
+    simpleTokenizer.init(dicPath).catch((err: Error) => {
       console.error('[PosHighlight] Failed to initialize tokenizer:', err);
       isInitialized = false;
     });

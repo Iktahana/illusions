@@ -6,7 +6,7 @@
 import { Plugin, PluginKey } from '@milkdown/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/prose/view';
 import type { Node as ProseMirrorNode } from '@milkdown/prose/model';
-import { tokenizerClient } from './tokenizer-client';
+import { simpleTokenizer } from './tokenizer-simple';
 import { getPosColor, DEFAULT_POS_COLORS } from './pos-colors';
 import type { Token, PosColorConfig } from './types';
 
@@ -150,7 +150,7 @@ async function buildDecorations(
   // 各テキストノードを解析してデコレーションを作成
   for (const { text, pos } of textNodes) {
     try {
-      const tokens = await tokenizerClient.tokenize(text);
+      const tokens = await simpleTokenizer.tokenize(text);
       
       for (const token of tokens) {
         const color = getPosColor(
