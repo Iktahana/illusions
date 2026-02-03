@@ -7,6 +7,7 @@ import NovelEditor from "@/components/Editor";
 import ResizablePanel from "@/components/ResizablePanel";
 import TitleUpdater from "@/components/TitleUpdater";
 import ActivityBar, { type ActivityBarView } from "@/components/ActivityBar";
+import SearchResults from "@/components/SearchResults";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { isElectronRenderer } from "@/lib/runtime-env";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
@@ -80,6 +81,8 @@ export default function EditorPage() {
   const [charsPerLine, setCharsPerLine] = useState(40); // 0 = 制限なし（既定 40）
   const [showParagraphNumbers, setShowParagraphNumbers] = useState(true);
   const [activeView, setActiveView] = useState<ActivityBarView>("explorer");
+  const [editorViewInstance, setEditorViewInstance] = useState<any>(null);
+  const [searchResults, setSearchResults] = useState<{matches: any[], searchTerm: string} | null>(null);
   
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
@@ -230,6 +233,16 @@ export default function EditorPage() {
     target.focus();
   };
 
+  const handleShowAllSearchResults = (matches: any[], searchTerm: string) => {
+    setSearchResults({ matches, searchTerm });
+    setActiveView("search");
+  };
+
+  const handleCloseSearchResults = () => {
+    setSearchResults(null);
+    setActiveView("explorer");
+  };
+
    const wordCount = words(content);
    const charCount = chars(content);
 
@@ -335,10 +348,12 @@ export default function EditorPage() {
               />
             )}
             {activeView === "search" && (
-              <div className="h-full bg-background-secondary border-r border-border p-4">
-                <h2 className="text-lg font-semibold text-foreground mb-4">検索</h2>
-                <p className="text-sm text-foreground-secondary">検索機能は開発中です</p>
-              </div>
+              <SearchResults
+                editorView={editorViewInstance}
+                matches={searchResults?.matches}
+                searchTerm={searchResults?.searchTerm}
+                onClose={handleCloseSearchResults}
+              />
             )}
             {activeView === "outline" && (
               <div className="h-full bg-background-secondary border-r border-border p-4">
@@ -371,6 +386,8 @@ export default function EditorPage() {
               charsPerLine={charsPerLine}
               searchOpenTrigger={searchOpenTrigger}
               showParagraphNumbers={showParagraphNumbers}
+              onEditorViewReady={setEditorViewInstance}
+              onShowAllSearchResults={handleShowAllSearchResults}
             />
           </div>
           
@@ -388,7 +405,7 @@ export default function EditorPage() {
         </main>
         
          {/* 右侧面板：统计信息（始终显示） */}
-        <ResizablePanel side="right" defaultWidth={256} minWidth={200} maxWidth={400}>
+         <ResizablePanel side="right" defaultWidth={256} minWidth={200} maxWidth={400}>
           <Inspector
             wordCount={wordCount}
             charCount={charCount}
@@ -400,6 +417,7 @@ export default function EditorPage() {
             lastSavedTime={lastSavedTime}
             onOpenFile={openFile}
             onNewFile={newFile}
+            onSaveFile={saveFile}
             onFileNameChange={updateFileName}
             sentenceCount={sentenceCount}
             charTypeAnalysis={charTypeAnalysis}
