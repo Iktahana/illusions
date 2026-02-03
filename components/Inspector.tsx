@@ -105,6 +105,11 @@ export default function Inspector({
   const [activeTab, setActiveTab] = useState<Tab>("ai");
   const hasLoadedRef = useRef(false);
   const [isTabReady, setIsTabReady] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -149,7 +154,8 @@ export default function Inspector({
   const inputRef = useRef<HTMLInputElement>(null);
   const extension = getMdiExtension(fileName);
   const baseName = getBaseName(fileName);
-  const displayBaseName = baseName || fileName;
+  // isDirty の場合はファイル名に * を追加（クライアント側のみ）
+  const displayBaseName = (baseName || fileName) + (isClient && isDirty ? " *" : "");
 
   // fileName の変更に合わせて編集用のベース名も更新する
   useEffect(() => {
@@ -252,23 +258,27 @@ export default function Inspector({
             {onSaveFile && (
               <button
                 onClick={() => void onSaveFile()}
-                disabled={isSaving || !isDirty}
+                disabled={!isClient || isSaving || !isDirty}
                 className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                  isSaving
+                  !isClient
+                    ? 'bg-background text-foreground-muted cursor-not-allowed opacity-50 border border-border'
+                    : isSaving
                     ? 'bg-background text-foreground-tertiary cursor-wait border border-border'
                     : isDirty
                     ? 'bg-accent text-white hover:bg-accent-hover'
                     : 'bg-background text-foreground-muted cursor-not-allowed opacity-50 border border-border'
                 }`}
                 title={
-                  isSaving
+                  !isClient
+                    ? '変更なし'
+                    : isSaving
                     ? '保存中...'
                     : isDirty
                     ? 'ファイルを保存 (Cmd/Ctrl+S)'
                     : '変更なし'
                 }
               >
-                {isSaving ? '保存中...' : '保存'}
+                {isClient && isSaving ? '保存中...' : '保存'}
               </button>
             )}
           </div>
@@ -325,28 +335,28 @@ export default function Inspector({
         
         <div className="mt-2 flex items-center justify-between text-xs">
           <span>
-              {isSaving && (
+              {isClient && isSaving && (
                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-info/20 text-info animate-pulse">
                  <span className="mr-1">⟳</span> 保存中
                </span>
              )}
-             {!isSaving && isDirty && (
+             {isClient && !isSaving && isDirty && (
                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-warning text-white">
                  <span className="mr-1">●</span> 編集中
                </span>
              )}
-             {!isSaving && !isDirty && lastSavedTime === null && (
+             {!isClient || (!isSaving && !isDirty && lastSavedTime === null) ? (
                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-foreground-muted text-white">
                  <span className="mr-1">●</span> 新規
                </span>
-             )}
-             {!isSaving && !isDirty && lastSavedTime !== null && (
+             ) : null}
+             {isClient && !isSaving && !isDirty && lastSavedTime !== null && (
                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-success text-white">
                  <span className="mr-1">✓</span> 保存済み
                </span>
              )}
           </span>
-          {lastSavedTime && !isDirty && (
+          {isClient && lastSavedTime && !isDirty && (
             <span className="text-foreground-tertiary">{formatTime(lastSavedTime)}</span>
           )}
         </div>

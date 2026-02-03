@@ -291,7 +291,8 @@ export default function EditorPage() {
    const readabilityAnalysis = calculateReadabilityScore(content);
    const particleAnalysis = analyzeParticleUsage(content);
 
-   const fileName = currentFile?.name ?? (isDirty ? "新規ファイル *" : "新規ファイル");
+   // ファイル名は currentFile.name のみを使用（isDirtyに基づく*の追加はInspectorコンポーネント側で処理）
+   const fileName = currentFile?.name ?? "新規ファイル";
 
    // キーボードショートカット: Cmd/Ctrl+S=保存、Cmd/Ctrl+F=検索
    useEffect(() => {
