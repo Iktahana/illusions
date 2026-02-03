@@ -216,9 +216,17 @@ export default function Inspector({
           <div className="flex items-center gap-1">
             {onNewFile && (
               <button
-                onClick={onNewFile}
+                onClick={() => {
+                  // Electron 环境下打开新窗口
+                  if (typeof window !== 'undefined' && (window as any).electronAPI?.newWindow) {
+                    (window as any).electronAPI.newWindow();
+                  } else {
+                    // Web 环境下使用原有逻辑
+                    onNewFile();
+                  }
+                }}
                 className="p-1 text-foreground-tertiary hover:text-accent hover:bg-active rounded transition-colors"
-                title="新規ファイル"
+                title="新規ファイル (新しいウィンドウ)"
               >
                 <FilePlus className="w-4 h-4" />
               </button>
