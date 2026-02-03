@@ -76,16 +76,16 @@ export default function ColorPicker({ value, onChange, label }: ColorPickerProps
 
       {/* ドロップダウンカラーパネル */}
       {isOpen && (
-        <div className="absolute z-50 mt-1 p-3 bg-background border border-border-secondary rounded-lg shadow-lg w-56">
+        <div className="absolute right-0 z-50 mt-1 p-2 bg-background border border-border-secondary rounded-lg shadow-lg w-48">
           {/* プリセットカラーグリッド */}
-          <div className="grid grid-cols-8 gap-1 mb-3">
+          <div className="grid grid-cols-8 gap-0.5 mb-2">
             {PRESET_COLORS.map((color) => (
               <button
                 key={color}
                 type="button"
                 onClick={() => handleSelectColor(color)}
                 className={clsx(
-                  "w-5 h-5 rounded transition-transform hover:scale-110",
+                  "w-4 h-4 rounded transition-transform hover:scale-110",
                   value === color && "ring-2 ring-accent ring-offset-1"
                 )}
                 style={{ backgroundColor: color }}
@@ -95,24 +95,24 @@ export default function ColorPicker({ value, onChange, label }: ColorPickerProps
           </div>
 
           {/* カスタムカラー入力 */}
-          <div className="flex items-center gap-2 pt-2 border-t border-border">
+          <div className="flex items-center gap-1.5 pt-2 border-t border-border">
             <input
               type="color"
               value={customColor}
               onChange={(e) => setCustomColor(e.target.value)}
-              className="w-8 h-8 rounded cursor-pointer"
+              className="w-6 h-6 flex-shrink-0 rounded cursor-pointer"
             />
             <input
               type="text"
               value={customColor}
               onChange={(e) => setCustomColor(e.target.value)}
               placeholder="#000000"
-              className="flex-1 px-2 py-1 text-xs font-mono border border-border-secondary rounded focus:outline-none focus:ring-1 focus:ring-accent bg-background text-foreground"
+              className="min-w-0 flex-1 px-1.5 py-0.5 text-xs font-mono border border-border-secondary rounded focus:outline-none focus:ring-1 focus:ring-accent bg-background text-foreground"
             />
             <button
               type="button"
               onClick={() => handleSelectColor(customColor)}
-              className="px-2 py-1 text-xs font-medium bg-accent text-white rounded hover:bg-accent-hover"
+              className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium bg-accent text-white rounded hover:bg-accent-hover"
             >
               OK
             </button>
