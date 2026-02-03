@@ -6,6 +6,7 @@ import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
 import ResizablePanel from "@/components/ResizablePanel";
 import TitleUpdater from "@/components/TitleUpdater";
+import ActivityBar, { type ActivityBarView } from "@/components/ActivityBar";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { isElectronRenderer } from "@/lib/runtime-env";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
@@ -78,6 +79,7 @@ export default function EditorPage() {
   const [fontFamily, setFontFamily] = useState('Noto Serif JP');
   const [charsPerLine, setCharsPerLine] = useState(40); // 0 = 制限なし（既定 40）
   const [showParagraphNumbers, setShowParagraphNumbers] = useState(true);
+  const [activeView, setActiveView] = useState<ActivityBarView>("explorer");
   
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
@@ -305,27 +307,53 @@ export default function EditorPage() {
       )}
 
       <div className="flex-1 flex overflow-hidden">
-        <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
-          <Explorer 
-            content={content} 
-            onChapterClick={handleChapterClick} 
-            onInsertText={handleInsertText}
-            fontScale={fontScale}
-            onFontScaleChange={setFontScale}
-            lineHeight={lineHeight}
-            onLineHeightChange={setLineHeight}
-            paragraphSpacing={paragraphSpacing}
-            onParagraphSpacingChange={handleParagraphSpacingChange}
-            textIndent={textIndent}
-            onTextIndentChange={setTextIndent}
-            fontFamily={fontFamily}
-            onFontFamilyChange={setFontFamily}
-            charsPerLine={charsPerLine}
-            onCharsPerLineChange={setCharsPerLine}
-            showParagraphNumbers={showParagraphNumbers}
-            onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
-          />
-        </ResizablePanel>
+        {/* Activity Bar */}
+        <ActivityBar activeView={activeView} onViewChange={setActiveView} />
+        
+        {/* 左侧面板 */}
+        {activeView !== "none" && (
+          <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
+            {activeView === "explorer" && (
+              <Explorer 
+                content={content} 
+                onChapterClick={handleChapterClick} 
+                onInsertText={handleInsertText}
+                fontScale={fontScale}
+                onFontScaleChange={setFontScale}
+                lineHeight={lineHeight}
+                onLineHeightChange={setLineHeight}
+                paragraphSpacing={paragraphSpacing}
+                onParagraphSpacingChange={handleParagraphSpacingChange}
+                textIndent={textIndent}
+                onTextIndentChange={setTextIndent}
+                fontFamily={fontFamily}
+                onFontFamilyChange={setFontFamily}
+                charsPerLine={charsPerLine}
+                onCharsPerLineChange={setCharsPerLine}
+                showParagraphNumbers={showParagraphNumbers}
+                onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
+              />
+            )}
+            {activeView === "search" && (
+              <div className="h-full bg-background-secondary border-r border-border p-4">
+                <h2 className="text-lg font-semibold text-foreground mb-4">検索</h2>
+                <p className="text-sm text-foreground-secondary">検索機能は開発中です</p>
+              </div>
+            )}
+            {activeView === "outline" && (
+              <div className="h-full bg-background-secondary border-r border-border p-4">
+                <h2 className="text-lg font-semibold text-foreground mb-4">アウトライン</h2>
+                <p className="text-sm text-foreground-secondary">アウトライン機能は開発中です</p>
+              </div>
+            )}
+            {activeView === "settings" && (
+              <div className="h-full bg-background-secondary border-r border-border p-4">
+                <h2 className="text-lg font-semibold text-foreground mb-4">設定</h2>
+                <p className="text-sm text-foreground-secondary">設定機能は開発中です</p>
+              </div>
+            )}
+          </ResizablePanel>
+        )}
         
         <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative">
           <div ref={editorDomRef} className="flex-1 min-h-0">
@@ -359,26 +387,27 @@ export default function EditorPage() {
           )}
         </main>
         
-         <ResizablePanel side="right" defaultWidth={256} minWidth={200} maxWidth={400}>
-           <Inspector
-             wordCount={wordCount}
-             charCount={charCount}
-             selectedCharCount={selectedCharCount}
-             paragraphCount={paragraphCount}
-             fileName={fileName}
-             isDirty={isDirty}
-             isSaving={isSaving}
-             lastSavedTime={lastSavedTime}
-             onOpenFile={openFile}
-             onNewFile={newFile}
-             onFileNameChange={updateFileName}
-             sentenceCount={sentenceCount}
-             charTypeAnalysis={charTypeAnalysis}
-             charUsageRates={charUsageRates}
-             readabilityAnalysis={readabilityAnalysis}
-             particleAnalysis={particleAnalysis}
-           />
-         </ResizablePanel>
+         {/* 右侧面板：统计信息（始终显示） */}
+        <ResizablePanel side="right" defaultWidth={256} minWidth={200} maxWidth={400}>
+          <Inspector
+            wordCount={wordCount}
+            charCount={charCount}
+            selectedCharCount={selectedCharCount}
+            paragraphCount={paragraphCount}
+            fileName={fileName}
+            isDirty={isDirty}
+            isSaving={isSaving}
+            lastSavedTime={lastSavedTime}
+            onOpenFile={openFile}
+            onNewFile={newFile}
+            onFileNameChange={updateFileName}
+            sentenceCount={sentenceCount}
+            charTypeAnalysis={charTypeAnalysis}
+            charUsageRates={charUsageRates}
+            readabilityAnalysis={readabilityAnalysis}
+            particleAnalysis={particleAnalysis}
+          />
+        </ResizablePanel>
       </div>
     </div>
   );
