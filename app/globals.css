@@ -50,6 +50,19 @@ html {
   --progress-hiragana: #3b82f6;
   --progress-katakana: #10b981;
   --progress-other: #71717a;
+  
+  /* Part-of-Speech (品詞) highlighting colors */
+  --pos-verb: #22c55e;
+  --pos-verb-intransitive: #16a34a;
+  --pos-verb-transitive: #4ade80;
+  --pos-particle: #a855f7;
+  --pos-auxiliary: #8b5cf6;
+  --pos-adjective: #3b82f6;
+  --pos-adverb: #f97316;
+  --pos-conjunction: #14b8a6;
+  --pos-interjection: #ec4899;
+  --pos-adnominal: #6366f1;
+  --pos-noun: inherit;
 }
 
 .dark {
@@ -91,6 +104,19 @@ html {
    --progress-hiragana: #60a5fa;
    --progress-katakana: #34d399;
    --progress-other: #a1a1aa;
+   
+   /* Part-of-Speech highlighting colors - dark mode (slightly brighter) */
+   --pos-verb: #4ade80;
+   --pos-verb-intransitive: #22c55e;
+   --pos-verb-transitive: #86efac;
+   --pos-particle: #c084fc;
+   --pos-auxiliary: #a78bfa;
+   --pos-adjective: #60a5fa;
+   --pos-adverb: #fb923c;
+   --pos-conjunction: #2dd4bf;
+   --pos-interjection: #f472b6;
+   --pos-adnominal: #818cf8;
+   --pos-noun: inherit;
 }
 
 body {
