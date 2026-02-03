@@ -23,6 +23,10 @@ export interface AppState {
   hasSeenDemo?: boolean;
   sidebarTab?: "chapters" | "settings" | "style";
   inspectorTab?: "ai" | "corrections" | "stats";
+  
+  // 品詞着色設定
+  posHighlightEnabled?: boolean;
+  posHighlightColors?: Record<string, string>;
 }
 
 /**
