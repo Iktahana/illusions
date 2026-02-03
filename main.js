@@ -446,8 +446,11 @@ ipcMain.handle('save-before-close-done', () => {
 })
 
 ipcMain.handle('new-window', () => {
+  console.log('[Main Process] Creating new window...')
   // 创建新窗口
-  createWindow()
+  const newWin = createWindow()
+  console.log('[Main Process] New window created:', newWin ? 'success' : 'failed')
+  return newWin ? true : false
 })
 
 app.whenReady().then(() => {
