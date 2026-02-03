@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, ReactNode } from "react";
-import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, X } from "lucide-react";
+import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, X, Save } from "lucide-react";
 import clsx from "clsx";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
 
@@ -56,6 +56,7 @@ interface InspectorProps {
   lastSavedTime?: number | null;
   onOpenFile?: () => void;
   onNewFile?: () => void;
+  onSaveFile?: () => void;
   onFileNameChange?: (newName: string) => void;
   sentenceCount?: number;
   charTypeAnalysis?: {
@@ -93,6 +94,7 @@ export default function Inspector({
   lastSavedTime = null,
   onOpenFile,
   onNewFile,
+  onSaveFile,
   onFileNameChange,
   sentenceCount = 0,
   charTypeAnalysis,
@@ -238,6 +240,28 @@ export default function Inspector({
                 title="ファイルを開く"
               >
                 <FolderOpen className="w-4 h-4" />
+              </button>
+            )}
+            {onSaveFile && (
+              <button
+                onClick={() => void onSaveFile()}
+                disabled={isSaving || !isDirty}
+                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                  isSaving
+                    ? 'bg-background text-foreground-tertiary cursor-wait border border-border'
+                    : isDirty
+                    ? 'bg-accent text-white hover:bg-accent-hover'
+                    : 'bg-background text-foreground-muted cursor-not-allowed opacity-50 border border-border'
+                }`}
+                title={
+                  isSaving
+                    ? '保存中...'
+                    : isDirty
+                    ? 'ファイルを保存 (Cmd/Ctrl+S)'
+                    : '変更なし'
+                }
+              >
+                {isSaving ? '保存中...' : '保存'}
               </button>
             )}
           </div>
