@@ -16,6 +16,7 @@ import {
   getScrollProgress, 
   setScrollProgress,
 } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
+import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
 import clsx from "clsx";
 import { Type, AlignLeft, Search } from "lucide-react";
 import { EditorView } from "@milkdown/prose/view";
@@ -43,6 +44,9 @@ interface EditorProps {
   onEditorViewReady?: (view: EditorView) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onShowAllSearchResults?: (matches: any[], searchTerm: string) => void;
+  // 品詞着色設定
+  posHighlightEnabled?: boolean;
+  posHighlightColors?: Record<string, string>;
 }
 
 export default function NovelEditor({
@@ -61,6 +65,8 @@ export default function NovelEditor({
   showParagraphNumbers = false,
   onEditorViewReady,
   onShowAllSearchResults,
+  posHighlightEnabled = false,
+  posHighlightColors = {},
 }: EditorProps) {
   // ハイドレーション不整合を避けるため、初期値は false にする
   const [isVertical, setIsVertical] = useState(false);
@@ -180,6 +186,8 @@ export default function NovelEditor({
               targetScrollProgress={targetScrollProgress}
               onScrollRestored={handleScrollRestored}
               savedScrollProgressRef={savedScrollProgressRef}
+              posHighlightEnabled={posHighlightEnabled}
+              posHighlightColors={posHighlightColors}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -269,6 +277,8 @@ function MilkdownEditor({
   targetScrollProgress,
   onScrollRestored,
   savedScrollProgressRef,
+  posHighlightEnabled,
+  posHighlightColors,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
@@ -287,6 +297,8 @@ function MilkdownEditor({
   targetScrollProgress?: number | null;
   onScrollRestored?: () => void;
   savedScrollProgressRef: RefObject<number>;
+  posHighlightEnabled?: boolean;
+  posHighlightColors?: Record<string, string>;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
@@ -370,8 +382,14 @@ function MilkdownEditor({
       .use(clipboard)
       .use(cursor)
       .use(verticalScrollPlugin)
-      .use($prose(() => searchHighlightPlugin));
-  }, [isVertical, verticalScrollPlugin]); // isVertical が変わったときのみ作り直す
+      .use($prose(() => searchHighlightPlugin))
+      .use(posHighlight({
+        enabled: posHighlightEnabled || false,
+        colors: posHighlightColors || {},
+        dicPath: '/dict',
+        debounceMs: 300,
+      }));
+  }, [isVertical, verticalScrollPlugin, posHighlightEnabled, posHighlightColors]); // 品詞着色設定も依存配列に追加
 
   // EditorView インスタンスを取得する
   useEffect(() => {
