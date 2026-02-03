@@ -5,11 +5,12 @@ import {
   Settings, 
   Search,
   Book,
-  Layers
+  Layers,
+  BarChart3
 } from "lucide-react";
 import clsx from "clsx";
 
-export type ActivityBarView = "explorer" | "inspector" | "settings" | "search" | "outline" | "none";
+export type ActivityBarView = "explorer" | "inspector" | "settings" | "search" | "outline" | "wordfreq" | "none";
 
 interface ActivityBarProps {
   activeView: ActivityBarView;
@@ -41,6 +42,12 @@ const ACTIVITY_BAR_ITEMS: ActivityBarItem[] = [
     icon: Book,
     label: "アウトライン",
     tooltip: "アウトライン (Ctrl+Shift+O)"
+  },
+  {
+    id: "wordfreq",
+    icon: BarChart3,
+    label: "語彙統計",
+    tooltip: "語彙統計"
   },
   {
     id: "settings",
