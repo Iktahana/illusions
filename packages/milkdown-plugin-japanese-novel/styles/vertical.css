@@ -39,3 +39,21 @@
   font-size: 0.5em;
   letter-spacing: 0;
 }
+
+/* List styles in vertical mode */
+.milkdown-japanese-vertical ul,
+.milkdown-japanese-vertical ol {
+  margin: 0 0.5em;
+  padding-top: 2em;
+}
+
+.milkdown-japanese-vertical li {
+  margin: 0.25em 0;
+}
+
+/* Blockquote styles in vertical mode */
+.milkdown-japanese-vertical blockquote {
+  margin: 0 0.5em;
+  padding-top: 1em;
+  border-top: 3px solid var(--border-secondary);
+}

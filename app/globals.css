@@ -209,7 +209,50 @@ html:not(.dark) {
 }
 
 .milkdown p {
-  @apply mb-4;
+  margin-bottom: 0.5em;
+}
+
+/* List styles */
+.milkdown ul,
+.milkdown ol {
+  margin: 0.5em 0;
+  padding-left: 2em;
+}
+
+.milkdown ul {
+  list-style-type: disc;
+}
+
+.milkdown ol {
+  list-style-type: decimal;
+}
+
+.milkdown li {
+  margin: 0.25em 0;
+}
+
+.milkdown ul ul {
+  list-style-type: circle;
+}
+
+.milkdown ul ul ul {
+  list-style-type: square;
+}
+
+.milkdown ol ol {
+  list-style-type: lower-alpha;
+}
+
+.milkdown ol ol ol {
+  list-style-type: lower-roman;
+}
+
+/* Blockquote styles */
+.milkdown blockquote {
+  margin: 0.5em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--border-secondary);
+  color: var(--foreground-secondary);
 }
 
 .milkdown h1 {
