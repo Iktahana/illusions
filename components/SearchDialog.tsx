@@ -204,7 +204,7 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
       {matches.length > 0 && (
         <button
           onClick={handleShowAllResults}
-          className="w-full mb-3 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium bg-accent-light text-accent hover:bg-active transition-colors"
+          className="w-full mb-3 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium bg-accent text-accent-foreground hover:bg-accent-hover transition-colors"
         >
           <List className="w-4 h-4" />
           すべての検索結果を表示 ({matches.length}件)
