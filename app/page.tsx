@@ -115,6 +115,8 @@ export default function EditorPage() {
   const [fontFamily, setFontFamily] = useState('Noto Serif JP');
   const [charsPerLine, setCharsPerLine] = useState(40); // 0 = 制限なし（既定 40）
   const [showParagraphNumbers, setShowParagraphNumbers] = useState(true);
+  const [posHighlightEnabled, setPosHighlightEnabled] = useState(false); // 品詞着色（デフォルト: 無効）
+  const [posHighlightColors, setPosHighlightColors] = useState<Record<string, string>>({}); // 品詞ごとの色設定
   const [activeView, setActiveView] = useState<ActivityBarView>("explorer");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editorViewInstance, setEditorViewInstance] = useState<any>(null);
@@ -159,6 +161,12 @@ export default function EditorPage() {
         if (typeof appState.showParagraphNumbers === "boolean") {
           setShowParagraphNumbers(appState.showParagraphNumbers);
         }
+        if (typeof appState.posHighlightEnabled === "boolean") {
+          setPosHighlightEnabled(appState.posHighlightEnabled);
+        }
+        if (appState.posHighlightColors && typeof appState.posHighlightColors === "object") {
+          setPosHighlightColors(appState.posHighlightColors);
+        }
       } catch (error) {
         console.error("設定の読み込みに失敗しました:", error);
       }
@@ -182,6 +190,20 @@ export default function EditorPage() {
     setShowParagraphNumbers(value);
     void persistAppState({ showParagraphNumbers: value }).catch((error) => {
       console.error("段落番号の設定保存に失敗しました:", error);
+    });
+  }, []);
+
+  const handlePosHighlightEnabledChange = useCallback((value: boolean) => {
+    setPosHighlightEnabled(value);
+    void persistAppState({ posHighlightEnabled: value }).catch((error) => {
+      console.error("品詞着色の設定保存に失敗しました:", error);
+    });
+  }, []);
+
+  const handlePosHighlightColorsChange = useCallback((value: Record<string, string>) => {
+    setPosHighlightColors(value);
+    void persistAppState({ posHighlightColors: value }).catch((error) => {
+      console.error("品詞色設定の保存に失敗しました:", error);
     });
   }, []);
 
@@ -438,6 +460,8 @@ export default function EditorPage() {
               showParagraphNumbers={showParagraphNumbers}
               onEditorViewReady={setEditorViewInstance}
               onShowAllSearchResults={handleShowAllSearchResults}
+              posHighlightEnabled={posHighlightEnabled}
+              posHighlightColors={posHighlightColors}
             />
           </div>
           
@@ -474,6 +498,10 @@ export default function EditorPage() {
             charUsageRates={charUsageRates}
             readabilityAnalysis={readabilityAnalysis}
             particleAnalysis={particleAnalysis}
+            posHighlightEnabled={posHighlightEnabled}
+            onPosHighlightEnabledChange={handlePosHighlightEnabledChange}
+            posHighlightColors={posHighlightColors}
+            onPosHighlightColorsChange={handlePosHighlightColorsChange}
           />
         </ResizablePanel>
       </div>
