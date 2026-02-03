@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search, X, ChevronUp, ChevronDown, Replace, ReplaceAll } from "lucide-react";
+import { Search, X, ChevronUp, ChevronDown, List } from "lucide-react";
 import clsx from "clsx";
-import { EditorView } from "@milkdown/prose/view";
+import { EditorView, Decoration, DecorationSet } from "@milkdown/prose/view";
 import { TextSelection } from "@milkdown/prose/state";
+import { Plugin, PluginKey } from "@milkdown/prose/state";
 
 interface SearchDialogProps {
   editorView: EditorView | null;
   isOpen: boolean;
   onClose: () => void;
+  onShowAllResults?: (matches: SearchMatch[], searchTerm: string) => void;
 }
 
 interface SearchMatch {
@@ -17,13 +19,11 @@ interface SearchMatch {
   to: number;
 }
 
-export default function SearchDialog({ editorView, isOpen, onClose }: SearchDialogProps) {
+export default function SearchDialog({ editorView, isOpen, onClose, onShowAllResults }: SearchDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [replaceTerm, setReplaceTerm] = useState("");
   const [matches, setMatches] = useState<SearchMatch[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
   const [caseSensitive, setCaseSensitive] = useState(false);
-  const [showReplace, setShowReplace] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // ダイアログ表示時に検索入力へフォーカスする
@@ -69,24 +69,35 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
     setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1);
   }, [searchTerm, caseSensitive, editorView]);
 
-  // 現在の一致箇所へ移動し、選択表示する
+  // 搜索高亮裝飾
   useEffect(() => {
-    if (!editorView || currentMatchIndex === -1 || matches.length === 0) {
-      return;
-    }
+    if (!editorView) return;
 
-    const match = matches[currentMatchIndex];
-    if (!match) return;
-
-    // 一致箇所を選択
     const { state, dispatch } = editorView;
-    const tr = state.tr
-      .setSelection(TextSelection.create(state.doc, match.from, match.to))
-      .scrollIntoView();
+    const decorations: Decoration[] = [];
+
+    // 為所有匹配項添加背景高亮
+    matches.forEach((match, index) => {
+      const isCurrentMatch = index === currentMatchIndex;
+      decorations.push(
+        Decoration.inline(match.from, match.to, {
+          class: isCurrentMatch ? "search-result-current" : "search-result",
+        })
+      );
+    });
+
+    // 使用 meta 傳遞裝飾信息
+    const tr = state.tr.setMeta("searchDecorations", decorations);
     dispatch(tr);
 
-    // 表示位置へスクロール
-    editorView.focus();
+    // 滾動到當前匹配項
+    if (currentMatchIndex !== -1 && matches[currentMatchIndex]) {
+      const match = matches[currentMatchIndex];
+      const tr2 = state.tr
+        .setSelection(TextSelection.create(state.doc, match.from, match.from))
+        .scrollIntoView();
+      dispatch(tr2);
+    }
   }, [currentMatchIndex, matches, editorView]);
 
   const goToNextMatch = () => {
@@ -99,49 +110,7 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
     setCurrentMatchIndex((prev) => (prev - 1 + matches.length) % matches.length);
   };
 
-  const replaceCurrentMatch = () => {
-    if (!editorView || currentMatchIndex === -1 || matches.length === 0) return;
 
-    const match = matches[currentMatchIndex];
-    const { state, dispatch } = editorView;
-    
-    // 現在の一致箇所を置換
-    const tr = state.tr.replaceWith(
-      match.from,
-      match.to,
-      state.schema.text(replaceTerm)
-    );
-    dispatch(tr);
-
-    // 再検索して一致箇所を更新
-    setSearchTerm(searchTerm + " "); // Trigger re-search
-    setTimeout(() => setSearchTerm(searchTerm.trim()), 0);
-  };
-
-  const replaceAllMatches = () => {
-    if (!editorView || matches.length === 0) return;
-
-    const { state, dispatch } = editorView;
-    let tr = state.tr;
-
-    // 位置ずれを避けるため、後ろから順に置換する
-    for (let i = matches.length - 1; i >= 0; i--) {
-      const match = matches[i];
-      tr = tr.replaceWith(
-        match.from,
-        match.to,
-        state.schema.text(replaceTerm)
-      );
-    }
-
-    dispatch(tr);
-
-    // 検索状態をクリア
-    setSearchTerm("");
-    setReplaceTerm("");
-    setMatches([]);
-    setCurrentMatchIndex(-1);
-  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
@@ -152,6 +121,12 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
       } else {
         goToNextMatch();
       }
+    }
+  };
+
+  const handleShowAllResults = () => {
+    if (matches.length > 0 && searchTerm && onShowAllResults) {
+      onShowAllResults(matches, searchTerm);
     }
   };
 
@@ -223,53 +198,17 @@ export default function SearchDialog({ editorView, isOpen, onClose }: SearchDial
           />
           大文字小文字を区別
         </label>
-        <button
-          onClick={() => setShowReplace(!showReplace)}
-          className="text-xs text-accent hover:text-accent-hover"
-        >
-          {showReplace ? "置換を非表示" : "置換"}
-        </button>
       </div>
 
-      {/* 置換 */}
-      {showReplace && (
-        <div className="space-y-2 pt-2 border-t border-border">
-          <input
-            type="text"
-            value={replaceTerm}
-            onChange={(e) => setReplaceTerm(e.target.value)}
-            placeholder="置換後..."
-            className="w-full px-3 py-2 border border-border-secondary bg-background text-foreground rounded focus:outline-none focus:ring-2 focus:ring-accent text-sm"
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={replaceCurrentMatch}
-              disabled={currentMatchIndex === -1}
-              className={clsx(
-                "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors",
-                currentMatchIndex === -1
-                  ? "bg-background-secondary text-foreground-muted cursor-not-allowed"
-                  : "bg-accent-light text-accent hover:bg-active"
-              )}
-            >
-              <Replace className="w-4 h-4" />
-              置換
-            </button>
-            <button
-              onClick={replaceAllMatches}
-              disabled={matches.length === 0}
-              className={clsx(
-                "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors",
-                matches.length === 0
-                  ? "bg-background-secondary text-foreground-muted cursor-not-allowed"
-                  : "bg-accent text-accent-foreground hover:bg-accent-hover"
-              )}
-            >
-              <ReplaceAll className="w-4 h-4" />
-              すべて置換
-            </button>
-          </div>
-        </div>
+      {/* 全文検索ボタン */}
+      {matches.length > 0 && (
+        <button
+          onClick={handleShowAllResults}
+          className="w-full mb-3 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium bg-accent-light text-accent hover:bg-active transition-colors"
+        >
+          <List className="w-4 h-4" />
+          すべての検索結果を表示 ({matches.length}件)
+        </button>
       )}
 
       {/* ショートカット */}
