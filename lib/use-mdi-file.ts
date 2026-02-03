@@ -14,12 +14,34 @@ async function loadDemoContent(): Promise<string | null> {
   if (typeof window === "undefined") return null;
 
   try {
-    const url = new URL("demo/鏡地獄.mdi", window.location.href);
-    const response = await fetch(url.toString());
-    if (!response.ok) return null;
-    return await response.text();
+    // 複数のパスパターンを試す（開発環境と本番環境の違いに対応）
+    const paths = [
+      "demo/鏡地獄.mdi",
+      "/demo/鏡地獄.mdi",
+      "./demo/鏡地獄.mdi"
+    ];
+    
+    for (const path of paths) {
+      try {
+        const url = new URL(path, window.location.href);
+        console.log('[Demo Loading] Trying to fetch:', url.toString());
+        const response = await fetch(url.toString());
+        if (response.ok) {
+          const content = await response.text();
+          console.log('[Demo Loading] Successfully loaded demo file, length:', content.length);
+          return content;
+        }
+        console.warn('[Demo Loading] Failed to fetch from:', url.toString(), 'Status:', response.status);
+      } catch (pathError) {
+        console.warn('[Demo Loading] Error fetching from path:', path, pathError);
+        continue;
+      }
+    }
+    
+    console.error('[Demo Loading] All demo file paths failed');
+    return null;
   } catch (error) {
-    console.warn("デモ文書の読み込みに失敗しました:", error);
+    console.error("デモ文書の読み込みに失敗しました:", error);
     return null;
   }
 }
@@ -79,12 +101,26 @@ export function useMdiFile(): UseMdiFileReturn {
         const session = await storage.loadSession();
         const appState = await storage.loadAppState();
         const hasSeenDemo = appState?.hasSeenDemo ?? false;
-        const hasSessionData = Boolean(
+        
+        // ユーザーが実際にファイルを編集したことがあるかを判定
+        // 設定項目（paragraphSpacing等）だけでは「編集済み」とみなさない
+        const hasEditedFiles = Boolean(
           session &&
-          (Object.keys(session.appState || {}).length > 0 ||
-            session.recentFiles.length > 0 ||
-            session.editorBuffer)
+          (session.recentFiles.length > 0 ||
+            session.editorBuffer ||
+            appState?.lastOpenedMdiPath)
         );
+
+        // デバッグログ
+        console.log('[Demo Loading] Session data:', {
+          session,
+          appState,
+          hasSeenDemo,
+          hasEditedFiles,
+          recentFilesCount: session?.recentFiles?.length ?? 0,
+          hasEditorBuffer: Boolean(session?.editorBuffer),
+          lastOpenedPath: appState?.lastOpenedMdiPath,
+        });
 
         // Web: エディタバッファからファイルハンドルの復元を試みる
         if (!isElectron) {
@@ -116,7 +152,7 @@ export function useMdiFile(): UseMdiFileReturn {
           }
         }
 
-        if (!hasSeenDemo && !hasSessionData) {
+        if (!hasSeenDemo && !hasEditedFiles) {
           const demoContent = await loadDemoContent();
           if (demoContent) {
             setCurrentFile({
