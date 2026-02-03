@@ -95,7 +95,7 @@ export default function SelectionCounter({ editorView, isVertical = false }: Sel
       editorDom.removeEventListener("keyup", handleKeyUp);
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, [editorView]);
+  }, [editorView, isVertical]);
 
   // 選択がない場合は描画しない
   if (selectionCount === 0 && !isVisible) {
