@@ -533,11 +533,11 @@ function CorrectionsPanel({
 
   return (
     <div className="space-y-3">
-      {/* 品詞着色開關 */}
+      {/* 構文ハイライト開關 */}
       <div className="bg-background-secondary rounded-lg p-3 border border-border">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="text-sm font-medium text-foreground">品詞着色</h4>
+            <h4 className="text-sm font-medium text-foreground">構文ハイライト</h4>
             <p className="text-xs text-foreground-tertiary mt-0.5">
               動詞・助詞などを色分け表示
             </p>

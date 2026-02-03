@@ -37,8 +37,8 @@ export const DEFAULT_POS_COLORS: PosColorConfig = {
   // 記号 - 継承（着色しない）
   '記号': 'inherit',
   
-  // 名詞 - 継承（複雑なので現時点では着色しない）
-  '名詞': 'inherit',
+  // 名詞 - 青系
+  '名詞': '#60a5fa',
 };
 
 /**
@@ -71,6 +71,11 @@ export function getPosColor(
   posDetail1: string | undefined,
   customColors: PosColorConfig
 ): string | null {
+  // 記号（句読点、括弧など）は着色しない
+  if (pos === '記号') {
+    return null;
+  }
+  
   // まず細分類キー（例: 動詞-自立）をチェック
   const detailKey = posDetail1 ? `${pos}-${posDetail1}` : null;
   if (detailKey && customColors[detailKey] && customColors[detailKey] !== 'inherit') {

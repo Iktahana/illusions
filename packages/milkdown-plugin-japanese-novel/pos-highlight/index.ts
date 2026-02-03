@@ -5,7 +5,9 @@
 
 import { $prose } from '@milkdown/utils';
 import { createPosHighlightPlugin, posHighlightKey } from './decoration-plugin';
-import { simpleTokenizer } from './tokenizer-simple';
+import { electronTokenizer } from './tokenizer-electron';
+import { cdnTokenizer } from './tokenizer-cdn';
+import { isElectron } from './env-utils';
 import { DEFAULT_POS_COLORS } from './pos-colors';
 import type { EditorView } from '@milkdown/prose/view';
 import type { PosColorConfig, PosHighlightSettings } from './types';
@@ -43,9 +45,14 @@ export function posHighlight(options: PosHighlightOptions = {}) {
   } = options;
   
   // トークナイザーを事前初期化（有効な場合のみ）
+  // 環境に応じて適切な tokenizer を選択
   if (enabled && !isInitialized) {
     isInitialized = true;
-    simpleTokenizer.init(dicPath).catch((err: Error) => {
+    const tokenizer = isElectron() ? electronTokenizer : cdnTokenizer;
+    
+    console.log(`[PosHighlight] Initializing ${isElectron() ? 'Electron' : 'CDN'} tokenizer`);
+    
+    tokenizer.init(dicPath).catch((err: Error) => {
       console.error('[PosHighlight] Failed to initialize tokenizer:', err);
       isInitialized = false;
     });
