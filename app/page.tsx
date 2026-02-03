@@ -8,7 +8,10 @@ import ResizablePanel from "@/components/ResizablePanel";
 import TitleUpdater from "@/components/TitleUpdater";
 import ActivityBar, { type ActivityBarView } from "@/components/ActivityBar";
 import SearchResults from "@/components/SearchResults";
+import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
 import { useMdiFile } from "@/lib/use-mdi-file";
+import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
+import { useElectronMenuHandlers } from "@/lib/use-electron-menu-handlers";
 import { isElectronRenderer } from "@/lib/runtime-env";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
 import {
@@ -29,7 +32,7 @@ function words(s: string) {
 
 export default function EditorPage() {
   const mdiFile = useMdiFile();
-  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile: originalOpenFile, saveFile, newFile: originalNewFile, updateFileName, wasAutoRecovered } =
+  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile: originalOpenFile, saveFile, newFile: originalNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen, _loadSystemFile } =
     mdiFile;
 
   const contentRef = useRef<string>(content);
@@ -45,6 +48,13 @@ export default function EditorPage() {
   const prevLastSavedTimeRef = useRef<number | null>(null);
   const hasAutoRecoveredRef = useRef(false);
 
+  // 未保存警告の Hook を初期化
+  const unsavedWarning = useUnsavedWarning(
+    isDirty,
+    saveFile,
+    currentFile?.name || null
+  );
+
   // 自動復元（ページ再読み込み）時はエディタを再マウントする
   useEffect(() => {
     if (wasAutoRecovered && !hasAutoRecoveredRef.current) {
@@ -54,23 +64,48 @@ export default function EditorPage() {
     }
   }, [wasAutoRecovered]);
 
-  // openFile/newFile をラップしてセッションIDを進める
+  // openFile/newFile をラップしてセッションIDを進める（安全チェック付き）
   const openFile = useCallback(async () => {
-    await originalOpenFile();
+    await unsavedWarning.confirmBeforeAction(async () => {
+      await originalOpenFile();
 
-    // content の状態更新を反映してからエディタを再マウントする
-    // setTimeout で originalOpenFile 由来の状態更新を React に先に処理させる
-    setTimeout(() => {
-      fileSessionRef.current += 1;
-      setEditorKey(prev => prev + 1);
-    }, 0);
-  }, [originalOpenFile]);
+      // content の状態更新を反映してからエディタを再マウントする
+      // setTimeout で originalOpenFile 由来の状態更新を React に先に処理させる
+      setTimeout(() => {
+        fileSessionRef.current += 1;
+        setEditorKey(prev => prev + 1);
+      }, 0);
+    });
+  }, [originalOpenFile, unsavedWarning]);
 
   const newFile = useCallback(() => {
-    originalNewFile();
-    fileSessionRef.current += 1;
-    setEditorKey(prev => prev + 1);
-  }, [originalNewFile]);
+    void unsavedWarning.confirmBeforeAction(() => {
+      originalNewFile();
+      fileSessionRef.current += 1;
+      setEditorKey(prev => prev + 1);
+    });
+  }, [originalNewFile, unsavedWarning]);
+
+  // Electron メニューの「新規」と「開く」をバインド（安全チェック付き）
+  useElectronMenuHandlers(newFile, openFile);
+
+  // システムからファイルを開く処理（安全チェック付き）
+  useEffect(() => {
+    if (!onSystemFileOpen) return;
+
+    onSystemFileOpen((path: string, fileContent: string) => {
+      void unsavedWarning.confirmBeforeAction(() => {
+        // ファイルを直接読み込む
+        _loadSystemFile(path, fileContent);
+        
+        // エディタを再マウント
+        setTimeout(() => {
+          fileSessionRef.current += 1;
+          setEditorKey(prev => prev + 1);
+        }, 0);
+      });
+    });
+  }, [onSystemFileOpen, unsavedWarning, _loadSystemFile]);
   
   // エディタ表示設定
   const [fontScale, setFontScale] = useState(100); // 100% = 標準サイズ
@@ -300,6 +335,15 @@ export default function EditorPage() {
      <div className="h-screen flex flex-col overflow-hidden relative">
         {/* 動的なタイトル更新 */}
        <TitleUpdater currentFile={currentFile} isDirty={isDirty} />
+
+        {/* 未保存警告ダイアログ */}
+       <UnsavedWarningDialog
+         isOpen={unsavedWarning.showWarning}
+         fileName={currentFile?.name || "新規ファイル"}
+         onSave={unsavedWarning.handleSave}
+         onDiscard={unsavedWarning.handleDiscard}
+         onCancel={unsavedWarning.handleCancel}
+       />
 
         {/* 自動復元の通知（Webのみ・固定表示） */}
        {!isElectron && wasAutoRecovered && !dismissedRecovery && (

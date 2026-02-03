@@ -59,6 +59,10 @@ export interface UseMdiFileReturn {
   newFile: () => void;
   updateFileName: (newName: string) => void;
   wasAutoRecovered?: boolean; // Webのみ: 自動復元されたかどうか
+  // システムからファイルを開くリクエストを処理するためのコールバック
+  onSystemFileOpen?: (handler: (path: string, content: string) => void) => void;
+  // 内部使用：システムファイルを直接読み込む（安全チェックをスキップ）
+  _loadSystemFile: (path: string, content: string) => void;
 }
 
 export function useMdiFile(): UseMdiFileReturn {
@@ -66,14 +70,15 @@ export function useMdiFile(): UseMdiFileReturn {
     typeof window !== "undefined" && isElectronRenderer();
 
   const [currentFile, setCurrentFile] = useState<MdiFileDescriptor | null>(null);
-  const [content, setContentState] = useState<string>(DEFAULT_CONTENT);
-  const [lastSavedContent, setLastSavedContent] = useState<string>(DEFAULT_CONTENT);
+  const [content, setContentState] = useState<string>(() => getRandomIllusionStory());
+  const [lastSavedContent, setLastSavedContent] = useState<string>(() => getRandomIllusionStory());
   const [isSaving, setIsSaving] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
   const [wasAutoRecovered, setWasAutoRecovered] = useState(false);
 
   const contentRef = useRef<string>(content);
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const systemFileOpenHandlerRef = useRef<((path: string, content: string) => void) | null>(null);
 
   contentRef.current = content;
 
@@ -187,6 +192,19 @@ export function useMdiFile(): UseMdiFileReturn {
     setLastSavedContent(randomContent);
     setLastSavedTime(null);
     setWasAutoRecovered(false);
+  }, []);
+
+  // システムからファイルを開く内部関数（安全チェックなし）
+  const loadSystemFile = useCallback((path: string, fileContent: string) => {
+    const now = Date.now();
+    setCurrentFile({
+      path,
+      handle: null,
+      name: path.split("/").pop() || "無題",
+    });
+    setContentState(fileContent);
+    setLastSavedContent(fileContent);
+    setLastSavedTime(now);
   }, []);
 
   const updateFileName = useCallback((newName: string) => {
@@ -311,19 +329,26 @@ export function useMdiFile(): UseMdiFileReturn {
   }, [isDirty, saveFile, isElectron]);
 
   // システムから開かれたファイル（.mdi のダブルクリック等）を処理する
+  // 実際の処理は page.tsx に委譲する（未保存チェックのため）
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onOpenFileFromSystem) return;
 
     const cleanup = window.electronAPI.onOpenFileFromSystem(({ path, content: fileContent }) => {
-      const now = Date.now();
-      setCurrentFile({
-        path,
-        handle: null,
-        name: path.split("/").pop() || "無題",
-      });
-      setContentState(fileContent);
-      setLastSavedContent(fileContent);
-      setLastSavedTime(now);
+      // 登録されたハンドラがあれば呼び出す（page.tsx で登録される）
+      if (systemFileOpenHandlerRef.current) {
+        systemFileOpenHandlerRef.current(path, fileContent);
+      } else {
+        // ハンドラが未登録の場合は直接実行（後方互換性）
+        const now = Date.now();
+        setCurrentFile({
+          path,
+          handle: null,
+          name: path.split("/").pop() || "無題",
+        });
+        setContentState(fileContent);
+        setLastSavedContent(fileContent);
+        setLastSavedTime(now);
+      }
     });
 
     return cleanup;
@@ -395,27 +420,8 @@ export function useMdiFile(): UseMdiFileReturn {
     return cleanup;
   }, [saveFile, isElectron, currentFile, persistLastOpenedPath]);
 
-  // メニューの新規作成を処理する
-  useEffect(() => {
-    if (!isElectron || !window.electronAPI?.onMenuNew) return;
-
-    const cleanup = window.electronAPI.onMenuNew(() => {
-      newFile();
-    });
-
-    return cleanup;
-  }, [newFile, isElectron]);
-
-  // メニューの「開く」を処理する
-  useEffect(() => {
-    if (!isElectron || !window.electronAPI?.onMenuOpen) return;
-
-    const cleanup = window.electronAPI.onMenuOpen(async () => {
-      await openFile();
-    });
-
-    return cleanup;
-  }, [openFile, isElectron]);
+  // メニューの新規作成と「開く」は page.tsx で処理する（安全チェックを適用するため）
+  // 以前はここで処理していたが、未保存チェックを統一するため移動した
 
   // Web の beforeunload を処理する
   useEffect(() => {
@@ -432,6 +438,11 @@ export function useMdiFile(): UseMdiFileReturn {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty, isElectron]);
 
+  // システムファイルオープンのハンドラを登録する関数
+  const onSystemFileOpen = useCallback((handler: (path: string, content: string) => void) => {
+    systemFileOpenHandlerRef.current = handler;
+  }, []);
+
   return {
     currentFile,
     content,
@@ -444,5 +455,7 @@ export function useMdiFile(): UseMdiFileReturn {
     newFile,
     updateFileName,
     wasAutoRecovered,
+    onSystemFileOpen,
+    _loadSystemFile: loadSystemFile,
   };
 }
