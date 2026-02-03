@@ -49,23 +49,38 @@ export default function SearchResults({
     const foundMatches: SearchMatch[] = [];
     const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
 
-    doc.descendants((node, pos) => {
-      if (!node.isText || !node.text) return;
+    // 文檔全文搜索
+    const fullText = doc.textContent;
+    const searchText = caseSensitive ? fullText : fullText.toLowerCase();
+    
+    let searchIndex = 0;
+    while (searchIndex < searchText.length) {
+      const matchIndex = searchText.indexOf(searchStr, searchIndex);
+      if (matchIndex === -1) break;
 
-      const text = caseSensitive ? node.text : node.text.toLowerCase();
-      let searchIndex = 0;
+      // 將文本位置轉換為文檔位置
+      let pos = 0;
+      let textOffset = 0;
+      
+      doc.descendants((node, nodePos) => {
+        if (pos !== 0) return false; // 已找到，停止遍歷
+        
+        if (node.isText && node.text) {
+          const nodeEnd = textOffset + node.text.length;
+          if (matchIndex >= textOffset && matchIndex < nodeEnd) {
+            pos = nodePos + (matchIndex - textOffset);
+            return false;
+          }
+          textOffset = nodeEnd;
+        }
+        return true;
+      });
 
-      while (searchIndex < text.length) {
-        const matchIndex = text.indexOf(searchStr, searchIndex);
-        if (matchIndex === -1) break;
-
-        const from = pos + matchIndex;
-        const to = from + searchTerm.length;
-
-        foundMatches.push({ from, to });
-        searchIndex = matchIndex + 1;
+      if (pos > 0) {
+        foundMatches.push({ from: pos, to: pos + searchTerm.length });
       }
-    });
+      searchIndex = matchIndex + 1;
+    }
 
     setMatches(foundMatches);
 
