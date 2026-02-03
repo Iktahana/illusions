@@ -9,6 +9,7 @@ import TitleUpdater from "@/components/TitleUpdater";
 import ActivityBar, { type ActivityBarView } from "@/components/ActivityBar";
 import SearchResults from "@/components/SearchResults";
 import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
+import WordFrequency from "@/components/WordFrequency";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
 import { useElectronMenuHandlers } from "@/lib/use-electron-menu-handlers";
@@ -438,6 +439,9 @@ export default function EditorPage() {
                 <h2 className="text-lg font-semibold text-foreground mb-4">設定</h2>
                 <p className="text-sm text-foreground-secondary">設定機能は開発中です</p>
               </div>
+            )}
+            {activeView === "wordfreq" && (
+              <WordFrequency content={content} />
             )}
           </ResizablePanel>
         )}
