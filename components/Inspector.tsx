@@ -218,13 +218,20 @@ export default function Inspector({
           <div className="flex items-center gap-1">
             {onNewFile && (
               <button
-                onClick={() => {
+                onClick={async () => {
+                  console.log('[Inspector] New file button clicked');
+                  console.log('[Inspector] Is Electron:', !!window.electronAPI);
+                  console.log('[Inspector] Has newWindow API:', !!window.electronAPI?.newWindow);
+                  
                   // Electron 环境下打开新窗口
-                  if (typeof window !== 'undefined' && (window as any).electronAPI?.newWindow) {
-                    (window as any).electronAPI.newWindow();
+                  if (typeof window !== 'undefined' && window.electronAPI?.newWindow) {
+                    console.log('[Inspector] Calling electronAPI.newWindow()');
+                    await window.electronAPI.newWindow();
+                    console.log('[Inspector] New window called');
                   } else {
-                    // Web 环境下使用原有逻辑
-                    onNewFile();
+                    // Web 环境下打开新标签页
+                    console.log('[Inspector] Opening new tab (Web environment)');
+                    window.open(window.location.href, '_blank');
                   }
                 }}
                 className="p-1 text-foreground-tertiary hover:text-accent hover:bg-active rounded transition-colors"
