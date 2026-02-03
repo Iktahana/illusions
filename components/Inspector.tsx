@@ -523,14 +523,7 @@ function CorrectionItem({
   line: number;
 }) {
   return (
-    <div
-      className={clsx(
-        "p-3 rounded-lg border cursor-pointer hover:shadow-sm transition-shadow",
-        type === "warning"
-          ? "bg-warning/10 border-warning/30"
-          : "bg-info/10 border-info/30"
-      )}
-    >
+    <div className="p-3 rounded-lg border border-border bg-card cursor-pointer hover:bg-accent/50 transition-colors">
       <div className="flex items-start gap-2">
         <AlertCircle
           className={clsx(
