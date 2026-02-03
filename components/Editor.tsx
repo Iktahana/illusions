@@ -41,6 +41,7 @@ interface EditorProps {
   searchOpenTrigger?: number;
   showParagraphNumbers?: boolean;
   onEditorViewReady?: (view: EditorView) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onShowAllSearchResults?: (matches: any[], searchTerm: string) => void;
 }
 

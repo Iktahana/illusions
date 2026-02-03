@@ -116,7 +116,9 @@ export default function EditorPage() {
   const [charsPerLine, setCharsPerLine] = useState(40); // 0 = 制限なし（既定 40）
   const [showParagraphNumbers, setShowParagraphNumbers] = useState(true);
   const [activeView, setActiveView] = useState<ActivityBarView>("explorer");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editorViewInstance, setEditorViewInstance] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [searchResults, setSearchResults] = useState<{matches: any[], searchTerm: string} | null>(null);
   
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
@@ -199,6 +201,7 @@ export default function EditorPage() {
      try {
        let text: string | null = null;
        
+       // eslint-disable-next-line @typescript-eslint/no-explicit-any
        if (isElectron && typeof window !== "undefined" && (window as any).electronAPI) {
           // Electron: 将来的にはメインプロセス経由でクリップボード取得（IPC）も検討
           // ひとまず標準のクリップボードAPIが使える場合はそれを利用する
@@ -227,6 +230,7 @@ export default function EditorPage() {
    useEffect(() => {
      if (!isElectron || typeof window === "undefined") return;
 
+     // eslint-disable-next-line @typescript-eslint/no-explicit-any
      const unsubscribe = (window as any).electronAPI?.onPasteAsPlaintext?.(() => {
        void handlePasteAsPlaintext();
      });
@@ -268,6 +272,7 @@ export default function EditorPage() {
     target.focus();
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleShowAllSearchResults = (matches: any[], searchTerm: string) => {
     setSearchResults({ matches, searchTerm });
     setActiveView("search");
