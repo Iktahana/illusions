@@ -468,3 +468,24 @@ input[type="range"]::-moz-range-thumb:active {
 input[type="range"]::-moz-range-progress {
   background-color: var(--accent);
 }
+
+/* Search highlight styles */
+.search-result {
+  background-color: rgba(255, 237, 74, 0.4);
+  transition: background-color 0.2s ease;
+}
+
+.dark .search-result {
+  background-color: rgba(255, 237, 74, 0.25);
+}
+
+.search-result-current {
+  background-color: rgba(255, 152, 0, 0.6);
+  transition: background-color 0.2s ease;
+  box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.3);
+}
+
+.dark .search-result-current {
+  background-color: rgba(255, 152, 0, 0.4);
+  box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.2);
+}
