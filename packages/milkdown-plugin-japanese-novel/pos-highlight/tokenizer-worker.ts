@@ -15,19 +15,27 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     // トークナイザーを初期化
     const dicPath = payload.dicPath || '/dict';
     
-    kuromoji.builder({ dicPath }).build((err, t) => {
-      if (err) {
-        const response: WorkerResponse = { 
-          id, 
-          error: `Failed to initialize tokenizer: ${err.message}` 
-        };
-        self.postMessage(response);
-      } else {
-        tokenizer = t;
-        const response: WorkerResponse = { id, result: 'ready' };
-        self.postMessage(response);
-      }
-    });
+    try {
+      kuromoji.builder({ dicPath }).build((err, t) => {
+        if (err) {
+          const response: WorkerResponse = { 
+            id, 
+            error: `Failed to initialize tokenizer: ${err.message || JSON.stringify(err)}` 
+          };
+          self.postMessage(response);
+        } else {
+          tokenizer = t;
+          const response: WorkerResponse = { id, result: 'ready' };
+          self.postMessage(response);
+        }
+      });
+    } catch (error) {
+      const response: WorkerResponse = { 
+        id, 
+        error: `Worker initialization error: ${error instanceof Error ? error.message : JSON.stringify(error)}`
+      };
+      self.postMessage(response);
+    }
     return;
   }
   

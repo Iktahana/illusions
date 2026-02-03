@@ -44,6 +44,12 @@ class TokenizerClient {
         // Worker のエラーをハンドル
         this.worker.onerror = (err) => {
           console.error('[TokenizerClient] Worker error:', err);
+          console.error('[TokenizerClient] Error details:', {
+            message: err.message,
+            filename: err.filename,
+            lineno: err.lineno,
+            colno: err.colno,
+          });
           reject(err.message || 'Worker initialization failed');
         };
         
