@@ -632,14 +632,6 @@ function MilkdownEditor({
         return;
       }
       
-      // 只有在 targetScrollProgress 被明確設置為 0.5（模式切換觸發值）時才執行滾動
-      if (targetScrollProgress !== 0.5) {
-        console.debug('[DEBUG] handleScrollAfterLayout: skip (not mode switch)', { targetScrollProgress });
-        shouldScrollToHeadRef.current = false;
-        onScrollRestored?.();
-        return;
-      }
-      
       const savedProgress = savedScrollProgressRef.current ?? 0;
       
       console.log('[DEBUG] Apply scroll after layout (mode switch):', {
