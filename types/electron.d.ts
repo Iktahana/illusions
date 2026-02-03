@@ -15,6 +15,7 @@ declare global {
     getChromeVersion: () => Promise<number>;
     setDirty: (dirty: boolean) => Promise<void>;
     saveDoneAndClose?: () => Promise<void>;
+    newWindow?: () => Promise<void>;
     onSaveBeforeClose?: (callback: () => void) => (() => void) | void;
     onOpenFileFromSystem?: (
       callback: (payload: { path: string; content: string }) => void
