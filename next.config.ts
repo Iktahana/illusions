@@ -1,17 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "export",
   images: { unoptimized: true },
   trailingSlash: true,
-  assetPrefix: process.env.NODE_ENV === "production" ? "." : undefined,
   webpack: (config, { isServer }) => {
-    // クライアントサイドのみに polyfill を適用
+    // クライアントサイドで kuromoji を使用するための設定
     if (!isServer) {
-      config.output = config.output || {};
-      config.output.globalObject = 'self';
-      
-      // kuromoji が必要とする Node.js モジュールの polyfill
+      // Node.js モジュールの fallback を設定
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
@@ -30,18 +25,11 @@ const nextConfig: NextConfig = {
       
       // グローバル変数を提供
       const webpack = require('webpack');
-      config.plugins = config.plugins || [];
       config.plugins.push(
         new webpack.ProvidePlugin({
           Buffer: ['buffer', 'Buffer'],
           process: 'process/browser',
-        }),
-        new webpack.NormalModuleReplacementPlugin(
-          /node:/, 
-          (resource: any) => {
-            resource.request = resource.request.replace(/^node:/, '');
-          }
-        )
+        })
       );
     }
     
