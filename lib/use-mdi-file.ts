@@ -5,6 +5,7 @@ import { openMdiFile, saveMdiFile, type MdiFileDescriptor } from "./mdi-file";
 import { isElectronRenderer } from "./runtime-env";
 import { getStorageService } from "./storage-service";
 import { persistAppState } from "./app-state-manager";
+import { getRandomIllusionStory } from "./illusion-stories";
 
 const DEFAULT_CONTENT = "# 錯覚\n\n物語はここから始めます。\n\n";
 const AUTO_SAVE_INTERVAL = 2000; // 2秒
@@ -180,9 +181,10 @@ export function useMdiFile(): UseMdiFileReturn {
   }, []);
 
   const newFile = useCallback(() => {
+    const randomContent = getRandomIllusionStory();
     setCurrentFile(null);
-    setContentState(DEFAULT_CONTENT);
-    setLastSavedContent(DEFAULT_CONTENT);
+    setContentState(randomContent);
+    setLastSavedContent(randomContent);
     setLastSavedTime(null);
     setWasAutoRecovered(false);
   }, []);
