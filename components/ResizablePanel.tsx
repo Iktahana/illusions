@@ -81,19 +81,11 @@ export default function ResizablePanel({
       {/* リサイズハンドル */}
       <div
         className={clsx(
-          "absolute top-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-accent transition-all cursor-col-resize z-10 group",
+          "absolute top-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-accent transition-all cursor-col-resize z-10",
           side === "left" ? "right-0" : "left-0"
         )}
         onMouseDown={handleMouseDown}
-      >
-        {/* ホバー時の視覚インジケータ */}
-        <div
-          className={clsx(
-            "absolute top-1/2 -translate-y-1/2 w-1 h-12 bg-border-secondary rounded-full opacity-0 group-hover:opacity-100 transition-opacity",
-            side === "left" ? "right-0" : "left-0"
-          )}
-        />
-      </div>
+      />
 
       {/* リサイズ中の操作を安定させるためのオーバーレイ */}
       {isResizing && (
