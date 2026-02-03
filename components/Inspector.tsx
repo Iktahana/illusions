@@ -1154,12 +1154,3 @@ function StatsPanel({
      </div>
    );
 }
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-background-secondary rounded-lg p-3 border border-border">
-      <p className="text-xs text-foreground-tertiary mb-1">{label}</p>
-      <p className="text-xl font-semibold text-foreground">{value}</p>
-    </div>
-  );
-}
