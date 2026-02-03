@@ -7,7 +7,6 @@ import { getStorageService } from "./storage-service";
 import { persistAppState } from "./app-state-manager";
 import { getRandomIllusionStory } from "./illusion-stories";
 
-const DEFAULT_CONTENT = "# 錯覚\n\n物語はここから始めます。\n\n";
 const AUTO_SAVE_INTERVAL = 2000; // 2秒
 const DEMO_FILE_NAME = "鏡地獄.mdi";
 

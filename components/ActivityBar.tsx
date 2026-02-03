@@ -3,7 +3,6 @@
 import { 
   FileText, 
   Settings, 
-  BarChart3, 
   Search,
   Book,
   Layers

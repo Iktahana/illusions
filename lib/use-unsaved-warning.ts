@@ -21,7 +21,7 @@ export interface UseUnsavedWarningReturn {
 export function useUnsavedWarning(
   isDirty: boolean,
   saveFile: () => Promise<void>,
-  currentFileName: string | null
+  _currentFileName: string | null
 ): UseUnsavedWarningReturn {
   const [showWarning, setShowWarning] = useState(false);
   const pendingActionRef = useRef<(() => void | Promise<void>) | null>(null);

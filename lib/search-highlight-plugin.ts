@@ -1,5 +1,5 @@
 import { Plugin, PluginKey } from "@milkdown/prose/state";
-import { Decoration, DecorationSet } from "@milkdown/prose/view";
+import { DecorationSet } from "@milkdown/prose/view";
 
 export const searchHighlightPluginKey = new PluginKey("searchHighlight");
 

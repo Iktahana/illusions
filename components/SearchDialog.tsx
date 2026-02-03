@@ -2,10 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Search, X, ChevronUp, ChevronDown, List } from "lucide-react";
-import clsx from "clsx";
-import { EditorView, Decoration, DecorationSet } from "@milkdown/prose/view";
+import { EditorView, Decoration } from "@milkdown/prose/view";
 import { TextSelection } from "@milkdown/prose/state";
-import { Plugin, PluginKey } from "@milkdown/prose/state";
 
 interface SearchDialogProps {
   editorView: EditorView | null;
