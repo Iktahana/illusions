@@ -4,6 +4,14 @@
 Refer to the detailed logic defined in:
 👉 `.cursor/rules/text-analysis.md`
 
+## Git Commit Strategy (CRITICAL - ALWAYS FOLLOW)
+**You MUST follow the Atomic Commit principle for ALL git operations:**
+1. **One commit = One logical change** (single feature/fix/refactor)
+2. **Never use `git add .`** - Always stage files individually by logical groups
+3. **Use Conventional Commits format**: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `perf:`, `test:`, `chore:`
+4. **Split unrelated changes**: If you modified both backend API and frontend UI, make separate commits
+5. **Before committing, ask yourself**: "Can this be broken into smaller independent parts?" If yes, DO IT.
+
 ## Token Usage Optimization (Critical)
 1. **Read Files Selectively**:
    - ❌ DO NOT read entire codebase or directory tree without specific need
