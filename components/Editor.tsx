@@ -311,9 +311,8 @@ function MilkdownEditor({
   }, [onSelectionChange]);
 
   // 縦書き用のスクロール制御プラグインを作成
-  // isVertical と scrollContainerRef の参照を保持
+  // isVertical の参照を保持
   const isVerticalRef = useRef(isVertical);
-  const scrollContainerRefLocal = scrollContainerRef;
   const shouldScrollToHeadRef = useRef(false); // 排版完成後にスクロールするかどうか
   
   // isVertical の変更を追跡（変更のみ、スクロールフラグは設定しない）
