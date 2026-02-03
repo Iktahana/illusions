@@ -221,7 +221,7 @@ export default function EditorPage() {
       } catch (error) {
         console.error("プレーンテキストとして貼り付けできませんでした:", error);
       }
-    }, [isElectron]);
+    }, [isElectron, setContent]);
 
    // メニューの「プレーンテキストで貼り付け」を受け取る（Electronのみ）
    useEffect(() => {
@@ -329,7 +329,7 @@ export default function EditorPage() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [saveFile]);
+  }, [saveFile, handlePasteAsPlaintext]);
 
    return (
      <div className="h-screen flex flex-col overflow-hidden relative">
