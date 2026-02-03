@@ -293,7 +293,7 @@ export function useMdiFile(): UseMdiFileReturn {
     } finally {
       setIsSaving(false);
     }
-  }, [currentFile, isElectron, isSaving]);
+  }, [currentFile, isElectron, isSaving, persistLastOpenedPath]);
 
   // Dirty かつファイル選択中なら、一定間隔で自動保存する
   useEffect(() => {
