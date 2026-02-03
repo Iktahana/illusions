@@ -23,6 +23,7 @@ autoUpdater.logger.transports.file.level = 'info'
 
 let mainWindow = null
 let isManualUpdateCheck = false
+const allWindows = new Set() // 追踪所有窗口
 
 // auto-updater のイベントハンドラ設定
 function setupAutoUpdater() {
@@ -163,10 +164,10 @@ function buildApplicationMenu() {
     label: 'ファイル',
     submenu: [
       {
-        label: '新規',
+        label: '新規ウィンドウ',
         accelerator: 'CmdOrCtrl+N',
         click: () => {
-          mainWindow?.webContents.send('menu-new-triggered')
+          createWindow()
         },
       },
       {
@@ -278,8 +279,9 @@ function buildApplicationMenu() {
   return template
 }
 
-function createMainWindow() {
-  mainWindow = new BrowserWindow({
+// 创建新窗口（支持多窗口）
+function createWindow() {
+  const newWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     show: false,
@@ -292,29 +294,52 @@ function createMainWindow() {
     },
   })
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow?.show()
+  // 将窗口添加到集合中
+  allWindows.add(newWindow)
+  
+  // 如果这是第一个窗口，设置为主窗口
+  if (!mainWindow) {
+    mainWindow = newWindow
+  }
+
+  newWindow.once('ready-to-show', () => {
+    newWindow?.show()
   })
 
   // 未保存の変更がある場合は終了前に保存を促す
-  mainWindow.on('close', (event) => {
-    if (mainWindow.isDocumentEdited()) {
+  newWindow.on('close', (event) => {
+    if (newWindow.isDocumentEdited()) {
       event.preventDefault()
-      mainWindow.webContents.send('electron-request-save-before-close')
+      newWindow.webContents.send('electron-request-save-before-close')
+    }
+  })
+  
+  // 窗口关闭时从集合中移除
+  newWindow.on('closed', () => {
+    allWindows.delete(newWindow)
+    if (mainWindow === newWindow) {
+      mainWindow = allWindows.values().next().value || null
     }
   })
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:3000')
-    mainWindow.webContents.openDevTools({ mode: 'detach' })
+    newWindow.loadURL('http://localhost:3000')
+    newWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
     // Next.js の静的出力
-    mainWindow.loadFile(path.join(__dirname, 'out', 'index.html'))
+    newWindow.loadFile(path.join(__dirname, 'out', 'index.html'))
   }
 
   // アプリメニューを設定
   const menu = Menu.buildFromTemplate(buildApplicationMenu())
   Menu.setApplicationMenu(menu)
+  
+  return newWindow
+}
+
+// 兼容旧代码
+function createMainWindow() {
+  return createWindow()
 }
 
 async function installQuickLookPluginIfNeeded() {
@@ -418,6 +443,11 @@ ipcMain.handle('save-before-close-done', () => {
   if (mainWindow) {
     mainWindow.destroy()
   }
+})
+
+ipcMain.handle('new-window', () => {
+  // 创建新窗口
+  createWindow()
 })
 
 app.whenReady().then(() => {

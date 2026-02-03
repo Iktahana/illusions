@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getChromeVersion: () => ipcRenderer.invoke('get-chrome-version'),
   setDirty: (dirty) => ipcRenderer.invoke('set-dirty', dirty),
   saveDoneAndClose: () => ipcRenderer.invoke('save-before-close-done'),
+  newWindow: () => ipcRenderer.invoke('new-window'),
   onMenuNew: (callback) => {
     const handler = () => callback()
     ipcRenderer.on('menu-new-triggered', handler)
