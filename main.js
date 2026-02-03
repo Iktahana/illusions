@@ -431,17 +431,21 @@ ipcMain.handle('save-file', async (_event, filePath, content) => {
   return target
 })
 
-ipcMain.handle('set-dirty', (_event, dirty) => {
-  // ウィンドウ終了時の判定用に dirty 状態を保持する
-  if (mainWindow) {
-    mainWindow.setDocumentEdited(dirty)
+ipcMain.handle('set-dirty', (event, dirty) => {
+  // イベントを送信したウィンドウの dirty 状態を保持する
+  const webContents = event.sender
+  const win = BrowserWindow.fromWebContents(webContents)
+  if (win) {
+    win.setDocumentEdited(dirty)
   }
 })
 
-ipcMain.handle('save-before-close-done', () => {
-  // 保存完了後にウィンドウを閉じる
-  if (mainWindow) {
-    mainWindow.destroy()
+ipcMain.handle('save-before-close-done', (event) => {
+  // イベントを送信したウィンドウを閉じる
+  const webContents = event.sender
+  const win = BrowserWindow.fromWebContents(webContents)
+  if (win) {
+    win.destroy()
   }
 })
 
