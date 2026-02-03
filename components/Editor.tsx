@@ -332,7 +332,7 @@ function MilkdownEditor({
   const verticalScrollPlugin = useMemo(() => $prose(() => new Plugin({
     key: new PluginKey('verticalScrollControl'),
     props: {
-      handleScrollToSelection(view) {
+      handleScrollToSelection(_view) {
         // 縦書きモードではスクロール動作を完全に無視（排版完成後の明示的なスクロール以外）
         if (isVerticalRef.current) {
           return true; // デフォルトのスクロールを完全に禁止
@@ -342,7 +342,7 @@ function MilkdownEditor({
         return false;
       },
     },
-  })), [scrollContainerRefLocal]);
+  })), []);
 
   const { get } = useEditor((root) => {
     const value = initialContentRef.current;
@@ -356,27 +356,7 @@ function MilkdownEditor({
       .use(listener)
       .config((ctx) => {
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
-          // 【調試用】在 markdown 更新前記錄滾動位置
-          const container = scrollContainerRefLocal.current;
-          const beforeScrollLeft = container?.scrollLeft;
-          const beforeScrollTop = container?.scrollTop;
-          
           onChangeRef.current?.(markdown);
-          
-          // 【調試用】在 markdown 更新後檢查滾動位置是否變化
-          requestAnimationFrame(() => {
-            if (container && isVerticalRef.current) {
-              const afterScrollLeft = container.scrollLeft;
-              const afterScrollTop = container.scrollTop;
-              if (Math.abs((afterScrollLeft ?? 0) - (beforeScrollLeft ?? 0)) > 10) {
-                console.warn('[AutoScroll] Scroll changed during markdownUpdated!', {
-                  beforeScrollLeft,
-                  afterScrollLeft,
-                  delta: (afterScrollLeft ?? 0) - (beforeScrollLeft ?? 0)
-                });
-              }
-            }
-          });
         });
       })
       .use(commonmark)

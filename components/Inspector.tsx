@@ -620,7 +620,7 @@ function InfoTooltip({ content, className, children }: { content: string; classN
 }
 
 function StatsPanel({
-  wordCount,
+  wordCount: _wordCount,
   charCount,
   selectedCharCount,
   paragraphCount,
@@ -686,31 +686,25 @@ function StatsPanel({
   const avgParagraphLength = paragraphCount > 0 ? Math.floor(activeCharCount / paragraphCount) : 0;
 
   let paragraphWarning = '';
-  let paragraphWarningColor = 'text-foreground-tertiary';
   if (avgParagraphLength >= 300) {
     paragraphWarning =
         '一段落に含まれる情報量がやや多いようです。内容のまとまりごとに区切ると、読みやすさが向上するかもしれません。';
-    paragraphWarningColor = 'text-warning';
 
   } else if (avgParagraphLength >= 200) {
     paragraphWarning =
         '読み応えのある段落構成です。公的文書や解説文としては安定していますが、スマホでは少し長く感じられる場合があります。';
-    paragraphWarningColor = 'text-foreground-secondary';
 
   } else if (avgParagraphLength >= 120) {
     paragraphWarning =
         '段落の長さは標準的で、エッセイや一般的な文章に適した構成です。落ち着いて読み進められます。';
-    paragraphWarningColor = 'text-foreground-secondary';
 
   } else if (avgParagraphLength >= 80) {
     paragraphWarning =
         '小説向きの自然な段落長です。文章のリズムと情報量のバランスが保たれています。';
-    paragraphWarningColor = 'text-success';
 
   } else if (avgParagraphLength > 0) {
     paragraphWarning =
         '段落がコンパクトで、テンポよく読めます。会話やスマホでの読書に向いた構成です。';
-    paragraphWarningColor = 'text-success';
   }
 
   // 3. 読了時間（シーン別の目安）
@@ -728,23 +722,9 @@ function StatsPanel({
     }
   };
 
-  const fastReadTime = calculateReadTime(900);    // 速読
-  const normalReadTime = calculateReadTime(500);  // 通常読書
-  const deepReadTime = calculateReadTime(250);    // 精読
-
-   // 読みやすさレベルの色
-   const getReadabilityLevelColor = (level?: string) => {
-     switch (level) {
-       case 'easy':
-         return 'text-success';
-       case 'normal':
-         return 'text-info';
-       case 'difficult':
-         return 'text-warning';
-       default:
-         return 'text-foreground';
-     }
-   };
+   const fastReadTime = calculateReadTime(900);    // 速読
+   const normalReadTime = calculateReadTime(500);  // 通常読書
+   const deepReadTime = calculateReadTime(250);    // 精読
 
     const getReadabilityLevelLabel = (level?: string) => {
       switch (level) {
