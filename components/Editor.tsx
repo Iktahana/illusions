@@ -24,6 +24,7 @@ import { $prose } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "./BubbleMenu";
 import SearchDialog from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
+import { searchHighlightPlugin } from "@/lib/search-highlight-plugin";
 
 interface EditorProps {
   initialContent?: string;
@@ -39,6 +40,8 @@ interface EditorProps {
   charsPerLine?: number;
   searchOpenTrigger?: number;
   showParagraphNumbers?: boolean;
+  onEditorViewReady?: (view: EditorView) => void;
+  onShowAllSearchResults?: (matches: any[], searchTerm: string) => void;
 }
 
 export default function NovelEditor({
@@ -55,6 +58,8 @@ export default function NovelEditor({
   charsPerLine = 40,
   searchOpenTrigger = 0,
   showParagraphNumbers = false,
+  onEditorViewReady,
+  onShowAllSearchResults,
 }: EditorProps) {
   // ハイドレーション不整合を避けるため、初期値は false にする
   const [isVertical, setIsVertical] = useState(false);
@@ -166,7 +171,10 @@ export default function NovelEditor({
               fontFamily={fontFamily}
               charsPerLine={charsPerLine}
               scrollContainerRef={scrollContainerRef}
-              onEditorViewReady={setEditorViewInstance}
+              onEditorViewReady={(view) => {
+                setEditorViewInstance(view);
+                onEditorViewReady?.(view);
+              }}
               showParagraphNumbers={showParagraphNumbers}
               targetScrollProgress={targetScrollProgress}
               onScrollRestored={handleScrollRestored}
@@ -186,6 +194,7 @@ export default function NovelEditor({
         editorView={editorViewInstance}
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
+        onShowAllResults={onShowAllSearchResults}
       />
     </div>
   );
@@ -380,7 +389,8 @@ function MilkdownEditor({
       .use(history)
       .use(clipboard)
       .use(cursor)
-      .use(verticalScrollPlugin);
+      .use(verticalScrollPlugin)
+      .use($prose(() => searchHighlightPlugin));
   }, [isVertical, verticalScrollPlugin]); // isVertical が変わったときのみ作り直す
 
   // EditorView インスタンスを取得する
