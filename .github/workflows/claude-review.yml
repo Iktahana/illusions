@@ -1,0 +1,126 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Please conduct a comprehensive code review of this PR according to the standards defined in CLAUDE.md.
+            
+            Focus on the following areas:
+            
+            ## 1. Security Review (CRITICAL)
+            - Check for hardcoded API keys, passwords, tokens, or credentials
+            - Verify Electron IPC security (contextIsolation, nodeIntegration, preload.js)
+            - Detect XSS vulnerabilities, unsafe DOM manipulation, dangerouslySetInnerHTML
+            - Flag use of eval(), Function(), or dynamic script execution
+            - Validate file path handling in Electron main process
+            
+            ## 2. Performance Review (HIGH PRIORITY)
+            - Verify React hooks dependency arrays (useEffect, useCallback, useMemo)
+            - Check for unnecessary re-renders and missing optimizations
+            - Detect memory leaks (uncleaned event listeners, subscriptions)
+            - Flag potential infinite render loops
+            - Review expensive computations that should be memoized
+            - Check IndexedDB (Dexie) query efficiency
+            
+            ## 3. Language Compliance (CRITICAL)
+            **STRICTLY FORBIDDEN**: Chinese (中文), Korean (한국어), or any language except English and Japanese
+            
+            Check the following locations:
+            - Variable names, function names, class names (code logic)
+            - All comments and documentation
+            - String literals (UI text, error messages, log messages)
+            - JSDoc documentation
+            - Configuration files and JSON data
+            
+            For any violations, report:
+            - **Location**: file.ts:line
+            - **Found**: The prohibited text
+            - **Required Action**: Replace with English or Japanese
+            
+            ## 4. Japanese Quality Suggestions (ADVISORY - NOT BLOCKING)
+            When Japanese text is present, provide friendly suggestions on:
+            - Naturalness: Does it read naturally for native speakers?
+            - Professionalism: Is the tone appropriate?
+            - Consistency: Is terminology consistent?
+            - Grammar: Are particles used correctly?
+            
+            **Note**: Mark these as suggestions (💡), not blocking issues.
+            
+            ## 5. Code Style Review
+            - TypeScript strict mode compliance
+            - Avoid `any` types (prefer `unknown` or specific types)
+            - Use `import type` for type-only imports
+            - Naming conventions: PascalCase (components), camelCase (functions), UPPER_SNAKE_CASE (constants)
+            - Proper imports order: external → internal (@/) → relative (./) → types
+            - JSDoc for public functions
+            - React best practices: functional components, hooks rules, event handler naming
+            
+            ## 6. Project-Specific Standards
+            - Electron: Use typed IPC channels from types/electron.d.ts
+            - Next.js: Proper "use client" directive usage
+            - Milkdown: Follow plugin patterns in packages/milkdown-plugin-japanese-novel/
+            
+            ## Output Format
+            
+            Please structure your review in the following format:
+            
+            ```markdown
+            ## 🔒 Security Issues
+            - [ ] **[CRITICAL/HIGH/MEDIUM/LOW]** Description
+              - **Location**: `file.ts:123`
+              - **Reason**: Explanation
+              - **Suggestion**: How to fix
+            
+            ## ⚡ Performance Issues
+            - [ ] **[HIGH/MEDIUM/LOW]** Description
+              - **Location**: `file.ts:123`
+              - **Impact**: Performance impact
+              - **Suggestion**: Optimization approach
+            
+            ## 🌐 Language Violations (CRITICAL)
+            - [ ] **[CRITICAL]** Non-English/Japanese language detected
+              - **Location**: `file.ts:123`
+              - **Found**: "禁止的語言"
+              - **Required Action**: Replace with English or Japanese
+            
+            ## 💡 Japanese Quality Suggestions (Advisory)
+            - 💡 **[SUGGESTION]** Japanese phrasing improvement
+              - **Location**: `file.ts:123`
+              - **Current**: "現在の表現"
+              - **Suggested**: "より自然な表現"
+              - **Reason**: Explanation
+            
+            ## 📝 Code Style Issues
+            - [ ] **[MEDIUM/LOW]** Description
+              - **Location**: `file.ts:123`
+              - **Expected**: Expected pattern
+              - **Suggestion**: How to align with standards
+            
+            ## ✅ Summary
+            - Status: **✅ Approved** / **⚠️ Needs Changes** / **🚫 Blocked**
+            - **Critical Issues**: X
+            - **High Priority**: X
+            - **Medium/Low**: X
+            - **Suggestions**: X
+            ```
+            
+            Be thorough, professional, and strict. Flag all issues clearly.
+          claude_args: "--max-turns 5 --model claude-3-5-haiku-20241022"
