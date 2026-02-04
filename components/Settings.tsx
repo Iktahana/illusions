@@ -8,13 +8,13 @@ import { PRESET_LABELS, PRESET_DESCRIPTIONS, getPresetOptions } from "@/packages
 import type { TokenizePreset, TokenMergeOptions } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/types";
 
 interface SettingsProps {
-  // 構文ハイライト設定
+  // 構文ハイライト機能の設定
   posHighlightEnabled: boolean;
   onPosHighlightEnabledChange: (enabled: boolean) => void;
   posHighlightColors: Record<string, string>;
   onPosHighlightColorsChange: (colors: Record<string, string>) => void;
   
-  // 分詞設定（新增）
+  // 分詞設定（新規）
   tokenizePreset: TokenizePreset;
   onTokenizePresetChange: (preset: TokenizePreset) => void;
   mergeOptions: TokenMergeOptions;
@@ -49,24 +49,24 @@ export default function Settings({
   };
 
   const handlePresetChange = (preset: TokenizePreset) => {
-    onTokenizePresetChange(preset);
-    if (preset !== 'custom') {
-      // 自動更新合併選項
-      const options = getPresetOptions(preset);
-      onMergeOptionsChange(options);
-    }
-  };
+     onTokenizePresetChange(preset);
+     if (preset !== 'custom') {
+       // プリセット選択時にマージオプションを自動更新
+       const options = getPresetOptions(preset);
+       onMergeOptionsChange(options);
+     }
+   };
 
   const handleMergeOptionChange = (key: keyof TokenMergeOptions, value: boolean | number) => {
     onMergeOptionsChange({
-      ...mergeOptions,
-      [key]: value,
-    });
-    // 切換到カスタム模式
-    if (tokenizePreset !== 'custom') {
-      onTokenizePresetChange('custom');
-    }
-  };
+       ...mergeOptions,
+       [key]: value,
+     });
+     // カスタムモードに切り替える
+     if (tokenizePreset !== 'custom') {
+       onTokenizePresetChange('custom');
+     }
+   };
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -115,11 +115,11 @@ export default function Settings({
                 </span>
               </button>
 
-              {/* セクション内容 */}
-              {showHighlightSection && (
-                <div className="px-4 pb-4 space-y-6 border-t border-border">
-                  {/* 開關 */}
-                  <div className="flex items-center justify-between pt-4">
+               {/* セクション内容 */}
+               {showHighlightSection && (
+                 <div className="px-4 pb-4 space-y-6 border-t border-border">
+                   {/* トグルスイッチ */}
+                   <div className="flex items-center justify-between pt-4">
                     <div>
                       <h3 className="text-sm font-medium text-foreground">構文ハイライトを有効化</h3>
                       <p className="text-xs text-foreground-tertiary mt-0.5">
