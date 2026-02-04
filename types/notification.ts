@@ -4,7 +4,7 @@ export interface NotificationMessage {
   id: string;
   type: NotificationType;
   message: string;
-  duration?: number; // 持续时间（毫秒），undefined 表示不自动关闭
+  duration?: number; // 継続時間（ミリ秒）、undefined は自動クローズなし
 }
 
 export interface NotificationProgress extends NotificationMessage {
@@ -16,7 +16,7 @@ export type NotificationItem = NotificationMessage | NotificationProgress;
 
 export interface NotificationOptions {
   type?: NotificationType;
-  duration?: number; // 默认 10000ms (10秒)
+   duration?: number; // デフォルト 10000ms (10秒)
 }
 
 export interface ProgressNotificationOptions extends NotificationOptions {
