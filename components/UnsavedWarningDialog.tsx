@@ -22,12 +22,12 @@ export default function UnsavedWarningDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       role="dialog"
       aria-modal="true"
-      onClick={(e) => {
-        // 點擊背景時關閉對話框（等同於取消）
-        if (e.target === e.currentTarget) {
-          onCancel();
-        }
-      }}
+       onClick={(e) => {
+         // 背景クリック時に対話を閉じる（キャンセルと同等）
+         if (e.target === e.currentTarget) {
+           onCancel();
+         }
+       }}
     >
       <div className="mx-4 w-full max-w-md rounded-xl bg-background-elevated p-6 shadow-xl border border-border">
         <h2 className="text-lg font-semibold text-foreground">
