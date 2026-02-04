@@ -48,9 +48,9 @@ export default function EditorPage() {
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [saveToastExiting, setSaveToastExiting] = useState(false);
-  const [selectedCharCount, setSelectedCharCount] = useState(0);
-  // ファイルセッションID（ファイルの新規作成/切り替え時のみ更新）
-  const fileSessionRef = useRef(0);
+   const [selectedCharCount, setSelectedCharCount] = useState(0);
+   // ファイルセッションID（ファイル新規作成/切り替え時のみ更新）
+   const fileSessionRef = useRef(0);
   const prevLastSavedTimeRef = useRef<number | null>(null);
   const hasAutoRecoveredRef = useRef(false);
 
@@ -61,8 +61,8 @@ export default function EditorPage() {
     currentFile?.name || null
   );
 
-  // 自動復元（ページ再読み込み）時はエディタを再マウントする
-  useEffect(() => {
+   // 自動復元（ページ再読み込み）時はエディタを再マウント
+   useEffect(() => {
     if (wasAutoRecovered && !hasAutoRecoveredRef.current) {
       hasAutoRecoveredRef.current = true;
       fileSessionRef.current += 1;
@@ -70,14 +70,14 @@ export default function EditorPage() {
     }
   }, [wasAutoRecovered]);
 
-  // openFile/newFile をラップしてセッションIDを進める（安全チェック付き）
-  const openFile = useCallback(async () => {
-    await unsavedWarning.confirmBeforeAction(async () => {
-      await originalOpenFile();
+   // openFile/newFile をラップしてセッションIDを進める（安全チェック付き）
+   const openFile = useCallback(async () => {
+     await unsavedWarning.confirmBeforeAction(async () => {
+       await originalOpenFile();
 
-      // content の状態更新を反映してからエディタを再マウントする
-      // setTimeout で originalOpenFile 由来の状態更新を React に先に処理させる
-      setTimeout(() => {
+       // content の状態更新を反映してからエディタを再マウント
+       // setTimeout で originalOpenFile 由来の状態更新を React に先に処理させる
+       setTimeout(() => {
         fileSessionRef.current += 1;
         setEditorKey(prev => prev + 1);
       }, 0);
@@ -131,11 +131,11 @@ export default function EditorPage() {
   
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
-  // lastSavedTime が更新されたら「保存完了」トーストを表示する
-  useEffect(() => {
-    if (lastSavedTime && prevLastSavedTimeRef.current !== lastSavedTime) {
-      // 初回読み込みでは表示しない
-      if (prevLastSavedTimeRef.current !== null) {
+   // lastSavedTime が更新されたら「保存完了」トーストを表示
+   useEffect(() => {
+     if (lastSavedTime && prevLastSavedTimeRef.current !== lastSavedTime) {
+       // 初回読み込みでは表示しない
+       if (prevLastSavedTimeRef.current !== null) {
         setShowSaveToast(true);
         setSaveToastExiting(false);
         
@@ -213,8 +213,8 @@ export default function EditorPage() {
     });
   }, []);
 
-   // 復元通知は5秒後に自動で閉じる
-   useEffect(() => {
+    // 復元通知は5秒後に自動で閉鎖
+    useEffect(() => {
      if (wasAutoRecovered && !dismissedRecovery) {
        const timer = setTimeout(() => {
          setDismissedRecovery(true);
@@ -224,38 +224,38 @@ export default function EditorPage() {
      }
    }, [wasAutoRecovered, dismissedRecovery]);
 
-   // プレーンテキストとして貼り付け
-   const handlePasteAsPlaintext = useCallback(async () => {
-     try {
-       let text: string | null = null;
-       
-       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-       if (isElectron && typeof window !== "undefined" && (window as any).electronAPI) {
-          // Electron: 将来的にはメインプロセス経由でクリップボード取得（IPC）も検討
-          // ひとまず標準のクリップボードAPIが使える場合はそれを利用する
-          if (navigator.clipboard && navigator.clipboard.readText) {
-            text = await navigator.clipboard.readText();
-          }
-        } else {
-          // Web: クリップボードAPIでプレーンテキストを取得する
-          if (navigator.clipboard && navigator.clipboard.readText) {
-            text = await navigator.clipboard.readText();
-          }
+    // プレーンテキストとして貼り付け
+    const handlePasteAsPlaintext = useCallback(async () => {
+      try {
+        let text: string | null = null;
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (isElectron && typeof window !== "undefined" && (window as any).electronAPI) {
+           // Electron: 将来的にはメインプロセス経由でクリップボード取得（IPC）も検討
+           // ひとまず標準のクリップボードAPIが使える場合はそれを利用
+           if (navigator.clipboard && navigator.clipboard.readText) {
+             text = await navigator.clipboard.readText();
+           }
+         } else {
+           // Web: クリップボードAPIでプレーンテキストを取得
+           if (navigator.clipboard && navigator.clipboard.readText) {
+             text = await navigator.clipboard.readText();
+           }
+         }
+        
+        if (text) {
+          const currentContent = contentRef.current;
+          const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
+          setContent(newContent);
+          setEditorKey(prev => prev + 1);
         }
-       
-       if (text) {
-         const currentContent = contentRef.current;
-         const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
-         setContent(newContent);
-         setEditorKey(prev => prev + 1);
+       } catch (error) {
+         console.error("プレーンテキストとして貼り付けできませんでした:", error);
        }
-      } catch (error) {
-        console.error("プレーンテキストとして貼り付けできませんでした:", error);
-      }
-    }, [isElectron, setContent]);
+     }, [isElectron, setContent]);
 
-   // メニューの「プレーンテキストで貼り付け」を受け取る（Electronのみ）
-   useEffect(() => {
+    // メニューの「プレーンテキストで貼り付け」を受け取る（Electronのみ）
+    useEffect(() => {
      if (!isElectron || typeof window === "undefined") return;
 
      // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -276,14 +276,14 @@ export default function EditorPage() {
     setContent(markdown);
   };
 
-  const handleInsertText = (text: string) => {
-    const currentContent = contentRef.current;
-    const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
-    // 見出しアンカーはエディタ側で管理するため、ここでの追加処理は不要
-    setContent(newContent);
-    // 新しい内容で確実に反映させるため、エディタを再マウントする
-    setEditorKey(prev => prev + 1);
-  };
+   const handleInsertText = (text: string) => {
+     const currentContent = contentRef.current;
+     const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
+     // 見出しアンカーはエディタ側で管理するため、ここでの追加処理は不要
+     setContent(newContent);
+     // 新しい内容で確実に反映させるため、エディタを再マウント
+     setEditorKey(prev => prev + 1);
+   };
 
    const handleChapterClick = (anchorId: string) => {
     if (!anchorId) return;
@@ -365,43 +365,43 @@ export default function EditorPage() {
     };
   }, [saveFile, handlePasteAsPlaintext]);
 
-   return (
-     <div className="h-screen flex flex-col overflow-hidden relative">
-        {/* 動的なタイトル更新 */}
-       <TitleUpdater currentFile={currentFile} isDirty={isDirty} />
+    return (
+      <div className="h-screen flex flex-col overflow-hidden relative">
+         {/* 動的なタイトル更新 */}
+        <TitleUpdater currentFile={currentFile} isDirty={isDirty} />
 
-        {/* 未保存警告ダイアログ */}
-       <UnsavedWarningDialog
-         isOpen={unsavedWarning.showWarning}
-         fileName={currentFile?.name || "新規ファイル"}
-         onSave={unsavedWarning.handleSave}
-         onDiscard={unsavedWarning.handleDiscard}
-         onCancel={unsavedWarning.handleCancel}
-       />
+         {/* 未保存警告ダイアログ */}
+        <UnsavedWarningDialog
+          isOpen={unsavedWarning.showWarning}
+          fileName={currentFile?.name || "新規ファイル"}
+          onSave={unsavedWarning.handleSave}
+          onDiscard={unsavedWarning.handleDiscard}
+          onCancel={unsavedWarning.handleCancel}
+        />
 
-        {/* 自動復元の通知（Webのみ・固定表示） */}
-       {!isElectron && wasAutoRecovered && !dismissedRecovery && (
-        <div className="fixed left-0 top-0 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between animate-slide-in-down shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
-            <p className="text-sm text-foreground">
-              <span className="font-semibold text-foreground">✓ 前回編集したファイルを復元しました：</span> <span className="font-mono text-success">{currentFile?.name}</span>
-            </p>
-          </div>
-          <button
-            onClick={() => setDismissedRecovery(true)}
-            className="text-foreground-secondary hover:text-foreground hover:bg-hover text-lg font-medium flex-shrink-0 ml-4 w-8 h-8 rounded flex items-center justify-center transition-all duration-200 hover:scale-110"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+         {/* 自動復元の通知（Webのみ・固定表示） */}
+        {!isElectron && wasAutoRecovered && !dismissedRecovery && (
+         <div className="fixed left-0 top-0 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between animate-slide-in-down shadow-lg">
+           <div className="flex items-center gap-3">
+             <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
+             <p className="text-sm text-foreground">
+               <span className="font-semibold text-foreground">✓ 前回編集したファイルを復元しました：</span> <span className="font-mono text-success">{currentFile?.name}</span>
+             </p>
+           </div>
+           <button
+             onClick={() => setDismissedRecovery(true)}
+             className="text-foreground-secondary hover:text-foreground hover:bg-hover text-lg font-medium flex-shrink-0 ml-4 w-8 h-8 rounded flex items-center justify-center transition-all duration-200 hover:scale-110"
+           >
+             ✕
+           </button>
+         </div>
+       )}
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Activity Bar */}
-        <ActivityBar activeView={activeView} onViewChange={setActiveView} />
-        
-        {/* 左侧面板 */}
+       <div className="flex-1 flex overflow-hidden">
+         {/* Activity Bar */}
+         <ActivityBar activeView={activeView} onViewChange={setActiveView} />
+         
+         {/* 左サイドパネル */}
         {activeView !== "none" && (
           <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
             {activeView === "explorer" && (
@@ -490,11 +490,11 @@ export default function EditorPage() {
               <span className="text-success text-sm font-medium">✓</span>
               <span className="text-foreground-secondary text-sm">保存完了</span>
             </div>
-          )}
-        </main>
-        
-         {/* 右侧面板：统计信息（始终显示） */}
-         <ResizablePanel side="right" defaultWidth={256} minWidth={200} maxWidth={400}>
+           )}
+         </main>
+         
+          {/* 右サイドパネル：統計情報（常に表示） */}
+          <ResizablePanel side="right" defaultWidth={256} minWidth={200} maxWidth={400}>
           <Inspector
             wordCount={wordCount}
             charCount={charCount}
