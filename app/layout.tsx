@@ -2,6 +2,7 @@
 
 import "./globals.css";
 import { ThemeProvider } from "../contexts/ThemeContext";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 
 export default function RootLayout({
@@ -41,6 +42,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         <ThemeProvider>{children}</ThemeProvider>
+        <SpeedInsights />
         <Analytics />
       </body>
     </html>
