@@ -94,7 +94,6 @@ export default function Dictionary({ content }: DictionaryProps) {
   const [isAddingEntry, setIsAddingEntry] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [newEntry, setNewEntry] = useState<Partial<UserDictionaryEntry>>({
     word: "",
     reading: "",
@@ -104,9 +103,9 @@ export default function Dictionary({ content }: DictionaryProps) {
     notes: "",
   });
 
-  // Web辞典用の状態
-  const [webSearchQuery, setWebSearchQuery] = useState("");
-  const [activeWebSearchQuery, setActiveWebSearchQuery] = useState("");
+  // グローバル検索用の状態（全タブ共有）
+  const [globalSearchQuery, setGlobalSearchQuery] = useState("");
+  const [activeSearchQuery, setActiveSearchQuery] = useState("");
 
   const handleToggleDictionary = (id: string) => {
     const newSelected = new Set(selectedDictionaries);
@@ -171,11 +170,12 @@ export default function Dictionary({ content }: DictionaryProps) {
     setExpandedId(expandedId === id ? null : id);
   };
 
+  // 用戶辭典のフィルタリング（activeSearchQueryを使用）
   const filteredEntries = userEntries.filter(
     (entry) =>
-      entry.word.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      entry.reading?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      entry.definition.toLowerCase().includes(searchTerm.toLowerCase())
+      entry.word.toLowerCase().includes(activeSearchQuery.toLowerCase()) ||
+      entry.reading?.toLowerCase().includes(activeSearchQuery.toLowerCase()) ||
+      entry.definition.toLowerCase().includes(activeSearchQuery.toLowerCase())
   );
 
   return (
@@ -186,6 +186,35 @@ export default function Dictionary({ content }: DictionaryProps) {
           <h2 className="text-lg font-semibold text-foreground">辭典</h2>
           <BookOpen className="w-5 h-5 text-foreground-secondary" />
         </div>
+
+        {/* Global Search */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setActiveSearchQuery(globalSearchQuery.trim());
+          }}
+          className="flex gap-2 mb-3"
+        >
+          <input
+            type="text"
+            placeholder="検索語を入力..."
+            value={globalSearchQuery}
+            onChange={(e) => setGlobalSearchQuery(e.target.value)}
+            className="flex-1 px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          <button
+            type="submit"
+            disabled={!globalSearchQuery.trim()}
+            className="px-3 py-1.5 bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        </form>
+        {activeSearchQuery && (
+          <div className="text-xs text-foreground-secondary mb-3">
+            検索中: 「{activeSearchQuery}」
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-1 bg-background rounded-md p-1">
@@ -286,15 +315,8 @@ export default function Dictionary({ content }: DictionaryProps) {
         ) : activeTab === "user" ? (
           /* 用戶辭典タブ */
           <div className="flex flex-col h-full">
-            {/* Search and Add */}
-            <div className="p-4 border-b border-border space-y-3">
-              <input
-                type="text"
-                placeholder="検索..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-              />
+            {/* Add Button */}
+            <div className="p-4 border-b border-border">
               <button
                 onClick={() => setIsAddingEntry(true)}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors text-sm font-medium"
@@ -427,8 +449,8 @@ export default function Dictionary({ content }: DictionaryProps) {
               {/* エントリーリスト */}
               {filteredEntries.length === 0 && !isAddingEntry ? (
                 <div className="text-center py-8 text-foreground-secondary text-sm">
-                  {searchTerm ? (
-                    <p>「{searchTerm}」に一致する項目が見つかりません</p>
+                  {activeSearchQuery ? (
+                    <p>「{activeSearchQuery}」に一致する項目が見つかりません</p>
                   ) : (
                     <>
                       <p>まだ辭典項目が追加されていません</p>
@@ -651,7 +673,7 @@ export default function Dictionary({ content }: DictionaryProps) {
               <div className="border-t border-border p-3 bg-background-elevated">
                 <div className="text-xs text-foreground-secondary">
                   合計: {userEntries.length} 項目
-                  {searchTerm && filteredEntries.length !== userEntries.length && (
+                  {activeSearchQuery && filteredEntries.length !== userEntries.length && (
                     <span className="ml-2">
                       ({filteredEntries.length} 件表示中)
                     </span>
@@ -663,42 +685,9 @@ export default function Dictionary({ content }: DictionaryProps) {
         ) : (
           /* Web辭典タブ */
           <div className="flex flex-col h-full">
-            {/* Search */}
-            <div className="p-4 border-b border-border">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (webSearchQuery.trim()) {
-                    setActiveWebSearchQuery(webSearchQuery.trim());
-                  }
-                }}
-                className="flex gap-2"
-              >
-                <input
-                  type="text"
-                  placeholder="検索語を入力..."
-                  value={webSearchQuery}
-                  onChange={(e) => setWebSearchQuery(e.target.value)}
-                  className="flex-1 px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                />
-                <button
-                  type="submit"
-                  disabled={!webSearchQuery.trim()}
-                  className="px-3 py-1.5 bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Search className="w-4 h-4" />
-                </button>
-              </form>
-              {activeWebSearchQuery && (
-                <div className="mt-2 text-xs text-foreground-secondary">
-                  検索中: 「{activeWebSearchQuery}」
-                </div>
-              )}
-            </div>
-
             {/* Dictionary Sources */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {!activeWebSearchQuery ? (
+              {!activeSearchQuery ? (
                 <div className="text-center py-8 text-foreground-secondary text-sm">
                   <Globe className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p>検索語を入力してWeb辭典を検索</p>
@@ -708,12 +697,12 @@ export default function Dictionary({ content }: DictionaryProps) {
                 </div>
               ) : (
                 WEB_DICTIONARIES.map((dict) => {
-                  const searchUrl = dict.urlTemplate.replace("{query}", encodeURIComponent(activeWebSearchQuery));
+                  const searchUrl = dict.urlTemplate.replace("{query}", encodeURIComponent(activeSearchQuery));
 
                   // Open dictionary in popup window (Electron) or new tab (Web)
                   const handleOpenDictionary = () => {
                     if (isElectron() && window.electronAPI?.openDictionaryPopup) {
-                      window.electronAPI.openDictionaryPopup(searchUrl, `${dict.name} - ${activeWebSearchQuery}`);
+                      window.electronAPI.openDictionaryPopup(searchUrl, `${dict.name} - ${activeSearchQuery}`);
                     } else {
                       window.open(searchUrl, "_blank", "noopener,noreferrer");
                     }
