@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Trash2, Edit2, Check, X, BookOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Plus, Trash2, Edit2, Check, X, BookOpen, ChevronDown, ChevronRight, Search, Globe, ExternalLink, Loader2 } from "lucide-react";
 
 // 標準出版社辭典
 interface StandardDictionary {
@@ -22,6 +22,33 @@ interface UserDictionaryEntry {
   examples?: string;
   notes?: string;
 }
+
+// Web辞典ソース
+interface WebDictionarySource {
+  id: string;
+  name: string;
+  urlTemplate: string;
+}
+
+const WEB_DICTIONARIES: WebDictionarySource[] = [
+  {
+    id: "weblio-thesaurus",
+    name: "Weblio類語辞典",
+    urlTemplate: "https://thesaurus.weblio.jp/content/{query}",
+  },
+  {
+    id: "kotobank",
+    name: "コトバンク",
+    urlTemplate: "https://kotobank.jp/word/{query}",
+  },
+];
+
+// Electron環境かどうかを判定
+const isElectron = (): boolean => {
+  return typeof window !== "undefined" &&
+    typeof window.process !== "undefined" &&
+    window.process?.type === "renderer";
+};
 
 const STANDARD_DICTIONARIES: StandardDictionary[] = [
   {
@@ -61,7 +88,7 @@ interface DictionaryProps {
 }
 
 export default function Dictionary({ content }: DictionaryProps) {
-  const [activeTab, setActiveTab] = useState<"standard" | "user">("standard");
+  const [activeTab, setActiveTab] = useState<"standard" | "user" | "web">("standard");
   const [selectedDictionaries, setSelectedDictionaries] = useState<Set<string>>(new Set());
   const [userEntries, setUserEntries] = useState<UserDictionaryEntry[]>([]);
   const [isAddingEntry, setIsAddingEntry] = useState(false);
@@ -76,6 +103,13 @@ export default function Dictionary({ content }: DictionaryProps) {
     examples: "",
     notes: "",
   });
+
+  // Web辞典用の状態
+  const [webSearchQuery, setWebSearchQuery] = useState("");
+  const [activeWebSearchQuery, setActiveWebSearchQuery] = useState("");
+  const [expandedWebDicts, setExpandedWebDicts] = useState<Set<string>>(new Set(WEB_DICTIONARIES.map(d => d.id)));
+  const [loadingWebDicts, setLoadingWebDicts] = useState<Set<string>>(new Set());
+  const webviewRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   const handleToggleDictionary = (id: string) => {
     const newSelected = new Set(selectedDictionaries);
@@ -160,7 +194,7 @@ export default function Dictionary({ content }: DictionaryProps) {
         <div className="flex gap-1 bg-background rounded-md p-1">
           <button
             onClick={() => setActiveTab("standard")}
-            className={`flex-1 px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+            className={`flex-1 px-2 py-1.5 text-sm font-medium rounded transition-colors ${
               activeTab === "standard"
                 ? "bg-accent text-accent-foreground"
                 : "text-foreground-secondary hover:text-foreground hover:bg-hover"
@@ -170,13 +204,23 @@ export default function Dictionary({ content }: DictionaryProps) {
           </button>
           <button
             onClick={() => setActiveTab("user")}
-            className={`flex-1 px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+            className={`flex-1 px-2 py-1.5 text-sm font-medium rounded transition-colors ${
               activeTab === "user"
                 ? "bg-accent text-accent-foreground"
                 : "text-foreground-secondary hover:text-foreground hover:bg-hover"
             }`}
           >
             用戶辭典
+          </button>
+          <button
+            onClick={() => setActiveTab("web")}
+            className={`flex-1 px-2 py-1.5 text-sm font-medium rounded transition-colors ${
+              activeTab === "web"
+                ? "bg-accent text-accent-foreground"
+                : "text-foreground-secondary hover:text-foreground hover:bg-hover"
+            }`}
+          >
+            Web辭典
           </button>
         </div>
       </div>
@@ -242,7 +286,7 @@ export default function Dictionary({ content }: DictionaryProps) {
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === "user" ? (
           /* 用戶辭典タブ */
           <div className="flex flex-col h-full">
             {/* Search and Add */}
@@ -618,6 +662,163 @@ export default function Dictionary({ content }: DictionaryProps) {
                 </div>
               </div>
             )}
+          </div>
+        ) : (
+          /* Web辭典タブ */
+          <div className="flex flex-col h-full">
+            {/* Search */}
+            <div className="p-4 border-b border-border">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (webSearchQuery.trim()) {
+                    setActiveWebSearchQuery(webSearchQuery.trim());
+                    // Set all dictionaries as loading only in Electron environment
+                    if (isElectron()) {
+                      setLoadingWebDicts(new Set(WEB_DICTIONARIES.map(d => d.id)));
+                    }
+                  }
+                }}
+                className="flex gap-2"
+              >
+                <input
+                  type="text"
+                  placeholder="検索語を入力..."
+                  value={webSearchQuery}
+                  onChange={(e) => setWebSearchQuery(e.target.value)}
+                  className="flex-1 px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                <button
+                  type="submit"
+                  disabled={!webSearchQuery.trim()}
+                  className="px-3 py-1.5 bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+              </form>
+              {activeWebSearchQuery && (
+                <div className="mt-2 text-xs text-foreground-secondary">
+                  検索中: 「{activeWebSearchQuery}」
+                </div>
+              )}
+            </div>
+
+            {/* Dictionary Sources */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {!activeWebSearchQuery ? (
+                <div className="text-center py-8 text-foreground-secondary text-sm">
+                  <Globe className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>検索語を入力してWeb辭典を検索</p>
+                  <p className="mt-1 text-xs">
+                    {WEB_DICTIONARIES.map(d => d.name).join("、")}で検索します
+                  </p>
+                </div>
+              ) : (
+                WEB_DICTIONARIES.map((dict) => {
+                  const searchUrl = dict.urlTemplate.replace("{query}", encodeURIComponent(activeWebSearchQuery));
+                  const isExpanded = expandedWebDicts.has(dict.id);
+                  const isLoading = loadingWebDicts.has(dict.id);
+
+                  return (
+                    <div
+                      key={dict.id}
+                      className="bg-background-elevated border border-border rounded-lg overflow-hidden"
+                    >
+                      {/* Header */}
+                      <div
+                        className="p-3 cursor-pointer hover:bg-hover transition-colors flex items-center justify-between"
+                        onClick={() => {
+                          const newExpanded = new Set(expandedWebDicts);
+                          if (isExpanded) {
+                            newExpanded.delete(dict.id);
+                          } else {
+                            newExpanded.add(dict.id);
+                          }
+                          setExpandedWebDicts(newExpanded);
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4 text-foreground-secondary" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-foreground-secondary" />
+                          )}
+                          <Globe className="w-4 h-4 text-foreground-secondary" />
+                          <span className="font-medium text-foreground">{dict.name}</span>
+                          {isLoading && isExpanded && (
+                            <Loader2 className="w-4 h-4 text-foreground-secondary animate-spin" />
+                          )}
+                        </div>
+                        <a
+                          href={searchUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-1 hover:bg-background rounded text-foreground-tertiary hover:text-foreground transition-colors"
+                          title="外部ブラウザで開く"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      </div>
+
+                      {/* Content */}
+                      {isExpanded && (
+                        <div className="border-t border-border">
+                          {isElectron() ? (
+                            // Electron環境: webviewを使用
+                            <webview
+                              ref={(el) => {
+                                if (el) {
+                                  webviewRefs.current.set(dict.id, el);
+                                  // Load event handlers
+                                  el.addEventListener("did-start-loading", () => {
+                                    setLoadingWebDicts(prev => new Set([...prev, dict.id]));
+                                  });
+                                  el.addEventListener("did-stop-loading", () => {
+                                    setLoadingWebDicts(prev => {
+                                      const next = new Set(prev);
+                                      next.delete(dict.id);
+                                      return next;
+                                    });
+                                  });
+                                  el.addEventListener("did-fail-load", () => {
+                                    setLoadingWebDicts(prev => {
+                                      const next = new Set(prev);
+                                      next.delete(dict.id);
+                                      return next;
+                                    });
+                                  });
+                                }
+                              }}
+                              src={searchUrl}
+                              style={{ width: "100%", height: "400px" }}
+                              // @ts-expect-error - webview is an Electron-specific element
+                              allowpopups="true"
+                            />
+                          ) : (
+                            // Web環境: リンクを表示
+                            <div className="p-4 text-center">
+                              <p className="text-sm text-foreground-secondary mb-3">
+                                ブラウザ環境ではWeb辭典を埋め込めません
+                              </p>
+                              <a
+                                href={searchUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors text-sm"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                                {dict.name}で検索
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         )}
       </div>
