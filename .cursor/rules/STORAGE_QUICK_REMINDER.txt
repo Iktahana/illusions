@@ -1,14 +1,14 @@
-✨ Storage Service - 使用提醒
+✨ Storage Service - 利用時の注意
 ===================================
 
-🎯 重要提醒
+🎯 重要なお知らせ
 -----------
 
-此項目已實現統一的數據持久化服務！
+このプロジェクトは統一されたデータ永続化サービスを実装しています！
 
-**不要忘記使用它，而是自己實現存儲邏輯。**
+**自分でストレージロジックを実装せず、必ずこのサービスを使用してください。**
 
-🚀 快速開始 (30 秒)
+🚀 クイックスタート (30秒)
 -------------------
 
 ```typescript
@@ -23,110 +23,110 @@ await storage.saveSession({
   editorBuffer: { content: "...", timestamp: Date.now() }
 });
 
-// 加載
+// 読み込み
 const session = await storage.loadSession();
 ```
 
-就這麼簡單！自動在 Electron 和 Web 中工作。
+とても簡単！Electron と Web で自動的に動作します。
 
-📚 文檔位置
+📚 ドキュメントの場所
 -----------
 
-快速導航:          STORAGE_INDEX.md
-集成指南:          ELECTRON_INTEGRATION_CHECKLIST.md
-API 查詢:          STORAGE_QUICK_REFERENCE.md
-架構詳解:          STORAGE_ARCHITECTURE.md
-代碼示例:          lib/storage-service-examples.ts
+クイックナビゲーション:  STORAGE_INDEX.md
+統合ガイド:          ELECTRON_INTEGRATION_CHECKLIST.md
+API リファレンス:    STORAGE_QUICK_REFERENCE.md
+アーキテクチャ詳細:  STORAGE_ARCHITECTURE.md
+コード例:            lib/storage-service-examples.ts
 
-📍 核心位置
+📍 コアファイルの場所
 -----------
 
-實現:  lib/storage-*.ts
+実装:  lib/storage-*.ts
 規則:  .cursor/rules/storage-service.md
 
-🎓 12 個核心方法
+🎓 12個のコアメソッド
 -----------------
 
-會話:  saveSession(), loadSession()
-狀態:  saveAppState(), loadAppState()
-文件:  addToRecent(), getRecentFiles(), removeFromRecent(), clearRecent()
-草稿:  saveEditorBuffer(), loadEditorBuffer(), clearEditorBuffer()
-清除:  clearAll()
+セッション:  saveSession(), loadSession()
+状態:        saveAppState(), loadAppState()
+ファイル:    addToRecent(), getRecentFiles(), removeFromRecent(), clearRecent()
+編集バッファ:      saveEditorBuffer(), loadEditorBuffer(), clearEditorBuffer()
+クリア:      clearAll()
 
-✅ 何時使用
+✅ 使用すべき場合
 -----------
 
-✓ 保存應用狀態
-✓ 加載先前的會話
-✓ 管理最近使用的檔案
-✓ 自動保存草稿
-✓ 崩潰恢復
-✓ 任何需要持久化的數據
+✓ アプリケーション状態の保存
+✓ 前回のセッションの読み込み
+✓ 最近使用したファイルの管理
+✓ 編集バッファの自動保存
+✓ クラッシュ回復
+✓ 永続化が必要なあらゆるデータ
 
-❌ 何時不用
+❌ 使用すべきでない場合
 -----------
 
-✗ 不要自己實現存儲邏輯
-✗ 不要直接使用 localStorage
-✗ 不要手動操作 IndexedDB
-✗ 不要直接訪問 SQLite
+✗ 独自のストレージロジックを実装しない
+✗ localStorage を直接使用しない
+✗ IndexedDB を手動で操作しない
+✗ SQLite に直接アクセスしない
 
-🔑 關鍵特性
+🔑 主な機能
 -----------
 
-✨ 統一 API     - 同一代碼支持 Electron 和 Web
-✨ 自動檢測     - 無需手動配置環境
-✨ 高效能       - Electron 同步，Web 異步
-✨ 類型安全     - 完整 TypeScript 支援
-✨ 易於使用     - 簡單直觀的 API
+✨ 統一されたAPI   - 同じコードで Electron と Web をサポート
+✨ 自動検出         - 環境の手動設定は不要
+✨ 高性能           - Electron は同期、Web は非同期
+✨ 型安全           - 完全な TypeScript サポート
+✨ 使いやすさ       - シンプルで直感的な API
 
-⚡ 性能提示
+⚡ パフォーマンスのヒント
 -----------
 
-• 最近文件自動限制 10 項
-• 編輯緩衝區每 30 秒保存一次
-• 使用 saveSession() 批量操作
-• Electron: ~2-5ms, Web: ~10-20ms
+• 最近使用したファイルは自動的に10件に制限されます
+• エディタバッファは30秒ごとに保存されます
+• 複数の操作には saveSession() を使用してください
+• Electron: 約2-5ms、Web: 約10-20ms
 
-📞 快速幫助
+📞 クイックヘルプ
 -----------
 
-設置自動保存:
+自動保存の設定:
   setInterval(() => storage.saveEditorBuffer(...), 30000)
 
-應用啟動恢復:
+アプリ起動時の復元:
   const session = await storage.loadSession()
 
-保存時更新:
+保存時の更新:
   await storage.addToRecent({...})
   await storage.saveAppState({...})
   await storage.clearEditorBuffer()
 
-測試:
+テスト:
   import { StorageServiceTestSuite } from "@/lib/storage-service-tests"
   await new StorageServiceTestSuite().runAll()
 
-❓ 常見問題
+❓ よくある質問
 -----------
 
-Q: 需要手動 initialize() 嗎?
-A: 不需要，自動調用。
+Q: 手動で initialize() を呼ぶ必要がありますか？
+A: いいえ、自動的に呼ばれます。
 
-Q: 在 Web 中需要配置嗎?
-A: 不需要，直接使用。
+Q: Web で設定が必要ですか？
+A: いいえ、直接使用できます。
 
-Q: 在 Electron 中需要什麼?
-A: 需要在 main.ts 和 preload.ts 中添加 IPC 處理器
-   參考: ELECTRON_INTEGRATION_CHECKLIST.md
+Q: Electron で必要なものは？
+A: main.ts と preload.ts に IPC ハンドラーの追加が必要です
+   参照: ELECTRON_INTEGRATION_CHECKLIST.md
 
-Q: 數據存儲在哪裡?
+Q: データはどこに保存されますか？
 A: Electron: ~/Library/Application Support/Illusions/illusions-storage.db
-   Web: 瀏覽器 IndexedDB
+   Web: ブラウザの IndexedDB
 
-Q: 能否自訂最近文件數量?
-A: 可以，編輯實作中的常數。
+Q: 最近使用したファイルの数をカスタマイズできますか？
+A: はい、実装内の定数を編集してください。
 
-版本: 1.0.0 | 狀態: ✅ 生產就緒
-更新: 2026-01-28
+バージョン: 1.0.0 | ステータス: ✅ 本番環境対応
+更新日: 2026-01-28
 
-👉 立即開始: 閱讀 STORAGE_INDEX.md
+👉 今すぐ始める: STORAGE_INDEX.md を読む

@@ -1,31 +1,31 @@
-# 消息弹窗系统使用文档
+# 通知ポップアップシステム使用ガイド
 
-类似 VS Code 的消息弹窗系统，支持信息、警告、错误三种类型，以及带进度条的消息提示。
+VS Code 風の通知ポップアップシステム。info（情報）、warning（警告）、error（エラー）の3種類と、進捗バー付き通知をサポートしています。
 
-## 功能特性
+## 機能
 
-- ✅ 三种消息类型：`info`（信息）、`warning`（警告）、`error`（错误）
-- ✅ 普通消息：默认 10 秒后自动关闭
-- ✅ 进度条消息：进度达到 100% 后 3 秒自动关闭
-- ✅ 手动关闭：点击关闭按钮即可关闭
-- ✅ 平滑动画：淡入淡出效果
-- ✅ 响应式设计：支持明暗主题
+- ✅ 3種類の通知タイプ：`info`（情報）、`warning`（警告）、`error`（エラー）
+- ✅ 通常の通知：デフォルトで10秒後に自動的に閉じます
+- ✅ 進捗バー付き通知：進捗が100%に達してから3秒後に自動的に閉じます
+- ✅ 手動で閉じる：閉じるボタンをクリックして閉じることができます
+- ✅ スムーズなアニメーション：フェードイン・フェードアウト効果
+- ✅ レスポンシブデザイン：ライト・ダークテーマ対応
 
-## 安装使用
+## インストールと使用方法
 
-### 1. 添加容器组件到布局
+### 1. レイアウトにコンテナコンポーネントを追加
 
-在你的根布局文件（如 `app/layout.tsx`）中添加 `NotificationContainer` 组件：
+ルートレイアウトファイル（例：`app/layout.tsx`）に `NotificationContainer` コンポーネントを追加します：
 
 ```tsx
 import { NotificationContainer } from '@/components/NotificationContainer';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh">
+    <html lang="ja">
       <body>
         {children}
-        {/* 添加消息容器 */}
+        {/* 通知コンテナを追加 */}
         <NotificationContainer />
       </body>
     </html>
@@ -33,43 +33,43 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-### 2. 使用消息管理器
+### 2. 通知マネージャーを使用
 
-在任意组件或函数中导入并使用 `notificationManager`：
+任意のコンポーネントまたは関数で `notificationManager` をインポートして使用します：
 
 ```tsx
 import { notificationManager } from '@/lib/notification-manager';
 ```
 
-## API 文档
+## API ドキュメント
 
-### 基础方法
+### 基本メソッド
 
 #### `showMessage(message: string, options?: NotificationOptions): string`
 
-显示普通消息。
+通常の通知を表示します。
 
-**参数：**
-- `message` - 消息内容
-- `options` - 可选配置
-  - `type` - 消息类型：`'info'` | `'warning'` | `'error'`，默认 `'info'`
-  - `duration` - 持续时间（毫秒），默认 `10000`（10 秒）
+**パラメータ：**
+- `message` - 通知内容
+- `options` - オプション設定
+  - `type` - 通知タイプ：`'info'` | `'warning'` | `'error'`、デフォルトは `'info'`
+  - `duration` - 表示時間（ミリ秒）、デフォルトは `10000`（10秒）
 
-**返回值：** 消息 ID（可用于后续操作）
+**戻り値：** 通知ID（後続の操作に使用可能）
 
-**示例：**
+**使用例：**
 ```tsx
-// 显示信息消息（10 秒后自动关闭）
-const id = notificationManager.showMessage('操作成功！');
+// 情報通知を表示（10秒後に自動的に閉じる）
+const id = notificationManager.showMessage('操作が成功しました！');
 
-// 显示警告消息（5 秒后自动关闭）
-notificationManager.showMessage('请注意检查数据', {
+// 警告通知を表示（5秒後に自動的に閉じる）
+notificationManager.showMessage('データを確認してください', {
   type: 'warning',
   duration: 5000
 });
 
-// 显示错误消息（不自动关闭）
-notificationManager.showMessage('发生错误，请重试', {
+// エラー通知を表示（自動的に閉じない）
+notificationManager.showMessage('エラーが発生しました。再試行してください', {
   type: 'error',
   duration: 0
 });
@@ -79,63 +79,63 @@ notificationManager.showMessage('发生错误，请重试', {
 
 #### `showProgress(message: string, options?: ProgressNotificationOptions): string`
 
-显示带进度条的消息。
+進捗バー付きの通知を表示します。
 
-**参数：**
-- `message` - 消息内容
-- `options` - 可选配置
-  - `type` - 消息类型：`'info'` | `'warning'` | `'error'`，默认 `'info'`
-  - `progress` - 初始进度（0-100），默认 `0`
+**パラメータ：**
+- `message` - 通知内容
+- `options` - オプション設定
+  - `type` - 通知タイプ：`'info'` | `'warning'` | `'error'`、デフォルトは `'info'`
+  - `progress` - 初期進捗（0-100）、デフォルトは `0`
 
-**返回值：** 消息 ID（用于更新进度）
+**戻り値：** 通知ID（進捗更新に使用）
 
-**示例：**
+**使用例：**
 ```tsx
-// 显示进度条消息
-const id = notificationManager.showProgress('正在上传文件...', {
+// 進捗バー付き通知を表示
+const id = notificationManager.showProgress('ファイルをアップロード中...', {
   progress: 0
 });
 
-// 更新进度
+// 進捗を更新
 notificationManager.updateProgress(id, 50);
-notificationManager.updateProgress(id, 100); // 达到 100% 后 3 秒自动关闭
+notificationManager.updateProgress(id, 100); // 100%に達すると3秒後に自動的に閉じる
 ```
 
 ---
 
 #### `updateProgress(id: string, progress: number, message?: string): void`
 
-更新进度条的进度和消息。
+進捗バーの進捗と通知内容を更新します。
 
-**参数：**
-- `id` - 消息 ID
-- `progress` - 新的进度值（0-100）
-- `message` - 可选的新消息内容
+**パラメータ：**
+- `id` - 通知ID
+- `progress` - 新しい進捗値（0-100）
+- `message` - オプションの新しい通知内容
 
-**示例：**
+**使用例：**
 ```tsx
-const id = notificationManager.showProgress('开始处理...');
+const id = notificationManager.showProgress('処理を開始...');
 
-// 更新进度和消息
-notificationManager.updateProgress(id, 25, '正在读取文件...');
-notificationManager.updateProgress(id, 50, '正在处理数据...');
-notificationManager.updateProgress(id, 75, '正在保存结果...');
-notificationManager.updateProgress(id, 100, '处理完成！');
+// 進捗と通知内容を更新
+notificationManager.updateProgress(id, 25, 'ファイルを読み込み中...');
+notificationManager.updateProgress(id, 50, 'データを処理中...');
+notificationManager.updateProgress(id, 75, '結果を保存中...');
+notificationManager.updateProgress(id, 100, '処理が完了しました！');
 ```
 
 ---
 
 #### `dismiss(id: string): void`
 
-手动关闭指定消息。
+指定した通知を手動で閉じます。
 
-**示例：**
+**使用例：**
 ```tsx
-const id = notificationManager.showMessage('这条消息会被手动关闭', {
-  duration: 0 // 不自动关闭
+const id = notificationManager.showMessage('この通知は手動で閉じられます', {
+  duration: 0 // 自動的に閉じない
 });
 
-// 3 秒后手动关闭
+// 3秒後に手動で閉じる
 setTimeout(() => {
   notificationManager.dismiss(id);
 }, 3000);
@@ -145,53 +145,53 @@ setTimeout(() => {
 
 #### `dismissAll(): void`
 
-关闭所有消息。
+すべての通知を閉じます。
 
-**示例：**
+**使用例：**
 ```tsx
 notificationManager.dismissAll();
 ```
 
 ---
 
-### 便捷方法
+### 便利なメソッド
 
 #### `info(message: string, duration?: number): string`
 
-显示信息消息（蓝色）。
+情報通知を表示します（青色）。
 
 ```tsx
-notificationManager.info('文件已保存');
-notificationManager.info('欢迎使用', 5000);
+notificationManager.info('ファイルを保存しました');
+notificationManager.info('ようこそ', 5000);
 ```
 
 ---
 
 #### `warning(message: string, duration?: number): string`
 
-显示警告消息（黄色）。
+警告通知を表示します（黄色）。
 
 ```tsx
-notificationManager.warning('磁盘空间不足');
-notificationManager.warning('即将超时', 3000);
+notificationManager.warning('ディスク容量が不足しています');
+notificationManager.warning('まもなくタイムアウトします', 3000);
 ```
 
 ---
 
 #### `error(message: string, duration?: number): string`
 
-显示错误消息（红色）。
+エラー通知を表示します（赤色）。
 
 ```tsx
-notificationManager.error('网络连接失败');
-notificationManager.error('保存失败，请重试', 15000);
+notificationManager.error('ネットワーク接続に失敗しました');
+notificationManager.error('保存に失敗しました。再試行してください', 15000);
 ```
 
 ---
 
-## 完整示例
+## 完全な使用例
 
-### 示例 1：普通消息
+### 例1：通常の通知
 
 ```tsx
 'use client';
@@ -201,20 +201,20 @@ import { notificationManager } from '@/lib/notification-manager';
 export function MyComponent() {
   const handleSave = async () => {
     try {
-      // 显示加载提示
-      const id = notificationManager.info('正在保存...', 0);
-      
-      // 执行保存操作
+      // ローディング通知を表示
+      const id = notificationManager.info('保存中...', 0);
+
+      // 保存処理を実行
       await saveData();
-      
-      // 关闭加载提示
+
+      // ローディング通知を閉じる
       notificationManager.dismiss(id);
-      
-      // 显示成功消息
-      notificationManager.info('保存成功！');
+
+      // 成功通知を表示
+      notificationManager.info('保存に成功しました！');
     } catch (error) {
-      // 显示错误消息
-      notificationManager.error('保存失败：' + error.message);
+      // エラー通知を表示
+      notificationManager.error('保存に失敗しました：' + error.message);
     }
   };
 
@@ -226,7 +226,7 @@ export function MyComponent() {
 }
 ```
 
-### 示例 2：进度条消息
+### 例2：進捗バー付き通知
 
 ```tsx
 'use client';
@@ -235,27 +235,27 @@ import { notificationManager } from '@/lib/notification-manager';
 
 export function FileUploader() {
   const handleUpload = async (file: File) => {
-    // 创建进度条消息
-    const id = notificationManager.showProgress('开始上传文件...', {
+    // 進捗バー付き通知を作成
+    const id = notificationManager.showProgress('ファイルのアップロードを開始...', {
       progress: 0
     });
 
     try {
-      // 模拟文件上传进度
+      // ファイルアップロードの進捗をシミュレート
       for (let i = 0; i <= 100; i += 10) {
         await new Promise(resolve => setTimeout(resolve, 200));
         notificationManager.updateProgress(
-          id, 
-          i, 
-          i < 100 ? `上传中... ${i}%` : '上传完成！'
+          id,
+          i,
+          i < 100 ? `アップロード中... ${i}%` : 'アップロード完了！'
         );
       }
-      // 进度达到 100% 后会自动在 3 秒后关闭
+      // 進捗が100%に達すると3秒後に自動的に閉じる
     } catch (error) {
-      // 关闭进度条
+      // 進捗バーを閉じる
       notificationManager.dismiss(id);
-      // 显示错误
-      notificationManager.error('上传失败：' + error.message);
+      // エラーを表示
+      notificationManager.error('アップロードに失敗しました：' + error.message);
     }
   };
 
@@ -271,7 +271,7 @@ export function FileUploader() {
 }
 ```
 
-### 示例 3：多种消息类型
+### 例3：複数の通知タイプ
 
 ```tsx
 'use client';
@@ -281,30 +281,30 @@ import { notificationManager } from '@/lib/notification-manager';
 export function NotificationDemo() {
   return (
     <div className="space-y-2">
-      <button 
-        onClick={() => notificationManager.info('这是一条信息消息')}
+      <button
+        onClick={() => notificationManager.info('これは情報通知です')}
         className="px-4 py-2 bg-blue-500 text-white rounded"
       >
-        显示信息
+        情報を表示
       </button>
 
-      <button 
-        onClick={() => notificationManager.warning('这是一条警告消息')}
+      <button
+        onClick={() => notificationManager.warning('これは警告通知です')}
         className="px-4 py-2 bg-yellow-500 text-white rounded"
       >
-        显示警告
+        警告を表示
       </button>
 
-      <button 
-        onClick={() => notificationManager.error('这是一条错误消息')}
+      <button
+        onClick={() => notificationManager.error('これはエラー通知です')}
         className="px-4 py-2 bg-red-500 text-white rounded"
       >
-        显示错误
+        エラーを表示
       </button>
 
-      <button 
+      <button
         onClick={() => {
-          const id = notificationManager.showProgress('处理中...', { progress: 0 });
+          const id = notificationManager.showProgress('処理中...', { progress: 0 });
           let progress = 0;
           const timer = setInterval(() => {
             progress += 10;
@@ -314,59 +314,59 @@ export function NotificationDemo() {
         }}
         className="px-4 py-2 bg-green-500 text-white rounded"
       >
-        显示进度条
+        進捗バーを表示
       </button>
 
-      <button 
+      <button
         onClick={() => notificationManager.dismissAll()}
         className="px-4 py-2 bg-gray-500 text-white rounded"
       >
-        关闭所有
+        すべて閉じる
       </button>
     </div>
   );
 }
 ```
 
-## 自定义样式
+## カスタムスタイル
 
-消息组件使用 Tailwind CSS 编写，支持明暗主题。你可以通过修改 `components/Notification.tsx` 来自定义样式：
+通知コンポーネントは Tailwind CSS で書かれており、ライト・ダークテーマに対応しています。`components/Notification.tsx` を修正することでスタイルをカスタマイズできます：
 
 ```tsx
-// 修改消息类型的颜色配置
+// 通知タイプの色設定を変更
 const config = {
   info: {
     icon: Info,
-    bgColor: 'bg-blue-500',      // 进度条颜色
-    borderColor: 'border-blue-500', // 左侧边框颜色
-    textColor: 'text-blue-500',    // 图标颜色
+    bgColor: 'bg-blue-500',      // 進捗バーの色
+    borderColor: 'border-blue-500', // 左側のボーダー色
+    textColor: 'text-blue-500',    // アイコンの色
   },
-  // ... 其他配置
+  // ... その他の設定
 };
 ```
 
-## 注意事项
+## 注意事項
 
-1. **自动关闭时间**：
-   - 普通消息默认 10 秒后自动关闭
-   - 进度条消息在进度达到 100% 后 3 秒自动关闭
-   - 设置 `duration: 0` 可以禁用自动关闭
+1. **自動的に閉じる時間**：
+   - 通常の通知はデフォルトで10秒後に自動的に閉じます
+   - 進捗バー付き通知は進捗が100%に達してから3秒後に自動的に閉じます
+   - `duration: 0` を設定すると自動的に閉じる機能を無効化できます
 
-2. **进度更新**：
-   - 进度值会自动限制在 0-100 范围内
-   - 只有带进度条的消息才能更新进度
+2. **進捗の更新**：
+   - 進捗値は自動的に0-100の範囲に制限されます
+   - 進捗バー付き通知のみ進捗を更新できます
 
-3. **消息定位**：
-   - 消息默认显示在屏幕右上角
-   - 多条消息会垂直堆叠显示
+3. **通知の位置**：
+   - 通知はデフォルトで画面の右上に表示されます
+   - 複数の通知は縦に並んで表示されます
 
-4. **性能优化**：
-   - 消息管理器使用单例模式，全局共享一个实例
-   - 使用订阅模式更新 UI，避免不必要的重渲染
+4. **パフォーマンスの最適化**：
+   - 通知マネージャーはシングルトンパターンを使用し、グローバルに1つのインスタンスを共有します
+   - サブスクリプションパターンを使用してUIを更新し、不要な再レンダリングを回避します
 
-## 类型定义
+## 型定義
 
-所有类型定义位于 `types/notification.ts`：
+すべての型定義は `types/notification.ts` にあります：
 
 ```typescript
 export type NotificationType = 'info' | 'warning' | 'error';

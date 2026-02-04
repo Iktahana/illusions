@@ -3,15 +3,6 @@
 import { useState } from "react";
 import { Plus, Trash2, Edit2, Check, X, BookOpen, ChevronDown, ChevronRight, Search, Globe, ExternalLink } from "lucide-react";
 
-// 標準出版社辭典
-interface StandardDictionary {
-  id: string;
-  name: string;
-  publisher: string;
-  description: string;
-  url?: string;
-}
-
 // 用戶辭典條目
 interface UserDictionaryEntry {
   id: string;
@@ -50,46 +41,12 @@ const isElectron = (): boolean => {
     window.process?.type === "renderer";
 };
 
-const STANDARD_DICTIONARIES: StandardDictionary[] = [
-  {
-    id: "kojien",
-    name: "広辞苑",
-    publisher: "岩波書店",
-    description: "日本を代表する総合国語辞典",
-  },
-  {
-    id: "daijirin",
-    name: "大辞林",
-    publisher: "三省堂",
-    description: "現代日本語を中心とした総合国語辞典",
-  },
-  {
-    id: "daijisen",
-    name: "大辞泉",
-    publisher: "小学館",
-    description: "デジタル時代の総合国語辞典",
-  },
-  {
-    id: "shinmeikai",
-    name: "新明解国語辞典",
-    publisher: "三省堂",
-    description: "独自の語釈で知られる国語辞典",
-  },
-  {
-    id: "meikyou",
-    name: "明鏡国語辞典",
-    publisher: "大修館書店",
-    description: "現代語の用法を重視した国語辞典",
-  },
-];
-
 interface DictionaryProps {
   content?: string;
 }
 
 export default function Dictionary({ content }: DictionaryProps) {
-  const [activeTab, setActiveTab] = useState<"standard" | "user" | "web">("standard");
-  const [selectedDictionaries, setSelectedDictionaries] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<"user" | "web">("web");
   const [userEntries, setUserEntries] = useState<UserDictionaryEntry[]>([]);
   const [isAddingEntry, setIsAddingEntry] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -106,16 +63,6 @@ export default function Dictionary({ content }: DictionaryProps) {
   // グローバル検索用の状態（全タブ共有）
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   const [activeSearchQuery, setActiveSearchQuery] = useState("");
-
-  const handleToggleDictionary = (id: string) => {
-    const newSelected = new Set(selectedDictionaries);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedDictionaries(newSelected);
-  };
 
   const handleAddEntry = () => {
     if (!newEntry.word?.trim() || !newEntry.definition?.trim()) return;
@@ -190,14 +137,14 @@ export default function Dictionary({ content }: DictionaryProps) {
         {/* Tabs */}
         <div className="flex gap-1 bg-background rounded-md p-1 mb-3">
           <button
-            onClick={() => setActiveTab("standard")}
+            onClick={() => setActiveTab("web")}
             className={`flex-1 px-2 py-1.5 text-sm font-medium rounded transition-colors ${
-              activeTab === "standard"
+              activeTab === "web"
                 ? "bg-accent text-accent-foreground"
                 : "text-foreground-secondary hover:text-foreground hover:bg-hover"
             }`}
           >
-            標準辭典
+            Web辭典
           </button>
           <button
             onClick={() => setActiveTab("user")}
@@ -208,16 +155,6 @@ export default function Dictionary({ content }: DictionaryProps) {
             }`}
           >
             用戶辭典
-          </button>
-          <button
-            onClick={() => setActiveTab("web")}
-            className={`flex-1 px-2 py-1.5 text-sm font-medium rounded transition-colors ${
-              activeTab === "web"
-                ? "bg-accent text-accent-foreground"
-                : "text-foreground-secondary hover:text-foreground hover:bg-hover"
-            }`}
-          >
-            Web辭典
           </button>
         </div>
 
@@ -253,66 +190,7 @@ export default function Dictionary({ content }: DictionaryProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === "standard" ? (
-          /* 標準辭典タブ */
-          <div className="p-4 space-y-3">
-            <div className="text-xs text-foreground-secondary mb-3">
-              選択した辭典を統合検索に使用します
-            </div>
-
-            {STANDARD_DICTIONARIES.map((dict) => (
-              <div
-                key={dict.id}
-                className="bg-background-elevated border border-border rounded-lg p-3 hover:bg-hover transition-colors cursor-pointer"
-                onClick={() => handleToggleDictionary(dict.id)}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5">
-                    <input
-                      type="checkbox"
-                      checked={selectedDictionaries.has(dict.id)}
-                      onChange={() => handleToggleDictionary(dict.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <h3 className="font-semibold text-foreground">{dict.name}</h3>
-                      <span className="text-xs text-foreground-tertiary">
-                        {dict.publisher}
-                      </span>
-                    </div>
-                    <p className="text-sm text-foreground-secondary">
-                      {dict.description}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {selectedDictionaries.size > 0 && (
-              <div className="mt-4 p-3 bg-background-elevated border border-border rounded-lg">
-                <div className="text-xs text-foreground-secondary mb-2">
-                  選択中: {selectedDictionaries.size} 件
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {Array.from(selectedDictionaries).map((id) => {
-                    const dict = STANDARD_DICTIONARIES.find((d) => d.id === id);
-                    return dict ? (
-                      <span
-                        key={id}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent text-accent-foreground text-xs rounded"
-                      >
-                        {dict.name}
-                      </span>
-                    ) : null;
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : activeTab === "user" ? (
+        {activeTab === "user" ? (
           /* 用戶辭典タブ */
           <div className="flex flex-col h-full">
             {/* Add Button */}
