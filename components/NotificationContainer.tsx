@@ -8,9 +8,9 @@ import type { NotificationItem } from '@/types/notification';
 export function NotificationContainer() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
-  useEffect(() => {
-    // 订阅通知更新
-    const unsubscribe = notificationManager.subscribe((newNotifications) => {
+   useEffect(() => {
+     // 通知更新を購読
+     const unsubscribe = notificationManager.subscribe((newNotifications) => {
       setNotifications(newNotifications);
     });
 
