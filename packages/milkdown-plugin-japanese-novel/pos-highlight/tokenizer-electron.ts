@@ -3,13 +3,14 @@
  * Electron では Node.js の zlib を使えるので、ローカルの辞書ファイルを使用可能
  */
 
-import kuromoji from 'kuromoji';
 import type { Token } from './types';
+import type kuromoji from 'kuromoji';
 
 class ElectronTokenizer {
   private tokenizer: kuromoji.Tokenizer<kuromoji.IpadicFeatures> | null = null;
   private initPromise: Promise<void> | null = null;
   private isReady = false;
+  private kuromojiModule: typeof kuromoji | null = null;
 
   /**
    * トークナイザーを初期化する
@@ -21,19 +22,26 @@ class ElectronTokenizer {
     
     console.log('[ElectronTokenizer] Initializing with dicPath:', dicPath);
     
-    this.initPromise = new Promise((resolve, reject) => {
-      kuromoji.builder({ dicPath }).build((err, tokenizer) => {
-        if (err) {
-          console.error('[ElectronTokenizer] Initialization error:', err);
-          reject(err);
-        } else {
-          this.tokenizer = tokenizer;
-          this.isReady = true;
-          console.log('[ElectronTokenizer] Initialized successfully');
-          resolve();
-        }
+    this.initPromise = (async () => {
+      // Dynamically import kuromoji to avoid server-side rendering issues
+      if (!this.kuromojiModule) {
+        this.kuromojiModule = (await import('kuromoji')).default;
+      }
+      
+      return new Promise<void>((resolve, reject) => {
+        this.kuromojiModule!.builder({ dicPath }).build((err, tokenizer) => {
+          if (err) {
+            console.error('[ElectronTokenizer] Initialization error:', err);
+            reject(err);
+          } else {
+            this.tokenizer = tokenizer;
+            this.isReady = true;
+            console.log('[ElectronTokenizer] Initialized successfully');
+            resolve();
+          }
+        });
       });
-    });
+    })();
     
     return this.initPromise;
   }

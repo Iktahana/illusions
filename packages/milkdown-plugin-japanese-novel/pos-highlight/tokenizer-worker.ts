@@ -3,8 +3,8 @@
  * 独立したスレッドで動作し、UIスレッドをブロックしない
  */
 
-import kuromoji from 'kuromoji';
 import type { Token, WorkerMessage, WorkerResponse } from './types';
+import type kuromoji from 'kuromoji';
 
 let tokenizer: kuromoji.Tokenizer<kuromoji.IpadicFeatures> | null = null;
 
@@ -16,7 +16,10 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     const dicPath = payload.dicPath || '/dict';
     
     try {
-      kuromoji.builder({ dicPath }).build((err, t) => {
+      // Dynamically import kuromoji to avoid server-side rendering issues
+      const kuromojiModule = (await import('kuromoji')).default;
+      
+      kuromojiModule.builder({ dicPath }).build((err, t) => {
         if (err) {
           const response: WorkerResponse = { 
             id, 

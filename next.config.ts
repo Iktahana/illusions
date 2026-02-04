@@ -9,9 +9,9 @@ const nextConfig: NextConfig = {
       // kuromoji のためのブラウザ互換モジュール
       zlib: 'browserify-zlib',
       stream: 'stream-browserify',
-      buffer: 'buffer/',
-      util: 'util/',
-      assert: 'assert/',
+      buffer: 'buffer',
+      util: 'util',
+      assert: 'assert',
       path: 'path-browserify',
       // Node.js 専用モジュールを無効化
       fs: { browser: './empty-module.js' },
@@ -23,6 +23,8 @@ const nextConfig: NextConfig = {
     },
   },
   webpack: (config, { isServer }) => {
+    const webpack = require('webpack');
+    
     // クライアントサイドで kuromoji を使用するための設定
     if (!isServer) {
       // Node.js モジュールの fallback を設定
@@ -33,9 +35,9 @@ const nextConfig: NextConfig = {
         tls: false,
         zlib: require.resolve('browserify-zlib'),
         stream: require.resolve('stream-browserify'),
-        buffer: require.resolve('buffer/'),
-        util: require.resolve('util/'),
-        assert: require.resolve('assert/'),
+        buffer: require.resolve('buffer'),
+        util: require.resolve('util'),
+        assert: require.resolve('assert'),
         http: false,
         https: false,
         os: false,
@@ -43,7 +45,14 @@ const nextConfig: NextConfig = {
       };
       
       // グローバル変数を提供
-      const webpack = require('webpack');
+      config.plugins.push(
+        new webpack.ProvidePlugin({
+          Buffer: ['buffer', 'Buffer'],
+          process: 'process/browser',
+        })
+      );
+    } else {
+      // Server-side: Provide polyfills for pre-rendering
       config.plugins.push(
         new webpack.ProvidePlugin({
           Buffer: ['buffer', 'Buffer'],
