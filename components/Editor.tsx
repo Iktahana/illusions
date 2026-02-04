@@ -93,12 +93,12 @@ export default function NovelEditor({
     localStorage.setItem('illusions-writing-mode', isVertical ? 'vertical' : 'horizontal');
   }, [isVertical, isMounted]);
 
-  // 注意：不再需要這個 effect，因為：
-  // 1. 新文件打開時，父組件會通過 key 屬性重新掛載整個 NovelEditor 組件
-  // 2. 編輯內容時，initialContent 會改變，但我們不應該重置滾動位置
-  // 3. 模式切換時，handleToggleVertical 會負責保存和恢復滾動位置
-  // 
-  // 如果將來需要在不重新掛載的情況下切換文件，可以添加一個明確的 fileId prop 來追蹤
+   // 注意：このエフェクトはもう不要。理由：
+   // 1. 新規ファイル打開時、親コンポーネント は key 属性経由で NovelEditor 全体を再マウント
+   // 2. 編集内容時、initialContent は変わるが、スクロール位置をリセットするべきではない
+   // 3. モード切替時、handleToggleVertical がスクロール位置の保存と復元を担当
+   // 
+   // 将来、再マウント無しでファイル切替が必要なら、明確な fileId prop を追加して追跡可能
 
   const handleSearchOpen = () => {
     setIsSearchOpen(true);
