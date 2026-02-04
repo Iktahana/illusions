@@ -23,7 +23,7 @@ class NotificationManager {
   }
 
   /**
-   * 添加订阅者
+   * リスナーを追加
    */
   subscribe(listener: NotificationListener): () => void {
     this.listeners.add(listener);
@@ -31,14 +31,14 @@ class NotificationManager {
   }
 
   /**
-   * 通知所有订阅者
+   * すべてのリスナーに通知
    */
   private notify(): void {
     this.listeners.forEach(listener => listener([...this.notifications]));
   }
 
   /**
-   * 显示普通消息
+   * 通常メッセージを表示
    */
   showMessage(
     message: string, 
@@ -46,7 +46,7 @@ class NotificationManager {
   ): string {
     const id = `notification-${this.nextId++}`;
     const type = options.type || 'info';
-    const duration = options.duration ?? 10000; // 默认 10 秒
+     const duration = options.duration ?? 10000; // デフォルト 10 秒
 
     const notification: NotificationItem = {
       id,
@@ -58,8 +58,8 @@ class NotificationManager {
     this.notifications.push(notification);
     this.notify();
 
-    // 自动关闭
-    if (duration > 0) {
+     // 自動クローズ
+     if (duration > 0) {
       setTimeout(() => {
         this.dismiss(id);
       }, duration);
@@ -69,7 +69,7 @@ class NotificationManager {
   }
 
   /**
-   * 显示进度条消息
+   * プログレスバーメッセージを表示
    */
   showProgress(
     message: string,
@@ -92,7 +92,7 @@ class NotificationManager {
   }
 
   /**
-   * 更新进度条
+   * プログレスバーを更新
    */
   updateProgress(id: string, progress: number, message?: string): void {
     const notification = this.notifications.find(n => n.id === id);
@@ -103,8 +103,8 @@ class NotificationManager {
       }
       this.notify();
 
-      // 进度达到 100% 后 3 秒自动关闭
-      if (notification.progress >= 100) {
+       // プログレスが 100% に達した後 3 秒で自動クローズ
+       if (notification.progress >= 100) {
         setTimeout(() => {
           this.dismiss(id);
         }, 3000);
@@ -113,7 +113,7 @@ class NotificationManager {
   }
 
   /**
-   * 关闭消息
+   * メッセージをクローズ
    */
   dismiss(id: string): void {
     const index = this.notifications.findIndex(n => n.id === id);
@@ -124,7 +124,7 @@ class NotificationManager {
   }
 
   /**
-   * 关闭所有消息
+   * すべてのメッセージをクローズ
    */
   dismissAll(): void {
     this.notifications = [];
@@ -132,26 +132,26 @@ class NotificationManager {
   }
 
   /**
-   * 便捷方法：显示信息消息
+   * ショートカット：情報メッセージを表示
    */
   info(message: string, duration?: number): string {
     return this.showMessage(message, { type: 'info', duration });
   }
 
   /**
-   * 便捷方法：显示警告消息
+   * ショートカット：警告メッセージを表示
    */
   warning(message: string, duration?: number): string {
     return this.showMessage(message, { type: 'warning', duration });
   }
 
   /**
-   * 便捷方法：显示错误消息
+   * ショートカット：エラーメッセージを表示
    */
   error(message: string, duration?: number): string {
     return this.showMessage(message, { type: 'error', duration });
   }
 }
 
-// 导出单例实例
+// シングルトン インスタンスをエクスポート
 export const notificationManager = NotificationManager.getInstance();

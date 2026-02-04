@@ -23,7 +23,7 @@ export function Notification({ notification }: NotificationProps) {
     setIsClosing(true);
     setTimeout(() => {
       notificationManager.dismiss(notification.id);
-    }, 300); // 等待动画完成
+       }, 300); // アニメーション完了を待つ
   };
 
   // アイコンと色の設定
