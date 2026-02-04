@@ -67,6 +67,31 @@ export interface PosHighlightSettings {
 }
 
 /**
+ * トークン結合オプション
+ */
+export interface TokenMergeOptions {
+  /** 助詞を結合 */
+  mergeParticles: boolean;
+  /** 動詞+助動詞を結合 */
+  mergeVerbAuxiliary: boolean;
+  /** 形容詞+助動詞を結合 */
+  mergeAdjectiveAux: boolean;
+  /** 副詞+助詞を結合 */
+  mergeAdverbParticle: boolean;
+  /** 名詞+接尾詞を結合 */
+  mergeNounSuffix: boolean;
+  /** 助詞連鎖の最大長 */
+  maxParticleChain: number;
+  /** 助動詞連鎖の最大長 */
+  maxAuxiliaryChain: number;
+}
+
+/**
+ * トークン化プリセット
+ */
+export type TokenizePreset = 'fine' | 'medium' | 'coarse' | 'custom';
+
+/**
  * Worker へ送るメッセージ
  */
 export interface WorkerMessage {

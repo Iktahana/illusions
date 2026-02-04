@@ -1,6 +1,9 @@
 /* Local fonts are loaded conditionally - see lib/fonts.ts */
 /* If local font files don't exist, Google Fonts will be used as fallback */
 
+/* Japanese novel plugin styles (vertical, manuscript, ruby, tcy) */
+@import '../packages/milkdown-plugin-japanese-novel/styles/index.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -221,9 +224,6 @@ html:not(.dark) {
 .animate-save-toast-out {
   animation: save-toast-out 0.15s ease-in forwards;
 }
-
-/* Japanese novel plugin styles (vertical, manuscript, ruby, tcy) */
-@import '../packages/milkdown-plugin-japanese-novel/styles/index.css';
 
 /* Milkdown editor custom styles */
 .milkdown {

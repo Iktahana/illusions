@@ -4,6 +4,9 @@
  */
 
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600;700&display=swap');
+@import './vertical.css';
+@import './horizontal.css';
+@import './manuscript.css';
 
 /* Unified base styles for both horizontal and vertical writing */
 .milkdown-japanese-base {
@@ -41,7 +44,3 @@
 .milkdown-japanese-base .mdi-kern {
   letter-spacing: var(--mdi-kern, 0em);
 }
-
-@import './vertical.css';
-@import './horizontal.css';
-@import './manuscript.css';

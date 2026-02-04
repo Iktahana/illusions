@@ -28,7 +28,7 @@ export default function SearchResults({
   const [replaceTerm, setReplaceTerm] = useState("");
   const [matches, setMatches] = useState<SearchMatch[]>(initialMatches || []);
   const [caseSensitive, setCaseSensitive] = useState(false);
-  const [showReplace, setShowReplace] = useState(false);
+  const [showReplace, setShowReplace] = useState(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // 文書内の一致箇所を検索する
