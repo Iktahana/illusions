@@ -187,37 +187,8 @@ export default function Dictionary({ content }: DictionaryProps) {
           <BookOpen className="w-5 h-5 text-foreground-secondary" />
         </div>
 
-        {/* Global Search */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setActiveSearchQuery(globalSearchQuery.trim());
-          }}
-          className="flex gap-2 mb-3"
-        >
-          <input
-            type="text"
-            placeholder="検索語を入力..."
-            value={globalSearchQuery}
-            onChange={(e) => setGlobalSearchQuery(e.target.value)}
-            className="flex-1 px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-          />
-          <button
-            type="submit"
-            disabled={!globalSearchQuery.trim()}
-            className="px-3 py-1.5 bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Search className="w-4 h-4" />
-          </button>
-        </form>
-        {activeSearchQuery && (
-          <div className="text-xs text-foreground-secondary mb-3">
-            検索中: 「{activeSearchQuery}」
-          </div>
-        )}
-
         {/* Tabs */}
-        <div className="flex gap-1 bg-background rounded-md p-1">
+        <div className="flex gap-1 bg-background rounded-md p-1 mb-3">
           <button
             onClick={() => setActiveTab("standard")}
             className={`flex-1 px-2 py-1.5 text-sm font-medium rounded transition-colors ${
@@ -249,6 +220,35 @@ export default function Dictionary({ content }: DictionaryProps) {
             Web辭典
           </button>
         </div>
+
+        {/* Global Search */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setActiveSearchQuery(globalSearchQuery.trim());
+          }}
+          className="flex gap-2"
+        >
+          <input
+            type="text"
+            placeholder="検索語を入力..."
+            value={globalSearchQuery}
+            onChange={(e) => setGlobalSearchQuery(e.target.value)}
+            className="flex-1 px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          <button
+            type="submit"
+            disabled={!globalSearchQuery.trim()}
+            className="px-3 py-1.5 bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        </form>
+        {activeSearchQuery && (
+          <div className="text-xs text-foreground-secondary mt-2">
+            検索中: 「{activeSearchQuery}」
+          </div>
+        )}
       </div>
 
       {/* Content */}
