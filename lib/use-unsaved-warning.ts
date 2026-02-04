@@ -13,10 +13,10 @@ export interface UseUnsavedWarningReturn {
 /**
  * 統一的未保存警告 Hook
  * 
- * 使用方式：
- * 1. 在需要保護的操作前調用 confirmBeforeAction(action)
- * 2. 如果有未保存變更，會顯示對話框
- * 3. 用戶選擇後，執行對應的操作
+ * 使用方法：
+ * 1. 保護が必要な操作前に confirmBeforeAction(action) を呼び出す
+ * 2. 未保存の変更がある場合、ダイアログを表示
+ * 3. ユーザー選択後、対応する操作を実行
  */
 export function useUnsavedWarning(
   isDirty: boolean,
@@ -26,68 +26,68 @@ export function useUnsavedWarning(
   const [showWarning, setShowWarning] = useState(false);
   const pendingActionRef = useRef<(() => void | Promise<void>) | null>(null);
 
-  /**
-   * 確認後執行操作
-   * 如果有未保存變更，顯示對話框；否則直接執行
-   */
+   /**
+    * 確認後に操作を実行
+    * 未保存の変更がある場合、ダイアログを表示；それ以外は直接実行
+    */
   const confirmBeforeAction = useCallback(
     async (action: () => void | Promise<void>) => {
-      // 如果沒有未保存的變更，直接執行
-      if (!isDirty) {
-        await action();
-        return;
-      }
+       // 未保存の変更がない場合、直接実行
+       if (!isDirty) {
+         await action();
+         return;
+       }
 
-      // 如果是新文件且從未保存過，一定要警告
-      // 或者有已保存的文件但有修改，也要警告
+       // 新規ファイルで一度も保存されていない場合、必ず警告
+       // または保存済みファイルだが修正がある場合も警告
       pendingActionRef.current = action;
       setShowWarning(true);
     },
     [isDirty]
   );
 
-  /**
-   * 用戶選擇「保存」
-   */
-  const handleSave = useCallback(async () => {
-    try {
-      // 先保存文件
-      await saveFile();
-      
-      // 保存成功後，執行待處理的操作
-      if (pendingActionRef.current) {
-        await pendingActionRef.current();
-        pendingActionRef.current = null;
-      }
-    } catch (error) {
-      console.error("保存失敗:", error);
-      // 保存失敗時不執行操作，也不關閉對話框
-      return;
-    }
-    
-    setShowWarning(false);
-  }, [saveFile]);
+   /**
+    * ユーザーが「保存」を選択
+    */
+   const handleSave = useCallback(async () => {
+     try {
+       // まずファイルを保存
+       await saveFile();
+       
+       // 保存成功後、待機中の操作を実行
+       if (pendingActionRef.current) {
+         await pendingActionRef.current();
+         pendingActionRef.current = null;
+       }
+     } catch (error) {
+       console.error("保存失敗:", error);
+       // 保存失敗時は操作を実行せず、ダイアログを閉じない
+       return;
+     }
+     
+     setShowWarning(false);
+   }, [saveFile]);
 
-  /**
-   * 用戶選擇「不保存」
-   */
-  const handleDiscard = useCallback(() => {
-    // 丟棄變更，直接執行待處理的操作
-    if (pendingActionRef.current) {
-      void pendingActionRef.current();
-      pendingActionRef.current = null;
-    }
-    setShowWarning(false);
-  }, []);
+   /**
+    * ユーザーが「保存しない」を選択
+    */
+   const handleDiscard = useCallback(() => {
+     // 変更を破棄して、待機中の操作を直接実行
+     if (pendingActionRef.current) {
+       void pendingActionRef.current();
+       pendingActionRef.current = null;
+     }
+     setShowWarning(false);
+   }, []);
 
-  /**
-   * 用戶選擇「取消」
-   */
-  const handleCancel = useCallback(() => {
-    // 取消操作，清除待處理的動作
-    pendingActionRef.current = null;
-    setShowWarning(false);
-  }, []);
+   /**
+    * ユーザーが「キャンセル」を選択
+    */
+   const handleCancel = useCallback(() => {
+     // 操作をキャンセルして、待機中のアクションをクリア
+     pendingActionRef.current = null;
+     setShowWarning(false);
+   }, []);
 
   return {
     showWarning,

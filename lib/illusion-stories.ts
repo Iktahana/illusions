@@ -1,4 +1,4 @@
-// 10篇錯覚文章
+// 10篇の錯覚ストーリー
 export const ILLUSION_STORIES = [
   `# 錯覚
 
@@ -41,7 +41,7 @@ export const ILLUSION_STORIES = [
 「愛している」という言葉が、至近距離で私の鼓膜を震わせた。あまりの熱量に眩暈がし、彼を抱きしめようとして腕を伸ばす。だが、指先が触れたのは彼の背中ではなく、冷たく硬い鏡の表面だった。彼は私を見ているのではない。私の背後に設置された鏡の中の、私によく似た「何か」と、私という肉体を突き抜けて愛を交わしていたのだ。`,
 ];
 
-// 随机获取一篇错觉文章
+// ランダムに1つの錯覚ストーリーを取得
 export function getRandomIllusionStory(): string {
   const randomIndex = Math.floor(Math.random() * ILLUSION_STORIES.length);
   return ILLUSION_STORIES[randomIndex];
