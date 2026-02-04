@@ -114,7 +114,7 @@ export default function ActivityBar({ activeView, onViewChange }: ActivityBarPro
         );
       })}
       
-      {/* 占位符：将来可以添加更多按钮 */}
+      {/* プレースホルダー：将来ボタンを追加予定 */}
       <div className="flex-1" />
     </div>
   );
