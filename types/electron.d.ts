@@ -16,6 +16,7 @@ declare global {
     setDirty: (dirty: boolean) => Promise<void>;
     saveDoneAndClose?: () => Promise<void>;
     newWindow?: () => Promise<void>;
+    openDictionaryPopup?: (url: string, title: string) => Promise<boolean>;
     onSaveBeforeClose?: (callback: () => void) => (() => void) | void;
     onOpenFileFromSystem?: (
       callback: (payload: { path: string; content: string }) => void

@@ -458,6 +458,22 @@ ipcMain.handle('new-window', () => {
    return newWin ? true : false
  })
 
+// 辞書ポップアップウィンドウを開く
+ipcMain.handle('open-dictionary-popup', (_event, url, title) => {
+  const popupWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    title: title || '辞典',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+
+  popupWindow.loadURL(url)
+  return true
+})
+
 app.whenReady().then(() => {
   createMainWindow()
   installQuickLookPluginIfNeeded()

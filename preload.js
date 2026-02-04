@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setDirty: (dirty) => ipcRenderer.invoke('set-dirty', dirty),
   saveDoneAndClose: () => ipcRenderer.invoke('save-before-close-done'),
   newWindow: () => ipcRenderer.invoke('new-window'),
+  openDictionaryPopup: (url, title) => ipcRenderer.invoke('open-dictionary-popup', url, title),
   onMenuNew: (callback) => {
     const handler = () => callback()
     ipcRenderer.on('menu-new-triggered', handler)
