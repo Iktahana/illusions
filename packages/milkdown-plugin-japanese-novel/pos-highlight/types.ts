@@ -119,3 +119,15 @@ export interface WorkerResponse {
   /** エラーメッセージ */
   error?: string;
 }
+
+/**
+ * 初期化進度回調
+ */
+export interface InitProgressCallback {
+  /** 進度更新（0-100） */
+  onProgress?: (progress: number, message: string) => void;
+  /** 初期化完了 */
+  onComplete?: () => void;
+  /** 初期化失敗 */
+  onError?: (error: Error) => void;
+}

@@ -13,7 +13,7 @@ import { electronTokenizer } from './tokenizer-electron';
 import { cdnTokenizer } from './tokenizer-cdn';
 import { isElectron } from './env-utils';
 import { getPosColor, DEFAULT_POS_COLORS } from './pos-colors';
-import type { Token, PosColorConfig } from './types';
+import type { Token, PosColorConfig, InitProgressCallback } from './types';
 
 export const posHighlightKey = new PluginKey('posHighlight');
 
@@ -148,19 +148,26 @@ export function createPosHighlightPlugin(
         const meta = tr.getMeta(posHighlightKey);
         if (meta) {
           // decorations が含まれている場合はそのまま適用
-          if (meta.decorations) {
+          if (meta.decorations !== undefined) {
             return {
               ...pluginState,
               ...meta,
             };
           }
           // enabled/colors の変更
-          return {
+          const newState = {
             ...pluginState,
             ...meta,
             // 設定変更時はキャッシュをクリア
             processedParagraphs: new Map(),
           };
+          
+          // enabled が false になった場合は decorations をクリア
+          if (meta.enabled === false) {
+            newState.decorations = DecorationSet.empty;
+          }
+          
+          return newState;
         }
         
         // ドキュメントが変更されていない場合、デコレーションをマップ
@@ -197,12 +204,66 @@ export function createPosHighlightPlugin(
           const state = posHighlightKey.getState(view.state);
           if (!state?.enabled) return;
           
+          // 動的に notificationManager を import
+          let notificationManager: any;
+          try {
+            const module = await import('../../../lib/notification-manager');
+            notificationManager = module.notificationManager;
+          } catch (err) {
+            console.warn('[PosHighlight] Failed to load notification manager:', err);
+          }
+          
+          // トークナイザーを取得して初期化状態を確認
+          const tokenizer = getTokenizer();
+          
+          // 初期化が必要な場合は進度通知を表示
+          let notificationId: string | undefined;
+          
+          // 初期化進度コールバック
+          const progressCallback: InitProgressCallback = {
+            onProgress: (progress, message) => {
+              if (notificationManager) {
+                if (!notificationId) {
+                  notificationId = notificationManager.showProgress('構文ハイライト初期化中...', {
+                    progress: 0,
+                    type: 'info'
+                  });
+                }
+                notificationManager.updateProgress(notificationId, progress, message);
+              }
+              console.log(`[PosHighlight] Init progress: ${progress}% - ${message}`);
+            },
+            onComplete: () => {
+              console.log('[PosHighlight] Tokenizer initialized successfully');
+            },
+            onError: (error) => {
+              console.error('[PosHighlight] Tokenizer initialization failed:', error);
+              if (notificationManager && notificationId) {
+                notificationManager.dismiss(notificationId);
+              }
+              if (notificationManager) {
+                notificationManager.error('構文ハイライト初期化失敗: ' + error.message);
+              }
+            }
+          };
+          
+          // 初期化を確実に完了させる
+          try {
+            await tokenizer.init('/dict', progressCallback);
+          } catch (err) {
+            console.error('[PosHighlight] Failed to initialize tokenizer:', err);
+            return;
+          }
+          
           const paragraphs = collectParagraphs(view.state.doc);
           const allDecorations: Decoration[] = [];
           
           console.log(`[PosHighlight] Processing ${paragraphs.length} paragraphs...`);
           
-          // 段落を順次処理（並列ではなく順次で安定性を確保）
+          // バッチサイズを定義（一度に処理する段落数）
+          const BATCH_SIZE = 10;
+          
+          // 段落をバッチで処理（並列ではなく順次で安定性を確保）
           for (let i = 0; i < paragraphs.length; i++) {
             // バージョンチェック（新しい更新があればキャンセル）
             if (version !== processingVersion) {
@@ -219,8 +280,11 @@ export function createPosHighlightPlugin(
             
             allDecorations.push(...decorations);
             
-            // 各段落処理後に UI を更新（インクリメンタル更新）
-            if (decorations.length > 0) {
+            // バッチごとまたは最後の段落で UI を更新
+            const isLastInBatch = (i + 1) % BATCH_SIZE === 0;
+            const isLastParagraph = i === paragraphs.length - 1;
+            
+            if ((isLastInBatch || isLastParagraph) && allDecorations.length > 0) {
               const currentDecorations = DecorationSet.create(
                 view.state.doc,
                 allDecorations
@@ -230,6 +294,12 @@ export function createPosHighlightPlugin(
                 decorations: currentDecorations,
               });
               view.dispatch(tr);
+              
+              // 進捗ログ
+              if (paragraphs.length > 20) {
+                const progress = Math.round(((i + 1) / paragraphs.length) * 100);
+                console.log(`[PosHighlight] Progress: ${progress}% (${i + 1}/${paragraphs.length})`);
+              }
             }
           }
           
@@ -240,6 +310,26 @@ export function createPosHighlightPlugin(
       return {
         update(view, prevState) {
           const state = posHighlightKey.getState(view.state);
+          const prevPluginState = posHighlightKey.getState(prevState);
+          
+          // enabled が変更された場合
+          if (state?.enabled !== prevPluginState?.enabled) {
+            if (state?.enabled) {
+              // 有効化された場合、完全に再処理
+              console.log('[PosHighlight] Enabled, scheduling full update');
+              scheduleFullUpdate(view);
+            }
+            // 無効化された場合は apply() で既に decorations がクリアされている
+            return;
+          }
+          
+          // colors が変更された場合
+          if (state?.enabled && JSON.stringify(state.colors) !== JSON.stringify(prevPluginState?.colors)) {
+            console.log('[PosHighlight] Colors changed, scheduling full update');
+            scheduleFullUpdate(view);
+            return;
+          }
+          
           if (!state?.enabled) return;
           
           // ドキュメントが変更された場合、再処理をスケジュール

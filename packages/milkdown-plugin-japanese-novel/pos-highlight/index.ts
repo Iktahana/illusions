@@ -28,8 +28,6 @@ export interface PosHighlightOptions {
   debounceMs?: number;
 }
 
-let isInitialized = false;
-
 /**
  * 品詞着色プラグイン
  * 
@@ -46,15 +44,15 @@ export function posHighlight(options: PosHighlightOptions = {}) {
   
   // トークナイザーを事前初期化（有効な場合のみ）
   // 環境に応じて適切な tokenizer を選択
-  if (enabled && !isInitialized) {
-    isInitialized = true;
+  // 注意: 初期化は tokenizer 内部で管理され、重複初期化は防がれる
+  if (enabled) {
     const tokenizer = isElectron() ? electronTokenizer : cdnTokenizer;
     
-    console.log(`[PosHighlight] Initializing ${isElectron() ? 'Electron' : 'CDN'} tokenizer`);
+    console.log(`[PosHighlight] Pre-initializing ${isElectron() ? 'Electron' : 'CDN'} tokenizer`);
     
+    // 非同期で初期化（バックグラウンドで実行）
     tokenizer.init(dicPath).catch((err: Error) => {
       console.error('[PosHighlight] Failed to initialize tokenizer:', err);
-      isInitialized = false;
     });
   }
   

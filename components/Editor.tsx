@@ -384,12 +384,12 @@ function MilkdownEditor({
       .use(verticalScrollPlugin)
       .use($prose(() => searchHighlightPlugin))
       .use(posHighlight({
-        enabled: posHighlightEnabled || false,
-        colors: posHighlightColors || {},
+        enabled: false, // 初期化時は無効、後で動的に更新
+        colors: {},
         dicPath: '/dict',
         debounceMs: 300,
       }));
-  }, [isVertical, verticalScrollPlugin, posHighlightEnabled, posHighlightColors]); // 品詞着色設定も依存配列に追加
+  }, [isVertical, verticalScrollPlugin]); // posHighlight の依賴を削除して Editor 再作成を防ぐ
 
   // EditorView インスタンスを取得する
   useEffect(() => {
@@ -422,6 +422,21 @@ function MilkdownEditor({
 
     return () => clearTimeout(timer);
   }, [get, onEditorViewReady]);
+
+  // posHighlight 設定を動的に更新（Editor を再作成せずに）
+  useEffect(() => {
+    if (!editorViewInstance) return;
+
+    // 動的に設定を更新
+    import('@/packages/milkdown-plugin-japanese-novel/pos-highlight').then(({ updatePosHighlightSettings }) => {
+      updatePosHighlightSettings(editorViewInstance, {
+        enabled: posHighlightEnabled,
+        colors: posHighlightColors,
+      });
+    }).catch(err => {
+      console.error('[Editor] Failed to update POS highlight settings:', err);
+    });
+  }, [editorViewInstance, posHighlightEnabled, posHighlightColors]);
 
   // 選択範囲の変更を追跡する
   useEffect(() => {

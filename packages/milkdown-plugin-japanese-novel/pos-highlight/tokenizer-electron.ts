@@ -3,7 +3,7 @@
  * Electron では Node.js の zlib を使えるので、ローカルの辞書ファイルを使用可能
  */
 
-import type { Token } from './types';
+import type { Token, InitProgressCallback } from './types';
 import type kuromoji from 'kuromoji';
 
 class ElectronTokenizer {
@@ -16,31 +16,55 @@ class ElectronTokenizer {
    * トークナイザーを初期化する
    * Electron では dicPath をローカルパスに設定可能
    */
-  async init(dicPath: string = '/dict'): Promise<void> {
+  async init(dicPath: string = '/dict', callback?: InitProgressCallback): Promise<void> {
     // 重複初期化を防ぐ
-    if (this.initPromise) return this.initPromise;
+    if (this.initPromise) {
+      // 既に初期化中または完了している場合
+      if (this.isReady) {
+        callback?.onComplete?.();
+      }
+      return this.initPromise;
+    }
     
     console.log('[ElectronTokenizer] Initializing with dicPath:', dicPath);
     
     this.initPromise = (async () => {
-      // Dynamically import kuromoji to avoid server-side rendering issues
-      if (!this.kuromojiModule) {
-        this.kuromojiModule = (await import('kuromoji')).default;
-      }
-      
-      return new Promise<void>((resolve, reject) => {
-        this.kuromojiModule!.builder({ dicPath }).build((err, tokenizer) => {
-          if (err) {
-            console.error('[ElectronTokenizer] Initialization error:', err);
-            reject(err);
-          } else {
-            this.tokenizer = tokenizer;
-            this.isReady = true;
-            console.log('[ElectronTokenizer] Initialized successfully');
-            resolve();
-          }
+      try {
+        // ステップ 1: kuromoji モジュールを読み込む（20%）
+        callback?.onProgress?.(20, 'kuromoji モジュールを読み込み中...');
+        
+        if (!this.kuromojiModule) {
+          this.kuromojiModule = (await import('kuromoji')).default;
+        }
+        
+        // ステップ 2: 辞書を読み込む（50%）
+        callback?.onProgress?.(50, 'ローカル辞書を読み込み中...');
+        
+        return new Promise<void>((resolve, reject) => {
+          this.kuromojiModule!.builder({ dicPath }).build((err, tokenizer) => {
+            if (err) {
+              console.error('[ElectronTokenizer] Initialization error:', err);
+              callback?.onError?.(err);
+              reject(err);
+            } else {
+              this.tokenizer = tokenizer;
+              this.isReady = true;
+              
+              // ステップ 3: 完了（100%）
+              callback?.onProgress?.(100, '初期化完了！');
+              callback?.onComplete?.();
+              
+              console.log('[ElectronTokenizer] Initialized successfully');
+              resolve();
+            }
+          });
         });
-      });
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        callback?.onError?.(err);
+        this.initPromise = null; // 失敗時はリセット
+        throw error;
+      }
     })();
     
     return this.initPromise;
