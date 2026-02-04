@@ -45,8 +45,8 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
     const foundMatches: SearchMatch[] = [];
     const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
 
-    // 文檔全文搜索
-    const fullText = doc.textContent;
+     // ドキュメント全文検索
+     const fullText = doc.textContent;
     const searchText = caseSensitive ? fullText : fullText.toLowerCase();
     
     let searchIndex = 0;
@@ -54,12 +54,12 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
       const matchIndex = searchText.indexOf(searchStr, searchIndex);
       if (matchIndex === -1) break;
 
-      // 將文本位置轉換為文檔位置
-      let pos = 0;
+       // テキスト位置をドキュメント位置に変換
+       let pos = 0;
       let textOffset = 0;
       
       doc.descendants((node, nodePos) => {
-        if (pos !== 0) return false; // 已找到，停止遍歷
+         if (pos !== 0) return false; // 見つかった、走査を停止
         
         if (node.isText && node.text) {
           const nodeEnd = textOffset + node.text.length;
@@ -82,15 +82,15 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
     setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1);
   }, [searchTerm, caseSensitive, editorView]);
 
-  // 搜索高亮裝飾
-  useEffect(() => {
+     // 検索ハイライト装飾
+     useEffect(() => {
     if (!editorView) return;
 
     const { state, dispatch } = editorView;
     const decorations: Decoration[] = [];
 
-    // 為所有匹配項添加背景高亮
-    matches.forEach((match, index) => {
+     // すべてのマッチ項目に背景ハイライトを追加
+     matches.forEach((match, index) => {
       const isCurrentMatch = index === currentMatchIndex;
       decorations.push(
         Decoration.inline(match.from, match.to, {
@@ -99,12 +99,12 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
       );
     });
 
-    // 使用 meta 傳遞裝飾信息
-    const tr = state.tr.setMeta("searchDecorations", decorations);
+     // meta を使用して装飾情報を渡す
+     const tr = state.tr.setMeta("searchDecorations", decorations);
     dispatch(tr);
 
-    // 滾動到當前匹配項
-    if (currentMatchIndex !== -1 && matches[currentMatchIndex]) {
+     // 現在のマッチ項目までスクロール
+     if (currentMatchIndex !== -1 && matches[currentMatchIndex]) {
       const match = matches[currentMatchIndex];
       const tr2 = state.tr
         .setSelection(TextSelection.create(state.doc, match.from, match.from))
