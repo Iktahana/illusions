@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Plus, Trash2, Edit2, Check, X, BookOpen, ChevronDown, ChevronRight, Search, Globe, ExternalLink, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Plus, Trash2, Edit2, Check, X, BookOpen, ChevronDown, ChevronRight, Search, Globe, ExternalLink } from "lucide-react";
 
 // 標準出版社辭典
 interface StandardDictionary {
@@ -107,9 +107,6 @@ export default function Dictionary({ content }: DictionaryProps) {
   // Web辞典用の状態
   const [webSearchQuery, setWebSearchQuery] = useState("");
   const [activeWebSearchQuery, setActiveWebSearchQuery] = useState("");
-  const [expandedWebDicts, setExpandedWebDicts] = useState<Set<string>>(new Set(WEB_DICTIONARIES.map(d => d.id)));
-  const [loadingWebDicts, setLoadingWebDicts] = useState<Set<string>>(new Set());
-  const webviewRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   const handleToggleDictionary = (id: string) => {
     const newSelected = new Set(selectedDictionaries);
@@ -673,10 +670,6 @@ export default function Dictionary({ content }: DictionaryProps) {
                   e.preventDefault();
                   if (webSearchQuery.trim()) {
                     setActiveWebSearchQuery(webSearchQuery.trim());
-                    // Set all dictionaries as loading only in Electron environment
-                    if (isElectron()) {
-                      setLoadingWebDicts(new Set(WEB_DICTIONARIES.map(d => d.id)));
-                    }
                   }
                 }}
                 className="flex gap-2"
@@ -716,105 +709,31 @@ export default function Dictionary({ content }: DictionaryProps) {
               ) : (
                 WEB_DICTIONARIES.map((dict) => {
                   const searchUrl = dict.urlTemplate.replace("{query}", encodeURIComponent(activeWebSearchQuery));
-                  const isExpanded = expandedWebDicts.has(dict.id);
-                  const isLoading = loadingWebDicts.has(dict.id);
+
+                  // Open dictionary in popup window (Electron) or new tab (Web)
+                  const handleOpenDictionary = () => {
+                    if (isElectron() && window.electronAPI?.openDictionaryPopup) {
+                      window.electronAPI.openDictionaryPopup(searchUrl, `${dict.name} - ${activeWebSearchQuery}`);
+                    } else {
+                      window.open(searchUrl, "_blank", "noopener,noreferrer");
+                    }
+                  };
 
                   return (
-                    <div
+                    <button
                       key={dict.id}
-                      className="bg-background-elevated border border-border rounded-lg overflow-hidden"
+                      onClick={handleOpenDictionary}
+                      className="w-full bg-background-elevated border border-border rounded-lg p-4 hover:bg-hover transition-colors text-left flex items-center gap-3"
                     >
-                      {/* Header */}
-                      <div
-                        className="p-3 cursor-pointer hover:bg-hover transition-colors flex items-center justify-between"
-                        onClick={() => {
-                          const newExpanded = new Set(expandedWebDicts);
-                          if (isExpanded) {
-                            newExpanded.delete(dict.id);
-                          } else {
-                            newExpanded.add(dict.id);
-                          }
-                          setExpandedWebDicts(newExpanded);
-                        }}
-                      >
-                        <div className="flex items-center gap-2">
-                          {isExpanded ? (
-                            <ChevronDown className="w-4 h-4 text-foreground-secondary" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4 text-foreground-secondary" />
-                          )}
-                          <Globe className="w-4 h-4 text-foreground-secondary" />
-                          <span className="font-medium text-foreground">{dict.name}</span>
-                          {isLoading && isExpanded && (
-                            <Loader2 className="w-4 h-4 text-foreground-secondary animate-spin" />
-                          )}
+                      <Globe className="w-5 h-5 text-foreground-secondary flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-foreground">{dict.name}</div>
+                        <div className="text-xs text-foreground-tertiary truncate mt-0.5">
+                          {searchUrl}
                         </div>
-                        <a
-                          href={searchUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-1 hover:bg-background rounded text-foreground-tertiary hover:text-foreground transition-colors"
-                          title="外部ブラウザで開く"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
                       </div>
-
-                      {/* Content */}
-                      {isExpanded && (
-                        <div className="border-t border-border">
-                          {isElectron() ? (
-                            // Electron環境: webviewを使用
-                            <webview
-                              ref={(el) => {
-                                if (el) {
-                                  webviewRefs.current.set(dict.id, el);
-                                  // Load event handlers
-                                  el.addEventListener("did-start-loading", () => {
-                                    setLoadingWebDicts(prev => new Set([...prev, dict.id]));
-                                  });
-                                  el.addEventListener("did-stop-loading", () => {
-                                    setLoadingWebDicts(prev => {
-                                      const next = new Set(prev);
-                                      next.delete(dict.id);
-                                      return next;
-                                    });
-                                  });
-                                  el.addEventListener("did-fail-load", () => {
-                                    setLoadingWebDicts(prev => {
-                                      const next = new Set(prev);
-                                      next.delete(dict.id);
-                                      return next;
-                                    });
-                                  });
-                                }
-                              }}
-                              src={searchUrl}
-                              style={{ width: "100%", height: "400px" }}
-                              // @ts-expect-error - webview is an Electron-specific element
-                              allowpopups="true"
-                            />
-                          ) : (
-                            // Web環境: リンクを表示
-                            <div className="p-4 text-center">
-                              <p className="text-sm text-foreground-secondary mb-3">
-                                ブラウザ環境ではWeb辭典を埋め込めません
-                              </p>
-                              <a
-                                href={searchUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors text-sm"
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                                {dict.name}で検索
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                      <ExternalLink className="w-4 h-4 text-foreground-tertiary flex-shrink-0" />
+                    </button>
                   );
                 })
               )}
