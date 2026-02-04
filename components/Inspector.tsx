@@ -240,13 +240,13 @@ export default function Inspector({
                   console.log('[Inspector] Is Electron:', !!window.electronAPI);
                   console.log('[Inspector] Has newWindow API:', !!window.electronAPI?.newWindow);
                   
-                  // Electron 环境下打开新窗口
-                  if (typeof window !== 'undefined' && window.electronAPI?.newWindow) {
-                    console.log('[Inspector] Calling electronAPI.newWindow()');
-                    await window.electronAPI.newWindow();
-                    console.log('[Inspector] New window called');
-                  } else {
-                    // Web 环境下打开新标签页
+                   // Electron 環境では新規ウィンドウを開く
+                   if (typeof window !== 'undefined' && window.electronAPI?.newWindow) {
+                     console.log('[Inspector] Calling electronAPI.newWindow()');
+                     await window.electronAPI.newWindow();
+                     console.log('[Inspector] New window called');
+                   } else {
+                     // Web 環境では新規タブを開く
                     console.log('[Inspector] Opening new tab (Web environment)');
                     window.open(window.location.href, '_blank');
                   }
