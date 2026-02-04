@@ -23,7 +23,7 @@ autoUpdater.logger.transports.file.level = 'info'
 
 let mainWindow = null
 let isManualUpdateCheck = false
-const allWindows = new Set() // 追踪所有窗口
+const allWindows = new Set() // すべてのウィンドウを追跡
 
 // auto-updater のイベントハンドラ設定
 function setupAutoUpdater() {
@@ -279,7 +279,7 @@ function buildApplicationMenu() {
   return template
 }
 
-// 创建新窗口（支持多窗口）
+// 新しいウィンドウを作成（マルチウィンドウ対応）
 function createWindow() {
   const newWindow = new BrowserWindow({
     width: 1400,
@@ -294,10 +294,10 @@ function createWindow() {
     },
   })
 
-  // 将窗口添加到集合中
+  // ウィンドウをセットに追加
   allWindows.add(newWindow)
   
-  // 如果这是第一个窗口，设置为主窗口
+  // 最初のウィンドウの場合はメインウィンドウに設定
   if (!mainWindow) {
     mainWindow = newWindow
   }
@@ -314,7 +314,7 @@ function createWindow() {
     }
   })
   
-  // 窗口关闭时从集合中移除
+  // ウィンドウ閉鎖時にセットから削除
   newWindow.on('closed', () => {
     allWindows.delete(newWindow)
     if (mainWindow === newWindow) {
@@ -337,7 +337,7 @@ function createWindow() {
   return newWindow
 }
 
-// 兼容旧代码
+// 従来のコードに対応
 function createMainWindow() {
   return createWindow()
 }
@@ -450,12 +450,12 @@ ipcMain.handle('save-before-close-done', (event) => {
 })
 
 ipcMain.handle('new-window', () => {
-  console.log('[Main Process] Creating new window...')
-  // 创建新窗口
-  const newWin = createWindow()
-  console.log('[Main Process] New window created:', newWin ? 'success' : 'failed')
-  return newWin ? true : false
-})
+   console.log('[Main Process] Creating new window...')
+   // 新しいウィンドウを作成
+   const newWin = createWindow()
+   console.log('[Main Process] New window created:', newWin ? 'success' : 'failed')
+   return newWin ? true : false
+ })
 
 app.whenReady().then(() => {
   createMainWindow()
