@@ -6,11 +6,13 @@ import {
   Search,
   Book,
   Layers,
-  BarChart3
+  BarChart3,
+  Users,
+  BookOpen
 } from "lucide-react";
 import clsx from "clsx";
 
-export type ActivityBarView = "explorer" | "inspector" | "settings" | "search" | "outline" | "wordfreq" | "none";
+export type ActivityBarView = "explorer" | "inspector" | "settings" | "search" | "outline" | "wordfreq" | "characters" | "dictionary" | "none";
 
 interface ActivityBarProps {
   activeView: ActivityBarView;
@@ -42,6 +44,18 @@ const ACTIVITY_BAR_ITEMS: ActivityBarItem[] = [
     icon: Book,
     label: "アウトライン",
     tooltip: "アウトライン (Ctrl+Shift+O)"
+  },
+  {
+    id: "characters",
+    icon: Users,
+    label: "登場人物",
+    tooltip: "登場人物"
+  },
+  {
+    id: "dictionary",
+    icon: BookOpen,
+    label: "辭典",
+    tooltip: "辭典"
   },
   {
     id: "wordfreq",

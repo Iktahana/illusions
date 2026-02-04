@@ -50,11 +50,19 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastAnalyzedContent, setLastAnalyzedContent] = useState<string>("");
+  const [cacheTimestamp, setCacheTimestamp] = useState<number>(0);
 
   // コンテンツを解析
-  const analyzeContent = async () => {
+  const analyzeContent = async (force = false) => {
+    // キャッシュが有効で、強制更新でない場合はスキップ
+    if (!force && content === lastAnalyzedContent && words.length > 0) {
+      return;
+    }
+
     if (!content.trim()) {
       setWords([]);
+      setLastAnalyzedContent("");
+      setCacheTimestamp(0);
       return;
     }
 
@@ -104,6 +112,7 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
       
       setWords(sorted);
       setLastAnalyzedContent(content);
+      setCacheTimestamp(Date.now());
     } catch (err) {
       console.error("[WordFrequency] Analysis error:", err);
       setError("解析に失敗しました");
@@ -122,7 +131,7 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
       
       return () => clearTimeout(timer);
     }
-  }, [content]);
+  }, [content, lastAnalyzedContent]);
 
   // 統計情報
   const stats = useMemo(() => {
@@ -152,7 +161,7 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-foreground">語彙統計</h2>
           <button
-            onClick={analyzeContent}
+            onClick={() => analyzeContent(true)}
             disabled={isLoading}
             className={clsx(
               "p-1 rounded hover:bg-hover transition-colors",

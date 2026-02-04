@@ -1,0 +1,626 @@
+"use client";
+
+import { useState } from "react";
+import { Plus, Trash2, Edit2, Check, X, BookOpen, ChevronDown, ChevronRight } from "lucide-react";
+
+// 標準出版社辭典
+interface StandardDictionary {
+  id: string;
+  name: string;
+  publisher: string;
+  description: string;
+  url?: string;
+}
+
+// 用戶辭典條目
+interface UserDictionaryEntry {
+  id: string;
+  word: string;
+  reading?: string;
+  partOfSpeech?: string;
+  definition: string;
+  examples?: string;
+  notes?: string;
+}
+
+const STANDARD_DICTIONARIES: StandardDictionary[] = [
+  {
+    id: "kojien",
+    name: "広辞苑",
+    publisher: "岩波書店",
+    description: "日本を代表する総合国語辞典",
+  },
+  {
+    id: "daijirin",
+    name: "大辞林",
+    publisher: "三省堂",
+    description: "現代日本語を中心とした総合国語辞典",
+  },
+  {
+    id: "daijisen",
+    name: "大辞泉",
+    publisher: "小学館",
+    description: "デジタル時代の総合国語辞典",
+  },
+  {
+    id: "shinmeikai",
+    name: "新明解国語辞典",
+    publisher: "三省堂",
+    description: "独自の語釈で知られる国語辞典",
+  },
+  {
+    id: "meikyou",
+    name: "明鏡国語辞典",
+    publisher: "大修館書店",
+    description: "現代語の用法を重視した国語辞典",
+  },
+];
+
+interface DictionaryProps {
+  content?: string;
+}
+
+export default function Dictionary({ content }: DictionaryProps) {
+  const [activeTab, setActiveTab] = useState<"standard" | "user">("standard");
+  const [selectedDictionaries, setSelectedDictionaries] = useState<Set<string>>(new Set());
+  const [userEntries, setUserEntries] = useState<UserDictionaryEntry[]>([]);
+  const [isAddingEntry, setIsAddingEntry] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [newEntry, setNewEntry] = useState<Partial<UserDictionaryEntry>>({
+    word: "",
+    reading: "",
+    partOfSpeech: "",
+    definition: "",
+    examples: "",
+    notes: "",
+  });
+
+  const handleToggleDictionary = (id: string) => {
+    const newSelected = new Set(selectedDictionaries);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedDictionaries(newSelected);
+  };
+
+  const handleAddEntry = () => {
+    if (!newEntry.word?.trim() || !newEntry.definition?.trim()) return;
+
+    const entry: UserDictionaryEntry = {
+      id: Date.now().toString(),
+      word: newEntry.word.trim(),
+      reading: newEntry.reading?.trim() || "",
+      partOfSpeech: newEntry.partOfSpeech?.trim() || "",
+      definition: newEntry.definition.trim(),
+      examples: newEntry.examples?.trim() || "",
+      notes: newEntry.notes?.trim() || "",
+    };
+
+    setUserEntries([...userEntries, entry].sort((a, b) => a.word.localeCompare(b.word)));
+    setNewEntry({
+      word: "",
+      reading: "",
+      partOfSpeech: "",
+      definition: "",
+      examples: "",
+      notes: "",
+    });
+    setIsAddingEntry(false);
+  };
+
+  const handleDeleteEntry = (id: string) => {
+    setUserEntries(userEntries.filter((e) => e.id !== id));
+    if (expandedId === id) setExpandedId(null);
+    if (editingId === id) setEditingId(null);
+  };
+
+  const handleUpdateEntry = (id: string, updates: Partial<UserDictionaryEntry>) => {
+    setUserEntries(
+      userEntries.map((e) => (e.id === id ? { ...e, ...updates } : e))
+    );
+  };
+
+  const handleCancelAdd = () => {
+    setIsAddingEntry(false);
+    setNewEntry({
+      word: "",
+      reading: "",
+      partOfSpeech: "",
+      definition: "",
+      examples: "",
+      notes: "",
+    });
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedId(expandedId === id ? null : id);
+  };
+
+  const filteredEntries = userEntries.filter(
+    (entry) =>
+      entry.word.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      entry.reading?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      entry.definition.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="h-full bg-background-secondary border-r border-border flex flex-col">
+      {/* Header */}
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-foreground">辭典</h2>
+          <BookOpen className="w-5 h-5 text-foreground-secondary" />
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 bg-background rounded-md p-1">
+          <button
+            onClick={() => setActiveTab("standard")}
+            className={`flex-1 px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+              activeTab === "standard"
+                ? "bg-accent text-accent-foreground"
+                : "text-foreground-secondary hover:text-foreground hover:bg-hover"
+            }`}
+          >
+            標準辭典
+          </button>
+          <button
+            onClick={() => setActiveTab("user")}
+            className={`flex-1 px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+              activeTab === "user"
+                ? "bg-accent text-accent-foreground"
+                : "text-foreground-secondary hover:text-foreground hover:bg-hover"
+            }`}
+          >
+            用戶辭典
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {activeTab === "standard" ? (
+          /* 標準辭典タブ */
+          <div className="p-4 space-y-3">
+            <div className="text-xs text-foreground-secondary mb-3">
+              選択した辭典を統合検索に使用します
+            </div>
+
+            {STANDARD_DICTIONARIES.map((dict) => (
+              <div
+                key={dict.id}
+                className="bg-background-elevated border border-border rounded-lg p-3 hover:bg-hover transition-colors cursor-pointer"
+                onClick={() => handleToggleDictionary(dict.id)}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={selectedDictionaries.has(dict.id)}
+                      onChange={() => handleToggleDictionary(dict.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <h3 className="font-semibold text-foreground">{dict.name}</h3>
+                      <span className="text-xs text-foreground-tertiary">
+                        {dict.publisher}
+                      </span>
+                    </div>
+                    <p className="text-sm text-foreground-secondary">
+                      {dict.description}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {selectedDictionaries.size > 0 && (
+              <div className="mt-4 p-3 bg-background-elevated border border-border rounded-lg">
+                <div className="text-xs text-foreground-secondary mb-2">
+                  選択中: {selectedDictionaries.size} 件
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {Array.from(selectedDictionaries).map((id) => {
+                    const dict = STANDARD_DICTIONARIES.find((d) => d.id === id);
+                    return dict ? (
+                      <span
+                        key={id}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent text-accent-foreground text-xs rounded"
+                      >
+                        {dict.name}
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* 用戶辭典タブ */
+          <div className="flex flex-col h-full">
+            {/* Search and Add */}
+            <div className="p-4 border-b border-border space-y-3">
+              <input
+                type="text"
+                placeholder="検索..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              <button
+                onClick={() => setIsAddingEntry(true)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors text-sm font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                新しい項目を追加
+              </button>
+            </div>
+
+            {/* Entries List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {/* 新規追加フォーム */}
+              {isAddingEntry && (
+                <div className="bg-background-elevated border border-border rounded-lg p-3 space-y-2 mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-foreground">新しい項目</h3>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={handleAddEntry}
+                        className="p-1 hover:bg-hover rounded text-success"
+                        title="追加"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={handleCancelAdd}
+                        className="p-1 hover:bg-hover rounded text-foreground-secondary"
+                        title="キャンセル"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                        見出し語 *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="例: 幻想"
+                        value={newEntry.word || ""}
+                        onChange={(e) =>
+                          setNewEntry({ ...newEntry, word: e.target.value })
+                        }
+                        className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                        autoFocus
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                        読み方
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="例: げんそう"
+                        value={newEntry.reading || ""}
+                        onChange={(e) =>
+                          setNewEntry({ ...newEntry, reading: e.target.value })
+                        }
+                        className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                        品詞
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="例: 名詞"
+                        value={newEntry.partOfSpeech || ""}
+                        onChange={(e) =>
+                          setNewEntry({ ...newEntry, partOfSpeech: e.target.value })
+                        }
+                        className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                        意味 *
+                      </label>
+                      <textarea
+                        placeholder="この言葉の意味を入力してください"
+                        value={newEntry.definition || ""}
+                        onChange={(e) =>
+                          setNewEntry({ ...newEntry, definition: e.target.value })
+                        }
+                        className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                        用例
+                      </label>
+                      <textarea
+                        placeholder="使用例を入力してください"
+                        value={newEntry.examples || ""}
+                        onChange={(e) =>
+                          setNewEntry({ ...newEntry, examples: e.target.value })
+                        }
+                        className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                        rows={2}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                        メモ
+                      </label>
+                      <textarea
+                        placeholder="メモや補足情報を入力してください"
+                        value={newEntry.notes || ""}
+                        onChange={(e) =>
+                          setNewEntry({ ...newEntry, notes: e.target.value })
+                        }
+                        className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* エントリーリスト */}
+              {filteredEntries.length === 0 && !isAddingEntry ? (
+                <div className="text-center py-8 text-foreground-secondary text-sm">
+                  {searchTerm ? (
+                    <p>「{searchTerm}」に一致する項目が見つかりません</p>
+                  ) : (
+                    <>
+                      <p>まだ辭典項目が追加されていません</p>
+                      <p className="mt-1 text-xs">「新しい項目を追加」ボタンで追加できます</p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                filteredEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="bg-background-elevated border border-border rounded-lg overflow-hidden"
+                  >
+                    {/* Header */}
+                    <div
+                      className="p-3 cursor-pointer hover:bg-hover transition-colors"
+                      onClick={() => toggleExpand(entry.id)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          {expandedId === entry.id ? (
+                            <ChevronDown className="w-4 h-4 text-foreground-secondary flex-shrink-0" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-foreground-secondary flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-2">
+                              <h3 className="font-semibold text-foreground">
+                                {entry.word}
+                              </h3>
+                              {entry.reading && (
+                                <span className="text-sm text-foreground-tertiary">
+                                  {entry.reading}
+                                </span>
+                              )}
+                              {entry.partOfSpeech && (
+                                <span className="text-xs px-1.5 py-0.5 bg-background rounded text-foreground-tertiary">
+                                  {entry.partOfSpeech}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-foreground-secondary mt-1 line-clamp-1">
+                              {entry.definition}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteEntry(entry.id);
+                          }}
+                          className="p-1 hover:bg-background rounded text-foreground-tertiary hover:text-danger transition-colors ml-2"
+                          title="削除"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expanded Details */}
+                    {expandedId === entry.id && (
+                      <div className="border-t border-border p-3 space-y-3 bg-background">
+                        {editingId === entry.id ? (
+                          // Edit Mode
+                          <div className="space-y-2">
+                            <div className="flex justify-end gap-1 mb-2">
+                              <button
+                                onClick={() => setEditingId(null)}
+                                className="p-1 hover:bg-hover rounded text-success"
+                                title="完了"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                                見出し語
+                              </label>
+                              <input
+                                type="text"
+                                value={entry.word}
+                                onChange={(e) =>
+                                  handleUpdateEntry(entry.id, { word: e.target.value })
+                                }
+                                className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                                読み方
+                              </label>
+                              <input
+                                type="text"
+                                value={entry.reading}
+                                onChange={(e) =>
+                                  handleUpdateEntry(entry.id, { reading: e.target.value })
+                                }
+                                className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                                品詞
+                              </label>
+                              <input
+                                type="text"
+                                value={entry.partOfSpeech}
+                                onChange={(e) =>
+                                  handleUpdateEntry(entry.id, {
+                                    partOfSpeech: e.target.value,
+                                  })
+                                }
+                                className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                                意味
+                              </label>
+                              <textarea
+                                value={entry.definition}
+                                onChange={(e) =>
+                                  handleUpdateEntry(entry.id, {
+                                    definition: e.target.value,
+                                  })
+                                }
+                                className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                                rows={3}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                                用例
+                              </label>
+                              <textarea
+                                value={entry.examples}
+                                onChange={(e) =>
+                                  handleUpdateEntry(entry.id, {
+                                    examples: e.target.value,
+                                  })
+                                }
+                                className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                                rows={2}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                                メモ
+                              </label>
+                              <textarea
+                                value={entry.notes}
+                                onChange={(e) =>
+                                  handleUpdateEntry(entry.id, { notes: e.target.value })
+                                }
+                                className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                                rows={2}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          // View Mode
+                          <div className="space-y-3">
+                            <div className="flex justify-end">
+                              <button
+                                onClick={() => setEditingId(entry.id)}
+                                className="p-1 hover:bg-hover rounded text-foreground-secondary hover:text-foreground"
+                                title="編集"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            <div>
+                              <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
+                                意味
+                              </h4>
+                              <p className="text-sm text-foreground whitespace-pre-wrap">
+                                {entry.definition}
+                              </p>
+                            </div>
+
+                            {entry.examples && (
+                              <div>
+                                <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
+                                  用例
+                                </h4>
+                                <p className="text-sm text-foreground whitespace-pre-wrap">
+                                  {entry.examples}
+                                </p>
+                              </div>
+                            )}
+
+                            {entry.notes && (
+                              <div>
+                                <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
+                                  メモ
+                                </h4>
+                                <p className="text-sm text-foreground whitespace-pre-wrap">
+                                  {entry.notes}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Stats */}
+            {userEntries.length > 0 && (
+              <div className="border-t border-border p-3 bg-background-elevated">
+                <div className="text-xs text-foreground-secondary">
+                  合計: {userEntries.length} 項目
+                  {searchTerm && filteredEntries.length !== userEntries.length && (
+                    <span className="ml-2">
+                      ({filteredEntries.length} 件表示中)
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

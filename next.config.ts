@@ -3,6 +3,25 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   images: { unoptimized: true },
   trailingSlash: true,
+  // Turbopack configuration (Next.js 16 default)
+  turbopack: {
+    resolveAlias: {
+      // kuromoji のためのブラウザ互換モジュール
+      zlib: 'browserify-zlib',
+      stream: 'stream-browserify',
+      buffer: 'buffer/',
+      util: 'util/',
+      assert: 'assert/',
+      path: 'path-browserify',
+      // Node.js 専用モジュールを無効化
+      fs: { browser: './empty-module.js' },
+      net: { browser: './empty-module.js' },
+      tls: { browser: './empty-module.js' },
+      http: { browser: './empty-module.js' },
+      https: { browser: './empty-module.js' },
+      os: { browser: './empty-module.js' },
+    },
+  },
   webpack: (config, { isServer }) => {
     // クライアントサイドで kuromoji を使用するための設定
     if (!isServer) {

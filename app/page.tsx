@@ -10,6 +10,8 @@ import ActivityBar, { type ActivityBarView } from "@/components/ActivityBar";
 import SearchResults from "@/components/SearchResults";
 import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
 import WordFrequency from "@/components/WordFrequency";
+import Characters from "@/components/Characters";
+import Dictionary from "@/components/Dictionary";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
 import { useElectronMenuHandlers } from "@/lib/use-electron-menu-handlers";
@@ -433,6 +435,12 @@ export default function EditorPage() {
                 <h2 className="text-lg font-semibold text-foreground mb-4">アウトライン</h2>
                 <p className="text-sm text-foreground-secondary">アウトライン機能は開発中です</p>
               </div>
+            )}
+            {activeView === "characters" && (
+              <Characters content={content} />
+            )}
+            {activeView === "dictionary" && (
+              <Dictionary content={content} />
             )}
             {activeView === "settings" && (
               <div className="h-full bg-background-secondary border-r border-border p-4">
