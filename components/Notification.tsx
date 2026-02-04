@@ -26,7 +26,7 @@ export function Notification({ notification }: NotificationProps) {
     }, 300); // 等待动画完成
   };
 
-  // 图标和颜色配置
+  // アイコンと色の設定
   const config = {
     info: {
       icon: Info,
@@ -64,7 +64,7 @@ export function Notification({ notification }: NotificationProps) {
         maxWidth: '500px',
       }}
     >
-      {/* 图标 */}
+      {/* アイコン */}
       <div className={`flex-shrink-0 ${textColor}`}>
         <Icon size={20} />
       </div>
@@ -75,8 +75,8 @@ export function Notification({ notification }: NotificationProps) {
           {notification.message}
         </p>
 
-        {/* 进度条 */}
-        {hasProgress && typeof progress === 'number' && (
+         {/* プログレスバー */}
+         {hasProgress && typeof progress === 'number' && (
           <div className="mt-2">
             <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
               <div
@@ -91,11 +91,11 @@ export function Notification({ notification }: NotificationProps) {
         )}
       </div>
 
-      {/* 关闭按钮 */}
-      <button
-        onClick={handleClose}
-        className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-        aria-label="关闭"
+       {/* クローズボタン */}
+       <button
+         onClick={handleClose}
+         className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+         aria-label="閉じる"
       >
         <X size={16} />
       </button>
