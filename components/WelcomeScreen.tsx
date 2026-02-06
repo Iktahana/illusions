@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderPlus, FolderOpen, FileText, Clock } from "lucide-react";
+import { FolderPlus, FolderOpen, FileText, Clock, Download } from "lucide-react";
 import clsx from "clsx";
 
 interface RecentProject {
@@ -129,11 +129,25 @@ export default function WelcomeScreen({
           </button>
         </div>
 
-        {/* Browser compatibility note */}
+        {/* Browser compatibility note with desktop download guidance */}
         {!isProjectModeSupported && (
-          <p className="text-xs text-foreground-muted text-center">
-            お使いのブラウザはプロジェクト機能に対応していません
-          </p>
+          <div className="w-full rounded-xl border border-border bg-background-elevated p-4 text-center">
+            <p className="text-sm text-foreground-secondary">
+              お使いのブラウザはプロジェクト機能に対応していません
+            </p>
+            <p className="mt-2 text-xs text-foreground-tertiary">
+              すべての機能をご利用いただくには、デスクトップ版をお試しください。
+            </p>
+            <a
+              href="https://download.illusions.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+            >
+              <Download className="h-4 w-4" />
+              デスクトップ版をダウンロード
+            </a>
+          </div>
         )}
 
         {/* Recent projects */}
