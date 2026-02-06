@@ -135,13 +135,12 @@ export class ProjectManager {
         };
       }
 
-      // Validate that the stored handle is actually a valid FileSystemDirectoryHandle
-      if (!stored.rootHandle || !("kind" in stored.rootHandle)) {
+      // Validate that the stored handle exists
+      if (!stored.rootHandle) {
         console.warn(
-          "Stored handle is invalid or corrupted, removing entry / 保存されたハンドルが無効または破損しています:",
+          "Stored handle is missing, removing entry / 保存されたハンドルがありません:",
           projectId
         );
-        // Clean up the corrupt entry from IndexedDB
         try {
           await db.projectHandles.delete(projectId);
         } catch {
@@ -151,7 +150,7 @@ export class ProjectManager {
           success: false,
           handle: null,
           permissionStatus: { status: "denied", canWrite: false, canRead: false },
-          error: `Stored handle for project "${projectId}" is invalid or corrupted`,
+          error: `Stored handle for project "${projectId}" is missing`,
         };
       }
 
