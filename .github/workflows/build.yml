@@ -199,19 +199,19 @@ jobs:
         with:
           path: dist-electron
 
+      - name: Consolidate artifacts
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          find dist-electron -type f \( -name "*.yml" -o -name "*.exe" -o -name "*.exe.blockmap" -o -name "*.dmg" -o -name "*.dmg.blockmap" -o -name "*-mac.zip" -o -name "*-mac.zip.blockmap" \) -exec cp {} release-assets/ \;
+          ls -lh release-assets/
+
       - name: Create GitHub Release and upload assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.full }}
           name: Illusions v${{ steps.version.outputs.full }}
-          files: |
-            dist-electron/**/latest*.yml
-            dist-electron/**/Illusions Setup *.exe
-            dist-electron/**/Illusions Setup *.exe.blockmap
-            dist-electron/**/Illusions-*.dmg
-            dist-electron/**/Illusions-*.dmg.blockmap
-            dist-electron/**/Illusions-*-mac.zip
-            dist-electron/**/Illusions-*-mac.zip.blockmap
+          files: release-assets/*
           draft: false
           prerelease: ${{ startsWith(github.ref, 'refs/heads/main') }}
           generate_release_notes: true

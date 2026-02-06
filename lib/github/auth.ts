@@ -145,6 +145,7 @@ export class GitHubAuthService {
       name: data.name || data.login,
       avatar_url: data.avatar_url,
       email: data.email,
+      html_url: data.html_url,
     };
   }
 
