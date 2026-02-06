@@ -10,6 +10,7 @@ export interface GitHubUser {
   name: string;
   avatar_url: string;
   email: string | null;
+  html_url: string;
 }
 
 export interface GitHubRepo {

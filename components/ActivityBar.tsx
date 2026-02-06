@@ -12,6 +12,7 @@ import {
   FolderGit2
 } from "lucide-react";
 import clsx from "clsx";
+import GitHubUserMenu from "./GitHubUserMenu";
 
 export type ActivityBarView = "projects" | "explorer" | "inspector" | "settings" | "search" | "outline" | "wordfreq" | "characters" | "dictionary" | "none";
 
@@ -123,6 +124,9 @@ export default function ActivityBar({ activeView, onViewChange }: ActivityBarPro
       
       {/* プレースホルダー：将来ボタンを追加予定 */}
       <div className="flex-1" />
+      
+      {/* GitHub User Profile */}
+      <GitHubUserMenu />
     </div>
   );
 }
