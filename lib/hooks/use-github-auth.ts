@@ -27,6 +27,35 @@ interface UseGitHubAuthReturn {
   clearError: () => void;
 }
 
+/**
+ * Translate common English error messages to Japanese for user-facing display.
+ */
+function translateErrorMessage(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes("failed to fetch") || lower.includes("networkerror") || lower.includes("network error")) {
+    return "ネットワーク接続に失敗しました。インターネット接続を確認してください。";
+  }
+  if (lower.includes("unauthorized") || lower.includes("401")) {
+    return "認証が無効です。再度ログインしてください。";
+  }
+  if (lower.includes("forbidden") || lower.includes("403")) {
+    return "アクセスが拒否されました。権限を確認してください。";
+  }
+  if (lower.includes("not found") || lower.includes("404")) {
+    return "リソースが見つかりませんでした。";
+  }
+  if (lower.includes("timeout") || lower.includes("timed out")) {
+    return "接続がタイムアウトしました。しばらくしてから再度お試しください。";
+  }
+  if (lower.includes("rate limit") || lower.includes("429")) {
+    return "リクエスト回数の上限に達しました。しばらくしてから再度お試しください。";
+  }
+  if (lower.includes("server error") || lower.includes("500") || lower.includes("internal server")) {
+    return "サーバーエラーが発生しました。しばらくしてから再度お試しください。";
+  }
+  return message;
+}
+
 export function useGitHubAuth(): UseGitHubAuthReturn {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<GitHubUser | null>(null);
@@ -55,7 +84,7 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
       }
     } catch (err) {
       console.error("Failed to check authentication:", err);
-      setError(err instanceof Error ? err.message : "認証の確認に失敗しました");
+      setError(err instanceof Error ? translateErrorMessage(err.message) : "認証の確認に失敗しました");
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +106,7 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
       setDeviceCode(null);
     } catch (err) {
       console.error("Login failed:", err);
-      setError(err instanceof Error ? err.message : "ログインに失敗しました");
+      setError(err instanceof Error ? translateErrorMessage(err.message) : "ログインに失敗しました");
       setDeviceCode(null);
     } finally {
       setIsAuthenticating(false);
@@ -92,7 +121,7 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
       setUser(null);
     } catch (err) {
       console.error("Logout failed:", err);
-      setError(err instanceof Error ? err.message : "ログアウトに失敗しました");
+      setError(err instanceof Error ? translateErrorMessage(err.message) : "ログアウトに失敗しました");
     }
   }, [authService]);
 
