@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MutableRefObject, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import { commonmark, toggleEmphasisCommand, toggleStrongCommand, toggleInlineCodeCommand, wrapInHeadingCommand, wrapInBlockquoteCommand, wrapInBulletListCommand, wrapInOrderedListCommand } from "@milkdown/preset-commonmark";
@@ -75,8 +75,8 @@ export default function NovelEditor({
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
-  // 模式切換時保持滾動位置：保存目標滾動進度（0-1）
-  const [targetScrollProgress, setTargetScrollProgress] = useState<number | null>(null);
+  // Ref to indicate a mode switch is in progress (for scroll restoration)
+  const isModeSwitchingRef = useRef(false);
 
   // マウント後に localStorage から読み込む（クライアントのみ）
   useEffect(() => {
@@ -129,17 +129,12 @@ export default function NovelEditor({
         progress
       });
       
-      // 標記需要恢復滾動位置
-      setTargetScrollProgress(0.5); // 使用任意非null值觸發滾動邏輯
+      // Mark that scroll position needs restoration after mode switch
+      isModeSwitchingRef.current = true;
     }
     
     setIsVertical(!isVertical);
   }, [isVertical, scrollContainerRef]);
-
-  // 滾動恢復完成後的回調
-  const handleScrollRestored = useCallback(() => {
-    setTargetScrollProgress(null);
-  }, []);
 
   return (
     <div className={clsx("flex flex-col h-full min-h-0 relative", className)}>
@@ -183,8 +178,7 @@ export default function NovelEditor({
                 onEditorViewReady?.(view);
               }}
               showParagraphNumbers={showParagraphNumbers}
-              targetScrollProgress={targetScrollProgress}
-              onScrollRestored={handleScrollRestored}
+              isModeSwitchingRef={isModeSwitchingRef}
               savedScrollProgressRef={savedScrollProgressRef}
               posHighlightEnabled={posHighlightEnabled}
               posHighlightColors={posHighlightColors}
@@ -274,8 +268,7 @@ function MilkdownEditor({
   scrollContainerRef,
   onEditorViewReady,
   showParagraphNumbers,
-  targetScrollProgress,
-  onScrollRestored,
+  isModeSwitchingRef,
   savedScrollProgressRef,
   posHighlightEnabled,
   posHighlightColors,
@@ -294,8 +287,7 @@ function MilkdownEditor({
   scrollContainerRef: RefObject<HTMLDivElement>;
   onEditorViewReady?: (view: EditorView) => void;
   showParagraphNumbers: boolean;
-  targetScrollProgress?: number | null;
-  onScrollRestored?: () => void;
+  isModeSwitchingRef: MutableRefObject<boolean>;
   savedScrollProgressRef: RefObject<number>;
   posHighlightEnabled?: boolean;
   posHighlightColors?: Record<string, string>;
@@ -325,19 +317,10 @@ function MilkdownEditor({
   // 縦書き用のスクロール制御プラグインを作成
   // isVertical の参照を保持
   const isVerticalRef = useRef(isVertical);
-  const shouldScrollToHeadRef = useRef(false); // 排版完成後にスクロールするかどうか
-  
-  // isVertical の変更を追跡（変更のみ、スクロールフラグは設定しない）
+  // isVertical の変更を追跡
   useEffect(() => {
     isVerticalRef.current = isVertical;
   }, [isVertical]);
-  
-  // targetScrollProgress が設定されたらスクロールフラグを立てる
-  useEffect(() => {
-    if (targetScrollProgress !== null && targetScrollProgress !== undefined) {
-      shouldScrollToHeadRef.current = true;
-    }
-  }, [targetScrollProgress]);
   
   // 縦書き時は完全にスクロール動作を禁止（ユーザーが手動でスクロールする）
   const verticalScrollPlugin = useMemo(() => $prose(() => new Plugin({
@@ -621,48 +604,34 @@ function MilkdownEditor({
     // 排版完成後的滾動處理回調
     let onLayoutCompleteCallback: (() => void) | null = null;
 
-    // 滾動處理函數：在排版完成後執行
-    // 注意：只有在「模式切換」時才需要恢復滾動位置
+    // Restore scroll position after layout completes (only during mode switch)
     const handleScrollAfterLayout = () => {
-      // 檢查是否真的需要滾動恢復（只有模式切換時會設置這個標記）
-      if (!shouldScrollToHeadRef.current) {
-        // 正常情況：編輯內容時不需要恢復滾動
+      if (!isModeSwitchingRef.current) {
         return;
       }
-      
+
       const container = scrollContainerRef.current;
       if (!container) {
-        console.debug('[DEBUG] handleScrollAfterLayout: skip (no container)');
-        shouldScrollToHeadRef.current = false;
+        isModeSwitchingRef.current = false;
         return;
       }
-      
-      // 只有在 targetScrollProgress 被明確設置為 0.5（模式切換觸發值）時才執行滾動
-      if (targetScrollProgress !== 0.5) {
-        console.debug('[DEBUG] handleScrollAfterLayout: skip (not mode switch)', { targetScrollProgress });
-        shouldScrollToHeadRef.current = false;
-        onScrollRestored?.();
-        return;
-      }
-      
+
       const savedProgress = savedScrollProgressRef.current ?? 0;
-      
+
       console.log('[DEBUG] Apply scroll after layout (mode switch):', {
         isVertical,
         savedProgress
       });
-      
-      // 使用保存的進度設置滾動位置
+
       const success = setScrollProgress({ container, isVertical }, savedProgress);
-      
+
       if (success) {
         console.log('[DEBUG] Scroll applied successfully');
       } else {
         console.log('[DEBUG] No scrollbar, skip scroll');
       }
-      
-      shouldScrollToHeadRef.current = false;
-      onScrollRestored?.();
+
+      isModeSwitchingRef.current = false;
     };
     
     // 設置排版完成回調
@@ -693,7 +662,7 @@ function MilkdownEditor({
       applyStyles(); // applyStyles 內部會在排版完成後調用 onLayoutCompleteCallback
       editorDom.style.opacity = '1';
     }
-  }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get, targetScrollProgress, onScrollRestored, savedScrollProgressRef]);
+  }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get, savedScrollProgressRef, isModeSwitchingRef]);
 
   // 縦書き時: マウスホイールの縦スクロールを横スクロールへ変換する
   useEffect(() => {
