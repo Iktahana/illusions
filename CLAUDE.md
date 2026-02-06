@@ -33,22 +33,31 @@ This document defines the code review standards for the Illusions project, a Jap
 
 ## 🌐 Language Standards (Critical)
 
-### Prohibited Languages
-**❌ STRICTLY FORBIDDEN:**
+### Code & Documentation Language Policy
+
+**❌ STRICTLY FORBIDDEN in Code/Documentation:**
 - Chinese (中文/中国語)
 - Korean (한국어/韓国語)
 - Any other languages except English and Japanese
 
-### Where to Check
+**Where This Policy Applies (Code/Documentation):**
 - ✅ **Code logic**: Variable names, function names, class names
-- ✅ **Comments**: All code comments and documentation
+- ✅ **Code comments**: All inline comments and block comments in source files
+- ✅ **Documentation files**: README, CONTRIBUTING, API docs, technical specs
 - ✅ **String literals**: UI text, error messages, log messages
-- ✅ **JSDoc**: Function documentation
-- ✅ **Configuration**: Config files, JSON data
+- ✅ **JSDoc**: Function documentation and type annotations
+- ✅ **Configuration**: Config files, JSON data, YAML files
+- ✅ **Commit messages**: Git commit messages and PR descriptions
 
-### Allowed Languages
-- ✅ English: Preferred for code logic (variables, functions, types)
-- ✅ Japanese (日本語): Allowed for comments, UI strings, and documentation
+**✅ ALLOWED in AI Conversations & Planning:**
+- AI assistant responses (可以用中文回复)
+- Project planning documents (计划书可以用中文)
+- Internal notes and discussions (内部讨论可以用中文)
+- Design documents and specifications (设计文档可以用中文)
+
+### Allowed Languages for Code/Documentation
+- ✅ **English**: Preferred for code logic (variables, functions, types)
+- ✅ **Japanese (日本語)**: Allowed for UI strings, comments, and user-facing documentation
 
 ### Japanese Quality Check (Advisory)
 When Japanese text is present, provide **suggestions** (not strict requirements) on:
