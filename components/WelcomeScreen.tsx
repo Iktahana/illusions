@@ -134,10 +134,10 @@ export default function WelcomeScreen({
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
             <div className="mx-4 w-full max-w-md rounded-xl bg-background-elevated p-8 shadow-xl border border-border text-center">
               <h2 className="text-xl font-bold text-foreground">
-                お使いのブラウザはillusionsに対応していません
+                現在お使いのブラウザでは、Illusions のWeb版はご利用いただけません。
               </h2>
               <p className="mt-3 text-sm text-foreground-secondary">
-                すべての機能をご利用いただくには、デスクトップ版をお試しください。
+                すべての機能を利用するには、デスクトップ版をお試しください。
               </p>
               <a
                 href="https://download.illusions.app"
