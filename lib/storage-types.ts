@@ -3,8 +3,6 @@
  * Web（IndexedDB）/ Electron（SQLite）を共通のAPIで扱う。
  */
 
-import type { GitHubUser } from "./github/types";
-
 /**
  * 最近使ったファイルの項目。
  */
@@ -21,21 +19,11 @@ export interface RecentFile {
 export interface ProjectMetadata {
   id: string;
   name: string;
-  type: "local" | "github";
+  type: "local";
   
   // ローカルファイル情報
   localPath?: string;
   fileHandle?: FileSystemFileHandle; // Web only
-  
-  // GitHub リポジトリ情報
-  githubRepo?: {
-    owner: string;
-    name: string;
-    fullName: string; // owner/name
-    url: string;
-    lastPushHash?: string;
-    lastPullHash?: string;
-  };
   
   // プロジェクト統計
   metadata: {
@@ -60,13 +48,6 @@ export interface AppState {
   // 品詞着色設定
   posHighlightEnabled?: boolean;
   posHighlightColors?: Record<string, string>;
-  
-  // GitHub 認証情報
-  githubAuth?: {
-    encryptedToken: string;
-    user: GitHubUser;
-    lastSync?: number;
-  };
   
   // プロジェクト管理
   currentProjectId?: string;
