@@ -6,3 +6,5 @@
 
 export { default as GitHubAuthPanel } from "./GitHubAuthPanel";
 export { default as ProjectsPanel } from "./ProjectsPanel";
+export { default as VersionHistoryPanel } from "./VersionHistoryPanel";
+export { default as DiffViewer } from "./DiffViewer";
