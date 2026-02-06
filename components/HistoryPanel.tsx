@@ -374,7 +374,7 @@ function SnapshotItem({ snapshot, isRestoring, onRestore }: SnapshotItemProps) {
             title="マイルストーンとしてマーク"
           >
             <Star className="w-3 h-3" />
-            重要にする
+            お気に入り
           </button>
         )}
       </div>
