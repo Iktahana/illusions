@@ -1000,6 +1000,10 @@ export default function EditorPage() {
             onPosHighlightEnabledChange={handlePosHighlightEnabledChange}
             posHighlightColors={posHighlightColors}
             onPosHighlightColorsChange={handlePosHighlightColorsChange}
+            onHistoryRestore={(restoredContent: string) => {
+              setContent(restoredContent);
+              setEditorKey(prev => prev + 1);
+            }}
           />
         </ResizablePanel>
       </div>
