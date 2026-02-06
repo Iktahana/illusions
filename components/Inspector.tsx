@@ -1,17 +1,20 @@
 "use client";
 
 import { useState, useRef, useEffect, ReactNode } from "react";
-import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, X } from "lucide-react";
+import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, X, History } from "lucide-react";
 import clsx from "clsx";
-import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
 import ColorPicker from "./ColorPicker";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
+import { useEditorMode } from "@/contexts/EditorModeContext";
+import HistoryPanel from "./HistoryPanel";
 
-type Tab = "ai" | "corrections" | "stats";
+import type { ProjectMode } from "@/lib/project-types";
+
+type Tab = "ai" | "corrections" | "stats" | "history";
 
 const rightTabStorageKey = "illusions:rightTab";
 const isValidTab = (value: string | null): value is Tab =>
-  value === "ai" || value === "corrections" || value === "stats";
+  value === "ai" || value === "corrections" || value === "stats" || value === "history";
 
 const readStoredTab = (): Tab | null => {
   if (typeof window === "undefined") return null;
@@ -87,6 +90,8 @@ interface InspectorProps {
   onPosHighlightEnabledChange?: (enabled: boolean) => void;
   posHighlightColors?: Record<string, string>;
   onPosHighlightColorsChange?: (colors: Record<string, string>) => void;
+  // 履歴復元コールバック（プロジェクトモード時に使用）
+  onHistoryRestore?: (content: string) => void;
 }
 
 export default function Inspector({
@@ -112,7 +117,11 @@ export default function Inspector({
   onPosHighlightEnabledChange,
   posHighlightColors = {},
   onPosHighlightColorsChange,
+  onHistoryRestore,
 }: InspectorProps) {
+  const { editorMode, isProject } = useEditorMode();
+  const projectMode = isProject ? (editorMode as ProjectMode) : null;
+
   const [activeTab, setActiveTab] = useState<Tab>("ai");
   const hasLoadedRef = useRef(false);
   const [isTabReady, setIsTabReady] = useState(false);
@@ -123,47 +132,25 @@ export default function Inspector({
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-
-    const loadTab = async () => {
-      try {
-        const storedTab = readStoredTab();
-        if (storedTab) {
-          setActiveTab(storedTab);
-          return;
-        }
-        const appState = await fetchAppState();
-        // If the stored tab is "versions", reset to "ai" since we removed that tab
-        const savedTab = appState?.inspectorTab;
-        if (mounted && savedTab && isValidTab(savedTab)) {
-          setActiveTab(savedTab);
-        } else if (mounted) {
-          setActiveTab("ai");
-        }
-      } catch (error) {
-        console.error("右サイドのタブ状態を読み込めませんでした:", error);
-      } finally {
-        if (mounted) {
-          hasLoadedRef.current = true;
-          setIsTabReady(true);
-        }
-      }
-    };
-
-    void loadTab();
-
-    return () => {
-      mounted = false;
-    };
+    const storedTab = readStoredTab();
+    if (storedTab) {
+      setActiveTab(storedTab);
+    }
+    hasLoadedRef.current = true;
+    setIsTabReady(true);
   }, []);
 
   useEffect(() => {
     if (!hasLoadedRef.current) return;
     writeStoredTab(activeTab);
-    void persistAppState({ inspectorTab: activeTab }).catch((error: unknown) => {
-      console.error("右サイドのタブ状態を保存できませんでした:", error);
-    });
   }, [activeTab]);
+
+  // プロジェクトモードでない場合に履歴タブが選択されていたらフォールバック
+  useEffect(() => {
+    if (!isProject && activeTab === "history") {
+      setActiveTab("ai");
+    }
+  }, [isProject, activeTab]);
   const [isEditingFileName, setIsEditingFileName] = useState(false);
   const [editedBaseName, setEditedBaseName] = useState(() => getBaseName(fileName));
   const inputRef = useRef<HTMLInputElement>(null);
@@ -417,7 +404,20 @@ export default function Inspector({
           <BarChart3 className="w-4 h-4" />
           統計
         </button>
-
+        {isProject && (
+          <button
+            onClick={() => setActiveTab("history")}
+            className={clsx(
+              "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
+              activeTab === "history"
+                ? "text-foreground border-b-2 border-accent"
+                : "text-foreground-tertiary hover:text-foreground-secondary"
+            )}
+          >
+            <History className="w-4 h-4" />
+            履歴
+          </button>
+        )}
       </div>
 
        {/* 本文 */}
@@ -432,17 +432,24 @@ export default function Inspector({
            />
          )}
          {activeTab === "stats" && (
-           <StatsPanel 
-             wordCount={wordCount} 
-             charCount={charCount} 
-             selectedCharCount={selectedCharCount} 
-             paragraphCount={paragraphCount} 
+           <StatsPanel
+             wordCount={wordCount}
+             charCount={charCount}
+             selectedCharCount={selectedCharCount}
+             paragraphCount={paragraphCount}
              manuscriptPages={manuscriptPages}
              sentenceCount={sentenceCount}
              charTypeAnalysis={charTypeAnalysis}
              charUsageRates={charUsageRates}
              readabilityAnalysis={readabilityAnalysis}
              particleAnalysis={particleAnalysis}
+           />
+         )}
+         {activeTab === "history" && projectMode && onHistoryRestore && (
+           <HistoryPanel
+             projectId={projectMode.projectId}
+             mainFileName={projectMode.metadata.mainFile}
+             onRestore={onHistoryRestore}
            />
          )}
        </div>
