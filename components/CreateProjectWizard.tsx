@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { FolderPlus, Check, Loader2, AlertCircle } from "lucide-react";
+import { FolderPlus, Check, Loader2, AlertCircle, ChevronDown } from "lucide-react";
 import { getProjectService } from "@/lib/project-service";
 
 import type { ProjectMode, SupportedFileExtension } from "@/lib/project-types";
@@ -61,6 +61,7 @@ export default function CreateProjectWizard({
   const [isCreating, setIsCreating] = useState(false);
   const [creationSuccess, setCreationSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showOtherFormats, setShowOtherFormats] = useState(false);
 
   // Ref to track if component is still mounted during async operations
   const mountedRef = useRef(true);
@@ -81,6 +82,7 @@ export default function CreateProjectWizard({
       setIsCreating(false);
       setCreationSuccess(false);
       setErrorMessage(null);
+      setShowOtherFormats(false);
     }
   }, [isOpen]);
 
@@ -243,44 +245,92 @@ export default function CreateProjectWizard({
               />
             </div>
 
-            {/* File format radio group */}
+            {/* File format selection: MDI prominent, others collapsible */}
             <div className="mb-6">
               <label className="mb-2 block text-sm font-medium text-foreground">
                 ファイル形式を選択
               </label>
               <div className="space-y-2">
-                {FORMAT_OPTIONS.map((option) => (
-                  <label
-                    key={option.extension}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
-                      selectedExtension === option.extension
-                        ? "border-accent bg-accent/5"
-                        : "border-border hover:bg-hover"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="file-format"
-                      value={option.extension}
-                      checked={selectedExtension === option.extension}
-                      onChange={() => setSelectedExtension(option.extension)}
-                      className="mt-0.5 accent-accent"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground">
-                          {option.label}
-                        </span>
-                        <code className="rounded bg-hover px-1.5 py-0.5 text-xs text-foreground-secondary">
-                          {option.extension}
-                        </code>
-                      </div>
-                      <p className="mt-0.5 text-xs text-foreground-secondary">
-                        {option.description}
-                      </p>
+                {/* MDI format - always visible */}
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                    selectedExtension === ".mdi"
+                      ? "border-accent bg-accent/5"
+                      : "border-border hover:bg-hover"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="file-format"
+                    value=".mdi"
+                    checked={selectedExtension === ".mdi"}
+                    onChange={() => setSelectedExtension(".mdi")}
+                    className="mt-0.5 accent-accent"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground">
+                        MDI形式（推奨）
+                      </span>
+                      <code className="rounded bg-hover px-1.5 py-0.5 text-xs text-foreground-secondary">
+                        .mdi
+                      </code>
                     </div>
-                  </label>
-                ))}
+                    <p className="mt-0.5 text-xs text-foreground-secondary">
+                      日本語小説向け。ルビ、縦中横が使えます。
+                    </p>
+                  </div>
+                </label>
+
+                {/* Collapsible section for other formats */}
+                <button
+                  type="button"
+                  onClick={() => setShowOtherFormats(!showOtherFormats)}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground-secondary hover:bg-hover transition-colors"
+                >
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${showOtherFormats ? "rotate-180" : ""}`}
+                  />
+                  その他の形式
+                </button>
+
+                {showOtherFormats &&
+                  FORMAT_OPTIONS.filter((opt) => !opt.recommended).map(
+                    (option) => (
+                      <label
+                        key={option.extension}
+                        className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                          selectedExtension === option.extension
+                            ? "border-accent bg-accent/5"
+                            : "border-border hover:bg-hover"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="file-format"
+                          value={option.extension}
+                          checked={selectedExtension === option.extension}
+                          onChange={() =>
+                            setSelectedExtension(option.extension)
+                          }
+                          className="mt-0.5 accent-accent"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-foreground">
+                              {option.label}
+                            </span>
+                            <code className="rounded bg-hover px-1.5 py-0.5 text-xs text-foreground-secondary">
+                              {option.extension}
+                            </code>
+                          </div>
+                          <p className="mt-0.5 text-xs text-foreground-secondary">
+                            {option.description}
+                          </p>
+                        </div>
+                      </label>
+                    )
+                  )}
               </div>
             </div>
 
