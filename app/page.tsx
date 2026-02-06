@@ -15,6 +15,7 @@ import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
 import WordFrequency from "@/components/WordFrequency";
 import Characters from "@/components/Characters";
 import Dictionary from "@/components/Dictionary";
+import { ProjectsPanel } from "@/components/github";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
 import { useElectronMenuHandlers } from "@/lib/use-electron-menu-handlers";
@@ -422,10 +423,15 @@ export default function EditorPage() {
          {/* Activity Bar */}
          <ActivityBar activeView={activeView} onViewChange={setActiveView} />
          
-         {/* 左サイドパネル */}
-        {activeView !== "none" && (
-          <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
-            {activeView === "explorer" && (
+          {/* 左サイドパネル */}
+         {activeView !== "none" && (
+           <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
+             {activeView === "projects" && (
+               <div className="h-full bg-background border-r border-border">
+                 <ProjectsPanel />
+               </div>
+             )}
+             {activeView === "explorer" && (
               <Explorer 
                 content={content} 
                 onChapterClick={handleChapterClick} 

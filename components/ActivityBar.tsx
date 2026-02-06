@@ -8,11 +8,12 @@ import {
   Layers,
   BarChart3,
   Users,
-  BookOpen
+  BookOpen,
+  FolderGit2
 } from "lucide-react";
 import clsx from "clsx";
 
-export type ActivityBarView = "explorer" | "inspector" | "settings" | "search" | "outline" | "wordfreq" | "characters" | "dictionary" | "none";
+export type ActivityBarView = "projects" | "explorer" | "inspector" | "settings" | "search" | "outline" | "wordfreq" | "characters" | "dictionary" | "none";
 
 interface ActivityBarProps {
   activeView: ActivityBarView;
@@ -27,6 +28,12 @@ interface ActivityBarItem {
 }
 
 const ACTIVITY_BAR_ITEMS: ActivityBarItem[] = [
+  {
+    id: "projects",
+    icon: FolderGit2,
+    label: "プロジェクト",
+    tooltip: "プロジェクト (Ctrl+Shift+P)"
+  },
   {
     id: "explorer",
     icon: Layers,
