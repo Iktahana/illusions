@@ -170,10 +170,12 @@ export default function Inspector({
   // isDirty の場合はファイル名に * を追加（クライアント側のみ）
   const displayBaseName = (baseName || fileName) + (isClient && isDirty ? " *" : "");
 
-  // fileName の変更に合わせて編集用のベース名も更新する
+  // fileName の変更に合わせて編集用のベース名も更新する（編集中は上書きしない）
   useEffect(() => {
-    setEditedBaseName(getBaseName(fileName));
-  }, [fileName]);
+    if (!isEditingFileName) {
+      setEditedBaseName(getBaseName(fileName));
+    }
+  }, [fileName, isEditingFileName]);
 
   // 編集モードに入ったら入力欄へフォーカスする
   useEffect(() => {

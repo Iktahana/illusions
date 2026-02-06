@@ -349,7 +349,11 @@ export default function EditorPage() {
    // キーボードショートカット: Cmd/Ctrl+S=保存、Cmd/Ctrl+F=検索
    useEffect(() => {
      const handleKeyDown = (event: KeyboardEvent) => {
-       const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       const nav = navigator as any;
+       const isMac = nav.userAgentData
+         ? nav.userAgentData.platform === "macOS"
+         : /mac/i.test(navigator.userAgent);
        
        // Cmd+S（macOS）/ Ctrl+S（Windows/Linux）: 保存
        const isSaveShortcut = isMac
