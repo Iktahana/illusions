@@ -135,10 +135,14 @@ export class ProjectManager {
         };
       }
 
-      // Validate that the stored handle exists
-      if (!stored.rootHandle) {
+      // Validate that the stored handle is a real FileSystemDirectoryHandle
+      // IndexedDB Structured Clone may fail to preserve the prototype in some browsers
+      if (
+        !stored.rootHandle ||
+        typeof stored.rootHandle.getDirectoryHandle !== "function"
+      ) {
         console.warn(
-          "Stored handle is missing, removing entry / 保存されたハンドルがありません:",
+          "Stored handle is missing or not a valid FileSystemDirectoryHandle / 保存されたハンドルが無効です:",
           projectId
         );
         try {
@@ -150,7 +154,7 @@ export class ProjectManager {
           success: false,
           handle: null,
           permissionStatus: { status: "denied", canWrite: false, canRead: false },
-          error: `Stored handle for project "${projectId}" is missing`,
+          error: `Stored handle for project "${projectId}" is invalid. Please re-open the project from the directory picker.`,
         };
       }
 

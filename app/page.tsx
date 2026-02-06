@@ -663,6 +663,7 @@ export default function EditorPage() {
 
       if (!restoreResult.success || !restoreResult.handle) {
         console.error("保存されたプロジェクトハンドルの復元に失敗しました:", restoreResult.error);
+        window.alert("このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。");
         return;
       }
 
