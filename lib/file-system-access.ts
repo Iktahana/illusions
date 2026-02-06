@@ -3,13 +3,7 @@
  * Falls back to download method if API is not supported
  */
 
-// Extend Window interface for File System Access API
-declare global {
-  interface Window {
-    showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<FileSystemFileHandle>;
-  }
-}
-
+// Type definitions for File System Access API
 interface SaveFilePickerOptions {
   suggestedName?: string;
   types?: {
@@ -18,14 +12,9 @@ interface SaveFilePickerOptions {
   }[];
 }
 
-interface FileSystemFileHandle {
-  createWritable: () => Promise<FileSystemWritableFileStream>;
-  name: string;
-}
-
-interface FileSystemWritableFileStream {
-  write: (data: string | BufferSource | Blob) => Promise<void>;
-  close: () => Promise<void>;
+// Check if showSaveFilePicker exists on window
+function hasShowSaveFilePicker(win: Window): win is Window & { showSaveFilePicker: (options?: SaveFilePickerOptions) => Promise<FileSystemFileHandle> } {
+  return 'showSaveFilePicker' in win;
 }
 
 /**
@@ -37,13 +26,13 @@ interface FileSystemWritableFileStream {
 export async function saveFileWithPicker(
   content: string,
   suggestedName: string = 'untitled.mdi'
-): Promise<{ fileName: string; handle: FileSystemFileHandle } | null> {
+): Promise<{ fileName: string; handle: FileSystemFileHandle | null } | null> {
   try {
     // Check if File System Access API is supported
-    if (!window.showSaveFilePicker) {
+    if (!hasShowSaveFilePicker(window)) {
       // Fallback to download
       downloadFile(content, suggestedName);
-      return { fileName: suggestedName, handle: null as any };
+      return { fileName: suggestedName, handle: null };
     }
 
     const handle = await window.showSaveFilePicker({
@@ -54,7 +43,8 @@ export async function saveFileWithPicker(
       }],
     });
 
-    const writable = await handle.createWritable();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const writable = await (handle as any).createWritable();
     await writable.write(content);
     await writable.close();
 
@@ -67,7 +57,7 @@ export async function saveFileWithPicker(
     console.error('Save file error:', err);
     // Fallback to download
     downloadFile(content, suggestedName);
-    return { fileName: suggestedName, handle: null as any };
+    return { fileName: suggestedName, handle: null };
   }
 }
 
@@ -80,7 +70,8 @@ export async function saveFileDirectly(
   handle: FileSystemFileHandle,
   content: string
 ): Promise<void> {
-  const writable = await handle.createWritable();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const writable = await (handle as any).createWritable();
   await writable.write(content);
   await writable.close();
 }
@@ -104,5 +95,5 @@ function downloadFile(content: string, filename: string): void {
  * Check if File System Access API is supported
  */
 export function isFileSystemAccessSupported(): boolean {
-  return typeof window !== 'undefined' && 'showSaveFilePicker' in window;
+  return typeof window !== 'undefined' && hasShowSaveFilePicker(window);
 }
