@@ -5,3 +5,4 @@
  */
 
 export { default as GitHubAuthPanel } from "./GitHubAuthPanel";
+export { default as ProjectsPanel } from "./ProjectsPanel";
