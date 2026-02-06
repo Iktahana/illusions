@@ -41,6 +41,10 @@ export interface StoredProjectHandle {
   rootHandle: FileSystemDirectoryHandle;
   lastAccessedAt: number;
   permissionState: "granted" | "denied" | "prompt";
+  /** User-visible project name (from project.json) */
+  name?: string;
+  /** Root directory name (from FileSystemDirectoryHandle.name) */
+  rootDirName?: string;
 }
 
 class WebStorageDatabase extends Dexie {

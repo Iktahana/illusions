@@ -170,7 +170,8 @@ export class ProjectService {
       try {
         await this.projectManager.saveProjectHandle(
           projectId,
-          nativeRootHandle
+          nativeRootHandle,
+          name
         );
       } catch (error) {
         // IndexedDB may not be available in all contexts
@@ -237,7 +238,8 @@ export class ProjectService {
       try {
         await this.projectManager.saveProjectHandle(
           metadata.projectId,
-          nativeRootHandle
+          nativeRootHandle,
+          metadata.name
         );
       } catch (error) {
         console.warn(

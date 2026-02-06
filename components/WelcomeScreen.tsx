@@ -7,6 +7,7 @@ interface RecentProject {
   projectId: string;
   name: string;
   lastAccessedAt: number;
+  rootDirName?: string;
 }
 
 interface WelcomeScreenProps {
@@ -167,9 +168,16 @@ export default function WelcomeScreen({
                     className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-hover"
                   >
                     <FileText className="h-4 w-4 shrink-0 text-foreground-tertiary" />
-                    <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                      {project.name}
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-foreground">
+                        {project.name}
+                      </span>
+                      {project.rootDirName && (
+                        <span className="block truncate text-xs text-foreground-muted">
+                          ~/{project.rootDirName}
+                        </span>
+                      )}
+                    </div>
                     <span className="flex shrink-0 items-center gap-1 text-xs text-foreground-muted">
                       <Clock className="h-3 w-3" />
                       {formatRelativeTime(project.lastAccessedAt)}

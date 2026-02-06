@@ -40,6 +40,10 @@ export interface ProjectHandleSummary {
   projectId: string;
   lastAccessedAt: number;
   permissionState: "granted" | "denied" | "prompt";
+  /** User-visible project name (from project.json) */
+  name?: string;
+  /** Root directory name (from FileSystemDirectoryHandle.name) */
+  rootDirName?: string;
 }
 
 /**
@@ -68,7 +72,8 @@ export class ProjectManager {
    */
   async saveProjectHandle(
     projectId: string,
-    rootHandle: FileSystemDirectoryHandle
+    rootHandle: FileSystemDirectoryHandle,
+    name?: string
   ): Promise<void> {
     const db = getWebStorageDatabase();
 
@@ -95,6 +100,8 @@ export class ProjectManager {
         rootHandle,
         lastAccessedAt: Date.now(),
         permissionState,
+        name,
+        rootDirName: rootHandle.name,
       };
 
       await db.projectHandles.put(record);
@@ -252,6 +259,8 @@ export class ProjectManager {
           projectId: record.projectId,
           lastAccessedAt: record.lastAccessedAt,
           permissionState: record.permissionState,
+          name: record.name,
+          rootDirName: record.rootDirName,
         }))
         .sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
     } catch (error) {

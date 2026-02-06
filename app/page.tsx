@@ -52,6 +52,7 @@ interface RecentProjectEntry {
   projectId: string;
   name: string;
   lastAccessedAt: number;
+  rootDirName?: string;
 }
 
 /** Permission prompt state for re-opening a stored project */
@@ -409,11 +410,11 @@ export default function EditorPage() {
         if (!mounted) return;
 
         // Map handles to RecentProjectEntry format
-        // Project name is not stored in the handle summary, so use projectId as fallback
         const entries: RecentProjectEntry[] = handles.map((h) => ({
           projectId: h.projectId,
-          name: h.projectId,
+          name: h.name ?? h.rootDirName ?? h.projectId,
           lastAccessedAt: h.lastAccessedAt,
+          rootDirName: h.rootDirName,
         }));
         setRecentProjects(entries);
       } catch (error) {
