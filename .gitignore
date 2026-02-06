@@ -23,6 +23,7 @@
 
 # electron
 /dist-electron/
+/dist-main/
 /*.dmg
 /*.dmg.blockmap
 /*.zip
