@@ -14,18 +14,13 @@
 
 import type { DeviceCodeResponse, AccessTokenResponse } from "./types";
 
-// GitHub OAuth App Client ID
-// TODO: Move this to environment variable or config file
-const GITHUB_CLIENT_ID = "Ov23liN8mQW7MWEYb0Gs";
-
-const DEVICE_CODE_URL = "https://github.com/login/device/code";
-const ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
+// Use Next.js API routes to proxy GitHub requests (avoids CORS issues in browser)
+const DEVICE_CODE_URL = "/api/github/device-code";
+const ACCESS_TOKEN_URL = "/api/github/access-token";
 
 export class GitHubDeviceFlow {
-  private clientId: string;
-
-  constructor(clientId: string = GITHUB_CLIENT_ID) {
-    this.clientId = clientId;
+  constructor() {
+    // Client ID is now handled by the API routes
   }
 
   /**
@@ -41,10 +36,6 @@ export class GitHubDeviceFlow {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({
-        client_id: this.clientId,
-        scope: "repo user", // Request repo and user permissions
-      }),
     });
 
     if (!response.ok) {
@@ -81,9 +72,7 @@ export class GitHubDeviceFlow {
               Accept: "application/json",
             },
             body: JSON.stringify({
-              client_id: this.clientId,
               device_code: deviceCode,
-              grant_type: "urn:ietf:params:oauth:grant-type:device_code",
             }),
           });
 
