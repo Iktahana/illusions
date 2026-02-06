@@ -31,19 +31,59 @@ interface StoredEditorBuffer {
   fileHandle?: FileSystemFileHandle; // シリアライズ性のため、ハンドルは別フィールドで保持
 }
 
+/**
+ * Stored project handle for directory-based project persistence.
+ * FileSystemDirectoryHandle is stored via Structured Clone Algorithm in IndexedDB.
+ * プロジェクトの FileSystemDirectoryHandle を IndexedDB に永続化するための型。
+ */
+export interface StoredProjectHandle {
+  projectId: string;
+  rootHandle: FileSystemDirectoryHandle;
+  lastAccessedAt: number;
+  permissionState: "granted" | "denied" | "prompt";
+}
+
 class WebStorageDatabase extends Dexie {
   appState!: Table<StoredAppState, string>;
   recentFiles!: Table<StoredRecentFile, string>;
   editorBuffer!: Table<StoredEditorBuffer, string>;
+  projectHandles!: Table<StoredProjectHandle, string>;
 
   constructor() {
     super("IllusionsStorage");
+
+    // v1: Initial schema
     this.version(1).stores({
       appState: "id",
       recentFiles: "id, path",
       editorBuffer: "id",
     });
+
+    // v2: Add projectHandles table for directory handle persistence
+    this.version(2).stores({
+      appState: "id",
+      recentFiles: "id, path",
+      editorBuffer: "id",
+      projectHandles: "projectId, lastAccessedAt",
+    });
   }
+}
+
+/**
+ * Shared database instance for use by ProjectManager and other modules.
+ * WebStorageProvider 以外のモジュール（ProjectManager 等）からも DB にアクセスするための共有インスタンス。
+ */
+let sharedDbInstance: WebStorageDatabase | null = null;
+
+/**
+ * Get the shared WebStorageDatabase instance.
+ * Creates a new instance if one doesn't exist yet.
+ */
+export function getWebStorageDatabase(): WebStorageDatabase {
+  if (!sharedDbInstance) {
+    sharedDbInstance = new WebStorageDatabase();
+  }
+  return sharedDbInstance;
 }
 
 export class WebStorageProvider implements IStorageService {
@@ -51,7 +91,7 @@ export class WebStorageProvider implements IStorageService {
   private initialized = false;
 
   constructor() {
-    this.db = new WebStorageDatabase();
+    this.db = getWebStorageDatabase();
   }
 
   async initialize(): Promise<void> {
@@ -277,6 +317,7 @@ export class WebStorageProvider implements IStorageService {
         this.db.appState.clear(),
         this.db.recentFiles.clear(),
         this.db.editorBuffer.clear(),
+        this.db.projectHandles.clear(),
       ]);
     } catch (error) {
       console.error("ストレージの全削除に失敗しました:", error);
