@@ -7,6 +7,8 @@
  */
 
 import type { INlpClient } from './types';
+import { ElectronNlpClient } from './electron-nlp-client';
+import { WebNlpClient } from './web-nlp-client';
 
 let cachedClient: INlpClient | null = null;
 
@@ -29,13 +31,9 @@ export function getNlpClient(): INlpClient {
   
   if (isElectron) {
     console.log('[NLP] Using Electron NLP Client (IPC)');
-    // Lazy import to avoid bundling in web mode
-    const { ElectronNlpClient } = require('./electron-nlp-client');
     client = new ElectronNlpClient();
   } else {
     console.log('[NLP] Using Web NLP Client (API)');
-    // Lazy import
-    const { WebNlpClient } = require('./web-nlp-client');
     client = new WebNlpClient();
   }
 
