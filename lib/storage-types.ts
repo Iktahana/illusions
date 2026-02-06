@@ -55,7 +55,7 @@ export interface AppState {
   showParagraphNumbers?: boolean;
   hasSeenDemo?: boolean;
   sidebarTab?: "chapters" | "settings" | "style";
-  inspectorTab?: "ai" | "corrections" | "stats";
+  inspectorTab?: "ai" | "corrections" | "stats" | "versions";
   
   // 品詞着色設定
   posHighlightEnabled?: boolean;
