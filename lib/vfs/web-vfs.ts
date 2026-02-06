@@ -104,10 +104,12 @@ async function resolveFileHandle(
 class WebVFSFileHandle implements VFSFileHandle {
   readonly name: string;
   readonly path: string;
+  readonly nativeFileHandle: FileSystemFileHandle;
   private readonly handle: FileSystemFileHandle;
 
   constructor(handle: FileSystemFileHandle, path: string) {
     this.handle = handle;
+    this.nativeFileHandle = handle;
     this.name = handle.name;
     this.path = path;
   }
@@ -142,10 +144,12 @@ class WebVFSFileHandle implements VFSFileHandle {
 class WebVFSDirectoryHandle implements VFSDirectoryHandle {
   readonly name: string;
   readonly path: string;
+  readonly nativeDirectoryHandle: FileSystemDirectoryHandle;
   private readonly handle: FileSystemDirectoryHandle;
 
   constructor(handle: FileSystemDirectoryHandle, path: string) {
     this.handle = handle;
+    this.nativeDirectoryHandle = handle;
     this.name = handle.name;
     this.path = path;
   }

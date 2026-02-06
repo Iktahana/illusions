@@ -157,12 +157,20 @@ export class ProjectService {
     });
     await gitignoreHandle.write(this.getGitignoreContent());
 
-    // 9. Save handle to IndexedDB for persistence (Web only)
+    // 9. Extract native handles for IndexedDB persistence and ProjectMode.
+    // VFS wrappers cannot be stored in IndexedDB (Structured Clone loses class methods).
+    // VFS ラッパーは Structured Clone でメソッドが失われるため、ネイティブハンドルを使用する。
+    const nativeRootHandle = rootDirHandle.nativeDirectoryHandle
+      ?? (rootDirHandle as unknown as FileSystemDirectoryHandle);
+    const nativeMainFileHandle = mainFileHandle.nativeFileHandle
+      ?? (mainFileHandle as unknown as FileSystemFileHandle);
+
+    // Save native handle to IndexedDB for persistence (Web only)
     if (!isElectronRenderer()) {
       try {
         await this.projectManager.saveProjectHandle(
           projectId,
-          rootDirHandle as unknown as FileSystemDirectoryHandle
+          nativeRootHandle
         );
       } catch (error) {
         // IndexedDB may not be available in all contexts
@@ -177,8 +185,8 @@ export class ProjectService {
       type: "project",
       projectId,
       name,
-      rootHandle: rootDirHandle as unknown as FileSystemDirectoryHandle,
-      mainFileHandle: mainFileHandle as unknown as FileSystemFileHandle,
+      rootHandle: nativeRootHandle,
+      mainFileHandle: nativeMainFileHandle,
       metadata,
       workspaceState,
     };
@@ -218,12 +226,18 @@ export class ProjectService {
       metadata.mainFile
     );
 
-    // Save handle to IndexedDB (Web only)
+    // Extract native handles (see createProject comment for rationale)
+    const nativeRootHandle = rootDirHandle.nativeDirectoryHandle
+      ?? (rootDirHandle as unknown as FileSystemDirectoryHandle);
+    const nativeMainFileHandle = mainFileHandle.nativeFileHandle
+      ?? (mainFileHandle as unknown as FileSystemFileHandle);
+
+    // Save native handle to IndexedDB (Web only)
     if (!isElectronRenderer()) {
       try {
         await this.projectManager.saveProjectHandle(
           metadata.projectId,
-          rootDirHandle as unknown as FileSystemDirectoryHandle
+          nativeRootHandle
         );
       } catch (error) {
         console.warn(
@@ -237,8 +251,8 @@ export class ProjectService {
       type: "project",
       projectId: metadata.projectId,
       name: metadata.name,
-      rootHandle: rootDirHandle as unknown as FileSystemDirectoryHandle,
-      mainFileHandle: mainFileHandle as unknown as FileSystemFileHandle,
+      rootHandle: nativeRootHandle,
+      mainFileHandle: nativeMainFileHandle,
       metadata,
       workspaceState,
     };

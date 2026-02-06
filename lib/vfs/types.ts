@@ -60,6 +60,8 @@ export interface VFSFileHandle {
   readonly name: string;
   /** Full path relative to VFS root */
   readonly path: string;
+  /** Native FileSystemFileHandle (Web only). Used for IndexedDB persistence. */
+  readonly nativeFileHandle?: FileSystemFileHandle;
   /** Get the underlying File object */
   getFile(): Promise<File>;
   /** Read file content as UTF-8 text */
@@ -77,6 +79,8 @@ export interface VFSDirectoryHandle {
   readonly name: string;
   /** Full path relative to VFS root */
   readonly path: string;
+  /** Native FileSystemDirectoryHandle (Web only). Used for IndexedDB persistence. */
+  readonly nativeDirectoryHandle?: FileSystemDirectoryHandle;
   /**
    * Get a file handle by name within this directory.
    * @param name - File name to look up
