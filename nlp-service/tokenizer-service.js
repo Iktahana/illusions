@@ -6,6 +6,7 @@
  */
 
 const kuromoji = require('kuromoji');
+const path = require('path');
 
 class TokenizerService {
   constructor() {
@@ -16,21 +17,46 @@ class TokenizerService {
   }
 
   /**
+   * Get default dictionary path
+   * Works in both dev and bundled (esbuild) environments
+   * 
+   * @returns {string} Dictionary path
+   */
+  _getDefaultDicPath() {
+    // In bundled environment, kuromoji is in dist-main/node_modules/kuromoji
+    // In dev environment, kuromoji is in node_modules/kuromoji
+    // We use require.resolve to find kuromoji's location dynamically
+    try {
+      const kuromojiPath = require.resolve('kuromoji');
+      const kuromojiRoot = path.dirname(kuromojiPath);
+      const dicPath = path.join(kuromojiRoot, 'dict');
+      return dicPath;
+    } catch (error) {
+      console.error('[TokenizerService] Failed to resolve kuromoji path:', error);
+      // Fallback to /dict
+      return '/dict';
+    }
+  }
+
+  /**
    * Initialize kuromoji tokenizer
    * 
-   * @param {string} dicPath - Dictionary directory path (default: '/dict')
+   * @param {string} dicPath - Dictionary directory path (default: auto-detected)
    * @returns {Promise<void>}
    */
-  async init(dicPath = '/dict') {
+  async init(dicPath) {
     // Prevent duplicate initialization
     if (this.initPromise) {
       return this.initPromise;
     }
     
-    console.log('[TokenizerService] Initializing with dicPath:', dicPath);
+    // Use provided path or auto-detect
+    const resolvedDicPath = dicPath || this._getDefaultDicPath();
+    
+    console.log('[TokenizerService] Initializing with dicPath:', resolvedDicPath);
     
     this.initPromise = new Promise((resolve, reject) => {
-      kuromoji.builder({ dicPath }).build((err, tokenizer) => {
+      kuromoji.builder({ dicPath: resolvedDicPath }).build((err, tokenizer) => {
         if (err) {
           console.error('[TokenizerService] Initialization error:', err);
           this.initPromise = null; // Reset on failure
