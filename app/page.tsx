@@ -15,7 +15,6 @@ import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
 import WordFrequency from "@/components/WordFrequency";
 import Characters from "@/components/Characters";
 import Dictionary from "@/components/Dictionary";
-import { ProjectsPanel } from "@/components/github";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
 import { useElectronMenuHandlers } from "@/lib/use-electron-menu-handlers";
@@ -48,6 +47,7 @@ export default function EditorPage() {
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
+  const [recoveryExiting, setRecoveryExiting] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
   const [showSaveToast, setShowSaveToast] = useState(false);
@@ -120,7 +120,7 @@ export default function EditorPage() {
   // エディタ表示設定
   const [fontScale, setFontScale] = useState(100); // 100% = 標準サイズ
   const [lineHeight, setLineHeight] = useState(1.8);
-  const [paragraphSpacing, setParagraphSpacing] = useState(0); // 0em = 間隔なし
+  const [paragraphSpacing, setParagraphSpacing] = useState(0.5); // 0.5em = 標準間隔
   const [textIndent, setTextIndent] = useState(1);
   const [fontFamily, setFontFamily] = useState('Noto Serif JP');
   const [charsPerLine, setCharsPerLine] = useState(40); // 0 = 制限なし（既定 40）
@@ -132,6 +132,7 @@ export default function EditorPage() {
   const [editorViewInstance, setEditorViewInstance] = useState<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [searchResults, setSearchResults] = useState<{matches: any[], searchTerm: string} | null>(null);
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
   
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
@@ -232,16 +233,26 @@ export default function EditorPage() {
     });
   }, []);
 
-    // 復元通知は5秒後に自動で閉鎖
+    // 復元通知は5秒後に fadeout アニメーション開始、アニメーション完了後に削除
     useEffect(() => {
-     if (wasAutoRecovered && !dismissedRecovery) {
-       const timer = setTimeout(() => {
-         setDismissedRecovery(true);
+     if (wasAutoRecovered && !dismissedRecovery && !recoveryExiting) {
+       // 5秒後にアニメーション開始
+       const fadeoutTimer = setTimeout(() => {
+         setRecoveryExiting(true);
        }, 5000);
        
-       return () => clearTimeout(timer);
+       return () => clearTimeout(fadeoutTimer);
      }
-   }, [wasAutoRecovered, dismissedRecovery]);
+     
+     // アニメーション中の場合、アニメーション完了後に実際に削除
+     if (recoveryExiting) {
+       const dismissTimer = setTimeout(() => {
+         setDismissedRecovery(true);
+       }, 300); // アニメーション時間に合わせる
+       
+       return () => clearTimeout(dismissTimer);
+     }
+   }, [wasAutoRecovered, dismissedRecovery, recoveryExiting]);
 
     // プレーンテキストとして貼り付け
     const handlePasteAsPlaintext = useCallback(async () => {
@@ -406,36 +417,33 @@ export default function EditorPage() {
         />
 
          {/* 自動復元の通知（Webのみ・固定表示） */}
-        {!isElectron && wasAutoRecovered && !dismissedRecovery && (
-         <div className="fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between animate-slide-in-down shadow-lg">
-           <div className="flex items-center gap-3">
-             <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
-             <p className="text-sm text-foreground">
-               <span className="font-semibold text-foreground">✓ 前回編集したファイルを復元しました：</span> <span className="font-mono text-success">{currentFile?.name}</span>
-             </p>
-           </div>
-           <button
-             onClick={() => setDismissedRecovery(true)}
-             className="text-foreground-secondary hover:text-foreground hover:bg-hover text-lg font-medium flex-shrink-0 ml-4 w-8 h-8 rounded flex items-center justify-center transition-all duration-200 hover:scale-110"
-           >
-             ✕
-           </button>
-         </div>
-       )}
+         {!isElectron && wasAutoRecovered && !dismissedRecovery && (
+          <div className={`fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between shadow-lg ${recoveryExiting ? 'animate-slide-out-up' : 'animate-slide-in-down'}`}>
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
+              <p className="text-sm text-foreground">
+                <span className="font-semibold text-foreground">✓ 前回編集したファイルを復元しました：</span> <span className="font-mono text-success">{currentFile?.name}</span>
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setRecoveryExiting(true);
+              }}
+              className="text-foreground-secondary hover:text-foreground hover:bg-hover text-lg font-medium flex-shrink-0 ml-4 w-8 h-8 rounded flex items-center justify-center transition-all duration-200 hover:scale-110"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
        <div className="flex-1 flex overflow-hidden">
          {/* Activity Bar */}
          <ActivityBar activeView={activeView} onViewChange={setActiveView} />
          
-          {/* 左サイドパネル */}
-         {activeView !== "none" && (
-           <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
-             {activeView === "projects" && (
-               <div className="h-full bg-background border-r border-border">
-                 <ProjectsPanel />
-               </div>
-             )}
-             {activeView === "explorer" && (
+           {/* 左サイドパネル */}
+          {activeView !== "none" && (
+            <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
+              {activeView === "explorer" && (
               <Explorer 
                 content={content} 
                 onChapterClick={handleChapterClick} 
@@ -525,7 +533,15 @@ export default function EditorPage() {
          </main>
          
           {/* 右サイドパネル：統計情報（常に表示） */}
-          <ResizablePanel side="right" defaultWidth={256} minWidth={200} maxWidth={400}>
+          <ResizablePanel 
+            side="right" 
+            defaultWidth={256} 
+            minWidth={200} 
+            maxWidth={400}
+            collapsible={true}
+            isCollapsed={isRightPanelCollapsed}
+            onToggleCollapse={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
+          >
           <Inspector
             wordCount={wordCount}
             charCount={charCount}

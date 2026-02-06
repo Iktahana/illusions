@@ -1,19 +1,17 @@
 "use client";
 
 import { useState, useRef, useEffect, ReactNode } from "react";
-import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, X, History } from "lucide-react";
+import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, X } from "lucide-react";
 import clsx from "clsx";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
 import ColorPicker from "./ColorPicker";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
-import { VersionHistoryPanel } from "@/components/github";
-import { useProjects } from "@/lib/hooks/use-projects";
 
-type Tab = "ai" | "corrections" | "stats" | "versions";
+type Tab = "ai" | "corrections" | "stats";
 
 const rightTabStorageKey = "illusions:rightTab";
 const isValidTab = (value: string | null): value is Tab =>
-  value === "ai" || value === "corrections" || value === "stats" || value === "versions";
+  value === "ai" || value === "corrections" || value === "stats";
 
 const readStoredTab = (): Tab | null => {
   if (typeof window === "undefined") return null;
@@ -135,8 +133,12 @@ export default function Inspector({
           return;
         }
         const appState = await fetchAppState();
-        if (mounted && isValidTab(appState?.inspectorTab ?? null)) {
-          setActiveTab(appState?.inspectorTab ?? "ai");
+        // If the stored tab is "versions", reset to "ai" since we removed that tab
+        const savedTab = appState?.inspectorTab;
+        if (mounted && savedTab && isValidTab(savedTab)) {
+          setActiveTab(savedTab);
+        } else if (mounted) {
+          setActiveTab("ai");
         }
       } catch (error) {
         console.error("右サイドのタブ状態を読み込めませんでした:", error);
@@ -415,22 +417,11 @@ export default function Inspector({
           <BarChart3 className="w-4 h-4" />
           統計
         </button>
-        <button
-          onClick={() => setActiveTab("versions")}
-          className={clsx(
-            "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
-            activeTab === "versions"
-              ? "text-foreground border-b-2 border-accent"
-              : "text-foreground-tertiary hover:text-foreground-secondary"
-          )}
-        >
-          <History className="w-4 h-4" />
-          履歴
-        </button>
+
       </div>
 
        {/* 本文 */}
-       <div className={clsx("flex-1 overflow-y-auto", activeTab !== "versions" && "p-4")}>
+       <div className="flex-1 overflow-y-auto p-4">
          {activeTab === "ai" && <AIPanel />}
          {activeTab === "corrections" && (
            <CorrectionsPanel 
@@ -454,7 +445,6 @@ export default function Inspector({
              particleAnalysis={particleAnalysis}
            />
          )}
-         {activeTab === "versions" && <VersionsPanel />}
        </div>
     </aside>
   );
@@ -1268,33 +1258,4 @@ function StatsPanel({
    );
 }
 
-// Versions Panel - shows Git history for GitHub projects
-function VersionsPanel() {
-  const { currentProject } = useProjects();
 
-  if (!currentProject) {
-    return (
-      <div className="p-8 text-center text-foreground-secondary">
-        <History size={48} className="mx-auto opacity-50 mb-3" />
-        <div className="text-sm">プロジェクトが選択されていません</div>
-      </div>
-    );
-  }
-
-  if (currentProject.type !== "github") {
-    return (
-      <div className="p-8 text-center text-foreground-secondary space-y-3">
-        <History size={48} className="mx-auto opacity-50" />
-        <div>
-          <div className="text-sm font-medium mb-1">バージョン履歴は GitHub プロジェクトでのみ利用可能です</div>
-          <div className="text-xs">
-            このプロジェクトを GitHub にアップロードすると、<br />
-            バージョン管理機能が利用できます
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return <VersionHistoryPanel projectId={currentProject.id} currentContent="" />;
-}
