@@ -2,6 +2,7 @@
 
 import type { StorageSession, AppState, RecentFile, EditorBuffer } from "@/lib/storage-types";
 import type { Token, WordEntry, TokenizeProgress } from "@/lib/nlp-client/types";
+import type { VFSWatchEvent } from "@/lib/vfs/types";
 
 export {}
 
@@ -26,6 +27,32 @@ declare global {
     onMenuOpen?: (callback: () => void) => (() => void) | void;
     onMenuSave?: (callback: () => void) => (() => void) | void;
     onMenuSaveAs?: (callback: () => void) => (() => void) | void;
+    /** Virtual File System IPC bridge */
+    vfs?: {
+      /** Open a native directory picker dialog */
+      openDirectory: () => Promise<{ path: string; name: string } | null>;
+      /** Read file content as UTF-8 text */
+      readFile: (filePath: string) => Promise<string>;
+      /** Write UTF-8 text content to a file */
+      writeFile: (filePath: string, content: string) => Promise<void>;
+      /** Read directory entries */
+      readDirectory: (
+        dirPath: string
+      ) => Promise<Array<{ name: string; kind: "file" | "directory" }>>;
+      /** Get file stats */
+      stat: (
+        filePath: string
+      ) => Promise<{ size: number; lastModified: number; type: string }>;
+      /** Create a directory (recursive) */
+      mkdir: (dirPath: string) => Promise<void>;
+      /** Delete a file or directory */
+      delete: (targetPath: string, options?: { recursive?: boolean }) => Promise<void>;
+      /** Watch a file for changes (optional) */
+      watch?: (
+        filePath: string,
+        callback: (event: VFSWatchEvent) => void
+      ) => { stop: () => void };
+    };
     storage?: {
       saveSession: (session: StorageSession) => Promise<void>;
       loadSession: () => Promise<StorageSession | null>;
