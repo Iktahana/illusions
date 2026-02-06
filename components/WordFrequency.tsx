@@ -4,46 +4,14 @@ import { useState, useEffect, useMemo } from "react";
 import { RefreshCw } from "lucide-react";
 import clsx from "clsx";
 
-// CDN tokenizer を使用
-import { cdnTokenizer } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/tokenizer-cdn";
-import type { Token } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/types";
+// Use NLP client abstraction
+import { getNlpClient } from "@/lib/nlp-client/nlp-client";
+import type { WordEntry } from "@/lib/nlp-client/types";
 
 interface WordFrequencyProps {
   /** エディタのテキストコンテンツ */
   content: string;
 }
-
-interface WordEntry {
-  word: string;
-  reading?: string;
-  pos: string;
-  count: number;
-}
-
-// 除外する品詞（助詞、助動詞、記号など）
-const EXCLUDED_POS = new Set([
-  "助詞",
-  "助動詞", 
-  "記号",
-  "フィラー",
-  "その他",
-]);
-
-// 除外する品詞詳細
-const EXCLUDED_POS_DETAILS = new Set([
-  "非自立",      // 動詞・形容詞の非自立
-  "接尾",        // 名詞の接尾
-  "数",          // 数詞
-  "代名詞",      // 代名詞
-  "句点",        // 。
-  "読点",        // 、
-  "空白",        // スペース
-  "括弧開",      // 「（
-  "括弧閉",      // 」）
-]);
-
-// 除外する文字パターン（記号・句読点など）
-const EXCLUDED_CHARS_PATTERN = /^[。、！？!?「」『』（）()【】［］\[\]・…―－ー〜～：；:;，,．.　\s]+$/;
 
 export default function WordFrequency({ content }: WordFrequencyProps) {
   const [words, setWords] = useState<WordEntry[]>([]);
@@ -70,47 +38,12 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
     setError(null);
 
     try {
-      const tokens = await cdnTokenizer.tokenize(content);
+      const nlpClient = getNlpClient();
       
-      // 単語をカウント
-      const wordMap = new Map<string, WordEntry>();
+      // Use backend word frequency analysis
+      const wordEntries = await nlpClient.analyzeWordFrequency(content);
       
-      for (const token of tokens) {
-        // 除外品詞をスキップ
-        if (EXCLUDED_POS.has(token.pos)) continue;
-        
-        // 除外品詞詳細をスキップ
-        if (token.pos_detail_1 && EXCLUDED_POS_DETAILS.has(token.pos_detail_1)) continue;
-        
-        // 空白や改行をスキップ
-        if (!token.surface.trim()) continue;
-        
-        // 記号・句読点パターンをスキップ
-        if (EXCLUDED_CHARS_PATTERN.test(token.surface)) continue;
-        
-        // 基本形をキーとして使用（なければ表層形）
-        const key = token.basic_form && token.basic_form !== "*" 
-          ? token.basic_form 
-          : token.surface;
-        
-        const existing = wordMap.get(key);
-        if (existing) {
-          existing.count++;
-        } else {
-          wordMap.set(key, {
-            word: key,
-            reading: token.reading !== "*" ? token.reading : undefined,
-            pos: token.pos,
-            count: 1,
-          });
-        }
-      }
-      
-      // カウント順にソート
-      const sorted = Array.from(wordMap.values())
-        .sort((a, b) => b.count - a.count);
-      
-      setWords(sorted);
+      setWords(wordEntries);
       setLastAnalyzedContent(content);
       setCacheTimestamp(Date.now());
     } catch (err) {

@@ -9,16 +9,12 @@ import { Plugin, PluginKey } from '@milkdown/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/prose/view';
 import type { Node as ProseMirrorNode } from '@milkdown/prose/model';
 import type { EditorView } from '@milkdown/prose/view';
-import { electronTokenizer } from './tokenizer-electron';
-import { cdnTokenizer } from './tokenizer-cdn';
-import { isElectron } from './env-utils';
+import { getNlpClient } from '@/lib/nlp-client/nlp-client';
+import type { TokenizeProgress } from '@/lib/nlp-client/types';
 import { getPosColor, DEFAULT_POS_COLORS } from './pos-colors';
-import type { Token, PosColorConfig, InitProgressCallback } from './types';
+import type { Token, PosColorConfig } from './types';
 
 export const posHighlightKey = new PluginKey('posHighlight');
-
-// 環境に応じて tokenizer を選択
-const getTokenizer = () => isElectron() ? electronTokenizer : cdnTokenizer;
 
 interface PosHighlightState {
   decorations: DecorationSet;
@@ -74,10 +70,10 @@ async function processParagraph(
   debug: boolean = false
 ): Promise<Decoration[]> {
   const decorations: Decoration[] = [];
-  const tokenizer = getTokenizer();
+  const nlpClient = getNlpClient();
   
   try {
-    const tokens = await tokenizer.tokenize(paragraph.text);
+    const tokens = await nlpClient.tokenizeParagraph(paragraph.text);
     
     // Debug log
     if (debug && tokens.length > 0) {
@@ -204,106 +200,67 @@ export function createPosHighlightPlugin(
           const state = posHighlightKey.getState(view.state);
           if (!state?.enabled) return;
           
-          // 動的に notificationManager を import
-          let notificationManager: any;
-          try {
-            const module = await import('../../../lib/notification-manager');
-            notificationManager = module.notificationManager;
-          } catch (err) {
-            console.warn('[PosHighlight] Failed to load notification manager:', err);
-          }
-          
-          // トークナイザーを取得して初期化状態を確認
-          const tokenizer = getTokenizer();
-          
-          // 初期化が必要な場合は進度通知を表示
-          let notificationId: string | undefined;
-          
-          // 初期化進度コールバック
-          const progressCallback: InitProgressCallback = {
-            onProgress: (progress, message) => {
-              if (notificationManager) {
-                if (!notificationId) {
-                  notificationId = notificationManager.showProgress('構文ハイライト初期化中...', {
-                    progress: 0,
-                    type: 'info'
-                  });
-                }
-                notificationManager.updateProgress(notificationId, progress, message);
-              }
-              console.log(`[PosHighlight] Init progress: ${progress}% - ${message}`);
-            },
-            onComplete: () => {
-              console.log('[PosHighlight] Tokenizer initialized successfully');
-            },
-            onError: (error) => {
-              console.error('[PosHighlight] Tokenizer initialization failed:', error);
-              if (notificationManager && notificationId) {
-                notificationManager.dismiss(notificationId);
-              }
-              if (notificationManager) {
-                notificationManager.error('構文ハイライト初期化失敗: ' + error.message);
-              }
-            }
-          };
-          
-          // 初期化を確実に完了させる
-          try {
-            await tokenizer.init('/dict', progressCallback);
-          } catch (err) {
-            console.error('[PosHighlight] Failed to initialize tokenizer:', err);
-            return;
-          }
-          
+          const nlpClient = getNlpClient();
           const paragraphs = collectParagraphs(view.state.doc);
-          const allDecorations: Decoration[] = [];
           
           console.log(`[PosHighlight] Processing ${paragraphs.length} paragraphs...`);
           
-          // バッチサイズを定義（一度に処理する段落数）
-          const BATCH_SIZE = 10;
-          
-          // 段落をバッチで処理（並列ではなく順次で安定性を確保）
-          for (let i = 0; i < paragraphs.length; i++) {
-            // バージョンチェック（新しい更新があればキャンセル）
+          // Use batch API for better performance
+          try {
+            const paragraphData = paragraphs.map(p => ({ pos: p.pos, text: p.text }));
+            
+            const results = await nlpClient.tokenizeDocument(paragraphData, (progress: TokenizeProgress) => {
+              if (paragraphs.length > 20) {
+                console.log(`[PosHighlight] Progress: ${progress.percentage}% (${progress.completed}/${progress.total})`);
+              }
+            });
+            
+            // Version check (cancel if new update)
             if (version !== processingVersion) {
               console.log('[PosHighlight] Processing cancelled (new update)');
               return;
             }
             
-            const paragraph = paragraphs[i];
-            const decorations = await processParagraph(
-              paragraph, 
-              state.colors,
-              i < 3  // 最初の3段落だけデバッグ出力
-            );
+            // Convert results to decorations
+            const allDecorations: Decoration[] = [];
             
-            allDecorations.push(...decorations);
-            
-            // バッチごとまたは最後の段落で UI を更新
-            const isLastInBatch = (i + 1) % BATCH_SIZE === 0;
-            const isLastParagraph = i === paragraphs.length - 1;
-            
-            if ((isLastInBatch || isLastParagraph) && allDecorations.length > 0) {
-              const currentDecorations = DecorationSet.create(
-                view.state.doc,
-                allDecorations
-              );
+            for (const result of results) {
+              const paragraph = paragraphs.find(p => p.pos === result.pos);
+              if (!paragraph) continue;
               
-              const tr = view.state.tr.setMeta(posHighlightKey, {
-                decorations: currentDecorations,
-              });
-              view.dispatch(tr);
-              
-              // 進捗ログ
-              if (paragraphs.length > 20) {
-                const progress = Math.round(((i + 1) / paragraphs.length) * 100);
-                console.log(`[PosHighlight] Progress: ${progress}% (${i + 1}/${paragraphs.length})`);
+              for (const token of result.tokens) {
+                const color = getPosColor(
+                  token.pos,
+                  token.pos_detail_1,
+                  { ...DEFAULT_POS_COLORS, ...state.colors }
+                );
+                
+                if (color) {
+                  const from = paragraph.pos + 1 + token.start;
+                  const to = paragraph.pos + 1 + token.end;
+                  
+                  allDecorations.push(
+                    Decoration.inline(from, to, {
+                      style: `color: ${color}`,
+                      class: `pos-${token.pos}`,
+                    })
+                  );
+                }
               }
             }
+            
+            // Update UI with all decorations
+            if (allDecorations.length > 0) {
+              const decorations = DecorationSet.create(view.state.doc, allDecorations);
+              const tr = view.state.tr.setMeta(posHighlightKey, { decorations });
+              view.dispatch(tr);
+            }
+            
+            console.log(`[PosHighlight] Completed: ${allDecorations.length} decorations`);
+            
+          } catch (err) {
+            console.error('[PosHighlight] Tokenization failed:', err);
           }
-          
-          console.log(`[PosHighlight] Completed: ${allDecorations.length} decorations`);
         }, debounceMs);
       }
       

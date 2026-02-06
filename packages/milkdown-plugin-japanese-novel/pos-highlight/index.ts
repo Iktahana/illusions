@@ -5,9 +5,6 @@
 
 import { $prose } from '@milkdown/utils';
 import { createPosHighlightPlugin, posHighlightKey } from './decoration-plugin';
-import { electronTokenizer } from './tokenizer-electron';
-import { cdnTokenizer } from './tokenizer-cdn';
-import { isElectron } from './env-utils';
 import { DEFAULT_POS_COLORS } from './pos-colors';
 import type { EditorView } from '@milkdown/prose/view';
 import type { PosColorConfig, PosHighlightSettings } from './types';
@@ -38,23 +35,12 @@ export function posHighlight(options: PosHighlightOptions = {}) {
   const {
     enabled = false,
     colors = DEFAULT_POS_COLORS,
-    dicPath = '/dict',
     debounceMs = 300,
   } = options;
   
-  // トークナイザーを事前初期化（有効な場合のみ）
-  // 環境に応じて適切な tokenizer を選択
-  // 注意: 初期化は tokenizer 内部で管理され、重複初期化は防がれる
-  if (enabled) {
-    const tokenizer = isElectron() ? electronTokenizer : cdnTokenizer;
-    
-    console.log(`[PosHighlight] Pre-initializing ${isElectron() ? 'Electron' : 'CDN'} tokenizer`);
-    
-    // 非同期で初期化（バックグラウンドで実行）
-    tokenizer.init(dicPath).catch((err: Error) => {
-      console.error('[PosHighlight] Failed to initialize tokenizer:', err);
-    });
-  }
+  // Note: NLP client initialization is now handled automatically
+  // on first use by getNlpClient() factory function
+  console.log('[PosHighlight] Plugin initialized with NLP client abstraction');
   
   return $prose(() => createPosHighlightPlugin({
     enabled,

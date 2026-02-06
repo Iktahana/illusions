@@ -47,4 +47,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu-paste-as-plaintext', handler)
     return () => ipcRenderer.removeListener('menu-paste-as-plaintext', handler)
   },
+  nlp: {
+    init: (dicPath) => ipcRenderer.invoke('nlp:init', dicPath),
+    tokenizeParagraph: (text) => ipcRenderer.invoke('nlp:tokenize-paragraph', text),
+    tokenizeDocument: (paragraphs, onProgress) => {
+      // Register progress listener if callback provided
+      if (onProgress) {
+        const handler = (event, progress) => onProgress(progress);
+        ipcRenderer.on('nlp:tokenize-progress', handler);
+        
+        // Auto-cleanup after 60 seconds
+        setTimeout(() => {
+          ipcRenderer.removeListener('nlp:tokenize-progress', handler);
+        }, 60000);
+      }
+      
+      return ipcRenderer.invoke('nlp:tokenize-document', { paragraphs });
+    },
+    analyzeWordFrequency: (text) => ipcRenderer.invoke('nlp:analyze-word-frequency', text),
+  },
 })

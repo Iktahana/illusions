@@ -9,6 +9,7 @@ const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { autoUpdater } = require('electron-updater')
 const log = require('electron-log')
+const { registerNlpHandlers } = require('./nlp-service/nlp-ipc-handlers')
 
 const execFileAsync = promisify(execFile)
 
@@ -477,6 +478,9 @@ ipcMain.handle('open-dictionary-popup', (_event, url, title) => {
 app.whenReady().then(() => {
   createMainWindow()
   installQuickLookPluginIfNeeded()
+
+  // Register NLP IPC handlers
+  registerNlpHandlers()
 
   // ウィンドウ作成後に auto-updater を初期化
   setupAutoUpdater()

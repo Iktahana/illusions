@@ -1,6 +1,7 @@
 // Electron preload API の型定義
 
 import type { StorageSession, AppState, RecentFile, EditorBuffer } from "@/lib/storage-types";
+import type { Token, WordEntry, TokenizeProgress } from "@/lib/nlp-client/types";
 
 export {}
 
@@ -38,6 +39,38 @@ declare global {
       loadEditorBuffer: () => Promise<EditorBuffer | null>;
       clearEditorBuffer: () => Promise<void>;
       clearAll: () => Promise<void>;
+    };
+    nlp?: {
+      /**
+       * Initialize NLP service (kuromoji tokenizer)
+       * @param dicPath - Dictionary path (e.g., '/dict')
+       */
+      init: (dicPath: string) => Promise<{ success: boolean }>;
+      
+      /**
+       * Tokenize a single paragraph
+       * @param text - Paragraph text
+       * @returns Token array
+       */
+      tokenizeParagraph: (text: string) => Promise<Token[]>;
+      
+      /**
+       * Tokenize multiple paragraphs in batch
+       * @param paragraphs - Array of {pos, text} objects
+       * @param onProgress - Optional progress callback
+       * @returns Array of {pos, tokens} results
+       */
+      tokenizeDocument: (
+        paragraphs: Array<{ pos: number; text: string }>,
+        onProgress?: (progress: TokenizeProgress) => void
+      ) => Promise<Array<{ pos: number; tokens: Token[] }>>;
+      
+      /**
+       * Analyze word frequency in text
+       * @param text - Full document text
+       * @returns Sorted word entries with counts
+       */
+      analyzeWordFrequency: (text: string) => Promise<WordEntry[]>;
     };
   }
 
