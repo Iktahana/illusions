@@ -9,8 +9,7 @@ import {
   FileText,
   RefreshCw,
   X,
-  Check,
-  Github
+  Check
 } from "lucide-react";
 import clsx from "clsx";
 import { parseMarkdownChapters, getChaptersFromDOM, type Chapter } from "@/lib/utils";
@@ -24,9 +23,7 @@ import {
   type FontInfo,
   type SystemFontInfo,
 } from "@/lib/fonts";
-import { GitHubAuthPanel } from "@/components/github";
-
-type Tab = "chapters" | "settings" | "style" | "github";
+type Tab = "chapters" | "settings" | "style";
 
 const formattingMarkers = ["**", "__", "~~", "*", "_", "`", "["];
 
@@ -210,7 +207,7 @@ export default function Explorer({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const savedTab = window.localStorage.getItem("illusions:leftTab");
-    if (savedTab === "chapters" || savedTab === "settings" || savedTab === "style" || savedTab === "github") {
+    if (savedTab === "chapters" || savedTab === "settings" || savedTab === "style") {
       setActiveTab(savedTab);
     }
   }, []);
@@ -260,18 +257,6 @@ export default function Explorer({
           <Palette className="w-4 h-4" />
           段落
         </button>
-        <button
-          onClick={() => setActiveTab("github")}
-          className={clsx(
-            "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
-            activeTab === "github"
-              ? "text-foreground border-b-2 border-accent"
-              : "text-foreground hover:text-foreground"
-          )}
-        >
-          <Github className="w-4 h-4" />
-          GitHub
-        </button>
       </div>
 
       {/* 内容 */}
@@ -298,7 +283,6 @@ export default function Explorer({
             />
           </div>
         )}
-        {activeTab === "github" && <GitHubAuthPanel />}
       </div>
     </aside>
   );
