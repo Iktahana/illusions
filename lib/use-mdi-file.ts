@@ -76,6 +76,7 @@ export function useMdiFile(): UseMdiFileReturn {
   const [wasAutoRecovered, setWasAutoRecovered] = useState(false);
 
   const contentRef = useRef<string>(content);
+  const isSavingRef = useRef(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const systemFileOpenHandlerRef = useRef<((path: string, content: string) => void) | null>(null);
 
@@ -255,8 +256,9 @@ export function useMdiFile(): UseMdiFileReturn {
   }, [isElectron, persistLastOpenedPath]);
 
   const saveFile = useCallback(async () => {
-    if (isSaving) return;
+    if (isSavingRef.current) return;
 
+    isSavingRef.current = true;
     setIsSaving(true);
     try {
       const result = await saveMdiFile({
@@ -269,7 +271,7 @@ export function useMdiFile(): UseMdiFileReturn {
         setCurrentFile(descriptor);
         setLastSavedContent(contentRef.current);
         setLastSavedTime(Date.now());
-        
+
         // 最後に開いたファイルの参照（パス/ハンドル）を保存する
         try {
           if (isElectron && descriptor.path) {
@@ -290,9 +292,10 @@ export function useMdiFile(): UseMdiFileReturn {
     } catch (error) {
       console.error("保存に失敗しました:", error);
     } finally {
+      isSavingRef.current = false;
       setIsSaving(false);
     }
-  }, [currentFile, isElectron, isSaving, persistLastOpenedPath]);
+  }, [currentFile, isElectron, persistLastOpenedPath]);
 
   // Dirty かつファイル選択中なら、一定間隔で自動保存する
   useEffect(() => {
