@@ -6,29 +6,27 @@ Complete documentation for the Illusions Japanese novel editor.
 
 ## 📚 Table of Contents
 
-### Getting Started
-- **[Quick Start Guide](guides/QUICKSTART.md)** - Get up and running in 5 minutes
-
-### Architecture
+### Architecture & Systems
 - **[Storage System](STORAGE.md)** - Storage architecture and API reference
 - **[NLP Backend](architecture/nlp-backend-architecture.md)** - Japanese text processing system
 - **[Notification System](architecture/notification-system.md)** - Toast notification API
 
 ### Development Guides
 - **[Theme Colors](guides/THEME_COLORS.md)** - Theming system and color variables
+- **[Claude Code Review Setup](setup/CLAUDE_REVIEW_SETUP.md)** - Configure automated PR reviews
 
 ---
 
 ## 🚀 Quick Links
 
 ### For Users
-- [Quick Start Guide](guides/QUICKSTART.md)
-- Main README: [../README.md](../README.md)
+- Main README: [../README.md](../README.md) - Features, installation, and setup
 
 ### For Developers
 - [Storage API Reference](STORAGE.md)
 - [NLP Backend Architecture](architecture/nlp-backend-architecture.md)
 - [Code Review Standards](../CLAUDE.md)
+- [GitHub Actions Setup](setup/CLAUDE_REVIEW_SETUP.md)
 
 ---
 
@@ -41,9 +39,10 @@ docs/
 ├── architecture/                          # System architecture
 │   ├── nlp-backend-architecture.md        # NLP processing
 │   └── notification-system.md             # Notification API
-└── guides/                                # User & developer guides
-    ├── QUICKSTART.md                      # Getting started
-    └── THEME_COLORS.md                    # Theming guide
+├── guides/                                # Development guides
+│   └── THEME_COLORS.md                    # Theming system
+└── setup/                                 # Setup and configuration
+    └── CLAUDE_REVIEW_SETUP.md             # Claude Code Review configuration
 ```
 
 ---
@@ -53,7 +52,7 @@ docs/
 ### I want to...
 
 **Get started with the project**
-→ Read [Quick Start Guide](guides/QUICKSTART.md)
+→ Read [Main README](../README.md)
 
 **Understand how storage works**
 → Read [Storage Documentation](STORAGE.md)
@@ -66,6 +65,9 @@ docs/
 
 **Customize the theme**
 → Read [Theme Colors Guide](guides/THEME_COLORS.md)
+
+**Set up automated PR reviews**
+→ Read [Claude Code Review Setup](setup/CLAUDE_REVIEW_SETUP.md)
 
 **Contribute code**
 → Read [Code Review Standards](../CLAUDE.md)
