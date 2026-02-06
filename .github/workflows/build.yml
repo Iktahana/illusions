@@ -1,4 +1,3 @@
-name: Build and Release Electron App
 name: Desktop Build and Release
 
 on:
