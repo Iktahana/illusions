@@ -133,6 +133,8 @@ git commit -m "style: adjust paragraph spacing in stats dashboard"
 - Comments (inline, block, JSDoc)
 - Documentation (README, specs)
 - Commit messages
+- **GitHub Issues** (titles and descriptions)
+- **Pull Requests** (titles and descriptions)
 - UI strings (buttons, menus, dialogs)
 
 ### Rule 4: Storage Service (MANDATORY)
@@ -210,7 +212,7 @@ docs/ (technical documentation only)
 - Working directly on main branch for new features
 - Not checking for old branches/directories before starting
 - Atomic commit violations
-- Language policy violations (Chinese/Korean in code)
+- Language policy violations (Chinese/Korean in code/commits/issues/PRs)
 - Security vulnerabilities
 - Missing Japanese in UI
 
@@ -244,7 +246,7 @@ docs/ (technical documentation only)
 3. ❌ Not cleaning up after merge
 4. ❌ Using `git add .`
 5. ❌ Grouping unrelated changes
-6. ❌ Using Chinese/Korean in code
+6. ❌ Using Chinese/Korean in code/commits/issues/PRs
 7. ❌ Not translating UI to Japanese
 8. ❌ Implementing custom storage logic
 9. ❌ Using `any` type excessively
@@ -286,9 +288,12 @@ import { getStorageService } from "@/lib/storage-service";
 
 ---
 
-**Version**: 2.1.0  
+**Version**: 2.1.1  
 **Last Updated**: 2026-02-06  
 **Status**: ✅ Active - All AI agents must follow
+**Changes in 2.1.1**:
+- Clarified language policy applies to GitHub Issues and Pull Requests
+- Added requirement: Issue/PR titles and descriptions must be English or Japanese only
 **Changes in 2.1.0**:
 - Added Branch & Directory Management as CRITICAL rule
 - Added pre-work branch/directory checks

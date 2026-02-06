@@ -210,14 +210,17 @@ rm -rf work-new-ui/
 - **English**: Preferred for code logic (variables, functions, types, comments)
 - **Japanese (日本語)**: Required for UI strings, allowed for comments and user-facing documentation
 
-### Where This Policy Applies (Code/Documentation):
+### Where This Policy Applies (Code/Documentation/Git):
 - ✅ Code logic: Variable names, function names, class names
 - ✅ Code comments: All inline comments and block comments in source files
 - ✅ Documentation files: README, API docs, technical specs
 - ✅ String literals: UI text, error messages, log messages
 - ✅ JSDoc: Function documentation and type annotations
 - ✅ Configuration: Config files, JSON data, YAML files
-- ✅ **Commit messages**: Git commit messages and PR descriptions (English or Japanese ONLY)
+- ✅ **Git commit messages**: English or Japanese ONLY
+- ✅ **GitHub Issues**: Issue titles and descriptions (English or Japanese ONLY)
+- ✅ **Pull Requests**: PR titles and descriptions (English or Japanese ONLY)
+- ✅ **Code Review Comments**: English or Japanese ONLY
 
 ### ✅ ALLOWED in AI Conversations & Planning:
 - AI assistant responses (可以用中文回复用户)
@@ -604,9 +607,12 @@ grep -r "[\uac00-\ud7af]" src/  # Korean check
 
 ---
 
-**Version**: 2.1.0  
+**Version**: 2.1.1  
 **Last Updated**: 2026-02-06  
 **Status**: ✅ Production - All AI agents must follow these rules
+**Changes in 2.1.1**:
+- Clarified language policy applies to GitHub Issues and Pull Requests
+- Added requirement: Issue/PR titles and descriptions must be English or Japanese only
 **Changes in 2.1.0**:
 - Added Branch & Directory Management rule (CRITICAL)
 - Added pre-work checklist for old branches/directories

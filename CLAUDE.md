@@ -94,7 +94,7 @@ When reviewing PRs, structure findings as follows:
   - Grouping unrelated changes in one commit
   - Missing or incorrect Conventional Commits format
 - **Language Violations**: 
-  - Chinese, Korean, or other prohibited languages in code/comments/commits
+  - Chinese, Korean, or other prohibited languages in code/comments/commits/issues/PRs
   - Missing Japanese in user-facing UI
 - **Security Vulnerabilities**: 
   - Hardcoded credentials
@@ -128,7 +128,8 @@ For every PR, verify:
 - [ ] **Atomic Commits**: Each commit represents a single logical change
 - [ ] **Commit Messages**: All commits use Conventional Commits format
 - [ ] **No `git add .`**: Files are staged individually or in logical groups
-- [ ] **Language Policy**: No Chinese, Korean, or other prohibited languages in code/comments/strings/commits
+- [ ] **Language Policy**: No Chinese, Korean, or other prohibited languages in code/comments/strings/commits/issues/PRs
+- [ ] **GitHub Communication**: Issue/PR titles and descriptions are in English or Japanese only
 - [ ] **UI Language**: All user-facing text is in Japanese
 
 ### High Priority Checks
@@ -232,6 +233,7 @@ Before reviewing ANY PR, read the current `.cursorrules` file to understand all 
 1. Scan all code changes for prohibited languages
 2. Verify UI text is in Japanese
 3. Check commit messages are in English or Japanese
+4. Check Issue/PR titles and descriptions are in English or Japanese
 
 ### Step 4: Verify Project Standards
 1. TypeScript types are proper
@@ -289,7 +291,7 @@ When reviewing, you can reference:
 
 **Immediate Block (🚫) - Do not approve until fixed:**
 1. Commits violate atomic commit principle
-2. Chinese or Korean text in code/comments/commits
+2. Chinese or Korean text in code/comments/commits/issues/PRs
 3. Security vulnerabilities
 4. Missing Japanese in user-facing UI
 
@@ -309,6 +311,9 @@ When reviewing, you can reference:
 
 **Note**: This document should evolve with the project. Update standards as new patterns emerge or requirements change.
 
-**Version**: 2.1.0  
+**Version**: 2.1.1  
 **Last Updated**: 2026-02-06  
+**Changes in 2.1.1**: 
+- Clarified language policy applies to Issues and PRs
+- Added GitHub communication checks
 **Changes in 2.1.0**: Added branch management requirements
