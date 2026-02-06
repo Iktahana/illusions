@@ -146,7 +146,7 @@ export default function WelcomeScreen({
                 className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
               >
                 <Download className="h-5 w-5" />
-                illusionsをダウンロード
+                デスクトップ版をダウンロード
               </a>
             </div>
           </div>
