@@ -2,6 +2,7 @@
 
 import "./globals.css";
 import { ThemeProvider } from "../contexts/ThemeContext";
+import { EditorModeProvider } from "../contexts/EditorModeContext";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 
@@ -41,7 +42,9 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <EditorModeProvider>{children}</EditorModeProvider>
+        </ThemeProvider>
         <SpeedInsights />
         <Analytics />
       </body>
