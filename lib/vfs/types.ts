@@ -178,4 +178,7 @@ export interface VirtualFileSystem {
 
   /** Get the root directory path as a string (Electron only). */
   getRootPath?(): string | null;
+
+  /** Check whether a root directory has been opened. */
+  isRootOpen(): boolean;
 }

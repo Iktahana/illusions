@@ -7,6 +7,7 @@ import { getStorageService } from "./storage-service";
 import { persistAppState } from "./app-state-manager";
 import { getRandomIllusionStory } from "./illusion-stories";
 import { getHistoryService } from "./history-service";
+import { getVFS } from "./vfs";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 
 const AUTO_SAVE_INTERVAL = 2000; // 2秒
@@ -104,6 +105,8 @@ export function useMdiFile(): UseMdiFileReturn {
    */
   const tryAutoSnapshot = useCallback(async (sourceFileName: string, savedContent: string) => {
     if (!isProject) return;
+    // VFS root may not be opened yet (e.g., permission not restored after reload)
+    if (!getVFS().isRootOpen()) return;
     try {
       const historyService = getHistoryService();
       const shouldCreate = await historyService.shouldCreateSnapshot(sourceFileName);

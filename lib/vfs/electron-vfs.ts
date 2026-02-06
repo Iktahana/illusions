@@ -395,6 +395,10 @@ export class ElectronVFS implements VirtualFileSystem {
     return this.rootPath;
   }
 
+  isRootOpen(): boolean {
+    return this.rootPath !== null;
+  }
+
   /**
    * Resolve a path to an absolute path.
    * If the path is already absolute (starts with "/"), return it as-is.

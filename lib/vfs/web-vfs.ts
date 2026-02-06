@@ -389,6 +389,10 @@ export class WebVFS implements VirtualFileSystem {
     return null;
   }
 
+  isRootOpen(): boolean {
+    return this.rootHandle !== null;
+  }
+
   /**
    * Ensure the root directory handle has been set via openDirectory().
    * @throws Error if no root directory is available
