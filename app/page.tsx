@@ -110,6 +110,8 @@ export default function EditorPage() {
   const standalonePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const standaloneLastModifiedRef = useRef<number>(0);
 
+  const isElectron = typeof window !== "undefined" && isElectronRenderer();
+
   // 未保存警告の Hook を初期化
   const unsavedWarning = useUnsavedWarning(
     isDirty,
@@ -133,12 +135,13 @@ export default function EditorPage() {
 
   /**
    * Start/stop file watcher when currentFile or editorMode changes.
-   * Project mode: use createFileWatcher with VFS path.
-   * Standalone mode: poll via FileSystemFileHandle.getFile() directly.
+   * Polls FileSystemFileHandle.getFile() every 5 seconds and compares
+   * lastModified to detect external changes. Works for both project mode
+   * (mainFileHandle) and standalone mode (fileHandle).
    *
    * ファイルまたはエディタモードが変わったら監視を開始/停止する。
-   * プロジェクトモード: VFSパスで createFileWatcher を使用。
-   * スタンドアロンモード: FileSystemFileHandle.getFile() で直接ポーリング。
+   * FileSystemFileHandle.getFile() を5秒ごとにポーリングし、
+   * lastModified を比較して外部変更を検出する。
    */
   useEffect(() => {
     // Clean up any previous watcher / polling
@@ -156,83 +159,95 @@ export default function EditorPage() {
       return;
     }
 
-    // Project mode: use VFS-based FileWatcher
-    if (isProjectMode(editorMode) && currentFile.path) {
-      // Use the main file name relative to VFS root
-      const relativePath = editorMode.metadata.mainFile;
-      const watcher = createFileWatcher({
-        path: relativePath,
-        onChanged: (newContent: string) => {
-          // Only show conflict if content actually differs from editor
-          if (newContent !== contentRef.current) {
-            setConflictData({
-              fileName: currentFile.name,
-              lastModified: Date.now(),
-              content: newContent,
-            });
-            setShowFileConflict(true);
-          }
-        },
-      });
-      fileWatcherRef.current = watcher;
-      watcher.start();
+    // Determine the FileSystemFileHandle to poll.
+    // Project mode: use mainFileHandle. Standalone mode: use fileHandle.
+    // Electron mode: use VFS-based watcher with absolute path instead.
+    let fileHandle: FileSystemFileHandle | null = null;
+    if (isProjectMode(editorMode)) {
+      // Electron: use VFS-based watcher (works with absolute path)
+      if (isElectron && currentFile.path) {
+        const relativePath = editorMode.metadata.mainFile;
+        const watcher = createFileWatcher({
+          path: relativePath,
+          onChanged: (newContent: string) => {
+            if (newContent !== contentRef.current) {
+              setConflictData({
+                fileName: currentFile.name,
+                lastModified: Date.now(),
+                content: newContent,
+              });
+              setShowFileConflict(true);
+            }
+          },
+        });
+        fileWatcherRef.current = watcher;
+        watcher.start();
+        // Return cleanup; skip the polling path below
+        return () => {
+          watcher.stop();
+          fileWatcherRef.current = null;
+        };
+      }
+      // Web: poll mainFileHandle directly
+      fileHandle = editorMode.mainFileHandle;
+    } else if (isStandaloneMode(editorMode)) {
+      fileHandle = editorMode.fileHandle;
     }
-    // Standalone mode: poll via FileSystemFileHandle directly
-    else if (isStandaloneMode(editorMode) && editorMode.fileHandle) {
-      const fileHandle = editorMode.fileHandle;
-      standaloneLastModifiedRef.current = 0;
 
-      // Initialize lastModified baseline
+    if (!fileHandle) {
+      return;
+    }
+
+    // Direct FileSystemFileHandle polling (Web)
+    const handleToWatch = fileHandle;
+    standaloneLastModifiedRef.current = 0;
+
+    // Initialize lastModified baseline
+    void (async () => {
+      try {
+        const file = await handleToWatch.getFile();
+        standaloneLastModifiedRef.current = file.lastModified;
+      } catch {
+        // File may not be accessible initially
+      }
+    })();
+
+    // Poll every 5 seconds
+    const POLL_INTERVAL_MS = 5000;
+    standalonePollingRef.current = setInterval(() => {
       void (async () => {
         try {
-          const file = await fileHandle.getFile();
-          standaloneLastModifiedRef.current = file.lastModified;
+          const file = await handleToWatch.getFile();
+          if (file.lastModified > standaloneLastModifiedRef.current && standaloneLastModifiedRef.current > 0) {
+            standaloneLastModifiedRef.current = file.lastModified;
+            const newContent = await file.text();
+            // Only show conflict if content differs from editor
+            if (newContent !== contentRef.current) {
+              setConflictData({
+                fileName: currentFile.name,
+                lastModified: file.lastModified,
+                content: newContent,
+              });
+              setShowFileConflict(true);
+            }
+          } else if (standaloneLastModifiedRef.current === 0) {
+            // First successful read, set baseline
+            standaloneLastModifiedRef.current = file.lastModified;
+          }
         } catch {
-          // File may not be accessible initially
+          // File may be inaccessible; skip this poll cycle
         }
       })();
-
-      // Poll every 5 seconds
-      const STANDALONE_POLL_MS = 5000;
-      standalonePollingRef.current = setInterval(() => {
-        void (async () => {
-          try {
-            const file = await fileHandle.getFile();
-            if (file.lastModified > standaloneLastModifiedRef.current && standaloneLastModifiedRef.current > 0) {
-              standaloneLastModifiedRef.current = file.lastModified;
-              const newContent = await file.text();
-              // Only show conflict if content differs from editor
-              if (newContent !== contentRef.current) {
-                setConflictData({
-                  fileName: currentFile.name,
-                  lastModified: file.lastModified,
-                  content: newContent,
-                });
-                setShowFileConflict(true);
-              }
-            } else if (standaloneLastModifiedRef.current === 0) {
-              // First successful read, set baseline
-              standaloneLastModifiedRef.current = file.lastModified;
-            }
-          } catch {
-            // File may be inaccessible; skip this poll cycle
-          }
-        })();
-      }, STANDALONE_POLL_MS);
-    }
+    }, POLL_INTERVAL_MS);
 
     // Cleanup on unmount or when dependencies change
     return () => {
-      if (fileWatcherRef.current) {
-        fileWatcherRef.current.stop();
-        fileWatcherRef.current = null;
-      }
       if (standalonePollingRef.current !== null) {
         clearInterval(standalonePollingRef.current);
         standalonePollingRef.current = null;
       }
     };
-  }, [editorMode, currentFile]);
+  }, [editorMode, currentFile, isElectron]);
 
    // 自動復元（ページ再読み込み）時はエディタを再マウント
    useEffect(() => {
@@ -302,8 +317,6 @@ export default function EditorPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [searchResults, setSearchResults] = useState<{matches: any[], searchTerm: string} | null>(null);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
-
-  const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
   // Web menu handlers
   const { handleMenuAction } = useWebMenuHandlers({
