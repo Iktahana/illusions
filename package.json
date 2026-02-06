@@ -2,7 +2,7 @@
   "name": "illusions",
   "version": "0.0.0",
   "private": true,
-  "main": "main.js",
+  "main": "dist-main/main.js",
   "scripts": {
     "type-check": "tsc --noEmit",
     "dev": "npm run type-check && next dev",
@@ -10,8 +10,9 @@
     "start": "next start",
     "lint": "next lint",
     "download:fonts": "node scripts/download-local-fonts.mjs",
-    "electron:dev": "npm run type-check && next build && concurrently \"next dev -p 3000\" \"wait-on http://localhost:3000 && env -u ELECTRON_RUN_AS_NODE electron .\"",
-    "electron:build": "npm run type-check && next build && electron-builder --publish never",
+    "bundle:electron": "node scripts/bundle-electron.mjs",
+    "electron:dev": "npm run bundle:electron && concurrently \"next dev -p 3000\" \"wait-on http://localhost:3000 && env -u ELECTRON_RUN_AS_NODE electron .\"",
+    "electron:build": "npm run type-check && next build && npm run bundle:electron && electron-builder --publish never",
     "build:quicklook": "bash scripts/build-quicklook.sh",
     "postinstall": "electron-builder install-app-deps"
   },
@@ -64,6 +65,7 @@
     "dexie": "^4.2.1",
     "electron": "^32.0.0",
     "electron-builder": "^26.4.0",
+    "esbuild": "^0.27.3",
     "eslint": "^9.18.0",
     "eslint-config-next": "^16.1.6",
     "lucide-react": "^0.469.0",
@@ -83,9 +85,9 @@
     },
     "icon": "build/icon.png",
     "files": [
-      "main.js",
-      "preload.js",
-      "out/**/*"
+      "dist-main/**/*",
+      "out/**/*",
+      "!node_modules/**/*"
     ],
     "publish": [
       {
