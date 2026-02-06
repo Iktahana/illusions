@@ -12,9 +12,15 @@ import TitleUpdater from "@/components/TitleUpdater";
 import ActivityBar, { type ActivityBarView } from "@/components/ActivityBar";
 import SearchResults from "@/components/SearchResults";
 import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
+import FileConflictDialog from "@/components/FileConflictDialog";
+import UpgradeToProjectBanner from "@/components/UpgradeToProjectBanner";
+import { getProjectUpgradeService } from "@/lib/project-upgrade";
 import WordFrequency from "@/components/WordFrequency";
 import Characters from "@/components/Characters";
 import Dictionary from "@/components/Dictionary";
+import WelcomeScreen from "@/components/WelcomeScreen";
+import CreateProjectWizard from "@/components/CreateProjectWizard";
+import PermissionPrompt from "@/components/PermissionPrompt";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
 import { useElectronMenuHandlers } from "@/lib/use-electron-menu-handlers";
@@ -23,6 +29,12 @@ import { useGlobalShortcuts } from "@/lib/use-global-shortcuts";
 import { isElectronRenderer } from "@/lib/runtime-env";
 import WebMenuBar from "@/components/WebMenuBar";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
+import { useEditorMode } from "@/contexts/EditorModeContext";
+import { getProjectService } from "@/lib/project-service";
+import { getProjectManager } from "@/lib/project-manager";
+import { getAvailableFeatures } from "@/lib/feature-detection";
+import { createFileWatcher } from "@/lib/file-watcher";
+import { isProjectMode, isStandaloneMode } from "@/lib/project-types";
 import {
   countSentences,
   analyzeCharacterTypes,
@@ -30,6 +42,23 @@ import {
   calculateReadabilityScore,
   analyzeParticleUsage,
 } from "@/lib/utils";
+
+import type { ProjectMode } from "@/lib/project-types";
+import type { FileWatcher } from "@/lib/file-watcher";
+
+/** Recent project entry for WelcomeScreen display */
+interface RecentProjectEntry {
+  projectId: string;
+  name: string;
+  lastAccessedAt: number;
+}
+
+/** Permission prompt state for re-opening a stored project */
+interface PermissionPromptState {
+  projectName: string;
+  handle: FileSystemDirectoryHandle;
+  projectId: string;
+}
 
 function chars(s: string) {
   return s.replace(/\s/g, "").length;
@@ -40,6 +69,14 @@ function words(s: string) {
 }
 
 export default function EditorPage() {
+  const { editorMode, setProjectMode, setStandaloneMode } = useEditorMode();
+
+  // Welcome screen / wizard / permission prompt state
+  const [showCreateWizard, setShowCreateWizard] = useState(false);
+  const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
+  const [permissionPromptData, setPermissionPromptData] = useState<PermissionPromptState | null>(null);
+  const [recentProjects, setRecentProjects] = useState<RecentProjectEntry[]>([]);
+
   const mdiFile = useMdiFile();
   const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile: originalOpenFile, saveFile, newFile: originalNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen, _loadSystemFile } =
     mdiFile;
@@ -53,10 +90,23 @@ export default function EditorPage() {
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [saveToastExiting, setSaveToastExiting] = useState(false);
    const [selectedCharCount, setSelectedCharCount] = useState(0);
-   // ファイルセッションID（ファイル新規作成/切り替え時のみ更新）
+   // File session ID (updated only on new file creation or file switch)
    const fileSessionRef = useRef(0);
   const prevLastSavedTimeRef = useRef<number | null>(null);
   const hasAutoRecoveredRef = useRef(false);
+
+  // UpgradeBanner trigger state
+  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
+  const [upgradeBannerDismissed, setUpgradeBannerDismissed] = useState(false);
+  const standaloneSaveCountRef = useRef(0);
+
+  // File conflict detection state (external file change)
+  const [showFileConflict, setShowFileConflict] = useState(false);
+  const [conflictData, setConflictData] = useState<{ fileName: string; lastModified: number; content: string } | null>(null);
+  const fileWatcherRef = useRef<FileWatcher | null>(null);
+  // Standalone polling timer ref for external change detection
+  const standalonePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const standaloneLastModifiedRef = useRef<number>(0);
 
   // 未保存警告の Hook を初期化
   const unsavedWarning = useUnsavedWarning(
@@ -64,6 +114,123 @@ export default function EditorPage() {
     saveFile,
     currentFile?.name || null
   );
+
+  // --- File conflict detection ---
+
+  /** Handle conflict resolution: keep local or load remote content */
+  const handleConflictResolve = useCallback((resolution: "local" | "remote") => {
+    if (resolution === "remote" && conflictData) {
+      // Load disk content into editor
+      setContent(conflictData.content);
+      setEditorKey(prev => prev + 1);
+    }
+    // "local" => keep editor content, dismiss dialog
+    setShowFileConflict(false);
+    setConflictData(null);
+  }, [conflictData, setContent]);
+
+  /**
+   * Start/stop file watcher when currentFile or editorMode changes.
+   * Project mode: use createFileWatcher with VFS path.
+   * Standalone mode: poll via FileSystemFileHandle.getFile() directly.
+   *
+   * ファイルまたはエディタモードが変わったら監視を開始/停止する。
+   * プロジェクトモード: VFSパスで createFileWatcher を使用。
+   * スタンドアロンモード: FileSystemFileHandle.getFile() で直接ポーリング。
+   */
+  useEffect(() => {
+    // Clean up any previous watcher / polling
+    if (fileWatcherRef.current) {
+      fileWatcherRef.current.stop();
+      fileWatcherRef.current = null;
+    }
+    if (standalonePollingRef.current !== null) {
+      clearInterval(standalonePollingRef.current);
+      standalonePollingRef.current = null;
+    }
+
+    // Only watch when in an active editor mode with a file open
+    if (editorMode === null || !currentFile) {
+      return;
+    }
+
+    // Project mode: use VFS-based FileWatcher
+    if (isProjectMode(editorMode) && currentFile.path) {
+      // Use the main file name relative to VFS root
+      const relativePath = editorMode.metadata.mainFile;
+      const watcher = createFileWatcher({
+        path: relativePath,
+        onChanged: (newContent: string) => {
+          // Only show conflict if content actually differs from editor
+          if (newContent !== contentRef.current) {
+            setConflictData({
+              fileName: currentFile.name,
+              lastModified: Date.now(),
+              content: newContent,
+            });
+            setShowFileConflict(true);
+          }
+        },
+      });
+      fileWatcherRef.current = watcher;
+      watcher.start();
+    }
+    // Standalone mode: poll via FileSystemFileHandle directly
+    else if (isStandaloneMode(editorMode) && editorMode.fileHandle) {
+      const fileHandle = editorMode.fileHandle;
+      standaloneLastModifiedRef.current = 0;
+
+      // Initialize lastModified baseline
+      void (async () => {
+        try {
+          const file = await fileHandle.getFile();
+          standaloneLastModifiedRef.current = file.lastModified;
+        } catch {
+          // File may not be accessible initially
+        }
+      })();
+
+      // Poll every 5 seconds
+      const STANDALONE_POLL_MS = 5000;
+      standalonePollingRef.current = setInterval(() => {
+        void (async () => {
+          try {
+            const file = await fileHandle.getFile();
+            if (file.lastModified > standaloneLastModifiedRef.current && standaloneLastModifiedRef.current > 0) {
+              standaloneLastModifiedRef.current = file.lastModified;
+              const newContent = await file.text();
+              // Only show conflict if content differs from editor
+              if (newContent !== contentRef.current) {
+                setConflictData({
+                  fileName: currentFile.name,
+                  lastModified: file.lastModified,
+                  content: newContent,
+                });
+                setShowFileConflict(true);
+              }
+            } else if (standaloneLastModifiedRef.current === 0) {
+              // First successful read, set baseline
+              standaloneLastModifiedRef.current = file.lastModified;
+            }
+          } catch {
+            // File may be inaccessible; skip this poll cycle
+          }
+        })();
+      }, STANDALONE_POLL_MS);
+    }
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      if (fileWatcherRef.current) {
+        fileWatcherRef.current.stop();
+        fileWatcherRef.current = null;
+      }
+      if (standalonePollingRef.current !== null) {
+        clearInterval(standalonePollingRef.current);
+        standalonePollingRef.current = null;
+      }
+    };
+  }, [editorMode, currentFile]);
 
    // 自動復元（ページ再読み込み）時はエディタを再マウント
    useEffect(() => {
@@ -107,7 +274,7 @@ export default function EditorPage() {
       void unsavedWarning.confirmBeforeAction(() => {
         // ファイルを直接読み込む
         _loadSystemFile(path, fileContent);
-        
+
         // エディタを再マウント
         setTimeout(() => {
           fileSessionRef.current += 1;
@@ -116,24 +283,24 @@ export default function EditorPage() {
       });
     });
   }, [onSystemFileOpen, unsavedWarning, _loadSystemFile]);
-  
+
   // エディタ表示設定
-  const [fontScale, setFontScale] = useState(100); // 100% = 標準サイズ
+  const [fontScale, setFontScale] = useState(100); // 100% = Standard size
   const [lineHeight, setLineHeight] = useState(1.8);
-  const [paragraphSpacing, setParagraphSpacing] = useState(0.5); // 0.5em = 標準間隔
+  const [paragraphSpacing, setParagraphSpacing] = useState(0.5); // 0.5em = Standard spacing
   const [textIndent, setTextIndent] = useState(1);
   const [fontFamily, setFontFamily] = useState('Noto Serif JP');
-  const [charsPerLine, setCharsPerLine] = useState(40); // 0 = 制限なし（既定 40）
+  const [charsPerLine, setCharsPerLine] = useState(40); // 0 = no limit (default 40)
   const [showParagraphNumbers, setShowParagraphNumbers] = useState(true);
-  const [posHighlightEnabled, setPosHighlightEnabled] = useState(false); // 品詞着色（デフォルト: 無効）
-  const [posHighlightColors, setPosHighlightColors] = useState<Record<string, string>>({}); // 品詞ごとの色設定
+  const [posHighlightEnabled, setPosHighlightEnabled] = useState(false); // POS coloring (default: disabled)
+  const [posHighlightColors, setPosHighlightColors] = useState<Record<string, string>>({}); // Per-POS color settings
   const [activeView, setActiveView] = useState<ActivityBarView>("explorer");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editorViewInstance, setEditorViewInstance] = useState<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [searchResults, setSearchResults] = useState<{matches: any[], searchTerm: string} | null>(null);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
-  
+
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
   // Web menu handlers
@@ -158,13 +325,13 @@ export default function EditorPage() {
        if (prevLastSavedTimeRef.current !== null) {
         setShowSaveToast(true);
         setSaveToastExiting(false);
-        
+
         const hideTimer = setTimeout(() => {
           setSaveToastExiting(true);
           setTimeout(() => {
             setShowSaveToast(false);
             setSaveToastExiting(false);
-          }, 150); // アニメーション時間に合わせる
+          }, 150); // Match animation duration
         }, 1200);
 
         prevLastSavedTimeRef.current = lastSavedTime;
@@ -173,6 +340,31 @@ export default function EditorPage() {
       prevLastSavedTimeRef.current = lastSavedTime;
     }
   }, [lastSavedTime]);
+
+  // Track save count to trigger UpgradeBanner in standalone mode
+  useEffect(() => {
+    if (!lastSavedTime || prevLastSavedTimeRef.current === null) return;
+    if (!isStandaloneMode(editorMode) || upgradeBannerDismissed) return;
+
+    standaloneSaveCountRef.current += 1;
+    // Show banner on 1st save or 3rd save
+    if (standaloneSaveCountRef.current >= 1) {
+      setShowUpgradeBanner(true);
+    }
+  }, [lastSavedTime, editorMode, upgradeBannerDismissed]);
+
+  // Track character count to trigger UpgradeBanner at 5,000 characters
+  useEffect(() => {
+    if (!isStandaloneMode(editorMode) || upgradeBannerDismissed) return;
+    if (chars(content) >= 5000) {
+      setShowUpgradeBanner(true);
+    }
+  }, [content, editorMode, upgradeBannerDismissed]);
+
+  // Reset save count tracking when editor mode changes
+  useEffect(() => {
+    standaloneSaveCountRef.current = 0;
+  }, [editorMode]);
 
   useEffect(() => {
     let mounted = true;
@@ -199,6 +391,36 @@ export default function EditorPage() {
     };
 
     void loadSettings();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Load recent projects on mount (for WelcomeScreen)
+  useEffect(() => {
+    let mounted = true;
+
+    const loadRecentProjects = async () => {
+      try {
+        const projectManager = getProjectManager();
+        const handles = await projectManager.listProjectHandles();
+        if (!mounted) return;
+
+        // Map handles to RecentProjectEntry format
+        // Project name is not stored in the handle summary, so use projectId as fallback
+        const entries: RecentProjectEntry[] = handles.map((h) => ({
+          projectId: h.projectId,
+          name: h.projectId,
+          lastAccessedAt: h.lastAccessedAt,
+        }));
+        setRecentProjects(entries);
+      } catch (error) {
+        console.error("最近のプロジェクト一覧の読み込みに失敗しました:", error);
+      }
+    };
+
+    void loadRecentProjects();
 
     return () => {
       mounted = false;
@@ -240,16 +462,16 @@ export default function EditorPage() {
        const fadeoutTimer = setTimeout(() => {
          setRecoveryExiting(true);
        }, 5000);
-       
+
        return () => clearTimeout(fadeoutTimer);
      }
-     
+
      // アニメーション中の場合、アニメーション完了後に実際に削除
      if (recoveryExiting) {
        const dismissTimer = setTimeout(() => {
          setDismissedRecovery(true);
-       }, 300); // アニメーション時間に合わせる
-       
+       }, 300); // Match animation duration
+
        return () => clearTimeout(dismissTimer);
      }
    }, [wasAutoRecovered, dismissedRecovery, recoveryExiting]);
@@ -258,21 +480,20 @@ export default function EditorPage() {
     const handlePasteAsPlaintext = useCallback(async () => {
       try {
         let text: string | null = null;
-        
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (isElectron && typeof window !== "undefined" && (window as any).electronAPI) {
-           // Electron: 将来的にはメインプロセス経由でクリップボード取得（IPC）も検討
-           // ひとまず標準のクリップボードAPIが使える場合はそれを利用
+           // Electron: use standard clipboard API if available
            if (navigator.clipboard && navigator.clipboard.readText) {
              text = await navigator.clipboard.readText();
            }
          } else {
-           // Web: クリップボードAPIでプレーンテキストを取得
+           // Web: get plaintext from clipboard API
            if (navigator.clipboard && navigator.clipboard.readText) {
              text = await navigator.clipboard.readText();
            }
          }
-        
+
         if (text) {
           const currentContent = contentRef.current;
           const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
@@ -309,9 +530,9 @@ export default function EditorPage() {
    const handleInsertText = (text: string) => {
      const currentContent = contentRef.current;
      const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
-     // 見出しアンカーはエディタ側で管理するため、ここでの追加処理は不要
+     // Heading anchors are managed by the editor, no extra processing needed here
      setContent(newContent);
-     // 新しい内容で確実に反映させるため、エディタを再マウント
+     // Re-mount the editor to ensure the new content is reflected
      setEditorKey(prev => prev + 1);
    };
 
@@ -321,12 +542,10 @@ export default function EditorPage() {
     const target = document.getElementById(anchorId) as HTMLElement | null;
     if (!target) return;
 
-    // 対象行を表示位置へスクロール
-    // console.debug('[AutoScroll] Scroll target into view', { anchorId, options: { behavior: 'smooth', block: 'start' } });
+    // Scroll to target
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    
-    // 任意: フォーカスして視線誘導
-    // console.debug('[AutoScroll] Focus target after scroll', { anchorId });
+
+    // Focus for visual guidance
     target.focus();
   };
 
@@ -365,30 +584,30 @@ export default function EditorPage() {
        const isMac = nav.userAgentData
          ? nav.userAgentData.platform === "macOS"
          : /mac/i.test(navigator.userAgent);
-       
-       // Cmd+S（macOS）/ Ctrl+S（Windows/Linux）: 保存
+
+       // Cmd+S (macOS) / Ctrl+S (Windows/Linux): Save
        const isSaveShortcut = isMac
          ? event.metaKey && event.key === "s"
          : event.ctrlKey && event.key === "s";
 
-       // Cmd+F（macOS）/ Ctrl+F（Windows/Linux）: 検索
+       // Cmd+F (macOS) / Ctrl+F (Windows/Linux): Search
        const isSearchShortcut = isMac
          ? event.metaKey && event.key === "f"
          : event.ctrlKey && event.key === "f";
 
-       // Shift+Cmd+V（macOS）/ Shift+Ctrl+V（Windows/Linux）: プレーンテキスト貼り付け
+       // Shift+Cmd+V (macOS) / Shift+Ctrl+V (Windows/Linux): Paste as plaintext
        const isPasteAsPlaintextShortcut = isMac
          ? event.shiftKey && event.metaKey && event.key === "v"
          : event.shiftKey && event.ctrlKey && event.key === "v";
 
        if (isSaveShortcut) {
-         event.preventDefault(); // ブラウザ既定の保存ダイアログを抑止
+         event.preventDefault();
          void saveFile();
        } else if (isSearchShortcut) {
-         event.preventDefault(); // ブラウザ既定の検索ダイアログを抑止
-         setSearchOpenTrigger(prev => prev + 1); // 検索ダイアログを開く
+         event.preventDefault();
+         setSearchOpenTrigger(prev => prev + 1);
        } else if (isPasteAsPlaintextShortcut) {
-         event.preventDefault(); // 既定の貼り付け動作を抑止
+         event.preventDefault();
          void handlePasteAsPlaintext();
        }
      };
@@ -399,6 +618,204 @@ export default function EditorPage() {
     };
   }, [saveFile, handlePasteAsPlaintext]);
 
+  // --- WelcomeScreen callbacks ---
+
+  /** Show the CreateProjectWizard dialog */
+  const handleCreateProject = useCallback(() => {
+    setShowCreateWizard(true);
+  }, []);
+
+  /** Open an existing project from directory picker */
+  const handleOpenProject = useCallback(async () => {
+    try {
+      const projectService = getProjectService();
+      const project = await projectService.openProject();
+      setProjectMode(project);
+    } catch (error) {
+      // User may have cancelled the directory picker
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      console.error("プロジェクトを開くのに失敗しました:", error);
+    }
+  }, [setProjectMode]);
+
+  /** Open a standalone file via the existing file-open flow */
+  const handleOpenStandaloneFile = useCallback(async () => {
+    try {
+      const projectService = getProjectService();
+      const standalone = await projectService.openStandaloneFile();
+      setStandaloneMode(standalone);
+    } catch (error) {
+      // User may have cancelled the file picker
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      console.error("ファイルを開くのに失敗しました:", error);
+    }
+  }, [setStandaloneMode]);
+
+  /** Open a recently-stored project by its ID */
+  const handleOpenRecentProject = useCallback(async (projectId: string) => {
+    try {
+      const projectManager = getProjectManager();
+      const restoreResult = await projectManager.restoreProjectHandle(projectId);
+
+      if (!restoreResult.success || !restoreResult.handle) {
+        console.error("保存されたプロジェクトハンドルの復元に失敗しました:", restoreResult.error);
+        return;
+      }
+
+      // If permission needs to be re-requested, show the PermissionPrompt
+      if (restoreResult.permissionStatus.status === "prompt-required") {
+        setPermissionPromptData({
+          projectName: projectId,
+          handle: restoreResult.handle,
+          projectId,
+        });
+        setShowPermissionPrompt(true);
+        return;
+      }
+
+      // Permission already granted; open the project by reading its config
+      await openRestoredProject(restoreResult.handle);
+    } catch (error) {
+      console.error("最近のプロジェクトを開くのに失敗しました:", error);
+    }
+  }, []);
+
+  /** Read project.json from a restored directory handle and enter project mode */
+  const openRestoredProject = useCallback(async (handle: FileSystemDirectoryHandle) => {
+    try {
+      const illusionsDir = await handle.getDirectoryHandle(".illusions");
+      const projectJsonHandle = await illusionsDir.getFileHandle("project.json");
+      const projectJsonFile = await projectJsonHandle.getFile();
+      const metadataText = await projectJsonFile.text();
+      const metadata = JSON.parse(metadataText) as ProjectMode["metadata"];
+
+      // Read workspace.json (defaults if missing)
+      let workspaceState: ProjectMode["workspaceState"];
+      try {
+        const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json");
+        const workspaceJsonFile = await workspaceJsonHandle.getFile();
+        const workspaceText = await workspaceJsonFile.text();
+        workspaceState = JSON.parse(workspaceText) as ProjectMode["workspaceState"];
+      } catch {
+        const { getDefaultWorkspaceState } = await import("@/lib/project-types");
+        workspaceState = getDefaultWorkspaceState();
+      }
+
+      // Get main file handle
+      const mainFileHandle = await handle.getFileHandle(metadata.mainFile);
+
+      const project: ProjectMode = {
+        type: "project",
+        projectId: metadata.projectId,
+        name: metadata.name,
+        rootHandle: handle,
+        mainFileHandle,
+        metadata,
+        workspaceState,
+      };
+
+      setProjectMode(project);
+    } catch (error) {
+      console.error("復元したプロジェクトの読み込みに失敗しました:", error);
+    }
+  }, [setProjectMode]);
+
+  /** Called when the CreateProjectWizard successfully creates a project */
+  const handleProjectCreated = useCallback((project: ProjectMode) => {
+    setProjectMode(project);
+    setShowCreateWizard(false);
+  }, [setProjectMode]);
+
+  /** Called when permission is granted for a restored project */
+  const handlePermissionGranted = useCallback(() => {
+    if (permissionPromptData) {
+      void openRestoredProject(permissionPromptData.handle);
+    }
+    setShowPermissionPrompt(false);
+    setPermissionPromptData(null);
+  }, [permissionPromptData, openRestoredProject]);
+
+  /** Called when permission is denied for a restored project */
+  const handlePermissionDenied = useCallback(() => {
+    setShowPermissionPrompt(false);
+    setPermissionPromptData(null);
+  }, []);
+
+  // --- UpgradeBanner handlers ---
+
+  /** Handle upgrading from standalone to project mode */
+  const handleUpgrade = useCallback(async () => {
+    if (!isStandaloneMode(editorMode)) return;
+    try {
+      const upgradeService = getProjectUpgradeService();
+      const project = await upgradeService.upgradeToProject(editorMode, content);
+      setProjectMode(project);
+      setShowUpgradeBanner(false);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return; // User cancelled directory picker
+      }
+      console.error("プロジェクトへのアップグレードに失敗しました:", error);
+    }
+  }, [editorMode, content, setProjectMode]);
+
+  /** Dismiss the upgrade banner for this session */
+  const handleUpgradeDismiss = useCallback(() => {
+    setShowUpgradeBanner(false);
+    setUpgradeBannerDismissed(true);
+  }, []);
+
+  // Detect feature availability after mount to avoid SSR hydration mismatch
+  // (browser APIs like showDirectoryPicker are unavailable during SSR)
+  const [features, setFeatures] = useState<ReturnType<typeof getAvailableFeatures>>({
+    projectMode: false,
+    standaloneMode: false,
+    downloadFallback: false,
+    isElectron: false,
+  });
+  useEffect(() => {
+    setFeatures(getAvailableFeatures());
+  }, []);
+
+  // --- Routing: WelcomeScreen vs Editor ---
+  if (editorMode === null) {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden relative">
+        <WelcomeScreen
+          onCreateProject={handleCreateProject}
+          onOpenProject={() => void handleOpenProject()}
+          onOpenStandaloneFile={() => void handleOpenStandaloneFile()}
+          onOpenRecentProject={(id) => void handleOpenRecentProject(id)}
+          recentProjects={recentProjects}
+          isProjectModeSupported={features.projectMode}
+        />
+
+        {/* CreateProjectWizard dialog */}
+        <CreateProjectWizard
+          isOpen={showCreateWizard}
+          onClose={() => setShowCreateWizard(false)}
+          onProjectCreated={handleProjectCreated}
+        />
+
+        {/* Permission prompt for re-opening stored projects */}
+        {permissionPromptData && (
+          <PermissionPrompt
+            isOpen={showPermissionPrompt}
+            projectName={permissionPromptData.projectName}
+            handle={permissionPromptData.handle}
+            onGranted={handlePermissionGranted}
+            onDenied={handlePermissionDenied}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // --- Editor view (project or standalone mode) ---
     return (
       <div className="h-screen flex flex-col overflow-hidden relative">
          {/* 動的なタイトル更新 */}
@@ -415,6 +832,24 @@ export default function EditorPage() {
           onDiscard={unsavedWarning.handleDiscard}
           onCancel={unsavedWarning.handleCancel}
         />
+
+        {/* 外部ファイル変更の競合解決ダイアログ */}
+        {showFileConflict && conflictData && (
+          <FileConflictDialog
+            isOpen={showFileConflict}
+            fileName={conflictData.fileName}
+            lastModified={conflictData.lastModified}
+            onResolve={handleConflictResolve}
+          />
+        )}
+
+        {/* UpgradeBanner for standalone mode */}
+        {showUpgradeBanner && !upgradeBannerDismissed && isStandaloneMode(editorMode) && features.projectMode && (
+          <UpgradeToProjectBanner
+            onUpgrade={() => void handleUpgrade()}
+            onDismiss={handleUpgradeDismiss}
+          />
+        )}
 
          {/* 自動復元の通知（Webのみ・固定表示） */}
          {!isElectron && wasAutoRecovered && !dismissedRecovery && (
@@ -439,14 +874,14 @@ export default function EditorPage() {
        <div className="flex-1 flex overflow-hidden">
          {/* Activity Bar */}
          <ActivityBar activeView={activeView} onViewChange={setActiveView} />
-         
+
            {/* 左サイドパネル */}
           {activeView !== "none" && (
             <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
               {activeView === "explorer" && (
-              <Explorer 
-                content={content} 
-                onChapterClick={handleChapterClick} 
+              <Explorer
+                content={content}
+                onChapterClick={handleChapterClick}
                 onInsertText={handleInsertText}
                 fontScale={fontScale}
                 onFontScaleChange={setFontScale}
@@ -495,7 +930,7 @@ export default function EditorPage() {
             )}
           </ResizablePanel>
         )}
-        
+
         <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative">
           <div ref={editorDomRef} className="flex-1 min-h-0">
             <NovelEditor
@@ -518,10 +953,10 @@ export default function EditorPage() {
               posHighlightColors={posHighlightColors}
             />
           </div>
-          
+
            {/* 保存完了トースト */}
           {showSaveToast && (
-            <div 
+            <div
               className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-background-elevated border border-border rounded-lg shadow-lg flex items-center gap-2 z-50 ${
                 saveToastExiting ? 'animate-save-toast-out' : 'animate-save-toast-in'
               }`}
@@ -531,12 +966,12 @@ export default function EditorPage() {
             </div>
            )}
          </main>
-         
+
           {/* 右サイドパネル：統計情報（常に表示） */}
-          <ResizablePanel 
-            side="right" 
-            defaultWidth={256} 
-            minWidth={200} 
+          <ResizablePanel
+            side="right"
+            defaultWidth={256}
+            minWidth={200}
             maxWidth={400}
             collapsible={true}
             isCollapsed={isRightPanelCollapsed}
