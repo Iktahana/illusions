@@ -129,24 +129,26 @@ export default function WelcomeScreen({
           </button>
         </div>
 
-        {/* Browser compatibility note with desktop download guidance */}
+        {/* Non-dismissible modal for unsupported browsers */}
         {!isProjectModeSupported && (
-          <div className="w-full rounded-xl border border-border bg-background-elevated p-4 text-center">
-            <p className="text-sm text-foreground-secondary">
-              お使いのブラウザはプロジェクト機能に対応していません
-            </p>
-            <p className="mt-2 text-xs text-foreground-tertiary">
-              すべての機能をご利用いただくには、デスクトップ版をお試しください。
-            </p>
-            <a
-              href="https://download.illusions.app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
-            >
-              <Download className="h-4 w-4" />
-              デスクトップ版をダウンロード
-            </a>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="mx-4 w-full max-w-md rounded-xl bg-background-elevated p-8 shadow-xl border border-border text-center">
+              <h2 className="text-xl font-bold text-foreground">
+                お使いのブラウザはillusionsに対応していません
+              </h2>
+              <p className="mt-3 text-sm text-foreground-secondary">
+                すべての機能をご利用いただくには、デスクトップ版をお試しください。
+              </p>
+              <a
+                href="https://download.illusions.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+              >
+                <Download className="h-5 w-5" />
+                illusionsをダウンロード
+              </a>
+            </div>
           </div>
         )}
 
