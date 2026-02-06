@@ -95,7 +95,7 @@ export class ProjectService {
 
     // 2. Generate project ID
     const projectId = crypto.randomUUID();
-    const mainFileName = `main${fileExtension}`;
+    const mainFileName = `${name}${fileExtension}`;
 
     // 3. Create .illusions/ directory
     const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", {
