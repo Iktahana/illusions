@@ -86,7 +86,7 @@ export interface StorageConfig {
 
 // UI State types
 export type SidebarTab = 'chapters' | 'settings' | 'style';
-export type InspectorTab = 'ai' | 'corrections' | 'stats';
+export type InspectorTab = 'ai' | 'corrections' | 'stats' | 'history';
 
 export interface UIState {
   sidebarTab: SidebarTab;

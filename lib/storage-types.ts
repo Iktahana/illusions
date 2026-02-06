@@ -43,7 +43,7 @@ export interface AppState {
   showParagraphNumbers?: boolean;
   hasSeenDemo?: boolean;
   sidebarTab?: "chapters" | "settings" | "style";
-  inspectorTab?: "ai" | "corrections" | "stats" | "versions";
+  inspectorTab?: "ai" | "corrections" | "stats" | "versions" | "history";
   
   // 品詞着色設定
   posHighlightEnabled?: boolean;

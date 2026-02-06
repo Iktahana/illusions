@@ -6,6 +6,8 @@ import { isElectronRenderer } from "./runtime-env";
 import { getStorageService } from "./storage-service";
 import { persistAppState } from "./app-state-manager";
 import { getRandomIllusionStory } from "./illusion-stories";
+import { getHistoryService } from "./history-service";
+import { useEditorMode } from "@/contexts/EditorModeContext";
 
 const AUTO_SAVE_INTERVAL = 2000; // 2秒
 const DEMO_FILE_NAME = "鏡地獄.mdi";
@@ -67,6 +69,7 @@ export interface UseMdiFileReturn {
 export function useMdiFile(): UseMdiFileReturn {
   const isElectron =
     typeof window !== "undefined" && isElectronRenderer();
+  const { isProject } = useEditorMode();
 
   const [currentFile, setCurrentFile] = useState<MdiFileDescriptor | null>(null);
   const [content, setContentState] = useState<string>(() => getRandomIllusionStory());
@@ -91,6 +94,30 @@ export function useMdiFile(): UseMdiFileReturn {
       console.error("最後に開いたパスの保存に失敗しました:", error);
     }
   }, []);
+
+  /**
+   * Attempt to create an auto-snapshot after a successful save (project mode only).
+   * Failures are logged but never block or break the save operation.
+   *
+   * 保存成功後に自動スナップショットの作成を試みる（プロジェクトモードのみ）。
+   * 失敗してもログ出力のみで、保存処理には影響しない。
+   */
+  const tryAutoSnapshot = useCallback(async (sourceFileName: string, savedContent: string) => {
+    if (!isProject) return;
+    try {
+      const historyService = getHistoryService();
+      const shouldCreate = await historyService.shouldCreateSnapshot(sourceFileName);
+      if (shouldCreate) {
+        await historyService.createSnapshot({
+          sourceFile: sourceFileName,
+          content: savedContent,
+          type: "auto",
+        });
+      }
+    } catch (error) {
+      console.warn("自動スナップショットの作成に失敗しました:", error);
+    }
+  }, [isProject]);
 
   // Dirty 状態を Electron 側へ通知する
   useEffect(() => {
@@ -288,6 +315,10 @@ export function useMdiFile(): UseMdiFileReturn {
         } catch (error) {
           console.error("ファイル参照の保存に失敗しました:", error);
         }
+
+        // Fire-and-forget: auto-snapshot in project mode
+        // プロジェクトモード時、自動スナップショットを非同期で作成
+        void tryAutoSnapshot(descriptor.name, contentRef.current);
       }
     } catch (error) {
       console.error("保存に失敗しました:", error);
@@ -295,7 +326,7 @@ export function useMdiFile(): UseMdiFileReturn {
       isSavingRef.current = false;
       setIsSaving(false);
     }
-  }, [currentFile, isElectron, persistLastOpenedPath]);
+  }, [currentFile, isElectron, persistLastOpenedPath, tryAutoSnapshot]);
 
   // Dirty かつファイル選択中なら、一定間隔で自動保存する
   useEffect(() => {
@@ -411,6 +442,10 @@ export function useMdiFile(): UseMdiFileReturn {
           } catch (error) {
             console.error("ファイル参照の保存に失敗しました:", error);
           }
+
+          // Fire-and-forget: auto-snapshot in project mode
+          // プロジェクトモード時、自動スナップショットを非同期で作成
+          void tryAutoSnapshot(descriptor.name, raw);
         }
       } catch (error) {
         console.error("名前を付けて保存に失敗しました:", error);
@@ -420,7 +455,7 @@ export function useMdiFile(): UseMdiFileReturn {
     });
 
     return cleanup;
-  }, [saveFile, isElectron, currentFile, persistLastOpenedPath]);
+  }, [saveFile, isElectron, currentFile, persistLastOpenedPath, tryAutoSnapshot]);
 
   // メニューの新規作成と「開く」は page.tsx で処理する（安全チェックを適用するため）
   // 以前はここで処理していたが、未保存チェックを統一するため移動した
