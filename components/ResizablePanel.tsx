@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, ReactNode } from "react";
 import clsx from "clsx";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface ResizablePanelProps {
   children: ReactNode;
@@ -10,6 +11,9 @@ interface ResizablePanelProps {
   minWidth?: number;
   maxWidth?: number;
   className?: string;
+  collapsible?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export default function ResizablePanel({
@@ -19,6 +23,9 @@ export default function ResizablePanel({
   minWidth = 200,
   maxWidth = 600,
   className,
+  collapsible = false,
+  isCollapsed = false,
+  onToggleCollapse,
 }: ResizablePanelProps) {
   const [width, setWidth] = useState(defaultWidth);
   const [isResizing, setIsResizing] = useState(false);
@@ -73,19 +80,54 @@ export default function ResizablePanel({
   return (
     <div
       ref={panelRef}
-      className={clsx("relative flex-shrink-0", className)}
-      style={{ width: `${width}px` }}
+      className={clsx(
+        "relative flex-shrink-0 transition-all duration-300 ease-in-out",
+        className
+      )}
+      style={{ width: isCollapsed ? '0px' : `${width}px` }}
     >
-      {children}
+      <div className={clsx(
+        "h-full transition-opacity duration-300",
+        isCollapsed ? "opacity-0" : "opacity-100"
+      )}>
+        {children}
+      </div>
 
       {/* リサイズハンドル */}
-      <div
-        className={clsx(
-          "absolute top-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-accent transition-all cursor-col-resize z-10",
-          side === "left" ? "right-0" : "left-0"
-        )}
-        onMouseDown={handleMouseDown}
-      />
+      {!isCollapsed && (
+        <div
+          className={clsx(
+            "absolute top-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-accent transition-all cursor-col-resize z-10",
+            side === "left" ? "right-0" : "left-0"
+          )}
+          onMouseDown={handleMouseDown}
+        />
+      )}
+
+      {/* 折叠/展开按钮 - 仅在 collapsible 为 true 时显示 */}
+      {collapsible && onToggleCollapse && (
+        <button
+          onClick={onToggleCollapse}
+          className={clsx(
+            "absolute top-4 z-20 w-6 h-12 flex items-center justify-center",
+            "bg-background-secondary border border-border rounded-md",
+            "hover:bg-hover transition-all duration-200",
+            "shadow-sm hover:shadow-md",
+            side === "left" 
+              ? "right-0 translate-x-1/2" 
+              : isCollapsed
+                ? "left-0 -translate-x-full"
+                : "left-0 -translate-x-1/2"
+          )}
+          title={isCollapsed ? "展開" : "折叠"}
+        >
+          {side === "left" ? (
+            isCollapsed ? <ChevronRight className="w-4 h-4 text-foreground-secondary" /> : <ChevronLeft className="w-4 h-4 text-foreground-secondary" />
+          ) : (
+            isCollapsed ? <ChevronLeft className="w-4 h-4 text-foreground-secondary" /> : <ChevronRight className="w-4 h-4 text-foreground-secondary" />
+          )}
+        </button>
+      )}
 
       {/* リサイズ中の操作を安定させるためのオーバーレイ */}
       {isResizing && (

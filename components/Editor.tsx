@@ -57,7 +57,7 @@ export default function NovelEditor({
   className,
   fontScale = 100,
   lineHeight = 1.8,
-  paragraphSpacing = 0,
+  paragraphSpacing = 0.5,
   textIndent = 1,
   fontFamily = 'Noto Serif JP',
   charsPerLine = 40,
