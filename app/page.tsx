@@ -18,7 +18,10 @@ import Dictionary from "@/components/Dictionary";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
 import { useElectronMenuHandlers } from "@/lib/use-electron-menu-handlers";
+import { useWebMenuHandlers } from "@/lib/use-web-menu-handlers";
+import { useGlobalShortcuts } from "@/lib/use-global-shortcuts";
 import { isElectronRenderer } from "@/lib/runtime-env";
+import WebMenuBar from "@/components/WebMenuBar";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
 import {
   countSentences,
@@ -130,6 +133,21 @@ export default function EditorPage() {
   const [searchResults, setSearchResults] = useState<{matches: any[], searchTerm: string} | null>(null);
   
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
+
+  // Web menu handlers
+  const { handleMenuAction } = useWebMenuHandlers({
+    onNew: newFile,
+    onOpen: openFile,
+    onSave: saveFile,
+    onSaveAs: saveFile, // TODO: Implement separate saveAs logic
+    editorView: editorViewInstance,
+  });
+
+  // Global shortcuts for Web (only when not in Electron)
+  useGlobalShortcuts(
+    !isElectron ? handleMenuAction : () => {},
+    editorDomRef
+  );
 
    // lastSavedTime が更新されたら「保存完了」トーストを表示
    useEffect(() => {
@@ -370,6 +388,9 @@ export default function EditorPage() {
          {/* 動的なタイトル更新 */}
         <TitleUpdater currentFile={currentFile} isDirty={isDirty} />
 
+        {/* Web menu bar (only for non-Electron environment) */}
+        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} />}
+
          {/* 未保存警告ダイアログ */}
         <UnsavedWarningDialog
           isOpen={unsavedWarning.showWarning}
@@ -381,7 +402,7 @@ export default function EditorPage() {
 
          {/* 自動復元の通知（Webのみ・固定表示） */}
         {!isElectron && wasAutoRecovered && !dismissedRecovery && (
-         <div className="fixed left-0 top-0 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between animate-slide-in-down shadow-lg">
+         <div className="fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between animate-slide-in-down shadow-lg">
            <div className="flex items-center gap-3">
              <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
              <p className="text-sm text-foreground">
