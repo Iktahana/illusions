@@ -137,7 +137,8 @@ export async function saveMdiFile(
     let handle = descriptor?.handle ?? null;
 
     if (!handle && hasShowSaveFilePicker(window)) {
-      handle = await window.showSaveFilePicker({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handle = await (window as any).showSaveFilePicker({
         suggestedName: ensureMdiExtension(descriptor?.name ?? "untitled.mdi"),
         types: [
           {
@@ -172,7 +173,8 @@ export async function saveMdiFile(
       }
     }
 
-    const writable = await handle.createWritable();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const writable = await (handle as any).createWritable();
     await writable.write(content);
     await writable.close();
 
