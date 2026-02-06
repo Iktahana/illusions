@@ -7,10 +7,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
-const GITHUB_CLIENT_ID = "Ov23liN8mQW7MWEYb0Gs";
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
+
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
+    if (!GITHUB_CLIENT_ID) {
+      console.error("[GitHub Access Token] GITHUB_CLIENT_ID is not set");
+      return NextResponse.json(
+        { 
+          error: "GitHub Client ID is not configured",
+          details: "Please set GITHUB_CLIENT_ID in your .env.local file"
+        },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     const { device_code } = body;
 

@@ -15,8 +15,8 @@
 import type { DeviceCodeResponse, AccessTokenResponse } from "./types";
 
 // Use Next.js API routes to proxy GitHub requests (avoids CORS issues in browser)
-const DEVICE_CODE_URL = "/api/github/device-code";
-const ACCESS_TOKEN_URL = "/api/github/access-token";
+const DEVICE_CODE_URL = "/api/github/device-code/";
+const ACCESS_TOKEN_URL = "/api/github/access-token/";
 
 export class GitHubDeviceFlow {
   constructor() {
