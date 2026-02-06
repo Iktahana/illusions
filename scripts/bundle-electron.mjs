@@ -62,20 +62,26 @@ await esbuild.build({
 
 console.log('✅ Preload script bundled to dist-main/preload.js');
 
-// Copy kuromoji dependency for runtime
-console.log('📦 Copying kuromoji for external dependency...');
-const kuromojiSrc = join(projectRoot, 'node_modules', 'kuromoji');
-const kuromojiDest = join(outDir, 'node_modules', 'kuromoji');
+// Copy kuromoji and its runtime dependencies
+console.log('📦 Copying kuromoji and dependencies for external dependency...');
 
-if (!fs.existsSync(join(outDir, 'node_modules'))) {
-  fs.mkdirSync(join(outDir, 'node_modules'), { recursive: true });
+const nodeModulesDest = join(outDir, 'node_modules');
+if (!fs.existsSync(nodeModulesDest)) {
+  fs.mkdirSync(nodeModulesDest, { recursive: true });
 }
 
-if (fs.existsSync(kuromojiSrc)) {
-  fs.cpSync(kuromojiSrc, kuromojiDest, { recursive: true });
-  console.log('✅ Kuromoji copied to dist-main/node_modules/kuromoji');
-} else {
-  console.warn('⚠️  Warning: kuromoji not found in node_modules');
+// kuromoji requires these modules at runtime (not bundled by esbuild)
+const kuromojiDeps = ['kuromoji', 'doublearray', 'zlibjs', 'async'];
+
+for (const dep of kuromojiDeps) {
+  const src = join(projectRoot, 'node_modules', dep);
+  const dest = join(nodeModulesDest, dep);
+  if (fs.existsSync(src)) {
+    fs.cpSync(src, dest, { recursive: true });
+    console.log(`  ✅ ${dep}`);
+  } else {
+    console.warn(`  ⚠️  Warning: ${dep} not found in node_modules`);
+  }
 }
 
 console.log('');
@@ -84,5 +90,5 @@ console.log('');
 console.log('Bundle summary:');
 console.log('  • Main process: dist-main/main.js');
 console.log('  • Preload script: dist-main/preload.js');
-console.log('  • Kuromoji: dist-main/node_modules/kuromoji (runtime dependency)');
+console.log('  • Kuromoji + deps: dist-main/node_modules/{kuromoji,doublearray,zlibjs,async}');
 console.log('');
