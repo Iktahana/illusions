@@ -391,6 +391,10 @@ export class ElectronVFS implements VirtualFileSystem {
     return bridge.watch(absolutePath, callback);
   }
 
+  getRootPath(): string | null {
+    return this.rootPath;
+  }
+
   /**
    * Resolve a path to an absolute path.
    * If the path is already absolute (starts with "/"), return it as-is.

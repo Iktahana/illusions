@@ -175,4 +175,7 @@ export interface VirtualFileSystem {
     path: string,
     callback: (event: VFSWatchEvent) => void
   ): VFSWatcher;
+
+  /** Get the root directory path as a string (Electron only). */
+  getRootPath?(): string | null;
 }

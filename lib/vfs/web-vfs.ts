@@ -385,6 +385,10 @@ export class WebVFS implements VirtualFileSystem {
 
   // watchFile is not implemented for Web - browsers do not support FS watching
 
+  getRootPath(): string | null {
+    return null;
+  }
+
   /**
    * Ensure the root directory handle has been set via openDirectory().
    * @throws Error if no root directory is available

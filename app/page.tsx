@@ -34,6 +34,7 @@ import { getProjectService } from "@/lib/project-service";
 import { getProjectManager } from "@/lib/project-manager";
 import { getAvailableFeatures } from "@/lib/feature-detection";
 import { createFileWatcher } from "@/lib/file-watcher";
+import { getVFS } from "@/lib/vfs";
 import { isProjectMode, isStandaloneMode } from "@/lib/project-types";
 import {
   countSentences,
@@ -518,6 +519,23 @@ export default function EditorPage() {
        unsubscribe?.();
      };
    }, [isElectron, handlePasteAsPlaintext]);
+
+    // メニューの「プロジェクトフォルダを開く」を受け取る（Electronのみ）
+    useEffect(() => {
+      if (!isElectron || typeof window === "undefined") return;
+
+      const cleanup = window.electronAPI?.onMenuShowInFileManager?.(() => {
+        const vfs = getVFS();
+        const rootPath = vfs.getRootPath?.();
+        if (rootPath) {
+          void window.electronAPI?.showInFileManager?.(rootPath);
+        }
+      });
+
+      return () => {
+        cleanup?.();
+      };
+    }, [isElectron]);
 
 
   contentRef.current = content;

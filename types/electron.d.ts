@@ -27,6 +27,8 @@ declare global {
     onMenuOpen?: (callback: () => void) => (() => void) | void;
     onMenuSave?: (callback: () => void) => (() => void) | void;
     onMenuSaveAs?: (callback: () => void) => (() => void) | void;
+    showInFileManager?: (dirPath: string) => Promise<boolean>;
+    onMenuShowInFileManager?: (callback: () => void) => (() => void) | void;
     /** Virtual File System IPC bridge */
     vfs?: {
       /** Open a native directory picker dialog */

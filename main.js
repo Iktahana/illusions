@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 // Electron のメインプロセス入口
 
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron')
 const path = require('path')
 const fs = require('fs/promises')
 const os = require('os')
@@ -191,6 +191,13 @@ function buildApplicationMenu() {
         accelerator: 'Shift+CmdOrCtrl+S',
         click: () => {
           mainWindow?.webContents.send('menu-save-as-triggered')
+        },
+      },
+      { type: 'separator' },
+      {
+        label: 'プロジェクトフォルダを開く',
+        click: () => {
+          mainWindow?.webContents.send('menu-show-in-file-manager')
         },
       },
       { type: 'separator' },
@@ -393,6 +400,12 @@ async function installQuickLookPluginIfNeeded() {
     log.warn('Quick Look のインストールに失敗しました:', error)
   }
 }
+
+ipcMain.handle('show-in-file-manager', async (_event, dirPath) => {
+  if (!dirPath) return false
+  const result = await shell.openPath(dirPath)
+  return result === '' // empty string = success
+})
 
 ipcMain.handle('get-chrome-version', () => {
   const v = process.versions.chrome || '0'

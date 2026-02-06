@@ -100,6 +100,10 @@ export function useWebMenuHandlers({
         console.warn('[Web Menu] Zoom functionality not yet implemented');
         break;
       
+      case 'show-in-file-manager':
+        // Handled by page.tsx via Electron IPC; no-op in web
+        break;
+
       default:
         console.warn('[Web Menu] Unknown action:', action);
     }

@@ -47,6 +47,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu-paste-as-plaintext', handler)
     return () => ipcRenderer.removeListener('menu-paste-as-plaintext', handler)
   },
+  showInFileManager: (dirPath) => ipcRenderer.invoke('show-in-file-manager', dirPath),
+  onMenuShowInFileManager: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-show-in-file-manager', handler)
+    return () => ipcRenderer.removeListener('menu-show-in-file-manager', handler)
+  },
   nlp: {
     init: (dicPath) => ipcRenderer.invoke('nlp:init', dicPath),
     tokenizeParagraph: (text) => ipcRenderer.invoke('nlp:tokenize-paragraph', text),

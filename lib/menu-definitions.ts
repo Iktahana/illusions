@@ -25,6 +25,8 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
       { type: 'separator' },
       { label: '保存', accelerator: 'Ctrl+S', action: 'save-file' },
       { label: '別名で保存...', accelerator: 'Shift+Ctrl+S', action: 'save-as' },
+      { type: 'separator' },
+      { label: 'プロジェクトフォルダを開く', action: 'show-in-file-manager', enabled: false },
     ]
   },
   {
