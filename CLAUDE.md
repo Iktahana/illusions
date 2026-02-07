@@ -368,6 +368,88 @@ async function saveFile(path: string, content: string) {
     - Minor refactoring opportunities
 
 # ============================================================================
+# 🔴 PM WORKFLOW - Multi-Agent Task Coordination (CRITICAL)
+# ============================================================================
+
+## Overview
+# The lead agent acts as **Project Manager (PM)**. It does NOT write code directly
+# for feature work. Instead, it plans, creates GitHub sub-issues, and dispatches
+# specialist agents to implement each sub-issue in parallel.
+
+## Workflow Steps
+
+### Phase 1: Planning & Issue Decomposition
+1. **Read the parent GitHub issue** to understand the full scope.
+2. **Explore the codebase** to identify affected files, dependencies, and patterns.
+3. **Decompose** the work into independent sub-issues (aim for parallelizable units).
+4. **Create sub-issues on GitHub** under the parent issue:
+   - Title: English or Japanese (per language rules).
+   - Body: Detailed spec including affected files, acceptance criteria, and code snippets.
+   - Label: same as parent issue.
+   - Reference parent: "Part of #<parent>" in the body.
+5. **Wait for user approval** before dispatching agents.
+
+### Phase 2: Agent Dispatch
+1. **Create a single feature branch** from `main` for the entire parent issue:
+   ```
+   git checkout -b feature/<parent-issue-slug>
+   ```
+2. **Dispatch agents in parallel** using the Task tool:
+   - Each agent receives: sub-issue number, full spec, branch name, file list.
+   - Agents work on **non-overlapping files** to avoid merge conflicts.
+   - If two sub-issues touch the same file, they must be sequenced (blocked).
+3. **Each agent must**:
+   - Work on the designated feature branch.
+   - Make atomic commits referencing the sub-issue number (`feat: ... #<sub-issue>`).
+   - Run `npx tsc --noEmit` before finishing to verify zero errors.
+   - NOT touch files outside its assigned scope.
+
+### Phase 3: Integration & Verification
+1. **PM reviews** all agent outputs (commits, TypeScript check).
+2. **Run final verification**: `npx tsc --noEmit` on the feature branch.
+3. **Create PR** referencing the parent issue: `Closes #<parent>`.
+4. **Close sub-issues** with verification comments.
+
+## Sub-Issue Template
+```markdown
+## Summary
+<1-2 sentence description>
+
+Part of #<parent-issue-number>
+
+## Affected Files
+| File | Action | Purpose |
+|------|--------|---------|
+| `path/to/file.ts` | MODIFY | Description |
+
+## Detailed Spec
+<Exact changes needed, including code snippets where helpful>
+
+## Acceptance Criteria
+- [ ] Criterion 1
+- [ ] Criterion 2
+- [ ] `npx tsc --noEmit` passes with zero errors
+
+## Dependencies
+- Blocked by: #<issue> (if any)
+- Blocks: #<issue> (if any)
+```
+
+## Rules for Agents
+- **DO NOT** create new files unless the sub-issue explicitly requires it.
+- **DO NOT** modify files outside the sub-issue scope.
+- **DO** follow all existing CLAUDE.md rules (language, TypeScript strict, etc.).
+- **DO** make atomic commits with sub-issue references.
+- **DO** run TypeScript check before reporting completion.
+
+## Rules for PM
+- **DO NOT** write implementation code directly; delegate to agents.
+- **DO** review agent output and catch cross-cutting issues.
+- **DO** sequence dependent sub-issues (use `blockedBy` / `blocks`).
+- **DO** create the feature branch before dispatching agents.
+- **DO** wait for user approval after creating sub-issues.
+
+# ============================================================================
 # 🎯 QUICK REFERENCE
 # ============================================================================
 
@@ -417,9 +499,13 @@ grep -r "[\uac00-\ud7af]" src/  # Korean check
 
 ---
 
-**Version**: 2.1.1  
-**Last Updated**: 2026-02-06  
+**Version**: 2.2.0
+**Last Updated**: 2026-02-07
 **Status**: ✅ Production - All AI agents must follow these rules
+**Changes in 2.2.0**:
+- Added PM Workflow section for multi-agent task coordination
+- Defined sub-issue template, agent rules, and PM rules
+- Established Phase 1 (Planning) → Phase 2 (Dispatch) → Phase 3 (Integration) workflow
 **Changes in 2.1.1**:
 - Clarified language policy applies to GitHub Issues and Pull Requests
 - Added requirement: Issue/PR titles and descriptions must be English or Japanese only
