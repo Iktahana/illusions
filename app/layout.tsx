@@ -24,6 +24,9 @@ export default function RootLayout({
         <link rel="icon" href="/icon/illusions-16.png" sizes="16x16" type="image/png" />
         <link rel="apple-touch-icon" href="/icon/illusions-180.png" />
         <link rel="manifest" href="/site.webmanifest" />
+        <meta name="theme-color" content="#0f172a" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

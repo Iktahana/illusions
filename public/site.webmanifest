@@ -2,6 +2,7 @@
   "name": "Illusions",
   "short_name": "Illusions",
   "description": "A professional Japanese novel editor with vertical writing support",
+  "start_url": "/",
   "icons": [
     {
       "src": "/icon/illusions-192.png",
@@ -11,7 +12,8 @@
     {
       "src": "/icon/illusions-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "theme_color": "#0f172a",

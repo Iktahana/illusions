@@ -55,5 +55,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Serwist (generated service worker)
+public/sw*
+public/swe-worker*
+
 # WebStorm
 .idea
