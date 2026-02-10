@@ -1,15 +1,18 @@
 "use client";
 
 import { ReactNode, useMemo, useState, useEffect, useRef } from "react";
-import { 
-  FolderTree, 
-  Settings, 
-  Palette, 
+import {
+  FolderTree,
+  Settings,
+  Palette,
   ChevronRight,
   FileText,
   RefreshCw,
   X,
-  Check
+  Check,
+  Folder,
+  File,
+  ChevronDown
 } from "lucide-react";
 import clsx from "clsx";
 import { parseMarkdownChapters, getChaptersFromDOM, type Chapter } from "@/lib/utils";
@@ -23,7 +26,7 @@ import {
   type FontInfo,
   type SystemFontInfo,
 } from "@/lib/fonts";
-type Tab = "chapters" | "settings" | "style";
+type Tab = "files" | "chapters" | "settings" | "style";
 
 const formattingMarkers = ["**", "__", "~~", "*", "_", "`", "["];
 
@@ -202,13 +205,13 @@ export default function Explorer({
   showParagraphNumbers = false,
   onShowParagraphNumbersChange,
 }: ExplorerProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("chapters");
+  const [activeTab, setActiveTab] = useState<Tab>("files");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const savedTab = window.localStorage.getItem("illusions:leftTab");
-    if (savedTab === "chapters" || savedTab === "settings" || savedTab === "style") {
-      setActiveTab(savedTab);
+    if (savedTab === "files" || savedTab === "chapters" || savedTab === "settings" || savedTab === "style") {
+      setActiveTab(savedTab as Tab);
     }
   }, []);
 
@@ -222,6 +225,19 @@ export default function Explorer({
       {/* タブ */}
       <div className="h-12 border-b border-border flex items-center">
         <button
+          onClick={() => setActiveTab("files")}
+          className={clsx(
+            "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
+            activeTab === "files"
+              ? "text-foreground border-b-2 border-accent"
+              : "text-foreground hover:text-foreground"
+          )}
+          title="ファイル"
+        >
+          <Folder className="w-4 h-4" />
+          <span className="hidden sm:inline">ファイル</span>
+        </button>
+        <button
           onClick={() => setActiveTab("chapters")}
           className={clsx(
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
@@ -229,9 +245,10 @@ export default function Explorer({
               ? "text-foreground border-b-2 border-accent"
               : "text-foreground hover:text-foreground"
           )}
+          title="章"
         >
           <FolderTree className="w-4 h-4" />
-          章
+          <span className="hidden sm:inline">章</span>
         </button>
         <button
           onClick={() => setActiveTab("settings")}
@@ -241,9 +258,10 @@ export default function Explorer({
               ? "text-foreground border-b-2 border-accent"
               : "text-foreground hover:text-foreground"
           )}
+          title="設定"
         >
           <Settings className="w-4 h-4" />
-          設定
+          <span className="hidden sm:inline">設定</span>
         </button>
         <button
           onClick={() => setActiveTab("style")}
@@ -253,14 +271,16 @@ export default function Explorer({
               ? "text-foreground border-b-2 border-accent"
               : "text-foreground hover:text-foreground"
           )}
+          title="段落"
         >
           <Palette className="w-4 h-4" />
-          段落
+          <span className="hidden sm:inline">段落</span>
         </button>
       </div>
 
       {/* 内容 */}
       <div className="flex-1 overflow-y-auto">
+        {activeTab === "files" && <div className="p-4"><FilesPanel /></div>}
         {activeTab === "chapters" && <div className="p-4"><ChaptersPanel content={content} onChapterClick={onChapterClick} onInsertText={onInsertText} /></div>}
         {activeTab === "settings" && <div className="p-4"><SettingsPanel /></div>}
         {activeTab === "style" && (
@@ -285,6 +305,107 @@ export default function Explorer({
         )}
       </div>
     </aside>
+  );
+}
+
+function FilesPanel() {
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(["/"]));
+
+  const toggleDir = (path: string) => {
+    const newExpanded = new Set(expandedDirs);
+    if (newExpanded.has(path)) {
+      newExpanded.delete(path);
+    } else {
+      newExpanded.add(path);
+    }
+    setExpandedDirs(newExpanded);
+  };
+
+  // Placeholder file tree data - in real implementation this would come from VFS
+  const fileTree = {
+    "/": {
+      type: "directory" as const,
+      children: {
+        ".illusions": {
+          type: "directory" as const,
+          children: {
+            "project.json": { type: "file" as const },
+            "workspace.json": { type: "file" as const },
+          },
+        },
+        "main.mdi": { type: "file" as const },
+        "章節": {
+          type: "directory" as const,
+          children: {
+            "第一章.mdi": { type: "file" as const },
+            "第二章.mdi": { type: "file" as const },
+          },
+        },
+      },
+    },
+  };
+
+  const renderTree = (path: string, node: typeof fileTree["/"], level = 0) => {
+    if (node.type === "file") {
+      return (
+        <div
+          key={path}
+          className="flex items-center gap-2 px-2 py-1 text-sm text-foreground-secondary hover:bg-hover rounded cursor-pointer"
+          style={{ paddingLeft: `${level * 12 + 8}px` }}
+        >
+          <File className="w-4 h-4 shrink-0" />
+          <span className="truncate">{path.split("/").pop()}</span>
+        </div>
+      );
+    }
+
+    const isExpanded = expandedDirs.has(path);
+    const dirName = path === "/" ? "プロジェクト" : path.split("/").pop() || "";
+
+    return (
+      <div key={path}>
+        <div
+          onClick={() => toggleDir(path)}
+          className="flex items-center gap-2 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer"
+          style={{ paddingLeft: `${level * 12 + 8}px` }}
+        >
+          <ChevronDown
+            className={clsx(
+              "w-4 h-4 shrink-0 transition-transform",
+              !isExpanded && "-rotate-90"
+            )}
+          />
+          <Folder className="w-4 h-4 shrink-0 text-accent" />
+          <span className="truncate font-medium">{dirName}</span>
+        </div>
+        {isExpanded && node.children && (
+          <div>
+            {Object.entries(node.children).map(([name, childNode]) =>
+              renderTree(
+                path === "/" ? `/${name}` : `${path}/${name}`,
+                childNode,
+                level + 1
+              )
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-medium text-foreground">ファイル</h3>
+        <button
+          className="p-1 text-foreground-tertiary hover:text-foreground hover:bg-hover rounded transition-colors"
+          title="更新"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
+      {renderTree("/", fileTree["/"])}
+    </div>
   );
 }
 
