@@ -104,10 +104,18 @@ export async function saveMdiFile(
   if (env === "electron-renderer" && window.electronAPI) {
     const existingPath = descriptor?.path ?? null;
     try {
-      const savedPath = await window.electronAPI.saveFile(existingPath, content);
-      if (!savedPath) {
+      const result = await window.electronAPI.saveFile(existingPath, content);
+      if (!result) {
+        // User cancelled the save dialog
         return null;
       }
+      // Check for structured error response from main process
+      if (typeof result === "object" && "success" in result && !result.success) {
+        throw new Error(
+          (result as { error?: string }).error ?? "ファイルの保存に失敗しました"
+        );
+      }
+      const savedPath = result as string;
       const name = basename(savedPath);
       return {
         descriptor: {
@@ -119,7 +127,7 @@ export async function saveMdiFile(
       };
     } catch (error) {
       console.error("Electron IPC 経由で .mdi を保存できませんでした:", error);
-      return null;
+      throw error;
     }
   }
 

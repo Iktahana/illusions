@@ -10,7 +10,7 @@ import { getHistoryService } from "./history-service";
 import { getVFS } from "./vfs";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 
-const AUTO_SAVE_INTERVAL = 2000; // 2秒
+const AUTO_SAVE_INTERVAL = 5000; // 5秒
 const DEMO_FILE_NAME = "鏡地獄.mdi";
 
 async function loadDemoContent(): Promise<string | null> {
@@ -325,22 +325,29 @@ export function useMdiFile(): UseMdiFileReturn {
       }
     } catch (error) {
       console.error("保存に失敗しました:", error);
+      const message =
+        error instanceof Error ? error.message : "不明なエラー";
+      window.alert(`保存に失敗しました: ${message}`);
     } finally {
       isSavingRef.current = false;
       setIsSaving(false);
     }
   }, [currentFile, isElectron, persistLastOpenedPath, tryAutoSnapshot]);
 
+  // Stabilize auto-save with refs to avoid unnecessary timer recreation
+  const saveFileRef = useRef(saveFile);
+  saveFileRef.current = saveFile;
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+  const currentFileRef = useRef(currentFile);
+  currentFileRef.current = currentFile;
+
   // Dirty かつファイル選択中なら、一定間隔で自動保存する
   useEffect(() => {
-    const autoSave = async () => {
-      if (isDirty && currentFile) {
-        await saveFile();
-      }
-    };
-
     autoSaveTimerRef.current = setInterval(() => {
-      void autoSave();
+      if (isDirtyRef.current && currentFileRef.current) {
+        void saveFileRef.current();
+      }
     }, AUTO_SAVE_INTERVAL);
 
     return () => {
@@ -348,7 +355,7 @@ export function useMdiFile(): UseMdiFileReturn {
         clearInterval(autoSaveTimerRef.current);
       }
     };
-  }, [isDirty, currentFile, saveFile]);
+  }, []); // stable - no deps, refs handle value changes
 
   // Electron の「終了前に保存」要求を処理する
   useEffect(() => {

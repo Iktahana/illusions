@@ -76,6 +76,8 @@ export interface ProjectMode {
   mainFileHandle: FileSystemFileHandle;
   metadata: ProjectConfig;
   workspaceState: WorkspaceState;
+  /** Absolute path to the project root directory (Electron only) */
+  rootPath?: string;
 }
 
 /**
@@ -84,7 +86,7 @@ export interface ProjectMode {
  */
 export interface StandaloneMode {
   type: "standalone";
-  fileHandle: FileSystemFileHandle;
+  fileHandle: FileSystemFileHandle | null;
   fileName: string;
   fileExtension: SupportedFileExtension;
   editorSettings: EditorSettings;

@@ -142,6 +142,12 @@ function checkForUpdates(manual = false) {
 function buildApplicationMenu() {
   const isMac = process.platform === 'darwin'
 
+  /** Send an IPC message to the focused window instead of mainWindow */
+  const sendToFocused = (channel, ...args) => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (win) win.webContents.send(channel, ...args)
+  }
+
   const template = []
 
   // アプリ（macOSのみ）
@@ -177,7 +183,7 @@ function buildApplicationMenu() {
         label: '開く...',
         accelerator: 'CmdOrCtrl+O',
         click: () => {
-          mainWindow?.webContents.send('menu-open-triggered')
+          sendToFocused('menu-open-triggered')
         },
       },
       { type: 'separator' },
@@ -185,21 +191,21 @@ function buildApplicationMenu() {
         label: '保存',
         accelerator: 'CmdOrCtrl+S',
         click: () => {
-          mainWindow?.webContents.send('menu-save-triggered')
+          sendToFocused('menu-save-triggered')
         },
       },
       {
         label: '別名で保存...',
         accelerator: 'Shift+CmdOrCtrl+S',
         click: () => {
-          mainWindow?.webContents.send('menu-save-as-triggered')
+          sendToFocused('menu-save-as-triggered')
         },
       },
       { type: 'separator' },
       {
         label: 'プロジェクトフォルダを開く',
         click: () => {
-          mainWindow?.webContents.send('menu-show-in-file-manager')
+          sendToFocused('menu-show-in-file-manager')
         },
       },
       { type: 'separator' },
@@ -207,7 +213,7 @@ function buildApplicationMenu() {
         label: '閉じる',
         accelerator: 'CmdOrCtrl+W',
         click: () => {
-          mainWindow?.close()
+          BrowserWindow.getFocusedWindow()?.close()
         },
       },
       ...(isMac ? [] : [{ type: 'separator' }]),
@@ -229,7 +235,7 @@ function buildApplicationMenu() {
          label: 'プレーンテキストとして貼り付け',
          accelerator: 'Shift+CmdOrCtrl+V',
          click: () => {
-           mainWindow?.webContents.send('menu-paste-as-plaintext')
+           sendToFocused('menu-paste-as-plaintext')
          },
        },
        { type: 'separator' },
@@ -328,11 +334,36 @@ function createWindow() {
     newWindow?.show()
   })
 
-  // 未保存の変更がある場合は終了前に保存を促す
+  // 未保存の変更がある場合は終了前に確認ダイアログを表示する
+  let isHandlingClose = false
   newWindow.on('close', (event) => {
-    if (newWindow.isDocumentEdited()) {
+    if (newWindow.isDocumentEdited() && !isHandlingClose) {
       event.preventDefault()
-      newWindow.webContents.send('electron-request-save-before-close')
+      isHandlingClose = true
+
+      dialog
+        .showMessageBox(newWindow, {
+          type: 'question',
+          buttons: ['保存', '保存しない', 'キャンセル'],
+          defaultId: 0,
+          cancelId: 2,
+          message: '変更が保存されていません',
+          detail: '保存しない場合、変更は失われます。',
+        })
+        .then(({ response }) => {
+          if (response === 0) {
+            // "Save": request renderer to save, then close
+            newWindow.webContents.send('electron-request-save-before-close')
+          } else if (response === 1) {
+            // "Don't Save": discard changes and close immediately
+            newWindow.destroy()
+          }
+          // response === 2 ("Cancel"): do nothing, keep window open
+          isHandlingClose = false
+        })
+        .catch(() => {
+          isHandlingClose = false
+        })
     }
   })
   
@@ -455,8 +486,13 @@ ipcMain.handle('save-file', async (_event, filePath, content) => {
     if (result.canceled || !result.filePath) return null
     target = result.filePath
   }
-  await fs.writeFile(target, content, 'utf-8')
-  return target
+  try {
+    await fs.writeFile(target, content, 'utf-8')
+    return target
+  } catch (error) {
+    log.error('ファイルの保存に失敗しました:', error)
+    return { success: false, error: error.message || '不明なエラー' }
+  }
 })
 
 ipcMain.handle('set-dirty', (event, dirty) => {
@@ -501,8 +537,40 @@ ipcMain.handle('open-dictionary-popup', (_event, url, title) => {
   return true
 })
 
+// Handle .mdi file association (macOS: open-file event, Windows/Linux: process.argv)
+let pendingFilePath = null
+
+app.on('open-file', async (event, filePath) => {
+  event.preventDefault()
+  if (mainWindow && mainWindow.webContents) {
+    try {
+      const content = await fs.readFile(filePath, 'utf-8')
+      mainWindow.webContents.send('open-file-from-system', { path: filePath, content })
+    } catch (err) {
+      log.error('システムからのファイルオープンに失敗しました:', err)
+    }
+  } else {
+    pendingFilePath = filePath
+  }
+})
+
 app.whenReady().then(() => {
   createMainWindow()
+
+  // Handle pending file from open-file event (received before window was ready)
+  if (pendingFilePath) {
+    const fileToOpen = pendingFilePath
+    pendingFilePath = null
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        const content = await fs.readFile(fileToOpen, 'utf-8')
+        mainWindow.webContents.send('open-file-from-system', { path: fileToOpen, content })
+      } catch (err) {
+        log.error('システムからのファイルオープンに失敗しました:', err)
+      }
+    })
+  }
+
   installQuickLookPluginIfNeeded()
 
   // Register IPC handlers

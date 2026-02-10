@@ -69,6 +69,37 @@ function hasShowOpenFilePicker(
   return "showOpenFilePicker" in w;
 }
 
+/**
+ * Validate a project name for filesystem safety.
+ * プロジェクト名がファイルシステムで安全かどうかを検証する。
+ */
+export function validateProjectName(
+  name: string
+): { valid: boolean; error?: string } {
+  if (!name.trim()) {
+    return { valid: false, error: "プロジェクト名を入力してください" };
+  }
+  if (name.length > 200) {
+    return { valid: false, error: "プロジェクト名が長すぎます" };
+  }
+  if (/[<>:"/\\|?*\x00-\x1f]/.test(name)) {
+    return {
+      valid: false,
+      error: '使用できない文字が含まれています: < > : " / \\ | ? *',
+    };
+  }
+  if (/^(CON|PRN|AUX|NUL|COM\d|LPT\d)$/i.test(name)) {
+    return { valid: false, error: "予約語は使用できません" };
+  }
+  if (/^[\s.]+$/.test(name)) {
+    return {
+      valid: false,
+      error: "空白やドットのみの名前は使用できません",
+    };
+  }
+  return { valid: true };
+}
+
 export class ProjectService {
   private vfs: VirtualFileSystem;
   private projectManager: ProjectManager;
@@ -90,6 +121,12 @@ export class ProjectService {
     name: string,
     fileExtension: SupportedFileExtension = ".mdi"
   ): Promise<ProjectMode> {
+    // Validate project name before proceeding
+    const validation = validateProjectName(name);
+    if (!validation.valid) {
+      throw new Error(validation.error ?? "無効なプロジェクト名です");
+    }
+
     // 1. Open parent directory picker via VFS
     const parentDirHandle = await this.vfs.openDirectory();
 
@@ -189,6 +226,7 @@ export class ProjectService {
       mainFileHandle: nativeMainFileHandle,
       metadata,
       workspaceState,
+      rootPath: isElectronRenderer() ? this.vfs.getRootPath?.() ?? undefined : undefined,
     };
   }
 
@@ -256,6 +294,7 @@ export class ProjectService {
       mainFileHandle: nativeMainFileHandle,
       metadata,
       workspaceState,
+      rootPath: isElectronRenderer() ? this.vfs.getRootPath?.() ?? undefined : undefined,
     };
   }
 
@@ -321,7 +360,7 @@ export class ProjectService {
       // Here we return a dummy handle since ProjectMode/StandaloneMode require it.
       return {
         type: "standalone",
-        fileHandle: null as unknown as FileSystemFileHandle,
+        fileHandle: null,
         fileName,
         fileExtension,
         editorSettings: getDefaultEditorSettings(fileExtension),
@@ -457,19 +496,27 @@ export class ProjectService {
    * ProjectMode のネイティブハンドルと VFS の間を橋渡しする。
    */
   private async getVFSDirectoryHandle(
-    _project: ProjectMode
+    project: ProjectMode
   ): Promise<VFSDirectoryHandle> {
-    // The VFS stores the root handle after openDirectory() was called.
-    // We retrieve it by getting the directory handle for the empty path (root).
-    try {
+    // If VFS already has root set, use it directly.
+    if (this.vfs.isRootOpen()) {
       return await this.vfs.getDirectoryHandle("");
-    } catch {
-      // If VFS doesn't have root set (e.g., after page reload),
-      // the caller needs to re-open the project via openProject().
-      throw new Error(
-        "VFS のルートディレクトリが利用できません。プロジェクトを再度開いてください。"
-      );
     }
+
+    // Electron: recover from stored rootPath after page reload
+    if (isElectronRenderer() && project.rootPath) {
+      // Re-set the VFS root using the stored absolute path
+      if ("setRootPath" in this.vfs) {
+        (this.vfs as { setRootPath: (p: string) => void }).setRootPath(
+          project.rootPath
+        );
+      }
+      return await this.vfs.getDirectoryHandle("");
+    }
+
+    throw new Error(
+      "VFS のルートディレクトリが利用できません。プロジェクトを再度開いてください。"
+    );
   }
 }
 

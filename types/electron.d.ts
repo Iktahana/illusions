@@ -13,7 +13,7 @@ declare global {
     saveFile: (
       filePath: string | null,
       content: string
-    ) => Promise<string | null>;
+    ) => Promise<string | { success: false; error: string } | null>;
     getChromeVersion: () => Promise<number>;
     setDirty: (dirty: boolean) => Promise<void>;
     saveDoneAndClose?: () => Promise<void>;
@@ -68,6 +68,9 @@ declare global {
       loadEditorBuffer: () => Promise<EditorBuffer | null>;
       clearEditorBuffer: () => Promise<void>;
       clearAll: () => Promise<void>;
+      addRecentProject: (project: { id: string; rootPath: string; name: string }) => Promise<void>;
+      getRecentProjects: () => Promise<Array<{ id: string; rootPath: string; name: string }>>;
+      removeRecentProject: (projectId: string) => Promise<void>;
     };
     nlp?: {
       /**
