@@ -2,6 +2,7 @@
 
 import { FolderPlus, FolderOpen, FileText, Clock, Download } from "lucide-react";
 import clsx from "clsx";
+import { useEffect, useState } from "react";
 
 interface RecentProject {
   projectId: string;
@@ -69,6 +70,22 @@ export default function WelcomeScreen({
   recentProjects,
   isProjectModeSupported,
 }: WelcomeScreenProps): React.JSX.Element {
+  // Client-side only check to avoid hydration mismatch
+  // Start with null (don't show modal), then check on mount
+  const [showUnsupportedModal, setShowUnsupportedModal] = useState(false);
+
+  useEffect(() => {
+    // Check if running in Electron
+    const isElectron = typeof window !== "undefined" &&
+      "electronAPI" in window &&
+      Boolean((window as { electronAPI?: { isElectron?: boolean } }).electronAPI?.isElectron);
+
+    // Only show modal if browser is unsupported AND not in Electron
+    if (!isProjectModeSupported && !isElectron) {
+      setShowUnsupportedModal(true);
+    }
+  }, [isProjectModeSupported]);
+
   return (
     <div className="flex h-full w-full items-center justify-center bg-background p-4">
       <div className="flex w-full max-w-lg flex-col items-center gap-8">
@@ -130,8 +147,8 @@ export default function WelcomeScreen({
           </button>
         </div>
 
-        {/* Non-dismissible modal for unsupported browsers */}
-        {!isProjectModeSupported && (
+        {/* Non-dismissible modal for unsupported browsers (not shown in Electron) */}
+        {showUnsupportedModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
             <div className="mx-4 w-full max-w-md rounded-xl bg-background-elevated p-8 shadow-xl border border-border text-center">
               <h2 className="text-xl font-bold text-foreground">
