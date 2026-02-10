@@ -308,6 +308,10 @@ export default function Explorer({
   );
 }
 
+type FileTreeNode =
+  | { type: "file" }
+  | { type: "directory"; children: Record<string, FileTreeNode> };
+
 function FilesPanel() {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(["/"]));
 
@@ -322,30 +326,30 @@ function FilesPanel() {
   };
 
   // Placeholder file tree data - in real implementation this would come from VFS
-  const fileTree = {
+  const fileTree: Record<string, FileTreeNode> = {
     "/": {
-      type: "directory" as const,
+      type: "directory",
       children: {
         ".illusions": {
-          type: "directory" as const,
+          type: "directory",
           children: {
-            "project.json": { type: "file" as const },
-            "workspace.json": { type: "file" as const },
+            "project.json": { type: "file" },
+            "workspace.json": { type: "file" },
           },
         },
-        "main.mdi": { type: "file" as const },
+        "main.mdi": { type: "file" },
         "章節": {
-          type: "directory" as const,
+          type: "directory",
           children: {
-            "第一章.mdi": { type: "file" as const },
-            "第二章.mdi": { type: "file" as const },
+            "第一章.mdi": { type: "file" },
+            "第二章.mdi": { type: "file" },
           },
         },
       },
     },
   };
 
-  const renderTree = (path: string, node: typeof fileTree["/"], level = 0) => {
+  const renderTree = (path: string, node: FileTreeNode, level = 0) => {
     if (node.type === "file") {
       return (
         <div
