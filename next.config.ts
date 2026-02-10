@@ -13,6 +13,7 @@ const withSerwist = withSerwistInit({
 const nextConfig: NextConfig = {
   images: { unoptimized: true },
   trailingSlash: true,
+  turbopack: {},
 
   // Note: After NLP backend migration, kuromoji is only used in:
   // 1. Server-side API routes (Next.js)
