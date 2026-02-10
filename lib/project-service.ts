@@ -156,13 +156,7 @@ export class ProjectService {
       JSON.stringify(historyIndex, null, 2)
     );
 
-    // 9. Create .gitignore in project directory
-    const gitignoreHandle = await projectDirHandle.getFileHandle(".gitignore", {
-      create: true,
-    });
-    await gitignoreHandle.write(this.getGitignoreContent());
-
-    // 10. Extract native handles for IndexedDB persistence and ProjectMode.
+    // 9. Extract native handles for IndexedDB persistence and ProjectMode.
     // VFS wrappers cannot be stored in IndexedDB (Structured Clone loses class methods).
     // VFS ラッパーは Structured Clone でメソッドが失われるため、ネイティブハンドルを使用する。
     const nativeRootHandle = projectDirHandle.nativeDirectoryHandle
@@ -443,21 +437,6 @@ export class ProjectService {
       case ".txt":
         return "新しいテキストファイル\n\nここから書き始めてください。\n";
     }
-  }
-
-  /**
-   * Generate .gitignore content for Illusions projects.
-   * .gitignore ファイルの内容を生成する。
-   */
-  private getGitignoreContent(): string {
-    return `# Illusions project settings
-.illusions/
-*.history
-
-# Editor backups
-*.bak
-*.tmp
-`;
   }
 
   /**
