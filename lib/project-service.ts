@@ -90,19 +90,24 @@ export class ProjectService {
     name: string,
     fileExtension: SupportedFileExtension = ".mdi"
   ): Promise<ProjectMode> {
-    // 1. Open directory picker via VFS
-    const rootDirHandle = await this.vfs.openDirectory();
+    // 1. Open parent directory picker via VFS
+    const parentDirHandle = await this.vfs.openDirectory();
 
-    // 2. Generate project ID
-    const projectId = crypto.randomUUID();
-    const mainFileName = `${name}${fileExtension}`;
-
-    // 3. Create .illusions/ directory
-    const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", {
+    // 2. Create project directory with the project name
+    const projectDirHandle = await parentDirHandle.getDirectoryHandle(name, {
       create: true,
     });
 
-    // 4. Create project.json
+    // 3. Generate project ID and main file name
+    const projectId = crypto.randomUUID();
+    const mainFileName = `${name}${fileExtension}`;
+
+    // 4. Create .illusions/ directory inside project directory
+    const illusionsDir = await projectDirHandle.getDirectoryHandle(".illusions", {
+      create: true,
+    });
+
+    // 5. Create project.json
     const metadata: ProjectConfig = {
       version: "1.0.0",
       projectId,
@@ -119,13 +124,13 @@ export class ProjectService {
     );
     await projectJsonHandle.write(JSON.stringify(metadata, null, 2));
 
-    // 5. Create main file with initial content
-    const mainFileHandle = await rootDirHandle.getFileHandle(mainFileName, {
+    // 6. Create main file with initial content in project directory
+    const mainFileHandle = await projectDirHandle.getFileHandle(mainFileName, {
       create: true,
     });
     await mainFileHandle.write(this.getInitialContent(fileExtension));
 
-    // 6. Create workspace.json
+    // 7. Create workspace.json
     const workspaceState = getDefaultWorkspaceState();
     const workspaceJsonHandle = await illusionsDir.getFileHandle(
       "workspace.json",
@@ -135,7 +140,7 @@ export class ProjectService {
       JSON.stringify(workspaceState, null, 2)
     );
 
-    // 7. Create history/ directory with empty index
+    // 8. Create history/ directory with empty index
     const historyDir = await illusionsDir.getDirectoryHandle("history", {
       create: true,
     });
@@ -151,17 +156,17 @@ export class ProjectService {
       JSON.stringify(historyIndex, null, 2)
     );
 
-    // 8. Create .gitignore
-    const gitignoreHandle = await rootDirHandle.getFileHandle(".gitignore", {
+    // 9. Create .gitignore in project directory
+    const gitignoreHandle = await projectDirHandle.getFileHandle(".gitignore", {
       create: true,
     });
     await gitignoreHandle.write(this.getGitignoreContent());
 
-    // 9. Extract native handles for IndexedDB persistence and ProjectMode.
+    // 10. Extract native handles for IndexedDB persistence and ProjectMode.
     // VFS wrappers cannot be stored in IndexedDB (Structured Clone loses class methods).
     // VFS ラッパーは Structured Clone でメソッドが失われるため、ネイティブハンドルを使用する。
-    const nativeRootHandle = rootDirHandle.nativeDirectoryHandle
-      ?? (rootDirHandle as unknown as FileSystemDirectoryHandle);
+    const nativeRootHandle = projectDirHandle.nativeDirectoryHandle
+      ?? (projectDirHandle as unknown as FileSystemDirectoryHandle);
     const nativeMainFileHandle = mainFileHandle.nativeFileHandle
       ?? (mainFileHandle as unknown as FileSystemFileHandle);
 
