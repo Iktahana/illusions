@@ -222,10 +222,11 @@ function EditorToolbar({
         {/* 縦書き/横書き */}
          <button
            onClick={onToggleVertical}
-           className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-accent text-accent-foreground hover:bg-accent-hover transition-colors"
+           className="flex items-center gap-2 px-3 py-1.5 rounded font-medium bg-accent text-accent-foreground hover:bg-accent-hover transition-colors whitespace-nowrap"
+           style={{ fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)' }}
          >
-           <Type className="w-4 h-4" />
-           {isVertical ? "縦書き" : "横書き"}
+           <Type className="w-4 h-4 shrink-0" />
+           <span className="overflow-hidden text-ellipsis">{isVertical ? "縦書き" : "横書き"}</span>
          </button>
 
         {/* 現在の設定 */}
