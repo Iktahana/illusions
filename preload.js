@@ -61,15 +61,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
       if (onProgress) {
         const handler = (event, progress) => onProgress(progress);
         ipcRenderer.on('nlp:tokenize-progress', handler);
-        
+
         // Auto-cleanup after 60 seconds
         setTimeout(() => {
           ipcRenderer.removeListener('nlp:tokenize-progress', handler);
         }, 60000);
       }
-      
+
       return ipcRenderer.invoke('nlp:tokenize-document', { paragraphs });
     },
     analyzeWordFrequency: (text) => ipcRenderer.invoke('nlp:analyze-word-frequency', text),
+  },
+  storage: {
+    saveSession: (session) => ipcRenderer.invoke('storage:save-session', session),
+    loadSession: () => ipcRenderer.invoke('storage:load-session'),
+    saveAppState: (appState) => ipcRenderer.invoke('storage:save-app-state', appState),
+    loadAppState: () => ipcRenderer.invoke('storage:load-app-state'),
+    addToRecent: (file) => ipcRenderer.invoke('storage:add-to-recent', file),
+    getRecentFiles: () => ipcRenderer.invoke('storage:get-recent-files'),
+    removeFromRecent: (path) => ipcRenderer.invoke('storage:remove-from-recent', path),
+    clearRecent: () => ipcRenderer.invoke('storage:clear-recent'),
+    saveEditorBuffer: (buffer) => ipcRenderer.invoke('storage:save-editor-buffer', buffer),
+    loadEditorBuffer: () => ipcRenderer.invoke('storage:load-editor-buffer'),
+    clearEditorBuffer: () => ipcRenderer.invoke('storage:clear-editor-buffer'),
+    clearAll: () => ipcRenderer.invoke('storage:clear-all'),
   },
 })

@@ -35,6 +35,8 @@ await esbuild.build({
     // kuromoji needs to load dictionary files at runtime
     // We'll copy them separately as extraResources
     'kuromoji',
+    // better-sqlite3 is a native module
+    'better-sqlite3',
   ],
   format: 'cjs',
   minify: false, // Keep readable for debugging
@@ -70,8 +72,8 @@ if (!fs.existsSync(nodeModulesDest)) {
   fs.mkdirSync(nodeModulesDest, { recursive: true });
 }
 
-// kuromoji requires these modules at runtime (not bundled by esbuild)
-const kuromojiDeps = ['kuromoji', 'doublearray', 'zlibjs', 'async'];
+// kuromoji and better-sqlite3 require these modules at runtime (not bundled by esbuild)
+const kuromojiDeps = ['kuromoji', 'doublearray', 'zlibjs', 'async', 'better-sqlite3'];
 
 for (const dep of kuromojiDeps) {
   const src = join(projectRoot, 'node_modules', dep);
@@ -90,5 +92,5 @@ console.log('');
 console.log('Bundle summary:');
 console.log('  • Main process: dist-main/main.js');
 console.log('  • Preload script: dist-main/preload.js');
-console.log('  • Kuromoji + deps: dist-main/node_modules/{kuromoji,doublearray,zlibjs,async}');
+console.log('  • Runtime deps: dist-main/node_modules/{kuromoji,doublearray,zlibjs,async,better-sqlite3}');
 console.log('');

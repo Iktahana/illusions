@@ -10,6 +10,7 @@ const { promisify } = require('util')
 const { autoUpdater } = require('electron-updater')
 const log = require('electron-log')
 const { registerNlpHandlers } = require('./nlp-service/nlp-ipc-handlers')
+const { registerStorageHandlers } = require('./electron-storage-ipc-handlers')
 
 const execFileAsync = promisify(execFile)
 
@@ -289,18 +290,29 @@ function buildApplicationMenu() {
 
 // 新しいウィンドウを作成（マルチウィンドウ対応）
 function createWindow() {
+  const preloadPath = path.join(__dirname, 'preload.js')
+  console.log('[Main] __dirname:', __dirname)
+  console.log('[Main] Preload path:', preloadPath)
+  console.log('[Main] Preload exists:', require('fs').existsSync(preloadPath))
+  console.log('[Main] isDev:', isDev)
+
   const newWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     show: false,
     backgroundColor: '#0f172a',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
       webviewTag: true,
     },
+  })
+
+  // Preload error detection
+  newWindow.webContents.on('preload-error', (_event, _preloadPath, error) => {
+    console.error('[Main] Preload error:', _preloadPath, error)
   })
 
   // ウィンドウをセットに追加
@@ -492,8 +504,9 @@ app.whenReady().then(() => {
   createMainWindow()
   installQuickLookPluginIfNeeded()
 
-  // Register NLP IPC handlers
+  // Register IPC handlers
   registerNlpHandlers()
+  registerStorageHandlers()
 
   // ウィンドウ作成後に auto-updater を初期化
   setupAutoUpdater()
