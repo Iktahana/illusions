@@ -98,22 +98,28 @@ class TokenizerService {
     }
     
     const rawTokens = this.tokenizer.tokenize(text);
-    
+
     // Convert to standardized format
-    return rawTokens.map(t => ({
-      surface: t.surface_form,
-      pos: t.pos,
-      pos_detail_1: t.pos_detail_1,
-      pos_detail_2: t.pos_detail_2,
-      pos_detail_3: t.pos_detail_3,
-      conjugation_type: t.conjugated_type,
-      conjugation_form: t.conjugated_form,
-      basic_form: t.basic_form,
-      reading: t.reading,
-      pronunciation: t.pronunciation,
-      start: t.word_position,
-      end: t.word_position + t.surface_form.length,
-    }));
+    // Calculate character positions manually since kuromoji's word_position is byte-based
+    let charPosition = 0;
+    return rawTokens.map(t => {
+      const token = {
+        surface: t.surface_form,
+        pos: t.pos,
+        pos_detail_1: t.pos_detail_1,
+        pos_detail_2: t.pos_detail_2,
+        pos_detail_3: t.pos_detail_3,
+        conjugation_type: t.conjugated_type,
+        conjugation_form: t.conjugated_form,
+        basic_form: t.basic_form,
+        reading: t.reading,
+        pronunciation: t.pronunciation,
+        start: charPosition,
+        end: charPosition + t.surface_form.length,
+      };
+      charPosition += t.surface_form.length;
+      return token;
+    });
   }
 
   /**

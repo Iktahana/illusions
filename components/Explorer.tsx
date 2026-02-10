@@ -354,9 +354,11 @@ function FilesPanel() {
       return (
         <div
           key={path}
-          className="flex items-center gap-2 px-2 py-1 text-sm text-foreground-secondary hover:bg-hover rounded cursor-pointer"
-          style={{ paddingLeft: `${level * 12 + 8}px` }}
+          className="flex items-center gap-1.5 px-2 py-1 text-sm text-foreground-secondary hover:bg-hover rounded cursor-pointer"
+          style={{ paddingLeft: `${level * 16 + 8}px` }}
         >
+          {/* Spacer to align with folder icons (chevron width + gap) */}
+          <div className="w-4 shrink-0" />
           <File className="w-4 h-4 shrink-0" />
           <span className="truncate">{path.split("/").pop()}</span>
         </div>
@@ -370,8 +372,8 @@ function FilesPanel() {
       <div key={path}>
         <div
           onClick={() => toggleDir(path)}
-          className="flex items-center gap-2 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer"
-          style={{ paddingLeft: `${level * 12 + 8}px` }}
+          className="flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer"
+          style={{ paddingLeft: `${level * 16 + 8}px` }}
         >
           <ChevronDown
             className={clsx(
