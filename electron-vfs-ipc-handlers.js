@@ -129,6 +129,13 @@ function registerVFSHandlers() {
     }
   });
 
+  // Set root directory programmatically (for restoring a recent project without dialog)
+  ipcMain.handle('vfs:set-root', async (_event, rootPath) => {
+    const resolved = path.resolve(rootPath);
+    allowedRoot = resolved;
+    return { path: resolved, name: path.basename(resolved) };
+  });
+
   console.log('[VFS IPC] VFS handlers registered');
 }
 

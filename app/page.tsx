@@ -667,6 +667,32 @@ export default function EditorPage() {
 
   // --- WelcomeScreen callbacks ---
 
+  /** Load a project's main file content into the editor */
+  const loadProjectContent = useCallback(async (project: ProjectMode) => {
+    try {
+      const projectService = getProjectService();
+      const mainContent = await projectService.readProjectContent(project);
+      const mainFileName = project.metadata.mainFile;
+
+      if (isElectron && project.rootPath) {
+        _loadSystemFile(
+          `${project.rootPath}/${mainFileName}`,
+          mainContent
+        );
+      } else {
+        _loadSystemFile(mainFileName, mainContent);
+      }
+
+      fileSessionRef.current += 1;
+      setEditorKey((prev) => prev + 1);
+    } catch (error) {
+      console.error(
+        "プロジェクトのメインファイルの読み込みに失敗しました:",
+        error
+      );
+    }
+  }, [isElectron, _loadSystemFile]);
+
   /** Show the CreateProjectWizard dialog */
   const handleCreateProject = useCallback(() => {
     setShowCreateWizard(true);
@@ -678,6 +704,7 @@ export default function EditorPage() {
       const projectService = getProjectService();
       const project = await projectService.openProject();
       setProjectMode(project);
+      await loadProjectContent(project);
 
       // Save to recent projects in Electron
       if (isElectron && project.rootPath) {
@@ -696,7 +723,7 @@ export default function EditorPage() {
       }
       console.error("プロジェクトを開くのに失敗しました:", error);
     }
-  }, [setProjectMode, isElectron]);
+  }, [setProjectMode, isElectron, loadProjectContent]);
 
   /** Open a standalone file via the existing file-open flow */
   const handleOpenStandaloneFile = useCallback(async () => {
@@ -748,10 +775,11 @@ export default function EditorPage() {
       };
 
       setProjectMode(project);
+      await loadProjectContent(project);
     } catch (error) {
       console.error("復元したプロジェクトの読み込みに失敗しました:", error);
     }
-  }, [setProjectMode]);
+  }, [setProjectMode, loadProjectContent]);
 
   /** Open a recently-stored project by its ID */
   const handleOpenRecentProject = useCallback(async (projectId: string) => {
@@ -806,6 +834,7 @@ export default function EditorPage() {
           };
 
           setProjectMode(restoredProject);
+          await loadProjectContent(restoredProject);
         } catch (error) {
           console.error("プロジェクトの読み込みに失敗しました:", error);
           window.alert("このプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。");
@@ -839,25 +868,25 @@ export default function EditorPage() {
     } catch (error) {
       console.error("最近のプロジェクトを開くのに失敗しました:", error);
     }
-  }, [isElectron, setProjectMode, openRestoredProject]);
+  }, [isElectron, setProjectMode, openRestoredProject, loadProjectContent]);
 
   /** Called when the CreateProjectWizard successfully creates a project */
-  const handleProjectCreated = useCallback((project: ProjectMode) => {
+  const handleProjectCreated = useCallback(async (project: ProjectMode) => {
     setProjectMode(project);
     setShowCreateWizard(false);
+    await loadProjectContent(project);
 
     // Save to recent projects in Electron
     if (isElectron && project.rootPath) {
       const storage = new ElectronStorageProvider();
-      void storage.initialize().then(() =>
-        storage.addRecentProject({
-          id: project.projectId,
-          rootPath: project.rootPath!,
-          name: project.name,
-        })
-      );
+      await storage.initialize();
+      await storage.addRecentProject({
+        id: project.projectId,
+        rootPath: project.rootPath,
+        name: project.name,
+      });
     }
-  }, [setProjectMode, isElectron]);
+  }, [setProjectMode, isElectron, loadProjectContent]);
 
   /** Called when permission is granted for a restored project */
   const handlePermissionGranted = useCallback(() => {

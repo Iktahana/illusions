@@ -218,6 +218,22 @@ export class ProjectService {
       }
     }
 
+    // Compute the correct project root path (parent + project name).
+    // After openDirectory(), VFS root points to the parent directory.
+    // Update it to the project directory for subsequent operations.
+    let projectRootPath: string | undefined;
+    if (isElectronRenderer()) {
+      const parentPath = this.vfs.getRootPath?.();
+      if (parentPath) {
+        projectRootPath = `${parentPath}/${name}`;
+        if ("setRootPath" in this.vfs) {
+          (this.vfs as { setRootPath: (p: string) => void }).setRootPath(
+            projectRootPath
+          );
+        }
+      }
+    }
+
     return {
       type: "project",
       projectId,
@@ -226,7 +242,7 @@ export class ProjectService {
       mainFileHandle: nativeMainFileHandle,
       metadata,
       workspaceState,
-      rootPath: isElectronRenderer() ? this.vfs.getRootPath?.() ?? undefined : undefined,
+      rootPath: projectRootPath,
     };
   }
 

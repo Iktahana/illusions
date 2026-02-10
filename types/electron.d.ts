@@ -33,6 +33,8 @@ declare global {
     vfs?: {
       /** Open a native directory picker dialog */
       openDirectory: () => Promise<{ path: string; name: string } | null>;
+      /** Set the root directory without opening a dialog (for recent project restore) */
+      setRoot: (rootPath: string) => Promise<{ path: string; name: string }>;
       /** Read file content as UTF-8 text */
       readFile: (filePath: string) => Promise<string>;
       /** Write UTF-8 text content to a file */
