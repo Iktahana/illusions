@@ -797,6 +797,7 @@ export default function EditorPage() {
 
         try {
           // Set the VFS root to the stored path and open the project
+          console.log("[Open Recent] Attempting to open project at:", project.rootPath);
           const vfs = getVFS();
           if ("setRootPath" in vfs) {
             (vfs as { setRootPath: (p: string) => void }).setRootPath(project.rootPath);
@@ -837,7 +838,34 @@ export default function EditorPage() {
           await loadProjectContent(restoredProject);
         } catch (error) {
           console.error("プロジェクトの読み込みに失敗しました:", error);
-          window.alert("このプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。");
+          console.error("プロジェクトパス:", project.rootPath);
+
+          // Check if it's a file not found error
+          const isFileNotFound = error && typeof error === 'object' &&
+            ('code' in error && (error as { code: string }).code === 'ENOENT');
+
+          const message = isFileNotFound
+            ? `プロジェクトが見つかりませんでした。\n\nパス: ${project.rootPath}\n\nフォルダが移動または削除された可能性があります。\n最近のプロジェクト一覧から削除しますか?`
+            : "このプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。";
+
+          if (isFileNotFound && window.confirm(message)) {
+            // Remove from recent projects
+            const storage = new ElectronStorageProvider();
+            await storage.initialize();
+            await storage.removeRecentProject(projectId);
+
+            // Refresh recent projects list
+            const updatedProjects = await storage.getRecentProjects();
+            const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
+              projectId: p.id,
+              name: p.name,
+              lastAccessedAt: Date.now(),
+              rootDirName: p.rootPath.split("/").pop(),
+            }));
+            setRecentProjects(entries);
+          } else if (!isFileNotFound) {
+            window.alert(message);
+          }
         }
         return;
       }
