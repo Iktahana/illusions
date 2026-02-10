@@ -558,14 +558,18 @@ function CorrectionsPanel({
   
   // 色設定項目
   const colorItems = [
+    { key: '名詞', label: '名詞' },
     { key: '動詞', label: '動詞' },
     { key: '動詞-自立', label: '└ 自立' },
     { key: '動詞-非自立', label: '└ 非自立' },
-    { key: '助詞', label: '助詞' },
-    { key: '助動詞', label: '助動詞' },
     { key: '形容詞', label: '形容詞' },
     { key: '副詞', label: '副詞' },
+    { key: '助詞', label: '助詞' },
+    { key: '助動詞', label: '助動詞' },
     { key: '接続詞', label: '接続詞' },
+    { key: '連体詞', label: '連体詞' },
+    { key: '感動詞', label: '感動詞' },
+    { key: '記号', label: '記号' },
   ];
 
   const handleColorChange = (key: string, color: string) => {
