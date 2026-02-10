@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import Explorer from "@/components/Explorer";
+import Explorer, { FilesPanel } from "@/components/Explorer";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
 import ResizablePanel from "@/components/ResizablePanel";
@@ -1064,6 +1064,13 @@ export default function EditorPage() {
            {/* 左サイドパネル */}
           {activeView !== "none" && (
             <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
+              {activeView === "files" && (
+                <aside className="h-full bg-background border-r border-border flex flex-col">
+                  <div className="p-4 flex-1 overflow-y-auto">
+                    <FilesPanel />
+                  </div>
+                </aside>
+              )}
               {activeView === "explorer" && (
               <Explorer
                 content={content}

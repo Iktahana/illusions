@@ -1,18 +1,19 @@
 "use client";
 
-import { 
-  FileText, 
-  Settings, 
+import {
+  FileText,
+  Settings,
   Search,
   Book,
   Layers,
   BarChart3,
   Users,
-  BookOpen
+  BookOpen,
+  Folder
 } from "lucide-react";
 import clsx from "clsx";
 
-export type ActivityBarView = "explorer" | "inspector" | "settings" | "search" | "outline" | "wordfreq" | "characters" | "dictionary" | "none";
+export type ActivityBarView = "files" | "explorer" | "inspector" | "settings" | "search" | "outline" | "wordfreq" | "characters" | "dictionary" | "none";
 
 interface ActivityBarProps {
   activeView: ActivityBarView;
@@ -27,6 +28,12 @@ interface ActivityBarItem {
 }
 
 const ACTIVITY_BAR_ITEMS: ActivityBarItem[] = [
+  {
+    id: "files",
+    icon: Folder,
+    label: "ファイル",
+    tooltip: "ファイル"
+  },
   {
     id: "explorer",
     icon: Layers,

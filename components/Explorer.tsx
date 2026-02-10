@@ -26,7 +26,7 @@ import {
   type FontInfo,
   type SystemFontInfo,
 } from "@/lib/fonts";
-type Tab = "files" | "chapters" | "settings" | "style";
+type Tab = "chapters" | "settings" | "style";
 
 const formattingMarkers = ["**", "__", "~~", "*", "_", "`", "["];
 
@@ -205,12 +205,12 @@ export default function Explorer({
   showParagraphNumbers = false,
   onShowParagraphNumbersChange,
 }: ExplorerProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("files");
+  const [activeTab, setActiveTab] = useState<Tab>("chapters");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const savedTab = window.localStorage.getItem("illusions:leftTab");
-    if (savedTab === "files" || savedTab === "chapters" || savedTab === "settings" || savedTab === "style") {
+    if (savedTab === "chapters" || savedTab === "settings" || savedTab === "style") {
       setActiveTab(savedTab as Tab);
     }
   }, []);
@@ -224,19 +224,6 @@ export default function Explorer({
     <aside className={clsx("h-full bg-background border-r border-border flex flex-col", className)}>
       {/* タブ */}
       <div className="h-12 border-b border-border flex items-center">
-        <button
-          onClick={() => setActiveTab("files")}
-          className={clsx(
-            "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
-            activeTab === "files"
-              ? "text-foreground border-b-2 border-accent"
-              : "text-foreground hover:text-foreground"
-          )}
-          title="ファイル"
-        >
-          <Folder className="w-4 h-4" />
-          <span className="hidden sm:inline">ファイル</span>
-        </button>
         <button
           onClick={() => setActiveTab("chapters")}
           className={clsx(
@@ -280,7 +267,6 @@ export default function Explorer({
 
       {/* 内容 */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === "files" && <div className="p-4"><FilesPanel /></div>}
         {activeTab === "chapters" && <div className="p-4"><ChaptersPanel content={content} onChapterClick={onChapterClick} onInsertText={onInsertText} /></div>}
         {activeTab === "settings" && <div className="p-4"><SettingsPanel /></div>}
         {activeTab === "style" && (
@@ -312,7 +298,7 @@ type FileTreeNode =
   | { type: "file" }
   | { type: "directory"; children: Record<string, FileTreeNode> };
 
-function FilesPanel() {
+export function FilesPanel() {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(["/"]));
 
   const toggleDir = (path: string) => {
