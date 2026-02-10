@@ -27,9 +27,13 @@ class TokenizerService {
     // In dev environment, kuromoji is in node_modules/kuromoji
     // We use require.resolve to find kuromoji's location dynamically
     try {
+      // require.resolve('kuromoji') returns <kuromoji-root>/src/kuromoji.js
+      // We need to go up to <kuromoji-root> then add /dict
       const kuromojiPath = require.resolve('kuromoji');
-      const kuromojiRoot = path.dirname(kuromojiPath);
+      const kuromojiSrcDir = path.dirname(kuromojiPath); // <kuromoji-root>/src
+      const kuromojiRoot = path.dirname(kuromojiSrcDir); // <kuromoji-root>
       const dicPath = path.join(kuromojiRoot, 'dict');
+      console.log('[TokenizerService] Resolved dictionary path:', dicPath);
       return dicPath;
     } catch (error) {
       console.error('[TokenizerService] Failed to resolve kuromoji path:', error);
