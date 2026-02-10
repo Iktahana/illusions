@@ -126,9 +126,30 @@ export default function Inspector({
   const hasLoadedRef = useRef(false);
   const [isTabReady, setIsTabReady] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [showLabels, setShowLabels] = useState(true);
+  const tabBarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsClient(true);
+  }, []);
+
+  // Responsive tab bar: hide labels when space is limited
+  useEffect(() => {
+    if (!tabBarRef.current) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const width = entry.contentRect.width;
+        // Hide labels if width is less than 400px
+        setShowLabels(width >= 400);
+      }
+    });
+
+    observer.observe(tabBarRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -367,55 +388,63 @@ export default function Inspector({
       </div>
 
       {/* タブ */}
-      <div className="h-12 border-b border-border flex items-center">
+      <div ref={tabBarRef} className="h-12 border-b border-border flex items-center">
         <button
           onClick={() => setActiveTab("ai")}
           className={clsx(
-            "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
+            "flex-1 h-full flex items-center justify-center text-sm transition-colors",
+            showLabels ? "gap-2" : "gap-0",
             activeTab === "ai"
               ? "text-foreground border-b-2 border-accent"
               : "text-foreground-tertiary hover:text-foreground-secondary"
           )}
+          title="AI"
         >
-          <Bot className="w-4 h-4" />
-          AI
+          <Bot className="w-4 h-4 shrink-0" />
+          {showLabels && <span>AI</span>}
         </button>
         <button
           onClick={() => setActiveTab("corrections")}
           className={clsx(
-            "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
+            "flex-1 h-full flex items-center justify-center text-sm transition-colors",
+            showLabels ? "gap-2" : "gap-0",
             activeTab === "corrections"
               ? "text-foreground border-b-2 border-accent"
               : "text-foreground-tertiary hover:text-foreground-secondary"
           )}
+          title="校正"
         >
-          <AlertCircle className="w-4 h-4" />
-          校正
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {showLabels && <span>校正</span>}
         </button>
         <button
           onClick={() => setActiveTab("stats")}
           className={clsx(
-            "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
+            "flex-1 h-full flex items-center justify-center text-sm transition-colors",
+            showLabels ? "gap-2" : "gap-0",
             activeTab === "stats"
               ? "text-foreground border-b-2 border-accent"
               : "text-foreground-tertiary hover:text-foreground-secondary"
           )}
+          title="統計"
         >
-          <BarChart3 className="w-4 h-4" />
-          統計
+          <BarChart3 className="w-4 h-4 shrink-0" />
+          {showLabels && <span>統計</span>}
         </button>
         {isProject && (
           <button
             onClick={() => setActiveTab("history")}
             className={clsx(
-              "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
+              "flex-1 h-full flex items-center justify-center text-sm transition-colors",
+              showLabels ? "gap-2" : "gap-0",
               activeTab === "history"
                 ? "text-foreground border-b-2 border-accent"
                 : "text-foreground-tertiary hover:text-foreground-secondary"
             )}
+            title="履歴"
           >
-            <History className="w-4 h-4" />
-            履歴
+            <History className="w-4 h-4 shrink-0" />
+            {showLabels && <span>履歴</span>}
           </button>
         )}
       </div>
