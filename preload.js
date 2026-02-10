@@ -85,6 +85,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     loadEditorBuffer: () => ipcRenderer.invoke('storage:load-editor-buffer'),
     clearEditorBuffer: () => ipcRenderer.invoke('storage:clear-editor-buffer'),
     clearAll: () => ipcRenderer.invoke('storage:clear-all'),
+    addRecentProject: (project) => ipcRenderer.invoke('storage:add-recent-project', project),
+    getRecentProjects: () => ipcRenderer.invoke('storage:get-recent-projects'),
+    removeRecentProject: (projectId) => ipcRenderer.invoke('storage:remove-recent-project', projectId),
   },
   vfs: {
     openDirectory: () => ipcRenderer.invoke('vfs:open-directory'),

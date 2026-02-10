@@ -391,6 +391,15 @@ export class ElectronVFS implements VirtualFileSystem {
     return bridge.watch(absolutePath, callback);
   }
 
+  /**
+   * Explicitly set the root path without opening a directory picker.
+   * Used for recovering VFS root after page reload (Electron).
+   * @param rootPath - Absolute path to the project root directory
+   */
+  setRootPath(rootPath: string): void {
+    this.rootPath = rootPath;
+  }
+
   getRootPath(): string | null {
     return this.rootPath;
   }

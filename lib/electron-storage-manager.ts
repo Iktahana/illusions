@@ -84,6 +84,14 @@ export class ElectronStorageManager {
         data TEXT NOT NULL,
         updated_at INTEGER NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS recent_projects (
+        id TEXT PRIMARY KEY,
+        root_path TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        data TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
     `);
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -304,6 +312,87 @@ export class ElectronStorageManager {
   }
 
   /**
+   * 最近使ったプロジェクトへ追加する（最大10件）
+   */
+  addRecentProject(project: {
+    id: string;
+    rootPath: string;
+    name: string;
+  }): void {
+    const db = this.ensureInitialized();
+
+    try {
+      db.exec("BEGIN TRANSACTION");
+
+      // Remove existing entry for this root path
+      const deleteStmt = db.prepare(
+        "DELETE FROM recent_projects WHERE root_path = ?"
+      );
+      deleteStmt.run(project.rootPath);
+
+      // Insert new entry
+      const insertStmt = db.prepare(`
+        INSERT INTO recent_projects (id, root_path, name, data, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      insertStmt.run(
+        project.id,
+        project.rootPath,
+        project.name,
+        JSON.stringify(project),
+        Date.now()
+      );
+
+      // Trim to 10 entries
+      const countStmt = db.prepare(
+        "SELECT COUNT(*) as count FROM recent_projects"
+      );
+      const countResult = countStmt.get() as { count: number };
+
+      if (countResult.count > 10) {
+        const trimStmt = db.prepare(`
+          DELETE FROM recent_projects WHERE id IN (
+            SELECT id FROM recent_projects
+            ORDER BY updated_at ASC
+            LIMIT ?
+          )
+        `);
+        trimStmt.run(countResult.count - 10);
+      }
+
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /**
+   * 最近使ったプロジェクト一覧を取得する
+   */
+  getRecentProjects(): Array<{
+    id: string;
+    rootPath: string;
+    name: string;
+  }> {
+    const db = this.ensureInitialized();
+    const stmt = db.prepare(
+      "SELECT data FROM recent_projects ORDER BY updated_at DESC LIMIT 10"
+    );
+    const rows = stmt.all() as { data: string }[];
+    return rows.map((row) => JSON.parse(row.data));
+  }
+
+  /**
+   * 最近使ったプロジェクトから削除する
+   */
+  removeRecentProject(projectId: string): void {
+    const db = this.ensureInitialized();
+    const stmt = db.prepare("DELETE FROM recent_projects WHERE id = ?");
+    stmt.run(projectId);
+  }
+
+  /**
    * すべてのデータを削除する
    */
   clearAll(): void {
@@ -312,6 +401,7 @@ export class ElectronStorageManager {
       DELETE FROM app_state;
       DELETE FROM recent_files;
       DELETE FROM editor_buffer;
+      DELETE FROM recent_projects;
     `);
   }
 

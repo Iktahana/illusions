@@ -22,7 +22,7 @@ function registerStorageHandlers() {
   // セッション保存
   ipcMain.handle('storage:save-session', async (_event, session) => {
     try {
-      manager.saveSession(session);
+      await manager.saveSession(session);
     } catch (error) {
       console.error('[Storage IPC] saveSession failed:', error);
       throw error;
@@ -42,7 +42,7 @@ function registerStorageHandlers() {
   // AppState 保存
   ipcMain.handle('storage:save-app-state', async (_event, appState) => {
     try {
-      manager.saveAppState(appState);
+      await manager.saveAppState(appState);
     } catch (error) {
       console.error('[Storage IPC] saveAppState failed:', error);
       throw error;
@@ -62,7 +62,7 @@ function registerStorageHandlers() {
   // Recent Files 追加
   ipcMain.handle('storage:add-to-recent', async (_event, file) => {
     try {
-      manager.addToRecent(file);
+      await manager.addToRecent(file);
     } catch (error) {
       console.error('[Storage IPC] addToRecent failed:', error);
       throw error;
@@ -82,7 +82,7 @@ function registerStorageHandlers() {
   // Recent Files から削除
   ipcMain.handle('storage:remove-from-recent', async (_event, path) => {
     try {
-      manager.removeFromRecent(path);
+      await manager.removeFromRecent(path);
     } catch (error) {
       console.error('[Storage IPC] removeFromRecent failed:', error);
       throw error;
@@ -92,7 +92,7 @@ function registerStorageHandlers() {
   // Recent Files クリア
   ipcMain.handle('storage:clear-recent', async () => {
     try {
-      manager.clearRecent();
+      await manager.clearRecent();
     } catch (error) {
       console.error('[Storage IPC] clearRecent failed:', error);
       throw error;
@@ -102,7 +102,7 @@ function registerStorageHandlers() {
   // Editor Buffer 保存
   ipcMain.handle('storage:save-editor-buffer', async (_event, buffer) => {
     try {
-      manager.saveEditorBuffer(buffer);
+      await manager.saveEditorBuffer(buffer);
     } catch (error) {
       console.error('[Storage IPC] saveEditorBuffer failed:', error);
       throw error;
@@ -122,7 +122,7 @@ function registerStorageHandlers() {
   // Editor Buffer クリア
   ipcMain.handle('storage:clear-editor-buffer', async () => {
     try {
-      manager.clearEditorBuffer();
+      await manager.clearEditorBuffer();
     } catch (error) {
       console.error('[Storage IPC] clearEditorBuffer failed:', error);
       throw error;
@@ -132,9 +132,39 @@ function registerStorageHandlers() {
   // すべてクリア
   ipcMain.handle('storage:clear-all', async () => {
     try {
-      manager.clearAll();
+      await manager.clearAll();
     } catch (error) {
       console.error('[Storage IPC] clearAll failed:', error);
+      throw error;
+    }
+  });
+
+  // Recent Projects 追加
+  ipcMain.handle('storage:add-recent-project', async (_event, project) => {
+    try {
+      await manager.addRecentProject(project);
+    } catch (error) {
+      console.error('[Storage IPC] addRecentProject failed:', error);
+      throw error;
+    }
+  });
+
+  // Recent Projects 取得
+  ipcMain.handle('storage:get-recent-projects', async () => {
+    try {
+      return await manager.getRecentProjects();
+    } catch (error) {
+      console.error('[Storage IPC] getRecentProjects failed:', error);
+      throw error;
+    }
+  });
+
+  // Recent Projects 削除
+  ipcMain.handle('storage:remove-recent-project', async (_event, projectId) => {
+    try {
+      await manager.removeRecentProject(projectId);
+    } catch (error) {
+      console.error('[Storage IPC] removeRecentProject failed:', error);
       throw error;
     }
   });

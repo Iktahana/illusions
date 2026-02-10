@@ -38,6 +38,9 @@ export class ElectronStorageProvider implements IStorageService {
       loadEditorBuffer: () => Promise<EditorBuffer | null>;
       clearEditorBuffer: () => Promise<void>;
       clearAll: () => Promise<void>;
+      addRecentProject: (project: { id: string; rootPath: string; name: string }) => Promise<void>;
+      getRecentProjects: () => Promise<Array<{ id: string; rootPath: string; name: string }>>;
+      removeRecentProject: (projectId: string) => Promise<void>;
     };
   }
 
@@ -111,6 +114,30 @@ export class ElectronStorageProvider implements IStorageService {
     await this.initialize();
     const api = this.getElectronAPI();
     return api.clearAll();
+  }
+
+  async addRecentProject(project: {
+    id: string;
+    rootPath: string;
+    name: string;
+  }): Promise<void> {
+    await this.initialize();
+    const api = this.getElectronAPI();
+    return api.addRecentProject(project);
+  }
+
+  async getRecentProjects(): Promise<
+    Array<{ id: string; rootPath: string; name: string }>
+  > {
+    await this.initialize();
+    const api = this.getElectronAPI();
+    return api.getRecentProjects();
+  }
+
+  async removeRecentProject(projectId: string): Promise<void> {
+    await this.initialize();
+    const api = this.getElectronAPI();
+    return api.removeRecentProject(projectId);
   }
 }
 

@@ -25,6 +25,7 @@ import { useElectronMenuHandlers } from "@/lib/use-electron-menu-handlers";
 import { useWebMenuHandlers } from "@/lib/use-web-menu-handlers";
 import { useGlobalShortcuts } from "@/lib/use-global-shortcuts";
 import { isElectronRenderer } from "@/lib/runtime-env";
+import ElectronStorageProvider from "@/lib/electron-storage";
 import WebMenuBar from "@/components/WebMenuBar";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
 import { useEditorMode } from "@/contexts/EditorModeContext";
@@ -416,18 +417,34 @@ export default function EditorPage() {
 
     const loadRecentProjects = async () => {
       try {
-        const projectManager = getProjectManager();
-        const handles = await projectManager.listProjectHandles();
-        if (!mounted) return;
+        if (isElectron) {
+          // Electron: load from SQLite via storage provider
+          const storage = new ElectronStorageProvider();
+          await storage.initialize();
+          const projects = await storage.getRecentProjects();
+          if (!mounted) return;
 
-        // Map handles to RecentProjectEntry format
-        const entries: RecentProjectEntry[] = handles.map((h) => ({
-          projectId: h.projectId,
-          name: h.name ?? h.rootDirName ?? h.projectId,
-          lastAccessedAt: h.lastAccessedAt,
-          rootDirName: h.rootDirName,
-        }));
-        setRecentProjects(entries);
+          const entries: RecentProjectEntry[] = projects.map((p) => ({
+            projectId: p.id,
+            name: p.name,
+            lastAccessedAt: Date.now(),
+            rootDirName: p.rootPath.split("/").pop(),
+          }));
+          setRecentProjects(entries);
+        } else {
+          // Web: load from IndexedDB project handles
+          const projectManager = getProjectManager();
+          const handles = await projectManager.listProjectHandles();
+          if (!mounted) return;
+
+          const entries: RecentProjectEntry[] = handles.map((h) => ({
+            projectId: h.projectId,
+            name: h.name ?? h.rootDirName ?? h.projectId,
+            lastAccessedAt: h.lastAccessedAt,
+            rootDirName: h.rootDirName,
+          }));
+          setRecentProjects(entries);
+        }
       } catch (error) {
         console.error("最近のプロジェクト一覧の読み込みに失敗しました:", error);
       }
@@ -438,7 +455,7 @@ export default function EditorPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [isElectron]);
 
   const handleParagraphSpacingChange = useCallback((value: number) => {
     setParagraphSpacing(value);
@@ -661,6 +678,17 @@ export default function EditorPage() {
       const projectService = getProjectService();
       const project = await projectService.openProject();
       setProjectMode(project);
+
+      // Save to recent projects in Electron
+      if (isElectron && project.rootPath) {
+        const storage = new ElectronStorageProvider();
+        await storage.initialize();
+        await storage.addRecentProject({
+          id: project.projectId,
+          rootPath: project.rootPath,
+          name: project.name,
+        });
+      }
     } catch (error) {
       // User may have cancelled the directory picker
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -668,7 +696,7 @@ export default function EditorPage() {
       }
       console.error("プロジェクトを開くのに失敗しました:", error);
     }
-  }, [setProjectMode]);
+  }, [setProjectMode, isElectron]);
 
   /** Open a standalone file via the existing file-open flow */
   const handleOpenStandaloneFile = useCallback(async () => {
@@ -684,36 +712,6 @@ export default function EditorPage() {
       console.error("ファイルを開くのに失敗しました:", error);
     }
   }, [setStandaloneMode]);
-
-  /** Open a recently-stored project by its ID */
-  const handleOpenRecentProject = useCallback(async (projectId: string) => {
-    try {
-      const projectManager = getProjectManager();
-      const restoreResult = await projectManager.restoreProjectHandle(projectId);
-
-      if (!restoreResult.success || !restoreResult.handle) {
-        console.error("保存されたプロジェクトハンドルの復元に失敗しました:", restoreResult.error);
-        window.alert("このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。");
-        return;
-      }
-
-      // If permission needs to be re-requested, show the PermissionPrompt
-      if (restoreResult.permissionStatus.status === "prompt-required") {
-        setPermissionPromptData({
-          projectName: projectId,
-          handle: restoreResult.handle,
-          projectId,
-        });
-        setShowPermissionPrompt(true);
-        return;
-      }
-
-      // Permission already granted; open the project by reading its config
-      await openRestoredProject(restoreResult.handle);
-    } catch (error) {
-      console.error("最近のプロジェクトを開くのに失敗しました:", error);
-    }
-  }, []);
 
   /** Read project.json from a restored directory handle and enter project mode */
   const openRestoredProject = useCallback(async (handle: FileSystemDirectoryHandle) => {
@@ -755,11 +753,111 @@ export default function EditorPage() {
     }
   }, [setProjectMode]);
 
+  /** Open a recently-stored project by its ID */
+  const handleOpenRecentProject = useCallback(async (projectId: string) => {
+    try {
+      // Electron: restore from SQLite using VFS with stored rootPath
+      if (isElectron) {
+        const storage = new ElectronStorageProvider();
+        await storage.initialize();
+        const projects = await storage.getRecentProjects();
+        const project = projects.find((p) => p.id === projectId);
+        if (!project) {
+          window.alert("このプロジェクトが見つかりませんでした。");
+          return;
+        }
+
+        try {
+          // Set the VFS root to the stored path and open the project
+          const vfs = getVFS();
+          if ("setRootPath" in vfs) {
+            (vfs as { setRootPath: (p: string) => void }).setRootPath(project.rootPath);
+          }
+          const rootDirHandle = await vfs.getDirectoryHandle("");
+          const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions");
+          const projectJsonHandle = await illusionsDir.getFileHandle("project.json");
+          const metadataText = await projectJsonHandle.read();
+          const metadata = JSON.parse(metadataText) as ProjectMode["metadata"];
+
+          let workspaceState: ProjectMode["workspaceState"];
+          try {
+            const wsHandle = await illusionsDir.getFileHandle("workspace.json");
+            const wsText = await wsHandle.read();
+            workspaceState = JSON.parse(wsText) as ProjectMode["workspaceState"];
+          } catch {
+            const { getDefaultWorkspaceState } = await import("@/lib/project-types");
+            workspaceState = getDefaultWorkspaceState();
+          }
+
+          const mainFileHandle = await rootDirHandle.getFileHandle(metadata.mainFile);
+          // In Electron, VFS handles are IPC-backed wrappers. Cast them for ProjectMode.
+          const nativeMainFileHandle = (mainFileHandle as unknown as FileSystemFileHandle);
+          const nativeRootHandle = (rootDirHandle as unknown as FileSystemDirectoryHandle);
+
+          const restoredProject: ProjectMode = {
+            type: "project",
+            projectId: metadata.projectId,
+            name: metadata.name,
+            rootHandle: nativeRootHandle,
+            mainFileHandle: nativeMainFileHandle,
+            metadata,
+            workspaceState,
+            rootPath: project.rootPath,
+          };
+
+          setProjectMode(restoredProject);
+        } catch (error) {
+          console.error("プロジェクトの読み込みに失敗しました:", error);
+          window.alert("このプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。");
+        }
+        return;
+      }
+
+      // Web: restore from IndexedDB project handles
+      const projectManager = getProjectManager();
+      const restoreResult = await projectManager.restoreProjectHandle(projectId);
+
+      if (!restoreResult.success || !restoreResult.handle) {
+        console.error("保存されたプロジェクトハンドルの復元に失敗しました:", restoreResult.error);
+        window.alert("このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。");
+        return;
+      }
+
+      // If permission needs to be re-requested, show the PermissionPrompt
+      if (restoreResult.permissionStatus.status === "prompt-required") {
+        setPermissionPromptData({
+          projectName: projectId,
+          handle: restoreResult.handle,
+          projectId,
+        });
+        setShowPermissionPrompt(true);
+        return;
+      }
+
+      // Permission already granted; open the project by reading its config
+      await openRestoredProject(restoreResult.handle);
+    } catch (error) {
+      console.error("最近のプロジェクトを開くのに失敗しました:", error);
+    }
+  }, [isElectron, setProjectMode, openRestoredProject]);
+
   /** Called when the CreateProjectWizard successfully creates a project */
   const handleProjectCreated = useCallback((project: ProjectMode) => {
     setProjectMode(project);
     setShowCreateWizard(false);
-  }, [setProjectMode]);
+
+    // Save to recent projects in Electron
+    if (isElectron && project.rootPath) {
+      const storage = new ElectronStorageProvider();
+      void storage.initialize().then(() =>
+        storage.addRecentProject({
+          id: project.projectId,
+          rootPath: project.rootPath!,
+          name: project.name,
+        })
+      );
+    }
+  }, [setProjectMode, isElectron]);
 
   /** Called when permission is granted for a restored project */
   const handlePermissionGranted = useCallback(() => {
