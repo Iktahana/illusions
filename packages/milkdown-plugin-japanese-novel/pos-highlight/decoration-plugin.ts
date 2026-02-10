@@ -31,33 +31,76 @@ export interface PosHighlightPluginOptions {
 }
 
 /**
+ * atom ノード（ruby等）による位置補正情報
+ * textContent ではスキップされるが ProseMirror 上では1位置を占める
+ */
+interface AtomAdjustment {
+  textPos: number;       // textContent 内での位置（atom の直前）
+  cumulativeOffset: number; // 累積の追加オフセット
+}
+
+/**
  * 段落情報
  */
 interface ParagraphInfo {
   node: ProseMirrorNode;
   pos: number;  // 段落の開始位置
   text: string; // 段落内のテキスト
+  atomAdjustments: AtomAdjustment[]; // atom ノードによる位置補正
+}
+
+/**
+ * textContent 上の位置を ProseMirror 段落内オフセットに変換する際の追加オフセットを取得
+ */
+function getAtomOffset(adjustments: AtomAdjustment[], textPos: number): number {
+  let offset = 0;
+  for (const adj of adjustments) {
+    if (adj.textPos <= textPos) {
+      offset = adj.cumulativeOffset;
+    } else {
+      break;
+    }
+  }
+  return offset;
 }
 
 /**
  * ドキュメントから段落を収集
+ * atom ノード（ruby等）の位置補正情報も同時に計算する
  */
 function collectParagraphs(doc: ProseMirrorNode): ParagraphInfo[] {
   const paragraphs: ParagraphInfo[] = [];
-  
+
   doc.descendants((node, pos) => {
     // paragraph ノードを収集
     if (node.type.name === 'paragraph' && node.textContent) {
+      // 段落の子ノードを走査し、atom ノードの位置補正を計算
+      const atomAdjustments: AtomAdjustment[] = [];
+      let textPos = 0;
+      let cumulativeOffset = 0;
+
+      node.forEach((child) => {
+        if (child.isText) {
+          textPos += child.text!.length;
+        } else {
+          // atom またはその他の非テキストインラインノード
+          // ProseMirror では nodeSize 分の位置を占めるが、textContent には含まれない
+          cumulativeOffset += child.nodeSize;
+          atomAdjustments.push({ textPos, cumulativeOffset });
+        }
+      });
+
       paragraphs.push({
         node,
         pos,
         text: node.textContent,
+        atomAdjustments,
       });
       return false; // 子ノードは走査しない
     }
     return true;
   });
-  
+
   return paragraphs;
 }
 
@@ -94,12 +137,15 @@ async function processParagraph(
         token.pos_detail_1,
         { ...DEFAULT_POS_COLORS, ...colors }
       );
-      
+
       if (color) {
         // 段落内の位置 + 段落の開始位置 + 1（段落ノード自体のオフセット）
-        const from = paragraph.pos + 1 + token.start;
-        const to = paragraph.pos + 1 + token.end;
-        
+        // atom ノード（ruby等）による追加オフセットを加算
+        const extraFrom = getAtomOffset(paragraph.atomAdjustments, token.start);
+        const extraTo = getAtomOffset(paragraph.atomAdjustments, token.end);
+        const from = paragraph.pos + 1 + token.start + extraFrom;
+        const to = paragraph.pos + 1 + token.end + extraTo;
+
         decorations.push(
           Decoration.inline(from, to, {
             style: `color: ${color}`,
@@ -234,11 +280,14 @@ export function createPosHighlightPlugin(
                   token.pos_detail_1,
                   { ...DEFAULT_POS_COLORS, ...state.colors }
                 );
-                
+
                 if (color) {
-                  const from = paragraph.pos + 1 + token.start;
-                  const to = paragraph.pos + 1 + token.end;
-                  
+                  // atom ノード（ruby等）による追加オフセットを加算
+                  const extraFrom = getAtomOffset(paragraph.atomAdjustments, token.start);
+                  const extraTo = getAtomOffset(paragraph.atomAdjustments, token.end);
+                  const from = paragraph.pos + 1 + token.start + extraFrom;
+                  const to = paragraph.pos + 1 + token.end + extraTo;
+
                   allDecorations.push(
                     Decoration.inline(from, to, {
                       style: `color: ${color}`,
