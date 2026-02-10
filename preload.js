@@ -86,4 +86,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     clearEditorBuffer: () => ipcRenderer.invoke('storage:clear-editor-buffer'),
     clearAll: () => ipcRenderer.invoke('storage:clear-all'),
   },
+  vfs: {
+    openDirectory: () => ipcRenderer.invoke('vfs:open-directory'),
+    readFile: (filePath) => ipcRenderer.invoke('vfs:read-file', filePath),
+    writeFile: (filePath, content) => ipcRenderer.invoke('vfs:write-file', filePath, content),
+    readDirectory: (dirPath) => ipcRenderer.invoke('vfs:read-directory', dirPath),
+    stat: (filePath) => ipcRenderer.invoke('vfs:stat', filePath),
+    mkdir: (dirPath) => ipcRenderer.invoke('vfs:mkdir', dirPath),
+    delete: (targetPath, options) => ipcRenderer.invoke('vfs:delete', targetPath, options),
+  },
 })

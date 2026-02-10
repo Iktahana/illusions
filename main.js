@@ -11,6 +11,7 @@ const { autoUpdater } = require('electron-updater')
 const log = require('electron-log')
 const { registerNlpHandlers } = require('./nlp-service/nlp-ipc-handlers')
 const { registerStorageHandlers } = require('./electron-storage-ipc-handlers')
+const { registerVFSHandlers } = require('./electron-vfs-ipc-handlers')
 
 const execFileAsync = promisify(execFile)
 
@@ -507,6 +508,7 @@ app.whenReady().then(() => {
   // Register IPC handlers
   registerNlpHandlers()
   registerStorageHandlers()
+  registerVFSHandlers()
 
   // ウィンドウ作成後に auto-updater を初期化
   setupAutoUpdater()
