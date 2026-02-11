@@ -1,0 +1,8 @@
+# robots.txt for www.illusions.app
+# Allow all bots to crawl the site
+
+User-agent: *
+Allow: /
+
+# Sitemap (optional - add when you have one)
+# Sitemap: https://www.illusions.app/sitemap.xml

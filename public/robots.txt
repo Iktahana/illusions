@@ -1,0 +1,5 @@
+# robots.txt for main Illusions app
+# Disallow all bots
+
+User-agent: *
+Disallow: /
