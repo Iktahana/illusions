@@ -403,6 +403,13 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
 
 function ChaptersPanel({ content, onChapterClick, onInsertText }: { content: string; onChapterClick?: (anchorId: string) => void; onInsertText?: (text: string) => void }) {
   const [refreshToken, setRefreshToken] = useState(0);
+
+  // 10秒ごとに自動更新
+  useEffect(() => {
+    const timer = setInterval(() => setRefreshToken((v) => v + 1), 10000);
+    return () => clearInterval(timer);
+  }, []);
+
   // まずDOMから章情報を取得し（より確実）、なければMarkdown解析にフォールバック
   const chapters = useMemo(() => {
     const domChapters = getChaptersFromDOM();
