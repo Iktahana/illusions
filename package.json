@@ -90,6 +90,7 @@
     "appId": "com.iktahana.illusions",
     "productName": "Illusions",
     "directories": {
+      "app": ".",
       "output": "dist-electron"
     },
     "icon": "build/icon.png",
