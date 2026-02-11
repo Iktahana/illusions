@@ -70,8 +70,11 @@ export default function NovelEditor({
   posHighlightEnabled = false,
   posHighlightColors = {},
 }: EditorProps) {
-  // ハイドレーション不整合を避けるため、初期値は false にする
-  const [isVertical, setIsVertical] = useState(false);
+  // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
+  const [isVertical, setIsVertical] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("illusions-writing-mode") === "vertical";
+  });
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
@@ -80,13 +83,8 @@ export default function NovelEditor({
   // Ref to indicate a mode switch is in progress (for scroll restoration)
   const isModeSwitchingRef = useRef(false);
 
-  // マウント後に localStorage から読み込む（クライアントのみ）
   useEffect(() => {
     setIsMounted(true);
-    const saved = localStorage.getItem('illusions-writing-mode');
-    if (saved === 'vertical') {
-      setIsVertical(true);
-    }
   }, []);
 
   // 変更時に縦書き状態を localStorage に保存する
