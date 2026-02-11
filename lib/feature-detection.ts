@@ -12,7 +12,9 @@ import { isElectronRenderer } from "./runtime-env";
  * showDirectoryPicker がサポートされているか確認する。
  */
 export function isDirectoryPickerSupported(): boolean {
-  return typeof window !== "undefined" && "showDirectoryPicker" in window;
+  const supported = typeof window !== "undefined" && "showDirectoryPicker" in window;
+  console.log('[FSA DEBUG] 🔍 showDirectoryPicker supported:', supported);
+  return supported;
 }
 
 /**
@@ -20,15 +22,88 @@ export function isDirectoryPickerSupported(): boolean {
  * showOpenFilePicker がサポートされているか確認する。
  */
 export function isFilePickerSupported(): boolean {
-  return typeof window !== "undefined" && "showOpenFilePicker" in window;
+  const supported = typeof window !== "undefined" && "showOpenFilePicker" in window;
+  console.log('[FSA DEBUG] 🔍 showOpenFilePicker supported:', supported);
+  return supported;
+}
+
+/**
+ * Check if File System Access API's showSaveFilePicker is supported.
+ * showSaveFilePicker がサポートされているか確認する。
+ */
+export function isSaveFilePickerSupported(): boolean {
+  const supported = typeof window !== "undefined" && "showSaveFilePicker" in window;
+  console.log('[FSA DEBUG] 🔍 showSaveFilePicker supported:', supported);
+  return supported;
+}
+
+/**
+ * Check if FileSystemFileHandle and its required methods are supported.
+ * FileSystemFileHandle と必要なメソッドがサポートされているか確認する。
+ */
+export function isFileSystemHandleSupported(): boolean {
+  if (typeof window === "undefined") {
+    console.log('[FSA DEBUG] 🔍 FileSystemHandle check: window is undefined');
+    return false;
+  }
+
+  try {
+    // Check if FileSystemFileHandle and FileSystemDirectoryHandle exist
+    const hasFileHandle = "FileSystemFileHandle" in window;
+    const hasDirHandle = "FileSystemDirectoryHandle" in window;
+
+    // Check if createWritable method exists on FileSystemFileHandle prototype
+    // createWritable は FileSystemFileHandle のメソッドなので prototype を確認
+    const hasCreateWritable =
+      hasFileHandle &&
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      typeof (window as any).FileSystemFileHandle?.prototype?.createWritable !== "undefined";
+
+    console.log('[FSA DEBUG] 🔍 FileSystemHandle support:', {
+      hasFileHandle,
+      hasDirHandle,
+      hasCreateWritable,
+      overall: hasFileHandle && hasDirHandle && hasCreateWritable
+    });
+
+    return hasFileHandle && hasDirHandle && hasCreateWritable;
+  } catch (error) {
+    console.log('[FSA DEBUG] 🔍 FileSystemHandle check error:', error);
+    return false;
+  }
 }
 
 /**
  * Check if the full File System Access API is supported (for project mode).
  * プロジェクトモードに必要な File System Access API が完全にサポートされているか確認する。
+ *
+ * Checks for:
+ * - showDirectoryPicker
+ * - showOpenFilePicker
+ * - showSaveFilePicker
+ * - FileSystemFileHandle
+ * - FileSystemDirectoryHandle
+ * - createWritable method
  */
 export function isFSASupported(): boolean {
-  return isDirectoryPickerSupported() && isFilePickerSupported();
+  console.log('[FSA DEBUG] 🔍 Starting File System Access API support check...');
+
+  const dirPickerSupported = isDirectoryPickerSupported();
+  const filePickerSupported = isFilePickerSupported();
+  const saveFilePickerSupported = isSaveFilePickerSupported();
+  const handleSupported = isFileSystemHandleSupported();
+
+  const allSupported = dirPickerSupported && filePickerSupported && saveFilePickerSupported && handleSupported;
+
+  console.log('[FSA DEBUG] 🔍 Final FSA support result:', {
+    showDirectoryPicker: dirPickerSupported,
+    showOpenFilePicker: filePickerSupported,
+    showSaveFilePicker: saveFilePickerSupported,
+    fileSystemHandles: handleSupported,
+    allSupported
+  });
+
+  return allSupported;
 }
 
 /**
@@ -67,7 +142,7 @@ export function getAvailableFeatures(): AvailableFeatures {
   }
 
   return {
-    projectMode: isDirectoryPickerSupported(),
+    projectMode: isFSASupported(), // Use full FSA check instead of just directory picker
     standaloneMode: isFilePickerSupported(),
     downloadFallback: typeof window !== "undefined",
     isElectron: false,

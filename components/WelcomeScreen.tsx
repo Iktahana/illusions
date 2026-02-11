@@ -83,6 +83,8 @@ export default function WelcomeScreen({
     // Only show modal if browser is unsupported AND not in Electron
     if (!isProjectModeSupported && !isElectron) {
       setShowUnsupportedModal(true);
+    } else {
+      setShowUnsupportedModal(false);
     }
   }, [isProjectModeSupported]);
 
