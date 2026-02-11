@@ -19,6 +19,7 @@ export default function RootLayout({
           name="description"
           content="縦書きに対応した、日本語小説のための執筆エディタです。"
         />
+        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
         <link rel="icon" href="/favicon.png" sizes="any" />
         <link rel="icon" href="/icon/illusions-32.png" sizes="32x32" type="image/png" />
         <link rel="icon" href="/icon/illusions-16.png" sizes="16x16" type="image/png" />
