@@ -31,7 +31,8 @@ export function useWebMenuHandlers({
     switch (action) {
       // File menu
       case 'new-window':
-        onNew();
+        // Open a new browser tab with the welcome page
+        window.open(`${window.location.origin}?welcome`, '_blank');
         break;
       case 'open-file':
         onOpen();

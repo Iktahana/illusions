@@ -301,7 +301,8 @@ function buildApplicationMenu() {
 }
 
 // 新しいウィンドウを作成（マルチウィンドウ対応）
-function createWindow() {
+// showWelcome: true の場合、自動復元をスキップしてウェルカム画面を表示する
+function createWindow({ showWelcome = false } = {}) {
   const preloadPath = path.join(__dirname, 'preload.js')
   console.log('[Main] __dirname:', __dirname)
   console.log('[Main] Preload path:', preloadPath)
@@ -380,12 +381,18 @@ function createWindow() {
     }
   })
 
+  const welcomeQuery = showWelcome ? '?welcome' : ''
   if (isDev) {
-    newWindow.loadURL('http://localhost:3000')
+    newWindow.loadURL(`http://localhost:3000${welcomeQuery}`)
     newWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
     // Next.js の静的出力 — app.getAppPath() はパッケージのルートを返す
-    newWindow.loadFile(path.join(app.getAppPath(), 'out', 'index.html'))
+    const filePath = path.join(app.getAppPath(), 'out', 'index.html')
+    if (showWelcome) {
+      newWindow.loadFile(filePath, { query: { welcome: '' } })
+    } else {
+      newWindow.loadFile(filePath)
+    }
   }
 
   // アプリメニューを設定
@@ -519,9 +526,9 @@ ipcMain.handle('save-before-close-done', (event) => {
 })
 
 ipcMain.handle('new-window', () => {
-   console.log('[Main Process] Creating new window...')
-   // 新しいウィンドウを作成
-   const newWin = createWindow()
+   console.log('[Main Process] Creating new window (welcome)...')
+   // 新しいウィンドウを作成（ウェルカム画面を表示）
+   const newWin = createWindow({ showWelcome: true })
    console.log('[Main Process] New window created:', newWin ? 'success' : 'failed')
    return newWin ? true : false
  })

@@ -78,6 +78,14 @@ export default function EditorPage() {
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
   const [permissionPromptData, setPermissionPromptData] = useState<PermissionPromptState | null>(null);
   const [recentProjects, setRecentProjects] = useState<RecentProjectEntry[]>([]);
+  // Auto-restore state: suppress WelcomeScreen flash during restore attempt
+  // Skip auto-restore when opened via "new window" (?welcome parameter)
+  const isNewWindowRef = useRef(
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("welcome")
+  );
+  const [isRestoring, setIsRestoring] = useState(!isNewWindowRef.current);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const isAutoRestoringRef = useRef(false);
 
   const mdiFile = useMdiFile();
   const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile: originalOpenFile, saveFile, saveAsFile, newFile: originalNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen, _loadSystemFile } =
@@ -417,12 +425,24 @@ export default function EditorPage() {
     };
   }, []);
 
-  // ID of the most recent project to auto-restore (Electron only)
+  // ID of the most recent project to auto-restore
   const [autoRestoreProjectId, setAutoRestoreProjectId] = useState<string | null>(null);
+
+  // Clean up ?welcome parameter from URL (so refreshing later will auto-restore)
+  useEffect(() => {
+    if (isNewWindowRef.current && typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("welcome");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  }, []);
 
   // Load recent projects on mount (for WelcomeScreen)
   useEffect(() => {
     let mounted = true;
+
+    // Skip auto-restore when opened via "new window" menu
+    const skipAutoRestore = isNewWindowRef.current;
 
     const loadRecentProjects = async () => {
       try {
@@ -442,12 +462,13 @@ export default function EditorPage() {
           setRecentProjects(entries);
 
           // Mark the most recent project for auto-restore (sorted by updated_at DESC)
-          if (projects.length > 0) {
+          if (!skipAutoRestore && projects.length > 0) {
             setAutoRestoreProjectId(projects[0].id);
+          } else {
+            setIsRestoring(false);
           }
         } else {
-          // Web: load from IndexedDB project handles
-          // (Web requires user interaction for permission re-grant, so no auto-restore)
+          // Web: attempt auto-restore of most recent project handle from IndexedDB
           const projectManager = getProjectManager();
           const handles = await projectManager.listProjectHandles();
           if (!mounted) return;
@@ -459,9 +480,17 @@ export default function EditorPage() {
             rootDirName: h.rootDirName,
           }));
           setRecentProjects(entries);
+
+          // Auto-restore the most recently accessed project
+          if (!skipAutoRestore && handles.length > 0) {
+            setAutoRestoreProjectId(handles[0].projectId);
+          } else {
+            setIsRestoring(false);
+          }
         }
       } catch (error) {
         console.error("最近のプロジェクト一覧の読み込みに失敗しました:", error);
+        setIsRestoring(false);
       }
     };
 
@@ -470,6 +499,40 @@ export default function EditorPage() {
     return () => {
       mounted = false;
     };
+  }, [isElectron]);
+
+  /** Delete a recent project from the list */
+  const handleDeleteRecentProject = useCallback(async (projectId: string) => {
+    try {
+      if (isElectron) {
+        const storage = new ElectronStorageProvider();
+        await storage.initialize();
+        await storage.removeRecentProject(projectId);
+
+        const updatedProjects = await storage.getRecentProjects();
+        const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
+          projectId: p.id,
+          name: p.name,
+          lastAccessedAt: Date.now(),
+          rootDirName: p.rootPath.split("/").pop(),
+        }));
+        setRecentProjects(entries);
+      } else {
+        const projectManager = getProjectManager();
+        await projectManager.removeProjectHandle(projectId);
+
+        const handles = await projectManager.listProjectHandles();
+        const entries: RecentProjectEntry[] = handles.map((h) => ({
+          projectId: h.projectId,
+          name: h.name ?? h.rootDirName ?? h.projectId,
+          lastAccessedAt: h.lastAccessedAt,
+          rootDirName: h.rootDirName,
+        }));
+        setRecentProjects(entries);
+      }
+    } catch (error) {
+      console.error("最近のプロジェクトの削除に失敗しました:", error);
+    }
   }, [isElectron]);
 
   const handleParagraphSpacingChange = useCallback((value: number) => {
@@ -829,7 +892,9 @@ export default function EditorPage() {
         const projects = await storage.getRecentProjects();
         const project = projects.find((p) => p.id === projectId);
         if (!project) {
-          window.alert("このプロジェクトが見つかりませんでした。");
+          if (!isAutoRestoringRef.current) {
+            window.alert("このプロジェクトが見つかりませんでした。");
+          }
           return;
         }
 
@@ -886,23 +951,24 @@ export default function EditorPage() {
             ? `プロジェクトが見つかりませんでした。\n\nパス: ${project.rootPath}\n\nフォルダが移動または削除された可能性があります。\n最近のプロジェクト一覧から削除しますか?`
             : "このプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。";
 
-          if (isFileNotFound && window.confirm(message)) {
-            // Remove from recent projects
-            const storage = new ElectronStorageProvider();
-            await storage.initialize();
-            await storage.removeRecentProject(projectId);
+          // During auto-restore, suppress blocking dialogs (banner will show instead)
+          if (!isAutoRestoringRef.current) {
+            if (isFileNotFound && window.confirm(message)) {
+              const storage = new ElectronStorageProvider();
+              await storage.initialize();
+              await storage.removeRecentProject(projectId);
 
-            // Refresh recent projects list
-            const updatedProjects = await storage.getRecentProjects();
-            const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
-              projectId: p.id,
-              name: p.name,
-              lastAccessedAt: Date.now(),
-              rootDirName: p.rootPath.split("/").pop(),
-            }));
-            setRecentProjects(entries);
-          } else if (!isFileNotFound) {
-            window.alert(message);
+              const updatedProjects = await storage.getRecentProjects();
+              const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
+                projectId: p.id,
+                name: p.name,
+                lastAccessedAt: Date.now(),
+                rootDirName: p.rootPath.split("/").pop(),
+              }));
+              setRecentProjects(entries);
+            } else if (!isFileNotFound) {
+              window.alert(message);
+            }
           }
         }
         return;
@@ -914,7 +980,9 @@ export default function EditorPage() {
 
       if (!restoreResult.success || !restoreResult.handle) {
         console.error("保存されたプロジェクトハンドルの復元に失敗しました:", restoreResult.error);
-        window.alert("このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。");
+        if (!isAutoRestoringRef.current) {
+          window.alert("このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。");
+        }
         return;
       }
 
@@ -936,12 +1004,33 @@ export default function EditorPage() {
     }
   }, [isElectron, setProjectMode, openRestoredProject, loadProjectContent]);
 
-  // Auto-restore the last opened project on startup (Electron only)
+  // Auto-restore the last opened project on startup
   const autoRestoreTriggeredRef = useRef(false);
   useEffect(() => {
     if (!autoRestoreProjectId || autoRestoreTriggeredRef.current) return;
     autoRestoreTriggeredRef.current = true;
-    void handleOpenRecentProject(autoRestoreProjectId);
+
+    isAutoRestoringRef.current = true;
+    void (async () => {
+      try {
+        await handleOpenRecentProject(autoRestoreProjectId);
+      } catch {
+        // handleOpenRecentProject catches its own errors internally
+      }
+      isAutoRestoringRef.current = false;
+      // After the attempt, if we're still restoring, stop and show error.
+      // A short delay lets React process any state updates from the handler.
+      // On Web, skip the error because the user may see a PermissionPrompt
+      // or simply the WelcomeScreen with the recent projects list.
+      setTimeout(() => {
+        setIsRestoring((prev) => {
+          if (prev && isElectron) {
+            setRestoreError("前回のプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。");
+          }
+          return false;
+        });
+      }, 200);
+    })();
   }, [autoRestoreProjectId, handleOpenRecentProject]);
 
   /** Called when the CreateProjectWizard successfully creates a project */
@@ -1015,15 +1104,26 @@ export default function EditorPage() {
 
   // --- Routing: WelcomeScreen vs Editor ---
   if (editorMode === null) {
+    // Show blank screen while auto-restoring last project (avoid WelcomeScreen flash)
+    if (isRestoring) {
+      return <div className="h-screen bg-background" />;
+    }
+
     return (
       <div className="h-screen flex flex-col overflow-hidden relative">
+        {/* Web menu bar (only for non-Electron environment) */}
+        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} />}
+
         <WelcomeScreen
           onCreateProject={handleCreateProject}
           onOpenProject={() => void handleOpenProject()}
           onOpenStandaloneFile={() => void handleOpenStandaloneFile()}
           onOpenRecentProject={(id) => void handleOpenRecentProject(id)}
+          onDeleteRecentProject={(id) => void handleDeleteRecentProject(id)}
           recentProjects={recentProjects}
           isProjectModeSupported={features.projectMode}
+          restoreError={restoreError}
+          onDismissRestoreError={() => setRestoreError(null)}
         />
 
         {/* CreateProjectWizard dialog */}

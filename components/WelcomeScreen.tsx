@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderPlus, FolderOpen, FileText, Clock, Download } from "lucide-react";
+import { FolderPlus, FolderOpen, FileText, Clock, Download, X } from "lucide-react";
 import clsx from "clsx";
 import { useEffect, useState } from "react";
 
@@ -16,8 +16,13 @@ interface WelcomeScreenProps {
   onOpenProject: () => void;
   onOpenStandaloneFile: () => void;
   onOpenRecentProject: (projectId: string) => void;
+  onDeleteRecentProject?: (projectId: string) => void;
   recentProjects: RecentProject[];
   isProjectModeSupported: boolean;
+  /** Error message from auto-restore failure */
+  restoreError?: string | null;
+  /** Dismiss the restore error banner */
+  onDismissRestoreError?: () => void;
 }
 
 /**
@@ -67,8 +72,11 @@ export default function WelcomeScreen({
   onOpenProject,
   onOpenStandaloneFile,
   onOpenRecentProject,
+  onDeleteRecentProject,
   recentProjects,
   isProjectModeSupported,
+  restoreError,
+  onDismissRestoreError,
 }: WelcomeScreenProps): React.JSX.Element {
   // Client-side only check to avoid hydration mismatch
   // Start with null (don't show modal), then check on mount
@@ -91,11 +99,32 @@ export default function WelcomeScreen({
   return (
     <div className="flex h-full w-full items-center justify-center bg-background p-4">
       <div className="flex w-full max-w-lg flex-col items-center gap-8">
+        {/* Restore error banner */}
+        {restoreError && (
+          <div className="w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 flex items-center justify-between gap-3">
+            <p className="text-sm text-red-400">{restoreError}</p>
+            {onDismissRestoreError && (
+              <button
+                type="button"
+                onClick={onDismissRestoreError}
+                className="shrink-0 rounded p-1 text-red-400 hover:bg-red-500/20 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">
-            Illusions
-          </h1>
+          {/* Logo SVG with dark mode inversion */}
+          <div className="mb-4 flex justify-center">
+            <img
+              src="/logo/illusions.min.svg"
+              alt="Illusions"
+              className="h-16 w-auto dark:invert"
+            />
+          </div>
           <p className="mt-2 text-sm text-foreground-secondary">
             日本語小説を書くためのエディタ
           </p>
@@ -180,11 +209,11 @@ export default function WelcomeScreen({
             </h2>
             <ul className="flex flex-col gap-1">
               {recentProjects.map((project) => (
-                <li key={project.projectId}>
+                <li key={project.projectId} className="group flex items-center rounded-lg hover:bg-hover">
                   <button
                     type="button"
                     onClick={() => onOpenRecentProject(project.projectId)}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-hover"
+                    className="flex flex-1 min-w-0 items-center gap-3 px-3 py-2 text-left transition-colors"
                   >
                     <FileText className="h-4 w-4 shrink-0 text-foreground-tertiary" />
                     <div className="min-w-0 flex-1">
@@ -202,6 +231,16 @@ export default function WelcomeScreen({
                       {formatRelativeTime(project.lastAccessedAt)}
                     </span>
                   </button>
+                  {onDeleteRecentProject && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteRecentProject(project.projectId)}
+                      className="mr-2 shrink-0 rounded p-1 text-foreground-muted opacity-0 transition-opacity hover:bg-hover hover:text-foreground group-hover:opacity-100"
+                      title="一覧から削除"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
