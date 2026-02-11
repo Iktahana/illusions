@@ -73,17 +73,20 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
     return { totalWords, uniqueWords };
   }, [words]);
 
-  // 品詞の色を取得
-  const getPosColor = (pos: string): string => {
+  // 品詞の色を取得（pos-colors.ts の DEFAULT_POS_COLORS と統一）
+  const getPosColorHex = (pos: string): string | null => {
     switch (pos) {
-      case "動詞": return "text-green-500";
-      case "名詞": return "text-blue-400";
-      case "形容詞": return "text-blue-500";
-      case "副詞": return "text-orange-500";
-      case "接続詞": return "text-teal-500";
-      case "感動詞": return "text-pink-500";
-      case "連体詞": return "text-indigo-500";
-      default: return "text-foreground-secondary";
+      case "名詞": return "#4A90E2";
+      case "動詞": return "#27AE60";
+      case "形容詞": return "#00A8FF";
+      case "副詞": return "#E84393";
+      case "助詞": return "#8E44AD";
+      case "助動詞": return "#E67E22";
+      case "接続詞": return "#D4A017";
+      case "連体詞": return "#6C5CE7";
+      case "感動詞": return "#FF7675";
+      case "記号": return "#7F8C8D";
+      default: return null;
     }
   };
 
@@ -151,7 +154,7 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
                       </span>
                     )}
                   </div>
-                  <span className={clsx("text-xs", getPosColor(entry.pos))}>
+                  <span className="text-xs" style={{ color: getPosColorHex(entry.pos) ?? undefined }}>
                     {entry.pos}
                   </span>
                 </div>
