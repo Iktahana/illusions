@@ -11,8 +11,8 @@
     "lint": "next lint",
     "download:fonts": "node scripts/download-local-fonts.mjs",
     "bundle:electron": "node scripts/bundle-electron.mjs",
-    "electron:dev": "npm run bundle:electron && concurrently \"next dev -p 3000 --webpack\" \"wait-on http://localhost:3000 && env -u ELECTRON_RUN_AS_NODE ELECTRON_DEV=1 electron .\"",
-    "electron:build": "npm run type-check && ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron && electron-builder --publish never",
+    "electron:dev": "npm run bundle:electron && concurrently \"next dev -p 3000 --webpack\" \"wait-on http://localhost:3000 && cross-env ELECTRON_DEV=1 electron .\"",
+    "electron:build": "npm run type-check && cross-env ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron && electron-builder --publish never",
     "build:quicklook": "bash scripts/build-quicklook.sh",
     "postinstall": "electron-builder install-app-deps"
   },
@@ -64,6 +64,7 @@
     "autoprefixer": "^10.4.23",
     "clsx": "^2.1.1",
     "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "dexie": "^4.2.1",
     "electron": "^32.3.3",
     "electron-builder": "^26.4.0",
