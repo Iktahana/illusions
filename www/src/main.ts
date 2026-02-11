@@ -24,14 +24,17 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div class="hero">
     <div class="logo">✨</div>
     <div class="title-logo">${logoSvg}</div>
-    <p class="tagline">日本語小説執筆のためのエディタ</p>
+    <p class="tagline">
+      縦書き、ルビ、縦中横、しっかり対応。<br/>
+      AI校正支援から文章分析まで、集中しやすい執筆環境。
+  </p>
 
     <div class="cta-buttons">
-      <a href="https://illusions.app" class="btn btn-primary">
-        Web版を開く
+      <a href="https://illusions.app" class="btn btn-primary" target="_blank">
+        Chrome版を開く
       </a>
       <a href="https://github.com/Iktahana/illusions/releases" class="btn btn-secondary">
-        デスクトップ版をダウンロード
+        MacOS/Windows版をダウンロード
       </a>
     </div>
 
