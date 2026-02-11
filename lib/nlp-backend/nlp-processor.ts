@@ -18,7 +18,9 @@ const EXCLUDED_POS = new Set(['助詞', '助動詞', '記号', 'フィラー', '
 const EXCLUDED_POS_DETAILS = new Set([
   '非自立', '接尾', '数', '代名詞', '句点', '読点', '空白', '括弧開', '括弧閉'
 ]);
-const EXCLUDED_CHARS_PATTERN = /^[。、！？!?「」『』（）()【】［］\[\]・…―－ー〜～：；:;，,．.　\s]+$/;
+// Note: ー (katakana prolonged sound mark) is intentionally NOT excluded
+// because it appears in actual words like コンピューター
+const EXCLUDED_CHARS_PATTERN = /^[\p{P}\p{S}\p{Z}\p{Cf}\s。、！？!?「」『』（）()【】［］\[\]・…―－〜～：；:;，,．.　""''〈〉《》〔〕｛｝＃＄＆＊＋＝＠＼＾｜]+$/u;
 
 interface CleanResult {
   cleanedText: string;
