@@ -4,7 +4,8 @@
   "private": true,
   "author": {
     "name": "幾田花",
-    "url": "https://github.com/iktahana"
+    "url": "https://iktahana.com",
+    "email": "illusions@iktahana.com"
   },
   "main": "dist-main/main.js",
   "scripts": {
