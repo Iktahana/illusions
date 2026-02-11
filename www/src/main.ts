@@ -1,22 +1,23 @@
 import './style.css'
+import { getRandomBackgroundImage } from './bg-images'
 
-// 背景画像リスト (bg1.jpg, bg2.jpg, bg3.jpg などの命名規則を想定)
-const BG_COUNT = 5; // 背景画像の数
+// ランダムな背景画像を取得
+const bgImageUrl = getRandomBackgroundImage()
 
-// ランダムな背景画像を設定（画像がない場合はグラデーションにフォールバック）
-const randomBgIndex = Math.floor(Math.random() * BG_COUNT) + 1;
-const bgImageUrl = `/image/bg/bg${randomBgIndex}.jpg`;
-
-// 画像が存在するかチェック
-const img = new Image();
-img.onload = () => {
-  document.body.style.setProperty('--bg-image', `url('${bgImageUrl}')`);
-};
-img.onerror = () => {
-  // 画像が見つからない場合はグラデーション背景を維持
-  console.info('Background image not found, using gradient fallback');
-};
-img.src = bgImageUrl;
+if (bgImageUrl) {
+  // 画像をプリロード
+  const img = new Image()
+  img.onload = () => {
+    document.body.style.setProperty('--bg-image', `url('${bgImageUrl}')`)
+  }
+  img.onerror = () => {
+    console.warn('Failed to load background image:', bgImageUrl)
+  }
+  img.src = bgImageUrl
+} else {
+  // 画像がない場合はグラデーション背景を維持
+  console.info('No background images available, using gradient fallback')
+}
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div class="hero">
