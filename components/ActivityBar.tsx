@@ -61,8 +61,8 @@ const ACTIVITY_BAR_ITEMS: ActivityBarItem[] = [
   {
     id: "dictionary",
     icon: BookOpen,
-    label: "辭典",
-    tooltip: "辭典"
+    label: "辞書",
+    tooltip: "辞書"
   },
   {
     id: "wordfreq",

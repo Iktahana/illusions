@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus, Trash2, Edit2, Check, X, BookOpen, ChevronDown, ChevronRight, Search, Globe, ExternalLink } from "lucide-react";
 
-// 用戶辭典條目
+// ユーザー辞書條目
 interface UserDictionaryEntry {
   id: string;
   word: string;
@@ -117,7 +117,7 @@ export default function Dictionary({ content }: DictionaryProps) {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  // 用戶辭典のフィルタリング（activeSearchQueryを使用）
+  // ユーザー辞書のフィルタリング（activeSearchQueryを使用）
   const filteredEntries = userEntries.filter(
     (entry) =>
       entry.word.toLowerCase().includes(activeSearchQuery.toLowerCase()) ||
@@ -130,7 +130,7 @@ export default function Dictionary({ content }: DictionaryProps) {
       {/* Header */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-foreground">辭典</h2>
+          <h2 className="text-lg font-semibold text-foreground">辞書</h2>
           <BookOpen className="w-5 h-5 text-foreground-secondary" />
         </div>
 
@@ -144,7 +144,7 @@ export default function Dictionary({ content }: DictionaryProps) {
                 : "text-foreground-secondary hover:text-foreground hover:bg-hover"
             }`}
           >
-            Web辭典
+            Web辞書
           </button>
           <button
             onClick={() => setActiveTab("user")}
@@ -154,7 +154,7 @@ export default function Dictionary({ content }: DictionaryProps) {
                 : "text-foreground-secondary hover:text-foreground hover:bg-hover"
             }`}
           >
-            用戶辭典
+            ユーザー辞書
           </button>
         </div>
 
@@ -191,7 +191,7 @@ export default function Dictionary({ content }: DictionaryProps) {
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === "user" ? (
-          /* 用戶辭典タブ */
+          /* ユーザー辞書タブ */
           <div className="flex flex-col h-full">
             {/* Add Button */}
             <div className="p-4 border-b border-border">
@@ -331,7 +331,7 @@ export default function Dictionary({ content }: DictionaryProps) {
                     <p>「{activeSearchQuery}」に一致する項目が見つかりません</p>
                   ) : (
                     <>
-                      <p>まだ辭典項目が追加されていません</p>
+                      <p>まだ辞書項目が追加されていません</p>
                       <p className="mt-1 text-xs">「新しい項目を追加」ボタンで追加できます</p>
                     </>
                   )}
@@ -561,14 +561,14 @@ export default function Dictionary({ content }: DictionaryProps) {
             )}
           </div>
         ) : (
-          /* Web辭典タブ */
+          /* Web辞書タブ */
           <div className="flex flex-col h-full">
             {/* Dictionary Sources */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {!activeSearchQuery ? (
                 <div className="text-center py-8 text-foreground-secondary text-sm">
                   <Globe className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>検索語を入力してWeb辭典を検索</p>
+                  <p>検索語を入力してWeb辞書を検索</p>
                   <p className="mt-1 text-xs">
                     {WEB_DICTIONARIES.map(d => d.name).join("、")}で検索します
                   </p>
