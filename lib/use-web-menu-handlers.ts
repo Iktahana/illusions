@@ -8,6 +8,9 @@ interface UseWebMenuHandlersProps {
   onOpen: () => Promise<void>;
   onSave: () => void;
   onSaveAs: () => void;
+  onOpenProject?: () => void;
+  onOpenRecentProject?: () => void;
+  onCloseWindow?: () => void;
   editorView?: EditorView | null;
 }
 
@@ -16,6 +19,9 @@ export function useWebMenuHandlers({
   onOpen,
   onSave,
   onSaveAs,
+  onOpenProject,
+  onOpenRecentProject,
+  onCloseWindow,
   editorView,
 }: UseWebMenuHandlersProps) {
   
@@ -36,7 +42,16 @@ export function useWebMenuHandlers({
       case 'save-as':
         onSaveAs();
         break;
-      
+      case 'open-project':
+        onOpenProject?.();
+        break;
+      case 'open-recent-project':
+        onOpenRecentProject?.();
+        break;
+      case 'close-window':
+        onCloseWindow?.();
+        break;
+
       // Edit menu - Using ProseMirror commands
       case 'undo':
         if (editorView) {
@@ -101,13 +116,13 @@ export function useWebMenuHandlers({
         break;
       
       case 'show-in-file-manager':
-        // Handled by page.tsx via Electron IPC; no-op in web
+        // No-op in web
         break;
 
       default:
         console.warn('[Web Menu] Unknown action:', action);
     }
-  }, [onNew, onOpen, onSave, onSaveAs, editorView]);
+  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, editorView]);
   
   return { handleMenuAction };
 }

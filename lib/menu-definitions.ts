@@ -21,12 +21,14 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
     label: 'ファイル',
     items: [
       { label: '新規ウィンドウ', accelerator: 'Ctrl+N', action: 'new-window' },
-      { label: '開く...', accelerator: 'Ctrl+O', action: 'open-file' },
+      { label: '最近のプロジェクトを開く', action: 'open-recent-project' },
+      { label: 'プロジェクトを開く', action: 'open-project' },
       { type: 'separator' },
+      { label: 'ファイルを開く...', accelerator: 'Ctrl+O', action: 'open-file' },
       { label: '保存', accelerator: 'Ctrl+S', action: 'save-file' },
       { label: '別名で保存...', accelerator: 'Shift+Ctrl+S', action: 'save-as' },
       { type: 'separator' },
-      { label: 'プロジェクトフォルダを開く', action: 'show-in-file-manager', enabled: false },
+      { label: '閉じる', accelerator: 'Ctrl+W', action: 'close-window' },
     ]
   },
   {

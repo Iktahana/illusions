@@ -48,6 +48,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('menu-paste-as-plaintext', handler)
   },
   showInFileManager: (dirPath) => ipcRenderer.invoke('show-in-file-manager', dirPath),
+  onMenuOpenProject: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-open-project', handler)
+    return () => ipcRenderer.removeListener('menu-open-project', handler)
+  },
+  onMenuOpenRecentProject: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-open-recent-project', handler)
+    return () => ipcRenderer.removeListener('menu-open-recent-project', handler)
+  },
   onMenuShowInFileManager: (callback) => {
     const handler = () => callback()
     ipcRenderer.on('menu-show-in-file-manager', handler)

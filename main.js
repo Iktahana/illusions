@@ -180,13 +180,25 @@ function buildApplicationMenu() {
         },
       },
       {
-        label: '開く...',
+        label: '最近のプロジェクトを開く',
+        click: () => {
+          sendToFocused('menu-open-recent-project')
+        },
+      },
+      {
+        label: 'プロジェクトを開く',
+        click: () => {
+          sendToFocused('menu-open-project')
+        },
+      },
+      { type: 'separator' },
+      {
+        label: 'ファイルを開く...',
         accelerator: 'CmdOrCtrl+O',
         click: () => {
           sendToFocused('menu-open-triggered')
         },
       },
-      { type: 'separator' },
       {
         label: '保存',
         accelerator: 'CmdOrCtrl+S',
@@ -199,13 +211,6 @@ function buildApplicationMenu() {
         accelerator: 'Shift+CmdOrCtrl+S',
         click: () => {
           sendToFocused('menu-save-as-triggered')
-        },
-      },
-      { type: 'separator' },
-      {
-        label: 'プロジェクトフォルダを開く',
-        click: () => {
-          sendToFocused('menu-show-in-file-manager')
         },
       },
       { type: 'separator' },

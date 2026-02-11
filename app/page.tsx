@@ -70,7 +70,7 @@ function words(s: string) {
 }
 
 export default function EditorPage() {
-  const { editorMode, setProjectMode, setStandaloneMode } = useEditorMode();
+  const { editorMode, setProjectMode, setStandaloneMode, resetMode } = useEditorMode();
 
   // Welcome screen / wizard / permission prompt state
   const [showCreateWizard, setShowCreateWizard] = useState(false);
@@ -323,6 +323,9 @@ export default function EditorPage() {
     onOpen: openFile,
     onSave: saveFile,
     onSaveAs: saveFile, // TODO: Implement separate saveAs logic
+    onOpenProject: () => void handleOpenProject(),
+    onOpenRecentProject: () => resetMode(),
+    onCloseWindow: () => window.close(),
     editorView: editorViewInstance,
   });
 
@@ -724,6 +727,25 @@ export default function EditorPage() {
       console.error("プロジェクトを開くのに失敗しました:", error);
     }
   }, [setProjectMode, isElectron, loadProjectContent]);
+
+  // メニューの「プロジェクトを開く」を受け取る（Electronのみ）
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onMenuOpenProject?.(() => {
+      void handleOpenProject();
+    });
+    return () => { cleanup?.(); };
+  }, [isElectron, handleOpenProject]);
+
+  // メニューの「最近のプロジェクトを開く」を受け取る（Electronのみ）
+  // → WelcomeScreenに戻る
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onMenuOpenRecentProject?.(() => {
+      resetMode();
+    });
+    return () => { cleanup?.(); };
+  }, [isElectron, resetMode]);
 
   /** Open a standalone file via the existing file-open flow */
   const handleOpenStandaloneFile = useCallback(async () => {
