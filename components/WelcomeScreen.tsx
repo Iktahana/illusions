@@ -3,6 +3,7 @@
 import { FolderPlus, FolderOpen, FileText, Clock, Download, X } from "lucide-react";
 import clsx from "clsx";
 import { useEffect, useState } from "react";
+import GlassDialog from "@/components/GlassDialog";
 
 interface RecentProject {
   projectId: string;
@@ -179,27 +180,23 @@ export default function WelcomeScreen({
         </div>
 
         {/* Non-dismissible modal for unsupported browsers (not shown in Electron) */}
-        {showUnsupportedModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="mx-4 w-full max-w-md rounded-xl bg-background-elevated p-8 shadow-xl border border-border text-center">
-              <h2 className="text-xl font-bold text-foreground">
-                現在お使いのブラウザでは、Illusions のWeb版はご利用いただけません。
-              </h2>
-              <p className="mt-3 text-sm text-foreground-secondary">
-                すべての機能を利用するには、デスクトップ版をお試しください。
-              </p>
-              <a
-                href="https://download.illusions.app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
-              >
-                <Download className="h-5 w-5" />
-                デスクトップ版をダウンロード
-              </a>
-            </div>
-          </div>
-        )}
+        <GlassDialog isOpen={showUnsupportedModal} panelClassName="mx-4 w-full max-w-md p-8 text-center">
+          <h2 className="text-xl font-bold text-foreground">
+            現在お使いのブラウザでは、Illusions のWeb版はご利用いただけません。
+          </h2>
+          <p className="mt-3 text-sm text-foreground-secondary">
+            すべての機能を利用するには、デスクトップ版をお試しください。
+          </p>
+          <a
+            href="https://download.illusions.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+          >
+            <Download className="h-5 w-5" />
+            デスクトップ版をダウンロード
+          </a>
+        </GlassDialog>
 
         {/* Recent projects */}
         {recentProjects.length > 0 && (

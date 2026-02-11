@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { FolderPlus, Check, Loader2, AlertCircle, ChevronDown } from "lucide-react";
 import { getProjectService, validateProjectName } from "@/lib/project-service";
+import GlassDialog from "@/components/GlassDialog";
 
 import type { ProjectMode, SupportedFileExtension } from "@/lib/project-types";
 
@@ -140,17 +141,6 @@ export default function CreateProjectWizard({
     setCreationSuccess(false);
   }, []);
 
-  /** Handle background click */
-  const handleBackgroundClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      // Only allow closing on step 1 (name-format)
-      if (e.target === e.currentTarget && step === "name-format") {
-        onClose();
-      }
-    },
-    [step, onClose]
-  );
-
   /** Handle keyboard input for name field */
   const handleNameKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -161,21 +151,17 @@ export default function CreateProjectWizard({
     [projectName, handleCreate]
   );
 
-  if (!isOpen) return null;
-
   const currentStepIndex = step === "name-format" ? 0 : 1;
   const nameValidation = projectName ? validateProjectName(projectName) : { valid: false };
   const isNameValid = nameValidation.valid;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      role="dialog"
-      aria-modal="true"
-      aria-label="新規プロジェクト作成"
-      onClick={handleBackgroundClick}
+    <GlassDialog
+      isOpen={isOpen}
+      onBackdropClick={step === "name-format" ? onClose : undefined}
+      ariaLabel="新規プロジェクト作成"
+      panelClassName="mx-4 w-full max-w-lg p-6"
     >
-      <div className="mx-4 w-full max-w-lg rounded-xl bg-background-elevated p-6 shadow-xl border border-border">
         {/* Step indicator */}
         <div className="mb-6 flex items-center justify-center gap-3">
           {STEP_LABELS.map((label, index) => (
@@ -419,7 +405,6 @@ export default function CreateProjectWizard({
             )}
           </div>
         )}
-      </div>
-    </div>
+    </GlassDialog>
   );
 }

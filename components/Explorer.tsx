@@ -20,6 +20,7 @@ import clsx from "clsx";
 import { parseMarkdownChapters, getChaptersFromDOM, type Chapter } from "@/lib/utils";
 import { useContextMenu } from "@/lib/use-context-menu";
 import ContextMenu from "@/components/ContextMenu";
+import GlassDialog from "@/components/GlassDialog";
 import {
   FEATURED_JAPANESE_FONTS,
   ALL_JAPANESE_FONTS,
@@ -933,66 +934,65 @@ function MarkdownSyntaxPanel({ onClose, onInsertText }: { onClose: () => void; o
   ];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center" onClick={onClose}>
-      <div 
-        className="bg-background rounded-lg shadow-2xl border border-border w-[500px] max-h-[80vh] overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* ヘッダー */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background-secondary">
-          <h3 className="text-sm font-semibold text-foreground">
-            章の見出しを追加
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+    <GlassDialog
+      isOpen={true}
+      onBackdropClick={onClose}
+      panelClassName="w-[500px] max-h-[80vh] overflow-hidden flex flex-col p-0"
+    >
+      {/* ヘッダー */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background-secondary/50 rounded-t-xl">
+        <h3 className="text-sm font-semibold text-foreground">
+          章の見出しを追加
+        </h3>
+        <button
+          onClick={onClose}
+          className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* 内容 */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="space-y-2">
+          {syntaxExamples.map((item, index) => (
+            <button
+              key={index}
+              onClick={() => onInsertText(item.example)}
+              className="w-full p-3 bg-background-secondary rounded-lg border border-border hover:border-accent hover:bg-active transition-colors text-left"
+            >
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <code className="text-sm font-mono text-accent bg-background px-2 py-0.5 rounded">
+                  {item.syntax}
+                </code>
+                <span className="text-xs text-foreground-tertiary">{item.description}</span>
+              </div>
+              <div className="text-foreground-secondary mt-2 pl-2 border-l-2 border-border-secondary">
+                {item.example.split('\n').map((line, i) => (
+                  <div
+                    key={i}
+                    className="font-mono"
+                    style={{ fontSize: item.fontSize }}
+                  >
+                    {line}
+                  </div>
+                ))}
+              </div>
+            </button>
+          ))}
         </div>
 
-        {/* 内容 */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="space-y-2">
-            {syntaxExamples.map((item, index) => (
-              <button
-                key={index}
-                onClick={() => onInsertText(item.example)}
-                className="w-full p-3 bg-background-secondary rounded-lg border border-border hover:border-accent hover:bg-active transition-colors text-left"
-              >
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <code className="text-sm font-mono text-accent bg-background px-2 py-0.5 rounded">
-                    {item.syntax}
-                  </code>
-                  <span className="text-xs text-foreground-tertiary">{item.description}</span>
-                </div>
-                <div className="text-foreground-secondary mt-2 pl-2 border-l-2 border-border-secondary">
-                  {item.example.split('\n').map((line, i) => (
-                    <div 
-                      key={i} 
-                      className="font-mono"
-                      style={{ fontSize: item.fontSize }}
-                    >
-                      {line}
-                    </div>
-                  ))}
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* 補足 */}
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <h4 className="text-xs font-semibold text-blue-800 mb-2">💡 ヒント</h4>
-            <ul className="text-xs text-blue-700 space-y-1">
-              <li>• 見出しの後には空行が必要です</li>
-              <li>• # の数が多いほど、小さな見出しになります</li>
-              <li>• 見出しは章の構造を表すのに使います</li>
-            </ul>
-          </div>
+        {/* 補足 */}
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 className="text-xs font-semibold text-blue-800 mb-2">💡 ヒント</h4>
+          <ul className="text-xs text-blue-700 space-y-1">
+            <li>• 見出しの後には空行が必要です</li>
+            <li>• # の数が多いほど、小さな見出しになります</li>
+            <li>• 見出しは章の構造を表すのに使います</li>
+          </ul>
         </div>
       </div>
-    </div>
+    </GlassDialog>
   );
 }
 

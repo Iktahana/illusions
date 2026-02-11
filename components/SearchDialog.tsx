@@ -189,7 +189,7 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
   return (
     <div
       ref={dialogRef}
-      className="fixed z-50 bg-background-elevated rounded-lg shadow-lg border border-border p-4 w-80 cursor-grab active:cursor-grabbing"
+      className="fixed z-50 bg-background-elevated/80 backdrop-blur-xl rounded-lg shadow-lg border border-border/50 p-4 w-80 cursor-grab active:cursor-grabbing"
       style={
         dragOffset
           ? { left: dragOffset.x, top: dragOffset.y, right: "auto" }
