@@ -324,6 +324,9 @@ export default function EditorPage() {
   const [searchResults, setSearchResults] = useState<{matches: any[], searchTerm: string} | null>(null);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
 
+  // Ref to forward handleOpenRecentProject (defined later) to useWebMenuHandlers
+  const openRecentProjectRef = useRef<(projectId: string) => void>(() => {});
+
   // Web menu handlers
   const { handleMenuAction } = useWebMenuHandlers({
     onNew: newFile,
@@ -331,7 +334,7 @@ export default function EditorPage() {
     onSave: saveFile,
     onSaveAs: saveAsFile,
     onOpenProject: () => void handleOpenProject(),
-    onOpenRecentProject: () => resetMode(),
+    onOpenRecentProject: (projectId: string) => openRecentProjectRef.current(projectId),
     onCloseWindow: () => window.close(),
     editorView: editorViewInstance,
   });
@@ -839,6 +842,8 @@ export default function EditorPage() {
           rootPath: project.rootPath,
           name: project.name,
         });
+        // Rebuild native menu to include the new project
+        void window.electronAPI?.rebuildMenu?.();
       }
     } catch (error) {
       // User may have cancelled the directory picker
@@ -860,16 +865,6 @@ export default function EditorPage() {
     });
     return () => { cleanup?.(); };
   }, [isElectron, handleOpenProject]);
-
-  // メニューの「最近のプロジェクトを開く」を受け取る（Electronのみ）
-  // → WelcomeScreenに戻る
-  useEffect(() => {
-    if (!isElectron || typeof window === "undefined") return;
-    const cleanup = window.electronAPI?.onMenuOpenRecentProject?.(() => {
-      resetMode();
-    });
-    return () => { cleanup?.(); };
-  }, [isElectron, resetMode]);
 
   /** Open a standalone file via the existing file-open flow */
   const handleOpenStandaloneFile = useCallback(async () => {
@@ -1049,6 +1044,19 @@ export default function EditorPage() {
     }
   }, [isElectron, setProjectMode, openRestoredProject, loadProjectContent]);
 
+  // Keep ref in sync so useWebMenuHandlers can call it
+  openRecentProjectRef.current = (projectId: string) => void handleOpenRecentProject(projectId);
+
+  // メニューの「最近のプロジェクトを開く」を受け取る（Electronのみ）
+  // → 指定されたプロジェクトIDで直接プロジェクトを開く
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onMenuOpenRecentProject?.((projectId: string) => {
+      void handleOpenRecentProject(projectId);
+    });
+    return () => { cleanup?.(); };
+  }, [isElectron, handleOpenRecentProject]);
+
   // Auto-restore the last opened project on startup
   const autoRestoreTriggeredRef = useRef(false);
   useEffect(() => {
@@ -1093,6 +1101,8 @@ export default function EditorPage() {
         rootPath: project.rootPath,
         name: project.name,
       });
+      // Rebuild native menu to include the new project
+      void window.electronAPI?.rebuildMenu?.();
     }
   }, [setProjectMode, isElectron, loadProjectContent]);
 
@@ -1157,7 +1167,7 @@ export default function EditorPage() {
     return (
       <div className="h-screen flex flex-col overflow-hidden relative">
         {/* Web menu bar (only for non-Electron environment) */}
-        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} />}
+        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} />}
 
         <WelcomeScreen
           onCreateProject={handleCreateProject}
@@ -1199,7 +1209,7 @@ export default function EditorPage() {
         <TitleUpdater currentFile={currentFile} isDirty={isDirty} />
 
         {/* Web menu bar (only for non-Electron environment) */}
-        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} />}
+        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} />}
 
          {/* 未保存警告ダイアログ */}
         <UnsavedWarningDialog

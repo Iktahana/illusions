@@ -9,6 +9,7 @@ export interface MenuItem {
   accelerator?: string;
   action?: string;
   enabled?: boolean;
+  submenu?: MenuItem[];
 }
 
 export interface MenuSection {
@@ -21,7 +22,7 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
     label: 'ファイル',
     items: [
       { label: '新規ウィンドウ', accelerator: 'Ctrl+N', action: 'new-window' },
-      { label: '最近のプロジェクトを開く', action: 'open-recent-project' },
+      { label: '最近のプロジェクトを開く', action: 'open-recent-project', submenu: [] },
       { label: 'プロジェクトを開く', action: 'open-project' },
       { type: 'separator' },
       { label: 'ファイルを開く...', accelerator: 'Ctrl+O', action: 'open-file' },

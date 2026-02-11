@@ -1,16 +1,51 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { WEB_MENU_STRUCTURE } from '@/lib/menu-definitions';
 import { MenuDropdown } from './WebMenuBar/MenuDropdown';
 
-interface WebMenuBarProps {
-  onMenuAction: (action: string) => void;
+import type { MenuSection, MenuItem } from '@/lib/menu-definitions';
+
+interface RecentProjectInfo {
+  projectId: string;
+  name: string;
+  rootDirName?: string;
 }
 
-export default function WebMenuBar({ onMenuAction }: WebMenuBarProps) {
+interface WebMenuBarProps {
+  onMenuAction: (action: string) => void;
+  recentProjects?: RecentProjectInfo[];
+}
+
+export default function WebMenuBar({ onMenuAction, recentProjects }: WebMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const menuRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Inject recent projects into the menu structure
+  const menuStructure = useMemo<MenuSection[]>(() => {
+    return WEB_MENU_STRUCTURE.map((section) => {
+      if (section.label !== 'ファイル') return section;
+
+      const items = section.items.map((item): MenuItem => {
+        if (item.action !== 'open-recent-project') return item;
+
+        const submenuItems: MenuItem[] =
+          recentProjects && recentProjects.length > 0
+            ? recentProjects.map((p) => ({
+                label: p.rootDirName ? `${p.name} (${p.rootDirName})` : p.name,
+                action: `open-recent-project:${p.projectId}`,
+              }))
+            : [];
+
+        return {
+          ...item,
+          submenu: submenuItems,
+        };
+      });
+
+      return { ...section, items };
+    });
+  }, [recentProjects]);
 
   const handleMenuClick = (index: number) => {
     setOpenMenu(openMenu === index ? null : index);
@@ -21,11 +56,11 @@ export default function WebMenuBar({ onMenuAction }: WebMenuBarProps) {
   };
 
   return (
-    <nav 
+    <nav
       className="h-10 bg-background border-b border-border flex items-center px-2 gap-1 flex-shrink-0"
       role="menubar"
     >
-      {WEB_MENU_STRUCTURE.map((section, index) => (
+      {menuStructure.map((section, index) => (
         <div key={index} className="relative">
           <button
             ref={(el) => { menuRefs.current[index] = el; }}
@@ -37,7 +72,7 @@ export default function WebMenuBar({ onMenuAction }: WebMenuBarProps) {
           >
             {section.label}
           </button>
-          
+
           <MenuDropdown
             section={section}
             isOpen={openMenu === index}

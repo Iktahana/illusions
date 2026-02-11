@@ -55,10 +55,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('menu-open-project', handler)
   },
   onMenuOpenRecentProject: (callback) => {
-    const handler = () => callback()
+    const handler = (_event, projectId) => callback(projectId)
     ipcRenderer.on('menu-open-recent-project', handler)
     return () => ipcRenderer.removeListener('menu-open-recent-project', handler)
   },
+  rebuildMenu: () => ipcRenderer.invoke('menu:rebuild'),
   onMenuShowInFileManager: (callback) => {
     const handler = () => callback()
     ipcRenderer.on('menu-show-in-file-manager', handler)

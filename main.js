@@ -10,7 +10,7 @@ const { promisify } = require('util')
 const { autoUpdater } = require('electron-updater')
 const log = require('electron-log')
 const { registerNlpHandlers } = require('./nlp-service/nlp-ipc-handlers')
-const { registerStorageHandlers } = require('./electron-storage-ipc-handlers')
+const { registerStorageHandlers, getStorageManager } = require('./electron-storage-ipc-handlers')
 const { registerVFSHandlers } = require('./electron-vfs-ipc-handlers')
 
 const execFileAsync = promisify(execFile)
@@ -139,7 +139,7 @@ function checkForUpdates(manual = false) {
   autoUpdater.checkForUpdates()
 }
 
-function buildApplicationMenu() {
+function buildApplicationMenu(recentProjects = []) {
   const isMac = process.platform === 'darwin'
 
   /** Send an IPC message to the focused window instead of mainWindow */
@@ -181,9 +181,14 @@ function buildApplicationMenu() {
       },
       {
         label: '最近のプロジェクトを開く',
-        click: () => {
-          sendToFocused('menu-open-recent-project')
-        },
+        submenu: recentProjects.length > 0
+          ? recentProjects.map((project) => ({
+              label: project.name,
+              click: () => {
+                sendToFocused('menu-open-recent-project', project.id)
+              },
+            }))
+          : [{ label: '項目なし', enabled: false }],
       },
       {
         label: 'プロジェクトを開く',
@@ -300,9 +305,24 @@ function buildApplicationMenu() {
   return template
 }
 
+/** Rebuild the application menu with fresh recent projects from SQLite */
+async function rebuildApplicationMenu() {
+  try {
+    const manager = getStorageManager()
+    const projects = await manager.getRecentProjects()
+    const menu = Menu.buildFromTemplate(buildApplicationMenu(projects))
+    Menu.setApplicationMenu(menu)
+  } catch (error) {
+    console.error('[Main] Failed to rebuild menu:', error)
+    // Fallback: build menu without recent projects
+    const menu = Menu.buildFromTemplate(buildApplicationMenu())
+    Menu.setApplicationMenu(menu)
+  }
+}
+
 // 新しいウィンドウを作成（マルチウィンドウ対応）
 // showWelcome: true の場合、自動復元をスキップしてウェルカム画面を表示する
-function createWindow({ showWelcome = false } = {}) {
+async function createWindow({ showWelcome = false } = {}) {
   const preloadPath = path.join(__dirname, 'preload.js')
   console.log('[Main] __dirname:', __dirname)
   console.log('[Main] Preload path:', preloadPath)
@@ -395,15 +415,14 @@ function createWindow({ showWelcome = false } = {}) {
     }
   }
 
-  // アプリメニューを設定
-  const menu = Menu.buildFromTemplate(buildApplicationMenu())
-  Menu.setApplicationMenu(menu)
-  
+  // アプリメニューを設定（最近のプロジェクトを含む）
+  await rebuildApplicationMenu()
+
   return newWindow
 }
 
 // 従来のコードに対応
-function createMainWindow() {
+async function createMainWindow() {
   return createWindow()
 }
 
@@ -525,10 +544,15 @@ ipcMain.handle('save-before-close-done', (event) => {
   }
 })
 
-ipcMain.handle('new-window', () => {
+ipcMain.handle('menu:rebuild', async () => {
+  await rebuildApplicationMenu()
+  return true
+})
+
+ipcMain.handle('new-window', async () => {
    console.log('[Main Process] Creating new window (welcome)...')
    // 新しいウィンドウを作成（ウェルカム画面を表示）
-   const newWin = createWindow({ showWelcome: true })
+   const newWin = await createWindow({ showWelcome: true })
    console.log('[Main Process] New window created:', newWin ? 'success' : 'failed')
    return newWin ? true : false
  })
@@ -584,8 +608,8 @@ app.on('open-file', async (event, filePath) => {
   }
 })
 
-app.whenReady().then(() => {
-  createMainWindow()
+app.whenReady().then(async () => {
+  await createMainWindow()
 
   // Handle pending file from open-file event (received before window was ready)
   if (pendingFilePath) {
@@ -617,7 +641,7 @@ app.whenReady().then(() => {
   }, 3000)
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+    if (BrowserWindow.getAllWindows().length === 0) void createMainWindow()
   })
 })
 

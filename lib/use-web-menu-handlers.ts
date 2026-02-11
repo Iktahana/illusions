@@ -9,7 +9,7 @@ interface UseWebMenuHandlersProps {
   onSave: () => void;
   onSaveAs: () => void;
   onOpenProject?: () => void;
-  onOpenRecentProject?: () => void;
+  onOpenRecentProject?: (projectId: string) => void;
   onCloseWindow?: () => void;
   editorView?: EditorView | null;
 }
@@ -47,7 +47,7 @@ export function useWebMenuHandlers({
         onOpenProject?.();
         break;
       case 'open-recent-project':
-        onOpenRecentProject?.();
+        // No-op: the parent item itself is not clickable; submenu items handle it
         break;
       case 'close-window':
         onCloseWindow?.();
@@ -118,6 +118,11 @@ export function useWebMenuHandlers({
         break;
 
       default:
+        if (action.startsWith('open-recent-project:')) {
+          const projectId = action.slice('open-recent-project:'.length);
+          onOpenRecentProject?.(projectId);
+          break;
+        }
         console.warn('[Web Menu] Unknown action:', action);
     }
   }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, editorView]);

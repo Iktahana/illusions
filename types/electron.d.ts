@@ -29,7 +29,8 @@ declare global {
     onMenuSave?: (callback: () => void) => (() => void) | void;
     onMenuSaveAs?: (callback: () => void) => (() => void) | void;
     onMenuOpenProject?: (callback: () => void) => (() => void) | void;
-    onMenuOpenRecentProject?: (callback: () => void) => (() => void) | void;
+    onMenuOpenRecentProject?: (callback: (projectId: string) => void) => (() => void) | void;
+    rebuildMenu?: () => Promise<boolean>;
     showInFileManager?: (dirPath: string) => Promise<boolean>;
     onMenuShowInFileManager?: (callback: () => void) => (() => void) | void;
     /** Virtual File System IPC bridge */
