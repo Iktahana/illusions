@@ -5,7 +5,7 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --bg-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -24,6 +24,18 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.7) 0%, rgba(118, 75, 162, 0.7) 100%);
+  z-index: -1;
 }
 
 #app {
