@@ -5,7 +5,7 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  --bg-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --bg-image: #000;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -34,7 +34,7 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.7) 0%, rgba(118, 75, 162, 0.7) 100%);
+  background: #000;
   z-index: -1;
 }
 
