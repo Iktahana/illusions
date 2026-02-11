@@ -530,6 +530,14 @@ export class ProjectService {
       return await this.vfs.getDirectoryHandle("");
     }
 
+    // Web: recover from project's rootHandle (restored from IndexedDB)
+    if (project.rootHandle && "setRootHandle" in this.vfs) {
+      (
+        this.vfs as { setRootHandle: (h: FileSystemDirectoryHandle) => void }
+      ).setRootHandle(project.rootHandle);
+      return await this.vfs.getDirectoryHandle("");
+    }
+
     throw new Error(
       "VFS のルートディレクトリが利用できません。プロジェクトを再度開いてください。"
     );

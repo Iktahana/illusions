@@ -394,6 +394,17 @@ export class WebVFS implements VirtualFileSystem {
   }
 
   /**
+   * Set the root directory from an existing FileSystemDirectoryHandle.
+   * Used to restore a project from IndexedDB without re-showing the directory picker.
+   *
+   * IndexedDB から復元した FileSystemDirectoryHandle をルートとして設定する。
+   * ディレクトリピッカーを再表示せずにプロジェクトを復元する際に使用。
+   */
+  setRootHandle(handle: FileSystemDirectoryHandle): void {
+    this.rootHandle = handle;
+  }
+
+  /**
    * Ensure the root directory handle has been set via openDirectory().
    * @throws Error if no root directory is available
    */
