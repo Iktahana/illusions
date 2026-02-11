@@ -176,7 +176,7 @@ function buildApplicationMenu() {
         label: '新規ウィンドウ',
         accelerator: 'CmdOrCtrl+N',
         click: () => {
-          createWindow()
+          createWindow({ showWelcome: true })
         },
       },
       {

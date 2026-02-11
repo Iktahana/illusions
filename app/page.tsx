@@ -79,11 +79,7 @@ export default function EditorPage() {
   const [permissionPromptData, setPermissionPromptData] = useState<PermissionPromptState | null>(null);
   const [recentProjects, setRecentProjects] = useState<RecentProjectEntry[]>([]);
   // Auto-restore state: suppress WelcomeScreen flash during restore attempt
-  // Skip auto-restore when opened via "new window" (?welcome parameter)
-  const isNewWindowRef = useRef(
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("welcome")
-  );
-  const [isRestoring, setIsRestoring] = useState(!isNewWindowRef.current);
+  const [isRestoring, setIsRestoring] = useState(true);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const isAutoRestoringRef = useRef(false);
 
@@ -428,21 +424,20 @@ export default function EditorPage() {
   // ID of the most recent project to auto-restore
   const [autoRestoreProjectId, setAutoRestoreProjectId] = useState<string | null>(null);
 
-  // Clean up ?welcome parameter from URL (so refreshing later will auto-restore)
-  useEffect(() => {
-    if (isNewWindowRef.current && typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("welcome");
-      window.history.replaceState({}, "", url.pathname + url.search);
-    }
-  }, []);
-
   // Load recent projects on mount (for WelcomeScreen)
   useEffect(() => {
     let mounted = true;
 
-    // Skip auto-restore when opened via "new window" menu
-    const skipAutoRestore = isNewWindowRef.current;
+    // Detect ?welcome parameter: skip auto-restore and show welcome page
+    // Check here (inside useEffect) to guarantee window is available (avoid SSR issues)
+    const params = new URLSearchParams(window.location.search);
+    const skipAutoRestore = params.has("welcome");
+    if (skipAutoRestore) {
+      // Clean up URL so a later page refresh will auto-restore normally
+      params.delete("welcome");
+      const cleanUrl = window.location.pathname + (params.toString() ? `?${params}` : "");
+      window.history.replaceState({}, "", cleanUrl);
+    }
 
     const loadRecentProjects = async () => {
       try {
