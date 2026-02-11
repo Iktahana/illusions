@@ -298,7 +298,7 @@ type FileTreeNode =
   | { type: "file" }
   | { type: "directory"; children: Record<string, FileTreeNode> };
 
-export function FilesPanel() {
+export function FilesPanel({ projectName }: { projectName?: string }) {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(["/"]));
 
   const toggleDir = (path: string) => {
@@ -352,7 +352,7 @@ export function FilesPanel() {
     }
 
     const isExpanded = expandedDirs.has(path);
-    const dirName = path === "/" ? "プロジェクト" : path.split("/").pop() || "";
+    const dirName = path === "/" ? (projectName || "プロジェクト") : path.split("/").pop() || "";
 
     return (
       <div key={path}>
