@@ -7,7 +7,8 @@ import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
 import ResizablePanel from "@/components/ResizablePanel";
 import TitleUpdater from "@/components/TitleUpdater";
-import ActivityBar, { type ActivityBarView } from "@/components/ActivityBar";
+import ActivityBar, { type ActivityBarView, isBottomView } from "@/components/ActivityBar";
+import SidebarSplitter from "@/components/SidebarSplitter";
 import SearchResults from "@/components/SearchResults";
 import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
 import FileConflictDialog from "@/components/FileConflictDialog";
@@ -88,6 +89,7 @@ export default function EditorPage() {
   const [recoveryExiting, setRecoveryExiting] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
+  const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [saveToastExiting, setSaveToastExiting] = useState(false);
    const [selectedCharCount, setSelectedCharCount] = useState(0);
@@ -310,7 +312,8 @@ export default function EditorPage() {
   const [showParagraphNumbers, setShowParagraphNumbers] = useState(true);
   const [posHighlightEnabled, setPosHighlightEnabled] = useState(false); // POS coloring (default: disabled)
   const [posHighlightColors, setPosHighlightColors] = useState<Record<string, string>>({}); // Per-POS color settings
-  const [activeView, setActiveView] = useState<ActivityBarView>("explorer");
+  const [topView, setTopView] = useState<ActivityBarView>("explorer");
+  const [bottomView, setBottomView] = useState<ActivityBarView>("none");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editorViewInstance, setEditorViewInstance] = useState<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -602,12 +605,13 @@ export default function EditorPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleShowAllSearchResults = (matches: any[], searchTerm: string) => {
     setSearchResults({ matches, searchTerm });
-    setActiveView("search");
+    // "search" belongs to top group
+    setTopView("search");
   };
 
   const handleCloseSearchResults = () => {
     setSearchResults(null);
-    setActiveView("explorer");
+    setTopView("explorer");
   };
 
    const wordCount = words(content);
@@ -1081,68 +1085,94 @@ export default function EditorPage() {
 
        <div className="flex-1 flex overflow-hidden">
          {/* Activity Bar */}
-         <ActivityBar activeView={activeView} onViewChange={setActiveView} />
+         <ActivityBar
+           topView={topView}
+           bottomView={bottomView}
+           onTopViewChange={setTopView}
+           onBottomViewChange={setBottomView}
+         />
 
            {/* 左サイドパネル */}
-          {activeView !== "none" && (
+          {(topView !== "none" || bottomView !== "none") && (
             <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
-              {activeView === "files" && (
-                <aside className="h-full bg-background border-r border-border flex flex-col">
-                  <div className="p-4 flex-1 overflow-y-auto">
-                    <FilesPanel projectName={isProjectMode(editorMode) ? editorMode.name : undefined} />
-                  </div>
-                </aside>
-              )}
-              {activeView === "explorer" && (
-              <Explorer
-                content={content}
-                onChapterClick={handleChapterClick}
-                onInsertText={handleInsertText}
-                fontScale={fontScale}
-                onFontScaleChange={setFontScale}
-                lineHeight={lineHeight}
-                onLineHeightChange={setLineHeight}
-                paragraphSpacing={paragraphSpacing}
-                onParagraphSpacingChange={handleParagraphSpacingChange}
-                textIndent={textIndent}
-                onTextIndentChange={setTextIndent}
-                fontFamily={fontFamily}
-                onFontFamilyChange={setFontFamily}
-                charsPerLine={charsPerLine}
-                onCharsPerLineChange={setCharsPerLine}
-                showParagraphNumbers={showParagraphNumbers}
-                onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
-              />
-            )}
-            {activeView === "search" && (
-              <SearchResults
-                editorView={editorViewInstance}
-                matches={searchResults?.matches}
-                searchTerm={searchResults?.searchTerm}
-                onClose={handleCloseSearchResults}
-              />
-            )}
-            {activeView === "outline" && (
-              <div className="h-full bg-background-secondary border-r border-border p-4">
-                <h2 className="text-lg font-semibold text-foreground mb-4">アウトライン</h2>
-                <p className="text-sm text-foreground-secondary">アウトライン機能は開発中です</p>
-              </div>
-            )}
-            {activeView === "characters" && (
-              <Characters content={content} />
-            )}
-            {activeView === "dictionary" && (
-              <Dictionary content={content} />
-            )}
-            {activeView === "settings" && (
-              <div className="h-full bg-background-secondary border-r border-border p-4">
-                <h2 className="text-lg font-semibold text-foreground mb-4">設定</h2>
-                <p className="text-sm text-foreground-secondary">設定機能は開発中です</p>
-              </div>
-            )}
-            {activeView === "wordfreq" && (
-              <WordFrequency content={content} />
-            )}
+              {(() => {
+                const renderPanel = (view: ActivityBarView) => {
+                  switch (view) {
+                    case "files":
+                      return (
+                        <aside className="h-full bg-background border-r border-border flex flex-col">
+                          <div className="p-4 flex-1 overflow-y-auto">
+                            <FilesPanel projectName={isProjectMode(editorMode) ? editorMode.name : undefined} />
+                          </div>
+                        </aside>
+                      );
+                    case "explorer":
+                      return (
+                        <Explorer
+                          content={content}
+                          onChapterClick={handleChapterClick}
+                          onInsertText={handleInsertText}
+                          fontScale={fontScale}
+                          onFontScaleChange={setFontScale}
+                          lineHeight={lineHeight}
+                          onLineHeightChange={setLineHeight}
+                          paragraphSpacing={paragraphSpacing}
+                          onParagraphSpacingChange={handleParagraphSpacingChange}
+                          textIndent={textIndent}
+                          onTextIndentChange={setTextIndent}
+                          fontFamily={fontFamily}
+                          onFontFamilyChange={setFontFamily}
+                          charsPerLine={charsPerLine}
+                          onCharsPerLineChange={setCharsPerLine}
+                          showParagraphNumbers={showParagraphNumbers}
+                          onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
+                        />
+                      );
+                    case "search":
+                      return (
+                        <SearchResults
+                          editorView={editorViewInstance}
+                          matches={searchResults?.matches}
+                          searchTerm={searchResults?.searchTerm}
+                          onClose={handleCloseSearchResults}
+                        />
+                      );
+                    case "outline":
+                      return (
+                        <div className="h-full bg-background-secondary border-r border-border p-4">
+                          <h2 className="text-lg font-semibold text-foreground mb-4">アウトライン</h2>
+                          <p className="text-sm text-foreground-secondary">アウトライン機能は開発中です</p>
+                        </div>
+                      );
+                    case "characters":
+                      return <Characters content={content} />;
+                    case "dictionary":
+                      return <Dictionary content={content} />;
+                    case "settings":
+                      return (
+                        <div className="h-full bg-background-secondary border-r border-border p-4">
+                          <h2 className="text-lg font-semibold text-foreground mb-4">設定</h2>
+                          <p className="text-sm text-foreground-secondary">設定機能は開発中です</p>
+                        </div>
+                      );
+                    case "wordfreq":
+                      return <WordFrequency content={content} onWordSearch={(word) => {
+                        setSearchInitialTerm(word);
+                        setSearchOpenTrigger(prev => prev + 1);
+                      }} />;
+                    default:
+                      return null;
+                  }
+                };
+
+                const topPanel = topView !== "none" ? renderPanel(topView) : null;
+                const bottomPanel = bottomView !== "none" ? renderPanel(bottomView) : null;
+
+                if (topPanel && bottomPanel) {
+                  return <SidebarSplitter top={topPanel} bottom={bottomPanel} />;
+                }
+                return topPanel || bottomPanel;
+              })()}
           </ResizablePanel>
         )}
 
@@ -1161,6 +1191,7 @@ export default function EditorPage() {
               fontFamily={fontFamily}
               charsPerLine={charsPerLine}
               searchOpenTrigger={searchOpenTrigger}
+              searchInitialTerm={searchInitialTerm}
               showParagraphNumbers={showParagraphNumbers}
               onEditorViewReady={setEditorViewInstance}
               onShowAllSearchResults={handleShowAllSearchResults}
