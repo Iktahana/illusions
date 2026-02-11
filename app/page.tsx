@@ -80,7 +80,7 @@ export default function EditorPage() {
   const [recentProjects, setRecentProjects] = useState<RecentProjectEntry[]>([]);
 
   const mdiFile = useMdiFile();
-  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile: originalOpenFile, saveFile, newFile: originalNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen, _loadSystemFile } =
+  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile: originalOpenFile, saveFile, saveAsFile, newFile: originalNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen, _loadSystemFile } =
     mdiFile;
 
   const contentRef = useRef<string>(content);
@@ -325,7 +325,7 @@ export default function EditorPage() {
     onNew: newFile,
     onOpen: openFile,
     onSave: saveFile,
-    onSaveAs: saveFile, // TODO: Implement separate saveAs logic
+    onSaveAs: saveAsFile,
     onOpenProject: () => void handleOpenProject(),
     onOpenRecentProject: () => resetMode(),
     onCloseWindow: () => window.close(),

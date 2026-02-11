@@ -58,6 +58,7 @@ export interface UseMdiFileReturn {
   lastSavedTime: number | null;
   openFile: () => Promise<void>;
   saveFile: () => Promise<void>;
+  saveAsFile: () => Promise<void>;
   newFile: () => void;
   updateFileName: (newName: string) => void;
   wasAutoRecovered?: boolean; // Webのみ: 自動復元されたかどうか
@@ -291,6 +292,16 @@ export function useMdiFile(): UseMdiFileReturn {
     isSavingRef.current = true;
     setIsSaving(true);
     try {
+      // Project mode: save directly via VFS (no system dialog)
+      if (isProject && currentFile?.path) {
+        const vfs = getVFS();
+        await vfs.writeFile(currentFile.path, contentRef.current);
+        setLastSavedContent(contentRef.current);
+        setLastSavedTime(Date.now());
+        void tryAutoSnapshot(currentFile.name, contentRef.current);
+        return;
+      }
+
       const result = await saveMdiFile({
         descriptor: currentFile,
         content: contentRef.current,
@@ -328,6 +339,55 @@ export function useMdiFile(): UseMdiFileReturn {
       const message =
         error instanceof Error ? error.message : "不明なエラー";
       window.alert(`保存に失敗しました: ${message}`);
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
+    }
+  }, [currentFile, isElectron, isProject, persistLastOpenedPath, tryAutoSnapshot]);
+
+  // 「名前を付けて保存」: Always force file dialog by clearing descriptor path/handle
+  const saveAsFile = useCallback(async () => {
+    if (isSavingRef.current) return;
+
+    isSavingRef.current = true;
+    setIsSaving(true);
+    const raw = contentRef.current;
+    try {
+      // Force dialog by clearing path/handle, keeping current name as suggestion
+      const descriptor: MdiFileDescriptor | null = currentFile
+        ? { path: null, handle: null, name: currentFile.name }
+        : null;
+
+      const result = await saveMdiFile({ descriptor, content: raw });
+
+      if (result) {
+        const { descriptor: newDescriptor } = result;
+        setCurrentFile(newDescriptor);
+        setLastSavedContent(raw);
+        setLastSavedTime(Date.now());
+
+        try {
+          if (isElectron && newDescriptor.path) {
+            await persistLastOpenedPath(newDescriptor.path);
+          } else if (!isElectron && newDescriptor.handle) {
+            const storage = getStorageService();
+            await storage.initialize();
+            await storage.saveEditorBuffer({
+              content: raw,
+              timestamp: Date.now(),
+              fileHandle: newDescriptor.handle,
+            });
+          }
+        } catch (error) {
+          console.error("ファイル参照の保存に失敗しました:", error);
+        }
+
+        void tryAutoSnapshot(newDescriptor.name, raw);
+      }
+    } catch (error) {
+      console.error("名前を付けて保存に失敗しました:", error);
+      const message = error instanceof Error ? error.message : "不明なエラー";
+      window.alert(`名前を付けて保存に失敗しました: ${message}`);
     } finally {
       isSavingRef.current = false;
       setIsSaving(false);
@@ -413,59 +473,11 @@ export function useMdiFile(): UseMdiFileReturn {
     if (!isElectron || !window.electronAPI?.onMenuSaveAs) return;
 
     const cleanup = window.electronAPI.onMenuSaveAs(async () => {
-      const raw = contentRef.current;
-      setIsSaving(true);
-      try {
-        const descriptor: MdiFileDescriptor | null = currentFile
-          ? {
-              path: null,
-              handle: null,
-              name: currentFile.name,
-            }
-          : null;
-
-        const result = await saveMdiFile({
-          descriptor,
-          content: raw,
-        });
-
-        if (result) {
-          const { descriptor } = result;
-          setCurrentFile(descriptor);
-          setLastSavedContent(raw);
-          setLastSavedTime(Date.now());
-          
-          // 最後に開いたファイルの参照（パス/ハンドル）を保存する
-          try {
-            const storage = getStorageService();
-            await storage.initialize();
-            
-            if (descriptor.path) {
-              await persistLastOpenedPath(descriptor.path);
-            } else if (descriptor.handle) {
-              await storage.saveEditorBuffer({
-                content: raw,
-                timestamp: Date.now(),
-                fileHandle: descriptor.handle,
-              });
-            }
-          } catch (error) {
-            console.error("ファイル参照の保存に失敗しました:", error);
-          }
-
-          // Fire-and-forget: auto-snapshot in project mode
-          // プロジェクトモード時、自動スナップショットを非同期で作成
-          void tryAutoSnapshot(descriptor.name, raw);
-        }
-      } catch (error) {
-        console.error("名前を付けて保存に失敗しました:", error);
-      } finally {
-        setIsSaving(false);
-      }
+      await saveAsFile();
     });
 
     return cleanup;
-  }, [saveFile, isElectron, currentFile, persistLastOpenedPath, tryAutoSnapshot]);
+  }, [saveAsFile, isElectron]);
 
   // メニューの新規作成と「開く」は page.tsx で処理する（安全チェックを適用するため）
   // 以前はここで処理していたが、未保存チェックを統一するため移動した
@@ -499,6 +511,7 @@ export function useMdiFile(): UseMdiFileReturn {
     lastSavedTime,
     openFile,
     saveFile,
+    saveAsFile,
     newFile,
     updateFileName,
     wasAutoRecovered,
