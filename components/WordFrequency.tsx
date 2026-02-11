@@ -12,6 +12,8 @@ import ContextMenu from "@/components/ContextMenu";
 interface WordFrequencyProps {
   /** エディタのテキストコンテンツ */
   content: string;
+  /** 単語をクリックしたときに検索ダイアログを開く */
+  onWordSearch?: (word: string) => void;
 }
 
 /** Dictionary lookup action map */
@@ -34,7 +36,7 @@ const DICTIONARY_ACTIONS: Record<string, (word: string) => { url: string; title:
   }),
 };
 
-export default function WordFrequency({ content }: WordFrequencyProps) {
+export default function WordFrequency({ content, onWordSearch }: WordFrequencyProps) {
   const [words, setWords] = useState<WordEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,10 +69,10 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
   const handleWordContextMenu = useCallback(
     async (e: React.MouseEvent, word: string) => {
       const items = [
+        { label: `Googleで調べる`, action: "google" },
         { label: `幻辞.comで調べる`, action: "genji" },
         { label: `コトバンクで調べる`, action: "kotobank" },
         { label: `weblio.jpで調べる`, action: "weblio" },
-        { label: `Googleで調べる`, action: "google" },
       ];
 
       setContextWord(word);
@@ -197,7 +199,8 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
             {words.map((entry, index) => (
               <div
                 key={`${entry.word}-${index}`}
-                className="px-3 py-1.5 hover:bg-hover flex items-center justify-between gap-2 cursor-context-menu"
+                className="px-3 py-1.5 hover:bg-hover flex items-center justify-between gap-2 cursor-pointer"
+                onClick={() => onWordSearch?.(entry.word)}
                 onContextMenu={(e) => handleWordContextMenu(e, entry.word)}
               >
                 <div className="flex-1 min-w-0">
