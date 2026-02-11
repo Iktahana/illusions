@@ -34,19 +34,88 @@ interface HistoryPanelProps {
 // Utility Functions
 // -----------------------------------------------------------------------
 
+/** Day-of-week names in Japanese (日〜土) */
+const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"] as const;
+
 /**
- * Format a timestamp in Japanese date format.
- * タイムスタンプを日本語の日付形式にフォーマットする。
- * e.g. "2026年2月6日 14:30"
+ * Extract a YYYY-MM-DD date key from a timestamp for grouping.
+ * タイムスタンプからグルーピング用の日付キー (YYYY-MM-DD) を抽出する。
  */
-function formatTimestampJa(timestamp: number): string {
+function getDateKey(timestamp: number): string {
+  const d = new Date(timestamp);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Format a date key into a Japanese group label.
+ * 日付キーを日本語のグループラベルにフォーマットする。
+ * - 今日 / 昨日 for recent dates
+ * - M月D日（曜日） for current year
+ * - YYYY年M月D日（曜日） for older years
+ */
+function formatDateGroupLabel(dateKey: string): string {
+  const today = new Date();
+  const todayKey = getDateKey(today.getTime());
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = getDateKey(yesterday.getTime());
+
+  if (dateKey === todayKey) return "今日";
+  if (dateKey === yesterdayKey) return "昨日";
+
+  const [yearStr, monthStr, dayStr] = dateKey.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  const d = new Date(year, month - 1, day);
+  const dow = DAY_NAMES[d.getDay()];
+
+  if (year === today.getFullYear()) {
+    return `${month}月${day}日（${dow}）`;
+  }
+  return `${year}年${month}月${day}日（${dow}）`;
+}
+
+interface DateGroup {
+  label: string;
+  snapshots: SnapshotEntry[];
+}
+
+/**
+ * Group snapshots by date, preserving newest-first order.
+ * スナップショットを日付ごとにグループ化する（新しい順を維持）。
+ */
+function groupSnapshotsByDate(items: SnapshotEntry[]): DateGroup[] {
+  const groups: DateGroup[] = [];
+  let currentKey = "";
+  let currentGroup: DateGroup | null = null;
+
+  for (const snapshot of items) {
+    const key = getDateKey(snapshot.timestamp);
+    if (key !== currentKey) {
+      currentKey = key;
+      currentGroup = { label: formatDateGroupLabel(key), snapshots: [] };
+      groups.push(currentGroup);
+    }
+    currentGroup!.snapshots.push(snapshot);
+  }
+
+  return groups;
+}
+
+/**
+ * Format a timestamp as time only (HH:mm).
+ * タイムスタンプを時刻のみ (HH:mm) にフォーマットする。
+ */
+function formatTimeJa(timestamp: number): string {
   const date = new Date(timestamp);
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${year}年${month}月${day}日 ${hours}:${minutes}`;
+  return `${hours}:${minutes}`;
 }
 
 /**
@@ -132,11 +201,11 @@ export default function HistoryPanel({
   }, [loadSnapshots]);
 
   /**
-   * Visible snapshots based on current pagination.
-   * ページネーションに基づく表示中のスナップショット。
+   * Grouped snapshots based on current pagination.
+   * ページネーションに基づき、日付ごとにグループ化されたスナップショット。
    */
-  const visibleSnapshots = useMemo(
-    () => snapshots.slice(0, displayCount),
+  const groupedSnapshots = useMemo(
+    () => groupSnapshotsByDate(snapshots.slice(0, displayCount)),
     [snapshots, displayCount]
   );
 
@@ -273,16 +342,29 @@ export default function HistoryPanel({
         </div>
       )}
 
-      {/* Snapshot list with pagination */}
+      {/* Snapshot list with date groups and pagination */}
       {snapshots.length > 0 && (
-        <div className="space-y-2">
-          {visibleSnapshots.map((snapshot) => (
-            <SnapshotItem
-              key={snapshot.id}
-              snapshot={snapshot}
-              isRestoring={restoringId === snapshot.id}
-              onRestore={handleRestore}
-            />
+        <div className="space-y-3">
+          {groupedSnapshots.map((group) => (
+            <div key={group.label} className="space-y-2">
+              {/* Date group header */}
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[11px] font-medium text-foreground-tertiary whitespace-nowrap">
+                  {group.label}
+                </span>
+                <div className="flex-1 border-b border-border" />
+              </div>
+
+              {/* Snapshots within this date group */}
+              {group.snapshots.map((snapshot) => (
+                <SnapshotItem
+                  key={snapshot.id}
+                  snapshot={snapshot}
+                  isRestoring={restoringId === snapshot.id}
+                  onRestore={handleRestore}
+                />
+              ))}
+            </div>
           ))}
 
           {/* Load more button */}
@@ -318,7 +400,7 @@ function SnapshotItem({ snapshot, isRestoring, onRestore }: SnapshotItemProps) {
         <div className="flex items-center gap-1.5 min-w-0">
           <Clock className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
           <span className="text-xs font-medium text-foreground truncate">
-            {formatTimestampJa(snapshot.timestamp)}
+            {formatTimeJa(snapshot.timestamp)}
           </span>
         </div>
         <span
