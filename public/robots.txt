@@ -1,4 +1,4 @@
-# robots.txt for main Illusions app
+# robots.txt for main illusions app
 # Disallow all bots
 
 User-agent: *
