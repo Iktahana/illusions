@@ -312,10 +312,13 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
     const entries = await vfs.listDirectory(dirPath);
 
     // Sort: directories first, then files, alphabetically within each group
-    const sorted = [...entries].sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === "directory" ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    });
+    // Hide dotfiles/dotdirs (e.g. .git, .DS_Store)
+    const sorted = [...entries]
+      .filter((e) => !e.name.startsWith("."))
+      .sort((a, b) => {
+        if (a.kind !== b.kind) return a.kind === "directory" ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
 
     const result: FileTreeEntry[] = [];
     for (const entry of sorted) {
@@ -650,7 +653,6 @@ function ChapterItem({
       )}
       style={{ paddingLeft: `${8 + indent}px` }}
     >
-      <ChevronRight className="w-4 h-4 flex-shrink-0" />
       <FileText className="w-4 h-4 flex-shrink-0" />
       <span className="text-sm flex-1 truncate">{renderFormattedTitle(chapter.title)}</span>
     </a>
