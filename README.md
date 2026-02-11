@@ -1,14 +1,17 @@
-# Illusions - Japanese Novel Editor
+# illusions - 日本語小説エディタ
 
-A professional-grade Japanese novel editor built with Next.js, Milkdown, and Electron.
+縦書き、ルビ、AI校正支援。Windows, macOS, Chromeで動作する執筆環境。文章分析から校正まで、小説家のための機能を凝縮。
 
-## 🌐 Try It Online
+A professional-grade Japanese novel editor with vertical writing, ruby notation, and AI proofreading support.
 
-**Web Version**: https://illusions.iktahana.com/  
+## 🌐 オンラインで試す / Try It Online
+
+**🌍 ランディングページ**: https://www.illusions.app/
+**Chrome版**: https://illusions.app/
 (Works on latest Chrome/Edge/Safari)
 
-**Desktop Version**: [Download Latest Release](https://github.com/Iktahana/illusions/releases/latest)  
-Available for macOS (Intel & Apple Silicon), Windows, and Linux
+**デスクトップ版**: [Download Latest Release](https://github.com/Iktahana/illusions/releases/latest)
+Available for macOS (Intel & Apple Silicon) and Windows
 
 ---
 
@@ -17,6 +20,9 @@ Available for macOS (Intel & Apple Silicon), Windows, and Linux
 ### 📝 Editor
 - **Milkdown-based Markdown editor** with real-time preview
 - **Vertical writing mode** (縦書き) for traditional Japanese novels
+- **Ruby notation support** (ルビ) - furigana for kanji
+- **Tate-chu-yoko** (縦中横) - horizontal text in vertical writing
+- **AI proofreading support** - grammar and style suggestions
 - **Auto-save** every 2 seconds
 - **Japanese NLP** integration for text analysis
 - **POS (Part-of-Speech) highlighting** for Japanese grammar review
@@ -54,8 +60,8 @@ Available for macOS (Intel & Apple Silicon), Windows, and Linux
 
 ### For Users
 
-#### Web Version
-Simply visit https://illusions.iktahana.com/ in your browser.
+#### Chrome版 / Web Version
+Simply visit https://illusions.app/ in your browser.
 
 #### Desktop Version
 1. Download the latest release from [GitHub Releases](https://github.com/Iktahana/illusions/releases/latest)
@@ -192,6 +198,9 @@ illusions/
 
 ### Current Release (v0.1.0)
 - ✅ Milkdown editor with vertical writing
+- ✅ Ruby notation (ルビ) support
+- ✅ Tate-chu-yoko (縦中横) support
+- ✅ AI proofreading support
 - ✅ Auto-save and crash recovery
 - ✅ Storage abstraction (Electron + Web)
 - ✅ GitHub integration with OAuth
@@ -199,10 +208,11 @@ illusions/
 - ✅ Japanese NLP backend
 - ✅ POS highlighting
 - ✅ Word frequency analysis
+- ✅ Landing page with SEO optimization
 
 ### Planned
 - [ ] Real-time collaboration
-- [ ] Advanced grammar checking with AI
+- [ ] Advanced AI grammar and style checking
 - [ ] Export to PDF/EPUB
 - [ ] Custom themes and fonts
 - [ ] Plugin system
@@ -251,7 +261,8 @@ MIT License - See [LICENSE](LICENSE) file for details.
 ## 📧 Contact
 
 - **GitHub Issues**: https://github.com/Iktahana/illusions/issues
-- **Website**: https://illusions.iktahana.com
+- **Website**: https://www.illusions.app
+- **Chrome版**: https://illusions.app
 
 ---
 
