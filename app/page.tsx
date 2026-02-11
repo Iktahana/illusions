@@ -397,8 +397,23 @@ export default function EditorPage() {
       try {
         const appState = await fetchAppState();
         if (!mounted || !appState) return;
+        if (typeof appState.fontScale === "number") {
+          setFontScale(appState.fontScale);
+        }
+        if (typeof appState.lineHeight === "number") {
+          setLineHeight(appState.lineHeight);
+        }
         if (typeof appState.paragraphSpacing === "number") {
           setParagraphSpacing(appState.paragraphSpacing);
+        }
+        if (typeof appState.textIndent === "number") {
+          setTextIndent(appState.textIndent);
+        }
+        if (typeof appState.fontFamily === "string") {
+          setFontFamily(appState.fontFamily);
+        }
+        if (typeof appState.charsPerLine === "number") {
+          setCharsPerLine(appState.charsPerLine);
         }
         if (typeof appState.showParagraphNumbers === "boolean") {
           setShowParagraphNumbers(appState.showParagraphNumbers);
@@ -530,10 +545,45 @@ export default function EditorPage() {
     }
   }, [isElectron]);
 
+  const handleFontScaleChange = useCallback((value: number) => {
+    setFontScale(value);
+    void persistAppState({ fontScale: value }).catch((error) => {
+      console.error("フォントサイズの保存に失敗しました:", error);
+    });
+  }, []);
+
+  const handleLineHeightChange = useCallback((value: number) => {
+    setLineHeight(value);
+    void persistAppState({ lineHeight: value }).catch((error) => {
+      console.error("行間の保存に失敗しました:", error);
+    });
+  }, []);
+
   const handleParagraphSpacingChange = useCallback((value: number) => {
     setParagraphSpacing(value);
     void persistAppState({ paragraphSpacing: value }).catch((error) => {
       console.error("段落間隔の保存に失敗しました:", error);
+    });
+  }, []);
+
+  const handleTextIndentChange = useCallback((value: number) => {
+    setTextIndent(value);
+    void persistAppState({ textIndent: value }).catch((error) => {
+      console.error("字下げの保存に失敗しました:", error);
+    });
+  }, []);
+
+  const handleFontFamilyChange = useCallback((value: string) => {
+    setFontFamily(value);
+    void persistAppState({ fontFamily: value }).catch((error) => {
+      console.error("フォントの保存に失敗しました:", error);
+    });
+  }, []);
+
+  const handleCharsPerLineChange = useCallback((value: number) => {
+    setCharsPerLine(value);
+    void persistAppState({ charsPerLine: value }).catch((error) => {
+      console.error("1行あたり文字数の保存に失敗しました:", error);
     });
   }, []);
 
@@ -1228,17 +1278,17 @@ export default function EditorPage() {
                           onChapterClick={handleChapterClick}
                           onInsertText={handleInsertText}
                           fontScale={fontScale}
-                          onFontScaleChange={setFontScale}
+                          onFontScaleChange={handleFontScaleChange}
                           lineHeight={lineHeight}
-                          onLineHeightChange={setLineHeight}
+                          onLineHeightChange={handleLineHeightChange}
                           paragraphSpacing={paragraphSpacing}
                           onParagraphSpacingChange={handleParagraphSpacingChange}
                           textIndent={textIndent}
-                          onTextIndentChange={setTextIndent}
+                          onTextIndentChange={handleTextIndentChange}
                           fontFamily={fontFamily}
-                          onFontFamilyChange={setFontFamily}
+                          onFontFamilyChange={handleFontFamilyChange}
                           charsPerLine={charsPerLine}
-                          onCharsPerLineChange={setCharsPerLine}
+                          onCharsPerLineChange={handleCharsPerLineChange}
                           showParagraphNumbers={showParagraphNumbers}
                           onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
                         />

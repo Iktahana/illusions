@@ -39,16 +39,23 @@ export interface ProjectMetadata {
  */
 export interface AppState {
   lastOpenedMdiPath?: string;
-  paragraphSpacing?: number;
-  showParagraphNumbers?: boolean;
   hasSeenDemo?: boolean;
   sidebarTab?: "chapters" | "settings" | "style";
   inspectorTab?: "ai" | "corrections" | "stats" | "versions" | "history";
-  
+
+  // エディタ表示設定
+  fontScale?: number;
+  lineHeight?: number;
+  paragraphSpacing?: number;
+  textIndent?: number;
+  fontFamily?: string;
+  charsPerLine?: number;
+  showParagraphNumbers?: boolean;
+
   // 品詞着色設定
   posHighlightEnabled?: boolean;
   posHighlightColors?: Record<string, string>;
-  
+
   // プロジェクト管理
   currentProjectId?: string;
   projects?: ProjectMetadata[];
