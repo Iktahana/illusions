@@ -2,6 +2,10 @@
   "name": "illusions",
   "version": "0.0.0",
   "private": true,
+  "author": {
+    "name": "幾田花",
+    "url": "https://github.com/iktahana"
+  },
   "main": "dist-main/main.js",
   "scripts": {
     "type-check": "tsc --noEmit",
