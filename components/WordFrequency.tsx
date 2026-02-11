@@ -1,17 +1,38 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { RefreshCw } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { RefreshCw, LoaderCircle } from "lucide-react";
 import clsx from "clsx";
 
-// Use NLP client abstraction
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import type { WordEntry } from "@/lib/nlp-client/types";
+import { useContextMenu } from "@/lib/use-context-menu";
+import ContextMenu from "@/components/ContextMenu";
 
 interface WordFrequencyProps {
   /** エディタのテキストコンテンツ */
   content: string;
 }
+
+/** Dictionary lookup action map */
+const DICTIONARY_ACTIONS: Record<string, (word: string) => { url: string; title: string }> = {
+  genji: (word) => ({
+    url: `https://genji.illusions.app/${encodeURIComponent(word)}`,
+    title: `${word} - 幻辞`,
+  }),
+  kotobank: (word) => ({
+    url: `https://kotobank.jp/word/${encodeURIComponent(word)}`,
+    title: `${word} - コトバンク`,
+  }),
+  weblio: (word) => ({
+    url: `https://www.weblio.jp/content/${encodeURIComponent(word)}`,
+    title: `${word} - Weblio`,
+  }),
+  google: (word) => ({
+    url: `https://www.google.com/search?q=${encodeURIComponent(word)}`,
+    title: `${word} - Google`,
+  }),
+};
 
 export default function WordFrequency({ content }: WordFrequencyProps) {
   const [words, setWords] = useState<WordEntry[]>([]);
@@ -20,9 +41,51 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
   const [lastAnalyzedContent, setLastAnalyzedContent] = useState<string>("");
   const [cacheTimestamp, setCacheTimestamp] = useState<number>(0);
 
+  const contextMenu = useContextMenu();
+
+  const openDictionary = useCallback((word: string, url: string, title: string) => {
+    if (window.electronAPI?.openDictionaryPopup) {
+      window.electronAPI.openDictionaryPopup(url, title);
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }, []);
+
+  const handleDictionaryAction = useCallback(
+    (action: string, word: string) => {
+      const lookup = DICTIONARY_ACTIONS[action];
+      if (lookup) {
+        const { url, title } = lookup(word);
+        openDictionary(word, url, title);
+      }
+    },
+    [openDictionary]
+  );
+
+  const [contextWord, setContextWord] = useState("");
+
+  const handleWordContextMenu = useCallback(
+    async (e: React.MouseEvent, word: string) => {
+      const items = [
+        { label: `幻辞.comで調べる`, action: "genji" },
+        { label: `コトバンクで調べる`, action: "kotobank" },
+        { label: `weblio.jpで調べる`, action: "weblio" },
+        { label: `Googleで調べる`, action: "google" },
+      ];
+
+      setContextWord(word);
+
+      // In Electron, show() returns the selected action; in Web, returns null
+      const action = await contextMenu.show(e, items);
+      if (action) {
+        handleDictionaryAction(action, word);
+      }
+    },
+    [contextMenu, handleDictionaryAction]
+  );
+
   // コンテンツを解析
   const analyzeContent = async (force = false) => {
-    // キャッシュが有効で、強制更新でない場合はスキップ
     if (!force && content === lastAnalyzedContent && words.length > 0) {
       return;
     }
@@ -39,10 +102,7 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
 
     try {
       const nlpClient = getNlpClient();
-      
-      // Use backend word frequency analysis
       const wordEntries = await nlpClient.analyzeWordFrequency(content);
-      
       setWords(wordEntries);
       setLastAnalyzedContent(content);
       setCacheTimestamp(Date.now());
@@ -56,24 +116,20 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
 
   // 初回マウント時と content 変更時に自動解析
   useEffect(() => {
-    // 内容が変わった場合のみ再解析
     if (content !== lastAnalyzedContent) {
       const timer = setTimeout(() => {
         analyzeContent();
-      }, 1000); // 1秒のデバウンス
-      
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [content, lastAnalyzedContent]);
 
-  // 統計情報
   const stats = useMemo(() => {
     const totalWords = words.reduce((sum, w) => sum + w.count, 0);
     const uniqueWords = words.length;
     return { totalWords, uniqueWords };
   }, [words]);
 
-  // 品詞の色を取得（pos-colors.ts の DEFAULT_POS_COLORS と統一）
   const getPosColorHex = (pos: string): string | null => {
     switch (pos) {
       case "名詞": return "#4A90E2";
@@ -108,7 +164,7 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
             <RefreshCw className="w-4 h-4 text-foreground-tertiary" />
           </button>
         </div>
-        
+
         {/* 統計サマリー */}
         <div className="flex gap-4 mt-2 text-xs text-foreground-tertiary">
           <span>総語数: <span className="text-foreground">{stats.totalWords}</span></span>
@@ -125,8 +181,8 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
 
       {/* ローディング */}
       {isLoading && (
-        <div className="px-3 py-4 text-center text-xs text-foreground-tertiary">
-          解析中...
+        <div className="flex-1 flex items-center justify-center">
+          <LoaderCircle className="w-5 h-5 text-foreground-tertiary animate-spin" />
         </div>
       )}
 
@@ -141,7 +197,8 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
             {words.map((entry, index) => (
               <div
                 key={`${entry.word}-${index}`}
-                className="px-3 py-1.5 hover:bg-hover flex items-center justify-between gap-2"
+                className="px-3 py-1.5 hover:bg-hover flex items-center justify-between gap-2 cursor-context-menu"
+                onContextMenu={(e) => handleWordContextMenu(e, entry.word)}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-1.5">
@@ -177,6 +234,15 @@ export default function WordFrequency({ content }: WordFrequencyProps) {
           </div>
         )}
       </div>
+
+      {/* Web context menu */}
+      {contextMenu.menu && (
+        <ContextMenu
+          menu={contextMenu.menu}
+          onAction={(action) => handleDictionaryAction(action, contextWord)}
+          onClose={contextMenu.close}
+        />
+      )}
     </div>
   );
 }

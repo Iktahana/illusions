@@ -19,6 +19,7 @@ declare global {
     saveDoneAndClose?: () => Promise<void>;
     newWindow?: () => Promise<void>;
     openDictionaryPopup?: (url: string, title: string) => Promise<boolean>;
+    showContextMenu?: (items: Array<{ label: string; action: string }>) => Promise<string | null>;
     onSaveBeforeClose?: (callback: () => void) => (() => void) | void;
     onOpenFileFromSystem?: (
       callback: (payload: { path: string; content: string }) => void

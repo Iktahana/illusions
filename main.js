@@ -542,6 +542,24 @@ ipcMain.handle('open-dictionary-popup', (_event, url, title) => {
   return true
 })
 
+// ネイティブコンテキストメニューを表示
+ipcMain.handle('show-context-menu', (_event, items) => {
+  const win = BrowserWindow.getFocusedWindow()
+  if (!win) return null
+
+  return new Promise((resolve) => {
+    const template = items.map((item) => ({
+      label: item.label,
+      click: () => resolve(item.action),
+    }))
+    const menu = Menu.buildFromTemplate(template)
+    menu.popup({
+      window: win,
+      callback: () => resolve(null),
+    })
+  })
+})
+
 // Handle .mdi file association (macOS: open-file event, Windows/Linux: process.argv)
 let pendingFilePath = null
 
