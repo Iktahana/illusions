@@ -1,5 +1,6 @@
 import './style.css'
 import { getRandomBackgroundImage } from './bg-images'
+import logoSvg from '/logo.svg?raw'
 
 // ランダムな背景画像を取得
 const bgImageUrl = getRandomBackgroundImage()
@@ -22,7 +23,7 @@ if (bgImageUrl) {
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div class="hero">
     <div class="logo">✨</div>
-    <h1>Illusions</h1>
+    <div class="title-logo">${logoSvg}</div>
     <p class="tagline">日本語小説執筆のためのエディタ</p>
 
     <div class="cta-buttons">

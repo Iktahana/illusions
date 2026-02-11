@@ -72,6 +72,23 @@ h1 {
   letter-spacing: -0.02em;
 }
 
+.title-logo {
+  max-width: 600px;
+  margin: 0 auto 2rem;
+}
+
+.title-logo svg {
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))
+          drop-shadow(0 0 40px rgba(255, 255, 255, 0.6))
+          drop-shadow(0 0 60px rgba(255, 255, 255, 0.4));
+}
+
+.title-logo svg path {
+  fill: white;
+}
+
 .tagline {
   font-size: 1.5rem;
   margin-bottom: 3rem;
@@ -155,6 +172,10 @@ h1 {
 @media (max-width: 768px) {
   h1 {
     font-size: 2.5rem;
+  }
+
+  .title-logo {
+    max-width: 90%;
   }
 
   .tagline {
