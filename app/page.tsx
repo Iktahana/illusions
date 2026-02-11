@@ -1159,7 +1159,7 @@ export default function EditorPage() {
                         </div>
                       );
                     case "wordfreq":
-                      return <WordFrequency content={content} onWordSearch={(word) => {
+                      return <WordFrequency content={content} filePath={currentFile?.path ?? undefined} onWordSearch={(word) => {
                         setSearchInitialTerm(word);
                         setSearchOpenTrigger(prev => prev + 1);
                       }} />;

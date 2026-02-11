@@ -8,12 +8,25 @@ import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import type { WordEntry } from "@/lib/nlp-client/types";
 import { useContextMenu } from "@/lib/use-context-menu";
 import ContextMenu from "@/components/ContextMenu";
+import { getVFS } from "@/lib/vfs";
+
+/** Cache file schema for word frequency results */
+interface WordFrequencyCache {
+  lastModified: number;
+  fileSize: number;
+  words: WordEntry[];
+  totalWords: number;
+  uniqueWords: number;
+  analyzedAt: number;
+}
 
 interface WordFrequencyProps {
   /** エディタのテキストコンテンツ */
   content: string;
   /** 単語をクリックしたときに検索ダイアログを開く */
   onWordSearch?: (word: string) => void;
+  /** File path (relative) for VFS-based cache; omit for standalone/no-cache mode */
+  filePath?: string;
 }
 
 /** Dictionary lookup action map */
@@ -36,7 +49,13 @@ const DICTIONARY_ACTIONS: Record<string, (word: string) => { url: string; title:
   }),
 };
 
-export default function WordFrequency({ content, onWordSearch }: WordFrequencyProps) {
+/** Derive cache path from a file path basename */
+function getCachePath(filePath: string): string {
+  const basename = filePath.split("/").pop() ?? filePath;
+  return `.illusions/word_count/${basename}.json`;
+}
+
+export default function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) {
   const [words, setWords] = useState<WordEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +105,7 @@ export default function WordFrequency({ content, onWordSearch }: WordFrequencyPr
     [contextMenu, handleDictionaryAction]
   );
 
-  // コンテンツを解析
+  // コンテンツを解析 (with VFS cache support)
   const analyzeContent = async (force = false) => {
     if (!force && content === lastAnalyzedContent && words.length > 0) {
       return;
@@ -103,11 +122,57 @@ export default function WordFrequency({ content, onWordSearch }: WordFrequencyPr
     setError(null);
 
     try {
+      const vfs = getVFS();
+      const canCache = !!filePath && vfs.isRootOpen();
+
+      // Try reading cache
+      if (canCache && !force) {
+        try {
+          const cachePath = getCachePath(filePath);
+          const cacheText = await vfs.readFile(cachePath);
+          const cache = JSON.parse(cacheText) as WordFrequencyCache;
+          const meta = await vfs.getFileMetadata(filePath);
+
+          if (cache.lastModified === meta.lastModified && cache.fileSize === meta.size) {
+            setWords(cache.words);
+            setLastAnalyzedContent(content);
+            setCacheTimestamp(cache.analyzedAt);
+            setIsLoading(false);
+            return;
+          }
+        } catch {
+          // Cache miss or read error — proceed to NLP analysis
+        }
+      }
+
+      // Run NLP analysis
       const nlpClient = getNlpClient();
       const wordEntries = await nlpClient.analyzeWordFrequency(content);
       setWords(wordEntries);
       setLastAnalyzedContent(content);
-      setCacheTimestamp(Date.now());
+      const now = Date.now();
+      setCacheTimestamp(now);
+
+      // Write cache
+      if (canCache) {
+        try {
+          const meta = await vfs.getFileMetadata(filePath);
+          const totalWords = wordEntries.reduce((sum, w) => sum + w.count, 0);
+          const cacheData: WordFrequencyCache = {
+            lastModified: meta.lastModified,
+            fileSize: meta.size,
+            words: wordEntries,
+            totalWords,
+            uniqueWords: wordEntries.length,
+            analyzedAt: now,
+          };
+          const cachePath = getCachePath(filePath);
+          // writeFile creates parent directories as needed
+          await vfs.writeFile(cachePath, JSON.stringify(cacheData, null, 2));
+        } catch (err) {
+          console.warn("[WordFrequency] Failed to write cache:", err);
+        }
+      }
     } catch (err) {
       console.error("[WordFrequency] Analysis error:", err);
       setError("解析に失敗しました");
