@@ -728,6 +728,9 @@ export default function EditorPage() {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
+      if (error instanceof Error && error.message.includes("cancelled")) {
+        return;
+      }
       console.error("プロジェクトを開くのに失敗しました:", error);
     }
   }, [setProjectMode, isElectron, loadProjectContent]);
