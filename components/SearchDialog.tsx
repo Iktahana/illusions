@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Search, X, ChevronUp, ChevronDown, List } from "lucide-react";
 import { EditorView, Decoration } from "@milkdown/prose/view";
 import { TextSelection } from "@milkdown/prose/state";
@@ -10,6 +10,7 @@ interface SearchDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onShowAllResults?: (matches: SearchMatch[], searchTerm: string) => void;
+  initialSearchTerm?: string;
 }
 
 interface SearchMatch {
@@ -17,12 +18,52 @@ interface SearchMatch {
   to: number;
 }
 
-export default function SearchDialog({ editorView, isOpen, onClose, onShowAllResults }: SearchDialogProps) {
+export default function SearchDialog({ editorView, isOpen, onClose, onShowAllResults, initialSearchTerm }: SearchDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [matches, setMatches] = useState<SearchMatch[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Drag state (session-only, resets on refresh)
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
+  const isDragging = useRef(false);
+  const dragStart = useRef<{ mouseX: number; mouseY: number; elX: number; elY: number }>({ mouseX: 0, mouseY: 0, elX: 0, elY: 0 });
+
+  const handleDragMouseDown = useCallback((e: React.MouseEvent) => {
+    // Don't initiate drag from interactive elements
+    if ((e.target as HTMLElement).closest("button, input, label, a")) return;
+    e.preventDefault();
+    isDragging.current = true;
+    const el = dialogRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    dragStart.current = { mouseX: e.clientX, mouseY: e.clientY, elX: rect.left, elY: rect.top };
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return;
+      const dx = ev.clientX - dragStart.current.mouseX;
+      const dy = ev.clientY - dragStart.current.mouseY;
+      setDragOffset({ x: dragStart.current.elX + dx, y: dragStart.current.elY + dy });
+    };
+
+    const handleMouseUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, []);
+
+  // initialSearchTerm が変わったら検索語を上書き
+  useEffect(() => {
+    if (initialSearchTerm) {
+      setSearchTerm(initialSearchTerm);
+    }
+  }, [initialSearchTerm]);
 
   // ダイアログ表示時に検索入力へフォーカスする
   useEffect(() => {
@@ -147,10 +188,19 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
 
   return (
     <div
-      className="fixed top-16 right-4 z-50 bg-background-elevated rounded-lg shadow-lg border border-border p-4 w-80"
+      ref={dialogRef}
+      className="fixed z-50 bg-background-elevated rounded-lg shadow-lg border border-border p-4 w-80 cursor-grab active:cursor-grabbing"
+      style={
+        dragOffset
+          ? { left: dragOffset.x, top: dragOffset.y, right: "auto" }
+          : { top: 64, right: 16 }
+      }
       onKeyDown={handleKeyDown}
+      onMouseDown={handleDragMouseDown}
     >
-      <div className="flex items-center justify-between mb-3">
+      <div
+        className="flex items-center justify-between mb-3 select-none"
+      >
         <div className="flex items-center gap-2">
           <Search className="w-4 h-4 text-foreground-secondary" />
           <h3 className="text-sm font-medium text-foreground">検索</h3>

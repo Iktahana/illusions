@@ -40,6 +40,7 @@ interface EditorProps {
   fontFamily?: string;
   charsPerLine?: number;
   searchOpenTrigger?: number;
+  searchInitialTerm?: string;
   showParagraphNumbers?: boolean;
   onEditorViewReady?: (view: EditorView) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,6 +63,7 @@ export default function NovelEditor({
   fontFamily = 'Noto Serif JP',
   charsPerLine = 40,
   searchOpenTrigger = 0,
+  searchInitialTerm,
   showParagraphNumbers = false,
   onEditorViewReady,
   onShowAllSearchResults,
@@ -100,14 +102,14 @@ export default function NovelEditor({
    // 
    // 将来、再マウント無しでファイル切替が必要なら、明確な fileId prop を追加して追跡可能
 
-  const handleSearchOpen = () => {
-    setIsSearchOpen(true);
+  const handleSearchToggle = () => {
+    setIsSearchOpen(prev => !prev);
   };
 
   // 親からのトリガーで検索ダイアログを開く（ショートカット）
   useEffect(() => {
     if (searchOpenTrigger > 0) {
-      handleSearchOpen();
+      handleSearchToggle();
     }
   }, [searchOpenTrigger]);
 
@@ -144,7 +146,7 @@ export default function NovelEditor({
         onToggleVertical={handleToggleVertical}
         fontScale={fontScale}
         lineHeight={lineHeight}
-        onSearchClick={handleSearchOpen}
+        onSearchClick={handleSearchToggle}
       />
 
       {/* エディタ領域 */}
@@ -198,6 +200,7 @@ export default function NovelEditor({
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onShowAllResults={onShowAllSearchResults}
+        initialSearchTerm={searchInitialTerm}
       />
     </div>
   );
