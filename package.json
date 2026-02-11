@@ -12,7 +12,7 @@
     "download:fonts": "node scripts/download-local-fonts.mjs",
     "bundle:electron": "node scripts/bundle-electron.mjs",
     "electron:dev": "npm run bundle:electron && concurrently \"next dev -p 3000 --webpack\" \"wait-on http://localhost:3000 && env -u ELECTRON_RUN_AS_NODE ELECTRON_DEV=1 electron .\"",
-    "electron:build": "npm run type-check && next build --webpack && npm run bundle:electron && electron-builder --publish never",
+    "electron:build": "npm run type-check && ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron && electron-builder --publish never",
     "build:quicklook": "bash scripts/build-quicklook.sh",
     "postinstall": "electron-builder install-app-deps"
   },

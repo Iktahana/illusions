@@ -384,8 +384,8 @@ function createWindow() {
     newWindow.loadURL('http://localhost:3000')
     newWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
-    // Next.js の静的出力
-    newWindow.loadFile(path.join(__dirname, 'out', 'index.html'))
+    // Next.js の静的出力 — app.getAppPath() はパッケージのルートを返す
+    newWindow.loadFile(path.join(app.getAppPath(), 'out', 'index.html'))
   }
 
   // アプリメニューを設定

@@ -10,7 +10,11 @@ const withSerwist = withSerwistInit({
   disable: process.env.NODE_ENV !== "production",
 });
 
+// Electron build: static export (API routes are handled via IPC, not HTTP)
+const isElectronBuild = process.env.ELECTRON_BUILD === "1";
+
 const nextConfig: NextConfig = {
+  ...(isElectronBuild ? { output: "export" } : {}),
   images: { unoptimized: true },
   trailingSlash: true,
   turbopack: {},
