@@ -12,15 +12,21 @@ export function useGlobalShortcuts(
 ) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check if focus is inside the editor
-      if (editorContainerRef?.current?.contains(document.activeElement)) {
-        // Inside editor, don't intercept shortcuts
+      const isMac = typeof navigator !== 'undefined' &&
+                    navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modifier = isMac ? e.metaKey : e.ctrlKey;
+
+      // Ctrl/Cmd + R: Block browser reload (always, regardless of focus)
+      if (modifier && e.key === 'r') {
+        e.preventDefault();
         return;
       }
 
-      const isMac = typeof navigator !== 'undefined' && 
-                    navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const modifier = isMac ? e.metaKey : e.ctrlKey;
+      // Check if focus is inside the editor
+      if (editorContainerRef?.current?.contains(document.activeElement)) {
+        // Inside editor, don't intercept other shortcuts
+        return;
+      }
 
       // Ctrl/Cmd + S: Save
       if (modifier && e.key === 's' && !e.shiftKey) {
@@ -47,13 +53,6 @@ export function useGlobalShortcuts(
       if (modifier && e.key === 'n') {
         e.preventDefault();
         onAction('new-window');
-        return;
-      }
-
-      // Ctrl/Cmd + R: Reload (prevent default browser reload)
-      if (modifier && e.key === 'r') {
-        e.preventDefault();
-        onAction('reload');
         return;
       }
 

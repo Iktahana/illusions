@@ -48,8 +48,6 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
   {
     label: '表示',
     items: [
-      { label: '再読み込み', accelerator: 'Ctrl+R', action: 'reload' },
-      { type: 'separator' },
       { label: '実際のサイズ', accelerator: 'Ctrl+0', action: 'reset-zoom' },
       { label: '拡大', accelerator: 'Ctrl++', action: 'zoom-in' },
       { label: '縮小', accelerator: 'Ctrl+-', action: 'zoom-out' },

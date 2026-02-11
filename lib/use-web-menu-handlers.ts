@@ -105,9 +105,6 @@ export function useWebMenuHandlers({
         break;
       
       // View menu
-      case 'reload':
-        window.location.reload();
-        break;
       case 'reset-zoom':
       case 'zoom-in':
       case 'zoom-out':
