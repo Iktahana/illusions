@@ -14,7 +14,7 @@ const withSerwist = withSerwistInit({
 const isElectronBuild = process.env.ELECTRON_BUILD === "1";
 
 const nextConfig: NextConfig = {
-  ...(isElectronBuild ? { output: "export" } : {}),
+  ...(isElectronBuild ? { output: "export", assetPrefix: "." } : {}),
   images: { unoptimized: true },
   trailingSlash: true,
   turbopack: {},
