@@ -417,6 +417,9 @@ export default function EditorPage() {
     };
   }, []);
 
+  // ID of the most recent project to auto-restore (Electron only)
+  const [autoRestoreProjectId, setAutoRestoreProjectId] = useState<string | null>(null);
+
   // Load recent projects on mount (for WelcomeScreen)
   useEffect(() => {
     let mounted = true;
@@ -437,8 +440,14 @@ export default function EditorPage() {
             rootDirName: p.rootPath.split("/").pop(),
           }));
           setRecentProjects(entries);
+
+          // Mark the most recent project for auto-restore (sorted by updated_at DESC)
+          if (projects.length > 0) {
+            setAutoRestoreProjectId(projects[0].id);
+          }
         } else {
           // Web: load from IndexedDB project handles
+          // (Web requires user interaction for permission re-grant, so no auto-restore)
           const projectManager = getProjectManager();
           const handles = await projectManager.listProjectHandles();
           if (!mounted) return;
@@ -926,6 +935,14 @@ export default function EditorPage() {
       console.error("最近のプロジェクトを開くのに失敗しました:", error);
     }
   }, [isElectron, setProjectMode, openRestoredProject, loadProjectContent]);
+
+  // Auto-restore the last opened project on startup (Electron only)
+  const autoRestoreTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (!autoRestoreProjectId || autoRestoreTriggeredRef.current) return;
+    autoRestoreTriggeredRef.current = true;
+    void handleOpenRecentProject(autoRestoreProjectId);
+  }, [autoRestoreProjectId, handleOpenRecentProject]);
 
   /** Called when the CreateProjectWizard successfully creates a project */
   const handleProjectCreated = useCallback(async (project: ProjectMode) => {
