@@ -18,7 +18,7 @@ const execFileAsync = promisify(execFile)
 const isDev =
   process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === '1'
 
-const APP_NAME = 'Illusions'
+const APP_NAME = 'illusions'
 
 // auto-updater のログ設定
 autoUpdater.logger = log

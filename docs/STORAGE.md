@@ -1,6 +1,6 @@
 # Storage Service Documentation
 
-Complete guide to the Illusions storage system architecture and API.
+Complete guide to the illusions storage system architecture and API.
 
 ---
 
@@ -291,9 +291,9 @@ async function saveFile(path: string, content: string) {
 - ❌ **Requires IPC**: Must communicate with main process
 
 **Storage Location:**
-- macOS: `~/Library/Application Support/Illusions/illusions-storage.db`
-- Windows: `%APPDATA%\Illusions\illusions-storage.db`
-- Linux: `~/.config/Illusions/illusions-storage.db`
+- macOS: `~/Library/Application Support/illusions/illusions-storage.db`
+- Windows: `%APPDATA%\illusions\illusions-storage.db`
+- Linux: `~/.config/illusions/illusions-storage.db`
 
 ### Web (IndexedDB)
 
@@ -311,7 +311,7 @@ async function saveFile(path: string, content: string) {
 
 ```bash
 # macOS
-sqlite3 ~/Library/Application\ Support/Illusions/illusions-storage.db
+sqlite3 ~/Library/Application\ Support/illusions/illusions-storage.db
 
 # View schema
 .schema
@@ -327,7 +327,7 @@ SELECT * FROM editor_buffer;
 1. Open DevTools (F12)
 2. Go to **Application** tab
 3. Expand **IndexedDB**
-4. Select **IllusionsStorage** database
+4. Select **illusionsStorage** database
 5. Browse tables: `appState`, `recentFiles`, `editorBuffer`
 
 ---

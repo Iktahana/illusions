@@ -22,7 +22,7 @@
   <array>
     <dict>
       <key>CFBundleTypeName</key>
-      <string>Illusions MDI Document</string>
+      <string>illusions MDI Document</string>
       <key>CFBundleTypeRole</key>
       <string>Viewer</string>
       <key>LSItemContentTypes</key>
@@ -41,7 +41,7 @@
       <key>UTTypeIdentifier</key>
       <string>com.iktahana.illusions.mdi</string>
       <key>UTTypeDescription</key>
-      <string>Illusions MDI Document</string>
+      <string>illusions MDI Document</string>
       <key>UTTypeConformsTo</key>
       <array>
         <string>public.plain-text</string>

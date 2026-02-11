@@ -12,7 +12,7 @@ export class AutoSaveDb extends Dexie {
   auto_save_cache!: Table<AutoSaveCacheEntry, string>;
 
   constructor() {
-    super("IllusionsAutoSave");
+    super("illusionsAutoSave");
     this.version(1).stores({
       auto_save_cache: "id, last_updated",
     });

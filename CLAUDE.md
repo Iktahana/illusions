@@ -1,4 +1,4 @@
-# Illusions Project - AI Agent Rules
+# illusions Project - AI Agent Rules
 # ====================================
 # Single source of truth for all AI assistants (Cursor, Claude, etc.)
 # Last updated: 2026-02-06
@@ -157,7 +157,7 @@ const session = await storage.loadSession();
 - **Utility**: `clearAll()`
 
 ### Storage Locations
-- **Electron**: SQLite at `~/Library/Application Support/Illusions/illusions-storage.db`
+- **Electron**: SQLite at `~/Library/Application Support/illusions/illusions-storage.db`
 - **Web**: Browser IndexedDB via Dexie
 
 ### What NOT to Do

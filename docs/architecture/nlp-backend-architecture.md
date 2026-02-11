@@ -1,6 +1,6 @@
 # NLP Backend Architecture
 
-This document describes the NLP (Natural Language Processing) backend architecture for the Illusions project after the migration from frontend to backend processing.
+This document describes the NLP (Natural Language Processing) backend architecture for the illusions project after the migration from frontend to backend processing.
 
 ## Overview
 

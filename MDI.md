@@ -1,6 +1,6 @@
 # MDI (Illusion Markdown) Syntax Specification (MDI 1.0 Draft)
 
-MDI files are Markdown documents with Illusions-specific extensions for Japanese typography.
+MDI files are Markdown documents with illusions-specific extensions for Japanese typography.
 This specification defines *inline* syntaxes that are difficult to express in standard Markdown (ruby, tate-chu-yoko, no-break, kerning).
 
 ## 1. Purpose & Assumptions

@@ -88,7 +88,7 @@
   },
   "build": {
     "appId": "com.iktahana.illusions",
-    "productName": "Illusions",
+    "productName": "illusions",
     "directories": {
       "app": ".",
       "output": "dist-electron"
@@ -162,7 +162,7 @@
           "ext": "mdi",
           "name": "illusions MDI Document",
           "icon": "build/mdi-icon.ico",
-          "description": "Illusions の illusions MDI Document"
+          "description": "illusions の illusions MDI Document"
         }
       ]
     },
@@ -173,7 +173,7 @@
           "ext": "mdi",
           "name": "illusions MDI Document",
           "icon": "build/mdi-icon.png",
-          "description": "Illusions の illusions MDI Document"
+          "description": "illusions の illusions MDI Document"
         }
       ]
     }

@@ -239,7 +239,7 @@ function EditorToolbar({
 
       <div className="flex items-center gap-4">
         <div className="text-xs text-foreground-tertiary">
-          Illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
+          illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
         </div>
 
         {/* 検索 */}

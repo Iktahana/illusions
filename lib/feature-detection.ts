@@ -1,5 +1,5 @@
 /**
- * Browser feature detection for Illusions.
+ * Browser feature detection for illusions.
  * Checks for File System Access API support and other capabilities.
  *
  * ブラウザの機能検出。File System Access API 等のサポート状況を確認する。

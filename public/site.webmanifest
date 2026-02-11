@@ -1,6 +1,6 @@
 {
-  "name": "Illusions",
-  "short_name": "Illusions",
+  "name": "illusions",
+  "short_name": "illusions",
   "description": "A professional Japanese novel editor with vertical writing support",
   "start_url": "/",
   "icons": [

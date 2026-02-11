@@ -1,6 +1,6 @@
-# Illusions Documentation
+# illusions Documentation
 
-Complete documentation for the Illusions Japanese novel editor.
+Complete documentation for the illusions Japanese novel editor.
 
 ---
 

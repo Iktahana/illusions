@@ -1,5 +1,5 @@
 /**
- * Type definitions for Illusions
+ * Type definitions for illusions
  */
 
 export interface NovelDocument {

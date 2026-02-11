@@ -54,7 +54,7 @@ class WebStorageDatabase extends Dexie {
   projectHandles!: Table<StoredProjectHandle, string>;
 
   constructor() {
-    super("IllusionsStorage");
+    super("illusionsStorage");
 
     // v1: Initial schema
     this.version(1).stores({

@@ -122,7 +122,7 @@ export default function WelcomeScreen({
           <div className="mb-4 flex justify-center">
             <img
               src="/logo/illusions.min.svg"
-              alt="Illusions"
+              alt="illusions"
               className="h-16 w-auto dark:invert"
             />
           </div>
@@ -182,7 +182,7 @@ export default function WelcomeScreen({
         {/* Non-dismissible modal for unsupported browsers (not shown in Electron) */}
         <GlassDialog isOpen={showUnsupportedModal} panelClassName="mx-4 w-full max-w-md p-8 text-center">
           <h2 className="text-xl font-bold text-foreground">
-            現在お使いのブラウザでは、Illusions のWeb版はご利用いただけません。
+            現在お使いのブラウザでは、illusions のWeb版はご利用いただけません。
           </h2>
           <p className="mt-3 text-sm text-foreground-secondary">
             すべての機能を利用するには、デスクトップ版をお試しください。

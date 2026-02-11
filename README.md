@@ -94,7 +94,7 @@ To enable GitHub authentication and cloud sync:
 
 1. Create a GitHub OAuth App at https://github.com/settings/applications/new
 2. Configure the OAuth App:
-   - **Application name**: `Illusions Novel Editor` (or your preferred name)
+   - **Application name**: `illusions Novel Editor` (or your preferred name)
    - **Homepage URL**: `http://localhost:3000`
    - **Authorization callback URL**: `http://localhost:3000`
 3. Copy the **Client ID** from the OAuth App page

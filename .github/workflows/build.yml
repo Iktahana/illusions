@@ -210,7 +210,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.full }}
-          name: Illusions v${{ steps.version.outputs.full }}
+          name: illusions v${{ steps.version.outputs.full }}
           files: release-assets/*
           draft: false
           prerelease: ${{ startsWith(github.ref, 'refs/heads/main') }}
