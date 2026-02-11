@@ -509,7 +509,7 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("ダウンロードに失敗しました:", error);
+      console.error("パソコンに保存に失敗しました:", error);
     }
   }, []);
 
@@ -634,7 +634,7 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
       { label: "名前の変更", action: "rename" },
       { label: "複製", action: "duplicate" },
       { label: "削除", action: "delete" },
-      { label: "ダウンロード", action: "download" },
+      { label: "パソコンに保存", action: "download" },
     ];
     const result = await showContextMenu(e, items);
     if (result) {
