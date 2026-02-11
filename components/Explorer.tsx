@@ -645,10 +645,10 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
   const onFolderContextMenu = useCallback(async (e: React.MouseEvent, fullPath: string) => {
     contextTargetRef.current = { path: fullPath, kind: "directory" };
     const items = [
+      { label: "名前の変更", action: "rename" },
       { label: "新規ファイル", action: "new-file" },
       { label: "新規フォルダ", action: "new-folder" },
       { label: "削除", action: "delete" },
-      { label: "名前の変更", action: "rename" },
     ];
     const result = await showContextMenu(e, items);
     if (result) {
