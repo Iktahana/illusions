@@ -43,6 +43,8 @@ interface ElectronVFSBridge {
   mkdir: (dirPath: string) => Promise<void>;
   /** Delete a file or directory */
   delete: (targetPath: string, options?: { recursive?: boolean }) => Promise<void>;
+  /** Rename (move) a file or directory */
+  rename: (oldPath: string, newPath: string) => Promise<void>;
   /** Watch a file for changes (optional) */
   watch?: (
     filePath: string,
@@ -323,6 +325,25 @@ export class ElectronVFS implements VirtualFileSystem {
     } catch (error) {
       throw new Error(
         `Failed to delete file "${path}": ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Rename (move) a file or directory.
+   * @param oldPath - Current path (absolute or relative to root)
+   * @param newPath - Desired new path (absolute or relative to root)
+   */
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    const bridge = getVFSBridge();
+    const absoluteOld = this.resolvePath(oldPath);
+    const absoluteNew = this.resolvePath(newPath);
+
+    try {
+      await bridge.rename(absoluteOld, absoluteNew);
+    } catch (error) {
+      throw new Error(
+        `Failed to rename "${oldPath}" to "${newPath}": ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }

@@ -154,6 +154,13 @@ export interface VirtualFileSystem {
   deleteFile(path: string): Promise<void>;
 
   /**
+   * Rename (move) a file or directory.
+   * @param oldPath - Current path
+   * @param newPath - Desired new path
+   */
+  rename(oldPath: string, newPath: string): Promise<void>;
+
+  /**
    * Get metadata about a file.
    * @param path - File path to query
    */

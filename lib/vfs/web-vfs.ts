@@ -330,6 +330,25 @@ export class WebVFS implements VirtualFileSystem {
   }
 
   /**
+   * Rename (move) a file or directory.
+   * Web FS API has no native rename, so this reads → writes → deletes.
+   * Only supports files (not directories).
+   * @param oldPath - Current file path relative to root
+   * @param newPath - Desired new file path relative to root
+   */
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    try {
+      const content = await this.readFile(oldPath);
+      await this.writeFile(newPath, content);
+      await this.deleteFile(oldPath);
+    } catch (error) {
+      throw new Error(
+        `Failed to rename "${oldPath}" to "${newPath}": ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
    * Get metadata about a file.
    * @param path - File path relative to root
    */

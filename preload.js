@@ -109,5 +109,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     stat: (filePath) => ipcRenderer.invoke('vfs:stat', filePath),
     mkdir: (dirPath) => ipcRenderer.invoke('vfs:mkdir', dirPath),
     delete: (targetPath, options) => ipcRenderer.invoke('vfs:delete', targetPath, options),
+    rename: (oldPath, newPath) => ipcRenderer.invoke('vfs:rename', oldPath, newPath),
   },
 })

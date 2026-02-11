@@ -129,6 +129,18 @@ function registerVFSHandlers() {
     }
   });
 
+  // Rename file or directory
+  ipcMain.handle('vfs:rename', async (_event, oldPath, newPath) => {
+    try {
+      const resolvedOld = validateVFSPath(oldPath);
+      const resolvedNew = validateVFSPath(newPath);
+      await fs.rename(resolvedOld, resolvedNew);
+    } catch (error) {
+      console.error('[VFS IPC] rename failed:', error);
+      throw error;
+    }
+  });
+
   // Set root directory programmatically (for restoring a recent project without dialog)
   ipcMain.handle('vfs:set-root', async (_event, rootPath) => {
     const resolved = path.resolve(rootPath);

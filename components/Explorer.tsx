@@ -12,10 +12,14 @@ import {
   Check,
   Folder,
   File,
-  ChevronDown
+  ChevronDown,
+  FilePlus,
+  FolderPlus,
 } from "lucide-react";
 import clsx from "clsx";
 import { parseMarkdownChapters, getChaptersFromDOM, type Chapter } from "@/lib/utils";
+import { useContextMenu } from "@/lib/use-context-menu";
+import ContextMenu from "@/components/ContextMenu";
 import {
   FEATURED_JAPANESE_FONTS,
   ALL_JAPANESE_FONTS,
@@ -300,19 +304,34 @@ interface FileTreeEntry {
   children?: FileTreeEntry[];
 }
 
+/** State for inline editing (rename / new file / new folder) */
+interface EditingEntry {
+  /** Parent directory path (e.g. "/" or "/subdir") */
+  parentPath: string;
+  /** What kind of editing operation */
+  kind: "rename" | "new-file" | "new-folder";
+  /** Current file/folder name (used for rename; empty for new) */
+  currentName: string;
+}
+
 export function FilesPanel({ projectName }: { projectName?: string }) {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(["/"]));
   const [tree, setTree] = useState<FileTreeEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [editing, setEditing] = useState<EditingEntry | null>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
+  const { menu, show: showContextMenu, close: closeContextMenu } = useContextMenu();
+  /** Track the right-clicked entry for Web context menu callback */
+  const contextTargetRef = useRef<{ path: string; kind: "file" | "directory" } | null>(null);
+
+  const refresh = useCallback(() => setRefreshToken(v => v + 1), []);
 
   const loadDirectory = useCallback(async (dirPath: string): Promise<FileTreeEntry[]> => {
     const { getVFS } = await import("@/lib/vfs");
     const vfs = getVFS();
     const entries = await vfs.listDirectory(dirPath);
 
-    // Sort: directories first, then files, alphabetically within each group
-    // Hide dotfiles/dotdirs (e.g. .git, .DS_Store)
     const sorted = [...entries]
       .filter((e) => !e.name.startsWith("."))
       .sort((a, b) => {
@@ -323,7 +342,6 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
     const result: FileTreeEntry[] = [];
     for (const entry of sorted) {
       if (entry.kind === "directory") {
-        // Lazy: only load children for already-expanded dirs
         const childPath = dirPath ? `${dirPath}/${entry.name}` : entry.name;
         const fullKey = `/${childPath}`;
         let children: FileTreeEntry[] | undefined;
@@ -342,7 +360,6 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
     return result;
   }, [expandedDirs]);
 
-  // Load tree from VFS
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -367,6 +384,25 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
     return () => { cancelled = true; };
   }, [loadDirectory, refreshToken]);
 
+  // Auto-focus the inline edit input when editing starts
+  useEffect(() => {
+    if (editing && editInputRef.current) {
+      const input = editInputRef.current;
+      input.focus();
+      if (editing.kind === "rename") {
+        // Select filename without extension
+        const dotIndex = editing.currentName.lastIndexOf(".");
+        if (dotIndex > 0) {
+          input.setSelectionRange(0, dotIndex);
+        } else {
+          input.select();
+        }
+      } else {
+        input.select();
+      }
+    }
+  }, [editing]);
+
   const toggleDir = useCallback((path: string) => {
     setExpandedDirs(prev => {
       const next = new Set(prev);
@@ -377,51 +413,340 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
       }
       return next;
     });
-    // Trigger reload to fetch newly expanded children
     setRefreshToken(v => v + 1);
   }, []);
 
+  // ---- File operations ----
+
+  /** Convert tree path (e.g. "/subdir/file.txt") to VFS-relative path (e.g. "subdir/file.txt") */
+  const toVFSPath = (treePath: string): string => treePath.replace(/^\//, "");
+
+  const handleDelete = useCallback(async (fullPath: string, kind: "file" | "directory") => {
+    const name = fullPath.split("/").pop() || fullPath;
+    const msg = kind === "directory"
+      ? `フォルダ「${name}」を削除しますか？中のファイルもすべて削除されます。`
+      : `ファイル「${name}」を削除しますか？`;
+    if (!window.confirm(msg)) return;
+
+    try {
+      const { getVFS } = await import("@/lib/vfs");
+      const vfs = getVFS();
+      if (kind === "directory") {
+        const dirHandle = await vfs.getDirectoryHandle(toVFSPath(fullPath));
+        // Delete all entries recursively
+        const entries = await vfs.listDirectory(toVFSPath(fullPath));
+        for (const entry of entries) {
+          await dirHandle.removeEntry(entry.name, { recursive: true });
+        }
+        // Delete the directory itself via parent
+        const parentPath = fullPath.substring(0, fullPath.lastIndexOf("/")) || "/";
+        const dirName = fullPath.split("/").pop()!;
+        const parentHandle = await vfs.getDirectoryHandle(toVFSPath(parentPath));
+        await parentHandle.removeEntry(dirName, { recursive: true });
+      } else {
+        await vfs.deleteFile(toVFSPath(fullPath));
+      }
+      refresh();
+    } catch (error) {
+      console.error("削除に失敗しました:", error);
+    }
+  }, [refresh]);
+
+  const handleRename = useCallback(async (fullPath: string, newName: string) => {
+    if (!newName.trim()) return;
+    const oldName = fullPath.split("/").pop()!;
+    if (newName === oldName) { setEditing(null); return; }
+
+    const parentPath = fullPath.substring(0, fullPath.lastIndexOf("/")) || "/";
+    const newFullPath = parentPath === "/" ? `/${newName}` : `${parentPath}/${newName}`;
+
+    try {
+      const { getVFS } = await import("@/lib/vfs");
+      const vfs = getVFS();
+      await vfs.rename(toVFSPath(fullPath), toVFSPath(newFullPath));
+      setEditing(null);
+      refresh();
+    } catch (error) {
+      console.error("名前の変更に失敗しました:", error);
+    }
+  }, [refresh]);
+
+  const handleDuplicate = useCallback(async (fullPath: string) => {
+    try {
+      const { getVFS } = await import("@/lib/vfs");
+      const vfs = getVFS();
+      const content = await vfs.readFile(toVFSPath(fullPath));
+
+      const name = fullPath.split("/").pop()!;
+      const parentPath = fullPath.substring(0, fullPath.lastIndexOf("/")) || "/";
+      const dotIndex = name.lastIndexOf(".");
+      const baseName = dotIndex > 0 ? name.substring(0, dotIndex) : name;
+      const ext = dotIndex > 0 ? name.substring(dotIndex) : "";
+      const copyName = `${baseName} (コピー)${ext}`;
+      const copyPath = parentPath === "/" ? `/${copyName}` : `${parentPath}/${copyName}`;
+
+      await vfs.writeFile(toVFSPath(copyPath), content);
+      refresh();
+    } catch (error) {
+      console.error("複製に失敗しました:", error);
+    }
+  }, [refresh]);
+
+  const handleDownload = useCallback(async (fullPath: string) => {
+    try {
+      const { getVFS } = await import("@/lib/vfs");
+      const vfs = getVFS();
+      const content = await vfs.readFile(toVFSPath(fullPath));
+      const name = fullPath.split("/").pop()!;
+
+      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("ダウンロードに失敗しました:", error);
+    }
+  }, []);
+
+  const handleNewFile = useCallback(async (parentPath: string, name: string) => {
+    if (!name.trim()) { setEditing(null); return; }
+    const filePath = parentPath === "/" ? `/${name}` : `${parentPath}/${name}`;
+    try {
+      const { getVFS } = await import("@/lib/vfs");
+      const vfs = getVFS();
+      await vfs.writeFile(toVFSPath(filePath), "");
+      setEditing(null);
+      refresh();
+    } catch (error) {
+      console.error("ファイル作成に失敗しました:", error);
+    }
+  }, [refresh]);
+
+  const handleNewFolder = useCallback(async (parentPath: string, name: string) => {
+    if (!name.trim()) { setEditing(null); return; }
+    const dirPath = parentPath === "/" ? `/${name}` : `${parentPath}/${name}`;
+    try {
+      const { getVFS } = await import("@/lib/vfs");
+      const vfs = getVFS();
+      const parentHandle = await vfs.getDirectoryHandle(toVFSPath(parentPath));
+      await parentHandle.getDirectoryHandle(name, { create: true });
+      setEditing(null);
+      // Expand the parent so new folder is visible
+      setExpandedDirs(prev => {
+        const next = new Set(prev);
+        next.add(parentPath);
+        next.add(dirPath);
+        return next;
+      });
+      refresh();
+    } catch (error) {
+      console.error("フォルダ作成に失敗しました:", error);
+    }
+  }, [refresh]);
+
+  const startNewFile = useCallback((parentPath: string) => {
+    // Ensure parent is expanded
+    setExpandedDirs(prev => { const next = new Set(prev); next.add(parentPath); return next; });
+    setEditing({ parentPath, kind: "new-file", currentName: "" });
+    refresh();
+  }, [refresh]);
+
+  const startNewFolder = useCallback((parentPath: string) => {
+    setExpandedDirs(prev => { const next = new Set(prev); next.add(parentPath); return next; });
+    setEditing({ parentPath, kind: "new-folder", currentName: "" });
+    refresh();
+  }, [refresh]);
+
+  const handleContextAction = useCallback(async (action: string, fullPath: string, kind: "file" | "directory") => {
+    switch (action) {
+      case "delete":
+        await handleDelete(fullPath, kind);
+        break;
+      case "rename": {
+        const parentPath = fullPath.substring(0, fullPath.lastIndexOf("/")) || "/";
+        const name = fullPath.split("/").pop()!;
+        setEditing({ parentPath, kind: "rename", currentName: name });
+        break;
+      }
+      case "duplicate":
+        await handleDuplicate(fullPath);
+        break;
+      case "download":
+        await handleDownload(fullPath);
+        break;
+      case "new-file":
+        startNewFile(fullPath);
+        break;
+      case "new-folder":
+        startNewFolder(fullPath);
+        break;
+    }
+  }, [handleDelete, handleDuplicate, handleDownload, startNewFile, startNewFolder]);
+
+  const handleEditSubmit = useCallback(async (value: string) => {
+    if (!editing) return;
+    switch (editing.kind) {
+      case "rename": {
+        const fullPath = editing.parentPath === "/"
+          ? `/${editing.currentName}`
+          : `${editing.parentPath}/${editing.currentName}`;
+        await handleRename(fullPath, value);
+        break;
+      }
+      case "new-file":
+        await handleNewFile(editing.parentPath, value);
+        break;
+      case "new-folder":
+        await handleNewFolder(editing.parentPath, value);
+        break;
+    }
+  }, [editing, handleRename, handleNewFile, handleNewFolder]);
+
+  const handleEditKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void handleEditSubmit(e.currentTarget.value);
+    } else if (e.key === "Escape") {
+      setEditing(null);
+    }
+  }, [handleEditSubmit]);
+
+  // ---- Inline edit input component ----
+  const renderEditInput = (defaultValue: string) => (
+    <input
+      ref={editInputRef}
+      defaultValue={defaultValue}
+      className="flex-1 min-w-0 px-1 py-0.5 text-sm bg-background border border-accent rounded outline-none text-foreground"
+      onKeyDown={handleEditKeyDown}
+      onBlur={() => setEditing(null)}
+    />
+  );
+
+  // ---- Context menu handlers ----
+  const onFileContextMenu = useCallback(async (e: React.MouseEvent, fullPath: string) => {
+    contextTargetRef.current = { path: fullPath, kind: "file" };
+    const items = [
+      { label: "名前の変更", action: "rename" },
+      { label: "複製", action: "duplicate" },
+      { label: "削除", action: "delete" },
+      { label: "ダウンロード", action: "download" },
+    ];
+    const result = await showContextMenu(e, items);
+    if (result) {
+      void handleContextAction(result, fullPath, "file");
+    }
+  }, [showContextMenu, handleContextAction]);
+
+  const onFolderContextMenu = useCallback(async (e: React.MouseEvent, fullPath: string) => {
+    contextTargetRef.current = { path: fullPath, kind: "directory" };
+    const items = [
+      { label: "新規ファイル", action: "new-file" },
+      { label: "新規フォルダ", action: "new-folder" },
+      { label: "削除", action: "delete" },
+      { label: "名前の変更", action: "rename" },
+    ];
+    const result = await showContextMenu(e, items);
+    if (result) {
+      void handleContextAction(result, fullPath, "directory");
+    }
+  }, [showContextMenu, handleContextAction]);
+
+  // ---- Render tree entries ----
   const renderEntries = (entries: FileTreeEntry[], parentPath: string, level: number) => {
-    return entries.map(entry => {
+    const rows: React.ReactNode[] = [];
+
+    for (const entry of entries) {
       const fullPath = parentPath === "/" ? `/${entry.name}` : `${parentPath}/${entry.name}`;
 
+      // Check if this entry is being renamed
+      const isRenaming = editing?.kind === "rename"
+        && editing.parentPath === parentPath
+        && editing.currentName === entry.name;
+
       if (entry.kind === "file") {
-        return (
+        rows.push(
           <div
             key={fullPath}
             className="flex items-center gap-1.5 px-2 py-1 text-sm text-foreground-secondary hover:bg-hover rounded cursor-pointer"
             style={{ paddingLeft: `${level * 16 + 8}px` }}
+            onContextMenu={(e) => { void onFileContextMenu(e, fullPath); }}
           >
             <div className="w-4 shrink-0" />
             <File className="w-4 h-4 shrink-0" />
-            <span className="truncate">{entry.name}</span>
+            {isRenaming
+              ? renderEditInput(entry.name)
+              : <span className="truncate">{entry.name}</span>
+            }
+          </div>
+        );
+      } else {
+        const isExpanded = expandedDirs.has(fullPath);
+        rows.push(
+          <div key={fullPath}>
+            <div
+              onClick={() => toggleDir(fullPath)}
+              onContextMenu={(e) => { void onFolderContextMenu(e, fullPath); }}
+              className="group flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer"
+              style={{ paddingLeft: `${level * 16 + 8}px` }}
+            >
+              <ChevronDown
+                className={clsx(
+                  "w-4 h-4 shrink-0 transition-transform",
+                  !isExpanded && "-rotate-90"
+                )}
+              />
+              <Folder className="w-4 h-4 shrink-0 text-accent" />
+              {isRenaming
+                ? renderEditInput(entry.name)
+                : <span className="truncate font-medium flex-1">{entry.name}</span>
+              }
+              {/* Inline hover buttons (VS Code style) */}
+              {!isRenaming && (
+                <span className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    className="p-0.5 hover:bg-hover rounded"
+                    title="新規ファイル"
+                    onClick={(e) => { e.stopPropagation(); startNewFile(fullPath); }}
+                  >
+                    <FilePlus className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    className="p-0.5 hover:bg-hover rounded"
+                    title="新規フォルダ"
+                    onClick={(e) => { e.stopPropagation(); startNewFolder(fullPath); }}
+                  >
+                    <FolderPlus className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              )}
+            </div>
+            {isExpanded && entry.children && (
+              <div>{renderEntries(entry.children, fullPath, level + 1)}</div>
+            )}
+            {/* New file/folder input row inside this directory */}
+            {isExpanded && editing && editing.parentPath === fullPath && (editing.kind === "new-file" || editing.kind === "new-folder") && (
+              <div
+                className="flex items-center gap-1.5 px-2 py-1 text-sm"
+                style={{ paddingLeft: `${(level + 1) * 16 + 8}px` }}
+              >
+                <div className="w-4 shrink-0" />
+                {editing.kind === "new-file"
+                  ? <File className="w-4 h-4 shrink-0" />
+                  : <Folder className="w-4 h-4 shrink-0 text-accent" />
+                }
+                {renderEditInput("")}
+              </div>
+            )}
           </div>
         );
       }
-
-      const isExpanded = expandedDirs.has(fullPath);
-      return (
-        <div key={fullPath}>
-          <div
-            onClick={() => toggleDir(fullPath)}
-            className="flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer"
-            style={{ paddingLeft: `${level * 16 + 8}px` }}
-          >
-            <ChevronDown
-              className={clsx(
-                "w-4 h-4 shrink-0 transition-transform",
-                !isExpanded && "-rotate-90"
-              )}
-            />
-            <Folder className="w-4 h-4 shrink-0 text-accent" />
-            <span className="truncate font-medium">{entry.name}</span>
-          </div>
-          {isExpanded && entry.children && (
-            <div>{renderEntries(entry.children, fullPath, level + 1)}</div>
-          )}
-        </div>
-      );
-    });
+    }
+    return rows;
   };
 
   return (
@@ -431,7 +756,7 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
         <button
           className="p-1 text-foreground-tertiary hover:text-foreground hover:bg-hover rounded transition-colors"
           title="更新"
-          onClick={() => setRefreshToken(v => v + 1)}
+          onClick={refresh}
         >
           <RefreshCw className={clsx("w-4 h-4", loading && "animate-spin")} />
         </button>
@@ -446,7 +771,8 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
           {/* Root directory header */}
           <div
             onClick={() => toggleDir("/")}
-            className="flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer"
+            onContextMenu={(e) => { void onFolderContextMenu(e, "/"); }}
+            className="group flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer"
           >
             <ChevronDown
               className={clsx(
@@ -455,12 +781,59 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
               )}
             />
             <Folder className="w-4 h-4 shrink-0 text-accent" />
-            <span className="truncate font-medium">{projectName || "プロジェクト"}</span>
+            <span className="truncate font-medium flex-1">{projectName || "プロジェクト"}</span>
+            {/* Root inline buttons */}
+            <span className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                className="p-0.5 hover:bg-hover rounded"
+                title="新規ファイル"
+                onClick={(e) => { e.stopPropagation(); startNewFile("/"); }}
+              >
+                <FilePlus className="w-3.5 h-3.5" />
+              </button>
+              <button
+                className="p-0.5 hover:bg-hover rounded"
+                title="新規フォルダ"
+                onClick={(e) => { e.stopPropagation(); startNewFolder("/"); }}
+              >
+                <FolderPlus className="w-3.5 h-3.5" />
+              </button>
+            </span>
           </div>
           {expandedDirs.has("/") && (
-            <div>{renderEntries(tree, "/", 1)}</div>
+            <>
+              {renderEntries(tree, "/", 1)}
+              {/* New file/folder input at root level */}
+              {editing && editing.parentPath === "/" && (editing.kind === "new-file" || editing.kind === "new-folder") && (
+                <div
+                  className="flex items-center gap-1.5 px-2 py-1 text-sm"
+                  style={{ paddingLeft: `${1 * 16 + 8}px` }}
+                >
+                  <div className="w-4 shrink-0" />
+                  {editing.kind === "new-file"
+                    ? <File className="w-4 h-4 shrink-0" />
+                    : <Folder className="w-4 h-4 shrink-0 text-accent" />
+                  }
+                  {renderEditInput("")}
+                </div>
+              )}
+            </>
           )}
         </div>
+      )}
+
+      {/* Web context menu overlay */}
+      {menu && (
+        <ContextMenu
+          menu={menu}
+          onAction={(action) => {
+            const target = contextTargetRef.current;
+            if (target) {
+              void handleContextAction(action, target.path, target.kind);
+            }
+          }}
+          onClose={closeContextMenu}
+        />
       )}
     </div>
   );
