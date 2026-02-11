@@ -1,21 +1,21 @@
 /**
- * API Route: /api/nlp/batch
- * 
+ * API Route: /api/nlp/batch (HTTP Adapter)
+ *
  * Tokenize multiple paragraphs in batch.
- * Processes sequentially with caching for efficiency.
+ * Delegates to shared NlpProcessor backend.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { tokenizerService } from '../shared/tokenizer-service';
-import { serverCache } from '../shared/server-cache';
+import { nlpProcessor } from '@/lib/nlp-backend/nlp-processor';
 import type { BatchTokenizeRequest, BatchTokenizeResponse } from '@/lib/nlp-client/types';
+
+const WEB_DIC_PATH = process.cwd() + '/public/dict';
 
 export async function POST(request: NextRequest) {
   try {
     const body: BatchTokenizeRequest = await request.json();
     const { paragraphs } = body;
 
-    // Validate input
     if (!Array.isArray(paragraphs)) {
       return NextResponse.json(
         { error: 'Invalid paragraphs parameter' },
@@ -23,32 +23,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const results = [];
-
-    // Process each paragraph sequentially
-    for (const paragraph of paragraphs) {
-      const { pos, text } = paragraph;
-      
-      // Check cache
-      let tokens = serverCache.get(text);
-      
-      if (!tokens) {
-        // Tokenize and cache
-        tokens = await tokenizerService.tokenize(text);
-        serverCache.set(text, tokens);
-      }
-      
-      results.push({ pos, tokens });
+    if (!nlpProcessor.isInitialized()) {
+      await nlpProcessor.init(WEB_DIC_PATH);
     }
 
+    const results = await nlpProcessor.tokenizeBatch(paragraphs);
     const response: BatchTokenizeResponse = { results };
     return NextResponse.json(response);
-    
+
   } catch (error) {
     console.error('[API /nlp/batch] Error:', error);
     return NextResponse.json(
-      { 
-        error: 'Batch tokenization failed', 
+      {
+        error: 'Batch tokenization failed',
         details: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
