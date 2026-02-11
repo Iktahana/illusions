@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useMemo, useState, useEffect, useRef } from "react";
+import { ReactNode, useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   FolderTree,
   Settings,
@@ -294,95 +294,131 @@ export default function Explorer({
   );
 }
 
-type FileTreeNode =
-  | { type: "file" }
-  | { type: "directory"; children: Record<string, FileTreeNode> };
+interface FileTreeEntry {
+  name: string;
+  kind: "file" | "directory";
+  children?: FileTreeEntry[];
+}
 
 export function FilesPanel({ projectName }: { projectName?: string }) {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(["/"]));
+  const [tree, setTree] = useState<FileTreeEntry[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
 
-  const toggleDir = (path: string) => {
-    const newExpanded = new Set(expandedDirs);
-    if (newExpanded.has(path)) {
-      newExpanded.delete(path);
-    } else {
-      newExpanded.add(path);
+  const loadDirectory = useCallback(async (dirPath: string): Promise<FileTreeEntry[]> => {
+    const { getVFS } = await import("@/lib/vfs");
+    const vfs = getVFS();
+    const entries = await vfs.listDirectory(dirPath);
+
+    // Sort: directories first, then files, alphabetically within each group
+    const sorted = [...entries].sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === "directory" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    const result: FileTreeEntry[] = [];
+    for (const entry of sorted) {
+      if (entry.kind === "directory") {
+        // Lazy: only load children for already-expanded dirs
+        const childPath = dirPath ? `${dirPath}/${entry.name}` : entry.name;
+        const fullKey = `/${childPath}`;
+        let children: FileTreeEntry[] | undefined;
+        if (expandedDirs.has(fullKey)) {
+          try {
+            children = await loadDirectory(childPath);
+          } catch {
+            children = [];
+          }
+        }
+        result.push({ name: entry.name, kind: "directory", children });
+      } else {
+        result.push({ name: entry.name, kind: "file" });
+      }
     }
-    setExpandedDirs(newExpanded);
-  };
+    return result;
+  }, [expandedDirs]);
 
-  // Placeholder file tree data - in real implementation this would come from VFS
-  const fileTree: Record<string, FileTreeNode> = {
-    "/": {
-      type: "directory",
-      children: {
-        ".illusions": {
-          type: "directory",
-          children: {
-            "project.json": { type: "file" },
-            "workspace.json": { type: "file" },
-          },
-        },
-        "main.mdi": { type: "file" },
-        "章節": {
-          type: "directory",
-          children: {
-            "第一章.mdi": { type: "file" },
-            "第二章.mdi": { type: "file" },
-          },
-        },
-      },
-    },
-  };
+  // Load tree from VFS
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const { getVFS } = await import("@/lib/vfs");
+        const vfs = getVFS();
+        if (!vfs.isRootOpen()) {
+          setTree(null);
+          return;
+        }
+        setLoading(true);
+        const entries = await loadDirectory("");
+        if (!cancelled) setTree(entries);
+      } catch (error) {
+        console.error("ファイルツリーの読み込みに失敗しました:", error);
+        if (!cancelled) setTree(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [loadDirectory, refreshToken]);
 
-  const renderTree = (path: string, node: FileTreeNode, level = 0) => {
-    if (node.type === "file") {
+  const toggleDir = useCallback((path: string) => {
+    setExpandedDirs(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+    // Trigger reload to fetch newly expanded children
+    setRefreshToken(v => v + 1);
+  }, []);
+
+  const renderEntries = (entries: FileTreeEntry[], parentPath: string, level: number) => {
+    return entries.map(entry => {
+      const fullPath = parentPath === "/" ? `/${entry.name}` : `${parentPath}/${entry.name}`;
+
+      if (entry.kind === "file") {
+        return (
+          <div
+            key={fullPath}
+            className="flex items-center gap-1.5 px-2 py-1 text-sm text-foreground-secondary hover:bg-hover rounded cursor-pointer"
+            style={{ paddingLeft: `${level * 16 + 8}px` }}
+          >
+            <div className="w-4 shrink-0" />
+            <File className="w-4 h-4 shrink-0" />
+            <span className="truncate">{entry.name}</span>
+          </div>
+        );
+      }
+
+      const isExpanded = expandedDirs.has(fullPath);
       return (
-        <div
-          key={path}
-          className="flex items-center gap-1.5 px-2 py-1 text-sm text-foreground-secondary hover:bg-hover rounded cursor-pointer"
-          style={{ paddingLeft: `${level * 16 + 8}px` }}
-        >
-          {/* Spacer to align with folder icons (chevron width + gap) */}
-          <div className="w-4 shrink-0" />
-          <File className="w-4 h-4 shrink-0" />
-          <span className="truncate">{path.split("/").pop()}</span>
+        <div key={fullPath}>
+          <div
+            onClick={() => toggleDir(fullPath)}
+            className="flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer"
+            style={{ paddingLeft: `${level * 16 + 8}px` }}
+          >
+            <ChevronDown
+              className={clsx(
+                "w-4 h-4 shrink-0 transition-transform",
+                !isExpanded && "-rotate-90"
+              )}
+            />
+            <Folder className="w-4 h-4 shrink-0 text-accent" />
+            <span className="truncate font-medium">{entry.name}</span>
+          </div>
+          {isExpanded && entry.children && (
+            <div>{renderEntries(entry.children, fullPath, level + 1)}</div>
+          )}
         </div>
       );
-    }
-
-    const isExpanded = expandedDirs.has(path);
-    const dirName = path === "/" ? (projectName || "プロジェクト") : path.split("/").pop() || "";
-
-    return (
-      <div key={path}>
-        <div
-          onClick={() => toggleDir(path)}
-          className="flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer"
-          style={{ paddingLeft: `${level * 16 + 8}px` }}
-        >
-          <ChevronDown
-            className={clsx(
-              "w-4 h-4 shrink-0 transition-transform",
-              !isExpanded && "-rotate-90"
-            )}
-          />
-          <Folder className="w-4 h-4 shrink-0 text-accent" />
-          <span className="truncate font-medium">{dirName}</span>
-        </div>
-        {isExpanded && node.children && (
-          <div>
-            {Object.entries(node.children).map(([name, childNode]) =>
-              renderTree(
-                path === "/" ? `/${name}` : `${path}/${name}`,
-                childNode,
-                level + 1
-              )
-            )}
-          </div>
-        )}
-      </div>
-    );
+    });
   };
 
   return (
@@ -392,11 +428,37 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
         <button
           className="p-1 text-foreground-tertiary hover:text-foreground hover:bg-hover rounded transition-colors"
           title="更新"
+          onClick={() => setRefreshToken(v => v + 1)}
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className={clsx("w-4 h-4", loading && "animate-spin")} />
         </button>
       </div>
-      {renderTree("/", fileTree["/"])}
+
+      {tree === null && !loading && (
+        <p className="text-xs text-foreground-tertiary px-2">プロジェクトが開かれていません</p>
+      )}
+
+      {tree !== null && (
+        <div>
+          {/* Root directory header */}
+          <div
+            onClick={() => toggleDir("/")}
+            className="flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer"
+          >
+            <ChevronDown
+              className={clsx(
+                "w-4 h-4 shrink-0 transition-transform",
+                !expandedDirs.has("/") && "-rotate-90"
+              )}
+            />
+            <Folder className="w-4 h-4 shrink-0 text-accent" />
+            <span className="truncate font-medium">{projectName || "プロジェクト"}</span>
+          </div>
+          {expandedDirs.has("/") && (
+            <div>{renderEntries(tree, "/", 1)}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
