@@ -305,7 +305,68 @@ async function saveFile(path: string, content: string) {
 - Avoid repeating unchanged code snippets
 - Be concise in explanations unless user asks for details
 
-## 13. Testing Standards (Future)
+## 13. Commit Message Standards
+# ----------------------------------------------------------------------------
+
+### Conventional Commits Format
+All commit messages must follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+### Issue References
+**CRITICAL**: If your commit relates to a GitHub Issue, you MUST include the issue number:
+
+- **General reference**: `feat: add feature (#123)`
+- **Closes issue**: `fix: resolve bug (closes #456)` or `fix: resolve bug (fixes #456)`
+- **Part of larger issue**: `feat: implement component (part of #789)`
+- **Multiple issues**: `refactor: update API (relates to #100, #101)`
+
+### Examples
+
+**Good commit messages**:
+```
+feat: add glassmorphism to all dialogs (#234)
+
+- Create reusable GlassDialog component
+- Refactor 7 dialog components to use GlassDialog
+- Apply frosted glass effect with backdrop-blur-xl
+
+Closes #234
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+```
+
+```
+fix: prevent infinite loop in search (fixes #567)
+
+The search was triggering re-renders on every keystroke.
+Added debounce with 300ms delay.
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+```
+
+**When NOT to reference issues**:
+- Trivial commits (typo fixes, formatting)
+- Internal refactoring without user-facing changes
+- Documentation updates (unless issue specifically requests it)
+- Dependency updates (unless fixing a specific issue)
+
+### Commit Types
+- `feat`: New feature
+- `fix`: Bug fix
+- `refactor`: Code refactoring
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, no logic change)
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks (deps, config)
+
+## 14. Testing Standards (Future)
 # ----------------------------------------------------------------------------
 
 ### Test Coverage
@@ -327,6 +388,7 @@ async function saveFile(path: string, content: string) {
 - [ ] **Working on feature branch**: Not committing directly to main
 - [ ] **Atomic commits**: Did I split unrelated changes into separate commits?
 - [ ] **Commit messages**: Did I use Conventional Commits format?
+- [ ] **Issue references**: If this commit relates to a GitHub Issue, did I include the issue number (e.g., `feat: add feature (#123)` or `fix: resolve bug (fixes #456)`)?
 - [ ] **Language check**: Are all code/docs in English or Japanese only?
 - [ ] **UI language**: Is all user-facing text in Japanese?
 - [ ] **Security**: No hardcoded secrets or vulnerabilities?
