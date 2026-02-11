@@ -61,3 +61,7 @@ public/swe-worker*
 
 # WebStorm
 .idea
+
+# www build output
+/www/dist
+/www/node_modules
