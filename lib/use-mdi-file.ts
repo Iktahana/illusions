@@ -5,7 +5,7 @@ import { openMdiFile, saveMdiFile, type MdiFileDescriptor } from "./mdi-file";
 import { isElectronRenderer } from "./runtime-env";
 import { getStorageService } from "./storage-service";
 import { persistAppState } from "./app-state-manager";
-import { getRandomIllusionStory } from "./illusion-stories";
+import { getRandomillusionstory } from "./illusion-stories";
 import { getHistoryService } from "./history-service";
 import { getVFS } from "./vfs";
 import { useEditorMode } from "@/contexts/EditorModeContext";
@@ -74,8 +74,8 @@ export function useMdiFile(): UseMdiFileReturn {
   const { isProject } = useEditorMode();
 
   const [currentFile, setCurrentFile] = useState<MdiFileDescriptor | null>(null);
-  const [content, setContentState] = useState<string>(() => getRandomIllusionStory());
-  const [lastSavedContent, setLastSavedContent] = useState<string>(() => getRandomIllusionStory());
+  const [content, setContentState] = useState<string>(() => getRandomillusionstory());
+  const [lastSavedContent, setLastSavedContent] = useState<string>(() => getRandomillusionstory());
   const [isSaving, setIsSaving] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
   const [wasAutoRecovered, setWasAutoRecovered] = useState(false);
@@ -217,7 +217,7 @@ export function useMdiFile(): UseMdiFileReturn {
   }, []);
 
   const newFile = useCallback(() => {
-    const randomContent = getRandomIllusionStory();
+    const randomContent = getRandomillusionstory();
     setCurrentFile(null);
     setContentState(randomContent);
     setLastSavedContent(randomContent);

@@ -42,7 +42,7 @@ export const ILLUSION_STORIES = [
 ];
 
 // ランダムに1つの錯覚ストーリーを取得
-export function getRandomIllusionStory(): string {
+export function getRandomillusionstory(): string {
   const randomIndex = Math.floor(Math.random() * ILLUSION_STORIES.length);
   return ILLUSION_STORIES[randomIndex];
 }
