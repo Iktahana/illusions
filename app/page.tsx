@@ -21,6 +21,7 @@ import Outline from "@/components/Outline";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
+import SettingsModal from "@/components/SettingsModal";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
 import { useElectronMenuHandlers } from "@/lib/use-electron-menu-handlers";
@@ -317,6 +318,9 @@ export default function EditorPage() {
   const [showParagraphNumbers, setShowParagraphNumbers] = useState(true);
   const [posHighlightEnabled, setPosHighlightEnabled] = useState(false); // POS coloring (default: disabled)
   const [posHighlightColors, setPosHighlightColors] = useState<Record<string, string>>({}); // Per-POS color settings
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [verticalScrollBehavior, setVerticalScrollBehavior] = useState<"auto" | "mouse" | "trackpad">("auto");
+  const [scrollSensitivity, setScrollSensitivity] = useState(1.0);
   const [topView, setTopView] = useState<ActivityBarView>("explorer");
   const [bottomView, setBottomView] = useState<ActivityBarView>("none");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -430,6 +434,12 @@ export default function EditorPage() {
         }
         if (appState.posHighlightColors && typeof appState.posHighlightColors === "object") {
           setPosHighlightColors(appState.posHighlightColors);
+        }
+        if (appState.verticalScrollBehavior) {
+          setVerticalScrollBehavior(appState.verticalScrollBehavior);
+        }
+        if (typeof appState.scrollSensitivity === "number") {
+          setScrollSensitivity(appState.scrollSensitivity);
         }
       } catch (error) {
         console.error("設定の読み込みに失敗しました:", error);
@@ -615,6 +625,20 @@ export default function EditorPage() {
     });
   }, []);
 
+  const handleVerticalScrollBehaviorChange = useCallback((value: "auto" | "mouse" | "trackpad") => {
+    setVerticalScrollBehavior(value);
+    void persistAppState({ verticalScrollBehavior: value }).catch((error) => {
+      console.error("縦書きスクロール設定の保存に失敗しました:", error);
+    });
+  }, []);
+
+  const handleScrollSensitivityChange = useCallback((value: number) => {
+    setScrollSensitivity(value);
+    void persistAppState({ scrollSensitivity: value }).catch((error) => {
+      console.error("スクロール感度の保存に失敗しました:", error);
+    });
+  }, []);
+
     // 復元通知は5秒後に fadeout アニメーション開始、アニメーション完了後に削除
     useEffect(() => {
      if (wasAutoRecovered && !dismissedRecovery && !recoveryExiting) {
@@ -763,6 +787,11 @@ export default function EditorPage() {
          ? nav.userAgentData.platform === "macOS"
          : /mac/i.test(navigator.userAgent);
 
+       // Cmd+, (macOS) / Ctrl+, (Windows/Linux): Settings
+       const isSettingsShortcut = isMac
+         ? event.metaKey && event.key === ","
+         : event.ctrlKey && event.key === ",";
+
        // Cmd+S (macOS) / Ctrl+S (Windows/Linux): Save
        const isSaveShortcut = isMac
          ? event.metaKey && event.key === "s"
@@ -778,7 +807,10 @@ export default function EditorPage() {
          ? event.shiftKey && event.metaKey && event.key === "v"
          : event.shiftKey && event.ctrlKey && event.key === "v";
 
-       if (isSaveShortcut) {
+       if (isSettingsShortcut) {
+         event.preventDefault();
+         setShowSettingsModal(true);
+       } else if (isSaveShortcut) {
          event.preventDefault();
          void saveFile();
        } else if (isSearchShortcut) {
@@ -1243,6 +1275,33 @@ export default function EditorPage() {
           />
         )}
 
+        <SettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => setShowSettingsModal(false)}
+          fontScale={fontScale}
+          onFontScaleChange={setFontScale}
+          lineHeight={lineHeight}
+          onLineHeightChange={setLineHeight}
+          paragraphSpacing={paragraphSpacing}
+          onParagraphSpacingChange={handleParagraphSpacingChange}
+          textIndent={textIndent}
+          onTextIndentChange={setTextIndent}
+          fontFamily={fontFamily}
+          onFontFamilyChange={setFontFamily}
+          charsPerLine={charsPerLine}
+          onCharsPerLineChange={setCharsPerLine}
+          showParagraphNumbers={showParagraphNumbers}
+          onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
+          verticalScrollBehavior={verticalScrollBehavior}
+          onVerticalScrollBehaviorChange={handleVerticalScrollBehaviorChange}
+          scrollSensitivity={scrollSensitivity}
+          onScrollSensitivityChange={handleScrollSensitivityChange}
+          posHighlightEnabled={posHighlightEnabled}
+          onPosHighlightEnabledChange={handlePosHighlightEnabledChange}
+          posHighlightColors={posHighlightColors}
+          onPosHighlightColorsChange={handlePosHighlightColorsChange}
+        />
+
          {/* 自動復元の通知（Webのみ・固定表示） */}
          {!isElectron && wasAutoRecovered && !dismissedRecovery && (
           <div className={`fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between shadow-lg ${recoveryExiting ? 'animate-slide-out-up' : 'animate-slide-in-down'}`}>
@@ -1268,8 +1327,20 @@ export default function EditorPage() {
          <ActivityBar
            topView={topView}
            bottomView={bottomView}
-           onTopViewChange={setTopView}
-           onBottomViewChange={setBottomView}
+           onTopViewChange={(view) => {
+             if (view === "settings") {
+               setShowSettingsModal(true);
+             } else {
+               setTopView(view);
+             }
+           }}
+           onBottomViewChange={(view) => {
+             if (view === "settings") {
+               setShowSettingsModal(true);
+             } else {
+               setBottomView(view);
+             }
+           }}
          />
 
            {/* 左サイドパネル */}
@@ -1328,13 +1399,6 @@ export default function EditorPage() {
                       return <Characters content={content} />;
                     case "dictionary":
                       return <Dictionary content={content} />;
-                    case "settings":
-                      return (
-                        <div className="h-full bg-background-secondary border-r border-border p-4">
-                          <h2 className="text-lg font-semibold text-foreground mb-4">設定</h2>
-                          <p className="text-sm text-foreground-secondary">設定機能は開発中です</p>
-                        </div>
-                      );
                     case "wordfreq":
                       return <WordFrequency content={content} filePath={currentFile?.path ?? undefined} onWordSearch={(word) => {
                         setSearchInitialTerm(word);
@@ -1378,6 +1442,8 @@ export default function EditorPage() {
               onShowAllSearchResults={handleShowAllSearchResults}
               posHighlightEnabled={posHighlightEnabled}
               posHighlightColors={posHighlightColors}
+              verticalScrollBehavior={verticalScrollBehavior}
+              scrollSensitivity={scrollSensitivity}
             />
           </div>
 
