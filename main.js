@@ -403,7 +403,7 @@ async function createWindow({ showWelcome = false } = {}) {
 
   const welcomeQuery = showWelcome ? '?welcome' : ''
   if (isDev) {
-    newWindow.loadURL(`http://localhost:3000${welcomeQuery}`)
+    newWindow.loadURL(`http://localhost:3020${welcomeQuery}`)
     newWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
     // Next.js の静的出力 — app.getAppPath() はパッケージのルートを返す
