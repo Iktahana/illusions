@@ -408,11 +408,8 @@ async function createWindow({ showWelcome = false } = {}) {
   } else {
     // Next.js の静的出力 — app.getAppPath() はパッケージのルートを返す
     const filePath = path.join(app.getAppPath(), 'out', 'index.html')
-    if (showWelcome) {
-      newWindow.loadFile(filePath, { query: { welcome: '' } })
-    } else {
-      newWindow.loadFile(filePath)
-    }
+    const fileUrl = `file://${filePath}${welcomeQuery}`
+    newWindow.loadURL(fileUrl)
   }
 
   // アプリメニューを設定（最近のプロジェクトを含む）
