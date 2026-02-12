@@ -49,6 +49,9 @@ interface EditorProps {
   // 品詞着色設定
   posHighlightEnabled?: boolean;
   posHighlightColors?: Record<string, string>;
+  // スクロール設定
+  verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
+  scrollSensitivity?: number;
 }
 
 export default function NovelEditor({
@@ -71,6 +74,8 @@ export default function NovelEditor({
   onShowAllSearchResults,
   posHighlightEnabled = false,
   posHighlightColors = {},
+  verticalScrollBehavior = "auto",
+  scrollSensitivity = 1.0,
 }: EditorProps) {
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
   const [isVertical, setIsVertical] = useState(() => {
@@ -256,6 +261,8 @@ export default function NovelEditor({
               savedScrollProgressRef={savedScrollProgressRef}
               posHighlightEnabled={posHighlightEnabled}
               posHighlightColors={posHighlightColors}
+              verticalScrollBehavior={verticalScrollBehavior}
+              scrollSensitivity={scrollSensitivity}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -348,6 +355,8 @@ function MilkdownEditor({
   savedScrollProgressRef,
   posHighlightEnabled,
   posHighlightColors,
+  verticalScrollBehavior = "auto",
+  scrollSensitivity = 1.0,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
@@ -367,6 +376,8 @@ function MilkdownEditor({
   savedScrollProgressRef: RefObject<number>;
   posHighlightEnabled?: boolean;
   posHighlightColors?: Record<string, string>;
+  verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
+  scrollSensitivity?: number;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
@@ -746,55 +757,33 @@ function MilkdownEditor({
     if (!container || !isVertical) return;
 
     const handleWheel = (event: WheelEvent) => {
-      // トラックパッド判定:
-      // 1) deltaX と deltaY の両方が出る（2Dスクロール）
-      // 2) 値が細かい（100/-100のように粗くない）
-      // 3) ctrlKey が押されていない（ピンチズーム除外）
-      const hasBothAxes = Math.abs(event.deltaX) > 0 && Math.abs(event.deltaY) > 0;
-      const hasFineGrainedValues = 
-        (Math.abs(event.deltaY) < 50 && Math.abs(event.deltaY) > 0) ||
-        (Math.abs(event.deltaX) < 50 && Math.abs(event.deltaX) > 0);
-      const isTouchpad = hasBothAxes || (hasFineGrainedValues && !event.ctrlKey);
+      let isTouchpad: boolean;
+
+      if (verticalScrollBehavior === "trackpad") {
+        isTouchpad = true;
+      } else if (verticalScrollBehavior === "mouse") {
+        isTouchpad = false;
+      } else {
+        // "auto": existing heuristic
+        const hasBothAxes = Math.abs(event.deltaX) > 0 && Math.abs(event.deltaY) > 0;
+        const hasFineGrainedValues =
+          (Math.abs(event.deltaY) < 50 && Math.abs(event.deltaY) > 0) ||
+          (Math.abs(event.deltaX) < 50 && Math.abs(event.deltaX) > 0);
+        isTouchpad = hasBothAxes || (hasFineGrainedValues && !event.ctrlKey);
+      }
+
+      const sensitivity = scrollSensitivity;
 
       if (isTouchpad) {
-        // トラックパッド: 自然なスクロールを維持
-        const beforeLeft = container.scrollLeft;
-        const beforeTop = container.scrollTop;
-        container.scrollLeft += event.deltaX;
-        container.scrollTop += event.deltaY;
-        console.debug('[AutoScroll] touchpad scroll', {
-          beforeLeft,
-          deltaX: event.deltaX,
-          afterLeft: container.scrollLeft,
-          beforeTop,
-          deltaY: event.deltaY,
-          afterTop: container.scrollTop,
-        });
+        container.scrollLeft += event.deltaX * sensitivity;
+        container.scrollTop += event.deltaY * sensitivity;
         event.preventDefault();
       } else {
-        // マウスホイール:
-        // - 縦回転（deltaY）→ 横スクロール（縦書きの読み進め方向）
-        // - 横回転（deltaX）→ 縦スクロール
-        // 横/縦のスクロール量を補正しつつ、操作を追跡ログを出す
         if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
-          // 縦回転 → 横スクロール
-          const beforeLeft = container.scrollLeft;
-          container.scrollLeft += event.deltaY;
-          console.debug('[AutoScroll] wheel vertical-scroll (deltaY)', {
-            beforeLeft,
-            deltaY: event.deltaY,
-            afterLeft: container.scrollLeft,
-          });
+          container.scrollLeft += event.deltaY * sensitivity;
           event.preventDefault();
         } else if (Math.abs(event.deltaX) > 0) {
-          // 横回転 → 縦スクロール
-          const beforeTop = container.scrollTop;
-          container.scrollTop += event.deltaX;
-          console.debug('[AutoScroll] wheel horizontal-scroll (deltaX)', {
-            beforeTop,
-            deltaX: event.deltaX,
-            afterTop: container.scrollTop,
-          });
+          container.scrollTop += event.deltaX * sensitivity;
           event.preventDefault();
         }
       }
@@ -805,7 +794,7 @@ function MilkdownEditor({
     return () => {
       container.removeEventListener("wheel", handleWheel);
     };
-  }, [isVertical, scrollContainerRef]);
+  }, [isVertical, scrollContainerRef, verticalScrollBehavior, scrollSensitivity]);
 
   // 【調試用】監聽所有 scroll 事件，追蹤滾動來源
   useEffect(() => {
