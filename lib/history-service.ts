@@ -150,6 +150,14 @@ function calculateByteSize(content: string): number {
 }
 
 /**
+ * Check if a snapshot filename contains the __auto__ marker.
+ * スナップショットのファイル名が __auto__ マーカーを含むかチェックする。
+ */
+function isAutoSnapshotFilename(filename: string): boolean {
+  return filename.includes(".__auto__.");
+}
+
+/**
  * Create a default (empty) history index.
  * デフォルトの空の履歴インデックスを作成する。
  */
@@ -476,9 +484,11 @@ export class HistoryService {
   /**
    * Get all snapshots for display, optionally filtered by source file.
    * Returns snapshots sorted by timestamp descending (newest first).
+   * Falls back to filename detection for type when metadata is missing.
    *
    * 表示用に全スナップショットを取得する。ソースファイルでフィルタ可能。
    * タイムスタンプ降順（新しい順）でソートされる。
+   * メタデータが不足している場合、ファイル名から型を検出する。
    *
    * @param sourceFile - Optional source file filter
    * @returns Array of snapshot entries
@@ -491,6 +501,13 @@ export class HistoryService {
 
       if (sourceFile !== undefined) {
         snapshots = snapshots.filter((s) => s.sourceFile === sourceFile);
+      }
+
+      // Add type fallback for entries missing type metadata
+      for (const entry of snapshots) {
+        if (!entry.type) {
+          entry.type = isAutoSnapshotFilename(entry.filename) ? "auto" : "manual";
+        }
       }
 
       // Ensure sorted by timestamp descending
