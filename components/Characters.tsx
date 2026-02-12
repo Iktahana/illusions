@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Trash2, Edit2, Check, X, Sparkles } from "lucide-react";
+import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 
 interface Character {
   id: string;
@@ -79,9 +80,51 @@ export default function Characters({ content }: CharactersProps) {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const handleAutoExtract = () => {
-    // TODO: 実装予定 - 文章から人物を自動抽出
-    console.log("自動検出開始");
+  const handleAutoExtract = async () => {
+    if (!content) {
+      return;
+    }
+
+    try {
+      console.log("自動検出開始");
+      const nlpClient = getNlpClient();
+      const tokens = await nlpClient.tokenizeParagraph(content);
+
+      // Extract proper nouns (固有名詞): pos === "名詞" && pos_detail_1 === "固有名詞"
+      const properNouns = new Map<string, boolean>();
+
+      for (const token of tokens) {
+        if (token.pos === "名詞" && token.pos_detail_1 === "固有名詞") {
+          // Only add if not already exists as a character
+          const alreadyExists = characters.some(
+            (c) => c.name.toLowerCase() === token.surface.toLowerCase()
+          );
+
+          if (!alreadyExists) {
+            properNouns.set(token.surface, true);
+          }
+        }
+      }
+
+      // Add extracted names as new characters
+      const newNames = Array.from(properNouns.keys());
+      for (const name of newNames) {
+        const character: Character = {
+          id: Date.now().toString() + Math.random(),
+          name: name,
+          description: "",
+          appearance: "",
+          personality: "",
+          relationships: "",
+        };
+
+        setCharacters((prev) => [...prev, character]);
+      }
+
+      console.log(`${newNames.length} 名の人物を自動抽出しました`);
+    } catch (err) {
+      console.error("自動抽出に失敗しました:", err);
+    }
   };
 
   return (
