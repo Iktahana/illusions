@@ -39,6 +39,7 @@ interface EditorProps {
   textIndent?: number;
   fontFamily?: string;
   charsPerLine?: number;
+  onCharsPerLineChange?: (chars: number) => void;
   searchOpenTrigger?: number;
   searchInitialTerm?: string;
   showParagraphNumbers?: boolean;
@@ -62,6 +63,7 @@ export default function NovelEditor({
   textIndent = 1,
   fontFamily = 'Noto Serif JP',
   charsPerLine = 40,
+  onCharsPerLineChange,
   searchOpenTrigger = 0,
   searchInitialTerm,
   showParagraphNumbers = false,
@@ -120,21 +122,93 @@ export default function NovelEditor({
     if (container) {
       // 使用抽象層獲取當前進度
       const progress = getScrollProgress({ container, isVertical });
-      
+
       // 保存進度
       savedScrollProgressRef.current = progress;
-      
+
       console.log('[DEBUG] Toggle - Save progress:', {
         mode: isVertical ? '豎→橫' : '橫→豎',
         progress
       });
-      
+
       // Mark that scroll position needs restoration after mode switch
       isModeSwitchingRef.current = true;
     }
-    
+
     setIsVertical(!isVertical);
   }, [isVertical, scrollContainerRef]);
+
+  // Calculate optimal chars per line based on editor width and font size
+  const calculateOptimalCharsPerLine = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Measure character width
+    const measureEl = document.createElement('span');
+    measureEl.style.cssText = `
+      position: absolute;
+      visibility: hidden;
+      white-space: nowrap;
+      font-family: "${fontFamily}", serif;
+      font-size: ${fontScale}%;
+      line-height: ${lineHeight};
+    `;
+    measureEl.textContent = '国'; // Measure with full-width character
+    document.body.appendChild(measureEl);
+    const charSize = measureEl.offsetWidth;
+    document.body.removeChild(measureEl);
+
+    if (charSize <= 0) return;
+
+    // Get available space (subtract padding)
+    const padding = 128; // px-16 = 64px * 2 for left and right
+    const availableWidth = container.clientWidth - padding;
+
+    if (isVertical) {
+      // For vertical writing: calculate based on available height
+      // Get visible height (subtract toolbar height)
+      const toolbarHeight = 48; // h-12 = 48px
+      const topPadding = 48; // pt-12 = 48px
+      const availableHeight = container.clientHeight - toolbarHeight - topPadding;
+
+      const optimalChars = Math.max(20, Math.floor(availableHeight / charSize));
+      // Clamp between 20-80 characters for vertical writing
+      const clamped = Math.min(80, optimalChars);
+
+      if (clamped !== charsPerLine) {
+        onCharsPerLineChange?.(clamped);
+      }
+    } else {
+      // For horizontal writing: calculate based on available width
+      const optimalChars = Math.max(30, Math.floor(availableWidth / charSize));
+      // Clamp between 30-120 characters for horizontal writing
+      const clamped = Math.min(120, optimalChars);
+
+      if (clamped !== charsPerLine) {
+        onCharsPerLineChange?.(clamped);
+      }
+    }
+  }, [fontFamily, fontScale, lineHeight, isVertical, charsPerLine, onCharsPerLineChange, scrollContainerRef]);
+
+  // Add window resize listener to auto-adjust chars per line
+  useEffect(() => {
+    if (!onCharsPerLineChange) return;
+
+    // Calculate on mount
+    const timer = setTimeout(calculateOptimalCharsPerLine, 100);
+
+    // Calculate on window resize
+    const handleResize = () => {
+      calculateOptimalCharsPerLine();
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [calculateOptimalCharsPerLine, onCharsPerLineChange]);
 
   return (
     <div className={clsx("flex flex-col h-full min-h-0 relative", className)}>
