@@ -100,6 +100,11 @@
       "!node_modules/**/*",
       "!www/**/*"
     ],
+    "asarUnpack": [
+      "dist-main/node_modules/better-sqlite3/**",
+      "dist-main/node_modules/bindings/**",
+      "dist-main/node_modules/file-uri-to-path/**"
+    ],
     "publish": [
       {
         "provider": "github",
