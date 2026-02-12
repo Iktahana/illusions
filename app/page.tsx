@@ -17,6 +17,7 @@ import { getProjectUpgradeService } from "@/lib/project-upgrade";
 import WordFrequency from "@/components/WordFrequency";
 import Characters from "@/components/Characters";
 import Dictionary from "@/components/Dictionary";
+import Outline from "@/components/Outline";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
@@ -1314,10 +1315,10 @@ export default function EditorPage() {
                       );
                     case "outline":
                       return (
-                        <div className="h-full bg-background-secondary border-r border-border p-4">
-                          <h2 className="text-lg font-semibold text-foreground mb-4">アウトライン</h2>
-                          <p className="text-sm text-foreground-secondary">アウトライン機能は開発中です</p>
-                        </div>
+                        <Outline
+                          content={content}
+                          onHeadingClick={handleChapterClick}
+                        />
                       );
                     case "characters":
                       return <Characters content={content} />;
