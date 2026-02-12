@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+      - alpha
+      - beta
+      - dev
     tags:
       - "v*"
 
@@ -62,8 +65,12 @@ jobs:
         shell: bash
         run: |
           BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
-          echo "base=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+          BRANCH_NAME="${GITHUB_REF_NAME}"
+          if [ "$BRANCH_NAME" = "main" ]; then
+            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          else
+            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}"
+          fi
           echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Building version: ${FULL_VERSION}"
 
@@ -147,8 +154,12 @@ jobs:
         shell: bash
         run: |
           BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
-          echo "base=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+          BRANCH_NAME="${GITHUB_REF_NAME}"
+          if [ "$BRANCH_NAME" = "main" ]; then
+            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          else
+            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}"
+          fi
           echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Building version: ${FULL_VERSION}"
 
@@ -189,9 +200,14 @@ jobs:
         shell: bash
         run: |
           BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
-          echo "base=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+          BRANCH_NAME="${GITHUB_REF_NAME}"
+          if [ "$BRANCH_NAME" = "main" ]; then
+            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          else
+            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}"
+          fi
           echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "branch=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
           echo "Releasing version: ${FULL_VERSION}"
 
       - name: Download build artifacts
@@ -210,10 +226,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.full }}
-          name: illusions v${{ steps.version.outputs.full }}
+          name: Illusions v${{ steps.version.outputs.full }}
           files: release-assets/*
           draft: false
-          prerelease: ${{ startsWith(github.ref, 'refs/heads/main') }}
+          prerelease: ${{ steps.version.outputs.branch != 'main' }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
