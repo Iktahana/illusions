@@ -401,6 +401,9 @@ function SnapshotItem({ snapshot, isRestoring, onRestore }: SnapshotItemProps) {
           <Clock className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
           <span className="text-xs font-medium text-foreground truncate">
             {formatTimeJa(snapshot.timestamp)}
+            {snapshot.type === "auto" && (
+              <span className="ml-1 text-[10px] text-foreground-tertiary">[自動]</span>
+            )}
           </span>
         </div>
         <span
