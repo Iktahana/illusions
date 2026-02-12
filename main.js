@@ -13,6 +13,25 @@ const { registerNlpHandlers } = require('./nlp-service/nlp-ipc-handlers')
 const { registerStorageHandlers, getStorageManager } = require('./electron-storage-ipc-handlers')
 const { registerVFSHandlers } = require('./electron-vfs-ipc-handlers')
 
+// Configure module resolution paths for ASAR environment
+if (app.isPackaged) {
+  const unpackedPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'dist-main', 'node_modules')
+  const packedPath = path.join(__dirname, 'node_modules')
+
+  // Set NODE_PATH to include both packed and unpacked locations
+  const existingPath = process.env.NODE_PATH || ''
+  process.env.NODE_PATH = [unpackedPath, packedPath, existingPath]
+    .filter(Boolean)
+    .join(path.delimiter)
+
+  // Reinitialize module paths
+  require('module').Module._initPaths()
+
+  console.log('[Main] Module paths configured for ASAR:')
+  console.log('  Unpacked:', unpackedPath)
+  console.log('  Packed:', packedPath)
+}
+
 const execFileAsync = promisify(execFile)
 
 const isDev =
