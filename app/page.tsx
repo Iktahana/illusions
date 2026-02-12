@@ -1366,6 +1366,7 @@ export default function EditorPage() {
               textIndent={textIndent}
               fontFamily={fontFamily}
               charsPerLine={charsPerLine}
+              onCharsPerLineChange={handleCharsPerLineChange}
               searchOpenTrigger={searchOpenTrigger}
               searchInitialTerm={searchInitialTerm}
               showParagraphNumbers={showParagraphNumbers}
