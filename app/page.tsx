@@ -324,8 +324,9 @@ export default function EditorPage() {
   const [searchResults, setSearchResults] = useState<{matches: any[], searchTerm: string} | null>(null);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
 
-  // Ref to forward handleOpenRecentProject (defined later) to useWebMenuHandlers
+  // Ref to forward handleOpenRecentProject and handleFontScaleChange (defined later) to useWebMenuHandlers
   const openRecentProjectRef = useRef<(projectId: string) => void>(() => {});
+  const fontScaleChangeRef = useRef<(scale: number) => void>(() => {});
 
   // Web menu handlers
   const { handleMenuAction } = useWebMenuHandlers({
@@ -337,6 +338,8 @@ export default function EditorPage() {
     onOpenRecentProject: (projectId: string) => openRecentProjectRef.current(projectId),
     onCloseWindow: () => window.close(),
     editorView: editorViewInstance,
+    fontScale,
+    onFontScaleChange: (scale: number) => fontScaleChangeRef.current(scale),
   });
 
   // Global shortcuts for Web (only when not in Electron)
@@ -1046,6 +1049,7 @@ export default function EditorPage() {
 
   // Keep ref in sync so useWebMenuHandlers can call it
   openRecentProjectRef.current = (projectId: string) => void handleOpenRecentProject(projectId);
+  fontScaleChangeRef.current = handleFontScaleChange;
 
   // メニューの「最近のプロジェクトを開く」を受け取る（Electronのみ）
   // → 指定されたプロジェクトIDで直接プロジェクトを開く

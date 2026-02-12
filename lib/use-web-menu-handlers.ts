@@ -12,6 +12,8 @@ interface UseWebMenuHandlersProps {
   onOpenRecentProject?: (projectId: string) => void;
   onCloseWindow?: () => void;
   editorView?: EditorView | null;
+  fontScale?: number;
+  onFontScaleChange?: (scale: number) => void;
 }
 
 export function useWebMenuHandlers({
@@ -23,6 +25,8 @@ export function useWebMenuHandlers({
   onOpenRecentProject,
   onCloseWindow,
   editorView,
+  fontScale = 100,
+  onFontScaleChange,
 }: UseWebMenuHandlersProps) {
   
   const handleMenuAction = useCallback((action: string) => {
@@ -106,12 +110,20 @@ export function useWebMenuHandlers({
         break;
       
       // View menu
-      case 'reset-zoom':
-      case 'zoom-in':
-      case 'zoom-out':
-        // TODO: Implement zoom functionality
-        console.warn('[Web Menu] Zoom functionality not yet implemented');
+      case 'zoom-in': {
+        const newScale = Math.min(fontScale + 10, 200);
+        onFontScaleChange?.(newScale);
         break;
+      }
+      case 'zoom-out': {
+        const newScale = Math.max(fontScale - 10, 50);
+        onFontScaleChange?.(newScale);
+        break;
+      }
+      case 'reset-zoom': {
+        onFontScaleChange?.(100);
+        break;
+      }
       
       case 'show-in-file-manager':
         // No-op in web
@@ -125,7 +137,7 @@ export function useWebMenuHandlers({
         }
         console.warn('[Web Menu] Unknown action:', action);
     }
-  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, editorView]);
+  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, editorView, fontScale, onFontScaleChange]);
   
   return { handleMenuAction };
 }
