@@ -200,7 +200,8 @@ export class HistoryService {
     try {
       const timestamp = Date.now();
       const formattedTime = formatTimestamp(timestamp);
-      const filename = `${sourceFile}.[${formattedTime}].history`;
+      const autoMarker = type === "auto" ? ".__auto__" : "";
+      const filename = `${sourceFile}.[${formattedTime}]${autoMarker}.history`;
       const checksum = await calculateChecksum(content);
       const fileSize = calculateByteSize(content);
       const characterCount = content.length;
