@@ -286,7 +286,7 @@ export function useMdiFile(): UseMdiFileReturn {
 
   }, [isElectron, persistLastOpenedPath]);
 
-  const saveFile = useCallback(async () => {
+  const saveFile = useCallback(async (isAutoSave: boolean = false) => {
     if (isSavingRef.current) return;
 
     isSavingRef.current = true;
@@ -297,7 +297,8 @@ export function useMdiFile(): UseMdiFileReturn {
         const vfs = getVFS();
         await vfs.writeFile(currentFile.path, contentRef.current);
         setLastSavedContent(contentRef.current);
-        setLastSavedTime(Date.now());
+        // Set negative timestamp for auto-save to distinguish from manual save
+        setLastSavedTime(isAutoSave ? -Date.now() : Date.now());
         void tryAutoSnapshot(currentFile.name, contentRef.current);
         return;
       }
@@ -311,7 +312,8 @@ export function useMdiFile(): UseMdiFileReturn {
         const { descriptor } = result;
         setCurrentFile(descriptor);
         setLastSavedContent(contentRef.current);
-        setLastSavedTime(Date.now());
+        // Set negative timestamp for auto-save to distinguish from manual save
+        setLastSavedTime(isAutoSave ? -Date.now() : Date.now());
 
         // 最後に開いたファイルの参照（パス/ハンドル）を保存する
         try {
@@ -406,7 +408,7 @@ export function useMdiFile(): UseMdiFileReturn {
   useEffect(() => {
     autoSaveTimerRef.current = setInterval(() => {
       if (isDirtyRef.current && currentFileRef.current) {
-        void saveFileRef.current();
+        void saveFileRef.current(true); // Pass true to indicate auto-save
       }
     }, AUTO_SAVE_INTERVAL);
 

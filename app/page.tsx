@@ -354,23 +354,27 @@ export default function EditorPage() {
   );
 
    // lastSavedTime が更新されたら「保存完了」トーストを表示
+   // ただし、自動保存時（負の値）は表示しない
    useEffect(() => {
      if (lastSavedTime && prevLastSavedTimeRef.current !== lastSavedTime) {
        // 初回読み込みでは表示しない
        if (prevLastSavedTimeRef.current !== null) {
-        setShowSaveToast(true);
-        setSaveToastExiting(false);
+        // Only show toast for manual saves (positive timestamp)
+        if (lastSavedTime > 0) {
+          setShowSaveToast(true);
+          setSaveToastExiting(false);
 
-        const hideTimer = setTimeout(() => {
-          setSaveToastExiting(true);
-          setTimeout(() => {
-            setShowSaveToast(false);
-            setSaveToastExiting(false);
-          }, 150); // Match animation duration
-        }, 1200);
+          const hideTimer = setTimeout(() => {
+            setSaveToastExiting(true);
+            setTimeout(() => {
+              setShowSaveToast(false);
+              setSaveToastExiting(false);
+            }, 150); // Match animation duration
+          }, 1200);
 
-        prevLastSavedTimeRef.current = lastSavedTime;
-        return () => clearTimeout(hideTimer);
+          prevLastSavedTimeRef.current = lastSavedTime;
+          return () => clearTimeout(hideTimer);
+        }
       }
       prevLastSavedTimeRef.current = lastSavedTime;
     }
