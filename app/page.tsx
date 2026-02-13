@@ -564,6 +564,7 @@ export default function EditorPage() {
 
   const handleFontScaleChange = useCallback((value: number) => {
     setFontScale(value);
+    setEditorKey(prev => prev + 1);
     void persistAppState({ fontScale: value }).catch((error) => {
       console.error("フォントサイズの保存に失敗しました:", error);
     });
@@ -571,6 +572,7 @@ export default function EditorPage() {
 
   const handleLineHeightChange = useCallback((value: number) => {
     setLineHeight(value);
+    setEditorKey(prev => prev + 1);
     void persistAppState({ lineHeight: value }).catch((error) => {
       console.error("行間の保存に失敗しました:", error);
     });
@@ -578,6 +580,7 @@ export default function EditorPage() {
 
   const handleParagraphSpacingChange = useCallback((value: number) => {
     setParagraphSpacing(value);
+    setEditorKey(prev => prev + 1);
     void persistAppState({ paragraphSpacing: value }).catch((error) => {
       console.error("段落間隔の保存に失敗しました:", error);
     });
@@ -585,6 +588,7 @@ export default function EditorPage() {
 
   const handleTextIndentChange = useCallback((value: number) => {
     setTextIndent(value);
+    setEditorKey(prev => prev + 1);
     void persistAppState({ textIndent: value }).catch((error) => {
       console.error("字下げの保存に失敗しました:", error);
     });
@@ -592,6 +596,7 @@ export default function EditorPage() {
 
   const handleFontFamilyChange = useCallback((value: string) => {
     setFontFamily(value);
+    setEditorKey(prev => prev + 1);
     void persistAppState({ fontFamily: value }).catch((error) => {
       console.error("フォントの保存に失敗しました:", error);
     });
@@ -599,6 +604,7 @@ export default function EditorPage() {
 
   const handleCharsPerLineChange = useCallback((value: number) => {
     setCharsPerLine(value);
+    setEditorKey(prev => prev + 1);
     void persistAppState({ charsPerLine: value }).catch((error) => {
       console.error("1行あたり文字数の保存に失敗しました:", error);
     });
@@ -1279,17 +1285,17 @@ export default function EditorPage() {
           isOpen={showSettingsModal}
           onClose={() => setShowSettingsModal(false)}
           fontScale={fontScale}
-          onFontScaleChange={setFontScale}
+          onFontScaleChange={handleFontScaleChange}
           lineHeight={lineHeight}
-          onLineHeightChange={setLineHeight}
+          onLineHeightChange={handleLineHeightChange}
           paragraphSpacing={paragraphSpacing}
           onParagraphSpacingChange={handleParagraphSpacingChange}
           textIndent={textIndent}
-          onTextIndentChange={setTextIndent}
+          onTextIndentChange={handleTextIndentChange}
           fontFamily={fontFamily}
-          onFontFamilyChange={setFontFamily}
+          onFontFamilyChange={handleFontFamilyChange}
           charsPerLine={charsPerLine}
-          onCharsPerLineChange={setCharsPerLine}
+          onCharsPerLineChange={handleCharsPerLineChange}
           showParagraphNumbers={showParagraphNumbers}
           onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
           verticalScrollBehavior={verticalScrollBehavior}
