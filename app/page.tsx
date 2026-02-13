@@ -1424,7 +1424,7 @@ export default function EditorPage() {
           </ResizablePanel>
         )}
 
-        <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative">
+        <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
           <div ref={editorDomRef} className="flex-1 min-h-0">
             <NovelEditor
               key={`file-${fileSessionRef.current}-${editorKey}`}
