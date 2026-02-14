@@ -27,6 +27,7 @@ import SearchDialog from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
 import { searchHighlightPlugin } from "@/lib/search-highlight-plugin";
 import EditorContextMenu, { type ContextMenuAction } from "./EditorContextMenu";
+import { isElectronRenderer } from "@/lib/runtime-env";
 
 interface EditorProps {
   initialContent?: string;
@@ -383,6 +384,7 @@ function MilkdownEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const [hasSelection, setHasSelection] = useState(false);
+  const isElectron = typeof window !== "undefined" && isElectronRenderer();
   // 初期内容はマウント時に固定（ファイル切り替えでコンポーネントが再マウントされたときだけ変わる）
   const initialContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
@@ -944,28 +946,27 @@ function MilkdownEditor({
     }
   }, [editorViewInstance]);
 
-  return (
-    <>
-      <EditorContextMenu onAction={handleContextMenuAction} hasSelection={hasSelection}>
-        <div
-          ref={editorRef}
-          className={clsx(
-            "editor-content-area",
-            isVertical
-              ? "px-16 py-8 min-w-fit"
-              : "p-8 mx-auto"
-          )}
-          style={{
-            fontSize: `${fontScale}%`,
-            fontFamily: `"${fontFamily}", serif`,
-            lineHeight: lineHeight,
-            ...(isVertical && {
-              minHeight: '100%',
-              display: 'flex',
-              alignItems: 'center',
-            }),
-          }}
-        >
+  // Editor content wrapper - only use custom context menu on Web, native on Electron
+  const editorContent = (
+    <div
+      ref={editorRef}
+      className={clsx(
+        "editor-content-area",
+        isVertical
+          ? "px-16 py-8 min-w-fit"
+          : "p-8 mx-auto"
+      )}
+      style={{
+        fontSize: `${fontScale}%`,
+        fontFamily: `"${fontFamily}", serif`,
+        lineHeight: lineHeight,
+        ...(isVertical && {
+          minHeight: '100%',
+          display: 'flex',
+          alignItems: 'center',
+        }),
+      }}
+    >
         <style jsx>{`
           div :global(.milkdown .ProseMirror) {
             font-family: "${fontFamily}", serif;
@@ -1030,7 +1031,18 @@ function MilkdownEditor({
         `}</style>
         <Milkdown />
       </div>
-      </EditorContextMenu>
+  );
+
+  return (
+    <>
+      {/* Use custom context menu only on Web, native context menu on Electron */}
+      {!isElectron ? (
+        <EditorContextMenu onAction={handleContextMenuAction} hasSelection={hasSelection}>
+          {editorContent}
+        </EditorContextMenu>
+      ) : (
+        editorContent
+      )}
       {editorViewInstance && (
         <BubbleMenu editorView={editorViewInstance} onFormat={handleFormat} isVertical={isVertical} />
       )}
