@@ -86,13 +86,15 @@ export default function ResizablePanel({
     <div
       ref={panelRef}
       className={clsx(
-        "relative flex-shrink-0 transition-all duration-300 ease-in-out",
+        "relative flex-shrink-0",
+        !isResizing && "transition-all duration-300 ease-in-out",
         className
       )}
       style={{ width: isCollapsed ? '0px' : `${width}px` }}
     >
       <div className={clsx(
-        "h-full transition-opacity duration-300",
+        "h-full",
+        !isResizing && "transition-opacity duration-300",
         isCollapsed ? "opacity-0" : "opacity-100"
       )}>
         {children}
