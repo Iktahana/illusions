@@ -628,7 +628,13 @@ ipcMain.handle('save-file', async (_event, filePath, content) => {
     target = result.filePath
   }
   try {
-    await fs.writeFile(target, content, 'utf-8')
+    // Use open -> write -> close pattern for better compatibility with virtual file systems (e.g., Google Drive on Windows)
+    const fileHandle = await fs.open(target, 'w')
+    try {
+      await fileHandle.writeFile(content, 'utf-8')
+    } finally {
+      await fileHandle.close()
+    }
     return target
   } catch (error) {
     log.error('ファイルの保存に失敗しました:', error)

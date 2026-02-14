@@ -11,13 +11,13 @@
   "scripts": {
     "type-check": "tsc --noEmit",
     "dev": "npm run type-check && next dev -p 3010",
-    "build": "npm run type-check && next build --webpack",
+    "build": "npm run type-check && npm run generate:credits && next build --webpack",
     "start": "next start",
     "lint": "next lint",
     "download:fonts": "node scripts/download-local-fonts.mjs",
     "bundle:electron": "node scripts/bundle-electron.mjs",
     "electron:dev": "npm run bundle:electron && concurrently \"next dev -p 3020 --webpack\" \"wait-on http://localhost:3020 && cross-env ELECTRON_DEV=1 electron .\"",
-    "electron:build": "npm run type-check && cross-env ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron && electron-builder --publish never",
+    "electron:build": "npm run type-check && npm run generate:credits && cross-env ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron && electron-builder --publish never",
     "build:quicklook": "bash scripts/build-quicklook.sh",
     "generate:credits": "npx tsx scripts/generate-credits.ts",
     "postinstall": "electron-builder install-app-deps"
