@@ -1,10 +1,27 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { X, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
 import ColorPicker from "./ColorPicker";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
+import { LICENSE_TEXT } from "@/lib/license-text";
 import clsx from "clsx";
+import packageJson from "@/package.json";
+
+interface CreditEntry {
+  name: string;
+  version: string;
+  license: string;
+  repository: string;
+}
+
+let creditsData: CreditEntry[] = [];
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  creditsData = require("@/generated/credits.json") as CreditEntry[];
+} catch {
+  // credits.json may not exist yet (before running generate:credits)
+}
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -38,7 +55,7 @@ interface SettingsModalProps {
   onPosHighlightColorsChange: (value: Record<string, string>) => void;
 }
 
-type SettingsCategory = "editor" | "vertical" | "pos-highlight";
+type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "about";
 
 const FONT_FAMILIES = [
   { value: "Noto Serif JP", label: "Noto Serif JP" },
@@ -136,10 +153,20 @@ export default function SettingsModal({
     return posHighlightColors[key] || DEFAULT_POS_COLORS[key] || "#000000";
   }
 
-  // Filter POS types: skip 記号, 名詞, and sub-types with `-`
-  const posTypes = Object.keys(DEFAULT_POS_COLORS).filter(
-    (key) => key !== "記号" && key !== "名詞" && !key.includes("-")
-  );
+  const posColorItems = [
+    { key: "名詞", label: "名詞" },
+    { key: "動詞", label: "動詞" },
+    { key: "動詞-自立", label: "└ 自立" },
+    { key: "動詞-非自立", label: "└ 非自立" },
+    { key: "形容詞", label: "形容詞" },
+    { key: "副詞", label: "副詞" },
+    { key: "助詞", label: "助詞" },
+    { key: "助動詞", label: "助動詞" },
+    { key: "接続詞", label: "接続詞" },
+    { key: "連体詞", label: "連体詞" },
+    { key: "感動詞", label: "感動詞" },
+    { key: "記号", label: "記号" },
+  ];
 
   return (
     <div
@@ -199,6 +226,18 @@ export default function SettingsModal({
                 )}
               >
                 品詞ハイライト
+              </button>
+              <div className="my-2 border-t border-border" />
+              <button
+                onClick={() => setActiveCategory("about")}
+                className={clsx(
+                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  activeCategory === "about"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                )}
+              >
+                illusionsについて
               </button>
             </nav>
           </div>
@@ -466,28 +505,191 @@ export default function SettingsModal({
                         デフォルトに戻す
                       </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      {posTypes.map((posType) => (
-                        <ColorPicker
-                          key={posType}
-                          label={posType}
-                          value={getEffectiveColor(posType)}
-                          onChange={(color) => {
-                            onPosHighlightColorsChange({
-                              ...posHighlightColors,
-                              [posType]: color,
-                            });
-                          }}
-                        />
+                    <div className="space-y-2">
+                      {posColorItems.map(({ key, label }) => (
+                        <div key={key} className="flex items-center justify-between">
+                          <span className="text-sm text-foreground-secondary">{label}</span>
+                          <ColorPicker
+                            value={getEffectiveColor(key)}
+                            onChange={(color) => {
+                              onPosHighlightColorsChange({
+                                ...posHighlightColors,
+                                [key]: color,
+                              });
+                            }}
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
                 )}
               </div>
             )}
+
+            {/* About section */}
+            {activeCategory === "about" && (
+              <AboutSection />
+            )}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+type AboutTab = "license" | "credits";
+
+function AboutSection(): React.ReactElement {
+  const [activeTab, setActiveTab] = useState<AboutTab>("license");
+  const [expandedCredits, setExpandedCredits] = useState<Set<string>>(new Set());
+
+  // Group credits by license type
+  const creditsByLicense = creditsData.reduce<Record<string, CreditEntry[]>>((acc, entry) => {
+    const key = entry.license || "Unknown";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(entry);
+    return acc;
+  }, {});
+
+  function handleToggleLicenseGroup(license: string): void {
+    setExpandedCredits((prev) => {
+      const next = new Set(prev);
+      if (next.has(license)) {
+        next.delete(license);
+      } else {
+        next.add(license);
+      }
+      return next;
+    });
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* App info header */}
+      <div className="text-center space-y-2">
+        <h3 className="text-2xl font-bold text-foreground">illusions</h3>
+        <p className="text-sm text-foreground-secondary">
+          バージョン {packageJson.version}
+        </p>
+        <p className="text-sm text-foreground-tertiary">
+          © {new Date().getFullYear()} 幾田花 (Iktahana). All rights reserved.
+        </p>
+      </div>
+
+      {/* Links */}
+      <div className="flex justify-center gap-4">
+        <a
+          href="https://illusions.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          illusions.app
+        </a>
+        <a
+          href="https://github.com/Iktahana/illusions"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          GitHub
+        </a>
+      </div>
+
+      {/* Tab switcher */}
+      <div className="flex border-b border-border">
+        <button
+          onClick={() => setActiveTab("license")}
+          className={clsx(
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+            activeTab === "license"
+              ? "border-accent text-accent"
+              : "border-transparent text-foreground-secondary hover:text-foreground"
+          )}
+        >
+          LICENSE
+        </button>
+        <button
+          onClick={() => setActiveTab("credits")}
+          className={clsx(
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+            activeTab === "credits"
+              ? "border-accent text-accent"
+              : "border-transparent text-foreground-secondary hover:text-foreground"
+          )}
+        >
+          CREDITS ({creditsData.length})
+        </button>
+      </div>
+
+      {/* Tab content */}
+      {activeTab === "license" && (
+        <div className="rounded-lg border border-border bg-background/50 overflow-hidden">
+          <pre className="p-4 text-xs text-foreground-secondary overflow-auto max-h-[40vh] whitespace-pre-wrap font-mono leading-relaxed">
+            {LICENSE_TEXT}
+          </pre>
+        </div>
+      )}
+
+      {activeTab === "credits" && (
+        <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+          {creditsData.length === 0 ? (
+            <p className="text-sm text-foreground-tertiary text-center py-4">
+              クレジットデータがありません。<code className="text-xs bg-background px-1 py-0.5 rounded">npm run generate:credits</code> を実行してください。
+            </p>
+          ) : (
+            Object.entries(creditsByLicense)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([license, entries]) => (
+                <div key={license} className="border border-border rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => handleToggleLicenseGroup(license)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground hover:bg-hover transition-colors"
+                  >
+                    {expandedCredits.has(license) ? (
+                      <ChevronDown className="w-4 h-4 flex-shrink-0" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 flex-shrink-0" />
+                    )}
+                    <span>{license}</span>
+                    <span className="text-foreground-tertiary text-xs ml-auto">
+                      {entries.length}
+                    </span>
+                  </button>
+                  {expandedCredits.has(license) && (
+                    <div className="border-t border-border divide-y divide-border">
+                      {entries.map((entry) => (
+                        <div
+                          key={`${entry.name}@${entry.version}`}
+                          className="px-3 py-1.5 flex items-center justify-between text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-foreground truncate">{entry.name}</span>
+                            <span className="text-foreground-tertiary flex-shrink-0">
+                              {entry.version}
+                            </span>
+                          </div>
+                          {entry.repository && (
+                            <a
+                              href={entry.repository}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-accent hover:text-accent-hover flex-shrink-0 ml-2"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
