@@ -75,6 +75,14 @@ function words(s: string) {
 export default function EditorPage() {
   const { editorMode, setProjectMode, setStandaloneMode, resetMode } = useEditorMode();
 
+  // Detect ?welcome parameter: skip auto-restore and show welcome page
+  // Use lazy initializer to safely check window.location only on client-side
+  const [skipAutoRestore] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.has("welcome");
+  });
+
   // Welcome screen / wizard / permission prompt state
   const [showCreateWizard, setShowCreateWizard] = useState(false);
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
@@ -85,7 +93,7 @@ export default function EditorPage() {
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const isAutoRestoringRef = useRef(false);
 
-  const mdiFile = useMdiFile();
+  const mdiFile = useMdiFile({ skipAutoRestore });
   const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile: originalOpenFile, saveFile, saveAsFile, newFile: originalNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen, _loadSystemFile } =
     mdiFile;
 
@@ -457,23 +465,24 @@ export default function EditorPage() {
     };
   }, []);
 
+  // Clean up ?welcome parameter from URL
+  useEffect(() => {
+    if (skipAutoRestore && typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has("welcome")) {
+        params.delete("welcome");
+        const cleanUrl = window.location.pathname + (params.toString() ? `?${params}` : "");
+        window.history.replaceState({}, "", cleanUrl);
+      }
+    }
+  }, [skipAutoRestore]);
+
   // ID of the most recent project to auto-restore
   const [autoRestoreProjectId, setAutoRestoreProjectId] = useState<string | null>(null);
 
   // Load recent projects on mount (for WelcomeScreen)
   useEffect(() => {
     let mounted = true;
-
-    // Detect ?welcome parameter: skip auto-restore and show welcome page
-    // Check here (inside useEffect) to guarantee window is available (avoid SSR issues)
-    const params = new URLSearchParams(window.location.search);
-    const skipAutoRestore = params.has("welcome");
-    if (skipAutoRestore) {
-      // Clean up URL so a later page refresh will auto-restore normally
-      params.delete("welcome");
-      const cleanUrl = window.location.pathname + (params.toString() ? `?${params}` : "");
-      window.history.replaceState({}, "", cleanUrl);
-    }
 
     const loadRecentProjects = async () => {
       try {
@@ -530,7 +539,7 @@ export default function EditorPage() {
     return () => {
       mounted = false;
     };
-  }, [isElectron]);
+  }, [isElectron, skipAutoRestore]);
 
   /** Delete a recent project from the list */
   const handleDeleteRecentProject = useCallback(async (projectId: string) => {

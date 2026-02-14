@@ -68,10 +68,11 @@ export interface UseMdiFileReturn {
   _loadSystemFile: (path: string, content: string) => void;
 }
 
-export function useMdiFile(): UseMdiFileReturn {
+export function useMdiFile(options?: { skipAutoRestore?: boolean }): UseMdiFileReturn {
   const isElectron =
     typeof window !== "undefined" && isElectronRenderer();
   const { isProject } = useEditorMode();
+  const skipAutoRestore = options?.skipAutoRestore ?? false;
 
   const [currentFile, setCurrentFile] = useState<MdiFileDescriptor | null>(null);
   const [content, setContentState] = useState<string>(() => getRandomillusionstory());
@@ -168,49 +169,52 @@ export function useMdiFile(): UseMdiFileReturn {
           lastOpenedPath: appState?.lastOpenedMdiPath,
         });
 
-        // Web: エディタバッファからファイルハンドルの復元を試みる
-        if (!isElectron) {
-          const buffer = await storage.loadEditorBuffer();
-          if (buffer?.fileHandle) {
-            try {
-              // 実ファイルへアクセスし、権限が残っているか確認する
-              const file = await buffer.fileHandle.getFile();
-              const content = await file.text();
+        // Skip auto-restore if skipAutoRestore flag is set (e.g., when opening new window with ?welcome parameter)
+        if (!skipAutoRestore) {
+          // Web: エディタバッファからファイルハンドルの復元を試みる
+          if (!isElectron) {
+            const buffer = await storage.loadEditorBuffer();
+            if (buffer?.fileHandle) {
+              try {
+                // 実ファイルへアクセスし、権限が残っているか確認する
+                const file = await buffer.fileHandle.getFile();
+                const content = await file.text();
 
-              setCurrentFile({
-                path: null,
-                handle: buffer.fileHandle,
-                name: file.name,
-              });
-              setContentState(content);
-              setLastSavedContent(content);
-              setLastSavedTime(Date.now());
-              setWasAutoRecovered(true);
-              if (!hasSeenDemo) {
-                await persistAppState({ hasSeenDemo: true });
+                setCurrentFile({
+                  path: null,
+                  handle: buffer.fileHandle,
+                  name: file.name,
+                });
+                setContentState(content);
+                setLastSavedContent(content);
+                setLastSavedTime(Date.now());
+                setWasAutoRecovered(true);
+                if (!hasSeenDemo) {
+                  await persistAppState({ hasSeenDemo: true });
+                }
+                return;
+              } catch (error) {
+                console.warn("前回のファイルを復元できませんでした（権限が失効している可能性があります）:", error);
+                // 古いハンドルを破棄する
+                await storage.clearEditorBuffer();
               }
-              return;
-            } catch (error) {
-              console.warn("前回のファイルを復元できませんでした（権限が失効している可能性があります）:", error);
-              // 古いハンドルを破棄する
-              await storage.clearEditorBuffer();
             }
           }
-        }
 
-        if (!hasSeenDemo && !hasEditedFiles) {
-          const demoContent = await loadDemoContent();
-          if (demoContent) {
-            setCurrentFile({
-              path: null,
-              handle: null,
-              name: DEMO_FILE_NAME,
-            });
-            setContentState(demoContent);
-            setLastSavedContent(demoContent);
-            setLastSavedTime(null);
-            setWasAutoRecovered(false);
-            await persistAppState({ hasSeenDemo: true });
+          if (!hasSeenDemo && !hasEditedFiles) {
+            const demoContent = await loadDemoContent();
+            if (demoContent) {
+              setCurrentFile({
+                path: null,
+                handle: null,
+                name: DEMO_FILE_NAME,
+              });
+              setContentState(demoContent);
+              setLastSavedContent(demoContent);
+              setLastSavedTime(null);
+              setWasAutoRecovered(false);
+              await persistAppState({ hasSeenDemo: true });
+            }
           }
         }
       } catch (error) {
@@ -219,7 +223,7 @@ export function useMdiFile(): UseMdiFileReturn {
     };
 
     void initializeStorage();
-  }, [isElectron]);
+  }, [isElectron, skipAutoRestore]);
 
   const setContent = useCallback((newContent: string) => {
     setContentState(newContent);
