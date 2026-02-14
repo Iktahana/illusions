@@ -47,6 +47,7 @@ interface ParagraphInfo {
   pos: number;  // 段落の開始位置
   text: string; // 段落内のテキスト
   atomAdjustments: AtomAdjustment[]; // atom ノードによる位置補正
+  index: number; // 段落のインデックス（0から始まる）
 }
 
 /**
@@ -70,6 +71,7 @@ function getAtomOffset(adjustments: AtomAdjustment[], textPos: number): number {
  */
 function collectParagraphs(doc: ProseMirrorNode): ParagraphInfo[] {
   const paragraphs: ParagraphInfo[] = [];
+  let index = 0;
 
   doc.descendants((node, pos) => {
     // paragraph ノードを収集
@@ -95,6 +97,7 @@ function collectParagraphs(doc: ProseMirrorNode): ParagraphInfo[] {
         pos,
         text: node.textContent,
         atomAdjustments,
+        index: index++,
       });
       return false; // 子ノードは走査しない
     }
@@ -102,6 +105,72 @@ function collectParagraphs(doc: ProseMirrorNode): ParagraphInfo[] {
   });
 
   return paragraphs;
+}
+
+/**
+ * ビューポート内に表示されている段落を取得（前後2段落を含む）
+ */
+function getVisibleParagraphs(
+  view: EditorView,
+  allParagraphs: ParagraphInfo[],
+  buffer: number = 2
+): ParagraphInfo[] {
+  if (allParagraphs.length === 0) return [];
+
+  const { from, to } = view.state.selection;
+  const editorDom = view.dom;
+
+  // エディタのビューポート範囲を取得
+  const viewportTop = editorDom.scrollTop;
+  const viewportBottom = viewportTop + editorDom.clientHeight;
+
+  // 可視範囲の段落を特定
+  const visibleIndices = new Set<number>();
+
+  for (const paragraph of allParagraphs) {
+    try {
+      const coords = view.coordsAtPos(paragraph.pos);
+      if (coords) {
+        const paragraphTop = coords.top - editorDom.getBoundingClientRect().top + editorDom.scrollTop;
+        const paragraphBottom = paragraphTop + 100; // 段落の高さの概算
+
+        // ビューポート内にある段落
+        if (paragraphBottom >= viewportTop && paragraphTop <= viewportBottom) {
+          visibleIndices.add(paragraph.index);
+        }
+      }
+    } catch (e) {
+      // coordsAtPos がエラーになる場合はスキップ
+    }
+  }
+
+  // カーソル位置の段落も含める
+  for (const paragraph of allParagraphs) {
+    if (from >= paragraph.pos && from <= paragraph.pos + paragraph.node.nodeSize) {
+      visibleIndices.add(paragraph.index);
+    }
+  }
+
+  // 可視範囲が空の場合、カーソル周辺を使用
+  if (visibleIndices.size === 0) {
+    for (const paragraph of allParagraphs) {
+      if (from >= paragraph.pos && from <= paragraph.pos + paragraph.node.nodeSize) {
+        visibleIndices.add(paragraph.index);
+        break;
+      }
+    }
+  }
+
+  // 前後のバッファを追加
+  const expandedIndices = new Set<number>();
+  for (const index of visibleIndices) {
+    for (let i = Math.max(0, index - buffer); i <= Math.min(allParagraphs.length - 1, index + buffer); i++) {
+      expandedIndices.add(i);
+    }
+  }
+
+  // インデックスに基づいてフィルタ
+  return allParagraphs.filter(p => expandedIndices.has(p.index));
 }
 
 /**
@@ -229,49 +298,67 @@ export function createPosHighlightPlugin(
     },
     
     view(editorView) {
+      let scrollTimer: ReturnType<typeof setTimeout> | null = null;
+
+      // スクロールイベントハンドラ
+      const handleScroll = () => {
+        const state = posHighlightKey.getState(editorView.state);
+        if (!state?.enabled) return;
+
+        if (scrollTimer) clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+          scheduleFullUpdate(editorView);
+        }, 150); // スクロール後150msで更新
+      };
+
+      // エディタのDOMにスクロールリスナーを追加
+      editorView.dom.addEventListener('scroll', handleScroll);
+
       // 初期化時に実行
       if (enabled) {
         scheduleFullUpdate(editorView);
       }
       
       /**
-       * 全段落を順次処理
+       * 可視範囲の段落を処理（viewport + 前後2段落）
        */
       async function scheduleFullUpdate(view: EditorView) {
         if (debounceTimer) clearTimeout(debounceTimer);
-        
+
         const version = ++processingVersion;
-        
+
         debounceTimer = setTimeout(async () => {
           const state = posHighlightKey.getState(view.state);
           if (!state?.enabled) return;
-          
+
           const nlpClient = getNlpClient();
-          const paragraphs = collectParagraphs(view.state.doc);
-          
-          console.log(`[PosHighlight] Processing ${paragraphs.length} paragraphs...`);
-          
+          const allParagraphs = collectParagraphs(view.state.doc);
+          const visibleParagraphs = getVisibleParagraphs(view, allParagraphs, 2);
+
+          console.log(`[PosHighlight] Processing ${visibleParagraphs.length}/${allParagraphs.length} visible paragraphs...`);
+
+
           // Use batch API for better performance
           try {
-            const paragraphData = paragraphs.map(p => ({ pos: p.pos, text: p.text }));
-            
+            const paragraphData = visibleParagraphs.map(p => ({ pos: p.pos, text: p.text }));
+
             const results = await nlpClient.tokenizeDocument(paragraphData, (progress: TokenizeProgress) => {
-              if (paragraphs.length > 20) {
+              if (visibleParagraphs.length > 20) {
                 console.log(`[PosHighlight] Progress: ${progress.percentage}% (${progress.completed}/${progress.total})`);
               }
             });
-            
+
             // Version check (cancel if new update)
             if (version !== processingVersion) {
               console.log('[PosHighlight] Processing cancelled (new update)');
               return;
             }
-            
+
             // Convert results to decorations
             const allDecorations: Decoration[] = [];
-            
+
             for (const result of results) {
-              const paragraph = paragraphs.find(p => p.pos === result.pos);
+              const paragraph = visibleParagraphs.find(p => p.pos === result.pos);
               if (!paragraph) continue;
               
               for (const token of result.tokens) {
@@ -345,6 +432,8 @@ export function createPosHighlightPlugin(
         },
         destroy() {
           if (debounceTimer) clearTimeout(debounceTimer);
+          if (scrollTimer) clearTimeout(scrollTimer);
+          editorView.dom.removeEventListener('scroll', handleScroll);
         },
       };
     },
