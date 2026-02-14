@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Explorer, { FilesPanel } from "@/components/Explorer";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
+import EditorDiffView from "@/components/EditorDiffView";
 import ResizablePanel from "@/components/ResizablePanel";
 import TitleUpdater from "@/components/TitleUpdater";
 import ActivityBar, { type ActivityBarView, isBottomView } from "@/components/ActivityBar";
@@ -340,6 +341,7 @@ export default function EditorPage() {
   const [compactMode, setCompactMode] = useState(false);
   const [showRubyDialog, setShowRubyDialog] = useState(false);
   const [rubySelectedText, setRubySelectedText] = useState("");
+  const [editorDiff, setEditorDiff] = useState<{ snapshotContent: string; currentContent: string; label: string } | null>(null);
   const [topView, setTopView] = useState<ActivityBarView>("explorer");
   const [bottomView, setBottomView] = useState<ActivityBarView>("none");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1600,29 +1602,44 @@ export default function EditorPage() {
 
         <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
           <div ref={editorDomRef} className="flex-1 min-h-0">
-            <NovelEditor
-              key={`file-${fileSessionRef.current}-${editorKey}`}
-              initialContent={content}
-              onChange={handleChange}
-              onInsertText={handleInsertText}
-              onSelectionChange={setSelectedCharCount}
-              fontScale={fontScale}
-              lineHeight={lineHeight}
-              paragraphSpacing={paragraphSpacing}
-              textIndent={textIndent}
-              fontFamily={fontFamily}
-              charsPerLine={charsPerLine}
-              onCharsPerLineChange={handleCharsPerLineChange}
-              searchOpenTrigger={searchOpenTrigger}
-              searchInitialTerm={searchInitialTerm}
-              showParagraphNumbers={showParagraphNumbers}
-              onEditorViewReady={setEditorViewInstance}
-              onShowAllSearchResults={handleShowAllSearchResults}
-              posHighlightEnabled={posHighlightEnabled}
-              posHighlightColors={posHighlightColors}
-              verticalScrollBehavior={verticalScrollBehavior}
-              scrollSensitivity={scrollSensitivity}
-            />
+            {editorDiff ? (
+              <EditorDiffView
+                snapshotContent={editorDiff.snapshotContent}
+                currentContent={editorDiff.currentContent}
+                snapshotLabel={editorDiff.label}
+                onClose={() => setEditorDiff(null)}
+                fontScale={fontScale}
+                lineHeight={lineHeight}
+                fontFamily={fontFamily}
+                charsPerLine={charsPerLine}
+                textIndent={textIndent}
+                paragraphSpacing={paragraphSpacing}
+              />
+            ) : (
+              <NovelEditor
+                key={`file-${fileSessionRef.current}-${editorKey}`}
+                initialContent={content}
+                onChange={handleChange}
+                onInsertText={handleInsertText}
+                onSelectionChange={setSelectedCharCount}
+                fontScale={fontScale}
+                lineHeight={lineHeight}
+                paragraphSpacing={paragraphSpacing}
+                textIndent={textIndent}
+                fontFamily={fontFamily}
+                charsPerLine={charsPerLine}
+                onCharsPerLineChange={handleCharsPerLineChange}
+                searchOpenTrigger={searchOpenTrigger}
+                searchInitialTerm={searchInitialTerm}
+                showParagraphNumbers={showParagraphNumbers}
+                onEditorViewReady={setEditorViewInstance}
+                onShowAllSearchResults={handleShowAllSearchResults}
+                posHighlightEnabled={posHighlightEnabled}
+                posHighlightColors={posHighlightColors}
+                verticalScrollBehavior={verticalScrollBehavior}
+                scrollSensitivity={scrollSensitivity}
+              />
+            )}
           </div>
 
            {/* 保存完了トースト */}
@@ -1675,6 +1692,7 @@ export default function EditorPage() {
               setContent(restoredContent);
               setEditorKey(prev => prev + 1);
             }}
+            onCompareInEditor={setEditorDiff}
           />
         </ResizablePanel>
       </div>

@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Clock, Pin, Plus, RotateCcw, Loader2, History, Star, GitCompare } from "lucide-react";
 import clsx from "clsx";
 import { getHistoryService } from "@/lib/history-service";
-import DiffView from "./DiffView";
 
 import type { SnapshotEntry, SnapshotType } from "@/lib/history-service";
 
@@ -31,6 +30,8 @@ interface HistoryPanelProps {
   onRestore: (content: string) => void;
   /** Current editor content for diff comparison */
   currentContent?: string;
+  /** Callback to display diff in the editor area */
+  onCompareInEditor?: (data: { snapshotContent: string; currentContent: string; label: string }) => void;
 }
 
 // -----------------------------------------------------------------------
@@ -170,6 +171,7 @@ export default function HistoryPanel({
   mainFileName,
   onRestore,
   currentContent = "",
+  onCompareInEditor,
 }: HistoryPanelProps) {
   const [snapshots, setSnapshots] = useState<SnapshotEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -177,8 +179,6 @@ export default function HistoryPanel({
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [displayCount, setDisplayCount] = useState(SNAPSHOTS_PER_PAGE);
-  // Diff view state
-  const [diffSnapshot, setDiffSnapshot] = useState<{ content: string; label: string } | null>(null);
   const [isLoadingDiff, setIsLoadingDiff] = useState(false);
 
   /**
@@ -300,7 +300,11 @@ export default function HistoryPanel({
         }
 
         const label = `${formatTimeJa(snapshot.timestamp)} (${getSnapshotTypeLabel(snapshot.type)})`;
-        setDiffSnapshot({ content: snapshotContent, label });
+        onCompareInEditor?.({
+          snapshotContent,
+          currentContent,
+          label,
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         setError(`差分の読み込みに失敗しました: ${message}`);
@@ -308,7 +312,7 @@ export default function HistoryPanel({
         setIsLoadingDiff(false);
       }
     },
-    []
+    [currentContent, onCompareInEditor]
   );
 
   // -----------------------------------------------------------------------
@@ -377,18 +381,8 @@ export default function HistoryPanel({
         </div>
       )}
 
-      {/* Diff view */}
-      {diffSnapshot && (
-        <DiffView
-          snapshotContent={diffSnapshot.content}
-          currentContent={currentContent}
-          snapshotLabel={diffSnapshot.label}
-          onClose={() => setDiffSnapshot(null)}
-        />
-      )}
-
       {/* Snapshot list with date groups and pagination */}
-      {snapshots.length > 0 && !diffSnapshot && (
+      {snapshots.length > 0 && (
         <div className="space-y-3">
           {groupedSnapshots.map((group) => (
             <div key={group.label} className="space-y-2">

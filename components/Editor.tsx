@@ -946,6 +946,23 @@ function MilkdownEditor({
     }
   }, [editorViewInstance]);
 
+  // Electron: native OS context menu via IPC
+  const handleElectronContextMenu = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault();
+    const items = [
+      ...(hasSelection ? [
+        { label: '切り取り', action: 'cut' },
+        { label: 'コピー', action: 'copy' },
+      ] : []),
+      { label: '貼り付け', action: 'paste' },
+      { label: 'プレーンテキストとして貼り付け', action: 'paste-plaintext' },
+      { label: '検索', action: 'find' },
+      { label: 'すべて選択', action: 'select-all' },
+    ];
+    const action = await window.electronAPI?.showContextMenu?.(items);
+    if (action) handleContextMenuAction(action as ContextMenuAction);
+  }, [hasSelection, handleContextMenuAction]);
+
   // Editor content wrapper - only use custom context menu on Web, native on Electron
   const editorContent = (
     <div
@@ -1041,7 +1058,9 @@ function MilkdownEditor({
           {editorContent}
         </EditorContextMenu>
       ) : (
-        editorContent
+        <div onContextMenu={handleElectronContextMenu}>
+          {editorContent}
+        </div>
       )}
       {editorViewInstance && (
         <BubbleMenu editorView={editorViewInstance} onFormat={handleFormat} isVertical={isVertical} />

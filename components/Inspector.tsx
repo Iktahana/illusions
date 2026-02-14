@@ -94,6 +94,8 @@ interface InspectorProps {
   onHistoryRestore?: (content: string) => void;
   // 現在のエディタ内容（履歴差分表示用）
   currentContent?: string;
+  // エディタ領域で差分を表示するコールバック
+  onCompareInEditor?: (data: { snapshotContent: string; currentContent: string; label: string }) => void;
 }
 
 export default function Inspector({
@@ -121,6 +123,7 @@ export default function Inspector({
   onPosHighlightColorsChange,
   onHistoryRestore,
   currentContent = "",
+  onCompareInEditor,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
   const projectMode = isProject ? (editorMode as ProjectMode) : null;
@@ -483,6 +486,7 @@ export default function Inspector({
              mainFileName={projectMode.metadata.mainFile}
              onRestore={onHistoryRestore}
              currentContent={currentContent}
+             onCompareInEditor={onCompareInEditor}
            />
          )}
        </div>
