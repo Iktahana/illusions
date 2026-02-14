@@ -802,6 +802,30 @@ interface DiffIndicatorProps {
  */
 function DiffIndicator({ diffStats, isFirstVersion }: DiffIndicatorProps) {
   const [showTooltip, setShowTooltip] = useState(false);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null);
+
+  const showTip = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+    setShowTooltip(true);
+  }, []);
+
+  const hideTip = useCallback(() => {
+    hideTimerRef.current = setTimeout(() => setShowTooltip(false), 100);
+  }, []);
+
+  useEffect(() => {
+    if (showTooltip && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setTooltipPos({ top: rect.top, left: rect.left });
+    } else {
+      setTooltipPos(null);
+    }
+  }, [showTooltip]);
 
   if (isFirstVersion) {
     return (
@@ -843,32 +867,7 @@ function DiffIndicator({ diffStats, isFirstVersion }: DiffIndicatorProps) {
     minusCount = TOTAL_SIGNS;
   }
 
-  // Build tooltip content showing actual changes
   const MAX_PREVIEW_LEN = 80;
-  const triggerRef = useRef<HTMLDivElement>(null);
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null);
-
-  const showTip = useCallback(() => {
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-    setShowTooltip(true);
-  }, []);
-
-  const hideTip = useCallback(() => {
-    hideTimerRef.current = setTimeout(() => setShowTooltip(false), 100);
-  }, []);
-
-  useEffect(() => {
-    if (showTooltip && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setTooltipPos({ top: rect.top, left: rect.left });
-    } else {
-      setTooltipPos(null);
-    }
-  }, [showTooltip]);
 
   return (
     <div

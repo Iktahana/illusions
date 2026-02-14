@@ -533,6 +533,8 @@ export default function EditorPage() {
         if (typeof appState.compactMode === "boolean") {
           setCompactMode(appState.compactMode);
         }
+        // Force editor rebuild to apply restored settings (e.g. custom font)
+        setEditorKey(prev => prev + 1);
       } catch (error) {
         console.error("設定の読み込みに失敗しました:", error);
       }
