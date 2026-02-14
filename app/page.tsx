@@ -22,6 +22,7 @@ import WelcomeScreen from "@/components/WelcomeScreen";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
+import RubyDialog from "@/components/RubyDialog";
 import { useMdiFile } from "@/lib/use-mdi-file";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
 import { useElectronMenuHandlers } from "@/lib/use-electron-menu-handlers";
@@ -336,6 +337,9 @@ export default function EditorPage() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [verticalScrollBehavior, setVerticalScrollBehavior] = useState<"auto" | "mouse" | "trackpad">("auto");
   const [scrollSensitivity, setScrollSensitivity] = useState(1.0);
+  const [compactMode, setCompactMode] = useState(false);
+  const [showRubyDialog, setShowRubyDialog] = useState(false);
+  const [rubySelectedText, setRubySelectedText] = useState("");
   const [topView, setTopView] = useState<ActivityBarView>("explorer");
   const [bottomView, setBottomView] = useState<ActivityBarView>("none");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -344,9 +348,10 @@ export default function EditorPage() {
   const [searchResults, setSearchResults] = useState<{matches: any[], searchTerm: string} | null>(null);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
 
-  // Ref to forward handleOpenRecentProject and handleFontScaleChange (defined later) to useWebMenuHandlers
+  // Ref to forward callbacks (defined later) to useWebMenuHandlers
   const openRecentProjectRef = useRef<(projectId: string) => void>(() => {});
   const fontScaleChangeRef = useRef<(scale: number) => void>(() => {});
+  const toggleCompactModeRef = useRef<() => void>(() => {});
 
   // Web menu handlers
   const { handleMenuAction } = useWebMenuHandlers({
@@ -357,6 +362,7 @@ export default function EditorPage() {
     onOpenProject: () => void handleOpenProject(),
     onOpenRecentProject: (projectId: string) => openRecentProjectRef.current(projectId),
     onCloseWindow: () => window.close(),
+    onToggleCompactMode: () => toggleCompactModeRef.current(),
     editorView: editorViewInstance,
     fontScale,
     onFontScaleChange: (scale: number) => fontScaleChangeRef.current(scale),
@@ -459,6 +465,9 @@ export default function EditorPage() {
         }
         if (typeof appState.scrollSensitivity === "number") {
           setScrollSensitivity(appState.scrollSensitivity);
+        }
+        if (typeof appState.compactMode === "boolean") {
+          setCompactMode(appState.compactMode);
         }
       } catch (error) {
         console.error("設定の読み込みに失敗しました:", error);
@@ -665,6 +674,37 @@ export default function EditorPage() {
     });
   }, []);
 
+  /** Open the Ruby dialog with current editor selection */
+  const handleOpenRubyDialog = useCallback(() => {
+    if (!editorViewInstance) return;
+    const { state } = editorViewInstance;
+    const { from, to } = state.selection;
+    if (from === to) return; // No selection
+    const text = state.doc.textBetween(from, to);
+    if (!text.trim()) return;
+    setRubySelectedText(text);
+    setShowRubyDialog(true);
+  }, [editorViewInstance]);
+
+  /** Apply Ruby markup by replacing the editor selection */
+  const handleApplyRuby = useCallback((rubyMarkup: string) => {
+    if (!editorViewInstance) return;
+    const { state, dispatch } = editorViewInstance;
+    const { from, to } = state.selection;
+    const tr = state.tr.insertText(rubyMarkup, from, to);
+    dispatch(tr);
+  }, [editorViewInstance]);
+
+  const handleToggleCompactMode = useCallback(() => {
+    setCompactMode(prev => {
+      const next = !prev;
+      void persistAppState({ compactMode: next }).catch((error) => {
+        console.error("コンパクトモードの保存に失敗しました:", error);
+      });
+      return next;
+    });
+  }, []);
+
     // 復元通知は5秒後に fadeout アニメーション開始、アニメーション完了後に削除
     useEffect(() => {
      if (wasAutoRecovered && !dismissedRecovery && !recoveryExiting) {
@@ -728,6 +768,15 @@ export default function EditorPage() {
        unsubscribe?.();
      };
    }, [isElectron, handlePasteAsPlaintext]);
+
+    // メニューの「コンパクトモード」トグルを受け取る（Electronのみ）
+    useEffect(() => {
+      if (!isElectron || typeof window === "undefined") return;
+      const cleanup = window.electronAPI?.onToggleCompactMode?.(() => {
+        handleToggleCompactMode();
+      });
+      return () => { cleanup?.(); };
+    }, [isElectron, handleToggleCompactMode]);
 
     // メニューの「プロジェクトフォルダを開く」を受け取る（Electronのみ）
     useEffect(() => {
@@ -833,7 +882,23 @@ export default function EditorPage() {
          ? event.shiftKey && event.metaKey && event.key === "v"
          : event.shiftKey && event.ctrlKey && event.key === "v";
 
-       if (isSettingsShortcut) {
+       // Shift+Cmd+M (macOS) / Shift+Ctrl+M (Windows/Linux): Compact mode toggle
+       const isCompactModeShortcut = isMac
+         ? event.shiftKey && event.metaKey && event.key === "m"
+         : event.shiftKey && event.ctrlKey && event.key === "m";
+
+       // Shift+Cmd+R (macOS) / Shift+Ctrl+R (Windows/Linux): Ruby dialog
+       const isRubyShortcut = isMac
+         ? event.shiftKey && event.metaKey && event.key === "r"
+         : event.shiftKey && event.ctrlKey && event.key === "r";
+
+       if (isRubyShortcut) {
+         event.preventDefault();
+         handleOpenRubyDialog();
+       } else if (isCompactModeShortcut) {
+         event.preventDefault();
+         handleToggleCompactMode();
+       } else if (isSettingsShortcut) {
          event.preventDefault();
          setShowSettingsModal(true);
        } else if (isSaveShortcut) {
@@ -852,7 +917,7 @@ export default function EditorPage() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [saveFile, handlePasteAsPlaintext]);
+  }, [saveFile, handlePasteAsPlaintext, handleToggleCompactMode, handleOpenRubyDialog]);
 
   // --- WelcomeScreen callbacks ---
 
@@ -1177,6 +1242,7 @@ export default function EditorPage() {
   // Keep ref in sync so useWebMenuHandlers can call it
   openRecentProjectRef.current = (projectId: string) => void handleOpenRecentProject(projectId);
   fontScaleChangeRef.current = handleFontScaleChange;
+  toggleCompactModeRef.current = handleToggleCompactMode;
 
   // メニューの「最近のプロジェクトを開く」を受け取る（Electronのみ）
   // → 指定されたプロジェクトIDで直接プロジェクトを開く
@@ -1405,6 +1471,14 @@ export default function EditorPage() {
           onPosHighlightColorsChange={handlePosHighlightColorsChange}
         />
 
+        {/* ルビ設定ダイアログ */}
+        <RubyDialog
+          isOpen={showRubyDialog}
+          onClose={() => setShowRubyDialog(false)}
+          selectedText={rubySelectedText}
+          onApply={handleApplyRuby}
+        />
+
          {/* 自動復元の通知（Webのみ・固定表示） */}
          {!isElectron && wasAutoRecovered && !dismissedRecovery && (
           <div className={`fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between shadow-lg ${recoveryExiting ? 'animate-slide-out-up' : 'animate-slide-in-down'}`}>
@@ -1430,6 +1504,7 @@ export default function EditorPage() {
          <ActivityBar
            topView={topView}
            bottomView={bottomView}
+           compactMode={compactMode}
            onTopViewChange={(view) => {
              if (view === "settings") {
                setShowSettingsModal(true);
@@ -1448,7 +1523,7 @@ export default function EditorPage() {
 
            {/* 左サイドパネル */}
           {(topView !== "none" || bottomView !== "none") && (
-            <ResizablePanel side="left" defaultWidth={256} minWidth={200} maxWidth={400}>
+            <ResizablePanel side="left" defaultWidth={compactMode ? 200 : 256} minWidth={compactMode ? 160 : 200} maxWidth={compactMode ? 320 : 400}>
               {(() => {
                 const renderPanel = (view: ActivityBarView) => {
                   switch (view) {
@@ -1566,9 +1641,9 @@ export default function EditorPage() {
           {/* 右サイドパネル：統計情報（常に表示） */}
           <ResizablePanel
             side="right"
-            defaultWidth={256}
-            minWidth={200}
-            maxWidth={400}
+            defaultWidth={compactMode ? 200 : 256}
+            minWidth={compactMode ? 160 : 200}
+            maxWidth={compactMode ? 320 : 400}
             collapsible={true}
             isCollapsed={isRightPanelCollapsed}
             onToggleCollapse={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
@@ -1595,6 +1670,7 @@ export default function EditorPage() {
             onPosHighlightEnabledChange={handlePosHighlightEnabledChange}
             posHighlightColors={posHighlightColors}
             onPosHighlightColorsChange={handlePosHighlightColorsChange}
+            currentContent={content}
             onHistoryRestore={(restoredContent: string) => {
               setContent(restoredContent);
               setEditorKey(prev => prev + 1);

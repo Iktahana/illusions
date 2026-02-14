@@ -92,6 +92,8 @@ interface InspectorProps {
   onPosHighlightColorsChange?: (colors: Record<string, string>) => void;
   // 履歴復元コールバック（プロジェクトモード時に使用）
   onHistoryRestore?: (content: string) => void;
+  // 現在のエディタ内容（履歴差分表示用）
+  currentContent?: string;
 }
 
 export default function Inspector({
@@ -118,6 +120,7 @@ export default function Inspector({
   posHighlightColors = {},
   onPosHighlightColorsChange,
   onHistoryRestore,
+  currentContent = "",
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
   const projectMode = isProject ? (editorMode as ProjectMode) : null;
@@ -479,6 +482,7 @@ export default function Inspector({
              projectId={projectMode.projectId}
              mainFileName={projectMode.metadata.mainFile}
              onRestore={onHistoryRestore}
+             currentContent={currentContent}
            />
          )}
        </div>

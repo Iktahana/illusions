@@ -36,6 +36,7 @@ declare global {
     rebuildMenu?: () => Promise<boolean>;
     showInFileManager?: (dirPath: string) => Promise<boolean>;
     onMenuShowInFileManager?: (callback: () => void) => (() => void) | void;
+    onToggleCompactMode?: (callback: () => void) => (() => void) | void;
     /** Virtual File System IPC bridge */
     vfs?: {
       /** Open a native directory picker dialog */

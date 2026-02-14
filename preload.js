@@ -70,6 +70,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu-show-in-file-manager', handler)
     return () => ipcRenderer.removeListener('menu-show-in-file-manager', handler)
   },
+  onToggleCompactMode: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-toggle-compact-mode', handler)
+    return () => ipcRenderer.removeListener('menu-toggle-compact-mode', handler)
+  },
   nlp: {
     init: (dicPath) => ipcRenderer.invoke('nlp:init', dicPath),
     tokenizeParagraph: (text) => ipcRenderer.invoke('nlp:tokenize-paragraph', text),

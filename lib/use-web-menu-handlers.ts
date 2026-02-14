@@ -11,6 +11,7 @@ interface UseWebMenuHandlersProps {
   onOpenProject?: () => void;
   onOpenRecentProject?: (projectId: string) => void;
   onCloseWindow?: () => void;
+  onToggleCompactMode?: () => void;
   editorView?: EditorView | null;
   fontScale?: number;
   onFontScaleChange?: (scale: number) => void;
@@ -24,6 +25,7 @@ export function useWebMenuHandlers({
   onOpenProject,
   onOpenRecentProject,
   onCloseWindow,
+  onToggleCompactMode,
   editorView,
   fontScale = 100,
   onFontScaleChange,
@@ -125,6 +127,10 @@ export function useWebMenuHandlers({
         break;
       }
       
+      case 'toggle-compact-mode':
+        onToggleCompactMode?.();
+        break;
+
       case 'show-in-file-manager':
         // No-op in web
         break;
@@ -137,7 +143,7 @@ export function useWebMenuHandlers({
         }
         console.warn('[Web Menu] Unknown action:', action);
     }
-  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, editorView, fontScale, onFontScaleChange]);
+  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, onToggleCompactMode, editorView, fontScale, onFontScaleChange]);
   
   return { handleMenuAction };
 }

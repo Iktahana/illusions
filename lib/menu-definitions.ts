@@ -55,6 +55,12 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
     ]
   },
   {
+    label: 'ウィンドウ',
+    items: [
+      { label: 'コンパクトモード', accelerator: 'Ctrl+Shift+M', action: 'toggle-compact-mode' },
+    ]
+  },
+  {
     label: 'ヘルプ',
     items: [
       { label: 'バージョン 0.0.0', enabled: false },

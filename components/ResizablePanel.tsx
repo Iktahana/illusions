@@ -31,6 +31,11 @@ export default function ResizablePanel({
   const [isResizing, setIsResizing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // defaultWidth の変更に追従（コンパクトモード切替時など）
+  useEffect(() => {
+    setWidth(defaultWidth);
+  }, [defaultWidth]);
+
   useEffect(() => {
     if (!isResizing) return;
 
@@ -104,7 +109,7 @@ export default function ResizablePanel({
         />
       )}
 
-      {/* 折叠/展开按钮 - 仅在 collapsible 为 true 时显示 */}
+      {/* 折りたたみ/展開ボタン - collapsible が true の場合のみ表示 */}
       {collapsible && onToggleCollapse && (
         <button
           onClick={onToggleCollapse}
@@ -119,7 +124,7 @@ export default function ResizablePanel({
                 ? "left-0 -translate-x-full"
                 : "left-0 -translate-x-1/2"
           )}
-          title={isCollapsed ? "展開" : "折叠"}
+          title={isCollapsed ? "展開" : "折りたたむ"}
         >
           {side === "left" ? (
             isCollapsed ? <ChevronRight className="w-4 h-4 text-foreground-secondary" /> : <ChevronLeft className="w-4 h-4 text-foreground-secondary" />

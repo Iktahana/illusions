@@ -288,20 +288,30 @@ function buildApplicationMenu(recentProjects = []) {
     ],
   })
 
-  // ウィンドウ（macOSのみ）
-  if (isMac) {
-    template.push({
-      label: 'ウィンドウ',
-      submenu: [
+  // ウィンドウ
+  template.push({
+    label: 'ウィンドウ',
+    submenu: [
+      {
+        label: 'コンパクトモード',
+        accelerator: 'CmdOrCtrl+Shift+M',
+        click: () => {
+          sendToFocused('menu-toggle-compact-mode')
+        },
+      },
+      { type: 'separator' },
+      ...(isMac ? [
         { role: 'minimize', label: '最小化' },
         { role: 'zoom', label: '拡大/縮小' },
         { type: 'separator' },
         { role: 'front', label: 'すべてを手前に移動' },
         { type: 'separator' },
         { role: 'window', label: 'ウィンドウ' },
-      ],
-    })
-  }
+      ] : [
+        { role: 'minimize', label: '最小化' },
+      ]),
+    ],
+  })
 
   // ヘルプ
   template.push({

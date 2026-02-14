@@ -63,6 +63,9 @@ export interface AppState {
   // 垂直スクロール設定
   verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
   scrollSensitivity?: number;
+
+  // コンパクトUIモード
+  compactMode?: boolean;
 }
 
 /**

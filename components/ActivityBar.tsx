@@ -148,9 +148,10 @@ interface SortableButtonProps {
   item: ActivityBarItem;
   isActive: boolean;
   onClick: () => void;
+  compactMode?: boolean;
 }
 
-function SortableButton({ item, isActive, onClick }: SortableButtonProps) {
+function SortableButton({ item, isActive, onClick, compactMode = false }: SortableButtonProps) {
   const {
     attributes,
     listeners,
@@ -173,7 +174,8 @@ function SortableButton({ item, isActive, onClick }: SortableButtonProps) {
       style={style}
       onClick={onClick}
       className={clsx(
-        "w-10 h-10 flex items-center justify-center rounded-md transition-all relative group",
+        "flex items-center justify-center rounded-md transition-all relative group",
+        compactMode ? "w-8 h-8" : "w-10 h-10",
         isActive
           ? "bg-accent text-accent-foreground"
           : "text-foreground-tertiary hover:text-foreground hover:bg-hover",
@@ -209,6 +211,7 @@ interface ActivityBarProps {
   bottomView: ActivityBarView;
   onTopViewChange: (view: ActivityBarView) => void;
   onBottomViewChange: (view: ActivityBarView) => void;
+  compactMode?: boolean;
 }
 
 export default function ActivityBar({
@@ -216,6 +219,7 @@ export default function ActivityBar({
   bottomView,
   onTopViewChange,
   onBottomViewChange,
+  compactMode = false,
 }: ActivityBarProps) {
   const [topItems, setTopItems] = useState<ActivityBarItem[]>(() =>
     loadOrder(STORAGE_KEY_TOP, DEFAULT_TOP_ITEMS)
@@ -264,7 +268,10 @@ export default function ActivityBar({
 
   return (
     <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis, restrictToParentElement]} onDragEnd={handleDragEnd}>
-      <div className="w-12 bg-background-tertiary border-r border-border flex flex-col items-center py-2 gap-1">
+      <div className={clsx(
+        "bg-background-tertiary border-r border-border flex flex-col items-center py-2 gap-1",
+        compactMode ? "w-10" : "w-12"
+      )}>
         {/* Top group */}
         <SortableContext
           items={topItems.map((item) => item.id)}
@@ -275,6 +282,7 @@ export default function ActivityBar({
               key={item.id}
               item={item}
               isActive={topView === item.id}
+              compactMode={compactMode}
               onClick={() => {
                 onTopViewChange(topView === item.id ? "none" : item.id);
               }}
@@ -295,6 +303,7 @@ export default function ActivityBar({
               key={item.id}
               item={item}
               isActive={bottomView === item.id}
+              compactMode={compactMode}
               onClick={() => {
                 onBottomViewChange(bottomView === item.id ? "none" : item.id);
               }}

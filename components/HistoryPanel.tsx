@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Clock, Pin, Plus, RotateCcw, Loader2, History, Star } from "lucide-react";
+import { Clock, Pin, Plus, RotateCcw, Loader2, History, Star, GitCompare } from "lucide-react";
 import clsx from "clsx";
 import { getHistoryService } from "@/lib/history-service";
+import DiffView from "./DiffView";
 
 import type { SnapshotEntry, SnapshotType } from "@/lib/history-service";
 
@@ -28,6 +29,8 @@ interface HistoryPanelProps {
   projectId: string;
   mainFileName: string;
   onRestore: (content: string) => void;
+  /** Current editor content for diff comparison */
+  currentContent?: string;
 }
 
 // -----------------------------------------------------------------------
@@ -166,6 +169,7 @@ export default function HistoryPanel({
   projectId: _projectId,
   mainFileName,
   onRestore,
+  currentContent = "",
 }: HistoryPanelProps) {
   const [snapshots, setSnapshots] = useState<SnapshotEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -173,6 +177,9 @@ export default function HistoryPanel({
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [displayCount, setDisplayCount] = useState(SNAPSHOTS_PER_PAGE);
+  // Diff view state
+  const [diffSnapshot, setDiffSnapshot] = useState<{ content: string; label: string } | null>(null);
+  const [isLoadingDiff, setIsLoadingDiff] = useState(false);
 
   /**
    * Load snapshots from HistoryService.
@@ -276,6 +283,34 @@ export default function HistoryPanel({
     }
   }, [mainFileName, loadSnapshots]);
 
+  /**
+   * Handle comparing a snapshot with current content.
+   * スナップショットを現在の内容と比較する。
+   */
+  const handleCompare = useCallback(
+    async (snapshot: SnapshotEntry) => {
+      try {
+        setIsLoadingDiff(true);
+        const historyService = getHistoryService();
+        const snapshotContent = await historyService.getSnapshotContent(snapshot.id);
+
+        if (snapshotContent === null) {
+          setError("スナップショットの読み込みに失敗しました");
+          return;
+        }
+
+        const label = `${formatTimeJa(snapshot.timestamp)} (${getSnapshotTypeLabel(snapshot.type)})`;
+        setDiffSnapshot({ content: snapshotContent, label });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(`差分の読み込みに失敗しました: ${message}`);
+      } finally {
+        setIsLoadingDiff(false);
+      }
+    },
+    []
+  );
+
   // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
@@ -342,8 +377,18 @@ export default function HistoryPanel({
         </div>
       )}
 
+      {/* Diff view */}
+      {diffSnapshot && (
+        <DiffView
+          snapshotContent={diffSnapshot.content}
+          currentContent={currentContent}
+          snapshotLabel={diffSnapshot.label}
+          onClose={() => setDiffSnapshot(null)}
+        />
+      )}
+
       {/* Snapshot list with date groups and pagination */}
-      {snapshots.length > 0 && (
+      {snapshots.length > 0 && !diffSnapshot && (
         <div className="space-y-3">
           {groupedSnapshots.map((group) => (
             <div key={group.label} className="space-y-2">
@@ -362,6 +407,8 @@ export default function HistoryPanel({
                   snapshot={snapshot}
                   isRestoring={restoringId === snapshot.id}
                   onRestore={handleRestore}
+                  onCompare={handleCompare}
+                  isLoadingDiff={isLoadingDiff}
                 />
               ))}
             </div>
@@ -390,9 +437,11 @@ interface SnapshotItemProps {
   snapshot: SnapshotEntry;
   isRestoring: boolean;
   onRestore: (snapshot: SnapshotEntry) => void;
+  onCompare: (snapshot: SnapshotEntry) => void;
+  isLoadingDiff: boolean;
 }
 
-function SnapshotItem({ snapshot, isRestoring, onRestore }: SnapshotItemProps) {
+function SnapshotItem({ snapshot, isRestoring, onRestore, onCompare, isLoadingDiff }: SnapshotItemProps) {
   return (
     <div className="bg-background-secondary rounded-lg p-3 border border-border">
       {/* Timestamp and type badge */}
@@ -450,6 +499,21 @@ function SnapshotItem({ snapshot, isRestoring, onRestore }: SnapshotItemProps) {
             <RotateCcw className="w-3 h-3" />
           )}
           復元
+        </button>
+
+        {/* Compare with current content */}
+        <button
+          onClick={() => onCompare(snapshot)}
+          disabled={isLoadingDiff}
+          className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded transition-colors bg-background text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover border border-border"
+          title="現在の内容と比較"
+        >
+          {isLoadingDiff ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <GitCompare className="w-3 h-3" />
+          )}
+          比較
         </button>
 
         {/* "Mark as milestone" button for auto snapshots */}

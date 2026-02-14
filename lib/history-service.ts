@@ -452,6 +452,21 @@ export class HistoryService {
   }
 
   /**
+   * Get the content of a snapshot without restoring it.
+   * Unlike restoreSnapshot, this does not trigger any side effects.
+   *
+   * スナップショットの内容を復元せずに取得する。
+   * restoreSnapshot と異なり、副作用を伴わない読み取り専用メソッド。
+   *
+   * @param snapshotId - The ID of the snapshot to read
+   * @returns The snapshot content, or null if not found/corrupted
+   */
+  async getSnapshotContent(snapshotId: string): Promise<string | null> {
+    const result = await this.restoreSnapshot(snapshotId);
+    return result.success ? (result.content ?? null) : null;
+  }
+
+  /**
    * Determine whether a new auto-snapshot should be created.
    * Returns false if the last snapshot was created within the minimum interval.
    *
