@@ -113,14 +113,14 @@ function groupSnapshotsByDate(items: SnapshotEntry[]): DateGroup[] {
 }
 
 /**
- * Format a timestamp as time only (HH:mm).
- * タイムスタンプを時刻のみ (HH:mm) にフォーマットする。
+ * Format a timestamp as time only, respecting the user's locale and
+ * 12/24-hour preference from the browser.
  */
 function formatTimeJa(timestamp: number): string {
-  const date = new Date(timestamp);
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${hours}:${minutes}`;
+  return new Date(timestamp).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 /**
