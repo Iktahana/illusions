@@ -4,10 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import { X, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
 import ColorPicker from "./ColorPicker";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
-import { LICENSE_TEXT } from "@/lib/license-text";
-import { TERMS_TEXT } from "@/lib/terms-text";
+const LICENSE_TEXT = process.env.NEXT_PUBLIC_LICENSE_TEXT || "";
+const TERMS_TEXT = process.env.NEXT_PUBLIC_TERMS_TEXT || "";
 import clsx from "clsx";
-import packageJson from "@/package.json";
 
 interface CreditEntry {
   name: string;
@@ -552,6 +551,15 @@ function AboutSection(): React.ReactElement {
     return acc;
   }, {});
 
+  function handleExternalLink(e: React.MouseEvent<HTMLAnchorElement>): void {
+    const url = e.currentTarget.href;
+    if (window.electronAPI?.openExternal) {
+      e.preventDefault();
+      void window.electronAPI.openExternal(url);
+    }
+    // Web: default <a target="_blank"> behavior handles it
+  }
+
   function handleToggleLicenseGroup(license: string): void {
     setExpandedCredits((prev) => {
       const next = new Set(prev);
@@ -570,7 +578,7 @@ function AboutSection(): React.ReactElement {
       <div className="text-center space-y-2">
         <h3 className="text-2xl font-bold text-foreground">illusions</h3>
         <p className="text-sm text-foreground-secondary">
-          バージョン {packageJson.version}
+          バージョン {process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0"}
         </p>
         <p className="text-sm text-foreground-tertiary">
           © {new Date().getFullYear()} 幾田花 (Iktahana). All rights reserved.
@@ -583,6 +591,7 @@ function AboutSection(): React.ReactElement {
           href="https://illusions.app"
           target="_blank"
           rel="noopener noreferrer"
+          onClick={handleExternalLink}
           className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
         >
           <ExternalLink className="w-3.5 h-3.5" />
@@ -592,6 +601,7 @@ function AboutSection(): React.ReactElement {
           href="https://github.com/Iktahana/illusions"
           target="_blank"
           rel="noopener noreferrer"
+          onClick={handleExternalLink}
           className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
         >
           <ExternalLink className="w-3.5 h-3.5" />

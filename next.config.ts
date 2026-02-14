@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
+import { readFileSync } from "fs";
+import { resolve } from "path";
+import packageJson from "./package.json";
 
 const revision = crypto.randomUUID();
 
@@ -15,6 +18,11 @@ const isElectronBuild = process.env.ELECTRON_BUILD === "1";
 
 const nextConfig: NextConfig = {
   ...(isElectronBuild ? { output: "export", assetPrefix: "." } : {}),
+  env: {
+    NEXT_PUBLIC_APP_VERSION: packageJson.version,
+    NEXT_PUBLIC_LICENSE_TEXT: readFileSync(resolve(__dirname, "LICENSE"), "utf8"),
+    NEXT_PUBLIC_TERMS_TEXT: readFileSync(resolve(__dirname, "TERMS.md"), "utf8"),
+  },
   images: { unoptimized: true },
   trailingSlash: true,
   turbopack: {},

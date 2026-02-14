@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('menu-paste-as-plaintext', handler)
   },
   showInFileManager: (dirPath) => ipcRenderer.invoke('show-in-file-manager', dirPath),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
   onMenuOpenProject: (callback) => {
     const handler = () => callback()
     ipcRenderer.on('menu-open-project', handler)

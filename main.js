@@ -584,6 +584,14 @@ ipcMain.handle('show-in-file-manager', async (_event, dirPath) => {
   return result === '' // empty string = success
 })
 
+ipcMain.handle('open-external', async (_event, url) => {
+  if (typeof url !== 'string') return false
+  // Only allow http/https URLs
+  if (!url.startsWith('https://') && !url.startsWith('http://')) return false
+  await shell.openExternal(url)
+  return true
+})
+
 ipcMain.handle('get-chrome-version', () => {
   const v = process.versions.chrome || '0'
   const major = Number.parseInt(String(v).split('.')[0] || '0', 10)

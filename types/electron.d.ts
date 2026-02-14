@@ -36,6 +36,7 @@ declare global {
     rebuildMenu?: () => Promise<boolean>;
     syncMenuUiState?: (state: { compactMode?: boolean; showParagraphNumbers?: boolean; themeMode?: string; autoCharsPerLine?: boolean }) => Promise<boolean>;
     showInFileManager?: (dirPath: string) => Promise<boolean>;
+    openExternal?: (url: string) => Promise<boolean>;
     onMenuShowInFileManager?: (callback: () => void) => (() => void) | void;
     onToggleCompactMode?: (callback: () => void) => (() => void) | void;
     onFormatChange?: (callback: (setting: string, action: string) => void) => (() => void) | void;
