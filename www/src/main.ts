@@ -33,7 +33,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <a href="https://illusions.app" class="btn btn-primary" target="_blank">
         Chrome版を開く
       </a>
-      <a href="https://github.com/Iktahana/illusions/releases" class="btn btn-secondary">
+      <a href="/downloads" class="btn btn-secondary">
         MacOS/Windows版をダウンロード
       </a>
     </div>

@@ -169,6 +169,244 @@ h1 {
   line-height: 1.6;
 }
 
+/* --- Downloads page --- */
+
+.back-link {
+  display: inline-block;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  font-size: 0.95rem;
+  margin-bottom: 2rem;
+  transition: color 0.2s ease;
+}
+
+.back-link:hover {
+  color: white;
+}
+
+.title-logo-small {
+  max-width: 300px;
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.01em;
+}
+
+.release-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 2.5rem;
+  font-size: 0.95rem;
+}
+
+.release-version {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.release-date {
+  opacity: 0.7;
+}
+
+.release-link {
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.release-link:hover {
+  color: white;
+  text-decoration: underline;
+}
+
+.platforms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+  text-align: left;
+}
+
+.platform-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 1.5rem;
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.platform-card:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.platform-current {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.platform-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.platform-icon {
+  font-size: 1.5rem;
+}
+
+.platform-name {
+  font-size: 1.25rem;
+  font-weight: 600;
+  flex: 1;
+}
+
+.platform-badge {
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.download-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.download-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  text-decoration: none;
+  color: white;
+  transition: all 0.2s ease;
+  gap: 1rem;
+}
+
+.download-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.download-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.download-item-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.download-item-filename {
+  font-size: 0.75rem;
+  opacity: 0.5;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.download-item-size {
+  font-size: 0.8rem;
+  opacity: 0.6;
+  font-family: monospace;
+}
+
+.download-icon {
+  font-size: 1.2rem;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.download-item:hover .download-icon {
+  opacity: 1;
+}
+
+.web-version {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.web-version p {
+  margin-bottom: 1rem;
+  opacity: 0.7;
+  font-size: 0.95rem;
+}
+
+/* Loading / Error states */
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem 0;
+  opacity: 0.7;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-card {
+  background: rgba(255, 80, 80, 0.1);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.error-card p {
+  margin-bottom: 1rem;
+}
+
+.error-detail {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  font-family: monospace;
+}
+
 @media (max-width: 768px) {
   h1 {
     font-size: 2.5rem;
@@ -188,5 +426,22 @@ h1 {
 
   .btn {
     width: 100%;
+  }
+
+  .platforms {
+    grid-template-columns: 1fr;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+  }
+
+  .release-info {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .title-logo-small {
+    max-width: 200px;
   }
 }
