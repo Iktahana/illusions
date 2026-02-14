@@ -1,6 +1,7 @@
 import { resolve } from 'path'
 import { defineConfig } from 'vite'
 import type { Plugin } from 'vite'
+import Icons from 'unplugin-icons/vite'
 import { ViteImageOptimizer } from 'vite-plugin-image-optimizer'
 
 /** Known page routes that have a corresponding directory with index.html */
@@ -47,6 +48,10 @@ export default defineConfig({
   },
   plugins: [
     mpaFallback(),
+    Icons({
+      compiler: 'raw',
+      defaultClass: 'icon',
+    }),
     ViteImageOptimizer({
       png: {
         quality: 80,

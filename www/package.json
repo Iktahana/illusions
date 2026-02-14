@@ -13,8 +13,10 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@iconify-json/mdi": "^1.2.3",
     "sharp": "^0.34.5",
     "typescript": "~5.9.3",
+    "unplugin-icons": "^23.0.1",
     "vite": "^7.3.1",
     "vite-plugin-image-optimizer": "^2.0.3"
   }

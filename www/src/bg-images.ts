@@ -4,8 +4,8 @@
  */
 
 // Import all jpg, jpeg, png, webp images from the bg directory
-// Note: Vite serves files from /public as /, so we use a relative path
-const imageModules = import.meta.glob<string>('/image/bg/*.{jpg,jpeg,png,webp}', {
+// import.meta.glob resolves from project root, so we need /public/ prefix
+const imageModules = import.meta.glob<string>('/public/image/bg/*.{jpg,jpeg,png,webp}', {
   eager: true,
   query: '?url',
   import: 'default',

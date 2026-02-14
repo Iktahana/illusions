@@ -73,8 +73,10 @@ h1 {
 }
 
 .title-logo {
+  display: block;
   max-width: 600px;
   margin: 0 auto 2rem;
+  text-decoration: none;
 }
 
 .title-logo svg {
@@ -195,6 +197,63 @@ h1 {
   letter-spacing: -0.01em;
 }
 
+/* Hero download CTA */
+
+.hero-download {
+  margin-bottom: 2rem;
+}
+
+.btn-hero-download {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1.25rem 3rem;
+  background: rgba(255, 255, 255, 0.95);
+  color: #000;
+  border-radius: 16px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+}
+
+.btn-hero-download:hover {
+  background: white;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 36px rgba(0, 0, 0, 0.35);
+}
+
+.btn-hero-download-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+}
+
+.btn-hero-download-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.btn-hero-download-label {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.btn-hero-download-meta {
+  font-size: 0.8rem;
+  opacity: 0.5;
+  font-family: monospace;
+}
+
+.hero-download-hint {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  opacity: 0.5;
+}
+
 .release-info {
   display: flex;
   align-items: center;
@@ -265,7 +324,17 @@ h1 {
 }
 
 .platform-icon {
-  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.platform-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
 }
 
 .platform-name {
@@ -443,5 +512,13 @@ h1 {
 
   .title-logo-small {
     max-width: 200px;
+  }
+
+  .btn-hero-download {
+    padding: 1rem 2rem;
+  }
+
+  .btn-hero-download-label {
+    font-size: 1.1rem;
   }
 }
