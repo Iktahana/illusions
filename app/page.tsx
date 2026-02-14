@@ -1679,8 +1679,6 @@ export default function EditorPage() {
             isDirty={isDirty}
             isSaving={isSaving}
             lastSavedTime={lastSavedTime}
-            onOpenFile={openFile}
-            onNewFile={newFile}
             onSaveFile={saveFile}
             onFileNameChange={updateFileName}
             sentenceCount={sentenceCount}

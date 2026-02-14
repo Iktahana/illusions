@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, ReactNode } from "react";
-import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, X, History } from "lucide-react";
+import { Bot, AlertCircle, BarChart3, ChevronRight, Edit2, X, History } from "lucide-react";
 import clsx from "clsx";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import HistoryPanel from "./HistoryPanel";
@@ -57,8 +57,6 @@ interface InspectorProps {
   isDirty?: boolean;
   isSaving?: boolean;
   lastSavedTime?: number | null;
-  onOpenFile?: () => void;
-  onNewFile?: () => void;
   onSaveFile?: () => void;
   onFileNameChange?: (newName: string) => void;
   sentenceCount?: number;
@@ -101,8 +99,6 @@ export default function Inspector({
   isDirty = false,
   isSaving = false,
   lastSavedTime = null,
-  onOpenFile,
-  onNewFile,
   onSaveFile,
   onFileNameChange,
   sentenceCount = 0,
@@ -243,39 +239,6 @@ export default function Inspector({
             ファイル情報
           </p>
           <div className="flex items-center gap-1">
-            {onNewFile && (
-              <button
-                onClick={async () => {
-                  console.log('[Inspector] New file button clicked');
-                  console.log('[Inspector] Is Electron:', !!window.electronAPI);
-                  console.log('[Inspector] Has newWindow API:', !!window.electronAPI?.newWindow);
-                  
-                   // Electron 環境では新規ウィンドウを開く
-                   if (typeof window !== 'undefined' && window.electronAPI?.newWindow) {
-                     console.log('[Inspector] Calling electronAPI.newWindow()');
-                     await window.electronAPI.newWindow();
-                     console.log('[Inspector] New window called');
-                   } else {
-                     // Web 環境では新規タブを開く
-                    console.log('[Inspector] Opening new tab (Web environment)');
-                    window.open(window.location.href, '_blank');
-                  }
-                }}
-                className="p-1 text-foreground-tertiary hover:text-accent hover:bg-active rounded transition-colors"
-                title="新規ファイル (新しいウィンドウ)"
-              >
-                <FilePlus className="w-4 h-4" />
-              </button>
-            )}
-            {onOpenFile && (
-              <button
-                onClick={onOpenFile}
-                className="p-1 text-foreground-tertiary hover:text-accent hover:bg-active rounded transition-colors"
-                title="ファイルを開く"
-              >
-                <FolderOpen className="w-4 h-4" />
-              </button>
-            )}
             {onSaveFile && (
               <button
                 onClick={() => void onSaveFile()}
