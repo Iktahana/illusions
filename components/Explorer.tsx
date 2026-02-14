@@ -186,6 +186,8 @@ interface ExplorerProps {
   onFontFamilyChange?: (family: string) => void;
   charsPerLine?: number;
   onCharsPerLineChange?: (chars: number) => void;
+  autoCharsPerLine?: boolean;
+  onAutoCharsPerLineChange?: (value: boolean) => void;
   showParagraphNumbers?: boolean;
   onShowParagraphNumbersChange?: (show: boolean) => void;
 }
@@ -207,6 +209,8 @@ export default function Explorer({
   onFontFamilyChange,
   charsPerLine = 40,
   onCharsPerLineChange,
+  autoCharsPerLine = true,
+  onAutoCharsPerLineChange,
   showParagraphNumbers = false,
   onShowParagraphNumbersChange,
 }: ExplorerProps) {
@@ -289,6 +293,8 @@ export default function Explorer({
               onFontFamilyChange={onFontFamilyChange}
               charsPerLine={charsPerLine}
               onCharsPerLineChange={onCharsPerLineChange}
+              autoCharsPerLine={autoCharsPerLine}
+              onAutoCharsPerLineChange={onAutoCharsPerLineChange}
               showParagraphNumbers={showParagraphNumbers}
               onShowParagraphNumbersChange={onShowParagraphNumbersChange}
             />
@@ -1318,6 +1324,8 @@ function StylePanel({
   onFontFamilyChange,
   charsPerLine = 40,
   onCharsPerLineChange,
+  autoCharsPerLine = true,
+  onAutoCharsPerLineChange,
   showParagraphNumbers = false,
   onShowParagraphNumbersChange,
 }: {
@@ -1333,6 +1341,8 @@ function StylePanel({
   onFontFamilyChange?: (family: string) => void;
   charsPerLine?: number;
   onCharsPerLineChange?: (chars: number) => void;
+  autoCharsPerLine?: boolean;
+  onAutoCharsPerLineChange?: (value: boolean) => void;
   showParagraphNumbers?: boolean;
   onShowParagraphNumbersChange?: (show: boolean) => void;
 }) {
@@ -1435,17 +1445,36 @@ function StylePanel({
         <div className="flex items-center gap-2">
           <input
             type="number"
-            min="0"
+            min="1"
             step="1"
             value={charsPerLine}
+            disabled={autoCharsPerLine}
             onChange={(e) => onCharsPerLineChange?.(Number(e.target.value))}
-            className="w-20 px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground"
+            className={clsx(
+              "w-20 px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground",
+              autoCharsPerLine && "opacity-50 cursor-not-allowed"
+            )}
           />
           <span className="text-sm text-foreground-secondary">字</span>
+          <button
+            onClick={() => onAutoCharsPerLineChange?.(!autoCharsPerLine)}
+            className={clsx(
+              "ml-2 relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out",
+              autoCharsPerLine ? "bg-accent" : "bg-border-secondary"
+            )}
+          >
+            <span
+              className={clsx(
+                "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition duration-200 ease-in-out",
+                autoCharsPerLine ? "translate-x-5" : "translate-x-0"
+              )}
+            />
+          </button>
+          <span className="text-sm text-foreground-secondary">自動</span>
         </div>
         <p className="text-xs text-foreground-tertiary mt-1">
-          {charsPerLine === 0 
-            ? '0に設定すると制限なし'
+          {autoCharsPerLine
+            ? 'ウィンドウサイズに応じて自動調整します（最大40字）'
             : '1行（縦書きの場合は1列）あたりの最大文字数'}
         </p>
       </div>

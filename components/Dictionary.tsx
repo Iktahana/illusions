@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Trash2, Edit2, Check, X, BookOpen, ChevronDown, ChevronRight, Search, Globe, ExternalLink } from "lucide-react";
 
 // ユーザー辞書條目
@@ -43,9 +43,11 @@ const isElectron = (): boolean => {
 
 interface DictionaryProps {
   content?: string;
+  initialSearchTerm?: string;
+  searchTriggerId?: number;
 }
 
-export default function Dictionary({ content }: DictionaryProps) {
+export default function Dictionary({ content, initialSearchTerm, searchTriggerId }: DictionaryProps) {
   const [activeTab, setActiveTab] = useState<"user" | "web">("web");
   const [userEntries, setUserEntries] = useState<UserDictionaryEntry[]>([]);
   const [isAddingEntry, setIsAddingEntry] = useState(false);
@@ -63,6 +65,14 @@ export default function Dictionary({ content }: DictionaryProps) {
   // グローバル検索用の状態（全タブ共有）
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   const [activeSearchQuery, setActiveSearchQuery] = useState("");
+
+  // initialSearchTerm が変わったら検索を実行
+  useEffect(() => {
+    if (initialSearchTerm && searchTriggerId) {
+      setGlobalSearchQuery(initialSearchTerm);
+      setActiveSearchQuery(initialSearchTerm);
+    }
+  }, [initialSearchTerm, searchTriggerId]);
 
   const handleAddEntry = () => {
     if (!newEntry.word?.trim() || !newEntry.definition?.trim()) return;

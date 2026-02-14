@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('menu-open-recent-project', handler)
   },
   rebuildMenu: () => ipcRenderer.invoke('menu:rebuild'),
+  syncMenuUiState: (state) => ipcRenderer.invoke('menu:sync-ui-state', state),
   onMenuShowInFileManager: (callback) => {
     const handler = () => callback()
     ipcRenderer.on('menu-show-in-file-manager', handler)
@@ -74,6 +75,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = () => callback()
     ipcRenderer.on('menu-toggle-compact-mode', handler)
     return () => ipcRenderer.removeListener('menu-toggle-compact-mode', handler)
+  },
+  onFormatChange: (callback) => {
+    const handler = (_event, setting, action) => callback(setting, action)
+    ipcRenderer.on('menu-format', handler)
+    return () => ipcRenderer.removeListener('menu-format', handler)
+  },
+  onThemeChange: (callback) => {
+    const handler = (_event, mode) => callback(mode)
+    ipcRenderer.on('menu-theme', handler)
+    return () => ipcRenderer.removeListener('menu-theme', handler)
   },
   nlp: {
     init: (dicPath) => ipcRenderer.invoke('nlp:init', dicPath),

@@ -1,7 +1,7 @@
 "use client";
 
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { Scissors, Copy, ClipboardPaste, Search, CheckSquare } from "lucide-react";
+import { Scissors, Copy, ClipboardPaste, Search, CheckSquare, Languages, ALargeSmall, Globe, BookOpen } from "lucide-react";
 import { type ReactNode } from "react";
 
 export type ContextMenuAction =
@@ -10,7 +10,11 @@ export type ContextMenuAction =
   | "paste"
   | "paste-plaintext"
   | "find"
-  | "select-all";
+  | "select-all"
+  | "ruby"
+  | "tcy"
+  | "google-search"
+  | "dictionary";
 
 interface EditorContextMenuProps {
   children: ReactNode;
@@ -66,6 +70,7 @@ export default function EditorContextMenu({
         <ContextMenu.Content
           className="min-w-[220px] bg-background/95 backdrop-blur-xl border border-border rounded-lg shadow-2xl p-1.5 will-change-[opacity,transform] data-[side=top]:animate-slideDownAndFade data-[side=right]:animate-slideLeftAndFade data-[side=bottom]:animate-slideUpAndFade data-[side=left]:animate-slideRightAndFade"
         >
+          {/* 編集 */}
           <MenuItem
             icon={<Scissors className="w-4 h-4" />}
             label="切り取り"
@@ -95,12 +100,48 @@ export default function EditorContextMenu({
 
           <Separator />
 
+          {/* 書式 */}
+          <MenuItem
+            icon={<Languages className="w-4 h-4" />}
+            label="ルビ"
+            shortcut={`Shift+${cmdKey}R`}
+            onClick={() => onAction("ruby")}
+            disabled={!hasSelection}
+          />
+          <MenuItem
+            icon={<ALargeSmall className="w-4 h-4" />}
+            label="縦中横"
+            shortcut={`Shift+${cmdKey}T`}
+            onClick={() => onAction("tcy")}
+            disabled={!hasSelection}
+          />
+
+          <Separator />
+
+          {/* 検索・調べる */}
           <MenuItem
             icon={<Search className="w-4 h-4" />}
             label="検索"
             shortcut={`${cmdKey}F`}
             onClick={() => onAction("find")}
           />
+          <MenuItem
+            icon={<Globe className="w-4 h-4" />}
+            label="Googleで検索"
+            shortcut=""
+            onClick={() => onAction("google-search")}
+            disabled={!hasSelection}
+          />
+          <MenuItem
+            icon={<BookOpen className="w-4 h-4" />}
+            label="辞書で調べる"
+            shortcut=""
+            onClick={() => onAction("dictionary")}
+            disabled={!hasSelection}
+          />
+
+          <Separator />
+
           <MenuItem
             icon={<CheckSquare className="w-4 h-4" />}
             label="すべて選択"

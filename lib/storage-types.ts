@@ -50,6 +50,7 @@ export interface AppState {
   textIndent?: number;
   fontFamily?: string;
   charsPerLine?: number;
+  autoCharsPerLine?: boolean;
   showParagraphNumbers?: boolean;
 
   // 品詞着色設定

@@ -20,7 +20,7 @@ import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-high
 import clsx from "clsx";
 import { Type, AlignLeft, Search } from "lucide-react";
 import { EditorView } from "@milkdown/prose/view";
-import { Plugin, PluginKey } from "@milkdown/prose/state";
+import { AllSelection, Plugin, PluginKey } from "@milkdown/prose/state";
 import { $prose } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "./BubbleMenu";
 import SearchDialog from "./SearchDialog";
@@ -54,6 +54,15 @@ interface EditorProps {
   // スクロール設定
   verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
   scrollSensitivity?: number;
+  // 書式コールバック
+  onOpenRubyDialog?: () => void;
+  onToggleTcy?: () => void;
+  // 辞書
+  onOpenDictionary?: (searchTerm?: string) => void;
+  // ツールバーからの設定変更
+  onFontScaleChange?: (v: number) => void;
+  onLineHeightChange?: (v: number) => void;
+  onParagraphSpacingChange?: (v: number) => void;
 }
 
 export default function NovelEditor({
@@ -78,6 +87,12 @@ export default function NovelEditor({
   posHighlightColors = {},
   verticalScrollBehavior = "auto",
   scrollSensitivity = 1.0,
+  onOpenRubyDialog,
+  onToggleTcy,
+  onOpenDictionary,
+  onFontScaleChange,
+  onLineHeightChange,
+  onParagraphSpacingChange,
 }: EditorProps) {
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
   const [isVertical, setIsVertical] = useState(() => {
@@ -178,18 +193,18 @@ export default function NovelEditor({
       const topPadding = 48; // pt-12 = 48px
       const availableHeight = container.clientHeight - toolbarHeight - topPadding;
 
-      const optimalChars = Math.max(20, Math.floor(availableHeight / charSize));
-      // Clamp between 20-80 characters for vertical writing
-      const clamped = Math.min(80, optimalChars);
+      const optimalChars = Math.max(10, Math.floor(availableHeight / charSize));
+      // Clamp: max 40 characters
+      const clamped = Math.min(40, optimalChars);
 
       if (clamped !== charsPerLine) {
         onCharsPerLineChange?.(clamped);
       }
     } else {
       // For horizontal writing: calculate based on available width
-      const optimalChars = Math.max(30, Math.floor(availableWidth / charSize));
-      // Clamp between 30-120 characters for horizontal writing
-      const clamped = Math.min(120, optimalChars);
+      const optimalChars = Math.max(10, Math.floor(availableWidth / charSize));
+      // Clamp: max 40 characters
+      const clamped = Math.min(40, optimalChars);
 
       if (clamped !== charsPerLine) {
         onCharsPerLineChange?.(clamped);
@@ -225,6 +240,10 @@ export default function NovelEditor({
         onToggleVertical={handleToggleVertical}
         fontScale={fontScale}
         lineHeight={lineHeight}
+        paragraphSpacing={paragraphSpacing}
+        onFontScaleChange={onFontScaleChange ?? (() => {})}
+        onLineHeightChange={onLineHeightChange ?? (() => {})}
+        onParagraphSpacingChange={onParagraphSpacingChange ?? (() => {})}
         onSearchClick={handleSearchToggle}
       />
 
@@ -265,6 +284,9 @@ export default function NovelEditor({
               posHighlightColors={posHighlightColors}
               verticalScrollBehavior={verticalScrollBehavior}
               scrollSensitivity={scrollSensitivity}
+              onOpenRubyDialog={onOpenRubyDialog}
+              onToggleTcy={onToggleTcy}
+              onOpenDictionary={onOpenDictionary}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -287,19 +309,87 @@ export default function NovelEditor({
   );
 }
 
+/** Dropdown for picking a numeric value from a list */
+function ValuePicker({
+  value,
+  label,
+  options,
+  onChange,
+  unit = "",
+}: {
+  value: number;
+  label: string;
+  options: number[];
+  onChange: (v: number) => void;
+  unit?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handle = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(prev => !prev)}
+        className="hover:text-foreground transition-colors cursor-pointer"
+        title={label}
+      >
+        {label}
+      </button>
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50 min-w-[56px] max-h-[200px] overflow-y-auto rounded-lg border border-border bg-background-secondary shadow-lg py-1 text-xs">
+          {options.map(opt => (
+            <button
+              key={opt}
+              onClick={() => { onChange(opt); setOpen(false); }}
+              className={clsx(
+                "block w-full px-3 py-1 text-center hover:bg-white/5 transition-colors",
+                opt === value ? "text-accent font-semibold" : "text-foreground-secondary"
+              )}
+            >
+              {(opt % 1 === 0 ? opt : opt.toFixed(1)) + unit}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EditorToolbar({
   isVertical,
   onToggleVertical,
   fontScale,
   lineHeight,
+  paragraphSpacing,
+  onFontScaleChange,
+  onLineHeightChange,
+  onParagraphSpacingChange,
   onSearchClick,
 }: {
   isVertical: boolean;
   onToggleVertical: () => void;
   fontScale: number;
   lineHeight: number;
+  paragraphSpacing: number;
+  onFontScaleChange: (v: number) => void;
+  onLineHeightChange: (v: number) => void;
+  onParagraphSpacingChange: (v: number) => void;
   onSearchClick: () => void;
 }) {
+  // Options matching the 書式 menu ranges/steps
+  const fontScaleOptions = Array.from({ length: 13 }, (_, i) => 50 + i * 10); // 50–170
+  const lineHeightOptions = Array.from({ length: 21 }, (_, i) => +(1.0 + i * 0.1).toFixed(1)); // 1.0–3.0
+  const paragraphSpacingOptions = Array.from({ length: 31 }, (_, i) => +(i * 0.1).toFixed(1)); // 0–3.0
+
   return (
     <div className="h-12 border-b border-border bg-background flex items-center justify-between px-4">
       <div className="flex items-center gap-4">
@@ -316,12 +406,16 @@ function EditorToolbar({
         {/* 現在の設定 */}
         <div className="flex items-center gap-2 text-xs text-foreground-secondary">
           <AlignLeft className="w-4 h-4 text-foreground-tertiary" />
-          <span>{fontScale}% / {lineHeight.toFixed(1)}</span>
+          <ValuePicker value={fontScale} label={`${fontScale}%`} options={fontScaleOptions} onChange={onFontScaleChange} unit="%" />
+          <span className="text-foreground-tertiary">/</span>
+          <ValuePicker value={lineHeight} label={lineHeight.toFixed(1)} options={lineHeightOptions} onChange={onLineHeightChange} />
+          <span className="text-foreground-tertiary">/</span>
+          <ValuePicker value={paragraphSpacing} label={`${paragraphSpacing.toFixed(1)}em`} options={paragraphSpacingOptions} onChange={onParagraphSpacingChange} unit="em" />
         </div>
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="text-xs text-foreground-tertiary">
+        <div className="text-xs text-foreground-tertiary whitespace-nowrap hidden lg:block">
           illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
         </div>
 
@@ -359,6 +453,9 @@ function MilkdownEditor({
   posHighlightColors,
   verticalScrollBehavior = "auto",
   scrollSensitivity = 1.0,
+  onOpenRubyDialog,
+  onToggleTcy,
+  onOpenDictionary,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
@@ -380,6 +477,9 @@ function MilkdownEditor({
   posHighlightColors?: Record<string, string>;
   verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
   scrollSensitivity?: number;
+  onOpenRubyDialog?: () => void;
+  onToggleTcy?: () => void;
+  onOpenDictionary?: (searchTerm?: string) => void;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
@@ -932,32 +1032,62 @@ function MilkdownEditor({
         // For now, we'll use the browser's default find
         document.execCommand("find");
         break;
-      case "select-all":
-        const { state, dispatch } = editorViewInstance;
-        const transaction = state.tr.setSelection({
-          ...state.selection,
-          from: 0,
-          to: state.doc.content.size,
-        } as any);
-        dispatch(transaction);
+      case "select-all": {
+        const { state: st, dispatch: dp } = editorViewInstance;
+        const allSelection = new AllSelection(st.doc);
+        dp(st.tr.setSelection(allSelection));
         break;
+      }
+      case "ruby":
+        onOpenRubyDialog?.();
+        break;
+      case "tcy":
+        onToggleTcy?.();
+        break;
+      case "google-search": {
+        const { state: gs } = editorViewInstance;
+        const { from: gf, to: gt } = gs.selection;
+        if (gf !== gt) {
+          const text = gs.doc.textBetween(gf, gt);
+          window.open(`https://www.google.com/search?q=${encodeURIComponent(text)}`, "_blank");
+        }
+        break;
+      }
+      case "dictionary": {
+        const { state: ds } = editorViewInstance;
+        const { from: df, to: dt } = ds.selection;
+        const selectedText = df !== dt ? ds.doc.textBetween(df, dt) : undefined;
+        onOpenDictionary?.(selectedText);
+        break;
+      }
       default:
         break;
     }
-  }, [editorViewInstance]);
+  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary]);
 
   // Electron: native OS context menu via IPC
   const handleElectronContextMenu = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
     const items = [
       ...(hasSelection ? [
-        { label: '切り取り', action: 'cut' },
-        { label: 'コピー', action: 'copy' },
+        { label: '切り取り', action: 'cut', accelerator: 'CmdOrCtrl+X' },
+        { label: 'コピー', action: 'copy', accelerator: 'CmdOrCtrl+C' },
       ] : []),
-      { label: '貼り付け', action: 'paste' },
-      { label: 'プレーンテキストとして貼り付け', action: 'paste-plaintext' },
-      { label: '検索', action: 'find' },
-      { label: 'すべて選択', action: 'select-all' },
+      { label: '貼り付け', action: 'paste', accelerator: 'CmdOrCtrl+V' },
+      { label: 'プレーンテキストとして貼り付け', action: 'paste-plaintext', accelerator: 'Shift+CmdOrCtrl+V' },
+      { label: '-', action: '_separator' },
+      ...(hasSelection ? [
+        { label: 'ルビ', action: 'ruby', accelerator: 'Shift+CmdOrCtrl+R' },
+        { label: '縦中横', action: 'tcy', accelerator: 'Shift+CmdOrCtrl+T' },
+        { label: '-', action: '_separator' },
+      ] : []),
+      { label: '検索', action: 'find', accelerator: 'CmdOrCtrl+F' },
+      ...(hasSelection ? [
+        { label: 'Googleで検索', action: 'google-search' },
+        { label: '辞書で調べる', action: 'dictionary' },
+      ] : []),
+      { label: '-', action: '_separator' },
+      { label: 'すべて選択', action: 'select-all', accelerator: 'CmdOrCtrl+A' },
     ];
     const action = await window.electronAPI?.showContextMenu?.(items);
     if (action) handleContextMenuAction(action as ContextMenuAction);

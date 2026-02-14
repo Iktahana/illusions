@@ -22,6 +22,8 @@ interface SettingsModalProps {
   onFontFamilyChange: (value: string) => void;
   charsPerLine: number;
   onCharsPerLineChange: (value: number) => void;
+  autoCharsPerLine: boolean;
+  onAutoCharsPerLineChange: (value: boolean) => void;
   showParagraphNumbers: boolean;
   onShowParagraphNumbersChange: (value: boolean) => void;
   // Vertical scroll settings
@@ -80,6 +82,8 @@ export default function SettingsModal({
   onFontFamilyChange,
   charsPerLine,
   onCharsPerLineChange,
+  autoCharsPerLine,
+  onAutoCharsPerLineChange,
   showParagraphNumbers,
   onShowParagraphNumbersChange,
   verticalScrollBehavior,
@@ -291,19 +295,43 @@ export default function SettingsModal({
                 {/* Chars per line */}
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    1行あたりの文字数
+                    1行あたりの文字数制限
                   </label>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
-                      min={0}
+                      min={1}
                       step={1}
                       value={charsPerLine}
+                      disabled={autoCharsPerLine}
                       onChange={(e) => onCharsPerLineChange(Number(e.target.value))}
-                      className="w-24 px-3 py-2 border border-border-secondary rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                      className={clsx(
+                        "w-24 px-3 py-2 border border-border-secondary rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent",
+                        autoCharsPerLine && "opacity-50 cursor-not-allowed"
+                      )}
                     />
                     <span className="text-sm text-foreground-secondary">字</span>
+                    <button
+                      onClick={() => onAutoCharsPerLineChange(!autoCharsPerLine)}
+                      className={clsx(
+                        "ml-2 relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out",
+                        autoCharsPerLine ? "bg-accent" : "bg-border-secondary"
+                      )}
+                    >
+                      <span
+                        className={clsx(
+                          "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition duration-200 ease-in-out",
+                          autoCharsPerLine ? "translate-x-5" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                    <span className="text-sm text-foreground-secondary">自動</span>
                   </div>
+                  <p className="text-xs text-foreground-tertiary mt-1">
+                    {autoCharsPerLine
+                      ? "ウィンドウサイズに応じて自動調整します（最大40字）"
+                      : "1行（縦書きの場合は1列）あたりの最大文字数"}
+                  </p>
                 </div>
 
                 {/* Paragraph numbers toggle */}

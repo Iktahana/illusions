@@ -94,10 +94,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useTheme() {
+const FALLBACK: ThemeContextType = {
+  theme: "dark",
+  themeMode: "auto",
+  setThemeMode: () => {},
+  toggleTheme: () => {},
+};
+
+export function useTheme(): ThemeContextType {
   const context = useContext(ThemeContext);
-  if (context === undefined) {
-    throw new Error("useTheme は ThemeProvider の内側で使用してください");
-  }
-  return context;
+  // Return a safe fallback if called before ThemeProvider mounts
+  return context ?? FALLBACK;
 }

@@ -158,6 +158,14 @@ function checkForUpdates(manual = false) {
   autoUpdater.checkForUpdates()
 }
 
+// UI state synced from renderer for menu checked states
+let menuUiState = {
+  compactMode: false,
+  showParagraphNumbers: true,
+  themeMode: 'auto', // 'auto' | 'light' | 'dark'
+  autoCharsPerLine: true,
+}
+
 function buildApplicationMenu(recentProjects = []) {
   const isMac = process.platform === 'darwin'
 
@@ -272,6 +280,57 @@ function buildApplicationMenu(recentProjects = []) {
      ],
    })
 
+  // 書式
+  template.push({
+    label: '書式',
+    submenu: [
+      {
+        label: '行間',
+        submenu: [
+          { label: '広くする', accelerator: 'CmdOrCtrl+]', click: () => sendToFocused('menu-format', 'lineHeight', 'increase') },
+          { label: '狭くする', accelerator: 'CmdOrCtrl+[', click: () => sendToFocused('menu-format', 'lineHeight', 'decrease') },
+        ],
+      },
+      {
+        label: '段落間隔',
+        submenu: [
+          { label: '広くする', click: () => sendToFocused('menu-format', 'paragraphSpacing', 'increase') },
+          { label: '狭くする', click: () => sendToFocused('menu-format', 'paragraphSpacing', 'decrease') },
+        ],
+      },
+      {
+        label: '字下げ',
+        submenu: [
+          { label: '深くする', click: () => sendToFocused('menu-format', 'textIndent', 'increase') },
+          { label: '浅くする', click: () => sendToFocused('menu-format', 'textIndent', 'decrease') },
+          { label: 'なし', click: () => sendToFocused('menu-format', 'textIndent', 'none') },
+        ],
+      },
+      { type: 'separator' },
+      {
+        label: '1行あたりの文字数',
+        submenu: [
+          {
+            label: '自動',
+            type: 'checkbox',
+            checked: menuUiState.autoCharsPerLine,
+            click: () => sendToFocused('menu-format', 'charsPerLine', 'auto'),
+          },
+          { type: 'separator' },
+          { label: '増やす', enabled: !menuUiState.autoCharsPerLine, click: () => sendToFocused('menu-format', 'charsPerLine', 'increase') },
+          { label: '減らす', enabled: !menuUiState.autoCharsPerLine, click: () => sendToFocused('menu-format', 'charsPerLine', 'decrease') },
+        ],
+      },
+      { type: 'separator' },
+      {
+        label: '段落番号を表示',
+        type: 'checkbox',
+        checked: menuUiState.showParagraphNumbers,
+        click: () => sendToFocused('menu-format', 'paragraphNumbers', 'toggle'),
+      },
+    ],
+  })
+
   // 表示
   template.push({
     label: '表示',
@@ -294,10 +353,20 @@ function buildApplicationMenu(recentProjects = []) {
     submenu: [
       {
         label: 'コンパクトモード',
+        type: 'checkbox',
+        checked: menuUiState.compactMode,
         accelerator: 'CmdOrCtrl+Shift+M',
         click: () => {
           sendToFocused('menu-toggle-compact-mode')
         },
+      },
+      {
+        label: 'ダークモード',
+        submenu: [
+          { label: '自動', type: 'radio', checked: menuUiState.themeMode === 'auto', click: () => sendToFocused('menu-theme', 'auto') },
+          { label: 'オフ', type: 'radio', checked: menuUiState.themeMode === 'light', click: () => sendToFocused('menu-theme', 'light') },
+          { label: 'オン', type: 'radio', checked: menuUiState.themeMode === 'dark', click: () => sendToFocused('menu-theme', 'dark') },
+        ],
       },
       { type: 'separator' },
       ...(isMac ? [
@@ -327,6 +396,13 @@ function buildApplicationMenu(recentProjects = []) {
       {
         label: `バージョン ${app.getVersion()}`,
         enabled: false,
+      },
+      { type: 'separator' },
+      {
+        label: '公式サイトへ',
+        click: () => {
+          shell.openExternal('https://www.illusions.app/')
+        },
       },
     ],
   })
@@ -575,6 +651,13 @@ ipcMain.handle('menu:rebuild', async () => {
   return true
 })
 
+// Sync UI state from renderer to update menu checked states
+ipcMain.handle('menu:sync-ui-state', async (_event, state) => {
+  menuUiState = { ...menuUiState, ...state }
+  await rebuildApplicationMenu()
+  return true
+})
+
 ipcMain.handle('new-window', async () => {
    console.log('[Main Process] Creating new window (welcome)...')
    // 新しいウィンドウを作成（ウェルカム画面を表示）
@@ -605,10 +688,15 @@ ipcMain.handle('show-context-menu', (_event, items) => {
   if (!win) return null
 
   return new Promise((resolve) => {
-    const template = items.map((item) => ({
-      label: item.label,
-      click: () => resolve(item.action),
-    }))
+    const template = items.map((item) =>
+      item.action === '_separator'
+        ? { type: 'separator' }
+        : {
+            label: item.label,
+            accelerator: item.accelerator || undefined,
+            click: () => resolve(item.action),
+          }
+    )
     const menu = Menu.buildFromTemplate(template)
     menu.popup({
       window: win,

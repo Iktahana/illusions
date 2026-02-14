@@ -19,7 +19,7 @@ declare global {
     saveDoneAndClose?: () => Promise<void>;
     newWindow?: () => Promise<void>;
     openDictionaryPopup?: (url: string, title: string) => Promise<boolean>;
-    showContextMenu?: (items: Array<{ label: string; action: string }>) => Promise<string | null>;
+    showContextMenu?: (items: Array<{ type?: string; label?: string; action?: string; accelerator?: string }>) => Promise<string | null>;
     onSaveBeforeClose?: (callback: () => void) => (() => void) | void;
     onOpenFileFromSystem?: (
       callback: (payload: { path: string; content: string }) => void
@@ -34,9 +34,12 @@ declare global {
     onMenuOpenProject?: (callback: () => void) => (() => void) | void;
     onMenuOpenRecentProject?: (callback: (projectId: string) => void) => (() => void) | void;
     rebuildMenu?: () => Promise<boolean>;
+    syncMenuUiState?: (state: { compactMode?: boolean; showParagraphNumbers?: boolean; themeMode?: string; autoCharsPerLine?: boolean }) => Promise<boolean>;
     showInFileManager?: (dirPath: string) => Promise<boolean>;
     onMenuShowInFileManager?: (callback: () => void) => (() => void) | void;
     onToggleCompactMode?: (callback: () => void) => (() => void) | void;
+    onFormatChange?: (callback: (setting: string, action: string) => void) => (() => void) | void;
+    onThemeChange?: (callback: (mode: "auto" | "light" | "dark") => void) => (() => void) | void;
     /** Virtual File System IPC bridge */
     vfs?: {
       /** Open a native directory picker dialog */

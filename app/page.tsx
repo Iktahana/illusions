@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useTheme } from "@/contexts/ThemeContext";
 import Explorer, { FilesPanel } from "@/components/Explorer";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
@@ -82,6 +83,7 @@ let _skipAutoRestoreDetected: boolean | null = null;
 
 export default function EditorPage() {
   const { editorMode, setProjectMode, setStandaloneMode, resetMode } = useEditorMode();
+  const { themeMode, setThemeMode } = useTheme();
 
   // Detect ?welcome parameter: skip auto-restore and show welcome page
   const [skipAutoRestore] = useState(() => {
@@ -387,7 +389,8 @@ export default function EditorPage() {
   const [paragraphSpacing, setParagraphSpacing] = useState(0.5); // 0.5em = Standard spacing
   const [textIndent, setTextIndent] = useState(1);
   const [fontFamily, setFontFamily] = useState('Noto Serif JP');
-  const [charsPerLine, setCharsPerLine] = useState(40); // 0 = no limit (default 40)
+  const [charsPerLine, setCharsPerLine] = useState(40); // max 40
+  const [autoCharsPerLine, setAutoCharsPerLine] = useState(true); // auto mode on by default
   const [showParagraphNumbers, setShowParagraphNumbers] = useState(true);
   const [posHighlightEnabled, setPosHighlightEnabled] = useState(false); // POS coloring (default: disabled)
   const [posHighlightColors, setPosHighlightColors] = useState<Record<string, string>>({}); // Per-POS color settings
@@ -508,6 +511,9 @@ export default function EditorPage() {
         }
         if (typeof appState.charsPerLine === "number") {
           setCharsPerLine(appState.charsPerLine);
+        }
+        if (typeof appState.autoCharsPerLine === "boolean") {
+          setAutoCharsPerLine(appState.autoCharsPerLine);
         }
         if (typeof appState.showParagraphNumbers === "boolean") {
           setShowParagraphNumbers(appState.showParagraphNumbers);
@@ -690,10 +696,21 @@ export default function EditorPage() {
   }, []);
 
   const handleCharsPerLineChange = useCallback((value: number) => {
-    setCharsPerLine(value);
+    const clamped = Math.max(1, value);
+    setCharsPerLine(clamped);
     setEditorKey(prev => prev + 1);
-    void persistAppState({ charsPerLine: value }).catch((error) => {
+    void persistAppState({ charsPerLine: clamped }).catch((error) => {
       console.error("1行あたり文字数の保存に失敗しました:", error);
+    });
+  }, []);
+
+  const handleAutoCharsPerLineChange = useCallback((value?: boolean) => {
+    setAutoCharsPerLine(prev => {
+      const next = value !== undefined ? value : !prev;
+      void persistAppState({ autoCharsPerLine: next }).catch((error) => {
+        console.error("自動文字数の保存に失敗しました:", error);
+      });
+      return next;
     });
   }, []);
 
@@ -752,6 +769,28 @@ export default function EditorPage() {
     const tr = state.tr.insertText(rubyMarkup, from, to);
     dispatch(tr);
   }, [editorViewInstance]);
+
+  /** Wrap selected text with tcy (縦中横) syntax: ^text^ */
+  const handleToggleTcy = useCallback(() => {
+    if (!editorViewInstance) return;
+    const { state, dispatch } = editorViewInstance;
+    const { from, to } = state.selection;
+    if (from === to) return;
+    const text = state.doc.textBetween(from, to);
+    if (!text.trim()) return;
+    // Toggle: if already wrapped in ^...^, unwrap
+    const tr = state.tr.insertText(`^${text}^`, from, to);
+    dispatch(tr);
+  }, [editorViewInstance]);
+
+  /** Open the dictionary panel in the sidebar with optional search term */
+  const [dictionarySearchTrigger, setDictionarySearchTrigger] = useState<{ term: string; id: number }>({ term: "", id: 0 });
+  const handleOpenDictionary = useCallback((searchTerm?: string) => {
+    if (searchTerm) {
+      setDictionarySearchTrigger(prev => ({ term: searchTerm, id: prev.id + 1 }));
+    }
+    setTopView("dictionary");
+  }, []);
 
   const handleToggleCompactMode = useCallback(() => {
     setCompactMode(prev => {
@@ -835,6 +874,92 @@ export default function EditorPage() {
       });
       return () => { cleanup?.(); };
     }, [isElectron, handleToggleCompactMode]);
+
+    // メニューの「書式」設定変更を受け取る（Electronのみ）
+    useEffect(() => {
+      if (!isElectron || typeof window === "undefined") return;
+      const cleanup = window.electronAPI?.onFormatChange?.((setting: string, action: string) => {
+        switch (setting) {
+          case "lineHeight": {
+            setLineHeight(prev => {
+              const next = action === "increase"
+                ? Math.min(3.0, +(prev + 0.1).toFixed(1))
+                : Math.max(1.0, +(prev - 0.1).toFixed(1));
+              setEditorKey(k => k + 1);
+              void persistAppState({ lineHeight: next });
+              return next;
+            });
+            break;
+          }
+          case "paragraphSpacing": {
+            setParagraphSpacing(prev => {
+              const next = action === "increase"
+                ? Math.min(3.0, +(prev + 0.1).toFixed(1))
+                : Math.max(0, +(prev - 0.1).toFixed(1));
+              setEditorKey(k => k + 1);
+              void persistAppState({ paragraphSpacing: next });
+              return next;
+            });
+            break;
+          }
+          case "textIndent": {
+            setTextIndent(prev => {
+              const next = action === "none" ? 0
+                : action === "increase" ? Math.min(5, prev + 1)
+                : Math.max(0, prev - 1);
+              setEditorKey(k => k + 1);
+              void persistAppState({ textIndent: next });
+              return next;
+            });
+            break;
+          }
+          case "charsPerLine": {
+            if (action === "auto") {
+              handleAutoCharsPerLineChange();
+              break;
+            }
+            // Manual adjustments only when auto is off
+            setCharsPerLine(prev => {
+              const next = action === "increase" ? prev + 5
+                : Math.max(1, prev - 5);
+              setEditorKey(k => k + 1);
+              void persistAppState({ charsPerLine: next });
+              return next;
+            });
+            break;
+          }
+          case "paragraphNumbers": {
+            setShowParagraphNumbers(prev => {
+              const next = !prev;
+              void persistAppState({ showParagraphNumbers: next });
+              return next;
+            });
+            break;
+          }
+        }
+      });
+      return () => { cleanup?.(); };
+    }, [isElectron]);
+
+    // メニューの「ダークモード」切り替えを受け取る（Electronのみ）
+    useEffect(() => {
+      if (!isElectron || typeof window === "undefined") return;
+      const cleanup = window.electronAPI?.onThemeChange?.((mode) => {
+        setThemeMode(mode);
+      });
+      return () => { cleanup?.(); };
+    }, [isElectron, setThemeMode]);
+
+    // メニューのチェック状態を同期する（Electronのみ）
+    useEffect(() => {
+      if (!isElectron || typeof window === "undefined") return;
+      void window.electronAPI?.syncMenuUiState?.({
+        compactMode,
+        showParagraphNumbers,
+        themeMode,
+        autoCharsPerLine,
+      });
+    }, [isElectron, compactMode, showParagraphNumbers, themeMode, autoCharsPerLine]);
 
     // メニューの「プロジェクトフォルダを開く」を受け取る（Electronのみ）
     useEffect(() => {
@@ -950,7 +1075,15 @@ export default function EditorPage() {
          ? event.shiftKey && event.metaKey && event.key === "r"
          : event.shiftKey && event.ctrlKey && event.key === "r";
 
-       if (isRubyShortcut) {
+       // Shift+Cmd+T (macOS) / Shift+Ctrl+T (Windows/Linux): Tcy (縦中横)
+       const isTcyShortcut = isMac
+         ? event.shiftKey && event.metaKey && event.key === "t"
+         : event.shiftKey && event.ctrlKey && event.key === "t";
+
+       if (isTcyShortcut) {
+         event.preventDefault();
+         handleToggleTcy();
+       } else if (isRubyShortcut) {
          event.preventDefault();
          handleOpenRubyDialog();
        } else if (isCompactModeShortcut) {
@@ -975,7 +1108,7 @@ export default function EditorPage() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [saveFile, handlePasteAsPlaintext, handleToggleCompactMode, handleOpenRubyDialog]);
+  }, [saveFile, handlePasteAsPlaintext, handleToggleCompactMode, handleOpenRubyDialog, handleToggleTcy]);
 
   // --- WelcomeScreen callbacks ---
 
@@ -1519,6 +1652,8 @@ export default function EditorPage() {
           onFontFamilyChange={handleFontFamilyChange}
           charsPerLine={charsPerLine}
           onCharsPerLineChange={handleCharsPerLineChange}
+          autoCharsPerLine={autoCharsPerLine}
+          onAutoCharsPerLineChange={handleAutoCharsPerLineChange}
           showParagraphNumbers={showParagraphNumbers}
           onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
           verticalScrollBehavior={verticalScrollBehavior}
@@ -1613,6 +1748,8 @@ export default function EditorPage() {
                           onFontFamilyChange={handleFontFamilyChange}
                           charsPerLine={charsPerLine}
                           onCharsPerLineChange={handleCharsPerLineChange}
+                          autoCharsPerLine={autoCharsPerLine}
+                          onAutoCharsPerLineChange={handleAutoCharsPerLineChange}
                           showParagraphNumbers={showParagraphNumbers}
                           onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
                         />
@@ -1636,7 +1773,7 @@ export default function EditorPage() {
                     case "characters":
                       return <Characters content={content} />;
                     case "dictionary":
-                      return <Dictionary content={content} />;
+                      return <Dictionary content={content} initialSearchTerm={dictionarySearchTrigger.term} searchTriggerId={dictionarySearchTrigger.id} />;
                     case "wordfreq":
                       return <WordFrequency content={content} filePath={currentFile?.path ?? undefined} onWordSearch={(word) => {
                         setSearchInitialTerm(word);
@@ -1686,7 +1823,7 @@ export default function EditorPage() {
                 textIndent={textIndent}
                 fontFamily={fontFamily}
                 charsPerLine={charsPerLine}
-                onCharsPerLineChange={handleCharsPerLineChange}
+                onCharsPerLineChange={autoCharsPerLine ? handleCharsPerLineChange : undefined}
                 searchOpenTrigger={searchOpenTrigger}
                 searchInitialTerm={searchInitialTerm}
                 showParagraphNumbers={showParagraphNumbers}
@@ -1696,6 +1833,12 @@ export default function EditorPage() {
                 posHighlightColors={posHighlightColors}
                 verticalScrollBehavior={verticalScrollBehavior}
                 scrollSensitivity={scrollSensitivity}
+                onOpenRubyDialog={handleOpenRubyDialog}
+                onToggleTcy={handleToggleTcy}
+                onOpenDictionary={handleOpenDictionary}
+                onFontScaleChange={handleFontScaleChange}
+                onLineHeightChange={handleLineHeightChange}
+                onParagraphSpacingChange={handleParagraphSpacingChange}
               />
             )}
           </div>
