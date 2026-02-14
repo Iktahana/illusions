@@ -40,6 +40,7 @@ import { getAvailableFeatures } from "@/lib/feature-detection";
 import { createFileWatcher } from "@/lib/file-watcher";
 import { getVFS } from "@/lib/vfs";
 import { isProjectMode, isStandaloneMode } from "@/lib/project-types";
+import { getHistoryService } from "@/lib/history-service";
 import {
   countSentences,
   analyzeCharacterTypes,
@@ -133,6 +134,9 @@ export default function EditorPage() {
   // Standalone polling timer ref for external change detection
   const standalonePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const standaloneLastModifiedRef = useRef<number>(0);
+  // Pending conflict that should be shown only when window regains focus
+  const pendingConflictRef = useRef<{ fileName: string; lastModified: number; content: string } | null>(null);
+  const [isWindowFocused, setIsWindowFocused] = useState(true);
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
@@ -143,11 +147,51 @@ export default function EditorPage() {
     currentFile?.name || null
   );
 
+  // --- Window focus tracking ---
+  useEffect(() => {
+    const handleFocus = () => {
+      setIsWindowFocused(true);
+      // Show pending conflict when window regains focus
+      if (pendingConflictRef.current) {
+        setConflictData(pendingConflictRef.current);
+        setShowFileConflict(true);
+        pendingConflictRef.current = null;
+      }
+    };
+    const handleBlur = () => setIsWindowFocused(false);
+
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, []);
+
   // --- File conflict detection ---
 
   /** Handle conflict resolution: keep local or load remote content */
-  const handleConflictResolve = useCallback((resolution: "local" | "remote") => {
-    if (resolution === "remote" && conflictData) {
+  const handleConflictResolve = useCallback(async (resolution: "local" | "remote") => {
+    if (!conflictData) return;
+
+    // Always create a conflict snapshot to preserve current editor content
+    if (isProjectMode(editorMode)) {
+      const historyService = getHistoryService();
+      const metadata = editorMode.metadata;
+      try {
+        await historyService.createSnapshot({
+          sourceFile: metadata.mainFile,
+          content: contentRef.current,
+          type: "manual",
+          label: "競合前の内容",
+        });
+      } catch (err) {
+        console.error("Failed to create conflict snapshot:", err);
+      }
+    }
+
+    if (resolution === "remote") {
       // Load disk content into editor
       setContent(conflictData.content);
       setEditorKey(prev => prev + 1);
@@ -155,7 +199,7 @@ export default function EditorPage() {
     // "local" => keep editor content, dismiss dialog
     setShowFileConflict(false);
     setConflictData(null);
-  }, [conflictData, setContent]);
+  }, [conflictData, setContent, editorMode]);
 
   /**
    * Start/stop file watcher when currentFile or editorMode changes.
@@ -195,12 +239,18 @@ export default function EditorPage() {
           path: relativePath,
           onChanged: (newContent: string) => {
             if (newContent !== contentRef.current) {
-              setConflictData({
+              const conflict = {
                 fileName: currentFile.name,
                 lastModified: Date.now(),
                 content: newContent,
-              });
-              setShowFileConflict(true);
+              };
+              // Only show dialog if window is focused; otherwise queue it
+              if (isWindowFocused) {
+                setConflictData(conflict);
+                setShowFileConflict(true);
+              } else {
+                pendingConflictRef.current = conflict;
+              }
             }
           },
         });
@@ -247,12 +297,18 @@ export default function EditorPage() {
             const newContent = await file.text();
             // Only show conflict if content differs from editor
             if (newContent !== contentRef.current) {
-              setConflictData({
+              const conflict = {
                 fileName: currentFile.name,
                 lastModified: file.lastModified,
                 content: newContent,
-              });
-              setShowFileConflict(true);
+              };
+              // Only show dialog if window is focused; otherwise queue it
+              if (isWindowFocused) {
+                setConflictData(conflict);
+                setShowFileConflict(true);
+              } else {
+                pendingConflictRef.current = conflict;
+              }
             }
           } else if (standaloneLastModifiedRef.current === 0) {
             // First successful read, set baseline
@@ -1435,6 +1491,8 @@ export default function EditorPage() {
             fileName={conflictData.fileName}
             lastModified={conflictData.lastModified}
             onResolve={handleConflictResolve}
+            localContent={contentRef.current}
+            remoteContent={conflictData.content}
           />
         )}
 

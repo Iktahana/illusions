@@ -37,6 +37,9 @@ const HISTORY_DIR_NAME = "history";
 /** Name of the history index file */
 const HISTORY_INDEX_FILENAME = "index.json";
 
+/** Name of the bookmarks file */
+const BOOKMARKS_FILENAME = ".history_bookmarks.json";
+
 // -----------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------
@@ -568,6 +571,52 @@ export class HistoryService {
     // Remove from index
     index.snapshots.splice(entryIndex, 1);
     await this.writeHistoryIndex(index);
+  }
+
+  // -----------------------------------------------------------------------
+  // Bookmarks
+  // -----------------------------------------------------------------------
+
+  /**
+   * Get all bookmarked snapshot IDs.
+   * ブックマーク済みのスナップショットIDセットを取得する。
+   */
+  async getBookmarks(): Promise<Set<string>> {
+    try {
+      const historyDir = await this.getHistoryDirectory();
+      const handle = await historyDir.getFileHandle(BOOKMARKS_FILENAME);
+      const content = await handle.read();
+      const ids = JSON.parse(content) as string[];
+      return new Set(ids);
+    } catch {
+      return new Set();
+    }
+  }
+
+  /**
+   * Toggle bookmark state for a snapshot.
+   * Returns the new bookmarked state.
+   *
+   * スナップショットのブックマーク状態をトグルする。
+   * 新しいブックマーク状態を返す。
+   */
+  async toggleBookmark(snapshotId: string): Promise<boolean> {
+    const bookmarks = await this.getBookmarks();
+    const isBookmarked = bookmarks.has(snapshotId);
+
+    if (isBookmarked) {
+      bookmarks.delete(snapshotId);
+    } else {
+      bookmarks.add(snapshotId);
+    }
+
+    const historyDir = await this.ensureHistoryDirectory();
+    const handle = await historyDir.getFileHandle(BOOKMARKS_FILENAME, {
+      create: true,
+    });
+    await handle.write(JSON.stringify([...bookmarks], null, 2));
+
+    return !isBookmarked;
   }
 
   // -----------------------------------------------------------------------

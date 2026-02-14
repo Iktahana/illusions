@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { Clock, Pin, Plus, RotateCcw, Loader2, History, Star, GitCompare } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Pin, Plus, RotateCcw, Loader2, History, Bookmark, GitCompare, MoreVertical, ChevronDown, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 import { getHistoryService } from "@/lib/history-service";
 
@@ -123,16 +123,6 @@ function formatTimeJa(timestamp: number): string {
 }
 
 /**
- * Format a file size in human-readable format.
- * ファイルサイズを人間が読みやすい形式にフォーマットする。
- */
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/**
  * Get the Japanese label for a snapshot type.
  * スナップショットタイプの日本語ラベルを取得する。
  */
@@ -163,6 +153,59 @@ function getSnapshotTypeBadgeClass(type: SnapshotType): string {
 }
 
 // -----------------------------------------------------------------------
+// Diff Stats
+// -----------------------------------------------------------------------
+
+interface DiffStats {
+  added: number;
+  removed: number;
+  addedText: string;
+  removedText: string;
+}
+
+/**
+ * Compute approximate character-level additions and removals
+ * by matching common prefix and suffix between two strings.
+ * O(n) time, no external library required.
+ *
+ * 共通の接頭辞と接尾辞を照合して文字レベルの追加・削除数を近似計算する。
+ */
+function computeDiffStats(oldText: string, newText: string): DiffStats {
+  const oldLen = oldText.length;
+  const newLen = newText.length;
+  const minLen = Math.min(oldLen, newLen);
+
+  let prefixLen = 0;
+  while (prefixLen < minLen && oldText[prefixLen] === newText[prefixLen]) {
+    prefixLen++;
+  }
+
+  let suffixLen = 0;
+  const maxSuffix = minLen - prefixLen;
+  while (
+    suffixLen < maxSuffix &&
+    oldText[oldLen - 1 - suffixLen] === newText[newLen - 1 - suffixLen]
+  ) {
+    suffixLen++;
+  }
+
+  const removedStart = prefixLen;
+  const removedEnd = oldLen - suffixLen;
+  const addedStart = prefixLen;
+  const addedEnd = newLen - suffixLen;
+
+  const removedText = oldText.slice(removedStart, removedEnd);
+  const addedText = newText.slice(addedStart, addedEnd);
+
+  return {
+    added: addedText.length,
+    removed: removedText.length,
+    addedText,
+    removedText,
+  };
+}
+
+// -----------------------------------------------------------------------
 // Component
 // -----------------------------------------------------------------------
 
@@ -179,7 +222,7 @@ export default function HistoryPanel({
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [displayCount, setDisplayCount] = useState(SNAPSHOTS_PER_PAGE);
-  const [isLoadingDiff, setIsLoadingDiff] = useState(false);
+  const [loadingDiffId, setLoadingDiffId] = useState<string | null>(null);
 
   /**
    * Load snapshots from HistoryService.
@@ -207,6 +250,79 @@ export default function HistoryPanel({
     setDisplayCount(SNAPSHOTS_PER_PAGE);
   }, [loadSnapshots]);
 
+  /** Map of snapshot ID → diff stats relative to previous version */
+  const [diffStatsMap, setDiffStatsMap] = useState<Map<string, DiffStats>>(new Map());
+
+  /** ID of the very first (oldest) snapshot overall */
+  const firstVersionId = snapshots.length > 0 ? snapshots[snapshots.length - 1].id : null;
+
+  // Compute diff stats between consecutive snapshots asynchronously
+  useEffect(() => {
+    const displayed = snapshots.slice(0, displayCount);
+    if (displayed.length < 2) {
+      setDiffStatsMap(new Map());
+      return;
+    }
+
+    let cancelled = false;
+
+    const compute = async () => {
+      const historyService = getHistoryService();
+      // Load one extra snapshot for the last displayed item's predecessor
+      const idsToLoad = displayed.map((s) => s.id);
+      const nextSnapshot = snapshots[displayCount];
+      if (nextSnapshot) idsToLoad.push(nextSnapshot.id);
+
+      const contents = await Promise.all(
+        idsToLoad.map((id) => historyService.getSnapshotContent(id))
+      );
+      if (cancelled) return;
+
+      const map = new Map<string, DiffStats>();
+      for (let i = 0; i < displayed.length; i++) {
+        const newContent = contents[i];
+        const oldContent = contents[i + 1];
+        if (newContent != null && oldContent != null) {
+          map.set(displayed[i].id, computeDiffStats(oldContent, newContent));
+        }
+      }
+      setDiffStatsMap(map);
+    };
+
+    void compute();
+    return () => { cancelled = true; };
+  }, [snapshots, displayCount]);
+
+  /** Set of bookmarked snapshot IDs */
+  const [bookmarkSet, setBookmarkSet] = useState<Set<string>>(new Set());
+
+  // Load bookmarks on mount
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const historyService = getHistoryService();
+      const set = await historyService.getBookmarks();
+      if (!cancelled) setBookmarkSet(set);
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [snapshots]);
+
+  /** Toggle a bookmark and update local state */
+  const handleToggleBookmark = useCallback(async (snapshotId: string) => {
+    const historyService = getHistoryService();
+    const isNowBookmarked = await historyService.toggleBookmark(snapshotId);
+    setBookmarkSet((prev) => {
+      const next = new Set(prev);
+      if (isNowBookmarked) {
+        next.add(snapshotId);
+      } else {
+        next.delete(snapshotId);
+      }
+      return next;
+    });
+  }, []);
+
   /**
    * Grouped snapshots based on current pagination.
    * ページネーションに基づき、日付ごとにグループ化されたスナップショット。
@@ -215,6 +331,89 @@ export default function HistoryPanel({
     () => groupSnapshotsByDate(snapshots.slice(0, displayCount)),
     [snapshots, displayCount]
   );
+
+  /** Collapsed state for each date group. Key = date label */
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  /** Daily diff stats: date label → DiffStats between last of prev day and first of this day */
+  const [dailyDiffMap, setDailyDiffMap] = useState<Map<string, DiffStats>>(new Map());
+
+  /** Initialize collapsed state: collapse groups older than 2 days */
+  useEffect(() => {
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const cutoffKey = getDateKey(twoDaysAgo.getTime());
+
+    const toCollapse = new Set<string>();
+    for (const group of groupedSnapshots) {
+      // Extract date key from label (reverse engineer from formatDateGroupLabel)
+      const firstSnapshot = group.snapshots[0];
+      if (!firstSnapshot) continue;
+      const groupKey = getDateKey(firstSnapshot.timestamp);
+      if (groupKey < cutoffKey) {
+        toCollapse.add(group.label);
+      }
+    }
+    setCollapsedGroups(toCollapse);
+  }, [groupedSnapshots]);
+
+  /** Compute daily diff: first snapshot of each day vs last snapshot of previous day */
+  useEffect(() => {
+    if (groupedSnapshots.length === 0) {
+      setDailyDiffMap(new Map());
+      return;
+    }
+
+    let cancelled = false;
+
+    const compute = async () => {
+      const historyService = getHistoryService();
+      const map = new Map<string, DiffStats>();
+
+      for (let i = 0; i < groupedSnapshots.length; i++) {
+        const group = groupedSnapshots[i];
+        const todayNewest = group.snapshots[0]; // newest in this group (today)
+        if (!todayNewest) continue;
+
+        // Find newest snapshot of previous day
+        const prevGroup = groupedSnapshots[i + 1];
+        const prevDayNewest = prevGroup?.snapshots[0]; // newest in previous day
+        if (!prevDayNewest) continue;
+
+        // Load both contents
+        const [newContent, oldContent] = await Promise.all([
+          historyService.getSnapshotContent(todayNewest.id),
+          historyService.getSnapshotContent(prevDayNewest.id),
+        ]);
+
+        if (cancelled) return;
+
+        if (newContent != null && oldContent != null) {
+          const stats = computeDiffStats(oldContent, newContent);
+          map.set(group.label, stats);
+        }
+      }
+
+      if (!cancelled) {
+        setDailyDiffMap(map);
+      }
+    };
+
+    void compute();
+    return () => { cancelled = true; };
+  }, [groupedSnapshots]);
+
+  const toggleGroup = useCallback((label: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  }, []);
 
   /** Whether there are more snapshots to load */
   const hasMore = snapshots.length > displayCount;
@@ -290,7 +489,7 @@ export default function HistoryPanel({
   const handleCompare = useCallback(
     async (snapshot: SnapshotEntry) => {
       try {
-        setIsLoadingDiff(true);
+        setLoadingDiffId(snapshot.id);
         const historyService = getHistoryService();
         const snapshotContent = await historyService.getSnapshotContent(snapshot.id);
 
@@ -309,7 +508,7 @@ export default function HistoryPanel({
         const message = err instanceof Error ? err.message : String(err);
         setError(`差分の読み込みに失敗しました: ${message}`);
       } finally {
-        setIsLoadingDiff(false);
+        setLoadingDiffId(null);
       }
     },
     [currentContent, onCompareInEditor]
@@ -351,7 +550,7 @@ export default function HistoryPanel({
           ) : (
             <Plus className="w-3 h-3" />
           )}
-          スナップショットを作成
+          スナップショット
         </button>
       </div>
 
@@ -384,29 +583,58 @@ export default function HistoryPanel({
       {/* Snapshot list with date groups and pagination */}
       {snapshots.length > 0 && (
         <div className="space-y-3">
-          {groupedSnapshots.map((group) => (
-            <div key={group.label} className="space-y-2">
-              {/* Date group header */}
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-[11px] font-medium text-foreground-tertiary whitespace-nowrap">
-                  {group.label}
-                </span>
-                <div className="flex-1 border-b border-border" />
-              </div>
+          {groupedSnapshots.map((group) => {
+            const isCollapsed = collapsedGroups.has(group.label);
+            const dailyStats = dailyDiffMap.get(group.label);
+            const totalAdded = dailyStats?.added ?? 0;
+            const totalRemoved = dailyStats?.removed ?? 0;
 
-              {/* Snapshots within this date group */}
-              {group.snapshots.map((snapshot) => (
-                <SnapshotItem
-                  key={snapshot.id}
-                  snapshot={snapshot}
-                  isRestoring={restoringId === snapshot.id}
-                  onRestore={handleRestore}
-                  onCompare={handleCompare}
-                  isLoadingDiff={isLoadingDiff}
-                />
-              ))}
-            </div>
-          ))}
+            return (
+              <div key={group.label} className="space-y-2">
+                {/* Date group header */}
+                <button
+                  onClick={() => toggleGroup(group.label)}
+                  className="flex items-center gap-2 pt-1 w-full text-left hover:opacity-80 transition-opacity"
+                >
+                  {isCollapsed ? (
+                    <ChevronRight className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
+                  )}
+                  <span className="text-[11px] font-medium text-foreground-tertiary whitespace-nowrap">
+                    {group.label}
+                  </span>
+                  <div className="flex-1 border-b border-border" />
+                  {(totalAdded > 0 || totalRemoved > 0) && (
+                    <span className="text-[10px] tabular-nums flex items-center gap-1.5 flex-shrink-0">
+                      {totalAdded > 0 && (
+                        <span className="text-success">+{totalAdded.toLocaleString()}</span>
+                      )}
+                      {totalRemoved > 0 && (
+                        <span className="text-error">−{totalRemoved.toLocaleString()}</span>
+                      )}
+                    </span>
+                  )}
+                </button>
+
+                {/* Snapshots within this date group */}
+                {!isCollapsed && group.snapshots.map((snapshot) => (
+                  <SnapshotItem
+                    key={snapshot.id}
+                    snapshot={snapshot}
+                    isRestoring={restoringId === snapshot.id}
+                    onRestore={handleRestore}
+                    onCompare={handleCompare}
+                    isLoadingDiff={loadingDiffId === snapshot.id}
+                    diffStats={diffStatsMap.get(snapshot.id)}
+                    isFirstVersion={snapshot.id === firstVersionId}
+                    isBookmarked={bookmarkSet.has(snapshot.id)}
+                    onToggleBookmark={handleToggleBookmark}
+                  />
+                ))}
+              </div>
+            );
+          })}
 
           {/* Load more button */}
           {hasMore && (
@@ -433,94 +661,240 @@ interface SnapshotItemProps {
   onRestore: (snapshot: SnapshotEntry) => void;
   onCompare: (snapshot: SnapshotEntry) => void;
   isLoadingDiff: boolean;
+  diffStats?: DiffStats;
+  isFirstVersion: boolean;
+  isBookmarked: boolean;
+  onToggleBookmark: (snapshotId: string) => void;
 }
 
-function SnapshotItem({ snapshot, isRestoring, onRestore, onCompare, isLoadingDiff }: SnapshotItemProps) {
+function SnapshotItem({ snapshot, isRestoring, onRestore, onCompare, isLoadingDiff, diffStats, isFirstVersion, isBookmarked, onToggleBookmark }: SnapshotItemProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
+
   return (
     <div className="bg-background-secondary rounded-lg p-3 border border-border">
-      {/* Timestamp and type badge */}
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <Clock className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
-          <span className="text-xs font-medium text-foreground truncate">
+      {/* Row 1: Time + type badge + char count */}
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-semibold tabular-nums text-foreground">
             {formatTimeJa(snapshot.timestamp)}
-            {snapshot.type === "auto" && (
-              <span className="ml-1 text-[10px] text-foreground-tertiary">[自動]</span>
+          </span>
+          <span
+            className={clsx(
+              "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0",
+              getSnapshotTypeBadgeClass(snapshot.type)
             )}
+          >
+            {snapshot.type === "milestone" && (
+              <Pin className="w-2.5 h-2.5" />
+            )}
+            {getSnapshotTypeLabel(snapshot.type)}
           </span>
         </div>
-        <span
-          className={clsx(
-            "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0",
-            getSnapshotTypeBadgeClass(snapshot.type)
-          )}
-        >
-          {snapshot.type === "milestone" && (
-            <Pin className="w-2.5 h-2.5" />
-          )}
-          {getSnapshotTypeLabel(snapshot.type)}
+        <span className="text-[10px] text-foreground-tertiary tabular-nums flex-shrink-0">
+          {snapshot.characterCount.toLocaleString()}文字
         </span>
       </div>
 
       {/* Milestone label */}
       {snapshot.label && (
-        <p className="text-xs font-medium text-foreground-secondary mb-2 pl-5">
+        <p className="text-xs font-medium text-foreground-secondary mb-1">
           {snapshot.label}
         </p>
       )}
 
-      {/* Stats: character count and file size */}
-      <div className="flex items-center gap-3 text-[10px] text-foreground-tertiary mb-2 pl-5">
-        <span>{snapshot.characterCount.toLocaleString()}文字</span>
-        <span>{formatFileSize(snapshot.fileSize)}</span>
-      </div>
+      {/* Row 2: Diff indicator + actions */}
+      <div className="flex items-end justify-between">
+        <DiffIndicator diffStats={diffStats} isFirstVersion={isFirstVersion} />
 
-      {/* Action buttons */}
-      <div className="flex items-center gap-2 pl-5">
-        <button
-          onClick={() => onRestore(snapshot)}
-          disabled={isRestoring}
-          className={clsx(
-            "flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded transition-colors",
-            isRestoring
-              ? "bg-background text-foreground-muted cursor-wait border border-border"
-              : "bg-accent/10 text-accent hover:bg-accent/20 border border-accent/30"
-          )}
-        >
-          {isRestoring ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : (
-            <RotateCcw className="w-3 h-3" />
-          )}
-          復元
-        </button>
-
-        {/* Compare with current content */}
-        <button
-          onClick={() => onCompare(snapshot)}
-          disabled={isLoadingDiff}
-          className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded transition-colors bg-background text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover border border-border"
-          title="現在の内容と比較"
-        >
-          {isLoadingDiff ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : (
-            <GitCompare className="w-3 h-3" />
-          )}
-          比較
-        </button>
-
-        {/* "Mark as milestone" button for auto snapshots */}
-        {snapshot.type === "auto" && (
+        <div className="flex items-center gap-0.5 flex-shrink-0">
+          {/* Bookmark button */}
           <button
-            className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded transition-colors bg-background text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover border border-border"
-            title="マイルストーンとしてマーク"
+            onClick={() => onToggleBookmark(snapshot.id)}
+            className={clsx(
+              "p-1 rounded transition-colors",
+              isBookmarked
+                ? "text-accent"
+                : "text-foreground-tertiary hover:text-accent hover:bg-hover"
+            )}
+            title={isBookmarked ? "ブックマークを解除" : "ブックマークに追加"}
           >
-            <Star className="w-3 h-3" />
-            お気に入り
+            <Bookmark className="w-3.5 h-3.5" fill={isBookmarked ? "currentColor" : "none"} />
           </button>
-        )}
+
+          {/* Three-dot menu */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              className="p-1 rounded transition-colors text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover"
+              title="メニュー"
+            >
+              <MoreVertical className="w-3.5 h-3.5" />
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 bottom-full mb-1 z-10 min-w-[120px] rounded-lg border border-border bg-background-secondary shadow-lg py-1">
+                <button
+                  onClick={() => { setMenuOpen(false); onRestore(snapshot); }}
+                  disabled={isRestoring}
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] font-medium text-foreground-secondary hover:bg-hover transition-colors disabled:opacity-50"
+                >
+                  {isRestoring ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  )}
+                  復元
+                </button>
+                <button
+                  onClick={() => { setMenuOpen(false); onCompare(snapshot); }}
+                  disabled={isLoadingDiff}
+                  className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] font-medium text-foreground-secondary hover:bg-hover transition-colors disabled:opacity-50"
+                >
+                  {isLoadingDiff ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <GitCompare className="w-3.5 h-3.5" />
+                  )}
+                  比較
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------
+// DiffIndicator sub-component
+// -----------------------------------------------------------------------
+
+/** Total number of signs (+/−) in the git-style bar */
+const TOTAL_SIGNS = 5;
+
+interface DiffIndicatorProps {
+  diffStats?: DiffStats;
+  isFirstVersion: boolean;
+}
+
+/**
+ * Git-style proportional diff bar with separate addition/removal lines.
+ * 前のバージョンとの差分を git 風の +/− バーで比率表示する。
+ *
+ * Example output:
+ *   +++++ +68
+ *   −−    −10
+ */
+function DiffIndicator({ diffStats, isFirstVersion }: DiffIndicatorProps) {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  if (isFirstVersion) {
+    return (
+      <span className="text-[10px] tabular-nums text-foreground-tertiary">
+        初版
+      </span>
+    );
+  }
+
+  if (!diffStats) return null;
+
+  const { added, removed, addedText, removedText } = diffStats;
+
+  if (added === 0 && removed === 0) {
+    return (
+      <span className="text-[10px] tabular-nums text-foreground-tertiary">
+        変更なし
+      </span>
+    );
+  }
+
+  const total = added + removed;
+  let plusCount: number;
+  let minusCount: number;
+
+  if (added > 0 && removed > 0) {
+    // Split proportionally, ensure at least 1 each
+    plusCount = Math.max(1, Math.round((added / total) * TOTAL_SIGNS));
+    minusCount = TOTAL_SIGNS - plusCount;
+    if (minusCount < 1) {
+      minusCount = 1;
+      plusCount = TOTAL_SIGNS - 1;
+    }
+  } else if (added > 0) {
+    plusCount = TOTAL_SIGNS;
+    minusCount = 0;
+  } else {
+    plusCount = 0;
+    minusCount = TOTAL_SIGNS;
+  }
+
+  // Build tooltip content showing actual changes
+  const MAX_PREVIEW_LEN = 80;
+
+  return (
+    <div
+      className="relative flex flex-col gap-0 cursor-help"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      {added > 0 && (
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] font-mono leading-tight text-success">
+            {"+".repeat(plusCount)}
+          </span>
+          <span className="text-[10px] tabular-nums text-success">
+            {added.toLocaleString()}
+          </span>
+        </div>
+      )}
+      {removed > 0 && (
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] font-mono leading-tight text-error">
+            {"\u2212".repeat(minusCount)}
+          </span>
+          <span className="text-[10px] tabular-nums text-error">
+            {removed.toLocaleString()}
+          </span>
+        </div>
+      )}
+
+      {/* Custom tooltip */}
+      {showTooltip && (
+        <div className="absolute left-0 bottom-full mb-2 z-20 min-w-[200px] max-w-[300px] p-2 rounded-lg bg-background-secondary border border-border shadow-lg text-[11px] leading-relaxed pointer-events-none">
+          {removed > 0 && (
+            <div className="mb-1">
+              <div className="text-error whitespace-pre-wrap break-words line-through">
+                {removedText.length > MAX_PREVIEW_LEN
+                  ? removedText.slice(0, MAX_PREVIEW_LEN) + "…"
+                  : removedText}
+              </div>
+            </div>
+          )}
+          {added > 0 && (
+            <div>
+              <div className="text-success whitespace-pre-wrap break-words">
+                {addedText.length > MAX_PREVIEW_LEN
+                  ? addedText.slice(0, MAX_PREVIEW_LEN) + "…"
+                  : addedText}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

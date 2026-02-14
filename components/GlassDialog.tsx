@@ -16,7 +16,7 @@ interface GlassDialogProps {
 }
 
 const GLASS_CLASSES =
-  "rounded-xl bg-background-elevated/80 backdrop-blur-xl shadow-xl border border-border/50";
+  "rounded-xl bg-background-elevated backdrop-blur-xl shadow-2xl ring-1 ring-white/10";
 
 const DEFAULT_PANEL = "mx-4 w-full max-w-md p-6";
 

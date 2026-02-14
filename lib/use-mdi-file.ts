@@ -11,6 +11,29 @@ import { getVFS } from "./vfs";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 
 const AUTO_SAVE_INTERVAL = 5000; // 5秒
+
+/**
+ * Sanitize MDI content before saving.
+ * Converts/removes HTML tags that should not appear in .mdi files.
+ *
+ * MDI ファイルに保存する前に HTML タグを除去・変換する。
+ * - `<br />`, `<br>`, `<br/>` → 改行に変換
+ * - その他の HTML タグは削除（テキスト内容のみ残す）
+ */
+function sanitizeMdiContent(content: string): string {
+  let result = content;
+
+  // <br />, <br>, <br/> → newline
+  result = result.replace(/<br\s*\/?>/gi, "\n");
+
+  // Remove paired HTML tags but keep inner text (e.g., <span>text</span> → text)
+  result = result.replace(/<(\w+)[^>]*>(.*?)<\/\1>/gi, "$2");
+
+  // Remove remaining self-closing or orphan tags (e.g., <hr />, <img ... />)
+  result = result.replace(/<[^>]+>/g, "");
+
+  return result;
+}
 const DEMO_FILE_NAME = "鏡地獄.mdi";
 
 async function loadDemoContent(): Promise<string | null> {
@@ -296,6 +319,9 @@ export function useMdiFile(options?: { skipAutoRestore?: boolean }): UseMdiFileR
     isSavingRef.current = true;
     setIsSaving(true);
     try {
+      // Sanitize HTML tags before saving
+      contentRef.current = sanitizeMdiContent(contentRef.current);
+
       // Project mode: save directly via VFS (no system dialog)
       if (isProject && currentFile?.path) {
         const vfs = getVFS();
