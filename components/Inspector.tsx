@@ -80,9 +80,6 @@ interface InspectorProps {
     avgSentenceLength: number;
     avgPunctuationSpacing: number;
   };
-  particleAnalysis?: {
-    duplicates: Array<{ particle: string; count: number }>;
-  };
   // 品詞着色設定
   posHighlightEnabled?: boolean;
   onPosHighlightEnabledChange?: (enabled: boolean) => void;
@@ -112,7 +109,6 @@ export default function Inspector({
   charTypeAnalysis,
   charUsageRates,
   readabilityAnalysis,
-  particleAnalysis,
   posHighlightEnabled = false,
   onPosHighlightEnabledChange,
   onHistoryRestore,
@@ -469,7 +465,6 @@ export default function Inspector({
              charTypeAnalysis={charTypeAnalysis}
              charUsageRates={charUsageRates}
              readabilityAnalysis={readabilityAnalysis}
-             particleAnalysis={particleAnalysis}
            />
          )}
          {activeTab === "history" && projectMode && onHistoryRestore && (
@@ -722,7 +717,6 @@ function StatsPanel({
   charTypeAnalysis,
   charUsageRates,
   readabilityAnalysis,
-  particleAnalysis,
 }: {
   wordCount: number;
   charCount: number;
@@ -747,9 +741,6 @@ function StatsPanel({
     level: string;
     avgSentenceLength: number;
     avgPunctuationSpacing: number;
-  };
-  particleAnalysis?: {
-    duplicates: Array<{ particle: string; count: number }>;
   };
 }) {
   // 選択範囲の分析かどうか
@@ -1211,27 +1202,6 @@ function StatsPanel({
           </div>
         </div>
 
-        {/* 6. 問題検出 */}
-        {particleAnalysis && particleAnalysis.duplicates.length > 0 && !isSelection && (
-         <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4 border border-amber-200 dark:border-amber-800/50">
-           <h4 className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wide mb-3 flex items-center gap-2">
-              <span>⚠️</span>
-              <span>要チェック</span>
-           </h4>
-           <div className="space-y-2">
-             {particleAnalysis.duplicates.map((item, idx) => (
-               <div key={idx} className="text-sm text-foreground-secondary dark:text-foreground-secondary">
-                 <span>助詞の重複：</span>
-                 <span className="text-amber-700 dark:text-amber-400 font-semibold">{item.particle}</span>
-                 <span className="text-foreground-tertiary dark:text-foreground-tertiary"> ×{item.count}</span>
-               </div>
-             ))}
-              <p className="text-xs text-foreground-tertiary dark:text-foreground-tertiary mt-2 leading-relaxed">
-                例：「のの」「にに」は文法エラーの可能性があります
-              </p>
-           </div>
-         </div>
-        )}
 
 
      </div>

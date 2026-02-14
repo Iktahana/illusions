@@ -169,9 +169,6 @@ export interface AdvancedStatistics {
   characterTypeAnalysis: CharacterTypeAnalysis;
   usageRates: CharacterUsageRates;
   readability: ReadabilityAnalysis;
-  particleAnalysis?: {
-    duplicates: Array<{ particle: string; count: number }>;
-  };
 }
 
 /**
@@ -199,7 +196,6 @@ export function calculateStatistics(text: string): TextStatistics {
     characterTypeAnalysis: analyzeCharacterTypes(cleanedText),
     usageRates: calculateCharacterUsageRates(analyzeCharacterTypes(cleanedText)),
     readability: calculateReadabilityScore(cleanedText),
-    particleAnalysis: analyzeParticleUsage(cleanedText),
   };
 
   return {
@@ -435,28 +431,6 @@ export function calculateReadabilityScore(text: string): ReadabilityAnalysis {
     avgSentenceLength,
     avgPunctuationSpacing,
   };
-}
-
-/**
- * 助詞の重複を検出する
- * 例: 「のの」「にに」は不自然/誤りの可能性がある
- */
-export function analyzeParticleUsage(text: string): { duplicates: Array<{ particle: string; count: number }> } {
-  const particles = ['の', 'に', 'を', 'が', 'は', 'や', 'と', 'で', 'から', 'まで'];
-  const duplicates: Array<{ particle: string; count: number }> = [];
-
-  for (const particle of particles) {
-    const pattern = new RegExp(particle + particle, 'g');
-    const matches = text.match(pattern);
-    if (matches && matches.length > 0) {
-      duplicates.push({
-        particle: particle + particle,
-        count: matches.length,
-      });
-    }
-  }
-
-  return { duplicates };
 }
 
 /**

@@ -47,7 +47,6 @@ import {
   analyzeCharacterTypes,
   calculateCharacterUsageRates,
   calculateReadabilityScore,
-  analyzeParticleUsage,
 } from "@/lib/utils";
 
 import type { ProjectMode } from "@/lib/project-types";
@@ -1052,7 +1051,6 @@ export default function EditorPage() {
    const charTypeAnalysis = analyzeCharacterTypes(content);
    const charUsageRates = calculateCharacterUsageRates(charTypeAnalysis);
    const readabilityAnalysis = calculateReadabilityScore(content);
-   const particleAnalysis = analyzeParticleUsage(content);
 
    // ファイル名は currentFile.name のみを使用（isDirtyに基づく*の追加はInspectorコンポーネント側で処理）
    const fileName = currentFile?.name ?? "新規ファイル";
@@ -1906,7 +1904,6 @@ export default function EditorPage() {
             charTypeAnalysis={charTypeAnalysis}
             charUsageRates={charUsageRates}
             readabilityAnalysis={readabilityAnalysis}
-            particleAnalysis={particleAnalysis}
             posHighlightEnabled={posHighlightEnabled}
             onPosHighlightEnabledChange={handlePosHighlightEnabledChange}
             currentContent={content}
