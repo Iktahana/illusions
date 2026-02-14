@@ -64,9 +64,25 @@ Available for macOS (Intel & Apple Silicon) and Windows
 Simply visit https://illusions.app/ in your browser.
 
 #### Desktop Version
-1. Download the latest release from [GitHub Releases](https://github.com/Iktahana/illusions/releases/latest)
-2. Install and launch the app
-3. Start writing!
+
+##### macOS
+1. Download the `.dmg` file from [GitHub Releases](https://github.com/Iktahana/illusions/releases/latest)
+2. Open the DMG and drag illusions to your Applications folder
+3. Launch the app and start writing!
+
+##### Windows
+1. Download the `.exe` installer from [GitHub Releases](https://github.com/Iktahana/illusions/releases/latest)
+2. Run the installer
+3. **Important**: You may see a Windows SmartScreen warning saying "Unknown Publisher"
+   - This is normal for unsigned applications
+   - Click **"More info"** → **"Run anyway"** to proceed with installation
+4. Launch the app and start writing!
+
+**Why does Windows show this warning?**
+- illusions is currently distributed without a Windows code signing certificate
+- Code signing certificates cost $200-400/year for individual developers
+- The app is completely safe and open-source - you can review the code on GitHub
+- We plan to add code signing in the future as the project grows
 
 ### For Developers
 
@@ -263,6 +279,61 @@ MIT License - See [LICENSE](LICENSE) file for details.
 - **GitHub Issues**: https://github.com/Iktahana/illusions/issues
 - **Website**: https://www.illusions.app
 - **Chrome版**: https://illusions.app
+
+---
+
+## ❓ FAQ / よくある質問
+
+### Windows: "不明な発行元" / "Unknown Publisher" 警告について
+
+**Q: Windows でインストール時に「不明な発行元」と表示されます。安全ですか？**
+
+**A:** はい、安全です。この警告は、アプリケーションが Microsoft の認証を受けた署名がないために表示されます。
+
+**原因**:
+- コード署名証明書は年間 $200-400 の費用がかかります
+- 個人開発プロジェクトのため、現時点では署名を購入していません
+- すべてのソースコードは GitHub で公開されており、誰でも確認できます
+
+**インストール方法**:
+1. インストーラーをダブルクリック
+2. 「Windows によって PC が保護されました」と表示される
+3. 「詳細情報」をクリック
+4. 「実行」ボタンをクリック
+5. インストールが開始されます
+
+**セキュリティについて**:
+- ✅ オープンソース（コードは GitHub で公開）
+- ✅ GitHub Actions で自動ビルド
+- ✅ マルウェアスキャン済み
+- ✅ コミュニティによるコードレビュー
+
+将来的には、プロジェクトの成長に伴いコード署名証明書を取得する予定です。
+
+---
+
+**Q: Windows shows "Unknown Publisher" warning during installation. Is it safe?**
+
+**A:** Yes, it's completely safe. This warning appears because the app doesn't have a Microsoft-verified signature.
+
+**Why this happens**:
+- Code signing certificates cost $200-400/year
+- As an individual developer project, we haven't purchased signing yet
+- All source code is public on GitHub and can be reviewed by anyone
+
+**How to install**:
+1. Double-click the installer
+2. When you see "Windows protected your PC", click **"More info"**
+3. Click **"Run anyway"**
+4. Installation will proceed normally
+
+**Security**:
+- ✅ Open source (code publicly available on GitHub)
+- ✅ Built automatically with GitHub Actions
+- ✅ Malware scanned
+- ✅ Community code reviewed
+
+We plan to obtain a code signing certificate as the project grows.
 
 ---
 
