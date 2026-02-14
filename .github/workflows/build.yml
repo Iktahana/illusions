@@ -172,14 +172,39 @@ jobs:
       - name: Download local fonts
         run: npm run download:fonts
 
-      - name: Build Electron application
-        run: npm run electron:build
+      - name: Build NSIS installer
+        run: npx electron-builder --win nsis --x64 --arm64
+
+      - name: Prepare MSIX version
+        shell: bash
+        run: |
+          # Add .0 suffix for MSIX only
+          MSIX_VERSION="${{ steps.version.outputs.full }}.0"
+          npm version $MSIX_VERSION --no-git-tag-version
+
+      - name: Build MSIX package
+        run: npx electron-builder --win appx --x64 --arm64
+
+      - name: Restore original version
+        if: always()
+        shell: bash
+        run: |
+          # Restore original 3-part version
+          npm version ${{ steps.version.outputs.full }} --no-git-tag-version
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: illusions-windows-${{ steps.version.outputs.full }}
           path: dist-electron/**
+
+      - name: Upload MSIX artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: illusions-windows-msix-${{ steps.version.outputs.full }}
+          path: |
+            dist-electron/*.appx
+            dist-electron/*.appx.blockmap
 
   release:
     name: Create GitHub Release
@@ -219,7 +244,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-assets
-          find dist-electron -type f \( -name "*.yml" -o -name "*.exe" -o -name "*.exe.blockmap" -o -name "*.dmg" -o -name "*.dmg.blockmap" -o -name "*-mac.zip" -o -name "*-mac.zip.blockmap" \) -exec cp {} release-assets/ \;
+          find dist-electron -type f \( -name "*.yml" -o -name "*.exe" -o -name "*.exe.blockmap" -o -name "*.dmg" -o -name "*.dmg.blockmap" -o -name "*-mac.zip" -o -name "*-mac.zip.blockmap" -o -name "*.appx" -o -name "*.appx.blockmap" \) -exec cp {} release-assets/ \;
           ls -lh release-assets/
 
       - name: Create GitHub Release and upload assets

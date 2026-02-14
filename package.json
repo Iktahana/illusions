@@ -163,6 +163,13 @@
             "x64",
             "arm64"
           ]
+        },
+        {
+          "target": "appx",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "fileAssociations": [
@@ -173,6 +180,18 @@
           "description": "illusions の illusions MDI Document"
         }
       ]
+    },
+    "appx": {
+      "identityName": "74B619E8.illusions-AI",
+      "publisher": "CN=700D90DC-B687-4899-8C1E-2E1B85A6195C",
+      "publisherDisplayName": "幾田花",
+      "applicationId": "IllusionsApp",
+      "displayName": "illusions",
+      "languages": [
+        "ja-JP",
+        "en-US"
+      ],
+      "backgroundColor": "#1a1a1a"
     },
     "linux": {
       "icon": "build/icon.png",
