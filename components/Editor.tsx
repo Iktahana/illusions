@@ -13,7 +13,7 @@ import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
 import {
-  getScrollProgress, 
+  getScrollProgress,
   setScrollProgress,
 } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
@@ -26,6 +26,7 @@ import BubbleMenu, { type FormatType } from "./BubbleMenu";
 import SearchDialog from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
 import { searchHighlightPlugin } from "@/lib/search-highlight-plugin";
+import EditorContextMenu, { type ContextMenuAction } from "./EditorContextMenu";
 
 interface EditorProps {
   initialContent?: string;
@@ -381,6 +382,7 @@ function MilkdownEditor({
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
+  const [hasSelection, setHasSelection] = useState(false);
   // 初期内容はマウント時に固定（ファイル切り替えでコンポーネントが再マウントされたときだけ変わる）
   const initialContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
@@ -519,6 +521,7 @@ function MilkdownEditor({
 
       // 選択がない場合は 0
       if (from === to) {
+        setHasSelection(false);
         onSelectionChangeRef.current?.(0);
         return;
       }
@@ -526,6 +529,7 @@ function MilkdownEditor({
       // 選択文字列の文字数を数える（空白は除外）
       const selectedText = state.doc.textBetween(from, to);
       const count = selectedText.replace(/\s/g, "").length;
+      setHasSelection(count > 0);
       onSelectionChangeRef.current?.(count);
     };
 
@@ -889,27 +893,79 @@ function MilkdownEditor({
     }
   };
 
+  // Context menu actions
+  const handleContextMenuAction = useCallback((action: ContextMenuAction) => {
+    if (!editorViewInstance) return;
+
+    switch (action) {
+      case "cut":
+        document.execCommand("cut");
+        break;
+      case "copy":
+        document.execCommand("copy");
+        break;
+      case "paste":
+        navigator.clipboard.readText().then((text) => {
+          const { state, dispatch } = editorViewInstance;
+          const { from } = state.selection;
+          const transaction = state.tr.insertText(text, from);
+          dispatch(transaction);
+        }).catch((err) => {
+          console.error("Failed to paste:", err);
+        });
+        break;
+      case "paste-plaintext":
+        navigator.clipboard.readText().then((text) => {
+          // Strip formatting by using plain text
+          const { state, dispatch } = editorViewInstance;
+          const { from } = state.selection;
+          const transaction = state.tr.insertText(text, from);
+          dispatch(transaction);
+        }).catch((err) => {
+          console.error("Failed to paste plain text:", err);
+        });
+        break;
+      case "find":
+        // Trigger search dialog (you'll need to expose this functionality)
+        // For now, we'll use the browser's default find
+        document.execCommand("find");
+        break;
+      case "select-all":
+        const { state, dispatch } = editorViewInstance;
+        const transaction = state.tr.setSelection({
+          ...state.selection,
+          from: 0,
+          to: state.doc.content.size,
+        } as any);
+        dispatch(transaction);
+        break;
+      default:
+        break;
+    }
+  }, [editorViewInstance]);
+
   return (
     <>
-      <div
-        ref={editorRef}
-        className={clsx(
-          "editor-content-area",
-          isVertical 
-            ? "px-16 py-8 min-w-fit" 
-            : "p-8 mx-auto"
-        )}
-        style={{
-          fontSize: `${fontScale}%`,
-          fontFamily: `"${fontFamily}", serif`,
-          lineHeight: lineHeight,
-          ...(isVertical && {
-            minHeight: '100%',
-            display: 'flex',
-            alignItems: 'center',
-          }),
-        }}
-      >
+      <EditorContextMenu onAction={handleContextMenuAction} hasSelection={hasSelection}>
+        <div
+          ref={editorRef}
+          className={clsx(
+            "editor-content-area",
+            isVertical
+              ? "px-16 py-8 min-w-fit"
+              : "p-8 mx-auto"
+          )}
+          style={{
+            fontSize: `${fontScale}%`,
+            fontFamily: `"${fontFamily}", serif`,
+            lineHeight: lineHeight,
+            ...(isVertical && {
+              minHeight: '100%',
+              display: 'flex',
+              alignItems: 'center',
+            }),
+          }}
+        >
         <style jsx>{`
           div :global(.milkdown .ProseMirror) {
             font-family: "${fontFamily}", serif;
@@ -974,6 +1030,7 @@ function MilkdownEditor({
         `}</style>
         <Milkdown />
       </div>
+      </EditorContextMenu>
       {editorViewInstance && (
         <BubbleMenu editorView={editorViewInstance} onFormat={handleFormat} isVertical={isVertical} />
       )}
