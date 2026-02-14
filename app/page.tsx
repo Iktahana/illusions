@@ -72,28 +72,22 @@ function words(s: string) {
   return s.split(/\s+/).filter(Boolean).length;
 }
 
+// Module-level flag: persists across React StrictMode/HMR remounts,
+// but resets on page refresh (module re-evaluated).
+// Each Electron BrowserWindow has its own JS context, so no cross-window contamination.
+let _skipAutoRestoreDetected: boolean | null = null;
+
 export default function EditorPage() {
   const { editorMode, setProjectMode, setStandaloneMode, resetMode } = useEditorMode();
 
   // Detect ?welcome parameter: skip auto-restore and show welcome page
-  // Use sessionStorage to persist the flag across component remounts (React StrictMode, HMR)
   const [skipAutoRestore] = useState(() => {
     if (typeof window === "undefined") return false;
+    if (_skipAutoRestoreDetected !== null) return _skipAutoRestoreDetected;
 
-    // Check sessionStorage first (in case component remounts)
-    const stored = sessionStorage.getItem('skipAutoRestore');
-    if (stored !== null) {
-      return stored === 'true';
-    }
-
-    // Check URL parameter on first mount
     const params = new URLSearchParams(window.location.search);
-    const hasWelcome = params.has("welcome");
-
-    // Store in sessionStorage for potential remounts
-    sessionStorage.setItem('skipAutoRestore', hasWelcome.toString());
-
-    return hasWelcome;
+    _skipAutoRestoreDetected = params.has("welcome");
+    return _skipAutoRestoreDetected;
   });
 
   // Welcome screen / wizard / permission prompt state
@@ -478,12 +472,9 @@ export default function EditorPage() {
     };
   }, []);
 
-  // Clean up ?welcome parameter from URL and sessionStorage
+  // Clean up ?welcome parameter from URL
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    if (skipAutoRestore) {
-      // Clean up URL parameter
+    if (skipAutoRestore && typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.has("welcome")) {
         params.delete("welcome");
@@ -491,11 +482,6 @@ export default function EditorPage() {
         window.history.replaceState({}, "", cleanUrl);
       }
     }
-
-    // Clean up sessionStorage when component unmounts or window closes
-    return () => {
-      sessionStorage.removeItem('skipAutoRestore');
-    };
   }, [skipAutoRestore]);
 
   // ID of the most recent project to auto-restore
