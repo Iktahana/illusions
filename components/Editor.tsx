@@ -753,7 +753,8 @@ function MilkdownEditor({
         // 計算したサイズをエディタへ適用
         if (isVertical) {
           // 縦書き: 高さを制限（1列あたりの文字数）
-          const targetHeight = charSize * charsPerLine;
+          // 高さ計算の誤差を修正: 1文字分を減算
+          const targetHeight = charSize * (charsPerLine - 1);
           editorDom.style.height = `${targetHeight}px`;
           editorDom.style.maxHeight = `${targetHeight}px`;
           editorDom.style.minHeight = `${targetHeight}px`;
