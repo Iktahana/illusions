@@ -610,18 +610,62 @@ ipcMain.handle('show-context-menu', (_event, items) => {
   })
 })
 
+/**
+ * Check if a directory contains a .illusions folder (project marker)
+ * @param {string} dirPath - Directory path to check
+ * @returns {Promise<boolean>} True if .illusions folder exists
+ */
+async function isProjectDirectory(dirPath) {
+  try {
+    const illusionsPath = path.join(dirPath, '.illusions')
+    const stats = await fs.stat(illusionsPath)
+    return stats.isDirectory()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Handle opening a .mdi file from the system
+ * Detects if the file is part of a project and opens accordingly
+ * @param {string} filePath - Path to the .mdi file
+ */
+async function handleMdiFileOpen(filePath) {
+  if (!mainWindow || !mainWindow.webContents) {
+    return false
+  }
+
+  try {
+    const dirPath = path.dirname(filePath)
+    const isProject = await isProjectDirectory(dirPath)
+
+    if (isProject) {
+      // Open as project with this file as initial file
+      log.info('Opening as project:', dirPath, 'Initial file:', path.basename(filePath))
+      mainWindow.webContents.send('open-as-project', {
+        projectPath: dirPath,
+        initialFile: path.basename(filePath),
+      })
+    } else {
+      // Open as standalone file
+      log.info('Opening as standalone file:', filePath)
+      const content = await fs.readFile(filePath, 'utf-8')
+      mainWindow.webContents.send('open-file-from-system', { path: filePath, content })
+    }
+    return true
+  } catch (err) {
+    log.error('システムからのファイルオープンに失敗しました:', err)
+    return false
+  }
+}
+
 // Handle .mdi file association (macOS: open-file event, Windows/Linux: process.argv)
 let pendingFilePath = null
 
 app.on('open-file', async (event, filePath) => {
   event.preventDefault()
   if (mainWindow && mainWindow.webContents) {
-    try {
-      const content = await fs.readFile(filePath, 'utf-8')
-      mainWindow.webContents.send('open-file-from-system', { path: filePath, content })
-    } catch (err) {
-      log.error('システムからのファイルオープンに失敗しました:', err)
-    }
+    await handleMdiFileOpen(filePath)
   } else {
     pendingFilePath = filePath
   }
@@ -635,12 +679,7 @@ app.whenReady().then(async () => {
     const fileToOpen = pendingFilePath
     pendingFilePath = null
     mainWindow.webContents.once('did-finish-load', async () => {
-      try {
-        const content = await fs.readFile(fileToOpen, 'utf-8')
-        mainWindow.webContents.send('open-file-from-system', { path: fileToOpen, content })
-      } catch (err) {
-        log.error('システムからのファイルオープンに失敗しました:', err)
-      }
+      await handleMdiFileOpen(fileToOpen)
     })
   }
 

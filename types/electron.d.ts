@@ -24,6 +24,9 @@ declare global {
     onOpenFileFromSystem?: (
       callback: (payload: { path: string; content: string }) => void
     ) => (() => void) | void;
+    onOpenAsProject?: (
+      callback: (payload: { projectPath: string; initialFile: string }) => void
+    ) => (() => void) | void;
     onMenuNew?: (callback: () => void) => (() => void) | void;
     onMenuOpen?: (callback: () => void) => (() => void) | void;
     onMenuSave?: (callback: () => void) => (() => void) | void;

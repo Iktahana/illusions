@@ -1099,6 +1099,74 @@ export default function EditorPage() {
     }
   }, [isElectron, setProjectMode, openRestoredProject, loadProjectContent]);
 
+  /** Open a project from a file system path (when .mdi file is double-clicked in a project directory) */
+  const handleOpenAsProject = useCallback(async (projectPath: string, initialFile: string) => {
+    try {
+      console.log("[Open as Project] Opening project:", projectPath, "Initial file:", initialFile);
+
+      // Set VFS root to project directory
+      const vfs = getVFS();
+      if ("setRootPath" in vfs) {
+        (vfs as { setRootPath: (p: string) => void }).setRootPath(projectPath);
+      }
+
+      // Read project metadata
+      const rootDirHandle = await vfs.getDirectoryHandle("");
+      const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions");
+      const projectJsonHandle = await illusionsDir.getFileHandle("project.json");
+      const metadataText = await projectJsonHandle.read();
+      const metadata = JSON.parse(metadataText) as ProjectMode["metadata"];
+
+      // Try to load workspace state
+      let workspaceState: ProjectMode["workspaceState"];
+      try {
+        const wsHandle = await illusionsDir.getFileHandle("workspace.json");
+        const wsText = await wsHandle.read();
+        workspaceState = JSON.parse(wsText) as ProjectMode["workspaceState"];
+      } catch {
+        const { getDefaultWorkspaceState } = await import("@/lib/project-types");
+        workspaceState = getDefaultWorkspaceState();
+      }
+
+      // Open the initial file (the one that was double-clicked)
+      const initialFileHandle = await rootDirHandle.getFileHandle(initialFile);
+
+      // Cast VFS handles for ProjectMode compatibility
+      const nativeMainFileHandle = (initialFileHandle as unknown as FileSystemFileHandle);
+      const nativeRootHandle = (rootDirHandle as unknown as FileSystemDirectoryHandle);
+
+      // Create project mode
+      const project: ProjectMode = {
+        type: "project",
+        projectId: metadata.projectId,
+        name: metadata.name,
+        rootHandle: nativeRootHandle,
+        mainFileHandle: nativeMainFileHandle,
+        metadata,
+        workspaceState,
+        rootPath: projectPath,
+      };
+
+      setProjectMode(project);
+      await loadProjectContent(project);
+
+      // Add to recent projects
+      const storage = new ElectronStorageProvider();
+      await storage.initialize();
+      await storage.addRecentProject({
+        id: project.projectId,
+        rootPath: projectPath,
+        name: project.name,
+      });
+
+      // Rebuild menu to show in recent projects
+      void window.electronAPI?.rebuildMenu?.();
+    } catch (error) {
+      console.error("[Open as Project] Failed to open project:", error);
+      window.alert("プロジェクトを開けませんでした。.illusionsフォルダが正しく設定されているか確認してください。");
+    }
+  }, [setProjectMode, loadProjectContent]);
+
   // Keep ref in sync so useWebMenuHandlers can call it
   openRecentProjectRef.current = (projectId: string) => void handleOpenRecentProject(projectId);
   fontScaleChangeRef.current = handleFontScaleChange;
@@ -1112,6 +1180,15 @@ export default function EditorPage() {
     });
     return () => { cleanup?.(); };
   }, [isElectron, handleOpenRecentProject]);
+
+  // システムから.mdiファイルをプロジェクトとして開く（.illusionsフォルダ検出時）
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onOpenAsProject?.(({ projectPath, initialFile }) => {
+      void unsavedWarning.confirmBeforeAction(() => handleOpenAsProject(projectPath, initialFile));
+    });
+    return () => { cleanup?.(); };
+  }, [isElectron, unsavedWarning, handleOpenAsProject]);
 
   // Auto-restore the last opened project on startup
   const autoRestoreTriggeredRef = useRef(false);
