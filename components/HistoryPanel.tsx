@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Pin, Plus, RotateCcw, Loader2, History, Bookmark, GitCompare, MoreVertical, ChevronDown, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 import { getHistoryService } from "@/lib/history-service";
@@ -844,12 +845,37 @@ function DiffIndicator({ diffStats, isFirstVersion }: DiffIndicatorProps) {
 
   // Build tooltip content showing actual changes
   const MAX_PREVIEW_LEN = 80;
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null);
+
+  const showTip = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+    setShowTooltip(true);
+  }, []);
+
+  const hideTip = useCallback(() => {
+    hideTimerRef.current = setTimeout(() => setShowTooltip(false), 100);
+  }, []);
+
+  useEffect(() => {
+    if (showTooltip && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setTooltipPos({ top: rect.top, left: rect.left });
+    } else {
+      setTooltipPos(null);
+    }
+  }, [showTooltip]);
 
   return (
     <div
-      className="relative flex flex-col gap-0 cursor-help"
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
+      ref={triggerRef}
+      className="flex flex-col gap-0 cursor-help"
+      onMouseEnter={showTip}
+      onMouseLeave={hideTip}
     >
       {added > 0 && (
         <div className="flex items-center gap-1">
@@ -872,12 +898,22 @@ function DiffIndicator({ diffStats, isFirstVersion }: DiffIndicatorProps) {
         </div>
       )}
 
-      {/* Custom tooltip */}
-      {showTooltip && (
-        <div className="absolute left-0 bottom-full mb-2 z-20 min-w-[200px] max-w-[300px] p-2 rounded-lg bg-background-secondary border border-border shadow-lg text-[11px] leading-relaxed pointer-events-none">
+      {/* Portal tooltip rendered at document root */}
+      {showTooltip && tooltipPos && createPortal(
+        <div
+          className="fixed min-w-[200px] max-w-[300px] max-h-[300px] overflow-y-auto p-1.5 rounded-lg bg-background-secondary border border-border shadow-lg text-[11px] leading-none"
+          style={{
+            zIndex: 9999,
+            top: tooltipPos.top,
+            left: tooltipPos.left,
+            transform: "translateY(-100%) translateY(-8px)",
+          }}
+          onMouseEnter={showTip}
+          onMouseLeave={hideTip}
+        >
           {removed > 0 && (
-            <div className="mb-1">
-              <div className="text-error whitespace-pre-wrap break-words line-through">
+            <div className={added > 0 ? "mb-0.5" : ""}>
+              <div className="text-error whitespace-pre-wrap break-words line-through" style={{ lineHeight: 1.15 }}>
                 {removedText.length > MAX_PREVIEW_LEN
                   ? removedText.slice(0, MAX_PREVIEW_LEN) + "…"
                   : removedText}
@@ -886,14 +922,15 @@ function DiffIndicator({ diffStats, isFirstVersion }: DiffIndicatorProps) {
           )}
           {added > 0 && (
             <div>
-              <div className="text-success whitespace-pre-wrap break-words">
+              <div className="text-success whitespace-pre-wrap break-words" style={{ lineHeight: 1.15 }}>
                 {addedText.length > MAX_PREVIEW_LEN
                   ? addedText.slice(0, MAX_PREVIEW_LEN) + "…"
                   : addedText}
               </div>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
