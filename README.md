@@ -142,6 +142,15 @@ npm run electron:dev
 npm run electron:build
 ```
 
+#### Generate Dependency Credits
+
+```bash
+# Generate credits.json (list of production dependency licenses)
+npm run generate:credits
+```
+
+The generated file is used in the "About illusions" page in Settings.
+
 ---
 
 ## 📂 Project Structure
@@ -261,7 +270,9 @@ Please follow the code review standards in [CLAUDE.md](CLAUDE.md).
 
 ## 📝 License
 
-MIT License - See [LICENSE](LICENSE) file for details.
+GNU Affero General Public License v3.0 - See [LICENSE](LICENSE) file for details.
+
+See also: [利用規約 / Terms of Service](TERMS.md)
 
 ---
 
