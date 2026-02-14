@@ -114,7 +114,7 @@ jobs:
           path: dist-electron/**
 
   build-windows:
-    name: Build (Windows)
+    name: Build (Windows NSIS)
     runs-on: windows-latest
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
@@ -176,30 +176,81 @@ jobs:
         run: npm run type-check && npx cross-env ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron
 
       - name: Build NSIS installer
-        run: npx electron-builder --win nsis --x64 --arm64
-
-      - name: Prepare MSIX version
-        shell: bash
-        run: |
-          # Add .0 suffix for MSIX only
-          MSIX_VERSION="${{ steps.version.outputs.full }}.0"
-          npm version $MSIX_VERSION --no-git-tag-version
-
-      - name: Build MSIX package
-        run: npx electron-builder --win appx --x64 --arm64
-
-      - name: Restore original version
-        if: always()
-        shell: bash
-        run: |
-          # Restore original 3-part version
-          npm version ${{ steps.version.outputs.full }} --no-git-tag-version
+        run: npx electron-builder --win nsis --x64 --arm64 --publish never
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: illusions-windows-${{ steps.version.outputs.full }}
           path: dist-electron/**
+
+  build-windows-msix:
+    name: Build (Windows Store)
+    runs-on: windows-latest
+    env:
+      ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Restore Electron caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ELECTRON_CACHE }}
+            ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: electron-${{ runner.os }}-msix-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-msix-
+
+      - name: Restore Next.js cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-msix-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            next-${{ runner.os }}-msix-
+
+      - name: Compute build version
+        id: version
+        shell: bash
+        run: |
+          BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          BRANCH_NAME="${GITHUB_REF_NAME}"
+          if [ "$BRANCH_NAME" = "main" ]; then
+            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          else
+            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}"
+          fi
+          # MSIX requires 4-part version (x.y.z.0)
+          MSIX_VERSION="${FULL_VERSION}.0"
+          echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "msix=${MSIX_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building MSIX version: ${MSIX_VERSION}"
+
+      - name: Update package.json version (4-part for MSIX)
+        run: npm version ${{ steps.version.outputs.msix }} --no-git-tag-version
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Download local fonts
+        run: npm run download:fonts
+
+      - name: Build Next.js (static export) and bundle Electron main process
+        run: npm run type-check && npx cross-env ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron
+
+      - name: Build MSIX package
+        run: npx electron-builder --win appx --x64 --arm64 --publish never
 
       - name: Upload MSIX artifacts
         uses: actions/upload-artifact@v4
@@ -211,7 +262,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-macos, build-windows]
+    needs: [build-macos, build-windows, build-windows-msix]
     runs-on: ubuntu-latest
 
     steps:
