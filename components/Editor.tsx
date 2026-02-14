@@ -668,34 +668,6 @@ function MilkdownEditor({
     };
   }, [editorViewInstance]);
 
-  // エディタ全体を作り直さずに縦書き/横書きを切り替える
-  useEffect(() => {
-    // 初期化完了を待つため少し遅延する
-    const timer = setTimeout(() => {
-      try {
-        const editor = get();
-        if (!editor) return;
-        
-        const editorDom = editorRef.current?.querySelector('.milkdown .ProseMirror');
-        if (editorDom) {
-          // まず両方のクラスを外して状態をリセットする
-          editorDom.classList.remove('milkdown-japanese-vertical', 'milkdown-japanese-horizontal');
-          
-          // モードに応じてクラスを付与
-          if (isVertical) {
-            editorDom.classList.add('milkdown-japanese-vertical');
-          } else {
-            editorDom.classList.add('milkdown-japanese-horizontal');
-          }
-        }
-      } catch {
-        // まだ準備中なら無視
-      }
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [isVertical, get]);
-
   // 不要なアニメーションを避けるため、直前のスタイル値を保持する
   const prevStyleRef = useRef({ charsPerLine, isVertical, fontFamily, fontScale, lineHeight });
   const isFirstRenderRef = useRef(true);
@@ -718,10 +690,15 @@ function MilkdownEditor({
     prevStyleRef.current = { charsPerLine, isVertical, fontFamily, fontScale, lineHeight };
 
     // スタイルが変わっていない場合はアニメーションをしない（保存による再構築など）
-    const shouldAnimate = styleChanged && !isFirstRenderRef.current;
+    const isFirstRender = isFirstRenderRef.current;
+    const shouldAnimate = styleChanged && !isFirstRender;
     isFirstRenderRef.current = false;
 
     const applyStyles = () => {
+      // writing-mode class toggle (atomic with style application)
+      editorDom.classList.remove('milkdown-japanese-vertical', 'milkdown-japanese-horizontal');
+      editorDom.classList.add(isVertical ? 'milkdown-japanese-vertical' : 'milkdown-japanese-horizontal');
+
       // まずスタイルをリセット
       editorDom.style.width = '';
       editorDom.style.maxWidth = '';
@@ -777,65 +754,74 @@ function MilkdownEditor({
         requestAnimationFrame(() => {
           const container = scrollContainerRef.current;
           if (!container) return;
-          
+
           const containerWidth = container.clientWidth;
           // パディング（px-16 = 左右 64px）
           const padding = 128; // 64px * 2
           const minWidth = containerWidth - padding;
-          
+
           // ProseMirror に最小幅を設定
           // vertical-rl では右→左へ流れるため、最小幅を確保すると開始位置が右端に揃う
           editorDom.style.minWidth = `${minWidth}px`;
-          
-          // 排版完全完成後的回調
-          onLayoutCompleteCallback?.();
+
+          // Wait one more frame for layout to fully stabilize after writing-mode + minWidth change
+          requestAnimationFrame(() => {
+            onLayoutCompleteCallback?.();
+          });
         });
       } else {
         // 横書きでは最小幅を解除
         editorDom.style.minWidth = '';
-        
-        // 横書きの場合は即座に排版完成
-        onLayoutCompleteCallback?.();
+
+        // Wait one frame for layout to stabilize after writing-mode change
+        requestAnimationFrame(() => {
+          onLayoutCompleteCallback?.();
+        });
       }
     };
     
     // 排版完成後的滾動處理回調
     let onLayoutCompleteCallback: (() => void) | null = null;
 
-    // Restore scroll position after layout completes (only during mode switch)
+    // Restore scroll position after layout completes (mode switch or first render)
     const handleScrollAfterLayout = () => {
-      if (!isModeSwitchingRef.current) {
-        return;
-      }
-
       const container = scrollContainerRef.current;
       if (!container) {
         isModeSwitchingRef.current = false;
         return;
       }
 
-      const savedProgress = savedScrollProgressRef.current ?? 0;
+      if (isModeSwitchingRef.current) {
+        // Mode switch: restore saved progress
+        const savedProgress = savedScrollProgressRef.current ?? 0;
 
-      console.log('[DEBUG] Apply scroll after layout (mode switch):', {
-        isVertical,
-        savedProgress
-      });
+        console.log('[DEBUG] Apply scroll after layout (mode switch):', {
+          isVertical,
+          savedProgress
+        });
 
-      const success = setScrollProgress({ container, isVertical }, savedProgress);
+        const success = setScrollProgress({ container, isVertical }, savedProgress);
 
-      // Update the saved position for auto-scroll prevention
-      savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
+        // Update the saved position for auto-scroll prevention
+        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
 
-      if (success) {
-        console.log('[DEBUG] Scroll applied successfully');
-      } else {
-        console.log('[DEBUG] No scrollbar, skip scroll');
+        if (success) {
+          console.log('[DEBUG] Scroll applied successfully');
+        } else {
+          console.log('[DEBUG] No scrollbar, skip scroll');
+        }
+
+        // Delay clearing the flag with double rAF to outlast any browser auto-scroll or ProseMirror focus management
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            isModeSwitchingRef.current = false;
+          });
+        });
+      } else if (isFirstRender && isVertical) {
+        // First mount in vertical mode: scroll to start (rightmost position)
+        setScrollProgress({ container, isVertical }, 0);
+        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
       }
-
-      // Delay clearing the flag to allow scroll events from setScrollProgress to be processed
-      requestAnimationFrame(() => {
-        isModeSwitchingRef.current = false;
-      });
     };
     
     // 設置排版完成回調
@@ -913,11 +899,11 @@ function MilkdownEditor({
     };
   }, [isVertical, scrollContainerRef, verticalScrollBehavior, scrollSensitivity]);
 
-  // 縦書きモード: ブラウザの自動スクロールを防止
-  // テキスト選択、編集、モード切替時にブラウザが不正な位置にスクロールするのを防ぐ
+  // Auto-scroll prevention for both modes
+  // Prevents browser from overriding scroll position during text selection, editing, and mode switches
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || !isVertical) return;
+    if (!container) return;
 
     let userScrollTimer: ReturnType<typeof setTimeout> | null = null;
     let isReverting = false;
