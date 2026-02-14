@@ -59,6 +59,10 @@ export interface AppState {
   // プロジェクト管理
   currentProjectId?: string;
   projects?: ProjectMetadata[];
+
+  // 垂直スクロール設定
+  verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
+  scrollSensitivity?: number;
 }
 
 /**

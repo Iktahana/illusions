@@ -121,7 +121,7 @@ export default function WelcomeScreen({
           {/* Logo SVG with dark mode inversion */}
           <div className="mb-4 flex justify-center">
             <img
-              src="/logo/illusions.min.svg"
+              src="./logo/illusions.min.svg"
               alt="illusions"
               className="h-16 w-auto dark:invert"
             />

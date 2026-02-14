@@ -30,7 +30,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-export type ActivityBarView = "files" | "explorer" | "inspector" | "settings" | "search" | "outline" | "wordfreq" | "characters" | "dictionary" | "none";
+export type ActivityBarView = "files" | "explorer" | "settings" | "search" | "outline" | "wordfreq" | "characters" | "dictionary" | "none";
 
 interface ActivityBarItem {
   id: ActivityBarView;

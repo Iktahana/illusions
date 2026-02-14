@@ -39,6 +39,7 @@ interface EditorProps {
   textIndent?: number;
   fontFamily?: string;
   charsPerLine?: number;
+  onCharsPerLineChange?: (chars: number) => void;
   searchOpenTrigger?: number;
   searchInitialTerm?: string;
   showParagraphNumbers?: boolean;
@@ -48,6 +49,9 @@ interface EditorProps {
   // 品詞着色設定
   posHighlightEnabled?: boolean;
   posHighlightColors?: Record<string, string>;
+  // スクロール設定
+  verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
+  scrollSensitivity?: number;
 }
 
 export default function NovelEditor({
@@ -62,6 +66,7 @@ export default function NovelEditor({
   textIndent = 1,
   fontFamily = 'Noto Serif JP',
   charsPerLine = 40,
+  onCharsPerLineChange,
   searchOpenTrigger = 0,
   searchInitialTerm,
   showParagraphNumbers = false,
@@ -69,6 +74,8 @@ export default function NovelEditor({
   onShowAllSearchResults,
   posHighlightEnabled = false,
   posHighlightColors = {},
+  verticalScrollBehavior = "auto",
+  scrollSensitivity = 1.0,
 }: EditorProps) {
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
   const [isVertical, setIsVertical] = useState(() => {
@@ -120,21 +127,93 @@ export default function NovelEditor({
     if (container) {
       // 使用抽象層獲取當前進度
       const progress = getScrollProgress({ container, isVertical });
-      
+
       // 保存進度
       savedScrollProgressRef.current = progress;
-      
+
       console.log('[DEBUG] Toggle - Save progress:', {
         mode: isVertical ? '豎→橫' : '橫→豎',
         progress
       });
-      
+
       // Mark that scroll position needs restoration after mode switch
       isModeSwitchingRef.current = true;
     }
-    
+
     setIsVertical(!isVertical);
   }, [isVertical, scrollContainerRef]);
+
+  // Calculate optimal chars per line based on editor width and font size
+  const calculateOptimalCharsPerLine = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Measure character width
+    const measureEl = document.createElement('span');
+    measureEl.style.cssText = `
+      position: absolute;
+      visibility: hidden;
+      white-space: nowrap;
+      font-family: "${fontFamily}", serif;
+      font-size: ${fontScale}%;
+      line-height: ${lineHeight};
+    `;
+    measureEl.textContent = '国'; // Measure with full-width character
+    document.body.appendChild(measureEl);
+    const charSize = measureEl.offsetWidth;
+    document.body.removeChild(measureEl);
+
+    if (charSize <= 0) return;
+
+    // Get available space (subtract padding)
+    const padding = 128; // px-16 = 64px * 2 for left and right
+    const availableWidth = container.clientWidth - padding;
+
+    if (isVertical) {
+      // For vertical writing: calculate based on available height
+      // Get visible height (subtract toolbar height)
+      const toolbarHeight = 48; // h-12 = 48px
+      const topPadding = 48; // pt-12 = 48px
+      const availableHeight = container.clientHeight - toolbarHeight - topPadding;
+
+      const optimalChars = Math.max(20, Math.floor(availableHeight / charSize));
+      // Clamp between 20-80 characters for vertical writing
+      const clamped = Math.min(80, optimalChars);
+
+      if (clamped !== charsPerLine) {
+        onCharsPerLineChange?.(clamped);
+      }
+    } else {
+      // For horizontal writing: calculate based on available width
+      const optimalChars = Math.max(30, Math.floor(availableWidth / charSize));
+      // Clamp between 30-120 characters for horizontal writing
+      const clamped = Math.min(120, optimalChars);
+
+      if (clamped !== charsPerLine) {
+        onCharsPerLineChange?.(clamped);
+      }
+    }
+  }, [fontFamily, fontScale, lineHeight, isVertical, charsPerLine, onCharsPerLineChange, scrollContainerRef]);
+
+  // Add window resize listener to auto-adjust chars per line
+  useEffect(() => {
+    if (!onCharsPerLineChange) return;
+
+    // Calculate on mount
+    const timer = setTimeout(calculateOptimalCharsPerLine, 100);
+
+    // Calculate on window resize
+    const handleResize = () => {
+      calculateOptimalCharsPerLine();
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [calculateOptimalCharsPerLine, onCharsPerLineChange]);
 
   return (
     <div className={clsx("flex flex-col h-full min-h-0 relative", className)}>
@@ -182,6 +261,8 @@ export default function NovelEditor({
               savedScrollProgressRef={savedScrollProgressRef}
               posHighlightEnabled={posHighlightEnabled}
               posHighlightColors={posHighlightColors}
+              verticalScrollBehavior={verticalScrollBehavior}
+              scrollSensitivity={scrollSensitivity}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -274,6 +355,8 @@ function MilkdownEditor({
   savedScrollProgressRef,
   posHighlightEnabled,
   posHighlightColors,
+  verticalScrollBehavior = "auto",
+  scrollSensitivity = 1.0,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
@@ -293,6 +376,8 @@ function MilkdownEditor({
   savedScrollProgressRef: RefObject<number>;
   posHighlightEnabled?: boolean;
   posHighlightColors?: Record<string, string>;
+  verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
+  scrollSensitivity?: number;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
@@ -672,55 +757,33 @@ function MilkdownEditor({
     if (!container || !isVertical) return;
 
     const handleWheel = (event: WheelEvent) => {
-      // トラックパッド判定:
-      // 1) deltaX と deltaY の両方が出る（2Dスクロール）
-      // 2) 値が細かい（100/-100のように粗くない）
-      // 3) ctrlKey が押されていない（ピンチズーム除外）
-      const hasBothAxes = Math.abs(event.deltaX) > 0 && Math.abs(event.deltaY) > 0;
-      const hasFineGrainedValues = 
-        (Math.abs(event.deltaY) < 50 && Math.abs(event.deltaY) > 0) ||
-        (Math.abs(event.deltaX) < 50 && Math.abs(event.deltaX) > 0);
-      const isTouchpad = hasBothAxes || (hasFineGrainedValues && !event.ctrlKey);
+      let isTouchpad: boolean;
+
+      if (verticalScrollBehavior === "trackpad") {
+        isTouchpad = true;
+      } else if (verticalScrollBehavior === "mouse") {
+        isTouchpad = false;
+      } else {
+        // "auto": existing heuristic
+        const hasBothAxes = Math.abs(event.deltaX) > 0 && Math.abs(event.deltaY) > 0;
+        const hasFineGrainedValues =
+          (Math.abs(event.deltaY) < 50 && Math.abs(event.deltaY) > 0) ||
+          (Math.abs(event.deltaX) < 50 && Math.abs(event.deltaX) > 0);
+        isTouchpad = hasBothAxes || (hasFineGrainedValues && !event.ctrlKey);
+      }
+
+      const sensitivity = scrollSensitivity;
 
       if (isTouchpad) {
-        // トラックパッド: 自然なスクロールを維持
-        const beforeLeft = container.scrollLeft;
-        const beforeTop = container.scrollTop;
-        container.scrollLeft += event.deltaX;
-        container.scrollTop += event.deltaY;
-        console.debug('[AutoScroll] touchpad scroll', {
-          beforeLeft,
-          deltaX: event.deltaX,
-          afterLeft: container.scrollLeft,
-          beforeTop,
-          deltaY: event.deltaY,
-          afterTop: container.scrollTop,
-        });
+        container.scrollLeft += event.deltaX * sensitivity;
+        container.scrollTop += event.deltaY * sensitivity;
         event.preventDefault();
       } else {
-        // マウスホイール:
-        // - 縦回転（deltaY）→ 横スクロール（縦書きの読み進め方向）
-        // - 横回転（deltaX）→ 縦スクロール
-        // 横/縦のスクロール量を補正しつつ、操作を追跡ログを出す
         if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
-          // 縦回転 → 横スクロール
-          const beforeLeft = container.scrollLeft;
-          container.scrollLeft += event.deltaY;
-          console.debug('[AutoScroll] wheel vertical-scroll (deltaY)', {
-            beforeLeft,
-            deltaY: event.deltaY,
-            afterLeft: container.scrollLeft,
-          });
+          container.scrollLeft += event.deltaY * sensitivity;
           event.preventDefault();
         } else if (Math.abs(event.deltaX) > 0) {
-          // 横回転 → 縦スクロール
-          const beforeTop = container.scrollTop;
-          container.scrollTop += event.deltaX;
-          console.debug('[AutoScroll] wheel horizontal-scroll (deltaX)', {
-            beforeTop,
-            deltaX: event.deltaX,
-            afterTop: container.scrollTop,
-          });
+          container.scrollTop += event.deltaX * sensitivity;
           event.preventDefault();
         }
       }
@@ -731,7 +794,7 @@ function MilkdownEditor({
     return () => {
       container.removeEventListener("wheel", handleWheel);
     };
-  }, [isVertical, scrollContainerRef]);
+  }, [isVertical, scrollContainerRef, verticalScrollBehavior, scrollSensitivity]);
 
   // 【調試用】監聽所有 scroll 事件，追蹤滾動來源
   useEffect(() => {
