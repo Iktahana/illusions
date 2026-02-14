@@ -79,7 +79,6 @@ export interface UseMdiFileReturn {
   isDirty: boolean;
   isSaving: boolean;
   lastSavedTime: number | null;
-  lastSavedContent: string;
   openFile: () => Promise<void>;
   saveFile: () => Promise<void>;
   saveAsFile: () => Promise<void>;
@@ -552,7 +551,6 @@ export function useMdiFile(options?: { skipAutoRestore?: boolean; autoSave?: boo
     isDirty,
     isSaving,
     lastSavedTime,
-    lastSavedContent,
     openFile,
     saveFile,
     saveAsFile,

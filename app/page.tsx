@@ -13,7 +13,6 @@ import ActivityBar, { type ActivityBarView, isBottomView } from "@/components/Ac
 import SidebarSplitter from "@/components/SidebarSplitter";
 import SearchResults from "@/components/SearchResults";
 import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
-import FileConflictDialog from "@/components/FileConflictDialog";
 import UpgradeToProjectBanner from "@/components/UpgradeToProjectBanner";
 import { getProjectUpgradeService } from "@/lib/project-upgrade";
 import WordFrequency from "@/components/WordFrequency";
@@ -38,10 +37,8 @@ import { useEditorMode } from "@/contexts/EditorModeContext";
 import { getProjectService } from "@/lib/project-service";
 import { getProjectManager } from "@/lib/project-manager";
 import { getAvailableFeatures } from "@/lib/feature-detection";
-import { createFileWatcher } from "@/lib/file-watcher";
 import { getVFS } from "@/lib/vfs";
 import { isProjectMode, isStandaloneMode } from "@/lib/project-types";
-import { getHistoryService } from "@/lib/history-service";
 import {
   countSentences,
   analyzeCharacterTypes,
@@ -50,7 +47,6 @@ import {
 } from "@/lib/utils";
 
 import type { ProjectMode } from "@/lib/project-types";
-import type { FileWatcher } from "@/lib/file-watcher";
 
 /** Recent project entry for WelcomeScreen display */
 interface RecentProjectEntry {
@@ -106,11 +102,10 @@ export default function EditorPage() {
   const [autoSave, setAutoSave] = useState(true); // Auto-save on by default
 
   const mdiFile = useMdiFile({ skipAutoRestore, autoSave });
-  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, lastSavedContent, openFile: originalOpenFile, saveFile, saveAsFile, newFile: originalNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen, _loadSystemFile } =
+  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile: originalOpenFile, saveFile, saveAsFile, newFile: originalNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen, _loadSystemFile } =
     mdiFile;
 
   const contentRef = useRef<string>(content);
-  const lastSavedContentRef = useRef<string>(lastSavedContent);
   const editorDomRef = useRef<HTMLDivElement>(null);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [recoveryExiting, setRecoveryExiting] = useState(false);
@@ -130,17 +125,6 @@ export default function EditorPage() {
   const [upgradeBannerDismissed, setUpgradeBannerDismissed] = useState(false);
   const standaloneSaveCountRef = useRef(0);
 
-  // File conflict detection state (external file change)
-  const [showFileConflict, setShowFileConflict] = useState(false);
-  const [conflictData, setConflictData] = useState<{ fileName: string; lastModified: number; content: string } | null>(null);
-  const fileWatcherRef = useRef<FileWatcher | null>(null);
-  // Standalone polling timer ref for external change detection
-  const standalonePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const standaloneLastModifiedRef = useRef<number>(0);
-  // Pending conflict that should be shown only when window regains focus
-  const pendingConflictRef = useRef<{ fileName: string; lastModified: number; content: string } | null>(null);
-  const [isWindowFocused, setIsWindowFocused] = useState(true);
-
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
   // 未保存警告の Hook を初期化
@@ -149,194 +133,6 @@ export default function EditorPage() {
     saveFile,
     currentFile?.name || null
   );
-
-  // --- Window focus tracking ---
-  useEffect(() => {
-    const handleFocus = () => {
-      setIsWindowFocused(true);
-      // Show pending conflict when window regains focus
-      if (pendingConflictRef.current) {
-        setConflictData(pendingConflictRef.current);
-        setShowFileConflict(true);
-        pendingConflictRef.current = null;
-      }
-    };
-    const handleBlur = () => setIsWindowFocused(false);
-
-    window.addEventListener("focus", handleFocus);
-    window.addEventListener("blur", handleBlur);
-
-    return () => {
-      window.removeEventListener("focus", handleFocus);
-      window.removeEventListener("blur", handleBlur);
-    };
-  }, []);
-
-  // --- File conflict detection ---
-
-  /** Handle conflict resolution: keep local or load remote content */
-  const handleConflictResolve = useCallback(async (resolution: "local" | "remote") => {
-    if (!conflictData) return;
-
-    // Always create a conflict snapshot to preserve current editor content
-    if (isProjectMode(editorMode)) {
-      const historyService = getHistoryService();
-      const metadata = editorMode.metadata;
-      try {
-        await historyService.createSnapshot({
-          sourceFile: metadata.mainFile,
-          content: contentRef.current,
-          type: "manual",
-          label: "競合前の内容",
-        });
-      } catch (err) {
-        console.error("Failed to create conflict snapshot:", err);
-      }
-    }
-
-    if (resolution === "remote") {
-      // Load disk content into editor
-      setContent(conflictData.content);
-      setEditorKey(prev => prev + 1);
-    }
-    // "local" => keep editor content, dismiss dialog
-    setShowFileConflict(false);
-    setConflictData(null);
-  }, [conflictData, setContent, editorMode]);
-
-  /**
-   * Start/stop file watcher when currentFile or editorMode changes.
-   * Polls FileSystemFileHandle.getFile() every 5 seconds and compares
-   * lastModified to detect external changes. Works for both project mode
-   * (mainFileHandle) and standalone mode (fileHandle).
-   *
-   * ファイルまたはエディタモードが変わったら監視を開始/停止する。
-   * FileSystemFileHandle.getFile() を5秒ごとにポーリングし、
-   * lastModified を比較して外部変更を検出する。
-   */
-  useEffect(() => {
-    // Clean up any previous watcher / polling
-    if (fileWatcherRef.current) {
-      fileWatcherRef.current.stop();
-      fileWatcherRef.current = null;
-    }
-    if (standalonePollingRef.current !== null) {
-      clearInterval(standalonePollingRef.current);
-      standalonePollingRef.current = null;
-    }
-
-    // Only watch when in an active editor mode with a file open
-    if (editorMode === null || !currentFile) {
-      return;
-    }
-
-    // Determine the FileSystemFileHandle to poll.
-    // Project mode: use mainFileHandle. Standalone mode: use fileHandle.
-    // Electron mode: use VFS-based watcher with absolute path instead.
-    let fileHandle: FileSystemFileHandle | null = null;
-    if (isProjectMode(editorMode)) {
-      // Electron: use VFS-based watcher (works with absolute path)
-      if (isElectron && currentFile.path) {
-        const relativePath = editorMode.metadata.mainFile;
-        const watcher = createFileWatcher({
-          path: relativePath,
-          onChanged: (newContent: string) => {
-            // Only show conflict if content differs from both the current editor
-            // content AND the last saved content. When Google Drive (or similar
-            // sync agents) touch the file after our own auto-save, the disk
-            // content will match lastSavedContent even though the editor has
-            // moved on — this suppresses the false-positive conflict dialog.
-            if (newContent !== contentRef.current && newContent !== lastSavedContentRef.current) {
-              const conflict = {
-                fileName: currentFile.name,
-                lastModified: Date.now(),
-                content: newContent,
-              };
-              // Only show dialog if window is focused; otherwise queue it
-              if (isWindowFocused) {
-                setConflictData(conflict);
-                setShowFileConflict(true);
-              } else {
-                pendingConflictRef.current = conflict;
-              }
-            }
-          },
-        });
-        fileWatcherRef.current = watcher;
-        watcher.start();
-        // Return cleanup; skip the polling path below
-        return () => {
-          watcher.stop();
-          fileWatcherRef.current = null;
-        };
-      }
-      // Web: poll mainFileHandle directly
-      fileHandle = editorMode.mainFileHandle;
-    } else if (isStandaloneMode(editorMode)) {
-      fileHandle = editorMode.fileHandle;
-    }
-
-    if (!fileHandle) {
-      return;
-    }
-
-    // Direct FileSystemFileHandle polling (Web)
-    const handleToWatch = fileHandle;
-    standaloneLastModifiedRef.current = 0;
-
-    // Initialize lastModified baseline
-    void (async () => {
-      try {
-        const file = await handleToWatch.getFile();
-        standaloneLastModifiedRef.current = file.lastModified;
-      } catch {
-        // File may not be accessible initially
-      }
-    })();
-
-    // Poll every 5 seconds
-    const POLL_INTERVAL_MS = 5000;
-    standalonePollingRef.current = setInterval(() => {
-      void (async () => {
-        try {
-          const file = await handleToWatch.getFile();
-          if (file.lastModified > standaloneLastModifiedRef.current && standaloneLastModifiedRef.current > 0) {
-            standaloneLastModifiedRef.current = file.lastModified;
-            const newContent = await file.text();
-            // Only show conflict if content differs from both editor and last save
-            // (suppresses false positives from Google Drive sync touching our own save)
-            if (newContent !== contentRef.current && newContent !== lastSavedContentRef.current) {
-              const conflict = {
-                fileName: currentFile.name,
-                lastModified: file.lastModified,
-                content: newContent,
-              };
-              // Only show dialog if window is focused; otherwise queue it
-              if (isWindowFocused) {
-                setConflictData(conflict);
-                setShowFileConflict(true);
-              } else {
-                pendingConflictRef.current = conflict;
-              }
-            }
-          } else if (standaloneLastModifiedRef.current === 0) {
-            // First successful read, set baseline
-            standaloneLastModifiedRef.current = file.lastModified;
-          }
-        } catch {
-          // File may be inaccessible; skip this poll cycle
-        }
-      })();
-    }, POLL_INTERVAL_MS);
-
-    // Cleanup on unmount or when dependencies change
-    return () => {
-      if (standalonePollingRef.current !== null) {
-        clearInterval(standalonePollingRef.current);
-        standalonePollingRef.current = null;
-      }
-    };
-  }, [editorMode, currentFile, isElectron]);
 
    // 自動復元（ページ再読み込み）時はエディタを再マウント
    useEffect(() => {
@@ -999,7 +795,6 @@ export default function EditorPage() {
 
 
   contentRef.current = content;
-  lastSavedContentRef.current = lastSavedContent;
 
   const handleChange = (markdown: string) => {
     contentRef.current = markdown;
@@ -1635,18 +1430,6 @@ export default function EditorPage() {
           onDiscard={unsavedWarning.handleDiscard}
           onCancel={unsavedWarning.handleCancel}
         />
-
-        {/* 外部ファイル変更の競合解決ダイアログ */}
-        {showFileConflict && conflictData && (
-          <FileConflictDialog
-            isOpen={showFileConflict}
-            fileName={conflictData.fileName}
-            lastModified={conflictData.lastModified}
-            onResolve={handleConflictResolve}
-            localContent={contentRef.current}
-            remoteContent={conflictData.content}
-          />
-        )}
 
         {/* UpgradeBanner for standalone mode */}
         {showUpgradeBanner && !upgradeBannerDismissed && isStandaloneMode(editorMode) && features.projectMode && (
