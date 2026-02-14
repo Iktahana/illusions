@@ -3,6 +3,13 @@
  * Mirrors Electron native menu structure
  */
 
+const APP_VERSION = (() => {
+  const v = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
+  const parts = v.split(".");
+  if (parts.length >= 3 && parts[2] !== "0") return v;
+  return parts.slice(0, 2).join(".");
+})();
+
 export interface MenuItem {
   label?: string;
   type?: 'normal' | 'separator';
@@ -63,7 +70,7 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
   {
     label: 'ヘルプ',
     items: [
-      { label: 'バージョン 0.0.0', enabled: false },
+      { label: `バージョン ${APP_VERSION}`, enabled: false },
     ]
   }
 ];

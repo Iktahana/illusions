@@ -6,6 +6,14 @@ import ColorPicker from "./ColorPicker";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 const LICENSE_TEXT = process.env.NEXT_PUBLIC_LICENSE_TEXT || "";
 const TERMS_TEXT = process.env.NEXT_PUBLIC_TERMS_TEXT || "";
+
+/** Display version: show full version for CI builds (x.y.z where z > 0), otherwise first two parts */
+const APP_VERSION = (() => {
+  const v = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
+  const parts = v.split(".");
+  if (parts.length >= 3 && parts[2] !== "0") return v;
+  return parts.slice(0, 2).join(".");
+})();
 import clsx from "clsx";
 
 interface CreditEntry {
@@ -494,35 +502,33 @@ export default function SettingsModal({
                 </div>
 
                 {/* Color pickers */}
-                {posHighlightEnabled && (
-                  <div className="space-y-4 pt-4 border-t border-border">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-medium text-foreground">品詞の色</h4>
-                      <button
-                        onClick={handleResetColors}
-                        className="text-xs text-accent hover:text-accent-hover transition-colors"
-                      >
-                        デフォルトに戻す
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {posColorItems.map(({ key, label }) => (
-                        <div key={key} className="flex items-center justify-between">
-                          <span className="text-sm text-foreground-secondary">{label}</span>
-                          <ColorPicker
-                            value={getEffectiveColor(key)}
-                            onChange={(color) => {
-                              onPosHighlightColorsChange({
-                                ...posHighlightColors,
-                                [key]: color,
-                              });
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium text-foreground">品詞の色</h4>
+                    <button
+                      onClick={handleResetColors}
+                      className="text-xs text-accent hover:text-accent-hover transition-colors"
+                    >
+                      デフォルトに戻す
+                    </button>
                   </div>
-                )}
+                  <div className="space-y-2">
+                    {posColorItems.map(({ key, label }) => (
+                      <div key={key} className="flex items-center justify-between">
+                        <span className="text-sm text-foreground-secondary">{label}</span>
+                        <ColorPicker
+                          value={getEffectiveColor(key)}
+                          onChange={(color) => {
+                            onPosHighlightColorsChange({
+                              ...posHighlightColors,
+                              [key]: color,
+                            });
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -578,7 +584,7 @@ function AboutSection(): React.ReactElement {
       <div className="text-center space-y-2">
         <h3 className="text-2xl font-bold text-foreground">illusions</h3>
         <p className="text-sm text-foreground-secondary">
-          バージョン {process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0"}
+          バージョン {APP_VERSION}
         </p>
         <p className="text-sm text-foreground-tertiary">
           © {new Date().getFullYear()} 幾田花 (Iktahana). All rights reserved.
