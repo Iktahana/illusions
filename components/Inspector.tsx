@@ -3,8 +3,6 @@
 import { useState, useRef, useEffect, ReactNode } from "react";
 import { Bot, AlertCircle, BarChart3, ChevronRight, FolderOpen, FilePlus, Edit2, X, History } from "lucide-react";
 import clsx from "clsx";
-import ColorPicker from "./ColorPicker";
-import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import HistoryPanel from "./HistoryPanel";
 
@@ -88,8 +86,6 @@ interface InspectorProps {
   // 品詞着色設定
   posHighlightEnabled?: boolean;
   onPosHighlightEnabledChange?: (enabled: boolean) => void;
-  posHighlightColors?: Record<string, string>;
-  onPosHighlightColorsChange?: (colors: Record<string, string>) => void;
   // 履歴復元コールバック（プロジェクトモード時に使用）
   onHistoryRestore?: (content: string) => void;
   // 現在のエディタ内容（履歴差分表示用）
@@ -119,8 +115,6 @@ export default function Inspector({
   particleAnalysis,
   posHighlightEnabled = false,
   onPosHighlightEnabledChange,
-  posHighlightColors = {},
-  onPosHighlightColorsChange,
   onHistoryRestore,
   currentContent = "",
   onCompareInEditor,
@@ -459,11 +453,9 @@ export default function Inspector({
        <div className="flex-1 overflow-y-auto p-4">
          {activeTab === "ai" && <AIPanel />}
          {activeTab === "corrections" && (
-           <CorrectionsPanel 
+           <CorrectionsPanel
              posHighlightEnabled={posHighlightEnabled}
              onPosHighlightEnabledChange={onPosHighlightEnabledChange}
-             posHighlightColors={posHighlightColors}
-             onPosHighlightColorsChange={onPosHighlightColorsChange}
            />
          )}
          {activeTab === "stats" && (
@@ -552,40 +544,12 @@ function AISuggestion({ title, description }: { title: string; description: stri
 interface CorrectionsPanelProps {
   posHighlightEnabled: boolean;
   onPosHighlightEnabledChange?: (enabled: boolean) => void;
-  posHighlightColors: Record<string, string>;
-  onPosHighlightColorsChange?: (colors: Record<string, string>) => void;
 }
 
 function CorrectionsPanel({
   posHighlightEnabled,
   onPosHighlightEnabledChange,
-  posHighlightColors,
-  onPosHighlightColorsChange,
 }: CorrectionsPanelProps) {
-  const [showColorSettings, setShowColorSettings] = useState(false);
-  
-  // 色設定項目
-  const colorItems = [
-    { key: '名詞', label: '名詞' },
-    { key: '動詞', label: '動詞' },
-    { key: '動詞-自立', label: '└ 自立' },
-    { key: '動詞-非自立', label: '└ 非自立' },
-    { key: '形容詞', label: '形容詞' },
-    { key: '副詞', label: '副詞' },
-    { key: '助詞', label: '助詞' },
-    { key: '助動詞', label: '助動詞' },
-    { key: '接続詞', label: '接続詞' },
-    { key: '連体詞', label: '連体詞' },
-    { key: '感動詞', label: '感動詞' },
-    { key: '記号', label: '記号' },
-  ];
-
-  const handleColorChange = (key: string, color: string) => {
-    if (onPosHighlightColorsChange) {
-      onPosHighlightColorsChange({ ...posHighlightColors, [key]: color });
-    }
-  };
-
   return (
     <div className="space-y-3">
       {/* 構文ハイライト開關 */}
@@ -612,45 +576,13 @@ function CorrectionsPanel({
             />
           </button>
         </div>
-        
-        {/* 色設定ボタン */}
         {posHighlightEnabled && (
-          <button
-            onClick={() => setShowColorSettings(!showColorSettings)}
-            className="w-full mt-2 py-1.5 text-xs text-foreground-secondary hover:text-foreground-primary border border-dashed border-border-secondary rounded hover:border-accent transition-colors"
-          >
-            {showColorSettings ? '色設定を閉じる' : '色設定を開く'}
-          </button>
+          <p className="text-xs text-foreground-tertiary mt-2">
+            色の設定は「設定 → 品詞ハイライト」で変更できます
+          </p>
         )}
       </div>
 
-      {/* 色設定パネル */}
-      {posHighlightEnabled && showColorSettings && (
-        <div className="bg-background-secondary rounded-lg p-3 border border-border space-y-2">
-          <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-2">
-            品詞の色設定
-          </h4>
-          {colorItems.map(({ key, label }) => (
-            <div key={key} className="flex items-center justify-between">
-              <span className="text-xs text-foreground-secondary">{label}</span>
-              <ColorPicker
-                value={posHighlightColors[key] || DEFAULT_POS_COLORS[key] || '#000000'}
-                onChange={(color) => handleColorChange(key, color)}
-              />
-            </div>
-          ))}
-          
-          {/* リセットボタン */}
-          <button
-            type="button"
-            onClick={() => onPosHighlightColorsChange?.(DEFAULT_POS_COLORS)}
-            className="w-full mt-2 py-1.5 text-xs text-foreground-tertiary hover:text-foreground-secondary border border-dashed border-border-secondary rounded hover:border-accent transition-colors"
-          >
-            デフォルトに戻す
-          </button>
-        </div>
-      )}
-      
       <h3 className="text-sm font-medium text-foreground-secondary">校正リスト</h3>
       
       <CorrectionItem

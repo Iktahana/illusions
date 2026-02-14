@@ -1886,8 +1886,6 @@ export default function EditorPage() {
             particleAnalysis={particleAnalysis}
             posHighlightEnabled={posHighlightEnabled}
             onPosHighlightEnabledChange={handlePosHighlightEnabledChange}
-            posHighlightColors={posHighlightColors}
-            onPosHighlightColorsChange={handlePosHighlightColorsChange}
             currentContent={content}
             onHistoryRestore={(restoredContent: string) => {
               setContent(restoredContent);
