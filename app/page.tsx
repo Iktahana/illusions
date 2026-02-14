@@ -104,12 +104,14 @@ export default function EditorPage() {
   const [isRestoring, setIsRestoring] = useState(true);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const isAutoRestoringRef = useRef(false);
+  const [autoSave, setAutoSave] = useState(true); // Auto-save on by default
 
-  const mdiFile = useMdiFile({ skipAutoRestore });
-  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile: originalOpenFile, saveFile, saveAsFile, newFile: originalNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen, _loadSystemFile } =
+  const mdiFile = useMdiFile({ skipAutoRestore, autoSave });
+  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, lastSavedContent, openFile: originalOpenFile, saveFile, saveAsFile, newFile: originalNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen, _loadSystemFile } =
     mdiFile;
 
   const contentRef = useRef<string>(content);
+  const lastSavedContentRef = useRef<string>(lastSavedContent);
   const editorDomRef = useRef<HTMLDivElement>(null);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [recoveryExiting, setRecoveryExiting] = useState(false);
@@ -240,7 +242,12 @@ export default function EditorPage() {
         const watcher = createFileWatcher({
           path: relativePath,
           onChanged: (newContent: string) => {
-            if (newContent !== contentRef.current) {
+            // Only show conflict if content differs from both the current editor
+            // content AND the last saved content. When Google Drive (or similar
+            // sync agents) touch the file after our own auto-save, the disk
+            // content will match lastSavedContent even though the editor has
+            // moved on — this suppresses the false-positive conflict dialog.
+            if (newContent !== contentRef.current && newContent !== lastSavedContentRef.current) {
               const conflict = {
                 fileName: currentFile.name,
                 lastModified: Date.now(),
@@ -297,8 +304,9 @@ export default function EditorPage() {
           if (file.lastModified > standaloneLastModifiedRef.current && standaloneLastModifiedRef.current > 0) {
             standaloneLastModifiedRef.current = file.lastModified;
             const newContent = await file.text();
-            // Only show conflict if content differs from editor
-            if (newContent !== contentRef.current) {
+            // Only show conflict if content differs from both editor and last save
+            // (suppresses false positives from Google Drive sync touching our own save)
+            if (newContent !== contentRef.current && newContent !== lastSavedContentRef.current) {
               const conflict = {
                 fileName: currentFile.name,
                 lastModified: file.lastModified,
@@ -518,6 +526,9 @@ export default function EditorPage() {
         if (typeof appState.showParagraphNumbers === "boolean") {
           setShowParagraphNumbers(appState.showParagraphNumbers);
         }
+        if (typeof appState.autoSave === "boolean") {
+          setAutoSave(appState.autoSave);
+        }
         if (typeof appState.posHighlightEnabled === "boolean") {
           setPosHighlightEnabled(appState.posHighlightEnabled);
         }
@@ -720,6 +731,13 @@ export default function EditorPage() {
     setShowParagraphNumbers(value);
     void persistAppState({ showParagraphNumbers: value }).catch((error) => {
       console.error("段落番号の設定保存に失敗しました:", error);
+    });
+  }, []);
+
+  const handleAutoSaveChange = useCallback((value: boolean) => {
+    setAutoSave(value);
+    void persistAppState({ autoSave: value }).catch((error) => {
+      console.error("自動保存の設定保存に失敗しました:", error);
     });
   }, []);
 
@@ -982,6 +1000,7 @@ export default function EditorPage() {
 
 
   contentRef.current = content;
+  lastSavedContentRef.current = lastSavedContent;
 
   const handleChange = (markdown: string) => {
     contentRef.current = markdown;
@@ -1658,6 +1677,8 @@ export default function EditorPage() {
           onAutoCharsPerLineChange={handleAutoCharsPerLineChange}
           showParagraphNumbers={showParagraphNumbers}
           onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
+          autoSave={autoSave}
+          onAutoSaveChange={handleAutoSaveChange}
           verticalScrollBehavior={verticalScrollBehavior}
           onVerticalScrollBehaviorChange={handleVerticalScrollBehaviorChange}
           scrollSensitivity={scrollSensitivity}

@@ -79,6 +79,7 @@ export interface UseMdiFileReturn {
   isDirty: boolean;
   isSaving: boolean;
   lastSavedTime: number | null;
+  lastSavedContent: string;
   openFile: () => Promise<void>;
   saveFile: () => Promise<void>;
   saveAsFile: () => Promise<void>;
@@ -91,11 +92,12 @@ export interface UseMdiFileReturn {
   _loadSystemFile: (path: string, content: string) => void;
 }
 
-export function useMdiFile(options?: { skipAutoRestore?: boolean }): UseMdiFileReturn {
+export function useMdiFile(options?: { skipAutoRestore?: boolean; autoSave?: boolean }): UseMdiFileReturn {
   const isElectron =
     typeof window !== "undefined" && isElectronRenderer();
   const { isProject } = useEditorMode();
   const skipAutoRestore = options?.skipAutoRestore ?? false;
+  const autoSaveEnabled = options?.autoSave ?? true;
 
   const [currentFile, setCurrentFile] = useState<MdiFileDescriptor | null>(null);
   const [content, setContentState] = useState<string>(() => getRandomillusionstory());
@@ -436,6 +438,15 @@ export function useMdiFile(options?: { skipAutoRestore?: boolean }): UseMdiFileR
 
   // Dirty かつファイル選択中なら、一定間隔で自動保存する
   useEffect(() => {
+    if (!autoSaveEnabled) {
+      // Clear existing timer when auto-save is disabled
+      if (autoSaveTimerRef.current) {
+        clearInterval(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      return;
+    }
+
     autoSaveTimerRef.current = setInterval(() => {
       if (isDirtyRef.current && currentFileRef.current) {
         void saveFileRef.current(true); // Pass true to indicate auto-save
@@ -447,7 +458,7 @@ export function useMdiFile(options?: { skipAutoRestore?: boolean }): UseMdiFileR
         clearInterval(autoSaveTimerRef.current);
       }
     };
-  }, []); // stable - no deps, refs handle value changes
+  }, [autoSaveEnabled]);
 
   // Electron の「終了前に保存」要求を処理する
   useEffect(() => {
@@ -541,6 +552,7 @@ export function useMdiFile(options?: { skipAutoRestore?: boolean }): UseMdiFileR
     isDirty,
     isSaving,
     lastSavedTime,
+    lastSavedContent,
     openFile,
     saveFile,
     saveAsFile,

@@ -51,6 +51,8 @@ interface SettingsModalProps {
   onAutoCharsPerLineChange: (value: boolean) => void;
   showParagraphNumbers: boolean;
   onShowParagraphNumbersChange: (value: boolean) => void;
+  autoSave: boolean;
+  onAutoSaveChange: (value: boolean) => void;
   // Vertical scroll settings
   verticalScrollBehavior: "auto" | "mouse" | "trackpad";
   onVerticalScrollBehaviorChange: (value: "auto" | "mouse" | "trackpad") => void;
@@ -111,6 +113,8 @@ export default function SettingsModal({
   onAutoCharsPerLineChange,
   showParagraphNumbers,
   onShowParagraphNumbersChange,
+  autoSave,
+  onAutoSaveChange,
   verticalScrollBehavior,
   onVerticalScrollBehaviorChange,
   scrollSensitivity,
@@ -400,6 +404,30 @@ export default function SettingsModal({
                       className={clsx(
                         "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
                         showParagraphNumbers ? "translate-x-6" : "translate-x-1"
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {/* Auto-save toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-foreground">自動保存</h3>
+                    <p className="text-xs text-foreground-tertiary mt-0.5">
+                      変更を5秒ごとに自動保存します
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onAutoSaveChange(!autoSave)}
+                    className={clsx(
+                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                      autoSave ? "bg-accent" : "bg-border-secondary"
+                    )}
+                  >
+                    <span
+                      className={clsx(
+                        "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
+                        autoSave ? "translate-x-6" : "translate-x-1"
                       )}
                     />
                   </button>
