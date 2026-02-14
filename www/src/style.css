@@ -120,6 +120,20 @@ h1 {
   font-family: inherit;
 }
 
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.btn-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
 .btn-primary {
   background: rgba(255, 255, 255, 0.95);
   color: #000;
@@ -147,12 +161,16 @@ h1 {
 
 .features {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 2rem;
   margin-top: 4rem;
+  text-align: left;
 }
 
 .feature-card {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 3;
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -161,14 +179,18 @@ h1 {
   color: white;
 }
 
+.feature-icon {
+  font-size: 2rem;
+}
+
 .feature-card h3 {
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
+  font-size: 1.15rem;
 }
 
 .feature-card p {
-  opacity: 0.9;
-  line-height: 1.6;
+  opacity: 0.85;
+  line-height: 1.8;
+  font-size: 0.93rem;
 }
 
 /* --- Downloads page --- */
@@ -495,6 +517,15 @@ h1 {
 
   .btn {
     width: 100%;
+  }
+
+  .features {
+    grid-template-columns: 1fr;
+  }
+
+  .feature-card {
+    grid-row: span 1;
+    grid-template-rows: auto;
   }
 
   .platforms {
