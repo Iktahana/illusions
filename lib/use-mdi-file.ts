@@ -133,6 +133,15 @@ export function useMdiFile(): UseMdiFileReturn {
   useEffect(() => {
     const initializeStorage = async () => {
       try {
+        // Detect ?welcome parameter: skip all auto-restore logic
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          if (params.has('welcome')) {
+            console.log('[use-mdi-file] ?welcome detected, skipping auto-restore');
+            return;
+          }
+        }
+
         const storage = getStorageService();
         await storage.initialize();
         const session = await storage.loadSession();
