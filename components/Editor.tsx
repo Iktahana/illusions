@@ -505,6 +505,10 @@ function MilkdownEditor({
     onSelectionChangeRef.current = onSelectionChange;
   }, [onSelectionChange]);
 
+  // 縦書き: ブラウザの自動スクロールを防止するための保存位置
+  const savedScrollPosRef = useRef({ left: 0, top: 0 });
+  const userScrollingRef = useRef(false);
+
   // 縦書き用のスクロール制御プラグインを作成
   // isVertical の参照を保持
   const isVerticalRef = useRef(isVertical);
@@ -819,13 +823,19 @@ function MilkdownEditor({
 
       const success = setScrollProgress({ container, isVertical }, savedProgress);
 
+      // Update the saved position for auto-scroll prevention
+      savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
+
       if (success) {
         console.log('[DEBUG] Scroll applied successfully');
       } else {
         console.log('[DEBUG] No scrollbar, skip scroll');
       }
 
-      isModeSwitchingRef.current = false;
+      // Delay clearing the flag to allow scroll events from setScrollProgress to be processed
+      requestAnimationFrame(() => {
+        isModeSwitchingRef.current = false;
+      });
     };
     
     // 設置排版完成回調
@@ -903,45 +913,65 @@ function MilkdownEditor({
     };
   }, [isVertical, scrollContainerRef, verticalScrollBehavior, scrollSensitivity]);
 
-  // 【調試用】監聽所有 scroll 事件，追蹤滾動來源
+  // 縦書きモード: ブラウザの自動スクロールを防止
+  // テキスト選択、編集、モード切替時にブラウザが不正な位置にスクロールするのを防ぐ
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || !isVertical) return;
 
-    let lastScrollLeft = container.scrollLeft;
-    let lastScrollTop = container.scrollTop;
+    let userScrollTimer: ReturnType<typeof setTimeout> | null = null;
+    let isReverting = false;
 
-    const handleScroll = () => {
-      const currentScrollLeft = container.scrollLeft;
-      const currentScrollTop = container.scrollTop;
-      
-      // 只有在滾動位置有明顯變化時才輸出日誌（避免太多噪音）
-      const deltaLeft = Math.abs(currentScrollLeft - lastScrollLeft);
-      const deltaTop = Math.abs(currentScrollTop - lastScrollTop);
-      
-      if (deltaLeft > 10 || deltaTop > 10) {
-        console.debug('[AutoScroll] scroll event detected', {
-          beforeLeft: lastScrollLeft,
-          afterLeft: currentScrollLeft,
-          deltaLeft,
-          beforeTop: lastScrollTop,
-          afterTop: currentScrollTop,
-          deltaTop,
-          // 嘗試獲取調用堆棧
-          stack: new Error().stack?.split('\n').slice(1, 5).join('\n')
-        });
-      }
-      
-      lastScrollLeft = currentScrollLeft;
-      lastScrollTop = currentScrollTop;
+    // Initialize saved position
+    savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
+
+    const markUserScroll = () => {
+      userScrollingRef.current = true;
+      if (userScrollTimer) clearTimeout(userScrollTimer);
+      userScrollTimer = setTimeout(() => {
+        userScrollingRef.current = false;
+      }, 200);
     };
 
-    container.addEventListener("scroll", handleScroll, { passive: true });
+    // Track user-initiated scroll sources
+    const onWheel = () => markUserScroll();
+    const onPointerDown = (e: PointerEvent) => {
+      // Detect scrollbar drag (pointer down on the container itself, not on editor content)
+      if (e.target === container) {
+        markUserScroll();
+      }
+    };
+    const onTouchStart = () => markUserScroll();
+
+    // Intercept and revert browser auto-scrolls
+    const onScroll = () => {
+      if (isReverting) return;
+
+      if (userScrollingRef.current || isModeSwitchingRef.current) {
+        // User interaction or mode switch: save position
+        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
+      } else {
+        // Browser auto-scroll (e.g., selection change, DOM update): revert
+        isReverting = true;
+        container.scrollLeft = savedScrollPosRef.current.left;
+        container.scrollTop = savedScrollPosRef.current.top;
+        requestAnimationFrame(() => { isReverting = false; });
+      }
+    };
+
+    container.addEventListener('wheel', onWheel, { passive: true });
+    container.addEventListener('pointerdown', onPointerDown, { passive: true });
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('scroll', onScroll, { passive: true });
 
     return () => {
-      container.removeEventListener("scroll", handleScroll);
+      container.removeEventListener('wheel', onWheel);
+      container.removeEventListener('pointerdown', onPointerDown);
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('scroll', onScroll);
+      if (userScrollTimer) clearTimeout(userScrollTimer);
     };
-  }, [isVertical, scrollContainerRef]);
+  }, [isVertical, scrollContainerRef, isModeSwitchingRef, savedScrollPosRef, userScrollingRef]);
 
   // BubbleMenu からの書式コマンドを処理する
   const handleFormat = (format: FormatType, level?: number) => {
