@@ -172,6 +172,9 @@ jobs:
       - name: Download local fonts
         run: npm run download:fonts
 
+      - name: Build Next.js (static export) and bundle Electron main process
+        run: npm run type-check && npx cross-env ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron
+
       - name: Build NSIS installer
         run: npx electron-builder --win nsis --x64 --arm64
 
