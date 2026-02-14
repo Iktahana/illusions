@@ -2,10 +2,13 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 
+type ThemeMode = "light" | "dark" | "auto";
 type Theme = "light" | "dark";
 
 interface ThemeContextType {
   theme: Theme;
+  themeMode: ThemeMode;
+  setThemeMode: (mode: ThemeMode) => void;
   toggleTheme: () => void;
 }
 
@@ -17,23 +20,30 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return "light";
     return document.documentElement.classList.contains("dark") ? "dark" : "light";
   });
+  const [themeMode, setThemeModeState] = useState<ThemeMode>("auto");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     // inline script が設定済みの値と状態を同期する
-    const stored = localStorage.getItem("theme") as Theme | null;
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initialTheme = stored || (prefersDark ? "dark" : "light");
-    setTheme(initialTheme);
-    // DOM class は inline script 側で設定済みのため、ここでは再設定しない
+    const storedMode = localStorage.getItem("themeMode") as ThemeMode | null;
+    const mode = storedMode || "auto";
+    setThemeModeState(mode);
+
+    // 実際のテーマを設定
+    if (mode === "auto") {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      setTheme(prefersDark ? "dark" : "light");
+    } else {
+      setTheme(mode);
+    }
   }, []);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = (event: MediaQueryListEvent | MediaQueryList) => {
-      const stored = localStorage.getItem("theme");
-      if (stored) return;
+      // Only auto-update if mode is "auto"
+      if (themeMode !== "auto") return;
       const newTheme = event.matches ? "dark" : "light";
       setTheme(newTheme);
       document.documentElement.classList.toggle("dark", newTheme === "dark");
@@ -48,13 +58,29 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         ? mediaQuery.removeEventListener("change", handleChange)
         : mediaQuery.removeListener(handleChange);
     };
-  }, []);
+  }, [themeMode]);
+
+  const setThemeMode = (mode: ThemeMode) => {
+    setThemeModeState(mode);
+    localStorage.setItem("themeMode", mode);
+
+    if (mode === "auto") {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const autoTheme = prefersDark ? "dark" : "light";
+      setTheme(autoTheme);
+      document.documentElement.classList.toggle("dark", autoTheme === "dark");
+    } else {
+      setTheme(mode);
+      document.documentElement.classList.toggle("dark", mode === "dark");
+    }
+  };
 
   const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
+    // Cycle through: light → dark → auto → light
+    const modeOrder: ThemeMode[] = ["light", "dark", "auto"];
+    const currentIndex = modeOrder.indexOf(themeMode);
+    const nextMode = modeOrder[(currentIndex + 1) % modeOrder.length];
+    setThemeMode(nextMode);
   };
 
   if (!mounted) {
@@ -62,7 +88,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, themeMode, setThemeMode, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
