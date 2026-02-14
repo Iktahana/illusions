@@ -5,6 +5,7 @@ import { X, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
 import ColorPicker from "./ColorPicker";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import { LICENSE_TEXT } from "@/lib/license-text";
+import { TERMS_TEXT } from "@/lib/terms-text";
 import clsx from "clsx";
 import packageJson from "@/package.json";
 
@@ -537,10 +538,10 @@ export default function SettingsModal({
   );
 }
 
-type AboutTab = "license" | "credits";
+type AboutTab = "terms" | "license" | "credits";
 
 function AboutSection(): React.ReactElement {
-  const [activeTab, setActiveTab] = useState<AboutTab>("license");
+  const [activeTab, setActiveTab] = useState<AboutTab>("terms");
   const [expandedCredits, setExpandedCredits] = useState<Set<string>>(new Set());
 
   // Group credits by license type
@@ -601,6 +602,17 @@ function AboutSection(): React.ReactElement {
       {/* Tab switcher */}
       <div className="flex border-b border-border">
         <button
+          onClick={() => setActiveTab("terms")}
+          className={clsx(
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+            activeTab === "terms"
+              ? "border-accent text-accent"
+              : "border-transparent text-foreground-secondary hover:text-foreground"
+          )}
+        >
+          利用規約
+        </button>
+        <button
           onClick={() => setActiveTab("license")}
           className={clsx(
             "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
@@ -625,10 +637,19 @@ function AboutSection(): React.ReactElement {
       </div>
 
       {/* Tab content */}
+      {activeTab === "terms" && (
+        <div className="rounded-lg border border-border bg-background/50 overflow-hidden">
+          <div
+            className="p-4 text-sm text-foreground-secondary overflow-auto max-h-[40vh] leading-relaxed prose-about"
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(TERMS_TEXT) }}
+          />
+        </div>
+      )}
+
       {activeTab === "license" && (
         <div className="rounded-lg border border-border bg-background/50 overflow-hidden">
-          <pre className="p-4 text-xs text-foreground-secondary overflow-auto max-h-[40vh] whitespace-pre-wrap font-mono leading-relaxed">
-            {LICENSE_TEXT}
+          <pre className="p-4 text-xs text-foreground-secondary overflow-auto max-h-[40vh] whitespace-pre-wrap font-mono leading-relaxed text-center">
+            {LICENSE_TEXT.replace(/^ {2,}/gm, "")}
           </pre>
         </div>
       )}
@@ -692,4 +713,75 @@ function AboutSection(): React.ReactElement {
       )}
     </div>
   );
+}
+
+/** Lightweight markdown to HTML renderer for simple documents */
+function renderMarkdown(md: string): string {
+  const escape = (s: string): string =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const lines = md.split("\n");
+  const html: string[] = [];
+  let inList = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Horizontal rule
+    if (/^---+$/.test(line.trim())) {
+      if (inList) { html.push("</ul>"); inList = false; }
+      html.push('<hr class="my-4 border-border" />');
+      continue;
+    }
+
+    // Headings
+    const headingMatch = line.match(/^(#{1,4})\s+(.*)/);
+    if (headingMatch) {
+      if (inList) { html.push("</ul>"); inList = false; }
+      const level = headingMatch[1].length;
+      const text = inlineFormat(escape(headingMatch[2]));
+      const sizes: Record<number, string> = { 1: "text-lg font-bold", 2: "text-base font-bold", 3: "text-sm font-semibold", 4: "text-sm font-medium" };
+      html.push(`<h${level} class="${sizes[level] || "text-sm font-medium"} text-foreground mt-4 mb-2">${text}</h${level}>`);
+      continue;
+    }
+
+    // List items (*, -)
+    const listMatch = line.match(/^(\s*)[*\-]\s+(.*)/);
+    if (listMatch) {
+      if (!inList) { html.push('<ul class="list-disc pl-5 space-y-1">'); inList = true; }
+      const indent = listMatch[1].length >= 4 ? ' class="ml-4"' : "";
+      html.push(`<li${indent}>${inlineFormat(escape(listMatch[2]))}</li>`);
+      continue;
+    }
+
+    // Close list if we hit a non-list line
+    if (inList) { html.push("</ul>"); inList = false; }
+
+    // Empty line
+    if (line.trim() === "") {
+      continue;
+    }
+
+    // Paragraph
+    html.push(`<p class="mb-2">${inlineFormat(escape(line))}</p>`);
+  }
+
+  if (inList) html.push("</ul>");
+  return html.join("\n");
+}
+
+/** Render inline markdown: bold, links, code */
+function inlineFormat(text: string): string {
+  // Bold **text**
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong class="text-foreground font-semibold">$1</strong>');
+  // Links [text](url)
+  text = text.replace(
+    /\[(.+?)\]\((.+?)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-accent hover:text-accent-hover underline">$1</a>'
+  );
+  // Inline code `text`
+  text = text.replace(/`(.+?)`/g, '<code class="text-xs bg-background px-1 py-0.5 rounded">$1</code>');
+  // Line break (two trailing spaces)
+  text = text.replace(/ {2}$/, "<br />");
+  return text;
 }
