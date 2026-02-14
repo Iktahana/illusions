@@ -921,6 +921,7 @@ function MilkdownEditor({
 
     let userScrollTimer: ReturnType<typeof setTimeout> | null = null;
     let isReverting = false;
+    let isPointerDown = false; // マウスドラッグ中（テキスト選択中）のフラグ
 
     // Initialize saved position
     savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
@@ -935,11 +936,12 @@ function MilkdownEditor({
 
     // Track user-initiated scroll sources
     const onWheel = () => markUserScroll();
-    const onPointerDown = (e: PointerEvent) => {
-      // Detect scrollbar drag (pointer down on the container itself, not on editor content)
-      if (e.target === container) {
-        markUserScroll();
-      }
+    const onPointerDown = () => {
+      // マウスボタンが押されている間はドラッグ選択の可能性がある
+      isPointerDown = true;
+    };
+    const onPointerUp = () => {
+      isPointerDown = false;
     };
     const onTouchStart = () => markUserScroll();
 
@@ -947,11 +949,11 @@ function MilkdownEditor({
     const onScroll = () => {
       if (isReverting) return;
 
-      if (userScrollingRef.current || isModeSwitchingRef.current) {
-        // User interaction or mode switch: save position
+      if (userScrollingRef.current || isModeSwitchingRef.current || isPointerDown) {
+        // User interaction, mode switch, or mouse drag: save position
         savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
       } else {
-        // Browser auto-scroll (e.g., selection change, DOM update): revert
+        // Browser auto-scroll (e.g., DOM update): revert
         isReverting = true;
         container.scrollLeft = savedScrollPosRef.current.left;
         container.scrollTop = savedScrollPosRef.current.top;
@@ -961,12 +963,14 @@ function MilkdownEditor({
 
     container.addEventListener('wheel', onWheel, { passive: true });
     container.addEventListener('pointerdown', onPointerDown, { passive: true });
+    document.addEventListener('pointerup', onPointerUp);
     container.addEventListener('touchstart', onTouchStart, { passive: true });
     container.addEventListener('scroll', onScroll, { passive: true });
 
     return () => {
       container.removeEventListener('wheel', onWheel);
       container.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('pointerup', onPointerUp);
       container.removeEventListener('touchstart', onTouchStart);
       container.removeEventListener('scroll', onScroll);
       if (userScrollTimer) clearTimeout(userScrollTimer);
