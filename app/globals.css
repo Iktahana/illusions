@@ -15,37 +15,37 @@ html {
 }
 
 :root {
-  /* Background colors */
-  --background: #ffffff;
-  --background-secondary: #f8fafc;
-  --background-tertiary: #f1f5f9;
-  --background-elevated: #ffffff;
-  
+  /* Background colors (RGB channels for Tailwind opacity support) */
+  --background: 255 255 255;
+  --background-secondary: 248 250 252;
+  --background-tertiary: 241 245 249;
+  --background-elevated: 255 255 255;
+
   /* Text colors */
-  --foreground: #0f172a;
-  --foreground-secondary: #475569;
-  --foreground-tertiary: #64748b;
-  --foreground-muted: #94a3b8;
-  
+  --foreground: 15 23 42;
+  --foreground-secondary: 71 85 105;
+  --foreground-tertiary: 100 116 139;
+  --foreground-muted: 148 163 184;
+
   /* Border colors */
-  --border: #e2e8f0;
-  --border-secondary: #cbd5e1;
-  
+  --border: 226 232 240;
+  --border-secondary: 203 213 225;
+
   /* Accent colors */
-  --accent: #6366f1;
-  --accent-foreground: #ffffff;
-  --accent-light: #eef2ff;
-  --accent-hover: #4f46e5;
-  
+  --accent: 99 102 241;
+  --accent-foreground: 255 255 255;
+  --accent-light: 238 242 255;
+  --accent-hover: 79 70 229;
+
   /* Interactive states */
-  --hover: #f1f5f9;
-  --active: #e0e7ff;
-  
+  --hover: 241 245 249;
+  --active: 224 231 255;
+
   /* Status colors */
-  --success: #10b981;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --info: #3b82f6;
+  --success: 16 185 129;
+  --warning: 245 158 11;
+  --error: 239 68 68;
+  --info: 59 130 246;
   
   /* Progress bar colors for light mode */
   --progress-readability: #6366f1;
@@ -69,37 +69,37 @@ html {
 }
 
 .dark {
-  /* Background colors - darker for better contrast */
-  --background: #0a0a0a;
-  --background-secondary: #1a1a1a;
-  --background-tertiary: #2a2a2a;
-  --background-elevated: #1a1a1a;
-  
+  /* Background colors - darker for better contrast (RGB channels) */
+  --background: 10 10 10;
+  --background-secondary: 26 26 26;
+  --background-tertiary: 42 42 42;
+  --background-elevated: 26 26 26;
+
   /* Text colors - brighter for better contrast */
-  --foreground: #ffffff;
-  --foreground-secondary: #e5e5e5;
-  --foreground-tertiary: #b3b3b3;
-  --foreground-muted: #808080;
-  
+  --foreground: 255 255 255;
+  --foreground-secondary: 229 229 229;
+  --foreground-tertiary: 179 179 179;
+  --foreground-muted: 128 128 128;
+
   /* Border colors - more visible */
-  --border: #333333;
-  --border-secondary: #404040;
-  
+  --border: 51 51 51;
+  --border-secondary: 64 64 64;
+
   /* Accent colors - brighter and more vibrant */
-  --accent: #818cf8;
-  --accent-foreground: #ffffff;
-  --accent-light: #4338ca;
-  --accent-hover: #6366f1;
-  
+  --accent: 129 140 248;
+  --accent-foreground: 255 255 255;
+  --accent-light: 67 56 202;
+  --accent-hover: 99 102 241;
+
   /* Interactive states */
-  --hover: #1f1f1f;
-  --active: #4338ca;
-  
+  --hover: 31 31 31;
+  --active: 67 56 202;
+
    /* Status colors - brighter for better visibility */
-   --success: #34d399;
-   --warning: #fbbf24;
-   --error: #f87171;
-   --info: #60a5fa;
+   --success: 52 211 153;
+   --warning: 251 191 36;
+   --error: 248 113 113;
+   --info: 96 165 250;
    
    /* Progress bar colors for dark mode */
    --progress-readability: #818cf8;
@@ -123,8 +123,8 @@ html {
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
+  color: rgb(var(--foreground));
+  background: rgb(var(--background));
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   transition: background-color 0s, color 0s; /* Prevent transition flash */
 }
@@ -277,8 +277,8 @@ html:not(.dark) {
 .milkdown blockquote {
   margin: 0.5em 0;
   padding-left: 1em;
-  border-left: 3px solid var(--border-secondary);
-  color: var(--foreground-secondary);
+  border-left: 3px solid rgb(var(--border-secondary));
+  color: rgb(var(--foreground-secondary));
 }
 
 .milkdown h1 {
@@ -334,8 +334,8 @@ html:not(.dark) {
 
 .font-preview-select optgroup {
   font-weight: 600;
-  color: var(--foreground-tertiary);
-  background: var(--background-tertiary);
+  color: rgb(var(--foreground-tertiary));
+  background: rgb(var(--background-tertiary));
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -363,7 +363,7 @@ html:not(.dark) {
   display: inline-block;
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--foreground-secondary);
+  color: rgb(var(--foreground-secondary));
 }
 
 
@@ -376,7 +376,7 @@ html:not(.dark) {
 
 /* Statistics panel text opacity */
 .stats-panel {
-  --stats-text: color-mix(in srgb, var(--foreground) 80%, transparent);
+  --stats-text: rgb(var(--foreground) / 0.8);
 }
 
 .stats-panel,
@@ -388,13 +388,13 @@ html:not(.dark) {
 .info-tooltip-content {
   position: fixed;
   padding: 8px 12px;
-  background: var(--background-elevated);
-  border: 1px solid var(--border);
+  background: rgb(var(--background-elevated));
+  border: 1px solid rgb(var(--border));
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   font-size: 12px;
   line-height: 1.5;
-  color: var(--foreground);
+  color: rgb(var(--foreground));
   max-width: 240px;
   white-space: pre-line;
   overflow-wrap: anywhere;
@@ -424,7 +424,7 @@ input[type="range"] {
   width: 100%;
   height: 6px;
   border-radius: 5px;
-  background: var(--border);
+  background: rgb(var(--border));
   outline: none;
   cursor: pointer;
 }
@@ -434,7 +434,7 @@ input[type="range"]::-webkit-slider-runnable-track {
   width: 100%;
   height: 6px;
   border-radius: 5px;
-  background: var(--border);
+  background: rgb(var(--border));
   cursor: pointer;
 }
 
@@ -445,7 +445,7 @@ input[type="range"]::-webkit-slider-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--accent);
+  background: rgb(var(--accent));
   cursor: pointer;
   margin-top: -5px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -465,7 +465,7 @@ input[type="range"]::-moz-range-track {
   width: 100%;
   height: 6px;
   border-radius: 5px;
-  background: var(--border);
+  background: rgb(var(--border));
   border: none;
   cursor: pointer;
 }
@@ -475,7 +475,7 @@ input[type="range"]::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--accent);
+  background: rgb(var(--accent));
   cursor: pointer;
   border: none;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -492,7 +492,7 @@ input[type="range"]::-moz-range-thumb:active {
 
 /* Firefox - 進度條 */
 input[type="range"]::-moz-range-progress {
-  background-color: var(--accent);
+  background-color: rgb(var(--accent));
 }
 
 /* Search highlight styles */

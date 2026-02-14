@@ -55,5 +55,5 @@
 .milkdown-japanese-vertical blockquote {
   margin: 0 0.5em;
   padding-top: 1em;
-  border-top: 3px solid var(--border-secondary);
+  border-top: 3px solid rgb(var(--border-secondary));
 }
