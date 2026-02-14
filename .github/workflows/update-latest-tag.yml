@@ -1,0 +1,75 @@
+name: Update Latest Tag
+
+on:
+  # Run daily at 00:00 UTC
+  schedule:
+    - cron: '0 0 * * *'
+  # Allow manual trigger
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find latest stable release
+        id: find-latest
+        run: |
+          # Get all tags sorted by version
+          # Filter out beta/dev versions, only keep stable releases (e.g., v0.0.113)
+          LATEST_STABLE=$(git tag -l 'v*.*.*' | \
+            grep -v -E '-(beta|dev|alpha|rc)' | \
+            sort -V | \
+            tail -1)
+
+          if [ -z "$LATEST_STABLE" ]; then
+            echo "❌ No stable release found"
+            exit 1
+          fi
+
+          echo "latest_version=$LATEST_STABLE" >> $GITHUB_OUTPUT
+          echo "✅ Latest stable release: $LATEST_STABLE"
+
+      - name: Update latest tag
+        env:
+          LATEST_VERSION: ${{ steps.find-latest.outputs.latest_version }}
+        run: |
+          # Check if 'latest' tag exists
+          if git rev-parse latest >/dev/null 2>&1; then
+            CURRENT_LATEST=$(git rev-parse latest)
+            NEW_LATEST=$(git rev-parse $LATEST_VERSION)
+
+            if [ "$CURRENT_LATEST" = "$NEW_LATEST" ]; then
+              echo "ℹ️ 'latest' tag already points to $LATEST_VERSION"
+              exit 0
+            fi
+
+            echo "📝 Updating 'latest' tag from $(git describe --tags $CURRENT_LATEST) to $LATEST_VERSION"
+            git tag -f latest $LATEST_VERSION
+          else
+            echo "🆕 Creating 'latest' tag pointing to $LATEST_VERSION"
+            git tag latest $LATEST_VERSION
+          fi
+
+          # Push the updated tag
+          git push origin latest --force
+          echo "✅ Successfully updated 'latest' tag to $LATEST_VERSION"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Update Latest Tag Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.find-latest.outputs.latest_version }}" != "" ]; then
+            echo "- ✅ Latest stable version: \`${{ steps.find-latest.outputs.latest_version }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- 🏷️ Tag \`latest\` updated" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ No stable release found" >> $GITHUB_STEP_SUMMARY
+          fi
