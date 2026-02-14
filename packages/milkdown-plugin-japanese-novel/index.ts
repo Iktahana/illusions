@@ -19,6 +19,7 @@ import {
   remarkKernPlugin,
 } from './syntax'
 import { createHeadingIdFixerPlugin } from './plugins/heading-id-fixer'
+import { createHardbreakIndentPlugin } from './plugins/hardbreak-indent'
 import {
   defaultJapaneseNovelOptions,
   type JapaneseNovelOptions,
@@ -96,6 +97,10 @@ export function japaneseNovel(
     return createHeadingIdFixerPlugin()
   })
 
+  const hardbreakIndentPlugin = $prose(() => {
+    return createHardbreakIndentPlugin()
+  })
+
   const plugins: MilkdownPlugin[] = [
     ...(enableRuby ? [remarkRuby, rubySchema] : []),
     ...(enableTcy ? [remarkTcy, tcySchema] : []),
@@ -104,6 +109,7 @@ export function japaneseNovel(
     remarkHeadingAnchor,
     headingAnchorSchema,
     headingIdFixerPlugin,
+    hardbreakIndentPlugin,
     stylePlugin,
   ].flat()
 

@@ -1002,6 +1002,11 @@ function MilkdownEditor({
             ${showParagraphNumbers ? 'counter-increment: paragraph;' : ''}
             ${showParagraphNumbers ? 'position: relative;' : ''}
           }
+          /* Hardbreak indent spacer: align lines after shift+enter with first-line indent */
+          div :global(.milkdown .ProseMirror .mdi-hardbreak-indent) {
+            display: inline-block;
+            width: ${textIndent}em;
+          }
           div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p::before) {
             ${showParagraphNumbers ? `
               content: counter(paragraph);
@@ -1038,6 +1043,15 @@ function MilkdownEditor({
           div :global(.milkdown .ProseMirror li),
           div :global(.milkdown .ProseMirror blockquote) {
             text-indent: 0;
+          }
+          /* 見出しも段落としてカウントするが番号は非表示 */
+          div :global(.milkdown .ProseMirror h1),
+          div :global(.milkdown .ProseMirror h2),
+          div :global(.milkdown .ProseMirror h3),
+          div :global(.milkdown .ProseMirror h4),
+          div :global(.milkdown .ProseMirror h5),
+          div :global(.milkdown .ProseMirror h6) {
+            ${showParagraphNumbers ? 'counter-increment: paragraph;' : ''}
           }
         `}</style>
         <style jsx global>{`
