@@ -1,5 +1,5 @@
 ---
-name: Illusions-Auto-Maintainer
+name: Maintainer Agent
 description: Issueの自動評価および自動修復エージェント。難易度分析とセキュリティ検証を行い、安全な場合のみコードを修正します。
 ---
 
