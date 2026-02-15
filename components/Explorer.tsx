@@ -267,10 +267,10 @@ export default function Explorer({
               ? "text-foreground border-b-2 border-accent"
               : "text-foreground hover:text-foreground"
           )}
-          title="段落"
+          title="行間"
         >
           <Palette className="w-4 h-4" />
-          <span className="hidden sm:inline">段落</span>
+          <span className="hidden sm:inline">行間</span>
         </button>
       </div>
 

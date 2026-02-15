@@ -235,6 +235,7 @@ Use `@agent-name` in GitHub Copilot Chat:
 - **@reviewer**: Pragmatic PR reviewer (focus on critical issues only)
 - **@maintainer**: Issue triage and bug fixing
 - **@ci-debugger**: CI/CD failure analysis
+- **@readme-updater**: Automatic README.md updates on push
 
 ## Questions?
 

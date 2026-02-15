@@ -1,0 +1,37 @@
+name: "Update README"
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "docs/**"
+      - "www/**"
+      - ".github/workflows/**"
+      - "*.md"
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    # Prevent recursive triggers from the bot's own commits
+    if: github.actor != 'github-actions[bot]' && github.actor != 'copilot-swe-agent[bot]'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10 # Enough history for diff analysis
+
+      - name: Trigger Copilot agent to update README
+        uses: github/copilot-swe-agent@v1
+        with:
+          agent: "readme-updater"
+          prompt: |
+            Analyse the recent commits on this branch and update README.md if needed.
+
+            Run `git log --oneline -10` to see recent changes, then `git diff HEAD~5 -- '*.ts' '*.tsx' 'package.json'` to understand what changed.
+
+            Only update README.md if there are user-facing feature additions, removals, dependency changes, or structural changes. If nothing relevant changed, do nothing.
+          allowedTools: "read,edit,search,execute"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
