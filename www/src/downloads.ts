@@ -222,7 +222,12 @@ function findBestAsset(platforms: Map<string, PlatformInfo>): DownloadAsset | nu
   }
 
   if (os === 'windows') {
-    // Prefer .exe installer, then .msi
+    // Prefer Setup.exe installer, then any .exe, then .msi
+    const setupExe = platform.assets.find((a) => {
+      const lower = a.name.toLowerCase()
+      return lower.endsWith('.exe') && (lower.includes('setup') || lower.includes('install'))
+    })
+    if (setupExe) return setupExe
     const exe = platform.assets.find((a) => a.name.toLowerCase().endsWith('.exe'))
     if (exe) return exe
     const msi = platform.assets.find((a) => a.name.toLowerCase().endsWith('.msi'))
