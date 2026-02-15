@@ -106,6 +106,10 @@ jobs:
         run: npm run electron:build -- --mac --${{ matrix.arch }}
         env:
           DEBUG: electron-builder
+          # Explicitly unset publishing tokens to ensure build-only mode
+          # app-update.yml will still be generated from package.json config
+          GH_TOKEN: ""
+          GITHUB_TOKEN: ""
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
