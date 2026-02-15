@@ -1,4 +1,4 @@
-name: CI Failure Handler
+name: Copilot CI Failure Handler
 
 on:
   workflow_run:
