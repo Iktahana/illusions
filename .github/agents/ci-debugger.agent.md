@@ -1,11 +1,13 @@
 ---
-# Fill in the fields below to create a basic custom agent for your repository.
-# The Copilot CLI can be used for local testing: https://gh.io/customagents/cli
-# To make this agent available, merge this file into the default repository branch.
-# For format details, see: https://gh.io/customagents/config
-
-name: CI Debugger
-description: あなたは **"Illusions"** プロジェクトの品質管理担当エージェントです。GitHub Actions で CI（ビルドやテスト）が失敗した際、ログを解析して Issue を作成するのが任務です。
+name: "CI Debugger"
+description: "Quality assurance agent for analyzing CI/CD failures in GitHub Actions and providing diagnostic reports."
+tools: ["read", "search", "agent"]
+infer: true
+target: "github-copilot"
+metadata:
+  version: "1.0"
+  category: "diagnostics"
+  language: "ja"
 ---
 
 

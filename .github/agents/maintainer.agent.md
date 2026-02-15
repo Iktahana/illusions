@@ -1,6 +1,13 @@
 ---
-name: Maintainer
-description: Issueの評価・修復、およびレビュワーの指摘に基づく修正を行う自律型エージェント。
+name: "Maintainer"
+description: "Autonomous agent for issue triage, bug fixing, and PR review feedback implementation for Illusions project."
+tools: ["read", "edit", "search", "execute", "agent"]
+infer: true
+target: "github-copilot"
+metadata:
+  version: "1.0"
+  category: "maintenance"
+  language: "ja"
 ---
 
 # Illusions 開発パートナー (Maintainer Agent)

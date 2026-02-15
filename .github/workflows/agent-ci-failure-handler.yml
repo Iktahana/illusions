@@ -50,7 +50,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           echo "Fetching logs for workflow run: $WORKFLOW_ID"
-          
+
           # 失敗したステップのログを取得
           gh run view $WORKFLOW_ID --log-failed > failure_log.txt || echo "Failed logs could not be retrieved." > failure_log.txt
 
@@ -59,18 +59,58 @@ jobs:
             exit 0
           fi
 
-          # ログの冒頭100行を抽出してIssueを作成
-          # (GitHub CLI の copilot 拡張を使用している場合はここに組み込めます)
-          LOG_SUMMARY=$(cat failure_log.txt | head -n 100)
-          
+          # ログの中間100行を抽出（冒頭はノイズが多いため）
+          LOG_SUMMARY=$(cat failure_log.txt | tail -n 200 | head -n 100)
+
+          # Workflow名を取得
+          WORKFLOW_NAME=$(gh run view $WORKFLOW_ID --json name --jq '.name')
+
           gh issue create \
-            --title "🚨 CI 失敗の自動解析レポート: Run #$WORKFLOW_ID" \
-            --body "### 📋 診断レポート (Run ID: $WORKFLOW_ID)
-            
-            ワークフローの失敗を検知しました。以下はエラーログの抜粋です：
-            
-            \`\`\`text
-            $LOG_SUMMARY
-            \`\`\`
-            
-            詳細は上記の Run ID から確認してください。デバッグ頑張ってください！"
+            --title "🚨 CI Failure: $WORKFLOW_NAME (Run #$WORKFLOW_ID)" \
+            --label "bug,ci-failure" \
+            --body "## 🔴 CI ビルドが失敗しました
+
+          **Workflow**: \`$WORKFLOW_NAME\`
+          **Run ID**: [$WORKFLOW_ID](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
+          **Triggered by**: ${{ github.event.workflow_run.head_commit.message }}
+
+          ---
+
+          ## 📋 エラーログ（抜粋）
+
+          \`\`\`
+          $LOG_SUMMARY
+          \`\`\`
+
+          [📄 完全なログを確認](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
+
+          ---
+
+          ## 🤖 AI による診断を実行
+
+          GitHub Copilot Chat で \`@ci-debugger\` エージェントを使用して詳細な分析を実行できます：
+
+          **VS Code / GitHub.com で：**
+          \`\`\`
+          @ci-debugger Run #$WORKFLOW_ID の失敗原因を分析して、修正方法を提案してください
+          \`\`\`
+
+          **または：**
+          \`\`\`
+          @ci-debugger このエラーログを解析してください:
+          [ログのエラー部分を貼り付け]
+          \`\`\`
+
+          ---
+
+          ## 🛠️ 推奨アクション
+
+          1. **ログを確認**: 上記のリンクから完全なログを確認
+          2. **エラーを特定**: \`##[error]\` マーカーを検索
+          3. **AI診断**: \`@ci-debugger\` で根本原因を分析
+          4. **修正を実装**: \`@maintainer\` で自動修正を試行（簡単な場合）
+          5. **再実行**: 修正後、workflow を再実行
+
+          ---
+
+          **Note**: この Issue は CI Failure Handler により自動作成されました。"

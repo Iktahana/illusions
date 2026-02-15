@@ -15,12 +15,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run Copilot Review
+      - name: Notify Review Available
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # エージェント指示書を読み込み、PRの内容を評価させる
-          # ERROR判定が出た場合のみ 'REQUEST_CHANGES' を送るように指示
-          gh copilot review --agent-file .github/agents/reviewer.agent.md \
-                            --pr ${{ github.event.pull_request.number }} \
-                            --block-on-error
+          # GitHub CLI does not currently support --agent-file option
+          # Notify developers to use @reviewer agent in GitHub Copilot Chat
+
+          gh pr comment ${{ github.event.pull_request.number }} --body \
+            "👋 **Copilot Review Ready**
+
+            このPRをレビューするには、GitHub Copilot Chat で以下のように \`@reviewer\` エージェントを呼び出してください：
+
+            **VS Code / GitHub.com で：**
+            \`\`\`
+            @reviewer この PR (#${{ github.event.pull_request.number }}) をレビューしてください
+            \`\`\`
+
+            **または GitHub CLI で：**
+            \`\`\`bash
+            gh copilot suggest \"Review PR #${{ github.event.pull_request.number }}\"
+            \`\`\`
+
+            ---
+
+            **自動レビューについて：**
+            現在、GitHub CLI は custom agents の自動実行をサポートしていません。
+            上記の方法で \`@reviewer\` エージェントを手動で呼び出してください。
+
+            **レビュー基準：**
+            - ✅ データ破損、クラッシュ、セキュリティ問題
+            - ⚠️ パフォーマンスの軽微な改善提案
+            - ❌ スタイルの好み、些細なフォーマット（指摘しません）"
