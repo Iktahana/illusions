@@ -1,12 +1,9 @@
 name: Copilot Maintainer Loop
 
+# DISABLED: gh copilot suggest does not support --agent-file option
+# Re-enable when GitHub Copilot CLI adds custom agent support
 on:
-  issues:
-    types: [opened, edited]
-  pull_request_review:
-    types: [submitted]
-  issue_comment:
-    types: [created]
+  workflow_dispatch: # Manual trigger only
 
 permissions:
   contents: write
@@ -62,12 +59,11 @@ jobs:
             git checkout $BRANCH_NAME
           fi
 
-          # Call the Copilot Agent to analyze and fix code based on the instructions
-          gh copilot suggest \
-            --agent-file .github/agents/maintainer.agent.md \
-            --context "$ISSUE_CONTEXT" \
-            --feedback "$REVIEW_FEEDBACK" \
-            --run-tests "npm test"
+          # GitHub Copilot CLI does not support --agent-file option
+          # This workflow is currently disabled pending proper implementation
+          echo "⚠️  Maintainer agent workflow is disabled (gh copilot suggest does not support custom agents)"
+          echo "Issue #$ISSUE_ID requires manual review"
+          exit 0
 
       - name: Commit and Push Changes
         id: git-push
