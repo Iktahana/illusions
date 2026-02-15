@@ -1,0 +1,9 @@
+# Setup steps for GitHub Copilot coding agent
+# This file defines the environment Copilot uses when working on issues/PRs.
+
+steps:
+  - uses: actions/checkout@v4
+  - uses: actions/setup-node@v4
+    with:
+      node-version: "20"
+  - run: npm ci

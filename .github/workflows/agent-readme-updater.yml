@@ -10,6 +10,10 @@ on:
       - ".github/workflows/**"
       - "*.md"
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   update-readme:
     runs-on: ubuntu-latest
@@ -20,18 +24,70 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 10 # Enough history for diff analysis
+          fetch-depth: 10
 
-      - name: Trigger Copilot agent to update README
-        uses: github/copilot-swe-agent@v1
-        with:
-          agent: "readme-updater"
-          prompt: |
-            Analyse the recent commits on this branch and update README.md if needed.
+      - name: Collect recent changes
+        id: changes
+        run: |
+          COMMITS=$(git log --oneline -10)
+          DIFF_STAT=$(git diff --stat HEAD~5 -- '*.ts' '*.tsx' 'package.json' 2>/dev/null || echo "No diff available")
 
-            Run `git log --oneline -10` to see recent changes, then `git diff HEAD~5 -- '*.ts' '*.tsx' 'package.json'` to understand what changed.
+          # Write to multiline output
+          {
+            echo "commits<<COMMITS_EOF"
+            echo "$COMMITS"
+            echo "COMMITS_EOF"
+            echo "diff_stat<<DIFF_EOF"
+            echo "$DIFF_STAT"
+            echo "DIFF_EOF"
+          } >> "$GITHUB_OUTPUT"
 
-            Only update README.md if there are user-facing feature additions, removals, dependency changes, or structural changes. If nothing relevant changed, do nothing.
-          allowedTools: "read,edit,search,execute"
+      - name: Create issue for Copilot
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Close any existing open README update issues to avoid duplicates
+          gh issue list \
+            --label "copilot" \
+            --label "documentation" \
+            --state open \
+            --json number \
+            --jq '.[].number' | while read -r num; do
+            gh issue close "$num" --comment "Superseded by a newer push." || true
+          done
+
+          # Create a new issue and assign Copilot
+          gh issue create \
+            --title "docs: update README.md to reflect recent changes" \
+            --label "copilot,documentation" \
+            --assignee "copilot-swe-agent[bot]" \
+            --body "$(cat <<'EOF'
+          ## Task
+
+          Update `README.md` to reflect the latest code changes pushed to `main`.
+
+          ## Recent Commits
+
+          ```
+          ${{ steps.changes.outputs.commits }}
+          ```
+
+          ## Changed Files
+
+          ```
+          ${{ steps.changes.outputs.diff_stat }}
+          ```
+
+          ## Instructions
+
+          Follow the instructions in `.github/agents/readme-updater.agent.md`:
+
+          1. Read the diff of the recent commits listed above.
+          2. Determine if any user-facing features were added, removed, or changed.
+          3. If changes are docs-only or internal refactoring with no user-facing impact, close this issue with "No README update needed".
+          4. Otherwise, make **minimal, surgical edits** to `README.md` — do NOT rewrite the entire file.
+          5. Commit with message: `docs: update README to reflect recent changes`
+
+          **Language rules**: English and Japanese only. No Chinese or Korean.
+          EOF
+          )"
