@@ -13,6 +13,15 @@ function registerVFSHandlers() {
   let allowedRoot = null;
 
   /**
+   * Normalize path separators to forward slashes for cross-platform compatibility.
+   * This ensures Windows backslashes (\) and Unix forward slashes (/) are handled consistently.
+   */
+  function normalizePath(p) {
+    // Replace all backslashes with forward slashes and remove trailing slashes
+    return p.replace(/\\/g, '/').replace(/\/+$/, '');
+  }
+
+  /**
    * Validate that a requested path is within the allowed root directory.
    * Prevents path traversal attacks from a compromised renderer.
    */
@@ -21,7 +30,12 @@ function registerVFSHandlers() {
       throw new Error('ディレクトリが開かれていません');
     }
     const resolved = path.resolve(requestedPath);
-    if (resolved !== allowedRoot && !resolved.startsWith(allowedRoot + path.sep)) {
+    
+    // Normalize paths for consistent comparison across platforms
+    const normalizedResolved = normalizePath(resolved);
+    const normalizedRoot = normalizePath(allowedRoot);
+    
+    if (normalizedResolved !== normalizedRoot && !normalizedResolved.startsWith(normalizedRoot + '/')) {
       throw new Error('プロジェクトディレクトリの外部へのアクセスは許可されていません');
     }
     return resolved;

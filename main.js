@@ -628,6 +628,7 @@ ipcMain.handle('save-file', async (_event, filePath, content) => {
     target = result.filePath
   }
   try {
+    log.info(`ファイル保存を試行中: ${target}`)
     // Use open -> write -> close pattern for better compatibility with virtual file systems (e.g., Google Drive on Windows)
     const fileHandle = await fs.open(target, 'w')
     try {
@@ -635,9 +636,10 @@ ipcMain.handle('save-file', async (_event, filePath, content) => {
     } finally {
       await fileHandle.close()
     }
+    log.info(`ファイル保存成功: ${target}`)
     return target
   } catch (error) {
-    log.error('ファイルの保存に失敗しました:', error)
+    log.error(`ファイルの保存に失敗しました (パス: ${target}):`, error)
     return { success: false, error: error.message || '不明なエラー' }
   }
 })
