@@ -1,0 +1,32 @@
+name: CI Failure Handler
+
+on:
+  workflow_run:
+    workflows: ["Main CI"] # ここに、普段動かしているCIのワークフロー名を指定
+    types: [completed]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  on-failure:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Analyze Logs and Create Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_ID: ${{ github.event.workflow_run.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          # 1. 失敗したログを取得
+          echo "Fetching logs for workflow run: $WORKFLOW_ID"
+          gh run view $WORKFLOW_ID --log-failed > failure_log.txt
+
+          # 2. Agentを呼び出してIssueを作成
+          # 注意: gh copilot の CLI 拡張機能などを使用して、.mdファイルを読み込ませます
+          gh copilot suggest "Based on .github/agents/ci-debugger.agent.md, analyze the following logs and create a detailed issue for $REPO: $(cat failure_log.txt | head -n 50)"
