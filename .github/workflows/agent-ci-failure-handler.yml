@@ -1,9 +1,15 @@
-name: Copilot CI Failure Handler
+name: CI Failure Handler
 
 on:
   workflow_run:
-    workflows: ["Main CI"] # ここに、普段動かしているCIのワークフロー名を指定
+    workflows: ["Deploy www to GitHub Pages", "Desktop Build and Release"]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: '分析したい Workflow Run ID (空欄の場合は直近の失敗を分析)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -12,21 +18,59 @@ permissions:
 jobs:
   on-failure:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    # 自動実行で失敗した場合、または手動でトリガーした場合に実行
+    if: >
+      github.event.workflow_run.conclusion == 'failure' || 
+      github.event_name == 'workflow_dispatch'
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Determine Workflow Run ID
+        id: info
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            INPUT_ID="${{ github.event.inputs.run_id }}"
+            if [ -z "$INPUT_ID" ]; then
+              # IDが未指定の場合、このリポジトリで直近に失敗した Run ID を取得
+              RUN_ID=$(gh run list --status failure --limit 1 --json databaseId --jq '.[0].databaseId')
+            else
+              RUN_ID=$INPUT_ID
+            fi
+          else
+            RUN_ID=${{ github.event.workflow_run.id }}
+          fi
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_OUTPUT
+
       - name: Analyze Logs and Create Issue
         env:
           GH_TOKEN: ${{ github.token }}
-          WORKFLOW_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_ID: ${{ steps.info.outputs.RUN_ID }}
           REPO: ${{ github.repository }}
         run: |
-          # 1. 失敗したログを取得
           echo "Fetching logs for workflow run: $WORKFLOW_ID"
-          gh run view $WORKFLOW_ID --log-failed > failure_log.txt
+          
+          # 失敗したステップのログを取得
+          gh run view $WORKFLOW_ID --log-failed > failure_log.txt || echo "Failed logs could not be retrieved." > failure_log.txt
 
-          # 2. Agentを呼び出してIssueを作成
-          # 注意: gh copilot の CLI 拡張機能などを使用して、.mdファイルを読み込ませます
-          gh copilot suggest "Based on .github/agents/ci-debugger.agent.md, analyze the following logs and create a detailed issue for $REPO: $(cat failure_log.txt | head -n 50)"
+          if [ ! -s failure_log.txt ]; then
+            echo "ログが空のため、Issueの作成をスキップします。"
+            exit 0
+          fi
+
+          # ログの冒頭100行を抽出してIssueを作成
+          # (GitHub CLI の copilot 拡張を使用している場合はここに組み込めます)
+          LOG_SUMMARY=$(cat failure_log.txt | head -n 100)
+          
+          gh issue create \
+            --title "🚨 CI 失敗の自動解析レポート: Run #$WORKFLOW_ID" \
+            --body "### 📋 診断レポート (Run ID: $WORKFLOW_ID)
+            
+            ワークフローの失敗を検知しました。以下はエラーログの抜粋です：
+            
+            \`\`\`text
+            $LOG_SUMMARY
+            \`\`\`
+            
+            詳細は上記の Run ID から確認してください。デバッグ頑張ってください！"
