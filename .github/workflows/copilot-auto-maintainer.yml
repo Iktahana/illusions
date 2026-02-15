@@ -1,0 +1,26 @@
+name: Copilot Auto Maintainer
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  agent-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Copilot Agent Assessment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          # 1. AgentにIssueを読み込ませ、難易度評価と解決策をコメントさせる
+          gh copilot suggest "Based on .github/agents/maintainer.agent.md, assess issue #$ISSUE_NUMBER: $ISSUE_BODY. If it's Low difficulty and safe, provide a fix. Otherwise, explain the solution in Japanese."
