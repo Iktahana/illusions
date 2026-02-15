@@ -369,8 +369,27 @@ export function useMdiFile(options?: { skipAutoRestore?: boolean; autoSave?: boo
       }
     } catch (error) {
       console.error("保存に失敗しました:", error);
-      const message =
-        error instanceof Error ? error.message : "不明なエラー";
+      
+      // Provide helpful error messages based on error type
+      let message = "不明なエラー";
+      if (error instanceof Error) {
+        message = error.message;
+        
+        // Check for common Windows error codes
+        const errorCode = (error as any).code;
+        if (errorCode === 'EACCES' || errorCode === 'EPERM') {
+          message = "ファイルへのアクセス権限がありません。ファイルが他のプログラムで開かれていないか、または書き込み権限があるかを確認してください。";
+        } else if (errorCode === 'ENOSPC') {
+          message = "ディスクの空き容量が不足しています。";
+        } else if (errorCode === 'ENOENT') {
+          message = "保存先のフォルダが見つかりません。";
+        } else if (errorCode === 'EINVAL') {
+          message = "ファイル名またはパスが無効です。使用できない文字が含まれている可能性があります。";
+        } else if (errorCode === 'ENAMETOOLONG') {
+          message = "ファイル名またはパスが長すぎます。";
+        }
+      }
+      
       window.alert(`保存に失敗しました: ${message}`);
     } finally {
       isSavingRef.current = false;
@@ -419,7 +438,27 @@ export function useMdiFile(options?: { skipAutoRestore?: boolean; autoSave?: boo
       }
     } catch (error) {
       console.error("名前を付けて保存に失敗しました:", error);
-      const message = error instanceof Error ? error.message : "不明なエラー";
+      
+      // Provide helpful error messages based on error type
+      let message = "不明なエラー";
+      if (error instanceof Error) {
+        message = error.message;
+        
+        // Check for common Windows error codes
+        const errorCode = (error as any).code;
+        if (errorCode === 'EACCES' || errorCode === 'EPERM') {
+          message = "ファイルへのアクセス権限がありません。ファイルが他のプログラムで開かれていないか、または書き込み権限があるかを確認してください。";
+        } else if (errorCode === 'ENOSPC') {
+          message = "ディスクの空き容量が不足しています。";
+        } else if (errorCode === 'ENOENT') {
+          message = "保存先のフォルダが見つかりません。";
+        } else if (errorCode === 'EINVAL') {
+          message = "ファイル名またはパスが無効です。使用できない文字が含まれている可能性があります。";
+        } else if (errorCode === 'ENAMETOOLONG') {
+          message = "ファイル名またはパスが長すぎます。";
+        }
+      }
+      
       window.alert(`名前を付けて保存に失敗しました: ${message}`);
     } finally {
       isSavingRef.current = false;
