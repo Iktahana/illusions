@@ -1,0 +1,26 @@
+name: Copilot PR Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Copilot Review
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # エージェント指示書を読み込み、PRの内容を評価させる
+          # ERROR判定が出た場合のみ 'REQUEST_CHANGES' を送るように指示
+          gh copilot review --agent-file .github/agents/reviewer.agent.md \
+                            --pr ${{ github.event.pull_request.number }} \
+                            --block-on-error
