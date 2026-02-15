@@ -78,15 +78,23 @@ function registerVFSHandlers() {
   ipcMain.handle('vfs:write-file', async (_event, filePath, content) => {
     try {
       const resolved = validateVFSPath(filePath);
-      // Use open -> write -> close pattern for better compatibility with virtual file systems (e.g., Google Drive on Windows)
+      // Use open -> write -> sync -> close pattern for better compatibility with virtual file systems (e.g., Google Drive on Windows)
       const fileHandle = await fs.open(resolved, 'w');
       try {
         await fileHandle.writeFile(content, 'utf-8');
+        // Explicitly sync to ensure data is flushed to disk (critical for Windows network drives)
+        await fileHandle.sync();
       } finally {
         await fileHandle.close();
       }
     } catch (error) {
       console.error('[VFS IPC] writeFile failed:', error);
+      console.error('[VFS IPC] Error details:', {
+        message: error.message,
+        code: error.code,
+        syscall: error.syscall,
+        path: filePath,
+      });
       throw error;
     }
   });
