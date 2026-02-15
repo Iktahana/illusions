@@ -2,7 +2,7 @@ name: CI Failure Handler
 
 on:
   workflow_run:
-    workflows: ["Deploy www to GitHub Pages", "Desktop Build and Release"]
+    workflows: ["Desktop Build and Release"]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -18,22 +18,19 @@ permissions:
 jobs:
   on-failure:
     runs-on: ubuntu-latest
-    # 自動実行で失敗した場合、または手動でトリガーした場合に実行
     if: >
-      github.event.workflow_run.conclusion == 'failure' || 
+      github.event.workflow_run.conclusion == 'failure' ||
       github.event_name == 'workflow_dispatch'
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
+    steps:
       - name: Determine Workflow Run ID
         id: info
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             INPUT_ID="${{ github.event.inputs.run_id }}"
             if [ -z "$INPUT_ID" ]; then
-              # IDが未指定の場合、このリポジトリで直近に失敗した Run ID を取得
               RUN_ID=$(gh run list --status failure --limit 1 --json databaseId --jq '.[0].databaseId')
             else
               RUN_ID=$INPUT_ID
@@ -41,9 +38,25 @@ jobs:
           else
             RUN_ID=${{ github.event.workflow_run.id }}
           fi
-          echo "RUN_ID=$RUN_ID" >> $GITHUB_OUTPUT
+          echo "RUN_ID=$RUN_ID" >> "$GITHUB_OUTPUT"
 
-      - name: Analyze Logs and Create Issue
+      - name: Check for duplicate issue
+        id: dedup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_ID: ${{ steps.info.outputs.RUN_ID }}
+        run: |
+          # Search for open issues that already reference this run ID
+          COUNT=$(gh issue list --state open --search "Run #$WORKFLOW_ID" --json number --jq 'length')
+          if [ "$COUNT" != "0" ]; then
+            echo "Issue already exists for Run #$WORKFLOW_ID, skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Analyze logs and create issue
+        if: steps.dedup.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           WORKFLOW_ID: ${{ steps.info.outputs.RUN_ID }}
@@ -51,66 +64,65 @@ jobs:
         run: |
           echo "Fetching logs for workflow run: $WORKFLOW_ID"
 
-          # 失敗したステップのログを取得
-          gh run view $WORKFLOW_ID --log-failed > failure_log.txt || echo "Failed logs could not be retrieved." > failure_log.txt
+          gh run view "$WORKFLOW_ID" --log-failed > failure_log.txt 2>&1 || true
 
           if [ ! -s failure_log.txt ]; then
-            echo "ログが空のため、Issueの作成をスキップします。"
+            echo "ログが空のため、Issue の作成をスキップします。"
             exit 0
           fi
 
-          # ログの中間100行を抽出（冒頭はノイズが多いため）
-          LOG_SUMMARY=$(cat failure_log.txt | tail -n 200 | head -n 100)
+          # Extract error lines and surrounding context
+          ERROR_LINES=$(grep -A 3 "##\[error\]" failure_log.txt | head -n 40 || true)
+          LOG_TAIL=$(tail -n 60 failure_log.txt | head -n 50)
 
-          # Workflow名を取得
-          WORKFLOW_NAME=$(gh run view $WORKFLOW_ID --json name --jq '.name')
+          # Get workflow metadata
+          WORKFLOW_NAME=$(gh run view "$WORKFLOW_ID" --json name --jq '.name' 2>/dev/null || echo "Unknown")
+          COMMIT_MSG="${{ github.event.workflow_run.head_commit.message }}"
+
+          # Ensure labels exist (create if missing)
+          gh label create "ci-failure" --color "D73A49" --description "CI/CD failure" 2>/dev/null || true
 
           gh issue create \
             --title "🚨 CI Failure: $WORKFLOW_NAME (Run #$WORKFLOW_ID)" \
-            --label "bug,ci-failure" \
-            --body "## 🔴 CI ビルドが失敗しました
+            --label "ci-failure" \
+            --body "$(cat <<EOF
+## CI ビルドが失敗しました
 
-          **Workflow**: \`$WORKFLOW_NAME\`
-          **Run ID**: [$WORKFLOW_ID](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
-          **Triggered by**: ${{ github.event.workflow_run.head_commit.message }}
+**Workflow**: \`$WORKFLOW_NAME\`
+**Run ID**: [#$WORKFLOW_ID](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
+**Commit**: $COMMIT_MSG
 
-          ---
+---
 
-          ## 📋 エラーログ（抜粋）
+## エラーログ
 
-          \`\`\`
-          $LOG_SUMMARY
-          \`\`\`
+\`\`\`
+$ERROR_LINES
+\`\`\`
 
-          [📄 完全なログを確認](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
+<details>
+<summary>ログ末尾（詳細）</summary>
 
-          ---
+\`\`\`
+$LOG_TAIL
+\`\`\`
 
-          ## 🤖 AI による診断を実行
+</details>
 
-          GitHub Copilot Chat で \`@ci-debugger\` エージェントを使用して詳細な分析を実行できます：
+[📄 完全なログを確認](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
 
-          **VS Code / GitHub.com で：**
-          \`\`\`
-          @ci-debugger Run #$WORKFLOW_ID の失敗原因を分析して、修正方法を提案してください
-          \`\`\`
+---
 
-          **または：**
-          \`\`\`
-          @ci-debugger このエラーログを解析してください:
-          [ログのエラー部分を貼り付け]
-          \`\`\`
+## AI による診断
 
-          ---
+GitHub Copilot Chat で \`@ci-debugger\` を呼び出してください：
 
-          ## 🛠️ 推奨アクション
+\`\`\`
+@ci-debugger Run #$WORKFLOW_ID の失敗原因を分析して、修正方法を提案してください
+\`\`\`
 
-          1. **ログを確認**: 上記のリンクから完全なログを確認
-          2. **エラーを特定**: \`##[error]\` マーカーを検索
-          3. **AI診断**: \`@ci-debugger\` で根本原因を分析
-          4. **修正を実装**: \`@maintainer\` で自動修正を試行（簡単な場合）
-          5. **再実行**: 修正後、workflow を再実行
+---
 
-          ---
-
-          **Note**: この Issue は CI Failure Handler により自動作成されました。"
+*この Issue は CI Failure Handler により自動作成されました。*
+EOF
+          )"

@@ -2,48 +2,42 @@ name: Copilot PR Reviewer
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened] # Only on open, not synchronize (avoid comment spam)
 
 permissions:
   pull-requests: write
-  contents: read
 
 jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Notify Review Available
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # GitHub CLI does not currently support --agent-file option
-          # Notify developers to use @reviewer agent in GitHub Copilot Chat
+          PR_NUM=${{ github.event.pull_request.number }}
 
-          gh pr comment ${{ github.event.pull_request.number }} --body \
-            "👋 **Copilot Review Ready**
+          # Dedup: skip if bot already commented on this PR
+          EXISTING=$(gh pr view "$PR_NUM" --json comments --jq \
+            '[.comments[] | select(.body | contains("Copilot Review Ready"))] | length')
 
-            このPRをレビューするには、GitHub Copilot Chat で以下のように \`@reviewer\` エージェントを呼び出してください：
+          if [ "$EXISTING" != "0" ]; then
+            echo "Review comment already exists, skipping."
+            exit 0
+          fi
 
-            **VS Code / GitHub.com で：**
-            \`\`\`
-            @reviewer この PR (#${{ github.event.pull_request.number }}) をレビューしてください
-            \`\`\`
+          gh pr comment "$PR_NUM" --body "$(cat <<'EOF'
+          👋 **Copilot Review Ready**
 
-            **または GitHub CLI で：**
-            \`\`\`bash
-            gh copilot suggest \"Review PR #${{ github.event.pull_request.number }}\"
-            \`\`\`
+          このPRをレビューするには、GitHub Copilot Chat で `@reviewer` を呼び出してください：
 
-            ---
+          ```
+          @reviewer この PR をレビューしてください
+          ```
 
-            **自動レビューについて：**
-            現在、GitHub CLI は custom agents の自動実行をサポートしていません。
-            上記の方法で \`@reviewer\` エージェントを手動で呼び出してください。
-
-            **レビュー基準：**
-            - ✅ データ破損、クラッシュ、セキュリティ問題
-            - ⚠️ パフォーマンスの軽微な改善提案
-            - ❌ スタイルの好み、些細なフォーマット（指摘しません）"
+          **レビュー基準：**
+          - ✅ データ破損、クラッシュ、セキュリティ問題
+          - ⚠️ パフォーマンスの軽微な改善提案
+          - ❌ スタイルの好み、些細なフォーマット（指摘しません）
+          EOF
+          )"
