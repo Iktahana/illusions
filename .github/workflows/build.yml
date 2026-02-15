@@ -103,13 +103,9 @@ jobs:
           fi
 
       - name: Build Electron application
-        run: npm run electron:build -- --mac --${{ matrix.arch }}
+        run: npm run electron:build -- --mac --${{ matrix.arch }} --publish never
         env:
           DEBUG: electron-builder
-          # Explicitly unset publishing tokens to ensure build-only mode
-          # app-update.yml will still be generated from package.json config
-          GH_TOKEN: ""
-          GITHUB_TOKEN: ""
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -180,12 +176,7 @@ jobs:
         run: npm run type-check && npx cross-env ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron
 
       - name: Build NSIS installer
-        run: npx electron-builder --win nsis --x64 --arm64
-        env:
-          # Explicitly unset publishing tokens to ensure build-only mode
-          # app-update.yml will still be generated from package.json config
-          GH_TOKEN: ""
-          GITHUB_TOKEN: ""
+        run: npx electron-builder --win nsis --x64 --arm64 --publish never
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -259,12 +250,7 @@ jobs:
         run: npm run type-check && npx cross-env ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron
 
       - name: Build MSIX package
-        run: npx electron-builder --win appx --x64 --arm64
-        env:
-          # Explicitly unset publishing tokens to ensure build-only mode
-          # app-update.yml will still be generated from package.json config
-          GH_TOKEN: ""
-          GITHUB_TOKEN: ""
+        run: npx electron-builder --win appx --x64 --arm64 --publish never
 
       - name: Upload MSIX artifacts
         uses: actions/upload-artifact@v4
