@@ -1,8 +1,12 @@
-name: Copilot Auto Maintainer
+name: Illusions Maintainer Loop
 
 on:
   issues:
-    types: [opened]
+    types: [opened, edited]
+  pull_request_review:
+    types: [submitted] # レビュワーが指摘を投げた時に起動
+  issue_comment:
+    types: [created] # 特定の指示をコメントした時用
 
 permissions:
   contents: write
@@ -10,17 +14,51 @@ permissions:
   pull-requests: write
 
 jobs:
-  agent-review:
+  maintainer-action:
+    # 自分のコメントには反応しないようにフィルター
+    if: github.event.sender.type != 'Bot'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Copilot Agent Assessment
+      - name: Setup Node.js (for testing)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Maintainer Agent Logic
         env:
           GH_TOKEN: ${{ github.token }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_CONTEXT: ${{ github.event.issue.body || github.event.pull_request.title }}
+          REVIEW_COMMENT: ${{ github.event.review.body }} # レビュー内容
         run: |
-          # 1. AgentにIssueを読み込ませ、難易度評価と解決策をコメントさせる
-          gh copilot suggest "Based on .github/agents/maintainer.agent.md, assess issue #$ISSUE_NUMBER: $ISSUE_BODY. If it's Low difficulty and safe, provide a fix. Otherwise, explain the solution in Japanese."
+          # 1. 指示書の読み込みと現在のコンテキスト分析
+          # 2. 低難易度かつ修正が必要な場合、コードを変更
+          # 3. コミットメッセージの作成（Issue番号の自動付与）
+          # 4. npm test の実行
+          
+          # ※ ここでは gh copilot の CLI 拡張等を利用する想定の疑似コードです
+          gh copilot suggest \
+            --agent-file .github/agents/maintainer.agent.md \
+            --context "$ISSUE_CONTEXT" \
+            --feedback "$REVIEW_COMMENT" \
+            --run-tests "npm test" \
+            --commit-format "fix: related to issue #{{issue_number}}"
+            
+      - name: Push changes and Notify
+        run: |
+          # 修正があった場合のみ、ブランチを push または PR を更新
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "fix: address reviewer feedback (#${{ github.event.issue.number || github.event.pull_request.number }})"
+            git push origin HEAD
+          fi
