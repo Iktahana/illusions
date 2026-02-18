@@ -81,7 +81,7 @@ export const remarkRubyPlugin: Plugin<[RemarkRubyOptions | undefined], Root> = (
       const value = (node as TextNode).value
       if (!value.includes('{')) return
       const segments = splitRuby(value)
-      if (segments.length <= 1) return
+      if (segments.length === 0 || (segments.length === 1 && segments[0]!.type === 'text')) return
       const children = (parent as { children: unknown[] }).children
       children.splice(index, 1, ...segments)
     })
@@ -100,7 +100,7 @@ export const remarkTcyPlugin: Plugin<[RemarkTcyOptions | undefined], Root> = (op
       const value = (node as TextNode).value
       if (!/\^[^^]+\^/.test(value)) return
       const segments = splitTcy(value)
-      if (segments.length <= 1) return
+      if (segments.length === 0 || (segments.length === 1 && segments[0]!.type === 'text')) return
       const children = (parent as { children: unknown[] }).children
       children.splice(index, 1, ...segments)
     })
@@ -164,7 +164,7 @@ export const remarkNoBreakPlugin: Plugin<[RemarkNoBreakOptions | undefined], Roo
       const value = (node as TextNode).value
       if (!/\[\[no-break:/.test(value)) return
       const segments = splitNoBreak(value)
-      if (segments.length <= 1) return
+      if (segments.length === 0 || (segments.length === 1 && segments[0]!.type === 'text')) return
       const children = (parent as { children: unknown[] }).children
       children.splice(index, 1, ...segments)
     })
@@ -183,7 +183,7 @@ export const remarkKernPlugin: Plugin<[RemarkKernOptions | undefined], Root> = (
       const value = (node as TextNode).value
       if (!/\[\[kern:/.test(value)) return
       const segments = splitKern(value)
-      if (segments.length <= 1) return
+      if (segments.length === 0 || (segments.length === 1 && segments[0]!.type === 'text')) return
       const children = (parent as { children: unknown[] }).children
       children.splice(index, 1, ...segments)
     })
