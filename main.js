@@ -247,10 +247,17 @@ function buildApplicationMenu(recentProjects = []) {
       },
       { type: 'separator' },
       {
-        label: '閉じる',
+        label: '新しいタブ',
+        accelerator: 'CmdOrCtrl+T',
+        click: () => {
+          sendToFocused('menu-new-tab')
+        },
+      },
+      {
+        label: 'タブを閉じる',
         accelerator: 'CmdOrCtrl+W',
         click: () => {
-          BrowserWindow.getFocusedWindow()?.close()
+          sendToFocused('menu-close-tab')
         },
       },
       ...(isMac ? [] : [{ type: 'separator' }]),

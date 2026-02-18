@@ -3,6 +3,8 @@
  * Web（IndexedDB）/ Electron（SQLite）を共通のAPIで扱う。
  */
 
+import type { TabPersistenceState } from "./tab-types";
+
 /**
  * 最近使ったファイルの項目。
  */
@@ -70,6 +72,9 @@ export interface AppState {
 
   // コンパクトUIモード
   compactMode?: boolean;
+
+  // タブの永続化
+  openTabs?: TabPersistenceState;
 }
 
 /**

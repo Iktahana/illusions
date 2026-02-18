@@ -24,8 +24,9 @@ import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
 import RubyDialog from "@/components/RubyDialog";
-import { useMdiFile } from "@/lib/use-mdi-file";
+import { useTabManager } from "@/lib/use-tab-manager";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
+import TabBar from "@/components/TabBar";
 import { useElectronMenuHandlers } from "@/lib/use-electron-menu-handlers";
 import { useWebMenuHandlers } from "@/lib/use-web-menu-handlers";
 import { useGlobalShortcuts } from "@/lib/use-global-shortcuts";
@@ -101,9 +102,15 @@ export default function EditorPage() {
   const isAutoRestoringRef = useRef(false);
   const [autoSave, setAutoSave] = useState(true); // Auto-save on by default
 
-  const mdiFile = useMdiFile({ skipAutoRestore, autoSave });
-  const { content, setContent, currentFile, isDirty, isSaving, lastSavedTime, openFile: originalOpenFile, saveFile, saveAsFile, newFile: originalNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen, _loadSystemFile } =
-    mdiFile;
+  const tabManager = useTabManager({ skipAutoRestore, autoSave });
+  const {
+    content, setContent, currentFile, isDirty, isSaving, lastSavedTime,
+    openFile: tabOpenFile, saveFile, saveAsFile,
+    newFile: tabNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen,
+    _loadSystemFile: tabLoadSystemFile,
+    tabs, activeTabId, newTab, closeTab, switchTab, nextTab, prevTab, switchToIndex,
+    pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
+  } = tabManager;
 
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
@@ -115,8 +122,7 @@ export default function EditorPage() {
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [saveToastExiting, setSaveToastExiting] = useState(false);
    const [selectedCharCount, setSelectedCharCount] = useState(0);
-   // File session ID (updated only on new file creation or file switch)
-   const fileSessionRef = useRef(0);
+   // (fileSessionRef removed: tab switching via activeTabId handles editor remount)
   const prevLastSavedTimeRef = useRef<number | null>(null);
   const hasAutoRecoveredRef = useRef(false);
 
@@ -127,9 +133,10 @@ export default function EditorPage() {
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
-  // 未保存警告の Hook を初期化
+  // 未保存警告の Hook (project mode transitions only; tabs handle per-tab dirty checks)
+  const anyDirty = tabs.some((t) => t.isDirty);
   const unsavedWarning = useUnsavedWarning(
-    isDirty,
+    anyDirty,
     saveFile,
     currentFile?.name || null
   );
@@ -138,53 +145,31 @@ export default function EditorPage() {
    useEffect(() => {
     if (wasAutoRecovered && !hasAutoRecoveredRef.current) {
       hasAutoRecoveredRef.current = true;
-      fileSessionRef.current += 1;
       setEditorKey(prev => prev + 1);
     }
   }, [wasAutoRecovered]);
 
-   // openFile/newFile をラップしてセッションIDを進める（安全チェック付き）
+   // With tabs, open/new don't need unsaved warnings (they create new tabs)
    const openFile = useCallback(async () => {
-     await unsavedWarning.confirmBeforeAction(async () => {
-       await originalOpenFile();
-
-       // content の状態更新を反映してからエディタを再マウント
-       // setTimeout で originalOpenFile 由来の状態更新を React に先に処理させる
-       setTimeout(() => {
-        fileSessionRef.current += 1;
-        setEditorKey(prev => prev + 1);
-      }, 0);
-    });
-  }, [originalOpenFile, unsavedWarning]);
+     await tabOpenFile();
+     setEditorKey(prev => prev + 1);
+   }, [tabOpenFile]);
 
   const newFile = useCallback(() => {
-    void unsavedWarning.confirmBeforeAction(() => {
-      originalNewFile();
-      fileSessionRef.current += 1;
-      setEditorKey(prev => prev + 1);
-    });
-  }, [originalNewFile, unsavedWarning]);
+    tabNewFile();
+    setEditorKey(prev => prev + 1);
+  }, [tabNewFile]);
 
   // Electron メニューの「新規」と「開く」をバインド（安全チェック付き）
   useElectronMenuHandlers(newFile, openFile);
 
-  // システムからファイルを開く処理（安全チェック付き）
+  // System file open: tab manager handles loading; we just update editor key
   useEffect(() => {
     if (!onSystemFileOpen) return;
-
-    onSystemFileOpen((path: string, fileContent: string) => {
-      void unsavedWarning.confirmBeforeAction(() => {
-        // ファイルを直接読み込む
-        _loadSystemFile(path, fileContent);
-
-        // エディタを再マウント
-        setTimeout(() => {
-          fileSessionRef.current += 1;
-          setEditorKey(prev => prev + 1);
-        }, 0);
-      });
+    onSystemFileOpen(() => {
+      setEditorKey(prev => prev + 1);
     });
-  }, [onSystemFileOpen, unsavedWarning, _loadSystemFile]);
+  }, [onSystemFileOpen]);
 
   // エディタ表示設定
   const [fontScale, setFontScale] = useState(100); // 100% = Standard size
@@ -894,6 +879,23 @@ export default function EditorPage() {
          ? event.shiftKey && event.metaKey && event.key === "t"
          : event.shiftKey && event.ctrlKey && event.key === "t";
 
+       // Tab shortcuts (Web only; Electron handles Cmd+W/T via menu)
+       // Ctrl+Tab: Next tab
+       const isNextTab = event.ctrlKey && !event.shiftKey && event.key === "Tab";
+       // Ctrl+Shift+Tab: Previous tab
+       const isPrevTab = event.ctrlKey && event.shiftKey && event.key === "Tab";
+       // Cmd+T (macOS) / Ctrl+T (Windows/Linux): New tab (Web only, Electron menu handles it)
+       const isNewTabShortcut = !isElectron && (isMac
+         ? event.metaKey && !event.shiftKey && event.key === "t"
+         : event.ctrlKey && !event.shiftKey && event.key === "t");
+       // Cmd+W (macOS) / Ctrl+W (Windows/Linux): Close tab (Web only, Electron menu handles it)
+       const isCloseTabShortcut = !isElectron && (isMac
+         ? event.metaKey && event.key === "w"
+         : event.ctrlKey && event.key === "w");
+       // Cmd+1~9 (macOS) / Ctrl+1~9 (Windows/Linux): Jump to tab N
+       const isTabJump = (isMac ? event.metaKey : event.ctrlKey) &&
+         !event.shiftKey && event.key >= "1" && event.key <= "9";
+
        if (isTcyShortcut) {
          event.preventDefault();
          handleToggleTcy();
@@ -915,6 +917,31 @@ export default function EditorPage() {
        } else if (isPasteAsPlaintextShortcut) {
          event.preventDefault();
          void handlePasteAsPlaintext();
+       } else if (isNextTab) {
+         event.preventDefault();
+         nextTab();
+         setEditorKey(prev => prev + 1);
+       } else if (isPrevTab) {
+         event.preventDefault();
+         prevTab();
+         setEditorKey(prev => prev + 1);
+       } else if (isNewTabShortcut) {
+         event.preventDefault();
+         newTab();
+         setEditorKey(prev => prev + 1);
+       } else if (isCloseTabShortcut) {
+         event.preventDefault();
+         // Single empty clean tab → close window
+         if (tabs.length === 1 && !tabs[0].file && !tabs[0].isDirty) {
+           window.close();
+           return;
+         }
+         closeTab(activeTabId);
+       } else if (isTabJump) {
+         event.preventDefault();
+         const idx = parseInt(event.key, 10) - 1; // Cmd+1 = index 0
+         switchToIndex(idx);
+         setEditorKey(prev => prev + 1);
        }
      };
 
@@ -922,7 +949,7 @@ export default function EditorPage() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [saveFile, handlePasteAsPlaintext, handleToggleCompactMode, handleOpenRubyDialog, handleToggleTcy]);
+  }, [saveFile, handlePasteAsPlaintext, handleToggleCompactMode, handleOpenRubyDialog, handleToggleTcy, isElectron, nextTab, prevTab, newTab, closeTab, tabs, activeTabId, switchToIndex]);
 
   // --- WelcomeScreen callbacks ---
 
@@ -934,15 +961,14 @@ export default function EditorPage() {
       const mainFileName = project.metadata.mainFile;
 
       if (isElectron && project.rootPath) {
-        _loadSystemFile(
+        tabLoadSystemFile(
           `${project.rootPath}/${mainFileName}`,
           mainContent
         );
       } else {
-        _loadSystemFile(mainFileName, mainContent);
+        tabLoadSystemFile(mainFileName, mainContent);
       }
 
-      fileSessionRef.current += 1;
       setEditorKey((prev) => prev + 1);
     } catch (error) {
       console.error(
@@ -950,7 +976,7 @@ export default function EditorPage() {
         error
       );
     }
-  }, [isElectron, _loadSystemFile]);
+  }, [isElectron, tabLoadSystemFile]);
 
   /** Show the CreateProjectWizard dialog */
   const handleCreateProject = useCallback(() => {
@@ -1422,13 +1448,22 @@ export default function EditorPage() {
         {/* Web menu bar (only for non-Electron environment) */}
         {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} />}
 
-         {/* 未保存警告ダイアログ */}
+         {/* 未保存警告ダイアログ (project mode transitions) */}
         <UnsavedWarningDialog
           isOpen={unsavedWarning.showWarning}
           fileName={currentFile?.name || "新規ファイル"}
           onSave={unsavedWarning.handleSave}
           onDiscard={unsavedWarning.handleDiscard}
           onCancel={unsavedWarning.handleCancel}
+        />
+
+        {/* 未保存警告ダイアログ (tab close) */}
+        <UnsavedWarningDialog
+          isOpen={pendingCloseTabId !== null}
+          fileName={pendingCloseFileName}
+          onSave={handleCloseTabSave}
+          onDiscard={handleCloseTabDiscard}
+          onCancel={handleCloseTabCancel}
         />
 
         {/* UpgradeBanner for standalone mode */}
@@ -1600,6 +1635,16 @@ export default function EditorPage() {
         )}
 
         <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
+          <TabBar
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onSwitchTab={(tabId) => {
+              switchTab(tabId);
+              setEditorKey(prev => prev + 1);
+            }}
+            onCloseTab={closeTab}
+            onNewTab={newTab}
+          />
           <div ref={editorDomRef} className="flex-1 min-h-0">
             {editorDiff ? (
               <EditorDiffView
@@ -1616,7 +1661,7 @@ export default function EditorPage() {
               />
             ) : (
               <NovelEditor
-                key={`file-${fileSessionRef.current}-${editorKey}`}
+                key={`tab-${activeTabId}-${editorKey}`}
                 initialContent={content}
                 onChange={handleChange}
                 onInsertText={handleInsertText}

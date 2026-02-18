@@ -31,6 +31,8 @@ declare global {
     onMenuOpen?: (callback: () => void) => (() => void) | void;
     onMenuSave?: (callback: () => void) => (() => void) | void;
     onMenuSaveAs?: (callback: () => void) => (() => void) | void;
+    onMenuCloseTab?: (callback: () => void) => (() => void) | void;
+    onMenuNewTab?: (callback: () => void) => (() => void) | void;
     onMenuOpenProject?: (callback: () => void) => (() => void) | void;
     onMenuOpenRecentProject?: (callback: (projectId: string) => void) => (() => void) | void;
     rebuildMenu?: () => Promise<boolean>;

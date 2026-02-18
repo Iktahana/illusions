@@ -33,6 +33,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu-save-as-triggered', handler)
     return () => ipcRenderer.removeListener('menu-save-as-triggered', handler)
   },
+  onMenuCloseTab: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-close-tab', handler)
+    return () => ipcRenderer.removeListener('menu-close-tab', handler)
+  },
+  onMenuNewTab: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-new-tab', handler)
+    return () => ipcRenderer.removeListener('menu-new-tab', handler)
+  },
   onSaveBeforeClose: (callback) => {
     const handler = () => callback()
     ipcRenderer.on('electron-request-save-before-close', handler)
