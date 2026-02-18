@@ -362,10 +362,11 @@ export default function SettingsModal({
                       )}
                     />
                     <span className="text-sm text-foreground-secondary">字</span>
+                    <span className="ml-auto text-sm text-foreground-secondary">自動</span>
                     <button
                       onClick={() => onAutoCharsPerLineChange(!autoCharsPerLine)}
                       className={clsx(
-                        "ml-2 relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out",
+                        "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out",
                         autoCharsPerLine ? "bg-accent" : "bg-border-secondary"
                       )}
                     >
@@ -376,7 +377,6 @@ export default function SettingsModal({
                         )}
                       />
                     </button>
-                    <span className="text-sm text-foreground-secondary">自動</span>
                   </div>
                   <p className="text-xs text-foreground-tertiary mt-1">
                     {autoCharsPerLine
