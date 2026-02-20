@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { saveMdiFile } from "../mdi-file";
 import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../file-watcher";
