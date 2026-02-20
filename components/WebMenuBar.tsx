@@ -12,40 +12,56 @@ interface RecentProjectInfo {
   rootDirName?: string;
 }
 
+interface MenuCheckedState {
+  compactMode?: boolean;
+}
+
 interface WebMenuBarProps {
   onMenuAction: (action: string) => void;
   recentProjects?: RecentProjectInfo[];
+  checkedState?: MenuCheckedState;
 }
 
-export default function WebMenuBar({ onMenuAction, recentProjects }: WebMenuBarProps) {
+export default function WebMenuBar({ onMenuAction, recentProjects, checkedState }: WebMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const menuRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Inject recent projects into the menu structure
+  // Checked state map: action → boolean
+  const checkedMap = useMemo<Record<string, boolean>>(() => {
+    const map: Record<string, boolean> = {};
+    if (checkedState?.compactMode != null) {
+      map['toggle-compact-mode'] = checkedState.compactMode;
+    }
+    return map;
+  }, [checkedState]);
+
+  // Inject recent projects and checked state into the menu structure
   const menuStructure = useMemo<MenuSection[]>(() => {
     return WEB_MENU_STRUCTURE.map((section) => {
-      if (section.label !== 'ファイル') return section;
-
       const items = section.items.map((item): MenuItem => {
-        if (item.action !== 'open-recent-project') return item;
+        // Inject recent projects submenu
+        if (item.action === 'open-recent-project' && section.label === 'ファイル') {
+          const submenuItems: MenuItem[] =
+            recentProjects && recentProjects.length > 0
+              ? recentProjects.map((p) => ({
+                  label: p.rootDirName ? `${p.name} (${p.rootDirName})` : p.name,
+                  action: `open-recent-project:${p.projectId}`,
+                }))
+              : [];
+          return { ...item, submenu: submenuItems };
+        }
 
-        const submenuItems: MenuItem[] =
-          recentProjects && recentProjects.length > 0
-            ? recentProjects.map((p) => ({
-                label: p.rootDirName ? `${p.name} (${p.rootDirName})` : p.name,
-                action: `open-recent-project:${p.projectId}`,
-              }))
-            : [];
+        // Inject checked state for checkbox items
+        if (item.type === 'checkbox' && item.action && item.action in checkedMap) {
+          return { ...item, checked: checkedMap[item.action] };
+        }
 
-        return {
-          ...item,
-          submenu: submenuItems,
-        };
+        return item;
       });
 
       return { ...section, items };
     });
-  }, [recentProjects]);
+  }, [recentProjects, checkedMap]);
 
   const handleMenuClick = (index: number) => {
     setOpenMenu(openMenu === index ? null : index);

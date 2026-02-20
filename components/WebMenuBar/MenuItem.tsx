@@ -52,9 +52,9 @@ export function MenuItem({ item, onClick, onClose }: MenuItemProps) {
         type="button"
         onClick={handleClick}
         disabled={item.enabled === false && !hasSubmenu}
-        className="w-full text-left px-3 py-1.5 text-sm flex items-center justify-between gap-8 hover:bg-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
-        <span className="text-foreground">{item.label}</span>
+        <span className="text-foreground flex-1">{item.label}</span>
         {hasSubmenu ? (
           <svg width="12" height="12" viewBox="0 0 12 12" className="text-foreground-tertiary flex-shrink-0">
             <path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
@@ -62,6 +62,12 @@ export function MenuItem({ item, onClick, onClose }: MenuItemProps) {
         ) : item.accelerator ? (
           <span className="text-xs text-foreground-tertiary font-mono">
             {formatAccelerator(item.accelerator)}
+          </span>
+        ) : null}
+        {/* Checkbox checkmark area — always rightmost */}
+        {item.type === 'checkbox' ? (
+          <span className="w-4 flex-shrink-0 text-center text-foreground">
+            {item.checked ? '✓' : ''}
           </span>
         ) : null}
       </button>

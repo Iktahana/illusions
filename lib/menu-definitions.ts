@@ -12,10 +12,11 @@ const APP_VERSION = (() => {
 
 export interface MenuItem {
   label?: string;
-  type?: 'normal' | 'separator';
+  type?: 'normal' | 'separator' | 'checkbox';
   accelerator?: string;
   action?: string;
   enabled?: boolean;
+  checked?: boolean;
   submenu?: MenuItem[];
 }
 
@@ -64,7 +65,7 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
   {
     label: 'ウィンドウ',
     items: [
-      { label: 'コンパクトモード', accelerator: 'Ctrl+Shift+M', action: 'toggle-compact-mode' },
+      { label: 'コンパクトモード', type: 'checkbox', action: 'toggle-compact-mode' },
     ]
   },
   {
