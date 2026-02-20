@@ -7,6 +7,7 @@ import {
   type MdiFileDescriptor,
 } from "./mdi-file";
 import { isElectronRenderer } from "./runtime-env";
+import { notificationManager } from "./notification-manager";
 import { getStorageService } from "./storage-service";
 import { fetchAppState, persistAppState } from "./app-state-manager";
 import { getRandomillusionstory } from "./illusion-stories";
@@ -391,7 +392,7 @@ export function useTabManager(options?: {
     } catch (error) {
       console.error("保存に失敗しました:", error);
       const message = getErrorMessage(error);
-      window.alert(`保存に失敗しました: ${message}`);
+      notificationManager.error(`保存に失敗しました: ${message}`);
       return;
     }
 
@@ -563,7 +564,7 @@ export function useTabManager(options?: {
         console.error("保存に失敗しました:", error);
         updateTab(tabId, { isSaving: false });
         const message = getErrorMessage(error);
-        window.alert(`保存に失敗しました: ${message}`);
+        notificationManager.error(`保存に失敗しました: ${message}`);
       } finally {
         isSavingRef.current = false;
       }
@@ -607,7 +608,7 @@ export function useTabManager(options?: {
       console.error("名前を付けて保存に失敗しました:", error);
       updateTab(tabId, { isSaving: false });
       const message = getErrorMessage(error);
-      window.alert(`名前を付けて保存に失敗しました: ${message}`);
+      notificationManager.error(`名前を付けて保存に失敗しました: ${message}`);
     } finally {
       isSavingRef.current = false;
     }
