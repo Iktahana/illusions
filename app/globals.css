@@ -141,6 +141,28 @@ html:not(.dark) {
   }
 }
 
+/* Linting decoration styles (wavy underlines by severity) */
+.lint-error {
+  text-decoration: wavy underline;
+  text-decoration-color: rgb(var(--error));
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+
+.lint-warning {
+  text-decoration: wavy underline;
+  text-decoration-color: rgb(var(--warning));
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+
+.lint-info {
+  text-decoration: wavy underline;
+  text-decoration-color: rgb(var(--info));
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+
 @keyframes fade-out {
   0%, 70% { opacity: 1; }
   100% { opacity: 0; }

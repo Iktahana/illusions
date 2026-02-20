@@ -17,6 +17,7 @@ import {
   setScrollProgress,
 } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
+import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import clsx from "clsx";
 import { Type, AlignLeft, Search } from "lucide-react";
 import { EditorView } from "@milkdown/prose/view";
@@ -28,6 +29,7 @@ import SelectionCounter from "./SelectionCounter";
 import { searchHighlightPlugin } from "@/lib/search-highlight-plugin";
 import EditorContextMenu, { type ContextMenuAction } from "./EditorContextMenu";
 import { isElectronRenderer } from "@/lib/runtime-env";
+import type { RuleRunner, LintIssue } from "@/lib/linting";
 
 interface EditorProps {
   initialContent?: string;
@@ -51,6 +53,10 @@ interface EditorProps {
   // 品詞着色設定
   posHighlightEnabled?: boolean;
   posHighlightColors?: Record<string, string>;
+  // リンティング設定
+  lintingEnabled?: boolean;
+  lintingRuleRunner?: RuleRunner | null;
+  onLintIssuesUpdated?: (issues: LintIssue[]) => void;
   // スクロール設定
   verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
   scrollSensitivity?: number;
@@ -88,6 +94,9 @@ export default function NovelEditor({
   onShowAllSearchResults,
   posHighlightEnabled = false,
   posHighlightColors = {},
+  lintingEnabled = false,
+  lintingRuleRunner,
+  onLintIssuesUpdated,
   verticalScrollBehavior = "auto",
   scrollSensitivity = 1.0,
   onOpenRubyDialog,
@@ -282,6 +291,9 @@ export default function NovelEditor({
               savedScrollProgressRef={savedScrollProgressRef}
               posHighlightEnabled={posHighlightEnabled}
               posHighlightColors={posHighlightColors}
+              lintingEnabled={lintingEnabled}
+              lintingRuleRunner={lintingRuleRunner}
+              onLintIssuesUpdated={onLintIssuesUpdated}
               verticalScrollBehavior={verticalScrollBehavior}
               scrollSensitivity={scrollSensitivity}
               onOpenRubyDialog={onOpenRubyDialog}
@@ -453,6 +465,9 @@ function MilkdownEditor({
   savedScrollProgressRef,
   posHighlightEnabled,
   posHighlightColors,
+  lintingEnabled,
+  lintingRuleRunner,
+  onLintIssuesUpdated,
   verticalScrollBehavior = "auto",
   scrollSensitivity = 1.0,
   onOpenRubyDialog,
@@ -479,6 +494,9 @@ function MilkdownEditor({
   savedScrollProgressRef: RefObject<number>;
   posHighlightEnabled?: boolean;
   posHighlightColors?: Record<string, string>;
+  lintingEnabled?: boolean;
+  lintingRuleRunner?: RuleRunner | null;
+  onLintIssuesUpdated?: (issues: LintIssue[]) => void;
   verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
   scrollSensitivity?: number;
   onOpenRubyDialog?: () => void;
@@ -496,6 +514,7 @@ function MilkdownEditor({
   const onChangeRef = useRef(onChange);
   const onInsertTextRef = useRef(onInsertText);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const onLintIssuesUpdatedRef = useRef(onLintIssuesUpdated);
 
   // コールバックが変わったら ref を更新する
 
@@ -510,6 +529,10 @@ function MilkdownEditor({
   useEffect(() => {
     onSelectionChangeRef.current = onSelectionChange;
   }, [onSelectionChange]);
+
+  useEffect(() => {
+    onLintIssuesUpdatedRef.current = onLintIssuesUpdated;
+  }, [onLintIssuesUpdated]);
 
   // 縦書き: ブラウザの自動スクロールを防止するための保存位置
   const savedScrollPosRef = useRef({ left: 0, top: 0 });
@@ -580,6 +603,11 @@ function MilkdownEditor({
         colors: {},
         dicPath: '/dict',
         debounceMs: 300,
+      }))
+      .use(linting({
+        enabled: false, // 初期化時は無効、後で動的に更新
+        debounceMs: 500,
+        onIssuesUpdated: (issues) => onLintIssuesUpdatedRef.current?.(issues),
       }));
 
     return editor;
@@ -631,6 +659,20 @@ function MilkdownEditor({
       console.error('[Editor] Failed to update POS highlight settings:', err);
     });
   }, [editorViewInstance, posHighlightEnabled, posHighlightColors]);
+
+  // linting 設定を動的に更新（Editor を再作成せずに）
+  useEffect(() => {
+    if (!editorViewInstance) return;
+
+    import('@/packages/milkdown-plugin-japanese-novel/linting-plugin').then(({ updateLintingSettings }) => {
+      updateLintingSettings(editorViewInstance, {
+        enabled: lintingEnabled,
+        ruleRunner: lintingRuleRunner,
+      });
+    }).catch(err => {
+      console.error('[Editor] Failed to update linting settings:', err);
+    });
+  }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
 
   // 選択範囲の変更を追跡する
   useEffect(() => {
