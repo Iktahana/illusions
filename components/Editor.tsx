@@ -142,16 +142,16 @@ export default function NovelEditor({
     setIsSearchOpen(prev => !prev);
   };
 
-  const handleSearchOpen = () => {
+  const handleSearchOpen = useCallback(() => {
     setIsSearchOpen(true);
-  };
+  }, []);
 
   // 親からのトリガーで検索ダイアログを開く（ショートカット）
   useEffect(() => {
     if (searchOpenTrigger > 0) {
       handleSearchOpen();
     }
-  }, [searchOpenTrigger]);
+  }, [searchOpenTrigger, handleSearchOpen]);
 
   // Save scroll progress (0-1) before mode switch
   const savedScrollProgressRef = useRef<number>(0);
