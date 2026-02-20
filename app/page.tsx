@@ -109,6 +109,7 @@ export default function EditorPage() {
     newFile: tabNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen,
     _loadSystemFile: tabLoadSystemFile,
     tabs, activeTabId, newTab, closeTab, switchTab, nextTab, prevTab, switchToIndex,
+    openProjectFile, pinTab,
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
   } = tabManager;
 
@@ -1565,7 +1566,21 @@ export default function EditorPage() {
                       return (
                         <aside className="h-full bg-background border-r border-border flex flex-col">
                           <div className="p-4 flex-1 overflow-y-auto">
-                            <FilesPanel projectName={isProjectMode(editorMode) ? editorMode.name : undefined} />
+                            <FilesPanel
+                              projectName={isProjectMode(editorMode) ? editorMode.name : undefined}
+                              onFileClick={(vfsPath) => {
+                                void openProjectFile(vfsPath, { preview: true });
+                                setEditorKey(prev => prev + 1);
+                              }}
+                              onFileDoubleClick={(vfsPath) => {
+                                void openProjectFile(vfsPath, { preview: false });
+                                setEditorKey(prev => prev + 1);
+                              }}
+                              onFileMiddleClick={(vfsPath) => {
+                                void openProjectFile(vfsPath, { preview: false });
+                                setEditorKey(prev => prev + 1);
+                              }}
+                            />
                           </div>
                         </aside>
                       );
@@ -1644,6 +1659,7 @@ export default function EditorPage() {
             }}
             onCloseTab={closeTab}
             onNewTab={newTab}
+            onPinTab={pinTab}
           />
           <div ref={editorDomRef} className="flex-1 min-h-0">
             {editorDiff ? (

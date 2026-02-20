@@ -591,6 +591,12 @@ ipcMain.handle('show-in-file-manager', async (_event, dirPath) => {
   return result === '' // empty string = success
 })
 
+ipcMain.handle('reveal-in-file-manager', async (_event, filePath) => {
+  if (!filePath || typeof filePath !== 'string') return false
+  shell.showItemInFolder(filePath)
+  return true
+})
+
 ipcMain.handle('open-external', async (_event, url) => {
   if (typeof url !== 'string') return false
   // Only allow http/https URLs

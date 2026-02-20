@@ -10,6 +10,7 @@ interface TabBarProps {
   onSwitchTab: (tabId: TabId) => void;
   onCloseTab: (tabId: TabId) => void;
   onNewTab: () => void;
+  onPinTab?: (tabId: TabId) => void;
 }
 
 export default function TabBar({
@@ -18,6 +19,7 @@ export default function TabBar({
   onSwitchTab,
   onCloseTab,
   onNewTab,
+  onPinTab,
 }: TabBarProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<HTMLButtonElement>(null);
@@ -76,6 +78,9 @@ export default function TabBar({
                 }
               `}
               onClick={() => onSwitchTab(tab.id)}
+              onDoubleClick={() => {
+                if (tab.isPreview) onPinTab?.(tab.id);
+              }}
               onMouseDown={(e) => handleMiddleClick(e, tab.id)}
             >
               {/* Dirty indicator */}
@@ -84,7 +89,7 @@ export default function TabBar({
               )}
 
               {/* Tab label */}
-              <span className="truncate flex-1 text-left">{label}</span>
+              <span className={`truncate flex-1 text-left${tab.isPreview ? " italic opacity-75" : ""}`}>{label}</span>
 
               {/* Close button */}
               <span

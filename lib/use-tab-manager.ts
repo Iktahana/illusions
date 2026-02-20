@@ -38,6 +38,7 @@ function createNewTab(content?: string): TabState {
     isDirty: false,
     lastSavedTime: null,
     isSaving: false,
+    isPreview: false,
   };
 }
 
@@ -124,6 +125,8 @@ export interface UseTabManagerReturn {
   nextTab: () => void;
   prevTab: () => void;
   switchToIndex: (index: number) => void;
+  openProjectFile: (vfsPath: string, options?: { preview?: boolean }) => Promise<void>;
+  pinTab: (tabId: TabId) => void;
 
   // Close-tab unsaved warning flow
   pendingCloseTabId: TabId | null;
@@ -403,10 +406,13 @@ export function useTabManager(options?: {
     setTabs((prev) =>
       prev.map((tab) => {
         if (tab.id !== activeTabIdRef.current) return tab;
+        const dirty = newContent !== tab.lastSavedContent;
         return {
           ...tab,
           content: newContent,
-          isDirty: newContent !== tab.lastSavedContent,
+          isDirty: dirty,
+          // Promote preview tab to fixed when edited
+          isPreview: dirty ? false : tab.isPreview,
         };
       }),
     );
@@ -465,6 +471,7 @@ export function useTabManager(options?: {
         isDirty: false,
         lastSavedTime: Date.now(),
         isSaving: false,
+        isPreview: false,
       };
       setTabs((prev) => [...prev, tab]);
       setActiveTabId(tab.id);
@@ -622,11 +629,103 @@ export function useTabManager(options?: {
         isDirty: false,
         lastSavedTime: Date.now(),
         isSaving: false,
+        isPreview: false,
       };
       setTabs((prev) => [...prev, tab]);
       setActiveTabId(tab.id);
     },
     [findTabByPath, updateTab],
+  );
+
+  /** Open a file from the project VFS into a tab */
+  const openProjectFile = useCallback(
+    async (vfsPath: string, options?: { preview?: boolean }) => {
+      const preview = options?.preview ?? false;
+
+      // Deduplicate: if already open, switch to it
+      const existing = tabsRef.current.find(
+        (t) => t.file?.path === vfsPath,
+      );
+      if (existing) {
+        setActiveTabId(existing.id);
+        // If double-click on existing preview tab, pin it
+        if (!preview && existing.isPreview) {
+          updateTab(existing.id, { isPreview: false });
+        }
+        return;
+      }
+
+      // Read file from VFS
+      let fileContent: string;
+      try {
+        const vfs = getVFS();
+        fileContent = await vfs.readFile(vfsPath);
+      } catch (error) {
+        console.error("ファイルの読み込みに失敗しました:", error);
+        return;
+      }
+
+      const fileName = vfsPath.split("/").pop() || "無題";
+
+      if (preview) {
+        // Replace existing preview tab, or create new preview tab
+        const existingPreview = tabsRef.current.find((t) => t.isPreview);
+        if (existingPreview) {
+          updateTab(existingPreview.id, {
+            file: { path: vfsPath, handle: null, name: fileName },
+            content: fileContent,
+            lastSavedContent: fileContent,
+            isDirty: false,
+            lastSavedTime: Date.now(),
+            isPreview: true,
+          });
+          setActiveTabId(existingPreview.id);
+          return;
+        }
+      }
+
+      // Reuse current tab if untitled and clean
+      const cur = tabsRef.current.find(
+        (t) => t.id === activeTabIdRef.current,
+      );
+      if (cur && !cur.file && !cur.isDirty) {
+        updateTab(cur.id, {
+          file: { path: vfsPath, handle: null, name: fileName },
+          content: fileContent,
+          lastSavedContent: fileContent,
+          isDirty: false,
+          lastSavedTime: Date.now(),
+          isPreview: preview,
+        });
+        return;
+      }
+
+      // New tab
+      const tab: TabState = {
+        id: generateTabId(),
+        file: { path: vfsPath, handle: null, name: fileName },
+        content: fileContent,
+        lastSavedContent: fileContent,
+        isDirty: false,
+        lastSavedTime: Date.now(),
+        isSaving: false,
+        isPreview: preview,
+      };
+      setTabs((prev) => [...prev, tab]);
+      setActiveTabId(tab.id);
+    },
+    [updateTab],
+  );
+
+  /** Pin (promote) a preview tab to a fixed tab */
+  const pinTab = useCallback(
+    (tabId: TabId) => {
+      const tab = tabsRef.current.find((t) => t.id === tabId);
+      if (tab?.isPreview) {
+        updateTab(tabId, { isPreview: false });
+      }
+    },
+    [updateTab],
   );
 
   // =========================================================================
@@ -857,6 +956,37 @@ export function useTabManager(options?: {
     return cleanup;
   }, [isElectron, loadSystemFile]);
 
+  // Reload non-dirty tabs when window regains visibility (#98)
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.hidden) return;
+      if (!isProjectRef.current) return;
+
+      const vfs = getVFS();
+      if (!vfs.isRootOpen()) return;
+
+      for (const tab of tabsRef.current) {
+        if (!tab.file?.path || tab.isSaving) continue;
+        if (tab.isDirty) continue;
+        try {
+          const diskContent = await vfs.readFile(tab.file.path);
+          if (diskContent !== tab.lastSavedContent) {
+            updateTab(tab.id, {
+              content: diskContent,
+              lastSavedContent: diskContent,
+              isDirty: false,
+              lastSavedTime: Date.now(),
+            });
+          }
+        } catch {
+          // File may have been deleted; skip
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [updateTab]);
+
   // Menu: Save
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onMenuSave) return;
@@ -946,6 +1076,7 @@ export function useTabManager(options?: {
       const serializedTabs: SerializedTab[] = tabs.map((t) => ({
         filePath: t.file?.path ?? null,
         fileName: t.file?.name ?? "新規ファイル",
+        isPreview: t.isPreview || undefined,
       }));
       const activeIndex = tabs.findIndex((t) => t.id === activeTabId);
       const state: TabPersistenceState = {
@@ -991,6 +1122,7 @@ export function useTabManager(options?: {
                 isDirty: false,
                 lastSavedTime: Date.now(),
                 isSaving: false,
+                isPreview: serialized.isPreview ?? false,
               });
             } catch (error) {
               console.warn(
@@ -1055,6 +1187,8 @@ export function useTabManager(options?: {
     nextTab: nextTabFn,
     prevTab: prevTabFn,
     switchToIndex,
+    openProjectFile,
+    pinTab,
 
     // Close-tab dialog
     pendingCloseTabId,

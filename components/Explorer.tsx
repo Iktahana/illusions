@@ -31,6 +31,7 @@ import {
   type FontInfo,
   type SystemFontInfo,
 } from "@/lib/fonts";
+import { isElectronRenderer } from "@/lib/runtime-env";
 type Tab = "chapters" | "settings" | "style";
 
 const formattingMarkers = ["**", "__", "~~", "*", "_", "`", "["];
@@ -321,7 +322,17 @@ interface EditingEntry {
   currentName: string;
 }
 
-export function FilesPanel({ projectName }: { projectName?: string }) {
+export function FilesPanel({
+  projectName,
+  onFileClick,
+  onFileDoubleClick,
+  onFileMiddleClick,
+}: {
+  projectName?: string;
+  onFileClick?: (vfsPath: string) => void;
+  onFileDoubleClick?: (vfsPath: string) => void;
+  onFileMiddleClick?: (vfsPath: string) => void;
+}) {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(["/"]));
   const [tree, setTree] = useState<FileTreeEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -331,6 +342,8 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
   const { menu, show: showContextMenu, close: closeContextMenu } = useContextMenu();
   /** Track the right-clicked entry for Web context menu callback */
   const contextTargetRef = useRef<{ path: string; kind: "file" | "directory" } | null>(null);
+  /** Timer for single/double click discrimination on files */
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refresh = useCallback(() => setRefreshToken(v => v + 1), []);
 
@@ -592,6 +605,30 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
       case "new-folder":
         startNewFolder(fullPath);
         break;
+      case "reveal-in-finder":
+      case "open-in-finder": {
+        try {
+          const { getVFS } = await import("@/lib/vfs");
+          const vfs = getVFS();
+          const rootPath = vfs.getRootPath?.();
+          if (rootPath && window.electronAPI?.revealInFileManager) {
+            const vfsRelative = toVFSPath(fullPath);
+            const absolutePath = vfsRelative
+              ? `${rootPath}/${vfsRelative}`
+              : rootPath;
+            void window.electronAPI.revealInFileManager(absolutePath);
+          } else if (rootPath && window.electronAPI?.showInFileManager) {
+            const vfsRelative = toVFSPath(fullPath);
+            const absolutePath = vfsRelative
+              ? `${rootPath}/${vfsRelative}`
+              : rootPath;
+            void window.electronAPI.showInFileManager(absolutePath);
+          }
+        } catch (error) {
+          console.error("Finder での表示に失敗しました:", error);
+        }
+        break;
+      }
     }
   }, [handleDelete, handleDuplicate, handleDownload, startNewFile, startNewFolder]);
 
@@ -642,6 +679,10 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
       { label: "複製", action: "duplicate" },
       { label: "削除", action: "delete" },
       { label: "パソコンに保存", action: "download" },
+      ...(isElectronRenderer() ? [
+        { label: "", action: "_separator" },
+        { label: "Finder で表示", action: "reveal-in-finder" },
+      ] : []),
     ];
     const result = await showContextMenu(e, items);
     if (result) {
@@ -656,6 +697,10 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
       { label: "新規ファイル", action: "new-file" },
       { label: "新規フォルダ", action: "new-folder" },
       { label: "削除", action: "delete" },
+      ...(isElectronRenderer() ? [
+        { label: "", action: "_separator" },
+        { label: "Finder で開く", action: "open-in-finder" },
+      ] : []),
     ];
     const result = await showContextMenu(e, items);
     if (result) {
@@ -676,11 +721,35 @@ export function FilesPanel({ projectName }: { projectName?: string }) {
         && editing.currentName === entry.name;
 
       if (entry.kind === "file") {
+        const vfsFilePath = toVFSPath(fullPath);
         rows.push(
           <div
             key={fullPath}
             className="flex items-center gap-1.5 px-2 py-1 text-sm text-foreground-secondary hover:bg-hover rounded cursor-pointer"
             style={{ paddingLeft: `${level * 16 + 8}px` }}
+            onClick={() => {
+              if (!onFileClick) return;
+              // Delay single click to discriminate from double click
+              if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+              clickTimerRef.current = setTimeout(() => {
+                onFileClick(vfsFilePath);
+                clickTimerRef.current = null;
+              }, 250);
+            }}
+            onDoubleClick={() => {
+              // Cancel pending single click
+              if (clickTimerRef.current) {
+                clearTimeout(clickTimerRef.current);
+                clickTimerRef.current = null;
+              }
+              onFileDoubleClick?.(vfsFilePath);
+            }}
+            onMouseDown={(e) => {
+              if (e.button === 1) {
+                e.preventDefault();
+                onFileMiddleClick?.(vfsFilePath);
+              }
+            }}
             onContextMenu={(e) => { void onFileContextMenu(e, fullPath); }}
           >
             <div className="w-4 shrink-0" />

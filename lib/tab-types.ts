@@ -12,12 +12,14 @@ export interface TabState {
   isDirty: boolean;
   lastSavedTime: number | null;
   isSaving: boolean;
+  isPreview: boolean;
 }
 
 /** Serialized tab for persistence (file path only, no handles) */
 export interface SerializedTab {
   filePath: string | null;
   fileName: string;
+  isPreview?: boolean;
 }
 
 /** Persisted state for open tabs (stored in AppState) */
