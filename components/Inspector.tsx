@@ -49,6 +49,7 @@ function getBaseName(name: string) {
 
 interface InspectorProps {
   className?: string;
+  compactMode?: boolean;
   wordCount?: number;
   charCount?: number;
   selectedCharCount?: number;
@@ -91,6 +92,7 @@ interface InspectorProps {
 
 export default function Inspector({
   className,
+  compactMode = false,
   wordCount = 0,
   charCount = 0,
   selectedCharCount = 0,
@@ -233,7 +235,7 @@ export default function Inspector({
       )}
     >
       {/* ファイル状態 */}
-      <div className="px-4 py-3 border-b border-border bg-background-secondary">
+      <div className={clsx("border-b border-border bg-background-secondary", compactMode ? "px-3 py-2" : "px-4 py-3")}>
         <div className="flex items-center justify-between mb-1">
           <p className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide">
             ファイル情報
@@ -347,7 +349,7 @@ export default function Inspector({
       </div>
 
       {/* タブ */}
-      <div ref={tabBarRef} className="h-12 border-b border-border flex items-center">
+      <div ref={tabBarRef} className={clsx("border-b border-border flex items-center", compactMode ? "h-10" : "h-12")}>
         <button
           onClick={() => setActiveTab("ai")}
           className={clsx(
@@ -409,7 +411,7 @@ export default function Inspector({
       </div>
 
        {/* 本文 */}
-       <div className="flex-1 overflow-y-auto p-4">
+       <div className={clsx("flex-1 overflow-y-auto", compactMode ? "p-3" : "p-4")}>
          {activeTab === "ai" && <AIPanel />}
          {activeTab === "corrections" && (
            <CorrectionsPanel
