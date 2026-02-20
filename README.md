@@ -256,7 +256,7 @@ The proofreading (linting) features in illusions comply with the following offic
 - ✅ Punctuation rules (記号の作法と偶数ルール)
 - ✅ Joyo kanji validation (常用漢字バリデーション)
 - ✅ Number format consistency (数字表記の統一)
-- ✅ Electron security hardening (CSP, navigation guards, safeStorage)
+- ✅ Electron security hardening (CSP, navigation guards, safeStorage, IPC input validation)
 
 ### Planned
 - [ ] Real-time collaboration
@@ -272,7 +272,8 @@ The proofreading (linting) features in illusions comply with the following offic
 
 - **Token encryption**: OS-level encryption via Electron safeStorage (macOS Keychain / Windows DPAPI)
 - **Context isolation**: Electron preload with secure IPC, sandbox enabled
-- **Content Security Policy**: CSP headers enforced on all windows
+- **IPC input validation**: Type and size checks on security-sensitive IPC handlers (VFS, NLP, file operations, context-menu)
+- **Content Security Policy**: CSP headers enforced; `unsafe-eval` disabled in production
 - **Navigation guards**: Blocks unexpected navigation and new-window creation
 - **VFS sandboxing**: File system access restricted to approved project directories
 - **HTTPS only**: All network requests use HTTPS

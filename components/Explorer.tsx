@@ -33,6 +33,7 @@ import {
   type SystemFontInfo,
 } from "@/lib/fonts";
 import { isElectronRenderer } from "@/lib/runtime-env";
+import { localPreferences } from "@/lib/local-preferences";
 type Tab = "chapters" | "settings" | "style";
 
 const formattingMarkers = ["**", "__", "~~", "*", "_", "`", "["];
@@ -221,16 +222,14 @@ export default function Explorer({
   const [activeTab, setActiveTab] = useState<Tab>("chapters");
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const savedTab = window.localStorage.getItem("illusions:leftTab");
+    const savedTab = localPreferences.getLeftTab();
     if (savedTab === "chapters" || savedTab === "settings" || savedTab === "style") {
       setActiveTab(savedTab as Tab);
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("illusions:leftTab", activeTab);
+    localPreferences.setLeftTab(activeTab);
   }, [activeTab]);
 
   return (
