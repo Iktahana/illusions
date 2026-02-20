@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import Explorer, { FilesPanel } from "@/components/Explorer";
@@ -827,17 +827,20 @@ export default function EditorPage() {
     setTopView("explorer");
   };
 
-   const wordCount = words(content);
-   const charCount = chars(content);
+   const wordCount = useMemo(() => words(content), [content]);
+   const charCount = useMemo(() => chars(content), [content]);
 
    // 段落数を計算（空行で区切る）
-   const paragraphCount = content ? content.split(/\n\n+/).filter(p => p.trim().length > 0).length : 0;
+   const paragraphCount = useMemo(
+     () => content ? content.split(/\n\n+/).filter(p => p.trim().length > 0).length : 0,
+     [content],
+   );
 
    // 日本語テキストの詳細統計を算出
-   const sentenceCount = countSentences(content);
-   const charTypeAnalysis = analyzeCharacterTypes(content);
-   const charUsageRates = calculateCharacterUsageRates(charTypeAnalysis);
-   const readabilityAnalysis = calculateReadabilityScore(content);
+   const sentenceCount = useMemo(() => countSentences(content), [content]);
+   const charTypeAnalysis = useMemo(() => analyzeCharacterTypes(content), [content]);
+   const charUsageRates = useMemo(() => calculateCharacterUsageRates(charTypeAnalysis), [charTypeAnalysis]);
+   const readabilityAnalysis = useMemo(() => calculateReadabilityScore(content), [content]);
 
    // ファイル名は currentFile.name のみを使用（isDirtyに基づく*の追加はInspectorコンポーネント側で処理）
    const fileName = currentFile?.name ?? "新規ファイル";
