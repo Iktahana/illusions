@@ -46,10 +46,6 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <span class="btn-icon">${iconChrome}</span>
         Chrome版を開く
       </a>
-      <a href="https://github.com/Iktahana/illusions" class="btn btn-secondary" target="_blank">
-        <span class="btn-icon">${iconGithub}</span>
-        GitHub
-      </a>
     </div>
     <a href="/downloads/" class="all-downloads-link">すべてのダウンロード →</a>
 
@@ -70,5 +66,10 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <p>あなたのアイデアや言葉は、何者にも侵されない「聖域」であるべきです。illusionsは、あなたが綴った大切な原稿をAIの学習素材として利用することは決してありません。データはクラウドではなく、常にあなた自身のパソコン内にのみ保存されます。</p>
       </div>
     </div>
+
+    <a href="https://github.com/Iktahana/illusions" class="github-link" target="_blank">
+      <span class="github-link-icon">${iconGithub}</span>
+      GitHub
+    </a>
   </div>
 `

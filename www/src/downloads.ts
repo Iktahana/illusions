@@ -3,6 +3,7 @@ import logoSvg from '/logo.svg?raw'
 import iconApple from '~icons/mdi/apple?raw'
 import iconWindows from '~icons/mdi/microsoft-windows?raw'
 import iconLinux from '~icons/mdi/linux?raw'
+import iconGithub from '~icons/mdi/github?raw'
 import { getRandomBackgroundImage } from './bg-images'
 
 // GitHub release asset type
@@ -357,6 +358,10 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
           <span class="btn-hero-download-meta">v${version} · ${bestAsset.size}</span>
         </a>
         <p class="hero-download-hint">他のプラットフォームは下記をご覧ください</p>
+        <a href="https://github.com/Iktahana/illusions" class="github-link" target="_blank">
+          <span class="github-link-icon">${iconGithub}</span>
+          GitHub
+        </a>
       </div>
     `
     : ''
