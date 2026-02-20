@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, ReactNode } from "react";
-import { Bot, AlertCircle, BarChart3, ChevronRight, Edit2, X, History } from "lucide-react";
+import { Bot, AlertCircle, BarChart3, Edit2, X, History } from "lucide-react";
 import clsx from "clsx";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import HistoryPanel from "./HistoryPanel";
@@ -450,52 +450,15 @@ function AIPanel() {
   return (
     <div className="space-y-4">
       <div className="bg-accent-light rounded-lg p-4 border border-border">
-        <div className="flex items-start gap-3 mb-3">
+        <div className="flex items-start gap-3">
           <Bot className="w-5 h-5 text-accent mt-0.5" />
           <div>
             <h3 className="text-sm font-medium text-foreground mb-1">AI アシスタント</h3>
-            <p className="text-xs text-foreground-secondary">
-              執筆をサポートします。質問や提案をお聞きください。
+            <p className="text-xs text-foreground-tertiary">
+              この機能は現在開発中です。今後のアップデートをお待ちください。
             </p>
           </div>
         </div>
-      </div>
-
-      {/* AI 提案 */}
-      <div className="space-y-2">
-        <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide">提案</h4>
-        <AISuggestion
-          title="次の展開を提案"
-          description="登場人物の心情を深掘りしませんか？"
-        />
-        <AISuggestion
-          title="文章の改善"
-          description="より自然な表現に書き換えます"
-        />
-      </div>
-
-      {/* 入力欄 */}
-      <div className="pt-4 border-t border-border">
-        <textarea
-          placeholder="AI に質問や指示を入力..."
-          rows={3}
-          className="w-full px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent resize-none bg-background text-foreground"
-        />
-        <button className="w-full mt-2 px-4 py-2 bg-accent text-white text-sm font-medium rounded hover:bg-accent-hover transition-colors">
-          送信
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function AISuggestion({ title, description }: { title: string; description: string }) {
-  return (
-      <div className="flex items-start gap-2 p-3 rounded-lg hover:bg-hover cursor-pointer transition-colors border border-border">
-      <ChevronRight className="w-4 h-4 text-foreground-muted mt-0.5 flex-shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground-secondary">{title}</p>
-        <p className="text-xs text-foreground-tertiary mt-0.5">{description}</p>
       </div>
     </div>
   );
@@ -544,64 +507,14 @@ function CorrectionsPanel({
       </div>
 
       <h3 className="text-sm font-medium text-foreground-secondary">校正リスト</h3>
-      
-      <CorrectionItem
-        type="warning"
-        message="重複する文末表現"
-        context="「...だった。...だった。」"
-        line={23}
-      />
-      <CorrectionItem
-        type="info"
-        message="長い文章"
-        context="この文は100文字を超えています"
-        line={45}
-      />
-      <CorrectionItem
-        type="warning"
-        message="助詞の連続"
-        context="「...のの...」"
-        line={67}
-      />
-      
-      <div className="pt-4 text-center">
-        <p className="text-sm text-foreground-tertiary">その他の問題は見つかりませんでした</p>
+
+      <div className="pt-2 text-center">
+        <p className="text-sm text-foreground-tertiary">校正機能は開発中です</p>
       </div>
     </div>
   );
 }
 
-function CorrectionItem({
-  type,
-  message,
-  context,
-  line,
-}: {
-  type: "warning" | "info";
-  message: string;
-  context: string;
-  line: number;
-}) {
-  return (
-    <div className="p-3 rounded-lg border border-border bg-card cursor-pointer hover:bg-accent/50 transition-colors">
-      <div className="flex items-start gap-2">
-        <AlertCircle
-          className={clsx(
-            "w-4 h-4 mt-0.5 flex-shrink-0",
-            type === "warning" 
-              ? "text-warning" 
-              : "text-info"
-          )}
-        />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground">{message}</p>
-          <p className="text-xs text-foreground-secondary mt-1">{context}</p>
-          <p className="text-xs text-foreground-tertiary mt-1">行 {line}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // 情報アイコン用のツールチップ
 function InfoTooltip({ content, className, children }: { content: string; className?: string; children: ReactNode }) {
