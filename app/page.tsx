@@ -44,6 +44,7 @@ import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
 
 import type { LintIssue } from "@/lib/linting/types";
+import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project-types";
 
 // Module-level flag: persists across React StrictMode/HMR remounts,
@@ -118,8 +119,7 @@ export default function EditorPage() {
   const [selectedCharCount, setSelectedCharCount] = useState(0);
   const prevLastSavedTimeRef = useRef<number | null>(null);
   const hasAutoRecoveredRef = useRef(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [editorViewInstance, setEditorViewInstance] = useState<any>(null);
+  const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 

@@ -599,6 +599,7 @@ function CorrectionsPanel({
               onClick={onRefreshLinting}
               className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
               title="全文を再検査"
+              aria-label="全文を再検査"
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
@@ -647,6 +648,8 @@ function CorrectionsPanel({
             key={option.value}
             onClick={() => setSeverityFilter(option.value)}
             title={option.label}
+            aria-label={option.label}
+            aria-pressed={severityFilter === option.value}
             className={clsx(
               "flex-1 flex items-center justify-center px-2 py-1.5 rounded transition-colors",
               severityFilter === option.value

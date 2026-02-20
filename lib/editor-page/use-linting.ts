@@ -1,3 +1,4 @@
+import type { EditorView } from "@milkdown/prose/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { RuleRunner } from "@/lib/linting/rule-runner";
@@ -30,8 +31,7 @@ export interface UseLintingResult {
 export function useLinting(
   lintingEnabled: boolean,
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  editorViewInstance: any,
+  editorViewInstance: EditorView | null,
 ): UseLintingResult {
   const ruleRunnerRef = useRef<RuleRunner | null>(null);
   const [lintIssues, setLintIssues] = useState<LintIssue[]>([]);

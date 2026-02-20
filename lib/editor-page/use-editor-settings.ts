@@ -143,7 +143,16 @@ export function useEditorSettings(
           setLintingEnabled(appState.lintingEnabled);
         }
         if (appState.lintingRuleConfigs && typeof appState.lintingRuleConfigs === "object") {
-          setLintingRuleConfigs(appState.lintingRuleConfigs as Record<string, { enabled: boolean; severity: Severity }>);
+          const isSeverity = (v: unknown): v is Severity =>
+            v === "error" || v === "warning" || v === "info";
+          const sanitized: Record<string, { enabled: boolean; severity: Severity }> = {};
+          for (const [ruleId, config] of Object.entries(appState.lintingRuleConfigs)) {
+            const cfg = config as { enabled?: unknown; severity?: unknown };
+            if (typeof cfg.enabled === "boolean" && isSeverity(cfg.severity)) {
+              sanitized[ruleId] = { enabled: cfg.enabled, severity: cfg.severity };
+            }
+          }
+          setLintingRuleConfigs(sanitized);
         }
         // Force editor rebuild to apply restored settings (e.g. custom font)
         incrementEditorKey();

@@ -3,6 +3,7 @@
  * Web（IndexedDB）/ Electron（SQLite）を共通のAPIで扱う。
  */
 
+import type { Severity } from "@/lib/linting/types";
 import type { TabPersistenceState } from "./tab-types";
 
 /**
@@ -75,7 +76,7 @@ export interface AppState {
 
   // リンティング設定
   lintingEnabled?: boolean;
-  lintingRuleConfigs?: Record<string, { enabled: boolean; severity: string }>;
+  lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity }>;
 
   // タブの永続化
   openTabs?: TabPersistenceState;
