@@ -395,7 +395,23 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - `test`: Adding or updating tests
 - `chore`: Maintenance tasks (deps, config)
 
-## 14. Testing Standards (Future)
+## 14. Issue Closing Policy
+# ----------------------------------------------------------------------------
+
+### Issues MUST Be Closed via Pull Requests
+**CRITICAL**: Never close GitHub Issues manually. Issues must always be closed automatically by merging a PR that references them.
+
+- Use `Closes #<issue>` or `Fixes #<issue>` in the **PR description body** (not just in commit messages)
+- GitHub will automatically close the issue when the PR is merged into the default branch
+- If a single PR addresses multiple issues, include all references: `Closes #100, Closes #101`
+- Do NOT use `gh issue close` or close issues from the GitHub UI
+
+### Why
+- PR-based closing creates a traceable link between the issue and the code change
+- Reviewers can verify that the issue is actually resolved by the PR
+- If the PR is reverted, the issue is automatically reopened
+
+## 15. Testing Standards (Future)
 # ----------------------------------------------------------------------------
 
 ### Test Coverage
