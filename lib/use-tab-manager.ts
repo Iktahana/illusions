@@ -512,12 +512,19 @@ export function useTabManager(options?: {
         if (isProjectRef.current && tab.file?.path) {
           const vfs = getVFS();
           await vfs.writeFile(tab.file.path, sanitized);
-          updateTab(tabId, {
-            lastSavedContent: sanitized,
-            isDirty: false,
-            lastSavedTime: isAutoSave ? -Date.now() : Date.now(),
-            isSaving: false,
-          });
+          setTabs((prev) =>
+            prev.map((t) =>
+              t.id === tabId
+                ? {
+                    ...t,
+                    lastSavedContent: sanitized,
+                    isDirty: sanitizeMdiContent(t.content) !== sanitized,
+                    lastSavedTime: isAutoSave ? -Date.now() : Date.now(),
+                    isSaving: false,
+                  }
+                : t,
+            ),
+          );
           void tryAutoSnapshot(tab.file.name, sanitized);
           return;
         }
@@ -529,13 +536,20 @@ export function useTabManager(options?: {
         });
 
         if (result) {
-          updateTab(tabId, {
-            file: result.descriptor,
-            lastSavedContent: sanitized,
-            isDirty: false,
-            lastSavedTime: isAutoSave ? -Date.now() : Date.now(),
-            isSaving: false,
-          });
+          setTabs((prev) =>
+            prev.map((t) =>
+              t.id === tabId
+                ? {
+                    ...t,
+                    file: result.descriptor,
+                    lastSavedContent: sanitized,
+                    isDirty: sanitizeMdiContent(t.content) !== sanitized,
+                    lastSavedTime: isAutoSave ? -Date.now() : Date.now(),
+                    isSaving: false,
+                  }
+                : t,
+            ),
+          );
           void persistFileReference(result.descriptor, sanitized);
           void tryAutoSnapshot(result.descriptor.name, sanitized);
         } else {
@@ -879,6 +893,12 @@ export function useTabManager(options?: {
         }
 
         // Non-active dirty tabs: save directly
+        // Set isSaving before starting async operation to prevent concurrent saves
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === tab.id ? { ...t, isSaving: true } : t,
+          ),
+        );
         void (async () => {
           try {
             const sanitized = sanitizeMdiContent(tab.content);
@@ -923,6 +943,12 @@ export function useTabManager(options?: {
             console.error(
               `自動保存に失敗しました (${tab.file?.name}):`,
               error,
+            );
+          } finally {
+            setTabs((prev) =>
+              prev.map((t) =>
+                t.id === tab.id ? { ...t, isSaving: false } : t,
+              ),
             );
           }
         })();
