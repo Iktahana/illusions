@@ -12,6 +12,7 @@ import {
 import clsx from "clsx";
 import { useContextMenu } from "@/lib/use-context-menu";
 import ContextMenu from "@/components/ContextMenu";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { isElectronRenderer } from "@/lib/runtime-env";
 import type { FileTreeEntry, EditingEntry } from "./types";
 
@@ -34,6 +35,7 @@ export function FilesPanel({
   const [loading, setLoading] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
   const [editing, setEditing] = useState<EditingEntry | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ path: string; kind: "file" | "directory"; name: string } | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const { menu, show: showContextMenu, close: closeContextMenu } = useContextMenu();
   /** Track the right-clicked entry for Web context menu callback */
@@ -145,13 +147,12 @@ export function FilesPanel({
   /** Convert tree path (e.g. "/subdir/file.txt") to VFS-relative path (e.g. "subdir/file.txt") */
   const toVFSPath = (treePath: string): string => treePath.replace(/^\//, "");
 
-  const handleDelete = useCallback(async (fullPath: string, kind: "file" | "directory") => {
+  const handleDelete = useCallback((fullPath: string, kind: "file" | "directory") => {
     const name = fullPath.split("/").pop() || fullPath;
-    const msg = kind === "directory"
-      ? `フォルダ「${name}」を削除しますか？中のファイルもすべて削除されます。`
-      : `ファイル「${name}」を削除しますか？`;
-    if (!window.confirm(msg)) return;
+    setDeleteConfirm({ path: fullPath, kind, name });
+  }, []);
 
+  const executeDelete = useCallback(async (fullPath: string, kind: "file" | "directory") => {
     try {
       const { getVFS } = await import("@/lib/vfs");
       const vfs = getVFS();
@@ -810,6 +811,27 @@ export function FilesPanel({
           onClose={closeContextMenu}
         />
       )}
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm !== null}
+        title="削除の確認"
+        message={
+          deleteConfirm?.kind === "directory"
+            ? `フォルダ「${deleteConfirm.name}」を削除しますか？中のファイルもすべて削除されます。`
+            : `ファイル「${deleteConfirm?.name ?? ""}」を削除しますか？`
+        }
+        confirmLabel="削除する"
+        cancelLabel="キャンセル"
+        dangerous={true}
+        onConfirm={() => {
+          if (deleteConfirm) {
+            void executeDelete(deleteConfirm.path, deleteConfirm.kind);
+          }
+          setDeleteConfirm(null);
+        }}
+        onCancel={() => setDeleteConfirm(null)}
+      />
     </div>
   );
 }
