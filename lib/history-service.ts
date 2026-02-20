@@ -10,6 +10,43 @@ import { getVFS } from "./vfs";
 import type { VirtualFileSystem, VFSDirectoryHandle } from "./vfs/types";
 
 // -----------------------------------------------------------------------
+// AsyncMutex
+// -----------------------------------------------------------------------
+
+/**
+ * Simple async mutex to serialize index read-modify-write operations.
+ * Prevents TOCTOU race conditions when multiple snapshots are created concurrently.
+ *
+ * インデックスの読み書き操作を直列化するシンプルな非同期ミューテックス。
+ * 複数のスナップショットが同時に作成される際のTOCTOUレースコンディションを防止する。
+ */
+class AsyncMutex {
+  private queue: (() => void)[] = [];
+  private locked = false;
+
+  async acquire(): Promise<() => void> {
+    if (!this.locked) {
+      this.locked = true;
+      return () => this.release();
+    }
+    return new Promise<() => void>((resolve) => {
+      this.queue.push(() => {
+        resolve(() => this.release());
+      });
+    });
+  }
+
+  private release(): void {
+    const next = this.queue.shift();
+    if (next) {
+      next();
+    } else {
+      this.locked = false;
+    }
+  }
+}
+
+// -----------------------------------------------------------------------
 // Constants
 // -----------------------------------------------------------------------
 
@@ -185,6 +222,7 @@ function createDefaultHistoryIndex(): HistoryIndex {
  */
 export class HistoryService {
   private vfs: VirtualFileSystem;
+  private readonly indexMutex = new AsyncMutex();
 
   constructor() {
     this.vfs = getVFS();
@@ -241,14 +279,19 @@ export class HistoryService {
       });
       await snapshotFileHandle.write(content);
 
-      // Update the index
-      const index = await this.readHistoryIndex();
-      index.snapshots.unshift(entry);
-      await this.writeHistoryIndex(index);
+      // Update the index (serialized via mutex to prevent TOCTOU race)
+      const releaseLock = await this.indexMutex.acquire();
+      try {
+        const index = await this.readHistoryIndex();
+        index.snapshots.unshift(entry);
+        await this.writeHistoryIndex(index);
 
-      // Auto-prune old snapshots (global and per-file)
-      await this.pruneOldSnapshots();
-      await this.pruneSnapshotsPerFile(sourceFile);
+        // Auto-prune old snapshots (global and per-file, within same lock)
+        await this.pruneOldSnapshotsUnsafe();
+        await this.pruneSnapshotsPerFileUnsafe(sourceFile);
+      } finally {
+        releaseLock();
+      }
 
       return entry;
     } catch (error) {
@@ -323,6 +366,22 @@ export class HistoryService {
    * - retentionDays を超えるスナップショットを削除
    */
   async pruneOldSnapshots(): Promise<void> {
+    const releaseLock = await this.indexMutex.acquire();
+    try {
+      await this.pruneOldSnapshotsUnsafe();
+    } finally {
+      releaseLock();
+    }
+  }
+
+  /**
+   * Internal pruning logic without lock acquisition.
+   * Caller MUST hold indexMutex before invoking this method.
+   *
+   * ロックを取得しない内部削減ロジック。
+   * 呼び出し元は事前に indexMutex を保持していなければならない。
+   */
+  private async pruneOldSnapshotsUnsafe(): Promise<void> {
     const index = await this.readHistoryIndex();
     const now = Date.now();
     const retentionMs = index.retentionDays * 24 * 60 * 60 * 1000;
@@ -394,6 +453,24 @@ export class HistoryService {
    * @param sourceFile - The source file name to prune snapshots for
    */
   async pruneSnapshotsPerFile(sourceFile: string): Promise<void> {
+    const releaseLock = await this.indexMutex.acquire();
+    try {
+      await this.pruneSnapshotsPerFileUnsafe(sourceFile);
+    } finally {
+      releaseLock();
+    }
+  }
+
+  /**
+   * Internal per-file pruning logic without lock acquisition.
+   * Caller MUST hold indexMutex before invoking this method.
+   *
+   * ロックを取得しないファイルごとの内部削減ロジック。
+   * 呼び出し元は事前に indexMutex を保持していなければならない。
+   *
+   * @param sourceFile - The source file name to prune snapshots for
+   */
+  private async pruneSnapshotsPerFileUnsafe(sourceFile: string): Promise<void> {
     try {
       const index = await this.readHistoryIndex();
 
@@ -551,26 +628,31 @@ export class HistoryService {
    * @param snapshotId - The ID of the snapshot to delete
    */
   async deleteSnapshot(snapshotId: string): Promise<void> {
-    const index = await this.readHistoryIndex();
-    const entryIndex = index.snapshots.findIndex((s) => s.id === snapshotId);
-
-    if (entryIndex === -1) {
-      throw new Error(`Snapshot not found: ${snapshotId}`);
-    }
-
-    const entry = index.snapshots[entryIndex];
-
-    // Delete the file
+    const releaseLock = await this.indexMutex.acquire();
     try {
-      const historyDir = await this.getHistoryDirectory();
-      await historyDir.removeEntry(entry.filename);
-    } catch {
-      console.warn(`Failed to delete snapshot file: ${entry.filename}`);
-    }
+      const index = await this.readHistoryIndex();
+      const entryIndex = index.snapshots.findIndex((s) => s.id === snapshotId);
 
-    // Remove from index
-    index.snapshots.splice(entryIndex, 1);
-    await this.writeHistoryIndex(index);
+      if (entryIndex === -1) {
+        throw new Error(`Snapshot not found: ${snapshotId}`);
+      }
+
+      const entry = index.snapshots[entryIndex];
+
+      // Delete the file
+      try {
+        const historyDir = await this.getHistoryDirectory();
+        await historyDir.removeEntry(entry.filename);
+      } catch {
+        console.warn(`Failed to delete snapshot file: ${entry.filename}`);
+      }
+
+      // Remove from index
+      index.snapshots.splice(entryIndex, 1);
+      await this.writeHistoryIndex(index);
+    } finally {
+      releaseLock();
+    }
   }
 
   // -----------------------------------------------------------------------
