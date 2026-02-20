@@ -13,6 +13,7 @@ import ActivityBar, { type ActivityBarView } from "@/components/ActivityBar";
 import SidebarSplitter from "@/components/SidebarSplitter";
 import SearchResults from "@/components/SearchResults";
 import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import UpgradeToProjectBanner from "@/components/UpgradeToProjectBanner";
 import WordFrequency from "@/components/WordFrequency";
 import Characters from "@/components/Characters";
@@ -130,14 +131,14 @@ export default function EditorPage() {
   const {
     state: {
       recentProjects, showCreateWizard, showPermissionPrompt, permissionPromptData,
-      isRestoring, restoreError,
+      isRestoring, restoreError, confirmRemoveRecent,
     },
     handlers: {
       handleCreateProject, handleOpenProject, handleOpenStandaloneFile,
       handleOpenRecentProject, handleDeleteRecentProject, handleOpenAsProject,
       handleProjectCreated, handlePermissionGranted, handlePermissionDenied,
       handleUpgrade, handleUpgradeDismiss,
-      setShowCreateWizard, setRestoreError,
+      setShowCreateWizard, setRestoreError, setConfirmRemoveRecent,
     },
     upgrade: { showUpgradeBanner, upgradeBannerDismissed },
   } = projectLifecycle;
@@ -427,7 +428,7 @@ export default function EditorPage() {
 
   // --- Text statistics hook ---
   const {
-    wordCount, charCount, paragraphCount, sentenceCount,
+    charCount, paragraphCount, sentenceCount,
     charTypeAnalysis, charUsageRates, readabilityAnalysis,
   } = useTextStatistics(content);
 
@@ -629,6 +630,24 @@ export default function EditorPage() {
           onSave={handleCloseTabSave}
           onDiscard={handleCloseTabDiscard}
           onCancel={handleCloseTabCancel}
+        />
+
+        {/* 最近のプロジェクト削除確認ダイアログ */}
+        <ConfirmDialog
+          isOpen={confirmRemoveRecent !== null}
+          title="プロジェクトが見つかりません"
+          message={confirmRemoveRecent?.message ?? ""}
+          confirmLabel="削除する"
+          cancelLabel="キャンセル"
+          dangerous={true}
+          onConfirm={() => {
+            if (confirmRemoveRecent) {
+              const { projectId: pid } = confirmRemoveRecent;
+              setConfirmRemoveRecent(null);
+              void handleDeleteRecentProject(pid);
+            }
+          }}
+          onCancel={() => setConfirmRemoveRecent(null)}
         />
 
         {/* UpgradeBanner for standalone mode */}
@@ -904,7 +923,6 @@ export default function EditorPage() {
           >
           <Inspector
             compactMode={compactMode}
-            wordCount={wordCount}
             charCount={charCount}
             selectedCharCount={selectedCharCount}
             paragraphCount={paragraphCount}

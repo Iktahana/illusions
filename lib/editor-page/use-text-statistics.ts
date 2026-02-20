@@ -15,12 +15,7 @@ import type {
 
 import { chars } from "./types";
 
-function words(s: string): number {
-  return s.split(/\s+/).filter(Boolean).length;
-}
-
 export interface TextStatisticsResult {
-  wordCount: number;
   charCount: number;
   paragraphCount: number;
   sentenceCount: number;
@@ -34,7 +29,6 @@ export interface TextStatisticsResult {
  * All values are memoized and only recomputed when content changes.
  */
 export function useTextStatistics(content: string): TextStatisticsResult {
-  const wordCount = useMemo(() => words(content), [content]);
   const charCount = useMemo(() => chars(content), [content]);
 
   const paragraphCount = useMemo(
@@ -48,7 +42,6 @@ export function useTextStatistics(content: string): TextStatisticsResult {
   const readabilityAnalysis = useMemo(() => calculateReadabilityScore(content), [content]);
 
   return {
-    wordCount,
     charCount,
     paragraphCount,
     sentenceCount,

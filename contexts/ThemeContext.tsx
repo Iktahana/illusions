@@ -1,8 +1,10 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { localPreferences } from "@/lib/local-preferences";
 
-type ThemeMode = "light" | "dark" | "auto";
+import type { ThemeMode } from "@/lib/local-preferences";
+
 type Theme = "light" | "dark";
 
 interface ThemeContextType {
@@ -26,7 +28,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMounted(true);
     // inline script が設定済みの値と状態を同期する
-    const storedMode = localStorage.getItem("themeMode") as ThemeMode | null;
+    const storedMode = localPreferences.getThemeMode();
     const mode = storedMode || "auto";
     setThemeModeState(mode);
 
@@ -62,7 +64,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setThemeMode = (mode: ThemeMode) => {
     setThemeModeState(mode);
-    localStorage.setItem("themeMode", mode);
+    localPreferences.setThemeMode(mode);
 
     if (mode === "auto") {
       const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;

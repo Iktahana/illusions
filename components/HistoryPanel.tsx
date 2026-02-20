@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Pin, Plus, RotateCcw, Loader2, History, Bookmark, GitCompare, MoreVertical, ChevronDown, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 import { getHistoryService } from "@/lib/history-service";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 import type { SnapshotEntry, SnapshotType } from "@/lib/history-service";
 
@@ -224,6 +225,7 @@ export default function HistoryPanel({
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [displayCount, setDisplayCount] = useState(SNAPSHOTS_PER_PAGE);
   const [loadingDiffId, setLoadingDiffId] = useState<string | null>(null);
+  const [restoreConfirm, setRestoreConfirm] = useState<SnapshotEntry | null>(null);
 
   /**
    * Load snapshots from HistoryService.
@@ -428,16 +430,22 @@ export default function HistoryPanel({
   }, []);
 
   /**
-   * Handle snapshot restoration with confirmation dialog.
-   * 確認ダイアログ付きでスナップショットの復元を処理する。
+   * Show confirmation dialog for snapshot restoration.
+   * スナップショット復元の確認ダイアログを表示する。
    */
   const handleRestore = useCallback(
-    async (snapshot: SnapshotEntry) => {
-      const confirmed = window.confirm(
-        "この時点の内容に戻しますか？現在の内容は失われます。"
-      );
-      if (!confirmed) return;
+    (snapshot: SnapshotEntry) => {
+      setRestoreConfirm(snapshot);
+    },
+    []
+  );
 
+  /**
+   * Execute the snapshot restoration after user confirmation.
+   * ユーザー確認後にスナップショットの復元を実行する。
+   */
+  const executeRestore = useCallback(
+    async (snapshot: SnapshotEntry) => {
       try {
         setRestoringId(snapshot.id);
         const historyService = getHistoryService();
@@ -648,6 +656,22 @@ export default function HistoryPanel({
           )}
         </div>
       )}
+
+      {/* Restore confirmation dialog */}
+      <ConfirmDialog
+        isOpen={restoreConfirm !== null}
+        title="スナップショットの復元"
+        message="この時点の内容に戻しますか？現在の内容は失われます。"
+        confirmLabel="復元する"
+        cancelLabel="キャンセル"
+        onConfirm={() => {
+          if (restoreConfirm) {
+            void executeRestore(restoreConfirm);
+          }
+          setRestoreConfirm(null);
+        }}
+        onCancel={() => setRestoreConfirm(null)}
+      />
     </div>
   );
 }

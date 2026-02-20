@@ -668,11 +668,103 @@ ipcMain.handle('open-file', async () => {
   })
   if (canceled || !filePaths[0]) return null
   const filePath = filePaths[0]
+  // Approve opened file path so it can be saved back without a new dialog
+  dialogApprovedPaths.add(path.resolve(filePath))
   const content = await fs.readFile(filePath, 'utf-8')
   return { path: filePath, content }
 })
 
+// --- save-file path security validation ---
+// Tracks file paths that have been approved via native dialog or system file association.
+// Paths provided directly by the renderer must be in this set or they will be rejected.
+const dialogApprovedPaths = new Set()
+
+/**
+ * Check whether a normalized path points to a system-sensitive location.
+ * Mirrors the deny-list logic in electron-vfs-ipc-handlers.js.
+ * @param {string} normalizedPath - Forward-slash normalized absolute path
+ * @returns {boolean} true if the path should be denied
+ */
+function isSavePathDenied(normalizedPath) {
+  const homedir = os.homedir().split(path.sep).join('/')
+
+  // System root directories (Unix + macOS + Windows)
+  const denyExact = new Set([
+    '/', '/etc', '/usr', '/bin', '/sbin', '/var', '/tmp', '/System',
+    '/private', '/private/etc', '/private/var',
+  ])
+
+  // Bare Windows drive root (C:/ or C:)
+  const driveLetterMatch = normalizedPath.match(/^([a-zA-Z]):?\/?$/)
+  if (driveLetterMatch) return true
+
+  const windowsDenyPrefixes = [
+    'C:/Windows', 'C:/Program Files', 'C:/Program Files (x86)',
+  ]
+
+  // Sensitive directories within home
+  const homeSensitiveSuffixes = [
+    '/.ssh', '/.gnupg', '/.aws', '/.kube', '/.docker',
+    '/.config/gcloud', '/Library/Keychains',
+  ]
+
+  // Treat denied roots as prefixes — block any nested path under them
+  if ([...denyExact].some(dir => normalizedPath === dir || normalizedPath.startsWith(`${dir}/`))) return true
+  if (normalizedPath === homedir || normalizedPath.startsWith(`${homedir}/`)) {
+    // Allow writes inside home, but block sensitive subdirectories
+    if (normalizedPath === homedir) return true
+    if (homeSensitiveSuffixes.some(s => normalizedPath.startsWith(homedir + s))) return true
+  }
+  const normalizedLower = normalizedPath.toLowerCase()
+  if (windowsDenyPrefixes.some(p => {
+    const pLower = p.toLowerCase()
+    return normalizedLower === pLower || normalizedLower.startsWith(`${pLower}/`)
+  })) return true
+
+  return false
+}
+
 const VALID_SAVE_FILE_TYPES = ['.mdi', '.md', '.txt']
+
+/**
+ * Validate a file path provided by the renderer for the save-file IPC handler.
+ * Returns an error object if validation fails, or null if the path is valid.
+ * @param {string} filePath - The raw file path from the renderer
+ * @param {{ skipApproval?: boolean }} [options] - Validation options
+ * @param {boolean} [options.skipApproval=false] - Skip the dialog-approval check (for dialog-selected paths)
+ * @returns {{ success: false, error: string, code: string } | null}
+ */
+function validateSaveFilePath(filePath, { skipApproval = false } = {}) {
+  // Reject paths containing '..' to prevent directory traversal
+  const resolved = path.resolve(filePath)
+  const normalized = resolved.split(path.sep).join('/')
+  if (filePath.includes('..')) {
+    log.warn(`save-file path rejected (directory traversal): ${filePath}`)
+    return { success: false, error: 'パスに不正なディレクトリ遷移が含まれています', code: 'PATH_TRAVERSAL' }
+  }
+
+  // Reject system-sensitive paths
+  // Check both the file itself and its parent directory
+  if (isSavePathDenied(normalized) || isSavePathDenied(path.dirname(normalized).split(path.sep).join('/'))) {
+    log.warn(`save-file path rejected (denied location): ${filePath}`)
+    return { success: false, error: 'セキュリティ上の理由により、この場所への書き込みは許可されていません', code: 'PATH_DENIED' }
+  }
+
+  // Validate file extension
+  const ext = path.extname(resolved).toLowerCase()
+  if (!VALID_SAVE_FILE_TYPES.includes(ext)) {
+    log.warn(`save-file path rejected (invalid extension "${ext}"): ${filePath}`)
+    return { success: false, error: `無効なファイル拡張子: ${ext}`, code: 'INVALID_EXTENSION' }
+  }
+
+  // Reject paths not previously approved via dialog or system file open
+  if (!skipApproval && !dialogApprovedPaths.has(resolved)) {
+    log.warn(`save-file path rejected (not dialog-approved): ${filePath}`)
+    return { success: false, error: 'ダイアログで承認されていないファイルパスです', code: 'PATH_NOT_APPROVED' }
+  }
+
+  return null
+}
 
 ipcMain.handle('save-file', async (_event, filePath, content, fileType) => {
   // Validate inputs
@@ -687,6 +779,13 @@ ipcMain.handle('save-file', async (_event, filePath, content, fileType) => {
   }
 
   let target = filePath
+  if (target) {
+    // Validate renderer-provided path before writing
+    const validationError = validateSaveFilePath(target)
+    if (validationError) return validationError
+    // Resolve to canonical form (consistent with dialogApprovedPaths entries)
+    target = path.resolve(target)
+  }
   if (!target) {
     // Determine default file name and filters based on fileType
     let defaultPath = 'untitled.mdi'
@@ -719,6 +818,11 @@ ipcMain.handle('save-file', async (_event, filePath, content, fileType) => {
     })
     if (result.canceled || !result.filePath) return null
     target = result.filePath
+    // Validate dialog-selected path (skip approval check since it came from the dialog)
+    const dialogValidationError = validateSaveFilePath(target, { skipApproval: true })
+    if (dialogValidationError) return dialogValidationError
+    // Approve this dialog-selected path for future saves
+    dialogApprovedPaths.add(path.resolve(target))
   }
   try {
     log.info(`ファイル保存を試行中: ${target}`)
@@ -935,6 +1039,8 @@ async function handleMdiFileOpen(filePath) {
     } else {
       // Open as standalone file
       log.info('Opening as standalone file:', filePath)
+      // Approve system-opened file path for future saves
+      dialogApprovedPaths.add(path.resolve(filePath))
       const content = await fs.readFile(filePath, 'utf-8')
       targetWindow.webContents.send('open-file-from-system', { path: filePath, content })
     }

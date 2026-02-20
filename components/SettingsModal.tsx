@@ -5,6 +5,7 @@ import { X, ExternalLink, ChevronDown, ChevronRight, AlertCircle } from "lucide-
 import type { Severity } from "@/lib/linting/types";
 import ColorPicker from "./ColorPicker";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
+import { FEATURED_JAPANESE_FONTS } from "@/lib/fonts";
 const LICENSE_TEXT = process.env.NEXT_PUBLIC_LICENSE_TEXT || "";
 const TERMS_TEXT = process.env.NEXT_PUBLIC_TERMS_TEXT || "";
 
@@ -73,15 +74,6 @@ interface SettingsModalProps {
 
 type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "about";
 
-const FONT_FAMILIES = [
-  { value: "Noto Serif JP", label: "Noto Serif JP" },
-  { value: "Noto Sans JP", label: "Noto Sans JP" },
-  { value: "Shippori Mincho", label: "Shippori Mincho" },
-  { value: "Zen Old Mincho", label: "Zen Old Mincho" },
-  { value: "BIZ UDMincho", label: "BIZ UDMincho" },
-  { value: "Klee One", label: "Klee One" },
-];
-
 const SCROLL_BEHAVIORS = [
   {
     value: "auto" as const,
@@ -105,6 +97,12 @@ const LINT_RULES_META = [
   { id: "punctuation-rules", nameJa: "記号の作法", descriptionJa: "句読点・記号の使い方をチェック" },
   { id: "number-format", nameJa: "数字表記の統一", descriptionJa: "数字の表記揺れを検出" },
   { id: "joyo-kanji", nameJa: "常用漢字バリデーション", descriptionJa: "常用漢字表外の漢字を検出" },
+  { id: "era-year-validator", nameJa: "元号・西暦の一致チェック", descriptionJa: "元号と西暦の対応を検証" },
+  { id: "particle-no-repetition", nameJa: "助詞「の」の連続使用", descriptionJa: "1文中の「の」の多用を検出" },
+  { id: "conjugation-errors", nameJa: "活用の誤り検出", descriptionJa: "ら抜き・さ入れ・い抜き言葉の検出" },
+  { id: "redundant-expression", nameJa: "二重表現の検出", descriptionJa: "意味が重複している冗長な表現を検出" },
+  { id: "verbose-expression", nameJa: "冗長表現の簡略化", descriptionJa: "冗長な表現を検出し簡潔な言い換えを提案" },
+  { id: "sentence-ending-repetition", nameJa: "文末表現の重複", descriptionJa: "同じ文末表現が連続する箇所を検出" },
 ];
 
 export default function SettingsModal({
@@ -298,9 +296,9 @@ export default function SettingsModal({
                     onChange={(e) => onFontFamilyChange(e.target.value)}
                     className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                   >
-                    {FONT_FAMILIES.map((font) => (
-                      <option key={font.value} value={font.value}>
-                        {font.label}
+                    {FEATURED_JAPANESE_FONTS.map((font) => (
+                      <option key={font.family} value={font.family}>
+                        {font.localizedName ? `${font.family} (${font.localizedName})` : font.family}
                       </option>
                     ))}
                   </select>

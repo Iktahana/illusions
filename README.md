@@ -33,6 +33,7 @@ Available for macOS (Intel & Apple Silicon) and Windows
 - **Three-column layout**: Explorer | Editor | Inspector
 - **Activity Bar**: Quick access to Projects, GitHub, Settings
 - **Theme system**: Automatic light/dark mode support
+- **Design system dialogs**: Custom GlassDialog-based alerts and confirmations (no native browser dialogs)
 - **Responsive design**: Optimized for various screen sizes
 
 ### 💾 Storage & Sync
@@ -44,7 +45,7 @@ Available for macOS (Intel & Apple Silicon) and Windows
 - **Crash recovery**: Auto-restore unsaved content
 
 ### 📊 Productivity
-- **Statistics panel**: Character count, word count, manuscript pages (原稿用紙)
+- **Statistics panel**: Character count, paragraph count, manuscript pages (原稿用紙)
 - **Composition settings**: Font, size, line height, spacing
 - **Version history**: Browse and restore previous versions
 - **Diff viewer**: Compare changes between versions
@@ -256,7 +257,9 @@ The proofreading (linting) features in illusions comply with the following offic
 - ✅ Punctuation rules (記号の作法と偶数ルール)
 - ✅ Joyo kanji validation (常用漢字バリデーション)
 - ✅ Number format consistency (数字表記の統一)
-- ✅ Electron security hardening (CSP, navigation guards, safeStorage)
+- ✅ Electron security hardening (CSP, navigation guards, safeStorage, IPC input validation, save-file path validation)
+- ✅ Design system dialogs replacing native browser alerts/confirms (GlassDialog)
+- ✅ Accurate Japanese text statistics (文字数 character count, misleading word count removed)
 
 ### Planned
 - [ ] Real-time collaboration
@@ -272,7 +275,9 @@ The proofreading (linting) features in illusions comply with the following offic
 
 - **Token encryption**: OS-level encryption via Electron safeStorage (macOS Keychain / Windows DPAPI)
 - **Context isolation**: Electron preload with secure IPC, sandbox enabled
-- **Content Security Policy**: CSP headers enforced on all windows
+- **IPC input validation**: Type and size checks on security-sensitive IPC handlers (VFS, NLP, file operations, context-menu)
+- **Save-file path validation**: Directory traversal prevention, system path denylist, extension allowlist, and dialog-approval enforcement
+- **Content Security Policy**: CSP headers enforced; `unsafe-eval` disabled in production
 - **Navigation guards**: Blocks unexpected navigation and new-window creation
 - **VFS sandboxing**: File system access restricted to approved project directories
 - **HTTPS only**: All network requests use HTTPS

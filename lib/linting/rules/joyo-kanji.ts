@@ -1,6 +1,7 @@
 import { AbstractLintRule } from "../base-rule";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 import { JOYO_KANJI_SET } from "../data/joyo-kanji";
+import { JINMEIYO_KANJI_SET } from "../data/jinmeiyo-kanji";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -46,7 +47,38 @@ const NON_JOYO_SUGGESTIONS: ReadonlyMap<string, string> = new Map([
   ["悉く", "ことごとく"],
   ["畢竟", "ひっきょう"],
   ["蔑ろ", "ないがしろ"],
+  // Additional compound word suggestions
+  ["蝶々", "ちょうちょ"],
+  ["鉤括弧", "かぎかっこ"],
+  ["躊躇", "ちゅうちょ"],
+  ["齟齬", "そご"],
+  ["逡巡", "しゅんじゅん"],
+  ["慟哭", "どうこく"],
+  ["忖度", "そんたく"],
+  ["蹉跌", "さてつ"],
+  ["瑕疵", "かし"],
+  ["矜持", "きょうじ"],
+  ["咄嗟", "とっさ"],
+  ["弄ぶ", "もてあそぶ"],
+  ["嘲る", "あざける"],
+  ["呟く", "つぶやく"],
+  ["囁く", "ささやく"],
+  ["躓く", "つまずく"],
+  ["蔑む", "さげすむ"],
 ]);
+
+/**
+ * Rule-specific options for JoyoKanjiRule.
+ */
+interface JoyoKanjiOptions {
+  /**
+   * When true (default), kanji in the official Jinmeiyo set (人名用漢字)
+   * are not flagged as non-Joyo. This is useful because Jinmeiyo kanji are
+   * legally approved for use in personal names and commonly appear in
+   * Japanese text.
+   */
+  allowJinmeiyo: boolean;
+}
 
 /**
  * Regex that matches CJK Unified Ideographs (BMP + Extension B for 𠮟).
@@ -77,6 +109,9 @@ const CJK_KANJI_REGEX = /[\u4e00-\u9fff\u3400-\u4dbf\u{20000}-\u{2a6df}]/gu;
  * 2. Then scan for individual non-Joyo kanji that were not already covered
  *    by a compound match.
  *
+ * When `options.allowJinmeiyo` is true (default), kanji in the official
+ * Jinmeiyo set (人名用漢字) are excluded from detection in Phase 2.
+ *
  * Reference: 文化庁 常用漢字表 (2010)
  */
 export class JoyoKanjiRule extends AbstractLintRule {
@@ -86,10 +121,19 @@ export class JoyoKanjiRule extends AbstractLintRule {
   readonly description = "Detect kanji outside the official Joyo kanji set";
   readonly descriptionJa = "常用漢字表外の漢字を検出";
   readonly level = "L1" as const;
-  readonly defaultConfig: LintRuleConfig = { enabled: true, severity: "info" };
+  readonly defaultConfig: LintRuleConfig = {
+    enabled: true,
+    severity: "info",
+    options: { allowJinmeiyo: true } satisfies JoyoKanjiOptions,
+  };
 
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (text.length === 0) return [];
+
+    const options = (config.options ?? this.defaultConfig.options) as
+      | JoyoKanjiOptions
+      | undefined;
+    const allowJinmeiyo = options?.allowJinmeiyo ?? true;
 
     const issues: LintIssue[] = [];
 
@@ -144,8 +188,11 @@ export class JoyoKanjiRule extends AbstractLintRule {
       const from = match.index;
       const to = from + char.length;
 
-      // Skip if this character is part of a Joyo kanji
+      // Skip if this character is part of the Joyo kanji set
       if (JOYO_KANJI_SET.has(char)) continue;
+
+      // Skip if Jinmeiyo kanji are allowed and this character is in the set
+      if (allowJinmeiyo && JINMEIYO_KANJI_SET.has(char)) continue;
 
       // Skip if this position is already covered by a compound match
       if (this.isPositionCovered(from, coveredRanges)) continue;

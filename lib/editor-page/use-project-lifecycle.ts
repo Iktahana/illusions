@@ -6,6 +6,7 @@ import { getProjectService } from "@/lib/project-service";
 import { getProjectUpgradeService } from "@/lib/project-upgrade";
 import { isStandaloneMode } from "@/lib/project-types";
 import { getVFS } from "@/lib/vfs";
+import { notificationManager } from "@/lib/notification-manager";
 
 import type { EditorMode, ProjectMode, StandaloneMode } from "@/lib/project-types";
 import { chars } from "./types";
@@ -35,6 +36,7 @@ export interface ProjectLifecycleState {
   permissionPromptData: PermissionPromptState | null;
   isRestoring: boolean;
   restoreError: string | null;
+  confirmRemoveRecent: { projectId: string; message: string } | null;
 }
 
 export interface ProjectLifecycleHandlers {
@@ -51,6 +53,7 @@ export interface ProjectLifecycleHandlers {
   handleUpgradeDismiss: () => void;
   setShowCreateWizard: (value: boolean) => void;
   setRestoreError: (value: string | null) => void;
+  setConfirmRemoveRecent: (value: { projectId: string; message: string } | null) => void;
 }
 
 export interface ProjectLifecycleUpgrade {
@@ -90,6 +93,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
   const [isRestoring, setIsRestoring] = useState(true);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const isAutoRestoringRef = useRef(false);
+  const [confirmRemoveRecent, setConfirmRemoveRecent] = useState<{ projectId: string; message: string } | null>(null);
   const [autoRestoreProjectId, setAutoRestoreProjectId] = useState<string | null>(null);
 
   // Upgrade banner state
@@ -349,7 +353,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         const project = projects.find((p) => p.id === projectId);
         if (!project) {
           if (!isAutoRestoringRef.current) {
-            window.alert("このプロジェクトが見つかりませんでした。");
+            notificationManager.error("このプロジェクトが見つかりませんでした。");
           }
           return;
         }
@@ -404,21 +408,10 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
             : "このプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。";
 
           if (!isAutoRestoringRef.current) {
-            if (isFileNotFound && window.confirm(message)) {
-              const stg = new ElectronStorageProvider();
-              await stg.initialize();
-              await stg.removeRecentProject(projectId);
-
-              const updatedProjects = await stg.getRecentProjects();
-              const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
-                projectId: p.id,
-                name: p.name,
-                lastAccessedAt: Date.now(),
-                rootDirName: p.rootPath.split("/").pop(),
-              }));
-              setRecentProjects(entries);
-            } else if (!isFileNotFound) {
-              window.alert(message);
+            if (isFileNotFound) {
+              setConfirmRemoveRecent({ projectId, message });
+            } else {
+              notificationManager.error(message);
             }
           }
         }
@@ -432,7 +425,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       if (!restoreResult.success || !restoreResult.handle) {
         console.error("Failed to restore project handle:", restoreResult.error);
         if (!isAutoRestoringRef.current) {
-          window.alert("このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。");
+          notificationManager.error("このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。");
         }
         return;
       }
@@ -506,7 +499,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       void window.electronAPI?.rebuildMenu?.();
     } catch (error) {
       console.error("[Open as Project] Failed to open project:", error);
-      window.alert("プロジェクトを開けませんでした。.illusionsフォルダが正しく設定されているか確認してください。");
+      notificationManager.error("プロジェクトを開けませんでした。.illusionsフォルダが正しく設定されているか確認してください。");
     }
   }, [setProjectMode, loadProjectContent]);
 
@@ -600,6 +593,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       permissionPromptData,
       isRestoring,
       restoreError,
+      confirmRemoveRecent,
     },
     handlers: {
       handleCreateProject,
@@ -615,6 +609,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       handleUpgradeDismiss,
       setShowCreateWizard,
       setRestoreError,
+      setConfirmRemoveRecent,
     },
     upgrade: {
       showUpgradeBanner,
