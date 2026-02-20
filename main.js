@@ -474,8 +474,26 @@ async function createWindow({ showWelcome = false } = {}) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      webviewTag: true,
     },
+  })
+
+  // Navigation guards: block navigation away from the app
+  newWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    const parsedUrl = new URL(navigationUrl)
+    // Allow dev server and file:// protocol
+    if (parsedUrl.protocol === 'file:') return
+    if (isDev && parsedUrl.hostname === 'localhost') return
+    event.preventDefault()
+    console.warn('[Security] Blocked navigation to:', navigationUrl)
+  })
+
+  // Block new window creation from renderer
+  newWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Allow opening external URLs in the default browser
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
   })
 
   // Preload error detection
@@ -609,14 +627,26 @@ async function installQuickLookPluginIfNeeded() {
 }
 
 ipcMain.handle('show-in-file-manager', async (_event, dirPath) => {
-  if (!dirPath) return false
-  const result = await shell.openPath(dirPath)
+  if (!dirPath || typeof dirPath !== 'string') return false
+  // Normalize and validate: must be absolute path, no traversal
+  const normalizedPath = path.resolve(dirPath)
+  if (normalizedPath !== path.normalize(dirPath)) {
+    console.warn('[Security] Path traversal detected in show-in-file-manager:', dirPath)
+    return false
+  }
+  const result = await shell.openPath(normalizedPath)
   return result === '' // empty string = success
 })
 
 ipcMain.handle('reveal-in-file-manager', async (_event, filePath) => {
   if (!filePath || typeof filePath !== 'string') return false
-  shell.showItemInFolder(filePath)
+  // Normalize and validate: must be absolute path, no traversal
+  const normalizedPath = path.resolve(filePath)
+  if (normalizedPath !== path.normalize(filePath)) {
+    console.warn('[Security] Path traversal detected in reveal-in-file-manager:', filePath)
+    return false
+  }
+  shell.showItemInFolder(normalizedPath)
   return true
 })
 
@@ -764,6 +794,20 @@ ipcMain.handle('new-window', async () => {
 
 // 辞書ポップアップウィンドウを開く
 ipcMain.handle('open-dictionary-popup', (_event, url, title) => {
+  // Validate URL: only allow https
+  if (typeof url !== 'string') return false
+  let parsedUrl
+  try {
+    parsedUrl = new URL(url)
+  } catch {
+    console.warn('[Security] Invalid dictionary URL:', url)
+    return false
+  }
+  if (parsedUrl.protocol !== 'https:') {
+    console.warn('[Security] Blocked non-HTTPS dictionary URL:', url)
+    return false
+  }
+
   const popupWindow = new BrowserWindow({
     width: 800,
     height: 600,
@@ -771,8 +815,24 @@ ipcMain.handle('open-dictionary-popup', (_event, url, title) => {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   })
+
+  // Block navigation away from the initial URL's origin
+  popupWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    try {
+      const navUrl = new URL(navigationUrl)
+      if (navUrl.origin !== parsedUrl.origin) {
+        event.preventDefault()
+        console.warn('[Security] Blocked popup navigation to:', navigationUrl)
+      }
+    } catch {
+      event.preventDefault()
+    }
+  })
+
+  popupWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
   popupWindow.loadURL(url)
   return true
@@ -863,6 +923,28 @@ app.on('open-file', async (event, filePath) => {
 })
 
 app.whenReady().then(async () => {
+  // Content Security Policy
+  const { session } = require('electron')
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob:",
+            "font-src 'self' data:",
+            "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com ws://localhost:*",
+            "worker-src 'self' blob:",
+            "frame-src 'none'",
+          ].join('; ')
+        ],
+      },
+    })
+  })
+
   await createMainWindow()
 
   // Handle pending file from open-file event (received before window was ready)
