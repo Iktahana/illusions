@@ -891,7 +891,7 @@ export function useTabManager(options?: {
                     ? {
                         ...t,
                         lastSavedContent: sanitized,
-                        isDirty: false,
+                        isDirty: sanitizeMdiContent(t.content) !== sanitized,
                         lastSavedTime: -Date.now(),
                       }
                     : t,
@@ -911,7 +911,7 @@ export function useTabManager(options?: {
                           ...t,
                           file: result.descriptor,
                           lastSavedContent: sanitized,
-                          isDirty: false,
+                          isDirty: sanitizeMdiContent(t.content) !== sanitized,
                           lastSavedTime: -Date.now(),
                         }
                       : t,
