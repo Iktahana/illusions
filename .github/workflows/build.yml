@@ -9,6 +9,9 @@ on:
       - dev
     tags:
       - "v*"
+    paths-ignore:
+      - 'www/**'
+      - '.github/workflows/deploy-www.yml'
 
 permissions:
   contents: write
