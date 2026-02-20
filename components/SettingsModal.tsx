@@ -659,14 +659,14 @@ function AboutSection(): React.ReactElement {
       {/* Links */}
       <div className="flex justify-center gap-4">
         <a
-          href="https://illusions.app"
+          href="https://www.illusions.app"
           target="_blank"
           rel="noopener noreferrer"
           onClick={handleExternalLink}
           className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
         >
           <ExternalLink className="w-3.5 h-3.5" />
-          illusions.app
+          www.illusions.app
         </a>
         <a
           href="https://github.com/Iktahana/illusions"

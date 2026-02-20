@@ -71,6 +71,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   } = params;
 
   const isSavingRef = useRef(false);
+  const openingPathsRef = useRef(new Map<string, boolean>());
 
   // --- Persist helpers ----------------------------------------------------
 
@@ -375,68 +376,84 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         return;
       }
 
-      // Read file from VFS
-      let fileContent: string;
-      try {
-        const vfs = getVFS();
-        fileContent = await vfs.readFile(vfsPath);
-      } catch (error) {
-        console.error("ファイルの読み込みに失敗しました:", error);
+      // Prevent concurrent opens of the same path (race between click → double-click).
+      // Use Map to track preview intent: if a non-preview open arrives while a
+      // preview open is in-flight, the AND logic ensures the tab is pinned.
+      const existingIntent = openingPathsRef.current.get(vfsPath);
+      if (existingIntent !== undefined) {
+        // Merge intent: non-preview (false) wins via AND
+        openingPathsRef.current.set(vfsPath, existingIntent && preview);
         return;
       }
+      openingPathsRef.current.set(vfsPath, preview);
 
-      const fileName = vfsPath.split("/").pop() || "無題";
-      const vfsFileType = inferFileType(fileName);
+      try {
+        // Read file from VFS
+        let fileContent: string;
+        try {
+          const vfs = getVFS();
+          fileContent = await vfs.readFile(vfsPath);
+        } catch (error) {
+          console.error("ファイルの読み込みに失敗しました:", error);
+          return;
+        }
 
-      if (preview) {
-        // Replace existing preview tab, or create new preview tab
-        const existingPreview = tabsRef.current.find((t) => t.isPreview);
-        if (existingPreview) {
-          updateTab(existingPreview.id, {
+        const fileName = vfsPath.split("/").pop() || "無題";
+        const vfsFileType = inferFileType(fileName);
+        const effectivePreview = openingPathsRef.current.get(vfsPath) ?? preview;
+
+        if (effectivePreview) {
+          // Replace existing preview tab, or create new preview tab
+          const existingPreview = tabsRef.current.find((t) => t.isPreview);
+          if (existingPreview) {
+            updateTab(existingPreview.id, {
+              file: { path: vfsPath, handle: null, name: fileName },
+              content: fileContent,
+              lastSavedContent: fileContent,
+              isDirty: false,
+              lastSavedTime: Date.now(),
+              isPreview: true,
+              fileType: vfsFileType,
+            });
+            setActiveTabId(existingPreview.id);
+            return;
+          }
+        }
+
+        // Reuse current tab if untitled and clean
+        const cur = tabsRef.current.find(
+          (t) => t.id === activeTabIdRef.current,
+        );
+        if (cur && !cur.file && !cur.isDirty) {
+          updateTab(cur.id, {
             file: { path: vfsPath, handle: null, name: fileName },
             content: fileContent,
             lastSavedContent: fileContent,
             isDirty: false,
             lastSavedTime: Date.now(),
-            isPreview: true,
+            isPreview: effectivePreview,
             fileType: vfsFileType,
           });
-          setActiveTabId(existingPreview.id);
           return;
         }
-      }
 
-      // Reuse current tab if untitled and clean
-      const cur = tabsRef.current.find(
-        (t) => t.id === activeTabIdRef.current,
-      );
-      if (cur && !cur.file && !cur.isDirty) {
-        updateTab(cur.id, {
+        // New tab
+        const tab: TabState = {
+          id: generateTabId(),
           file: { path: vfsPath, handle: null, name: fileName },
           content: fileContent,
           lastSavedContent: fileContent,
           isDirty: false,
           lastSavedTime: Date.now(),
-          isPreview: preview,
+          isSaving: false,
+          isPreview: effectivePreview,
           fileType: vfsFileType,
-        });
-        return;
+        };
+        setTabs((prev) => [...prev, tab]);
+        setActiveTabId(tab.id);
+      } finally {
+        openingPathsRef.current.delete(vfsPath);
       }
-
-      // New tab
-      const tab: TabState = {
-        id: generateTabId(),
-        file: { path: vfsPath, handle: null, name: fileName },
-        content: fileContent,
-        lastSavedContent: fileContent,
-        isDirty: false,
-        lastSavedTime: Date.now(),
-        isSaving: false,
-        isPreview: preview,
-        fileType: vfsFileType,
-      };
-      setTabs((prev) => [...prev, tab]);
-      setActiveTabId(tab.id);
     },
     [updateTab, setTabs, setActiveTabId, tabsRef, activeTabIdRef],
   );

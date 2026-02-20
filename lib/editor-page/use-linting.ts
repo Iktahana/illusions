@@ -1,7 +1,6 @@
 import type { EditorView } from "@milkdown/prose/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { EditorView } from "@milkdown/prose/view";
 import { RuleRunner } from "@/lib/linting/rule-runner";
 import type { LintIssue, Severity } from "@/lib/linting/types";
 
@@ -54,7 +53,8 @@ export function useLinting(
     ruleRunnerRef.current = runner;
   }
 
-  const ruleRunner = ruleRunnerRef.current;
+  // Guaranteed non-null after the lazy initialization block above
+  const ruleRunner = ruleRunnerRef.current!;
 
   // Sync rule configs from settings to RuleRunner
   useEffect(() => {
