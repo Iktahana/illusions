@@ -45,6 +45,7 @@ import { useLinting } from "@/lib/editor-page/use-linting";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { LintIssue } from "@/lib/linting/types";
+import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project-types";
 
 // Module-level flag: persists across React StrictMode/HMR remounts,

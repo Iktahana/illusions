@@ -1,3 +1,4 @@
+import type { EditorView } from "@milkdown/prose/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { EditorView } from "@milkdown/prose/view";
