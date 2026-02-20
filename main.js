@@ -924,7 +924,9 @@ async function isProjectDirectory(dirPath) {
  * @param {string} filePath - Path to the .mdi file
  */
 async function handleMdiFileOpen(filePath) {
-  if (!mainWindow || !mainWindow.webContents) {
+  // Use focused window when available; fall back to mainWindow (e.g., app in background)
+  const targetWindow = BrowserWindow.getFocusedWindow() || mainWindow
+  if (!targetWindow || !targetWindow.webContents) {
     return false
   }
 
@@ -935,7 +937,7 @@ async function handleMdiFileOpen(filePath) {
     if (isProject) {
       // Open as project with this file as initial file
       log.info('Opening as project:', dirPath, 'Initial file:', path.basename(filePath))
-      mainWindow.webContents.send('open-as-project', {
+      targetWindow.webContents.send('open-as-project', {
         projectPath: dirPath,
         initialFile: path.basename(filePath),
       })
@@ -943,7 +945,7 @@ async function handleMdiFileOpen(filePath) {
       // Open as standalone file
       log.info('Opening as standalone file:', filePath)
       const content = await fs.readFile(filePath, 'utf-8')
-      mainWindow.webContents.send('open-file-from-system', { path: filePath, content })
+      targetWindow.webContents.send('open-file-from-system', { path: filePath, content })
     }
     return true
   } catch (err) {
