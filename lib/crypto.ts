@@ -59,36 +59,35 @@ async function openKeyStore(): Promise<IDBDatabase> {
 
 async function getOrCreateKey(): Promise<CryptoKey> {
   const db = await openKeyStore();
+  try {
+    // Try to load existing key
+    const existing = await new Promise<CryptoKey | undefined>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const req = tx.objectStore(STORE_NAME).get(KEY_ID);
+      req.onsuccess = () => resolve(req.result as CryptoKey | undefined);
+      req.onerror = () => reject(req.error);
+    });
 
-  // Try to load existing key
-  const existing = await new Promise<CryptoKey | undefined>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const req = tx.objectStore(STORE_NAME).get(KEY_ID);
-    req.onsuccess = () => resolve(req.result as CryptoKey | undefined);
-    req.onerror = () => reject(req.error);
-  });
+    if (existing) return existing;
 
-  if (existing) {
+    // Generate new key
+    const key = await crypto.subtle.generateKey(
+      { name: "AES-GCM", length: 256 },
+      false, // not extractable
+      ["encrypt", "decrypt"],
+    );
+
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const req = tx.objectStore(STORE_NAME).put(key, KEY_ID);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+
+    return key;
+  } finally {
     db.close();
-    return existing;
   }
-
-  // Generate new key
-  const key = await crypto.subtle.generateKey(
-    { name: "AES-GCM", length: 256 },
-    false, // not extractable
-    ["encrypt", "decrypt"],
-  );
-
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const req = tx.objectStore(STORE_NAME).put(key, KEY_ID);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-
-  db.close();
-  return key;
 }
 
 async function browserEncrypt(plaintext: string): Promise<string> {
@@ -104,7 +103,7 @@ async function browserEncrypt(plaintext: string): Promise<string> {
   const combined = new Uint8Array(iv.length + cipherBuf.byteLength);
   combined.set(iv, 0);
   combined.set(new Uint8Array(cipherBuf), iv.length);
-  return btoa(String.fromCharCode(...combined));
+  return btoa(combined.reduce((s, b) => s + String.fromCharCode(b), ""));
 }
 
 async function browserDecrypt(base64Cipher: string): Promise<string> {
