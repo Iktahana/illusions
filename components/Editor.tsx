@@ -142,10 +142,14 @@ export default function NovelEditor({
     setIsSearchOpen(prev => !prev);
   };
 
+  const handleSearchOpen = () => {
+    setIsSearchOpen(true);
+  };
+
   // 親からのトリガーで検索ダイアログを開く（ショートカット）
   useEffect(() => {
     if (searchOpenTrigger > 0) {
-      handleSearchToggle();
+      handleSearchOpen();
     }
   }, [searchOpenTrigger]);
 
