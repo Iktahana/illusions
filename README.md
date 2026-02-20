@@ -27,6 +27,7 @@ Available for macOS (Intel & Apple Silicon) and Windows
 - **Japanese NLP** integration for text analysis
 - **POS (Part-of-Speech) highlighting** for Japanese grammar review
 - **Word frequency analysis** for vocabulary insights
+- **Japanese text linting** — punctuation, number format, joyo kanji rules (JIS X 4051 / 文化庁標準準拠)
 
 ### 🎨 Interface
 - **Three-column layout**: Explorer | Editor | Inspector
@@ -171,6 +172,7 @@ illusions/
 │   ├── storage-service.ts    # Storage factory
 │   ├── electron-storage.ts   # Electron storage provider
 │   ├── web-storage.ts        # Web storage provider
+│   ├── linting/              # Japanese text linting framework
 │   ├── nlp-client/           # NLP client abstraction
 │   ├── git/                  # Git service (isomorphic-git)
 │   ├── github/               # GitHub API integration
@@ -249,11 +251,14 @@ The proofreading (linting) features in illusions comply with the following offic
 - ✅ Word frequency analysis
 - ✅ Landing page with SEO optimization
 
+### Recently Added
+- ✅ Japanese text linting framework (JIS X 4051 / 文化庁標準準拠)
+- ✅ Punctuation rules (記号の作法と偶数ルール)
+- ✅ Joyo kanji validation (常用漢字バリデーション)
+- ✅ Number format consistency (数字表記の統一)
+- ✅ Electron security hardening (CSP, navigation guards, safeStorage)
+
 ### Planned
-- [ ] Japanese text linting framework (JIS X 4051 / 文化庁標準準拠)
-- [ ] Punctuation rules (記号の作法と偶数ルール)
-- [ ] Joyo kanji validation (常用漢字バリデーション)
-- [ ] Number format consistency (数字表記の統一)
 - [ ] Real-time collaboration
 - [ ] Advanced AI grammar and style checking
 - [ ] Export to PDF/EPUB
@@ -265,9 +270,11 @@ The proofreading (linting) features in illusions comply with the following offic
 
 ## 🔒 Security
 
-- **Token encryption**: GitHub tokens encrypted with AES
-- **Context isolation**: Electron preload with secure IPC
-- **No hardcoded secrets**: All sensitive data stored securely
+- **Token encryption**: OS-level encryption via Electron safeStorage (macOS Keychain / Windows DPAPI)
+- **Context isolation**: Electron preload with secure IPC, sandbox enabled
+- **Content Security Policy**: CSP headers enforced on all windows
+- **Navigation guards**: Blocks unexpected navigation and new-window creation
+- **VFS sandboxing**: File system access restricted to approved project directories
 - **HTTPS only**: All network requests use HTTPS
 
 ---
