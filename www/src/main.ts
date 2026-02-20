@@ -30,7 +30,6 @@ const downloadLabel = isApple ? 'macOS版をダウンロード' : 'Windows版を
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div class="hero">
-    <div class="logo">✨</div>
     <div class="title-logo">${logoSvg}</div>
     <p class="tagline">
       縦書き、ルビ、縦中横、しっかり対応。<br/>
@@ -47,6 +46,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         Chrome版を開く
       </a>
     </div>
+    <a href="/downloads/" class="all-downloads-link">すべてのダウンロード →</a>
 
     <div class="features">
       <div class="feature-card">

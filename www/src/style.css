@@ -51,19 +51,6 @@ body::before {
   padding: 4rem 2rem;
 }
 
-.logo {
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 2rem;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-}
 
 h1 {
   font-size: 4rem;
@@ -103,6 +90,19 @@ h1 {
   gap: 1rem;
   justify-content: center;
   flex-wrap: wrap;
+}
+
+.all-downloads-link {
+  display: inline-block;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.all-downloads-link:hover {
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .btn {
@@ -623,13 +623,6 @@ h1 {
     padding: 2rem 1rem;
   }
 
-  .logo {
-    width: 80px;
-    height: 80px;
-    font-size: 36px;
-    margin-bottom: 1.5rem;
-  }
-
   h1 {
     font-size: 2.5rem;
   }
@@ -712,12 +705,6 @@ h1 {
 @media (max-width: 480px) {
   .hero {
     padding: 1.5rem 0.5rem;
-  }
-
-  .logo {
-    width: 64px;
-    height: 64px;
-    font-size: 28px;
   }
 
   h1 {
