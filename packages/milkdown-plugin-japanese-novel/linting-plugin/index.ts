@@ -36,8 +36,6 @@ export function linting(options: LintingOptions = {}) {
     debounceMs = 500,
   } = options;
 
-  console.log('[Linting] Plugin initialized');
-
   return $prose(() => createLintingPlugin({
     enabled,
     ruleRunner,

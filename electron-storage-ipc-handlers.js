@@ -169,7 +169,6 @@ function registerStorageHandlers() {
     }
   });
 
-  console.log('[Storage IPC] Storage handlers registered');
 }
 
 module.exports = { registerStorageHandlers, getStorageManager };

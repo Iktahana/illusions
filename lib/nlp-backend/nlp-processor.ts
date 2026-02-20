@@ -43,8 +43,6 @@ class NlpProcessor {
       return this.initPromise;
     }
 
-    console.log('[NlpProcessor] Initializing with dicPath:', dicPath);
-
     this.initPromise = new Promise((resolve, reject) => {
       kuromoji.builder({ dicPath }).build((err, tokenizer) => {
         if (err) {
@@ -54,7 +52,6 @@ class NlpProcessor {
         } else {
           this.tokenizer = tokenizer;
           this.isReady = true;
-          console.log('[NlpProcessor] Initialized successfully');
           resolve();
         }
       });
@@ -120,14 +117,6 @@ class NlpProcessor {
 
     // Step 1: Clean text
     const { cleanedText, positionMap } = this.cleanTextForTokenization(text);
-
-    if (cleanedText !== text) {
-      console.log('[NlpProcessor] Noise cleaned:', {
-        originalLength: text.length,
-        cleanedLength: cleanedText.length,
-        removedChars: text.length - cleanedText.length,
-      });
-    }
 
     // Step 2: Tokenize cleaned text
     const rawTokens = this.tokenizer.tokenize(cleanedText);

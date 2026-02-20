@@ -86,7 +86,6 @@ export default function Characters({ content }: CharactersProps) {
     }
 
     try {
-      console.log("自動検出開始");
       const nlpClient = getNlpClient();
       const tokens = await nlpClient.tokenizeParagraph(content);
 
@@ -121,7 +120,6 @@ export default function Characters({ content }: CharactersProps) {
         setCharacters((prev) => [...prev, character]);
       }
 
-      console.log(`${newNames.length} 名の人物を自動抽出しました`);
     } catch (err) {
       console.error("自動抽出に失敗しました:", err);
     }

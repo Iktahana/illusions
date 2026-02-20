@@ -13,7 +13,6 @@ import { isElectronRenderer } from "./runtime-env";
  */
 export function isDirectoryPickerSupported(): boolean {
   const supported = typeof window !== "undefined" && "showDirectoryPicker" in window;
-  console.log('[FSA DEBUG] 🔍 showDirectoryPicker supported:', supported);
   return supported;
 }
 
@@ -23,7 +22,6 @@ export function isDirectoryPickerSupported(): boolean {
  */
 export function isFilePickerSupported(): boolean {
   const supported = typeof window !== "undefined" && "showOpenFilePicker" in window;
-  console.log('[FSA DEBUG] 🔍 showOpenFilePicker supported:', supported);
   return supported;
 }
 
@@ -33,7 +31,6 @@ export function isFilePickerSupported(): boolean {
  */
 export function isSaveFilePickerSupported(): boolean {
   const supported = typeof window !== "undefined" && "showSaveFilePicker" in window;
-  console.log('[FSA DEBUG] 🔍 showSaveFilePicker supported:', supported);
   return supported;
 }
 
@@ -43,7 +40,6 @@ export function isSaveFilePickerSupported(): boolean {
  */
 export function isFileSystemHandleSupported(): boolean {
   if (typeof window === "undefined") {
-    console.log('[FSA DEBUG] 🔍 FileSystemHandle check: window is undefined');
     return false;
   }
 
@@ -59,16 +55,8 @@ export function isFileSystemHandleSupported(): boolean {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       typeof (window as any).FileSystemFileHandle?.prototype?.createWritable !== "undefined";
 
-    console.log('[FSA DEBUG] 🔍 FileSystemHandle support:', {
-      hasFileHandle,
-      hasDirHandle,
-      hasCreateWritable,
-      overall: hasFileHandle && hasDirHandle && hasCreateWritable
-    });
-
     return hasFileHandle && hasDirHandle && hasCreateWritable;
   } catch (error) {
-    console.log('[FSA DEBUG] 🔍 FileSystemHandle check error:', error);
     return false;
   }
 }
@@ -86,22 +74,12 @@ export function isFileSystemHandleSupported(): boolean {
  * - createWritable method
  */
 export function isFSASupported(): boolean {
-  console.log('[FSA DEBUG] 🔍 Starting File System Access API support check...');
-
   const dirPickerSupported = isDirectoryPickerSupported();
   const filePickerSupported = isFilePickerSupported();
   const saveFilePickerSupported = isSaveFilePickerSupported();
   const handleSupported = isFileSystemHandleSupported();
 
   const allSupported = dirPickerSupported && filePickerSupported && saveFilePickerSupported && handleSupported;
-
-  console.log('[FSA DEBUG] 🔍 Final FSA support result:', {
-    showDirectoryPicker: dirPickerSupported,
-    showOpenFilePicker: filePickerSupported,
-    showSaveFilePicker: saveFilePickerSupported,
-    fileSystemHandles: handleSupported,
-    allSupported
-  });
 
   return allSupported;
 }

@@ -293,7 +293,6 @@ export function createLintingPlugin(
           const uncachedParagraphs = visibleParagraphs.filter(p => !issueCache.has(p.text));
 
           if (uncachedParagraphs.length > 0) {
-            console.log(`[Linting] Processing ${uncachedParagraphs.length} new paragraphs (${visibleParagraphs.length} visible, ${issueCache.size} cached)`);
 
             for (const paragraph of uncachedParagraphs) {
               if (version !== processingVersion) return;
@@ -346,9 +345,6 @@ export function createLintingPlugin(
           // Notify parent of all issues
           onIssuesUpdated?.(allIssues);
 
-          if (uncachedParagraphs.length > 0) {
-            console.log(`[Linting] Done: ${decoratedCount}/${allParagraphs.length} paragraphs processed, ${allDecorations.length} issues found`);
-          }
         }, debounceMs);
       }
 
@@ -361,7 +357,6 @@ export function createLintingPlugin(
           if (state?.enabled !== prevPluginState?.enabled) {
             if (state?.enabled) {
               issueCache.clear();
-              console.log('[Linting] Enabled, scheduling update');
               scheduleViewportUpdate(view);
             }
             return;

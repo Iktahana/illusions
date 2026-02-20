@@ -32,7 +32,6 @@ export function useWebMenuHandlers({
 }: UseWebMenuHandlersProps) {
   
   const handleMenuAction = useCallback((action: string) => {
-    console.log('[Web Menu] Action:', action);
     
     switch (action) {
       // File menu

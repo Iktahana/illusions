@@ -1132,7 +1132,6 @@ export default function EditorPage() {
 
         try {
           // Set the VFS root to the stored path and open the project
-          console.log("[Open Recent] Attempting to open project at:", project.rootPath);
           const vfs = getVFS();
           if ("setRootPath" in vfs) {
             (vfs as { setRootPath: (p: string) => void }).setRootPath(project.rootPath);
@@ -1239,8 +1238,6 @@ export default function EditorPage() {
   /** Open a project from a file system path (when .mdi file is double-clicked in a project directory) */
   const handleOpenAsProject = useCallback(async (projectPath: string, initialFile: string) => {
     try {
-      console.log("[Open as Project] Opening project:", projectPath, "Initial file:", initialFile);
-
       // Set VFS root to project directory
       const vfs = getVFS();
       if ("setRootPath" in vfs) {

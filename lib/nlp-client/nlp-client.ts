@@ -30,10 +30,8 @@ export function getNlpClient(): INlpClient {
   let client: INlpClient;
   
   if (isElectron) {
-    console.log('[NLP] Using Electron NLP Client (IPC)');
     client = new ElectronNlpClient();
   } else {
-    console.log('[NLP] Using Web NLP Client (API)');
     client = new WebNlpClient();
   }
 

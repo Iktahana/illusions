@@ -40,7 +40,6 @@ export function posHighlight(options: PosHighlightOptions = {}) {
   
   // Note: NLP client initialization is now handled automatically
   // on first use by getNlpClient() factory function
-  console.log('[PosHighlight] Plugin initialized with NLP client abstraction');
   
   return $prose(() => createPosHighlightPlugin({
     enabled,
