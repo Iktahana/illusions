@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 // Electron のメインプロセス入口
 
-const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell, safeStorage } = require('electron')
 const path = require('path')
 const fs = require('fs/promises')
 const os = require('os')
@@ -799,6 +799,29 @@ ipcMain.handle('show-context-menu', (_event, items) => {
       callback: () => resolve(null),
     })
   })
+})
+
+// safeStorage: OS-level encryption (macOS Keychain / Windows DPAPI)
+ipcMain.handle('safe-storage:encrypt', (_event, plaintext) => {
+  if (typeof plaintext !== 'string' || !plaintext) return null
+  if (!safeStorage.isEncryptionAvailable()) return null
+  const encrypted = safeStorage.encryptString(plaintext)
+  return encrypted.toString('base64')
+})
+
+ipcMain.handle('safe-storage:decrypt', (_event, base64Cipher) => {
+  if (typeof base64Cipher !== 'string' || !base64Cipher) return null
+  if (!safeStorage.isEncryptionAvailable()) return null
+  try {
+    const buffer = Buffer.from(base64Cipher, 'base64')
+    return safeStorage.decryptString(buffer)
+  } catch {
+    return null
+  }
+})
+
+ipcMain.handle('safe-storage:is-available', () => {
+  return safeStorage.isEncryptionAvailable()
 })
 
 /**

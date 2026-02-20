@@ -145,4 +145,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     delete: (targetPath, options) => ipcRenderer.invoke('vfs:delete', targetPath, options),
     rename: (oldPath, newPath) => ipcRenderer.invoke('vfs:rename', oldPath, newPath),
   },
+  safeStorage: {
+    encrypt: (plaintext) => ipcRenderer.invoke('safe-storage:encrypt', plaintext),
+    decrypt: (base64Cipher) => ipcRenderer.invoke('safe-storage:decrypt', base64Cipher),
+    isAvailable: () => ipcRenderer.invoke('safe-storage:is-available'),
+  },
 })

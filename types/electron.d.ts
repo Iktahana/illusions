@@ -122,6 +122,14 @@ declare global {
        */
       analyzeWordFrequency: (text: string) => Promise<WordEntry[]>;
     };
+    safeStorage?: {
+      /** Encrypt a string using OS-level encryption (macOS Keychain / Windows DPAPI) */
+      encrypt: (plaintext: string) => Promise<string | null>;
+      /** Decrypt a base64-encoded ciphertext */
+      decrypt: (base64Cipher: string) => Promise<string | null>;
+      /** Check if OS-level encryption is available */
+      isAvailable: () => Promise<boolean>;
+    };
   }
 
   interface Window {
