@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, ReactNode } from "react";
-import { Bot, AlertCircle, BarChart3, Edit2, X, History, RefreshCw } from "lucide-react";
+import { Bot, AlertCircle, BarChart3, Edit2, X, History, RefreshCw, ListFilter, XCircle, AlertTriangle, Info } from "lucide-react";
 import clsx from "clsx";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import HistoryPanel from "./HistoryPanel";
@@ -498,11 +498,11 @@ function CorrectionsPanel({
     ? lintIssues
     : lintIssues.filter((issue) => issue.severity === severityFilter);
 
-  const filterOptions: { value: SeverityFilter; label: string }[] = [
-    { value: "all", label: "全て" },
-    { value: "error", label: "エラー" },
-    { value: "warning", label: "警告" },
-    { value: "info", label: "情報" },
+  const filterOptions: { value: SeverityFilter; label: string; icon: ReactNode }[] = [
+    { value: "all", label: "全て", icon: <ListFilter className="w-3.5 h-3.5" /> },
+    { value: "error", label: "エラー", icon: <XCircle className="w-3.5 h-3.5" /> },
+    { value: "warning", label: "警告", icon: <AlertTriangle className="w-3.5 h-3.5" /> },
+    { value: "info", label: "情報", icon: <Info className="w-3.5 h-3.5" /> },
   ];
 
   return (
@@ -563,14 +563,15 @@ function CorrectionsPanel({
           <button
             key={option.value}
             onClick={() => setSeverityFilter(option.value)}
+            title={option.label}
             className={clsx(
-              "flex-1 px-2 py-1 text-xs font-medium rounded transition-colors",
+              "flex-1 flex items-center justify-center px-2 py-1.5 rounded transition-colors",
               severityFilter === option.value
                 ? "bg-accent text-white"
                 : "bg-background-secondary text-foreground-tertiary hover:text-foreground-secondary border border-border"
             )}
           >
-            {option.label}
+            {option.icon}
           </button>
         ))}
       </div>
