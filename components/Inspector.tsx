@@ -5,34 +5,15 @@ import { Bot, AlertCircle, BarChart3, Edit2, X, History } from "lucide-react";
 import clsx from "clsx";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import HistoryPanel from "./HistoryPanel";
+import { localPreferences } from "@/lib/local-preferences";
 
 import type { ProjectMode } from "@/lib/project-types";
 import type { LintIssue, Severity } from "@/lib/linting";
 
 type Tab = "ai" | "corrections" | "stats" | "history";
 
-const rightTabStorageKey = "illusions:rightTab";
 const isValidTab = (value: string | null): value is Tab =>
   value === "ai" || value === "corrections" || value === "stats" || value === "history";
-
-const readStoredTab = (): Tab | null => {
-  if (typeof window === "undefined") return null;
-  try {
-    const savedTab = window.localStorage.getItem(rightTabStorageKey);
-    return isValidTab(savedTab) ? savedTab : null;
-  } catch {
-    return null;
-  }
-};
-
-const writeStoredTab = (tab: Tab) => {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(rightTabStorageKey, tab);
-  } catch (error) {
-    console.error("右サイドのタブ状態を保存できませんでした:", error);
-  }
-};
 
 const MDI_EXTENSION = ".mdi";
 
@@ -51,7 +32,6 @@ function getBaseName(name: string) {
 interface InspectorProps {
   className?: string;
   compactMode?: boolean;
-  wordCount?: number;
   charCount?: number;
   selectedCharCount?: number;
   paragraphCount?: number;
@@ -100,7 +80,6 @@ interface InspectorProps {
 export default function Inspector({
   className,
   compactMode = false,
-  wordCount = 0,
   charCount = 0,
   selectedCharCount = 0,
   paragraphCount = 0,
@@ -158,7 +137,8 @@ export default function Inspector({
   }, []);
 
   useEffect(() => {
-    const storedTab = readStoredTab();
+    const raw = localPreferences.getRightTab();
+    const storedTab = isValidTab(raw) ? raw : null;
     if (storedTab) {
       setActiveTab(storedTab);
     }
@@ -168,7 +148,7 @@ export default function Inspector({
 
   useEffect(() => {
     if (!hasLoadedRef.current) return;
-    writeStoredTab(activeTab);
+    localPreferences.setRightTab(activeTab);
   }, [activeTab]);
 
   // プロジェクトモードでない場合に履歴タブが選択されていたらフォールバック
@@ -435,7 +415,6 @@ export default function Inspector({
          )}
          {activeTab === "stats" && (
            <StatsPanel
-             wordCount={wordCount}
              charCount={charCount}
              selectedCharCount={selectedCharCount}
              paragraphCount={paragraphCount}
@@ -722,7 +701,6 @@ function InfoTooltip({ content, className, children }: { content: string; classN
 }
 
 function StatsPanel({
-  wordCount: _wordCount,
   charCount,
   selectedCharCount,
   paragraphCount,
@@ -732,7 +710,6 @@ function StatsPanel({
   charUsageRates,
   readabilityAnalysis,
 }: {
-  wordCount: number;
   charCount: number;
   selectedCharCount: number;
   paragraphCount: number;

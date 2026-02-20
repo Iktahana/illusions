@@ -68,9 +68,6 @@ function chars(s: string) {
   return s.replace(/\s/g, "").length;
 }
 
-function words(s: string) {
-  return s.split(/\s+/).filter(Boolean).length;
-}
 
 // Module-level flag: persists across React StrictMode/HMR remounts,
 // but resets on page refresh (module re-evaluated).
@@ -851,7 +848,6 @@ export default function EditorPage() {
     setTopView("explorer");
   };
 
-   const wordCount = useMemo(() => words(content), [content]);
    const charCount = useMemo(() => chars(content), [content]);
 
    // 段落数を計算（空行で区切る）
@@ -1770,7 +1766,6 @@ export default function EditorPage() {
           >
           <Inspector
             compactMode={compactMode}
-            wordCount={wordCount}
             charCount={charCount}
             selectedCharCount={selectedCharCount}
             paragraphCount={paragraphCount}
