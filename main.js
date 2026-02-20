@@ -47,11 +47,21 @@ let mainWindow = null
 let isManualUpdateCheck = false
 const allWindows = new Set() // すべてのウィンドウを追跡
 
+// Microsoft Store (APPX) ビルドかどうかを判定
+// Store 版はストア経由で更新されるため、electron-updater を無効化する
+const isMicrosoftStoreApp = process.windowsStore === true
+
 // auto-updater のイベントハンドラ設定
 function setupAutoUpdater() {
   // 開発モードではアップデート確認をしない
   if (isDev) {
     log.info('開発モードのため auto-updater は無効です')
+    return
+  }
+
+  // Microsoft Store 版ではストア更新と衝突するため無効化
+  if (isMicrosoftStoreApp) {
+    log.info('Microsoft Store 版のため auto-updater は無効です')
     return
   }
 
@@ -148,6 +158,19 @@ function checkForUpdates(manual = false) {
         title: 'アップデート',
         message: '開発モード',
         detail: '開発モードではアップデート機能は無効です。',
+        buttons: ['OK'],
+      })
+    }
+    return
+  }
+
+  if (isMicrosoftStoreApp) {
+    if (manual && mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'アップデート',
+        message: 'Microsoft Store 版',
+        detail: 'このバージョンは Microsoft Store 経由で更新されます。ストアアプリからアップデートを確認してください。',
         buttons: ['OK'],
       })
     }
