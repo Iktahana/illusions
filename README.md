@@ -217,6 +217,20 @@ illusions/
 - **[Notification System](docs/architecture/notification-system.md)** - Toast notification API
 - **[Theme Colors Guide](docs/guides/THEME_COLORS.md)** - Theming system
 
+### 📐 校正基準 / Proofreading Standards
+
+illusions の校正（リンティング）機能は、以下の公的標準・業界規範に準拠しています。
+検出された問題は、必ず準拠する標準名を明示してユーザーに提示します。
+
+The proofreading (linting) features in illusions comply with the following official standards. All detected issues cite their source standard when presented to users.
+
+| Standard | Scope | Reference |
+|----------|-------|-----------|
+| **JIS X 4051:2004** | 日本語文書の組版方法（禁則処理・約物・ルビ） | [Full text](https://kikakurui.com/x4/X4051-2004-02.html) |
+| **文化庁「公用文作成の考え方」(2022)** | 公用文の句読点・用字用語 | [PDF](https://www.bunka.go.jp/seisaku/bunkashingikai/kokugo/hokoku/pdf/93098001_01.pdf) |
+| **W3C JLREQ** | 日本語組版処理の要件（Web/デジタル組版） | [W3C](https://w3c.github.io/jlreq/) |
+| **文化庁 常用漢字表 (2010)** | 常用漢字 2,136字 | [文化庁](https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/naikaku/kanji/) |
+
 ---
 
 ## 🎯 Features Roadmap
@@ -236,6 +250,10 @@ illusions/
 - ✅ Landing page with SEO optimization
 
 ### Planned
+- [ ] Japanese text linting framework (JIS X 4051 / 文化庁標準準拠)
+- [ ] Punctuation rules (記号の作法と偶数ルール)
+- [ ] Joyo kanji validation (常用漢字バリデーション)
+- [ ] Number format consistency (数字表記の統一)
 - [ ] Real-time collaboration
 - [ ] Advanced AI grammar and style checking
 - [ ] Export to PDF/EPUB

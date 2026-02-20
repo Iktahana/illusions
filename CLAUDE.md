@@ -57,6 +57,35 @@
 - Paragraph Count → 段落数
 - Reading Time → 読了時間
 
+## 2. Git Worktree Isolation (CRITICAL - STRICTLY ENFORCED)
+# ----------------------------------------------------------------------------
+
+### Every task MUST use a dedicated git worktree
+- **DO NOT** work directly on the main branch worktree for feature/fix tasks
+- **DO** create a new worktree + branch for each task before writing any code
+- **DO** clean up (remove) the worktree and delete the branch after merging
+
+### Workflow
+```bash
+# 1. Create worktree with a new feature branch
+git worktree add ../illusions-work-<short-name> -b feature/<branch-name>
+cd ../illusions-work-<short-name>
+
+# 2. Do all implementation work inside the worktree
+#    (commits, builds, tests, etc.)
+
+# 3. After merging to main, clean up
+cd /path/to/illusions          # return to main worktree
+git worktree remove ../illusions-work-<short-name>
+git branch -d feature/<branch-name>
+```
+
+### Rules
+- One worktree per task — do NOT reuse worktrees across unrelated tasks
+- Worktree directory naming convention: `illusions-work-<short-name>`
+- Always verify the worktree is removed after merge (`git worktree list`)
+- If a worktree is left behind from a previous session, ask the user before cleaning up
+
 # ============================================================================
 # 🟡 HIGH PRIORITY RULES
 # ============================================================================
@@ -379,10 +408,10 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 # ============================================================================
 
 ## Before Starting Work (Every Time!)
+- [ ] **Check for stale worktrees**: Run `git worktree list` to find leftover worktrees
 - [ ] **Check for old branches**: Run `git branch` to find feature branches
-- [ ] **Check for old directories**: Run `ls -la` to find work-* or feature-* directories
-- [ ] **Ask user if cleanup needed**: If old branches/directories exist, ask user before proceeding
-- [ ] **Create feature branch**: Never work directly on main for new features
+- [ ] **Ask user if cleanup needed**: If old worktrees/branches exist, ask user before proceeding
+- [ ] **Create a new worktree**: `git worktree add ../illusions-work-<name> -b feature/<name>`
 
 ## Before Committing (Every Time!)
 - [ ] **Working on feature branch**: Not committing directly to main
@@ -400,9 +429,9 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 
 ## After Completing Work (Every Time!)
 - [ ] **Merge to main**: Merge feature branch to main
-- [ ] **Delete feature branch**: Clean up merged branches
-- [ ] **Delete working directory**: Remove temporary work directories
-- [ ] **Verify cleanup**: No orphaned branches or directories left
+- [ ] **Remove worktree**: `git worktree remove ../illusions-work-<name>`
+- [ ] **Delete feature branch**: `git branch -d feature/<name>`
+- [ ] **Verify cleanup**: Run `git worktree list` — only the main worktree should remain
 
 ## Priority Levels
 1. **Critical (Must Fix)**:
@@ -516,9 +545,9 @@ Part of #<parent-issue-number>
 # ============================================================================
 
 ## Most Common Mistakes to Avoid
-1. ❌ Working directly on main branch for new features
-2. ❌ Not checking for old branches/directories before starting
-3. ❌ Not cleaning up branches/directories after merging
+1. ❌ Not using a dedicated git worktree for each task
+2. ❌ Not cleaning up worktrees/branches after merging
+3. ❌ Working directly on main branch for new features
 4. ❌ Using `git add .` instead of staging files individually
 5. ❌ Grouping unrelated changes into one commit
 6. ❌ Using Chinese/Korean in code, comments, or commit messages
@@ -536,22 +565,24 @@ Part of #<parent-issue-number>
 
 ## Quick Commands Reference
 ```bash
+# Check for stale worktrees
+git worktree list
+
 # Check for old branches
 git branch | grep -E "feature/|feat/|work/"
 
-# Check for old working directories  
-ls -la | grep -E "work-|feature-|temp-"
-
-# Create feature branch
-git checkout -b feature/my-feature
+# Create worktree + feature branch (standard workflow)
+git worktree add ../illusions-work-my-feature -b feature/my-feature
+cd ../illusions-work-my-feature
 
 # Good commit workflow
 git add src/specific-file.ts
 git commit -m "feat: add specific feature"
 
-# Merge and cleanup
-git checkout main
+# Merge and cleanup (from main worktree)
+cd /path/to/illusions
 git merge feature/my-feature
+git worktree remove ../illusions-work-my-feature
 git branch -d feature/my-feature
 
 # Check language compliance
@@ -561,9 +592,12 @@ grep -r "[\uac00-\ud7af]" src/  # Korean check
 
 ---
 
-**Version**: 2.2.0
-**Last Updated**: 2026-02-07
+**Version**: 2.3.0
+**Last Updated**: 2026-02-20
 **Status**: ✅ Production - All AI agents must follow these rules
+**Changes in 2.3.0**:
+- Added Git Worktree Isolation rule (CRITICAL) — every task must use a dedicated worktree
+- Updated checklists and quick commands to reflect worktree workflow
 **Changes in 2.2.0**:
 - Added PM Workflow section for multi-agent task coordination
 - Defined sub-issue template, agent rules, and PM rules
