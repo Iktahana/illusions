@@ -417,7 +417,8 @@ html:not(.dark) {
   font-size: 12px;
   line-height: 1.5;
   color: rgb(var(--foreground));
-  max-width: 240px;
+  max-width: 320px;
+  min-width: 200px;
   white-space: pre-line;
   overflow-wrap: anywhere;
   word-break: break-word;
