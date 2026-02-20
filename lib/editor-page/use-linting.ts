@@ -54,7 +54,8 @@ export function useLinting(
     ruleRunnerRef.current = runner;
   }
 
-  const ruleRunner = ruleRunnerRef.current;
+  // Guaranteed non-null after the lazy initialization block above
+  const ruleRunner = ruleRunnerRef.current!;
 
   // Sync rule configs from settings to RuleRunner
   useEffect(() => {

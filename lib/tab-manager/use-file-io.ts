@@ -71,7 +71,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   } = params;
 
   const isSavingRef = useRef(false);
-  const openingPathsRef = useRef(new Set<string>());
+  const openingPathsRef = useRef(new Map<string, boolean>());
 
   // --- Persist helpers ----------------------------------------------------
 
@@ -376,9 +376,16 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         return;
       }
 
-      // Prevent concurrent opens of the same path (race between click → double-click)
-      if (openingPathsRef.current.has(vfsPath)) return;
-      openingPathsRef.current.add(vfsPath);
+      // Prevent concurrent opens of the same path (race between click → double-click).
+      // Use Map to track preview intent: if a non-preview open arrives while a
+      // preview open is in-flight, the AND logic ensures the tab is pinned.
+      const existingIntent = openingPathsRef.current.get(vfsPath);
+      if (existingIntent !== undefined) {
+        // Merge intent: non-preview (false) wins via AND
+        openingPathsRef.current.set(vfsPath, existingIntent && preview);
+        return;
+      }
+      openingPathsRef.current.set(vfsPath, preview);
 
       try {
         // Read file from VFS
@@ -393,8 +400,9 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
         const fileName = vfsPath.split("/").pop() || "無題";
         const vfsFileType = inferFileType(fileName);
+        const effectivePreview = openingPathsRef.current.get(vfsPath) ?? preview;
 
-        if (preview) {
+        if (effectivePreview) {
           // Replace existing preview tab, or create new preview tab
           const existingPreview = tabsRef.current.find((t) => t.isPreview);
           if (existingPreview) {
@@ -423,7 +431,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
             lastSavedContent: fileContent,
             isDirty: false,
             lastSavedTime: Date.now(),
-            isPreview: preview,
+            isPreview: effectivePreview,
             fileType: vfsFileType,
           });
           return;
@@ -438,7 +446,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           isDirty: false,
           lastSavedTime: Date.now(),
           isSaving: false,
-          isPreview: preview,
+          isPreview: effectivePreview,
           fileType: vfsFileType,
         };
         setTabs((prev) => [...prev, tab]);
