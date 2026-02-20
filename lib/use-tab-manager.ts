@@ -179,6 +179,7 @@ export function useTabManager(options?: {
   isProjectRef.current = isProject;
   const isSavingRef = useRef(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const savingTabIdsRef = useRef<Set<string>>(new Set());
   const systemFileOpenHandlerRef = useRef<
     ((path: string, content: string) => void) | null
   >(null);
@@ -894,6 +895,9 @@ export function useTabManager(options?: {
           void saveFileRef.current(true);
           continue;
         }
+        // Synchronous guard to prevent concurrent saves for the same tab
+        if (savingTabIdsRef.current.has(tab.id)) continue;
+        savingTabIdsRef.current.add(tab.id);
 
         // Non-active dirty tabs: save directly
         // Set isSaving before starting async operation to prevent concurrent saves
@@ -949,6 +953,7 @@ export function useTabManager(options?: {
               error,
             );
           } finally {
+            savingTabIdsRef.current.delete(tab.id);
             setTabs((prev) =>
               prev.map((t) =>
                 t.id === tab.id ? { ...t, isSaving: false } : t,
