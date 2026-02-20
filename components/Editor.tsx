@@ -514,6 +514,7 @@ function MilkdownEditor({
   const onChangeRef = useRef(onChange);
   const onInsertTextRef = useRef(onInsertText);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const onLintIssuesUpdatedRef = useRef(onLintIssuesUpdated);
 
   // コールバックが変わったら ref を更新する
 
@@ -528,6 +529,10 @@ function MilkdownEditor({
   useEffect(() => {
     onSelectionChangeRef.current = onSelectionChange;
   }, [onSelectionChange]);
+
+  useEffect(() => {
+    onLintIssuesUpdatedRef.current = onLintIssuesUpdated;
+  }, [onLintIssuesUpdated]);
 
   // 縦書き: ブラウザの自動スクロールを防止するための保存位置
   const savedScrollPosRef = useRef({ left: 0, top: 0 });
@@ -602,6 +607,7 @@ function MilkdownEditor({
       .use(linting({
         enabled: false, // 初期化時は無効、後で動的に更新
         debounceMs: 500,
+        onIssuesUpdated: (issues) => onLintIssuesUpdatedRef.current?.(issues),
       }));
 
     return editor;
