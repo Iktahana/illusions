@@ -4,6 +4,7 @@ import logoSvg from '/logo.svg?raw'
 import iconApple from '~icons/mdi/apple?raw'
 import iconWindows from '~icons/mdi/microsoft-windows?raw'
 import iconChrome from '~icons/mdi/google-chrome?raw'
+import iconGithub from '~icons/mdi/github?raw'
 
 // ランダムな背景画像を取得
 const bgImageUrl = getRandomBackgroundImage()
@@ -44,6 +45,10 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <a href="https://illusions.app" class="btn btn-secondary" target="_blank">
         <span class="btn-icon">${iconChrome}</span>
         Chrome版を開く
+      </a>
+      <a href="https://github.com/Iktahana/illusions" class="btn btn-secondary" target="_blank">
+        <span class="btn-icon">${iconGithub}</span>
+        GitHub
       </a>
     </div>
     <a href="/downloads/" class="all-downloads-link">すべてのダウンロード →</a>
