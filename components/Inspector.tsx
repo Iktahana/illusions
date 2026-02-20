@@ -7,6 +7,7 @@ import { useEditorMode } from "@/contexts/EditorModeContext";
 import HistoryPanel from "./HistoryPanel";
 
 import type { ProjectMode } from "@/lib/project-types";
+import type { LintIssue, Severity } from "@/lib/linting";
 
 type Tab = "ai" | "corrections" | "stats" | "history";
 
@@ -90,6 +91,10 @@ interface InspectorProps {
   currentContent?: string;
   // エディタ領域で差分を表示するコールバック
   onCompareInEditor?: (data: { snapshotContent: string; currentContent: string; label: string }) => void;
+  // リンティング結果
+  lintIssues?: LintIssue[];
+  onNavigateToIssue?: (issue: LintIssue) => void;
+  onApplyFix?: (issue: LintIssue) => void;
 }
 
 export default function Inspector({
@@ -115,6 +120,9 @@ export default function Inspector({
   activeFileName,
   currentContent = "",
   onCompareInEditor,
+  lintIssues,
+  onNavigateToIssue,
+  onApplyFix,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
   const projectMode = isProject ? (editorMode as ProjectMode) : null;
@@ -420,6 +428,9 @@ export default function Inspector({
            <CorrectionsPanel
              posHighlightEnabled={posHighlightEnabled}
              onPosHighlightEnabledChange={onPosHighlightEnabledChange}
+             lintIssues={lintIssues ?? []}
+             onNavigateToIssue={onNavigateToIssue}
+             onApplyFix={onApplyFix}
            />
          )}
          {activeTab === "stats" && (
@@ -467,18 +478,52 @@ function AIPanel() {
   );
 }
 
+/** Severity filter options for the corrections panel */
+type SeverityFilter = "all" | Severity;
+
 interface CorrectionsPanelProps {
   posHighlightEnabled: boolean;
   onPosHighlightEnabledChange?: (enabled: boolean) => void;
+  lintIssues: LintIssue[];
+  onNavigateToIssue?: (issue: LintIssue) => void;
+  onApplyFix?: (issue: LintIssue) => void;
+}
+
+/** Returns the display color class for a severity level */
+function severityColor(severity: Severity): string {
+  switch (severity) {
+    case "error":
+      return "bg-error";
+    case "warning":
+      return "bg-warning";
+    case "info":
+      return "bg-info";
+  }
 }
 
 function CorrectionsPanel({
   posHighlightEnabled,
   onPosHighlightEnabledChange,
+  lintIssues,
+  onNavigateToIssue,
+  onApplyFix,
 }: CorrectionsPanelProps) {
+  const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
+
+  const filteredIssues = severityFilter === "all"
+    ? lintIssues
+    : lintIssues.filter((issue) => issue.severity === severityFilter);
+
+  const filterOptions: { value: SeverityFilter; label: string }[] = [
+    { value: "all", label: "全て" },
+    { value: "error", label: "エラー" },
+    { value: "warning", label: "警告" },
+    { value: "info", label: "情報" },
+  ];
+
   return (
     <div className="space-y-3">
-      {/* 構文ハイライト開關 */}
+      {/* POS highlight toggle (existing feature) */}
       <div className="bg-background-secondary rounded-lg p-3 border border-border">
         <div className="flex items-center justify-between">
           <div>
@@ -509,11 +554,99 @@ function CorrectionsPanel({
         )}
       </div>
 
-      <h3 className="text-sm font-medium text-foreground-secondary">校正リスト</h3>
-
-      <div className="pt-2 text-center">
-        <p className="text-sm text-foreground-tertiary">校正機能は開発中です</p>
+      {/* Issue count summary */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-foreground-secondary">検出結果</h3>
+        <span className="text-xs text-foreground-tertiary">
+          {lintIssues.length}件の問題を検出
+        </span>
       </div>
+
+      {/* Severity filter buttons */}
+      <div className="flex gap-1">
+        {filterOptions.map((option) => (
+          <button
+            key={option.value}
+            onClick={() => setSeverityFilter(option.value)}
+            className={clsx(
+              "flex-1 px-2 py-1 text-xs font-medium rounded transition-colors",
+              severityFilter === option.value
+                ? "bg-accent text-white"
+                : "bg-background-secondary text-foreground-tertiary hover:text-foreground-secondary border border-border"
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Issue list */}
+      {filteredIssues.length === 0 ? (
+        <div className="pt-4 text-center">
+          <p className="text-sm text-foreground-tertiary">問題は検出されませんでした</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filteredIssues.map((issue, index) => (
+            <button
+              key={`${issue.ruleId}-${issue.from}-${issue.to}-${index}`}
+              type="button"
+              onClick={() => onNavigateToIssue?.(issue)}
+              className="w-full text-left bg-background-secondary rounded-lg p-3 border border-border hover:border-border-secondary transition-colors"
+            >
+              <div className="flex items-start gap-2">
+                {/* Severity indicator */}
+                <span
+                  className={clsx(
+                    "mt-1 w-2.5 h-2.5 rounded-full shrink-0",
+                    severityColor(issue.severity)
+                  )}
+                  title={issue.severity}
+                />
+                <div className="flex-1 min-w-0">
+                  {/* Japanese message */}
+                  <p className="text-sm text-foreground leading-snug">
+                    {issue.messageJa}
+                  </p>
+                  {/* Position info */}
+                  <p className="text-xs text-foreground-tertiary mt-1">
+                    位置: {issue.from}-{issue.to}
+                  </p>
+                  {/* Reference info */}
+                  {issue.reference && (
+                    <p className="text-xs text-foreground-tertiary mt-0.5">
+                      {issue.reference.standard}
+                      {issue.reference.section ? ` ${issue.reference.section}` : ""}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {/* Fix button */}
+              {issue.fix && (
+                <div className="mt-2 flex justify-end">
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onApplyFix?.(issue);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.stopPropagation();
+                        onApplyFix?.(issue);
+                      }
+                    }}
+                    className="inline-flex items-center px-2 py-1 text-xs font-medium text-accent hover:text-accent-hover bg-accent/10 hover:bg-accent/20 rounded transition-colors cursor-pointer"
+                  >
+                    修正: {issue.fix.labelJa}
+                  </span>
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
