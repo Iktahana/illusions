@@ -1587,6 +1587,7 @@ export default function EditorPage() {
                     case "explorer":
                       return (
                         <Explorer
+                          compactMode={compactMode}
                           content={content}
                           onChapterClick={handleChapterClick}
                           onInsertText={handleInsertText}
@@ -1651,6 +1652,7 @@ export default function EditorPage() {
 
         <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
           <TabBar
+            compactMode={compactMode}
             tabs={tabs}
             activeTabId={activeTabId}
             onSwitchTab={(tabId) => {
@@ -1732,6 +1734,7 @@ export default function EditorPage() {
             onToggleCollapse={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
           >
           <Inspector
+            compactMode={compactMode}
             wordCount={wordCount}
             charCount={charCount}
             selectedCharCount={selectedCharCount}
