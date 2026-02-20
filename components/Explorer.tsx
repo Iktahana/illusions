@@ -174,6 +174,7 @@ interface ExplorerProps {
   content?: string;
   onChapterClick?: (anchorId: string) => void;
   onInsertText?: (text: string) => void;
+  compactMode?: boolean;
   // 表示設定
   fontScale?: number;
   onFontScaleChange?: (scale: number) => void;
@@ -193,11 +194,12 @@ interface ExplorerProps {
   onShowParagraphNumbersChange?: (show: boolean) => void;
 }
 
-export default function Explorer({ 
-  className, 
-  content = "", 
-  onChapterClick, 
+export default function Explorer({
+  className,
+  content = "",
+  onChapterClick,
   onInsertText,
+  compactMode = false,
   fontScale = 100,
   onFontScaleChange,
   lineHeight = 1.8,
@@ -233,7 +235,7 @@ export default function Explorer({
   return (
     <aside className={clsx("h-full bg-background border-r border-border flex flex-col", className)}>
       {/* タブ */}
-      <div className="h-12 border-b border-border flex items-center">
+      <div className={clsx("border-b border-border flex items-center", compactMode ? "h-10" : "h-12")}>
         <button
           onClick={() => setActiveTab("chapters")}
           className={clsx(
@@ -277,10 +279,10 @@ export default function Explorer({
 
       {/* 内容 */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === "chapters" && <div className="p-4"><ChaptersPanel content={content} onChapterClick={onChapterClick} onInsertText={onInsertText} /></div>}
-        {activeTab === "settings" && <div className="p-4"><SettingsPanel /></div>}
+        {activeTab === "chapters" && <div className={compactMode ? "p-3" : "p-4"}><ChaptersPanel content={content} onChapterClick={onChapterClick} onInsertText={onInsertText} /></div>}
+        {activeTab === "settings" && <div className={compactMode ? "p-3" : "p-4"}><SettingsPanel /></div>}
         {activeTab === "style" && (
-          <div className="p-4">
+          <div className={compactMode ? "p-3" : "p-4"}>
             <StylePanel 
               fontScale={fontScale}
               onFontScaleChange={onFontScaleChange}
