@@ -14,6 +14,7 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
+/** Reusable confirmation dialog built on GlassDialog. */
 export default function ConfirmDialog({
   isOpen,
   title,
@@ -23,7 +24,7 @@ export default function ConfirmDialog({
   dangerous = false,
   onConfirm,
   onCancel,
-}: ConfirmDialogProps) {
+}: ConfirmDialogProps): React.JSX.Element {
   return (
     <GlassDialog isOpen={isOpen} onBackdropClick={onCancel} ariaLabel={title}>
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>

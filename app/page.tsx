@@ -1502,18 +1502,23 @@ export default function EditorPage() {
               const { projectId: pid } = confirmRemoveRecent;
               setConfirmRemoveRecent(null);
               void (async () => {
-                const storage = new ElectronStorageProvider();
-                await storage.initialize();
-                await storage.removeRecentProject(pid);
+                try {
+                  const storage = new ElectronStorageProvider();
+                  await storage.initialize();
+                  await storage.removeRecentProject(pid);
 
-                const updatedProjects = await storage.getRecentProjects();
-                const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
-                  projectId: p.id,
-                  name: p.name,
-                  lastAccessedAt: Date.now(),
-                  rootDirName: p.rootPath.split("/").pop(),
-                }));
-                setRecentProjects(entries);
+                  const updatedProjects = await storage.getRecentProjects();
+                  const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
+                    projectId: p.id,
+                    name: p.name,
+                    lastAccessedAt: Date.now(),
+                    rootDirName: p.rootPath.split("/").pop(),
+                  }));
+                  setRecentProjects(entries);
+                } catch (error) {
+                  console.error("Failed to remove recent project:", error);
+                  notificationManager.error("最近のプロジェクトの削除に失敗しました。");
+                }
               })();
             }
           }}
