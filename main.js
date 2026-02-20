@@ -27,9 +27,6 @@ if (app.isPackaged) {
   // Reinitialize module paths
   require('module').Module._initPaths()
 
-  console.log('[Main] Module paths configured for ASAR:')
-  console.log('  Unpacked:', unpackedPath)
-  console.log('  Packed:', packedPath)
 }
 
 const execFileAsync = promisify(execFile)
@@ -459,10 +456,6 @@ async function rebuildApplicationMenu() {
 // showWelcome: true の場合、自動復元をスキップしてウェルカム画面を表示する
 async function createWindow({ showWelcome = false } = {}) {
   const preloadPath = path.join(__dirname, 'preload.js')
-  console.log('[Main] __dirname:', __dirname)
-  console.log('[Main] Preload path:', preloadPath)
-  console.log('[Main] Preload exists:', require('fs').existsSync(preloadPath))
-  console.log('[Main] isDev:', isDev)
 
   const newWindow = new BrowserWindow({
     width: 1400,
@@ -785,10 +778,8 @@ ipcMain.handle('menu:sync-ui-state', async (_event, state) => {
 })
 
 ipcMain.handle('new-window', async () => {
-   console.log('[Main Process] Creating new window (welcome)...')
    // 新しいウィンドウを作成（ウェルカム画面を表示）
    const newWin = await createWindow({ showWelcome: true })
-   console.log('[Main Process] New window created:', newWin ? 'success' : 'failed')
    return newWin ? true : false
  })
 

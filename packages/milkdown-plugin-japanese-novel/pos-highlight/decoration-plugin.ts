@@ -10,7 +10,7 @@ import { Decoration, DecorationSet } from '@milkdown/prose/view';
 import type { Node as ProseMirrorNode } from '@milkdown/prose/model';
 import type { EditorView } from '@milkdown/prose/view';
 import { getNlpClient } from '@/lib/nlp-client/nlp-client';
-import type { Token as NlpToken, TokenizeProgress } from '@/lib/nlp-client/types';
+import type { Token as NlpToken } from '@/lib/nlp-client/types';
 import { getPosColor, DEFAULT_POS_COLORS } from './pos-colors';
 import type { PosColorConfig } from './types';
 
@@ -288,15 +288,10 @@ export function createPosHighlightPlugin(
           const uncachedParagraphs = visibleParagraphs.filter(p => !tokenCache.has(p.text));
 
           if (uncachedParagraphs.length > 0) {
-            console.log(`[PosHighlight] Tokenizing ${uncachedParagraphs.length} new paragraphs (${visibleParagraphs.length} visible, ${tokenCache.size} cached)`);
 
             try {
               const paragraphData = uncachedParagraphs.map(p => ({ pos: p.pos, text: p.text }));
-              const results = await nlpClient.tokenizeDocument(paragraphData, (progress: TokenizeProgress) => {
-                if (uncachedParagraphs.length > 20) {
-                  console.log(`[PosHighlight] Progress: ${progress.percentage}% (${progress.completed}/${progress.total})`);
-                }
-              });
+              const results = await nlpClient.tokenizeDocument(paragraphData);
 
               if (version !== processingVersion) return;
 
@@ -355,9 +350,6 @@ export function createPosHighlightPlugin(
           const tr = view.state.tr.setMeta(posHighlightKey, { decorations });
           view.dispatch(tr);
 
-          if (uncachedParagraphs.length > 0) {
-            console.log(`[PosHighlight] Done: ${decoratedCount}/${allParagraphs.length} paragraphs decorated, ${allDecorations.length} decorations`);
-          }
         }, debounceMs);
       }
 
@@ -370,7 +362,6 @@ export function createPosHighlightPlugin(
           if (state?.enabled !== prevPluginState?.enabled) {
             if (state?.enabled) {
               tokenCache.clear();
-              console.log('[PosHighlight] Enabled, scheduling update');
               scheduleViewportUpdate(view);
             }
             return;
@@ -379,7 +370,6 @@ export function createPosHighlightPlugin(
           // colors が変更された場合
           if (state?.enabled && JSON.stringify(state.colors) !== JSON.stringify(prevPluginState?.colors)) {
             tokenCache.clear();
-            console.log('[PosHighlight] Colors changed, scheduling update');
             scheduleViewportUpdate(view);
             return;
           }

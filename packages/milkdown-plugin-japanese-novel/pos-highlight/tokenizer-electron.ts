@@ -26,8 +26,6 @@ class ElectronTokenizer {
       return this.initPromise;
     }
     
-    console.log('[ElectronTokenizer] Initializing with dicPath:', dicPath);
-    
     this.initPromise = (async () => {
       try {
         // ステップ 1: kuromoji モジュールを読み込む（20%）
@@ -54,7 +52,6 @@ class ElectronTokenizer {
               callback?.onProgress?.(100, '初期化完了！');
               callback?.onComplete?.();
               
-              console.log('[ElectronTokenizer] Initialized successfully');
               resolve();
             }
           });

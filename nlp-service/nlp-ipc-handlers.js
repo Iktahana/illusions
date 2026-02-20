@@ -28,7 +28,6 @@ function getDefaultDicPath() {
     const kuromojiSrcDir = path.dirname(kuromojiPath);
     const kuromojiRoot = path.dirname(kuromojiSrcDir);
     const dicPath = path.join(kuromojiRoot, 'dict');
-    console.log('[NLP IPC] Resolved dictionary path:', dicPath);
     return dicPath;
   } catch (error) {
     console.error('[NLP IPC] Failed to resolve kuromoji path:', error);
@@ -49,7 +48,6 @@ async function ensureInitialized() {
  * Register all NLP-related IPC handlers
  */
 function registerNlpHandlers() {
-  console.log('[NLP IPC] Registering handlers...');
 
   /**
    * Initialize NLP service
@@ -74,18 +72,7 @@ function registerNlpHandlers() {
     try {
       await ensureInitialized();
 
-      console.log('[NLP DEBUG] 🔵 分析前 - フロントエンドから受信:', {
-        textLength: text.length,
-        textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
-        fullText: text
-      });
-
       const tokens = await nlpProcessor.tokenize(text);
-
-      console.log('[NLP DEBUG] 🟢 分析後 - フロントエンドへ返す結果:', {
-        tokensCount: tokens.length,
-        tokens: tokens
-      });
 
       return tokens;
     } catch (error) {
@@ -108,16 +95,6 @@ function registerNlpHandlers() {
 
       await ensureInitialized();
 
-      console.log('[NLP IPC] Tokenize document request:', {
-        paragraphsCount: paragraphs.length,
-        paragraphsPreview: paragraphs.slice(0, 3).map((p, i) => ({
-          index: i,
-          pos: p.pos,
-          textLength: p.text.length,
-          textPreview: p.text.substring(0, 50) + (p.text.length > 50 ? '...' : '')
-        }))
-      });
-
       // Process paragraphs with IPC progress reporting
       const results = [];
       const total = paragraphs.length;
@@ -136,11 +113,6 @@ function registerNlpHandlers() {
           });
         }
       }
-
-      console.log('[NLP IPC] Tokenize document response:', {
-        resultsCount: results.length,
-        totalTokens: results.reduce((sum, r) => sum + r.tokens.length, 0),
-      });
 
       return results;
     } catch (error) {
@@ -164,7 +136,6 @@ function registerNlpHandlers() {
     }
   });
 
-  console.log('[NLP IPC] Handlers registered successfully');
 }
 
 module.exports = { registerNlpHandlers };

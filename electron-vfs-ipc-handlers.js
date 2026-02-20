@@ -264,7 +264,6 @@ function registerVFSHandlers() {
     });
   });
 
-  console.log('[VFS IPC] VFS handlers registered');
 }
 
 module.exports = { registerVFSHandlers };
