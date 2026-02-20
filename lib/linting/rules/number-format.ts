@@ -282,7 +282,11 @@ export class NumberFormatRule extends AbstractLintRule {
     if (isVertical) {
       return this.checkArabicInVertical(text, config);
     }
-    return this.checkKanjiInHorizontal(text, config);
+    // Existing horizontal check
+    const issues = this.checkKanjiInHorizontal(text, config);
+    // NEW: comma formatting check for large numbers
+    issues.push(...this.checkCommaFormatting(text, config));
+    return issues;
   }
 
   // -------------------------------------------------------------------------
@@ -380,6 +384,55 @@ export class NumberFormatRule extends AbstractLintRule {
           label: `Replace with "${arabicStr}"`,
           labelJa: `「${arabicStr}」に置換`,
           replacement: arabicStr,
+        },
+      });
+    }
+
+    return issues;
+  }
+
+  // -------------------------------------------------------------------------
+  // Horizontal mode: comma formatting for large numbers
+  // -------------------------------------------------------------------------
+
+  /**
+   * Sub-check: Detect large Arabic numbers without comma separators.
+   * Numbers with 5+ digits should use comma formatting in horizontal writing.
+   * 4-digit numbers are skipped as they are often years.
+   *
+   * Reference: 文化庁「公用文作成の考え方」(2022)
+   */
+  private checkCommaFormatting(
+    text: string,
+    config: LintRuleConfig,
+  ): LintIssue[] {
+    const issues: LintIssue[] = [];
+    // Match sequences of 5+ digits (skip 4-digit as likely years)
+    const pattern = /\d{5,}/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = pattern.exec(text)) !== null) {
+      const matched = match[0];
+      const from = match.index;
+      const to = from + matched.length;
+
+      // Format with commas
+      const formatted = Number(matched).toLocaleString("en-US");
+
+      issues.push({
+        ruleId: this.id,
+        severity: config.severity,
+        message:
+          "Large numbers should use comma separators in horizontal writing.",
+        messageJa:
+          "文化庁「公用文作成の考え方」に基づき、横書きの大きな数字には桁区切りのカンマを使用してください",
+        from,
+        to,
+        reference: STANDARD_REF,
+        fix: {
+          label: `Format as "${formatted}"`,
+          labelJa: `「${formatted}」に置換`,
+          replacement: formatted,
         },
       });
     }
