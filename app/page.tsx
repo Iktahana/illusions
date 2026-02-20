@@ -440,7 +440,7 @@ export default function EditorPage() {
   } = useTextStatistics(content);
 
   // --- Linting hook ---
-  const { ruleRunner, lintIssues, handleLintIssuesUpdated, refreshLinting } = useLinting(
+  const { ruleRunner, lintIssues, isLinting, handleLintIssuesUpdated, refreshLinting } = useLinting(
     lintingEnabled,
     lintingRuleConfigs,
     editorViewInstance,
@@ -1068,6 +1068,7 @@ export default function EditorPage() {
             onNavigateToIssue={handleNavigateToIssue}
             onApplyFix={handleApplyFix}
             onRefreshLinting={refreshLinting}
+            isLinting={isLinting}
             activeLintIssueIndex={activeLintIssueIndex}
             onOpenLintingSettings={handleOpenLintingSettings}
             onApplyLintPreset={handleApplyLintPreset}

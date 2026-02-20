@@ -20,6 +20,7 @@ import { NotationConsistencyRule } from "@/lib/linting/rules/notation-consistenc
 export interface UseLintingResult {
   ruleRunner: RuleRunner;
   lintIssues: LintIssue[];
+  isLinting: boolean;
   handleLintIssuesUpdated: (issues: LintIssue[]) => void;
   refreshLinting: () => void;
 }
@@ -35,6 +36,7 @@ export function useLinting(
 ): UseLintingResult {
   const ruleRunnerRef = useRef<RuleRunner | null>(null);
   const [lintIssues, setLintIssues] = useState<LintIssue[]>([]);
+  const [isLinting, setIsLinting] = useState(false);
 
   // Lazily create and register all rules once
   if (!ruleRunnerRef.current) {
@@ -72,6 +74,7 @@ export function useLinting(
   const handleLintIssuesUpdated = useCallback((issues: LintIssue[]) => {
     if (!lintingEnabled) return;
     setLintIssues(issues);
+    setIsLinting(false);
   }, [lintingEnabled]);
 
   // Clear issues when linting is disabled
@@ -85,6 +88,7 @@ export function useLinting(
   const refreshLinting = useCallback(() => {
     if (!editorViewInstance || !lintingEnabled) return;
 
+    setIsLinting(true);
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
       ({ updateLintingSettings }) => {
         updateLintingSettings(editorViewInstance, {
@@ -94,12 +98,14 @@ export function useLinting(
       },
     ).catch((err) => {
       console.error("[useLinting] Failed to refresh linting:", err);
+      setIsLinting(false);
     });
   }, [editorViewInstance, lintingEnabled]);
 
   return {
     ruleRunner,
     lintIssues,
+    isLinting,
     handleLintIssuesUpdated,
     refreshLinting,
   };

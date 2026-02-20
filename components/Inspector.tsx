@@ -77,6 +77,7 @@ interface InspectorProps {
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
   onRefreshLinting?: () => void;
+  isLinting?: boolean;
   // Active lint issue (cursor sync)
   activeLintIssueIndex?: number | null;
   // Settings integration
@@ -110,6 +111,7 @@ export default function Inspector({
   onNavigateToIssue,
   onApplyFix,
   onRefreshLinting,
+  isLinting = false,
   activeLintIssueIndex,
   onOpenLintingSettings,
   onApplyLintPreset,
@@ -423,6 +425,7 @@ export default function Inspector({
              onNavigateToIssue={onNavigateToIssue}
              onApplyFix={onApplyFix}
              onRefreshLinting={onRefreshLinting}
+             isLinting={isLinting}
              activeLintIssueIndex={activeLintIssueIndex}
              onOpenLintingSettings={onOpenLintingSettings}
              onApplyLintPreset={onApplyLintPreset}
@@ -487,6 +490,7 @@ interface CorrectionsPanelProps {
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
   onRefreshLinting?: () => void;
+  isLinting?: boolean;
   activeLintIssueIndex?: number | null;
   onOpenLintingSettings?: () => void;
   onApplyLintPreset?: (presetId: string) => void;
@@ -517,6 +521,7 @@ function CorrectionsPanel({
   onNavigateToIssue,
   onApplyFix,
   onRefreshLinting,
+  isLinting = false,
   activeLintIssueIndex,
   onOpenLintingSettings,
   onApplyLintPreset,
@@ -597,11 +602,17 @@ function CorrectionsPanel({
           {onRefreshLinting && (
             <button
               onClick={onRefreshLinting}
-              className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
+              disabled={isLinting}
+              className={clsx(
+                "p-1 rounded transition-colors",
+                isLinting
+                  ? "text-accent cursor-wait"
+                  : "text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover"
+              )}
               title="全文を再検査"
               aria-label="全文を再検査"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className={clsx("w-3.5 h-3.5", isLinting && "animate-spin")} />
             </button>
           )}
         </div>
