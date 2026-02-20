@@ -4,6 +4,7 @@ import logoSvg from '/logo.svg?raw'
 import iconApple from '~icons/mdi/apple?raw'
 import iconWindows from '~icons/mdi/microsoft-windows?raw'
 import iconChrome from '~icons/mdi/google-chrome?raw'
+import iconGithub from '~icons/mdi/github?raw'
 
 // ランダムな背景画像を取得
 const bgImageUrl = getRandomBackgroundImage()
@@ -30,7 +31,6 @@ const downloadLabel = isApple ? 'macOS版をダウンロード' : 'Windows版を
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div class="hero">
-    <div class="logo">✨</div>
     <div class="title-logo">${logoSvg}</div>
     <p class="tagline">
       縦書き、ルビ、縦中横、しっかり対応。<br/>
@@ -46,7 +46,12 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <span class="btn-icon">${iconChrome}</span>
         Chrome版を開く
       </a>
+      <a href="https://github.com/Iktahana/illusions" class="btn btn-secondary" target="_blank">
+        <span class="btn-icon">${iconGithub}</span>
+        GitHub
+      </a>
     </div>
+    <a href="/downloads/" class="all-downloads-link">すべてのダウンロード →</a>
 
     <div class="features">
       <div class="feature-card">
