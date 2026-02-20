@@ -26,7 +26,10 @@ export const FEATURED_JAPANESE_FONTS: FontInfo[] = [
   { family: 'Noto Serif JP', localizedName: 'Noto 明朝', category: 'serif' },
   { family: 'Noto Sans JP', localizedName: 'Noto ゴシック', category: 'sans-serif' },
   { family: 'Shippori Mincho', localizedName: 'しっぽり明朝', category: 'serif' },
+  { family: 'Zen Old Mincho', localizedName: '禅オールド明朝', category: 'serif' },
   { family: 'Zen Kaku Gothic New', localizedName: '禅角ゴシック New', category: 'sans-serif' },
+  { family: 'BIZ UDMincho', localizedName: 'BIZ UD明朝', category: 'serif' },
+  { family: 'Klee One', localizedName: 'クレー One', category: 'handwriting' },
   { family: 'M PLUS Rounded 1c', localizedName: 'Mプラス 丸ゴシック 1c', category: 'sans-serif' },
 ];
 

@@ -5,6 +5,7 @@ import { X, ExternalLink, ChevronDown, ChevronRight, AlertCircle } from "lucide-
 import type { Severity } from "@/lib/linting/types";
 import ColorPicker from "./ColorPicker";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
+import { FEATURED_JAPANESE_FONTS } from "@/lib/fonts";
 const LICENSE_TEXT = process.env.NEXT_PUBLIC_LICENSE_TEXT || "";
 const TERMS_TEXT = process.env.NEXT_PUBLIC_TERMS_TEXT || "";
 
@@ -72,15 +73,6 @@ interface SettingsModalProps {
 }
 
 type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "about";
-
-const FONT_FAMILIES = [
-  { value: "Noto Serif JP", label: "Noto Serif JP" },
-  { value: "Noto Sans JP", label: "Noto Sans JP" },
-  { value: "Shippori Mincho", label: "Shippori Mincho" },
-  { value: "Zen Old Mincho", label: "Zen Old Mincho" },
-  { value: "BIZ UDMincho", label: "BIZ UDMincho" },
-  { value: "Klee One", label: "Klee One" },
-];
 
 const SCROLL_BEHAVIORS = [
   {
@@ -304,9 +296,9 @@ export default function SettingsModal({
                     onChange={(e) => onFontFamilyChange(e.target.value)}
                     className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                   >
-                    {FONT_FAMILIES.map((font) => (
-                      <option key={font.value} value={font.value}>
-                        {font.label}
+                    {FEATURED_JAPANESE_FONTS.map((font) => (
+                      <option key={font.family} value={font.family}>
+                        {font.localizedName ? `${font.family} (${font.localizedName})` : font.family}
                       </option>
                     ))}
                   </select>
