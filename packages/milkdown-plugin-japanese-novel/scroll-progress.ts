@@ -1,13 +1,14 @@
 /**
- * 滾動進度抽象層
- * 
- * 統一處理橫排/豎排的滾動進度，提供 0-1 的進度值：
- * - 0% = 文章開頭
- * - 100% = 文章末尾
- * 
- * 內部處理：
- * - 橫排 (horizontal-tb): 使用 scrollTop，0=開頭，max=末尾
- * - 豎排 (vertical-rl): 使用 scrollLeft，max=開頭，0=末尾
+ * Scroll progress abstraction layer
+ *
+ * Unified handling of scroll progress for horizontal/vertical writing modes,
+ * providing a 0-1 progress value:
+ * - 0% = beginning of document
+ * - 100% = end of document
+ *
+ * Internal handling:
+ * - Horizontal writing mode (horizontal-tb): uses scrollTop, 0=beginning, max=end
+ * - Vertical writing mode (vertical-rl): uses scrollLeft, max=beginning, 0=end
  */
 
 export interface ScrollProgressOptions {
@@ -16,21 +17,21 @@ export interface ScrollProgressOptions {
 }
 
 /**
- * 獲取當前閱讀進度 (0-1)
- * 
- * @param options.container - 滾動容器元素
- * @param options.isVertical - 是否為豎排模式
- * @returns 進度值 0-1，0=開頭，1=末尾
- * 
+ * Get current reading progress (0-1)
+ *
+ * @param options.container - Scroll container element
+ * @param options.isVertical - Whether in vertical writing mode
+ * @returns Progress value 0-1, 0=beginning, 1=end
+ *
  * @example
  * const progress = getScrollProgress({ container, isVertical: true });
- * // 豎排模式下，scrollLeft=maxScroll 返回 0，scrollLeft=0 返回 1
+ * // In vertical mode, scrollLeft=maxScroll returns 0, scrollLeft=0 returns 1
  */
 export function getScrollProgress({ container, isVertical }: ScrollProgressOptions): number {
   if (isVertical) {
-    // 豎排：使用 scrollLeft（橫向滾動條）
-    // scrollLeft = maxScroll 是開頭 (0%)
-    // scrollLeft = 0 是末尾 (100%)
+    // Vertical writing mode: uses scrollLeft (horizontal scrollbar)
+    // scrollLeft = maxScroll is the beginning (0%)
+    // scrollLeft = 0 is the end (100%)
     const maxScroll = container.scrollWidth - container.clientWidth;
     if (maxScroll <= 0) return 0;
     
@@ -46,9 +47,9 @@ export function getScrollProgress({ container, isVertical }: ScrollProgressOptio
     
     return progress;
   } else {
-    // 橫排：使用 scrollTop（豎向滾動條）
-    // scrollTop = 0 是開頭 (0%)
-    // scrollTop = maxScroll 是末尾 (100%)
+    // Horizontal writing mode: uses scrollTop (vertical scrollbar)
+    // scrollTop = 0 is the beginning (0%)
+    // scrollTop = maxScroll is the end (100%)
     const maxScroll = container.scrollHeight - container.clientHeight;
     if (maxScroll <= 0) return 0;
     
@@ -67,28 +68,28 @@ export function getScrollProgress({ container, isVertical }: ScrollProgressOptio
 }
 
 /**
- * 設置閱讀進度 (0-1)
- * 
- * @param options.container - 滾動容器元素
- * @param options.isVertical - 是否為豎排模式
- * @param progress - 目標進度值 0-1，0=開頭，1=末尾
- * @returns 是否成功設置（如果沒有滾動條則返回 false）
- * 
+ * Set reading progress (0-1)
+ *
+ * @param options.container - Scroll container element
+ * @param options.isVertical - Whether in vertical writing mode
+ * @param progress - Target progress value 0-1, 0=beginning, 1=end
+ * @returns Whether the progress was set successfully (returns false if no scrollbar)
+ *
  * @example
  * setScrollProgress({ container, isVertical: true }, 0.5);
- * // 豎排模式下，設置到 50% 位置
+ * // In vertical mode, sets to the 50% position
  */
 export function setScrollProgress(
   { container, isVertical }: ScrollProgressOptions,
   progress: number
 ): boolean {
-  // 確保進度值在 0-1 範圍內
+  // Clamp progress value to the 0-1 range
   const clampedProgress = Math.max(0, Math.min(1, progress));
   
   if (isVertical) {
-    // 豎排：使用 scrollLeft
-    // progress = 0% → scrollLeft = maxScroll (開頭/右邊)
-    // progress = 100% → scrollLeft = 0 (末尾/左邊)
+    // Vertical writing mode: uses scrollLeft
+    // progress = 0% -> scrollLeft = maxScroll (beginning/right)
+    // progress = 100% -> scrollLeft = 0 (end/left)
     const maxScroll = container.scrollWidth - container.clientWidth;
     if (maxScroll <= 0) return false;
     
@@ -112,9 +113,9 @@ export function setScrollProgress(
     
     return true;
   } else {
-    // 橫排：使用 scrollTop
-    // progress = 0% → scrollTop = 0 (開頭/頂部)
-    // progress = 100% → scrollTop = maxScroll (末尾/底部)
+    // Horizontal writing mode: uses scrollTop
+    // progress = 0% -> scrollTop = 0 (beginning/top)
+    // progress = 100% -> scrollTop = maxScroll (end/bottom)
     const maxScroll = container.scrollHeight - container.clientHeight;
     if (maxScroll <= 0) return false;
     
@@ -141,25 +142,25 @@ export function setScrollProgress(
 }
 
 /**
- * 計算鏡像進度
- * 用於模式切換時保持視覺位置
- * 
- * @param progress - 原始進度 0-1
- * @returns 鏡像進度 (1 - progress)
- * 
+ * Calculate mirrored progress
+ * Used to maintain visual position during mode switch
+ *
+ * @param progress - Original progress 0-1
+ * @returns Mirrored progress (1 - progress)
+ *
  * @example
- * getMirroredProgress(0.3) // 返回 0.7
+ * getMirroredProgress(0.3) // returns 0.7
  */
 export function getMirroredProgress(progress: number): number {
   return 1 - progress;
 }
 
 /**
- * 獲取最大滾動值
- * 
- * @param options.container - 滾動容器元素
- * @param options.isVertical - 是否為豎排模式
- * @returns 最大滾動值（像素）
+ * Get maximum scroll value
+ *
+ * @param options.container - Scroll container element
+ * @param options.isVertical - Whether in vertical writing mode
+ * @returns Maximum scroll value (in pixels)
  */
 export function getMaxScroll({ container, isVertical }: ScrollProgressOptions): number {
   if (isVertical) {
@@ -170,22 +171,22 @@ export function getMaxScroll({ container, isVertical }: ScrollProgressOptions): 
 }
 
 /**
- * 檢查是否有滾動條
- * 
- * @param options.container - 滾動容器元素
- * @param options.isVertical - 是否為豎排模式
- * @returns 是否有滾動條
+ * Check if a scrollbar exists
+ *
+ * @param options.container - Scroll container element
+ * @param options.isVertical - Whether in vertical writing mode
+ * @returns Whether a scrollbar exists
  */
 export function hasScrollbar({ container, isVertical }: ScrollProgressOptions): boolean {
   return getMaxScroll({ container, isVertical }) > 0;
 }
 
 /**
- * 跳到文章開頭 (0%)
- * 
- * @param options.container - 滾動容器元素
- * @param options.isVertical - 是否為豎排模式
- * @returns 是否成功
+ * Jump to the beginning of the document (0%)
+ *
+ * @param options.container - Scroll container element
+ * @param options.isVertical - Whether in vertical writing mode
+ * @returns Whether the operation succeeded
  */
 export function scrollToStart({ container, isVertical }: ScrollProgressOptions): boolean {
   // console.debug('[ScrollProgress] Scroll to start');
@@ -193,11 +194,11 @@ export function scrollToStart({ container, isVertical }: ScrollProgressOptions):
 }
 
 /**
- * 跳到文章末尾 (100%)
- * 
- * @param options.container - 滾動容器元素
- * @param options.isVertical - 是否為豎排模式
- * @returns 是否成功
+ * Jump to the end of the document (100%)
+ *
+ * @param options.container - Scroll container element
+ * @param options.isVertical - Whether in vertical writing mode
+ * @returns Whether the operation succeeded
  */
 export function scrollToEnd({ container, isVertical }: ScrollProgressOptions): boolean {
   // console.debug('[ScrollProgress] Scroll to end');
@@ -205,16 +206,16 @@ export function scrollToEnd({ container, isVertical }: ScrollProgressOptions): b
 }
 
 /**
- * 按百分比滾動
- * 
- * @param options.container - 滾動容器元素
- * @param options.isVertical - 是否為豎排模式
- * @param delta - 滾動的百分比增量，正數向末尾滾動，負數向開頭滾動
- * @returns 是否成功
- * 
+ * Scroll by percentage
+ *
+ * @param options.container - Scroll container element
+ * @param options.isVertical - Whether in vertical writing mode
+ * @param delta - Percentage increment to scroll; positive scrolls toward end, negative toward beginning
+ * @returns Whether the operation succeeded
+ *
  * @example
- * scrollByPercent({ container, isVertical }, 0.1);  // 向末尾滾動 10%
- * scrollByPercent({ container, isVertical }, -0.05); // 向開頭滾動 5%
+ * scrollByPercent({ container, isVertical }, 0.1);  // scroll 10% toward end
+ * scrollByPercent({ container, isVertical }, -0.05); // scroll 5% toward beginning
  */
 export function scrollByPercent(
   { container, isVertical }: ScrollProgressOptions,

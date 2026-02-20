@@ -35,7 +35,7 @@ export default function SearchResults({
   useEffect(() => {
     if (!editorView || !searchTerm) {
       setMatches([]);
-      // 清除高亮
+      // Clear highlights
       if (editorView) {
         const { state, dispatch } = editorView;
         const tr = state.tr.setMeta("searchDecorations", []);
@@ -49,7 +49,7 @@ export default function SearchResults({
     const foundMatches: SearchMatch[] = [];
     const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
 
-    // 文檔全文搜索
+    // Full document text search
     const fullText = doc.textContent;
     const searchText = caseSensitive ? fullText : fullText.toLowerCase();
     
@@ -58,12 +58,12 @@ export default function SearchResults({
       const matchIndex = searchText.indexOf(searchStr, searchIndex);
       if (matchIndex === -1) break;
 
-      // 將文本位置轉換為文檔位置
+      // Convert text position to document position
       let pos = 0;
       let textOffset = 0;
       
       doc.descendants((node, nodePos) => {
-        if (pos !== 0) return false; // 已找到，停止遍歷
+        if (pos !== 0) return false; // Found, stop traversal
         
         if (node.isText && node.text) {
           const nodeEnd = textOffset + node.text.length;
@@ -84,7 +84,7 @@ export default function SearchResults({
 
     setMatches(foundMatches);
 
-    // 應用高亮裝飾
+    // Apply highlight decorations
     const decorations: Decoration[] = foundMatches.map((m) =>
       Decoration.inline(m.from, m.to, {
         class: "search-result",
@@ -93,7 +93,7 @@ export default function SearchResults({
     const tr = state.tr.setMeta("searchDecorations", decorations);
     dispatch(tr);
   }, [searchTerm, caseSensitive, editorView]);
-  // 获取匹配项的上下文文本
+  // Get context text for match
   const getMatchContext = (match: SearchMatch): { before: string; text: string; after: string } => {
     if (!editorView) {
       return { before: "", text: "", after: "" };
@@ -102,10 +102,10 @@ export default function SearchResults({
     const { state } = editorView;
     const { doc } = state;
     
-    // 获取匹配文本
+    // Get match text
     const matchText = doc.textBetween(match.from, match.to);
     
-    // 获取前后文本（各30个字符）
+    // Get surrounding text (30 characters before and after)
     const contextLength = 30;
     const beforeStart = Math.max(0, match.from - contextLength);
     const afterEnd = Math.min(doc.content.size, match.to + contextLength);
@@ -120,13 +120,13 @@ export default function SearchResults({
     };
   };
 
-  // 跳轉到指定匹配項並高亮
+  // Jump to specified match and highlight
   const goToMatch = (match: SearchMatch, index: number) => {
     if (!editorView) return;
 
     const { state, dispatch } = editorView;
     
-    // 創建裝飾，將這個匹配項標記為當前項
+    // Create decoration to mark this match as current
     const decorations: Decoration[] = [];
     matches.forEach((m, i) => {
       const isCurrentMatch = i === index;
@@ -137,10 +137,10 @@ export default function SearchResults({
       );
     });
 
-    // 使用 meta 傳遞裝飾信息
+    // Pass decoration info via meta
     const tr = state.tr.setMeta("searchDecorations", decorations);
     
-    // 滾動到匹配項（不選中文字，只移動光標）
+    // Scroll to match (don't select text, just move cursor)
     const scrollTr = tr.setSelection(TextSelection.create(tr.doc, match.from, match.from))
       .scrollIntoView();
     
@@ -148,7 +148,7 @@ export default function SearchResults({
     editorView.focus();
   };
 
-  // 替換單個匹配項
+  // Replace single match
   const replaceMatch = (match: SearchMatch) => {
     if (!editorView) return;
 
@@ -160,21 +160,21 @@ export default function SearchResults({
     );
     dispatch(tr);
 
-    // 重新搜索
+    // Re-search
     setTimeout(() => {
       setSearchTerm(searchTerm + " ");
       setTimeout(() => setSearchTerm(searchTerm.trim()), 0);
     }, 100);
   };
 
-  // 替換所有匹配項
+  // Replace all matches
   const replaceAllMatches = () => {
     if (!editorView || matches.length === 0) return;
 
     const { state, dispatch } = editorView;
     let tr = state.tr;
 
-    // 從後往前替換，避免位置偏移
+    // Replace from end to start to avoid position shift
     for (let i = matches.length - 1; i >= 0; i--) {
       const match = matches[i];
       tr = tr.replaceWith(
@@ -186,7 +186,7 @@ export default function SearchResults({
 
     dispatch(tr);
 
-    // 清空搜索
+    // Clear search
     setMatches([]);
     setSearchTerm("");
     setReplaceTerm("");
@@ -194,7 +194,7 @@ export default function SearchResults({
 
   return (
     <div className="h-full bg-background-secondary border-r border-border flex flex-col">
-      {/* 标题栏 */}
+      {/* Title bar */}
       <div className="p-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Search className="w-5 h-5 text-foreground-secondary" />
@@ -209,9 +209,9 @@ export default function SearchResults({
         </button>
       </div>
 
-      {/* 搜索輸入區域 */}
+      {/* Search input area */}
       <div className="p-4 border-b border-border space-y-3">
-        {/* 搜索框 */}
+        {/* Search box */}
         <div>
           <input
             ref={searchInputRef}
@@ -223,7 +223,7 @@ export default function SearchResults({
           />
         </div>
 
-        {/* 選項 */}
+        {/* Options */}
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 text-xs text-foreground-secondary cursor-pointer">
             <input
@@ -241,7 +241,7 @@ export default function SearchResults({
           )}
         </div>
 
-        {/* 替換開關 */}
+        {/* Replace toggle */}
         <button
           onClick={() => setShowReplace(!showReplace)}
           className="w-full flex items-center justify-between px-3 py-2 text-sm text-foreground-secondary hover:bg-hover rounded transition-colors"
@@ -252,7 +252,7 @@ export default function SearchResults({
           </div>
         </button>
 
-        {/* 替換區域 */}
+        {/* Replace area */}
         {showReplace && (
           <div className="space-y-2 pl-6">
             <input
@@ -281,7 +281,7 @@ export default function SearchResults({
         )}
       </div>
 
-      {/* 结果列表 */}
+      {/* Results list */}
       <div className="flex-1 overflow-y-auto">
         {searchTerm && matches.length === 0 ? (
           <div className="p-4 text-center text-foreground-secondary">

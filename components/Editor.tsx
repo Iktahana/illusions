@@ -140,23 +140,18 @@ export default function NovelEditor({
     }
   }, [searchOpenTrigger]);
 
-  // 儲存切換前的滾動進度（0-1）
+  // Save scroll progress (0-1) before mode switch
   const savedScrollProgressRef = useRef<number>(0);
   
-  // 模式切換時保存當前滾動進度
+  // Save current scroll progress on mode switch
   const handleToggleVertical = useCallback(() => {
     const container = scrollContainerRef.current;
     if (container) {
-      // 使用抽象層獲取當前進度
+      // Get current progress via abstraction layer
       const progress = getScrollProgress({ container, isVertical });
 
-      // 保存進度
+      // Save progress
       savedScrollProgressRef.current = progress;
-
-      console.log('[DEBUG] Toggle - Save progress:', {
-        mode: isVertical ? '豎→橫' : '橫→豎',
-        progress
-      });
 
       // Mark that scroll position needs restoration after mode switch
       isModeSwitchingRef.current = true;
@@ -259,7 +254,7 @@ export default function NovelEditor({
         style={{
           overflowX: 'auto',
           overflowY: 'auto',
-          // 禁用瀏覽器的滾動錨定行為，避免在豎排模式下 DOM 更新時自動調整滾動位置
+          // Disable browser scroll anchoring to prevent auto-scroll adjustment during DOM updates in vertical mode
           overflowAnchor: 'none',
         }}
       >
@@ -801,7 +796,7 @@ function MilkdownEditor({
       }
     };
     
-    // 排版完成後的滾動處理回調
+    // Scroll handling callback after layout completes
     let onLayoutCompleteCallback: (() => void) | null = null;
 
     // Restore scroll position after layout completes (mode switch or first render)
@@ -816,21 +811,10 @@ function MilkdownEditor({
         // Mode switch: restore saved progress
         const savedProgress = savedScrollProgressRef.current ?? 0;
 
-        console.log('[DEBUG] Apply scroll after layout (mode switch):', {
-          isVertical,
-          savedProgress
-        });
-
         const success = setScrollProgress({ container, isVertical }, savedProgress);
 
         // Update the saved position for auto-scroll prevention
         savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
-
-        if (success) {
-          console.log('[DEBUG] Scroll applied successfully');
-        } else {
-          console.log('[DEBUG] No scrollbar, skip scroll');
-        }
 
         // Delay clearing the flag with double rAF to outlast any browser auto-scroll or ProseMirror focus management
         requestAnimationFrame(() => {
@@ -845,7 +829,7 @@ function MilkdownEditor({
       }
     };
     
-    // 設置排版完成回調
+    // Set layout completion callback
     onLayoutCompleteCallback = handleScrollAfterLayout;
 
     if (shouldAnimate) {
@@ -855,7 +839,7 @@ function MilkdownEditor({
 
       // DOMの準備とフェードアウト完了を待って適用
       const timer = setTimeout(() => {
-        applyStyles(); // applyStyles 內部會在排版完成後調用 onLayoutCompleteCallback
+        applyStyles(); // applyStyles will call onLayoutCompleteCallback after layout completes
 
         // 適用後にフェードイン
         requestAnimationFrame(() => {
@@ -870,7 +854,7 @@ function MilkdownEditor({
       };
     } else {
       // アニメーションなしで即時適用
-      applyStyles(); // applyStyles 內部會在排版完成後調用 onLayoutCompleteCallback
+      applyStyles(); // applyStyles will call onLayoutCompleteCallback after layout completes
       editorDom.style.opacity = '1';
     }
   }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get, savedScrollProgressRef, isModeSwitchingRef]);
