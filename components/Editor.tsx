@@ -658,29 +658,29 @@ function MilkdownEditor({
     // 選択変更を購読
     const editorDom = editorViewInstance.dom;
 
-    const handleMouseUp = () => {
-      setTimeout(updateSelectionCount, 10);
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+
+    const scheduleUpdate = () => {
+      const id = setTimeout(() => {
+        timers.delete(id);
+        updateSelectionCount();
+      }, 10);
+      timers.add(id);
     };
 
-    const handleKeyUp = () => {
-      setTimeout(updateSelectionCount, 10);
-    };
-
-    const handleSelectionChange = () => {
-      setTimeout(updateSelectionCount, 10);
-    };
-
-    editorDom.addEventListener("mouseup", handleMouseUp);
-    editorDom.addEventListener("keyup", handleKeyUp);
-    document.addEventListener("selectionchange", handleSelectionChange);
+    editorDom.addEventListener("mouseup", scheduleUpdate);
+    editorDom.addEventListener("keyup", scheduleUpdate);
+    document.addEventListener("selectionchange", scheduleUpdate);
 
     // 初期値
     updateSelectionCount();
 
     return () => {
-      editorDom.removeEventListener("mouseup", handleMouseUp);
-      editorDom.removeEventListener("keyup", handleKeyUp);
-      document.removeEventListener("selectionchange", handleSelectionChange);
+      editorDom.removeEventListener("mouseup", scheduleUpdate);
+      editorDom.removeEventListener("keyup", scheduleUpdate);
+      document.removeEventListener("selectionchange", scheduleUpdate);
+      timers.forEach(clearTimeout);
+      timers.clear();
     };
   }, [editorViewInstance]);
 
