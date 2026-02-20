@@ -48,3 +48,25 @@ export interface LintRule {
   /** Run the rule on text, return issues found */
   lint(text: string, config: LintRuleConfig): LintIssue[];
 }
+
+/**
+ * A document-level lint rule that analyzes all paragraphs together.
+ * Used for cross-paragraph checks like notation consistency.
+ */
+export interface DocumentLintRule extends LintRule {
+  /**
+   * Run the rule on the entire document.
+   * @param paragraphs All paragraphs with their text and index
+   * @param config Rule configuration
+   * @returns Issues grouped by paragraph index
+   */
+  lintDocument(
+    paragraphs: ReadonlyArray<{ text: string; index: number }>,
+    config: LintRuleConfig,
+  ): Array<{ paragraphIndex: number; issues: LintIssue[] }>;
+}
+
+/** Type guard for DocumentLintRule */
+export function isDocumentLintRule(rule: LintRule): rule is DocumentLintRule {
+  return "lintDocument" in rule;
+}

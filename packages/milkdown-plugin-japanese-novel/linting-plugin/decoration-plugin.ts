@@ -3,6 +3,7 @@
  * リンティング結果をエディタ内にデコレーションとして表示するプラグイン
  *
  * Follows the same viewport-aware, cached pattern as the POS highlight plugin.
+ * Supports both per-paragraph rules and document-level rules.
  */
 
 import { Plugin, PluginKey } from '@milkdown/prose/state';
@@ -194,6 +195,10 @@ export function createLintingPlugin(
   // Minimizes rule execution and prevents flicker on scroll
   const issueCache = new Map<string, LintIssue[]>();
 
+  // Document-level rule cache: paragraph index -> LintIssue[]
+  // Invalidated on every update since document-level rules depend on all paragraphs
+  let documentIssueCache: Map<number, LintIssue[]> | null = null;
+
   return new Plugin<LintingPluginState>({
     key: lintingKey,
 
@@ -218,10 +223,12 @@ export function createLintingPlugin(
             currentRuleRunner = meta.ruleRunner ?? null;
             // Clear cache when runner changes (rules may have changed)
             issueCache.clear();
+            documentIssueCache = null;
           }
           // enabled/disabled change
           if (meta.enabled !== undefined) {
             issueCache.clear();
+            documentIssueCache = null;
           }
           const updated: LintingPluginState = {
             decorations: pluginState.decorations,
@@ -276,6 +283,7 @@ export function createLintingPlugin(
       /**
        * Process only viewport-visible paragraphs.
        * Cached paragraphs skip rule execution; only decorations are rebuilt.
+       * Document-level rules are recomputed on every update.
        */
       function scheduleViewportUpdate(view: EditorView): void {
         if (debounceTimer) clearTimeout(debounceTimer);
@@ -289,11 +297,10 @@ export function createLintingPlugin(
           const allParagraphs = collectParagraphs(view.state.doc);
           const visibleParagraphs = getVisibleParagraphs(view, allParagraphs, 2);
 
-          // Process uncached visible paragraphs
+          // Process uncached visible paragraphs (per-paragraph rules)
           const uncachedParagraphs = visibleParagraphs.filter(p => !issueCache.has(p.text));
 
           if (uncachedParagraphs.length > 0) {
-
             for (const paragraph of uncachedParagraphs) {
               if (version !== processingVersion) return;
               const issues = currentRuleRunner.runAll(paragraph.text);
@@ -303,17 +310,39 @@ export function createLintingPlugin(
 
           if (version !== processingVersion) return;
 
+          // Run document-level rules on all paragraphs (always recompute)
+          // Document-level rules are fast (L1/L2) so recomputing is acceptable
+          documentIssueCache = null;
+          if (currentRuleRunner.hasDocumentRules()) {
+            documentIssueCache = currentRuleRunner.runDocument(
+              allParagraphs.map(p => ({ text: p.text, index: p.index }))
+            );
+          }
+
+          if (version !== processingVersion) return;
+
           // Build decorations from all paragraphs that have cached results
           const allDecorations: Decoration[] = [];
           const allIssues: LintIssue[] = [];
-          let decoratedCount = 0;
 
           for (const paragraph of allParagraphs) {
-            const issues = issueCache.get(paragraph.text);
-            if (!issues) continue;
-            decoratedCount++;
+            // Per-paragraph issues from cache
+            const perParagraphIssues = issueCache.get(paragraph.text);
+            // Document-level issues for this paragraph
+            const docLevelIssues = documentIssueCache?.get(paragraph.index);
 
-            for (const issue of issues) {
+            // Combine both sources of issues
+            const combinedIssues: LintIssue[] = [];
+            if (perParagraphIssues) {
+              combinedIssues.push(...perParagraphIssues);
+            }
+            if (docLevelIssues) {
+              combinedIssues.push(...docLevelIssues);
+            }
+
+            if (combinedIssues.length === 0) continue;
+
+            for (const issue of combinedIssues) {
               const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
               const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
               const from = paragraph.pos + 1 + issue.from + extraFrom;
@@ -357,6 +386,7 @@ export function createLintingPlugin(
           if (state?.enabled !== prevPluginState?.enabled) {
             if (state?.enabled) {
               issueCache.clear();
+              documentIssueCache = null;
               scheduleViewportUpdate(view);
             }
             return;
@@ -374,6 +404,7 @@ export function createLintingPlugin(
           if (scrollTimer) clearTimeout(scrollTimer);
           scrollContainer.removeEventListener('scroll', handleScroll);
           issueCache.clear();
+          documentIssueCache = null;
         },
       };
     },
