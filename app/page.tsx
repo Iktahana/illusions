@@ -195,6 +195,7 @@ export default function EditorPage() {
   const [compactMode, setCompactMode] = useState(false);
   const [showRubyDialog, setShowRubyDialog] = useState(false);
   const [rubySelectedText, setRubySelectedText] = useState("");
+  const rubySelectionRef = useRef<{ from: number; to: number } | null>(null);
   const [editorDiff, setEditorDiff] = useState<{ snapshotContent: string; currentContent: string; label: string } | null>(null);
   const [topView, setTopView] = useState<ActivityBarView>("explorer");
   const [bottomView, setBottomView] = useState<ActivityBarView>("none");
@@ -564,6 +565,7 @@ export default function EditorPage() {
     if (from === to) return; // No selection
     const text = state.doc.textBetween(from, to);
     if (!text.trim()) return;
+    rubySelectionRef.current = { from, to };
     setRubySelectedText(text);
     setShowRubyDialog(true);
   }, [editorViewInstance]);
@@ -571,10 +573,12 @@ export default function EditorPage() {
   /** Apply Ruby markup by replacing the editor selection */
   const handleApplyRuby = useCallback((rubyMarkup: string) => {
     if (!editorViewInstance) return;
+    const sel = rubySelectionRef.current;
+    if (!sel) return;
     const { state, dispatch } = editorViewInstance;
-    const { from, to } = state.selection;
-    const tr = state.tr.insertText(rubyMarkup, from, to);
+    const tr = state.tr.insertText(rubyMarkup, sel.from, sel.to);
     dispatch(tr);
+    rubySelectionRef.current = null;
   }, [editorViewInstance]);
 
   /** Wrap selected text with tcy (縦中横) syntax: ^text^ */
