@@ -1,4 +1,9 @@
-/** Shared types for editor-page hooks */
+/** Shared types and utilities for editor-page hooks */
+
+/** Count non-whitespace characters in a string */
+export function chars(s: string): number {
+  return s.replace(/\s/g, "").length;
+}
 
 /** Recent project entry for WelcomeScreen display */
 export interface RecentProjectEntry {

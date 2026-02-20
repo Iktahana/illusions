@@ -13,9 +13,7 @@ import type {
   ReadabilityAnalysis,
 } from "@/lib/utils";
 
-function chars(s: string): number {
-  return s.replace(/\s/g, "").length;
-}
+import { chars } from "./types";
 
 function words(s: string): number {
   return s.split(/\s+/).filter(Boolean).length;

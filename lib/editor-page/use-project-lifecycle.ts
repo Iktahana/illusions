@@ -8,11 +8,8 @@ import { isStandaloneMode } from "@/lib/project-types";
 import { getVFS } from "@/lib/vfs";
 
 import type { EditorMode, ProjectMode, StandaloneMode } from "@/lib/project-types";
+import { chars } from "./types";
 import type { RecentProjectEntry, PermissionPromptState } from "./types";
-
-function chars(s: string): number {
-  return s.replace(/\s/g, "").length;
-}
 
 interface UseProjectLifecycleParams {
   editorMode: EditorMode;
