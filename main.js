@@ -716,6 +716,8 @@ function isSavePathDenied(normalizedPath) {
   return false
 }
 
+const VALID_SAVE_FILE_TYPES = ['.mdi', '.md', '.txt']
+
 /**
  * Validate a file path provided by the renderer for the save-file IPC handler.
  * Returns an error object if validation fails, or null if the path is valid.
@@ -753,8 +755,6 @@ function validateSaveFilePath(filePath) {
 
   return null
 }
-
-const VALID_SAVE_FILE_TYPES = ['.mdi', '.md', '.txt']
 
 ipcMain.handle('save-file', async (_event, filePath, content, fileType) => {
   // Validate inputs
