@@ -15,10 +15,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          REPO=${{ github.repository }}
           PR_NUM=${{ github.event.pull_request.number }}
 
           # Dedup: skip if bot already commented on this PR
-          EXISTING=$(gh pr view "$PR_NUM" --json comments --jq \
+          EXISTING=$(gh pr view "$PR_NUM" --repo "$REPO" --json comments --jq \
             '[.comments[] | select(.body | contains("Copilot Review Ready"))] | length')
 
           if [ "$EXISTING" != "0" ]; then
@@ -26,7 +27,7 @@ jobs:
             exit 0
           fi
 
-          gh pr comment "$PR_NUM" --body "$(cat <<'EOF'
+          gh pr comment "$PR_NUM" --repo "$REPO" --body "$(cat <<'EOF'
           👋 **Copilot Review Ready**
 
           このPRをレビューするには、GitHub Copilot Chat で `@reviewer` を呼び出してください：
