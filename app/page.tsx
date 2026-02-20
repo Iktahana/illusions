@@ -13,6 +13,8 @@ import ActivityBar, { type ActivityBarView, isBottomView } from "@/components/Ac
 import SidebarSplitter from "@/components/SidebarSplitter";
 import SearchResults from "@/components/SearchResults";
 import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { notificationManager } from "@/lib/notification-manager";
 import UpgradeToProjectBanner from "@/components/UpgradeToProjectBanner";
 import { getProjectUpgradeService } from "@/lib/project-upgrade";
 import WordFrequency from "@/components/WordFrequency";
@@ -97,6 +99,7 @@ export default function EditorPage() {
   const [isRestoring, setIsRestoring] = useState(true);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const isAutoRestoringRef = useRef(false);
+  const [confirmRemoveRecent, setConfirmRemoveRecent] = useState<{ projectId: string; message: string } | null>(null);
   const [autoSave, setAutoSave] = useState(true); // Auto-save on by default
 
   const tabManager = useTabManager({ skipAutoRestore, autoSave });
@@ -1121,7 +1124,7 @@ export default function EditorPage() {
         const project = projects.find((p) => p.id === projectId);
         if (!project) {
           if (!isAutoRestoringRef.current) {
-            window.alert("このプロジェクトが見つかりませんでした。");
+            notificationManager.error("このプロジェクトが見つかりませんでした。");
           }
           return;
         }
@@ -1180,21 +1183,10 @@ export default function EditorPage() {
 
           // During auto-restore, suppress blocking dialogs (banner will show instead)
           if (!isAutoRestoringRef.current) {
-            if (isFileNotFound && window.confirm(message)) {
-              const storage = new ElectronStorageProvider();
-              await storage.initialize();
-              await storage.removeRecentProject(projectId);
-
-              const updatedProjects = await storage.getRecentProjects();
-              const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
-                projectId: p.id,
-                name: p.name,
-                lastAccessedAt: Date.now(),
-                rootDirName: p.rootPath.split("/").pop(),
-              }));
-              setRecentProjects(entries);
-            } else if (!isFileNotFound) {
-              window.alert(message);
+            if (isFileNotFound) {
+              setConfirmRemoveRecent({ projectId, message });
+            } else {
+              notificationManager.error(message);
             }
           }
         }
@@ -1208,7 +1200,7 @@ export default function EditorPage() {
       if (!restoreResult.success || !restoreResult.handle) {
         console.error("保存されたプロジェクトハンドルの復元に失敗しました:", restoreResult.error);
         if (!isAutoRestoringRef.current) {
-          window.alert("このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。");
+          notificationManager.error("このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。");
         }
         return;
       }
@@ -1293,7 +1285,7 @@ export default function EditorPage() {
       void window.electronAPI?.rebuildMenu?.();
     } catch (error) {
       console.error("[Open as Project] Failed to open project:", error);
-      window.alert("プロジェクトを開けませんでした。.illusionsフォルダが正しく設定されているか確認してください。");
+      notificationManager.error("プロジェクトを開けませんでした。.illusionsフォルダが正しく設定されているか確認してください。");
     }
   }, [setProjectMode, loadProjectContent]);
 
@@ -1491,6 +1483,42 @@ export default function EditorPage() {
           onSave={handleCloseTabSave}
           onDiscard={handleCloseTabDiscard}
           onCancel={handleCloseTabCancel}
+        />
+
+        {/* 最近のプロジェクト削除確認ダイアログ */}
+        <ConfirmDialog
+          isOpen={confirmRemoveRecent !== null}
+          title="プロジェクトが見つかりません"
+          message={confirmRemoveRecent?.message ?? ""}
+          confirmLabel="削除する"
+          cancelLabel="キャンセル"
+          dangerous={true}
+          onConfirm={() => {
+            if (confirmRemoveRecent) {
+              const { projectId: pid } = confirmRemoveRecent;
+              setConfirmRemoveRecent(null);
+              void (async () => {
+                try {
+                  const storage = new ElectronStorageProvider();
+                  await storage.initialize();
+                  await storage.removeRecentProject(pid);
+
+                  const updatedProjects = await storage.getRecentProjects();
+                  const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
+                    projectId: p.id,
+                    name: p.name,
+                    lastAccessedAt: Date.now(),
+                    rootDirName: p.rootPath.split("/").pop(),
+                  }));
+                  setRecentProjects(entries);
+                } catch (error) {
+                  console.error("Failed to remove recent project:", error);
+                  notificationManager.error("最近のプロジェクトの削除に失敗しました。");
+                }
+              })();
+            }
+          }}
+          onCancel={() => setConfirmRemoveRecent(null)}
         />
 
         {/* UpgradeBanner for standalone mode */}
