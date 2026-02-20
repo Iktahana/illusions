@@ -1315,37 +1315,16 @@ function ChapterItem({
 function SettingsPanel() {
   return (
     <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-foreground-secondary mb-2">
-          小説タイトル
-        </label>
-        <input
-          type="text"
-          placeholder="無題の小説"
-          className="w-full px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground"
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-foreground-secondary mb-2">
-          著者名
-        </label>
-        <input
-          type="text"
-          placeholder="著者名"
-          className="w-full px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground"
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-foreground-secondary mb-2">
-          あらすじ
-        </label>
-        <textarea
-          placeholder="小説の概要を入力..."
-          rows={4}
-          className="w-full px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent resize-none bg-background text-foreground"
-        />
+      <div className="bg-background-secondary rounded-lg p-4 border border-border">
+        <div className="flex items-start gap-3">
+          <Settings className="w-5 h-5 text-foreground-tertiary mt-0.5" />
+          <div>
+            <h3 className="text-sm font-medium text-foreground mb-1">プロジェクト設定</h3>
+            <p className="text-xs text-foreground-tertiary">
+              この機能は現在開発中です。今後のアップデートをお待ちください。
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
