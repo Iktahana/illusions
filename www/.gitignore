@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Build artifact (copied from ../TERMS.md by vite plugin)
+public/TERMS.md
