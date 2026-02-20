@@ -199,6 +199,9 @@ export function createLintingPlugin(
   // Invalidated on every update since document-level rules depend on all paragraphs
   let documentIssueCache: Map<number, LintIssue[]> | null = null;
 
+  // When true, the next scheduleViewportUpdate will scan ALL paragraphs (not just visible)
+  let pendingFullScan = false;
+
   return new Plugin<LintingPluginState>({
     key: lintingKey,
 
@@ -212,7 +215,7 @@ export function createLintingPlugin(
 
       apply(tr, pluginState): LintingPluginState {
         // Update settings via meta
-        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null }> | undefined;
+        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null; forceFullScan?: boolean }> | undefined;
         if (meta) {
           // If decorations are included, apply directly
           if (meta.decorations !== undefined) {
@@ -224,6 +227,12 @@ export function createLintingPlugin(
             // Clear cache when runner changes (rules may have changed)
             issueCache.clear();
             documentIssueCache = null;
+          }
+          // Force full scan flag
+          if (meta.forceFullScan) {
+            issueCache.clear();
+            documentIssueCache = null;
+            pendingFullScan = true;
           }
           // enabled/disabled change
           if (meta.enabled !== undefined) {
@@ -295,10 +304,15 @@ export function createLintingPlugin(
           if (!state?.enabled || !currentRuleRunner) return;
 
           const allParagraphs = collectParagraphs(view.state.doc);
-          const visibleParagraphs = getVisibleParagraphs(view, allParagraphs, 2);
+          // Use all paragraphs if full scan was requested, otherwise viewport-only
+          const isFullScan = pendingFullScan;
+          if (pendingFullScan) pendingFullScan = false;
+          const targetParagraphs = isFullScan
+            ? allParagraphs
+            : getVisibleParagraphs(view, allParagraphs, 2);
 
-          // Process uncached visible paragraphs (per-paragraph rules)
-          const uncachedParagraphs = visibleParagraphs.filter(p => !issueCache.has(p.text));
+          // Process uncached paragraphs (per-paragraph rules)
+          const uncachedParagraphs = targetParagraphs.filter(p => !issueCache.has(p.text));
 
           if (uncachedParagraphs.length > 0) {
             for (const paragraph of uncachedParagraphs) {

@@ -73,6 +73,10 @@ export interface AppState {
   // コンパクトUIモード
   compactMode?: boolean;
 
+  // リンティング設定
+  lintingEnabled?: boolean;
+  lintingRuleConfigs?: Record<string, { enabled: boolean; severity: string }>;
+
   // タブの永続化
   openTabs?: TabPersistenceState;
 }
