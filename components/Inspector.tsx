@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, ReactNode } from "react";
-import { Bot, AlertCircle, BarChart3, Edit2, X, History } from "lucide-react";
+import { Bot, AlertCircle, BarChart3, Edit2, X, History, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import HistoryPanel from "./HistoryPanel";
@@ -75,6 +75,7 @@ interface InspectorProps {
   lintIssues?: LintIssue[];
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
+  onRefreshLinting?: () => void;
 }
 
 export default function Inspector({
@@ -102,6 +103,7 @@ export default function Inspector({
   lintIssues,
   onNavigateToIssue,
   onApplyFix,
+  onRefreshLinting,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
   const projectMode = isProject ? (editorMode as ProjectMode) : null;
@@ -411,6 +413,7 @@ export default function Inspector({
              lintIssues={lintIssues ?? []}
              onNavigateToIssue={onNavigateToIssue}
              onApplyFix={onApplyFix}
+             onRefreshLinting={onRefreshLinting}
            />
          )}
          {activeTab === "stats" && (
@@ -466,6 +469,7 @@ interface CorrectionsPanelProps {
   lintIssues: LintIssue[];
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
+  onRefreshLinting?: () => void;
 }
 
 /** Returns the display color class for a severity level */
@@ -486,6 +490,7 @@ function CorrectionsPanel({
   lintIssues,
   onNavigateToIssue,
   onApplyFix,
+  onRefreshLinting,
 }: CorrectionsPanelProps) {
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
 
@@ -535,7 +540,18 @@ function CorrectionsPanel({
 
       {/* Issue count summary */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-foreground-secondary">検出結果</h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-sm font-medium text-foreground-secondary">検出結果</h3>
+          {onRefreshLinting && (
+            <button
+              onClick={onRefreshLinting}
+              className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
+              title="再検査"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
         <span className="text-xs text-foreground-tertiary">
           {lintIssues.length}件の問題を検出
         </span>

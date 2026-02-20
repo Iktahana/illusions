@@ -39,7 +39,9 @@ import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
 import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
+import { useLinting } from "@/lib/editor-page/use-linting";
 
+import type { LintIssue } from "@/lib/linting/types";
 import type { SupportedFileExtension } from "@/lib/project-types";
 
 // Module-level flag: persists across React StrictMode/HMR remounts,
@@ -73,6 +75,7 @@ export default function EditorPage() {
     charsPerLine, autoCharsPerLine, showParagraphNumbers, autoSave,
     posHighlightEnabled, posHighlightColors, verticalScrollBehavior,
     scrollSensitivity, compactMode, showSettingsModal,
+    lintingEnabled, lintingRuleConfigs,
   } = settings;
   const {
     handleFontScaleChange, handleLineHeightChange, handleParagraphSpacingChange,
@@ -81,6 +84,7 @@ export default function EditorPage() {
     handleAutoSaveChange, handlePosHighlightEnabledChange,
     handlePosHighlightColorsChange, handleVerticalScrollBehaviorChange,
     handleScrollSensitivityChange, handleToggleCompactMode, setShowSettingsModal,
+    handleLintingEnabledChange, handleLintingRuleConfigChange,
   } = settingsHandlers;
 
   const tabManager = useTabManager({ skipAutoRestore, autoSave });
@@ -432,6 +436,36 @@ export default function EditorPage() {
     charTypeAnalysis, charUsageRates, readabilityAnalysis,
   } = useTextStatistics(content);
 
+  // --- Linting hook ---
+  const { ruleRunner, lintIssues, handleLintIssuesUpdated, refreshLinting } = useLinting(
+    lintingEnabled,
+    lintingRuleConfigs,
+    editorViewInstance,
+  );
+
+  /** Navigate to a lint issue in the editor */
+  const handleNavigateToIssue = useCallback((issue: LintIssue) => {
+    if (!editorViewInstance) return;
+    void import("@milkdown/prose/state").then(({ TextSelection }) => {
+      const { state, dispatch } = editorViewInstance;
+      const clampedTo = Math.min(issue.to, state.doc.content.size);
+      const clampedFrom = Math.min(issue.from, clampedTo);
+      const selection = TextSelection.create(state.doc, clampedFrom, clampedTo);
+      dispatch(state.tr.setSelection(selection).scrollIntoView());
+      editorViewInstance.focus();
+    });
+  }, [editorViewInstance]);
+
+  /** Apply a lint fix by replacing the text range */
+  const handleApplyFix = useCallback((issue: LintIssue) => {
+    if (!editorViewInstance || !issue.fix) return;
+    const { state, dispatch } = editorViewInstance;
+    const clampedTo = Math.min(issue.to, state.doc.content.size);
+    const clampedFrom = Math.min(issue.from, clampedTo);
+    const tr = state.tr.insertText(issue.fix.replacement, clampedFrom, clampedTo);
+    dispatch(tr);
+  }, [editorViewInstance]);
+
   const fileName = currentFile?.name ?? "新規ファイル";
 
   // Keep refs in sync so useWebMenuHandlers can call them
@@ -687,6 +721,10 @@ export default function EditorPage() {
           onPosHighlightEnabledChange={handlePosHighlightEnabledChange}
           posHighlightColors={posHighlightColors}
           onPosHighlightColorsChange={handlePosHighlightColorsChange}
+          lintingEnabled={lintingEnabled}
+          onLintingEnabledChange={handleLintingEnabledChange}
+          lintingRuleConfigs={lintingRuleConfigs}
+          onLintingRuleConfigChange={handleLintingRuleConfigChange}
         />
 
         {/* Ruby dialog */}
@@ -884,6 +922,9 @@ export default function EditorPage() {
                 onShowAllSearchResults={handleShowAllSearchResults}
                 posHighlightEnabled={posHighlightEnabled}
                 posHighlightColors={posHighlightColors}
+                lintingEnabled={lintingEnabled}
+                lintingRuleRunner={ruleRunner}
+                onLintIssuesUpdated={handleLintIssuesUpdated}
                 verticalScrollBehavior={verticalScrollBehavior}
                 scrollSensitivity={scrollSensitivity}
                 onOpenRubyDialog={handleOpenRubyDialog}
@@ -945,6 +986,10 @@ export default function EditorPage() {
               incrementEditorKey();
             }}
             onCompareInEditor={setEditorDiff}
+            lintIssues={lintIssues}
+            onNavigateToIssue={handleNavigateToIssue}
+            onApplyFix={handleApplyFix}
+            onRefreshLinting={refreshLinting}
           />
         </ResizablePanel>
       </div>

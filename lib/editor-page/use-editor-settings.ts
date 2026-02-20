@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useState } from "react";
 
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
+import type { Severity } from "@/lib/linting/types";
 
 export interface EditorSettings {
   fontScale: number;
@@ -19,6 +20,8 @@ export interface EditorSettings {
   scrollSensitivity: number;
   compactMode: boolean;
   showSettingsModal: boolean;
+  lintingEnabled: boolean;
+  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
 }
 
 export interface EditorSettingsHandlers {
@@ -37,6 +40,8 @@ export interface EditorSettingsHandlers {
   handleScrollSensitivityChange: (value: number) => void;
   handleToggleCompactMode: () => void;
   setShowSettingsModal: (value: boolean) => void;
+  handleLintingEnabledChange: (value: boolean) => void;
+  handleLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
 }
 
 export interface EditorSettingsSetters {
@@ -80,6 +85,8 @@ export function useEditorSettings(
   const [verticalScrollBehavior, setVerticalScrollBehavior] = useState<"auto" | "mouse" | "trackpad">("auto");
   const [scrollSensitivity, setScrollSensitivity] = useState(1.0);
   const [compactMode, setCompactMode] = useState(false);
+  const [lintingEnabled, setLintingEnabled] = useState(true);
+  const [lintingRuleConfigs, setLintingRuleConfigs] = useState<Record<string, { enabled: boolean; severity: Severity }>>({});
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -130,6 +137,12 @@ export function useEditorSettings(
         }
         if (typeof appState.compactMode === "boolean") {
           setCompactMode(appState.compactMode);
+        }
+        if (typeof appState.lintingEnabled === "boolean") {
+          setLintingEnabled(appState.lintingEnabled);
+        }
+        if (appState.lintingRuleConfigs && typeof appState.lintingRuleConfigs === "object") {
+          setLintingRuleConfigs(appState.lintingRuleConfigs as Record<string, { enabled: boolean; severity: Severity }>);
         }
         // Force editor rebuild to apply restored settings (e.g. custom font)
         incrementEditorKey();
@@ -258,6 +271,23 @@ export function useEditorSettings(
     });
   }, []);
 
+  const handleLintingEnabledChange = useCallback((value: boolean) => {
+    setLintingEnabled(value);
+    void persistAppState({ lintingEnabled: value }).catch((error) => {
+      console.error("Failed to persist lintingEnabled:", error);
+    });
+  }, []);
+
+  const handleLintingRuleConfigChange = useCallback((ruleId: string, config: { enabled: boolean; severity: Severity }) => {
+    setLintingRuleConfigs(prev => {
+      const next = { ...prev, [ruleId]: config };
+      void persistAppState({ lintingRuleConfigs: next }).catch((error) => {
+        console.error("Failed to persist lintingRuleConfigs:", error);
+      });
+      return next;
+    });
+  }, []);
+
   return {
     settings: {
       fontScale,
@@ -275,6 +305,8 @@ export function useEditorSettings(
       scrollSensitivity,
       compactMode,
       showSettingsModal,
+      lintingEnabled,
+      lintingRuleConfigs,
     },
     handlers: {
       handleFontScaleChange,
@@ -292,6 +324,8 @@ export function useEditorSettings(
       handleScrollSensitivityChange,
       handleToggleCompactMode,
       setShowSettingsModal,
+      handleLintingEnabledChange,
+      handleLintingRuleConfigChange,
     },
     setters: {
       setLineHeight,
