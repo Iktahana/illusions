@@ -69,7 +69,6 @@ interface SettingsModalProps {
   onLintingEnabledChange?: (value: boolean) => void;
   lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity }>;
   onLintingRuleConfigChange?: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
-  lintingRuleMetadata?: Array<{ id: string; nameJa: string; descriptionJa: string }>;
 }
 
 type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "about";
@@ -99,6 +98,13 @@ const SCROLL_BEHAVIORS = [
     label: "トラックパッド優先",
     description: "常にトラックパッドとして処理します（自然なスクロール方向を維持）",
   },
+];
+
+/** Static metadata for lint rules displayed in settings */
+const LINT_RULES_META = [
+  { id: "punctuation-rules", nameJa: "記号の作法", descriptionJa: "句読点・記号の使い方をチェック" },
+  { id: "number-format", nameJa: "数字表記の統一", descriptionJa: "数字の表記揺れを検出" },
+  { id: "joyo-kanji", nameJa: "常用漢字バリデーション", descriptionJa: "常用漢字表外の漢字を検出" },
 ];
 
 export default function SettingsModal({
@@ -134,7 +140,6 @@ export default function SettingsModal({
   onLintingEnabledChange,
   lintingRuleConfigs = {},
   onLintingRuleConfigChange,
-  lintingRuleMetadata,
 }: SettingsModalProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>("editor");
   const modalRef = useRef<HTMLDivElement>(null);
@@ -621,13 +626,13 @@ export default function SettingsModal({
                   )}
                 >
                   <h4 className="text-sm font-medium text-foreground">ルール設定</h4>
-                  {(lintingRuleMetadata ?? []).length === 0 ? (
+                  {LINT_RULES_META.length === 0 ? (
                     <p className="text-xs text-foreground-tertiary">
                       登録されたルールはありません
                     </p>
                   ) : (
                     <div className="space-y-3">
-                      {(lintingRuleMetadata ?? []).map((rule) => {
+                      {LINT_RULES_META.map((rule) => {
                         const config = lintingRuleConfigs[rule.id] ?? { enabled: true, severity: "warning" as Severity };
                         return (
                           <div
