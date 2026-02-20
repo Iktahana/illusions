@@ -1110,7 +1110,9 @@ export function useTabManager(options?: {
         tabs: serializedTabs,
         activeIndex: Math.max(0, activeIndex),
       };
-      void persistAppState({ openTabs: state });
+      void persistAppState({ openTabs: state }).catch((error) => {
+        console.error("タブ状態の保存に失敗しました:", error);
+      });
     }, TAB_PERSIST_DEBOUNCE);
 
     return () => {
