@@ -628,24 +628,24 @@ async function installQuickLookPluginIfNeeded() {
 
 ipcMain.handle('show-in-file-manager', async (_event, dirPath) => {
   if (!dirPath || typeof dirPath !== 'string') return false
-  // Normalize and validate: must be absolute path, no traversal
-  const normalizedPath = path.resolve(dirPath)
-  if (normalizedPath !== path.normalize(dirPath)) {
-    console.warn('[Security] Path traversal detected in show-in-file-manager:', dirPath)
+  // Reject relative paths and paths containing traversal sequences
+  if (!path.isAbsolute(dirPath) || dirPath.includes('..')) {
+    console.warn('[Security] Invalid path in show-in-file-manager:', dirPath)
     return false
   }
+  const normalizedPath = path.normalize(dirPath)
   const result = await shell.openPath(normalizedPath)
   return result === '' // empty string = success
 })
 
 ipcMain.handle('reveal-in-file-manager', async (_event, filePath) => {
   if (!filePath || typeof filePath !== 'string') return false
-  // Normalize and validate: must be absolute path, no traversal
-  const normalizedPath = path.resolve(filePath)
-  if (normalizedPath !== path.normalize(filePath)) {
-    console.warn('[Security] Path traversal detected in reveal-in-file-manager:', filePath)
+  // Reject relative paths and paths containing traversal sequences
+  if (!path.isAbsolute(filePath) || filePath.includes('..')) {
+    console.warn('[Security] Invalid path in reveal-in-file-manager:', filePath)
     return false
   }
+  const normalizedPath = path.normalize(filePath)
   shell.showItemInFolder(normalizedPath)
   return true
 })
@@ -816,14 +816,24 @@ ipcMain.handle('open-dictionary-popup', (_event, url, title) => {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Use isolated session so the app's CSP does not break external pages
+      partition: 'dictionary',
     },
   })
 
-  // Block navigation away from the initial URL's origin
+  // Block navigation away from the initial URL's site (allow subdomains)
+  const initialHostParts = parsedUrl.hostname.split('.')
+  const initialDomain = initialHostParts.slice(-2).join('.')
   popupWindow.webContents.on('will-navigate', (event, navigationUrl) => {
     try {
       const navUrl = new URL(navigationUrl)
-      if (navUrl.origin !== parsedUrl.origin) {
+      if (navUrl.protocol !== 'https:') {
+        event.preventDefault()
+        return
+      }
+      const navHostParts = navUrl.hostname.split('.')
+      const navDomain = navHostParts.slice(-2).join('.')
+      if (navDomain !== initialDomain) {
         event.preventDefault()
         console.warn('[Security] Blocked popup navigation to:', navigationUrl)
       }
@@ -933,9 +943,9 @@ app.whenReady().then(async () => {
           [
             "default-src 'self'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-            "style-src 'self' 'unsafe-inline'",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: blob:",
-            "font-src 'self' data:",
+            "font-src 'self' data: https://fonts.gstatic.com",
             "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com ws://localhost:*",
             "worker-src 'self' blob:",
             "frame-src 'none'",
