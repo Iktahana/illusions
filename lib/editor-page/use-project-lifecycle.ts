@@ -509,6 +509,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     if (!autoRestoreProjectId || autoRestoreTriggeredRef.current) return;
     autoRestoreTriggeredRef.current = true;
 
+    let timerId: ReturnType<typeof setTimeout> | undefined;
     isAutoRestoringRef.current = true;
     void (async () => {
       try {
@@ -517,7 +518,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         // handleOpenRecentProject catches its own errors internally
       }
       isAutoRestoringRef.current = false;
-      setTimeout(() => {
+      timerId = setTimeout(() => {
         setIsRestoring((prev) => {
           if (prev && isElectron) {
             setRestoreError("前回のプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。");
@@ -526,6 +527,10 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         });
       }, 200);
     })();
+
+    return () => {
+      if (timerId !== undefined) clearTimeout(timerId);
+    };
   }, [autoRestoreProjectId, handleOpenRecentProject, isElectron]);
 
   /** Called when the CreateProjectWizard successfully creates a project */

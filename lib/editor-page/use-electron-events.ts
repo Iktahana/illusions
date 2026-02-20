@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from "react";
 import { useEffect } from "react";
 
 import { persistAppState } from "@/lib/app-state-manager";
@@ -13,11 +14,11 @@ interface UseElectronEventsParams {
   handleToggleCompactMode: () => void;
 
   // Format change: direct setters for IPC-driven adjustments
-  setLineHeight: React.Dispatch<React.SetStateAction<number>>;
-  setParagraphSpacing: React.Dispatch<React.SetStateAction<number>>;
-  setTextIndent: React.Dispatch<React.SetStateAction<number>>;
-  setCharsPerLine: React.Dispatch<React.SetStateAction<number>>;
-  setShowParagraphNumbers: React.Dispatch<React.SetStateAction<boolean>>;
+  setLineHeight: Dispatch<SetStateAction<number>>;
+  setParagraphSpacing: Dispatch<SetStateAction<number>>;
+  setTextIndent: Dispatch<SetStateAction<number>>;
+  setCharsPerLine: Dispatch<SetStateAction<number>>;
+  setShowParagraphNumbers: Dispatch<SetStateAction<boolean>>;
   handleAutoCharsPerLineChange: (value?: boolean) => void;
   incrementEditorKey: () => void;
 

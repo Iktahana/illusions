@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useState } from "react";
 
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
@@ -40,12 +41,12 @@ export interface EditorSettingsHandlers {
 
 export interface EditorSettingsSetters {
   /** Direct setters exposed for Electron IPC format-change handler */
-  setLineHeight: React.Dispatch<React.SetStateAction<number>>;
-  setParagraphSpacing: React.Dispatch<React.SetStateAction<number>>;
-  setTextIndent: React.Dispatch<React.SetStateAction<number>>;
-  setCharsPerLine: React.Dispatch<React.SetStateAction<number>>;
-  setShowParagraphNumbers: React.Dispatch<React.SetStateAction<boolean>>;
-  setCompactMode: React.Dispatch<React.SetStateAction<boolean>>;
+  setLineHeight: Dispatch<SetStateAction<number>>;
+  setParagraphSpacing: Dispatch<SetStateAction<number>>;
+  setTextIndent: Dispatch<SetStateAction<number>>;
+  setCharsPerLine: Dispatch<SetStateAction<number>>;
+  setShowParagraphNumbers: Dispatch<SetStateAction<boolean>>;
+  setCompactMode: Dispatch<SetStateAction<boolean>>;
 }
 
 export interface UseEditorSettingsResult {
