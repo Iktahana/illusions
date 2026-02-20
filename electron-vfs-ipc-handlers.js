@@ -7,10 +7,14 @@
 const { ipcMain, dialog, app } = require('electron');
 const fs = require('fs/promises');
 const path = require('path');
+const os = require('os');
 
 function registerVFSHandlers() {
   // Track the opened root directory per window for path validation
   const allowedRoots = new Map();
+
+  // Track paths that were selected via the native file dialog
+  const dialogApprovedPaths = new Set();
 
   /**
    * Normalize path separators to forward slashes for cross-platform compatibility.
@@ -59,6 +63,7 @@ function registerVFSHandlers() {
 
     // Update the allowed root for this window
     allowedRoots.set(event.sender.id, dirPath);
+    dialogApprovedPaths.add(dirPath);
 
     return {
       path: dirPath,
@@ -175,6 +180,25 @@ function registerVFSHandlers() {
   // Set root directory programmatically (for restoring a recent project without dialog)
   ipcMain.handle('vfs:set-root', async (event, rootPath) => {
     const resolved = path.resolve(rootPath);
+
+    // Deny system-sensitive paths
+    const normalizedPath = normalizePath(resolved);
+    const homedir = os.homedir();
+    const sensitivePatterns = [
+      normalizePath(homedir + '/.ssh'),
+      normalizePath(homedir + '/.gnupg'),
+    ];
+    const denyExact = new Set(['/', '/etc', '/usr', '/bin', '/sbin', '/var', '/tmp', '/System']);
+
+    if (denyExact.has(normalizedPath) || sensitivePatterns.some(p => normalizedPath.startsWith(p))) {
+      throw new Error('セキュリティ上の理由により、このディレクトリへのアクセスは制限されています');
+    }
+
+    // Only allow paths previously selected via native dialog
+    if (!dialogApprovedPaths.has(resolved)) {
+      throw new Error('このディレクトリはファイルダイアログで選択されていません。セキュリティのため、直接のルート変更は許可されていません');
+    }
+
     allowedRoots.set(event.sender.id, resolved);
     return { path: resolved, name: path.basename(resolved) };
   });
