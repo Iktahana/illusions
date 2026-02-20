@@ -30,6 +30,47 @@ const DEFAULT_POLL_INTERVAL_MS = 5000;
 const MAX_CONSECUTIVE_FAILURES = 5;
 
 // -----------------------------------------------------------------------
+// Save Suppression
+// -----------------------------------------------------------------------
+
+/**
+ * Global save-suppression registry.
+ * Tracks paths that were recently saved by the application,
+ * so watchers can ignore self-triggered change events.
+ *
+ * アプリケーション自身による保存を追跡し、
+ * ウォッチャーが自身のトリガーによる変更イベントを無視できるようにする。
+ */
+const saveSuppression = new Map<string, number>();
+
+/** Default suppression duration in milliseconds */
+const SAVE_SUPPRESSION_MS = 3000;
+
+/**
+ * Suppress file watch notifications for the given path.
+ * Call this before saving a file to prevent the watcher
+ * from treating the save as an external change.
+ *
+ * 指定パスのファイル監視通知を一時的に抑制する。
+ * ファイル保存前に呼び出し、ウォッチャーが自身の保存を
+ * 外部変更として扱うのを防ぐ。
+ *
+ * @param filePath - The file path to suppress notifications for
+ * @param durationMs - How long to suppress (default 3000ms)
+ */
+export function suppressFileWatch(filePath: string, durationMs: number = SAVE_SUPPRESSION_MS): void {
+  saveSuppression.set(filePath, Date.now() + durationMs);
+}
+
+function isFileSuppressed(filePath: string): boolean {
+  const until = saveSuppression.get(filePath);
+  if (!until) return false;
+  if (Date.now() < until) return true;
+  saveSuppression.delete(filePath);
+  return false;
+}
+
+// -----------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------
 
@@ -111,12 +152,13 @@ class WebFileWatcher implements FileWatcher {
 
     this._isActive = true;
 
-    // Initialize lastModified by reading current metadata
-    void this.initializeLastModified();
-
-    this.timerId = setInterval(() => {
-      void this.checkForChanges();
-    }, this.pollIntervalMs);
+    // Initialize lastModified before starting to poll
+    void this.initializeLastModified().then(() => {
+      if (!this._isActive) return;
+      this.timerId = setInterval(() => {
+        void this.checkForChanges();
+      }, this.pollIntervalMs);
+    });
   }
 
   /**
@@ -153,6 +195,8 @@ class WebFileWatcher implements FileWatcher {
    * MAX_CONSECUTIVE_FAILURES 回連続で失敗した場合、監視を自動停止する。
    */
   private async checkForChanges(): Promise<void> {
+    const suppressed = isFileSuppressed(this.path);
+
     try {
       const metadata = await this.vfs.getFileMetadata(this.path);
 
@@ -162,9 +206,11 @@ class WebFileWatcher implements FileWatcher {
       if (metadata.lastModified > this.lastModified) {
         this.lastModified = metadata.lastModified;
 
-        // Read the updated content
-        const content = await this.vfs.readFile(this.path);
-        this.onChanged(content);
+        // Skip callback if suppressed (app's own save), but still update baseline
+        if (!suppressed) {
+          const content = await this.vfs.readFile(this.path);
+          this.onChanged(content);
+        }
       }
     } catch {
       this.consecutiveFailures++;
@@ -296,6 +342,11 @@ class ElectronFileWatcher implements FileWatcher {
    * 権限の取り消しやその他のエラーを適切に処理する。
    */
   private async readAndNotify(): Promise<void> {
+    // Skip if this path was recently saved by the application
+    if (isFileSuppressed(this.path)) {
+      return;
+    }
+
     try {
       const content = await this.vfs.readFile(this.path);
       this.onChanged(content);
