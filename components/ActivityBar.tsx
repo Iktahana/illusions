@@ -13,6 +13,7 @@ import {
   Folder
 } from "lucide-react";
 import clsx from "clsx";
+import { localPreferences } from "@/lib/local-preferences";
 import {
   DndContext,
   PointerSensor,
@@ -105,15 +106,14 @@ export function isBottomView(view: ActivityBarView): boolean {
 
 // --- localStorage helpers ---
 
-const STORAGE_KEY_TOP = "illusions:sidebar-top-order";
-const STORAGE_KEY_BOTTOM = "illusions:sidebar-bottom-order";
-
-function loadOrder(key: string, defaultItems: ActivityBarItem[]): ActivityBarItem[] {
+function loadOrder(
+  getter: () => string[] | null,
+  defaultItems: ActivityBarItem[]
+): ActivityBarItem[] {
   if (typeof window === "undefined") return defaultItems;
   try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return defaultItems;
-    const ids: string[] = JSON.parse(raw);
+    const ids = getter();
+    if (!ids) return defaultItems;
     const itemMap = new Map(defaultItems.map((item) => [item.id, item]));
     // Restore saved order, skipping IDs that no longer exist
     const ordered: ActivityBarItem[] = [];
@@ -131,14 +131,6 @@ function loadOrder(key: string, defaultItems: ActivityBarItem[]): ActivityBarIte
     return ordered;
   } catch {
     return defaultItems;
-  }
-}
-
-function saveOrder(key: string, items: ActivityBarItem[]): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(items.map((item) => item.id)));
-  } catch {
-    // Ignore write failures
   }
 }
 
@@ -222,10 +214,10 @@ export default function ActivityBar({
   compactMode = false,
 }: ActivityBarProps) {
   const [topItems, setTopItems] = useState<ActivityBarItem[]>(() =>
-    loadOrder(STORAGE_KEY_TOP, DEFAULT_TOP_ITEMS)
+    loadOrder(() => localPreferences.getSidebarTopOrder(), DEFAULT_TOP_ITEMS)
   );
   const [bottomItems, setBottomItems] = useState<ActivityBarItem[]>(() =>
-    loadOrder(STORAGE_KEY_BOTTOM, DEFAULT_BOTTOM_ITEMS)
+    loadOrder(() => localPreferences.getSidebarBottomOrder(), DEFAULT_BOTTOM_ITEMS)
   );
 
   const sensors = useSensors(
@@ -248,7 +240,7 @@ export default function ActivityBar({
         if (overIndex !== -1) {
           const reordered = arrayMove(topItems, topIndex, overIndex);
           setTopItems(reordered);
-          saveOrder(STORAGE_KEY_TOP, reordered);
+          localPreferences.setSidebarTopOrder(reordered.map((item) => item.id));
         }
         return;
       }
@@ -259,7 +251,7 @@ export default function ActivityBar({
         if (overIndex !== -1) {
           const reordered = arrayMove(bottomItems, bottomIndex, overIndex);
           setBottomItems(reordered);
-          saveOrder(STORAGE_KEY_BOTTOM, reordered);
+          localPreferences.setSidebarBottomOrder(reordered.map((item) => item.id));
         }
       }
     },
