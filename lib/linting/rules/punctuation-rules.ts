@@ -55,22 +55,21 @@ const WIDTH_VARIANTS: readonly WidthVariant[] = [
 ] as const;
 
 /**
- * PunctuationRule — L1 regex-based punctuation convention checks.
+ * PunctuationRule -- L1 regex-based punctuation convention checks.
  *
  * Sub-checks:
- * 1. Bracket-internal period: 「...。」 → 「...」
- * 2. Ellipsis format: single … → ……, ・・・ → ……
+ * 1. Bracket-internal period: detect period before closing bracket
+ * 2. Ellipsis format: single ellipsis or middle dots should be paired ellipsis
  * 3. Bracket pairing: matching open/close counts
- * 4. Full-width/half-width consistency: ！/! and ？/? mixing
+ * 4. Full-width/half-width consistency: mixed usage of width variants
  */
 export class PunctuationRule extends AbstractLintRule {
   readonly id = "punctuation-rules";
   readonly name = "Punctuation conventions";
   readonly nameJa = "記号の作法";
   readonly description =
-    "Check Japanese punctuation usage following JIS X 4051 and editorial conventions";
-  readonly descriptionJa =
-    "JIS X 4051・文化庁基準に基づく句読点・記号チェック";
+    "Check Japanese punctuation usage (brackets, ellipsis, width consistency)";
+  readonly descriptionJa = "句読点・括弧・三点リーダーの用法チェック";
   readonly level = "L1" as const;
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
@@ -89,17 +88,16 @@ export class PunctuationRule extends AbstractLintRule {
   }
 
   /**
-   * Sub-check 1: Detect sentence-ending period inside bracket 「...。」
+   * Sub-check 1: Detect sentence-ending period inside closing bracket.
    *
-   * Per 文化庁「公用文作成の考え方」(2022), the period before a closing
-   * bracket should be omitted.
+   * Per JIS X 4051:2004, the period before a closing bracket is
+   * generally omitted in Japanese text.
    */
   private checkBracketPeriod(
     text: string,
     severity: Severity,
   ): LintIssue[] {
     const issues: LintIssue[] = [];
-    // Match 。」 sequences
     const pattern = /。」/g;
 
     for (const match of text.matchAll(pattern)) {
@@ -112,16 +110,16 @@ export class PunctuationRule extends AbstractLintRule {
         ruleId: this.id,
         severity,
         message:
-          "Period before closing bracket should be omitted",
+          "Period before closing bracket should be omitted (JIS X 4051:2004)",
         messageJa:
-          "「文化庁「公用文作成の考え方」に基づき、カギカッコ内の文末に句点は不要です」",
+          "「JIS X 4051:2004に基づき、カギカッコ内末尾の句点は省略が一般的です」",
         from: periodPos,
-        to: periodPos + 1,
-        reference: BUNKACHO_REF,
+        to: periodPos + 2,
+        reference: JIS_REF,
         fix: {
           label: "Remove period before closing bracket",
           labelJa: "閉じカッコ前の句点を削除",
-          replacement: "",
+          replacement: "」",
         },
       });
     }
@@ -132,14 +130,14 @@ export class PunctuationRule extends AbstractLintRule {
   /**
    * Sub-check 2: Detect incorrect ellipsis usage.
    *
-   * Per JIS X 4051:2004, ellipsis should be used in pairs (……).
-   * - Single … should be doubled to ……
-   * - Three middle dots ・・・ should be replaced with ……
+   * Per JIS X 4051:2004, ellipsis should be used in even numbers (paired).
+   * - Single ... (U+2026) should be doubled to ......
+   * - Middle dots used as ellipsis should be replaced with ......
    */
   private checkEllipsis(text: string, severity: Severity): LintIssue[] {
     const issues: LintIssue[] = [];
 
-    // Pattern 1: Single … not adjacent to another …
+    // Pattern 1: Single ellipsis not adjacent to another ellipsis
     const singleEllipsis = /(?<![…])…(?![…])/g;
     for (const match of text.matchAll(singleEllipsis)) {
       if (match.index === undefined) continue;
@@ -150,7 +148,7 @@ export class PunctuationRule extends AbstractLintRule {
         message:
           "Ellipsis should be used in pairs (JIS X 4051:2004)",
         messageJa:
-          "「JIS X 4051:2004に基づき、三点リーダーは偶数個（……）で使用してください」",
+          "「JIS X 4051:2004に基づき、三点リーダーは偶数個（……）の使用が標準です」",
         from: match.index,
         to: match.index + 1,
         reference: JIS_REF,
@@ -162,8 +160,8 @@ export class PunctuationRule extends AbstractLintRule {
       });
     }
 
-    // Pattern 2: Three or more middle dots ・・・
-    const middleDots = /・{3,}/g;
+    // Pattern 2: Two or more middle dots used as ellipsis
+    const middleDots = /・{2,}/g;
     for (const match of text.matchAll(middleDots)) {
       if (match.index === undefined) continue;
 
@@ -173,7 +171,7 @@ export class PunctuationRule extends AbstractLintRule {
         message:
           "Use ellipsis character instead of middle dots (JIS X 4051:2004)",
         messageJa:
-          "「JIS X 4051:2004に基づき、中点の連続ではなく三点リーダー（……）を使用してください」",
+          "「JIS X 4051:2004に基づき、三点リーダーは偶数個（……）の使用が標準です」",
         from: match.index,
         to: match.index + match[0].length,
         reference: JIS_REF,
@@ -192,7 +190,8 @@ export class PunctuationRule extends AbstractLintRule {
    * Sub-check 3: Detect mismatched bracket pairs.
    *
    * Counts open and close brackets for each pair type and reports
-   * mismatches. No auto-fix is provided since the correct fix is ambiguous.
+   * mismatches with surplus information. No auto-fix is provided
+   * since the correct fix is context-dependent.
    */
   private checkBracketPairing(
     text: string,
@@ -210,12 +209,15 @@ export class PunctuationRule extends AbstractLintRule {
       }
 
       if (openCount !== closeCount) {
+        const surplusType = openCount > closeCount ? "開き括弧" : "閉じ括弧";
+        const surplusCount = Math.abs(openCount - closeCount);
+
         issues.push({
           ruleId: this.id,
           severity,
-          message: `Mismatched ${pair.nameJa}: ${openCount} open, ${closeCount} close`,
+          message: `Mismatched ${pair.nameJa}: ${surplusCount} surplus ${openCount > closeCount ? "opening" : "closing"} bracket(s)`,
           messageJa:
-            `「JIS X 4051:2004に基づき、${pair.nameJa}の対応が不正です（開き${openCount}個、閉じ${closeCount}個）」`,
+            `「JIS X 4051:2004に基づき、括弧の対応が不正です（${surplusType}が${surplusCount}個余剰）」`,
           from: 0,
           to: text.length,
           reference: JIS_REF,
@@ -229,9 +231,9 @@ export class PunctuationRule extends AbstractLintRule {
   /**
    * Sub-check 4: Detect mixed full-width/half-width punctuation.
    *
-   * Per JIS X 4051:2004, full-width punctuation should be used in
-   * Japanese text. When both full-width and half-width variants appear,
-   * the half-width ones are flagged.
+   * When both full-width and half-width variants of the same punctuation
+   * appear, the minority variant (whichever appears less) is flagged
+   * with a suggestion to convert to the majority variant.
    */
   private checkWidthConsistency(
     text: string,
@@ -240,31 +242,51 @@ export class PunctuationRule extends AbstractLintRule {
     const issues: LintIssue[] = [];
 
     for (const variant of WIDTH_VARIANTS) {
-      const hasFullWidth = text.includes(variant.fullWidth);
-      const hasHalfWidth = text.includes(variant.halfWidth);
+      // Count occurrences of each variant
+      let fullWidthCount = 0;
+      let halfWidthCount = 0;
+
+      for (const ch of text) {
+        if (ch === variant.fullWidth) fullWidthCount++;
+        if (ch === variant.halfWidth) halfWidthCount++;
+      }
 
       // Only flag if BOTH variants exist (mixed usage)
-      if (!hasFullWidth || !hasHalfWidth) {
+      if (fullWidthCount === 0 || halfWidthCount === 0) {
         continue;
       }
 
-      // Flag all half-width occurrences and suggest full-width
+      // Determine which is the minority variant
+      const minorityIsHalfWidth = halfWidthCount <= fullWidthCount;
+      const minorityChar = minorityIsHalfWidth
+        ? variant.halfWidth
+        : variant.fullWidth;
+      const majorityChar = minorityIsHalfWidth
+        ? variant.fullWidth
+        : variant.halfWidth;
+      const conversionLabelJa = minorityIsHalfWidth
+        ? "全角に変換"
+        : "半角に変換";
+      const conversionLabel = minorityIsHalfWidth
+        ? "Convert to full-width"
+        : "Convert to half-width";
+
+      // Flag all minority variant occurrences
       for (let i = 0; i < text.length; i++) {
-        if (text[i] === variant.halfWidth) {
+        if (text[i] === minorityChar) {
           issues.push({
             ruleId: this.id,
             severity,
-            message:
-              `${variant.nameEn} should be full-width for consistency`,
+            message: `Mixed ${variant.nameEn} width: convert to ${minorityIsHalfWidth ? "full" : "half"}-width for consistency`,
             messageJa:
-              `「JIS X 4051:2004に基づき、${variant.nameJa}は全角（${variant.fullWidth}）に統一してください」`,
+              `「文化庁「公用文作成の考え方」に基づき、${variant.nameJa}の全角・半角が混在しています」`,
             from: i,
             to: i + 1,
-            reference: JIS_REF,
+            reference: BUNKACHO_REF,
             fix: {
-              label: `Convert to full-width`,
-              labelJa: `全角に変換`,
-              replacement: variant.fullWidth,
+              label: conversionLabel,
+              labelJa: conversionLabelJa,
+              replacement: majorityChar,
             },
           });
         }
