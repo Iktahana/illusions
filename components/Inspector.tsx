@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, ReactNode } from "react";
-import { Bot, AlertCircle, BarChart3, Edit2, X, History, RefreshCw } from "lucide-react";
+import { useState, useRef, useEffect, useMemo, ReactNode } from "react";
+import { Bot, AlertCircle, BarChart3, Edit2, X, History, RefreshCw, Settings, Info } from "lucide-react";
 import clsx from "clsx";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import HistoryPanel from "./HistoryPanel";
 import { localPreferences } from "@/lib/local-preferences";
+import { LINT_PRESETS, LINT_RULES_META } from "@/lib/linting/lint-presets";
 
 import type { ProjectMode } from "@/lib/project-types";
 import type { LintIssue, Severity } from "@/lib/linting";
@@ -76,6 +77,11 @@ interface InspectorProps {
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
   onRefreshLinting?: () => void;
+  // Active lint issue (cursor sync)
+  activeLintIssueIndex?: number | null;
+  // Settings integration
+  onOpenLintingSettings?: () => void;
+  onApplyLintPreset?: (presetId: string) => void;
 }
 
 export default function Inspector({
@@ -104,6 +110,9 @@ export default function Inspector({
   onNavigateToIssue,
   onApplyFix,
   onRefreshLinting,
+  activeLintIssueIndex,
+  onOpenLintingSettings,
+  onApplyLintPreset,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
   const projectMode = isProject ? (editorMode as ProjectMode) : null;
@@ -414,6 +423,9 @@ export default function Inspector({
              onNavigateToIssue={onNavigateToIssue}
              onApplyFix={onApplyFix}
              onRefreshLinting={onRefreshLinting}
+             activeLintIssueIndex={activeLintIssueIndex}
+             onOpenLintingSettings={onOpenLintingSettings}
+             onApplyLintPreset={onApplyLintPreset}
            />
          )}
          {activeTab === "stats" && (
@@ -463,13 +475,21 @@ function AIPanel() {
 /** Severity filter options for the corrections panel */
 type SeverityFilter = "all" | Severity;
 
+/** Extended issue with original text from the document */
+interface EnrichedLintIssue extends LintIssue {
+  originalText?: string;
+}
+
 interface CorrectionsPanelProps {
   posHighlightEnabled: boolean;
   onPosHighlightEnabledChange?: (enabled: boolean) => void;
-  lintIssues: LintIssue[];
+  lintIssues: (LintIssue | EnrichedLintIssue)[];
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
   onRefreshLinting?: () => void;
+  activeLintIssueIndex?: number | null;
+  onOpenLintingSettings?: () => void;
+  onApplyLintPreset?: (presetId: string) => void;
 }
 
 /** Returns the display color class for a severity level */
@@ -484,6 +504,12 @@ function severityColor(severity: Severity): string {
   }
 }
 
+/** Get rule display name from metadata */
+function getRuleName(ruleId: string): string {
+  const meta = LINT_RULES_META.find(r => r.id === ruleId);
+  return meta?.nameJa ?? ruleId;
+}
+
 function CorrectionsPanel({
   posHighlightEnabled,
   onPosHighlightEnabledChange,
@@ -491,12 +517,38 @@ function CorrectionsPanel({
   onNavigateToIssue,
   onApplyFix,
   onRefreshLinting,
+  activeLintIssueIndex,
+  onOpenLintingSettings,
+  onApplyLintPreset,
 }: CorrectionsPanelProps) {
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
+  const issueListRef = useRef<HTMLDivElement>(null);
 
-  const filteredIssues = severityFilter === "all"
-    ? lintIssues
-    : lintIssues.filter((issue) => issue.severity === severityFilter);
+  const filteredIssues = useMemo(() =>
+    severityFilter === "all"
+      ? lintIssues
+      : lintIssues.filter((issue) => issue.severity === severityFilter),
+    [lintIssues, severityFilter]
+  );
+
+  // Find active index within filtered list
+  const activeFilteredIndex = useMemo(() => {
+    if (activeLintIssueIndex == null) return null;
+    const activeIssue = lintIssues[activeLintIssueIndex];
+    if (!activeIssue) return null;
+    return filteredIssues.indexOf(activeIssue);
+  }, [activeLintIssueIndex, lintIssues, filteredIssues]);
+
+  // Auto-scroll active card into view
+  useEffect(() => {
+    if (activeFilteredIndex == null || activeFilteredIndex < 0) return;
+    const container = issueListRef.current;
+    if (!container) return;
+    const card = container.querySelector(`[data-issue-index="${activeFilteredIndex}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [activeFilteredIndex]);
 
   const filterOptions: { value: SeverityFilter; label: string }[] = [
     { value: "all", label: "全て" },
@@ -538,23 +590,54 @@ function CorrectionsPanel({
         )}
       </div>
 
-      {/* Issue count summary */}
-      <div className="flex items-center justify-between">
+      {/* Header: issue count + preset + settings */}
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <h3 className="text-sm font-medium text-foreground-secondary">検出結果</h3>
           {onRefreshLinting && (
             <button
               onClick={onRefreshLinting}
               className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
-              title="再検査"
+              title="全文を再検査"
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
-        <span className="text-xs text-foreground-tertiary">
-          {lintIssues.length}件の問題を検出
-        </span>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-foreground-tertiary mr-1">
+            {lintIssues.length}件
+          </span>
+          {/* Preset dropdown */}
+          {onApplyLintPreset && (
+            <select
+              onChange={(e) => {
+                if (e.target.value) {
+                  onApplyLintPreset(e.target.value);
+                  e.target.value = "";
+                }
+              }}
+              defaultValue=""
+              className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+              title="プリセットを適用"
+            >
+              <option value="" disabled>モード</option>
+              {Object.entries(LINT_PRESETS).map(([id, preset]) => (
+                <option key={id} value={id}>{preset.nameJa}</option>
+              ))}
+            </select>
+          )}
+          {/* Settings gear */}
+          {onOpenLintingSettings && (
+            <button
+              onClick={onOpenLintingSettings}
+              className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
+              title="校正設定を開く"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Severity filter buttons */}
@@ -581,65 +664,96 @@ function CorrectionsPanel({
           <p className="text-sm text-foreground-tertiary">問題は検出されませんでした</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filteredIssues.map((issue, index) => (
-            <button
-              key={`${issue.ruleId}-${issue.from}-${issue.to}-${index}`}
-              type="button"
-              onClick={() => onNavigateToIssue?.(issue)}
-              className="w-full text-left bg-background-secondary rounded-lg p-3 border border-border hover:border-border-secondary transition-colors"
-            >
-              <div className="flex items-start gap-2">
-                {/* Severity indicator */}
-                <span
-                  className={clsx(
-                    "mt-1 w-2.5 h-2.5 rounded-full shrink-0",
-                    severityColor(issue.severity)
-                  )}
-                  title={issue.severity}
-                />
-                <div className="flex-1 min-w-0">
-                  {/* Japanese message */}
-                  <p className="text-sm text-foreground leading-snug">
-                    {issue.messageJa}
-                  </p>
-                  {/* Position info */}
-                  <p className="text-xs text-foreground-tertiary mt-1">
-                    位置: {issue.from}-{issue.to}
-                  </p>
-                  {/* Reference info */}
-                  {issue.reference && (
-                    <p className="text-xs text-foreground-tertiary mt-0.5">
-                      {issue.reference.standard}
-                      {issue.reference.section ? ` ${issue.reference.section}` : ""}
+        <div ref={issueListRef} className="space-y-1.5">
+          {filteredIssues.map((issue, index) => {
+            const enriched = issue as EnrichedLintIssue;
+            const isActive = activeFilteredIndex === index;
+            const hasOriginal = !!enriched.originalText;
+            const hasFix = !!issue.fix;
+
+            return (
+              <div
+                key={`${issue.ruleId}-${issue.from}-${issue.to}-${index}`}
+                data-issue-index={index}
+                className={clsx(
+                  "rounded-lg border transition-colors",
+                  isActive
+                    ? "border-accent bg-accent/5"
+                    : "border-border bg-background-secondary hover:border-border-secondary"
+                )}
+              >
+                {/* Main row: click to navigate */}
+                <button
+                  type="button"
+                  onClick={() => onNavigateToIssue?.(issue)}
+                  className="w-full text-left px-3 py-2"
+                >
+                  <div className="flex items-center gap-2">
+                    {/* Severity dot */}
+                    <span
+                      className={clsx(
+                        "w-2 h-2 rounded-full shrink-0",
+                        severityColor(issue.severity)
+                      )}
+                      title={issue.severity}
+                    />
+                    {/* Content: original → replacement or just message */}
+                    <div className="flex-1 min-w-0">
+                      {hasOriginal && hasFix ? (
+                        <p className="text-sm text-foreground leading-snug truncate">
+                          <span className="text-foreground-tertiary line-through">{enriched.originalText}</span>
+                          <span className="text-foreground-tertiary mx-1">→</span>
+                          <span className="text-foreground font-medium">{issue.fix!.replacement}</span>
+                        </p>
+                      ) : hasOriginal ? (
+                        <p className="text-sm text-foreground leading-snug truncate">
+                          {enriched.originalText}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-foreground leading-snug truncate">
+                          {issue.messageJa}
+                        </p>
+                      )}
+                    </div>
+                    {/* Info tooltip + fix button */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <InfoTooltip
+                        content={`${issue.messageJa}${issue.reference ? `\n${issue.reference.standard}${issue.reference.section ? ` ${issue.reference.section}` : ""}` : ""}\n[${getRuleName(issue.ruleId)}]`}
+                        className="text-foreground-tertiary hover:text-foreground-secondary"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                      </InfoTooltip>
+                      {hasFix && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onApplyFix?.(issue);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                              onApplyFix?.(issue);
+                            }
+                          }}
+                          className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-accent hover:text-accent-hover bg-accent/10 hover:bg-accent/20 rounded transition-colors cursor-pointer"
+                        >
+                          置換
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Secondary line: show message when we have original text but no fix */}
+                  {hasOriginal && !hasFix && (
+                    <p className="text-xs text-foreground-tertiary mt-0.5 ml-4 truncate">
+                      {issue.messageJa}
                     </p>
                   )}
-                </div>
+                </button>
               </div>
-              {/* Fix button */}
-              {issue.fix && (
-                <div className="mt-2 flex justify-end">
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onApplyFix?.(issue);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.stopPropagation();
-                        onApplyFix?.(issue);
-                      }
-                    }}
-                    className="inline-flex items-center px-2 py-1 text-xs font-medium text-accent hover:text-accent-hover bg-accent/10 hover:bg-accent/20 rounded transition-colors cursor-pointer"
-                  >
-                    修正: {issue.fix.labelJa}
-                  </span>
-                </div>
-              )}
-            </button>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

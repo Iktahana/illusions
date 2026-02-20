@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import Explorer, { FilesPanel } from "@/components/Explorer";
@@ -23,6 +23,8 @@ import WelcomeScreen from "@/components/WelcomeScreen";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
+import type { SettingsCategory } from "@/components/SettingsModal";
+import { LINT_PRESETS } from "@/lib/linting/lint-presets";
 import RubyDialog from "@/components/RubyDialog";
 import { useTabManager } from "@/lib/use-tab-manager";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
@@ -85,6 +87,7 @@ export default function EditorPage() {
     handlePosHighlightColorsChange, handleVerticalScrollBehaviorChange,
     handleScrollSensitivityChange, handleToggleCompactMode, setShowSettingsModal,
     handleLintingEnabledChange, handleLintingRuleConfigChange,
+    handleLintingRuleConfigsBatchChange,
   } = settingsHandlers;
 
   const tabManager = useTabManager({ skipAutoRestore, autoSave });
@@ -443,6 +446,50 @@ export default function EditorPage() {
     editorViewInstance,
   );
 
+  // Enrich lint issues with original text from the document
+  const enrichedLintIssues = useMemo(() => {
+    if (!editorViewInstance || lintIssues.length === 0) return lintIssues;
+    const doc = editorViewInstance.state.doc;
+    return lintIssues.map((issue: LintIssue) => {
+      try {
+        const originalText = doc.textBetween(
+          issue.from,
+          Math.min(issue.to, doc.content.size),
+        );
+        return { ...issue, originalText };
+      } catch {
+        return issue;
+      }
+    });
+  }, [editorViewInstance, lintIssues]);
+
+  // Cursor → issue sync: track which issue the cursor is on
+  const [activeLintIssueIndex, setActiveLintIssueIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!editorViewInstance || enrichedLintIssues.length === 0) {
+      setActiveLintIssueIndex(null);
+      return;
+    }
+    const dom = editorViewInstance.dom as HTMLElement;
+    const handler = () => {
+      const pos = editorViewInstance.state.selection.from;
+      const idx = enrichedLintIssues.findIndex(
+        (i: LintIssue) => pos >= i.from && pos <= i.to,
+      );
+      setActiveLintIssueIndex(idx >= 0 ? idx : null);
+    };
+    dom.addEventListener("mouseup", handler);
+    dom.addEventListener("keyup", handler);
+    return () => {
+      dom.removeEventListener("mouseup", handler);
+      dom.removeEventListener("keyup", handler);
+    };
+  }, [editorViewInstance, enrichedLintIssues]);
+
+  // Settings modal: track which category to open on
+  const [settingsInitialCategory, setSettingsInitialCategory] = useState<SettingsCategory | undefined>(undefined);
+
   /** Navigate to a lint issue in the editor */
   const handleNavigateToIssue = useCallback((issue: LintIssue) => {
     if (!editorViewInstance) return;
@@ -452,6 +499,18 @@ export default function EditorPage() {
       const clampedFrom = Math.min(issue.from, clampedTo);
       const selection = TextSelection.create(state.doc, clampedFrom, clampedTo);
       dispatch(state.tr.setSelection(selection).scrollIntoView());
+
+      // DOM-level scroll for vertical writing mode compatibility
+      try {
+        const domResult = editorViewInstance.domAtPos(clampedFrom);
+        const target = domResult.node instanceof HTMLElement
+          ? domResult.node
+          : domResult.node.parentElement;
+        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch {
+        // fallback: ProseMirror scrollIntoView already called above
+      }
+
       editorViewInstance.focus();
     });
   }, [editorViewInstance]);
@@ -465,6 +524,20 @@ export default function EditorPage() {
     const tr = state.tr.insertText(issue.fix.replacement, clampedFrom, clampedTo);
     dispatch(tr);
   }, [editorViewInstance]);
+
+  /** Open SettingsModal directly on the linting tab */
+  const handleOpenLintingSettings = useCallback(() => {
+    setSettingsInitialCategory("linting");
+    setShowSettingsModal(true);
+  }, [setShowSettingsModal]);
+
+  /** Apply a lint preset from the Inspector dropdown */
+  const handleApplyLintPreset = useCallback((presetId: string) => {
+    const preset = LINT_PRESETS[presetId];
+    if (preset) {
+      handleLintingRuleConfigsBatchChange({ ...preset.configs });
+    }
+  }, [handleLintingRuleConfigsBatchChange]);
 
   const fileName = currentFile?.name ?? "新規ファイル";
 
@@ -694,7 +767,10 @@ export default function EditorPage() {
 
         <SettingsModal
           isOpen={showSettingsModal}
-          onClose={() => setShowSettingsModal(false)}
+          onClose={() => {
+            setShowSettingsModal(false);
+            setSettingsInitialCategory(undefined);
+          }}
           fontScale={fontScale}
           onFontScaleChange={handleFontScaleChange}
           lineHeight={lineHeight}
@@ -725,6 +801,8 @@ export default function EditorPage() {
           onLintingEnabledChange={handleLintingEnabledChange}
           lintingRuleConfigs={lintingRuleConfigs}
           onLintingRuleConfigChange={handleLintingRuleConfigChange}
+          onLintingRuleConfigsBatchChange={handleLintingRuleConfigsBatchChange}
+          initialCategory={settingsInitialCategory}
         />
 
         {/* Ruby dialog */}
@@ -986,10 +1064,13 @@ export default function EditorPage() {
               incrementEditorKey();
             }}
             onCompareInEditor={setEditorDiff}
-            lintIssues={lintIssues}
+            lintIssues={enrichedLintIssues}
             onNavigateToIssue={handleNavigateToIssue}
             onApplyFix={handleApplyFix}
             onRefreshLinting={refreshLinting}
+            activeLintIssueIndex={activeLintIssueIndex}
+            onOpenLintingSettings={handleOpenLintingSettings}
+            onApplyLintPreset={handleApplyLintPreset}
           />
         </ResizablePanel>
       </div>

@@ -52,7 +52,7 @@ export function linting(options: LintingOptions = {}) {
  */
 export function updateLintingSettings(
   view: EditorView,
-  settings: { enabled?: boolean; ruleRunner?: RuleRunner | null }
+  settings: { enabled?: boolean; ruleRunner?: RuleRunner | null; forceFullScan?: boolean }
 ): void {
   const tr = view.state.tr.setMeta(lintingKey, settings);
   view.dispatch(tr);

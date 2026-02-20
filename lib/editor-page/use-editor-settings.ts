@@ -42,6 +42,7 @@ export interface EditorSettingsHandlers {
   setShowSettingsModal: (value: boolean) => void;
   handleLintingEnabledChange: (value: boolean) => void;
   handleLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
+  handleLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
 }
 
 export interface EditorSettingsSetters {
@@ -288,6 +289,13 @@ export function useEditorSettings(
     });
   }, []);
 
+  const handleLintingRuleConfigsBatchChange = useCallback((configs: Record<string, { enabled: boolean; severity: Severity }>) => {
+    setLintingRuleConfigs(configs);
+    void persistAppState({ lintingRuleConfigs: configs }).catch((error) => {
+      console.error("Failed to persist lintingRuleConfigs:", error);
+    });
+  }, []);
+
   return {
     settings: {
       fontScale,
@@ -326,6 +334,7 @@ export function useEditorSettings(
       setShowSettingsModal,
       handleLintingEnabledChange,
       handleLintingRuleConfigChange,
+      handleLintingRuleConfigsBatchChange,
     },
     setters: {
       setLineHeight,

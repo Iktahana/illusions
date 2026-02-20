@@ -79,7 +79,7 @@ export function useLinting(
     }
   }, [lintingEnabled]);
 
-  // Force re-run linting by dispatching updateLintingSettings with current ruleRunner
+  // Force re-run linting on the full document (not just visible paragraphs)
   const refreshLinting = useCallback(() => {
     if (!editorViewInstance || !lintingEnabled) return;
 
@@ -87,6 +87,7 @@ export function useLinting(
       ({ updateLintingSettings }) => {
         updateLintingSettings(editorViewInstance, {
           ruleRunner: ruleRunnerRef.current,
+          forceFullScan: true,
         });
       },
     ).catch((err) => {

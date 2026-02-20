@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { X, ExternalLink, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
 import type { Severity } from "@/lib/linting/types";
 import ColorPicker from "./ColorPicker";
+import LintingSettings from "./LintingSettings";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import { FEATURED_JAPANESE_FONTS } from "@/lib/fonts";
 const LICENSE_TEXT = process.env.NEXT_PUBLIC_LICENSE_TEXT || "";
@@ -70,9 +71,12 @@ interface SettingsModalProps {
   onLintingEnabledChange?: (value: boolean) => void;
   lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity }>;
   onLintingRuleConfigChange?: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
+  onLintingRuleConfigsBatchChange?: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
+  /** Open modal on a specific tab */
+  initialCategory?: SettingsCategory;
 }
 
-type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "about";
+export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "about";
 
 const SCROLL_BEHAVIORS = [
   {
@@ -90,21 +94,6 @@ const SCROLL_BEHAVIORS = [
     label: "トラックパッド優先",
     description: "常にトラックパッドとして処理します（自然なスクロール方向を維持）",
   },
-];
-
-/** Static metadata for lint rules displayed in settings */
-const LINT_RULES_META = [
-  { id: "punctuation-rules", nameJa: "記号の作法", descriptionJa: "句読点・記号の使い方をチェック" },
-  { id: "number-format", nameJa: "数字表記の統一", descriptionJa: "数字の表記揺れを検出" },
-  { id: "joyo-kanji", nameJa: "常用漢字バリデーション", descriptionJa: "常用漢字表外の漢字を検出" },
-  { id: "era-year-validator", nameJa: "元号・西暦の一致チェック", descriptionJa: "元号と西暦の対応を検証" },
-  { id: "particle-no-repetition", nameJa: "助詞「の」の連続使用", descriptionJa: "1文中の「の」の多用を検出" },
-  { id: "conjugation-errors", nameJa: "活用の誤り検出", descriptionJa: "ら抜き・さ入れ・い抜き言葉の検出" },
-  { id: "redundant-expression", nameJa: "二重表現の検出", descriptionJa: "意味が重複している冗長な表現を検出" },
-  { id: "verbose-expression", nameJa: "冗長表現の簡略化", descriptionJa: "冗長な表現を検出し簡潔な言い換えを提案" },
-  { id: "sentence-ending-repetition", nameJa: "文末表現の重複", descriptionJa: "同じ文末表現が連続する箇所を検出" },
-  { id: "notation-consistency", nameJa: "表記ゆれの検出", descriptionJa: "文書内の同一語彙の表記ゆれを検出" },
-  { id: "correlative-expression", nameJa: "呼応表現の整合性", descriptionJa: "副詞と文末表現の対応をチェック" },
 ];
 
 export default function SettingsModal({
@@ -140,9 +129,18 @@ export default function SettingsModal({
   onLintingEnabledChange,
   lintingRuleConfigs = {},
   onLintingRuleConfigChange,
+  onLintingRuleConfigsBatchChange,
+  initialCategory,
 }: SettingsModalProps) {
-  const [activeCategory, setActiveCategory] = useState<SettingsCategory>("editor");
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>(initialCategory ?? "editor");
   const modalRef = useRef<HTMLDivElement>(null);
+
+  // Sync initialCategory when modal opens
+  useEffect(() => {
+    if (isOpen && initialCategory) {
+      setActiveCategory(initialCategory);
+    }
+  }, [isOpen, initialCategory]);
 
   // Body scroll lock
   useEffect(() => {
@@ -591,107 +589,13 @@ export default function SettingsModal({
 
             {/* Linting section */}
             {activeCategory === "linting" && (
-              <div className="space-y-6">
-                {/* Master toggle */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-medium text-foreground">
-                      校正機能を有効にする
-                    </h3>
-                    <p className="text-xs text-foreground-tertiary mt-0.5">
-                      テキストの校正ルールを適用します
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => onLintingEnabledChange?.(!lintingEnabled)}
-                    className={clsx(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                      lintingEnabled ? "bg-accent" : "bg-border-secondary"
-                    )}
-                  >
-                    <span
-                      className={clsx(
-                        "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
-                        lintingEnabled ? "translate-x-6" : "translate-x-1"
-                      )}
-                    />
-                  </button>
-                </div>
-
-                {/* Rule settings */}
-                <div
-                  className={clsx(
-                    "space-y-4 pt-4 border-t border-border transition-opacity",
-                    !lintingEnabled && "opacity-50 pointer-events-none"
-                  )}
-                >
-                  <h4 className="text-sm font-medium text-foreground">ルール設定</h4>
-                  {LINT_RULES_META.length === 0 ? (
-                    <p className="text-xs text-foreground-tertiary">
-                      登録されたルールはありません
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {LINT_RULES_META.map((rule) => {
-                        const config = lintingRuleConfigs[rule.id] ?? { enabled: true, severity: "warning" as Severity };
-                        return (
-                          <div
-                            key={rule.id}
-                            className="rounded-lg border border-border bg-background/50 p-3 space-y-2"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-foreground">
-                                {rule.nameJa}
-                              </span>
-                              <button
-                                onClick={() =>
-                                  onLintingRuleConfigChange?.(rule.id, {
-                                    ...config,
-                                    enabled: !config.enabled,
-                                  })
-                                }
-                                className={clsx(
-                                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                                  config.enabled ? "bg-accent" : "bg-border-secondary"
-                                )}
-                              >
-                                <span
-                                  className={clsx(
-                                    "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
-                                    config.enabled ? "translate-x-6" : "translate-x-1"
-                                  )}
-                                />
-                              </button>
-                            </div>
-                            <p className="text-xs text-foreground-tertiary">
-                              {rule.descriptionJa}
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <label className="text-xs text-foreground-secondary">
-                                重要度
-                              </label>
-                              <select
-                                value={config.severity}
-                                onChange={(e) =>
-                                  onLintingRuleConfigChange?.(rule.id, {
-                                    ...config,
-                                    severity: e.target.value as Severity,
-                                  })
-                                }
-                                className="text-xs px-2 py-1 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                              >
-                                <option value="error">エラー</option>
-                                <option value="warning">警告</option>
-                                <option value="info">情報</option>
-                              </select>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <LintingSettings
+                lintingEnabled={lintingEnabled}
+                onLintingEnabledChange={(v) => onLintingEnabledChange?.(v)}
+                lintingRuleConfigs={lintingRuleConfigs}
+                onLintingRuleConfigChange={(id, cfg) => onLintingRuleConfigChange?.(id, cfg)}
+                onLintingRuleConfigsBatchChange={(cfgs) => onLintingRuleConfigsBatchChange?.(cfgs)}
+              />
             )}
 
             {/* About section */}
