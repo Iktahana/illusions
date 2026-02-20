@@ -51,7 +51,6 @@ function getBaseName(name: string) {
 interface InspectorProps {
   className?: string;
   compactMode?: boolean;
-  wordCount?: number;
   charCount?: number;
   selectedCharCount?: number;
   paragraphCount?: number;
@@ -100,7 +99,6 @@ interface InspectorProps {
 export default function Inspector({
   className,
   compactMode = false,
-  wordCount = 0,
   charCount = 0,
   selectedCharCount = 0,
   paragraphCount = 0,
@@ -435,7 +433,6 @@ export default function Inspector({
          )}
          {activeTab === "stats" && (
            <StatsPanel
-             wordCount={wordCount}
              charCount={charCount}
              selectedCharCount={selectedCharCount}
              paragraphCount={paragraphCount}
@@ -722,7 +719,6 @@ function InfoTooltip({ content, className, children }: { content: string; classN
 }
 
 function StatsPanel({
-  wordCount: _wordCount,
   charCount,
   selectedCharCount,
   paragraphCount,
@@ -732,7 +728,6 @@ function StatsPanel({
   charUsageRates,
   readabilityAnalysis,
 }: {
-  wordCount: number;
   charCount: number;
   selectedCharCount: number;
   paragraphCount: number;
