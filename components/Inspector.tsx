@@ -84,6 +84,8 @@ interface InspectorProps {
   onPosHighlightEnabledChange?: (enabled: boolean) => void;
   // 履歴復元コールバック（プロジェクトモード時に使用）
   onHistoryRestore?: (content: string) => void;
+  // 現在開いているファイル名（履歴パネルの切り替え用）
+  activeFileName?: string;
   // 現在のエディタ内容（履歴差分表示用）
   currentContent?: string;
   // エディタ領域で差分を表示するコールバック
@@ -110,6 +112,7 @@ export default function Inspector({
   posHighlightEnabled = false,
   onPosHighlightEnabledChange,
   onHistoryRestore,
+  activeFileName,
   currentContent = "",
   onCompareInEditor,
 }: InspectorProps) {
@@ -435,7 +438,7 @@ export default function Inspector({
          {activeTab === "history" && projectMode && onHistoryRestore && (
            <HistoryPanel
              projectId={projectMode.projectId}
-             mainFileName={projectMode.metadata.mainFile}
+             mainFileName={activeFileName || projectMode.metadata.mainFile}
              onRestore={onHistoryRestore}
              currentContent={currentContent}
              onCompareInEditor={onCompareInEditor}

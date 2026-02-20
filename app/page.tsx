@@ -1762,6 +1762,7 @@ export default function EditorPage() {
             readabilityAnalysis={readabilityAnalysis}
             posHighlightEnabled={posHighlightEnabled}
             onPosHighlightEnabledChange={handlePosHighlightEnabledChange}
+            activeFileName={currentFile?.name}
             currentContent={content}
             onHistoryRestore={(restoredContent: string) => {
               setContent(restoredContent);
