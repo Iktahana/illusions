@@ -272,7 +272,7 @@ Please follow the code review standards in [CLAUDE.md](CLAUDE.md).
 
 GNU Affero General Public License v3.0 - See [LICENSE](LICENSE) file for details.
 
-See also: [利用規約 / Terms of Service](TERMS.md)
+See also: [利用規約 / Terms of Service](TERMS.md) | [Online Policy Page](https://www.illusions.app/policy)
 
 ---
 
