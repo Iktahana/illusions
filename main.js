@@ -708,10 +708,18 @@ function isSavePathDenied(normalizedPath) {
     '/.config/gcloud', '/Library/Keychains',
   ]
 
-  if (denyExact.has(normalizedPath)) return true
-  if (normalizedPath === homedir) return true
-  if (windowsDenyPrefixes.some(p => normalizedPath.toLowerCase().startsWith(p.toLowerCase()))) return true
-  if (homeSensitiveSuffixes.some(s => normalizedPath.startsWith(homedir + s))) return true
+  // Treat denied roots as prefixes — block any nested path under them
+  if ([...denyExact].some(dir => normalizedPath === dir || normalizedPath.startsWith(`${dir}/`))) return true
+  if (normalizedPath === homedir || normalizedPath.startsWith(`${homedir}/`)) {
+    // Allow writes inside home, but block sensitive subdirectories
+    if (normalizedPath === homedir) return true
+    if (homeSensitiveSuffixes.some(s => normalizedPath.startsWith(homedir + s))) return true
+  }
+  const normalizedLower = normalizedPath.toLowerCase()
+  if (windowsDenyPrefixes.some(p => {
+    const pLower = p.toLowerCase()
+    return normalizedLower === pLower || normalizedLower.startsWith(`${pLower}/`)
+  })) return true
 
   return false
 }
@@ -730,27 +738,27 @@ function validateSaveFilePath(filePath) {
   const normalized = resolved.split(path.sep).join('/')
   if (resolved !== path.resolve(resolved) || filePath.includes('..')) {
     log.warn(`save-file path rejected (directory traversal): ${filePath}`)
-    return { success: false, error: 'Path contains disallowed directory traversal', code: 'PATH_TRAVERSAL' }
+    return { success: false, error: 'パスに許可されていないディレクトリ移動が含まれています', code: 'PATH_TRAVERSAL' }
   }
 
   // Reject system-sensitive paths
   // Check both the file itself and its parent directory
   if (isSavePathDenied(normalized) || isSavePathDenied(path.dirname(normalized).split(path.sep).join('/'))) {
     log.warn(`save-file path rejected (denied location): ${filePath}`)
-    return { success: false, error: 'Writing to this location is not allowed for security reasons', code: 'PATH_DENIED' }
+    return { success: false, error: 'この場所への書き込みはセキュリティ上許可されていません', code: 'PATH_DENIED' }
   }
 
   // Validate file extension
   const ext = path.extname(resolved).toLowerCase()
   if (!VALID_SAVE_FILE_TYPES.includes(ext)) {
     log.warn(`save-file path rejected (invalid extension "${ext}"): ${filePath}`)
-    return { success: false, error: `Invalid file extension: ${ext}`, code: 'INVALID_EXTENSION' }
+    return { success: false, error: `無効な拡張子です: ${ext}`, code: 'INVALID_EXTENSION' }
   }
 
   // Reject paths not previously approved via dialog or system file open
   if (!dialogApprovedPaths.has(resolved)) {
     log.warn(`save-file path rejected (not dialog-approved): ${filePath}`)
-    return { success: false, error: 'File path was not approved via dialog', code: 'PATH_NOT_APPROVED' }
+    return { success: false, error: 'ダイアログで承認されていないパスです', code: 'PATH_NOT_APPROVED' }
   }
 
   return null
