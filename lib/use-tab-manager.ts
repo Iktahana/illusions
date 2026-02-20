@@ -12,6 +12,7 @@ import { fetchAppState, persistAppState } from "./app-state-manager";
 import { getRandomillusionstory } from "./illusion-stories";
 import { getHistoryService } from "./history-service";
 import { getVFS } from "./vfs";
+import { suppressFileWatch } from "./file-watcher";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import type { SupportedFileExtension } from "./project-types";
 import type { TabId, TabState, TabPersistenceState, SerializedTab } from "./tab-types";
@@ -367,6 +368,7 @@ export function useTabManager(options?: {
 
       if (isProjectRef.current && tab.file?.path) {
         const vfs = getVFS();
+        suppressFileWatch(tab.file.path);
         await vfs.writeFile(tab.file.path, sanitized);
       } else {
         const result = await saveMdiFile({
@@ -511,6 +513,7 @@ export function useTabManager(options?: {
         // Project mode: VFS direct write
         if (isProjectRef.current && tab.file?.path) {
           const vfs = getVFS();
+          suppressFileWatch(tab.file.path);
           await vfs.writeFile(tab.file.path, sanitized);
           updateTab(tabId, {
             lastSavedContent: sanitized,
@@ -884,6 +887,7 @@ export function useTabManager(options?: {
             const sanitized = sanitizeMdiContent(tab.content);
             if (isProjectRef.current && tab.file?.path) {
               const vfs = getVFS();
+              suppressFileWatch(tab.file.path);
               await vfs.writeFile(tab.file.path, sanitized);
               setTabs((prev) =>
                 prev.map((t) =>
@@ -947,6 +951,7 @@ export function useTabManager(options?: {
           const sanitized = sanitizeMdiContent(tab.content);
           if (isProjectRef.current && tab.file.path) {
             const vfs = getVFS();
+            suppressFileWatch(tab.file.path);
             await vfs.writeFile(tab.file.path, sanitized);
           } else {
             await saveMdiFile({

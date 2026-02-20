@@ -195,10 +195,7 @@ class WebFileWatcher implements FileWatcher {
    * MAX_CONSECUTIVE_FAILURES 回連続で失敗した場合、監視を自動停止する。
    */
   private async checkForChanges(): Promise<void> {
-    // Skip if this path was recently saved by the application
-    if (isFileSuppressed(this.path)) {
-      return;
-    }
+    const suppressed = isFileSuppressed(this.path);
 
     try {
       const metadata = await this.vfs.getFileMetadata(this.path);
@@ -209,9 +206,11 @@ class WebFileWatcher implements FileWatcher {
       if (metadata.lastModified > this.lastModified) {
         this.lastModified = metadata.lastModified;
 
-        // Read the updated content
-        const content = await this.vfs.readFile(this.path);
-        this.onChanged(content);
+        // Skip callback if suppressed (app's own save), but still update baseline
+        if (!suppressed) {
+          const content = await this.vfs.readFile(this.path);
+          this.onChanged(content);
+        }
       }
     } catch {
       this.consecutiveFailures++;
