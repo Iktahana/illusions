@@ -1,4 +1,5 @@
 import type { LintRule, LintRuleConfig, LintIssue } from "./types";
+import { isDocumentLintRule } from "./types";
 
 /**
  * Manages lint rule registration, configuration, and execution.
@@ -47,6 +48,36 @@ export class RuleRunner {
     if (!config?.enabled) return [];
 
     return rule.lint(text, config);
+  }
+
+  /** Run document-level rules on all paragraphs. Returns issues grouped by paragraph index. */
+  runDocument(
+    paragraphs: ReadonlyArray<{ text: string; index: number }>,
+  ): Map<number, LintIssue[]> {
+    const results = new Map<number, LintIssue[]>();
+
+    for (const rule of this.rules.values()) {
+      if (!isDocumentLintRule(rule)) continue;
+      const config = this.configs.get(rule.id);
+      if (!config?.enabled) continue;
+
+      const ruleResults = rule.lintDocument(paragraphs, config);
+      for (const { paragraphIndex, issues } of ruleResults) {
+        const existing = results.get(paragraphIndex) ?? [];
+        existing.push(...issues);
+        results.set(paragraphIndex, existing);
+      }
+    }
+
+    return results;
+  }
+
+  /** Check if any registered rule is a document-level rule. */
+  hasDocumentRules(): boolean {
+    for (const rule of this.rules.values()) {
+      if (isDocumentLintRule(rule)) return true;
+    }
+    return false;
   }
 
   /** Return all registered rules. */

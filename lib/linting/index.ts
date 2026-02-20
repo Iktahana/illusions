@@ -4,6 +4,8 @@ export type {
   LintRule,
   LintRuleConfig,
   LintReference,
+  DocumentLintRule,
 } from "./types";
-export { AbstractLintRule } from "./base-rule";
+export { isDocumentLintRule } from "./types";
+export { AbstractLintRule, AbstractDocumentLintRule } from "./base-rule";
 export { RuleRunner } from "./rule-runner";
