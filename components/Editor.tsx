@@ -1035,8 +1035,8 @@ function MilkdownEditor({
       case "paste":
         navigator.clipboard.readText().then((text) => {
           const { state, dispatch } = editorViewInstance;
-          const { from } = state.selection;
-          const transaction = state.tr.insertText(text, from);
+          const { from, to } = state.selection;
+          const transaction = state.tr.insertText(text, from, to);
           dispatch(transaction);
         }).catch((err) => {
           console.error("Failed to paste:", err);
@@ -1046,8 +1046,8 @@ function MilkdownEditor({
         navigator.clipboard.readText().then((text) => {
           // Strip formatting by using plain text
           const { state, dispatch } = editorViewInstance;
-          const { from } = state.selection;
-          const transaction = state.tr.insertText(text, from);
+          const { from, to } = state.selection;
+          const transaction = state.tr.insertText(text, from, to);
           dispatch(transaction);
         }).catch((err) => {
           console.error("Failed to paste plain text:", err);
