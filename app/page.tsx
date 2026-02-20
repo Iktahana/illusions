@@ -589,9 +589,15 @@ export default function EditorPage() {
     if (from === to) return;
     const text = state.doc.textBetween(from, to);
     if (!text.trim()) return;
-    // Toggle: if already wrapped in ^...^, unwrap
-    const tr = state.tr.insertText(`^${text}^`, from, to);
-    dispatch(tr);
+    // Toggle: if already wrapped in ^...^, unwrap; otherwise wrap
+    if (text.startsWith("^") && text.endsWith("^") && text.length >= 2) {
+      const unwrapped = text.slice(1, -1);
+      const tr = state.tr.insertText(unwrapped, from, to);
+      dispatch(tr);
+    } else {
+      const tr = state.tr.insertText(`^${text}^`, from, to);
+      dispatch(tr);
+    }
   }, [editorViewInstance]);
 
   /** Open the dictionary panel in the sidebar with optional search term */
@@ -653,15 +659,23 @@ export default function EditorPage() {
          }
 
         if (text) {
-          const currentContent = contentRef.current;
-          const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
-          setContent(newContent);
-          setEditorKey(prev => prev + 1);
+          if (editorViewInstance) {
+            const { state, dispatch } = editorViewInstance;
+            const { from, to } = state.selection;
+            const tr = state.tr.insertText(text, from, to);
+            dispatch(tr);
+          } else {
+            // Fallback: append at end if editor view not available
+            const currentContent = contentRef.current;
+            const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
+            setContent(newContent);
+            setEditorKey(prev => prev + 1);
+          }
         }
        } catch (error) {
          console.error("プレーンテキストとして貼り付けできませんでした:", error);
        }
-     }, [isElectron, setContent]);
+     }, [isElectron, setContent, editorViewInstance]);
 
     // メニューの「プレーンテキストで貼り付け」を受け取る（Electronのみ）
     useEffect(() => {
@@ -797,14 +811,20 @@ export default function EditorPage() {
     setContent(markdown);
   };
 
-   const handleInsertText = (text: string) => {
-     const currentContent = contentRef.current;
-     const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
-     // Heading anchors are managed by the editor, no extra processing needed here
-     setContent(newContent);
-     // Re-mount the editor to ensure the new content is reflected
-     setEditorKey(prev => prev + 1);
-   };
+   const handleInsertText = useCallback((text: string) => {
+     if (editorViewInstance) {
+       const { state, dispatch } = editorViewInstance;
+       const { from, to } = state.selection;
+       const tr = state.tr.insertText(text, from, to);
+       dispatch(tr);
+     } else {
+       // Fallback: append at end if editor view not available
+       const currentContent = contentRef.current;
+       const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
+       setContent(newContent);
+       setEditorKey(prev => prev + 1);
+     }
+   }, [editorViewInstance, setContent]);
 
    const handleChapterClick = (anchorId: string) => {
     if (!anchorId) return;
