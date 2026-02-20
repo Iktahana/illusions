@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, ExternalLink, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
+import { X, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
 import type { Severity } from "@/lib/linting/types";
 import ColorPicker from "./ColorPicker";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
@@ -259,13 +259,12 @@ export default function SettingsModal({
               <button
                 onClick={() => setActiveCategory("linting")}
                 className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2",
+                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                   activeCategory === "linting"
                     ? "bg-accent text-accent-foreground"
                     : "text-foreground-secondary hover:bg-hover hover:text-foreground"
                 )}
               >
-                <AlertCircle className="w-4 h-4" />
                 校正
               </button>
               <div className="my-2 border-t border-border" />
