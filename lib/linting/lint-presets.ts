@@ -125,4 +125,20 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "correlative-expression": { enabled: true, severity: "warning" },
     },
   },
+  official: {
+    nameJa: "公用文モード",
+    configs: {
+      "punctuation-rules": { enabled: true, severity: "error" },
+      "number-format": { enabled: true, severity: "error" },
+      "joyo-kanji": { enabled: true, severity: "warning" },
+      "era-year-validator": { enabled: true, severity: "error" },
+      "particle-no-repetition": { enabled: true, severity: "warning" },
+      "conjugation-errors": { enabled: true, severity: "error" },
+      "redundant-expression": { enabled: true, severity: "error" },
+      "verbose-expression": { enabled: true, severity: "warning" },
+      "sentence-ending-repetition": { enabled: true, severity: "info" },
+      "notation-consistency": { enabled: true, severity: "error" },
+      "correlative-expression": { enabled: true, severity: "error" },
+    },
+  },
 };
