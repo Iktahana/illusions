@@ -31,7 +31,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             INPUT_ID="${{ github.event.inputs.run_id }}"
             if [ -z "$INPUT_ID" ]; then
-              RUN_ID=$(gh run list --status failure --limit 1 --json databaseId --jq '.[0].databaseId')
+              RUN_ID=$(gh run list --repo "${{ github.repository }}" --status failure --limit 1 --json databaseId --jq '.[0].databaseId')
             else
               RUN_ID=$INPUT_ID
             fi
@@ -47,7 +47,7 @@ jobs:
           WORKFLOW_ID: ${{ steps.info.outputs.RUN_ID }}
         run: |
           # Search for open issues that already reference this run ID
-          COUNT=$(gh issue list --state open --search "Run #$WORKFLOW_ID" --json number --jq 'length')
+          COUNT=$(gh issue list --repo "${{ github.repository }}" --state open --search "Run #$WORKFLOW_ID" --json number --jq 'length')
           if [ "$COUNT" != "0" ]; then
             echo "Issue already exists for Run #$WORKFLOW_ID, skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -64,7 +64,7 @@ jobs:
         run: |
           echo "Fetching logs for workflow run: $WORKFLOW_ID"
 
-          gh run view "$WORKFLOW_ID" --log-failed > failure_log.txt 2>&1 || true
+          gh run view "$WORKFLOW_ID" --repo "$REPO" --log-failed > failure_log.txt 2>&1 || true
 
           if [ ! -s failure_log.txt ]; then
             echo "ログが空のため、Issue の作成をスキップします。"
@@ -76,11 +76,11 @@ jobs:
           LOG_TAIL=$(tail -n 60 failure_log.txt | head -n 50)
 
           # Get workflow metadata
-          WORKFLOW_NAME=$(gh run view "$WORKFLOW_ID" --json name --jq '.name' 2>/dev/null || echo "Unknown")
+          WORKFLOW_NAME=$(gh run view "$WORKFLOW_ID" --repo "$REPO" --json name --jq '.name' 2>/dev/null || echo "Unknown")
           COMMIT_MSG="${{ github.event.workflow_run.head_commit.message }}"
 
           # Ensure labels exist (create if missing)
-          gh label create "ci-failure" --color "D73A49" --description "CI/CD failure" 2>/dev/null || true
+          gh label create "ci-failure" --repo "$REPO" --color "D73A49" --description "CI/CD failure" 2>/dev/null || true
 
           BODY=$(cat <<BODY_EOF
           ## CI ビルドが失敗しました
@@ -115,6 +115,7 @@ jobs:
           )
 
           gh issue create \
+            --repo "$REPO" \
             --title "CI Failure: $WORKFLOW_NAME (Run #$WORKFLOW_ID)" \
             --label "ci-failure" \
             --body "$BODY"

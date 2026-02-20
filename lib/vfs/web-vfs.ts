@@ -331,21 +331,80 @@ export class WebVFS implements VirtualFileSystem {
 
   /**
    * Rename (move) a file or directory.
-   * Web FS API has no native rename, so this reads → writes → deletes.
-   * Only supports files (not directories).
-   * @param oldPath - Current file path relative to root
-   * @param newPath - Desired new file path relative to root
+   * Web FS API has no native rename, so this copies → deletes.
+   * For directories, recursively copies all contents to the new path.
+   * @param oldPath - Current path relative to root
+   * @param newPath - Desired new path relative to root
    */
   async rename(oldPath: string, newPath: string): Promise<void> {
+    const root = this.ensureRoot();
     try {
-      const content = await this.readFile(oldPath);
-      await this.writeFile(newPath, content);
-      await this.deleteFile(oldPath);
+      const isDir = await this.isDirectory(root, oldPath);
+      if (isDir) {
+        await this.copyDirectoryRecursive(oldPath, newPath);
+        await this.removeDirectoryRecursive(oldPath);
+      } else {
+        const content = await this.readFile(oldPath);
+        await this.writeFile(newPath, content);
+        await this.deleteFile(oldPath);
+      }
     } catch (error) {
       throw new Error(
         `Failed to rename "${oldPath}" to "${newPath}": ${error instanceof Error ? error.message : String(error)}`
       );
     }
+  }
+
+  /**
+   * Check whether a path refers to a directory.
+   */
+  private async isDirectory(
+    root: FileSystemDirectoryHandle,
+    path: string
+  ): Promise<boolean> {
+    const segments = splitPath(path);
+    if (segments.length === 0) return true;
+    try {
+      await resolveDirectoryHandle(root, segments);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Recursively copy a directory and all its contents to a new path.
+   */
+  private async copyDirectoryRecursive(
+    srcPath: string,
+    destPath: string
+  ): Promise<void> {
+    const entries = await this.listDirectory(srcPath);
+    for (const entry of entries) {
+      const srcEntryPath = joinPath(srcPath, entry.name);
+      const destEntryPath = joinPath(destPath, entry.name);
+      if (entry.kind === "directory") {
+        await this.copyDirectoryRecursive(srcEntryPath, destEntryPath);
+      } else {
+        const content = await this.readFile(srcEntryPath);
+        await this.writeFile(destEntryPath, content);
+      }
+    }
+  }
+
+  /**
+   * Recursively remove a directory and all its contents.
+   */
+  private async removeDirectoryRecursive(path: string): Promise<void> {
+    const root = this.ensureRoot();
+    const segments = splitPath(path);
+    if (segments.length === 0) {
+      throw new Error("Cannot remove root directory");
+    }
+    const dirName = segments.pop()!;
+    const parentHandle = await resolveDirectoryHandle(root, segments);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (parentHandle as unknown as { removeEntry(name: string, options?: { recursive?: boolean }): Promise<void> }).removeEntry(dirName, { recursive: true });
   }
 
   /**
