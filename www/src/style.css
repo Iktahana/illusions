@@ -165,13 +165,13 @@ h1 {
   gap: 0.4rem;
   margin-top: 2rem;
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.8);
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
 .github-link:hover {
-  color: rgba(255, 255, 255, 0.9);
+  color: white;
 }
 
 .github-link-icon {
