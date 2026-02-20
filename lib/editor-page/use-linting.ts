@@ -1,7 +1,6 @@
 import type { EditorView } from "@milkdown/prose/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { EditorView } from "@milkdown/prose/view";
 import { RuleRunner } from "@/lib/linting/rule-runner";
 import type { LintIssue, Severity } from "@/lib/linting/types";
 
