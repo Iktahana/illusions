@@ -24,7 +24,7 @@ import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
 import type { SettingsCategory } from "@/components/SettingsModal";
-import { LINT_PRESETS } from "@/lib/linting/lint-presets";
+import { LINT_PRESETS, LINT_RULES_META, LINT_DEFAULT_CONFIGS } from "@/lib/linting/lint-presets";
 import RubyDialog from "@/components/RubyDialog";
 import { useTabManager } from "@/lib/use-tab-manager";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
@@ -120,6 +120,7 @@ export default function EditorPage() {
   const prevLastSavedTimeRef = useRef<number | null>(null);
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
+  const programmaticScrollRef = useRef(false);
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
@@ -498,18 +499,45 @@ export default function EditorPage() {
       const clampedTo = Math.min(issue.to, state.doc.content.size);
       const clampedFrom = Math.min(issue.from, clampedTo);
       const selection = TextSelection.create(state.doc, clampedFrom, clampedTo);
+
+      // Allow the scroll protection to accept our programmatic scroll
+      programmaticScrollRef.current = true;
+
       dispatch(state.tr.setSelection(selection).scrollIntoView());
 
-      // DOM-level scroll for vertical writing mode compatibility
+      // DOM-level scroll for vertical writing mode
       try {
-        const domResult = editorViewInstance.domAtPos(clampedFrom);
-        const target = domResult.node instanceof HTMLElement
-          ? domResult.node
-          : domResult.node.parentElement;
-        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+        const coords = editorViewInstance.coordsAtPos(clampedFrom);
+        const scrollContainer = editorViewInstance.dom.closest(
+          ".flex-1.bg-background-secondary"
+        ) as HTMLElement | null;
+        if (scrollContainer) {
+          const containerRect = scrollContainer.getBoundingClientRect();
+          const offsetY = coords.top - containerRect.top + scrollContainer.scrollTop;
+          const offsetX = coords.left - containerRect.left + scrollContainer.scrollLeft;
+          scrollContainer.scrollTo({
+            left: offsetX - containerRect.width / 2,
+            top: offsetY - containerRect.height / 2,
+            behavior: "smooth",
+          });
+        }
       } catch {
-        // fallback: ProseMirror scrollIntoView already called above
+        // fallback
+        try {
+          const domResult = editorViewInstance.domAtPos(clampedFrom);
+          const target = domResult.node instanceof HTMLElement
+            ? domResult.node
+            : domResult.node.parentElement;
+          target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+        } catch {
+          // ignore
+        }
       }
+
+      // Reset the flag after smooth scroll completes
+      setTimeout(() => {
+        programmaticScrollRef.current = false;
+      }, 500);
 
       editorViewInstance.focus();
     });
@@ -538,6 +566,20 @@ export default function EditorPage() {
       handleLintingRuleConfigsBatchChange({ ...preset.configs });
     }
   }, [handleLintingRuleConfigsBatchChange]);
+
+  /** Detect which preset matches the current linting config */
+  const activeLintPresetId = useMemo(() => {
+    for (const [id, preset] of Object.entries(LINT_PRESETS)) {
+      const allMatch = LINT_RULES_META.every((rule) => {
+        const current = lintingRuleConfigs[rule.id] ?? LINT_DEFAULT_CONFIGS[rule.id] ?? { enabled: true, severity: "warning" };
+        const presetCfg = preset.configs[rule.id];
+        if (!presetCfg) return false;
+        return current.enabled === presetCfg.enabled && current.severity === presetCfg.severity;
+      });
+      if (allMatch) return id;
+    }
+    return "";
+  }, [lintingRuleConfigs]);
 
   const fileName = currentFile?.name ?? "新規ファイル";
 
@@ -997,6 +1039,7 @@ export default function EditorPage() {
                 searchInitialTerm={searchInitialTerm}
                 showParagraphNumbers={showParagraphNumbers}
                 onEditorViewReady={setEditorViewInstance}
+                programmaticScrollRef={programmaticScrollRef}
                 onShowAllSearchResults={handleShowAllSearchResults}
                 posHighlightEnabled={posHighlightEnabled}
                 posHighlightColors={posHighlightColors}
@@ -1072,6 +1115,7 @@ export default function EditorPage() {
             activeLintIssueIndex={activeLintIssueIndex}
             onOpenLintingSettings={handleOpenLintingSettings}
             onApplyLintPreset={handleApplyLintPreset}
+            activeLintPresetId={activeLintPresetId}
           />
         </ResizablePanel>
       </div>

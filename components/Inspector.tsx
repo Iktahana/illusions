@@ -83,6 +83,7 @@ interface InspectorProps {
   // Settings integration
   onOpenLintingSettings?: () => void;
   onApplyLintPreset?: (presetId: string) => void;
+  activeLintPresetId?: string;
 }
 
 export default function Inspector({
@@ -115,6 +116,7 @@ export default function Inspector({
   activeLintIssueIndex,
   onOpenLintingSettings,
   onApplyLintPreset,
+  activeLintPresetId,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
   const projectMode = isProject ? (editorMode as ProjectMode) : null;
@@ -429,6 +431,7 @@ export default function Inspector({
              activeLintIssueIndex={activeLintIssueIndex}
              onOpenLintingSettings={onOpenLintingSettings}
              onApplyLintPreset={onApplyLintPreset}
+             activeLintPresetId={activeLintPresetId}
            />
          )}
          {activeTab === "stats" && (
@@ -494,6 +497,7 @@ interface CorrectionsPanelProps {
   activeLintIssueIndex?: number | null;
   onOpenLintingSettings?: () => void;
   onApplyLintPreset?: (presetId: string) => void;
+  activeLintPresetId?: string;
 }
 
 /** Returns the display color class for a severity level */
@@ -525,6 +529,7 @@ function CorrectionsPanel({
   activeLintIssueIndex,
   onOpenLintingSettings,
   onApplyLintPreset,
+  activeLintPresetId = "",
 }: CorrectionsPanelProps) {
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const issueListRef = useRef<HTMLDivElement>(null);
@@ -595,60 +600,61 @@ function CorrectionsPanel({
         )}
       </div>
 
-      {/* Header: issue count + preset + settings */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <h3 className="text-sm font-medium text-foreground-secondary">検出結果</h3>
-          {onRefreshLinting && (
-            <button
-              onClick={onRefreshLinting}
-              disabled={isLinting}
-              className={clsx(
-                "p-1 rounded transition-colors",
-                isLinting
-                  ? "text-accent cursor-wait"
-                  : "text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover"
-              )}
-              title="全文を再検査"
-              aria-label="全文を再検査"
-            >
-              <RefreshCw className={clsx("w-3.5 h-3.5", isLinting && "animate-spin")} />
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-foreground-tertiary mr-1">
-            {lintIssues.length}件
-          </span>
-          {/* Preset dropdown */}
-          {onApplyLintPreset && (
-            <select
-              onChange={(e) => {
-                if (e.target.value) {
-                  onApplyLintPreset(e.target.value);
-                  e.target.value = "";
-                }
-              }}
-              defaultValue=""
-              className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-              title="プリセットを適用"
-            >
-              <option value="" disabled>モード</option>
-              {Object.entries(LINT_PRESETS).map(([id, preset]) => (
-                <option key={id} value={id}>{preset.nameJa}</option>
-              ))}
-            </select>
-          )}
-          {/* Settings gear */}
-          {onOpenLintingSettings && (
-            <button
-              onClick={onOpenLintingSettings}
-              className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
-              title="校正設定を開く"
-            >
-              <Settings className="w-3.5 h-3.5" />
-            </button>
-          )}
+      {/* Header: issue count + controls */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-sm font-medium text-foreground-secondary">検出結果</h3>
+            <span className="text-xs text-foreground-tertiary">
+              {lintIssues.length}件
+            </span>
+            {onRefreshLinting && (
+              <button
+                onClick={onRefreshLinting}
+                disabled={isLinting}
+                className={clsx(
+                  "p-1 rounded transition-colors",
+                  isLinting
+                    ? "text-accent cursor-wait"
+                    : "text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover"
+                )}
+                title="全文を再検査"
+                aria-label="全文を再検査"
+              >
+                <RefreshCw className={clsx("w-3.5 h-3.5", isLinting && "animate-spin")} />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {/* Preset dropdown */}
+            {onApplyLintPreset && (
+              <select
+                value={activeLintPresetId}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onApplyLintPreset(e.target.value);
+                  }
+                }}
+                className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                title="プリセットを適用"
+              >
+                {!activeLintPresetId && <option value="">カスタム</option>}
+                {Object.entries(LINT_PRESETS).map(([id, preset]) => (
+                  <option key={id} value={id}>{preset.nameJa}</option>
+                ))}
+              </select>
+            )}
+            {/* Settings gear */}
+            {onOpenLintingSettings && (
+              <button
+                onClick={onOpenLintingSettings}
+                className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
+                title="校正設定を開く"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

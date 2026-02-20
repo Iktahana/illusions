@@ -49,6 +49,8 @@ interface EditorProps {
   searchInitialTerm?: string;
   showParagraphNumbers?: boolean;
   onEditorViewReady?: (view: EditorView) => void;
+  /** Ref that external code sets to true before programmatic scrolling */
+  programmaticScrollRef?: React.RefObject<boolean>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onShowAllSearchResults?: (matches: any[], searchTerm: string) => void;
   // 品詞着色設定
@@ -92,6 +94,7 @@ export default function NovelEditor({
   searchInitialTerm,
   showParagraphNumbers = false,
   onEditorViewReady,
+  programmaticScrollRef,
   onShowAllSearchResults,
   posHighlightEnabled = false,
   posHighlightColors = {},
@@ -292,6 +295,7 @@ export default function NovelEditor({
                 onEditorViewReady?.(view);
               }}
               showParagraphNumbers={showParagraphNumbers}
+              programmaticScrollRef={programmaticScrollRef}
               isModeSwitchingRef={isModeSwitchingRef}
               savedScrollProgressRef={savedScrollProgressRef}
               posHighlightEnabled={posHighlightEnabled}
@@ -465,6 +469,7 @@ function MilkdownEditor({
   charsPerLine,
   scrollContainerRef,
   onEditorViewReady,
+  programmaticScrollRef,
   showParagraphNumbers,
   isModeSwitchingRef,
   savedScrollProgressRef,
@@ -494,6 +499,7 @@ function MilkdownEditor({
   charsPerLine: number;
   scrollContainerRef: RefObject<HTMLDivElement>;
   onEditorViewReady?: (view: EditorView) => void;
+  programmaticScrollRef?: React.RefObject<boolean>;
   showParagraphNumbers: boolean;
   isModeSwitchingRef: MutableRefObject<boolean>;
   savedScrollProgressRef: RefObject<number>;
@@ -987,8 +993,8 @@ function MilkdownEditor({
     const onScroll = () => {
       if (isReverting) return;
 
-      if (userScrollingRef.current || isModeSwitchingRef.current || isPointerDown) {
-        // User interaction, mode switch, or mouse drag: save position
+      if (userScrollingRef.current || isModeSwitchingRef.current || isPointerDown || programmaticScrollRef?.current) {
+        // User interaction, mode switch, mouse drag, or programmatic navigation: save position
         savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
       } else {
         // Browser auto-scroll (e.g., DOM update): revert

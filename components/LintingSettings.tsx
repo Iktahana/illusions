@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 
@@ -98,6 +98,20 @@ export default function LintingSettings({
 
   const ruleMetaMap = new Map(LINT_RULES_META.map(r => [r.id, r]));
 
+  /** Detect which preset matches the current config (if any) */
+  const activePresetId = useMemo(() => {
+    for (const [id, preset] of Object.entries(LINT_PRESETS)) {
+      const allMatch = LINT_RULES_META.every((rule) => {
+        const current = getConfig(rule.id, lintingRuleConfigs);
+        const presetCfg = preset.configs[rule.id];
+        if (!presetCfg) return false;
+        return current.enabled === presetCfg.enabled && current.severity === presetCfg.severity;
+      });
+      if (allMatch) return id;
+    }
+    return "";
+  }, [lintingRuleConfigs]);
+
   return (
     <div className="space-y-6">
       {/* Master toggle */}
@@ -136,16 +150,15 @@ export default function LintingSettings({
         {/* Preset dropdown + bulk actions */}
         <div className="flex items-center gap-2 flex-wrap">
           <select
+            value={activePresetId}
             onChange={(e) => {
               if (e.target.value) {
                 handleApplyPreset(e.target.value);
-                e.target.value = "";
               }
             }}
-            defaultValue=""
             className="text-xs px-2 py-1.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
           >
-            <option value="" disabled>プリセット...</option>
+            {!activePresetId && <option value="">カスタム</option>}
             {Object.entries(LINT_PRESETS).map(([id, preset]) => (
               <option key={id} value={id}>{preset.nameJa}</option>
             ))}
@@ -209,7 +222,7 @@ export default function LintingSettings({
                   <span
                     className={clsx(
                       "inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform",
-                      allEnabled ? "translate-x-4.5" : "translate-x-0.5"
+                      allEnabled ? "translate-x-5" : "translate-x-0.5"
                     )}
                   />
                 </button>
@@ -267,7 +280,7 @@ export default function LintingSettings({
                           <span
                             className={clsx(
                               "inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform",
-                              config.enabled ? "translate-x-4.5" : "translate-x-0.5"
+                              config.enabled ? "translate-x-5" : "translate-x-0.5"
                             )}
                           />
                         </button>
