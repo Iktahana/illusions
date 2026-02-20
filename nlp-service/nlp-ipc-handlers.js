@@ -55,9 +55,9 @@ function registerNlpHandlers() {
    * Initialize NLP service
    * Handler: nlp:init
    */
-  ipcMain.handle('nlp:init', async (event, dicPath) => {
+  ipcMain.handle('nlp:init', async () => {
     try {
-      const resolvedPath = dicPath || getDefaultDicPath();
+      const resolvedPath = getDefaultDicPath();
       await nlpProcessor.init(resolvedPath);
       return { success: true };
     } catch (error) {
@@ -72,6 +72,9 @@ function registerNlpHandlers() {
    */
   ipcMain.handle('nlp:tokenize-paragraph', async (event, text) => {
     try {
+      if (typeof text !== 'string' || text.length === 0 || text.length > 1_000_000) {
+        throw new Error('Invalid text parameter');
+      }
       await ensureInitialized();
 
       console.log('[NLP DEBUG] 🔵 分析前 - フロントエンドから受信:', {
@@ -102,8 +105,13 @@ function registerNlpHandlers() {
     try {
       const { paragraphs } = request;
 
-      if (!Array.isArray(paragraphs)) {
+      if (!Array.isArray(paragraphs) || paragraphs.length > 10_000) {
         throw new Error('Invalid paragraphs parameter');
+      }
+      for (const p of paragraphs) {
+        if (typeof p?.text !== 'string' || typeof p?.pos !== 'number') {
+          throw new Error('Invalid paragraph structure');
+        }
       }
 
       await ensureInitialized();
@@ -155,6 +163,9 @@ function registerNlpHandlers() {
    */
   ipcMain.handle('nlp:analyze-word-frequency', async (event, text) => {
     try {
+      if (typeof text !== 'string' || text.length === 0 || text.length > 10_000_000) {
+        throw new Error('Invalid text parameter');
+      }
       await ensureInitialized();
       const result = await nlpProcessor.analyzeWordFrequency(text);
       return result.words;

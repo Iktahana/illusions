@@ -850,6 +850,15 @@ ipcMain.handle('open-dictionary-popup', (_event, url, title) => {
 
 // ネイティブコンテキストメニューを表示
 ipcMain.handle('show-context-menu', (_event, items) => {
+  // Input validation
+  if (!Array.isArray(items) || items.length === 0 || items.length > 50) return null
+  for (const item of items) {
+    if (typeof item !== 'object' || item === null) return null
+    if (item.action !== '_separator') {
+      if (typeof item.label !== 'string' || typeof item.action !== 'string') return null
+    }
+  }
+
   const win = BrowserWindow.getFocusedWindow()
   if (!win) return null
 
