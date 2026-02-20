@@ -18,7 +18,6 @@ export default function RootLayout({
   return (
     <html lang="ja" suppressHydrationWarning>
       <head>
-        <title>illusions</title>
         <meta
           name="description"
           content="縦書きに対応した、日本語小説のための執筆エディタです。"
