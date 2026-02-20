@@ -730,35 +730,37 @@ const VALID_SAVE_FILE_TYPES = ['.mdi', '.md', '.txt']
  * Validate a file path provided by the renderer for the save-file IPC handler.
  * Returns an error object if validation fails, or null if the path is valid.
  * @param {string} filePath - The raw file path from the renderer
+ * @param {{ skipApproval?: boolean }} [options] - Validation options
+ * @param {boolean} [options.skipApproval=false] - Skip the dialog-approval check (for dialog-selected paths)
  * @returns {{ success: false, error: string, code: string } | null}
  */
-function validateSaveFilePath(filePath) {
+function validateSaveFilePath(filePath, { skipApproval = false } = {}) {
   // Reject paths containing '..' to prevent directory traversal
   const resolved = path.resolve(filePath)
   const normalized = resolved.split(path.sep).join('/')
-  if (resolved !== path.resolve(resolved) || filePath.includes('..')) {
+  if (filePath.includes('..')) {
     log.warn(`save-file path rejected (directory traversal): ${filePath}`)
-    return { success: false, error: 'パスに許可されていないディレクトリ移動が含まれています', code: 'PATH_TRAVERSAL' }
+    return { success: false, error: 'パスに不正なディレクトリ遷移が含まれています', code: 'PATH_TRAVERSAL' }
   }
 
   // Reject system-sensitive paths
   // Check both the file itself and its parent directory
   if (isSavePathDenied(normalized) || isSavePathDenied(path.dirname(normalized).split(path.sep).join('/'))) {
     log.warn(`save-file path rejected (denied location): ${filePath}`)
-    return { success: false, error: 'この場所への書き込みはセキュリティ上許可されていません', code: 'PATH_DENIED' }
+    return { success: false, error: 'セキュリティ上の理由により、この場所への書き込みは許可されていません', code: 'PATH_DENIED' }
   }
 
   // Validate file extension
   const ext = path.extname(resolved).toLowerCase()
   if (!VALID_SAVE_FILE_TYPES.includes(ext)) {
     log.warn(`save-file path rejected (invalid extension "${ext}"): ${filePath}`)
-    return { success: false, error: `無効な拡張子です: ${ext}`, code: 'INVALID_EXTENSION' }
+    return { success: false, error: `無効なファイル拡張子: ${ext}`, code: 'INVALID_EXTENSION' }
   }
 
   // Reject paths not previously approved via dialog or system file open
-  if (!dialogApprovedPaths.has(resolved)) {
+  if (!skipApproval && !dialogApprovedPaths.has(resolved)) {
     log.warn(`save-file path rejected (not dialog-approved): ${filePath}`)
-    return { success: false, error: 'ダイアログで承認されていないパスです', code: 'PATH_NOT_APPROVED' }
+    return { success: false, error: 'ダイアログで承認されていないファイルパスです', code: 'PATH_NOT_APPROVED' }
   }
 
   return null
@@ -816,6 +818,9 @@ ipcMain.handle('save-file', async (_event, filePath, content, fileType) => {
     })
     if (result.canceled || !result.filePath) return null
     target = result.filePath
+    // Validate dialog-selected path (skip approval check since it came from the dialog)
+    const dialogValidationError = validateSaveFilePath(target, { skipApproval: true })
+    if (dialogValidationError) return dialogValidationError
     // Approve this dialog-selected path for future saves
     dialogApprovedPaths.add(path.resolve(target))
   }
