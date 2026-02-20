@@ -626,7 +626,20 @@ ipcMain.handle('open-file', async () => {
   return { path: filePath, content }
 })
 
+const VALID_SAVE_FILE_TYPES = ['.mdi', '.md', '.txt']
+
 ipcMain.handle('save-file', async (_event, filePath, content, fileType) => {
+  // Validate inputs
+  if (filePath != null && typeof filePath !== 'string') {
+    return { success: false, error: 'Invalid file path', code: 'INVALID_INPUT' }
+  }
+  if (typeof content !== 'string') {
+    return { success: false, error: 'Invalid content', code: 'INVALID_INPUT' }
+  }
+  if (fileType != null && !VALID_SAVE_FILE_TYPES.includes(fileType)) {
+    return { success: false, error: `Invalid file type: ${fileType}`, code: 'INVALID_INPUT' }
+  }
+
   let target = filePath
   if (!target) {
     // Determine default file name and filters based on fileType
