@@ -6,6 +6,7 @@ import {
   saveMdiFile,
 } from "../mdi-file";
 import type { MdiFileDescriptor } from "../mdi-file";
+import { notificationManager } from "../notification-manager";
 import { getStorageService } from "../storage-service";
 import { persistAppState } from "../app-state-manager";
 import { getHistoryService } from "../history-service";
@@ -245,7 +246,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         console.error("保存に失敗しました:", error);
         updateTab(tabId, { isSaving: false });
         const message = getErrorMessage(error);
-        window.alert(`保存に失敗しました: ${message}`);
+        notificationManager.error(`保存に失敗しました: ${message}`);
       } finally {
         isSavingRef.current = false;
       }
@@ -289,7 +290,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       console.error("名前を付けて保存に失敗しました:", error);
       updateTab(tabId, { isSaving: false });
       const message = getErrorMessage(error);
-      window.alert(`名前を付けて保存に失敗しました: ${message}`);
+      notificationManager.error(`名前を付けて保存に失敗しました: ${message}`);
     } finally {
       isSavingRef.current = false;
     }

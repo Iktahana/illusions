@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { saveMdiFile } from "../mdi-file";
 import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../file-watcher";
+import { notificationManager } from "../notification-manager";
 import type { TabId, TabState } from "../tab-types";
 import { sanitizeMdiContent, getErrorMessage } from "./types";
 import type { TabManagerCore } from "./types";
@@ -83,7 +84,7 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
     } catch (error) {
       console.error("保存に失敗しました:", error);
       const message = getErrorMessage(error);
-      window.alert(`保存に失敗しました: ${message}`);
+      notificationManager.error(`保存に失敗しました: ${message}`);
       return;
     }
 
