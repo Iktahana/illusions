@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
+import { X, ExternalLink, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
+import type { Severity } from "@/lib/linting/types";
 import ColorPicker from "./ColorPicker";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 const LICENSE_TEXT = process.env.NEXT_PUBLIC_LICENSE_TEXT || "";
@@ -63,9 +64,15 @@ interface SettingsModalProps {
   onPosHighlightEnabledChange: (value: boolean) => void;
   posHighlightColors: Record<string, string>;
   onPosHighlightColorsChange: (value: Record<string, string>) => void;
+  // Linting settings
+  lintingEnabled?: boolean;
+  onLintingEnabledChange?: (value: boolean) => void;
+  lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity }>;
+  onLintingRuleConfigChange?: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
+  lintingRuleMetadata?: Array<{ id: string; nameJa: string; descriptionJa: string }>;
 }
 
-type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "about";
+type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "about";
 
 const FONT_FAMILIES = [
   { value: "Noto Serif JP", label: "Noto Serif JP" },
@@ -123,6 +130,11 @@ export default function SettingsModal({
   onPosHighlightEnabledChange,
   posHighlightColors,
   onPosHighlightColorsChange,
+  lintingEnabled = false,
+  onLintingEnabledChange,
+  lintingRuleConfigs = {},
+  onLintingRuleConfigChange,
+  lintingRuleMetadata,
 }: SettingsModalProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>("editor");
   const modalRef = useRef<HTMLDivElement>(null);
@@ -238,6 +250,18 @@ export default function SettingsModal({
                 )}
               >
                 品詞ハイライト
+              </button>
+              <button
+                onClick={() => setActiveCategory("linting")}
+                className={clsx(
+                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2",
+                  activeCategory === "linting"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                )}
+              >
+                <AlertCircle className="w-4 h-4" />
+                校正
               </button>
               <div className="my-2 border-t border-border" />
               <button
@@ -556,6 +580,111 @@ export default function SettingsModal({
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Linting section */}
+            {activeCategory === "linting" && (
+              <div className="space-y-6">
+                {/* Master toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-foreground">
+                      校正機能を有効にする
+                    </h3>
+                    <p className="text-xs text-foreground-tertiary mt-0.5">
+                      テキストの校正ルールを適用します
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onLintingEnabledChange?.(!lintingEnabled)}
+                    className={clsx(
+                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                      lintingEnabled ? "bg-accent" : "bg-border-secondary"
+                    )}
+                  >
+                    <span
+                      className={clsx(
+                        "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
+                        lintingEnabled ? "translate-x-6" : "translate-x-1"
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {/* Rule settings */}
+                <div
+                  className={clsx(
+                    "space-y-4 pt-4 border-t border-border transition-opacity",
+                    !lintingEnabled && "opacity-50 pointer-events-none"
+                  )}
+                >
+                  <h4 className="text-sm font-medium text-foreground">ルール設定</h4>
+                  {(lintingRuleMetadata ?? []).length === 0 ? (
+                    <p className="text-xs text-foreground-tertiary">
+                      登録されたルールはありません
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {(lintingRuleMetadata ?? []).map((rule) => {
+                        const config = lintingRuleConfigs[rule.id] ?? { enabled: true, severity: "warning" as Severity };
+                        return (
+                          <div
+                            key={rule.id}
+                            className="rounded-lg border border-border bg-background/50 p-3 space-y-2"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-foreground">
+                                {rule.nameJa}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  onLintingRuleConfigChange?.(rule.id, {
+                                    ...config,
+                                    enabled: !config.enabled,
+                                  })
+                                }
+                                className={clsx(
+                                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                                  config.enabled ? "bg-accent" : "bg-border-secondary"
+                                )}
+                              >
+                                <span
+                                  className={clsx(
+                                    "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
+                                    config.enabled ? "translate-x-6" : "translate-x-1"
+                                  )}
+                                />
+                              </button>
+                            </div>
+                            <p className="text-xs text-foreground-tertiary">
+                              {rule.descriptionJa}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs text-foreground-secondary">
+                                重要度
+                              </label>
+                              <select
+                                value={config.severity}
+                                onChange={(e) =>
+                                  onLintingRuleConfigChange?.(rule.id, {
+                                    ...config,
+                                    severity: e.target.value as Severity,
+                                  })
+                                }
+                                className="text-xs px-2 py-1 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                              >
+                                <option value="error">エラー</option>
+                                <option value="warning">警告</option>
+                                <option value="info">情報</option>
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
