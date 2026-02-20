@@ -589,9 +589,15 @@ export default function EditorPage() {
     if (from === to) return;
     const text = state.doc.textBetween(from, to);
     if (!text.trim()) return;
-    // Toggle: if already wrapped in ^...^, unwrap
-    const tr = state.tr.insertText(`^${text}^`, from, to);
-    dispatch(tr);
+    // Toggle: if already wrapped in ^...^, unwrap; otherwise wrap
+    if (text.startsWith("^") && text.endsWith("^") && text.length >= 2) {
+      const unwrapped = text.slice(1, -1);
+      const tr = state.tr.insertText(unwrapped, from, to);
+      dispatch(tr);
+    } else {
+      const tr = state.tr.insertText(`^${text}^`, from, to);
+      dispatch(tr);
+    }
   }, [editorViewInstance]);
 
   /** Open the dictionary panel in the sidebar with optional search term */
