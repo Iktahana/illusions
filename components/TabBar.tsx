@@ -11,6 +11,7 @@ interface TabBarProps {
   onCloseTab: (tabId: TabId) => void;
   onNewTab: () => void;
   onPinTab?: (tabId: TabId) => void;
+  compactMode?: boolean;
 }
 
 export default function TabBar({
@@ -20,6 +21,7 @@ export default function TabBar({
   onCloseTab,
   onNewTab,
   onPinTab,
+  compactMode = false,
 }: TabBarProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<HTMLButtonElement>(null);
@@ -50,7 +52,7 @@ export default function TabBar({
 
   return (
     <div
-      className="flex items-stretch h-9 bg-background-secondary border-b border-border select-none shrink-0"
+      className={`flex items-stretch ${compactMode ? "h-7" : "h-9"} bg-background-secondary border-b border-border select-none shrink-0`}
       role="tablist"
     >
       <div
@@ -68,7 +70,7 @@ export default function TabBar({
               role="tab"
               aria-selected={isActive}
               className={`
-                group relative flex items-center gap-1.5 px-3 min-w-[120px] max-w-[200px]
+                group relative flex items-center gap-1.5 ${compactMode ? "px-2 min-w-[100px]" : "px-3 min-w-[120px]"} max-w-[200px]
                 text-xs whitespace-nowrap transition-colors duration-100
                 border-r border-border
                 ${
@@ -115,7 +117,7 @@ export default function TabBar({
 
       {/* New tab button */}
       <button
-        className="shrink-0 w-8 flex items-center justify-center text-foreground-secondary hover:bg-hover hover:text-foreground transition-colors"
+        className={`shrink-0 ${compactMode ? "w-7" : "w-8"} flex items-center justify-center text-foreground-secondary hover:bg-hover hover:text-foreground transition-colors`}
         onClick={onNewTab}
         title="新しいタブ"
         aria-label="新しいタブ"
