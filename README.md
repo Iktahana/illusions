@@ -272,7 +272,7 @@ The proofreading (linting) features in illusions comply with the following offic
 
 - **Token encryption**: OS-level encryption via Electron safeStorage (macOS Keychain / Windows DPAPI)
 - **Context isolation**: Electron preload with secure IPC, sandbox enabled
-- **IPC input validation**: Type and size checks on all renderer-to-main IPC handlers
+- **IPC input validation**: Type and size checks on security-sensitive IPC handlers (VFS, NLP, file operations, context-menu)
 - **Content Security Policy**: CSP headers enforced; `unsafe-eval` disabled in production
 - **Navigation guards**: Blocks unexpected navigation and new-window creation
 - **VFS sandboxing**: File system access restricted to approved project directories
