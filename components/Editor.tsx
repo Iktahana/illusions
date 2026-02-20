@@ -29,6 +29,7 @@ import SelectionCounter from "./SelectionCounter";
 import { searchHighlightPlugin } from "@/lib/search-highlight-plugin";
 import EditorContextMenu, { type ContextMenuAction } from "./EditorContextMenu";
 import { isElectronRenderer } from "@/lib/runtime-env";
+import { localPreferences } from "@/lib/local-preferences";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
 
 interface EditorProps {
@@ -111,7 +112,7 @@ export default function NovelEditor({
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
   const [isVertical, setIsVertical] = useState(() => {
     if (typeof window === "undefined") return false;
-    return localStorage.getItem("illusions-writing-mode") === "vertical";
+    return localPreferences.getWritingMode() === "vertical";
   });
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -128,7 +129,7 @@ export default function NovelEditor({
   // 変更時に縦書き状態を localStorage に保存する
   useEffect(() => {
     if (!isMounted) return;
-    localStorage.setItem('illusions-writing-mode', isVertical ? 'vertical' : 'horizontal');
+    localPreferences.setWritingMode(isVertical ? 'vertical' : 'horizontal');
   }, [isVertical, isMounted]);
 
    // 注意：このエフェクトはもう不要。理由：
