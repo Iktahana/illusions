@@ -7,3 +7,10 @@ name: Copilot Maintainer Loop
 # Re-enable when GitHub adds workflow-triggered agent support.
 on:
   workflow_dispatch: # Manual trigger only
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notice
+        run: echo "This workflow is disabled. Use Copilot Chat with @maintainer instead."

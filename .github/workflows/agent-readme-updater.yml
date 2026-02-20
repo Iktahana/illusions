@@ -60,7 +60,6 @@ jobs:
           gh issue create \
             --title "docs: update README.md to reflect recent changes" \
             --label "copilot,documentation" \
-            --assignee "copilot-swe-agent[bot]" \
             --body "$(cat <<'EOF'
           ## Task
 

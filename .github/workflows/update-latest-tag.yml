@@ -25,7 +25,7 @@ jobs:
           # Get all tags sorted by version
           # Filter out beta/dev versions, only keep stable releases (e.g., v0.0.113)
           LATEST_STABLE=$(git tag -l 'v*.*.*' | \
-            grep -v -E '-(beta|dev|alpha|rc)' | \
+            grep -v -e '-beta' -e '-dev' -e '-alpha' -e '-rc' | \
             sort -V | \
             tail -1)
 

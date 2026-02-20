@@ -82,47 +82,39 @@ jobs:
           # Ensure labels exist (create if missing)
           gh label create "ci-failure" --color "D73A49" --description "CI/CD failure" 2>/dev/null || true
 
+          BODY=$(cat <<BODY_EOF
+          ## CI ビルドが失敗しました
+
+          **Workflow**: \`$WORKFLOW_NAME\`
+          **Run ID**: [#$WORKFLOW_ID](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
+          **Commit**: $COMMIT_MSG
+
+          ---
+
+          ## エラーログ
+
+          \`\`\`
+          $ERROR_LINES
+          \`\`\`
+
+          <details>
+          <summary>ログ末尾（詳細）</summary>
+
+          \`\`\`
+          $LOG_TAIL
+          \`\`\`
+
+          </details>
+
+          [完全なログを確認](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
+
+          ---
+
+          *この Issue は CI Failure Handler により自動作成されました。*
+          BODY_EOF
+          )
+
           gh issue create \
-            --title "🚨 CI Failure: $WORKFLOW_NAME (Run #$WORKFLOW_ID)" \
+            --title "CI Failure: $WORKFLOW_NAME (Run #$WORKFLOW_ID)" \
             --label "ci-failure" \
-            --body "$(cat <<EOF
-## CI ビルドが失敗しました
-
-**Workflow**: \`$WORKFLOW_NAME\`
-**Run ID**: [#$WORKFLOW_ID](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
-**Commit**: $COMMIT_MSG
-
----
-
-## エラーログ
-
-\`\`\`
-$ERROR_LINES
-\`\`\`
-
-<details>
-<summary>ログ末尾（詳細）</summary>
-
-\`\`\`
-$LOG_TAIL
-\`\`\`
-
-</details>
-
-[📄 完全なログを確認](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
-
----
-
-## AI による診断
-
-GitHub Copilot Chat で \`@ci-debugger\` を呼び出してください：
-
-\`\`\`
-@ci-debugger Run #$WORKFLOW_ID の失敗原因を分析して、修正方法を提案してください
-\`\`\`
-
----
-
-*この Issue は CI Failure Handler により自動作成されました。*
-EOF
-          )"
+            --body "$BODY"
