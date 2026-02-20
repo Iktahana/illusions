@@ -47,7 +47,7 @@ import {
   calculateReadabilityScore,
 } from "@/lib/utils";
 
-import type { ProjectMode } from "@/lib/project-types";
+import type { ProjectMode, SupportedFileExtension } from "@/lib/project-types";
 
 /** Recent project entry for WelcomeScreen display */
 interface RecentProjectEntry {
@@ -113,6 +113,12 @@ export default function EditorPage() {
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
   } = tabManager;
 
+  // Derive editor mode from active tab's fileType
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const activeFileType = activeTab?.fileType ?? ".mdi";
+  const mdiExtensionsEnabled = activeFileType === ".mdi";
+  const gfmEnabled = activeFileType !== ".txt";
+
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
@@ -156,8 +162,8 @@ export default function EditorPage() {
      setEditorKey(prev => prev + 1);
    }, [tabOpenFile]);
 
-  const newFile = useCallback(() => {
-    tabNewFile();
+  const newFile = useCallback((fileType?: SupportedFileExtension) => {
+    tabNewFile(fileType);
     setEditorKey(prev => prev + 1);
   }, [tabNewFile]);
 
@@ -1405,7 +1411,7 @@ export default function EditorPage() {
     return (
       <div className="h-screen flex flex-col overflow-hidden relative">
         {/* Web menu bar (only for non-Electron environment) */}
-        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} />}
+        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} checkedState={{ compactMode }} />}
 
         <WelcomeScreen
           onCreateProject={handleCreateProject}
@@ -1447,7 +1453,7 @@ export default function EditorPage() {
         <TitleUpdater currentFile={currentFile} isDirty={isDirty} />
 
         {/* Web menu bar (only for non-Electron environment) */}
-        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} />}
+        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} checkedState={{ compactMode }} />}
 
          {/* 未保存警告ダイアログ (project mode transitions) */}
         <UnsavedWarningDialog
@@ -1660,7 +1666,10 @@ export default function EditorPage() {
               setEditorKey(prev => prev + 1);
             }}
             onCloseTab={closeTab}
-            onNewTab={newTab}
+            onNewTab={(fileType) => {
+              newTab(fileType);
+              setEditorKey(prev => prev + 1);
+            }}
             onPinTab={pinTab}
           />
           <div ref={editorDomRef} className="flex-1 min-h-0">
@@ -1706,6 +1715,8 @@ export default function EditorPage() {
                 onFontScaleChange={handleFontScaleChange}
                 onLineHeightChange={handleLineHeightChange}
                 onParagraphSpacingChange={handleParagraphSpacingChange}
+                mdiExtensionsEnabled={mdiExtensionsEnabled}
+                gfmEnabled={gfmEnabled}
               />
             )}
           </div>

@@ -13,6 +13,7 @@ import { getRandomillusionstory } from "./illusion-stories";
 import { getHistoryService } from "./history-service";
 import { getVFS } from "./vfs";
 import { useEditorMode } from "@/contexts/EditorModeContext";
+import type { SupportedFileExtension } from "./project-types";
 import type { TabId, TabState, TabPersistenceState, SerializedTab } from "./tab-types";
 
 const AUTO_SAVE_INTERVAL = 5000;
@@ -28,8 +29,14 @@ function generateTabId(): TabId {
   return `tab-${++nextTabCounter}-${Date.now()}`;
 }
 
-function createNewTab(content?: string): TabState {
-  const c = content ?? getRandomillusionstory();
+function inferFileType(fileName: string): SupportedFileExtension {
+  if (fileName.endsWith(".md")) return ".md";
+  if (fileName.endsWith(".txt")) return ".txt";
+  return ".mdi";
+}
+
+function createNewTab(content?: string, fileType: SupportedFileExtension = ".mdi"): TabState {
+  const c = content ?? (fileType === ".mdi" ? getRandomillusionstory() : "");
   return {
     id: generateTabId(),
     file: null,
@@ -39,6 +46,7 @@ function createNewTab(content?: string): TabState {
     lastSavedTime: null,
     isSaving: false,
     isPreview: false,
+    fileType,
   };
 }
 
@@ -110,7 +118,7 @@ export interface UseTabManagerReturn {
   openFile: () => Promise<void>;
   saveFile: (isAutoSave?: boolean) => Promise<void>;
   saveAsFile: () => Promise<void>;
-  newFile: () => void;
+  newFile: (fileType?: SupportedFileExtension) => void;
   updateFileName: (newName: string) => void;
   wasAutoRecovered?: boolean;
   onSystemFileOpen?: (handler: (path: string, content: string) => void) => void;
@@ -119,7 +127,7 @@ export interface UseTabManagerReturn {
   // Tab management
   tabs: TabState[];
   activeTabId: TabId;
-  newTab: () => void;
+  newTab: (fileType?: SupportedFileExtension) => void;
   closeTab: (tabId: TabId) => void;
   switchTab: (tabId: TabId) => void;
   nextTab: () => void;
@@ -264,8 +272,8 @@ export function useTabManager(options?: {
   // Tab management functions
   // =========================================================================
 
-  const newTab = useCallback(() => {
-    const tab = createNewTab();
+  const newTab = useCallback((fileType?: SupportedFileExtension) => {
+    const tab = createNewTab(undefined, fileType);
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(tab.id);
   }, []);
@@ -314,7 +322,7 @@ export function useTabManager(options?: {
 
     const remaining = current.filter((t) => t.id !== tabId);
     if (remaining.length === 0) {
-      const emptyTab = createNewTab();
+      const emptyTab = createNewTab(undefined, ".mdi");
       setTabs([emptyTab]);
       setActiveTabId(emptyTab.id);
       return;
@@ -347,7 +355,7 @@ export function useTabManager(options?: {
     ? tabs.find((t) => t.id === pendingCloseTabId)
     : null;
   const pendingCloseFileName =
-    pendingCloseTab?.file?.name ?? "新規ファイル";
+    pendingCloseTab?.file?.name ?? `新規ファイル${pendingCloseTab?.fileType ?? ".mdi"}`;
 
   const handleCloseTabSave = useCallback(async () => {
     if (!pendingCloseTabId) return;
@@ -364,6 +372,7 @@ export function useTabManager(options?: {
         const result = await saveMdiFile({
           descriptor: tab.file,
           content: sanitized,
+          fileType: tab.fileType,
         });
         if (!result) {
           // User cancelled save dialog → keep tab open
@@ -450,6 +459,8 @@ export function useTabManager(options?: {
       }
     }
 
+    const detectedFileType = inferFileType(descriptor.name);
+
     // Reuse current tab if untitled and clean
     const cur = tabsRef.current.find(
       (t) => t.id === activeTabIdRef.current,
@@ -461,6 +472,7 @@ export function useTabManager(options?: {
         lastSavedContent: fileContent,
         isDirty: false,
         lastSavedTime: Date.now(),
+        fileType: detectedFileType,
       });
     } else {
       const tab: TabState = {
@@ -472,6 +484,7 @@ export function useTabManager(options?: {
         lastSavedTime: Date.now(),
         isSaving: false,
         isPreview: false,
+        fileType: detectedFileType,
       };
       setTabs((prev) => [...prev, tab]);
       setActiveTabId(tab.id);
@@ -512,6 +525,7 @@ export function useTabManager(options?: {
         const result = await saveMdiFile({
           descriptor: tab.file,
           content: sanitized,
+          fileType: tab.fileType,
         });
 
         if (result) {
@@ -556,7 +570,7 @@ export function useTabManager(options?: {
         ? { path: null, handle: null, name: tab.file.name }
         : null;
 
-      const result = await saveMdiFile({ descriptor, content: sanitized });
+      const result = await saveMdiFile({ descriptor, content: sanitized, fileType: tab.fileType });
 
       if (result) {
         updateTab(tabId, {
@@ -597,6 +611,9 @@ export function useTabManager(options?: {
         return;
       }
 
+      const sysFileName = path.split("/").pop() || "無題";
+      const sysFileType = inferFileType(sysFileName);
+
       // Reuse current tab if untitled and clean
       const cur = tabsRef.current.find(
         (t) => t.id === activeTabIdRef.current,
@@ -606,12 +623,13 @@ export function useTabManager(options?: {
           file: {
             path,
             handle: null,
-            name: path.split("/").pop() || "無題",
+            name: sysFileName,
           },
           content: fileContent,
           lastSavedContent: fileContent,
           isDirty: false,
           lastSavedTime: Date.now(),
+          fileType: sysFileType,
         });
         return;
       }
@@ -622,7 +640,7 @@ export function useTabManager(options?: {
         file: {
           path,
           handle: null,
-          name: path.split("/").pop() || "無題",
+          name: sysFileName,
         },
         content: fileContent,
         lastSavedContent: fileContent,
@@ -630,6 +648,7 @@ export function useTabManager(options?: {
         lastSavedTime: Date.now(),
         isSaving: false,
         isPreview: false,
+        fileType: sysFileType,
       };
       setTabs((prev) => [...prev, tab]);
       setActiveTabId(tab.id);
@@ -666,6 +685,7 @@ export function useTabManager(options?: {
       }
 
       const fileName = vfsPath.split("/").pop() || "無題";
+      const vfsFileType = inferFileType(fileName);
 
       if (preview) {
         // Replace existing preview tab, or create new preview tab
@@ -678,6 +698,7 @@ export function useTabManager(options?: {
             isDirty: false,
             lastSavedTime: Date.now(),
             isPreview: true,
+            fileType: vfsFileType,
           });
           setActiveTabId(existingPreview.id);
           return;
@@ -696,6 +717,7 @@ export function useTabManager(options?: {
           isDirty: false,
           lastSavedTime: Date.now(),
           isPreview: preview,
+          fileType: vfsFileType,
         });
         return;
       }
@@ -710,6 +732,7 @@ export function useTabManager(options?: {
         lastSavedTime: Date.now(),
         isSaving: false,
         isPreview: preview,
+        fileType: vfsFileType,
       };
       setTabs((prev) => [...prev, tab]);
       setActiveTabId(tab.id);
@@ -778,6 +801,7 @@ export function useTabManager(options?: {
                           content: fileContent,
                           lastSavedContent: fileContent,
                           lastSavedTime: Date.now(),
+                          fileType: inferFileType(file.name),
                         }
                       : tab,
                   ),
@@ -813,6 +837,7 @@ export function useTabManager(options?: {
                         },
                         content: demoContent,
                         lastSavedContent: demoContent,
+                        fileType: inferFileType(DEMO_FILE_NAME),
                       }
                     : tab,
                 ),
@@ -876,6 +901,7 @@ export function useTabManager(options?: {
               const result = await saveMdiFile({
                 descriptor: tab.file,
                 content: sanitized,
+                fileType: tab.fileType,
               });
               if (result) {
                 setTabs((prev) =>
@@ -1077,6 +1103,7 @@ export function useTabManager(options?: {
         filePath: t.file?.path ?? null,
         fileName: t.file?.name ?? "新規ファイル",
         isPreview: t.isPreview || undefined,
+        fileType: t.fileType,
       }));
       const activeIndex = tabs.findIndex((t) => t.id === activeTabId);
       const state: TabPersistenceState = {
@@ -1123,6 +1150,7 @@ export function useTabManager(options?: {
                 lastSavedTime: Date.now(),
                 isSaving: false,
                 isPreview: serialized.isPreview ?? false,
+                fileType: serialized.fileType ?? inferFileType(serialized.fileName),
               });
             } catch (error) {
               console.warn(

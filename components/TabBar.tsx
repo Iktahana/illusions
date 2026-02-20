@@ -1,15 +1,17 @@
 "use client";
 
 import { useCallback, useRef, useEffect } from "react";
-import { X, Plus } from "lucide-react";
+import { X } from "lucide-react";
 import type { TabId, TabState } from "@/lib/tab-types";
+import type { SupportedFileExtension } from "@/lib/project-types";
+import NewTabMenu from "./NewTabMenu";
 
 interface TabBarProps {
   tabs: TabState[];
   activeTabId: TabId;
   onSwitchTab: (tabId: TabId) => void;
   onCloseTab: (tabId: TabId) => void;
-  onNewTab: () => void;
+  onNewTab: (fileType?: SupportedFileExtension) => void;
   onPinTab?: (tabId: TabId) => void;
   compactMode?: boolean;
 }
@@ -61,7 +63,7 @@ export default function TabBar({
       >
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
-          const label = tab.file?.name ?? "新規ファイル";
+          const label = tab.file?.name ?? `新規ファイル${tab.fileType}`;
 
           return (
             <button
@@ -115,15 +117,11 @@ export default function TabBar({
         })}
       </div>
 
-      {/* New tab button */}
-      <button
-        className={`shrink-0 ${compactMode ? "w-7" : "w-8"} flex items-center justify-center text-foreground-secondary hover:bg-hover hover:text-foreground transition-colors`}
-        onClick={onNewTab}
-        title="新しいタブ"
-        aria-label="新しいタブ"
-      >
-        <Plus size={14} />
-      </button>
+      {/* New tab dropdown menu */}
+      <NewTabMenu
+        onNewTab={(fileType) => onNewTab(fileType)}
+        compactMode={compactMode}
+      />
     </div>
   );
 }

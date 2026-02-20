@@ -1,4 +1,5 @@
 import type { MdiFileDescriptor } from "./mdi-file";
+import type { SupportedFileExtension } from "./project-types";
 
 /** Unique identifier for a tab */
 export type TabId = string;
@@ -13,6 +14,7 @@ export interface TabState {
   lastSavedTime: number | null;
   isSaving: boolean;
   isPreview: boolean;
+  fileType: SupportedFileExtension;
 }
 
 /** Serialized tab for persistence (file path only, no handles) */
@@ -20,6 +22,7 @@ export interface SerializedTab {
   filePath: string | null;
   fileName: string;
   isPreview?: boolean;
+  fileType?: SupportedFileExtension;
 }
 
 /** Persisted state for open tabs (stored in AppState) */

@@ -347,6 +347,11 @@ export function FilesPanel({
   /** Timer for single/double click discrimination on files */
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ---- Drag-and-drop state ----
+  const [dragSourcePath, setDragSourcePath] = useState<string | null>(null);
+  const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
+  const dragExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const refresh = useCallback(() => setRefreshToken(v => v + 1), []);
 
   const loadDirectory = useCallback(async (dirPath: string): Promise<FileTreeEntry[]> => {
@@ -419,6 +424,9 @@ export function FilesPanel({
         } else {
           input.select();
         }
+      } else if (editing.kind === "new-file" && editing.currentName.startsWith(".")) {
+        // Extension pre-filled: place cursor at the start (before the extension)
+        input.setSelectionRange(0, 0);
       } else {
         input.select();
       }
@@ -571,10 +579,10 @@ export function FilesPanel({
     }
   }, [refresh]);
 
-  const startNewFile = useCallback((parentPath: string) => {
+  const startNewFile = useCallback((parentPath: string, defaultExtension?: string) => {
     // Ensure parent is expanded
     setExpandedDirs(prev => { const next = new Set(prev); next.add(parentPath); return next; });
-    setEditing({ parentPath, kind: "new-file", currentName: "" });
+    setEditing({ parentPath, kind: "new-file", currentName: defaultExtension ?? "" });
     refresh();
   }, [refresh]);
 
@@ -583,6 +591,153 @@ export function FilesPanel({
     setEditing({ parentPath, kind: "new-folder", currentName: "" });
     refresh();
   }, [refresh]);
+
+  // ---- Drag-and-drop helpers ----
+
+  /** For a drop target, return the directory path items should be moved/dropped into */
+  const getDropTargetDir = (path: string, kind: "file" | "directory"): string => {
+    if (kind === "directory") return path;
+    // For files, use the parent directory
+    const lastSlash = path.lastIndexOf("/");
+    return lastSlash <= 0 ? "/" : path.substring(0, lastSlash);
+  };
+
+  /** Check if moving src into destDir would create a circular reference */
+  const isCircularMove = (src: string, destDir: string): boolean => {
+    // Cannot move a folder into itself or any of its descendants
+    return destDir === src || destDir.startsWith(src + "/");
+  };
+
+  /** Move an internal VFS item from src to destDir */
+  const handleDragMove = useCallback(async (srcPath: string, destDir: string) => {
+    const name = srcPath.split("/").pop()!;
+    const srcParent = srcPath.substring(0, srcPath.lastIndexOf("/")) || "/";
+    // No-op if dropped back into the same parent
+    if (srcParent === destDir) return;
+
+    const newPath = destDir === "/" ? `/${name}` : `${destDir}/${name}`;
+    try {
+      const { getVFS } = await import("@/lib/vfs");
+      const vfs = getVFS();
+      await vfs.rename(toVFSPath(srcPath), toVFSPath(newPath));
+      refresh();
+    } catch (error) {
+      console.error("移動に失敗しました:", error);
+    }
+  }, [refresh]);
+
+  /** Import external files dropped from the OS into destDir */
+  const handleExternalFileDrop = useCallback(async (files: FileList, destDir: string) => {
+    try {
+      const { getVFS } = await import("@/lib/vfs");
+      const vfs = getVFS();
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+          const content = await file.text();
+          const filePath = destDir === "/" ? `/${file.name}` : `${destDir}/${file.name}`;
+          await vfs.writeFile(toVFSPath(filePath), content);
+        } catch (err) {
+          console.warn("外部ファイルの読み込みに失敗しました:", file.name, err);
+        }
+      }
+      refresh();
+    } catch (error) {
+      console.error("外部ファイルのインポートに失敗しました:", error);
+    }
+  }, [refresh]);
+
+  // ---- Drag event handlers ----
+
+  const DRAG_MIME = "application/x-illusions-tree-path";
+
+  const handleDragStart = useCallback((e: React.DragEvent, path: string, kind: "file" | "directory") => {
+    e.dataTransfer.setData(DRAG_MIME, path);
+    e.dataTransfer.effectAllowed = "move";
+    setDragSourcePath(path);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setDragSourcePath(null);
+    setDropTargetPath(null);
+    if (dragExpandTimerRef.current) {
+      clearTimeout(dragExpandTimerRef.current);
+      dragExpandTimerRef.current = null;
+    }
+  }, []);
+
+  const handleTreeDragOver = useCallback((e: React.DragEvent, path: string, kind: "file" | "directory") => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const destDir = getDropTargetDir(path, kind);
+    const srcPath = dragSourcePath;
+
+    // Validate drop target
+    if (srcPath) {
+      if (isCircularMove(srcPath, destDir)) {
+        e.dataTransfer.dropEffect = "none";
+        setDropTargetPath(null);
+        return;
+      }
+      // No-op: same parent
+      const srcParent = srcPath.substring(0, srcPath.lastIndexOf("/")) || "/";
+      if (srcParent === destDir) {
+        e.dataTransfer.dropEffect = "none";
+        setDropTargetPath(null);
+        return;
+      }
+    }
+
+    e.dataTransfer.dropEffect = srcPath ? "move" : "copy";
+    setDropTargetPath(destDir);
+
+    // Auto-expand collapsed folder after 500ms hover
+    if (kind === "directory" && !expandedDirs.has(path)) {
+      if (dragExpandTimerRef.current) clearTimeout(dragExpandTimerRef.current);
+      dragExpandTimerRef.current = setTimeout(() => {
+        setExpandedDirs(prev => {
+          const next = new Set(prev);
+          next.add(path);
+          return next;
+        });
+        setRefreshToken(v => v + 1);
+        dragExpandTimerRef.current = null;
+      }, 500);
+    }
+  }, [dragSourcePath, expandedDirs]);
+
+  const handleTreeDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDropTargetPath(null);
+    if (dragExpandTimerRef.current) {
+      clearTimeout(dragExpandTimerRef.current);
+      dragExpandTimerRef.current = null;
+    }
+  }, []);
+
+  const handleTreeDrop = useCallback(async (e: React.DragEvent, path: string, kind: "file" | "directory") => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const destDir = getDropTargetDir(path, kind);
+    setDropTargetPath(null);
+    setDragSourcePath(null);
+    if (dragExpandTimerRef.current) {
+      clearTimeout(dragExpandTimerRef.current);
+      dragExpandTimerRef.current = null;
+    }
+
+    const srcPath = e.dataTransfer.getData(DRAG_MIME);
+    if (srcPath) {
+      // Internal move
+      if (isCircularMove(srcPath, destDir)) return;
+      await handleDragMove(srcPath, destDir);
+    } else if (e.dataTransfer.files.length > 0) {
+      // External file drop
+      await handleExternalFileDrop(e.dataTransfer.files, destDir);
+    }
+  }, [handleDragMove, handleExternalFileDrop]);
 
   const handleContextAction = useCallback(async (action: string, fullPath: string, kind: "file" | "directory") => {
     switch (action) {
@@ -603,6 +758,15 @@ export function FilesPanel({
         break;
       case "new-file":
         startNewFile(fullPath);
+        break;
+      case "new-file-mdi":
+        startNewFile(fullPath, ".mdi");
+        break;
+      case "new-file-md":
+        startNewFile(fullPath, ".md");
+        break;
+      case "new-file-txt":
+        startNewFile(fullPath, ".txt");
         break;
       case "new-folder":
         startNewFolder(fullPath);
@@ -696,8 +860,11 @@ export function FilesPanel({
     contextTargetRef.current = { path: fullPath, kind: "directory" };
     const items = [
       { label: "名前の変更", action: "rename" },
-      { label: "新規ファイル", action: "new-file" },
+      { label: "新規 MDI ファイル", action: "new-file-mdi" },
+      { label: "新規 Markdown ファイル", action: "new-file-md" },
+      { label: "新規テキストファイル", action: "new-file-txt" },
       { label: "新規フォルダ", action: "new-folder" },
+      { label: "", action: "_separator" },
       { label: "削除", action: "delete" },
       ...(isElectronRenderer() ? [
         { label: "", action: "_separator" },
@@ -727,7 +894,16 @@ export function FilesPanel({
         rows.push(
           <div
             key={fullPath}
-            className="flex items-center gap-1.5 px-2 py-1 text-sm text-foreground-secondary hover:bg-hover rounded cursor-pointer"
+            draggable={!isRenaming}
+            onDragStart={(e) => handleDragStart(e, fullPath, "file")}
+            onDragEnd={handleDragEnd}
+            onDragOver={(e) => handleTreeDragOver(e, fullPath, "file")}
+            onDragLeave={handleTreeDragLeave}
+            onDrop={(e) => { void handleTreeDrop(e, fullPath, "file"); }}
+            className={clsx(
+              "flex items-center gap-1.5 px-2 py-1 text-sm text-foreground-secondary hover:bg-hover rounded cursor-pointer",
+              dragSourcePath === fullPath && "opacity-40"
+            )}
             style={{ paddingLeft: `${level * 16 + 8}px` }}
             onClick={() => {
               if (!onFileClick) return;
@@ -764,12 +940,25 @@ export function FilesPanel({
         );
       } else {
         const isExpanded = expandedDirs.has(fullPath);
+        const isFolderDropTarget = dropTargetPath === fullPath && dragSourcePath !== fullPath;
         rows.push(
-          <div key={fullPath}>
+          <div
+            key={fullPath}
+            onDragOver={(e) => handleTreeDragOver(e, fullPath, "directory")}
+            onDragLeave={handleTreeDragLeave}
+            onDrop={(e) => { void handleTreeDrop(e, fullPath, "directory"); }}
+          >
             <div
+              draggable={!isRenaming}
+              onDragStart={(e) => handleDragStart(e, fullPath, "directory")}
+              onDragEnd={handleDragEnd}
               onClick={() => toggleDir(fullPath)}
               onContextMenu={(e) => { void onFolderContextMenu(e, fullPath); }}
-              className="group flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer"
+              className={clsx(
+                "group flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer",
+                dragSourcePath === fullPath && "opacity-40",
+                isFolderDropTarget && "bg-accent/15 outline outline-1 outline-accent/50 -outline-offset-1"
+              )}
               style={{ paddingLeft: `${level * 16 + 8}px` }}
             >
               <ChevronDown
@@ -789,7 +978,7 @@ export function FilesPanel({
                   <button
                     className="p-0.5 hover:bg-hover rounded"
                     title="新規ファイル"
-                    onClick={(e) => { e.stopPropagation(); startNewFile(fullPath); }}
+                    onClick={(e) => { e.stopPropagation(); startNewFile(fullPath, ".mdi"); }}
                   >
                     <FilePlus className="w-3.5 h-3.5" />
                   </button>
@@ -828,7 +1017,15 @@ export function FilesPanel({
   };
 
   return (
-    <div className="space-y-1">
+    <div
+      className="space-y-1"
+      onDragOver={(e) => { e.preventDefault(); }}
+      onDrop={(e) => {
+        // Fallback: drops that miss any specific item → treat as root drop
+        e.preventDefault();
+        void handleTreeDrop(e, "/", "directory");
+      }}
+    >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-foreground">ファイル</h3>
         <button
@@ -850,7 +1047,13 @@ export function FilesPanel({
           <div
             onClick={() => toggleDir("/")}
             onContextMenu={(e) => { void onFolderContextMenu(e, "/"); }}
-            className="group flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer"
+            onDragOver={(e) => handleTreeDragOver(e, "/", "directory")}
+            onDragLeave={handleTreeDragLeave}
+            onDrop={(e) => { void handleTreeDrop(e, "/", "directory"); }}
+            className={clsx(
+              "group flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer",
+              dropTargetPath === "/" && dragSourcePath !== "/" && "bg-accent/15 outline outline-1 outline-accent/50 -outline-offset-1"
+            )}
           >
             <ChevronDown
               className={clsx(
@@ -865,7 +1068,7 @@ export function FilesPanel({
               <button
                 className="p-0.5 hover:bg-hover rounded"
                 title="新規ファイル"
-                onClick={(e) => { e.stopPropagation(); startNewFile("/"); }}
+                onClick={(e) => { e.stopPropagation(); startNewFile("/", ".mdi"); }}
               >
                 <FilePlus className="w-3.5 h-3.5" />
               </button>

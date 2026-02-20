@@ -63,6 +63,9 @@ interface EditorProps {
   onFontScaleChange?: (v: number) => void;
   onLineHeightChange?: (v: number) => void;
   onParagraphSpacingChange?: (v: number) => void;
+  // Editor mode controls
+  mdiExtensionsEnabled?: boolean;
+  gfmEnabled?: boolean;
 }
 
 export default function NovelEditor({
@@ -93,6 +96,8 @@ export default function NovelEditor({
   onFontScaleChange,
   onLineHeightChange,
   onParagraphSpacingChange,
+  mdiExtensionsEnabled = true,
+  gfmEnabled = true,
 }: EditorProps) {
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
   const [isVertical, setIsVertical] = useState(() => {
@@ -287,6 +292,8 @@ export default function NovelEditor({
               onOpenRubyDialog={onOpenRubyDialog}
               onToggleTcy={onToggleTcy}
               onOpenDictionary={onOpenDictionary}
+              mdiExtensionsEnabled={mdiExtensionsEnabled}
+              gfmEnabled={gfmEnabled}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -415,7 +422,7 @@ function EditorToolbar({
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="text-xs text-foreground-tertiary whitespace-nowrap hidden lg:block">
+        <div className="text-xs text-foreground-tertiary whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
           illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
         </div>
 
@@ -456,6 +463,8 @@ function MilkdownEditor({
   onOpenRubyDialog,
   onToggleTcy,
   onOpenDictionary,
+  mdiExtensionsEnabled = true,
+  gfmEnabled = true,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
@@ -480,6 +489,8 @@ function MilkdownEditor({
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
   onOpenDictionary?: (searchTerm?: string) => void;
+  mdiExtensionsEnabled?: boolean;
+  gfmEnabled?: boolean;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
@@ -535,7 +546,7 @@ function MilkdownEditor({
 
   const { get } = useEditor((root) => {
     const value = initialContentRef.current;
-    return Editor.make()
+    let editor = Editor.make()
       .config(nord)
       .config((ctx) => {
         ctx.set(rootCtx, root);
@@ -548,14 +559,22 @@ function MilkdownEditor({
           onChangeRef.current?.(markdown);
         });
       })
-      .use(commonmark)
-      .use(gfm)
-      .use(japaneseNovel({
-        isVertical,
-        showManuscriptLine: false,
-        enableRuby: true,
-        enableTcy: true,
-      }))
+      .use(commonmark);
+
+    // GFM: conditionally loaded
+    if (gfmEnabled) {
+      editor = editor.use(gfm);
+    }
+
+    // MDI extensions: conditionally loaded
+    editor = editor.use(japaneseNovel({
+      isVertical,
+      showManuscriptLine: false,
+      enableRuby: mdiExtensionsEnabled,
+      enableTcy: mdiExtensionsEnabled,
+    }));
+
+    editor = editor
       .use(history)
       .use(clipboard)
       .use(cursor)
@@ -567,7 +586,9 @@ function MilkdownEditor({
         dicPath: '/dict',
         debounceMs: 300,
       }));
-  }, [isVertical, verticalScrollPlugin]); // posHighlight の依賴を削除して Editor 再作成を防ぐ
+
+    return editor;
+  }, [isVertical, verticalScrollPlugin, mdiExtensionsEnabled, gfmEnabled]);
 
   // EditorView インスタンスを取得する
   useEffect(() => {
@@ -1097,7 +1118,7 @@ function MilkdownEditor({
       { label: '貼り付け', action: 'paste', accelerator: 'CmdOrCtrl+V' },
       { label: 'プレーンテキストとして貼り付け', action: 'paste-plaintext', accelerator: 'Shift+CmdOrCtrl+V' },
       { label: '-', action: '_separator' },
-      ...(hasSelection ? [
+      ...(hasSelection && mdiExtensionsEnabled ? [
         { label: 'ルビ', action: 'ruby', accelerator: 'Shift+CmdOrCtrl+R' },
         { label: '縦中横', action: 'tcy', accelerator: 'Shift+CmdOrCtrl+T' },
         { label: '-', action: '_separator' },
@@ -1112,7 +1133,7 @@ function MilkdownEditor({
     ];
     const action = await window.electronAPI?.showContextMenu?.(items);
     if (action) handleContextMenuAction(action as ContextMenuAction);
-  }, [hasSelection, handleContextMenuAction]);
+  }, [hasSelection, handleContextMenuAction, mdiExtensionsEnabled]);
 
   // Editor content wrapper - only use custom context menu on Web, native on Electron
   const editorContent = (

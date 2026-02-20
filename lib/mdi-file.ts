@@ -1,6 +1,7 @@
 // クロスプラットフォームな .mdi ファイルの開閉/保存
 
 import { getRuntimeEnvironment, isBrowser } from "./runtime-env";
+import type { SupportedFileExtension } from "./project-types";
 
 export interface MdiFileDescriptor {
   /** 絶対パス（Electron）/ ブラウザのファイルハンドル利用時は null */
@@ -19,6 +20,37 @@ export interface OpenMdiResult {
 export interface SaveMdiParams {
   descriptor: MdiFileDescriptor | null;
   content: string;
+  fileType?: SupportedFileExtension;
+}
+
+/** Default file name for each file type */
+function getDefaultFileName(fileType: SupportedFileExtension): string {
+  switch (fileType) {
+    case ".md": return "untitled.md";
+    case ".txt": return "untitled.txt";
+    default: return "untitled.mdi";
+  }
+}
+
+/** Save dialog file type filters per file type */
+function getSaveFilters(fileType: SupportedFileExtension): Array<{ description: string; accept: Record<string, string[]> }> {
+  switch (fileType) {
+    case ".md":
+      return [
+        { description: "Markdown", accept: { "text/markdown": [".md"] } },
+        { description: "すべてのファイル", accept: { "*/*": [] } },
+      ];
+    case ".txt":
+      return [
+        { description: "テキストファイル", accept: { "text/plain": [".txt"] } },
+        { description: "すべてのファイル", accept: { "*/*": [] } },
+      ];
+    default:
+      return [
+        { description: "illusions MDI Document", accept: { "text/plain": [".mdi"] } },
+        { description: "すべてのファイル", accept: { "*/*": [] } },
+      ];
+  }
 }
 
 /**
@@ -99,12 +131,12 @@ export async function saveMdiFile(
   params: SaveMdiParams
 ): Promise<OpenMdiResult | null> {
   const env = getRuntimeEnvironment();
-  const { descriptor, content } = params;
+  const { descriptor, content, fileType = ".mdi" } = params;
 
   if (env === "electron-renderer" && window.electronAPI) {
     const existingPath = descriptor?.path ?? null;
     try {
-      const result = await window.electronAPI.saveFile(existingPath, content);
+      const result = await window.electronAPI.saveFile(existingPath, content, fileType);
       if (!result) {
         // User cancelled the save dialog
         return null;
@@ -145,17 +177,12 @@ export async function saveMdiFile(
     let handle = descriptor?.handle ?? null;
 
     if (!handle && hasShowSaveFilePicker(window)) {
+      const defaultName = descriptor?.name ?? getDefaultFileName(fileType);
+      const suggestedName = ensureExtension(defaultName, fileType);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       handle = await (window as any).showSaveFilePicker({
-        suggestedName: ensureMdiExtension(descriptor?.name ?? "untitled.mdi"),
-        types: [
-          {
-            description: "illusions MDI Document",
-            accept: {
-              "text/plain": [".mdi"],
-            },
-          },
-        ],
+        suggestedName,
+        types: getSaveFilters(fileType),
       });
     }
 
@@ -210,11 +237,14 @@ function basename(p: string): string {
   return parts[parts.length - 1] || p;
 }
 
-function ensureMdiExtension(name: string): string {
-  if (name.toLowerCase().endsWith(".mdi")) {
+/** Ensure the file name has the correct extension for its type */
+function ensureExtension(name: string, fileType: SupportedFileExtension): string {
+  if (name.toLowerCase().endsWith(fileType)) {
     return name;
   }
-  return `${name}.mdi`;
+  // Remove any existing known extension before adding the correct one
+  const withoutExt = name.replace(/\.(mdi|md|txt)$/i, "");
+  return `${withoutExt}${fileType}`;
 }
 
 function hasShowOpenFilePicker(

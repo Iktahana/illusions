@@ -12,7 +12,8 @@ declare global {
     openFile: () => Promise<{ path: string; content: string } | null>;
     saveFile: (
       filePath: string | null,
-      content: string
+      content: string,
+      fileType?: string
     ) => Promise<string | { success: false; error: string } | null>;
     getChromeVersion: () => Promise<number>;
     setDirty: (dirty: boolean) => Promise<void>;

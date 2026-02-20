@@ -626,16 +626,37 @@ ipcMain.handle('open-file', async () => {
   return { path: filePath, content }
 })
 
-ipcMain.handle('save-file', async (_event, filePath, content) => {
+ipcMain.handle('save-file', async (_event, filePath, content, fileType) => {
   let target = filePath
   if (!target) {
-    const result = await dialog.showSaveDialog({
-      filters: [
+    // Determine default file name and filters based on fileType
+    let defaultPath = 'untitled.mdi'
+    let filters = [
+      { name: 'illusions MDI Document', extensions: ['mdi'] },
+      { name: 'Markdown', extensions: ['md'] },
+      { name: 'テキストファイル', extensions: ['txt'] },
+      { name: 'すべてのファイル', extensions: ['*'] },
+    ]
+    if (fileType === '.md') {
+      defaultPath = 'untitled.md'
+      filters = [
+        { name: 'Markdown', extensions: ['md'] },
+        { name: 'illusions MDI Document', extensions: ['mdi'] },
+        { name: 'テキストファイル', extensions: ['txt'] },
+        { name: 'すべてのファイル', extensions: ['*'] },
+      ]
+    } else if (fileType === '.txt') {
+      defaultPath = 'untitled.txt'
+      filters = [
+        { name: 'テキストファイル', extensions: ['txt'] },
         { name: 'illusions MDI Document', extensions: ['mdi'] },
         { name: 'Markdown', extensions: ['md'] },
         { name: 'すべてのファイル', extensions: ['*'] },
-      ],
-      defaultPath: 'untitled.mdi',
+      ]
+    }
+    const result = await dialog.showSaveDialog({
+      filters,
+      defaultPath,
     })
     if (result.canceled || !result.filePath) return null
     target = result.filePath
