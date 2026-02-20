@@ -5,16 +5,18 @@ import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 // Constants
 // ---------------------------------------------------------------------------
 
+/** Reference to the official standard for number formatting */
 const STANDARD_REF: LintReference = {
   standard: '文化庁「公用文作成の考え方」(2022)',
 };
 
-/** Kanji digits 0-9 */
-const KANJI_DIGITS = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"] as const;
+/** Kanji digits indexed by their numeric value (0-9) */
+const KANJI_DIGITS = [
+  "零", "一", "二", "三", "四", "五", "六", "七", "八", "九",
+] as const;
 
 /** Map from kanji digit characters to their numeric value */
 const KANJI_DIGIT_MAP: ReadonlyMap<string, number> = new Map([
-  ["零", 0],
   ["一", 1],
   ["二", 2],
   ["三", 3],
@@ -36,107 +38,123 @@ const KANJI_UNIT_MAP: ReadonlyMap<string, number> = new Map([
   ["兆", 1000000000000],
 ]);
 
-/** Full-width to half-width digit map */
-const FULLWIDTH_DIGIT_MAP: ReadonlyMap<string, string> = new Map([
-  ["０", "0"],
-  ["１", "1"],
-  ["２", "2"],
-  ["３", "3"],
-  ["４", "4"],
-  ["５", "5"],
-  ["６", "6"],
-  ["７", "7"],
-  ["８", "8"],
-  ["９", "9"],
-]);
-
 /**
- * Idiomatic kanji number expressions that should NOT be flagged.
- * These are fixed phrases where kanji numerals are used regardless
- * of writing direction (vertical or horizontal).
+ * Idiomatic kanji number expressions that should NEVER be flagged.
+ * These are fixed phrases where kanji numerals are always used,
+ * regardless of writing direction (vertical or horizontal).
  */
 const KANJI_NUMBER_EXCEPTIONS = new Set([
-  // Counter expressions
-  "一つ",
-  "二つ",
-  "三つ",
-  "四つ",
-  "五つ",
-  "六つ",
-  "七つ",
-  "八つ",
-  "九つ",
+  // Counters (tsu)
+  "一つ", "二つ", "三つ", "四つ", "五つ", "六つ", "七つ", "八つ", "九つ",
   // People counters
-  "一人",
-  "二人",
-  "三人",
-  // Day counters
-  "一日",
-  "二日",
-  "三日",
-  // Proper nouns and idiomatic expressions
-  "三日月",
-  "一番",
-  "二番",
-  "三番",
-  "七五三",
-  "四国",
-  "九州",
-  // Common phrases with kanji numerals
-  "一方",
-  "一度",
-  "一般",
-  "一部",
-  "一緒",
-  "一生",
-  "一切",
-  "一応",
-  "一瞬",
-  "一種",
-  "二度",
-  "一見",
-  "一体",
-  "一旦",
-  "万一",
-  "十分",
-  "百科",
+  "一人", "二人", "三人",
+  // Day counters (tsuitachi through tooka, hatsuka, misoka)
+  "一日", "二日", "三日", "四日", "五日", "六日", "七日", "八日", "九日", "十日",
+  "二十日", "三十日",
+  // Month names
+  "一月", "二月", "三月", "四月", "五月", "六月",
+  "七月", "八月", "九月", "十月", "十一月", "十二月",
+  // Ordinal counters (ban)
+  "一番", "二番", "三番",
+  // Degree counters (do)
+  "一度", "二度", "三度",
+  // Idiomatic single-kanji prefix expressions
+  "一方", "一般", "一部", "一切", "一応", "一旦", "一層", "一体", "一向",
+  // Four-character idioms / set phrases
+  "一生懸命", "一所懸命", "一期一会",
+  // Place names
+  "七五三", "四国", "九州", "四谷", "六本木", "八王子", "三鷹",
+  // Other idiomatic expressions
+  "三日月", "七夕", "七転八倒", "四苦八苦", "五里霧中",
+  "十分", "百合", "千鳥", "万歳",
 ]);
 
 // ---------------------------------------------------------------------------
-// Helper functions
+// Kanji <-> Arabic conversion helpers
 // ---------------------------------------------------------------------------
 
 /**
- * Normalize full-width Arabic digits to half-width.
- * e.g. "１２３" -> "123"
+ * Convert a kanji numeral string to its numeric value.
+ * Returns null if the string does not form a valid kanji number.
+ *
+ * Supports units: 十, 百, 千, 万, 億, 兆
+ *
+ * @example
+ * kanjiToArabic("三百五十") // => 350
+ * kanjiToArabic("千五百")   // => 1500
+ * kanjiToArabic("二万三千") // => 23000
  */
-function normalizeFullWidth(str: string): string {
-  return str
-    .split("")
-    .map((ch) => FULLWIDTH_DIGIT_MAP.get(ch) ?? ch)
-    .join("");
+function kanjiToArabic(kanji: string): number | null {
+  if (kanji.length === 0) return null;
+
+  // Single digit case
+  if (kanji.length === 1) {
+    const digit = KANJI_DIGIT_MAP.get(kanji);
+    if (digit !== undefined) return digit;
+    // Single unit character (e.g. "十" = 10, "百" = 100)
+    const unit = KANJI_UNIT_MAP.get(kanji);
+    if (unit !== undefined) return unit;
+    return null;
+  }
+
+  let total = 0;
+  let current = 0;
+  let lastSmallUnit = Infinity;
+
+  for (let i = 0; i < kanji.length; i++) {
+    const ch = kanji[i];
+    const digitVal = KANJI_DIGIT_MAP.get(ch);
+    const unitVal = KANJI_UNIT_MAP.get(ch);
+
+    if (digitVal !== undefined) {
+      current = digitVal;
+    } else if (unitVal !== undefined) {
+      if (unitVal >= 10000) {
+        // Large units (万, 億, 兆) aggregate everything so far
+        total = (total + (current === 0 ? 1 : current)) * unitVal;
+        current = 0;
+        lastSmallUnit = Infinity;
+      } else {
+        // Small units (十, 百, 千) must be in decreasing order
+        if (unitVal >= lastSmallUnit) {
+          return null; // Invalid order (e.g. "十百")
+        }
+        total += (current === 0 ? 1 : current) * unitVal;
+        current = 0;
+        lastSmallUnit = unitVal;
+      }
+    } else {
+      // Unrecognized character — not a valid kanji number
+      return null;
+    }
+  }
+
+  // Add any trailing digit (e.g. the 五 in 三百五十五)
+  total += current;
+
+  return total > 0 ? total : null;
 }
 
 /**
  * Convert a positive integer to its kanji numeral representation.
- * Handles numbers up to 9999 with proper unit placement.
- * For numbers >= 10000, uses 万 unit.
+ * Returns the original number as a string for values that are
+ * too large (>= 100,000,000) or non-positive.
  *
- * Examples:
- *   3 -> "三"
- *   15 -> "十五"
- *   350 -> "三百五十"
- *   1500 -> "千五百"
- *   10000 -> "一万"
+ * @example
+ * arabicToKanji(3)     // => "三"
+ * arabicToKanji(15)    // => "十五"
+ * arabicToKanji(350)   // => "三百五十"
+ * arabicToKanji(1500)  // => "千五百"
+ * arabicToKanji(10000) // => "一万"
  */
 function arabicToKanji(num: number): string {
   if (num <= 0 || !Number.isInteger(num)) return String(num);
-  if (num >= 100000000) return String(num); // Too large to convert
+  if (num >= 100000000) return String(num);
 
   let result = "";
   let remaining = num;
 
-  // Process 万 (10000) block
+  // Process 万 (10,000) block
   if (remaining >= 10000) {
     const manCount = Math.floor(remaining / 10000);
     result += convertBlockToKanji(manCount) + "万";
@@ -152,7 +170,8 @@ function arabicToKanji(num: number): string {
 }
 
 /**
- * Convert a number 1-9999 into kanji with 千/百/十 units.
+ * Convert a number in the range 1-9999 to kanji using 千/百/十 units.
+ * Uses implicit "1" prefix: 千 (not 一千), 百 (not 一百), 十 (not 一十).
  */
 function convertBlockToKanji(n: number): string {
   if (n <= 0 || n > 9999) return "";
@@ -163,7 +182,6 @@ function convertBlockToKanji(n: number): string {
   // Thousands (千)
   const thousands = Math.floor(remaining / 1000);
   if (thousands > 0) {
-    // "千" alone for 1000, otherwise prefix with digit kanji
     result += thousands === 1 ? "千" : KANJI_DIGITS[thousands] + "千";
     remaining %= 1000;
   }
@@ -190,87 +208,37 @@ function convertBlockToKanji(n: number): string {
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// Exception detection
+// ---------------------------------------------------------------------------
+
 /**
- * Convert a kanji numeral string to its numeric value.
- * Returns null if the string is not a valid kanji number pattern.
+ * Check whether a kanji number match at the given position is part of
+ * (or overlaps with) an idiomatic exception phrase in the original text.
  *
- * Supports: 一, 十, 百, 千, 万, 億, 兆 units
- *
- * Examples:
- *   "三百五十" -> 350
- *   "千五百" -> 1500
- *   "二万三千" -> 23000
+ * The function searches a window around the match position for any
+ * exception phrase that overlaps with the matched range.
  */
-function kanjiToArabic(kanji: string): number | null {
-  if (kanji.length === 0) return null;
-
-  // Single digit
-  if (kanji.length === 1 && KANJI_DIGIT_MAP.has(kanji)) {
-    return KANJI_DIGIT_MAP.get(kanji) ?? null;
-  }
-
-  let total = 0;
-  let current = 0; // Accumulator for the current segment
-  let lastUnit = Infinity; // Track decreasing units for validation
-
-  for (let i = 0; i < kanji.length; i++) {
-    const ch = kanji[i];
-    const digitVal = KANJI_DIGIT_MAP.get(ch);
-    const unitVal = KANJI_UNIT_MAP.get(ch);
-
-    if (digitVal !== undefined) {
-      current = digitVal;
-    } else if (unitVal !== undefined) {
-      // Large units (万, 億, 兆) aggregate everything accumulated so far
-      if (unitVal >= 10000) {
-        total = (total + (current === 0 ? 1 : current)) * unitVal;
-        current = 0;
-        // For large units we reset tracking
-        lastUnit = unitVal;
-      } else {
-        // Small units (十, 百, 千)
-        if (unitVal >= lastUnit && lastUnit < 10000) {
-          // Invalid: units not in decreasing order (e.g. 十百)
-          return null;
-        }
-        total += (current === 0 ? 1 : current) * unitVal;
-        current = 0;
-        lastUnit = unitVal;
-      }
-    } else {
-      // Character is not a recognized kanji numeral
-      return null;
-    }
-  }
-
-  // Add any trailing digit (e.g. the 五 in 三百五十五)
-  total += current;
-
-  return total > 0 ? total : null;
-}
-
-/**
- * Format a numeric string with comma separators.
- * e.g. "1000000" -> "1,000,000"
- */
-function formatWithCommas(numStr: string): string {
-  return numStr.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-
-/**
- * Check whether a kanji number match at the given position is part
- * of an exception phrase in the original text.
- */
-function isKanjiException(text: string, matchStart: number, matchEnd: number): boolean {
+function isKanjiException(
+  text: string,
+  matchStart: number,
+  matchEnd: number,
+): boolean {
   for (const exception of KANJI_NUMBER_EXCEPTIONS) {
-    // Check if the exception overlaps with this match in the text
-    const exIdx = text.indexOf(exception, Math.max(0, matchStart - exception.length + 1));
-    if (exIdx === -1) continue;
-    const exEnd = exIdx + exception.length;
-    // If the exception fully covers the match range, skip it
-    if (exIdx <= matchStart && exEnd >= matchEnd) return true;
-    // If the match is a substring of the exception, skip it
-    if (exIdx < matchEnd && exEnd > matchStart) return true;
+    // Search for the exception starting from before the match
+    // (as the exception may start before our match)
+    const searchStart = Math.max(0, matchStart - exception.length + 1);
+    const searchEnd = matchEnd;
+
+    let idx = text.indexOf(exception, searchStart);
+    while (idx !== -1 && idx < searchEnd) {
+      const exEnd = idx + exception.length;
+      // If the exception overlaps with the match range at all, skip it
+      if (idx < matchEnd && exEnd > matchStart) {
+        return true;
+      }
+      idx = text.indexOf(exception, idx + 1);
+    }
   }
   return false;
 }
@@ -283,9 +251,11 @@ function isKanjiException(text: string, matchStart: number, matchEnd: number): b
  * Number Format Rule (L1)
  *
  * Checks for consistent number formatting based on writing direction:
- * - Vertical writing: recommends kanji numerals instead of Arabic digits
- * - Horizontal writing: recommends Arabic numerals instead of kanji digits,
- *   and comma formatting for numbers with 4+ digits
+ * - Horizontal writing (default): flags kanji numerals, suggests Arabic
+ * - Vertical writing: flags Arabic numerals, suggests kanji
+ *
+ * Idiomatic kanji expressions (e.g. "一人", "三日月", "九州") are
+ * always exempt from flagging.
  *
  * Reference: 文化庁「公用文作成の考え方」(2022)
  */
@@ -293,12 +263,12 @@ export class NumberFormatRule extends AbstractLintRule {
   readonly id = "number-format";
   readonly name = "Number format consistency";
   readonly nameJa = "数字表記の統一";
-  readonly description = "Checks for consistent number formatting based on writing direction";
-  readonly descriptionJa = "数字表記の一貫性を検査します";
+  readonly description = "Check for mixed Arabic/Kanji numeral usage";
+  readonly descriptionJa = "漢数字とアラビア数字の混在チェック";
   readonly level = "L1" as const;
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
-    severity: "info",
+    severity: "warning",
     options: {
       isVertical: false,
     },
@@ -308,25 +278,27 @@ export class NumberFormatRule extends AbstractLintRule {
     if (text.length === 0) return [];
 
     const isVertical = (config.options?.isVertical as boolean) ?? false;
-    const issues: LintIssue[] = [];
 
     if (isVertical) {
-      issues.push(...this.checkArabicInVertical(text, config));
-    } else {
-      issues.push(...this.checkKanjiInHorizontal(text, config));
-      issues.push(...this.checkCommaFormatting(text, config));
+      return this.checkArabicInVertical(text, config);
     }
-
-    return issues;
+    return this.checkKanjiInHorizontal(text, config);
   }
 
+  // -------------------------------------------------------------------------
+  // Vertical mode: flag Arabic numerals, suggest kanji
+  // -------------------------------------------------------------------------
+
   /**
-   * Detect Arabic numerals (half-width and full-width) of 2+ digits
-   * in vertical writing mode. Single digits are acceptable.
+   * In vertical writing mode, detect Arabic numeral sequences
+   * and suggest kanji replacements.
    */
-  private checkArabicInVertical(text: string, config: LintRuleConfig): LintIssue[] {
+  private checkArabicInVertical(
+    text: string,
+    config: LintRuleConfig,
+  ): LintIssue[] {
     const issues: LintIssue[] = [];
-    const pattern = /[0-9０-９]{2,}/g;
+    const pattern = /\d+/g;
     let match: RegExpExecArray | null;
 
     while ((match = pattern.exec(text)) !== null) {
@@ -334,9 +306,7 @@ export class NumberFormatRule extends AbstractLintRule {
       const from = match.index;
       const to = from + matched.length;
 
-      // Normalize full-width digits to half-width for conversion
-      const normalized = normalizeFullWidth(matched);
-      const numValue = parseInt(normalized, 10);
+      const numValue = parseInt(matched, 10);
 
       // Skip if conversion is not feasible (NaN or too large)
       if (isNaN(numValue) || numValue >= 100000000) continue;
@@ -364,13 +334,20 @@ export class NumberFormatRule extends AbstractLintRule {
     return issues;
   }
 
+  // -------------------------------------------------------------------------
+  // Horizontal mode: flag kanji numerals, suggest Arabic
+  // -------------------------------------------------------------------------
+
   /**
-   * Detect kanji numeral sequences of 2+ characters in horizontal writing mode.
-   * Skips idiomatic expressions listed in KANJI_NUMBER_EXCEPTIONS.
+   * In horizontal writing mode, detect kanji numeral sequences
+   * and suggest Arabic replacements. Skips idiomatic exceptions.
    */
-  private checkKanjiInHorizontal(text: string, config: LintRuleConfig): LintIssue[] {
+  private checkKanjiInHorizontal(
+    text: string,
+    config: LintRuleConfig,
+  ): LintIssue[] {
     const issues: LintIssue[] = [];
-    const pattern = /[一二三四五六七八九十百千万億兆]{2,}/g;
+    const pattern = /[一二三四五六七八九十百千万億兆]+/g;
     let match: RegExpExecArray | null;
 
     while ((match = pattern.exec(text)) !== null) {
@@ -378,18 +355,16 @@ export class NumberFormatRule extends AbstractLintRule {
       const from = match.index;
       const to = from + matched.length;
 
-      // Skip idiomatic expressions
+      // Skip idiomatic expressions (check surrounding context)
       if (isKanjiException(text, from, to)) continue;
 
-      // Try to convert to Arabic number
+      // Try to convert to an Arabic number
       const numValue = kanjiToArabic(matched);
 
       // Skip if the kanji sequence doesn't form a valid number
       if (numValue === null) continue;
 
       const arabicStr = String(numValue);
-      // Apply comma formatting for large numbers
-      const formatted = numValue >= 10000 ? formatWithCommas(arabicStr) : arabicStr;
 
       issues.push({
         ruleId: this.id,
@@ -402,49 +377,9 @@ export class NumberFormatRule extends AbstractLintRule {
         to,
         reference: STANDARD_REF,
         fix: {
-          label: `Replace with "${formatted}"`,
-          labelJa: `「${formatted}」に置換`,
-          replacement: formatted,
-        },
-      });
-    }
-
-    return issues;
-  }
-
-  /**
-   * Detect Arabic numbers with 4+ consecutive digits that lack comma separators.
-   * Only applies in horizontal writing mode.
-   */
-  private checkCommaFormatting(text: string, config: LintRuleConfig): LintIssue[] {
-    const issues: LintIssue[] = [];
-    // Match 4+ digit sequences not preceded or followed by digits or commas
-    const pattern = /(?<![0-9,])[0-9]{4,}(?![0-9,])/g;
-    let match: RegExpExecArray | null;
-
-    while ((match = pattern.exec(text)) !== null) {
-      const matched = match[0];
-      const from = match.index;
-      const to = from + matched.length;
-
-      const formatted = formatWithCommas(matched);
-
-      // Skip if formatting wouldn't change anything (shouldn't happen with 4+ digits)
-      if (formatted === matched) continue;
-
-      issues.push({
-        ruleId: this.id,
-        severity: config.severity,
-        message: "Numbers with 4 or more digits should use comma separators.",
-        messageJa:
-          "文化庁「公用文作成の考え方」に基づき、4桁以上の数字にはカンマ区切りを推奨します",
-        from,
-        to,
-        reference: STANDARD_REF,
-        fix: {
-          label: `Replace with "${formatted}"`,
-          labelJa: `「${formatted}」に置換`,
-          replacement: formatted,
+          label: `Replace with "${arabicStr}"`,
+          labelJa: `「${arabicStr}」に置換`,
+          replacement: arabicStr,
         },
       });
     }
