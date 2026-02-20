@@ -7,10 +7,14 @@
 const { ipcMain, dialog, app } = require('electron');
 const fs = require('fs/promises');
 const path = require('path');
+const os = require('os');
 
 function registerVFSHandlers() {
   // Track the opened root directory per window for path validation
   const allowedRoots = new Map();
+
+  // Track paths that were selected via the native file dialog
+  const dialogApprovedPaths = new Set();
 
   /**
    * Normalize path separators to forward slashes for cross-platform compatibility.
@@ -59,6 +63,7 @@ function registerVFSHandlers() {
 
     // Update the allowed root for this window
     allowedRoots.set(event.sender.id, dirPath);
+    dialogApprovedPaths.add(dirPath);
 
     return {
       path: dirPath,
@@ -172,9 +177,82 @@ function registerVFSHandlers() {
     }
   });
 
+  /**
+   * Check if a path is in the system-sensitive denylist.
+   * Prevents access to critical system directories and credential stores.
+   *
+   * @param {string} normalizedPath - Forward-slash normalized absolute path
+   * @returns {boolean} true if the path should be denied
+   */
+  function isDeniedPath(normalizedPath) {
+    const homedir = normalizePath(os.homedir());
+
+    // System root directories (Unix + macOS + Windows)
+    const denyExact = new Set([
+      '/', '/etc', '/usr', '/bin', '/sbin', '/var', '/tmp', '/System',
+      '/private', '/private/etc', '/private/var',
+    ]);
+
+    // Add Windows drive roots and system directories
+    const driveLetterMatch = normalizedPath.match(/^([a-zA-Z]):?\/?$/);
+    if (driveLetterMatch) return true; // Bare drive root (C:/ or C:)
+
+    const windowsDenyPrefixes = [
+      'C:/Windows', 'C:/Program Files', 'C:/Program Files (x86)',
+    ];
+
+    // Sensitive directories within home
+    const homeSensitiveSuffixes = [
+      '/.ssh', '/.gnupg', '/.aws', '/.kube', '/.docker',
+      '/.config/gcloud', '/Library/Keychains',
+    ];
+
+    if (denyExact.has(normalizedPath)) return true;
+    if (normalizedPath === homedir) return true;
+    if (windowsDenyPrefixes.some(p => normalizedPath.toLowerCase().startsWith(p.toLowerCase()))) return true;
+    if (homeSensitiveSuffixes.some(s => normalizedPath.startsWith(homedir + s))) return true;
+
+    return false;
+  }
+
   // Set root directory programmatically (for restoring a recent project without dialog)
   ipcMain.handle('vfs:set-root', async (event, rootPath) => {
     const resolved = path.resolve(rootPath);
+    const normalizedResolved = normalizePath(resolved);
+
+    // 1. Deny system-sensitive paths
+    if (isDeniedPath(normalizedResolved)) {
+      throw new Error('セキュリティ上の理由により、このディレクトリへのアクセスは制限されています');
+    }
+
+    // 2. Verify the path actually exists and is a directory
+    try {
+      const stats = await fs.stat(resolved);
+      if (!stats.isDirectory()) {
+        throw new Error('指定されたパスはディレクトリではありません');
+      }
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        throw new Error('指定されたディレクトリが見つかりません');
+      }
+      throw error;
+    }
+
+    // 3. Allow if path is dialog-approved or child of a dialog-approved path
+    const isDialogApproved = [...dialogApprovedPaths].some(approved => {
+      const normalizedApproved = normalizePath(approved);
+      return normalizedResolved === normalizedApproved
+        || normalizedResolved.startsWith(normalizedApproved + '/');
+    });
+
+    // 4. Allow if path is within user's home directory (for session restore, double-click open)
+    const normalizedHome = normalizePath(os.homedir());
+    const isUnderHome = normalizedResolved.startsWith(normalizedHome + '/');
+
+    if (!isDialogApproved && !isUnderHome) {
+      throw new Error('セキュリティ上の理由により、ホームディレクトリ外のパスには直接アクセスできません');
+    }
+
     allowedRoots.set(event.sender.id, resolved);
     return { path: resolved, name: path.basename(resolved) };
   });
