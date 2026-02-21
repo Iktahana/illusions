@@ -1,5 +1,10 @@
 import type { LintRule, LintRuleConfig, LintIssue } from "./types";
-import { isDocumentLintRule } from "./types";
+import {
+  isDocumentLintRule,
+  isMorphologicalLintRule,
+  isMorphologicalDocumentLintRule,
+} from "./types";
+import type { Token } from "@/lib/nlp-client/types";
 
 /**
  * Manages lint rule registration, configuration, and execution.
@@ -91,5 +96,80 @@ export class RuleRunner {
       const config = this.configs.get(rule.id);
       return config?.enabled === true;
     });
+  }
+
+  /**
+   * Run all enabled rules, using tokens for L2 rules.
+   * L1 rules use `lint()`, L2 rules use `lintWithTokens()`.
+   */
+  runAllWithTokens(text: string, tokens: ReadonlyArray<Token>): LintIssue[] {
+    const issues: LintIssue[] = [];
+
+    for (const rule of this.rules.values()) {
+      const config = this.configs.get(rule.id);
+      if (!config?.enabled) continue;
+
+      if (isMorphologicalLintRule(rule)) {
+        issues.push(...rule.lintWithTokens(text, tokens, config));
+      } else {
+        issues.push(...rule.lint(text, config));
+      }
+    }
+
+    return issues.sort((a, b) => a.from - b.from);
+  }
+
+  /**
+   * Run document-level rules with tokens.
+   * Routes morphological document rules through lintDocumentWithTokens(),
+   * and regular document rules through lintDocument().
+   */
+  runDocumentWithTokens(
+    paragraphs: ReadonlyArray<{
+      text: string;
+      index: number;
+      tokens: ReadonlyArray<Token>;
+    }>,
+  ): Map<number, LintIssue[]> {
+    const results = new Map<number, LintIssue[]>();
+
+    for (const rule of this.rules.values()) {
+      const config = this.configs.get(rule.id);
+      if (!config?.enabled) continue;
+
+      let ruleResults: Array<{ paragraphIndex: number; issues: LintIssue[] }>;
+
+      if (isMorphologicalDocumentLintRule(rule)) {
+        ruleResults = rule.lintDocumentWithTokens(paragraphs, config);
+      } else if (isDocumentLintRule(rule)) {
+        // Strip tokens for non-morphological document rules
+        ruleResults = rule.lintDocument(
+          paragraphs.map((p) => ({ text: p.text, index: p.index })),
+          config,
+        );
+      } else {
+        continue;
+      }
+
+      for (const { paragraphIndex, issues } of ruleResults) {
+        const existing = results.get(paragraphIndex) ?? [];
+        existing.push(...issues);
+        results.set(paragraphIndex, existing);
+      }
+    }
+
+    return results;
+  }
+
+  /** Check if any registered rule requires morphological analysis. */
+  hasMorphologicalRules(): boolean {
+    for (const rule of this.rules.values()) {
+      const config = this.configs.get(rule.id);
+      if (!config?.enabled) continue;
+      if (isMorphologicalLintRule(rule) || isMorphologicalDocumentLintRule(rule)) {
+        return true;
+      }
+    }
+    return false;
   }
 }

@@ -1,4 +1,12 @@
-import type { LintRule, LintRuleConfig, LintIssue, DocumentLintRule } from "./types";
+import type {
+  LintRule,
+  LintRuleConfig,
+  LintIssue,
+  DocumentLintRule,
+  MorphologicalLintRule,
+  MorphologicalDocumentLintRule,
+} from "./types";
+import type { Token } from "@/lib/nlp-client/types";
 
 /**
  * Abstract base class for lint rules.
@@ -31,6 +39,58 @@ export abstract class AbstractDocumentLintRule extends AbstractLintRule implemen
 
   /** Document-level rules return no issues when called per-paragraph. */
   lint(_text: string, _config: LintRuleConfig): LintIssue[] {
+    return [];
+  }
+}
+
+/**
+ * Abstract base class for morphological (L2) lint rules.
+ * These rules receive pre-tokenized kuromoji data.
+ * The `lint()` method returns empty since L2 rules need tokens.
+ */
+export abstract class AbstractMorphologicalLintRule
+  extends AbstractLintRule
+  implements MorphologicalLintRule
+{
+  abstract lintWithTokens(
+    text: string,
+    tokens: ReadonlyArray<Token>,
+    config: LintRuleConfig,
+  ): LintIssue[];
+
+  /** L2 rules return no issues without tokens. */
+  lint(_text: string, _config: LintRuleConfig): LintIssue[] {
+    return [];
+  }
+}
+
+/**
+ * Abstract base class for morphological document-level lint rules.
+ * These rules analyze all paragraphs together with kuromoji tokens.
+ */
+export abstract class AbstractMorphologicalDocumentLintRule
+  extends AbstractLintRule
+  implements MorphologicalDocumentLintRule
+{
+  abstract lintDocumentWithTokens(
+    paragraphs: ReadonlyArray<{
+      text: string;
+      index: number;
+      tokens: ReadonlyArray<Token>;
+    }>,
+    config: LintRuleConfig,
+  ): Array<{ paragraphIndex: number; issues: LintIssue[] }>;
+
+  /** Document-level rules return no issues when called per-paragraph. */
+  lint(_text: string, _config: LintRuleConfig): LintIssue[] {
+    return [];
+  }
+
+  /** Non-morphological document lint is a no-op; use lintDocumentWithTokens instead. */
+  lintDocument(
+    _paragraphs: ReadonlyArray<{ text: string; index: number }>,
+    _config: LintRuleConfig,
+  ): Array<{ paragraphIndex: number; issues: LintIssue[] }> {
     return [];
   }
 }

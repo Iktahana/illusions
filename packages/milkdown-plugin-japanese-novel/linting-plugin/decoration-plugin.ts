@@ -11,6 +11,8 @@ import { Decoration, DecorationSet } from '@milkdown/prose/view';
 import type { Node as ProseMirrorNode } from '@milkdown/prose/model';
 import type { EditorView } from '@milkdown/prose/view';
 import type { RuleRunner, LintIssue, Severity } from '@/lib/linting';
+import type { INlpClient } from '@/lib/nlp-client/types';
+import type { Token } from '@/lib/nlp-client/types';
 import type { LintingPluginState, LintingPluginOptions } from './types';
 
 export const lintingKey = new PluginKey<LintingPluginState>('linting');
@@ -183,7 +185,7 @@ function severityToClass(severity: Severity): string {
 export function createLintingPlugin(
   options: LintingPluginOptions
 ): Plugin<LintingPluginState> {
-  const { enabled, ruleRunner, onIssuesUpdated, debounceMs = 500 } = options;
+  const { enabled, ruleRunner, nlpClient, onIssuesUpdated, debounceMs = 500 } = options;
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let processingVersion = 0;
@@ -191,9 +193,16 @@ export function createLintingPlugin(
   // Current ruleRunner reference (updated dynamically via setMeta)
   let currentRuleRunner: RuleRunner | null = ruleRunner;
 
+  // Current NLP client reference (updated dynamically via setMeta)
+  let currentNlpClient: INlpClient | null = nlpClient ?? null;
+
   // Lint result cache: paragraph text -> LintIssue[]
   // Minimizes rule execution and prevents flicker on scroll
   const issueCache = new Map<string, LintIssue[]>();
+
+  // Token cache: paragraph text -> Token[]
+  // Caches kuromoji tokenization results for L2 rules
+  const tokenCache = new Map<string, Token[]>();
 
   // Document-level rule cache: paragraph index -> LintIssue[]
   // Invalidated on every update since document-level rules depend on all paragraphs
@@ -215,7 +224,7 @@ export function createLintingPlugin(
 
       apply(tr, pluginState): LintingPluginState {
         // Update settings via meta
-        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null; forceFullScan?: boolean }> | undefined;
+        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null; nlpClient?: INlpClient | null; forceFullScan?: boolean }> | undefined;
         if (meta) {
           // If decorations are included, apply directly
           if (meta.decorations !== undefined) {
@@ -226,17 +235,24 @@ export function createLintingPlugin(
             currentRuleRunner = meta.ruleRunner ?? null;
             // Clear cache when runner changes (rules may have changed)
             issueCache.clear();
+            tokenCache.clear();
             documentIssueCache = null;
+          }
+          // Update nlpClient reference if provided
+          if ('nlpClient' in meta) {
+            currentNlpClient = meta.nlpClient ?? null;
           }
           // Force full scan flag
           if (meta.forceFullScan) {
             issueCache.clear();
+            tokenCache.clear();
             documentIssueCache = null;
             pendingFullScan = true;
           }
           // enabled/disabled change
           if (meta.enabled !== undefined) {
             issueCache.clear();
+            tokenCache.clear();
             documentIssueCache = null;
           }
           const updated: LintingPluginState = {
@@ -293,13 +309,14 @@ export function createLintingPlugin(
        * Process only viewport-visible paragraphs.
        * Cached paragraphs skip rule execution; only decorations are rebuilt.
        * Document-level rules are recomputed on every update.
+       * When morphological rules are present, paragraphs are tokenized via NLP client.
        */
       function scheduleViewportUpdate(view: EditorView): void {
         if (debounceTimer) clearTimeout(debounceTimer);
 
         const version = ++processingVersion;
 
-        debounceTimer = setTimeout(() => {
+        debounceTimer = setTimeout(async () => {
           const state = lintingKey.getState(view.state);
           if (!state?.enabled || !currentRuleRunner) return;
 
@@ -311,13 +328,34 @@ export function createLintingPlugin(
             ? allParagraphs
             : getVisibleParagraphs(view, allParagraphs, 2);
 
+          // Check if morphological rules are active
+          const hasMorphRules = currentRuleRunner.hasMorphologicalRules();
+          const nlp = currentNlpClient;
+
           // Process uncached paragraphs (per-paragraph rules)
           const uncachedParagraphs = targetParagraphs.filter(p => !issueCache.has(p.text));
 
           if (uncachedParagraphs.length > 0) {
             for (const paragraph of uncachedParagraphs) {
               if (version !== processingVersion) return;
-              const issues = currentRuleRunner.runAll(paragraph.text);
+
+              let issues: LintIssue[];
+              if (hasMorphRules && nlp) {
+                // Get or compute tokens for L2 rules
+                let tokens = tokenCache.get(paragraph.text);
+                if (!tokens) {
+                  try {
+                    tokens = await nlp.tokenizeParagraph(paragraph.text);
+                    tokenCache.set(paragraph.text, tokens);
+                  } catch {
+                    // Fallback to empty tokens if tokenization fails
+                    tokens = [];
+                  }
+                }
+                issues = currentRuleRunner.runAllWithTokens(paragraph.text, tokens);
+              } else {
+                issues = currentRuleRunner.runAll(paragraph.text);
+              }
               issueCache.set(paragraph.text, issues);
             }
           }
@@ -328,9 +366,28 @@ export function createLintingPlugin(
           // Document-level rules are fast (L1/L2) so recomputing is acceptable
           documentIssueCache = null;
           if (currentRuleRunner.hasDocumentRules()) {
-            documentIssueCache = currentRuleRunner.runDocument(
-              allParagraphs.map(p => ({ text: p.text, index: p.index }))
-            );
+            if (hasMorphRules && nlp) {
+              // Tokenize all paragraphs for morphological document rules (use cache where possible)
+              const paragraphsWithTokens = [];
+              for (const p of allParagraphs) {
+                if (version !== processingVersion) return;
+                let tokens = tokenCache.get(p.text);
+                if (!tokens) {
+                  try {
+                    tokens = await nlp.tokenizeParagraph(p.text);
+                    tokenCache.set(p.text, tokens);
+                  } catch {
+                    tokens = [];
+                  }
+                }
+                paragraphsWithTokens.push({ text: p.text, index: p.index, tokens });
+              }
+              documentIssueCache = currentRuleRunner.runDocumentWithTokens(paragraphsWithTokens);
+            } else {
+              documentIssueCache = currentRuleRunner.runDocument(
+                allParagraphs.map(p => ({ text: p.text, index: p.index }))
+              );
+            }
           }
 
           if (version !== processingVersion) return;
@@ -400,6 +457,7 @@ export function createLintingPlugin(
           if (state?.enabled !== prevPluginState?.enabled) {
             if (state?.enabled) {
               issueCache.clear();
+              tokenCache.clear();
               documentIssueCache = null;
               scheduleViewportUpdate(view);
             }
@@ -418,6 +476,7 @@ export function createLintingPlugin(
           if (scrollTimer) clearTimeout(scrollTimer);
           scrollContainer.removeEventListener('scroll', handleScroll);
           issueCache.clear();
+          tokenCache.clear();
           documentIssueCache = null;
         },
       };
