@@ -14,6 +14,7 @@ import type { RuleRunner, LintIssue, Severity } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
 import type { Token } from '@/lib/nlp-client/types';
 import type { ILlmClient } from '@/lib/llm-client/types';
+import type { IgnoredCorrection } from '@/lib/project-types';
 import { LRUCache } from '@/lib/utils/lru-cache';
 import type { LintingPluginState, LintingPluginOptions } from './types';
 
@@ -184,6 +185,37 @@ function severityToClass(severity: Severity): string {
 /**
  * Create the linting ProseMirror plugin.
  */
+/**
+ * Simple string hash matching the one in use-ignored-corrections.ts.
+ */
+function hashString(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    hash = ((hash << 5) - hash + ch) | 0;
+  }
+  return (hash >>> 0).toString(16);
+}
+
+/**
+ * Check if a lint issue should be filtered out based on ignored corrections.
+ */
+function isIssueIgnored(
+  issue: LintIssue,
+  issueText: string,
+  paragraphText: string,
+  ignoredList: IgnoredCorrection[],
+): boolean {
+  const paragraphHash = hashString(paragraphText);
+  return ignoredList.some((ignored) => {
+    if (ignored.ruleId !== issue.ruleId || ignored.text !== issueText) return false;
+    // Global ignore (no context) matches everything
+    if (!ignored.context) return true;
+    // Context-specific: match paragraph hash
+    return ignored.context === paragraphHash;
+  });
+}
+
 export function createLintingPlugin(
   options: LintingPluginOptions
 ): Plugin<LintingPluginState> {
@@ -197,6 +229,9 @@ export function createLintingPlugin(
 
   // Current NLP client reference (updated dynamically via setMeta)
   let currentNlpClient: INlpClient | null = nlpClient ?? null;
+
+  // Ignored corrections list (updated dynamically via setMeta)
+  let currentIgnoredCorrections: IgnoredCorrection[] = options.ignoredCorrections ?? [];
 
   // Lint result cache: paragraph text -> LintIssue[]
   // Minimizes rule execution and prevents flicker on scroll
@@ -236,7 +271,7 @@ export function createLintingPlugin(
 
       apply(tr, pluginState): LintingPluginState {
         // Update settings via meta
-        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null; nlpClient?: INlpClient | null; llmClient?: ILlmClient | null; llmEnabled?: boolean; forceFullScan?: boolean }> | undefined;
+        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null; nlpClient?: INlpClient | null; llmClient?: ILlmClient | null; llmEnabled?: boolean; forceFullScan?: boolean; ignoredCorrections?: IgnoredCorrection[] }> | undefined;
         if (meta) {
           // If decorations are included, apply directly
           if (meta.decorations !== undefined) {
@@ -282,6 +317,10 @@ export function createLintingPlugin(
             tokenCache.clear();
             documentIssueCache = null;
             pendingFullScan = true;
+          }
+          // Update ignoredCorrections list if provided
+          if ('ignoredCorrections' in meta) {
+            currentIgnoredCorrections = meta.ignoredCorrections ?? [];
           }
           // enabled/disabled change
           if (meta.enabled !== undefined) {
@@ -448,6 +487,12 @@ export function createLintingPlugin(
             if (combinedIssues.length === 0) continue;
 
             for (const issue of combinedIssues) {
+              // Filter out ignored corrections
+              const issueText = paragraph.text.slice(issue.from, issue.to);
+              if (currentIgnoredCorrections.length > 0 &&
+                  isIssueIgnored(issue, issueText, paragraph.text, currentIgnoredCorrections)) {
+                continue;
+              }
               const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
               const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
               const from = paragraph.pos + 1 + issue.from + extraFrom;
@@ -586,6 +631,13 @@ export function createLintingPlugin(
 
           // L1/L2 issues (paragraph-relative positions)
           for (const issue of combinedIssues) {
+            // Filter out ignored corrections
+            const issueText = paragraph.text.slice(issue.from, issue.to);
+            if (currentIgnoredCorrections.length > 0 &&
+                isIssueIgnored(issue, issueText, paragraph.text, currentIgnoredCorrections)) {
+              continue;
+            }
+
             const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
             const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
             const from = paragraph.pos + 1 + issue.from + extraFrom;
@@ -606,6 +658,15 @@ export function createLintingPlugin(
           if (llmIssues) {
             for (const issue of llmIssues) {
               if (issue.from < issue.to) {
+                // Filter out ignored L3 corrections
+                const l3IssueText = paragraph.text.slice(
+                  issue.from - (paragraph.pos + 1),
+                  issue.to - (paragraph.pos + 1),
+                );
+                if (currentIgnoredCorrections.length > 0 &&
+                    isIssueIgnored(issue, l3IssueText, paragraph.text, currentIgnoredCorrections)) {
+                  continue;
+                }
                 allDecorations.push(
                   Decoration.inline(issue.from, issue.to, {
                     class: severityToClass(issue.severity),
