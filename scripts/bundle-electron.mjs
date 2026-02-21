@@ -83,11 +83,31 @@ const runtimeDeps = [
   'node-llama-cpp',
 ];
 
+/**
+ * Recursively remove all .bin directories under a given path.
+ * These contain symlinks that break macOS code signing when unpacked from ASAR.
+ */
+function removeDotBinDirs(dir) {
+  if (!fs.existsSync(dir)) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === '.bin') {
+        fs.rmSync(fullPath, { recursive: true, force: true });
+      } else {
+        removeDotBinDirs(fullPath);
+      }
+    }
+  }
+}
+
 for (const dep of runtimeDeps) {
   const src = join(projectRoot, 'node_modules', dep);
   const dest = join(nodeModulesDest, dep);
   if (fs.existsSync(src)) {
     fs.cpSync(src, dest, { recursive: true });
+    // Remove .bin directories that contain symlinks breaking macOS code signing
+    removeDotBinDirs(dest);
     console.log(`  ✅ ${dep}`);
   } else {
     console.warn(`  ⚠️  Warning: ${dep} not found in node_modules`);

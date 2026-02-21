@@ -20,6 +20,8 @@ import {
 export interface UseTabPersistenceParams extends TabManagerCore {
   /** Whether to skip auto-restore on mount. */
   skipAutoRestore: boolean;
+  /** Promise that resolves once the VFS root is set (Electron only). */
+  vfsReadyPromise?: Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,6 +50,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     setActiveTabId,
     isElectron,
     skipAutoRestore,
+    vfsReadyPromise,
   } = params;
 
   const [wasAutoRecovered, setWasAutoRecovered] = useState(false);
@@ -188,6 +191,14 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
     const restoreTabs = async () => {
       try {
+        // Wait for VFS root to be set before reading files (prevents race condition)
+        if (vfsReadyPromise) {
+          await Promise.race([
+            vfsReadyPromise,
+            new Promise<void>((r) => setTimeout(r, 5000)),
+          ]);
+        }
+
         const appState = await fetchAppState();
         const openTabs = appState?.openTabs;
         if (!openTabs || openTabs.tabs.length === 0) return;
@@ -236,7 +247,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     };
 
     void restoreTabs();
-  }, [isElectron, skipAutoRestore, setTabs, setActiveTabId]);
+  }, [isElectron, skipAutoRestore, setTabs, setActiveTabId, vfsReadyPromise]);
 
   return { wasAutoRecovered };
 }

@@ -73,6 +73,13 @@ export default function EditorPage() {
     setEditorKey(prev => prev + 1);
   }, []);
 
+  // Deferred promise gate: tab restoration waits until VFS root is set
+  const [vfsGate] = useState(() => {
+    let resolve!: () => void;
+    const promise = new Promise<void>((r) => { resolve = r; });
+    return { promise, resolve };
+  });
+
   // --- Editor settings hook ---
   const { settings, handlers: settingsHandlers, setters: settingsSetters } = useEditorSettings(incrementEditorKey);
   const {
@@ -147,6 +154,7 @@ export default function EditorPage() {
     content,
     skipAutoRestore,
     lastSavedTime,
+    onVfsReady: vfsGate.resolve,
   });
   const {
     state: {
