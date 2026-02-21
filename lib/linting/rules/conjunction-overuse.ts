@@ -1,5 +1,6 @@
 import type { Token } from "@/lib/nlp-client/types";
 import { AbstractMorphologicalLintRule } from "../base-rule";
+import { isInDialogue } from "../helpers/dialogue-mask";
 import type { SentenceSpan } from "../helpers/sentence-splitter";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
@@ -64,6 +65,17 @@ export class ConjunctionOveruseRule extends AbstractMorphologicalLintRule {
 
     for (let i = 0; i < sentences.length; i++) {
       const sentence = sentences[i];
+
+      // Skip sentences inside dialogue
+      if (isInDialogue(sentence.from, text)) {
+        if (runLength >= threshold) {
+          issues.push(
+            this.createIssue(sentences, runStart, runLength, config),
+          );
+        }
+        runLength = 0;
+        continue;
+      }
 
       // Filter tokens that belong to this sentence
       const sentenceTokens = tokens.filter(

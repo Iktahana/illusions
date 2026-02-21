@@ -1,5 +1,6 @@
 import type { Token } from "@/lib/nlp-client/types";
 import { AbstractMorphologicalLintRule } from "../base-rule";
+import { isInDialogue } from "../helpers/dialogue-mask";
 import type { SentenceSpan } from "../helpers/sentence-splitter";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
@@ -85,6 +86,17 @@ export class TaigenDomeOveruseRule extends AbstractMorphologicalLintRule {
     let runLength = 0;
 
     for (let i = 0; i < sentences.length; i++) {
+      // Skip sentences inside dialogue
+      if (isInDialogue(sentences[i].from, text)) {
+        if (runLength >= threshold) {
+          issues.push(
+            this.createIssue(sentences, runStart, runLength, config),
+          );
+        }
+        runLength = 0;
+        continue;
+      }
+
       if (isTaigenDome(sentences[i], tokens)) {
         if (runLength === 0) {
           runStart = i;

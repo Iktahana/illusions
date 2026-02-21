@@ -1,4 +1,5 @@
 import { AbstractDocumentLintRule } from "../base-rule";
+import { maskDialogue } from "../helpers/dialogue-mask";
 import type { LintIssue, LintRuleConfig, LintReference, Severity } from "../types";
 import {
   VARIANT_GROUPS,
@@ -86,8 +87,9 @@ export class NotationConsistencyRule extends AbstractDocumentLintRule {
     const variantLocations = new Map<string, VariantLocation[]>();
 
     for (const paragraph of paragraphs) {
+      const maskedText = maskDialogue(paragraph.text);
       for (const variant of group.variants) {
-        const locations = this.findAllOccurrences(paragraph.text, variant);
+        const locations = this.findAllOccurrences(maskedText, variant);
         if (locations.length === 0) continue;
 
         const currentCount = variantCounts.get(variant) ?? 0;

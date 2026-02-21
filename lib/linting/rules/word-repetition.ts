@@ -1,5 +1,6 @@
 import type { Token } from "@/lib/nlp-client/types";
 import { AbstractMorphologicalLintRule } from "../base-rule";
+import { isInDialogue } from "../helpers/dialogue-mask";
 import type { SentenceSpan } from "../helpers/sentence-splitter";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
@@ -41,12 +42,16 @@ interface ContentWord {
 function extractContentWords(
   tokens: ReadonlyArray<Token>,
   sentence: SentenceSpan,
+  fullText: string,
 ): ContentWord[] {
   const words: ContentWord[] = [];
 
   for (const token of tokens) {
     // Only consider tokens within the sentence range
     if (token.start < sentence.from || token.end > sentence.to) continue;
+
+    // Skip tokens inside dialogue
+    if (isInDialogue(token.start, fullText)) continue;
 
     // Must be a content POS
     if (!CONTENT_POS.has(token.pos)) continue;
@@ -129,7 +134,7 @@ export class WordRepetitionRule extends AbstractMorphologicalLintRule {
 
     // Step 2: Extract content words per sentence
     const sentenceWords: ContentWord[][] = sentences.map((sentence) =>
-      extractContentWords(tokens, sentence),
+      extractContentWords(tokens, sentence, text),
     );
 
     // Step 3: Sliding window detection

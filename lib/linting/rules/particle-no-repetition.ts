@@ -1,4 +1,5 @@
 import { AbstractLintRule } from "../base-rule";
+import { maskDialogue } from "../helpers/dialogue-mask";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
@@ -108,8 +109,9 @@ export class ParticleNoRepetitionRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (!text) return [];
 
+    const maskedText = maskDialogue(text);
     const threshold = (config.options?.threshold as number) ?? 4;
-    const sentences = splitIntoSentences(text);
+    const sentences = splitIntoSentences(maskedText);
     const issues: LintIssue[] = [];
 
     for (const sentence of sentences) {

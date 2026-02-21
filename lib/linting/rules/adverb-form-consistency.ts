@@ -4,6 +4,7 @@ import {
   ADVERB_VARIANT_GROUPS,
   type AdverbVariantGroup,
 } from "../data/adverb-variants";
+import { isInDialogue } from "../helpers/dialogue-mask";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -117,6 +118,9 @@ export class AdverbFormConsistencyRule extends AbstractMorphologicalDocumentLint
 
     for (const paragraph of paragraphs) {
       for (const token of paragraph.tokens) {
+        // Skip tokens inside dialogue
+        if (isInDialogue(token.start, paragraph.text)) continue;
+
         // Filter for adverb POS only
         if (token.pos !== "副詞") continue;
         if (!token.reading) continue;

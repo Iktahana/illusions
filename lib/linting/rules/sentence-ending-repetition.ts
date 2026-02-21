@@ -1,4 +1,5 @@
 import { AbstractLintRule } from "../base-rule";
+import { isInDialogue } from "../helpers/dialogue-mask";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -134,6 +135,26 @@ export class SentenceEndingRepetitionRule extends AbstractLintRule {
 
     for (let i = 0; i < sentences.length; i++) {
       const pattern = sentences[i].endingPattern;
+
+      // Skip sentences inside dialogue
+      if (isInDialogue(sentences[i].from, text)) {
+        if (runLength >= threshold && runPattern !== null) {
+          issues.push(
+            this.createIssue(
+              sentences,
+              runStart,
+              i - 1,
+              runPattern,
+              runLength,
+              config.severity,
+            ),
+          );
+        }
+        runPattern = null;
+        runLength = 0;
+        runStart = i + 1;
+        continue;
+      }
 
       // Skip sentences with no detectable pattern (too short)
       if (pattern === null) {

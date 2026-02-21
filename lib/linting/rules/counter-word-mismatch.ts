@@ -1,6 +1,7 @@
 import type { Token } from "@/lib/nlp-client/types";
 import { AbstractMorphologicalLintRule } from "../base-rule";
 import { COUNTER_MISMATCHES } from "../data/counter-words";
+import { isInDialogue } from "../helpers/dialogue-mask";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -146,6 +147,9 @@ export class CounterWordMismatchRule extends AbstractMorphologicalLintRule {
     const issues: LintIssue[] = [];
 
     for (let i = 0; i < tokens.length; i++) {
+      // Skip tokens inside dialogue
+      if (isInDialogue(tokens[i].start, text)) continue;
+
       // Step 1: Find a number token
       if (!isNumberToken(tokens[i])) continue;
 

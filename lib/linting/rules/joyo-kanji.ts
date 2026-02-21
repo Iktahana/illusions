@@ -1,7 +1,8 @@
 import { AbstractLintRule } from "../base-rule";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
-import { JOYO_KANJI_SET } from "../data/joyo-kanji";
 import { JINMEIYO_KANJI_SET } from "../data/jinmeiyo-kanji";
+import { JOYO_KANJI_SET } from "../data/joyo-kanji";
+import { maskDialogue } from "../helpers/dialogue-mask";
+import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -130,6 +131,7 @@ export class JoyoKanjiRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (text.length === 0) return [];
 
+    const maskedText = maskDialogue(text);
     const options = (config.options ?? this.defaultConfig.options) as
       | JoyoKanjiOptions
       | undefined;
@@ -146,8 +148,8 @@ export class JoyoKanjiRule extends AbstractLintRule {
     // -----------------------------------------------------------------
     for (const [word, hiragana] of NON_JOYO_SUGGESTIONS) {
       let searchFrom = 0;
-      while (searchFrom <= text.length - word.length) {
-        const idx = text.indexOf(word, searchFrom);
+      while (searchFrom <= maskedText.length - word.length) {
+        const idx = maskedText.indexOf(word, searchFrom);
         if (idx === -1) break;
 
         const from = idx;
@@ -183,7 +185,7 @@ export class JoyoKanjiRule extends AbstractLintRule {
     // Reset lastIndex in case the regex was used before
     CJK_KANJI_REGEX.lastIndex = 0;
 
-    while ((match = CJK_KANJI_REGEX.exec(text)) !== null) {
+    while ((match = CJK_KANJI_REGEX.exec(maskedText)) !== null) {
       const char = match[0];
       const from = match.index;
       const to = from + char.length;
