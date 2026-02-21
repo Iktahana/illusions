@@ -50,6 +50,8 @@ export function useIgnoredCorrections(
 
   // Load on mount or mode change
   useEffect(() => {
+    let cancelled = false;
+
     const modeKey = editorMode
       ? editorMode.type === "project"
         ? `project:${editorMode.projectId}`
@@ -70,16 +72,22 @@ export function useIgnoredCorrections(
     if (isProjectMode(editorMode)) {
       service
         .loadIgnoredCorrections()
-        .then(setIgnoredCorrections)
+        .then((data) => {
+          if (!cancelled) setIgnoredCorrections(data);
+        })
         .catch((err) => {
           console.warn("[useIgnoredCorrections] Failed to load:", err);
-          setIgnoredCorrections([]);
+          if (!cancelled) setIgnoredCorrections([]);
         });
     } else if (isStandaloneMode(editorMode)) {
       setIgnoredCorrections(
         service.loadIgnoredCorrectionsStandalone(editorMode.fileName),
       );
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [editorMode]);
 
   const computeContextHash = useCallback(

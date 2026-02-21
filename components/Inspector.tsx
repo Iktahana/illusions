@@ -796,6 +796,7 @@ function CorrectionsPanel({
                       <span
                         role="button"
                         tabIndex={0}
+                        aria-label="この指摘を無視"
                         onClick={(e) => {
                           e.stopPropagation();
                           onIgnoreCorrection(issue, false);
