@@ -21,6 +21,13 @@ import { SentenceLengthRule } from "@/lib/linting/rules/sentence-length";
 import { DashFormatRule } from "@/lib/linting/rules/dash-format";
 import { DialoguePunctuationRule } from "@/lib/linting/rules/dialogue-punctuation";
 import { CommaFrequencyRule } from "@/lib/linting/rules/comma-frequency";
+import { DesuMasuConsistencyRule } from "@/lib/linting/rules/desu-masu-consistency";
+import { ConjunctionOveruseRule } from "@/lib/linting/rules/conjunction-overuse";
+import { WordRepetitionRule } from "@/lib/linting/rules/word-repetition";
+import { TaigenDomeOveruseRule } from "@/lib/linting/rules/taigen-dome-overuse";
+import { PassiveOveruseRule } from "@/lib/linting/rules/passive-overuse";
+import { CounterWordMismatchRule } from "@/lib/linting/rules/counter-word-mismatch";
+import { AdverbFormConsistencyRule } from "@/lib/linting/rules/adverb-form-consistency";
 
 export interface UseLintingResult {
   ruleRunner: RuleRunner;
@@ -61,6 +68,13 @@ export function useLinting(
     runner.registerRule(new DashFormatRule());
     runner.registerRule(new DialoguePunctuationRule());
     runner.registerRule(new CommaFrequencyRule());
+    runner.registerRule(new DesuMasuConsistencyRule());
+    runner.registerRule(new ConjunctionOveruseRule());
+    runner.registerRule(new WordRepetitionRule());
+    runner.registerRule(new TaigenDomeOveruseRule());
+    runner.registerRule(new PassiveOveruseRule());
+    runner.registerRule(new CounterWordMismatchRule());
+    runner.registerRule(new AdverbFormConsistencyRule());
     ruleRunnerRef.current = runner;
   }
 

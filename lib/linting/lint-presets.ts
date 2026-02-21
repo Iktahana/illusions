@@ -23,6 +23,13 @@ export const LINT_RULES_META: LintRuleMeta[] = [
   { id: "dash-format", nameJa: "ダッシュの用法", descriptionJa: "ダッシュの誤用を検出し、正しい表記を提案します" },
   { id: "dialogue-punctuation", nameJa: "台詞の約物チェック", descriptionJa: "台詞のカギ括弧の書式エラーを検出します" },
   { id: "comma-frequency", nameJa: "読点の頻度チェック", descriptionJa: "読点が多すぎる、または少なすぎる文を検出します" },
+  { id: "desu-masu-consistency", nameJa: "敬体・常体の混在検出", descriptionJa: "です・ます体と、だ・である体の混在を検出します" },
+  { id: "conjunction-overuse", nameJa: "接続詞の多用検出", descriptionJa: "接続詞で始まる文が連続している箇所を検出します" },
+  { id: "word-repetition", nameJa: "近接語句の反復検出", descriptionJa: "近接する文で同じ語句が繰り返し使われている箇所を検出します" },
+  { id: "taigen-dome-overuse", nameJa: "体言止めの多用検出", descriptionJa: "体言止めが連続している箇所を検出します" },
+  { id: "passive-overuse", nameJa: "受動態の多用検出", descriptionJa: "受動態が連続して使われている箇所を検出します" },
+  { id: "counter-word-mismatch", nameJa: "助数詞の誤用検出", descriptionJa: "助数詞と数えられる対象の組み合わせの誤りを検出します" },
+  { id: "adverb-form-consistency", nameJa: "副詞の漢字・ひらがな統一", descriptionJa: "副詞の漢字表記とひらがな表記の混在を検出します" },
 ];
 
 /** Category grouping for rule display */
@@ -41,17 +48,17 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
   {
     id: "kanji",
     nameJa: "漢字・用字",
-    rules: ["joyo-kanji", "era-year-validator"],
+    rules: ["joyo-kanji", "era-year-validator", "adverb-form-consistency"],
   },
   {
     id: "grammar",
     nameJa: "文法・語法",
-    rules: ["particle-no-repetition", "conjugation-errors", "correlative-expression"],
+    rules: ["particle-no-repetition", "conjugation-errors", "correlative-expression", "counter-word-mismatch", "passive-overuse"],
   },
   {
     id: "style",
     nameJa: "文体",
-    rules: ["redundant-expression", "verbose-expression", "sentence-ending-repetition", "sentence-length"],
+    rules: ["redundant-expression", "verbose-expression", "sentence-ending-repetition", "sentence-length", "desu-masu-consistency", "conjunction-overuse", "word-repetition", "taigen-dome-overuse"],
   },
 ];
 
@@ -72,6 +79,13 @@ export const LINT_DEFAULT_CONFIGS: Record<string, { enabled: boolean; severity: 
   "dash-format": { enabled: true, severity: "warning" },
   "dialogue-punctuation": { enabled: true, severity: "warning" },
   "comma-frequency": { enabled: true, severity: "info" },
+  "desu-masu-consistency": { enabled: true, severity: "warning" },
+  "conjunction-overuse": { enabled: true, severity: "info" },
+  "word-repetition": { enabled: true, severity: "info" },
+  "taigen-dome-overuse": { enabled: true, severity: "info" },
+  "passive-overuse": { enabled: true, severity: "info" },
+  "counter-word-mismatch": { enabled: true, severity: "warning" },
+  "adverb-form-consistency": { enabled: true, severity: "info" },
 };
 
 /** Preset configuration for one-shot application */
@@ -99,6 +113,13 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "dash-format": { enabled: false, severity: "info" },
       "dialogue-punctuation": { enabled: true, severity: "warning" },
       "comma-frequency": { enabled: false, severity: "info" },
+      "desu-masu-consistency": { enabled: false, severity: "info" },
+      "conjunction-overuse": { enabled: false, severity: "info" },
+      "word-repetition": { enabled: false, severity: "info" },
+      "taigen-dome-overuse": { enabled: false, severity: "info" },
+      "passive-overuse": { enabled: false, severity: "info" },
+      "counter-word-mismatch": { enabled: false, severity: "info" },
+      "adverb-form-consistency": { enabled: false, severity: "info" },
     },
   },
   standard: {
@@ -123,6 +144,13 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "dash-format": { enabled: true, severity: "error" },
       "dialogue-punctuation": { enabled: true, severity: "error" },
       "comma-frequency": { enabled: true, severity: "warning" },
+      "desu-masu-consistency": { enabled: true, severity: "error" },
+      "conjunction-overuse": { enabled: true, severity: "warning" },
+      "word-repetition": { enabled: true, severity: "warning" },
+      "taigen-dome-overuse": { enabled: true, severity: "warning" },
+      "passive-overuse": { enabled: true, severity: "warning" },
+      "counter-word-mismatch": { enabled: true, severity: "error" },
+      "adverb-form-consistency": { enabled: true, severity: "warning" },
     },
   },
   novel: {
@@ -143,6 +171,13 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "dash-format": { enabled: true, severity: "warning" },
       "dialogue-punctuation": { enabled: true, severity: "warning" },
       "comma-frequency": { enabled: true, severity: "info" },
+      "desu-masu-consistency": { enabled: false, severity: "info" },
+      "conjunction-overuse": { enabled: true, severity: "info" },
+      "word-repetition": { enabled: true, severity: "info" },
+      "taigen-dome-overuse": { enabled: true, severity: "info" },
+      "passive-overuse": { enabled: true, severity: "info" },
+      "counter-word-mismatch": { enabled: true, severity: "warning" },
+      "adverb-form-consistency": { enabled: true, severity: "info" },
     },
   },
   official: {
@@ -163,6 +198,13 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "dash-format": { enabled: true, severity: "error" },
       "dialogue-punctuation": { enabled: true, severity: "warning" },
       "comma-frequency": { enabled: true, severity: "warning" },
+      "desu-masu-consistency": { enabled: true, severity: "error" },
+      "conjunction-overuse": { enabled: true, severity: "warning" },
+      "word-repetition": { enabled: true, severity: "info" },
+      "taigen-dome-overuse": { enabled: true, severity: "info" },
+      "passive-overuse": { enabled: true, severity: "warning" },
+      "counter-word-mismatch": { enabled: true, severity: "error" },
+      "adverb-form-consistency": { enabled: true, severity: "warning" },
     },
   },
 };
