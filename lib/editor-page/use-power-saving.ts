@@ -63,7 +63,6 @@ export function usePowerSaving({
 
     return () => {
       cleanup?.();
-      api.power?.removeOnPowerStateChange();
     };
   }, []); // Empty deps -- refs handle state updates
 }
