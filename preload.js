@@ -166,4 +166,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     decrypt: (base64Cipher) => ipcRenderer.invoke('safe-storage:decrypt', base64Cipher),
     isAvailable: () => ipcRenderer.invoke('safe-storage:is-available'),
   },
+  power: {
+    onPowerStateChange: (callback) => {
+      const handler = (_event, state) => callback(state)
+      ipcRenderer.on('power:state-changed', handler)
+      return () => ipcRenderer.removeListener('power:state-changed', handler)
+    },
+    getPowerState: () => ipcRenderer.invoke('power:get-state'),
+    removeOnPowerStateChange: () => {
+      ipcRenderer.removeAllListeners('power:state-changed')
+    },
+    showBatteryPrompt: () => ipcRenderer.invoke('power:show-battery-prompt'),
+  },
 })
