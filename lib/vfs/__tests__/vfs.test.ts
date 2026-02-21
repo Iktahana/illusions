@@ -12,6 +12,8 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import type { VFSEntry, VirtualFileSystem } from "../types";
 
 // -----------------------------------------------------------------------
@@ -135,7 +137,7 @@ describe("WebVFS", () => {
 
   beforeEach(async () => {
     // Reset modules to get a clean slate
-    jest.resetModules();
+    vi.resetModules();
 
     // Remove Electron API from window
     delete (window as any).electronAPI;
@@ -218,7 +220,7 @@ describe("WebVFS", () => {
 
       // The file should now be readable
       const content = await vfs.readFile("newdir/newfile.txt");
-      expect(content).toBe("");  // Mock createWritable doesn't persist to getFile
+      expect(content).toBe("new content");
     });
   });
 
@@ -302,17 +304,17 @@ describe("ElectronVFS", () => {
   let ElectronVFS: new () => VirtualFileSystem;
 
   const mockBridge = {
-    openDirectory: jest.fn(),
-    readFile: jest.fn(),
-    writeFile: jest.fn(),
-    readDirectory: jest.fn(),
-    stat: jest.fn(),
-    mkdir: jest.fn(),
-    delete: jest.fn(),
+    openDirectory: vi.fn(),
+    readFile: vi.fn(),
+    writeFile: vi.fn(),
+    readDirectory: vi.fn(),
+    stat: vi.fn(),
+    mkdir: vi.fn(),
+    delete: vi.fn(),
   };
 
   beforeEach(async () => {
-    jest.resetModules();
+    vi.resetModules();
 
     // Set up Electron API mock with vfs bridge
     (window as any).electronAPI = {
@@ -512,8 +514,8 @@ describe("ElectronVFS", () => {
 // -----------------------------------------------------------------------
 
 describe("VFS Factory (getVFS / resetVFS)", () => {
-  beforeEach(() => {
-    jest.resetModules();
+  beforeEach(async () => {
+    vi.resetModules();
   });
 
   afterEach(() => {
@@ -523,12 +525,14 @@ describe("VFS Factory (getVFS / resetVFS)", () => {
   it("should return WebVFS in browser environment", async () => {
     delete (window as any).electronAPI;
 
+    // Import the concrete class directly (bypassing require in factory)
+    const { WebVFS } = await import("../web-vfs");
     const { getVFS, resetVFS } = await import("../index");
     resetVFS();
 
     const vfs = getVFS();
-    // WebVFS instance should have no rootHandle, and should be from web-vfs module
     expect(vfs).toBeDefined();
+    expect(vfs).toBeInstanceOf(WebVFS);
     expect(typeof vfs.openDirectory).toBe("function");
     expect(typeof vfs.readFile).toBe("function");
   });
@@ -537,21 +541,23 @@ describe("VFS Factory (getVFS / resetVFS)", () => {
     (window as any).electronAPI = {
       isElectron: true,
       vfs: {
-        openDirectory: jest.fn(),
-        readFile: jest.fn(),
-        writeFile: jest.fn(),
-        readDirectory: jest.fn(),
-        stat: jest.fn(),
-        mkdir: jest.fn(),
-        delete: jest.fn(),
+        openDirectory: vi.fn(),
+        readFile: vi.fn(),
+        writeFile: vi.fn(),
+        readDirectory: vi.fn(),
+        stat: vi.fn(),
+        mkdir: vi.fn(),
+        delete: vi.fn(),
       },
     };
 
+    const { ElectronVFS } = await import("../electron-vfs");
     const { getVFS, resetVFS } = await import("../index");
     resetVFS();
 
     const vfs = getVFS();
     expect(vfs).toBeDefined();
+    expect(vfs).toBeInstanceOf(ElectronVFS);
     expect(typeof vfs.openDirectory).toBe("function");
     expect(typeof vfs.readFile).toBe("function");
   });
