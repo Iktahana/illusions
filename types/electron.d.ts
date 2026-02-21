@@ -158,6 +158,14 @@ declare global {
       ) => void;
       removeDownloadProgressListener: () => void;
     };
+    power?: {
+      /** Listen for debounced power state changes from main process */
+      onPowerStateChange: (callback: (state: 'ac' | 'battery') => void) => (() => void);
+      /** Get current power state */
+      getPowerState: () => Promise<'ac' | 'battery'>;
+      /** Remove all power state change listeners */
+      removeOnPowerStateChange: () => void;
+    };
   }
 
   interface Window {

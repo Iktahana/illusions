@@ -87,7 +87,7 @@ export class TaigenDomeOveruseRule extends AbstractMorphologicalLintRule {
 
     for (let i = 0; i < sentences.length; i++) {
       // Skip sentences inside dialogue
-      if (isInDialogue(sentences[i].from, text)) {
+      if (config.skipDialogue && isInDialogue(sentences[i].from, text)) {
         if (runLength >= threshold) {
           issues.push(
             this.createIssue(sentences, runStart, runLength, config),

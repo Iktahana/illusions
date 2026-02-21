@@ -43,6 +43,7 @@ function extractContentWords(
   tokens: ReadonlyArray<Token>,
   sentence: SentenceSpan,
   fullText: string,
+  skipDialogue?: boolean,
 ): ContentWord[] {
   const words: ContentWord[] = [];
 
@@ -51,7 +52,7 @@ function extractContentWords(
     if (token.start < sentence.from || token.end > sentence.to) continue;
 
     // Skip tokens inside dialogue
-    if (isInDialogue(token.start, fullText)) continue;
+    if (skipDialogue && isInDialogue(token.start, fullText)) continue;
 
     // Must be a content POS
     if (!CONTENT_POS.has(token.pos)) continue;
@@ -134,7 +135,7 @@ export class WordRepetitionRule extends AbstractMorphologicalLintRule {
 
     // Step 2: Extract content words per sentence
     const sentenceWords: ContentWord[][] = sentences.map((sentence) =>
-      extractContentWords(tokens, sentence, text),
+      extractContentWords(tokens, sentence, text, config.skipDialogue),
     );
 
     // Step 3: Sliding window detection

@@ -1,20 +1,24 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, ExternalLink, ChevronDown, ChevronRight, Sparkles, Settings, Columns2, Highlighter, SpellCheck } from "lucide-react";
+import { X, ExternalLink, ChevronDown, ChevronRight, Sparkles, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium } from "lucide-react";
 import type { Severity } from "@/lib/linting/types";
 import dynamic from "next/dynamic";
 
+import { isElectronRenderer } from "@/lib/runtime-env";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import { FEATURED_JAPANESE_FONTS } from "@/lib/fonts";
 import ColorPicker from "./ColorPicker";
 import LintingSettings from "./LintingSettings";
-import { LlmSettings } from "./LlmSettings";
 import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 
 const PosHighlightPreview = dynamic(() => import("./PosHighlightPreview"), {
   ssr: false,
 });
+const LlmSettings = dynamic(
+  () => import("./LlmSettings").then((mod) => mod.LlmSettings),
+  { ssr: false },
+);
 const LICENSE_TEXT = process.env.NEXT_PUBLIC_LICENSE_TEXT || "";
 const TERMS_TEXT = process.env.NEXT_PUBLIC_TERMS_TEXT || "";
 
@@ -85,11 +89,14 @@ interface SettingsModalProps {
   onLlmEnabledChange?: (value: boolean) => void;
   llmModelId?: string;
   onLlmModelIdChange?: (modelId: string) => void;
+  // Power saving (Electron only)
+  powerSaveMode?: boolean;
+  onPowerSaveModeChange?: (value: boolean) => void;
   /** Open modal on a specific tab */
   initialCategory?: SettingsCategory;
 }
 
-export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "llm" | "about";
+export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "llm" | "power" | "about";
 
 const SCROLL_BEHAVIORS = [
   {
@@ -147,6 +154,8 @@ export default function SettingsModal({
   onLlmEnabledChange,
   llmModelId,
   onLlmModelIdChange,
+  powerSaveMode,
+  onPowerSaveModeChange,
   initialCategory,
 }: SettingsModalProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(initialCategory ?? "editor");
@@ -301,6 +310,20 @@ export default function SettingsModal({
                 <Sparkles className="w-4 h-4" />
                 AI機能
               </button>
+              {isElectronRenderer() && (
+                <button
+                  onClick={() => setActiveCategory("power")}
+                  className={clsx(
+                    "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
+                    activeCategory === "power"
+                      ? "bg-accent text-accent-foreground"
+                      : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                  )}
+                >
+                  <BatteryMedium className="w-4 h-4" />
+                  省電力
+                </button>
+              )}
               <div className="my-2 border-t border-border" />
               <button
                 onClick={() => setActiveCategory("about")}
@@ -656,6 +679,32 @@ export default function SettingsModal({
                 llmModelId={llmModelId ?? DEFAULT_MODEL_ID}
                 onLlmModelIdChange={onLlmModelIdChange}
               />
+            )}
+
+            {/* Power saving section (Electron only) */}
+            {activeCategory === "power" && (
+              <div className="space-y-6 p-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground mb-1">省電力モード</h3>
+                  <p className="text-sm text-foreground-secondary mb-4">
+                    省電力モードを有効にすると、校正機能とAI関連機能が一時的に無効になり、バッテリー消費を抑えます。
+                  </p>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={powerSaveMode ?? false}
+                      onChange={(e) => onPowerSaveModeChange?.(e.target.checked)}
+                      className="w-4 h-4 rounded border-border accent-accent"
+                    />
+                    <span className="text-sm font-medium text-foreground">省電力モードを有効にする</span>
+                  </label>
+                </div>
+                <div className="text-xs text-foreground-secondary space-y-1">
+                  <p>• バッテリー駆動時に自動的に省電力モードの有効化を提案します</p>
+                  <p>• AC電源接続時に自動的に省電力モードを解除します</p>
+                  <p>• 省電力モード解除時、以前の校正・AI設定が復元されます</p>
+                </div>
+              </div>
             )}
 
             {/* About section */}

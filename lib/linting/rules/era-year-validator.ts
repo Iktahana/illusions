@@ -88,7 +88,7 @@ export class EraYearValidatorRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (text.length === 0) return [];
 
-    const maskedText = maskDialogue(text);
+    const maskedText = config.skipDialogue ? maskDialogue(text) : text;
     const issues: LintIssue[] = [];
 
     // Reset regex state for safety (global regex retains lastIndex)

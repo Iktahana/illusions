@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, MessageSquareOff, MessageSquare } from "lucide-react";
 import clsx from "clsx";
 
 import type { Severity } from "@/lib/linting/types";
@@ -17,20 +17,25 @@ const AI_RULE_IDS = new Set(
   LINT_RULE_CATEGORIES.find((c) => c.id === "ai")?.rules ?? [],
 );
 
+/** Map of rule ID → supportsSkipDialogue from metadata */
+const SKIP_DIALOGUE_SUPPORT = new Map(
+  LINT_RULES_META.map((r) => [r.id, r.supportsSkipDialogue ?? false]),
+);
+
 interface LintingSettingsProps {
   lintingEnabled: boolean;
   onLintingEnabledChange: (value: boolean) => void;
-  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
-  onLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
-  onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
+  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>;
+  onLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity; skipDialogue?: boolean }) => void;
+  onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>) => void;
   llmEnabled?: boolean;
 }
 
 /** Resolve the effective config for a rule, falling back to defaults */
 function getConfig(
   ruleId: string,
-  configs: Record<string, { enabled: boolean; severity: Severity }>,
-): { enabled: boolean; severity: Severity } {
+  configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
+): { enabled: boolean; severity: Severity; skipDialogue?: boolean } {
   return configs[ruleId] ?? LINT_DEFAULT_CONFIGS[ruleId] ?? { enabled: true, severity: "warning" };
 }
 
@@ -82,7 +87,7 @@ export default function LintingSettings({
   };
 
   const handleEnableAll = () => {
-    const next: Record<string, { enabled: boolean; severity: Severity }> = {};
+    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> = {};
     for (const rule of LINT_RULES_META) {
       const current = getConfig(rule.id, lintingRuleConfigs);
       next[rule.id] = { ...current, enabled: true };
@@ -91,7 +96,7 @@ export default function LintingSettings({
   };
 
   const handleDisableAll = () => {
-    const next: Record<string, { enabled: boolean; severity: Severity }> = {};
+    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> = {};
     for (const rule of LINT_RULES_META) {
       const current = getConfig(rule.id, lintingRuleConfigs);
       next[rule.id] = { ...current, enabled: false };
@@ -112,7 +117,11 @@ export default function LintingSettings({
         const current = getConfig(rule.id, lintingRuleConfigs);
         const presetCfg = preset.configs[rule.id];
         if (!presetCfg) return false;
-        return current.enabled === presetCfg.enabled && current.severity === presetCfg.severity;
+        return (
+          current.enabled === presetCfg.enabled &&
+          current.severity === presetCfg.severity &&
+          (current.skipDialogue ?? false) === (presetCfg.skipDialogue ?? false)
+        );
       });
       if (allMatch) return id;
     }
@@ -244,6 +253,7 @@ export default function LintingSettings({
                     const config = getConfig(ruleId, lintingRuleConfigs);
                     const isAiRule = AI_RULE_IDS.has(ruleId);
                     const aiDisabled = isAiRule && !llmEnabled;
+                    const showDialogueToggle = SKIP_DIALOGUE_SUPPORT.get(ruleId) ?? false;
 
                     return (
                       <div
@@ -260,6 +270,32 @@ export default function LintingSettings({
                             {meta.nameJa}
                           </span>
                         </div>
+
+                        {/* Skip dialogue toggle */}
+                        {showDialogueToggle && (
+                          <button
+                            disabled={aiDisabled}
+                            onClick={() =>
+                              onLintingRuleConfigChange(ruleId, {
+                                ...config,
+                                skipDialogue: !config.skipDialogue,
+                              })
+                            }
+                            className={clsx(
+                              "p-1 rounded transition-colors flex-shrink-0",
+                              config.skipDialogue
+                                ? "text-accent hover:text-accent-hover"
+                                : "text-foreground-muted hover:text-foreground-secondary",
+                            )}
+                            title={config.skipDialogue ? "対話文を無視中" : "対話文も検査中"}
+                          >
+                            {config.skipDialogue ? (
+                              <MessageSquareOff className="w-3.5 h-3.5" />
+                            ) : (
+                              <MessageSquare className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        )}
 
                         {/* Severity dropdown */}
                         <select

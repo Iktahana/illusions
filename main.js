@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 // Electron のメインプロセス入口
 
-const { app, BrowserWindow, ipcMain, dialog, Menu, shell, safeStorage } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell, safeStorage, powerMonitor } = require('electron')
 const path = require('path')
 const fs = require('fs/promises')
 const os = require('os')
@@ -44,6 +44,20 @@ autoUpdater.logger.transports.file.level = 'info'
 let mainWindow = null
 let isManualUpdateCheck = false
 const allWindows = new Set() // すべてのウィンドウを追跡
+
+// --- Power state monitoring ---
+let powerDebounceTimer = null
+
+function broadcastPowerState(state) {
+  clearTimeout(powerDebounceTimer)
+  powerDebounceTimer = setTimeout(() => {
+    for (const win of allWindows) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('power:state-changed', state)
+      }
+    }
+  }, 60_000) // 1-minute debounce
+}
 
 // Microsoft Store (APPX) ビルドかどうかを判定
 // Store 版はストア経由で更新されるため、electron-updater を無効化する
@@ -999,6 +1013,12 @@ ipcMain.handle('safe-storage:is-available', () => {
   return safeStorage.isEncryptionAvailable()
 })
 
+// Power state IPC handlers
+ipcMain.handle('power:get-state', () => {
+  return powerMonitor.isOnBatteryPower() ? 'battery' : 'ac'
+})
+
+
 /**
  * Check if a directory contains a .illusions folder (project marker)
  * @param {string} dirPath - Directory path to check
@@ -1105,6 +1125,10 @@ app.whenReady().then(async () => {
   registerLlmHandlers()
   registerStorageHandlers()
   registerVFSHandlers()
+
+  // Power state monitoring
+  powerMonitor.on('on-ac', () => broadcastPowerState('ac'))
+  powerMonitor.on('on-battery', () => broadcastPowerState('battery'))
 
   // ウィンドウ作成後に auto-updater を初期化
   setupAutoUpdater()

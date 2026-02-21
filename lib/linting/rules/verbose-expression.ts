@@ -86,7 +86,7 @@ export class VerboseExpressionRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (!text) return [];
 
-    const maskedText = maskDialogue(text);
+    const maskedText = config.skipDialogue ? maskDialogue(text) : text;
     const issues: LintIssue[] = [];
 
     for (const entry of VERBOSE_PATTERNS) {

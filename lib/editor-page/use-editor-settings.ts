@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useState } from "react";
 
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
+import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 import type { Severity } from "@/lib/linting/types";
 
 export interface EditorSettings {
@@ -24,6 +25,7 @@ export interface EditorSettings {
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
   llmEnabled: boolean;
   llmModelId: string;
+  powerSaveMode: boolean;
 }
 
 export interface EditorSettingsHandlers {
@@ -47,6 +49,7 @@ export interface EditorSettingsHandlers {
   handleLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
   handleLlmEnabledChange: (value: boolean) => void;
   handleLlmModelIdChange: (modelId: string) => void;
+  handlePowerSaveModeChange: (enabled: boolean) => void;
 }
 
 export interface EditorSettingsSetters {
@@ -94,6 +97,7 @@ export function useEditorSettings(
   const [lintingRuleConfigs, setLintingRuleConfigs] = useState<Record<string, { enabled: boolean; severity: Severity }>>({});
   const [llmEnabled, setLlmEnabled] = useState(false);
   const [llmModelId, setLlmModelId] = useState("qwen3-1.7b-q8");
+  const [powerSaveMode, setPowerSaveMode] = useState(false);
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -157,15 +161,20 @@ export function useEditorSettings(
         if (appState.lintingRuleConfigs && typeof appState.lintingRuleConfigs === "object") {
           const isSeverity = (v: unknown): v is Severity =>
             v === "error" || v === "warning" || v === "info";
-          const sanitized: Record<string, { enabled: boolean; severity: Severity }> = {};
+          const sanitized: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> = {};
           for (const [ruleId, config] of Object.entries(appState.lintingRuleConfigs)) {
-            const cfg = config as { enabled?: unknown; severity?: unknown };
+            const cfg = config as { enabled?: unknown; severity?: unknown; skipDialogue?: unknown };
             if (typeof cfg.enabled === "boolean" && isSeverity(cfg.severity)) {
-              sanitized[ruleId] = { enabled: cfg.enabled, severity: cfg.severity };
+              const entry: { enabled: boolean; severity: Severity; skipDialogue?: boolean } = { enabled: cfg.enabled, severity: cfg.severity };
+              if (typeof cfg.skipDialogue === "boolean") {
+                entry.skipDialogue = cfg.skipDialogue;
+              }
+              sanitized[ruleId] = entry;
             }
           }
           setLintingRuleConfigs(sanitized);
         }
+        if (appState.powerSaveMode !== undefined) setPowerSaveMode(appState.powerSaveMode);
         // Force editor rebuild to apply restored settings (e.g. custom font)
         incrementEditorKey();
       } catch (error) {
@@ -324,12 +333,51 @@ export function useEditorSettings(
     });
   }, []);
 
-  const handleLintingRuleConfigsBatchChange = useCallback((configs: Record<string, { enabled: boolean; severity: Severity }>) => {
+  const handleLintingRuleConfigsBatchChange = useCallback((configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>) => {
     setLintingRuleConfigs(configs);
     void persistAppState({ lintingRuleConfigs: configs }).catch((error) => {
       console.error("Failed to persist lintingRuleConfigs:", error);
     });
   }, []);
+
+  const handlePowerSaveModeChange = useCallback(async (enabled: boolean) => {
+    if (enabled) {
+      // Save current state before enabling power save
+      const snapshot = {
+        lintingEnabled,
+        lintingRuleConfigs,
+        llmEnabled,
+      };
+      await persistAppState({
+        powerSaveMode: true,
+        prePowerSaveState: snapshot,
+        lintingEnabled: false,
+        llmEnabled: false,
+      });
+      setPowerSaveMode(true);
+      setLintingEnabled(false);
+      setLlmEnabled(false);
+    } else {
+      // Restore previous state
+      const stored = await fetchAppState();
+      const prev = stored?.prePowerSaveState;
+      if (prev) {
+        setLintingEnabled(prev.lintingEnabled);
+        setLintingRuleConfigs(prev.lintingRuleConfigs);
+        setLlmEnabled(prev.llmEnabled);
+        await persistAppState({
+          powerSaveMode: false,
+          prePowerSaveState: null,
+          lintingEnabled: prev.lintingEnabled,
+          lintingRuleConfigs: prev.lintingRuleConfigs,
+          llmEnabled: prev.llmEnabled,
+        });
+      } else {
+        await persistAppState({ powerSaveMode: false, prePowerSaveState: null });
+      }
+      setPowerSaveMode(false);
+    }
+  }, [lintingEnabled, lintingRuleConfigs, llmEnabled]);
 
   return {
     settings: {
@@ -352,6 +400,7 @@ export function useEditorSettings(
       lintingRuleConfigs,
       llmEnabled,
       llmModelId,
+      powerSaveMode,
     },
     handlers: {
       handleFontScaleChange,
@@ -374,6 +423,7 @@ export function useEditorSettings(
       handleLintingRuleConfigsBatchChange,
       handleLlmEnabledChange,
       handleLlmModelIdChange,
+      handlePowerSaveModeChange,
     },
     setters: {
       setLineHeight,

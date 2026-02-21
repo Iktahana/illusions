@@ -42,6 +42,7 @@ import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
 import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
+import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 
 import type { EditorView } from "@milkdown/prose/view";
@@ -88,6 +89,7 @@ export default function EditorPage() {
     scrollSensitivity, compactMode, showSettingsModal,
     lintingEnabled, lintingRuleConfigs,
     llmEnabled, llmModelId,
+    powerSaveMode,
   } = settings;
   const {
     handleFontScaleChange, handleLineHeightChange, handleParagraphSpacingChange,
@@ -99,9 +101,16 @@ export default function EditorPage() {
     handleLintingEnabledChange, handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
     handleLlmEnabledChange, handleLlmModelIdChange,
+    handlePowerSaveModeChange,
   } = settingsHandlers;
 
-  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReadyPromise: vfsGate.promise });
+  // --- Power saving hook ---
+  usePowerSaving({
+    powerSaveMode,
+    onPowerSaveModeChange: handlePowerSaveModeChange,
+  });
+
+  const tabManager = useTabManager({ skipAutoRestore, autoSave });
   const {
     content, setContent, currentFile, isDirty, isSaving, lastSavedTime,
     openFile: tabOpenFile, saveFile, saveAsFile,
@@ -935,6 +944,8 @@ export default function EditorPage() {
           llmModelId={llmModelId}
           onLlmModelIdChange={handleLlmModelIdChange}
           initialCategory={settingsInitialCategory}
+          powerSaveMode={powerSaveMode}
+          onPowerSaveModeChange={handlePowerSaveModeChange}
         />
 
         {/* Ruby dialog */}

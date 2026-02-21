@@ -278,7 +278,7 @@ export class NumberFormatRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (text.length === 0) return [];
 
-    const maskedText = maskDialogue(text);
+    const maskedText = config.skipDialogue ? maskDialogue(text) : text;
     const isVertical = (config.options?.isVertical as boolean) ?? false;
 
     if (isVertical) {
