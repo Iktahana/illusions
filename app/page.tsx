@@ -559,6 +559,12 @@ export default function EditorPage() {
     setShowSettingsModal(true);
   }, [setShowSettingsModal]);
 
+  /** Open SettingsModal directly on the POS highlight tab */
+  const handleOpenPosHighlightSettings = useCallback(() => {
+    setSettingsInitialCategory("pos-highlight");
+    setShowSettingsModal(true);
+  }, [setShowSettingsModal]);
+
   /** Apply a lint preset from the Inspector dropdown */
   const handleApplyLintPreset = useCallback((presetId: string) => {
     const preset = LINT_PRESETS[presetId];
@@ -1051,6 +1057,7 @@ export default function EditorPage() {
                 onOpenRubyDialog={handleOpenRubyDialog}
                 onToggleTcy={handleToggleTcy}
                 onOpenDictionary={handleOpenDictionary}
+                onShowLintHint={handleNavigateToIssue}
                 onFontScaleChange={handleFontScaleChange}
                 onLineHeightChange={handleLineHeightChange}
                 onParagraphSpacingChange={handleParagraphSpacingChange}
@@ -1100,6 +1107,8 @@ export default function EditorPage() {
             readabilityAnalysis={readabilityAnalysis}
             posHighlightEnabled={posHighlightEnabled}
             onPosHighlightEnabledChange={handlePosHighlightEnabledChange}
+            posHighlightColors={posHighlightColors}
+            onOpenPosHighlightSettings={handleOpenPosHighlightSettings}
             activeFileName={currentFile?.name}
             currentContent={content}
             onHistoryRestore={(restoredContent: string) => {
