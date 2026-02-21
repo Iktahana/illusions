@@ -86,35 +86,49 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
     const foundMatches: SearchMatch[] = [];
     const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
 
-     // ドキュメント全文検索
-     const fullText = doc.textContent;
+    // Build a mapping from textContent offset to ProseMirror position.
+    // doc.textContent concatenates all text nodes without any separator,
+    // but ProseMirror positions include structural offsets for block
+    // boundaries (each paragraph boundary occupies positions that
+    // textContent does not account for).
+    const textSegments: { textOffset: number; pmPos: number; length: number }[] = [];
+    let textOffset = 0;
+    doc.descendants((node, nodePos) => {
+      if (node.isText && node.text) {
+        textSegments.push({ textOffset, pmPos: nodePos, length: node.text.length });
+        textOffset += node.text.length;
+      }
+      return true;
+    });
+
+    const fullText = doc.textContent;
     const searchText = caseSensitive ? fullText : fullText.toLowerCase();
-    
+
+    // Convert a textContent offset to the correct ProseMirror position
+    const textOffsetToPmPos = (offset: number): number => {
+      for (const seg of textSegments) {
+        if (offset >= seg.textOffset && offset < seg.textOffset + seg.length) {
+          return seg.pmPos + (offset - seg.textOffset);
+        }
+      }
+      // Offset is at the very end of the last segment
+      const last = textSegments[textSegments.length - 1];
+      if (last && offset === last.textOffset + last.length) {
+        return last.pmPos + last.length;
+      }
+      return -1;
+    };
+
     let searchIndex = 0;
     while (searchIndex < searchText.length) {
       const matchIndex = searchText.indexOf(searchStr, searchIndex);
       if (matchIndex === -1) break;
 
-       // テキスト位置をドキュメント位置に変換
-       let pos = 0;
-      let textOffset = 0;
-      
-      doc.descendants((node, nodePos) => {
-         if (pos !== 0) return false; // 見つかった、走査を停止
-        
-        if (node.isText && node.text) {
-          const nodeEnd = textOffset + node.text.length;
-          if (matchIndex >= textOffset && matchIndex < nodeEnd) {
-            pos = nodePos + (matchIndex - textOffset);
-            return false;
-          }
-          textOffset = nodeEnd;
-        }
-        return true;
-      });
+      const from = textOffsetToPmPos(matchIndex);
+      const to = textOffsetToPmPos(matchIndex + searchTerm.length);
 
-      if (pos > 0) {
-        foundMatches.push({ from: pos, to: pos + searchTerm.length });
+      if (from > 0 && to > 0) {
+        foundMatches.push({ from, to });
       }
       searchIndex = matchIndex + 1;
     }
