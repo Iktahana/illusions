@@ -17,17 +17,12 @@ const AI_RULE_IDS = new Set(
   LINT_RULE_CATEGORIES.find((c) => c.id === "ai")?.rules ?? [],
 );
 
-/** Map of rule ID → supportsSkipDialogue from metadata */
-const SKIP_DIALOGUE_SUPPORT = new Map(
-  LINT_RULES_META.map((r) => [r.id, r.supportsSkipDialogue ?? false]),
-);
-
 interface LintingSettingsProps {
   lintingEnabled: boolean;
   onLintingEnabledChange: (value: boolean) => void;
-  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>;
-  onLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity; skipDialogue?: boolean }) => void;
-  onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>) => void;
+  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
+  onLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
+  onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
   llmEnabled?: boolean;
 }
 
@@ -253,7 +248,6 @@ export default function LintingSettings({
                     const config = getConfig(ruleId, lintingRuleConfigs);
                     const isAiRule = AI_RULE_IDS.has(ruleId);
                     const aiDisabled = isAiRule && !llmEnabled;
-                    const showDialogueToggle = SKIP_DIALOGUE_SUPPORT.get(ruleId) ?? false;
 
                     return (
                       <div

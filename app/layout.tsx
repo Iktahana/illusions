@@ -6,6 +6,7 @@ import { EditorModeProvider } from "../contexts/EditorModeContext";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import { isElectronRenderer } from "@/lib/runtime-env";
+import { NotificationContainer } from "@/components/NotificationContainer";
 
 export default function RootLayout({
   children,
@@ -52,6 +53,7 @@ export default function RootLayout({
         <ThemeProvider>
           <EditorModeProvider>{children}</EditorModeProvider>
         </ThemeProvider>
+        <NotificationContainer />
         {/* Only load analytics in web environment */}
         {!isElectron && (
           <>

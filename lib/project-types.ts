@@ -95,6 +95,30 @@ export interface StandaloneMode {
 /** Current editor mode (null when no file/project is open) */
 export type EditorMode = ProjectMode | StandaloneMode | null;
 
+/**
+ * A single ignored correction entry.
+ * 無視された校正指摘の1件分。
+ */
+export interface IgnoredCorrection {
+  /** Lint rule ID (e.g. "homophone-detection") */
+  ruleId: string;
+  /** The original text that was flagged */
+  text: string;
+  /** Optional paragraph text hash — when present, only that specific occurrence is ignored */
+  context?: string;
+  /** Timestamp when the ignore was added */
+  addedAt: number;
+}
+
+/**
+ * File format for .illusions/ignored-corrections.json
+ * 無視リストのファイルフォーマット。
+ */
+export interface IgnoredCorrectionsFile {
+  version: "1.0.0";
+  ignoredCorrections: IgnoredCorrection[];
+}
+
 /** Type guard for project mode */
 export function isProjectMode(mode: EditorMode): mode is ProjectMode {
   return mode?.type === "project";

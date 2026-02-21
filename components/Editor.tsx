@@ -74,6 +74,8 @@ interface EditorProps {
   onParagraphSpacingChange?: (v: number) => void;
   // 校正提示表示コールバック
   onShowLintHint?: (issue: LintIssue) => void;
+  // 校正無視コールバック
+  onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
   // Editor mode controls
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
@@ -109,6 +111,7 @@ export default function NovelEditor({
   onToggleTcy,
   onOpenDictionary,
   onShowLintHint,
+  onIgnoreCorrection,
   onFontScaleChange,
   onLineHeightChange,
   onParagraphSpacingChange,
@@ -312,6 +315,7 @@ export default function NovelEditor({
               onToggleTcy={onToggleTcy}
               onOpenDictionary={onOpenDictionary}
               onShowLintHint={onShowLintHint}
+              onIgnoreCorrection={onIgnoreCorrection}
               mdiExtensionsEnabled={mdiExtensionsEnabled}
               gfmEnabled={gfmEnabled}
             />
@@ -488,6 +492,7 @@ function MilkdownEditor({
   onToggleTcy,
   onOpenDictionary,
   onShowLintHint,
+  onIgnoreCorrection,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
 }: {
@@ -519,6 +524,7 @@ function MilkdownEditor({
   onToggleTcy?: () => void;
   onOpenDictionary?: (searchTerm?: string) => void;
   onShowLintHint?: (issue: LintIssue) => void;
+  onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
 }) {
@@ -1162,10 +1168,20 @@ function MilkdownEditor({
           onShowLintHint?.(lintIssueAtCursor);
         }
         break;
+      case "ignore-correction":
+        if (lintIssueAtCursor) {
+          onIgnoreCorrection?.(lintIssueAtCursor, false);
+        }
+        break;
+      case "ignore-correction-all":
+        if (lintIssueAtCursor) {
+          onIgnoreCorrection?.(lintIssueAtCursor, true);
+        }
+        break;
       default:
         break;
     }
-  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary, lintIssueAtCursor, onShowLintHint]);
+  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary, lintIssueAtCursor, onShowLintHint, onIgnoreCorrection]);
 
   // Electron: native OS context menu via IPC
   const handleElectronContextMenu = useCallback(async (e: React.MouseEvent) => {
@@ -1175,6 +1191,8 @@ function MilkdownEditor({
     const items = [
       ...(issue ? [
         { label: '校正提示を表示', action: 'show-lint-hint' },
+        { label: 'この指摘を無視', action: 'ignore-correction' },
+        { label: '同じ指摘をすべて無視', action: 'ignore-correction-all' },
         { label: '-', action: '_separator' },
       ] : []),
       ...(hasSelection ? [

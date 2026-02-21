@@ -3,7 +3,7 @@
 
 const path = require('path');
 const fs = require('fs/promises');
-const { createWriteStream } = require('fs');
+const { createWriteStream, createReadStream } = require('fs');
 const crypto = require('crypto');
 
 // Model registry data (duplicated from TS for CJS compatibility)
@@ -145,16 +145,17 @@ class LlmEngine {
 
     const fileStream = createWriteStream(tmpPath, { flags: startByte > 0 ? 'a' : 'w' });
 
-    if (!response.body) {
-      throw new Error('Download failed: response body is null');
-    }
     const reader = response.body.getReader();
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        fileStream.write(Buffer.from(value));
+        const buf = Buffer.from(value);
+        if (!fileStream.write(buf)) {
+          // Backpressure: wait for drain before reading more
+          await new Promise((resolve) => fileStream.once('drain', resolve));
+        }
         downloaded += value.byteLength;
 
         if (onProgress && totalSize > 0) {
@@ -172,11 +173,12 @@ class LlmEngine {
     // SHA256 verification (skip if sha256 is empty — not yet filled)
     if (entry.sha256) {
       const hash = crypto.createHash('sha256');
-      const { createReadStream } = require('fs');
-      const stream = createReadStream(tmpPath);
-      for await (const chunk of stream) {
-        hash.update(chunk);
-      }
+      await new Promise((resolve, reject) => {
+        const stream = createReadStream(tmpPath);
+        stream.on('data', (chunk) => hash.update(chunk));
+        stream.on('end', resolve);
+        stream.on('error', reject);
+      });
       const digest = hash.digest('hex');
       if (digest !== entry.sha256) {
         await fs.unlink(tmpPath);
