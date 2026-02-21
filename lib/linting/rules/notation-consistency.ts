@@ -87,7 +87,7 @@ export class NotationConsistencyRule extends AbstractDocumentLintRule {
     const variantLocations = new Map<string, VariantLocation[]>();
 
     for (const paragraph of paragraphs) {
-      const maskedText = maskDialogue(paragraph.text);
+      const maskedText = config.skipDialogue ? maskDialogue(paragraph.text) : paragraph.text;
       for (const variant of group.variants) {
         const locations = this.findAllOccurrences(maskedText, variant);
         if (locations.length === 0) continue;

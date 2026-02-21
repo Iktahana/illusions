@@ -435,7 +435,7 @@ export class CorrelativeExpressionRule extends AbstractLintRule {
     severity: LintIssue["severity"],
   ): LintIssue[] {
     const issues: LintIssue[] = [];
-    const masked = maskDialogue(sentence.text);
+    const masked = config.skipDialogue ? maskDialogue(sentence.text) : sentence.text;
     const ending = getEffectiveEnding(masked);
 
     // Skip very short sentences (unlikely to have meaningful correlative pairs)

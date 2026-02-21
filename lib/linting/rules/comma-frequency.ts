@@ -73,7 +73,7 @@ export class CommaFrequencyRule extends AbstractLintRule {
     const sentences = splitIntoSentences(text);
 
     for (const sentence of sentences) {
-      const masked = maskDialogue(sentence.text);
+      const masked = config.skipDialogue ? maskDialogue(sentence.text) : sentence.text;
 
       // Count commas in non-dialogue text only
       let commaCount = 0;
@@ -120,7 +120,7 @@ export class CommaFrequencyRule extends AbstractLintRule {
     const sentences = splitIntoSentences(text);
 
     for (const sentence of sentences) {
-      const masked = maskDialogue(sentence.text);
+      const masked = config.skipDialogue ? maskDialogue(sentence.text) : sentence.text;
 
       let commaCount = 0;
       let maskPlaceholderCount = 0;

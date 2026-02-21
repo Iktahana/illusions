@@ -54,7 +54,7 @@ export class SentenceLengthRule extends AbstractLintRule {
     const issues: LintIssue[] = [];
 
     for (const sentence of sentences) {
-      const masked = maskDialogue(sentence.text);
+      const masked = config.skipDialogue ? maskDialogue(sentence.text) : sentence.text;
       // Effective length: exclude the placeholder characters
       const effectiveLength = masked.replace(/〇/g, "").length;
 

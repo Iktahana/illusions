@@ -77,9 +77,9 @@ interface SettingsModalProps {
   // Linting settings
   lintingEnabled?: boolean;
   onLintingEnabledChange?: (value: boolean) => void;
-  lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity }>;
-  onLintingRuleConfigChange?: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
-  onLintingRuleConfigsBatchChange?: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
+  lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>;
+  onLintingRuleConfigChange?: (ruleId: string, config: { enabled: boolean; severity: Severity; skipDialogue?: boolean }) => void;
+  onLintingRuleConfigsBatchChange?: (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>) => void;
   // LLM settings
   llmEnabled?: boolean;
   onLlmEnabledChange?: (value: boolean) => void;

@@ -76,7 +76,7 @@ export interface AppState {
 
   // リンティング設定
   lintingEnabled?: boolean;
-  lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity }>;
+  lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>;
 
   // LLM設定
   llmEnabled?: boolean;

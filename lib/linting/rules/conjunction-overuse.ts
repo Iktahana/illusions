@@ -67,7 +67,7 @@ export class ConjunctionOveruseRule extends AbstractMorphologicalLintRule {
       const sentence = sentences[i];
 
       // Skip sentences inside dialogue
-      if (isInDialogue(sentence.from, text)) {
+      if (config.skipDialogue && isInDialogue(sentence.from, text)) {
         if (runLength >= threshold) {
           issues.push(
             this.createIssue(sentences, runStart, runLength, config),

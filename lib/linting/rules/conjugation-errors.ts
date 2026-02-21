@@ -155,7 +155,7 @@ export class ConjugationErrorRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (!text) return [];
 
-    const maskedText = maskDialogue(text);
+    const maskedText = config.skipDialogue ? maskDialogue(text) : text;
     const issues: LintIssue[] = [];
     issues.push(...this.checkRaNuki(maskedText, config.severity));
     issues.push(...this.checkSaIre(maskedText, config.severity));

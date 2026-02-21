@@ -21,7 +21,7 @@ export interface EditorSettings {
   compactMode: boolean;
   showSettingsModal: boolean;
   lintingEnabled: boolean;
-  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
+  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>;
   llmEnabled: boolean;
   llmModelId: string;
 }
@@ -43,8 +43,8 @@ export interface EditorSettingsHandlers {
   handleToggleCompactMode: () => void;
   setShowSettingsModal: (value: boolean) => void;
   handleLintingEnabledChange: (value: boolean) => void;
-  handleLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
-  handleLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
+  handleLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity; skipDialogue?: boolean }) => void;
+  handleLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>) => void;
   handleLlmEnabledChange: (value: boolean) => void;
   handleLlmModelIdChange: (modelId: string) => void;
 }
@@ -91,7 +91,7 @@ export function useEditorSettings(
   const [scrollSensitivity, setScrollSensitivity] = useState(1.0);
   const [compactMode, setCompactMode] = useState(false);
   const [lintingEnabled, setLintingEnabled] = useState(true);
-  const [lintingRuleConfigs, setLintingRuleConfigs] = useState<Record<string, { enabled: boolean; severity: Severity }>>({});
+  const [lintingRuleConfigs, setLintingRuleConfigs] = useState<Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>>({});
   const [llmEnabled, setLlmEnabled] = useState(false);
   const [llmModelId, setLlmModelId] = useState("qwen3-1.7b-q8");
 
@@ -157,11 +157,15 @@ export function useEditorSettings(
         if (appState.lintingRuleConfigs && typeof appState.lintingRuleConfigs === "object") {
           const isSeverity = (v: unknown): v is Severity =>
             v === "error" || v === "warning" || v === "info";
-          const sanitized: Record<string, { enabled: boolean; severity: Severity }> = {};
+          const sanitized: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> = {};
           for (const [ruleId, config] of Object.entries(appState.lintingRuleConfigs)) {
-            const cfg = config as { enabled?: unknown; severity?: unknown };
+            const cfg = config as { enabled?: unknown; severity?: unknown; skipDialogue?: unknown };
             if (typeof cfg.enabled === "boolean" && isSeverity(cfg.severity)) {
-              sanitized[ruleId] = { enabled: cfg.enabled, severity: cfg.severity };
+              const entry: { enabled: boolean; severity: Severity; skipDialogue?: boolean } = { enabled: cfg.enabled, severity: cfg.severity };
+              if (typeof cfg.skipDialogue === "boolean") {
+                entry.skipDialogue = cfg.skipDialogue;
+              }
+              sanitized[ruleId] = entry;
             }
           }
           setLintingRuleConfigs(sanitized);
@@ -314,7 +318,7 @@ export function useEditorSettings(
     });
   }, []);
 
-  const handleLintingRuleConfigChange = useCallback((ruleId: string, config: { enabled: boolean; severity: Severity }) => {
+  const handleLintingRuleConfigChange = useCallback((ruleId: string, config: { enabled: boolean; severity: Severity; skipDialogue?: boolean }) => {
     setLintingRuleConfigs(prev => {
       const next = { ...prev, [ruleId]: config };
       void persistAppState({ lintingRuleConfigs: next }).catch((error) => {
@@ -324,7 +328,7 @@ export function useEditorSettings(
     });
   }, []);
 
-  const handleLintingRuleConfigsBatchChange = useCallback((configs: Record<string, { enabled: boolean; severity: Severity }>) => {
+  const handleLintingRuleConfigsBatchChange = useCallback((configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>) => {
     setLintingRuleConfigs(configs);
     void persistAppState({ lintingRuleConfigs: configs }).catch((error) => {
       console.error("Failed to persist lintingRuleConfigs:", error);
