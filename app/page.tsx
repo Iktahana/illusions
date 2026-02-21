@@ -97,13 +97,22 @@ export default function EditorPage() {
     handlePowerSaveModeChange,
   } = settingsHandlers;
 
+  const isElectron = typeof window !== "undefined" && isElectronRenderer();
+
   // --- Power saving hook ---
   usePowerSaving({
     powerSaveMode,
     onPowerSaveModeChange: handlePowerSaveModeChange,
   });
 
-  const tabManager = useTabManager({ skipAutoRestore, autoSave });
+  // VFS root readiness: in Electron, tab restoration must wait for the
+  // project lifecycle to set the VFS root via vfs:set-root IPC so that
+  // subsequent vfs:read-file calls pass the allowed-root validation.
+  // In Web mode, there is no such restriction.
+  const [vfsReady, setVfsReady] = useState(!isElectron);
+  const handleVfsReady = useCallback(() => setVfsReady(true), []);
+
+  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReady });
   const {
     content, setContent, currentFile, isDirty, isSaving, lastSavedTime,
     openFile: tabOpenFile, saveFile, saveAsFile,
@@ -134,8 +143,6 @@ export default function EditorPage() {
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const programmaticScrollRef = useRef(false);
 
-  const isElectron = typeof window !== "undefined" && isElectronRenderer();
-
   // --- Project lifecycle hook ---
   const projectLifecycle = useProjectLifecycle({
     editorMode,
@@ -147,6 +154,7 @@ export default function EditorPage() {
     content,
     skipAutoRestore,
     lastSavedTime,
+    onVfsReady: handleVfsReady,
   });
   const {
     state: {
