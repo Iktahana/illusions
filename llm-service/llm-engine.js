@@ -145,6 +145,9 @@ class LlmEngine {
 
     const fileStream = createWriteStream(tmpPath, { flags: startByte > 0 ? 'a' : 'w' });
 
+    if (!response.body) {
+      throw new Error('Download failed: response body is null');
+    }
     const reader = response.body.getReader();
     try {
       while (true) {
@@ -169,8 +172,11 @@ class LlmEngine {
     // SHA256 verification (skip if sha256 is empty — not yet filled)
     if (entry.sha256) {
       const hash = crypto.createHash('sha256');
-      const fileBuffer = await fs.readFile(tmpPath);
-      hash.update(fileBuffer);
+      const { createReadStream } = require('fs');
+      const stream = createReadStream(tmpPath);
+      for await (const chunk of stream) {
+        hash.update(chunk);
+      }
       const digest = hash.digest('hex');
       if (digest !== entry.sha256) {
         await fs.unlink(tmpPath);

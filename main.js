@@ -1119,8 +1119,14 @@ app.whenReady().then(async () => {
   })
 })
 
-app.on('before-quit', async () => {
-  await disposeLlmEngine()
+let isQuitting = false
+app.on('before-quit', (event) => {
+  if (isQuitting) return
+  isQuitting = true
+  event.preventDefault()
+  disposeLlmEngine()
+    .catch((err) => console.error('[Main] Failed to dispose LLM engine:', err))
+    .finally(() => app.exit(0))
 })
 
 app.on('window-all-closed', () => {

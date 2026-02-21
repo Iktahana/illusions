@@ -4,6 +4,8 @@
 const { ipcMain } = require('electron');
 const { LlmEngine } = require('./llm-engine');
 
+const MAX_TOKENS = 8192;
+
 /** @type {LlmEngine | null} */
 let llmEngine = null;
 
@@ -64,9 +66,10 @@ function registerLlmHandlers() {
       throw new Error('Prompt too long (max 100,000 characters)');
     }
     await ensureInit();
-    return llmEngine.infer(params.prompt, {
-      maxTokens: typeof params.maxTokens === 'number' ? params.maxTokens : undefined,
-    });
+    const maxTokens = typeof params.maxTokens === 'number'
+      ? Math.min(Math.max(1, params.maxTokens), MAX_TOKENS)
+      : undefined;
+    return llmEngine.infer(params.prompt, { maxTokens });
   });
 
   ipcMain.handle('llm:get-storage-usage', async () => {
