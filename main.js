@@ -10,6 +10,7 @@ const { promisify } = require('util')
 const { autoUpdater } = require('electron-updater')
 const log = require('electron-log')
 const { registerNlpHandlers } = require('./nlp-service/nlp-ipc-handlers')
+const { registerLlmHandlers, disposeLlmEngine } = require('./llm-service/llm-ipc-handlers')
 const { registerStorageHandlers, getStorageManager } = require('./electron-storage-ipc-handlers')
 const { registerVFSHandlers } = require('./electron-vfs-ipc-handlers')
 
@@ -1101,6 +1102,7 @@ app.whenReady().then(async () => {
 
   // Register IPC handlers
   registerNlpHandlers()
+  registerLlmHandlers()
   registerStorageHandlers()
   registerVFSHandlers()
 
@@ -1115,6 +1117,10 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createMainWindow()
   })
+})
+
+app.on('before-quit', async () => {
+  await disposeLlmEngine()
 })
 
 app.on('window-all-closed', () => {

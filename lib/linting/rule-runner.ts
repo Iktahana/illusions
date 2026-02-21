@@ -1,10 +1,13 @@
+import type { ILlmClient } from "@/lib/llm-client/types";
+import type { Token } from "@/lib/nlp-client/types";
+
 import type { LintRule, LintRuleConfig, LintIssue } from "./types";
 import {
   isDocumentLintRule,
+  isLlmLintRule,
   isMorphologicalLintRule,
   isMorphologicalDocumentLintRule,
 } from "./types";
-import type { Token } from "@/lib/nlp-client/types";
 
 /**
  * Manages lint rule registration, configuration, and execution.
@@ -171,5 +174,54 @@ export class RuleRunner {
       }
     }
     return false;
+  }
+
+  /**
+   * Check if any enabled rule requires LLM inference.
+   */
+  hasLlmRules(): boolean {
+    for (const [id, rule] of this.rules) {
+      const config = this.configs.get(id);
+      if (config?.enabled && isLlmLintRule(rule)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Run all enabled L3 (LLM) rules on the given sentences.
+   * Returns aggregated issues from all L3 rules.
+   */
+  async runLlmRules(
+    sentences: ReadonlyArray<{ text: string; from: number; to: number }>,
+    llmClient: ILlmClient,
+    signal?: AbortSignal,
+  ): Promise<LintIssue[]> {
+    const allIssues: LintIssue[] = [];
+
+    for (const [id, rule] of this.rules) {
+      if (signal?.aborted) break;
+
+      const config = this.configs.get(id);
+      if (!config?.enabled) continue;
+      if (!isLlmLintRule(rule)) continue;
+
+      try {
+        const issues = await rule.lintWithLlm(
+          sentences,
+          config,
+          llmClient,
+          signal,
+        );
+        allIssues.push(...issues);
+      } catch (error) {
+        if ((error as Error).name === "AbortError") break;
+        console.error(`L3 rule "${id}" failed:`, error);
+        // Don't let one rule failure break all L3 linting
+      }
+    }
+
+    return allIssues.sort((a, b) => a.from - b.from);
   }
 }
