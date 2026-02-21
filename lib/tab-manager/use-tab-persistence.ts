@@ -20,6 +20,13 @@ import {
 export interface UseTabPersistenceParams extends TabManagerCore {
   /** Whether to skip auto-restore on mount. */
   skipAutoRestore: boolean;
+  /**
+   * Whether the VFS root has been initialized (Electron only).
+   * Tab restoration is deferred until this becomes true so that
+   * `vfs:read-file` IPC calls do not fail before the main process
+   * has a registered allowed root directory.
+   */
+  vfsReady: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,6 +55,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     setActiveTabId,
     isElectron,
     skipAutoRestore,
+    vfsReady,
   } = params;
 
   const [wasAutoRecovered, setWasAutoRecovered] = useState(false);
@@ -181,10 +189,13 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
   }, [isElectron, skipAutoRestore, setTabs]);
 
   // --- Restore tabs from AppState on mount (Electron only) ----------------
+  // Wait for vfsReady so that the main process has a registered allowed root
+  // before we attempt vfs:read-file IPC calls.
 
   useEffect(() => {
     if (!isElectron || skipAutoRestore) return;
     if (!window.electronAPI?.vfs?.readFile) return;
+    if (!vfsReady) return;
 
     const restoreTabs = async () => {
       try {
@@ -236,7 +247,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     };
 
     void restoreTabs();
-  }, [isElectron, skipAutoRestore, setTabs, setActiveTabId]);
+  }, [isElectron, skipAutoRestore, vfsReady, setTabs, setActiveTabId]);
 
   return { wasAutoRecovered };
 }
