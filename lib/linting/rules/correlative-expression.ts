@@ -417,7 +417,7 @@ export class CorrelativeExpressionRule extends AbstractLintRule {
 
     for (const sentence of sentences) {
       issues.push(
-        ...this.checkSentence(sentence, config.severity),
+        ...this.checkSentence(sentence, config),
       );
     }
 
@@ -432,7 +432,7 @@ export class CorrelativeExpressionRule extends AbstractLintRule {
    */
   private checkSentence(
     sentence: SentenceSpan,
-    severity: LintIssue["severity"],
+    config: LintRuleConfig,
   ): LintIssue[] {
     const issues: LintIssue[] = [];
     const masked = config.skipDialogue ? maskDialogue(sentence.text) : sentence.text;
@@ -459,7 +459,7 @@ export class CorrelativeExpressionRule extends AbstractLintRule {
 
         issues.push({
           ruleId: this.id,
-          severity,
+          severity: config.severity,
           message:
             `Correlative expression mismatch: "${pattern.adverb}" (${pattern.category}) requires a matching sentence ending (${pattern.expectedEndingsJa})`,
           messageJa:

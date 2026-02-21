@@ -53,8 +53,8 @@ export class CommaFrequencyRule extends AbstractLintRule {
 
     const issues: LintIssue[] = [];
     issues.push(
-      ...this.checkTooManyCommas(text, maxCommaRatio, config.severity),
-      ...this.checkNoCommas(text, minLengthForComma, config.severity),
+      ...this.checkTooManyCommas(text, maxCommaRatio, config),
+      ...this.checkNoCommas(text, minLengthForComma, config),
     );
     return issues;
   }
@@ -67,7 +67,7 @@ export class CommaFrequencyRule extends AbstractLintRule {
   private checkTooManyCommas(
     text: string,
     maxCommaRatio: number,
-    severity: LintIssue["severity"],
+    config: LintRuleConfig,
   ): LintIssue[] {
     const issues: LintIssue[] = [];
     const sentences = splitIntoSentences(text);
@@ -92,7 +92,7 @@ export class CommaFrequencyRule extends AbstractLintRule {
         const ratio = commaCount / effectiveLength;
         issues.push({
           ruleId: this.id,
-          severity,
+          severity: config.severity,
           message: `Sentence has ${commaCount} commas in ${effectiveLength} characters (ratio: ${ratio.toFixed(2)})`,
           messageJa: `文化庁「公用文作成の考え方」に基づき、一文に読点が${commaCount}個あります（${effectiveLength}文字中、比率: ${ratio.toFixed(2)}）`,
           from: sentence.from,
@@ -114,7 +114,7 @@ export class CommaFrequencyRule extends AbstractLintRule {
   private checkNoCommas(
     text: string,
     minLengthForComma: number,
-    severity: LintIssue["severity"],
+    config: LintRuleConfig,
   ): LintIssue[] {
     const issues: LintIssue[] = [];
     const sentences = splitIntoSentences(text);
@@ -137,7 +137,7 @@ export class CommaFrequencyRule extends AbstractLintRule {
       if (commaCount === 0 && effectiveLength > minLengthForComma) {
         issues.push({
           ruleId: this.id,
-          severity,
+          severity: config.severity,
           message: `Long sentence (${effectiveLength} characters) has no commas`,
           messageJa: `文化庁「公用文作成の考え方」に基づき、${effectiveLength}文字の文に読点がありません`,
           from: sentence.from,
