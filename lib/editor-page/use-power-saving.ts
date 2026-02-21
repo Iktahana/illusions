@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 
 import { isElectronRenderer } from "@/lib/runtime-env";
+import { notificationManager } from "@/lib/notification-manager";
 
 interface UsePowerSavingOptions {
   powerSaveMode: boolean;
@@ -9,8 +10,8 @@ interface UsePowerSavingOptions {
 
 /**
  * Listens for Electron powerMonitor events and manages power saving mode.
- * - On battery (>1min debounced): shows native dialog prompt
- * - On AC (>1min debounced): auto-disables power saving mode
+ * - On battery (>1min debounced): shows in-app notification with action buttons
+ * - On AC (>1min debounced): auto-disables power saving mode with info notification
  * - No-op on web platform
  */
 export function usePowerSaving({
@@ -29,16 +30,34 @@ export function usePowerSaving({
     const api = window.electronAPI;
     if (!api?.power) return;
 
-    const cleanup = api.power.onPowerStateChange(async (state) => {
+    const cleanup = api.power.onPowerStateChange((state) => {
       if (state === "battery" && !powerSaveModeRef.current) {
-        // Show native dialog asking user to enable power saving
-        const result = await api.power!.showBatteryPrompt();
-        if (result === "enable") {
-          onChangeRef.current(true);
-        }
+        // Show in-app notification with action buttons
+        notificationManager.showMessage(
+          "バッテリー駆動を検出しました。省電力モードを有効にしますか？\n校正機能とAI関連機能が一時的に無効になります。",
+          {
+            type: "warning",
+            duration: 0, // No auto-dismiss — require user action
+            actions: [
+              {
+                label: "有効にする",
+                onClick: () => onChangeRef.current(true),
+              },
+              {
+                label: "後で",
+                onClick: () => {
+                  // No-op — dismiss handled by Notification component
+                },
+              },
+            ],
+          },
+        );
       } else if (state === "ac" && powerSaveModeRef.current) {
         // Auto-restore when plugged in
         onChangeRef.current(false);
+        notificationManager.info(
+          "AC電源を検出しました。省電力モードを解除しました。",
+        );
       }
     });
 

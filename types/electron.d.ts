@@ -165,8 +165,6 @@ declare global {
       getPowerState: () => Promise<'ac' | 'battery'>;
       /** Remove all power state change listeners */
       removeOnPowerStateChange: () => void;
-      /** Show native battery prompt dialog */
-      showBatteryPrompt: () => Promise<'enable' | 'later'>;
     };
   }
 

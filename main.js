@@ -1018,20 +1018,6 @@ ipcMain.handle('power:get-state', () => {
   return powerMonitor.isOnBatteryPower() ? 'battery' : 'ac'
 })
 
-ipcMain.handle('power:show-battery-prompt', async (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
-  if (!win) return 'later'
-  const result = await dialog.showMessageBox(win, {
-    type: 'question',
-    title: '省電力モード',
-    message: 'バッテリー駆動を検出しました。省電力モードを有効にしますか？',
-    detail: '省電力モードでは、校正機能とAI関連機能が一時的に無効になります。',
-    buttons: ['有効にする', '後で'],
-    defaultId: 0,
-    cancelId: 1,
-  })
-  return result.response === 0 ? 'enable' : 'later'
-})
 
 /**
  * Check if a directory contains a .illusions folder (project marker)

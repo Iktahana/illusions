@@ -176,6 +176,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeOnPowerStateChange: () => {
       ipcRenderer.removeAllListeners('power:state-changed')
     },
-    showBatteryPrompt: () => ipcRenderer.invoke('power:show-battery-prompt'),
   },
 })
