@@ -44,6 +44,7 @@ import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
 import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
+import { notificationManager } from "@/lib/notification-manager";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { LintIssue } from "@/lib/linting/types";
@@ -625,12 +626,25 @@ export default function EditorPage() {
     }
   }, [editorViewInstance, ignoreCorrection]);
 
-  /** Apply a lint fix by replacing the text range */
+  /** Apply a lint fix by replacing the text range, with text verification */
   const handleApplyFix = useCallback((issue: LintIssue) => {
     if (!editorViewInstance || !issue.fix) return;
     const { state, dispatch } = editorViewInstance;
     const clampedTo = Math.min(issue.to, state.doc.content.size);
     const clampedFrom = Math.min(issue.from, clampedTo);
+
+    // Verify the text at target range still matches the original text
+    if (issue.originalText) {
+      const currentText = state.doc.textBetween(clampedFrom, clampedTo, "");
+      if (currentText !== issue.originalText) {
+        notificationManager.warning(
+          "テキストが変更されたため、修正を適用できません。校正を再実行してください。",
+          5000,
+        );
+        return;
+      }
+    }
+
     const tr = state.tr.insertText(issue.fix.replacement, clampedFrom, clampedTo);
     dispatch(tr);
   }, [editorViewInstance]);
