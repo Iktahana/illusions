@@ -1,8 +1,10 @@
 "use client";
 
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { Scissors, Copy, ClipboardPaste, Search, CheckSquare, Languages, ALargeSmall, Globe, BookOpen } from "lucide-react";
-import { type ReactNode } from "react";
+import { Scissors, Copy, ClipboardPaste, Search, CheckSquare, Languages, ALargeSmall, Globe, BookOpen, AlertCircle } from "lucide-react";
+import type { ReactNode, MouseEvent } from "react";
+
+import type { LintIssue } from "@/lib/linting";
 
 export type ContextMenuAction =
   | "cut"
@@ -14,12 +16,15 @@ export type ContextMenuAction =
   | "ruby"
   | "tcy"
   | "google-search"
-  | "dictionary";
+  | "dictionary"
+  | "show-lint-hint";
 
 interface EditorContextMenuProps {
   children: ReactNode;
   onAction: (action: ContextMenuAction) => void;
   hasSelection?: boolean;
+  lintIssueAtCursor?: LintIssue | null;
+  onContextMenuOpen?: (e: MouseEvent) => void;
 }
 
 interface MenuItemProps {
@@ -58,6 +63,8 @@ export default function EditorContextMenu({
   children,
   onAction,
   hasSelection = false,
+  lintIssueAtCursor,
+  onContextMenuOpen,
 }: EditorContextMenuProps) {
   // Detect platform for keyboard shortcuts
   const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
@@ -65,11 +72,24 @@ export default function EditorContextMenu({
 
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
+      <ContextMenu.Trigger onContextMenu={onContextMenuOpen} asChild>{children}</ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content
           className="min-w-[220px] bg-background/95 backdrop-blur-xl border border-border rounded-lg shadow-2xl p-1.5 will-change-[opacity,transform] data-[side=top]:animate-slideDownAndFade data-[side=right]:animate-slideLeftAndFade data-[side=bottom]:animate-slideUpAndFade data-[side=left]:animate-slideRightAndFade"
         >
+          {/* 校正提示 */}
+          {lintIssueAtCursor && (
+            <>
+              <MenuItem
+                icon={<AlertCircle className="w-4 h-4" />}
+                label="校正提示を表示"
+                shortcut=""
+                onClick={() => onAction("show-lint-hint")}
+              />
+              <Separator />
+            </>
+          )}
+
           {/* 編集 */}
           <MenuItem
             icon={<Scissors className="w-4 h-4" />}

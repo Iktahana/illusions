@@ -365,7 +365,7 @@ export function createLintingPlugin(
               allDecorations.push(
                 Decoration.inline(from, to, {
                   class: severityToClass(issue.severity),
-                  'data-lint-issue': JSON.stringify(issue),
+                  'data-lint-issue': JSON.stringify({ ...issue, from, to }),
                 })
               );
 

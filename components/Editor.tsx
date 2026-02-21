@@ -72,6 +72,8 @@ interface EditorProps {
   onFontScaleChange?: (v: number) => void;
   onLineHeightChange?: (v: number) => void;
   onParagraphSpacingChange?: (v: number) => void;
+  // 校正提示表示コールバック
+  onShowLintHint?: (issue: LintIssue) => void;
   // Editor mode controls
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
@@ -106,6 +108,7 @@ export default function NovelEditor({
   onOpenRubyDialog,
   onToggleTcy,
   onOpenDictionary,
+  onShowLintHint,
   onFontScaleChange,
   onLineHeightChange,
   onParagraphSpacingChange,
@@ -308,6 +311,7 @@ export default function NovelEditor({
               onOpenRubyDialog={onOpenRubyDialog}
               onToggleTcy={onToggleTcy}
               onOpenDictionary={onOpenDictionary}
+              onShowLintHint={onShowLintHint}
               mdiExtensionsEnabled={mdiExtensionsEnabled}
               gfmEnabled={gfmEnabled}
             />
@@ -483,6 +487,7 @@ function MilkdownEditor({
   onOpenRubyDialog,
   onToggleTcy,
   onOpenDictionary,
+  onShowLintHint,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
 }: {
@@ -513,12 +518,14 @@ function MilkdownEditor({
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
   onOpenDictionary?: (searchTerm?: string) => void;
+  onShowLintHint?: (issue: LintIssue) => void;
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const [hasSelection, setHasSelection] = useState(false);
+  const [lintIssueAtCursor, setLintIssueAtCursor] = useState<LintIssue | null>(null);
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
   // 初期内容はマウント時に固定（ファイル切り替えでコンポーネントが再マウントされたときだけ変わる）
   const initialContentRef = useRef<string>(initialContent);
@@ -1074,6 +1081,17 @@ function MilkdownEditor({
     }
   };
 
+  // Detect lint issue at a given mouse position via DOM attribute
+  const getLintIssueAtCoords = useCallback((x: number, y: number): LintIssue | null => {
+    const el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    const lintEl = el.closest('[data-lint-issue]');
+    if (!lintEl) return null;
+    const issueJson = lintEl.getAttribute('data-lint-issue');
+    if (!issueJson) return null;
+    try { return JSON.parse(issueJson); } catch { return null; }
+  }, []);
+
   // Context menu actions
   const handleContextMenuAction = useCallback((action: ContextMenuAction) => {
     if (!editorViewInstance) return;
@@ -1139,15 +1157,26 @@ function MilkdownEditor({
         onOpenDictionary?.(selectedText);
         break;
       }
+      case "show-lint-hint":
+        if (lintIssueAtCursor) {
+          onShowLintHint?.(lintIssueAtCursor);
+        }
+        break;
       default:
         break;
     }
-  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary]);
+  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary, lintIssueAtCursor, onShowLintHint]);
 
   // Electron: native OS context menu via IPC
   const handleElectronContextMenu = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
+    const issue = getLintIssueAtCoords(e.clientX, e.clientY);
+    setLintIssueAtCursor(issue);
     const items = [
+      ...(issue ? [
+        { label: '校正提示を表示', action: 'show-lint-hint' },
+        { label: '-', action: '_separator' },
+      ] : []),
       ...(hasSelection ? [
         { label: '切り取り', action: 'cut', accelerator: 'CmdOrCtrl+X' },
         { label: 'コピー', action: 'copy', accelerator: 'CmdOrCtrl+C' },
@@ -1170,7 +1199,7 @@ function MilkdownEditor({
     ];
     const action = await window.electronAPI?.showContextMenu?.(items);
     if (action) handleContextMenuAction(action as ContextMenuAction);
-  }, [hasSelection, handleContextMenuAction, mdiExtensionsEnabled]);
+  }, [hasSelection, handleContextMenuAction, mdiExtensionsEnabled, getLintIssueAtCoords]);
 
   // Editor content wrapper - only use custom context menu on Web, native on Electron
   const editorContent = (
@@ -1277,7 +1306,12 @@ function MilkdownEditor({
     <>
       {/* Use custom context menu only on Web, native context menu on Electron */}
       {!isElectron ? (
-        <EditorContextMenu onAction={handleContextMenuAction} hasSelection={hasSelection}>
+        <EditorContextMenu
+          onAction={handleContextMenuAction}
+          hasSelection={hasSelection}
+          lintIssueAtCursor={lintIssueAtCursor}
+          onContextMenuOpen={(e) => setLintIssueAtCursor(getLintIssueAtCoords(e.clientX, e.clientY))}
+        >
           {editorContent}
         </EditorContextMenu>
       ) : (
