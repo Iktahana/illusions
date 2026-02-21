@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { RuleRunner } from "@/lib/linting/rule-runner";
 import type { LintIssue, Severity } from "@/lib/linting/types";
+import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 
 // Import all lint rules
 import { PunctuationRule } from "@/lib/linting/rules/punctuation-rules";
@@ -16,6 +17,10 @@ import { VerboseExpressionRule } from "@/lib/linting/rules/verbose-expression";
 import { SentenceEndingRepetitionRule } from "@/lib/linting/rules/sentence-ending-repetition";
 import { CorrelativeExpressionRule } from "@/lib/linting/rules/correlative-expression";
 import { NotationConsistencyRule } from "@/lib/linting/rules/notation-consistency";
+import { SentenceLengthRule } from "@/lib/linting/rules/sentence-length";
+import { DashFormatRule } from "@/lib/linting/rules/dash-format";
+import { DialoguePunctuationRule } from "@/lib/linting/rules/dialogue-punctuation";
+import { CommaFrequencyRule } from "@/lib/linting/rules/comma-frequency";
 
 export interface UseLintingResult {
   ruleRunner: RuleRunner;
@@ -52,6 +57,10 @@ export function useLinting(
     runner.registerRule(new SentenceEndingRepetitionRule());
     runner.registerRule(new CorrelativeExpressionRule());
     runner.registerRule(new NotationConsistencyRule());
+    runner.registerRule(new SentenceLengthRule());
+    runner.registerRule(new DashFormatRule());
+    runner.registerRule(new DialoguePunctuationRule());
+    runner.registerRule(new CommaFrequencyRule());
     ruleRunnerRef.current = runner;
   }
 
@@ -91,8 +100,12 @@ export function useLinting(
     setIsLinting(true);
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
       ({ updateLintingSettings }) => {
+        const nlpClient = ruleRunnerRef.current?.hasMorphologicalRules()
+          ? getNlpClient()
+          : null;
         updateLintingSettings(editorViewInstance, {
           ruleRunner: ruleRunnerRef.current,
+          nlpClient,
           forceFullScan: true,
         });
       },

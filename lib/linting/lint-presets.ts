@@ -19,6 +19,10 @@ export const LINT_RULES_META: LintRuleMeta[] = [
   { id: "sentence-ending-repetition", nameJa: "文末表現の重複", descriptionJa: "同じ文末表現が連続する箇所を検出" },
   { id: "notation-consistency", nameJa: "表記ゆれの検出", descriptionJa: "文書内の同一語彙の表記ゆれを検出" },
   { id: "correlative-expression", nameJa: "呼応表現の整合性", descriptionJa: "副詞と文末表現の対応をチェック" },
+  { id: "sentence-length", nameJa: "長文の検出", descriptionJa: "設定した文字数を超える文を検出します" },
+  { id: "dash-format", nameJa: "ダッシュの用法", descriptionJa: "ダッシュの誤用を検出し、正しい表記を提案します" },
+  { id: "dialogue-punctuation", nameJa: "台詞の約物チェック", descriptionJa: "台詞のカギ括弧の書式エラーを検出します" },
+  { id: "comma-frequency", nameJa: "読点の頻度チェック", descriptionJa: "読点が多すぎる、または少なすぎる文を検出します" },
 ];
 
 /** Category grouping for rule display */
@@ -32,7 +36,7 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
   {
     id: "notation",
     nameJa: "約物・表記",
-    rules: ["punctuation-rules", "number-format", "notation-consistency"],
+    rules: ["punctuation-rules", "number-format", "notation-consistency", "dash-format", "dialogue-punctuation", "comma-frequency"],
   },
   {
     id: "kanji",
@@ -47,7 +51,7 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
   {
     id: "style",
     nameJa: "文体",
-    rules: ["redundant-expression", "verbose-expression", "sentence-ending-repetition"],
+    rules: ["redundant-expression", "verbose-expression", "sentence-ending-repetition", "sentence-length"],
   },
 ];
 
@@ -64,6 +68,10 @@ export const LINT_DEFAULT_CONFIGS: Record<string, { enabled: boolean; severity: 
   "sentence-ending-repetition": { enabled: true, severity: "info" },
   "notation-consistency": { enabled: true, severity: "warning" },
   "correlative-expression": { enabled: true, severity: "warning" },
+  "sentence-length": { enabled: true, severity: "info" },
+  "dash-format": { enabled: true, severity: "warning" },
+  "dialogue-punctuation": { enabled: true, severity: "warning" },
+  "comma-frequency": { enabled: true, severity: "info" },
 };
 
 /** Preset configuration for one-shot application */
@@ -87,6 +95,10 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "sentence-ending-repetition": { enabled: false, severity: "info" },
       "notation-consistency": { enabled: false, severity: "info" },
       "correlative-expression": { enabled: true, severity: "info" },
+      "sentence-length": { enabled: false, severity: "info" },
+      "dash-format": { enabled: false, severity: "info" },
+      "dialogue-punctuation": { enabled: true, severity: "warning" },
+      "comma-frequency": { enabled: false, severity: "info" },
     },
   },
   standard: {
@@ -107,6 +119,10 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "sentence-ending-repetition": { enabled: true, severity: "warning" },
       "notation-consistency": { enabled: true, severity: "error" },
       "correlative-expression": { enabled: true, severity: "error" },
+      "sentence-length": { enabled: true, severity: "warning" },
+      "dash-format": { enabled: true, severity: "error" },
+      "dialogue-punctuation": { enabled: true, severity: "error" },
+      "comma-frequency": { enabled: true, severity: "warning" },
     },
   },
   novel: {
@@ -123,6 +139,10 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "sentence-ending-repetition": { enabled: true, severity: "warning" },
       "notation-consistency": { enabled: true, severity: "warning" },
       "correlative-expression": { enabled: true, severity: "warning" },
+      "sentence-length": { enabled: true, severity: "info" },
+      "dash-format": { enabled: true, severity: "warning" },
+      "dialogue-punctuation": { enabled: true, severity: "warning" },
+      "comma-frequency": { enabled: true, severity: "info" },
     },
   },
   official: {
@@ -139,6 +159,10 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "sentence-ending-repetition": { enabled: true, severity: "info" },
       "notation-consistency": { enabled: true, severity: "error" },
       "correlative-expression": { enabled: true, severity: "error" },
+      "sentence-length": { enabled: true, severity: "warning" },
+      "dash-format": { enabled: true, severity: "error" },
+      "dialogue-punctuation": { enabled: true, severity: "warning" },
+      "comma-frequency": { enabled: true, severity: "warning" },
     },
   },
 };
