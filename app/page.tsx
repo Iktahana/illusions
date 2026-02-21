@@ -236,16 +236,20 @@ export default function EditorPage() {
           setShowSaveToast(true);
           setSaveToastExiting(false);
 
+          let exitTimer: ReturnType<typeof setTimeout> | null = null;
           const hideTimer = setTimeout(() => {
             setSaveToastExiting(true);
-            setTimeout(() => {
+            exitTimer = setTimeout(() => {
               setShowSaveToast(false);
               setSaveToastExiting(false);
             }, 150);
           }, 1200);
 
           prevLastSavedTimeRef.current = lastSavedTime;
-          return () => clearTimeout(hideTimer);
+          return () => {
+            clearTimeout(hideTimer);
+            if (exitTimer) clearTimeout(exitTimer);
+          };
         }
       }
       prevLastSavedTimeRef.current = lastSavedTime;
@@ -258,8 +262,7 @@ export default function EditorPage() {
   const [editorDiff, setEditorDiff] = useState<{ snapshotContent: string; currentContent: string; label: string } | null>(null);
   const [topView, setTopView] = useState<ActivityBarView>("explorer");
   const [bottomView, setBottomView] = useState<ActivityBarView>("none");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [searchResults, setSearchResults] = useState<{matches: any[], searchTerm: string} | null>(null);
+  const [searchResults, setSearchResults] = useState<{matches: { from: number; to: number }[], searchTerm: string} | null>(null);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
 
   /** Open the Ruby dialog with current editor selection */
@@ -338,8 +341,7 @@ export default function EditorPage() {
     try {
       let text: string | null = null;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (isElectron && typeof window !== "undefined" && (window as any).electronAPI) {
+      if (isElectron && typeof window !== "undefined" && window.electronAPI) {
         if (navigator.clipboard && navigator.clipboard.readText) {
           text = await navigator.clipboard.readText();
         }
@@ -423,8 +425,7 @@ export default function EditorPage() {
     target.focus();
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleShowAllSearchResults = (matches: any[], searchTerm: string) => {
+  const handleShowAllSearchResults = (matches: { from: number; to: number }[], searchTerm: string) => {
     setSearchResults({ matches, searchTerm });
     setTopView("search");
   };
@@ -597,8 +598,7 @@ export default function EditorPage() {
   // Keyboard shortcuts: Cmd/Ctrl+S=save, Cmd/Ctrl+F=search, etc.
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const nav = navigator as any;
+      const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
       const isMac = nav.userAgentData
         ? nav.userAgentData.platform === "macOS"
         : /mac/i.test(navigator.userAgent);

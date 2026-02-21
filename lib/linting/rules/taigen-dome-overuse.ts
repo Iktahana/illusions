@@ -1,5 +1,7 @@
 import type { Token } from "@/lib/nlp-client/types";
 import { AbstractMorphologicalLintRule } from "../base-rule";
+import type { SentenceSpan } from "../helpers/sentence-splitter";
+import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -10,60 +12,6 @@ import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 const STYLE_GUIDE_REF: LintReference = {
   standard: "日本語スタイルガイド",
 };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Represents a sentence extracted from source text,
- * along with its character offsets.
- */
-interface SentenceSpan {
-  text: string;
-  from: number;
-  to: number;
-}
-
-/**
- * Split text into sentences at sentence-ending delimiters,
- * tracking character positions for each sentence.
- *
- * Delimiters: 。 ！ ？ ! ? \n
- * Empty or whitespace-only segments are skipped.
- */
-function splitIntoSentences(text: string): SentenceSpan[] {
-  const sentences: SentenceSpan[] = [];
-  let start = 0;
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (
-      ch === "\u3002" || // 。
-      ch === "\uFF01" || // ！
-      ch === "\uFF1F" || // ？
-      ch === "!" ||
-      ch === "?" ||
-      ch === "\n"
-    ) {
-      const sentenceText = text.substring(start, i);
-      if (sentenceText.trim().length > 0) {
-        sentences.push({ text: sentenceText, from: start, to: i });
-      }
-      start = i + 1;
-    }
-  }
-
-  // Handle trailing text without delimiter
-  if (start < text.length) {
-    const sentenceText = text.substring(start);
-    if (sentenceText.trim().length > 0) {
-      sentences.push({ text: sentenceText, from: start, to: text.length });
-    }
-  }
-
-  return sentences;
-}
 
 /**
  * Determine whether a sentence ends with a noun (体言止め).

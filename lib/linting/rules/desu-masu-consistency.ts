@@ -1,5 +1,6 @@
 import type { Token } from "@/lib/nlp-client/types";
 import { AbstractMorphologicalDocumentLintRule } from "../base-rule";
+import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -21,13 +22,6 @@ const MAJORITY_THRESHOLD = 0.6;
 /** Writing style classification */
 type WritingStyle = "polite" | "plain";
 
-/** A sentence span within a paragraph */
-interface SentenceSpan {
-  text: string;
-  from: number;
-  to: number;
-}
-
 /** A classified sentence with its style and location */
 interface ClassifiedSentence {
   paragraphIndex: number;
@@ -45,31 +39,6 @@ interface ClassifiedSentence {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Split text into sentences at sentence-ending delimiters (。！？!?\n).
- * Tracks character positions for each sentence within the paragraph.
- * Empty/whitespace-only segments are skipped.
- */
-function splitIntoSentences(text: string): SentenceSpan[] {
-  const sentences: SentenceSpan[] = [];
-  const parts = text.split(/([。！？!?\n])/);
-  let offset = 0;
-
-  for (let i = 0; i < parts.length; i += 2) {
-    const sentenceText = parts[i];
-    if (sentenceText && sentenceText.trim().length > 0) {
-      sentences.push({
-        text: sentenceText,
-        from: offset,
-        to: offset + sentenceText.length,
-      });
-    }
-    offset += sentenceText.length + (parts[i + 1]?.length ?? 0);
-  }
-
-  return sentences;
-}
 
 /**
  * Check if a sentence position is entirely within dialogue brackets (「…」 or 『…』).

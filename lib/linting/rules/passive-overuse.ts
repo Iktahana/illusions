@@ -1,5 +1,7 @@
 import type { Token } from "@/lib/nlp-client/types";
 import { AbstractMorphologicalLintRule } from "../base-rule";
+import type { SentenceSpan } from "../helpers/sentence-splitter";
+import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -14,53 +16,6 @@ const STYLE_GUIDE_REF: LintReference = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** A sentence extracted from source text with its character offsets */
-interface SentenceSpan {
-  /** The sentence text */
-  text: string;
-  /** Start offset in the original text (inclusive) */
-  from: number;
-  /** End offset in the original text (exclusive) */
-  to: number;
-}
-
-/**
- * Split text into sentences at 。！？!?\n boundaries, tracking positions.
- * Empty sentences are skipped.
- */
-function splitIntoSentences(text: string): SentenceSpan[] {
-  const sentences: SentenceSpan[] = [];
-  let start = 0;
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (
-      ch === "。" ||
-      ch === "！" ||
-      ch === "？" ||
-      ch === "!" ||
-      ch === "?" ||
-      ch === "\n"
-    ) {
-      const sentenceText = text.substring(start, i);
-      if (sentenceText.trim().length > 0) {
-        sentences.push({ text: sentenceText, from: start, to: i });
-      }
-      start = i + 1;
-    }
-  }
-
-  // Handle trailing text without a delimiter
-  if (start < text.length) {
-    const trailing = text.substring(start);
-    if (trailing.trim().length > 0) {
-      sentences.push({ text: trailing, from: start, to: text.length });
-    }
-  }
-
-  return sentences;
-}
 
 /**
  * Check whether a given character offset falls inside a dialogue bracket pair.

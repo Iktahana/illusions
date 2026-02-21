@@ -1,4 +1,6 @@
 import { AbstractLintRule } from "../base-rule";
+import { maskDialogue } from "../helpers/dialogue-mask";
+import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -9,74 +11,6 @@ import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 const STYLE_GUIDE_REF: LintReference = {
   standard: "文化庁「公用文作成の考え方」(2022)",
 };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Represents a sentence extracted from source text,
- * along with its character offsets.
- */
-interface SentenceSpan {
-  text: string;
-  from: number;
-  to: number;
-}
-
-/**
- * Split text into sentences at sentence-ending delimiters (。！？!?\n),
- * tracking character positions for each sentence.
- *
- * Empty or whitespace-only segments are skipped.
- */
-function splitIntoSentences(text: string): SentenceSpan[] {
-  const sentences: SentenceSpan[] = [];
-  const delimiter = /[。！？!?\n]/;
-  let remaining = text;
-  let offset = 0;
-
-  while (remaining.length > 0) {
-    const match = delimiter.exec(remaining);
-    if (!match) {
-      if (remaining.trim().length > 0) {
-        sentences.push({ text: remaining, from: offset, to: offset + remaining.length });
-      }
-      break;
-    }
-    const sentenceText = remaining.substring(0, match.index);
-    if (sentenceText.trim().length > 0) {
-      sentences.push({ text: sentenceText, from: offset, to: offset + sentenceText.length });
-    }
-    offset += match.index + match[0].length;
-    remaining = remaining.substring(match.index + match[0].length);
-  }
-  return sentences;
-}
-
-/**
- * Mask dialogue content (「…」, 『…』) by replacing it with 〇 placeholders.
- * Uses depth tracking to handle nested quotation marks correctly.
- * Preserves string length so character offsets remain valid.
- */
-function maskDialogue(text: string): string {
-  let result = "";
-  let depth = 0;
-  for (const ch of text) {
-    if (ch === "「" || ch === "『") {
-      depth++;
-      result += "〇";
-    } else if (ch === "」" || ch === "』") {
-      if (depth > 0) depth--;
-      result += "〇";
-    } else if (depth > 0) {
-      result += "〇";
-    } else {
-      result += ch;
-    }
-  }
-  return result;
-}
 
 // ---------------------------------------------------------------------------
 // Rule implementation
