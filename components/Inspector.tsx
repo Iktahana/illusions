@@ -608,6 +608,9 @@ function CorrectionsPanel({
             <span className="text-xs text-foreground-tertiary">
               {lintIssues.length}件
             </span>
+          </div>
+          <div className="flex items-center gap-1">
+            {/* Refresh button */}
             {onRefreshLinting && (
               <button
                 onClick={onRefreshLinting}
@@ -624,8 +627,6 @@ function CorrectionsPanel({
                 <RefreshCw className={clsx("w-3.5 h-3.5", isLinting && "animate-spin")} />
               </button>
             )}
-          </div>
-          <div className="flex items-center gap-1">
             {/* Preset dropdown */}
             {onApplyLintPreset && (
               <select
@@ -703,17 +704,45 @@ function CorrectionsPanel({
                     : "border-border bg-background-secondary hover:border-border-secondary"
                 )}
               >
+                {/* Actions: top-right corner */}
+                <div className="flex items-center gap-1 float-right ml-2 mt-2 mr-2">
+                  <InfoTooltip
+                    content={`${issue.messageJa}${issue.reference ? `\n${issue.reference.standard}${issue.reference.section ? ` ${issue.reference.section}` : ""}` : ""}\n[${getRuleName(issue.ruleId)}]`}
+                    className="text-foreground-tertiary hover:text-foreground-secondary"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                  </InfoTooltip>
+                  {hasFix && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onApplyFix?.(issue);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.stopPropagation();
+                          onApplyFix?.(issue);
+                        }
+                      }}
+                      className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-accent hover:text-accent-hover bg-accent/10 hover:bg-accent/20 rounded transition-colors cursor-pointer"
+                    >
+                      置換
+                    </span>
+                  )}
+                </div>
                 {/* Main row: click to navigate */}
                 <button
                   type="button"
                   onClick={() => onNavigateToIssue?.(issue)}
                   className="w-full text-left px-3 py-2"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-start gap-2">
                     {/* Severity dot */}
                     <span
                       className={clsx(
-                        "w-2 h-2 rounded-full shrink-0",
+                        "w-2 h-2 rounded-full shrink-0 mt-1.5",
                         severityColor(issue.severity)
                       )}
                       title={issue.severity}
@@ -721,56 +750,28 @@ function CorrectionsPanel({
                     {/* Content: original → replacement or just message */}
                     <div className="flex-1 min-w-0">
                       {hasOriginal && hasFix ? (
-                        <p className="text-sm text-foreground leading-snug truncate">
+                        <p className="text-sm text-foreground leading-snug">
                           <span className="text-foreground-tertiary line-through">{enriched.originalText}</span>
                           <span className="text-foreground-tertiary mx-1">→</span>
                           <span className="text-foreground font-medium">{issue.fix!.replacement}</span>
                         </p>
                       ) : hasOriginal ? (
-                        <p className="text-sm text-foreground leading-snug truncate">
+                        <p className="text-sm text-foreground leading-snug">
                           {enriched.originalText}
                         </p>
                       ) : (
-                        <p className="text-sm text-foreground leading-snug truncate">
+                        <p className="text-sm text-foreground leading-snug">
+                          {issue.messageJa}
+                        </p>
+                      )}
+                      {/* Secondary line: show message when we have original text but no fix */}
+                      {hasOriginal && !hasFix && (
+                        <p className="text-xs text-foreground-tertiary mt-0.5">
                           {issue.messageJa}
                         </p>
                       )}
                     </div>
-                    {/* Info tooltip + fix button */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <InfoTooltip
-                        content={`${issue.messageJa}${issue.reference ? `\n${issue.reference.standard}${issue.reference.section ? ` ${issue.reference.section}` : ""}` : ""}\n[${getRuleName(issue.ruleId)}]`}
-                        className="text-foreground-tertiary hover:text-foreground-secondary"
-                      >
-                        <Info className="w-3.5 h-3.5" />
-                      </InfoTooltip>
-                      {hasFix && (
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onApplyFix?.(issue);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.stopPropagation();
-                              onApplyFix?.(issue);
-                            }
-                          }}
-                          className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-accent hover:text-accent-hover bg-accent/10 hover:bg-accent/20 rounded transition-colors cursor-pointer"
-                        >
-                          置換
-                        </span>
-                      )}
-                    </div>
                   </div>
-                  {/* Secondary line: show message when we have original text but no fix */}
-                  {hasOriginal && !hasFix && (
-                    <p className="text-xs text-foreground-tertiary mt-0.5 ml-4 truncate">
-                      {issue.messageJa}
-                    </p>
-                  )}
                 </button>
               </div>
             );
