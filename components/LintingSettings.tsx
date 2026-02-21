@@ -128,12 +128,12 @@ export default function LintingSettings({
           onClick={() => onLintingEnabledChange(!lintingEnabled)}
           className={clsx(
             "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-            lintingEnabled ? "bg-accent" : "bg-border-secondary"
+            lintingEnabled ? "bg-accent" : "bg-foreground-muted"
           )}
         >
           <span
             className={clsx(
-              "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
+              "inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm",
               lintingEnabled ? "translate-x-6" : "translate-x-1"
             )}
           />
@@ -166,21 +166,21 @@ export default function LintingSettings({
           <div className="flex-1" />
           <button
             onClick={handleEnableAll}
-            className="text-xs px-2 py-1 text-accent hover:text-accent-hover transition-colors"
+            className="text-xs px-2 py-1 text-foreground-secondary hover:text-foreground hover:bg-hover rounded transition-colors"
           >
             すべて有効
           </button>
-          <span className="text-foreground-tertiary text-xs">|</span>
+          <span className="text-border-secondary text-xs">|</span>
           <button
             onClick={handleDisableAll}
-            className="text-xs px-2 py-1 text-accent hover:text-accent-hover transition-colors"
+            className="text-xs px-2 py-1 text-foreground-secondary hover:text-foreground hover:bg-hover rounded transition-colors"
           >
             すべて無効
           </button>
-          <span className="text-foreground-tertiary text-xs">|</span>
+          <span className="text-border-secondary text-xs">|</span>
           <button
             onClick={handleResetDefaults}
-            className="text-xs px-2 py-1 text-accent hover:text-accent-hover transition-colors"
+            className="text-xs px-2 py-1 text-foreground-secondary hover:text-foreground hover:bg-hover rounded transition-colors"
           >
             デフォルト
           </button>
@@ -195,7 +195,7 @@ export default function LintingSettings({
           return (
             <div key={category.id} className="border border-border rounded-lg overflow-hidden">
               {/* Category header */}
-              <div className="flex items-center gap-2 px-3 py-2 bg-background-secondary">
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-background-tertiary/50">
                 <button
                   onClick={() => toggleGroup(category.id)}
                   className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
@@ -216,12 +216,12 @@ export default function LintingSettings({
                   onClick={() => toggleCategoryEnabled(category.rules, !allEnabled)}
                   className={clsx(
                     "relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0",
-                    allEnabled ? "bg-accent" : "bg-border-secondary"
+                    allEnabled ? "bg-accent" : "bg-foreground-muted"
                   )}
                 >
                   <span
                     className={clsx(
-                      "inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform",
+                      "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm",
                       allEnabled ? "translate-x-5" : "translate-x-0.5"
                     )}
                   />
@@ -274,12 +274,12 @@ export default function LintingSettings({
                           }
                           className={clsx(
                             "relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0",
-                            config.enabled ? "bg-accent" : "bg-border-secondary"
+                            config.enabled ? "bg-accent" : "bg-foreground-muted"
                           )}
                         >
                           <span
                             className={clsx(
-                              "inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform",
+                              "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm",
                               config.enabled ? "translate-x-5" : "translate-x-0.5"
                             )}
                           />
