@@ -437,7 +437,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           return;
         }
 
-        // New tab
+        // New tab — with atomic dedup guard inside the updater
         const tab: TabState = {
           id: generateTabId(),
           file: { path: vfsPath, handle: null, name: fileName },
@@ -449,8 +449,21 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           isPreview: effectivePreview,
           fileType: vfsFileType,
         };
-        setTabs((prev) => [...prev, tab]);
-        setActiveTabId(tab.id);
+        let existingTabId: TabId | null = null;
+        setTabs((prev) => {
+          const dup = prev.find((t) => t.file?.path === vfsPath);
+          if (dup) {
+            existingTabId = dup.id;
+            if (!preview && dup.isPreview) {
+              return prev.map((t) =>
+                t.id === dup.id ? { ...t, isPreview: false } : t,
+              );
+            }
+            return prev;
+          }
+          return [...prev, tab];
+        });
+        setActiveTabId(existingTabId ?? tab.id);
       } finally {
         openingPathsRef.current.delete(vfsPath);
       }
