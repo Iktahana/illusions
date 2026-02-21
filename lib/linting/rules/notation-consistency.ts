@@ -1,6 +1,6 @@
 import { AbstractDocumentLintRule } from "../base-rule";
 import { maskDialogue } from "../helpers/dialogue-mask";
-import type { LintIssue, LintRuleConfig, LintReference, Severity } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 import {
   VARIANT_GROUPS,
   VARIANT_CATEGORY_LABELS,
@@ -57,7 +57,7 @@ export class NotationConsistencyRule extends AbstractDocumentLintRule {
     const issuesByParagraph = new Map<number, LintIssue[]>();
 
     for (const group of VARIANT_GROUPS) {
-      this.checkVariantGroup(group, paragraphs, config.severity, issuesByParagraph);
+      this.checkVariantGroup(group, paragraphs, config, issuesByParagraph);
     }
 
     // Convert map to array format
@@ -79,7 +79,7 @@ export class NotationConsistencyRule extends AbstractDocumentLintRule {
   private checkVariantGroup(
     group: VariantGroup,
     paragraphs: ReadonlyArray<{ text: string; index: number }>,
-    severity: Severity,
+    config: LintRuleConfig,
     issuesByParagraph: Map<number, LintIssue[]>,
   ): void {
     // Count occurrences and record locations for each variant
@@ -87,7 +87,7 @@ export class NotationConsistencyRule extends AbstractDocumentLintRule {
     const variantLocations = new Map<string, VariantLocation[]>();
 
     for (const paragraph of paragraphs) {
-      const maskedText = maskDialogue(paragraph.text);
+      const maskedText = config.skipDialogue ? maskDialogue(paragraph.text) : paragraph.text;
       for (const variant of group.variants) {
         const locations = this.findAllOccurrences(maskedText, variant);
         if (locations.length === 0) continue;
@@ -122,7 +122,7 @@ export class NotationConsistencyRule extends AbstractDocumentLintRule {
       for (const loc of locations) {
         const issue: LintIssue = {
           ruleId: this.id,
-          severity,
+          severity: config.severity,
           message: `Inconsistent notation: "${variant}" vs "${majorityVariant}" (${group.category})`,
           messageJa: `「${reference.standard}に基づき、${categoryLabel}「${variant}」と「${majorityVariant}」の表記が混在しています。「${majorityVariant}」への統一を推奨します」`,
           from: loc.from,

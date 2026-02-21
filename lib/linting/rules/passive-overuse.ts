@@ -114,7 +114,7 @@ export class PassiveOveruseRule extends AbstractMorphologicalLintRule {
       const sentence = sentences[i];
 
       // Skip dialogue sentences
-      if (isInDialogue(sentence.from, text)) {
+      if (config.skipDialogue && isInDialogue(sentence.from, text)) {
         // Flush any pending run before skipping
         if (runLength >= threshold) {
           issues.push(

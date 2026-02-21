@@ -35,6 +35,8 @@ export interface LintIssue {
 export interface LintRuleConfig {
   enabled: boolean;
   severity: Severity;
+  /** Whether to skip dialogue text (「」『』) when running this rule */
+  skipDialogue?: boolean;
   /** Rule-specific options */
   options?: Record<string, unknown>;
 }

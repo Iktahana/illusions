@@ -46,7 +46,7 @@ export interface UseLintingResult {
  */
 export function useLinting(
   lintingEnabled: boolean,
-  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>,
+  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
   editorViewInstance: EditorView | null,
   llmEnabled: boolean = false,
 ): UseLintingResult {
@@ -98,6 +98,7 @@ export function useLinting(
       ruleRunner.setConfig(ruleId, {
         enabled: config.enabled,
         severity: config.severity,
+        skipDialogue: config.skipDialogue,
       });
     }
   }, [ruleRunner, lintingRuleConfigs]);

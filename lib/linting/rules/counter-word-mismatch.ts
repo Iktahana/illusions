@@ -148,7 +148,7 @@ export class CounterWordMismatchRule extends AbstractMorphologicalLintRule {
 
     for (let i = 0; i < tokens.length; i++) {
       // Skip tokens inside dialogue
-      if (isInDialogue(tokens[i].start, text)) continue;
+      if (config.skipDialogue && isInDialogue(tokens[i].start, text)) continue;
 
       // Step 1: Find a number token
       if (!isNumberToken(tokens[i])) continue;

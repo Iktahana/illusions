@@ -137,7 +137,7 @@ export class SentenceEndingRepetitionRule extends AbstractLintRule {
       const pattern = sentences[i].endingPattern;
 
       // Skip sentences inside dialogue
-      if (isInDialogue(sentences[i].from, text)) {
+      if (config.skipDialogue && isInDialogue(sentences[i].from, text)) {
         if (runLength >= threshold && runPattern !== null) {
           issues.push(
             this.createIssue(

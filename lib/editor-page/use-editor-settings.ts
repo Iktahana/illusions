@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useState } from "react";
 
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
+import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 import type { Severity } from "@/lib/linting/types";
 
 export interface EditorSettings {
@@ -160,11 +161,15 @@ export function useEditorSettings(
         if (appState.lintingRuleConfigs && typeof appState.lintingRuleConfigs === "object") {
           const isSeverity = (v: unknown): v is Severity =>
             v === "error" || v === "warning" || v === "info";
-          const sanitized: Record<string, { enabled: boolean; severity: Severity }> = {};
+          const sanitized: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> = {};
           for (const [ruleId, config] of Object.entries(appState.lintingRuleConfigs)) {
-            const cfg = config as { enabled?: unknown; severity?: unknown };
+            const cfg = config as { enabled?: unknown; severity?: unknown; skipDialogue?: unknown };
             if (typeof cfg.enabled === "boolean" && isSeverity(cfg.severity)) {
-              sanitized[ruleId] = { enabled: cfg.enabled, severity: cfg.severity };
+              const entry: { enabled: boolean; severity: Severity; skipDialogue?: boolean } = { enabled: cfg.enabled, severity: cfg.severity };
+              if (typeof cfg.skipDialogue === "boolean") {
+                entry.skipDialogue = cfg.skipDialogue;
+              }
+              sanitized[ruleId] = entry;
             }
           }
           setLintingRuleConfigs(sanitized);
@@ -328,7 +333,7 @@ export function useEditorSettings(
     });
   }, []);
 
-  const handleLintingRuleConfigsBatchChange = useCallback((configs: Record<string, { enabled: boolean; severity: Severity }>) => {
+  const handleLintingRuleConfigsBatchChange = useCallback((configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>) => {
     setLintingRuleConfigs(configs);
     void persistAppState({ lintingRuleConfigs: configs }).catch((error) => {
       console.error("Failed to persist lintingRuleConfigs:", error);

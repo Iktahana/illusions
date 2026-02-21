@@ -131,7 +131,7 @@ export class JoyoKanjiRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (text.length === 0) return [];
 
-    const maskedText = maskDialogue(text);
+    const maskedText = config.skipDialogue ? maskDialogue(text) : text;
     const options = (config.options ?? this.defaultConfig.options) as
       | JoyoKanjiOptions
       | undefined;
