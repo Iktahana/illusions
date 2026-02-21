@@ -202,7 +202,7 @@ export default function SettingsModal({
     >
       <div
         ref={modalRef}
-        className="relative w-full max-w-4xl h-[80vh] mx-4 rounded-xl bg-background-elevated/80 backdrop-blur-xl shadow-xl border border-border/50 flex flex-col"
+        className="relative w-full max-w-4xl h-[80vh] mx-4 rounded-xl bg-background-elevated shadow-xl border border-border flex flex-col"
       >
         {/* Header */}
         <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-border">
@@ -219,7 +219,7 @@ export default function SettingsModal({
         {/* 2-column layout */}
         <div className="flex-1 flex overflow-hidden">
           {/* Left navigation */}
-          <div className="w-48 flex-shrink-0 border-r border-border bg-background/50 p-2">
+          <div className="w-48 flex-shrink-0 border-r border-border bg-background-secondary p-2">
             <nav className="space-y-1">
               <button
                 onClick={() => setActiveCategory("editor")}
@@ -719,7 +719,7 @@ function AboutSection(): React.ReactElement {
 
       {/* Tab content */}
       {activeTab === "terms" && (
-        <div className="rounded-lg border border-border bg-background/50 overflow-hidden">
+        <div className="rounded-lg border border-border bg-background-secondary overflow-hidden">
           <div
             className="p-4 text-sm text-foreground-secondary overflow-auto max-h-[40vh] leading-relaxed prose-about"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(TERMS_TEXT) }}
@@ -728,7 +728,7 @@ function AboutSection(): React.ReactElement {
       )}
 
       {activeTab === "license" && (
-        <div className="rounded-lg border border-border bg-background/50 overflow-hidden">
+        <div className="rounded-lg border border-border bg-background-secondary overflow-hidden">
           <pre className="p-4 text-xs text-foreground-secondary overflow-auto max-h-[40vh] whitespace-pre-wrap font-mono leading-relaxed text-center">
             {LICENSE_TEXT.replace(/^ {2,}/gm, "")}
           </pre>

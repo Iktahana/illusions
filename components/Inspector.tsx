@@ -7,6 +7,7 @@ import { useEditorMode } from "@/contexts/EditorModeContext";
 import HistoryPanel from "./HistoryPanel";
 import { localPreferences } from "@/lib/local-preferences";
 import { LINT_PRESETS, LINT_RULES_META } from "@/lib/linting/lint-presets";
+import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 
 import type { ProjectMode } from "@/lib/project-types";
 import type { LintIssue, Severity } from "@/lib/linting";
@@ -64,6 +65,8 @@ interface InspectorProps {
   // 品詞着色設定
   posHighlightEnabled?: boolean;
   onPosHighlightEnabledChange?: (enabled: boolean) => void;
+  posHighlightColors?: Record<string, string>;
+  onOpenPosHighlightSettings?: () => void;
   // 履歴復元コールバック（プロジェクトモード時に使用）
   onHistoryRestore?: (content: string) => void;
   // 現在開いているファイル名（履歴パネルの切り替え用）
@@ -104,6 +107,8 @@ export default function Inspector({
   readabilityAnalysis,
   posHighlightEnabled = false,
   onPosHighlightEnabledChange,
+  posHighlightColors,
+  onOpenPosHighlightSettings,
   onHistoryRestore,
   activeFileName,
   currentContent = "",
@@ -423,6 +428,8 @@ export default function Inspector({
            <CorrectionsPanel
              posHighlightEnabled={posHighlightEnabled}
              onPosHighlightEnabledChange={onPosHighlightEnabledChange}
+             posHighlightColors={posHighlightColors}
+             onOpenPosHighlightSettings={onOpenPosHighlightSettings}
              lintIssues={lintIssues ?? []}
              onNavigateToIssue={onNavigateToIssue}
              onApplyFix={onApplyFix}
@@ -489,6 +496,8 @@ interface EnrichedLintIssue extends LintIssue {
 interface CorrectionsPanelProps {
   posHighlightEnabled: boolean;
   onPosHighlightEnabledChange?: (enabled: boolean) => void;
+  posHighlightColors?: Record<string, string>;
+  onOpenPosHighlightSettings?: () => void;
   lintIssues: (LintIssue | EnrichedLintIssue)[];
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
@@ -518,9 +527,25 @@ function getRuleName(ruleId: string): string {
   return meta?.nameJa ?? ruleId;
 }
 
+/** POS legend items (main categories only, compact) */
+const POS_LEGEND_ITEMS = [
+  { key: "名詞", label: "名詞" },
+  { key: "動詞", label: "動詞" },
+  { key: "形容詞", label: "形容詞" },
+  { key: "副詞", label: "副詞" },
+  { key: "助詞", label: "助詞" },
+  { key: "助動詞", label: "助動詞" },
+  { key: "接続詞", label: "接続詞" },
+  { key: "連体詞", label: "連体詞" },
+  { key: "感動詞", label: "感動詞" },
+  { key: "記号", label: "記号" },
+];
+
 function CorrectionsPanel({
   posHighlightEnabled,
   onPosHighlightEnabledChange,
+  posHighlightColors = {},
+  onOpenPosHighlightSettings,
   lintIssues,
   onNavigateToIssue,
   onApplyFix,
@@ -582,28 +607,46 @@ function CorrectionsPanel({
             onClick={() => onPosHighlightEnabledChange?.(!posHighlightEnabled)}
             className={clsx(
               "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-              posHighlightEnabled ? "bg-accent" : "bg-border-secondary"
+              posHighlightEnabled ? "bg-accent" : "bg-foreground-muted"
             )}
           >
             <span
               className={clsx(
-                "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
+                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm",
                 posHighlightEnabled ? "translate-x-6" : "translate-x-1"
               )}
             />
           </button>
         </div>
         {posHighlightEnabled && (
-          <p className="text-xs text-foreground-tertiary mt-2">
-            色の設定は「設定 → 品詞ハイライト」で変更できます
-          </p>
+          <div className="mt-2 space-y-2">
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              {POS_LEGEND_ITEMS.map(({ key, label }) => (
+                <span key={key} className="inline-flex items-center gap-1 text-xs text-foreground-secondary">
+                  <span
+                    className="inline-block w-2.5 h-2.5 rounded-sm"
+                    style={{ backgroundColor: posHighlightColors[key] || DEFAULT_POS_COLORS[key] || "#000" }}
+                  />
+                  {label}
+                </span>
+              ))}
+            </div>
+            {onOpenPosHighlightSettings && (
+              <button
+                onClick={onOpenPosHighlightSettings}
+                className="text-xs text-accent hover:text-accent-hover hover:underline transition-colors"
+              >
+                色の設定を変更
+              </button>
+            )}
+          </div>
         )}
       </div>
 
       {/* Header: issue count + controls */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <h3 className="text-sm font-medium text-foreground-secondary">検出結果</h3>
             <span className="text-xs text-foreground-tertiary">
               {lintIssues.length}件
@@ -627,25 +670,6 @@ function CorrectionsPanel({
                 <RefreshCw className={clsx("w-3.5 h-3.5", isLinting && "animate-spin")} />
               </button>
             )}
-            {/* Preset dropdown */}
-            {onApplyLintPreset && (
-              <select
-                value={activeLintPresetId}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    onApplyLintPreset(e.target.value);
-                  }
-                }}
-                className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                title="プリセットを適用"
-              >
-                {!activeLintPresetId && <option value="">カスタム</option>}
-                {Object.entries(LINT_PRESETS).map(([id, preset]) => (
-                  <option key={id} value={id}>{preset.nameJa}</option>
-                ))}
-              </select>
-            )}
-            {/* Settings gear */}
             {onOpenLintingSettings && (
               <button
                 onClick={onOpenLintingSettings}
@@ -656,6 +680,23 @@ function CorrectionsPanel({
               </button>
             )}
           </div>
+          {onApplyLintPreset && (
+            <select
+              value={activeLintPresetId}
+              onChange={(e) => {
+                if (e.target.value) {
+                  onApplyLintPreset(e.target.value);
+                }
+              }}
+              className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+              title="プリセットを適用"
+            >
+              {!activeLintPresetId && <option value="">カスタム</option>}
+              {Object.entries(LINT_PRESETS).map(([id, preset]) => (
+                <option key={id} value={id}>{preset.nameJa}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
