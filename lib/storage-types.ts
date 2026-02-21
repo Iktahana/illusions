@@ -82,6 +82,14 @@ export interface AppState {
   llmEnabled?: boolean;
   llmModelId?: string;
 
+  // 省電力モード
+  powerSaveMode?: boolean;
+  prePowerSaveState?: {
+    lintingEnabled: boolean;
+    lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
+    llmEnabled: boolean;
+  } | null;
+
   // タブの永続化
   openTabs?: TabPersistenceState;
 }
