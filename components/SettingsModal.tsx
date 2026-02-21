@@ -9,12 +9,15 @@ import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/po
 import { FEATURED_JAPANESE_FONTS } from "@/lib/fonts";
 import ColorPicker from "./ColorPicker";
 import LintingSettings from "./LintingSettings";
-import { LlmSettings } from "./LlmSettings";
 import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 
 const PosHighlightPreview = dynamic(() => import("./PosHighlightPreview"), {
   ssr: false,
 });
+const LlmSettings = dynamic(
+  () => import("./LlmSettings").then((mod) => mod.LlmSettings),
+  { ssr: false },
+);
 const LICENSE_TEXT = process.env.NEXT_PUBLIC_LICENSE_TEXT || "";
 const TERMS_TEXT = process.env.NEXT_PUBLIC_TERMS_TEXT || "";
 

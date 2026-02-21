@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useState } from "react";
 
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
+import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 import type { Severity } from "@/lib/linting/types";
 
 export interface EditorSettings {
@@ -93,7 +94,7 @@ export function useEditorSettings(
   const [lintingEnabled, setLintingEnabled] = useState(true);
   const [lintingRuleConfigs, setLintingRuleConfigs] = useState<Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>>({});
   const [llmEnabled, setLlmEnabled] = useState(false);
-  const [llmModelId, setLlmModelId] = useState("qwen3-1.7b-q8");
+  const [llmModelId, setLlmModelId] = useState(DEFAULT_MODEL_ID);
 
   // Load persisted settings on mount
   useEffect(() => {
