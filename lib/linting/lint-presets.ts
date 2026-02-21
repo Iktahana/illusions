@@ -200,6 +200,9 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "homophone-detection": { enabled: true, severity: "warning" },
     },
   },
+  // The official preset intentionally omits skipDialogue on most rules because
+  // government documents rarely contain dialogue; adding the toggle would be
+  // misleading for users of this preset.
   official: {
     nameJa: "公用文モード",
     configs: {

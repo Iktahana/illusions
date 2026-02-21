@@ -118,17 +118,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     analyzeWordFrequency: (text) => ipcRenderer.invoke('nlp:analyze-word-frequency', text),
   },
   llm: {
+    /** List available models with their download/load status */
     getModels: () => ipcRenderer.invoke('llm:get-models'),
+    /** Download a model GGUF file from HuggingFace */
     downloadModel: (modelId) => ipcRenderer.invoke('llm:download-model', modelId),
+    /** Delete a downloaded model file */
     deleteModel: (modelId) => ipcRenderer.invoke('llm:delete-model', modelId),
+    /** Load a downloaded model into memory for inference */
     loadModel: (modelId) => ipcRenderer.invoke('llm:load-model', modelId),
+    /** Unload the currently loaded model, freeing memory */
     unloadModel: () => ipcRenderer.invoke('llm:unload-model'),
+    /** Check whether a model is currently loaded */
     isModelLoaded: () => ipcRenderer.invoke('llm:is-model-loaded'),
+    /** Run inference on the loaded model */
     infer: (prompt, options) => ipcRenderer.invoke('llm:infer', { prompt, ...options }),
+    /** Get disk usage for downloaded models */
     getStorageUsage: () => ipcRenderer.invoke('llm:get-storage-usage'),
+    /** Subscribe to download progress events */
     onDownloadProgress: (callback) => {
       ipcRenderer.on('llm:download-progress', (_event, progress) => callback(progress));
     },
+    /** Remove all download progress listeners */
     removeDownloadProgressListener: () => {
       ipcRenderer.removeAllListeners('llm:download-progress');
     },
