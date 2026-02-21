@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, ReactNode } from "react";
-import { Bot, AlertCircle, BarChart3, Edit2, X, History, RefreshCw, Settings, Info, ListFilter, XCircle, AlertTriangle } from "lucide-react";
+import { Bot, AlertCircle, BarChart3, Edit2, X, History, RefreshCw, Settings, Info, ListFilter, XCircle, AlertTriangle, EyeOff } from "lucide-react";
 import clsx from "clsx";
 
 import { useEditorMode } from "@/contexts/EditorModeContext";
@@ -80,6 +80,7 @@ interface InspectorProps {
   lintIssues?: LintIssue[];
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
+  onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
   onRefreshLinting?: () => void;
   isLinting?: boolean;
   // Active lint issue (cursor sync)
@@ -119,6 +120,7 @@ export default function Inspector({
   lintIssues,
   onNavigateToIssue,
   onApplyFix,
+  onIgnoreCorrection,
   onRefreshLinting,
   isLinting = false,
   activeLintIssueIndex,
@@ -444,6 +446,7 @@ export default function Inspector({
              lintIssues={lintIssues ?? []}
              onNavigateToIssue={onNavigateToIssue}
              onApplyFix={onApplyFix}
+             onIgnoreCorrection={onIgnoreCorrection}
              onRefreshLinting={onRefreshLinting}
              isLinting={isLinting}
              activeLintIssueIndex={activeLintIssueIndex}
@@ -512,6 +515,7 @@ interface CorrectionsPanelProps {
   lintIssues: (LintIssue | EnrichedLintIssue)[];
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
+  onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
   onRefreshLinting?: () => void;
   isLinting?: boolean;
   activeLintIssueIndex?: number | null;
@@ -560,6 +564,7 @@ function CorrectionsPanel({
   lintIssues,
   onNavigateToIssue,
   onApplyFix,
+  onIgnoreCorrection,
   onRefreshLinting,
   isLinting = false,
   activeLintIssueIndex,
@@ -782,6 +787,36 @@ function CorrectionsPanel({
                     >
                       置換
                     </span>
+                  )}
+                  {onIgnoreCorrection && (
+                    <InfoTooltip
+                      content="この指摘を無視（右クリックで同じ指摘をすべて無視）"
+                      className="text-foreground-tertiary hover:text-foreground-secondary"
+                    >
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        aria-label="この指摘を無視"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onIgnoreCorrection(issue, false);
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onIgnoreCorrection(issue, true);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.stopPropagation();
+                            onIgnoreCorrection(issue, false);
+                          }
+                        }}
+                        className="inline-flex items-center p-0.5 rounded transition-colors cursor-pointer hover:bg-hover"
+                      >
+                        <EyeOff className="w-3.5 h-3.5" />
+                      </span>
+                    </InfoTooltip>
                   )}
                 </div>
                 {/* Main row: click to navigate */}
