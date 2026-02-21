@@ -634,12 +634,17 @@ export default function EditorPage() {
   }, [editorViewInstance, ignoreCorrection]);
 
   /** Apply a lint fix by replacing the text range */
-  const handleApplyFix = useCallback((issue: LintIssue) => {
+  const handleApplyFix = useCallback((issue: LintIssue & { originalText?: string }) => {
     if (!editorViewInstance || !issue.fix) return;
     const { state, dispatch } = editorViewInstance;
-    const clampedTo = Math.min(issue.to, state.doc.content.size);
-    const clampedFrom = Math.min(issue.from, clampedTo);
-    const tr = state.tr.insertText(issue.fix.replacement, clampedFrom, clampedTo);
+    if (issue.to > state.doc.content.size) {
+      return;
+    }
+    const currentText = state.doc.textBetween(issue.from, issue.to, "");
+    if (issue.originalText && currentText !== issue.originalText) {
+      return;
+    }
+    const tr = state.tr.insertText(issue.fix.replacement, issue.from, issue.to);
     dispatch(tr);
   }, [editorViewInstance]);
 
