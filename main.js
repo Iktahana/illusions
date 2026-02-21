@@ -1143,8 +1143,11 @@ app.whenReady().then(async () => {
   })
 })
 
-app.on('before-quit', async () => {
-  await disposeLlmEngine()
+app.on('before-quit', (event) => {
+  event.preventDefault()
+  disposeLlmEngine().finally(() => {
+    app.exit(0)
+  })
 })
 
 app.on('window-all-closed', () => {

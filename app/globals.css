@@ -588,6 +588,5 @@ input[type="range"]::-moz-range-progress {
   min-height: 100%;
   cursor: default;
   writing-mode: horizontal-tb;
-  word-wrap: break-word;
   overflow-wrap: break-word;
 }
