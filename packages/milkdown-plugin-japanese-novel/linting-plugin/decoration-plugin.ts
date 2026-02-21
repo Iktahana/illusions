@@ -501,7 +501,7 @@ export function createLintingPlugin(
               allDecorations.push(
                 Decoration.inline(from, to, {
                   class: severityToClass(issue.severity),
-                  'data-lint-issue': JSON.stringify({ ...issue, from, to }),
+                  'data-lint-issue': JSON.stringify({ ...issue, from, to, originalText: issueText }),
                 })
               );
 
@@ -510,6 +510,7 @@ export function createLintingPlugin(
                 ...issue,
                 from,
                 to,
+                originalText: issueText,
               });
             }
           }
@@ -646,11 +647,11 @@ export function createLintingPlugin(
             allDecorations.push(
               Decoration.inline(from, to, {
                 class: severityToClass(issue.severity),
-                'data-lint-issue': JSON.stringify({ ...issue, from, to }),
+                'data-lint-issue': JSON.stringify({ ...issue, from, to, originalText: issueText }),
               })
             );
 
-            allIssues.push({ ...issue, from, to });
+            allIssues.push({ ...issue, from, to, originalText: issueText });
           }
 
           // L3 issues from LLM cache (already have absolute positions)
@@ -667,14 +668,15 @@ export function createLintingPlugin(
                     isIssueIgnored(issue, l3IssueText, paragraph.text, currentIgnoredCorrections)) {
                   continue;
                 }
+                const issueWithOriginal = { ...issue, originalText: l3IssueText };
                 allDecorations.push(
                   Decoration.inline(issue.from, issue.to, {
                     class: severityToClass(issue.severity),
-                    'data-lint-issue': JSON.stringify(issue),
+                    'data-lint-issue': JSON.stringify(issueWithOriginal),
                   })
                 );
 
-                allIssues.push(issue);
+                allIssues.push(issueWithOriginal);
               }
             }
           }
