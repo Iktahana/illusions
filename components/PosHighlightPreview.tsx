@@ -105,6 +105,7 @@ function PreviewEditor({
   );
 }
 
+/** Live preview panel for POS (part-of-speech) highlight settings */
 export default function PosHighlightPreview({
   posHighlightColors,
   posHighlightEnabled,
@@ -112,10 +113,14 @@ export default function PosHighlightPreview({
   const [content, setContent] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/demo/鏡地獄.mdi")
+    const controller = new AbortController();
+    fetch("/demo/鏡地獄.mdi", { signal: controller.signal })
       .then((res) => res.text())
       .then(setContent)
-      .catch(() => setContent(""));
+      .catch(() => {
+        if (!controller.signal.aborted) setContent("");
+      });
+    return () => controller.abort();
   }, []);
 
   if (content === null) {

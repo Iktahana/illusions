@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { X, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
 import type { Severity } from "@/lib/linting/types";
-import ColorPicker from "./ColorPicker";
-import LintingSettings from "./LintingSettings";
+import dynamic from "next/dynamic";
+
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import { FEATURED_JAPANESE_FONTS } from "@/lib/fonts";
-import dynamic from "next/dynamic";
+import ColorPicker from "./ColorPicker";
+import LintingSettings from "./LintingSettings";
 
 const PosHighlightPreview = dynamic(() => import("./PosHighlightPreview"), {
   ssr: false,
