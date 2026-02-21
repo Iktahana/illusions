@@ -1,4 +1,5 @@
 import { AbstractLintRule } from "../base-rule";
+import { maskDialogue } from "../helpers/dialogue-mask";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 /** Reference for verbose expression checks */
@@ -85,10 +86,11 @@ export class VerboseExpressionRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (!text) return [];
 
+    const maskedText = maskDialogue(text);
     const issues: LintIssue[] = [];
 
     for (const entry of VERBOSE_PATTERNS) {
-      this.findPatternOccurrences(text, entry, config.severity, issues);
+      this.findPatternOccurrences(maskedText, entry, config.severity, issues);
     }
 
     // Sort issues by position for consistent output

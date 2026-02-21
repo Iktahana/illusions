@@ -1,5 +1,6 @@
 import type { Token } from "@/lib/nlp-client/types";
 import { AbstractMorphologicalLintRule } from "../base-rule";
+import { isInDialogue } from "../helpers/dialogue-mask";
 import type { SentenceSpan } from "../helpers/sentence-splitter";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
@@ -16,23 +17,6 @@ const STYLE_GUIDE_REF: LintReference = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Check whether a given character offset falls inside a dialogue bracket pair.
- *
- * Dialogue is defined by 「…」 or 『…』 pairs. We scan from the beginning
- * of the text up to `from`, tracking bracket nesting depth.
- */
-function isInDialogue(from: number, text: string): boolean {
-  let depth = 0;
-  for (let i = 0; i < text.length && i <= from; i++) {
-    if (text[i] === "「" || text[i] === "『") depth++;
-    if (text[i] === "」" || text[i] === "』") {
-      if (depth > 0) depth--;
-    }
-  }
-  return depth > 0;
-}
 
 /**
  * Determine whether a set of tokens for a sentence contains a passive

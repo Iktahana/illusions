@@ -1,4 +1,5 @@
 import { AbstractLintRule } from "../base-rule";
+import { maskDialogue } from "../helpers/dialogue-mask";
 import type { LintIssue, LintRuleConfig, LintReference, Severity } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -154,10 +155,11 @@ export class ConjugationErrorRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (!text) return [];
 
+    const maskedText = maskDialogue(text);
     const issues: LintIssue[] = [];
-    issues.push(...this.checkRaNuki(text, config.severity));
-    issues.push(...this.checkSaIre(text, config.severity));
-    issues.push(...this.checkINuki(text));
+    issues.push(...this.checkRaNuki(maskedText, config.severity));
+    issues.push(...this.checkSaIre(maskedText, config.severity));
+    issues.push(...this.checkINuki(maskedText));
     return issues;
   }
 

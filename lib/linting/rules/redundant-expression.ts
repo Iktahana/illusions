@@ -1,4 +1,5 @@
 import { AbstractLintRule } from "../base-rule";
+import { maskDialogue } from "../helpers/dialogue-mask";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 /** Reference for redundant expression detection */
@@ -175,11 +176,12 @@ export class RedundantExpressionRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (!text) return [];
 
+    const maskedText = maskDialogue(text);
     const issues: LintIssue[] = [];
 
     for (const entry of REDUNDANT_EXPRESSIONS) {
       let searchFrom = 0;
-      let index = text.indexOf(entry.pattern, searchFrom);
+      let index = maskedText.indexOf(entry.pattern, searchFrom);
 
       while (index !== -1) {
         const from = index;
@@ -202,7 +204,7 @@ export class RedundantExpressionRule extends AbstractLintRule {
         });
 
         searchFrom = to;
-        index = text.indexOf(entry.pattern, searchFrom);
+        index = maskedText.indexOf(entry.pattern, searchFrom);
       }
     }
 

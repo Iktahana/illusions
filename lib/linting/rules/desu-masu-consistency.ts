@@ -1,5 +1,6 @@
 import type { Token } from "@/lib/nlp-client/types";
 import { AbstractMorphologicalDocumentLintRule } from "../base-rule";
+import { isInDialogue } from "../helpers/dialogue-mask";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
@@ -39,28 +40,6 @@ interface ClassifiedSentence {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Check if a sentence position is entirely within dialogue brackets (「…」 or 『…』).
- * Uses bracket depth tracking across the full paragraph text.
- */
-function isDialogueSentence(
-  from: number,
-  fullParagraph: string,
-): boolean {
-  let depth = 0;
-
-  for (let i = 0; i < fullParagraph.length; i++) {
-    const ch = fullParagraph[i];
-    if (ch === "「" || ch === "『") depth++;
-    if (i === from && depth > 0) return true;
-    if (ch === "」" || ch === "』") {
-      if (depth > 0) depth--;
-    }
-  }
-
-  return false;
-}
 
 /**
  * Extract tokens that fall within a given character range.
@@ -230,7 +209,7 @@ export class DesuMasuConsistencyRule extends AbstractMorphologicalDocumentLintRu
 
       for (const sentence of sentences) {
         // Skip dialogue sentences
-        if (isDialogueSentence(sentence.from, paragraph.text)) continue;
+        if (isInDialogue(sentence.from, paragraph.text)) continue;
 
         // Get tokens within this sentence's range
         const sentenceTokens = getTokensInRange(

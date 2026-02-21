@@ -1,4 +1,5 @@
 import { AbstractLintRule } from "../base-rule";
+import { maskDialogue } from "../helpers/dialogue-mask";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -277,15 +278,16 @@ export class NumberFormatRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (text.length === 0) return [];
 
+    const maskedText = maskDialogue(text);
     const isVertical = (config.options?.isVertical as boolean) ?? false;
 
     if (isVertical) {
-      return this.checkArabicInVertical(text, config);
+      return this.checkArabicInVertical(maskedText, config);
     }
     // Existing horizontal check
-    const issues = this.checkKanjiInHorizontal(text, config);
+    const issues = this.checkKanjiInHorizontal(maskedText, text, config);
     // NEW: comma formatting check for large numbers
-    issues.push(...this.checkCommaFormatting(text, config));
+    issues.push(...this.checkCommaFormatting(maskedText, config));
     return issues;
   }
 
@@ -348,6 +350,7 @@ export class NumberFormatRule extends AbstractLintRule {
    */
   private checkKanjiInHorizontal(
     text: string,
+    originalText: string,
     config: LintRuleConfig,
   ): LintIssue[] {
     const issues: LintIssue[] = [];
@@ -359,8 +362,8 @@ export class NumberFormatRule extends AbstractLintRule {
       const from = match.index;
       const to = from + matched.length;
 
-      // Skip idiomatic expressions (check surrounding context)
-      if (isKanjiException(text, from, to)) continue;
+      // Skip idiomatic expressions (check surrounding context using original text)
+      if (isKanjiException(originalText, from, to)) continue;
 
       // Try to convert to an Arabic number
       const numValue = kanjiToArabic(matched);

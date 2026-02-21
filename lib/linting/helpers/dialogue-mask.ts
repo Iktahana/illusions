@@ -7,6 +7,22 @@
  */
 
 /**
+ * Check whether a character offset falls inside dialogue brackets.
+ * Scans text from the beginning, tracking bracket depth.
+ */
+export function isInDialogue(offset: number, text: string): boolean {
+  let depth = 0;
+  for (let i = 0; i < text.length && i <= offset; i++) {
+    const ch = text[i];
+    if (ch === "「" || ch === "『") depth++;
+    else if (ch === "」" || ch === "』") {
+      if (depth > 0) depth--;
+    }
+  }
+  return depth > 0;
+}
+
+/**
  * Mask dialogue content within Japanese quotation brackets.
  *
  * Characters inside 「」 and 『』 (including the brackets themselves)

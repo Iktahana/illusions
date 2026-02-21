@@ -1,4 +1,5 @@
 import { AbstractLintRule } from "../base-rule";
+import { maskDialogue } from "../helpers/dialogue-mask";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -87,13 +88,14 @@ export class EraYearValidatorRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (text.length === 0) return [];
 
+    const maskedText = maskDialogue(text);
     const issues: LintIssue[] = [];
 
     // Reset regex state for safety (global regex retains lastIndex)
     ERA_WESTERN_PATTERN.lastIndex = 0;
 
     let match: RegExpExecArray | null;
-    while ((match = ERA_WESTERN_PATTERN.exec(text)) !== null) {
+    while ((match = ERA_WESTERN_PATTERN.exec(maskedText)) !== null) {
       const fullMatch = match[0];
       const eraName = match[1];
       const eraYearStr = match[2];
