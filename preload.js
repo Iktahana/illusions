@@ -117,6 +117,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     analyzeWordFrequency: (text) => ipcRenderer.invoke('nlp:analyze-word-frequency', text),
   },
+  llm: {
+    getModels: () => ipcRenderer.invoke('llm:get-models'),
+    downloadModel: (modelId) => ipcRenderer.invoke('llm:download-model', modelId),
+    deleteModel: (modelId) => ipcRenderer.invoke('llm:delete-model', modelId),
+    loadModel: (modelId) => ipcRenderer.invoke('llm:load-model', modelId),
+    unloadModel: () => ipcRenderer.invoke('llm:unload-model'),
+    isModelLoaded: () => ipcRenderer.invoke('llm:is-model-loaded'),
+    infer: (prompt, options) => ipcRenderer.invoke('llm:infer', { prompt, ...options }),
+    getStorageUsage: () => ipcRenderer.invoke('llm:get-storage-usage'),
+    onDownloadProgress: (callback) => {
+      ipcRenderer.on('llm:download-progress', (_event, progress) => callback(progress));
+    },
+    removeDownloadProgressListener: () => {
+      ipcRenderer.removeAllListeners('llm:download-progress');
+    },
+  },
   storage: {
     saveSession: (session) => ipcRenderer.invoke('storage:save-session', session),
     loadSession: () => ipcRenderer.invoke('storage:load-session'),

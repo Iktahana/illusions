@@ -37,6 +37,8 @@ await esbuild.build({
     'kuromoji',
     // better-sqlite3 is a native module
     'better-sqlite3',
+    // node-llama-cpp is a native module for local LLM inference
+    'node-llama-cpp',
   ],
   format: 'cjs',
   minify: false, // Keep readable for debugging
@@ -64,19 +66,24 @@ await esbuild.build({
 
 console.log('✅ Preload script bundled to dist-main/preload.js');
 
-// Copy kuromoji and its runtime dependencies
-console.log('📦 Copying kuromoji and dependencies for external dependency...');
+// Copy runtime dependencies that cannot be bundled
+console.log('📦 Copying runtime dependencies for external modules...');
 
 const nodeModulesDest = join(outDir, 'node_modules');
 if (!fs.existsSync(nodeModulesDest)) {
   fs.mkdirSync(nodeModulesDest, { recursive: true });
 }
 
-// kuromoji and better-sqlite3 require these modules at runtime (not bundled by esbuild)
+// Native/runtime modules that cannot be bundled by esbuild
+// kuromoji: dictionary loading at runtime; better-sqlite3: native addon; node-llama-cpp: native LLM inference
 // bindings + file-uri-to-path are runtime dependencies of better-sqlite3
-const kuromojiDeps = ['kuromoji', 'doublearray', 'zlibjs', 'async', 'better-sqlite3', 'bindings', 'file-uri-to-path'];
+const runtimeDeps = [
+  'kuromoji', 'doublearray', 'zlibjs', 'async',
+  'better-sqlite3', 'bindings', 'file-uri-to-path',
+  'node-llama-cpp',
+];
 
-for (const dep of kuromojiDeps) {
+for (const dep of runtimeDeps) {
   const src = join(projectRoot, 'node_modules', dep);
   const dest = join(nodeModulesDest, dep);
   if (fs.existsSync(src)) {
@@ -93,5 +100,5 @@ console.log('');
 console.log('Bundle summary:');
 console.log('  • Main process: dist-main/main.js');
 console.log('  • Preload script: dist-main/preload.js');
-console.log('  • Runtime deps: dist-main/node_modules/{kuromoji,doublearray,zlibjs,async,better-sqlite3,bindings,file-uri-to-path}');
+console.log('  • Runtime deps: dist-main/node_modules/{kuromoji,doublearray,zlibjs,async,better-sqlite3,bindings,file-uri-to-path,node-llama-cpp}');
 console.log('');

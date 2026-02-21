@@ -22,6 +22,8 @@ export interface EditorSettings {
   showSettingsModal: boolean;
   lintingEnabled: boolean;
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
+  llmEnabled: boolean;
+  llmModelId: string;
 }
 
 export interface EditorSettingsHandlers {
@@ -43,6 +45,8 @@ export interface EditorSettingsHandlers {
   handleLintingEnabledChange: (value: boolean) => void;
   handleLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
   handleLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
+  handleLlmEnabledChange: (value: boolean) => void;
+  handleLlmModelIdChange: (modelId: string) => void;
 }
 
 export interface EditorSettingsSetters {
@@ -88,6 +92,8 @@ export function useEditorSettings(
   const [compactMode, setCompactMode] = useState(false);
   const [lintingEnabled, setLintingEnabled] = useState(true);
   const [lintingRuleConfigs, setLintingRuleConfigs] = useState<Record<string, { enabled: boolean; severity: Severity }>>({});
+  const [llmEnabled, setLlmEnabled] = useState(false);
+  const [llmModelId, setLlmModelId] = useState("qwen3-1.7b-q8");
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -141,6 +147,12 @@ export function useEditorSettings(
         }
         if (typeof appState.lintingEnabled === "boolean") {
           setLintingEnabled(appState.lintingEnabled);
+        }
+        if (typeof appState.llmEnabled === "boolean") {
+          setLlmEnabled(appState.llmEnabled);
+        }
+        if (typeof appState.llmModelId === "string") {
+          setLlmModelId(appState.llmModelId);
         }
         if (appState.lintingRuleConfigs && typeof appState.lintingRuleConfigs === "object") {
           const isSeverity = (v: unknown): v is Severity =>
@@ -288,6 +300,20 @@ export function useEditorSettings(
     });
   }, []);
 
+  const handleLlmEnabledChange = useCallback((value: boolean) => {
+    setLlmEnabled(value);
+    void persistAppState({ llmEnabled: value }).catch((error) => {
+      console.error("Failed to persist llmEnabled:", error);
+    });
+  }, []);
+
+  const handleLlmModelIdChange = useCallback((modelId: string) => {
+    setLlmModelId(modelId);
+    void persistAppState({ llmModelId: modelId }).catch((error) => {
+      console.error("Failed to persist llmModelId:", error);
+    });
+  }, []);
+
   const handleLintingRuleConfigChange = useCallback((ruleId: string, config: { enabled: boolean; severity: Severity }) => {
     setLintingRuleConfigs(prev => {
       const next = { ...prev, [ruleId]: config };
@@ -324,6 +350,8 @@ export function useEditorSettings(
       showSettingsModal,
       lintingEnabled,
       lintingRuleConfigs,
+      llmEnabled,
+      llmModelId,
     },
     handlers: {
       handleFontScaleChange,
@@ -344,6 +372,8 @@ export function useEditorSettings(
       handleLintingEnabledChange,
       handleLintingRuleConfigChange,
       handleLintingRuleConfigsBatchChange,
+      handleLlmEnabledChange,
+      handleLlmModelIdChange,
     },
     setters: {
       setLineHeight,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
+import { X, ExternalLink, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 import type { Severity } from "@/lib/linting/types";
 import dynamic from "next/dynamic";
 
@@ -9,6 +9,8 @@ import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/po
 import { FEATURED_JAPANESE_FONTS } from "@/lib/fonts";
 import ColorPicker from "./ColorPicker";
 import LintingSettings from "./LintingSettings";
+import { LlmSettings } from "./LlmSettings";
+import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 
 const PosHighlightPreview = dynamic(() => import("./PosHighlightPreview"), {
   ssr: false,
@@ -78,11 +80,16 @@ interface SettingsModalProps {
   lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity }>;
   onLintingRuleConfigChange?: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
   onLintingRuleConfigsBatchChange?: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
+  // LLM settings
+  llmEnabled?: boolean;
+  onLlmEnabledChange?: (value: boolean) => void;
+  llmModelId?: string;
+  onLlmModelIdChange?: (modelId: string) => void;
   /** Open modal on a specific tab */
   initialCategory?: SettingsCategory;
 }
 
-export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "about";
+export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "llm" | "about";
 
 const SCROLL_BEHAVIORS = [
   {
@@ -136,6 +143,10 @@ export default function SettingsModal({
   lintingRuleConfigs = {},
   onLintingRuleConfigChange,
   onLintingRuleConfigsBatchChange,
+  llmEnabled,
+  onLlmEnabledChange,
+  llmModelId,
+  onLlmModelIdChange,
   initialCategory,
 }: SettingsModalProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(initialCategory ?? "editor");
@@ -273,6 +284,18 @@ export default function SettingsModal({
                 )}
               >
                 校正
+              </button>
+              <button
+                onClick={() => setActiveCategory("llm")}
+                className={clsx(
+                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
+                  activeCategory === "llm"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                )}
+              >
+                <Sparkles className="w-4 h-4" />
+                AI校正
               </button>
               <div className="my-2 border-t border-border" />
               <button
@@ -617,6 +640,17 @@ export default function SettingsModal({
                 lintingRuleConfigs={lintingRuleConfigs}
                 onLintingRuleConfigChange={(id, cfg) => onLintingRuleConfigChange?.(id, cfg)}
                 onLintingRuleConfigsBatchChange={(cfgs) => onLintingRuleConfigsBatchChange?.(cfgs)}
+                llmEnabled={llmEnabled}
+              />
+            )}
+
+            {/* LLM section */}
+            {activeCategory === "llm" && (
+              <LlmSettings
+                llmEnabled={llmEnabled ?? false}
+                onLlmEnabledChange={onLlmEnabledChange}
+                llmModelId={llmModelId ?? DEFAULT_MODEL_ID}
+                onLlmModelIdChange={onLlmModelIdChange}
               />
             )}
 

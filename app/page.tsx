@@ -79,6 +79,7 @@ export default function EditorPage() {
     posHighlightEnabled, posHighlightColors, verticalScrollBehavior,
     scrollSensitivity, compactMode, showSettingsModal,
     lintingEnabled, lintingRuleConfigs,
+    llmEnabled, llmModelId,
   } = settings;
   const {
     handleFontScaleChange, handleLineHeightChange, handleParagraphSpacingChange,
@@ -89,6 +90,7 @@ export default function EditorPage() {
     handleScrollSensitivityChange, handleToggleCompactMode, setShowSettingsModal,
     handleLintingEnabledChange, handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
+    handleLlmEnabledChange, handleLlmModelIdChange,
   } = settingsHandlers;
 
   const tabManager = useTabManager({ skipAutoRestore, autoSave });
@@ -446,6 +448,7 @@ export default function EditorPage() {
     lintingEnabled,
     lintingRuleConfigs,
     editorViewInstance,
+    llmEnabled,
   );
 
   // Enrich lint issues with original text from the document
@@ -859,6 +862,10 @@ export default function EditorPage() {
           lintingRuleConfigs={lintingRuleConfigs}
           onLintingRuleConfigChange={handleLintingRuleConfigChange}
           onLintingRuleConfigsBatchChange={handleLintingRuleConfigsBatchChange}
+          llmEnabled={llmEnabled}
+          onLlmEnabledChange={handleLlmEnabledChange}
+          llmModelId={llmModelId}
+          onLlmModelIdChange={handleLlmModelIdChange}
           initialCategory={settingsInitialCategory}
         />
 

@@ -78,6 +78,10 @@ export interface AppState {
   lintingEnabled?: boolean;
   lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity }>;
 
+  // LLM設定
+  llmEnabled?: boolean;
+  llmModelId?: string;
+
   // タブの永続化
   openTabs?: TabPersistenceState;
 }

@@ -7,6 +7,7 @@ import type { EditorView } from '@milkdown/prose/view';
 import { $prose } from '@milkdown/utils';
 import type { RuleRunner, LintIssue } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
+import type { ILlmClient } from '@/lib/llm-client/types';
 import { createLintingPlugin, lintingKey } from './decoration-plugin';
 
 // Export the plugin key for external use
@@ -61,6 +62,8 @@ export function updateLintingSettings(
     enabled?: boolean;
     ruleRunner?: RuleRunner | null;
     nlpClient?: INlpClient | null;
+    llmClient?: ILlmClient | null;
+    llmEnabled?: boolean;
     forceFullScan?: boolean;
   }
 ): void {

@@ -13,6 +13,7 @@ import type { EditorView } from '@milkdown/prose/view';
 import type { RuleRunner, LintIssue, Severity } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
 import type { Token } from '@/lib/nlp-client/types';
+import type { ILlmClient } from '@/lib/llm-client/types';
 import { LRUCache } from '@/lib/utils/lru-cache';
 import type { LintingPluginState, LintingPluginOptions } from './types';
 
@@ -213,6 +214,15 @@ export function createLintingPlugin(
   // When true, the next scheduleViewportUpdate will scan ALL paragraphs (not just visible)
   let pendingFullScan = false;
 
+  // L3 (LLM) state
+  let currentLlmClient: ILlmClient | null = options.llmClient ?? null;
+  let llmEnabled = options.llmEnabled ?? false;
+  let llmAbortController: AbortController | null = null;
+  let llmIssueCache: Map<number, LintIssue[]> | null = null;
+  let llmDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const LLM_DEBOUNCE_MS = 8000;
+  let llmInFlight = false;
+
   return new Plugin<LintingPluginState>({
     key: lintingKey,
 
@@ -226,7 +236,7 @@ export function createLintingPlugin(
 
       apply(tr, pluginState): LintingPluginState {
         // Update settings via meta
-        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null; nlpClient?: INlpClient | null; forceFullScan?: boolean }> | undefined;
+        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null; nlpClient?: INlpClient | null; llmClient?: ILlmClient | null; llmEnabled?: boolean; forceFullScan?: boolean }> | undefined;
         if (meta) {
           // If decorations are included, apply directly
           if (meta.decorations !== undefined) {
@@ -247,6 +257,24 @@ export function createLintingPlugin(
             issueCache.clear();
             tokenCache.clear();
             documentIssueCache = null;
+          }
+          // Update llmClient reference if provided
+          if ('llmClient' in meta) {
+            currentLlmClient = meta.llmClient ?? null;
+          }
+          // Update llmEnabled flag if provided
+          if ('llmEnabled' in meta) {
+            const wasEnabled = llmEnabled;
+            llmEnabled = meta.llmEnabled ?? false;
+
+            if (wasEnabled && !llmEnabled) {
+              // L3 just disabled — cancel everything and unload
+              if (llmAbortController) llmAbortController.abort();
+              if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
+              llmIssueCache = null;
+              llmInFlight = false;
+              currentLlmClient?.unloadModel().catch(console.error);
+            }
           }
           // Force full scan flag
           if (meta.forceFullScan) {
@@ -451,7 +479,155 @@ export function createLintingPlugin(
           // Notify parent of all issues
           onIssuesUpdated?.(allIssues);
 
+          // Schedule L3 (LLM) linting with longer debounce
+          scheduleLlmUpdate(view, allParagraphs);
+
         }, debounceMs);
+      }
+
+      /**
+       * Schedule L3 (LLM) linting with a long debounce.
+       * L3 results are merged with existing L1/L2 decorations when they arrive.
+       */
+      function scheduleLlmUpdate(
+        view: EditorView,
+        allParagraphs: ParagraphInfo[],
+      ): void {
+        if (!llmEnabled || !currentLlmClient || !currentRuleRunner?.hasLlmRules()) return;
+        if (llmInFlight) return;
+
+        if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
+
+        llmDebounceTimer = setTimeout(async () => {
+          const version = processingVersion;
+          llmInFlight = true;
+
+          if (llmAbortController) llmAbortController.abort();
+          llmAbortController = new AbortController();
+
+          try {
+            // Build sentences from paragraphs with document-absolute positions
+            const sentences: Array<{ text: string; from: number; to: number }> = [];
+            for (const para of allParagraphs) {
+              if (para.text.trim().length === 0) continue;
+              // +1 to skip the paragraph node open token
+              const from = para.pos + 1;
+              const to = from + para.text.length;
+              sentences.push({ text: para.text, from, to });
+            }
+
+            if (sentences.length === 0) return;
+
+            const issues = await currentRuleRunner!.runLlmRules(
+              sentences,
+              currentLlmClient!,
+              llmAbortController!.signal,
+            );
+
+            // Staleness check
+            if (processingVersion !== version) return;
+
+            // Group issues by paragraph index
+            llmIssueCache = new Map();
+            for (const issue of issues) {
+              // Find which paragraph this issue belongs to
+              for (let i = 0; i < allParagraphs.length; i++) {
+                const para = allParagraphs[i];
+                const paraFrom = para.pos + 1;
+                const paraTo = paraFrom + para.text.length;
+                if (issue.from >= paraFrom && issue.to <= paraTo) {
+                  const existing = llmIssueCache.get(i) ?? [];
+                  existing.push(issue);
+                  llmIssueCache.set(i, existing);
+                  break;
+                }
+              }
+            }
+
+            // Rebuild decorations with L3 issues merged in
+            rebuildDecorationsWithLlm(view, allParagraphs);
+          } catch (error) {
+            if ((error as Error).name !== "AbortError") {
+              console.error("L3 linting failed:", error);
+            }
+          } finally {
+            llmInFlight = false;
+          }
+        }, LLM_DEBOUNCE_MS);
+      }
+
+      /**
+       * Rebuild decorations merging L1/L2 cached issues + L3 (LLM) cached issues.
+       * Called when L3 results arrive asynchronously after L1/L2 decorations are already shown.
+       */
+      function rebuildDecorationsWithLlm(
+        view: EditorView,
+        allParagraphs: ParagraphInfo[],
+      ): void {
+        const allDecorations: Decoration[] = [];
+        const allIssues: LintIssue[] = [];
+
+        for (let i = 0; i < allParagraphs.length; i++) {
+          const paragraph = allParagraphs[i];
+
+          // L1/L2 per-paragraph issues from cache
+          const perParagraphIssues = issueCache.get(paragraph.text);
+          // L1/L2 document-level issues for this paragraph
+          const docLevelIssues = documentIssueCache?.get(paragraph.index);
+
+          // Combine L1/L2 sources
+          const combinedIssues: LintIssue[] = [];
+          if (perParagraphIssues) {
+            combinedIssues.push(...perParagraphIssues);
+          }
+          if (docLevelIssues) {
+            combinedIssues.push(...docLevelIssues);
+          }
+
+          // L1/L2 issues (paragraph-relative positions)
+          for (const issue of combinedIssues) {
+            const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
+            const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
+            const from = paragraph.pos + 1 + issue.from + extraFrom;
+            const to = paragraph.pos + 1 + issue.to + extraTo;
+
+            allDecorations.push(
+              Decoration.inline(from, to, {
+                class: severityToClass(issue.severity),
+                'data-lint-issue': JSON.stringify({ ...issue, from, to }),
+              })
+            );
+
+            allIssues.push({ ...issue, from, to });
+          }
+
+          // L3 issues from LLM cache (already have absolute positions)
+          const llmIssues = llmIssueCache?.get(i);
+          if (llmIssues) {
+            for (const issue of llmIssues) {
+              if (issue.from < issue.to) {
+                allDecorations.push(
+                  Decoration.inline(issue.from, issue.to, {
+                    class: severityToClass(issue.severity),
+                    'data-lint-issue': JSON.stringify(issue),
+                  })
+                );
+
+                allIssues.push(issue);
+              }
+            }
+          }
+        }
+
+        // Apply decorations
+        const decorations = allDecorations.length > 0
+          ? DecorationSet.create(view.state.doc, allDecorations)
+          : DecorationSet.empty;
+        const tr = view.state.tr.setMeta(lintingKey, { decorations });
+        view.dispatch(tr);
+
+        // Notify parent of all issues
+        onIssuesUpdated?.(allIssues);
       }
 
       return {
@@ -480,10 +656,14 @@ export function createLintingPlugin(
         destroy() {
           if (debounceTimer) clearTimeout(debounceTimer);
           if (scrollTimer) clearTimeout(scrollTimer);
+          if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
+          if (llmAbortController) llmAbortController.abort();
           scrollContainer.removeEventListener('scroll', handleScroll);
           issueCache.clear();
           tokenCache.clear();
           documentIssueCache = null;
+          llmIssueCache = null;
+          llmInFlight = false;
         },
       };
     },
