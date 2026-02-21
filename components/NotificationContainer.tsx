@@ -5,12 +5,13 @@ import { notificationManager } from '@/lib/notification-manager';
 import { Notification } from './Notification';
 import type { NotificationItem } from '@/types/notification';
 
+const MAX_VISIBLE = 5;
+
 export function NotificationContainer() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
-   useEffect(() => {
-     // 通知更新を購読
-     const unsubscribe = notificationManager.subscribe((newNotifications) => {
+  useEffect(() => {
+    const unsubscribe = notificationManager.subscribe((newNotifications) => {
       setNotifications(newNotifications);
     });
 
@@ -23,16 +24,14 @@ export function NotificationContainer() {
     return null;
   }
 
+  // Show only the latest MAX_VISIBLE notifications
+  const visible = notifications.slice(-MAX_VISIBLE);
+
   return (
-    <div
-      className="fixed top-4 right-4 z-50 flex flex-col items-end"
-      style={{ pointerEvents: 'none' }}
-    >
-      <div style={{ pointerEvents: 'auto' }}>
-        {notifications.map((notification) => (
-          <Notification key={notification.id} notification={notification} />
-        ))}
-      </div>
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+      {visible.map((notification) => (
+        <Notification key={notification.id} notification={notification} />
+      ))}
     </div>
   );
 }
