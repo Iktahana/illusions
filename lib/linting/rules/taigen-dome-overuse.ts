@@ -83,9 +83,9 @@ function isTaigenDome(
   // Find last meaningful token (skip 記号 and whitespace-only surfaces)
   const lastMeaningful = [...sentenceTokens]
     .reverse()
-    .find((t) => t.pos !== "\u8A18\u53F7" && t.surface.trim().length > 0); // 記号
+    .find((t) => t.pos !== "記号" && t.surface.trim().length > 0);
 
-  return lastMeaningful?.pos === "\u540D\u8A5E"; // 名詞
+  return lastMeaningful?.pos === "名詞";
 }
 
 // ---------------------------------------------------------------------------

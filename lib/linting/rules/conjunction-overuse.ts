@@ -127,7 +127,7 @@ export class ConjunctionOveruseRule extends AbstractMorphologicalLintRule {
         (t) => t.surface.trim().length > 0,
       );
 
-      const startsWithConjunction = firstToken?.pos === "\u63A5\u7D9A\u8A5E"; // 接続詞
+      const startsWithConjunction = firstToken?.pos === "接続詞";
 
       if (startsWithConjunction) {
         if (runLength === 0) {

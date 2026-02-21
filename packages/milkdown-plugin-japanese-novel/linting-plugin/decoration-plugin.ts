@@ -347,8 +347,8 @@ export function createLintingPlugin(
                   try {
                     tokens = await nlp.tokenizeParagraph(paragraph.text);
                     tokenCache.set(paragraph.text, tokens);
-                  } catch {
-                    // Fallback to empty tokens if tokenization fails
+                  } catch (err) {
+                    console.warn('[Linting] Tokenization failed, falling back to empty tokens:', err);
                     tokens = [];
                   }
                 }

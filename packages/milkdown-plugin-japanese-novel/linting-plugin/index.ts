@@ -3,11 +3,11 @@
  * リンティングプラグイン - エントリーポイント
  */
 
-import { $prose } from '@milkdown/utils';
-import { createLintingPlugin, lintingKey } from './decoration-plugin';
 import type { EditorView } from '@milkdown/prose/view';
+import { $prose } from '@milkdown/utils';
 import type { RuleRunner, LintIssue } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
+import { createLintingPlugin, lintingKey } from './decoration-plugin';
 
 // Export the plugin key for external use
 export { lintingKey } from './decoration-plugin';

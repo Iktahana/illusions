@@ -1,7 +1,7 @@
-import { AbstractMorphologicalLintRule } from "../base-rule";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 import type { Token } from "@/lib/nlp-client/types";
+import { AbstractMorphologicalLintRule } from "../base-rule";
 import { COUNTER_MISMATCHES } from "../data/counter-words";
+import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
