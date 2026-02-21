@@ -53,6 +53,7 @@ class NotificationManager {
       type,
       message,
       duration,
+      actions: options.actions,
     };
 
     this.notifications.push(notification);
@@ -150,6 +151,13 @@ class NotificationManager {
    */
   error(message: string, duration?: number): string {
     return this.showMessage(message, { type: 'error', duration });
+  }
+
+  /**
+   * ショートカット：成功メッセージを表示
+   */
+  success(message: string, duration?: number): string {
+    return this.showMessage(message, { type: 'success', duration });
   }
 }
 

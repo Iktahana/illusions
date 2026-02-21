@@ -1,104 +1,101 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { NotificationItem } from '@/types/notification';
 import { notificationManager } from '@/lib/notification-manager';
-import { 
-  AlertCircle, 
-  AlertTriangle, 
-  Info, 
-  X 
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle,
+  Info,
+  X,
 } from 'lucide-react';
 
 interface NotificationProps {
   notification: NotificationItem;
 }
 
+const iconConfig = {
+  info: { icon: Info, colorClass: 'text-info' },
+  warning: { icon: AlertTriangle, colorClass: 'text-warning' },
+  error: { icon: AlertCircle, colorClass: 'text-error' },
+  success: { icon: CheckCircle, colorClass: 'text-success' },
+} as const;
+
 export function Notification({ notification }: NotificationProps) {
   const [isClosing, setIsClosing] = useState(false);
   const hasProgress = 'progress' in notification;
   const progress = hasProgress ? notification.progress ?? 0 : undefined;
+  const actions = notification.actions?.slice(0, 3);
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     setIsClosing(true);
     setTimeout(() => {
       notificationManager.dismiss(notification.id);
-       }, 300); // アニメーション完了を待つ
+    }, 200); // match slide-out duration
   };
 
-  // アイコンと色の設定
-  const config = {
-    info: {
-      icon: Info,
-      bgColor: 'bg-blue-500',
-      borderColor: 'border-blue-500',
-      textColor: 'text-blue-500',
-    },
-    warning: {
-      icon: AlertTriangle,
-      bgColor: 'bg-yellow-500',
-      borderColor: 'border-yellow-500',
-      textColor: 'text-yellow-500',
-    },
-    error: {
-      icon: AlertCircle,
-      bgColor: 'bg-red-500',
-      borderColor: 'border-red-500',
-      textColor: 'text-red-500',
-    },
+  const handleAction = (onClick: () => void): void => {
+    onClick();
+    handleClose();
   };
 
-  const { icon: Icon, bgColor, borderColor, textColor } = config[notification.type];
+  const { icon: Icon, colorClass } = iconConfig[notification.type];
 
   return (
     <div
       className={`
-        relative flex items-start gap-3 p-4 mb-2 rounded-lg border-l-4 
-        bg-white dark:bg-gray-800 shadow-lg
-        ${borderColor}
-        transition-all duration-300 ease-in-out
-        ${isClosing ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}
+        relative flex flex-col rounded-md border
+        bg-background-elevated border-border shadow-lg
+        ${isClosing ? 'animate-notification-out' : 'animate-notification-in'}
       `}
-      style={{
-        minWidth: '320px',
-        maxWidth: '500px',
-      }}
+      style={{ width: 340 }}
     >
-      {/* アイコン */}
-      <div className={`flex-shrink-0 ${textColor}`}>
-        <Icon size={20} />
-      </div>
+      {/* Top row: icon + message + close */}
+      <div className="flex items-start gap-2.5 p-3">
+        <div className={`flex-shrink-0 mt-0.5 ${colorClass}`}>
+          <Icon size={18} />
+        </div>
 
-      {/* 内容 */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-gray-900 dark:text-gray-100 break-words">
+        <p className="flex-1 min-w-0 text-sm text-foreground break-words leading-snug">
           {notification.message}
         </p>
 
-         {/* プログレスバー */}
-         {hasProgress && typeof progress === 'number' && (
-          <div className="mt-2">
-            <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className={`h-full ${bgColor} transition-all duration-300 ease-out`}
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {Math.round(progress)}%
-            </p>
-          </div>
-        )}
+        <button
+          onClick={handleClose}
+          className="flex-shrink-0 text-foreground-muted hover:text-foreground transition-colors"
+          aria-label="閉じる"
+        >
+          <X size={14} />
+        </button>
       </div>
 
-       {/* クローズボタン */}
-       <button
-         onClick={handleClose}
-         className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-         aria-label="閉じる"
-      >
-        <X size={16} />
-      </button>
+      {/* Action buttons */}
+      {actions && actions.length > 0 && (
+        <div className="flex gap-3 px-3 pb-2.5 pl-[38px]">
+          {actions.map((action) => (
+            <button
+              key={action.label}
+              onClick={() => handleAction(action.onClick)}
+              className="text-xs font-medium text-accent hover:text-accent-hover transition-colors"
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Progress bar */}
+      {hasProgress && typeof progress === 'number' && (
+        <div className="px-3 pb-2.5">
+          <div className="w-full h-1 bg-border rounded-full overflow-hidden">
+            <div
+              className={`h-full ${colorClass.replace('text-', 'bg-')} transition-all duration-300 ease-out`}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
