@@ -65,7 +65,7 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
     nameJa: "文体",
     rules: ["redundant-expression", "verbose-expression", "sentence-ending-repetition", "sentence-length", "desu-masu-consistency", "conjunction-overuse", "word-repetition", "taigen-dome-overuse"],
   },
-  { id: "ai", nameJa: "AI校正", rules: ["homophone-detection"] },
+  { id: "ai", nameJa: "AI機能", rules: ["homophone-detection"] },
 ];
 
 /** Default configs per rule (matching each rule's defaultConfig) */

@@ -252,7 +252,7 @@ export default function LintingSettings({
                           "flex items-center gap-2 px-3 py-2",
                           aiDisabled && "opacity-50",
                         )}
-                        title={aiDisabled ? "AI校正を有効にしてください" : undefined}
+                        title={aiDisabled ? "AI機能を有効にしてください" : undefined}
                       >
                         {/* Rule name */}
                         <div className="flex-1 min-w-0">

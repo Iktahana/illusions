@@ -172,7 +172,7 @@ export function LlmSettings({
     return (
       <div className="space-y-6">
         <div>
-          <h3 className="text-sm font-medium text-foreground">AI校正</h3>
+          <h3 className="text-sm font-medium text-foreground">AI機能</h3>
           <p className="text-xs text-foreground-tertiary mt-0.5">
             読み込み中...
           </p>
@@ -192,7 +192,7 @@ export function LlmSettings({
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h3 className="text-sm font-medium text-foreground">AI校正</h3>
+        <h3 className="text-sm font-medium text-foreground">AI機能</h3>
         <p className="text-xs text-foreground-tertiary mt-0.5">
           ローカルLLMを使用した高度な校正機能です。
         </p>
@@ -218,7 +218,7 @@ export function LlmSettings({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-medium text-foreground">
-              AI校正を有効にする
+              AI機能を有効にする
             </h3>
             <p className="text-xs text-foreground-tertiary mt-0.5">
               有効にすると、選択したモデルがメモリに読み込まれます。無効にすると、モデルはメモリから解放されます。
@@ -273,7 +273,7 @@ export function LlmSettings({
           </select>
           {llmEnabled && (
             <p className="text-xs text-foreground-tertiary mt-1">
-              モデルを変更するにはAI校正を無効にしてください
+              モデルを変更するにはAI機能を無効にしてください
             </p>
           )}
         </div>

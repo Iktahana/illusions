@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, ExternalLink, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
+import { X, ExternalLink, ChevronDown, ChevronRight, Sparkles, Settings, Columns2, Highlighter, SpellCheck } from "lucide-react";
 import type { Severity } from "@/lib/linting/types";
 import dynamic from "next/dynamic";
 
@@ -244,45 +244,49 @@ export default function SettingsModal({
               <button
                 onClick={() => setActiveCategory("editor")}
                 className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
                   activeCategory === "editor"
                     ? "bg-accent text-accent-foreground"
                     : "text-foreground-secondary hover:bg-hover hover:text-foreground"
                 )}
               >
+                <Settings className="w-4 h-4" />
                 エディタ
               </button>
               <button
                 onClick={() => setActiveCategory("vertical")}
                 className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
                   activeCategory === "vertical"
                     ? "bg-accent text-accent-foreground"
                     : "text-foreground-secondary hover:bg-hover hover:text-foreground"
                 )}
               >
+                <Columns2 className="w-4 h-4" />
                 縦書き
               </button>
               <button
                 onClick={() => setActiveCategory("pos-highlight")}
                 className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
                   activeCategory === "pos-highlight"
                     ? "bg-accent text-accent-foreground"
                     : "text-foreground-secondary hover:bg-hover hover:text-foreground"
                 )}
               >
+                <Highlighter className="w-4 h-4" />
                 品詞ハイライト
               </button>
               <button
                 onClick={() => setActiveCategory("linting")}
                 className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
                   activeCategory === "linting"
                     ? "bg-accent text-accent-foreground"
                     : "text-foreground-secondary hover:bg-hover hover:text-foreground"
                 )}
               >
+                <SpellCheck className="w-4 h-4" />
                 校正
               </button>
               <button
@@ -295,7 +299,7 @@ export default function SettingsModal({
                 )}
               >
                 <Sparkles className="w-4 h-4" />
-                AI校正
+                AI機能
               </button>
               <div className="my-2 border-t border-border" />
               <button
