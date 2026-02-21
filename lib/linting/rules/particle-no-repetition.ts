@@ -1,4 +1,5 @@
 import { AbstractLintRule } from "../base-rule";
+import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -9,12 +10,6 @@ import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 const STYLE_GUIDE_REF: LintReference = {
   standard: "日本語スタイルガイド",
 };
-
-/**
- * Sentence delimiter pattern.
- * Splits on Japanese/ASCII sentence-ending punctuation and newlines.
- */
-const SENTENCE_DELIMITER = /[。！？!?\n]/;
 
 /**
  * Words that contain の but are NOT particle usage.
@@ -48,45 +43,6 @@ const EXCEPTION_PATTERN = buildExceptionPattern();
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Represents a sentence extracted from the source text,
- * along with its character offset in the original text.
- */
-interface SentenceSpan {
-  /** The sentence text (excluding delimiter) */
-  text: string;
-  /** Start offset in the original text */
-  from: number;
-  /** End offset in the original text (exclusive) */
-  to: number;
-}
-
-/**
- * Split the input text into sentences based on sentence delimiters.
- * Tracks the character offset of each sentence within the original text.
- */
-function splitIntoSentences(text: string): SentenceSpan[] {
-  const sentences: SentenceSpan[] = [];
-  let offset = 0;
-  const parts = text.split(SENTENCE_DELIMITER);
-
-  for (const part of parts) {
-    const trimmed = part;
-    if (trimmed.length > 0) {
-      sentences.push({
-        text: trimmed,
-        from: offset,
-        to: offset + trimmed.length,
-      });
-    }
-    // Advance offset past the sentence text + 1 for the delimiter character
-    // (or just past the text if this is the last segment with no delimiter)
-    offset += part.length + 1;
-  }
-
-  return sentences;
-}
 
 /**
  * Count the number of particle の occurrences in a sentence.

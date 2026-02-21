@@ -1,4 +1,7 @@
 import { AbstractLintRule } from "../base-rule";
+import { maskDialogue } from "../helpers/dialogue-mask";
+import type { SentenceSpan } from "../helpers/sentence-splitter";
+import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -343,76 +346,6 @@ const CORRELATIVE_PATTERNS: ReadonlyArray<CorrelativePattern> = [
 // ---------------------------------------------------------------------------
 
 /**
- * Represents a sentence extracted from source text,
- * along with its character offsets.
- */
-interface SentenceSpan {
-  /** The sentence text (excluding the delimiter) */
-  readonly text: string;
-  /** Start offset in the original text (inclusive) */
-  readonly from: number;
-  /** End offset in the original text (exclusive) */
-  readonly to: number;
-}
-
-/** Sentence delimiter pattern: 。, ！, ？, !, ?, and newlines */
-const SENTENCE_DELIMITER = /[。！？!?\n]/;
-
-/**
- * Split the input text into sentences based on sentence delimiters.
- * Tracks the character offset of each sentence within the original text.
- */
-function splitIntoSentences(text: string): SentenceSpan[] {
-  const sentences: SentenceSpan[] = [];
-  let offset = 0;
-  const parts = text.split(SENTENCE_DELIMITER);
-
-  for (const part of parts) {
-    if (part.length > 0) {
-      sentences.push({
-        text: part,
-        from: offset,
-        to: offset + part.length,
-      });
-    }
-    // Advance offset past the sentence text + 1 for the delimiter character
-    offset += part.length + 1;
-  }
-
-  return sentences;
-}
-
-/**
- * Strip quoted text (「…」) from a sentence for ending analysis.
- *
- * When a sentence contains quoted dialogue, the quote's ending should
- * not be treated as the sentence ending. For example:
- *   彼は「決して負けない」と言った。
- * The sentence ending is "言った", not "ない".
- *
- * This function replaces all 「…」 ranges with placeholder characters
- * (〇) of the same length, preserving character offsets.
- */
-function maskQuotedText(sentence: string): string {
-  let result = "";
-  let depth = 0;
-  for (const ch of sentence) {
-    if (ch === "「") {
-      depth++;
-      result += "〇";
-    } else if (ch === "」") {
-      if (depth > 0) depth--;
-      result += "〇";
-    } else if (depth > 0) {
-      result += "〇";
-    } else {
-      result += ch;
-    }
-  }
-  return result;
-}
-
-/**
  * Extract the effective ending of a sentence by stripping trailing
  * whitespace and common sentence-final particles/punctuation.
  *
@@ -502,7 +435,7 @@ export class CorrelativeExpressionRule extends AbstractLintRule {
     severity: LintIssue["severity"],
   ): LintIssue[] {
     const issues: LintIssue[] = [];
-    const masked = maskQuotedText(sentence.text);
+    const masked = maskDialogue(sentence.text);
     const ending = getEffectiveEnding(masked);
 
     // Skip very short sentences (unlikely to have meaningful correlative pairs)

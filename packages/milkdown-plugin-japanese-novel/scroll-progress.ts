@@ -34,17 +34,8 @@ export function getScrollProgress({ container, isVertical }: ScrollProgressOptio
     // scrollLeft = 0 is the end (100%)
     const maxScroll = container.scrollWidth - container.clientWidth;
     if (maxScroll <= 0) return 0;
-    
+
     const progress = 1 - (container.scrollLeft / maxScroll);
-    
-    // console.debug('[ScrollProgress] Get (vertical):', {
-    //   scrollLeft: container.scrollLeft,
-    //   maxScroll,
-    //   progress,
-    //   scrollWidth: container.scrollWidth,
-    //   clientWidth: container.clientWidth
-    // });
-    
     return progress;
   } else {
     // Horizontal writing mode: uses scrollTop (vertical scrollbar)
@@ -52,17 +43,8 @@ export function getScrollProgress({ container, isVertical }: ScrollProgressOptio
     // scrollTop = maxScroll is the end (100%)
     const maxScroll = container.scrollHeight - container.clientHeight;
     if (maxScroll <= 0) return 0;
-    
+
     const progress = container.scrollTop / maxScroll;
-    
-    // console.debug('[ScrollProgress] Get (horizontal):', {
-    //   scrollTop: container.scrollTop,
-    //   maxScroll,
-    //   progress,
-    //   scrollHeight: container.scrollHeight,
-    //   clientHeight: container.clientHeight
-    // });
-    
     return progress;
   }
 }
@@ -85,32 +67,16 @@ export function setScrollProgress(
 ): boolean {
   // Clamp progress value to the 0-1 range
   const clampedProgress = Math.max(0, Math.min(1, progress));
-  
+
   if (isVertical) {
     // Vertical writing mode: uses scrollLeft
     // progress = 0% -> scrollLeft = maxScroll (beginning/right)
     // progress = 100% -> scrollLeft = 0 (end/left)
     const maxScroll = container.scrollWidth - container.clientWidth;
     if (maxScroll <= 0) return false;
-    
+
     const newScrollLeft = (1 - clampedProgress) * maxScroll;
-    
-    // console.debug('[ScrollProgress] Set (vertical):', {
-    //   progress: clampedProgress,
-    //   maxScroll,
-    //   newScrollLeft,
-    //   beforeScrollLeft: container.scrollLeft,
-    //   scrollWidth: container.scrollWidth,
-    //   clientWidth: container.clientWidth
-    // });
-    
     container.scrollLeft = newScrollLeft;
-    
-    // console.debug('[ScrollProgress] After set (vertical):', {
-    //   scrollLeft: container.scrollLeft,
-    //   actualProgress: 1 - (container.scrollLeft / maxScroll)
-    // });
-    
     return true;
   } else {
     // Horizontal writing mode: uses scrollTop
@@ -118,25 +84,9 @@ export function setScrollProgress(
     // progress = 100% -> scrollTop = maxScroll (end/bottom)
     const maxScroll = container.scrollHeight - container.clientHeight;
     if (maxScroll <= 0) return false;
-    
+
     const newScrollTop = clampedProgress * maxScroll;
-    
-    // console.debug('[ScrollProgress] Set (horizontal):', {
-    //   progress: clampedProgress,
-    //   maxScroll,
-    //   newScrollTop,
-    //   beforeScrollTop: container.scrollTop,
-    //   scrollHeight: container.scrollHeight,
-    //   clientHeight: container.clientHeight
-    // });
-    
     container.scrollTop = newScrollTop;
-    
-    // console.debug('[ScrollProgress] After set (horizontal):', {
-    //   scrollTop: container.scrollTop,
-    //   actualProgress: container.scrollTop / maxScroll
-    // });
-    
     return true;
   }
 }
@@ -189,7 +139,6 @@ export function hasScrollbar({ container, isVertical }: ScrollProgressOptions): 
  * @returns Whether the operation succeeded
  */
 export function scrollToStart({ container, isVertical }: ScrollProgressOptions): boolean {
-  // console.debug('[ScrollProgress] Scroll to start');
   return setScrollProgress({ container, isVertical }, 0);
 }
 
@@ -201,7 +150,6 @@ export function scrollToStart({ container, isVertical }: ScrollProgressOptions):
  * @returns Whether the operation succeeded
  */
 export function scrollToEnd({ container, isVertical }: ScrollProgressOptions): boolean {
-  // console.debug('[ScrollProgress] Scroll to end');
   return setScrollProgress({ container, isVertical }, 1);
 }
 
@@ -223,12 +171,5 @@ export function scrollByPercent(
 ): boolean {
   const currentProgress = getScrollProgress({ container, isVertical });
   const newProgress = currentProgress + delta;
-  
-  // console.debug('[ScrollProgress] Scroll by percent:', {
-  //   currentProgress,
-  //   delta,
-  //   newProgress
-  // });
-  
   return setScrollProgress({ container, isVertical }, newProgress);
 }

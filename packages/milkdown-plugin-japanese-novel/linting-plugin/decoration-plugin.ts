@@ -13,6 +13,7 @@ import type { EditorView } from '@milkdown/prose/view';
 import type { RuleRunner, LintIssue, Severity } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
 import type { Token } from '@/lib/nlp-client/types';
+import { LRUCache } from '@/lib/utils/lru-cache';
 import type { LintingPluginState, LintingPluginOptions } from './types';
 
 export const lintingKey = new PluginKey<LintingPluginState>('linting');
@@ -198,11 +199,12 @@ export function createLintingPlugin(
 
   // Lint result cache: paragraph text -> LintIssue[]
   // Minimizes rule execution and prevents flicker on scroll
-  const issueCache = new Map<string, LintIssue[]>();
+  // LRU-bounded to prevent unbounded memory growth in long editing sessions
+  const issueCache = new LRUCache<string, LintIssue[]>(200);
 
   // Token cache: paragraph text -> Token[]
   // Caches kuromoji tokenization results for L2 rules
-  const tokenCache = new Map<string, Token[]>();
+  const tokenCache = new LRUCache<string, Token[]>(200);
 
   // Document-level rule cache: paragraph index -> LintIssue[]
   // Invalidated on every update since document-level rules depend on all paragraphs

@@ -1,5 +1,7 @@
 import type { Token } from "@/lib/nlp-client/types";
 import { AbstractMorphologicalLintRule } from "../base-rule";
+import type { SentenceSpan } from "../helpers/sentence-splitter";
+import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -11,9 +13,6 @@ const STYLE_GUIDE_REF: LintReference = {
   standard: "日本語スタイルガイド",
 };
 
-/** Sentence-ending delimiter pattern */
-const SENTENCE_DELIMITER = /[。！？!?\n]/;
-
 /** POS categories considered as content words */
 const CONTENT_POS = new Set(["名詞", "動詞", "形容詞", "副詞"]);
 
@@ -24,46 +23,12 @@ const EXCLUDED_POS_DETAIL = new Set(["非自立", "接尾", "数"]);
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** A sentence with its text range in the source */
-interface SentenceRange {
-  /** Start offset in the original text (inclusive) */
-  from: number;
-  /** End offset in the original text (exclusive) */
-  to: number;
-}
-
 /** A content word extracted from a sentence */
 interface ContentWord {
   /** Normalized basic form */
   basicForm: string;
   /** Original token (for position info) */
   token: Token;
-}
-
-/**
- * Split text into sentence ranges by delimiter characters.
- * Each range represents the text between delimiters.
- */
-function splitSentences(text: string): SentenceRange[] {
-  const sentences: SentenceRange[] = [];
-  let start = 0;
-
-  for (let i = 0; i < text.length; i++) {
-    if (SENTENCE_DELIMITER.test(text[i])) {
-      // Only add non-empty sentences
-      if (i > start) {
-        sentences.push({ from: start, to: i });
-      }
-      start = i + 1;
-    }
-  }
-
-  // Handle trailing text without a delimiter
-  if (start < text.length) {
-    sentences.push({ from: start, to: text.length });
-  }
-
-  return sentences;
 }
 
 /**
@@ -75,7 +40,7 @@ function splitSentences(text: string): SentenceRange[] {
  */
 function extractContentWords(
   tokens: ReadonlyArray<Token>,
-  sentence: SentenceRange,
+  sentence: SentenceSpan,
 ): ContentWord[] {
   const words: ContentWord[] = [];
 
@@ -159,7 +124,7 @@ export class WordRepetitionRule extends AbstractMorphologicalLintRule {
     const windowSize = (config.options?.windowSize as number) ?? 5;
 
     // Step 1: Split text into sentences
-    const sentences = splitSentences(text);
+    const sentences = splitIntoSentences(text);
     if (sentences.length === 0) return [];
 
     // Step 2: Extract content words per sentence

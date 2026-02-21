@@ -1,4 +1,6 @@
 import { AbstractLintRule } from "../base-rule";
+import { maskDialogue } from "../helpers/dialogue-mask";
+import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -9,117 +11,6 @@ import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 const STYLE_GUIDE_REF: LintReference = {
   standard: "日本語スタイルガイド",
 };
-
-/** Sentence-ending delimiters */
-const SENTENCE_DELIMITERS = /[。！？!?\n]/;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Represents a sentence extracted from source text,
- * along with its character offsets.
- */
-interface SentenceSpan {
-  /** Start offset in the original text (inclusive) */
-  from: number;
-  /** End offset in the original text (exclusive) */
-  to: number;
-  /** The raw sentence text (before masking) */
-  text: string;
-}
-
-/**
- * Split text into sentences by delimiter characters (。！？!?\n),
- * tracking the original character offsets of each sentence.
- *
- * Empty sentences (whitespace-only) are skipped.
- */
-function splitSentences(text: string): SentenceSpan[] {
-  const sentences: SentenceSpan[] = [];
-  let sentenceStart = 0;
-
-  for (let i = 0; i < text.length; i++) {
-    if (SENTENCE_DELIMITERS.test(text[i])) {
-      const content = text.slice(sentenceStart, i);
-
-      // Skip empty / whitespace-only segments
-      if (content.trim().length > 0) {
-        sentences.push({
-          from: sentenceStart,
-          to: i, // Exclude the delimiter itself from the span
-          text: content,
-        });
-      }
-
-      sentenceStart = i + 1;
-    }
-  }
-
-  // Handle trailing text without a delimiter
-  if (sentenceStart < text.length) {
-    const content = text.slice(sentenceStart);
-    if (content.trim().length > 0) {
-      sentences.push({
-        from: sentenceStart,
-        to: text.length,
-        text: content,
-      });
-    }
-  }
-
-  return sentences;
-}
-
-/**
- * Mask dialogue content inside bracket pairs so that dialogue characters
- * are not counted toward the sentence length.
- *
- * Handles nested brackets by tracking depth for each bracket type:
- * - `「…」` (corner brackets)
- * - `『…』` (double corner brackets)
- *
- * Characters inside dialogue are replaced with the placeholder `〇`
- * to preserve string length / offsets.
- */
-function maskDialogue(sentence: string): string {
-  const chars = Array.from(sentence);
-  let cornerDepth = 0; // 「」 depth
-  let doubleCornerDepth = 0; // 『』 depth
-
-  for (let i = 0; i < chars.length; i++) {
-    const ch = chars[i];
-
-    if (ch === "「") {
-      cornerDepth++;
-      chars[i] = "〇";
-      continue;
-    }
-    if (ch === "」") {
-      if (cornerDepth > 0) cornerDepth--;
-      chars[i] = "〇";
-      continue;
-    }
-    if (ch === "『") {
-      doubleCornerDepth++;
-      chars[i] = "〇";
-      continue;
-    }
-    if (ch === "』") {
-      if (doubleCornerDepth > 0) doubleCornerDepth--;
-      chars[i] = "〇";
-      continue;
-    }
-
-    // Inside any dialogue — mask the character
-    if (cornerDepth > 0 || doubleCornerDepth > 0) {
-      chars[i] = "〇";
-    }
-  }
-
-  return chars.join("");
-}
 
 // ---------------------------------------------------------------------------
 // Rule implementation
@@ -159,7 +50,7 @@ export class SentenceLengthRule extends AbstractLintRule {
     if (!text) return [];
 
     const maxLength = (config.options?.maxLength as number) ?? 100;
-    const sentences = splitSentences(text);
+    const sentences = splitIntoSentences(text);
     const issues: LintIssue[] = [];
 
     for (const sentence of sentences) {

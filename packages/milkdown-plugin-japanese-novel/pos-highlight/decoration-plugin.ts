@@ -11,6 +11,7 @@ import type { Node as ProseMirrorNode } from '@milkdown/prose/model';
 import type { EditorView } from '@milkdown/prose/view';
 import { getNlpClient } from '@/lib/nlp-client/nlp-client';
 import type { Token as NlpToken } from '@/lib/nlp-client/types';
+import { LRUCache } from '@/lib/utils/lru-cache';
 import { getPosColor, DEFAULT_POS_COLORS } from './pos-colors';
 import type { PosColorConfig } from './types';
 
@@ -194,7 +195,8 @@ export function createPosHighlightPlugin(
 
   // トークンキャッシュ: 段落テキスト → トークン配列
   // NLP の呼び出しを最小限にし、スクロール時のちらつきを防ぐ
-  const tokenCache = new Map<string, NlpToken[]>();
+  // LRU-bounded to prevent unbounded memory growth in long editing sessions
+  const tokenCache = new LRUCache<string, NlpToken[]>(200);
 
   return new Plugin<PosHighlightState>({
     key: posHighlightKey,
