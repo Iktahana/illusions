@@ -1,0 +1,53 @@
+name: Merged Branch Cleanup
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # Every day at 03:00 UTC (12:00 JST)
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete merged branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Fetching merged branches..."
+
+          # List remote branches merged into main, excluding protected branches
+          MERGED=$(gh api "repos/$REPO/branches?per_page=100" \
+            --jq '.[].name' \
+            | grep -vE '^(main|master|develop|release/.*)$' \
+            || true)
+
+          if [ -z "$MERGED" ]; then
+            echo "No candidate branches found."
+            exit 0
+          fi
+
+          DELETED=0
+          SKIPPED=0
+
+          for BRANCH in $MERGED; do
+            # Check if branch is merged into main
+            STATUS=$(gh api "repos/$REPO/compare/main...$BRANCH" \
+              --jq '.status' 2>/dev/null || echo "error")
+
+            if [ "$STATUS" = "behind" ] || [ "$STATUS" = "identical" ]; then
+              echo "Deleting merged branch: $BRANCH"
+              gh api -X DELETE "repos/$REPO/git/refs/heads/$BRANCH" 2>/dev/null && DELETED=$((DELETED + 1)) || true
+            else
+              SKIPPED=$((SKIPPED + 1))
+            fi
+          done
+
+          echo ""
+          echo "=== Summary ==="
+          echo "Deleted: $DELETED"
+          echo "Skipped: $SKIPPED"
