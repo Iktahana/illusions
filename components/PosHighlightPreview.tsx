@@ -49,7 +49,7 @@ function PreviewEditor({
       })
       .use(commonmark)
       .use(japaneseNovel({
-        isVertical: true,
+        isVertical: false,
         showManuscriptLine: false,
         enableRuby: true,
         enableTcy: true,

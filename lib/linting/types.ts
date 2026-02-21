@@ -1,3 +1,4 @@
+import type { ILlmClient } from "@/lib/llm-client/types";
 import type { Token } from "@/lib/nlp-client/types";
 
 export type Severity = "error" | "warning" | "info";
@@ -112,4 +113,32 @@ export function isMorphologicalDocumentLintRule(
   rule: LintRule,
 ): rule is MorphologicalDocumentLintRule {
   return "lintDocumentWithTokens" in rule;
+}
+
+/**
+ * LLM-based lint rule (L3).
+ * Uses a language model for contextual analysis.
+ * All LLM rules are async and accept an ILlmClient + AbortSignal.
+ */
+export interface LlmLintRule extends LintRule {
+  /**
+   * Lint sentences using an LLM for contextual analysis.
+   * @param sentences - Array of sentence objects with text and position info
+   * @param config - Rule configuration
+   * @param llmClient - LLM client for inference
+   * @param signal - AbortSignal for cancellation
+   */
+  lintWithLlm(
+    sentences: ReadonlyArray<{ text: string; from: number; to: number }>,
+    config: LintRuleConfig,
+    llmClient: ILlmClient,
+    signal?: AbortSignal,
+  ): Promise<LintIssue[]>;
+}
+
+/**
+ * Type guard for LLM-based lint rules
+ */
+export function isLlmLintRule(rule: LintRule): rule is LlmLintRule {
+  return "lintWithLlm" in rule;
 }

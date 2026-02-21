@@ -30,6 +30,11 @@ export const LINT_RULES_META: LintRuleMeta[] = [
   { id: "passive-overuse", nameJa: "受動態の多用検出", descriptionJa: "受動態が連続して使われている箇所を検出します" },
   { id: "counter-word-mismatch", nameJa: "助数詞の誤用検出", descriptionJa: "助数詞と数えられる対象の組み合わせの誤りを検出します" },
   { id: "adverb-form-consistency", nameJa: "副詞の漢字・ひらがな統一", descriptionJa: "副詞の漢字表記とひらがな表記の混在を検出します" },
+  {
+    id: "homophone-detection",
+    nameJa: "同音異義語の検出",
+    descriptionJa: "LLMによる文脈分析で、同音異義語の誤用を検出します",
+  },
 ];
 
 /** Category grouping for rule display */
@@ -60,6 +65,7 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
     nameJa: "文体",
     rules: ["redundant-expression", "verbose-expression", "sentence-ending-repetition", "sentence-length", "desu-masu-consistency", "conjunction-overuse", "word-repetition", "taigen-dome-overuse"],
   },
+  { id: "ai", nameJa: "AI機能", rules: ["homophone-detection"] },
 ];
 
 /** Default configs per rule (matching each rule's defaultConfig) */
@@ -86,6 +92,7 @@ export const LINT_DEFAULT_CONFIGS: Record<string, { enabled: boolean; severity: 
   "passive-overuse": { enabled: true, severity: "info" },
   "counter-word-mismatch": { enabled: true, severity: "warning" },
   "adverb-form-consistency": { enabled: true, severity: "info" },
+  "homophone-detection": { enabled: true, severity: "warning" },
 };
 
 /** Preset configuration for one-shot application */
@@ -120,6 +127,7 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "passive-overuse": { enabled: false, severity: "info" },
       "counter-word-mismatch": { enabled: false, severity: "info" },
       "adverb-form-consistency": { enabled: false, severity: "info" },
+      "homophone-detection": { enabled: false, severity: "info" },
     },
   },
   standard: {
@@ -151,6 +159,7 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "passive-overuse": { enabled: true, severity: "warning" },
       "counter-word-mismatch": { enabled: true, severity: "error" },
       "adverb-form-consistency": { enabled: true, severity: "warning" },
+      "homophone-detection": { enabled: true, severity: "error" },
     },
   },
   novel: {
@@ -178,6 +187,7 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "passive-overuse": { enabled: true, severity: "info" },
       "counter-word-mismatch": { enabled: true, severity: "warning" },
       "adverb-form-consistency": { enabled: true, severity: "info" },
+      "homophone-detection": { enabled: true, severity: "warning" },
     },
   },
   official: {
@@ -205,6 +215,7 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "passive-overuse": { enabled: true, severity: "warning" },
       "counter-word-mismatch": { enabled: true, severity: "error" },
       "adverb-form-consistency": { enabled: true, severity: "warning" },
+      "homophone-detection": { enabled: true, severity: "warning" },
     },
   },
 };

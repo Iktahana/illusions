@@ -1,3 +1,6 @@
+import type { ILlmClient } from "@/lib/llm-client/types";
+import type { Token } from "@/lib/nlp-client/types";
+
 import type {
   LintRule,
   LintRuleConfig,
@@ -5,8 +8,8 @@ import type {
   DocumentLintRule,
   MorphologicalLintRule,
   MorphologicalDocumentLintRule,
+  LlmLintRule,
 } from "./types";
-import type { Token } from "@/lib/nlp-client/types";
 
 /**
  * Abstract base class for lint rules.
@@ -93,4 +96,26 @@ export abstract class AbstractMorphologicalDocumentLintRule
   ): Array<{ paragraphIndex: number; issues: LintIssue[] }> {
     return [];
   }
+}
+
+/**
+ * Abstract base class for LLM-based lint rules (L3).
+ * Subclasses implement lintWithLlm(). The sync lint() is a no-op.
+ */
+export abstract class AbstractLlmLintRule
+  extends AbstractLintRule
+  implements LlmLintRule
+{
+  readonly level = "L3" as const;
+
+  lint(_text: string, _config: LintRuleConfig): LintIssue[] {
+    return []; // L3 rules only run via lintWithLlm()
+  }
+
+  abstract lintWithLlm(
+    sentences: ReadonlyArray<{ text: string; from: number; to: number }>,
+    config: LintRuleConfig,
+    llmClient: ILlmClient,
+    signal?: AbortSignal,
+  ): Promise<LintIssue[]>;
 }

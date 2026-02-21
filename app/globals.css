@@ -542,7 +542,8 @@ input[type="range"]::-moz-range-progress {
 /* POS highlight preview editor in settings modal */
 .pos-preview-editor {
   height: 100%;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 1rem;
 }
 
@@ -555,4 +556,6 @@ input[type="range"]::-moz-range-progress {
   outline: none;
   min-height: 100%;
   cursor: default;
+  writing-mode: horizontal-tb;
+  overflow-wrap: break-word;
 }

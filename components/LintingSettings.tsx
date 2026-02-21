@@ -12,12 +12,18 @@ import {
   LINT_DEFAULT_CONFIGS,
 } from "@/lib/linting/lint-presets";
 
+/** Set of rule IDs that belong to the AI category */
+const AI_RULE_IDS = new Set(
+  LINT_RULE_CATEGORIES.find((c) => c.id === "ai")?.rules ?? [],
+);
+
 interface LintingSettingsProps {
   lintingEnabled: boolean;
   onLintingEnabledChange: (value: boolean) => void;
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
   onLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
   onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
+  llmEnabled?: boolean;
 }
 
 /** Resolve the effective config for a rule, falling back to defaults */
@@ -34,6 +40,7 @@ export default function LintingSettings({
   lintingRuleConfigs,
   onLintingRuleConfigChange,
   onLintingRuleConfigsBatchChange,
+  llmEnabled,
 }: LintingSettingsProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
@@ -235,11 +242,17 @@ export default function LintingSettings({
                     const meta = ruleMetaMap.get(ruleId);
                     if (!meta) return null;
                     const config = getConfig(ruleId, lintingRuleConfigs);
+                    const isAiRule = AI_RULE_IDS.has(ruleId);
+                    const aiDisabled = isAiRule && !llmEnabled;
 
                     return (
                       <div
                         key={ruleId}
-                        className="flex items-center gap-2 px-3 py-2"
+                        className={clsx(
+                          "flex items-center gap-2 px-3 py-2",
+                          aiDisabled && "opacity-50",
+                        )}
+                        title={aiDisabled ? "AI機能を有効にしてください" : undefined}
                       >
                         {/* Rule name */}
                         <div className="flex-1 min-w-0">
@@ -251,6 +264,7 @@ export default function LintingSettings({
                         {/* Severity dropdown */}
                         <select
                           value={config.severity}
+                          disabled={aiDisabled}
                           onChange={(e) =>
                             onLintingRuleConfigChange(ruleId, {
                               ...config,
@@ -266,6 +280,7 @@ export default function LintingSettings({
 
                         {/* Toggle */}
                         <button
+                          disabled={aiDisabled}
                           onClick={() =>
                             onLintingRuleConfigChange(ruleId, {
                               ...config,

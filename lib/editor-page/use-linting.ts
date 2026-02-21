@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { RuleRunner } from "@/lib/linting/rule-runner";
 import type { LintIssue, Severity } from "@/lib/linting/types";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
+import type { ILlmClient } from "@/lib/llm-client/types";
+import { getLlmClient } from "@/lib/llm-client/llm-client";
 
 // Import all lint rules
 import { PunctuationRule } from "@/lib/linting/rules/punctuation-rules";
@@ -28,6 +30,7 @@ import { TaigenDomeOveruseRule } from "@/lib/linting/rules/taigen-dome-overuse";
 import { PassiveOveruseRule } from "@/lib/linting/rules/passive-overuse";
 import { CounterWordMismatchRule } from "@/lib/linting/rules/counter-word-mismatch";
 import { AdverbFormConsistencyRule } from "@/lib/linting/rules/adverb-form-consistency";
+import { HomophoneDetectionRule } from "@/lib/linting/rules/homophone-detection";
 
 export interface UseLintingResult {
   ruleRunner: RuleRunner;
@@ -45,6 +48,7 @@ export function useLinting(
   lintingEnabled: boolean,
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>,
   editorViewInstance: EditorView | null,
+  llmEnabled: boolean = false,
 ): UseLintingResult {
   const ruleRunnerRef = useRef<RuleRunner | null>(null);
   const [lintIssues, setLintIssues] = useState<LintIssue[]>([]);
@@ -75,6 +79,10 @@ export function useLinting(
     runner.registerRule(new PassiveOveruseRule());
     runner.registerRule(new CounterWordMismatchRule());
     runner.registerRule(new AdverbFormConsistencyRule());
+
+    // L3 rules (LLM-based)
+    runner.registerRule(new HomophoneDetectionRule());
+
     ruleRunnerRef.current = runner;
   }
 
@@ -117,9 +125,17 @@ export function useLinting(
         const nlpClient = ruleRunnerRef.current?.hasMorphologicalRules()
           ? getNlpClient()
           : null;
+
+        const llmClient: ILlmClient | null =
+          llmEnabled && ruleRunnerRef.current?.hasLlmRules()
+            ? getLlmClient()
+            : null;
+
         updateLintingSettings(editorViewInstance, {
           ruleRunner: ruleRunnerRef.current,
           nlpClient,
+          llmClient,
+          llmEnabled,
           forceFullScan: true,
         });
       },
@@ -127,7 +143,7 @@ export function useLinting(
       console.error("[useLinting] Failed to refresh linting:", err);
       setIsLinting(false);
     });
-  }, [editorViewInstance, lintingEnabled]);
+  }, [editorViewInstance, lintingEnabled, llmEnabled]);
 
   return {
     ruleRunner,
