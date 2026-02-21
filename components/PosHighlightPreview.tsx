@@ -6,18 +6,21 @@ import { nord } from "@milkdown/theme-nord";
 import { commonmark } from "@milkdown/preset-commonmark";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
-import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
-import { posHighlight, updatePosHighlightSettings } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
 import { $prose } from "@milkdown/utils";
 import { Plugin, PluginKey } from "@milkdown/prose/state";
-import type { EditorView } from "@milkdown/prose/view";
 import { Loader2 } from "lucide-react";
+
+import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
+import { posHighlight, updatePosHighlightSettings } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
+
+import type { EditorView } from "@milkdown/prose/view";
 
 interface PosHighlightPreviewProps {
   posHighlightColors: Record<string, string>;
   posHighlightEnabled: boolean;
 }
 
+/** Read-only Milkdown editor for previewing POS highlight colors */
 function PreviewEditor({
   content,
   posHighlightColors,
