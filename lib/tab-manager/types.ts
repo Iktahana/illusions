@@ -103,7 +103,7 @@ export function sanitizeMdiContent(content: string): string {
   let result = content;
   result = result.replace(/<br\s*\/?>/gi, "\n");
   result = result.replace(/<(\w+)[^>]*>(.*?)<\/\1>/gi, "$2");
-  result = result.replace(/<[^>]+>/g, "");
+  result = result.replace(/<\/?[a-zA-Z][a-zA-Z0-9]*\b[^>]*\/?>/g, "");
   return result;
 }
 
