@@ -3,10 +3,16 @@
 import { useState, useEffect, useRef } from "react";
 import { X, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
 import type { Severity } from "@/lib/linting/types";
-import ColorPicker from "./ColorPicker";
-import LintingSettings from "./LintingSettings";
+import dynamic from "next/dynamic";
+
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import { FEATURED_JAPANESE_FONTS } from "@/lib/fonts";
+import ColorPicker from "./ColorPicker";
+import LintingSettings from "./LintingSettings";
+
+const PosHighlightPreview = dynamic(() => import("./PosHighlightPreview"), {
+  ssr: false,
+});
 const LICENSE_TEXT = process.env.NEXT_PUBLIC_LICENSE_TEXT || "";
 const TERMS_TEXT = process.env.NEXT_PUBLIC_TERMS_TEXT || "";
 
@@ -202,7 +208,10 @@ export default function SettingsModal({
     >
       <div
         ref={modalRef}
-        className="relative w-full max-w-4xl h-[80vh] mx-4 rounded-xl bg-background-elevated shadow-xl border border-border flex flex-col"
+        className={clsx(
+          "relative w-full h-[80vh] mx-4 rounded-xl bg-background-elevated shadow-xl border border-border flex flex-col transition-[max-width] duration-200",
+          activeCategory === "pos-highlight" ? "max-w-6xl" : "max-w-4xl"
+        )}
       >
         {/* Header */}
         <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-border">
@@ -281,7 +290,10 @@ export default function SettingsModal({
           </div>
 
           {/* Right content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className={clsx(
+            "flex-1 p-6",
+            activeCategory === "pos-highlight" ? "overflow-hidden" : "overflow-y-auto"
+          )}>
             {/* Editor section */}
             {activeCategory === "editor" && (
               <div className="space-y-6">
@@ -528,60 +540,71 @@ export default function SettingsModal({
 
             {/* POS highlight section */}
             {activeCategory === "pos-highlight" && (
-              <div className="space-y-6">
-                {/* Toggle */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-medium text-foreground">
-                      品詞ハイライトを有効化
-                    </h3>
-                    <p className="text-xs text-foreground-tertiary mt-0.5">
-                      動詞・助詞などを色分け表示
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => onPosHighlightEnabledChange(!posHighlightEnabled)}
-                    className={clsx(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                      posHighlightEnabled ? "bg-accent" : "bg-border-secondary"
-                    )}
-                  >
-                    <span
-                      className={clsx(
-                        "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
-                        posHighlightEnabled ? "translate-x-6" : "translate-x-1"
-                      )}
-                    />
-                  </button>
-                </div>
-
-                {/* Color pickers */}
-                <div className="space-y-4 pt-4 border-t border-border">
+              <div className="flex gap-6 h-full">
+                {/* Left: controls */}
+                <div className="w-2/5 overflow-y-auto space-y-6 pr-2">
+                  {/* Toggle */}
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-medium text-foreground">品詞の色</h4>
+                    <div>
+                      <h3 className="text-sm font-medium text-foreground">
+                        品詞ハイライトを有効化
+                      </h3>
+                      <p className="text-xs text-foreground-tertiary mt-0.5">
+                        動詞・助詞などを色分け表示
+                      </p>
+                    </div>
                     <button
-                      onClick={handleResetColors}
-                      className="text-xs text-accent hover:text-accent-hover transition-colors"
+                      onClick={() => onPosHighlightEnabledChange(!posHighlightEnabled)}
+                      className={clsx(
+                        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                        posHighlightEnabled ? "bg-accent" : "bg-border-secondary"
+                      )}
                     >
-                      デフォルトに戻す
+                      <span
+                        className={clsx(
+                          "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
+                          posHighlightEnabled ? "translate-x-6" : "translate-x-1"
+                        )}
+                      />
                     </button>
                   </div>
-                  <div className="space-y-2">
-                    {posColorItems.map(({ key, label }) => (
-                      <div key={key} className="flex items-center justify-between">
-                        <span className="text-sm text-foreground-secondary">{label}</span>
-                        <ColorPicker
-                          value={getEffectiveColor(key)}
-                          onChange={(color) => {
-                            onPosHighlightColorsChange({
-                              ...posHighlightColors,
-                              [key]: color,
-                            });
-                          }}
-                        />
-                      </div>
-                    ))}
+
+                  {/* Color pickers */}
+                  <div className="space-y-4 pt-4 border-t border-border">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-foreground">品詞の色</h4>
+                      <button
+                        onClick={handleResetColors}
+                        className="text-xs text-accent hover:text-accent-hover transition-colors"
+                      >
+                        デフォルトに戻す
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {posColorItems.map(({ key, label }) => (
+                        <div key={key} className="flex items-center justify-between">
+                          <span className="text-sm text-foreground-secondary">{label}</span>
+                          <ColorPicker
+                            value={getEffectiveColor(key)}
+                            onChange={(color) => {
+                              onPosHighlightColorsChange({
+                                ...posHighlightColors,
+                                [key]: color,
+                              });
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
+                </div>
+
+                {/* Right: live preview */}
+                <div className="w-3/5 min-h-0">
+                  <PosHighlightPreview
+                    posHighlightColors={posHighlightColors}
+                    posHighlightEnabled={posHighlightEnabled}
+                  />
                 </div>
               </div>
             )}

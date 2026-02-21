@@ -538,3 +538,21 @@ input[type="range"]::-moz-range-progress {
   background-color: rgba(255, 152, 0, 0.4);
   box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.2);
 }
+
+/* POS highlight preview editor in settings modal */
+.pos-preview-editor {
+  height: 100%;
+  overflow: auto;
+  padding: 1rem;
+}
+
+.pos-preview-editor .milkdown {
+  background: transparent;
+  min-height: 100%;
+}
+
+.pos-preview-editor .milkdown .ProseMirror {
+  outline: none;
+  min-height: 100%;
+  cursor: default;
+}

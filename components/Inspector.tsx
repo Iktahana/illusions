@@ -3,11 +3,12 @@
 import { useState, useRef, useEffect, useMemo, ReactNode } from "react";
 import { Bot, AlertCircle, BarChart3, Edit2, X, History, RefreshCw, Settings, Info, ListFilter, XCircle, AlertTriangle } from "lucide-react";
 import clsx from "clsx";
+
 import { useEditorMode } from "@/contexts/EditorModeContext";
-import HistoryPanel from "./HistoryPanel";
 import { localPreferences } from "@/lib/local-preferences";
 import { LINT_PRESETS, LINT_RULES_META } from "@/lib/linting/lint-presets";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
+import HistoryPanel from "./HistoryPanel";
 
 import type { ProjectMode } from "@/lib/project-types";
 import type { LintIssue, Severity } from "@/lib/linting";
