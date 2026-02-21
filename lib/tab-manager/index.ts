@@ -23,6 +23,7 @@ export type { UseTabManagerReturn } from "./types";
 export function useTabManager(options?: {
   skipAutoRestore?: boolean;
   autoSave?: boolean;
+  vfsReadyPromise?: Promise<void>;
 }): UseTabManagerReturn {
   const skipAutoRestore = options?.skipAutoRestore ?? false;
   const autoSaveEnabled = options?.autoSave ?? true;
@@ -114,6 +115,7 @@ export function useTabManager(options?: {
     isProjectRef: tabState.isProjectRef,
     isElectron: tabState.isElectron,
     skipAutoRestore,
+    vfsReadyPromise: options?.vfsReadyPromise,
   });
 
   // --- Backward compat alias: newFile === newTab --------------------------

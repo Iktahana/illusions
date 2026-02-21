@@ -71,6 +71,13 @@ export default function EditorPage() {
     setEditorKey(prev => prev + 1);
   }, []);
 
+  // Deferred promise gate: tab restoration waits until VFS root is set
+  const [vfsGate] = useState(() => {
+    let resolve!: () => void;
+    const promise = new Promise<void>((r) => { resolve = r; });
+    return { promise, resolve };
+  });
+
   // --- Editor settings hook ---
   const { settings, handlers: settingsHandlers, setters: settingsSetters } = useEditorSettings(incrementEditorKey);
   const {
@@ -93,7 +100,7 @@ export default function EditorPage() {
     handleLlmEnabledChange, handleLlmModelIdChange,
   } = settingsHandlers;
 
-  const tabManager = useTabManager({ skipAutoRestore, autoSave });
+  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReadyPromise: vfsGate.promise });
   const {
     content, setContent, currentFile, isDirty, isSaving, lastSavedTime,
     openFile: tabOpenFile, saveFile, saveAsFile,
@@ -137,6 +144,7 @@ export default function EditorPage() {
     content,
     skipAutoRestore,
     lastSavedTime,
+    onVfsReady: vfsGate.resolve,
   });
   const {
     state: {
