@@ -22,12 +22,13 @@ Available for macOS (Intel & Apple Silicon) and Windows
 - **Vertical writing mode** (縦書き) for traditional Japanese novels
 - **Ruby notation support** (ルビ) - furigana for kanji
 - **Tate-chu-yoko** (縦中横) - horizontal text in vertical writing
-- **AI proofreading support** - grammar and style suggestions
+- **AI proofreading support** - grammar and style suggestions powered by local LLM engine
 - **Auto-save** every 2 seconds
 - **Japanese NLP** integration for text analysis
-- **POS (Part-of-Speech) highlighting** for Japanese grammar review
+- **POS (Part-of-Speech) highlighting** for Japanese grammar review with live demo preview
 - **Word frequency analysis** for vocabulary insights
-- **Japanese text linting** — punctuation, number format, joyo kanji rules (JIS X 4051 / 文化庁標準準拠)
+- **Japanese text linting** — 22 rules covering punctuation, number format, joyo kanji, and more (JIS X 4051 / 文化庁標準準拠)
+- **Correction ignore** — dismiss individual lint warnings; per-rule dialogue skip toggle
 
 ### 🎨 Interface
 - **Three-column layout**: Explorer | Editor | Inspector
@@ -205,6 +206,9 @@ illusions/
 - **isomorphic-git** - Git implementation in JavaScript
 - **@octokit/rest** - GitHub API client
 
+### Testing
+- **Vitest** - Unit testing framework
+
 ### Desktop
 - **Electron 32** - Cross-platform desktop app
 - **electron-builder** - Build and packaging
@@ -253,17 +257,21 @@ The proofreading (linting) features in illusions comply with the following offic
 - ✅ Landing page with SEO optimization
 
 ### Recently Added
+- ✅ Local LLM engine for AI proofreading (ローカルLLMによるAI校正)
+- ✅ Correction ignore feature — dismiss individual lint warnings
+- ✅ Dialogue-aware linting — skip dialogue content with per-rule toggle
+- ✅ Live demo preview for POS highlight settings
+- ✅ 22 lint rules (15 L1 regex + 7 L2 morphological) with 5 presets
+- ✅ In-app notification for power saving (replaces native dialog)
+- ✅ Unit test coverage for core library modules (Vitest)
 - ✅ Japanese text linting framework (JIS X 4051 / 文化庁標準準拠)
-- ✅ Punctuation rules (記号の作法と偶数ルール)
-- ✅ Joyo kanji validation (常用漢字バリデーション)
-- ✅ Number format consistency (数字表記の統一)
 - ✅ Electron security hardening (CSP, navigation guards, safeStorage, IPC input validation, save-file path validation)
 - ✅ Design system dialogs replacing native browser alerts/confirms (GlassDialog)
 - ✅ Accurate Japanese text statistics (文字数 character count, misleading word count removed)
 
 ### Planned
 - [ ] Real-time collaboration
-- [ ] Advanced AI grammar and style checking
+- [ ] Advanced AI grammar and style checking (local LLM integration in progress)
 - [ ] Export to PDF/EPUB
 - [ ] Custom themes and fonts
 - [ ] Plugin system
