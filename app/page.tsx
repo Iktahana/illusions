@@ -492,6 +492,9 @@ export default function EditorPage() {
   // Settings modal: track which category to open on
   const [settingsInitialCategory, setSettingsInitialCategory] = useState<SettingsCategory | undefined>(undefined);
 
+  // Trigger to switch Inspector to corrections tab (monotonically increasing)
+  const [switchToCorrectionsTrigger, setSwitchToCorrectionsTrigger] = useState(0);
+
   /** Navigate to a lint issue in the editor */
   const handleNavigateToIssue = useCallback((issue: LintIssue) => {
     if (!editorViewInstance) return;
@@ -543,6 +546,12 @@ export default function EditorPage() {
       editorViewInstance.focus();
     });
   }, [editorViewInstance]);
+
+  /** Navigate to a lint issue from context menu (also switches Inspector to corrections tab) */
+  const handleShowLintHint = useCallback((issue: LintIssue) => {
+    setSwitchToCorrectionsTrigger((n) => n + 1);
+    handleNavigateToIssue(issue);
+  }, [handleNavigateToIssue]);
 
   /** Apply a lint fix by replacing the text range */
   const handleApplyFix = useCallback((issue: LintIssue) => {
@@ -1057,7 +1066,7 @@ export default function EditorPage() {
                 onOpenRubyDialog={handleOpenRubyDialog}
                 onToggleTcy={handleToggleTcy}
                 onOpenDictionary={handleOpenDictionary}
-                onShowLintHint={handleNavigateToIssue}
+                onShowLintHint={handleShowLintHint}
                 onFontScaleChange={handleFontScaleChange}
                 onLineHeightChange={handleLineHeightChange}
                 onParagraphSpacingChange={handleParagraphSpacingChange}
@@ -1125,6 +1134,7 @@ export default function EditorPage() {
             onOpenLintingSettings={handleOpenLintingSettings}
             onApplyLintPreset={handleApplyLintPreset}
             activeLintPresetId={activeLintPresetId}
+            switchToCorrectionsTrigger={switchToCorrectionsTrigger}
           />
         </ResizablePanel>
       </div>

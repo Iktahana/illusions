@@ -88,6 +88,8 @@ interface InspectorProps {
   onOpenLintingSettings?: () => void;
   onApplyLintPreset?: (presetId: string) => void;
   activeLintPresetId?: string;
+  /** Monotonically increasing trigger to switch to the corrections tab from outside */
+  switchToCorrectionsTrigger?: number;
 }
 
 export default function Inspector({
@@ -123,6 +125,7 @@ export default function Inspector({
   onOpenLintingSettings,
   onApplyLintPreset,
   activeLintPresetId,
+  switchToCorrectionsTrigger = 0,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
   const projectMode = isProject ? (editorMode as ProjectMode) : null;
@@ -171,6 +174,13 @@ export default function Inspector({
     if (!hasLoadedRef.current) return;
     localPreferences.setRightTab(activeTab);
   }, [activeTab]);
+
+  // Switch to corrections tab when triggered externally (e.g. context menu "校正提示を表示")
+  useEffect(() => {
+    if (switchToCorrectionsTrigger > 0) {
+      setActiveTab("corrections");
+    }
+  }, [switchToCorrectionsTrigger]);
 
   // プロジェクトモードでない場合に履歴タブが選択されていたらフォールバック
   useEffect(() => {
