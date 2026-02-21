@@ -1,0 +1,218 @@
+import { AbstractLintRule } from "../base-rule";
+import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Reference to the official document writing guide */
+const STYLE_GUIDE_REF: LintReference = {
+  standard: "文化庁「公用文作成の考え方」(2022)",
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Represents a sentence extracted from source text,
+ * along with its character offsets.
+ */
+interface SentenceSpan {
+  text: string;
+  from: number;
+  to: number;
+}
+
+/**
+ * Split text into sentences at sentence-ending delimiters (。！？!?\n),
+ * tracking character positions for each sentence.
+ *
+ * Empty or whitespace-only segments are skipped.
+ */
+function splitIntoSentences(text: string): SentenceSpan[] {
+  const sentences: SentenceSpan[] = [];
+  const delimiter = /[。！？!?\n]/;
+  let remaining = text;
+  let offset = 0;
+
+  while (remaining.length > 0) {
+    const match = delimiter.exec(remaining);
+    if (!match) {
+      if (remaining.trim().length > 0) {
+        sentences.push({ text: remaining, from: offset, to: offset + remaining.length });
+      }
+      break;
+    }
+    const sentenceText = remaining.substring(0, match.index);
+    if (sentenceText.trim().length > 0) {
+      sentences.push({ text: sentenceText, from: offset, to: offset + sentenceText.length });
+    }
+    offset += match.index + match[0].length;
+    remaining = remaining.substring(match.index + match[0].length);
+  }
+  return sentences;
+}
+
+/**
+ * Mask dialogue content (「…」, 『…』) by replacing it with 〇 placeholders.
+ * Uses depth tracking to handle nested quotation marks correctly.
+ * Preserves string length so character offsets remain valid.
+ */
+function maskDialogue(text: string): string {
+  let result = "";
+  let depth = 0;
+  for (const ch of text) {
+    if (ch === "「" || ch === "『") {
+      depth++;
+      result += "〇";
+    } else if (ch === "」" || ch === "』") {
+      if (depth > 0) depth--;
+      result += "〇";
+    } else if (depth > 0) {
+      result += "〇";
+    } else {
+      result += ch;
+    }
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Rule implementation
+// ---------------------------------------------------------------------------
+
+/**
+ * Comma Frequency Rule (L1)
+ *
+ * Detects sentences with excessive comma density or long sentences
+ * with no commas at all. Commas inside dialogue (「」『』) are excluded
+ * from the analysis.
+ *
+ * Two sub-checks:
+ * 1. Too many commas: comma-to-character ratio exceeds threshold (default 1/8)
+ * 2. No commas: sentence longer than threshold (default 50 chars) has no commas
+ *
+ * Reference: 文化庁「公用文作成の考え方」(2022)
+ */
+export class CommaFrequencyRule extends AbstractLintRule {
+  readonly id = "comma-frequency";
+  readonly name = "Comma Frequency";
+  readonly nameJa = "読点の頻度チェック";
+  readonly description = "Flags sentences with too many or too few commas";
+  readonly descriptionJa = "読点が多すぎる、または少なすぎる文を検出します";
+  readonly level = "L1" as const;
+  readonly defaultConfig: LintRuleConfig = {
+    enabled: true,
+    severity: "info",
+    options: {
+      maxCommaRatio: 0.125,
+      minLengthForComma: 50,
+    },
+  };
+
+  lint(text: string, config: LintRuleConfig): LintIssue[] {
+    if (!text) return [];
+
+    const maxCommaRatio = (config.options?.maxCommaRatio as number) ?? 0.125;
+    const minLengthForComma = (config.options?.minLengthForComma as number) ?? 50;
+
+    const issues: LintIssue[] = [];
+    issues.push(
+      ...this.checkTooManyCommas(text, maxCommaRatio, config.severity),
+      ...this.checkNoCommas(text, minLengthForComma, config.severity),
+    );
+    return issues;
+  }
+
+  /**
+   * Check for sentences with excessive comma density.
+   * A sentence is flagged when comma count / effective length exceeds maxCommaRatio.
+   * Sentences shorter than 8 characters are skipped as too short to judge.
+   */
+  private checkTooManyCommas(
+    text: string,
+    maxCommaRatio: number,
+    severity: LintIssue["severity"],
+  ): LintIssue[] {
+    const issues: LintIssue[] = [];
+    const sentences = splitIntoSentences(text);
+
+    for (const sentence of sentences) {
+      const masked = maskDialogue(sentence.text);
+
+      // Count commas in non-dialogue text only
+      let commaCount = 0;
+      let maskPlaceholderCount = 0;
+      for (const ch of masked) {
+        if (ch === "、") commaCount++;
+        if (ch === "〇") maskPlaceholderCount++;
+      }
+
+      const effectiveLength = masked.length - maskPlaceholderCount;
+
+      // Skip sentences that are too short to judge
+      if (effectiveLength < 8) continue;
+
+      if (commaCount > 0 && commaCount / effectiveLength > maxCommaRatio) {
+        const ratio = commaCount / effectiveLength;
+        issues.push({
+          ruleId: this.id,
+          severity,
+          message: `Sentence has ${commaCount} commas in ${effectiveLength} characters (ratio: ${ratio.toFixed(2)})`,
+          messageJa: `文化庁「公用文作成の考え方」に基づき、一文に読点が${commaCount}個あります（${effectiveLength}文字中、比率: ${ratio.toFixed(2)}）`,
+          from: sentence.from,
+          to: sentence.to,
+          reference: STYLE_GUIDE_REF,
+        });
+      }
+    }
+
+    return issues;
+  }
+
+  /**
+   * Check for long sentences with no commas at all.
+   * A sentence is flagged when its non-dialogue length exceeds minLengthForComma
+   * and it contains zero 、 characters.
+   * Dialogue-only sentences (where all content is masked) are skipped.
+   */
+  private checkNoCommas(
+    text: string,
+    minLengthForComma: number,
+    severity: LintIssue["severity"],
+  ): LintIssue[] {
+    const issues: LintIssue[] = [];
+    const sentences = splitIntoSentences(text);
+
+    for (const sentence of sentences) {
+      const masked = maskDialogue(sentence.text);
+
+      let commaCount = 0;
+      let maskPlaceholderCount = 0;
+      for (const ch of masked) {
+        if (ch === "、") commaCount++;
+        if (ch === "〇") maskPlaceholderCount++;
+      }
+
+      const effectiveLength = masked.length - maskPlaceholderCount;
+
+      // Skip dialogue-only sentences (all content is masked)
+      if (effectiveLength === 0) continue;
+
+      if (commaCount === 0 && effectiveLength > minLengthForComma) {
+        issues.push({
+          ruleId: this.id,
+          severity,
+          message: `Long sentence (${effectiveLength} characters) has no commas`,
+          messageJa: `文化庁「公用文作成の考え方」に基づき、${effectiveLength}文字の文に読点がありません`,
+          from: sentence.from,
+          to: sentence.to,
+          reference: STYLE_GUIDE_REF,
+        });
+      }
+    }
+
+    return issues;
+  }
+}

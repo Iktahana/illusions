@@ -1,3 +1,5 @@
+import type { Token } from "@/lib/nlp-client/types";
+
 export type Severity = "error" | "warning" | "info";
 
 export interface LintReference {
@@ -69,4 +71,45 @@ export interface DocumentLintRule extends LintRule {
 /** Type guard for DocumentLintRule */
 export function isDocumentLintRule(rule: LintRule): rule is DocumentLintRule {
   return "lintDocument" in rule;
+}
+
+/**
+ * A lint rule that requires morphological analysis (kuromoji tokens).
+ * Used for L2 rules that need POS tagging, conjugation info, etc.
+ */
+export interface MorphologicalLintRule extends LintRule {
+  lintWithTokens(
+    text: string,
+    tokens: ReadonlyArray<Token>,
+    config: LintRuleConfig,
+  ): LintIssue[];
+}
+
+/** Type guard for MorphologicalLintRule */
+export function isMorphologicalLintRule(
+  rule: LintRule,
+): rule is MorphologicalLintRule {
+  return "lintWithTokens" in rule;
+}
+
+/**
+ * A document-level lint rule that requires morphological analysis.
+ * Used for L2 document-level rules like desu-masu consistency.
+ */
+export interface MorphologicalDocumentLintRule extends DocumentLintRule {
+  lintDocumentWithTokens(
+    paragraphs: ReadonlyArray<{
+      text: string;
+      index: number;
+      tokens: ReadonlyArray<Token>;
+    }>,
+    config: LintRuleConfig,
+  ): Array<{ paragraphIndex: number; issues: LintIssue[] }>;
+}
+
+/** Type guard for MorphologicalDocumentLintRule */
+export function isMorphologicalDocumentLintRule(
+  rule: LintRule,
+): rule is MorphologicalDocumentLintRule {
+  return "lintDocumentWithTokens" in rule;
 }
