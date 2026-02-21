@@ -1,10 +1,10 @@
-import { AbstractMorphologicalDocumentLintRule } from "../base-rule";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 import type { Token } from "@/lib/nlp-client/types";
+import { AbstractMorphologicalDocumentLintRule } from "../base-rule";
 import {
   ADVERB_VARIANT_GROUPS,
   type AdverbVariantGroup,
 } from "../data/adverb-variants";
+import type { LintIssue, LintRuleConfig, LintReference } from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants

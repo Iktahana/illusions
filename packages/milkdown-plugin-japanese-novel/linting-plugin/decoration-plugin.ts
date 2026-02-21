@@ -241,6 +241,10 @@ export function createLintingPlugin(
           // Update nlpClient reference if provided
           if ('nlpClient' in meta) {
             currentNlpClient = meta.nlpClient ?? null;
+            // Clear caches when NLP client changes to avoid stale L2 results
+            issueCache.clear();
+            tokenCache.clear();
+            documentIssueCache = null;
           }
           // Force full scan flag
           if (meta.forceFullScan) {
