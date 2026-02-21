@@ -8,6 +8,7 @@ import { $prose } from '@milkdown/utils';
 import type { RuleRunner, LintIssue } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
 import type { ILlmClient } from '@/lib/llm-client/types';
+import type { IgnoredCorrection } from '@/lib/project-types';
 import { createLintingPlugin, lintingKey } from './decoration-plugin';
 
 // Export the plugin key for external use
@@ -20,6 +21,8 @@ export interface LintingOptions {
   ruleRunner?: RuleRunner | null;
   /** NLP client for morphological analysis (L2 rules) */
   nlpClient?: INlpClient | null;
+  /** Ignored corrections to filter out from decorations */
+  ignoredCorrections?: IgnoredCorrection[];
   /** Callback when lint issues are updated */
   onIssuesUpdated?: (issues: LintIssue[]) => void;
   /** Debounce time in milliseconds */
@@ -65,6 +68,7 @@ export function updateLintingSettings(
     llmClient?: ILlmClient | null;
     llmEnabled?: boolean;
     forceFullScan?: boolean;
+    ignoredCorrections?: IgnoredCorrection[];
   }
 ): void {
   const tr = view.state.tr.setMeta(lintingKey, settings);

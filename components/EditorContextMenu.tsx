@@ -1,7 +1,7 @@
 "use client";
 
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { Scissors, Copy, ClipboardPaste, Search, CheckSquare, Languages, ALargeSmall, Globe, BookOpen, AlertCircle } from "lucide-react";
+import { Scissors, Copy, ClipboardPaste, Search, CheckSquare, Languages, ALargeSmall, Globe, BookOpen, AlertCircle, EyeOff } from "lucide-react";
 import type { ReactNode, MouseEvent } from "react";
 
 import type { LintIssue } from "@/lib/linting";
@@ -17,7 +17,9 @@ export type ContextMenuAction =
   | "tcy"
   | "google-search"
   | "dictionary"
-  | "show-lint-hint";
+  | "show-lint-hint"
+  | "ignore-correction"
+  | "ignore-correction-all";
 
 interface EditorContextMenuProps {
   children: ReactNode;
@@ -85,6 +87,18 @@ export default function EditorContextMenu({
                 label="校正提示を表示"
                 shortcut=""
                 onClick={() => onAction("show-lint-hint")}
+              />
+              <MenuItem
+                icon={<EyeOff className="w-4 h-4" />}
+                label="この指摘を無視"
+                shortcut=""
+                onClick={() => onAction("ignore-correction")}
+              />
+              <MenuItem
+                icon={<EyeOff className="w-4 h-4" />}
+                label="同じ指摘をすべて無視"
+                shortcut=""
+                onClick={() => onAction("ignore-correction-all")}
               />
               <Separator />
             </>

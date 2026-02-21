@@ -42,6 +42,7 @@ import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
 import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
+import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { LintIssue } from "@/lib/linting/types";
@@ -451,6 +452,28 @@ export default function EditorPage() {
     llmEnabled,
   );
 
+  // --- Ignored corrections hook ---
+  const {
+    ignoredCorrections,
+    ignoreCorrection,
+  } = useIgnoredCorrections(editorMode);
+
+  // Sync ignoredCorrections to ProseMirror plugin
+  useEffect(() => {
+    if (!editorViewInstance) return;
+
+    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
+      ({ updateLintingSettings }) => {
+        updateLintingSettings(editorViewInstance, {
+          ignoredCorrections,
+          forceFullScan: true,
+        });
+      },
+    ).catch((err) => {
+      console.error("[page] Failed to sync ignored corrections:", err);
+    });
+  }, [editorViewInstance, ignoredCorrections]);
+
   // Enrich lint issues with original text from the document
   const enrichedLintIssues = useMemo(() => {
     if (!editorViewInstance || lintIssues.length === 0) return lintIssues;
@@ -555,6 +578,43 @@ export default function EditorPage() {
     setSwitchToCorrectionsTrigger((n) => n + 1);
     handleNavigateToIssue(issue);
   }, [handleNavigateToIssue]);
+
+  /** Handle ignoring a correction (single or all identical) */
+  const handleIgnoreCorrection = useCallback((issue: LintIssue, ignoreAll: boolean) => {
+    if (!editorViewInstance) return;
+    // Extract original text from the document
+    let issueText: string;
+    try {
+      issueText = editorViewInstance.state.doc.textBetween(
+        issue.from,
+        Math.min(issue.to, editorViewInstance.state.doc.content.size),
+      );
+    } catch {
+      return;
+    }
+    if (!issueText) return;
+
+    if (ignoreAll) {
+      // Ignore all occurrences: no context hash
+      ignoreCorrection(issue.ruleId, issueText);
+    } else {
+      // Ignore single occurrence: compute context hash from paragraph text
+      // Find the paragraph containing this issue
+      let paragraphText: string | undefined;
+      editorViewInstance.state.doc.descendants((node, pos) => {
+        if (paragraphText) return false;
+        if (node.type.name === "paragraph" && node.textContent) {
+          const paraEnd = pos + node.nodeSize;
+          if (issue.from >= pos && issue.to <= paraEnd) {
+            paragraphText = node.textContent;
+            return false;
+          }
+        }
+        return true;
+      });
+      ignoreCorrection(issue.ruleId, issueText, paragraphText);
+    }
+  }, [editorViewInstance, ignoreCorrection]);
 
   /** Apply a lint fix by replacing the text range */
   const handleApplyFix = useCallback((issue: LintIssue) => {
@@ -1074,6 +1134,7 @@ export default function EditorPage() {
                 onToggleTcy={handleToggleTcy}
                 onOpenDictionary={handleOpenDictionary}
                 onShowLintHint={handleShowLintHint}
+                onIgnoreCorrection={handleIgnoreCorrection}
                 onFontScaleChange={handleFontScaleChange}
                 onLineHeightChange={handleLineHeightChange}
                 onParagraphSpacingChange={handleParagraphSpacingChange}
@@ -1135,6 +1196,7 @@ export default function EditorPage() {
             lintIssues={enrichedLintIssues}
             onNavigateToIssue={handleNavigateToIssue}
             onApplyFix={handleApplyFix}
+            onIgnoreCorrection={handleIgnoreCorrection}
             onRefreshLinting={refreshLinting}
             isLinting={isLinting}
             activeLintIssueIndex={activeLintIssueIndex}

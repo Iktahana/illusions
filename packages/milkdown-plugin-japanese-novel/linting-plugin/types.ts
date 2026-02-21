@@ -8,6 +8,7 @@ import type { LintIssue } from '@/lib/linting';
 import type { RuleRunner } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
 import type { ILlmClient } from '@/lib/llm-client/types';
+import type { IgnoredCorrection } from '@/lib/project-types';
 
 /**
  * Options for the linting ProseMirror plugin
@@ -18,6 +19,7 @@ export interface LintingPluginOptions {
   nlpClient?: INlpClient | null;
   llmClient?: ILlmClient | null;
   llmEnabled?: boolean;
+  ignoredCorrections?: IgnoredCorrection[];
   onIssuesUpdated?: (issues: LintIssue[]) => void;
   debounceMs?: number;
 }
