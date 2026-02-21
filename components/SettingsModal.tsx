@@ -640,6 +640,7 @@ export default function SettingsModal({
                 lintingRuleConfigs={lintingRuleConfigs}
                 onLintingRuleConfigChange={(id, cfg) => onLintingRuleConfigChange?.(id, cfg)}
                 onLintingRuleConfigsBatchChange={(cfgs) => onLintingRuleConfigsBatchChange?.(cfgs)}
+                llmEnabled={llmEnabled}
               />
             )}
 
