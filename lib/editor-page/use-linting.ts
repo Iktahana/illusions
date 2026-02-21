@@ -30,6 +30,7 @@ import { TaigenDomeOveruseRule } from "@/lib/linting/rules/taigen-dome-overuse";
 import { PassiveOveruseRule } from "@/lib/linting/rules/passive-overuse";
 import { CounterWordMismatchRule } from "@/lib/linting/rules/counter-word-mismatch";
 import { AdverbFormConsistencyRule } from "@/lib/linting/rules/adverb-form-consistency";
+import { HomophoneDetectionRule } from "@/lib/linting/rules/homophone-detection";
 
 export interface UseLintingResult {
   ruleRunner: RuleRunner;
@@ -80,7 +81,7 @@ export function useLinting(
     runner.registerRule(new AdverbFormConsistencyRule());
 
     // L3 rules (LLM-based)
-    // HomophoneDetectionRule will be registered here once implemented
+    runner.registerRule(new HomophoneDetectionRule());
 
     ruleRunnerRef.current = runner;
   }
