@@ -1133,6 +1133,10 @@ export default function EditorPage() {
             onOpenLintingSettings={handleOpenLintingSettings}
             onApplyLintPreset={handleApplyLintPreset}
             activeLintPresetId={activeLintPresetId}
+            lintingEnabled={lintingEnabled}
+            onLintingEnabledChange={handleLintingEnabledChange}
+            lintingRuleConfigs={lintingRuleConfigs}
+            onLintingRuleConfigChange={handleLintingRuleConfigChange}
             switchToCorrectionsTrigger={switchToCorrectionsTrigger}
           />
           </ErrorBoundary>
