@@ -7,11 +7,11 @@
 
 import { Plugin, PluginKey } from '@milkdown/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/prose/view';
-import type { Node as ProseMirrorNode } from '@milkdown/prose/model';
 import type { EditorView } from '@milkdown/prose/view';
 import { getNlpClient } from '@/lib/nlp-client/nlp-client';
 import type { Token as NlpToken } from '@/lib/nlp-client/types';
 import { LRUCache } from '@/lib/utils/lru-cache';
+import { getAtomOffset, collectParagraphs, findScrollContainer, getVisibleParagraphs } from '../shared/paragraph-helpers';
 import { getPosColor, DEFAULT_POS_COLORS } from './pos-colors';
 import type { PosColorConfig } from './types';
 
@@ -27,159 +27,6 @@ export interface PosHighlightPluginOptions {
   enabled: boolean;
   colors: PosColorConfig;
   debounceMs?: number;
-}
-
-/**
- * atom ノード（ruby等）による位置補正情報
- * textContent ではスキップされるが ProseMirror 上では1位置を占める
- */
-interface AtomAdjustment {
-  textPos: number;       // textContent 内での位置（atom の直前）
-  cumulativeOffset: number; // 累積の追加オフセット
-}
-
-/**
- * 段落情報
- */
-interface ParagraphInfo {
-  node: ProseMirrorNode;
-  pos: number;  // 段落の開始位置
-  text: string; // 段落内のテキスト
-  atomAdjustments: AtomAdjustment[]; // atom ノードによる位置補正
-  index: number; // 段落のインデックス（0から始まる）
-}
-
-/**
- * textContent 上の位置を ProseMirror 段落内オフセットに変換する際の追加オフセットを取得
- */
-function getAtomOffset(adjustments: AtomAdjustment[], textPos: number): number {
-  let offset = 0;
-  for (const adj of adjustments) {
-    if (adj.textPos <= textPos) {
-      offset = adj.cumulativeOffset;
-    } else {
-      break;
-    }
-  }
-  return offset;
-}
-
-/**
- * ドキュメントから段落を収集
- * atom ノード（ruby等）の位置補正情報も同時に計算する
- */
-function collectParagraphs(doc: ProseMirrorNode): ParagraphInfo[] {
-  const paragraphs: ParagraphInfo[] = [];
-  let index = 0;
-
-  doc.descendants((node, pos) => {
-    // paragraph ノードを収集
-    if (node.type.name === 'paragraph' && node.textContent) {
-      // 段落の子ノードを走査し、atom ノードの位置補正を計算
-      const atomAdjustments: AtomAdjustment[] = [];
-      let textPos = 0;
-      let cumulativeOffset = 0;
-
-      node.forEach((child) => {
-        if (child.isText) {
-          textPos += child.text!.length;
-        } else {
-          // atom またはその他の非テキストインラインノード
-          // ProseMirror では nodeSize 分の位置を占めるが、textContent には含まれない
-          cumulativeOffset += child.nodeSize;
-          atomAdjustments.push({ textPos, cumulativeOffset });
-        }
-      });
-
-      paragraphs.push({
-        node,
-        pos,
-        text: node.textContent,
-        atomAdjustments,
-        index: index++,
-      });
-      return false; // 子ノードは走査しない
-    }
-    return true;
-  });
-
-  return paragraphs;
-}
-
-/**
- * エディタの実際のスクロールコンテナを探す
- * ProseMirror の DOM から親を辿り、overflow: auto/scroll を持つ要素を返す
- */
-function findScrollContainer(el: HTMLElement): HTMLElement {
-  let parent = el.parentElement;
-  while (parent) {
-    const style = getComputedStyle(parent);
-    if (style.overflowX === 'auto' || style.overflowX === 'scroll' ||
-        style.overflowY === 'auto' || style.overflowY === 'scroll') {
-      return parent;
-    }
-    parent = parent.parentElement;
-  }
-  return el;
-}
-
-/**
- * ビューポート内に表示されている段落を取得（前後2段落を含む）
- * coordsAtPos はビューポート座標を返すため、横書き・縦書きの両方で正しく動作する
- */
-function getVisibleParagraphs(
-  view: EditorView,
-  allParagraphs: ParagraphInfo[],
-  buffer: number = 2
-): ParagraphInfo[] {
-  if (allParagraphs.length === 0) return [];
-
-  const scrollContainer = findScrollContainer(view.dom);
-  const containerRect = scrollContainer.getBoundingClientRect();
-  const visibleIndices = new Set<number>();
-
-  for (const paragraph of allParagraphs) {
-    try {
-      // +1 で段落ノードの内側の座標を取得
-      const coords = view.coordsAtPos(paragraph.pos + 1);
-      if (coords) {
-        // coordsAtPos はビューポート座標を返す
-        // コンテナの可視領域と交差しているかチェック
-        if (coords.top < containerRect.bottom && coords.bottom > containerRect.top &&
-            coords.left < containerRect.right && coords.right > containerRect.left) {
-          visibleIndices.add(paragraph.index);
-        }
-      }
-    } catch {
-      // coordsAtPos がエラーになる場合はスキップ
-    }
-  }
-
-  // カーソル位置の段落も含める
-  const { from } = view.state.selection;
-  for (const paragraph of allParagraphs) {
-    if (from >= paragraph.pos && from <= paragraph.pos + paragraph.node.nodeSize) {
-      visibleIndices.add(paragraph.index);
-      break;
-    }
-  }
-
-  // 可視範囲が空の場合、先頭5段落をフォールバックとして使用
-  if (visibleIndices.size === 0) {
-    for (let i = 0; i < Math.min(5, allParagraphs.length); i++) {
-      visibleIndices.add(i);
-    }
-  }
-
-  // 前後のバッファを追加
-  const expandedIndices = new Set<number>();
-  for (const index of visibleIndices) {
-    for (let i = Math.max(0, index - buffer); i <= Math.min(allParagraphs.length - 1, index + buffer); i++) {
-      expandedIndices.add(i);
-    }
-  }
-
-  return allParagraphs.filter(p => expandedIndices.has(p.index));
 }
 
 /**
