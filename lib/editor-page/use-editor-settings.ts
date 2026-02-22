@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
 import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 import type { Severity } from "@/lib/linting/types";
+import { notificationManager } from "@/lib/notification-manager";
 
 export interface EditorSettings {
   fontScale: number;
@@ -357,6 +358,7 @@ export function useEditorSettings(
       setPowerSaveMode(true);
       setLintingEnabled(false);
       setLlmEnabled(false);
+      notificationManager.warning("省電力モードが有効になりました。校正精度が低下する場合があります。");
     } else {
       // Restore previous state
       const stored = await fetchAppState();
@@ -376,6 +378,7 @@ export function useEditorSettings(
         await persistAppState({ powerSaveMode: false, prePowerSaveState: null });
       }
       setPowerSaveMode(false);
+      notificationManager.info("省電力モードを解除しました。");
     }
   }, [lintingEnabled, lintingRuleConfigs, llmEnabled]);
 
