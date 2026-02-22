@@ -117,8 +117,13 @@ export default function PosHighlightPreview({
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/demo/鏡地獄.mdi", { signal: controller.signal })
-      .then((res) => res.text())
+    // Use relative path for Electron file:// protocol compatibility
+    const basePath = window.location.protocol === "file:" ? "." : "";
+    fetch(`${basePath}/demo/鏡地獄.mdi`, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.text();
+      })
       .then(setContent)
       .catch(() => {
         if (!controller.signal.aborted) setContent("");

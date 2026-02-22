@@ -570,6 +570,11 @@ input[type="range"]::-moz-range-progress {
   box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.2);
 }
 
+/* POS highlight color fade-in transition */
+[class^="pos-"] {
+  transition: color 0.3s ease;
+}
+
 /* POS highlight preview editor in settings modal */
 .pos-preview-editor {
   height: 100%;
