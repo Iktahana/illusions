@@ -1,11 +1,12 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect } from "react";
 
+import type { MdiFileDescriptor } from "@/lib/mdi-file";
 import type { SupportedFileExtension } from "@/lib/project-types";
 
 interface TabInfo {
   id: string;
-  file: { name: string; path: string } | null;
+  file: MdiFileDescriptor | null;
   isDirty: boolean;
 }
 
