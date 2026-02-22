@@ -216,6 +216,20 @@ html:not(.dark) {
   animation: pulse-glow 2s infinite;
 }
 
+/* LLM status indicator blink (inferring state) */
+@keyframes llm-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.animate-llm-pulse {
+  animation: llm-pulse 1.2s ease-in-out infinite;
+}
+
 /* Save success toast animation */
 @keyframes save-toast-in {
   0% {

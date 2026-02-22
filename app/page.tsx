@@ -1068,6 +1068,8 @@ export default function EditorPage() {
                 onParagraphSpacingChange={handleParagraphSpacingChange}
                 mdiExtensionsEnabled={mdiExtensionsEnabled}
                 gfmEnabled={gfmEnabled}
+                llmEnabled={llmEnabled}
+                llmModelId={llmModelId}
               />
               </ErrorBoundary>
             )}

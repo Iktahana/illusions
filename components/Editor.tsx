@@ -31,6 +31,8 @@ import EditorContextMenu, { type ContextMenuAction } from "./EditorContextMenu";
 import { isElectronRenderer } from "@/lib/runtime-env";
 import { localPreferences } from "@/lib/local-preferences";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
+import { useLlmStatus } from "@/lib/hooks/use-llm-status";
+import type { LlmStatusState } from "@/lib/hooks/use-llm-status";
 
 interface EditorProps {
   initialContent?: string;
@@ -79,6 +81,9 @@ interface EditorProps {
   // Editor mode controls
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
+  // LLM status indicator
+  llmEnabled?: boolean;
+  llmModelId?: string;
 }
 
 export default function NovelEditor({
@@ -117,6 +122,8 @@ export default function NovelEditor({
   onParagraphSpacingChange,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
+  llmEnabled = false,
+  llmModelId = "",
 }: EditorProps) {
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
   const [isVertical, setIsVertical] = useState(() => {
@@ -268,6 +275,8 @@ export default function NovelEditor({
         onLineHeightChange={onLineHeightChange ?? (() => {})}
         onParagraphSpacingChange={onParagraphSpacingChange ?? (() => {})}
         onSearchClick={handleSearchToggle}
+        llmEnabled={llmEnabled}
+        llmModelId={llmModelId}
       />
 
       {/* エディタ領域 */}
@@ -395,6 +404,31 @@ function ValuePicker({
   );
 }
 
+const LLM_STATUS_LABELS: Record<LlmStatusState, string> = {
+  off: "AI: 無効",
+  loading: "AI: 読み込み中",
+  ready: "AI: 準備完了",
+  inferring: "AI: 推論中",
+};
+
+function LlmStatusDot({ status }: { status: LlmStatusState }) {
+  const dotClass = clsx(
+    "w-2.5 h-2.5 rounded-full shrink-0 transition-colors",
+    {
+      "bg-foreground-muted": status === "off",
+      "bg-yellow-400": status === "loading",
+      "bg-emerald-500": status === "ready",
+      "bg-emerald-500 animate-llm-pulse": status === "inferring",
+    },
+  );
+
+  return (
+    <span title={LLM_STATUS_LABELS[status]} className="flex items-center">
+      <span className={dotClass} />
+    </span>
+  );
+}
+
 function EditorToolbar({
   isVertical,
   onToggleVertical,
@@ -405,6 +439,8 @@ function EditorToolbar({
   onLineHeightChange,
   onParagraphSpacingChange,
   onSearchClick,
+  llmEnabled = false,
+  llmModelId = "",
 }: {
   isVertical: boolean;
   onToggleVertical: () => void;
@@ -415,7 +451,10 @@ function EditorToolbar({
   onLineHeightChange: (v: number) => void;
   onParagraphSpacingChange: (v: number) => void;
   onSearchClick: () => void;
+  llmEnabled?: boolean;
+  llmModelId?: string;
 }) {
+  const llmStatus = useLlmStatus(llmEnabled, llmModelId);
   // Options matching the 書式 menu ranges/steps
   const fontScaleOptions = Array.from({ length: 13 }, (_, i) => 50 + i * 10); // 50–170
   const lineHeightOptions = Array.from({ length: 21 }, (_, i) => +(1.0 + i * 0.1).toFixed(1)); // 1.0–3.0
@@ -449,6 +488,9 @@ function EditorToolbar({
         <div className="text-xs text-foreground-tertiary whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
           illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
         </div>
+
+        {/* LLM status indicator */}
+        <LlmStatusDot status={llmStatus} />
 
         {/* 検索 */}
         <button
