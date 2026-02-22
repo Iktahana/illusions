@@ -30,6 +30,7 @@ import { useTabManager } from "@/lib/use-tab-manager";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
 import TabBar from "@/components/TabBar";
 import { useElectronMenuHandlers } from "@/lib/use-electron-menu-handlers";
+import { useExport } from "@/lib/export/use-export";
 import { useWebMenuHandlers } from "@/lib/use-web-menu-handlers";
 import { useGlobalShortcuts } from "@/lib/use-global-shortcuts";
 import { isElectronRenderer } from "@/lib/runtime-env";
@@ -219,6 +220,19 @@ export default function EditorPage() {
   // Electron menu "New" and "Open" bindings (with safety checks)
   useElectronMenuHandlers(newFile, openFile);
 
+  // Export hook: handles PDF/EPUB/DOCX export with notifications
+  const getExportContent = useCallback(() => content, [content]);
+  const getExportTitle = useCallback(() => {
+    const tab = tabs.find((t) => t.id === activeTabId);
+    const name = tab?.file?.name ?? "untitled";
+    return name.replace(/\.[^.]+$/, "");
+  }, [tabs, activeTabId]);
+
+  const { exportAs } = useExport({
+    getContent: getExportContent,
+    getTitle: getExportTitle,
+  });
+
   // System file open: tab manager handles loading; we just update editor key
   useEffect(() => {
     if (!onSystemFileOpen) return;
@@ -254,6 +268,7 @@ export default function EditorPage() {
     onOpenRecentProject: (projectId: string) => openRecentProjectRef.current(projectId),
     onCloseWindow: () => window.close(),
     onToggleCompactMode: () => toggleCompactModeRef.current(),
+    onExport: (format) => void exportAs(format),
     editorView: editorViewInstance,
     fontScale,
     onFontScaleChange: (scale: number) => fontScaleChangeRef.current(scale),

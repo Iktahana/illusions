@@ -45,6 +45,22 @@ declare global {
     onToggleCompactMode?: (callback: () => void) => (() => void) | void;
     onFormatChange?: (callback: (setting: string, action: string) => void) => (() => void) | void;
     onThemeChange?: (callback: (mode: "auto" | "light" | "dark") => void) => (() => void) | void;
+    // Export
+    exportPDF?: (
+      content: string,
+      options: { metadata: { title: string; author?: string; date?: string; language?: string }; verticalWriting?: boolean; pageSize?: 'A4' | 'A5' | 'B5' | 'B6' }
+    ) => Promise<string | { success: false; error: string } | null>;
+    exportEPUB?: (
+      content: string,
+      options: { metadata: { title: string; author?: string; date?: string; language?: string } }
+    ) => Promise<string | { success: false; error: string } | null>;
+    exportDOCX?: (
+      content: string,
+      options: { metadata: { title: string; author?: string; date?: string; language?: string } }
+    ) => Promise<string | { success: false; error: string } | null>;
+    onMenuExportPDF?: (callback: () => void) => (() => void) | void;
+    onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
+    onMenuExportDOCX?: (callback: () => void) => (() => void) | void;
     /** Virtual File System IPC bridge */
     vfs?: {
       /** Open a native directory picker dialog */
