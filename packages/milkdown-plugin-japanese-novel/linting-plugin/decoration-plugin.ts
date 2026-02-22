@@ -101,6 +101,9 @@ export function createLintingPlugin(
   // When true, the next scheduleViewportUpdate will scan ALL paragraphs (not just visible)
   let pendingFullScan = false;
 
+  // When true, the next scheduleLlmUpdate will run L1/L2 validation even if llmEnabled is false
+  let forceLlmValidation = false;
+
   // L3 (LLM) state
   let currentLlmClient: ILlmClient | null = options.llmClient ?? null;
   let llmEnabled = options.llmEnabled ?? false;
@@ -127,7 +130,7 @@ export function createLintingPlugin(
 
       apply(tr, pluginState): LintingPluginState {
         // Update settings via meta
-        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null; nlpClient?: INlpClient | null; llmClient?: ILlmClient | null; llmEnabled?: boolean; forceFullScan?: boolean; ignoredCorrections?: IgnoredCorrection[] }> | undefined;
+        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null; nlpClient?: INlpClient | null; llmClient?: ILlmClient | null; llmEnabled?: boolean; forceFullScan?: boolean; forceLlmValidation?: boolean; ignoredCorrections?: IgnoredCorrection[] }> | undefined;
         if (meta) {
           // If decorations are included, apply directly
           if (meta.decorations !== undefined) {
@@ -177,6 +180,10 @@ export function createLintingPlugin(
             documentIssueCache = null;
             validationCache.clear();
             pendingFullScan = true;
+          }
+          // Force LLM validation on next update (e.g. manual refresh)
+          if (meta.forceLlmValidation) {
+            forceLlmValidation = true;
           }
           // Update ignoredCorrections list if provided
           if ('ignoredCorrections' in meta) {
@@ -401,8 +408,13 @@ export function createLintingPlugin(
         view: EditorView,
         allParagraphs: ParagraphInfo[],
       ): void {
-        if (!llmEnabled || !currentLlmClient) return;
+        if (!currentLlmClient) return;
+        const isForced = forceLlmValidation;
+        if (!isForced && !llmEnabled) return;
         if (llmInFlight) return;
+
+        // Consume the one-shot flag
+        forceLlmValidation = false;
 
         if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
 
@@ -451,8 +463,8 @@ export function createLintingPlugin(
 
             if (processingVersion !== version) return;
 
-            // --- Step 2: Run L3 (LLM) rules ---
-            if (currentRuleRunner?.hasLlmRules()) {
+            // --- Step 2: Run L3 (LLM) rules (only when llmEnabled) ---
+            if (llmEnabled && currentRuleRunner?.hasLlmRules()) {
               const sentences: Array<{ text: string; from: number; to: number }> = [];
               for (const para of allParagraphs) {
                 if (para.text.trim().length === 0) continue;

@@ -117,6 +117,7 @@ export function useLinting(
   }, [lintingEnabled]);
 
   // Force re-run linting on the full document (not just visible paragraphs)
+  // Always provides llmClient for L1/L2 validation regardless of power-save/llmEnabled state
   const refreshLinting = useCallback(() => {
     if (!editorViewInstance || !lintingEnabled) return;
 
@@ -127,17 +128,13 @@ export function useLinting(
           ? getNlpClient()
           : null;
 
-        const llmClient: ILlmClient | null =
-          llmEnabled && ruleRunnerRef.current?.hasLlmRules()
-            ? getLlmClient()
-            : null;
-
         updateLintingSettings(editorViewInstance, {
           ruleRunner: ruleRunnerRef.current,
           nlpClient,
-          llmClient,
+          llmClient: getLlmClient(),
           llmEnabled,
           forceFullScan: true,
+          forceLlmValidation: true,
         });
       },
     ).catch((err) => {
