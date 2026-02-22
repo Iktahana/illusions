@@ -68,6 +68,7 @@ export function updateLintingSettings(
     llmClient?: ILlmClient | null;
     llmEnabled?: boolean;
     forceFullScan?: boolean;
+    forceLlmValidation?: boolean;
     ignoredCorrections?: IgnoredCorrection[];
   }
 ): void {
