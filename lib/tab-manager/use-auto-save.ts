@@ -38,6 +38,9 @@ export function useAutoSave(params: UseAutoSaveParams): void {
 
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const savingTabIdsRef = useRef<Set<string>>(new Set());
+  const mountedRef = useRef(true);
+
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   useEffect(() => {
     if (!autoSaveEnabled) {
@@ -76,13 +79,14 @@ export function useAutoSave(params: UseAutoSaveParams): void {
               const vfs = getVFS();
               suppressFileWatch(tab.file.path);
               await vfs.writeFile(tab.file.path, sanitized);
+              if (!mountedRef.current) return;
               setTabs((prev) =>
                 prev.map((t) =>
                   t.id === tab.id
                     ? {
                         ...t,
                         lastSavedContent: sanitized,
-                        isDirty: sanitizeMdiContent(t.content) !== sanitized,
+                        isDirty: t.content !== tab.content && sanitizeMdiContent(t.content) !== sanitized,
                         lastSavedTime: -Date.now(),
                       }
                     : t,
@@ -95,6 +99,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                 fileType: tab.fileType,
               });
               if (result) {
+                if (!mountedRef.current) return;
                 setTabs((prev) =>
                   prev.map((t) =>
                     t.id === tab.id
@@ -102,7 +107,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                           ...t,
                           file: result.descriptor,
                           lastSavedContent: sanitized,
-                          isDirty: sanitizeMdiContent(t.content) !== sanitized,
+                          isDirty: t.content !== tab.content && sanitizeMdiContent(t.content) !== sanitized,
                           lastSavedTime: -Date.now(),
                         }
                       : t,
@@ -117,6 +122,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
             );
           } finally {
             savingTabIdsRef.current.delete(tab.id);
+            if (!mountedRef.current) return;
             setTabs((prev) =>
               prev.map((t) =>
                 t.id === tab.id ? { ...t, isSaving: false } : t,

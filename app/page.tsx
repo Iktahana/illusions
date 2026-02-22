@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import Explorer, { FilesPanel } from "@/components/Explorer";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
 import EditorDiffView from "@/components/EditorDiffView";
@@ -781,6 +782,7 @@ export default function EditorPage() {
         );
       case "explorer":
         return (
+          <ErrorBoundary sectionName="エクスプローラ">
           <Explorer
             compactMode={compactMode}
             content={content}
@@ -803,6 +805,7 @@ export default function EditorPage() {
             showParagraphNumbers={showParagraphNumbers}
             onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
           />
+          </ErrorBoundary>
         );
       case "search":
         return (
@@ -1028,6 +1031,7 @@ export default function EditorPage() {
                 paragraphSpacing={paragraphSpacing}
               />
             ) : (
+              <ErrorBoundary sectionName="エディタ">
               <NovelEditor
                 key={`tab-${activeTabId}-${editorKey}`}
                 initialContent={content}
@@ -1065,6 +1069,7 @@ export default function EditorPage() {
                 mdiExtensionsEnabled={mdiExtensionsEnabled}
                 gfmEnabled={gfmEnabled}
               />
+              </ErrorBoundary>
             )}
           </div>
 
@@ -1091,6 +1096,7 @@ export default function EditorPage() {
             isCollapsed={isRightPanelCollapsed}
             onToggleCollapse={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
           >
+          <ErrorBoundary sectionName="インスペクタ">
           <Inspector
             compactMode={compactMode}
             charCount={charCount}
@@ -1129,6 +1135,7 @@ export default function EditorPage() {
             activeLintPresetId={activeLintPresetId}
             switchToCorrectionsTrigger={switchToCorrectionsTrigger}
           />
+          </ErrorBoundary>
         </ResizablePanel>
       </div>
     </div>
