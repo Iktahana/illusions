@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { parseMarkdownChapters, getChaptersFromDOM } from "@/lib/utils";
+import { useChapters } from "@/lib/editor-page";
 import { ChapterItem } from "./ChapterItem";
 import { MarkdownSyntaxPanel } from "./MarkdownSyntaxPanel";
 
@@ -14,22 +14,7 @@ interface ChaptersPanelProps {
 
 /** Table of contents panel showing heading-based chapter navigation */
 export function ChaptersPanel({ content, onChapterClick, onInsertText }: ChaptersPanelProps) {
-  const [refreshToken, setRefreshToken] = useState(0);
-
-  // Auto-refresh every 10 seconds
-  useEffect(() => {
-    const timer = setInterval(() => setRefreshToken((v) => v + 1), 10000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Prefer DOM-based chapters (more reliable), fall back to Markdown parsing
-  const chapters = useMemo(() => {
-    const domChapters = getChaptersFromDOM();
-    if (domChapters.length > 0 && domChapters.some(ch => ch.anchorId)) {
-      return domChapters;
-    }
-    return parseMarkdownChapters(content);
-  }, [content, refreshToken]);
+  const { chapters, refresh } = useChapters(content);
   const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
 
   return (
@@ -43,7 +28,7 @@ export function ChaptersPanel({ content, onChapterClick, onInsertText }: Chapter
           aria-label="目次を更新"
           onClick={() => {
             setShowSyntaxHelp(false);
-            setRefreshToken((v) => v + 1);
+            refresh();
           }}
         >
           <RefreshCw className="w-4 h-4 text-foreground-secondary" />
