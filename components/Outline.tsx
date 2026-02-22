@@ -1,9 +1,10 @@
 "use client";
 
-import { ReactNode, useMemo, useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { RefreshCw } from "lucide-react";
 import clsx from "clsx";
-import { getChaptersFromDOM, parseMarkdownChapters, type Chapter } from "@/lib/utils";
+import type { Chapter } from "@/lib/utils";
+import { useChapters } from "@/lib/editor-page";
 
 interface OutlineProps {
   className?: string;
@@ -17,24 +18,7 @@ export default function Outline({
   onHeadingClick,
 }: OutlineProps): React.ReactElement {
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState(0);
-
-  // 10秒ごとに自動更新
-  useEffect(() => {
-    const timer = setInterval(() => setRefreshToken((v) => v + 1), 10000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // まずDOMから見出し情報を取得し（より確実）、なければMarkdown解析にフォールバック
-  const headings = useMemo(() => {
-    const domHeadings = getChaptersFromDOM();
-    // DOM側でアンカーIDが取れるなら、それを優先して使う
-    if (domHeadings.length > 0 && domHeadings.some((h) => h.anchorId)) {
-      return domHeadings;
-    }
-    // それ以外はMarkdownを解析して見出し情報を作る
-    return parseMarkdownChapters(content);
-  }, [content, refreshToken]);
+  const { chapters: headings, refresh } = useChapters(content);
 
   // スクロールイベントで現在のセクションを追跡
   useEffect(() => {
@@ -92,7 +76,7 @@ export default function Outline({
           className="p-1 hover:bg-hover rounded transition-colors text-foreground-tertiary hover:text-foreground"
           title="アウトラインを更新"
           aria-label="アウトラインを更新"
-          onClick={() => setRefreshToken((v) => v + 1)}
+          onClick={refresh}
         >
           <RefreshCw className="w-4 h-4" />
         </button>
