@@ -485,10 +485,6 @@ function EditorToolbar({
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="text-xs text-foreground-tertiary whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
-          illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
-        </div>
-
         {/* LLM status indicator */}
         <LlmStatusDot status={llmStatus} />
 

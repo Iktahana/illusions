@@ -473,6 +473,7 @@ export default function EditorPage() {
     lintingRuleConfigs,
     editorViewInstance,
     llmEnabled,
+    powerSaveMode,
   );
 
   // --- Ignored corrections hook ---
