@@ -155,14 +155,14 @@ export function StylePanel({
           <button
             onClick={() => onAutoCharsPerLineChange?.(!autoCharsPerLine)}
             className={clsx(
-              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out",
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
               autoCharsPerLine ? "bg-accent" : "bg-border-secondary"
             )}
           >
             <span
               className={clsx(
-                "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition duration-200 ease-in-out",
-                autoCharsPerLine ? "translate-x-5" : "translate-x-0"
+                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm",
+                autoCharsPerLine ? "translate-x-6" : "translate-x-1"
               )}
             />
           </button>
