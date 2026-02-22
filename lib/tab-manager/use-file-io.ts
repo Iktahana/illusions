@@ -177,7 +177,9 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       setActiveTabId(tab.id);
     }
 
-    void persistFileReference(descriptor, fileContent);
+    persistFileReference(descriptor, fileContent).catch(() => {
+      notificationManager.warning("ファイル参照の保存に失敗しました");
+    });
   }, [findTabByPath, updateTab, persistFileReference, setTabs, setActiveTabId, tabsRef, activeTabIdRef]);
 
   /** Save the active tab */
@@ -213,7 +215,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
                 : t,
             ),
           );
-          void tryAutoSnapshot(tab.file.name, sanitized);
+          await tryAutoSnapshot(tab.file.name, sanitized);
           return;
         }
 
@@ -238,8 +240,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
                 : t,
             ),
           );
-          void persistFileReference(result.descriptor, sanitized);
-          void tryAutoSnapshot(result.descriptor.name, sanitized);
+          await persistFileReference(result.descriptor, sanitized);
+          await tryAutoSnapshot(result.descriptor.name, sanitized);
         } else {
           updateTab(tabId, { isSaving: false });
         }
@@ -282,8 +284,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           lastSavedTime: Date.now(),
           isSaving: false,
         });
-        void persistFileReference(result.descriptor, sanitized);
-        void tryAutoSnapshot(result.descriptor.name, sanitized);
+        await persistFileReference(result.descriptor, sanitized);
+        await tryAutoSnapshot(result.descriptor.name, sanitized);
       } else {
         updateTab(tabId, { isSaving: false });
       }
