@@ -151,7 +151,7 @@ export function StylePanel({
             )}
           />
           <span className="text-sm text-foreground-secondary">字</span>
-          <span className="text-sm text-foreground-secondary ml-2">自動</span>
+          <span className="text-sm text-foreground-secondary ml-auto">自動</span>
           <button
             onClick={() => onAutoCharsPerLineChange?.(!autoCharsPerLine)}
             className={clsx(
