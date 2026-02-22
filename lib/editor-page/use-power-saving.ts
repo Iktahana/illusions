@@ -5,6 +5,7 @@ import { notificationManager } from "@/lib/notification-manager";
 
 interface UsePowerSavingOptions {
   powerSaveMode: boolean;
+  autoPowerSaveOnBattery: boolean;
   onPowerSaveModeChange: (enabled: boolean) => void;
 }
 
@@ -16,11 +17,15 @@ interface UsePowerSavingOptions {
  */
 export function usePowerSaving({
   powerSaveMode,
+  autoPowerSaveOnBattery,
   onPowerSaveModeChange,
 }: UsePowerSavingOptions): void {
   // Use refs to avoid stale closures in the IPC callback
   const powerSaveModeRef = useRef(powerSaveMode);
   powerSaveModeRef.current = powerSaveMode;
+
+  const autoPowerSaveRef = useRef(autoPowerSaveOnBattery);
+  autoPowerSaveRef.current = autoPowerSaveOnBattery;
 
   const onChangeRef = useRef(onPowerSaveModeChange);
   onChangeRef.current = onPowerSaveModeChange;
@@ -31,7 +36,7 @@ export function usePowerSaving({
     if (!api?.power) return;
 
     const cleanup = api.power.onPowerStateChange((state) => {
-      if (state === "battery" && !powerSaveModeRef.current) {
+      if (state === "battery" && !powerSaveModeRef.current && autoPowerSaveRef.current) {
         // Show in-app notification with action buttons
         notificationManager.showMessage(
           "バッテリー駆動を検出しました。省電力モードを有効にしますか？\n校正機能とAI関連機能が一時的に無効になります。",

@@ -26,6 +26,7 @@ export interface EditorSettings {
   llmEnabled: boolean;
   llmModelId: string;
   powerSaveMode: boolean;
+  autoPowerSaveOnBattery: boolean;
 }
 
 export interface EditorSettingsHandlers {
@@ -50,6 +51,7 @@ export interface EditorSettingsHandlers {
   handleLlmEnabledChange: (value: boolean) => void;
   handleLlmModelIdChange: (modelId: string) => void;
   handlePowerSaveModeChange: (enabled: boolean) => void;
+  handleAutoPowerSaveOnBatteryChange: (enabled: boolean) => void;
 }
 
 export interface EditorSettingsSetters {
@@ -98,6 +100,7 @@ export function useEditorSettings(
   const [llmEnabled, setLlmEnabled] = useState(false);
   const [llmModelId, setLlmModelId] = useState("qwen3-1.7b-q8");
   const [powerSaveMode, setPowerSaveMode] = useState(false);
+  const [autoPowerSaveOnBattery, setAutoPowerSaveOnBattery] = useState(true);
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -175,6 +178,7 @@ export function useEditorSettings(
           setLintingRuleConfigs(sanitized);
         }
         if (appState.powerSaveMode !== undefined) setPowerSaveMode(appState.powerSaveMode);
+        if (appState.autoPowerSaveOnBattery !== undefined) setAutoPowerSaveOnBattery(appState.autoPowerSaveOnBattery);
         // Force editor rebuild to apply restored settings (e.g. custom font)
         incrementEditorKey();
       } catch (error) {
@@ -379,6 +383,13 @@ export function useEditorSettings(
     }
   }, [lintingEnabled, lintingRuleConfigs, llmEnabled]);
 
+  const handleAutoPowerSaveOnBatteryChange = useCallback((enabled: boolean) => {
+    setAutoPowerSaveOnBattery(enabled);
+    void persistAppState({ autoPowerSaveOnBattery: enabled }).catch((error) => {
+      console.error("Failed to persist autoPowerSaveOnBattery:", error);
+    });
+  }, []);
+
   return {
     settings: {
       fontScale,
@@ -401,6 +412,7 @@ export function useEditorSettings(
       llmEnabled,
       llmModelId,
       powerSaveMode,
+      autoPowerSaveOnBattery,
     },
     handlers: {
       handleFontScaleChange,
@@ -424,6 +436,7 @@ export function useEditorSettings(
       handleLlmEnabledChange,
       handleLlmModelIdChange,
       handlePowerSaveModeChange,
+      handleAutoPowerSaveOnBatteryChange,
     },
     setters: {
       setLineHeight,
