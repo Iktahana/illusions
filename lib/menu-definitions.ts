@@ -37,6 +37,15 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
       { label: '保存', accelerator: 'Ctrl+S', action: 'save-file' },
       { label: '別名で保存...', accelerator: 'Shift+Ctrl+S', action: 'save-as' },
       { type: 'separator' },
+      {
+        label: 'エクスポート',
+        submenu: [
+          { label: 'PDF としてエクスポート...', action: 'export-pdf' },
+          { label: 'EPUB としてエクスポート...', action: 'export-epub' },
+          { label: 'DOCX としてエクスポート...', action: 'export-docx' },
+        ],
+      },
+      { type: 'separator' },
       { label: '閉じる', accelerator: 'Ctrl+W', action: 'close-window' },
     ]
   },

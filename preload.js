@@ -98,6 +98,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu-theme', handler)
     return () => ipcRenderer.removeListener('menu-theme', handler)
   },
+  // Export
+  exportPDF: (content, options) => ipcRenderer.invoke('export-pdf', content, options),
+  exportEPUB: (content, options) => ipcRenderer.invoke('export-epub', content, options),
+  exportDOCX: (content, options) => ipcRenderer.invoke('export-docx', content, options),
+  onMenuExportPDF: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-export-pdf', handler)
+    return () => ipcRenderer.removeListener('menu-export-pdf', handler)
+  },
+  onMenuExportEPUB: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-export-epub', handler)
+    return () => ipcRenderer.removeListener('menu-export-epub', handler)
+  },
+  onMenuExportDOCX: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-export-docx', handler)
+    return () => ipcRenderer.removeListener('menu-export-docx', handler)
+  },
   nlp: {
     init: (dicPath) => ipcRenderer.invoke('nlp:init', dicPath),
     tokenizeParagraph: (text) => ipcRenderer.invoke('nlp:tokenize-paragraph', text),

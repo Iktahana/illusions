@@ -282,6 +282,24 @@ function buildApplicationMenu(recentProjects = []) {
       },
       { type: 'separator' },
       {
+        label: 'エクスポート',
+        submenu: [
+          {
+            label: 'PDF としてエクスポート...',
+            click: () => sendToFocused('menu-export-pdf'),
+          },
+          {
+            label: 'EPUB としてエクスポート...',
+            click: () => sendToFocused('menu-export-epub'),
+          },
+          {
+            label: 'DOCX としてエクスポート...',
+            click: () => sendToFocused('menu-export-docx'),
+          },
+        ],
+      },
+      { type: 'separator' },
+      {
         label: '新しいタブ',
         accelerator: 'CmdOrCtrl+T',
         click: () => {
@@ -863,6 +881,80 @@ ipcMain.handle('save-file', async (_event, filePath, content, fileType) => {
     }
     log.error('詳細エラー情報:', errorDetails)
     return { success: false, error: errorDetails.message, code: errorDetails.code }
+  }
+})
+
+// --- Export handlers ---
+
+ipcMain.handle('export-pdf', async (_event, content, options) => {
+  if (typeof content !== 'string') {
+    return { success: false, error: 'Invalid content' }
+  }
+  try {
+    const { generatePdf } = require('./lib/export/pdf-exporter')
+    const pdfBuffer = await generatePdf(content, options || {})
+
+    const { filePath } = await dialog.showSaveDialog({
+      title: 'PDFとしてエクスポート',
+      defaultPath: `${(options?.metadata?.title || 'untitled')}.pdf`,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    })
+
+    if (!filePath) return null
+    await fs.writeFile(filePath, pdfBuffer)
+    log.info(`Exported PDF: ${filePath}`)
+    return filePath
+  } catch (error) {
+    log.error('PDF export failed:', error)
+    return { success: false, error: error.message || 'PDF export failed' }
+  }
+})
+
+ipcMain.handle('export-epub', async (_event, content, options) => {
+  if (typeof content !== 'string') {
+    return { success: false, error: 'Invalid content' }
+  }
+  try {
+    const { generateEpub } = require('./lib/export/epub-exporter')
+    const epubBuffer = await generateEpub(content, options || {})
+
+    const { filePath } = await dialog.showSaveDialog({
+      title: 'EPUBとしてエクスポート',
+      defaultPath: `${(options?.metadata?.title || 'untitled')}.epub`,
+      filters: [{ name: 'EPUB', extensions: ['epub'] }],
+    })
+
+    if (!filePath) return null
+    await fs.writeFile(filePath, epubBuffer)
+    log.info(`Exported EPUB: ${filePath}`)
+    return filePath
+  } catch (error) {
+    log.error('EPUB export failed:', error)
+    return { success: false, error: error.message || 'EPUB export failed' }
+  }
+})
+
+ipcMain.handle('export-docx', async (_event, content, options) => {
+  if (typeof content !== 'string') {
+    return { success: false, error: 'Invalid content' }
+  }
+  try {
+    const { generateDocx } = require('./lib/export/docx-exporter')
+    const docxBuffer = await generateDocx(content, options || {})
+
+    const { filePath } = await dialog.showSaveDialog({
+      title: 'DOCXとしてエクスポート',
+      defaultPath: `${(options?.metadata?.title || 'untitled')}.docx`,
+      filters: [{ name: 'Word Document', extensions: ['docx'] }],
+    })
+
+    if (!filePath) return null
+    await fs.writeFile(filePath, docxBuffer)
+    log.info(`Exported DOCX: ${filePath}`)
+    return filePath
+  } catch (error) {
+    log.error('DOCX export failed:', error)
+    return { success: false, error: error.message || 'DOCX export failed' }
   }
 })
 

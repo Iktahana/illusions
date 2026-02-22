@@ -12,6 +12,7 @@ interface UseWebMenuHandlersProps {
   onOpenRecentProject?: (projectId: string) => void;
   onCloseWindow?: () => void;
   onToggleCompactMode?: () => void;
+  onExport?: (format: 'pdf' | 'epub' | 'docx') => void;
   editorView?: EditorView | null;
   fontScale?: number;
   onFontScaleChange?: (scale: number) => void;
@@ -26,6 +27,7 @@ export function useWebMenuHandlers({
   onOpenRecentProject,
   onCloseWindow,
   onToggleCompactMode,
+  onExport,
   editorView,
   fontScale = 100,
   onFontScaleChange,
@@ -56,6 +58,17 @@ export function useWebMenuHandlers({
         break;
       case 'close-window':
         onCloseWindow?.();
+        break;
+
+      // Export
+      case 'export-pdf':
+        onExport?.('pdf');
+        break;
+      case 'export-epub':
+        onExport?.('epub');
+        break;
+      case 'export-docx':
+        onExport?.('docx');
         break;
 
       // Edit menu - Using ProseMirror commands
@@ -142,7 +155,7 @@ export function useWebMenuHandlers({
         }
         console.warn('[Web Menu] Unknown action:', action);
     }
-  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, onToggleCompactMode, editorView, fontScale, onFontScaleChange]);
+  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, onToggleCompactMode, onExport, editorView, fontScale, onFontScaleChange]);
   
   return { handleMenuAction };
 }
