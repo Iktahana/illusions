@@ -216,13 +216,18 @@ export function sanitizeMdiContent(content: string): string {
   // Step 2: Remove properly paired known HTML tags, keeping inner content.
   // Only matched pairs (e.g. <div>...</div>) are stripped; an orphaned
   // `<B>` without a closing `</B>` is left untouched.
-  result = result.replace(
-    new RegExp(
-      `<(${PAIRED_HTML_TAGS.join("|")})(\\s[^>]*)?>([\\s\\S]*?)<\\/\\1>`,
-      "gi",
-    ),
-    "$3",
+  // Loop until stable so nested identical tags (e.g. <div><div>x</div></div>)
+  // are fully stripped.
+  const pairedTagPattern = new RegExp(
+    `<(${PAIRED_HTML_TAGS.join("|")})(\\s[^>]*)?>([\\s\\S]*?)<\\/\\1>`,
+    "gi",
   );
+  let prev = result;
+  result = result.replace(pairedTagPattern, "$3");
+  while (result !== prev) {
+    prev = result;
+    result = result.replace(pairedTagPattern, "$3");
+  }
   // Step 3: Remove void HTML elements (img, hr, etc.) which are always
   // self-closing and cannot be confused with user content.
   result = result.replace(VOID_TAG_PATTERN, "");
