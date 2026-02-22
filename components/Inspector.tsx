@@ -50,6 +50,10 @@ export default function Inspector({
   onOpenLintingSettings,
   onApplyLintPreset,
   activeLintPresetId,
+  lintingEnabled = false,
+  onLintingEnabledChange,
+  lintingRuleConfigs,
+  onLintingRuleConfigChange,
   switchToCorrectionsTrigger = 0,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
@@ -377,6 +381,10 @@ export default function Inspector({
              onOpenLintingSettings={onOpenLintingSettings}
              onApplyLintPreset={onApplyLintPreset}
              activeLintPresetId={activeLintPresetId}
+             lintingEnabled={lintingEnabled}
+             onLintingEnabledChange={onLintingEnabledChange}
+             lintingRuleConfigs={lintingRuleConfigs}
+             onLintingRuleConfigChange={onLintingRuleConfigChange}
            />
          )}
          {activeTab === "stats" && (
