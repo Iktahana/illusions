@@ -25,6 +25,7 @@ import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
 import type { SettingsCategory } from "@/components/SettingsModal";
 import { LINT_PRESETS, LINT_RULES_META, LINT_DEFAULT_CONFIGS } from "@/lib/linting/lint-presets";
+import { notificationManager } from "@/lib/notification-manager";
 import RubyDialog from "@/components/RubyDialog";
 import { useTabManager } from "@/lib/use-tab-manager";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
@@ -44,7 +45,6 @@ import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
 import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
-import { notificationManager } from "@/lib/notification-manager";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { LintIssue } from "@/lib/linting/types";
@@ -73,6 +73,13 @@ export default function EditorPage() {
   const incrementEditorKey = useCallback(() => {
     setEditorKey(prev => prev + 1);
   }, []);
+
+  // Deferred promise gate: tab restoration waits until VFS root is set
+  const [vfsGate] = useState(() => {
+    let resolve!: () => void;
+    const promise = new Promise<void>((r) => { resolve = r; });
+    return { promise, resolve };
+  });
 
   // --- Editor settings hook ---
   const { settings, handlers: settingsHandlers, setters: settingsSetters } = useEditorSettings(incrementEditorKey);
@@ -106,14 +113,7 @@ export default function EditorPage() {
     onPowerSaveModeChange: handlePowerSaveModeChange,
   });
 
-  // VFS root readiness: in Electron, tab restoration must wait for the
-  // project lifecycle to set the VFS root via vfs:set-root IPC so that
-  // subsequent vfs:read-file calls pass the allowed-root validation.
-  // In Web mode, there is no such restriction.
-  const [vfsReady, setVfsReady] = useState(!isElectron);
-  const handleVfsReady = useCallback(() => setVfsReady(true), []);
-
-  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReady });
+  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReadyPromise: vfsGate.promise });
   const {
     content, setContent, currentFile, isDirty, isSaving, lastSavedTime,
     openFile: tabOpenFile, saveFile, saveAsFile,
@@ -155,7 +155,7 @@ export default function EditorPage() {
     content,
     skipAutoRestore,
     lastSavedTime,
-    onVfsReady: handleVfsReady,
+    onVfsReady: vfsGate.resolve,
   });
   const {
     state: {
@@ -634,26 +634,20 @@ export default function EditorPage() {
     }
   }, [editorViewInstance, ignoreCorrection]);
 
-  /** Apply a lint fix by replacing the text range, with text verification */
-  const handleApplyFix = useCallback((issue: LintIssue) => {
+  /** Apply a lint fix by replacing the text range */
+  const handleApplyFix = useCallback((issue: LintIssue & { originalText?: string }) => {
     if (!editorViewInstance || !issue.fix) return;
     const { state, dispatch } = editorViewInstance;
-    const clampedTo = Math.min(issue.to, state.doc.content.size);
-    const clampedFrom = Math.min(issue.from, clampedTo);
-
-    // Verify the text at target range still matches the original text
-    if (issue.originalText) {
-      const currentText = state.doc.textBetween(clampedFrom, clampedTo, "");
-      if (currentText !== issue.originalText) {
-        notificationManager.warning(
-          "テキストが変更されたため、修正を適用できません。校正を再実行してください。",
-          5000,
-        );
-        return;
-      }
+    if (issue.to > state.doc.content.size) {
+      notificationManager.warning("テキストが変更されたため修正を適用できません");
+      return;
     }
-
-    const tr = state.tr.insertText(issue.fix.replacement, clampedFrom, clampedTo);
+    const currentText = state.doc.textBetween(issue.from, issue.to, "");
+    if (issue.originalText && currentText !== issue.originalText) {
+      notificationManager.warning("テキストが変更されたため修正を適用できません");
+      return;
+    }
+    const tr = state.tr.insertText(issue.fix.replacement, issue.from, issue.to);
     dispatch(tr);
   }, [editorViewInstance]);
 

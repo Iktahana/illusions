@@ -19,6 +19,9 @@
     "electron:dev": "npm run bundle:electron && concurrently \"next dev -p 3020 --webpack\" \"wait-on http://localhost:3020 && cross-env ELECTRON_DEV=1 electron .\"",
     "electron:build": "npm run type-check && npm run generate:credits && cross-env ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron && electron-builder",
     "build:quicklook": "bash scripts/build-quicklook.sh",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "generate:credits": "npx tsx scripts/generate-credits.ts",
     "postinstall": "electron-builder install-app-deps"
   },
@@ -71,6 +74,7 @@
     "@types/node": "^22.10.5",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
+    "@vitest/coverage-v8": "^4.0.18",
     "autoprefixer": "^10.4.23",
     "clsx": "^2.1.1",
     "concurrently": "^9.2.1",
@@ -82,6 +86,7 @@
     "esbuild": "^0.27.3",
     "eslint": "^9.18.0",
     "eslint-config-next": "^16.1.6",
+    "jsdom": "^28.1.0",
     "license-checker": "^25.0.1",
     "lucide-react": "^0.469.0",
     "postcss": "^8.4.49",
@@ -91,6 +96,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
     "unist-util-visit": "^5.0.0",
+    "vitest": "^4.0.18",
     "wait-on": "^9.0.3"
   },
   "build": {

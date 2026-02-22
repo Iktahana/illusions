@@ -10,6 +10,8 @@
  */
 
 import { isElectronRenderer } from "../runtime-env";
+import { ElectronVFS } from "./electron-vfs";
+import { WebVFS } from "./web-vfs";
 
 import type { VirtualFileSystem } from "./types";
 
@@ -17,24 +19,15 @@ let instance: VirtualFileSystem | null = null;
 
 /**
  * Get or create the global VFS instance.
- * Uses dynamic require to avoid bundling the wrong implementation.
+ * Selects the appropriate implementation based on the runtime environment.
  *
  * @returns Singleton VirtualFileSystem instance
  */
 export function getVFS(): VirtualFileSystem {
   if (!instance) {
     if (isElectronRenderer()) {
-      // Use require to avoid bundling Electron code in web builds
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { ElectronVFS } = require("./electron-vfs") as {
-        ElectronVFS: new () => VirtualFileSystem;
-      };
       instance = new ElectronVFS();
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { WebVFS } = require("./web-vfs") as {
-        WebVFS: new () => VirtualFileSystem;
-      };
       instance = new WebVFS();
     }
   }

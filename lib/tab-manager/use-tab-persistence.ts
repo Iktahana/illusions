@@ -20,13 +20,8 @@ import {
 export interface UseTabPersistenceParams extends TabManagerCore {
   /** Whether to skip auto-restore on mount. */
   skipAutoRestore: boolean;
-  /**
-   * Whether the VFS root has been initialized (Electron only).
-   * Tab restoration is deferred until this becomes true so that
-   * `vfs:read-file` IPC calls do not fail before the main process
-   * has a registered allowed root directory.
-   */
-  vfsReady: boolean;
+  /** Promise that resolves once the VFS root is set (Electron only). */
+  vfsReadyPromise?: Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +50,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     setActiveTabId,
     isElectron,
     skipAutoRestore,
-    vfsReady,
+    vfsReadyPromise,
   } = params;
 
   const [wasAutoRecovered, setWasAutoRecovered] = useState(false);
@@ -189,16 +184,23 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
   }, [isElectron, skipAutoRestore, setTabs]);
 
   // --- Restore tabs from AppState on mount (Electron only) ----------------
-  // Wait for vfsReady so that the main process has a registered allowed root
-  // before we attempt vfs:read-file IPC calls.
+  // Wait for VFS root to be set so that the main process has a registered
+  // allowed root before we attempt vfs:read-file IPC calls.
 
   useEffect(() => {
     if (!isElectron || skipAutoRestore) return;
     if (!window.electronAPI?.vfs?.readFile) return;
-    if (!vfsReady) return;
 
     const restoreTabs = async () => {
       try {
+        // Wait for VFS root to be set before reading files (prevents race condition)
+        if (vfsReadyPromise) {
+          await Promise.race([
+            vfsReadyPromise,
+            new Promise<void>((r) => setTimeout(r, 5000)),
+          ]);
+        }
+
         const appState = await fetchAppState();
         const openTabs = appState?.openTabs;
         if (!openTabs || openTabs.tabs.length === 0) return;
@@ -247,7 +249,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     };
 
     void restoreTabs();
-  }, [isElectron, skipAutoRestore, vfsReady, setTabs, setActiveTabId]);
+  }, [isElectron, skipAutoRestore, setTabs, setActiveTabId, vfsReadyPromise]);
 
   return { wasAutoRecovered };
 }

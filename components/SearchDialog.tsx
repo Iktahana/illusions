@@ -86,53 +86,22 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
     const foundMatches: SearchMatch[] = [];
     const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
 
-    // Build a mapping from textContent offset to ProseMirror position.
-    // doc.textContent concatenates all text nodes without any separator,
-    // but ProseMirror positions include structural offsets for block
-    // boundaries (each paragraph boundary occupies positions that
-    // textContent does not account for).
-    const textSegments: { textOffset: number; pmPos: number; length: number }[] = [];
-    let textOffset = 0;
-    doc.descendants((node, nodePos) => {
+    // Search within each text node using correct ProseMirror positions
+    doc.descendants((node, pos) => {
       if (node.isText && node.text) {
-        textSegments.push({ textOffset, pmPos: nodePos, length: node.text.length });
-        textOffset += node.text.length;
-      }
-      return true;
-    });
-
-    const fullText = doc.textContent;
-    const searchText = caseSensitive ? fullText : fullText.toLowerCase();
-
-    // Convert a textContent offset to the correct ProseMirror position
-    const textOffsetToPmPos = (offset: number): number => {
-      for (const seg of textSegments) {
-        if (offset >= seg.textOffset && offset < seg.textOffset + seg.length) {
-          return seg.pmPos + (offset - seg.textOffset);
+        const nodeText = caseSensitive ? node.text : node.text.toLowerCase();
+        let searchIndex = 0;
+        while (searchIndex < nodeText.length) {
+          const matchIndex = nodeText.indexOf(searchStr, searchIndex);
+          if (matchIndex === -1) break;
+          foundMatches.push({
+            from: pos + matchIndex,
+            to: pos + matchIndex + searchTerm.length,
+          });
+          searchIndex = matchIndex + 1;
         }
       }
-      // Offset is at the very end of the last segment
-      const last = textSegments[textSegments.length - 1];
-      if (last && offset === last.textOffset + last.length) {
-        return last.pmPos + last.length;
-      }
-      return -1;
-    };
-
-    let searchIndex = 0;
-    while (searchIndex < searchText.length) {
-      const matchIndex = searchText.indexOf(searchStr, searchIndex);
-      if (matchIndex === -1) break;
-
-      const from = textOffsetToPmPos(matchIndex);
-      const to = textOffsetToPmPos(matchIndex + searchTerm.length);
-
-      if (from > 0 && to > 0) {
-        foundMatches.push({ from, to });
-      }
-      searchIndex = matchIndex + 1;
-    }
-
+    });
     setMatches(foundMatches);
     setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1);
   }, [searchTerm, caseSensitive, editorView]);

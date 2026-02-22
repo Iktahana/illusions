@@ -109,7 +109,7 @@ export class ParticleNoRepetitionRule extends AbstractLintRule {
   lint(text: string, config: LintRuleConfig): LintIssue[] {
     if (!text) return [];
 
-    const maskedText = maskDialogue(text);
+    const maskedText = config.skipDialogue ? maskDialogue(text) : text;
     const threshold = (config.options?.threshold as number) ?? 4;
     const sentences = splitIntoSentences(maskedText);
     const issues: LintIssue[] = [];

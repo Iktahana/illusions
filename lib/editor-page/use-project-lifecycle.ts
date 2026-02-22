@@ -27,11 +27,7 @@ interface UseProjectLifecycleParams {
   skipAutoRestore: boolean;
   /** Last saved timestamp from tab manager (needed for upgrade-banner triggers) */
   lastSavedTime: number | null;
-  /**
-   * Callback invoked when the VFS root directory has been initialized.
-   * Used to coordinate tab restoration which depends on the VFS root
-   * being set in the main process before `vfs:read-file` IPC calls succeed.
-   */
+  /** Called once after the VFS root has been set (or when no project to restore) */
   onVfsReady?: () => void;
 }
 
@@ -102,6 +98,17 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
   const isAutoRestoringRef = useRef(false);
   const [confirmRemoveRecent, setConfirmRemoveRecent] = useState<{ projectId: string; message: string } | null>(null);
   const [autoRestoreProjectId, setAutoRestoreProjectId] = useState<string | null>(null);
+
+  // VFS readiness signal: ensures onVfsReady is called exactly once
+  const vfsReadyFiredRef = useRef(false);
+  const onVfsReadyRef = useRef(onVfsReady);
+  onVfsReadyRef.current = onVfsReady;
+
+  const signalVfsReady = useCallback(() => {
+    if (vfsReadyFiredRef.current) return;
+    vfsReadyFiredRef.current = true;
+    onVfsReadyRef.current?.();
+  }, []);
 
   // Upgrade banner state
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
@@ -232,7 +239,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
             setAutoRestoreProjectId(projects[0].id);
           } else {
             setIsRestoring(false);
-            onVfsReady?.();
+            signalVfsReady();
           }
         } else {
           const projectManager = getProjectManager();
@@ -251,13 +258,13 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
             setAutoRestoreProjectId(handles[0].projectId);
           } else {
             setIsRestoring(false);
-            onVfsReady?.();
+            signalVfsReady();
           }
         }
       } catch (error) {
         console.error("Failed to load recent projects:", error);
         setIsRestoring(false);
-        onVfsReady?.();
+        signalVfsReady();
       }
     };
 
@@ -266,7 +273,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     return () => {
       mounted = false;
     };
-  }, [isElectron, skipAutoRestore, onVfsReady]);
+  }, [isElectron, skipAutoRestore, signalVfsReady]);
 
   // --- Handlers ---
 
@@ -371,8 +378,9 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         try {
           const vfs = getVFS();
           if ("setRootPath" in vfs) {
-            (vfs as { setRootPath: (p: string) => void }).setRootPath(project.rootPath);
+            await (vfs as { setRootPath: (p: string) => Promise<void> }).setRootPath(project.rootPath);
           }
+          signalVfsReady();
           const rootDirHandle = await vfs.getDirectoryHandle("");
           const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions");
           const projectJsonHandle = await illusionsDir.getFileHandle("project.json");
@@ -407,6 +415,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
           setProjectMode(restoredProject);
           await loadProjectContent(restoredProject);
         } catch (error) {
+          signalVfsReady();
           console.error("Failed to load project:", error);
           console.error("Project path:", project.rootPath);
 
@@ -454,14 +463,14 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     } catch (error) {
       console.error("Failed to open recent project:", error);
     }
-  }, [isElectron, setProjectMode, openRestoredProject, loadProjectContent]);
+  }, [isElectron, setProjectMode, openRestoredProject, loadProjectContent, signalVfsReady]);
 
   /** Open a project from a file system path (when .mdi file is double-clicked in a project directory) */
   const handleOpenAsProject = useCallback(async (projectPath: string, initialFile: string) => {
     try {
       const vfs = getVFS();
       if ("setRootPath" in vfs) {
-        (vfs as { setRootPath: (p: string) => void }).setRootPath(projectPath);
+        await (vfs as { setRootPath: (p: string) => Promise<void> }).setRootPath(projectPath);
       }
 
       const rootDirHandle = await vfs.getDirectoryHandle("");

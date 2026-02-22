@@ -418,14 +418,14 @@ export class ElectronVFS implements VirtualFileSystem {
    * Also updates the main process allowed root for path validation.
    * @param rootPath - Absolute path to the project root directory
    */
-  setRootPath(rootPath: string): void {
+  async setRootPath(rootPath: string): Promise<void> {
     this.rootPath = rootPath;
-    // Fire-and-forget: sync allowed root in main process for path validation.
-    // IPC messages are ordered, so the next VFS operation will see the updated root.
+    // Await the main process root update so allowedRoots is set before
+    // any subsequent VFS operation (fixes tab-restoration race condition).
     try {
       const bridge = getVFSBridge();
       if ("setRoot" in bridge) {
-        void (bridge as { setRoot: (p: string) => Promise<unknown> }).setRoot(
+        await (bridge as { setRoot: (p: string) => Promise<unknown> }).setRoot(
           rootPath
         );
       }

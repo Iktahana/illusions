@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "types": ["@serwist/next/typings", "jest"],
+    "types": ["@serwist/next/typings", "vitest/globals"],
     "lib": [
       "dom",
       "dom.iterable",

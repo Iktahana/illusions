@@ -209,7 +209,7 @@ export class DesuMasuConsistencyRule extends AbstractMorphologicalDocumentLintRu
 
       for (const sentence of sentences) {
         // Skip dialogue sentences
-        if (isInDialogue(sentence.from, paragraph.text)) continue;
+        if (config.skipDialogue && isInDialogue(sentence.from, paragraph.text)) continue;
 
         // Get tokens within this sentence's range
         const sentenceTokens = getTokensInRange(

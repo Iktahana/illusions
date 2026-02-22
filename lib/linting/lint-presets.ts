@@ -5,6 +5,8 @@ export interface LintRuleMeta {
   id: string;
   nameJa: string;
   descriptionJa: string;
+  /** Whether this rule supports the skipDialogue toggle. False = toggle hidden in UI. */
+  supportsSkipDialogue?: boolean;
 }
 
 export const LINT_RULES_META: LintRuleMeta[] = [
@@ -68,28 +70,35 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
   { id: "ai", nameJa: "AI機能", rules: ["homophone-detection"] },
 ];
 
-/** Default configs per rule (matching each rule's defaultConfig) */
-export const LINT_DEFAULT_CONFIGS: Record<string, { enabled: boolean; severity: Severity }> = {
+/** Per-rule config shape used in presets and settings */
+export interface LintRulePresetConfig {
+  enabled: boolean;
+  severity: Severity;
+  skipDialogue?: boolean;
+}
+
+/** Default configs per rule (matching each rule's defaultConfig) — used as 標準モード */
+export const LINT_DEFAULT_CONFIGS: Record<string, LintRulePresetConfig> = {
   "punctuation-rules": { enabled: true, severity: "warning" },
-  "number-format": { enabled: true, severity: "warning" },
-  "joyo-kanji": { enabled: true, severity: "info" },
+  "number-format": { enabled: true, severity: "warning", skipDialogue: true },
+  "joyo-kanji": { enabled: true, severity: "info", skipDialogue: true },
   "era-year-validator": { enabled: true, severity: "warning" },
-  "particle-no-repetition": { enabled: true, severity: "info" },
-  "conjugation-errors": { enabled: true, severity: "warning" },
-  "redundant-expression": { enabled: true, severity: "warning" },
-  "verbose-expression": { enabled: true, severity: "info" },
-  "sentence-ending-repetition": { enabled: true, severity: "info" },
-  "notation-consistency": { enabled: true, severity: "warning" },
-  "correlative-expression": { enabled: true, severity: "warning" },
-  "sentence-length": { enabled: true, severity: "info" },
+  "particle-no-repetition": { enabled: true, severity: "info", skipDialogue: true },
+  "conjugation-errors": { enabled: true, severity: "warning", skipDialogue: true },
+  "redundant-expression": { enabled: true, severity: "warning", skipDialogue: true },
+  "verbose-expression": { enabled: true, severity: "info", skipDialogue: true },
+  "sentence-ending-repetition": { enabled: true, severity: "info", skipDialogue: true },
+  "notation-consistency": { enabled: true, severity: "warning", skipDialogue: true },
+  "correlative-expression": { enabled: true, severity: "warning", skipDialogue: true },
+  "sentence-length": { enabled: true, severity: "info", skipDialogue: true },
   "dash-format": { enabled: true, severity: "warning" },
   "dialogue-punctuation": { enabled: true, severity: "warning" },
-  "comma-frequency": { enabled: true, severity: "info" },
-  "desu-masu-consistency": { enabled: true, severity: "warning" },
-  "conjunction-overuse": { enabled: true, severity: "info" },
-  "word-repetition": { enabled: true, severity: "info" },
-  "taigen-dome-overuse": { enabled: true, severity: "info" },
-  "passive-overuse": { enabled: true, severity: "info" },
+  "comma-frequency": { enabled: true, severity: "info", skipDialogue: true },
+  "desu-masu-consistency": { enabled: true, severity: "warning", skipDialogue: true },
+  "conjunction-overuse": { enabled: true, severity: "info", skipDialogue: true },
+  "word-repetition": { enabled: true, severity: "info", skipDialogue: true },
+  "taigen-dome-overuse": { enabled: true, severity: "info", skipDialogue: true },
+  "passive-overuse": { enabled: true, severity: "info", skipDialogue: true },
   "counter-word-mismatch": { enabled: true, severity: "warning" },
   "adverb-form-consistency": { enabled: true, severity: "info" },
   "homophone-detection": { enabled: true, severity: "warning" },
@@ -98,7 +107,7 @@ export const LINT_DEFAULT_CONFIGS: Record<string, { enabled: boolean; severity: 
 /** Preset configuration for one-shot application */
 export interface LintPreset {
   nameJa: string;
-  configs: Record<string, { enabled: boolean; severity: Severity }>;
+  configs: Record<string, LintRulePresetConfig>;
 }
 
 export const LINT_PRESETS: Record<string, LintPreset> = {
@@ -106,17 +115,17 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
     nameJa: "寛容モード",
     configs: {
       "punctuation-rules": { enabled: true, severity: "info" },
-      "number-format": { enabled: false, severity: "info" },
-      "joyo-kanji": { enabled: false, severity: "info" },
+      "number-format": { enabled: false, severity: "info", skipDialogue: true },
+      "joyo-kanji": { enabled: false, severity: "info", skipDialogue: true },
       "era-year-validator": { enabled: false, severity: "info" },
-      "particle-no-repetition": { enabled: false, severity: "info" },
-      "conjugation-errors": { enabled: true, severity: "warning" },
-      "redundant-expression": { enabled: true, severity: "info" },
-      "verbose-expression": { enabled: false, severity: "info" },
-      "sentence-ending-repetition": { enabled: false, severity: "info" },
-      "notation-consistency": { enabled: false, severity: "info" },
-      "correlative-expression": { enabled: true, severity: "info" },
-      "sentence-length": { enabled: false, severity: "info" },
+      "particle-no-repetition": { enabled: false, severity: "info", skipDialogue: true },
+      "conjugation-errors": { enabled: true, severity: "warning", skipDialogue: true },
+      "redundant-expression": { enabled: true, severity: "info", skipDialogue: true },
+      "verbose-expression": { enabled: false, severity: "info", skipDialogue: true },
+      "sentence-ending-repetition": { enabled: false, severity: "info", skipDialogue: true },
+      "notation-consistency": { enabled: false, severity: "info", skipDialogue: true },
+      "correlative-expression": { enabled: true, severity: "info", skipDialogue: true },
+      "sentence-length": { enabled: false, severity: "info", skipDialogue: true },
       "dash-format": { enabled: false, severity: "info" },
       "dialogue-punctuation": { enabled: true, severity: "warning" },
       "comma-frequency": { enabled: false, severity: "info" },
@@ -145,18 +154,18 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "conjugation-errors": { enabled: true, severity: "error" },
       "redundant-expression": { enabled: true, severity: "error" },
       "verbose-expression": { enabled: true, severity: "warning" },
-      "sentence-ending-repetition": { enabled: true, severity: "warning" },
+      "sentence-ending-repetition": { enabled: true, severity: "warning", skipDialogue: true },
       "notation-consistency": { enabled: true, severity: "error" },
       "correlative-expression": { enabled: true, severity: "error" },
       "sentence-length": { enabled: true, severity: "warning" },
       "dash-format": { enabled: true, severity: "error" },
       "dialogue-punctuation": { enabled: true, severity: "error" },
       "comma-frequency": { enabled: true, severity: "warning" },
-      "desu-masu-consistency": { enabled: true, severity: "error" },
-      "conjunction-overuse": { enabled: true, severity: "warning" },
+      "desu-masu-consistency": { enabled: true, severity: "error", skipDialogue: true },
+      "conjunction-overuse": { enabled: true, severity: "warning", skipDialogue: true },
       "word-repetition": { enabled: true, severity: "warning" },
-      "taigen-dome-overuse": { enabled: true, severity: "warning" },
-      "passive-overuse": { enabled: true, severity: "warning" },
+      "taigen-dome-overuse": { enabled: true, severity: "warning", skipDialogue: true },
+      "passive-overuse": { enabled: true, severity: "warning", skipDialogue: true },
       "counter-word-mismatch": { enabled: true, severity: "error" },
       "adverb-form-consistency": { enabled: true, severity: "warning" },
       "homophone-detection": { enabled: true, severity: "error" },
@@ -166,17 +175,17 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
     nameJa: "小説モード",
     configs: {
       "punctuation-rules": { enabled: true, severity: "warning" },
-      "number-format": { enabled: false, severity: "info" },
-      "joyo-kanji": { enabled: false, severity: "info" },
+      "number-format": { enabled: false, severity: "info", skipDialogue: true },
+      "joyo-kanji": { enabled: false, severity: "info", skipDialogue: true },
       "era-year-validator": { enabled: true, severity: "info" },
-      "particle-no-repetition": { enabled: true, severity: "info" },
-      "conjugation-errors": { enabled: true, severity: "warning" },
-      "redundant-expression": { enabled: true, severity: "warning" },
-      "verbose-expression": { enabled: true, severity: "info" },
-      "sentence-ending-repetition": { enabled: true, severity: "warning" },
-      "notation-consistency": { enabled: true, severity: "warning" },
-      "correlative-expression": { enabled: true, severity: "warning" },
-      "sentence-length": { enabled: true, severity: "info" },
+      "particle-no-repetition": { enabled: true, severity: "info", skipDialogue: true },
+      "conjugation-errors": { enabled: true, severity: "warning", skipDialogue: true },
+      "redundant-expression": { enabled: true, severity: "warning", skipDialogue: true },
+      "verbose-expression": { enabled: true, severity: "info", skipDialogue: true },
+      "sentence-ending-repetition": { enabled: true, severity: "warning", skipDialogue: true },
+      "notation-consistency": { enabled: true, severity: "warning", skipDialogue: true },
+      "correlative-expression": { enabled: true, severity: "warning", skipDialogue: true },
+      "sentence-length": { enabled: true, severity: "info", skipDialogue: true },
       "dash-format": { enabled: true, severity: "warning" },
       "dialogue-punctuation": { enabled: true, severity: "warning" },
       "comma-frequency": { enabled: true, severity: "info" },
@@ -190,6 +199,9 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "homophone-detection": { enabled: true, severity: "warning" },
     },
   },
+  // The official preset intentionally omits skipDialogue on most rules because
+  // government documents rarely contain dialogue; adding the toggle would be
+  // misleading for users of this preset.
   official: {
     nameJa: "公用文モード",
     configs: {

@@ -23,12 +23,10 @@ export type { UseTabManagerReturn } from "./types";
 export function useTabManager(options?: {
   skipAutoRestore?: boolean;
   autoSave?: boolean;
-  /** Whether VFS root has been initialized. Tab restore waits for this in Electron. */
-  vfsReady?: boolean;
+  vfsReadyPromise?: Promise<void>;
 }): UseTabManagerReturn {
   const skipAutoRestore = options?.skipAutoRestore ?? false;
   const autoSaveEnabled = options?.autoSave ?? true;
-  const vfsReady = options?.vfsReady ?? true;
 
   // --- Core tab state -----------------------------------------------------
 
@@ -117,7 +115,7 @@ export function useTabManager(options?: {
     isProjectRef: tabState.isProjectRef,
     isElectron: tabState.isElectron,
     skipAutoRestore,
-    vfsReady,
+    vfsReadyPromise: options?.vfsReadyPromise,
   });
 
   // --- Backward compat alias: newFile === newTab --------------------------
