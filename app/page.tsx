@@ -9,7 +9,7 @@ import NovelEditor from "@/components/Editor";
 import EditorDiffView from "@/components/EditorDiffView";
 import ResizablePanel from "@/components/ResizablePanel";
 import TitleUpdater from "@/components/TitleUpdater";
-import ActivityBar, { type ActivityBarView } from "@/components/ActivityBar";
+import ActivityBar from "@/components/ActivityBar";
 import SidebarSplitter from "@/components/SidebarSplitter";
 import SearchResults from "@/components/SearchResults";
 import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
@@ -23,7 +23,6 @@ import WelcomeScreen from "@/components/WelcomeScreen";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
-import type { SettingsCategory } from "@/components/SettingsModal";
 import { LINT_PRESETS, LINT_RULES_META, LINT_DEFAULT_CONFIGS } from "@/lib/linting/lint-presets";
 import { notificationManager } from "@/lib/notification-manager";
 import RubyDialog from "@/components/RubyDialog";
@@ -45,7 +44,10 @@ import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
 import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
+import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
+import { usePanelState } from "@/lib/editor-page/use-panel-state";
 
+import type { ActivityBarView } from "@/components/ActivityBar";
 import type { EditorView } from "@milkdown/prose/view";
 import type { LintIssue } from "@/lib/linting/types";
 import type { SupportedFileExtension } from "@/lib/project-types";
@@ -113,6 +115,20 @@ export default function EditorPage() {
     onPowerSaveModeChange: handlePowerSaveModeChange,
   });
 
+  // --- Panel state hook ---
+  const { state: panelState, handlers: panelHandlers } = usePanelState({ setShowSettingsModal });
+  const {
+    topView, bottomView, searchResults, isRightPanelCollapsed,
+    dictionarySearchTrigger, settingsInitialCategory, switchToCorrectionsTrigger,
+    showRubyDialog, rubySelectedText, editorDiff,
+  } = panelState;
+  const {
+    setTopView, setBottomView, setIsRightPanelCollapsed,
+    setSettingsInitialCategory, setShowRubyDialog, setRubySelectedText, setEditorDiff,
+    handleOpenDictionary, handleShowAllSearchResults, handleCloseSearchResults,
+    handleOpenLintingSettings, handleOpenPosHighlightSettings, triggerSwitchToCorrections,
+  } = panelHandlers;
+
   const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReadyPromise: vfsGate.promise });
   const {
     content, setContent, currentFile, isDirty, isSaving, lastSavedTime,
@@ -143,6 +159,7 @@ export default function EditorPage() {
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const programmaticScrollRef = useRef(false);
+  const rubySelectionRef = useRef<{ from: number; to: number } | null>(null);
 
   // --- Project lifecycle hook ---
   const projectLifecycle = useProjectLifecycle({
@@ -277,15 +294,6 @@ export default function EditorPage() {
     }
   }, [lastSavedTime]);
 
-  const [showRubyDialog, setShowRubyDialog] = useState(false);
-  const [rubySelectedText, setRubySelectedText] = useState("");
-  const rubySelectionRef = useRef<{ from: number; to: number } | null>(null);
-  const [editorDiff, setEditorDiff] = useState<{ snapshotContent: string; currentContent: string; label: string } | null>(null);
-  const [topView, setTopView] = useState<ActivityBarView>("explorer");
-  const [bottomView, setBottomView] = useState<ActivityBarView>("none");
-  const [searchResults, setSearchResults] = useState<{matches: { from: number; to: number }[], searchTerm: string} | null>(null);
-  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
-
   /** Open the Ruby dialog with current editor selection */
   const handleOpenRubyDialog = useCallback(() => {
     if (!editorViewInstance) return;
@@ -297,7 +305,7 @@ export default function EditorPage() {
     rubySelectionRef.current = { from, to };
     setRubySelectedText(text);
     setShowRubyDialog(true);
-  }, [editorViewInstance]);
+  }, [editorViewInstance, setRubySelectedText, setShowRubyDialog]);
 
   /** Apply Ruby markup by replacing the editor selection */
   const handleApplyRuby = useCallback((rubyMarkup: string) => {
@@ -328,15 +336,6 @@ export default function EditorPage() {
       dispatch(tr);
     }
   }, [editorViewInstance]);
-
-  /** Open the dictionary panel in the sidebar with optional search term */
-  const [dictionarySearchTrigger, setDictionarySearchTrigger] = useState<{ term: string; id: number }>({ term: "", id: 0 });
-  const handleOpenDictionary = useCallback((searchTerm?: string) => {
-    if (searchTerm) {
-      setDictionarySearchTrigger(prev => ({ term: searchTerm, id: prev.id + 1 }));
-    }
-    setTopView("dictionary");
-  }, []);
 
   // Recovery notification: fade-out after 5s, then dismiss
   useEffect(() => {
@@ -446,16 +445,6 @@ export default function EditorPage() {
     target.focus();
   };
 
-  const handleShowAllSearchResults = (matches: { from: number; to: number }[], searchTerm: string) => {
-    setSearchResults({ matches, searchTerm });
-    setTopView("search");
-  };
-
-  const handleCloseSearchResults = () => {
-    setSearchResults(null);
-    setTopView("explorer");
-  };
-
   // --- Text statistics hook ---
   const {
     charCount, paragraphCount, sentenceCount,
@@ -533,12 +522,6 @@ export default function EditorPage() {
     };
   }, [editorViewInstance, enrichedLintIssues]);
 
-  // Settings modal: track which category to open on
-  const [settingsInitialCategory, setSettingsInitialCategory] = useState<SettingsCategory | undefined>(undefined);
-
-  // Trigger to switch Inspector to corrections tab (monotonically increasing)
-  const [switchToCorrectionsTrigger, setSwitchToCorrectionsTrigger] = useState(0);
-
   /** Navigate to a lint issue in the editor */
   const handleNavigateToIssue = useCallback((issue: LintIssue) => {
     if (!editorViewInstance) return;
@@ -593,9 +576,9 @@ export default function EditorPage() {
 
   /** Navigate to a lint issue from context menu (also switches Inspector to corrections tab) */
   const handleShowLintHint = useCallback((issue: LintIssue) => {
-    setSwitchToCorrectionsTrigger((n) => n + 1);
+    triggerSwitchToCorrections();
     handleNavigateToIssue(issue);
-  }, [handleNavigateToIssue]);
+  }, [handleNavigateToIssue, triggerSwitchToCorrections]);
 
   /** Handle ignoring a correction (single or all identical) */
   const handleIgnoreCorrection = useCallback((issue: LintIssue, ignoreAll: boolean) => {
@@ -651,18 +634,6 @@ export default function EditorPage() {
     dispatch(tr);
   }, [editorViewInstance]);
 
-  /** Open SettingsModal directly on the linting tab */
-  const handleOpenLintingSettings = useCallback(() => {
-    setSettingsInitialCategory("linting");
-    setShowSettingsModal(true);
-  }, [setShowSettingsModal]);
-
-  /** Open SettingsModal directly on the POS highlight tab */
-  const handleOpenPosHighlightSettings = useCallback(() => {
-    setSettingsInitialCategory("pos-highlight");
-    setShowSettingsModal(true);
-  }, [setShowSettingsModal]);
-
   /** Apply a lint preset from the Inspector dropdown */
   const handleApplyLintPreset = useCallback((presetId: string) => {
     const preset = LINT_PRESETS[presetId];
@@ -692,114 +663,25 @@ export default function EditorPage() {
   fontScaleChangeRef.current = handleFontScaleChange;
   toggleCompactModeRef.current = handleToggleCompactMode;
 
-  // Keyboard shortcuts: Cmd/Ctrl+S=save, Cmd/Ctrl+F=search, etc.
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
-      const isMac = nav.userAgentData
-        ? nav.userAgentData.platform === "macOS"
-        : /mac/i.test(navigator.userAgent);
-
-      // Cmd+, (macOS) / Ctrl+, (Windows/Linux): Settings
-      const isSettingsShortcut = isMac
-        ? event.metaKey && event.key === ","
-        : event.ctrlKey && event.key === ",";
-
-      // Cmd+S (macOS) / Ctrl+S (Windows/Linux): Save
-      const isSaveShortcut = isMac
-        ? event.metaKey && event.key === "s"
-        : event.ctrlKey && event.key === "s";
-
-      // Cmd+F (macOS) / Ctrl+F (Windows/Linux): Search
-      const isSearchShortcut = isMac
-        ? event.metaKey && event.key === "f"
-        : event.ctrlKey && event.key === "f";
-
-      // Shift+Cmd+V (macOS) / Shift+Ctrl+V (Windows/Linux): Paste as plaintext
-      const isPasteAsPlaintextShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "v"
-        : event.shiftKey && event.ctrlKey && event.key === "v";
-
-      // Shift+Cmd+M (macOS) / Shift+Ctrl+M (Windows/Linux): Compact mode toggle
-      const isCompactModeShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "m"
-        : event.shiftKey && event.ctrlKey && event.key === "m";
-
-      // Shift+Cmd+R (macOS) / Shift+Ctrl+R (Windows/Linux): Ruby dialog
-      const isRubyShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "r"
-        : event.shiftKey && event.ctrlKey && event.key === "r";
-
-      // Shift+Cmd+T (macOS) / Shift+Ctrl+T (Windows/Linux): Tcy
-      const isTcyShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "t"
-        : event.shiftKey && event.ctrlKey && event.key === "t";
-
-      // Tab shortcuts (Web only; Electron handles Cmd+W/T via menu)
-      const isNextTab = event.ctrlKey && !event.shiftKey && event.key === "Tab";
-      const isPrevTab = event.ctrlKey && event.shiftKey && event.key === "Tab";
-      const isNewTabShortcut = !isElectron && (isMac
-        ? event.metaKey && !event.shiftKey && event.key === "t"
-        : event.ctrlKey && !event.shiftKey && event.key === "t");
-      const isCloseTabShortcut = !isElectron && (isMac
-        ? event.metaKey && event.key === "w"
-        : event.ctrlKey && event.key === "w");
-      const isTabJump = (isMac ? event.metaKey : event.ctrlKey) &&
-        !event.shiftKey && event.key >= "1" && event.key <= "9";
-
-      if (isTcyShortcut) {
-        event.preventDefault();
-        handleToggleTcy();
-      } else if (isRubyShortcut) {
-        event.preventDefault();
-        handleOpenRubyDialog();
-      } else if (isCompactModeShortcut) {
-        event.preventDefault();
-        handleToggleCompactMode();
-      } else if (isSettingsShortcut) {
-        event.preventDefault();
-        setShowSettingsModal(true);
-      } else if (isSaveShortcut) {
-        event.preventDefault();
-        void saveFile();
-      } else if (isSearchShortcut) {
-        event.preventDefault();
-        setSearchOpenTrigger(prev => prev + 1);
-      } else if (isPasteAsPlaintextShortcut) {
-        event.preventDefault();
-        void handlePasteAsPlaintext();
-      } else if (isNextTab) {
-        event.preventDefault();
-        nextTab();
-        incrementEditorKey();
-      } else if (isPrevTab) {
-        event.preventDefault();
-        prevTab();
-        incrementEditorKey();
-      } else if (isNewTabShortcut) {
-        event.preventDefault();
-        newTab();
-        incrementEditorKey();
-      } else if (isCloseTabShortcut) {
-        event.preventDefault();
-        if (tabs.length === 1 && !tabs[0].file && !tabs[0].isDirty) {
-          window.close();
-          return;
-        }
-        closeTab(activeTabId);
-      } else if (isTabJump) {
-        event.preventDefault();
-        const idx = parseInt(event.key, 10) - 1;
-        switchToIndex(idx);
-        incrementEditorKey();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [saveFile, handlePasteAsPlaintext, handleToggleCompactMode, handleOpenRubyDialog, handleToggleTcy, isElectron, nextTab, prevTab, newTab, closeTab, tabs, activeTabId, switchToIndex, setShowSettingsModal, incrementEditorKey]);
+  // --- Keyboard shortcuts hook ---
+  useKeyboardShortcuts({
+    isElectron,
+    saveFile,
+    handlePasteAsPlaintext,
+    handleToggleCompactMode,
+    handleOpenRubyDialog,
+    handleToggleTcy,
+    setShowSettingsModal,
+    setSearchOpenTrigger,
+    incrementEditorKey,
+    nextTab,
+    prevTab,
+    newTab,
+    closeTab,
+    switchToIndex,
+    tabs,
+    activeTabId,
+  });
 
   // Detect feature availability after mount to avoid SSR hydration mismatch
   const [features, setFeatures] = useState<ReturnType<typeof getAvailableFeatures>>({
@@ -858,6 +740,85 @@ export default function EditorPage() {
   }
 
   // --- Editor view (project or standalone mode) ---
+  const renderPanel = (view: ActivityBarView) => {
+    switch (view) {
+      case "files":
+        return (
+          <aside className="h-full bg-background border-r border-border flex flex-col">
+            <div className="p-4 flex-1 overflow-y-auto">
+              <FilesPanel
+                projectName={isProjectMode(editorMode) ? editorMode.name : undefined}
+                onFileClick={(vfsPath) => {
+                  void openProjectFile(vfsPath, { preview: true });
+                  incrementEditorKey();
+                }}
+                onFileDoubleClick={(vfsPath) => {
+                  void openProjectFile(vfsPath, { preview: false });
+                  incrementEditorKey();
+                }}
+                onFileMiddleClick={(vfsPath) => {
+                  void openProjectFile(vfsPath, { preview: false });
+                  incrementEditorKey();
+                }}
+              />
+            </div>
+          </aside>
+        );
+      case "explorer":
+        return (
+          <Explorer
+            compactMode={compactMode}
+            content={content}
+            onChapterClick={handleChapterClick}
+            onInsertText={handleInsertText}
+            fontScale={fontScale}
+            onFontScaleChange={handleFontScaleChange}
+            lineHeight={lineHeight}
+            onLineHeightChange={handleLineHeightChange}
+            paragraphSpacing={paragraphSpacing}
+            onParagraphSpacingChange={handleParagraphSpacingChange}
+            textIndent={textIndent}
+            onTextIndentChange={handleTextIndentChange}
+            fontFamily={fontFamily}
+            onFontFamilyChange={handleFontFamilyChange}
+            charsPerLine={charsPerLine}
+            onCharsPerLineChange={handleCharsPerLineChange}
+            autoCharsPerLine={autoCharsPerLine}
+            onAutoCharsPerLineChange={handleAutoCharsPerLineChange}
+            showParagraphNumbers={showParagraphNumbers}
+            onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
+          />
+        );
+      case "search":
+        return (
+          <SearchResults
+            editorView={editorViewInstance}
+            matches={searchResults?.matches}
+            searchTerm={searchResults?.searchTerm}
+            onClose={handleCloseSearchResults}
+          />
+        );
+      case "outline":
+        return (
+          <Outline
+            content={content}
+            onHeadingClick={handleChapterClick}
+          />
+        );
+      case "characters":
+        return <Characters content={content} />;
+      case "dictionary":
+        return <Dictionary content={content} initialSearchTerm={dictionarySearchTrigger.term} searchTriggerId={dictionarySearchTrigger.id} />;
+      case "wordfreq":
+        return <WordFrequency content={content} filePath={currentFile?.path ?? undefined} onWordSearch={(word) => {
+          setSearchInitialTerm(word);
+          setSearchOpenTrigger(prev => prev + 1);
+        }} />;
+      default:
+        return null;
+    }
+  };
+
     return (
       <div className="h-screen flex flex-col overflow-hidden relative">
          {/* Dynamic title update */}
@@ -1010,85 +971,6 @@ export default function EditorPage() {
           {(topView !== "none" || bottomView !== "none") && (
             <ResizablePanel side="left" defaultWidth={compactMode ? 200 : 256} minWidth={compactMode ? 160 : 200} maxWidth={compactMode ? 320 : 400}>
               {(() => {
-                const renderPanel = (view: ActivityBarView) => {
-                  switch (view) {
-                    case "files":
-                      return (
-                        <aside className="h-full bg-background border-r border-border flex flex-col">
-                          <div className="p-4 flex-1 overflow-y-auto">
-                            <FilesPanel
-                              projectName={isProjectMode(editorMode) ? editorMode.name : undefined}
-                              onFileClick={(vfsPath) => {
-                                void openProjectFile(vfsPath, { preview: true });
-                                incrementEditorKey();
-                              }}
-                              onFileDoubleClick={(vfsPath) => {
-                                void openProjectFile(vfsPath, { preview: false });
-                                incrementEditorKey();
-                              }}
-                              onFileMiddleClick={(vfsPath) => {
-                                void openProjectFile(vfsPath, { preview: false });
-                                incrementEditorKey();
-                              }}
-                            />
-                          </div>
-                        </aside>
-                      );
-                    case "explorer":
-                      return (
-                        <Explorer
-                          compactMode={compactMode}
-                          content={content}
-                          onChapterClick={handleChapterClick}
-                          onInsertText={handleInsertText}
-                          fontScale={fontScale}
-                          onFontScaleChange={handleFontScaleChange}
-                          lineHeight={lineHeight}
-                          onLineHeightChange={handleLineHeightChange}
-                          paragraphSpacing={paragraphSpacing}
-                          onParagraphSpacingChange={handleParagraphSpacingChange}
-                          textIndent={textIndent}
-                          onTextIndentChange={handleTextIndentChange}
-                          fontFamily={fontFamily}
-                          onFontFamilyChange={handleFontFamilyChange}
-                          charsPerLine={charsPerLine}
-                          onCharsPerLineChange={handleCharsPerLineChange}
-                          autoCharsPerLine={autoCharsPerLine}
-                          onAutoCharsPerLineChange={handleAutoCharsPerLineChange}
-                          showParagraphNumbers={showParagraphNumbers}
-                          onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
-                        />
-                      );
-                    case "search":
-                      return (
-                        <SearchResults
-                          editorView={editorViewInstance}
-                          matches={searchResults?.matches}
-                          searchTerm={searchResults?.searchTerm}
-                          onClose={handleCloseSearchResults}
-                        />
-                      );
-                    case "outline":
-                      return (
-                        <Outline
-                          content={content}
-                          onHeadingClick={handleChapterClick}
-                        />
-                      );
-                    case "characters":
-                      return <Characters content={content} />;
-                    case "dictionary":
-                      return <Dictionary content={content} initialSearchTerm={dictionarySearchTrigger.term} searchTriggerId={dictionarySearchTrigger.id} />;
-                    case "wordfreq":
-                      return <WordFrequency content={content} filePath={currentFile?.path ?? undefined} onWordSearch={(word) => {
-                        setSearchInitialTerm(word);
-                        setSearchOpenTrigger(prev => prev + 1);
-                      }} />;
-                    default:
-                      return null;
-                  }
-                };
-
                 const topPanel = topView !== "none" ? renderPanel(topView) : null;
                 const bottomPanel = bottomView !== "none" ? renderPanel(bottomView) : null;
 
