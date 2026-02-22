@@ -25,17 +25,17 @@ const SKIP_DIALOGUE_SUPPORT = new Map(
 interface LintingSettingsProps {
   lintingEnabled: boolean;
   onLintingEnabledChange: (value: boolean) => void;
-  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>;
-  onLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity; skipDialogue?: boolean }) => void;
-  onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>) => void;
+  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }>;
+  onLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }) => void;
+  onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }>) => void;
   llmEnabled?: boolean;
 }
 
 /** Resolve the effective config for a rule, falling back to defaults */
 function getConfig(
   ruleId: string,
-  configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
-): { enabled: boolean; severity: Severity; skipDialogue?: boolean } {
+  configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }>,
+): { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean } {
   return configs[ruleId] ?? LINT_DEFAULT_CONFIGS[ruleId] ?? { enabled: true, severity: "warning" };
 }
 
@@ -87,7 +87,7 @@ export default function LintingSettings({
   };
 
   const handleEnableAll = () => {
-    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> = {};
+    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }> = {};
     for (const rule of LINT_RULES_META) {
       const current = getConfig(rule.id, lintingRuleConfigs);
       next[rule.id] = { ...current, enabled: true };
@@ -96,7 +96,7 @@ export default function LintingSettings({
   };
 
   const handleDisableAll = () => {
-    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> = {};
+    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }> = {};
     for (const rule of LINT_RULES_META) {
       const current = getConfig(rule.id, lintingRuleConfigs);
       next[rule.id] = { ...current, enabled: false };
