@@ -9,6 +9,7 @@
 import kuromoji from 'kuromoji';
 import type { Token, WordEntry } from '../nlp-client/types';
 import { NlpCache } from './nlp-cache';
+import type { UserDictionaryEntry } from '../project-types';
 
 // Noise characters to strip before tokenization
 const NOISE_CHARS = new Set(['\n', '\r']);
@@ -32,6 +33,69 @@ class NlpProcessor {
   private initPromise: Promise<void> | null = null;
   private isReady = false;
   private cache = new NlpCache();
+  private userDictionary: UserDictionaryEntry[] = [];
+
+  /**
+   * Set user dictionary entries for token merging.
+   * Entries are sorted by word length (longest first) for greedy matching.
+   * Clears cache since tokenization results may change.
+   */
+  setUserDictionary(entries: UserDictionaryEntry[]): void {
+    this.userDictionary = [...entries].sort(
+      (a, b) => b.word.length - a.word.length,
+    );
+    this.cache.clear();
+  }
+
+  /**
+   * Merge consecutive tokens that match user dictionary words.
+   * Scans the token stream for sequences whose combined surface forms
+   * match a user-defined word, then replaces them with a single token.
+   */
+  private mergeUserDictionaryTokens(tokens: Token[]): Token[] {
+    if (this.userDictionary.length === 0) return tokens;
+
+    const result: Token[] = [];
+    let i = 0;
+
+    while (i < tokens.length) {
+      let matched = false;
+
+      for (const dictEntry of this.userDictionary) {
+        const word = dictEntry.word;
+        // Try to match starting from token i
+        let combined = '';
+        let j = i;
+        while (j < tokens.length && combined.length < word.length) {
+          combined += tokens[j].surface;
+          j++;
+        }
+
+        if (combined === word) {
+          // Merge tokens[i..j-1] into a single token
+          const mergedToken: Token = {
+            surface: word,
+            pos: dictEntry.partOfSpeech ?? tokens[i].pos,
+            basic_form: word,
+            reading: dictEntry.reading ?? tokens[i].reading,
+            start: tokens[i].start,
+            end: tokens[j - 1].end,
+          };
+          result.push(mergedToken);
+          i = j;
+          matched = true;
+          break;
+        }
+      }
+
+      if (!matched) {
+        result.push(tokens[i]);
+        i++;
+      }
+    }
+
+    return result;
+  }
 
   /**
    * Initialize kuromoji tokenizer
@@ -150,10 +214,13 @@ class NlpProcessor {
       end: positionMap[t.end] ?? t.end,
     }));
 
-    // Step 5: Cache
-    this.cache.set(text, remappedTokens);
+    // Step 5: Apply user dictionary (merge matching token sequences)
+    const mergedTokens = this.mergeUserDictionaryTokens(remappedTokens);
 
-    return remappedTokens;
+    // Step 6: Cache
+    this.cache.set(text, mergedTokens);
+
+    return mergedTokens;
   }
 
   /**
@@ -197,17 +264,38 @@ class NlpProcessor {
     // For frequency analysis, positions don't matter — tokenize raw text
     const rawTokens = this.tokenizer.tokenize(text);
 
+    // Build Token[] for user dictionary merging
+    let charPos = 0;
+    const tokensForMerge: Token[] = rawTokens.map(t => {
+      const token: Token = {
+        surface: t.surface_form,
+        pos: t.pos,
+        pos_detail_1: t.pos_detail_1,
+        pos_detail_2: t.pos_detail_2,
+        pos_detail_3: t.pos_detail_3,
+        basic_form: t.basic_form,
+        reading: t.reading,
+        start: charPos,
+        end: charPos + t.surface_form.length,
+      };
+      charPos += t.surface_form.length;
+      return token;
+    });
+
+    // Apply user dictionary merging
+    const mergedTokens = this.mergeUserDictionaryTokens(tokensForMerge);
+
     const wordMap = new Map<string, WordEntry>();
 
-    for (const t of rawTokens) {
+    for (const t of mergedTokens) {
       if (EXCLUDED_POS.has(t.pos)) continue;
       if (t.pos_detail_1 && EXCLUDED_POS_DETAILS.has(t.pos_detail_1)) continue;
-      if (!t.surface_form.trim()) continue;
-      if (EXCLUDED_CHARS_PATTERN.test(t.surface_form)) continue;
+      if (!t.surface.trim()) continue;
+      if (EXCLUDED_CHARS_PATTERN.test(t.surface)) continue;
 
       const key = t.basic_form && t.basic_form !== '*'
         ? t.basic_form
-        : t.surface_form;
+        : t.surface;
 
       const existing = wordMap.get(key);
       if (existing) {
