@@ -27,6 +27,8 @@ interface UseProjectLifecycleParams {
   skipAutoRestore: boolean;
   /** Last saved timestamp from tab manager (needed for upgrade-banner triggers) */
   lastSavedTime: number | null;
+  /** Called when VFS root is ready (after project restore or when no project to restore) */
+  onVfsReady?: () => void;
 }
 
 export interface ProjectLifecycleState {
@@ -83,6 +85,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     content,
     skipAutoRestore,
     lastSavedTime,
+    onVfsReady,
   } = params;
 
   // State
@@ -225,6 +228,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
             setAutoRestoreProjectId(projects[0].id);
           } else {
             setIsRestoring(false);
+            onVfsReady?.();
           }
         } else {
           const projectManager = getProjectManager();
@@ -243,11 +247,13 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
             setAutoRestoreProjectId(handles[0].projectId);
           } else {
             setIsRestoring(false);
+            onVfsReady?.();
           }
         }
       } catch (error) {
         console.error("Failed to load recent projects:", error);
         setIsRestoring(false);
+        onVfsReady?.();
       }
     };
 
@@ -256,7 +262,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     return () => {
       mounted = false;
     };
-  }, [isElectron, skipAutoRestore]);
+  }, [isElectron, skipAutoRestore, onVfsReady]);
 
   // --- Handlers ---
 
@@ -518,6 +524,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         // handleOpenRecentProject catches its own errors internally
       }
       isAutoRestoringRef.current = false;
+      onVfsReady?.();
       timerId = setTimeout(() => {
         setIsRestoring((prev) => {
           if (prev && isElectron) {
@@ -531,7 +538,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     return () => {
       if (timerId !== undefined) clearTimeout(timerId);
     };
-  }, [autoRestoreProjectId, handleOpenRecentProject, isElectron]);
+  }, [autoRestoreProjectId, handleOpenRecentProject, isElectron, onVfsReady]);
 
   /** Called when the CreateProjectWizard successfully creates a project */
   const handleProjectCreated = useCallback(async (project: ProjectMode) => {

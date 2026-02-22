@@ -68,6 +68,13 @@ export default function EditorPage() {
     return _skipAutoRestoreDetected;
   });
 
+  const isElectron = typeof window !== "undefined" && isElectronRenderer();
+
+  // VFS readiness: Web defaults to true (no VFS root validation),
+  // Electron waits for project lifecycle to set VFS root before tab restore.
+  const [vfsReady, setVfsReady] = useState(!isElectron);
+  const handleVfsReady = useCallback(() => setVfsReady(true), []);
+
   const [editorKey, setEditorKey] = useState(0);
   const incrementEditorKey = useCallback(() => {
     setEditorKey(prev => prev + 1);
@@ -103,7 +110,7 @@ export default function EditorPage() {
     onPowerSaveModeChange: handlePowerSaveModeChange,
   });
 
-  const tabManager = useTabManager({ skipAutoRestore, autoSave });
+  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReady });
   const {
     content, setContent, currentFile, isDirty, isSaving, lastSavedTime,
     openFile: tabOpenFile, saveFile, saveAsFile,
@@ -134,8 +141,6 @@ export default function EditorPage() {
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const programmaticScrollRef = useRef(false);
 
-  const isElectron = typeof window !== "undefined" && isElectronRenderer();
-
   // --- Project lifecycle hook ---
   const projectLifecycle = useProjectLifecycle({
     editorMode,
@@ -147,6 +152,7 @@ export default function EditorPage() {
     content,
     skipAutoRestore,
     lastSavedTime,
+    onVfsReady: handleVfsReady,
   });
   const {
     state: {
