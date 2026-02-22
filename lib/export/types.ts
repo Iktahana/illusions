@@ -15,7 +15,7 @@ export interface ExportOptions {
   includeTableOfContents?: boolean;
 }
 
-export type ExportFormat = "pdf" | "epub" | "docx";
+export type ExportFormat = "pdf" | "epub" | "docx" | "txt" | "txt-ruby";
 
 export interface Chapter {
   title: string;

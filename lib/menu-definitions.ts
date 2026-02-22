@@ -40,6 +40,9 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
       {
         label: 'エクスポート',
         submenu: [
+          { label: 'テキスト（プレーン）としてエクスポート...', action: 'export-txt' },
+          { label: 'テキスト（ルビ付き）としてエクスポート...', action: 'export-txt-ruby' },
+          { type: 'separator' },
           { label: 'PDF としてエクスポート...', action: 'export-pdf' },
           { label: 'EPUB としてエクスポート...', action: 'export-epub' },
           { label: 'DOCX としてエクスポート...', action: 'export-docx' },

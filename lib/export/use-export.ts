@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from "react";
 import { isElectronRenderer } from "@/lib/runtime-env";
 import { notificationManager } from "@/lib/notification-manager";
+import { mdiToPlainText, mdiToRubyText } from "./txt-exporter";
 import type { ExportFormat } from "./types";
 
 interface UseExportParams {
@@ -13,8 +14,48 @@ interface UseExportParams {
 }
 
 /**
+ * Save text content to a file via browser download or File System Access API.
+ */
+async function saveTxtFile(text: string, suggestedName: string): Promise<boolean> {
+  // Try File System Access API first (Chromium browsers + Electron)
+  if ("showSaveFilePicker" in window) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const handle = await (window as any).showSaveFilePicker({
+        suggestedName,
+        types: [
+          {
+            description: "テキストファイル",
+            accept: { "text/plain": [".txt"] },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(text);
+      await writable.close();
+      return true;
+    } catch (error) {
+      if ((error as { name?: string }).name === "AbortError") return false;
+      throw error;
+    }
+  }
+
+  // Fallback: trigger download via Blob URL
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = suggestedName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return true;
+}
+
+/**
  * Hook that provides export functionality and registers Electron menu handlers.
- * Handles PDF, EPUB, DOCX export with progress notifications.
+ * Handles PDF, EPUB, DOCX, TXT export with progress notifications.
  */
 export function useExport({ getContent, getTitle }: UseExportParams): {
   exportAs: (format: ExportFormat) => Promise<void>;
@@ -36,8 +77,44 @@ export function useExport({ getContent, getTitle }: UseExportParams): {
         pdf: "PDF",
         epub: "EPUB",
         docx: "DOCX",
+        txt: "テキスト",
+        "txt-ruby": "テキスト（ルビ付き）",
       };
       const label = formatLabels[format];
+
+      // TXT exports are client-side (no Electron IPC needed)
+      if (format === "txt" || format === "txt-ruby") {
+        const progressId = notificationManager.showProgress(
+          `${label}をエクスポート中...`,
+          { type: "info" },
+        );
+
+        try {
+          const converted =
+            format === "txt"
+              ? mdiToPlainText(content)
+              : mdiToRubyText(content);
+
+          const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
+          const suffix = format === "txt-ruby" ? "_ruby" : "";
+          const suggestedName = `${baseName}${suffix}.txt`;
+
+          const saved = await saveTxtFile(converted, suggestedName);
+          notificationManager.dismiss(progressId);
+
+          if (saved) {
+            notificationManager.success(`${label}をエクスポートしました`);
+          }
+        } catch (error) {
+          notificationManager.dismiss(progressId);
+          const message =
+            error instanceof Error ? error.message : "Unknown error";
+          notificationManager.error(
+            `${label}のエクスポートに失敗しました: ${message}`,
+          );
+        }
+        return;
+      }
 
       const progressId = notificationManager.showProgress(
         `${label}をエクスポート中...`,

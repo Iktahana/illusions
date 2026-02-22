@@ -12,7 +12,7 @@ interface UseWebMenuHandlersProps {
   onOpenRecentProject?: (projectId: string) => void;
   onCloseWindow?: () => void;
   onToggleCompactMode?: () => void;
-  onExport?: (format: 'pdf' | 'epub' | 'docx') => void;
+  onExport?: (format: 'pdf' | 'epub' | 'docx' | 'txt' | 'txt-ruby') => void;
   editorView?: EditorView | null;
   fontScale?: number;
   onFontScaleChange?: (scale: number) => void;
@@ -61,6 +61,12 @@ export function useWebMenuHandlers({
         break;
 
       // Export
+      case 'export-txt':
+        onExport?.('txt');
+        break;
+      case 'export-txt-ruby':
+        onExport?.('txt-ruby');
+        break;
       case 'export-pdf':
         onExport?.('pdf');
         break;
