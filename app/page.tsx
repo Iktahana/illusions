@@ -826,7 +826,7 @@ export default function EditorPage() {
       case "characters":
         return <Characters content={content} />;
       case "dictionary":
-        return <Dictionary content={content} initialSearchTerm={dictionarySearchTrigger.term} searchTriggerId={dictionarySearchTrigger.id} />;
+        return <Dictionary content={content} initialSearchTerm={dictionarySearchTrigger.term} searchTriggerId={dictionarySearchTrigger.id} editorMode={editorMode} />;
       case "wordfreq":
         return <WordFrequency content={content} filePath={currentFile?.path ?? undefined} onWordSearch={(word) => {
           setSearchInitialTerm(word);

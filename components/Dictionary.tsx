@@ -1,20 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Trash2, Edit2, Check, X, BookOpen, ChevronDown, ChevronRight, Search, Globe, ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Plus, Trash2, Edit2, BookOpen, ChevronDown, ChevronRight, Search, Globe, ExternalLink } from "lucide-react";
+import GlassDialog from "@/components/GlassDialog";
+import type { UserDictionaryEntry } from "@/lib/project-types";
+import type { EditorMode } from "@/lib/project-types";
+import { isProjectMode, isStandaloneMode } from "@/lib/project-types";
+import { getUserDictionaryService } from "@/lib/user-dictionary-service";
 
-// ユーザー辞書條目
-interface UserDictionaryEntry {
-  id: string;
-  word: string;
-  reading?: string;
-  partOfSpeech?: string;
-  definition: string;
-  examples?: string;
-  notes?: string;
-}
+// Predefined POS values matching PosType
+const POS_OPTIONS = [
+  "名詞",
+  "動詞",
+  "形容詞",
+  "副詞",
+  "助詞",
+  "助動詞",
+  "接続詞",
+  "感動詞",
+  "記号",
+  "連体詞",
+  "フィラー",
+  "その他",
+] as const;
 
-// Web辞典ソース
+// Web dictionary sources
 interface WebDictionarySource {
   id: string;
   name: string;
@@ -34,39 +44,77 @@ const WEB_DICTIONARIES: WebDictionarySource[] = [
   },
 ];
 
-// Electron環境かどうかを判定
 const isElectron = (): boolean => {
   return typeof window !== "undefined" &&
     typeof window.process !== "undefined" &&
     window.process?.type === "renderer";
 };
 
+const EMPTY_FORM: Partial<UserDictionaryEntry> = {
+  word: "",
+  reading: "",
+  partOfSpeech: "",
+  definition: "",
+  examples: "",
+  notes: "",
+};
+
 interface DictionaryProps {
   content?: string;
   initialSearchTerm?: string;
   searchTriggerId?: number;
+  editorMode?: EditorMode;
 }
 
-export default function Dictionary({ content, initialSearchTerm, searchTriggerId }: DictionaryProps) {
+export default function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }: DictionaryProps) {
   const [activeTab, setActiveTab] = useState<"user" | "web">("web");
   const [userEntries, setUserEntries] = useState<UserDictionaryEntry[]>([]);
-  const [isAddingEntry, setIsAddingEntry] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [newEntry, setNewEntry] = useState<Partial<UserDictionaryEntry>>({
-    word: "",
-    reading: "",
-    partOfSpeech: "",
-    definition: "",
-    examples: "",
-    notes: "",
-  });
 
-  // グローバル検索用の状態（全タブ共有）
+  // Modal state
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<UserDictionaryEntry | null>(null);
+  const [formData, setFormData] = useState<Partial<UserDictionaryEntry>>(EMPTY_FORM);
+
+  // Search state
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   const [activeSearchQuery, setActiveSearchQuery] = useState("");
 
-  // initialSearchTerm が変わったら検索を実行
+  // Persistence
+  const dictService = getUserDictionaryService();
+
+  const loadEntries = useCallback(async () => {
+    try {
+      if (editorMode && isProjectMode(editorMode)) {
+        const entries = await dictService.loadEntries();
+        setUserEntries(entries);
+      } else if (editorMode && isStandaloneMode(editorMode)) {
+        const entries = dictService.loadEntriesStandalone(editorMode.fileName);
+        setUserEntries(entries);
+      }
+    } catch {
+      // Silently fail — dictionary is not critical
+    }
+  }, [editorMode, dictService]);
+
+  const persistEntries = useCallback(async (entries: UserDictionaryEntry[]) => {
+    try {
+      if (editorMode && isProjectMode(editorMode)) {
+        await dictService.saveEntries(entries);
+      } else if (editorMode && isStandaloneMode(editorMode)) {
+        dictService.saveEntriesStandalone(editorMode.fileName, entries);
+      }
+    } catch {
+      // Silently fail
+    }
+  }, [editorMode, dictService]);
+
+  // Load entries on mount / mode change
+  useEffect(() => {
+    void loadEntries();
+  }, [loadEntries]);
+
+  // Update search when initialSearchTerm changes
   useEffect(() => {
     if (initialSearchTerm && searchTriggerId) {
       setGlobalSearchQuery(initialSearchTerm);
@@ -74,65 +122,89 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
     }
   }, [initialSearchTerm, searchTriggerId]);
 
-  const handleAddEntry = () => {
-    if (!newEntry.word?.trim() || !newEntry.definition?.trim()) return;
+  // --- Modal handlers ---
 
-    const entry: UserDictionaryEntry = {
-      id: Date.now().toString(),
-      word: newEntry.word.trim(),
-      reading: newEntry.reading?.trim() || "",
-      partOfSpeech: newEntry.partOfSpeech?.trim() || "",
-      definition: newEntry.definition.trim(),
-      examples: newEntry.examples?.trim() || "",
-      notes: newEntry.notes?.trim() || "",
-    };
-
-    setUserEntries([...userEntries, entry].sort((a, b) => a.word.localeCompare(b.word)));
-    setNewEntry({
-      word: "",
-      reading: "",
-      partOfSpeech: "",
-      definition: "",
-      examples: "",
-      notes: "",
-    });
-    setIsAddingEntry(false);
+  const handleOpenAddDialog = () => {
+    setEditingEntry(null);
+    setFormData(EMPTY_FORM);
+    setIsDialogOpen(true);
   };
 
-  const handleDeleteEntry = (id: string) => {
-    setUserEntries(userEntries.filter((e) => e.id !== id));
+  const handleOpenEditDialog = (entry: UserDictionaryEntry) => {
+    setEditingEntry(entry);
+    setFormData({
+      word: entry.word,
+      reading: entry.reading ?? "",
+      partOfSpeech: entry.partOfSpeech ?? "",
+      definition: entry.definition ?? "",
+      examples: entry.examples ?? "",
+      notes: entry.notes ?? "",
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setEditingEntry(null);
+    setFormData(EMPTY_FORM);
+  };
+
+  const handleSaveEntry = async () => {
+    if (!formData.word?.trim()) return;
+
+    if (editingEntry) {
+      // Update existing
+      const updated = userEntries.map((e) =>
+        e.id === editingEntry.id
+          ? {
+              ...e,
+              word: formData.word?.trim() ?? e.word,
+              reading: formData.reading?.trim() || undefined,
+              partOfSpeech: formData.partOfSpeech?.trim() || undefined,
+              definition: formData.definition?.trim() || undefined,
+              examples: formData.examples?.trim() || undefined,
+              notes: formData.notes?.trim() || undefined,
+            }
+          : e,
+      );
+      setUserEntries(updated);
+      await persistEntries(updated);
+    } else {
+      // Add new
+      const entry: UserDictionaryEntry = {
+        id: Date.now().toString(),
+        word: formData.word.trim(),
+        reading: formData.reading?.trim() || undefined,
+        partOfSpeech: formData.partOfSpeech?.trim() || undefined,
+        definition: formData.definition?.trim() || undefined,
+        examples: formData.examples?.trim() || undefined,
+        notes: formData.notes?.trim() || undefined,
+      };
+      const updated = [...userEntries, entry].sort((a, b) => a.word.localeCompare(b.word));
+      setUserEntries(updated);
+      await persistEntries(updated);
+    }
+
+    handleCloseDialog();
+  };
+
+  const handleDeleteEntry = async (id: string) => {
+    const updated = userEntries.filter((e) => e.id !== id);
+    setUserEntries(updated);
     if (expandedId === id) setExpandedId(null);
-    if (editingId === id) setEditingId(null);
-  };
-
-  const handleUpdateEntry = (id: string, updates: Partial<UserDictionaryEntry>) => {
-    setUserEntries(
-      userEntries.map((e) => (e.id === id ? { ...e, ...updates } : e))
-    );
-  };
-
-  const handleCancelAdd = () => {
-    setIsAddingEntry(false);
-    setNewEntry({
-      word: "",
-      reading: "",
-      partOfSpeech: "",
-      definition: "",
-      examples: "",
-      notes: "",
-    });
+    await persistEntries(updated);
   };
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  // ユーザー辞書のフィルタリング（activeSearchQueryを使用）
+  // Filtered entries
   const filteredEntries = userEntries.filter(
     (entry) =>
       entry.word.toLowerCase().includes(activeSearchQuery.toLowerCase()) ||
       entry.reading?.toLowerCase().includes(activeSearchQuery.toLowerCase()) ||
-      entry.definition.toLowerCase().includes(activeSearchQuery.toLowerCase())
+      entry.definition?.toLowerCase().includes(activeSearchQuery.toLowerCase()),
   );
 
   return (
@@ -201,12 +273,12 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === "user" ? (
-          /* ユーザー辞書タブ */
+          /* User dictionary tab */
           <div className="flex flex-col h-full">
             {/* Add Button */}
             <div className="p-4 border-b border-border">
               <button
-                onClick={() => setIsAddingEntry(true)}
+                onClick={handleOpenAddDialog}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors text-sm font-medium"
               >
                 <Plus className="w-4 h-4" />
@@ -216,126 +288,7 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
 
             {/* Entries List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {/* 新規追加フォーム */}
-              {isAddingEntry && (
-                <div className="bg-background-elevated border border-border rounded-lg p-3 space-y-2 mb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold text-foreground">新しい項目</h3>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={handleAddEntry}
-                        className="p-1 hover:bg-hover rounded text-success"
-                        title="追加"
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={handleCancelAdd}
-                        className="p-1 hover:bg-hover rounded text-foreground-secondary"
-                        title="キャンセル"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                        見出し語 *
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="例: 幻想"
-                        value={newEntry.word || ""}
-                        onChange={(e) =>
-                          setNewEntry({ ...newEntry, word: e.target.value })
-                        }
-                        className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                        autoFocus
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                        読み方
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="例: げんそう"
-                        value={newEntry.reading || ""}
-                        onChange={(e) =>
-                          setNewEntry({ ...newEntry, reading: e.target.value })
-                        }
-                        className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                        品詞
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="例: 名詞"
-                        value={newEntry.partOfSpeech || ""}
-                        onChange={(e) =>
-                          setNewEntry({ ...newEntry, partOfSpeech: e.target.value })
-                        }
-                        className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                        意味 *
-                      </label>
-                      <textarea
-                        placeholder="この言葉の意味を入力してください"
-                        value={newEntry.definition || ""}
-                        onChange={(e) =>
-                          setNewEntry({ ...newEntry, definition: e.target.value })
-                        }
-                        className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-                        rows={3}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                        用例
-                      </label>
-                      <textarea
-                        placeholder="使用例を入力してください"
-                        value={newEntry.examples || ""}
-                        onChange={(e) =>
-                          setNewEntry({ ...newEntry, examples: e.target.value })
-                        }
-                        className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-                        rows={2}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                        メモ
-                      </label>
-                      <textarea
-                        placeholder="メモや補足情報を入力してください"
-                        value={newEntry.notes || ""}
-                        onChange={(e) =>
-                          setNewEntry({ ...newEntry, notes: e.target.value })
-                        }
-                        className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-                        rows={2}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* エントリーリスト */}
-              {filteredEntries.length === 0 && !isAddingEntry ? (
+              {filteredEntries.length === 0 ? (
                 <div className="text-center py-8 text-foreground-secondary text-sm">
                   {activeSearchQuery ? (
                     <p>「{activeSearchQuery}」に一致する項目が見つかりません</p>
@@ -380,174 +333,78 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-foreground-secondary mt-1 line-clamp-1">
-                              {entry.definition}
-                            </p>
+                            {entry.definition && (
+                              <p className="text-sm text-foreground-secondary mt-1 line-clamp-1">
+                                {entry.definition}
+                              </p>
+                            )}
                           </div>
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteEntry(entry.id);
-                          }}
-                          className="p-1 hover:bg-background rounded text-foreground-tertiary hover:text-danger transition-colors ml-2"
-                          title="削除"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex gap-1 ml-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditDialog(entry);
+                            }}
+                            className="p-1 hover:bg-background rounded text-foreground-tertiary hover:text-foreground transition-colors"
+                            title="編集"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleDeleteEntry(entry.id);
+                            }}
+                            className="p-1 hover:bg-background rounded text-foreground-tertiary hover:text-danger transition-colors"
+                            title="削除"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
                     {/* Expanded Details */}
                     {expandedId === entry.id && (
                       <div className="border-t border-border p-3 space-y-3 bg-background">
-                        {editingId === entry.id ? (
-                          // Edit Mode
-                          <div className="space-y-2">
-                            <div className="flex justify-end gap-1 mb-2">
-                              <button
-                                onClick={() => setEditingId(null)}
-                                className="p-1 hover:bg-hover rounded text-success"
-                                title="完了"
-                              >
-                                <Check className="w-4 h-4" />
-                              </button>
-                            </div>
-
-                            <div>
-                              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                                見出し語
-                              </label>
-                              <input
-                                type="text"
-                                value={entry.word}
-                                onChange={(e) =>
-                                  handleUpdateEntry(entry.id, { word: e.target.value })
-                                }
-                                className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                                読み方
-                              </label>
-                              <input
-                                type="text"
-                                value={entry.reading}
-                                onChange={(e) =>
-                                  handleUpdateEntry(entry.id, { reading: e.target.value })
-                                }
-                                className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                                品詞
-                              </label>
-                              <input
-                                type="text"
-                                value={entry.partOfSpeech}
-                                onChange={(e) =>
-                                  handleUpdateEntry(entry.id, {
-                                    partOfSpeech: e.target.value,
-                                  })
-                                }
-                                className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                                意味
-                              </label>
-                              <textarea
-                                value={entry.definition}
-                                onChange={(e) =>
-                                  handleUpdateEntry(entry.id, {
-                                    definition: e.target.value,
-                                  })
-                                }
-                                className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-                                rows={3}
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                                用例
-                              </label>
-                              <textarea
-                                value={entry.examples}
-                                onChange={(e) =>
-                                  handleUpdateEntry(entry.id, {
-                                    examples: e.target.value,
-                                  })
-                                }
-                                className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-                                rows={2}
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                                メモ
-                              </label>
-                              <textarea
-                                value={entry.notes}
-                                onChange={(e) =>
-                                  handleUpdateEntry(entry.id, { notes: e.target.value })
-                                }
-                                className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-                                rows={2}
-                              />
-                            </div>
+                        {entry.definition && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
+                              意味
+                            </h4>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">
+                              {entry.definition}
+                            </p>
                           </div>
-                        ) : (
-                          // View Mode
-                          <div className="space-y-3">
-                            <div className="flex justify-end">
-                              <button
-                                onClick={() => setEditingId(entry.id)}
-                                className="p-1 hover:bg-hover rounded text-foreground-secondary hover:text-foreground"
-                                title="編集"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                        )}
 
-                            <div>
-                              <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
-                                意味
-                              </h4>
-                              <p className="text-sm text-foreground whitespace-pre-wrap">
-                                {entry.definition}
-                              </p>
-                            </div>
-
-                            {entry.examples && (
-                              <div>
-                                <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
-                                  用例
-                                </h4>
-                                <p className="text-sm text-foreground whitespace-pre-wrap">
-                                  {entry.examples}
-                                </p>
-                              </div>
-                            )}
-
-                            {entry.notes && (
-                              <div>
-                                <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
-                                  メモ
-                                </h4>
-                                <p className="text-sm text-foreground whitespace-pre-wrap">
-                                  {entry.notes}
-                                </p>
-                              </div>
-                            )}
+                        {entry.examples && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
+                              用例
+                            </h4>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">
+                              {entry.examples}
+                            </p>
                           </div>
+                        )}
+
+                        {entry.notes && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
+                              メモ
+                            </h4>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">
+                              {entry.notes}
+                            </p>
+                          </div>
+                        )}
+
+                        {!entry.definition && !entry.examples && !entry.notes && (
+                          <p className="text-sm text-foreground-tertiary">
+                            詳細情報はありません
+                          </p>
                         )}
                       </div>
                     )}
@@ -571,9 +428,8 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
             )}
           </div>
         ) : (
-          /* Web辞書タブ */
+          /* Web dictionary tab */
           <div className="flex flex-col h-full">
-            {/* Dictionary Sources */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {!activeSearchQuery ? (
                 <div className="text-center py-8 text-foreground-secondary text-sm">
@@ -587,7 +443,6 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
                 WEB_DICTIONARIES.map((dict) => {
                   const searchUrl = dict.urlTemplate.replace("{query}", encodeURIComponent(activeSearchQuery));
 
-                  // Open dictionary in popup window (Electron) or new tab (Web)
                   const handleOpenDictionary = () => {
                     if (isElectron() && window.electronAPI?.openDictionaryPopup) {
                       window.electronAPI.openDictionaryPopup(searchUrl, `${dict.name} - ${activeSearchQuery}`);
@@ -618,6 +473,129 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
           </div>
         )}
       </div>
+
+      {/* Add/Edit Modal Dialog */}
+      <GlassDialog
+        isOpen={isDialogOpen}
+        onBackdropClick={handleCloseDialog}
+        ariaLabel={editingEntry ? "辞書項目を編集" : "新しい辞書項目を追加"}
+        panelClassName="mx-4 w-full max-w-lg p-6"
+      >
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-foreground">
+            {editingEntry ? "辞書項目を編集" : "新しい辞書項目を追加"}
+          </h3>
+
+          <div className="space-y-3">
+            {/* Word (required) */}
+            <div>
+              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                見出し語 *
+              </label>
+              <input
+                type="text"
+                placeholder="例: 幻想"
+                value={formData.word || ""}
+                onChange={(e) => setFormData({ ...formData, word: e.target.value })}
+                className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                autoFocus
+              />
+            </div>
+
+            {/* Reading */}
+            <div>
+              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                読み方
+              </label>
+              <input
+                type="text"
+                placeholder="例: げんそう"
+                value={formData.reading || ""}
+                onChange={(e) => setFormData({ ...formData, reading: e.target.value })}
+                className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+
+            {/* POS - Dropdown */}
+            <div>
+              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                品詞
+              </label>
+              <select
+                value={formData.partOfSpeech || ""}
+                onChange={(e) => setFormData({ ...formData, partOfSpeech: e.target.value })}
+                className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                <option value="">選択してください</option>
+                {POS_OPTIONS.map((pos) => (
+                  <option key={pos} value={pos}>
+                    {pos}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Definition (optional) */}
+            <div>
+              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                意味
+              </label>
+              <textarea
+                placeholder="この言葉の意味を入力してください"
+                value={formData.definition || ""}
+                onChange={(e) => setFormData({ ...formData, definition: e.target.value })}
+                className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                rows={3}
+              />
+            </div>
+
+            {/* Examples */}
+            <div>
+              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                用例
+              </label>
+              <textarea
+                placeholder="使用例を入力してください"
+                value={formData.examples || ""}
+                onChange={(e) => setFormData({ ...formData, examples: e.target.value })}
+                className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                rows={2}
+              />
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="text-xs font-medium text-foreground-secondary mb-1 block">
+                メモ
+              </label>
+              <textarea
+                placeholder="メモや補足情報を入力してください"
+                value={formData.notes || ""}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={handleCloseDialog}
+              className="px-4 py-2 text-sm text-foreground-secondary hover:text-foreground transition-colors rounded hover:bg-hover"
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={() => void handleSaveEntry()}
+              disabled={!formData.word?.trim()}
+              className="px-4 py-2 text-sm bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {editingEntry ? "保存" : "追加"}
+            </button>
+          </div>
+        </div>
+      </GlassDialog>
     </div>
   );
 }
