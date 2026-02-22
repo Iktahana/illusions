@@ -306,7 +306,7 @@ export class DesuMasuConsistencyRule extends AbstractMorphologicalDocumentLintRu
         message:
           "This sentence uses polite style (です・ます体), but the document predominantly uses plain style (だ・である体)",
         messageJa:
-          "文化庁「公用文作成の考え方」に基づき、この文は敬体（です・ます体）ですが、文書全体では常体（だ・である体）が使われています",
+          "この文は敬体（です・ます体）ですが、文書全体では常体（だ・である体）が使われています",
         from: sentence.styleFrom,
         to: sentence.styleTo,
         reference: STYLE_GUIDE_REF,
@@ -320,7 +320,7 @@ export class DesuMasuConsistencyRule extends AbstractMorphologicalDocumentLintRu
       message:
         "This sentence uses plain style (だ・である体), but the document predominantly uses polite style (です・ます体)",
       messageJa:
-        "文化庁「公用文作成の考え方」に基づき、この文は常体（だ・である体）ですが、文書全体では敬体（です・ます体）が使われています",
+        "この文は常体（だ・である体）ですが、文書全体では敬体（です・ます体）が使われています",
       from: sentence.styleFrom,
       to: sentence.styleTo,
       reference: STYLE_GUIDE_REF,
