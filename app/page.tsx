@@ -105,13 +105,15 @@ export default function EditorPage() {
     handlePowerSaveModeChange,
   } = settingsHandlers;
 
+  const isElectron = typeof window !== "undefined" && isElectronRenderer();
+
   // --- Power saving hook ---
   usePowerSaving({
     powerSaveMode,
     onPowerSaveModeChange: handlePowerSaveModeChange,
   });
 
-  const tabManager = useTabManager({ skipAutoRestore, autoSave });
+  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReadyPromise: vfsGate.promise });
   const {
     content, setContent, currentFile, isDirty, isSaving, lastSavedTime,
     openFile: tabOpenFile, saveFile, saveAsFile,
@@ -141,8 +143,6 @@ export default function EditorPage() {
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const programmaticScrollRef = useRef(false);
-
-  const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
   // --- Project lifecycle hook ---
   const projectLifecycle = useProjectLifecycle({

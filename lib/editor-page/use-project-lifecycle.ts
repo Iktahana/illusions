@@ -537,6 +537,10 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         // handleOpenRecentProject catches its own errors internally
       }
       isAutoRestoringRef.current = false;
+      // Signal that VFS root has been initialized (or restore failed).
+      // Tab restoration depends on this to avoid race conditions with
+      // vfs:read-file IPC calls that require an allowed root.
+      signalVfsReady();
       timerId = setTimeout(() => {
         setIsRestoring((prev) => {
           if (prev && isElectron) {
@@ -550,7 +554,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     return () => {
       if (timerId !== undefined) clearTimeout(timerId);
     };
-  }, [autoRestoreProjectId, handleOpenRecentProject, isElectron]);
+  }, [autoRestoreProjectId, handleOpenRecentProject, isElectron, signalVfsReady]);
 
   /** Called when the CreateProjectWizard successfully creates a project */
   const handleProjectCreated = useCallback(async (project: ProjectMode) => {

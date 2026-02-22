@@ -96,14 +96,141 @@ export function inferFileType(fileName: string): SupportedFileExtension {
 }
 
 /**
+ * Known HTML tag names that may be injected by the editor (ProseMirror/Milkdown)
+ * and should be stripped when saving to .mdi format.
+ *
+ * Only properly paired tags (e.g. `<div>...</div>`) and void elements
+ * (e.g. `<img>`, `<hr>`) are removed. Orphaned non-void tags like a bare
+ * `<B>` are left intact so that arbitrary angle-bracket content
+ * (e.g. math expressions `A<B>C`) is not silently destroyed.
+ */
+const PAIRED_HTML_TAGS = [
+  "a",
+  "abbr",
+  "article",
+  "aside",
+  "b",
+  "blockquote",
+  "body",
+  "caption",
+  "cite",
+  "code",
+  "colgroup",
+  "dd",
+  "del",
+  "details",
+  "dfn",
+  "div",
+  "dl",
+  "dt",
+  "em",
+  "figcaption",
+  "figure",
+  "footer",
+  "h[1-6]",
+  "head",
+  "header",
+  "html",
+  "i",
+  "iframe",
+  "ins",
+  "kbd",
+  "label",
+  "li",
+  "main",
+  "mark",
+  "nav",
+  "noscript",
+  "ol",
+  "p",
+  "picture",
+  "pre",
+  "q",
+  "rp",
+  "rt",
+  "ruby",
+  "s",
+  "samp",
+  "script",
+  "section",
+  "select",
+  "small",
+  "span",
+  "strong",
+  "style",
+  "sub",
+  "summary",
+  "sup",
+  "table",
+  "tbody",
+  "td",
+  "template",
+  "textarea",
+  "tfoot",
+  "th",
+  "thead",
+  "time",
+  "title",
+  "tr",
+  "u",
+  "ul",
+  "var",
+  "video",
+] as const;
+
+/**
+ * Void HTML elements that are self-closing and cannot have content.
+ * These are safe to strip even when not paired, since tag names like
+ * `img`, `hr`, `wbr` etc. are unambiguous and won't collide with
+ * user-authored angle-bracket content.
+ */
+const VOID_HTML_TAGS = [
+  "area",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "source",
+  "track",
+  "wbr",
+] as const;
+
+/** Regex matching void HTML elements (opening or self-closing form). */
+const VOID_TAG_PATTERN = new RegExp(
+  `<(${VOID_HTML_TAGS.join("|")})(\\s[^>]*)?\\/?>`,
+  "gi",
+);
+
+/**
  * Sanitize MDI content before saving.
- * Converts/removes HTML tags that should not appear in .mdi files.
+ * Strips known HTML tags that should not appear in .mdi files,
+ * while preserving arbitrary angle-bracket content (e.g. `A<B>C`).
  */
 export function sanitizeMdiContent(content: string): string {
   let result = content;
+  // Step 1: Convert <br> tags to newlines
   result = result.replace(/<br\s*\/?>/gi, "\n");
-  result = result.replace(/<(\w+)[^>]*>(.*?)<\/\1>/gi, "$2");
-  result = result.replace(/<\/?[a-zA-Z][a-zA-Z0-9]*\b[^>]*\/?>/g, "");
+  // Step 2: Remove properly paired known HTML tags, keeping inner content.
+  // Only matched pairs (e.g. <div>...</div>) are stripped; an orphaned
+  // `<B>` without a closing `</B>` is left untouched.
+  // Loop until stable so nested identical tags (e.g. <div><div>x</div></div>)
+  // are fully stripped.
+  const pairedTagPattern = new RegExp(
+    `<(${PAIRED_HTML_TAGS.join("|")})(\\s[^>]*)?>([\\s\\S]*?)<\\/\\1>`,
+    "gi",
+  );
+  let prev = result;
+  result = result.replace(pairedTagPattern, "$3");
+  while (result !== prev) {
+    prev = result;
+    result = result.replace(pairedTagPattern, "$3");
+  }
+  // Step 3: Remove void HTML elements (img, hr, etc.) which are always
+  // self-closing and cannot be confused with user content.
+  result = result.replace(VOID_TAG_PATTERN, "");
   return result;
 }
 

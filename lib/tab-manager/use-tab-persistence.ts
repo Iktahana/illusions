@@ -184,6 +184,8 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
   }, [isElectron, skipAutoRestore, setTabs]);
 
   // --- Restore tabs from AppState on mount (Electron only) ----------------
+  // Wait for VFS root to be set so that the main process has a registered
+  // allowed root before we attempt vfs:read-file IPC calls.
 
   useEffect(() => {
     if (!isElectron || skipAutoRestore) return;

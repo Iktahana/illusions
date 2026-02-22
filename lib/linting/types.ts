@@ -24,6 +24,8 @@ export interface LintIssue {
   to: number;
   /** Reference to official standard */
   reference?: LintReference;
+  /** Original text at [from, to] when the issue was detected, used to verify before applying a fix */
+  originalText?: string;
   /** Optional fix suggestion */
   fix?: {
     label: string;
