@@ -41,6 +41,14 @@ const APP_NAME = 'illusions'
 autoUpdater.logger = log
 autoUpdater.logger.transports.file.level = 'info'
 
+// Set update channel based on app version suffix (e.g., 0.1.123-beta → beta)
+// Only 'latest' (stable) channel is the default; alpha/beta users stay on their channel
+const versionMatch = app.getVersion().match(/-(.+)$/)
+if (versionMatch) {
+  autoUpdater.channel = versionMatch[1]
+  autoUpdater.allowPrerelease = true
+}
+
 let mainWindow = null
 let isManualUpdateCheck = false
 const allWindows = new Set() // すべてのウィンドウを追跡
