@@ -67,6 +67,7 @@ export function updateLintingSettings(
     nlpClient?: INlpClient | null;
     llmClient?: ILlmClient | null;
     llmEnabled?: boolean;
+    llmModelId?: string;
     forceFullScan?: boolean;
     forceLlmValidation?: boolean;
     ignoredCorrections?: IgnoredCorrection[];

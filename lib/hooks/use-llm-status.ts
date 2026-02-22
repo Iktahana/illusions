@@ -92,8 +92,8 @@ export function useLlmStatus(
     };
   }, []);
 
-  // Inferring overrides ready
-  if (isInferring && baseStatus === "ready") {
+  // Inferring overrides any base status (including "off" during forced validation)
+  if (isInferring) {
     return "inferring";
   }
 
