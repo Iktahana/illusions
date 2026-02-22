@@ -49,6 +49,7 @@ export function useLinting(
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
   editorViewInstance: EditorView | null,
   llmEnabled: boolean = false,
+  powerSaveMode: boolean = false,
 ): UseLintingResult {
   const ruleRunnerRef = useRef<RuleRunner | null>(null);
   const [lintIssues, setLintIssues] = useState<LintIssue[]>([]);
@@ -141,7 +142,7 @@ export function useLinting(
       console.error("[useLinting] Failed to refresh linting:", err);
       setIsLinting(false);
     });
-  }, [editorViewInstance, lintingEnabled, llmEnabled]);
+  }, [editorViewInstance, lintingEnabled, llmEnabled, powerSaveMode]);
 
   return {
     ruleRunner,

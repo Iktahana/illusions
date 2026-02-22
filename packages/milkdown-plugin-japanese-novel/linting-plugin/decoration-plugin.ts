@@ -164,13 +164,12 @@ export function createLintingPlugin(
             llmEnabled = meta.llmEnabled ?? false;
 
             if (wasEnabled && !llmEnabled) {
-              // L3 just disabled — cancel everything and unload
+              // L3 just disabled — cancel in-flight work and clear L3 cache
               if (llmAbortController) llmAbortController.abort();
               if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
               llmIssueCache = null;
               llmInFlight = false;
-              validationCache.clear();
-              currentLlmClient?.unloadModel().catch(console.error);
+              // Keep validationCache — L1/L2 validation runs independently
             }
           }
           // Force full scan flag
