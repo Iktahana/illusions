@@ -1,5 +1,7 @@
 "use client";
 
+const PERSIST_FAILURE_WARNING = "ファイル参照の保存に失敗しました";
+
 import { useCallback, useRef } from "react";
 import {
   openMdiFile,
@@ -84,7 +86,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   }, []);
 
   const persistFileReference = useCallback(
-    async (descriptor: MdiFileDescriptor, fileContent: string) => {
+    async (descriptor: MdiFileDescriptor, fileContent: string): Promise<boolean> => {
       try {
         if (isElectron && descriptor.path) {
           await persistLastOpenedPath(descriptor.path);
@@ -97,8 +99,10 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
             fileHandle: descriptor.handle,
           });
         }
+        return true;
       } catch (error) {
         console.error("ファイル参照の保存に失敗しました:", error);
+        return false;
       }
     },
     [isElectron, persistLastOpenedPath],
@@ -177,7 +181,10 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       setActiveTabId(tab.id);
     }
 
-    void persistFileReference(descriptor, fileContent);
+    void (async () => {
+      const ok = await persistFileReference(descriptor, fileContent);
+      if (!ok) notificationManager.warning(PERSIST_FAILURE_WARNING);
+    })();
   }, [findTabByPath, updateTab, persistFileReference, setTabs, setActiveTabId, tabsRef, activeTabIdRef]);
 
   /** Save the active tab */
@@ -213,7 +220,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
                 : t,
             ),
           );
-          void tryAutoSnapshot(tab.file.name, sanitized);
+          await tryAutoSnapshot(tab.file.name, sanitized);
           return;
         }
 
@@ -238,8 +245,10 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
                 : t,
             ),
           );
-          void persistFileReference(result.descriptor, sanitized);
-          void tryAutoSnapshot(result.descriptor.name, sanitized);
+          if (!(await persistFileReference(result.descriptor, sanitized))) {
+            notificationManager.warning(PERSIST_FAILURE_WARNING);
+          }
+          await tryAutoSnapshot(result.descriptor.name, sanitized);
         } else {
           updateTab(tabId, { isSaving: false });
         }
@@ -282,8 +291,10 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           lastSavedTime: Date.now(),
           isSaving: false,
         });
-        void persistFileReference(result.descriptor, sanitized);
-        void tryAutoSnapshot(result.descriptor.name, sanitized);
+        if (!(await persistFileReference(result.descriptor, sanitized))) {
+          notificationManager.warning(PERSIST_FAILURE_WARNING);
+        }
+        await tryAutoSnapshot(result.descriptor.name, sanitized);
       } else {
         updateTab(tabId, { isSaving: false });
       }

@@ -9,8 +9,10 @@ type NotificationListener = (notifications: NotificationItem[]) => void;
 
 class NotificationManager {
   private static instance: NotificationManager;
+  private static readonly MAX_NOTIFICATIONS = 50;
   private notifications: NotificationItem[] = [];
   private listeners: Set<NotificationListener> = new Set();
+  private timers = new Map<string, ReturnType<typeof setTimeout>>();
   private nextId = 0;
 
   private constructor() {}
@@ -46,7 +48,7 @@ class NotificationManager {
   ): string {
     const id = `notification-${this.nextId++}`;
     const type = options.type || 'info';
-     const duration = options.duration ?? 10000; // デフォルト 10 秒
+    const duration = options.duration ?? 10000; // デフォルト 10 秒
 
     const notification: NotificationItem = {
       id,
@@ -57,13 +59,28 @@ class NotificationManager {
     };
 
     this.notifications.push(notification);
+
+    // Enforce cap: evict oldest when exceeding MAX_NOTIFICATIONS
+    while (this.notifications.length > NotificationManager.MAX_NOTIFICATIONS) {
+      const oldest = this.notifications.shift();
+      if (oldest) {
+        const oldTimer = this.timers.get(oldest.id);
+        if (oldTimer !== undefined) {
+          clearTimeout(oldTimer);
+          this.timers.delete(oldest.id);
+        }
+      }
+    }
+
     this.notify();
 
-     // 自動クローズ
-     if (duration > 0) {
-      setTimeout(() => {
+    // 自動クローズ
+    if (duration > 0) {
+      const timerId = setTimeout(() => {
+        this.timers.delete(id);
         this.dismiss(id);
       }, duration);
+      this.timers.set(id, timerId);
     }
 
     return id;
@@ -87,6 +104,19 @@ class NotificationManager {
     };
 
     this.notifications.push(notification);
+
+    // Enforce cap: evict oldest when exceeding MAX_NOTIFICATIONS
+    while (this.notifications.length > NotificationManager.MAX_NOTIFICATIONS) {
+      const oldest = this.notifications.shift();
+      if (oldest) {
+        const oldTimer = this.timers.get(oldest.id);
+        if (oldTimer !== undefined) {
+          clearTimeout(oldTimer);
+          this.timers.delete(oldest.id);
+        }
+      }
+    }
+
     this.notify();
 
     return id;
@@ -104,11 +134,18 @@ class NotificationManager {
       }
       this.notify();
 
-       // プログレスが 100% に達した後 3 秒で自動クローズ
-       if (notification.progress >= 100) {
-        setTimeout(() => {
+      // プログレスが 100% に達した後 3 秒で自動クローズ
+      if (notification.progress >= 100) {
+        // Clear any existing timer for this notification
+        const existingTimer = this.timers.get(id);
+        if (existingTimer !== undefined) {
+          clearTimeout(existingTimer);
+        }
+        const timerId = setTimeout(() => {
+          this.timers.delete(id);
           this.dismiss(id);
         }, 3000);
+        this.timers.set(id, timerId);
       }
     }
   }
@@ -117,6 +154,13 @@ class NotificationManager {
    * メッセージをクローズ
    */
   dismiss(id: string): void {
+    // Clear associated timer
+    const timerId = this.timers.get(id);
+    if (timerId !== undefined) {
+      clearTimeout(timerId);
+      this.timers.delete(id);
+    }
+
     const index = this.notifications.findIndex(n => n.id === id);
     if (index !== -1) {
       this.notifications.splice(index, 1);
@@ -128,8 +172,22 @@ class NotificationManager {
    * すべてのメッセージをクローズ
    */
   dismissAll(): void {
+    // Clear all pending timers
+    for (const timerId of this.timers.values()) {
+      clearTimeout(timerId);
+    }
+    this.timers.clear();
+
     this.notifications = [];
     this.notify();
+  }
+
+  /**
+   * マネージャを完全にクリーンアップ
+   */
+  destroy(): void {
+    this.dismissAll();
+    this.listeners.clear();
   }
 
   /**
