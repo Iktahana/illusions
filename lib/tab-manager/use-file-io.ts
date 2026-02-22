@@ -84,7 +84,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   }, []);
 
   const persistFileReference = useCallback(
-    async (descriptor: MdiFileDescriptor, fileContent: string) => {
+    async (descriptor: MdiFileDescriptor, fileContent: string): Promise<boolean> => {
       try {
         if (isElectron && descriptor.path) {
           await persistLastOpenedPath(descriptor.path);
@@ -97,8 +97,10 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
             fileHandle: descriptor.handle,
           });
         }
+        return true;
       } catch (error) {
         console.error("ファイル参照の保存に失敗しました:", error);
+        return false;
       }
     },
     [isElectron, persistLastOpenedPath],
@@ -177,9 +179,10 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       setActiveTabId(tab.id);
     }
 
-    persistFileReference(descriptor, fileContent).catch(() => {
-      notificationManager.warning("ファイル参照の保存に失敗しました");
-    });
+    void (async () => {
+      const ok = await persistFileReference(descriptor, fileContent);
+      if (!ok) notificationManager.warning("ファイル参照の保存に失敗しました");
+    })();
   }, [findTabByPath, updateTab, persistFileReference, setTabs, setActiveTabId, tabsRef, activeTabIdRef]);
 
   /** Save the active tab */
@@ -240,7 +243,9 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
                 : t,
             ),
           );
-          await persistFileReference(result.descriptor, sanitized);
+          if (!(await persistFileReference(result.descriptor, sanitized))) {
+            notificationManager.warning("ファイル参照の保存に失敗しました");
+          }
           await tryAutoSnapshot(result.descriptor.name, sanitized);
         } else {
           updateTab(tabId, { isSaving: false });
@@ -284,7 +289,9 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           lastSavedTime: Date.now(),
           isSaving: false,
         });
-        await persistFileReference(result.descriptor, sanitized);
+        if (!(await persistFileReference(result.descriptor, sanitized))) {
+          notificationManager.warning("ファイル参照の保存に失敗しました");
+        }
         await tryAutoSnapshot(result.descriptor.name, sanitized);
       } else {
         updateTab(tabId, { isSaving: false });

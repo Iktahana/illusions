@@ -201,24 +201,24 @@ export default function CorrectionsPanel({
                 <Settings className="w-3.5 h-3.5" />
               </button>
             )}
+            {onApplyLintPreset && (
+              <select
+                value={activeLintPresetId}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onApplyLintPreset(e.target.value);
+                  }
+                }}
+                className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                title="プリセットを適用"
+              >
+                {!activeLintPresetId && <option value="">カスタム</option>}
+                {Object.entries(LINT_PRESETS).map(([id, preset]) => (
+                  <option key={id} value={id}>{preset.nameJa}</option>
+                ))}
+              </select>
+            )}
           </div>
-          {onApplyLintPreset && (
-            <select
-              value={activeLintPresetId}
-              onChange={(e) => {
-                if (e.target.value) {
-                  onApplyLintPreset(e.target.value);
-                }
-              }}
-              className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-              title="プリセットを適用"
-            >
-              {!activeLintPresetId && <option value="">カスタム</option>}
-              {Object.entries(LINT_PRESETS).map(([id, preset]) => (
-                <option key={id} value={id}>{preset.nameJa}</option>
-              ))}
-            </select>
-          )}
         </div>
       </div>
 

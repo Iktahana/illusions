@@ -54,9 +54,10 @@ export class LRUCache<K, V> {
   private toKey(key: K): string {
     if (this.hashFn) return this.hashFn(key);
     // For primitive keys, use direct string conversion
-    return key as unknown as string;
+    return String(key);
   }
 
+  /** Retrieves a value by key, promoting it to most-recently-used. Returns `undefined` on miss. */
   get(key: K): V | undefined {
     const k = this.toKey(key);
     const value = this.cache.get(k);
@@ -71,10 +72,12 @@ export class LRUCache<K, V> {
     return value;
   }
 
+  /** Checks if a key exists without updating recency. */
   has(key: K): boolean {
     return this.cache.has(this.toKey(key));
   }
 
+  /** Inserts or updates an entry, evicting the oldest if the cache exceeds `maxSize`. */
   set(key: K, value: V): void {
     const k = this.toKey(key);
     if (this.cache.has(k)) {
@@ -91,6 +94,7 @@ export class LRUCache<K, V> {
     }
   }
 
+  /** Removes all entries and resets hit/miss counters. */
   clear(): void {
     this.cache.clear();
     if (this.trackStats) {
@@ -99,10 +103,12 @@ export class LRUCache<K, V> {
     }
   }
 
+  /** Current number of entries in the cache. */
   get size(): number {
     return this.cache.size;
   }
 
+  /** Returns a snapshot of cache statistics (size, hit/miss counts and rates). */
   getStats(): CacheStats {
     const totalAccesses = this.hitCount + this.missCount;
     const hitRate = totalAccesses > 0 ? (this.hitCount / totalAccesses) * 100 : 0;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
 import clsx from "clsx";
 
@@ -11,7 +11,7 @@ interface InfoTooltipProps {
 }
 
 /** Tooltip component for information icons */
-export default function InfoTooltip({ content, className, children }: InfoTooltipProps) {
+export default function InfoTooltip({ content, className, children }: InfoTooltipProps): React.JSX.Element {
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0, placement: 'top' as 'top' | 'bottom' });
   const ref = useRef<HTMLSpanElement>(null);
@@ -27,6 +27,10 @@ export default function InfoTooltip({ content, className, children }: InfoToolti
       });
     }
     setIsVisible(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsVisible(false);
   };
 
   useEffect(() => {
@@ -56,7 +60,7 @@ export default function InfoTooltip({ content, className, children }: InfoToolti
       ref={ref}
       className={clsx("info-tooltip-wrapper cursor-help", className)}
       onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setIsVisible(false)}
+      onMouseLeave={handleMouseLeave}
     >
       {children}
       {isVisible && (

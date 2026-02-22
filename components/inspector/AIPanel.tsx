@@ -1,9 +1,10 @@
 "use client";
 
+import React from "react";
 import { Bot } from "lucide-react";
 
 /** AI assistant panel (placeholder for upcoming feature) */
-export default function AIPanel() {
+export default function AIPanel(): React.JSX.Element {
   return (
     <div className="space-y-4">
       <div className="bg-accent-light rounded-lg p-4 border border-border">

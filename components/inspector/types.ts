@@ -2,11 +2,13 @@ import type { LintIssue, Severity } from "@/lib/linting";
 
 export type Tab = "ai" | "corrections" | "stats" | "history";
 
+/** Returns true when the value is a supported inspector tab. */
 export const isValidTab = (value: string | null): value is Tab =>
   value === "ai" || value === "corrections" || value === "stats" || value === "history";
 
 const MDI_EXTENSION = ".mdi";
 
+/** Returns ".mdi" when present (case-insensitive), otherwise an empty string. */
 export function getMdiExtension(name: string): string {
   if (name.toLowerCase().endsWith(MDI_EXTENSION)) {
     return name.slice(name.length - MDI_EXTENSION.length);
@@ -14,6 +16,7 @@ export function getMdiExtension(name: string): string {
   return "";
 }
 
+/** Returns the base filename without the .mdi extension. */
 export function getBaseName(name: string): string {
   const extension = getMdiExtension(name);
   return extension ? name.slice(0, -extension.length) : name;

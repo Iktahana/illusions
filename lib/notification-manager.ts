@@ -104,6 +104,19 @@ class NotificationManager {
     };
 
     this.notifications.push(notification);
+
+    // Enforce cap: evict oldest when exceeding MAX_NOTIFICATIONS
+    while (this.notifications.length > NotificationManager.MAX_NOTIFICATIONS) {
+      const oldest = this.notifications.shift();
+      if (oldest) {
+        const oldTimer = this.timers.get(oldest.id);
+        if (oldTimer !== undefined) {
+          clearTimeout(oldTimer);
+          this.timers.delete(oldest.id);
+        }
+      }
+    }
+
     this.notify();
 
     return id;
