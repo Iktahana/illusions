@@ -53,10 +53,13 @@ export function useLlmStatus(
             setBaseStatus("loading");
             break;
           case "loaded":
+          case "ready":
+            // "loaded" = in memory, "ready" = downloaded on disk
+            // Both mean model is available when llmEnabled is true
             setBaseStatus("ready");
             break;
           default:
-            // not-downloaded, downloading, ready (on disk but not loaded), error
+            // not-downloaded, downloading, error
             setBaseStatus("off");
             break;
         }
