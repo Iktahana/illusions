@@ -308,11 +308,11 @@ export function LlmSettings({
                 <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-accent rounded-full transition-all duration-300"
-                    style={{ width: `${Math.round(downloadProgress * 100)}%` }}
+                    style={{ width: `${Math.min(Math.round(downloadProgress), 100)}%` }}
                   />
                 </div>
                 <p className="text-xs text-foreground-tertiary text-right">
-                  {Math.round(downloadProgress * 100)}%
+                  {Math.min(Math.round(downloadProgress), 100)}%
                 </p>
               </div>
             )}
