@@ -107,6 +107,7 @@ export function createLintingPlugin(
   // L3 (LLM) state
   let currentLlmClient: ILlmClient | null = options.llmClient ?? null;
   let llmEnabled = options.llmEnabled ?? false;
+  let currentLlmModelId: string | null = null;
   let llmAbortController: AbortController | null = null;
   let llmIssueCache: Map<number, LintIssue[]> | null = null;
   let llmDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -130,7 +131,7 @@ export function createLintingPlugin(
 
       apply(tr, pluginState): LintingPluginState {
         // Update settings via meta
-        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null; nlpClient?: INlpClient | null; llmClient?: ILlmClient | null; llmEnabled?: boolean; forceFullScan?: boolean; forceLlmValidation?: boolean; ignoredCorrections?: IgnoredCorrection[] }> | undefined;
+        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null; nlpClient?: INlpClient | null; llmClient?: ILlmClient | null; llmEnabled?: boolean; llmModelId?: string; forceFullScan?: boolean; forceLlmValidation?: boolean; ignoredCorrections?: IgnoredCorrection[] }> | undefined;
         if (meta) {
           // If decorations are included, apply directly
           if (meta.decorations !== undefined) {
@@ -157,6 +158,10 @@ export function createLintingPlugin(
           // Update llmClient reference if provided
           if ('llmClient' in meta) {
             currentLlmClient = meta.llmClient ?? null;
+          }
+          // Update llmModelId if provided
+          if ('llmModelId' in meta && meta.llmModelId) {
+            currentLlmModelId = meta.llmModelId;
           }
           // Update llmEnabled flag if provided
           if ('llmEnabled' in meta) {
@@ -425,6 +430,11 @@ export function createLintingPlugin(
           llmAbortController = new AbortController();
 
           try {
+            // Ensure model is loaded before inference
+            if (currentLlmModelId) {
+              await currentLlmClient!.loadModel(currentLlmModelId);
+            }
+
             // --- Step 1: Validate L1/L2 issues ---
             const unvalidatedIssues: ValidatableIssue[] = [];
             for (const paragraph of allParagraphs) {

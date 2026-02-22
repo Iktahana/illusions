@@ -50,6 +50,7 @@ export function useLinting(
   editorViewInstance: EditorView | null,
   llmEnabled: boolean = false,
   powerSaveMode: boolean = false,
+  llmModelId: string = "qwen3-1.7b-q8",
 ): UseLintingResult {
   const ruleRunnerRef = useRef<RuleRunner | null>(null);
   const [lintIssues, setLintIssues] = useState<LintIssue[]>([]);
@@ -134,6 +135,7 @@ export function useLinting(
           nlpClient,
           llmClient: getLlmClient(),
           llmEnabled,
+          llmModelId,
           forceFullScan: true,
           forceLlmValidation: true,
         });
@@ -142,7 +144,7 @@ export function useLinting(
       console.error("[useLinting] Failed to refresh linting:", err);
       setIsLinting(false);
     });
-  }, [editorViewInstance, lintingEnabled, llmEnabled, powerSaveMode]);
+  }, [editorViewInstance, lintingEnabled, llmEnabled, powerSaveMode, llmModelId]);
 
   return {
     ruleRunner,
