@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
 import { AlertTriangle, EyeOff, Info, ListFilter, RefreshCw, Settings, XCircle } from "lucide-react";
 import clsx from "clsx";
@@ -28,6 +28,12 @@ interface CorrectionsPanelProps {
   onApplyLintPreset?: (presetId: string) => void;
   activeLintPresetId?: string;
 }
+
+const SEVERITY_LABELS: Record<Severity, string> = {
+  error: "エラー",
+  warning: "警告",
+  info: "情報",
+};
 
 /** Returns the display color class for a severity level */
 function severityColor(severity: Severity): string {
@@ -77,7 +83,7 @@ export default function CorrectionsPanel({
   onOpenLintingSettings,
   onApplyLintPreset,
   activeLintPresetId = "",
-}: CorrectionsPanelProps) {
+}: CorrectionsPanelProps): React.JSX.Element {
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const issueListRef = useRef<HTMLDivElement>(null);
 
@@ -338,7 +344,7 @@ export default function CorrectionsPanel({
                         "w-2 h-2 rounded-full shrink-0 mt-1.5",
                         severityColor(issue.severity)
                       )}
-                      title={issue.severity}
+                      title={SEVERITY_LABELS[issue.severity]}
                     />
                     {/* Content: original → replacement or just message */}
                     <div className="flex-1 min-w-0">

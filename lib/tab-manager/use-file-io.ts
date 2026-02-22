@@ -1,5 +1,7 @@
 "use client";
 
+const PERSIST_FAILURE_WARNING = "ファイル参照の保存に失敗しました";
+
 import { useCallback, useRef } from "react";
 import {
   openMdiFile,
@@ -181,7 +183,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
     void (async () => {
       const ok = await persistFileReference(descriptor, fileContent);
-      if (!ok) notificationManager.warning("ファイル参照の保存に失敗しました");
+      if (!ok) notificationManager.warning(PERSIST_FAILURE_WARNING);
     })();
   }, [findTabByPath, updateTab, persistFileReference, setTabs, setActiveTabId, tabsRef, activeTabIdRef]);
 
@@ -244,7 +246,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
             ),
           );
           if (!(await persistFileReference(result.descriptor, sanitized))) {
-            notificationManager.warning("ファイル参照の保存に失敗しました");
+            notificationManager.warning(PERSIST_FAILURE_WARNING);
           }
           await tryAutoSnapshot(result.descriptor.name, sanitized);
         } else {
@@ -290,7 +292,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           isSaving: false,
         });
         if (!(await persistFileReference(result.descriptor, sanitized))) {
-          notificationManager.warning("ファイル参照の保存に失敗しました");
+          notificationManager.warning(PERSIST_FAILURE_WARNING);
         }
         await tryAutoSnapshot(result.descriptor.name, sanitized);
       } else {
