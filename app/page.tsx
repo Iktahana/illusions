@@ -25,6 +25,7 @@ import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
 import type { SettingsCategory } from "@/components/SettingsModal";
 import { LINT_PRESETS, LINT_RULES_META, LINT_DEFAULT_CONFIGS } from "@/lib/linting/lint-presets";
+import { notificationManager } from "@/lib/notification-manager";
 import RubyDialog from "@/components/RubyDialog";
 import { useTabManager } from "@/lib/use-tab-manager";
 import { useUnsavedWarning } from "@/lib/use-unsaved-warning";
@@ -638,10 +639,12 @@ export default function EditorPage() {
     if (!editorViewInstance || !issue.fix) return;
     const { state, dispatch } = editorViewInstance;
     if (issue.to > state.doc.content.size) {
+      notificationManager.warning("テキストが変更されたため修正を適用できません");
       return;
     }
     const currentText = state.doc.textBetween(issue.from, issue.to, "");
     if (issue.originalText && currentText !== issue.originalText) {
+      notificationManager.warning("テキストが変更されたため修正を適用できません");
       return;
     }
     const tr = state.tr.insertText(issue.fix.replacement, issue.from, issue.to);
