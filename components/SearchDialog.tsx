@@ -86,39 +86,22 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
     const foundMatches: SearchMatch[] = [];
     const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
 
-     // ドキュメント全文検索
-     const fullText = doc.textContent;
-    const searchText = caseSensitive ? fullText : fullText.toLowerCase();
-    
-    let searchIndex = 0;
-    while (searchIndex < searchText.length) {
-      const matchIndex = searchText.indexOf(searchStr, searchIndex);
-      if (matchIndex === -1) break;
-
-       // テキスト位置をドキュメント位置に変換
-       let pos = 0;
-      let textOffset = 0;
-      
-      doc.descendants((node, nodePos) => {
-         if (pos !== 0) return false; // 見つかった、走査を停止
-        
-        if (node.isText && node.text) {
-          const nodeEnd = textOffset + node.text.length;
-          if (matchIndex >= textOffset && matchIndex < nodeEnd) {
-            pos = nodePos + (matchIndex - textOffset);
-            return false;
-          }
-          textOffset = nodeEnd;
+    // Search within each text node using correct ProseMirror positions
+    doc.descendants((node, pos) => {
+      if (node.isText && node.text) {
+        const nodeText = caseSensitive ? node.text : node.text.toLowerCase();
+        let searchIndex = 0;
+        while (searchIndex < nodeText.length) {
+          const matchIndex = nodeText.indexOf(searchStr, searchIndex);
+          if (matchIndex === -1) break;
+          foundMatches.push({
+            from: pos + matchIndex,
+            to: pos + matchIndex + searchTerm.length,
+          });
+          searchIndex = matchIndex + 1;
         }
-        return true;
-      });
-
-      if (pos > 0) {
-        foundMatches.push({ from: pos, to: pos + searchTerm.length });
       }
-      searchIndex = matchIndex + 1;
-    }
-
+    });
     setMatches(foundMatches);
     setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1);
   }, [searchTerm, caseSensitive, editorView]);
