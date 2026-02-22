@@ -94,7 +94,7 @@ export default function EditorPage() {
     scrollSensitivity, compactMode, showSettingsModal,
     lintingEnabled, lintingRuleConfigs,
     llmEnabled, llmModelId,
-    powerSaveMode,
+    powerSaveMode, autoPowerSaveOnBattery,
   } = settings;
   const {
     handleFontScaleChange, handleLineHeightChange, handleParagraphSpacingChange,
@@ -106,7 +106,7 @@ export default function EditorPage() {
     handleLintingEnabledChange, handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
     handleLlmEnabledChange, handleLlmModelIdChange,
-    handlePowerSaveModeChange,
+    handlePowerSaveModeChange, handleAutoPowerSaveOnBatteryChange,
   } = settingsHandlers;
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
@@ -114,6 +114,7 @@ export default function EditorPage() {
   // --- Power saving hook ---
   usePowerSaving({
     powerSaveMode,
+    autoPowerSaveOnBattery,
     onPowerSaveModeChange: handlePowerSaveModeChange,
   });
 
@@ -934,6 +935,8 @@ export default function EditorPage() {
           initialCategory={settingsInitialCategory}
           powerSaveMode={powerSaveMode}
           onPowerSaveModeChange={handlePowerSaveModeChange}
+          autoPowerSaveOnBattery={autoPowerSaveOnBattery}
+          onAutoPowerSaveOnBatteryChange={handleAutoPowerSaveOnBatteryChange}
         />
 
         {/* Ruby dialog */}

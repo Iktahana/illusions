@@ -85,6 +85,7 @@ export interface AppState {
 
   // 省電力モード
   powerSaveMode?: boolean;
+  autoPowerSaveOnBattery?: boolean;
   prePowerSaveState?: {
     lintingEnabled: boolean;
     lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
