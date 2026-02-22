@@ -355,7 +355,7 @@ export function LlmSettings({
             <div className="text-xs text-foreground-tertiary space-y-1">
               <p>サイズ: 約 {formatBytes(selectedEntry.size)}</p>
               <p>量子化: {selectedEntry.quantization}</p>
-              <p>最低メモリ: {selectedEntry.minRamMb} MB</p>
+              <p>必要メモリ: {selectedEntry.minRamMb} MB</p>
             </div>
           </div>
         )}

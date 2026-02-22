@@ -45,7 +45,7 @@ export default function PermissionPrompt({
       const message =
         err instanceof Error
           ? err.message
-          : "権限のリクエスト中に不明なエラーが発生しました。";
+          : "権限の取得中に不明なエラーが発生しました。";
       setError(message);
     } finally {
       setIsRequesting(false);

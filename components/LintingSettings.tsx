@@ -137,7 +137,7 @@ export default function LintingSettings({
             校正機能を有効にする
           </h3>
           <p className="text-xs text-foreground-tertiary mt-0.5">
-            テキストの校正ルールを適用します
+            文章の校正ルールを適用します
           </p>
         </div>
         <button
@@ -198,7 +198,7 @@ export default function LintingSettings({
             onClick={handleResetDefaults}
             className="text-xs px-2 py-1 text-foreground-secondary hover:text-foreground hover:bg-hover rounded transition-colors"
           >
-            デフォルト
+            デフォルトに戻す
           </button>
         </div>
 

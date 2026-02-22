@@ -509,7 +509,7 @@ export default function CorrectionsPanel({
       <div className="bg-background-secondary rounded-lg p-3 border border-border">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="text-sm font-medium text-foreground">構文ハイライト</h4>
+            <h4 className="text-sm font-medium text-foreground">品詞ハイライト</h4>
             <p className="text-xs text-foreground-tertiary mt-0.5">
               動詞・助詞などを色分け表示
             </p>

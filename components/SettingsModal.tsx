@@ -700,9 +700,9 @@ export default function SettingsModal({
                   </label>
                 </div>
                 <div className="text-xs text-foreground-secondary space-y-1">
-                  <p>• バッテリー駆動時に自動的に省電力モードの有効化を提案します</p>
+                  <p>• バッテリー駆動中は自動的に省電力モードの使用を提案します</p>
                   <p>• AC電源接続時に自動的に省電力モードを解除します</p>
-                  <p>• 省電力モード解除時、以前の校正・AI設定が復元されます</p>
+                  <p>• 省電力モードを解除すると、以前の校正・AI設定が復元されます</p>
                 </div>
               </div>
             )}
