@@ -272,17 +272,11 @@ export function createNewTab(content?: string, fileType: SupportedFileExtension 
 export async function loadDemoContent(): Promise<string | null> {
   if (typeof window === "undefined") return null;
   try {
-    const paths = ["demo/鏡地獄.mdi", "/demo/鏡地獄.mdi", "./demo/鏡地獄.mdi"];
-    for (const p of paths) {
-      try {
-        const url = new URL(p, window.location.href);
-        const response = await fetch(url.toString());
-        if (response.ok) {
-          return await response.text();
-        }
-      } catch {
-        continue;
-      }
+    // Use relative path for Electron file:// protocol compatibility
+    const basePath = window.location.protocol === "file:" ? "." : "";
+    const response = await fetch(`${basePath}/demo/鏡地獄.mdi`);
+    if (response.ok) {
+      return await response.text();
     }
     return null;
   } catch {

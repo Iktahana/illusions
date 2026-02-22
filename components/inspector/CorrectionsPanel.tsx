@@ -509,7 +509,7 @@ export default function CorrectionsPanel({
       <div className="bg-background-secondary rounded-lg p-3 border border-border">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="text-sm font-medium text-foreground">構文ハイライト</h4>
+            <h4 className="text-sm font-medium text-foreground">品詞ハイライト</h4>
             <p className="text-xs text-foreground-tertiary mt-0.5">
               動詞・助詞などを色分け表示
             </p>
@@ -562,70 +562,69 @@ export default function CorrectionsPanel({
       <>
       {/* Header: issue count + controls */}
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            <h3 className="text-sm font-medium text-foreground-secondary">検出結果</h3>
-            <span className="text-xs text-foreground-tertiary">
-              {lintIssues.length}件
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            {/* Sort selector */}
-            <select
-              value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-              title="並び替え"
-            >
-              <option value="category">種類別</option>
-              <option value="position">出現順</option>
-              <option value="severity">重要度順</option>
-            </select>
-            {/* Refresh button */}
-            {onRefreshLinting && (
-              <button
-                onClick={onRefreshLinting}
-                disabled={isLinting}
-                className={clsx(
-                  "p-1 rounded transition-colors",
-                  isLinting
-                    ? "text-accent cursor-wait"
-                    : "text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover"
-                )}
-                title="全文を再検査"
-                aria-label="全文を再検査"
-              >
-                <RefreshCw className={clsx("w-3.5 h-3.5", isLinting && "animate-spin")} />
-              </button>
-            )}
-            {onOpenLintingSettings && (
-              <button
-                onClick={onOpenLintingSettings}
-                className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
-                title="校正設定を開く"
-              >
-                <Settings className="w-3.5 h-3.5" />
-              </button>
-            )}
-            {onApplyLintPreset && (
-              <select
-                value={activeLintPresetId}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    onApplyLintPreset(e.target.value);
-                  }
-                }}
-                className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                title="プリセットを適用"
-              >
-                {!activeLintPresetId && <option value="">カスタム</option>}
-                {Object.entries(LINT_PRESETS).map(([id, preset]) => (
-                  <option key={id} value={id}>{preset.nameJa}</option>
-                ))}
-              </select>
-            )}
-          </div>
+        {/* Row 1: issue count */}
+        <div className="flex items-center gap-1">
+          <h3 className="text-sm font-medium text-foreground-secondary">検出結果</h3>
+          <span className="text-xs text-foreground-tertiary">
+            {lintIssues.length}件
+          </span>
         </div>
+        {/* Row 2: sort + refresh + settings */}
+        <div className="flex items-center gap-1">
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+            title="並び替え"
+          >
+            <option value="category">種類別</option>
+            <option value="position">出現順</option>
+            <option value="severity">重要度順</option>
+          </select>
+          {onRefreshLinting && (
+            <button
+              onClick={onRefreshLinting}
+              disabled={isLinting}
+              className={clsx(
+                "p-1 rounded transition-colors",
+                isLinting
+                  ? "text-accent cursor-wait"
+                  : "text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover"
+              )}
+              title="全文を再検査"
+              aria-label="全文を再検査"
+            >
+              <RefreshCw className={clsx("w-3.5 h-3.5", isLinting && "animate-spin")} />
+            </button>
+          )}
+          {onOpenLintingSettings && (
+            <button
+              onClick={onOpenLintingSettings}
+              className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
+              title="校正設定を開く"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+        {/* Row 3: preset selector */}
+        {onApplyLintPreset && (
+          <select
+            value={activeLintPresetId}
+            onChange={(e) => {
+              if (e.target.value) {
+                onApplyLintPreset(e.target.value);
+              }
+            }}
+            className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent w-full"
+            title="プリセットを適用"
+          >
+            {!activeLintPresetId && <option value="">カスタム</option>}
+            {Object.entries(LINT_PRESETS).map(([id, preset]) => (
+              <option key={id} value={id}>{preset.nameJa}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Severity filter buttons */}

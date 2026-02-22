@@ -195,7 +195,7 @@ export class CounterWordMismatchRule extends AbstractMorphologicalLintRule {
           ruleId: this.id,
           severity: config.severity,
           message: `Counter '${counterSurface}' may be incorrect for '${nounSurface}'; consider '${mismatch.suggestion}'`,
-          messageJa: `文化庁「公用文作成の考え方」に基づき、「${nounSurface}」に対して助数詞「${counterSurface}」は不適切です。${mismatch.descriptionJa}`,
+          messageJa: `「${nounSurface}」に対して助数詞「${counterSurface}」は不適切です。${mismatch.descriptionJa}`,
           from: counterToken.start,
           to: counterToken.end,
           reference: STYLE_GUIDE_REF,

@@ -15,6 +15,8 @@ import type { Token } from '@/lib/nlp-client/types';
 import type { ILlmClient } from '@/lib/llm-client/types';
 import type { IgnoredCorrection } from '@/lib/project-types';
 import { LRUCache } from '@/lib/utils/lru-cache';
+import { LintIssueValidator } from '@/lib/linting/lint-issue-validator';
+import type { ValidatableIssue } from '@/lib/linting/lint-issue-validator';
 import type { ParagraphInfo } from '../shared/paragraph-helpers';
 import { getAtomOffset, collectParagraphs, findScrollContainer, getVisibleParagraphs } from '../shared/paragraph-helpers';
 import type { LintingPluginState, LintingPluginOptions } from './types';
@@ -108,6 +110,10 @@ export function createLintingPlugin(
   const LLM_DEBOUNCE_MS = 8000;
   let llmInFlight = false;
 
+  // LLM validation of L1/L2 issues: cache and validator instance
+  const validationCache = new LRUCache<string, boolean>(500);
+  const issueValidator = new LintIssueValidator();
+
   return new Plugin<LintingPluginState>({
     key: lintingKey,
 
@@ -134,6 +140,7 @@ export function createLintingPlugin(
             issueCache.clear();
             tokenCache.clear();
             documentIssueCache = null;
+            validationCache.clear();
           }
           // Update nlpClient reference if provided
           if ('nlpClient' in meta) {
@@ -142,6 +149,7 @@ export function createLintingPlugin(
             issueCache.clear();
             tokenCache.clear();
             documentIssueCache = null;
+            validationCache.clear();
           }
           // Update llmClient reference if provided
           if ('llmClient' in meta) {
@@ -158,6 +166,7 @@ export function createLintingPlugin(
               if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
               llmIssueCache = null;
               llmInFlight = false;
+              validationCache.clear();
               currentLlmClient?.unloadModel().catch(console.error);
             }
           }
@@ -166,6 +175,7 @@ export function createLintingPlugin(
             issueCache.clear();
             tokenCache.clear();
             documentIssueCache = null;
+            validationCache.clear();
             pendingFullScan = true;
           }
           // Update ignoredCorrections list if provided
@@ -177,6 +187,7 @@ export function createLintingPlugin(
             issueCache.clear();
             tokenCache.clear();
             documentIssueCache = null;
+            validationCache.clear();
           }
           const updated: LintingPluginState = {
             decorations: pluginState.decorations,
@@ -382,14 +393,15 @@ export function createLintingPlugin(
       }
 
       /**
-       * Schedule L3 (LLM) linting with a long debounce.
+       * Schedule LLM pass: L1/L2 validation + L3 linting with a long debounce.
+       * Validation filters false positives from L1/L2 issues.
        * L3 results are merged with existing L1/L2 decorations when they arrive.
        */
       function scheduleLlmUpdate(
         view: EditorView,
         allParagraphs: ParagraphInfo[],
       ): void {
-        if (!llmEnabled || !currentLlmClient || !currentRuleRunner?.hasLlmRules()) return;
+        if (!llmEnabled || !currentLlmClient) return;
         if (llmInFlight) return;
 
         if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
@@ -402,49 +414,84 @@ export function createLintingPlugin(
           llmAbortController = new AbortController();
 
           try {
-            // Build sentences from paragraphs with document-absolute positions
-            const sentences: Array<{ text: string; from: number; to: number }> = [];
-            for (const para of allParagraphs) {
-              if (para.text.trim().length === 0) continue;
-              // +1 to skip the paragraph node open token
-              const from = para.pos + 1;
-              const to = from + para.text.length;
-              sentences.push({ text: para.text, from, to });
+            // --- Step 1: Validate L1/L2 issues ---
+            const unvalidatedIssues: ValidatableIssue[] = [];
+            for (const paragraph of allParagraphs) {
+              const perParaIssues = issueCache.get(paragraph.text) ?? [];
+              const docIssues = documentIssueCache?.get(paragraph.index) ?? [];
+              const combined = [...perParaIssues, ...docIssues];
+
+              for (const issue of combined) {
+                // Skip rules that opt out of LLM validation
+                const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
+                if (ruleConfig?.skipLlmValidation) continue;
+
+                const key = LintIssueValidator.issueKey(issue, paragraph.text);
+                if (validationCache.has(key)) continue;
+
+                unvalidatedIssues.push({ ...issue, paragraphText: paragraph.text });
+              }
             }
 
-            if (sentences.length === 0) return;
+            if (unvalidatedIssues.length > 0) {
+              const dismissed = await issueValidator.validate(
+                unvalidatedIssues,
+                currentLlmClient!,
+                llmAbortController!.signal,
+              );
 
-            const issues = await currentRuleRunner!.runLlmRules(
-              sentences,
-              currentLlmClient!,
-              llmAbortController!.signal,
-            );
+              if (processingVersion !== version) return;
 
-            // Staleness check
+              // Update validation cache
+              for (const issue of unvalidatedIssues) {
+                const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
+                validationCache.set(key, !dismissed.has(key));
+              }
+            }
+
             if (processingVersion !== version) return;
 
-            // Group issues by paragraph index
-            llmIssueCache = new Map();
-            for (const issue of issues) {
-              // Find which paragraph this issue belongs to
-              for (let i = 0; i < allParagraphs.length; i++) {
-                const para = allParagraphs[i];
-                const paraFrom = para.pos + 1;
-                const paraTo = paraFrom + para.text.length;
-                if (issue.from >= paraFrom && issue.to <= paraTo) {
-                  const existing = llmIssueCache.get(i) ?? [];
-                  existing.push(issue);
-                  llmIssueCache.set(i, existing);
-                  break;
+            // --- Step 2: Run L3 (LLM) rules ---
+            if (currentRuleRunner?.hasLlmRules()) {
+              const sentences: Array<{ text: string; from: number; to: number }> = [];
+              for (const para of allParagraphs) {
+                if (para.text.trim().length === 0) continue;
+                const from = para.pos + 1;
+                const to = from + para.text.length;
+                sentences.push({ text: para.text, from, to });
+              }
+
+              if (sentences.length > 0) {
+                const issues = await currentRuleRunner!.runLlmRules(
+                  sentences,
+                  currentLlmClient!,
+                  llmAbortController!.signal,
+                );
+
+                if (processingVersion !== version) return;
+
+                llmIssueCache = new Map();
+                for (const issue of issues) {
+                  for (let i = 0; i < allParagraphs.length; i++) {
+                    const para = allParagraphs[i];
+                    const paraFrom = para.pos + 1;
+                    const paraTo = paraFrom + para.text.length;
+                    if (issue.from >= paraFrom && issue.to <= paraTo) {
+                      const existing = llmIssueCache.get(i) ?? [];
+                      existing.push(issue);
+                      llmIssueCache.set(i, existing);
+                      break;
+                    }
+                  }
                 }
               }
             }
 
-            // Rebuild decorations with L3 issues merged in
+            // Rebuild decorations with validation results + L3 issues merged in
             rebuildDecorationsWithLlm(view, allParagraphs);
           } catch (error) {
             if ((error as Error).name !== "AbortError") {
-              console.error("L3 linting failed:", error);
+              console.error("LLM linting/validation failed:", error);
             }
           } finally {
             llmInFlight = false;
@@ -488,6 +535,10 @@ export function createLintingPlugin(
                 isIssueIgnored(issue, issueText, paragraph.text, currentIgnoredCorrections)) {
               continue;
             }
+
+            // Filter out LLM-dismissed false positives
+            const vKey = LintIssueValidator.issueKey(issue, paragraph.text);
+            if (validationCache.get(vKey) === false) continue;
 
             const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
             const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
@@ -554,12 +605,19 @@ export function createLintingPlugin(
               issueCache.clear();
               tokenCache.clear();
               documentIssueCache = null;
+              validationCache.clear();
               scheduleViewportUpdate(view);
             }
             return;
           }
 
           if (!state?.enabled) return;
+
+          // Full scan requested (e.g. ignored corrections changed)
+          if (pendingFullScan) {
+            scheduleViewportUpdate(view);
+            return;
+          }
 
           // Document changed: schedule re-processing
           if (view.state.doc !== prevState.doc) {
@@ -575,6 +633,7 @@ export function createLintingPlugin(
           issueCache.clear();
           tokenCache.clear();
           documentIssueCache = null;
+          validationCache.clear();
           llmIssueCache = null;
           llmInFlight = false;
         },

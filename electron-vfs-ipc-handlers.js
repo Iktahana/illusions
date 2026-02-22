@@ -77,7 +77,10 @@ function registerVFSHandlers() {
       const resolved = validateVFSPath(event, filePath);
       return await fs.readFile(resolved, 'utf-8');
     } catch (error) {
-      console.error('[VFS IPC] readFile failed:', error);
+      // ENOENT is expected for optional config files — skip noisy logging
+      if (error.code !== 'ENOENT') {
+        console.error('[VFS IPC] readFile failed:', error);
+      }
       throw error;
     }
   });

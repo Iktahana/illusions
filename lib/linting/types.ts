@@ -39,6 +39,8 @@ export interface LintRuleConfig {
   severity: Severity;
   /** Whether to skip dialogue text (「」『』) when running this rule */
   skipDialogue?: boolean;
+  /** Skip LLM validation for this rule (for rules with very low false-positive rate) */
+  skipLlmValidation?: boolean;
   /** Rule-specific options */
   options?: Record<string, unknown>;
 }

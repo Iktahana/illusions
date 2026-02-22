@@ -234,7 +234,7 @@ export default function StatsPanel({
                 content="文末の句点（。）で区切られる文の数"
                 className="text-sm text-foreground-secondary whitespace-nowrap"
               >
-                文章数
+                文数
               </InfoTooltip>
             </div>
             <span className="text-sm font-medium text-foreground flex-shrink-0">{sentenceCount}文</span>
