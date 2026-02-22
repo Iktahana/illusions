@@ -66,10 +66,15 @@ export class ElectronLlmClient implements ILlmClient {
     options?: { signal?: AbortSignal; maxTokens?: number },
   ): Promise<LlmInferenceResult> {
     if (!window.electronAPI?.llm) throw new Error("LLM not available");
-    // AbortSignal cannot cross IPC boundary directly - handled at engine level
-    return window.electronAPI.llm.infer(prompt, {
-      maxTokens: options?.maxTokens,
-    });
+    window.dispatchEvent(new Event("llm:inference-start"));
+    try {
+      // AbortSignal cannot cross IPC boundary directly - handled at engine level
+      return await window.electronAPI.llm.infer(prompt, {
+        maxTokens: options?.maxTokens,
+      });
+    } finally {
+      window.dispatchEvent(new Event("llm:inference-end"));
+    }
   }
 
   async getStorageUsage(): Promise<{
