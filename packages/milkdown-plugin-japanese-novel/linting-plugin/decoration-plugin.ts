@@ -561,6 +561,12 @@ export function createLintingPlugin(
 
           if (!state?.enabled) return;
 
+          // Full scan requested (e.g. ignored corrections changed)
+          if (pendingFullScan) {
+            scheduleViewportUpdate(view);
+            return;
+          }
+
           // Document changed: schedule re-processing
           if (view.state.doc !== prevState.doc) {
             scheduleViewportUpdate(view);
