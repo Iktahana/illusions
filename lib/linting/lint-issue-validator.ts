@@ -62,13 +62,13 @@ export class LintIssueValidator {
 
       try {
         const prompt = this.buildPrompt(issue);
-        console.debug('[LintIssueValidator] prompt:\n', prompt);
         const result = await llmClient.infer(prompt, {
           signal,
           maxTokens: 60,
         });
-        console.debug('[LintIssueValidator] raw LLM response:\n', result.text);
-        console.debug('[LintIssueValidator] tokens used:', result.tokenCount);
+        console.debug('[LintIssueValidator] prompt + response:\n',
+          `--- PROMPT ---\n${prompt}\n--- RESPONSE ---\n${result.text}\n--- tokens: ${result.tokenCount} ---`
+        );
 
         const parsed = this.parseResponse(result.text);
         const valid = parsed?.valid ?? true; // fail-open if unparseable
