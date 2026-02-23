@@ -15,6 +15,7 @@ import type { Token } from '@/lib/nlp-client/types';
 import type { ILlmClient } from '@/lib/llm-client/types';
 import type { IgnoredCorrection } from '@/lib/project-types';
 import { LRUCache } from '@/lib/utils/lru-cache';
+import { hashString } from '@/lib/utils/hash-string';
 import { LintIssueValidator } from '@/lib/linting/lint-issue-validator';
 import type { ValidatableIssue } from '@/lib/linting/lint-issue-validator';
 import type { ParagraphInfo } from '../shared/paragraph-helpers';
@@ -32,21 +33,6 @@ function severityToClass(severity: Severity): string {
     case 'warning': return 'lint-warning';
     case 'info': return 'lint-info';
   }
-}
-
-/**
- * Create the linting ProseMirror plugin.
- */
-/**
- * Simple string hash matching the one in use-ignored-corrections.ts.
- */
-function hashString(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i);
-    hash = ((hash << 5) - hash + ch) | 0;
-  }
-  return (hash >>> 0).toString(16);
 }
 
 /**
