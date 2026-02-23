@@ -67,7 +67,7 @@ export class LintIssueValidator {
         console.debug('[LintIssueValidator] prompt:\n', prompt);
         const result = await llmClient.infer(prompt, {
           signal,
-          maxTokens: batch.length * 30,
+          maxTokens: batch.length * 60,
         });
         console.debug('[LintIssueValidator] raw LLM response:\n', result.text);
         console.debug('[LintIssueValidator] tokens used:', result.tokenCount);
@@ -75,12 +75,18 @@ export class LintIssueValidator {
         console.debug('[LintIssueValidator] parsed results:', parsed);
 
         for (const entry of parsed) {
-          if (entry.id >= 0 && entry.id < batch.length && !entry.valid) {
+          if (entry.id >= 0 && entry.id < batch.length) {
             const issue = batch[entry.id];
-            const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
-            console.debug('[LintIssueValidator] DISMISSED:', issue.ruleId,
-              issue.paragraphText.slice(issue.from, issue.to), key);
-            dismissed.add(key);
+            const flagged = issue.paragraphText.slice(issue.from, issue.to);
+            if (!entry.valid) {
+              const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
+              console.debug('[LintIssueValidator] DISMISSED:', issue.ruleId, flagged,
+                'reason:', entry.reason ?? '(none)');
+              dismissed.add(key);
+            } else {
+              console.debug('[LintIssueValidator] CONFIRMED:', issue.ruleId, flagged,
+                'reason:', entry.reason ?? '(none)');
+            }
           }
         }
       } catch (error) {
@@ -132,7 +138,7 @@ export class LintIssueValidator {
   private parseResponse(
     text: string,
     expectedCount: number,
-  ): Array<{ id: number; valid: boolean }> {
+  ): Array<{ id: number; valid: boolean; reason?: string }> {
     // Try to extract a JSON array from the response
     const jsonMatch = text.match(/\[[\s\S]*?\]/);
     if (!jsonMatch) return [];
@@ -141,7 +147,7 @@ export class LintIssueValidator {
       const parsed: unknown = JSON.parse(jsonMatch[0]);
       if (!Array.isArray(parsed)) return [];
 
-      const results: Array<{ id: number; valid: boolean }> = [];
+      const results: Array<{ id: number; valid: boolean; reason?: string }> = [];
       for (const item of parsed) {
         if (
           typeof item === "object" &&
@@ -151,9 +157,13 @@ export class LintIssueValidator {
           typeof (item as Record<string, unknown>).id === "number" &&
           typeof (item as Record<string, unknown>).valid === "boolean"
         ) {
-          const entry = item as { id: number; valid: boolean };
+          const entry = item as { id: number; valid: boolean; reason?: string };
           if (entry.id >= 0 && entry.id < expectedCount) {
-            results.push(entry);
+            results.push({
+              id: entry.id,
+              valid: entry.valid,
+              reason: typeof entry.reason === "string" ? entry.reason : undefined,
+            });
           }
         }
       }
