@@ -971,6 +971,29 @@ function MilkdownEditor({
     }
   }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get, savedScrollProgressRef, isModeSwitchingRef]);
 
+  // 縦書き時: コンテンツサイズ変更時に minWidth を再計算し、スクロール範囲を更新する
+  useEffect(() => {
+    if (!isVertical) return;
+
+    const container = scrollContainerRef.current;
+    const editorContainer = editorRef.current;
+    const editorDom = editorContainer?.querySelector('.milkdown .ProseMirror') as HTMLElement;
+    if (!container || !editorDom) return;
+
+    const observer = new ResizeObserver(() => {
+      const containerWidth = container.clientWidth;
+      const padding = 128; // 64px * 2
+      const minWidth = containerWidth - padding;
+      editorDom.style.minWidth = `${minWidth}px`;
+    });
+
+    observer.observe(editorDom);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isVertical, scrollContainerRef]);
+
   // 縦書き時: マウスホイールの縦スクロールを横スクロールへ変換する
   useEffect(() => {
     const container = scrollContainerRef.current;
