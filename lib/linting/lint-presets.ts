@@ -231,3 +231,33 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
     },
   },
 };
+
+// ---------------------------------------------------------------------------
+// Mode-based preset generation
+// ---------------------------------------------------------------------------
+
+import type { CorrectionModeId } from "./correction-config";
+import { CORRECTION_MODES } from "./correction-modes";
+
+/**
+ * Generate a LintPreset from a correction mode by merging the mode's
+ * ruleOverrides on top of the standard (default) preset configs.
+ *
+ * @param modeId - The correction mode to generate a preset for
+ * @returns A LintPreset with the mode's overrides applied
+ */
+export function getPresetForMode(modeId: CorrectionModeId): LintPreset {
+  const mode = CORRECTION_MODES[modeId];
+  const base = { ...LINT_DEFAULT_CONFIGS };
+
+  const merged: Record<string, LintRulePresetConfig> = { ...base };
+  for (const [ruleId, override] of Object.entries(mode.ruleOverrides)) {
+    const existing = merged[ruleId] ?? { enabled: true, severity: "warning" as const };
+    merged[ruleId] = { ...existing, ...override } as LintRulePresetConfig;
+  }
+
+  return {
+    nameJa: mode.nameJa,
+    configs: merged,
+  };
+}

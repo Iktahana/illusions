@@ -30,3 +30,13 @@ export type {
   CorrectionConfig,
 } from "./correction-config";
 export { DEFAULT_CORRECTION_CONFIG } from "./correction-config";
+
+export type { Guideline, GuidelineLicense } from "./guidelines";
+export { GUIDELINES, getGuideline } from "./guidelines";
+export type { CorrectionMode } from "./correction-modes";
+export {
+  CORRECTION_MODES,
+  getCorrectionMode,
+  CORRECTION_MODE_IDS,
+} from "./correction-modes";
+export { getPresetForMode } from "./lint-presets";
