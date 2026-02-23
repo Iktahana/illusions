@@ -553,6 +553,9 @@ export function createLintingPlugin(
 
             // --- Step 2: Run L3 (LLM) rules (only when llmEnabled) ---
             if (llmEnabled && currentRuleRunner?.hasLlmRules()) {
+              // Re-ensure model is loaded (may have been unloaded by idle timer)
+              await currentLlmClient!.loadModel(currentLlmModelId!);
+
               const sentences: Array<{ text: string; from: number; to: number }> = [];
               for (const para of allParagraphs) {
                 if (para.text.trim().length === 0) continue;
