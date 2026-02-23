@@ -96,6 +96,7 @@ export default function EditorPage() {
     lintingEnabled, lintingRuleConfigs,
     llmEnabled, llmModelId,
     powerSaveMode, autoPowerSaveOnBattery,
+    llmIdlingStop, correctionConfig,
   } = settings;
   const {
     handleFontScaleChange, handleLineHeightChange, handleParagraphSpacingChange,
@@ -108,6 +109,7 @@ export default function EditorPage() {
     handleLintingRuleConfigsBatchChange,
     handleLlmEnabledChange, handleLlmModelIdChange,
     handlePowerSaveModeChange, handleAutoPowerSaveOnBatteryChange,
+    handleCorrectionConfigChange, handleLlmIdlingStopChange,
   } = settingsHandlers;
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
@@ -959,6 +961,10 @@ export default function EditorPage() {
           onLlmEnabledChange={handleLlmEnabledChange}
           llmModelId={llmModelId}
           onLlmModelIdChange={handleLlmModelIdChange}
+          llmIdlingStop={llmIdlingStop}
+          onLlmIdlingStopChange={handleLlmIdlingStopChange}
+          correctionConfig={correctionConfig}
+          onCorrectionConfigChange={handleCorrectionConfigChange}
           initialCategory={settingsInitialCategory}
           powerSaveMode={powerSaveMode}
           onPowerSaveModeChange={handlePowerSaveModeChange}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, ExternalLink, ChevronDown, ChevronRight, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium } from "lucide-react";
 import type { Severity } from "@/lib/linting/types";
+import type { CorrectionConfig } from "@/lib/linting/correction-config";
 import dynamic from "next/dynamic";
 
 import { isElectronRenderer } from "@/lib/runtime-env";
@@ -86,6 +87,9 @@ interface SettingsModalProps {
   onLlmModelIdChange?: (modelId: string) => void;
   llmIdlingStop?: boolean;
   onLlmIdlingStopChange?: (value: boolean) => void;
+  // Correction config
+  correctionConfig?: CorrectionConfig;
+  onCorrectionConfigChange?: (partial: Partial<CorrectionConfig>) => void;
   // Power saving (Electron only)
   powerSaveMode?: boolean;
   onPowerSaveModeChange?: (value: boolean) => void;
@@ -155,6 +159,8 @@ export default function SettingsModal({
   onLlmModelIdChange,
   llmIdlingStop,
   onLlmIdlingStopChange,
+  correctionConfig,
+  onCorrectionConfigChange,
   powerSaveMode,
   onPowerSaveModeChange,
   autoPowerSaveOnBattery,
@@ -664,6 +670,8 @@ export default function SettingsModal({
                 onLlmModelIdChange={onLlmModelIdChange}
                 llmIdlingStop={llmIdlingStop}
                 onLlmIdlingStopChange={onLlmIdlingStopChange}
+                correctionConfig={correctionConfig}
+                onCorrectionConfigChange={onCorrectionConfigChange}
               />
             )}
 
