@@ -27,13 +27,17 @@ const LITERARY_PATTERNS: ReadonlyArray<{
     note: "文語の完了形「〜せり」は現代語に言い換えてください",
   },
   {
-    pattern: /なり[。、\s]/g,
+    // Negative lookbehind excludes modern 「〜になり」「〜となり」
+    // and onomatopoeia like めりなり, びなり etc.
+    pattern: /(?<![にと])なり[。、\s]/g,
     example: "〜なり",
     modern: "〜である",
     note: "文語の断定「〜なり」は「〜である」に言い換えてください",
   },
   {
-    pattern: /たり[。、\s]/g,
+    // Negative lookbehind excludes onomatopoeia: ぽたり, ぱたり, ばたり, がたり,
+    // かたり, はたり, ぴたり, ひたり, and っ-geminate forms (ぐったり, ばったり, etc.)
+    pattern: /(?<![ぽぱばがかはぴひっ])たり[。、\s]/g,
     example: "〜たり",
     modern: "〜た",
     note: "文語の完了「〜たり」は「〜た」に言い換えてください",
