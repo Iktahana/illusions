@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment } from "@milkdown/prose/model";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import Explorer, { FilesPanel } from "@/components/Explorer";
@@ -324,13 +325,37 @@ export default function EditorPage() {
     setShowRubyDialog(true);
   }, [editorViewInstance, setRubySelectedText, setShowRubyDialog]);
 
-  /** Apply Ruby markup by replacing the editor selection */
+  /** Apply Ruby markup by replacing the editor selection with ProseMirror nodes */
   const handleApplyRuby = useCallback((rubyMarkup: string) => {
     if (!editorViewInstance) return;
     const sel = rubySelectionRef.current;
     if (!sel) return;
     const { state, dispatch } = editorViewInstance;
-    const tr = state.tr.insertText(rubyMarkup, sel.from, sel.to);
+    const rubyNodeType = state.schema.nodes.ruby;
+    if (!rubyNodeType) {
+      // Fallback: insert as plain text if ruby node type is not available
+      const tr = state.tr.insertText(rubyMarkup, sel.from, sel.to);
+      dispatch(tr);
+      rubySelectionRef.current = null;
+      return;
+    }
+    // Parse ruby markup: mixed text and {base|reading} segments
+    const RUBY_RE = /\{([^|]+)\|([^}]+)\}/g;
+    const nodes: import("@milkdown/prose/model").Node[] = [];
+    let lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = RUBY_RE.exec(rubyMarkup)) !== null) {
+      if (m.index > lastIndex) {
+        nodes.push(state.schema.text(rubyMarkup.slice(lastIndex, m.index)));
+      }
+      nodes.push(rubyNodeType.create({ base: m[1], text: m[2] }));
+      lastIndex = m.index + m[0].length;
+    }
+    if (lastIndex < rubyMarkup.length) {
+      nodes.push(state.schema.text(rubyMarkup.slice(lastIndex)));
+    }
+    const fragment = Fragment.from(nodes);
+    const tr = state.tr.replaceWith(sel.from, sel.to, fragment);
     dispatch(tr);
     rubySelectionRef.current = null;
   }, [editorViewInstance]);
