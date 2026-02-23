@@ -50,6 +50,8 @@ export interface LintingSettingsUpdate {
   ignoredCorrections?: IgnoredCorrection[];
   /** Current correction mode (novel, official, blog, academic, sns) for LLM validation */
   correctionMode?: string;
+  /** LLM model ID to load before inference */
+  llmModelId?: string | null;
   /** Identifies the trigger for this change, enabling precise cache invalidation */
   changeReason?: ConfigChangeReason;
 }

@@ -173,6 +173,10 @@ export function createLintingPlugin(
               // Keep validationCache — L1/L2 validation runs independently
             }
           }
+          // Update llmModelId if provided
+          if ('llmModelId' in meta) {
+            currentLlmModelId = meta.llmModelId ?? null;
+          }
           // Update correctionMode for LLM validation context
           if ('correctionMode' in meta && meta.correctionMode) {
             issueValidator.setMode(meta.correctionMode);
