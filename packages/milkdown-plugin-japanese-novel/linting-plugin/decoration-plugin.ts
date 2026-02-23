@@ -190,6 +190,11 @@ export function createLintingPlugin(
                 issueCache.clear();
                 tokenCache.clear();
                 documentIssueCache = null;
+                validationCache.clear();
+                llmIssueCache = null;
+                if (llmAbortController) llmAbortController.abort();
+                if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
+                llmInFlight = false;
                 pendingFullScan = true;
                 break;
               case "rule-config-change":
@@ -391,6 +396,21 @@ export function createLintingPlugin(
                   isIssueIgnored(issue, issueText, paragraph.text, currentIgnoredCorrections)) {
                 continue;
               }
+
+              // Determine LLM validation state for the issue
+              const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
+              const needsValidation = llmEnabled && !ruleConfig?.skipLlmValidation;
+              const vKey = needsValidation ? LintIssueValidator.issueKey(issue, paragraph.text) : undefined;
+              const cachedResult = vKey !== undefined ? validationCache.get(vKey) : undefined;
+
+              // Skip issues pending LLM validation — they will appear after
+              // rebuildDecorationsWithLlm runs once validation completes
+              if (needsValidation && cachedResult === undefined) continue;
+              // Skip issues dismissed by LLM validation
+              if (cachedResult === false) continue;
+
+              const llmValidated = !needsValidation ? true : cachedResult;
+
               const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
               const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
               const from = paragraph.pos + 1 + issue.from + extraFrom;
@@ -402,13 +422,6 @@ export function createLintingPlugin(
                   'data-lint-issue': JSON.stringify({ ...issue, from, to, originalText: issueText }),
                 })
               );
-
-              // Determine LLM validation state for the issue
-              const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
-              const needsValidation = llmEnabled && !ruleConfig?.skipLlmValidation;
-              const vKey = needsValidation ? LintIssueValidator.issueKey(issue, paragraph.text) : undefined;
-              const cachedResult = vKey !== undefined ? validationCache.get(vKey) : undefined;
-              const llmValidated = !needsValidation ? true : cachedResult;
 
               // Collect issues with absolute positions for the callback
               allIssues.push({

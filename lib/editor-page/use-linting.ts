@@ -261,10 +261,11 @@ export function useLinting(
           ? getNlpClient()
           : null;
 
-        const llmClient: ILlmClient | null =
-          llmEnabled && ruleRunnerRef.current?.hasLlmRules()
-            ? getLlmClient()
-            : null;
+        // Always provide llmClient when LLM is enabled — needed for L1/L2
+        // validation (false-positive filtering), not just L3 rules
+        const llmClient: ILlmClient | null = llmEnabled
+          ? getLlmClient()
+          : null;
 
         updateLintingSettings(
           editorViewInstance,
