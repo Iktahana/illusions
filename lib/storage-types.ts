@@ -3,6 +3,7 @@
  * Web（IndexedDB）/ Electron（SQLite）を共通のAPIで扱う。
  */
 
+import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import type { Severity } from "@/lib/linting/types";
 import type { TabPersistenceState } from "./tab-types";
 
@@ -81,7 +82,11 @@ export interface AppState {
   // LLM設定
   llmEnabled?: boolean;
   llmModelId?: string;
+  llmIdlingStop?: boolean;
 
+  // 校正モード設定
+  correctionMode?: CorrectionModeId;
+  correctionGuidelines?: GuidelineId[];
 
   // 省電力モード
   powerSaveMode?: boolean;

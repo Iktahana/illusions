@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
 import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 import type { Severity } from "@/lib/linting/types";
-import type { CorrectionConfig } from "@/lib/linting/correction-config";
+import type { CorrectionConfig, CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import { DEFAULT_CORRECTION_CONFIG } from "@/lib/linting/correction-config";
 
 export interface EditorSettings {
@@ -29,6 +29,7 @@ export interface EditorSettings {
   llmModelId: string;
   powerSaveMode: boolean;
   autoPowerSaveOnBattery: boolean;
+  llmIdlingStop: boolean;
   /** Unified correction config derived from individual linting fields */
   correctionConfig: CorrectionConfig;
 }
@@ -56,6 +57,8 @@ export interface EditorSettingsHandlers {
   handleLlmModelIdChange: (modelId: string) => void;
   handlePowerSaveModeChange: (enabled: boolean) => void;
   handleAutoPowerSaveOnBatteryChange: (enabled: boolean) => void;
+  handleCorrectionConfigChange: (partial: Partial<CorrectionConfig>) => void;
+  handleLlmIdlingStopChange: (value: boolean) => void;
 }
 
 export interface EditorSettingsSetters {
@@ -105,6 +108,9 @@ export function useEditorSettings(
   const [llmModelId, setLlmModelId] = useState("qwen3-1.7b-q8");
   const [powerSaveMode, setPowerSaveMode] = useState(false);
   const [autoPowerSaveOnBattery, setAutoPowerSaveOnBattery] = useState(true);
+  const [correctionMode, setCorrectionMode] = useState<CorrectionModeId>("novel");
+  const [correctionGuidelines, setCorrectionGuidelines] = useState<GuidelineId[]>(DEFAULT_CORRECTION_CONFIG.guidelines);
+  const [llmIdlingStop, setLlmIdlingStop] = useState(true);
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -183,6 +189,9 @@ export function useEditorSettings(
         }
         if (appState.powerSaveMode !== undefined) setPowerSaveMode(appState.powerSaveMode);
         if (appState.autoPowerSaveOnBattery !== undefined) setAutoPowerSaveOnBattery(appState.autoPowerSaveOnBattery);
+        if (appState.correctionMode) setCorrectionMode(appState.correctionMode);
+        if (appState.correctionGuidelines) setCorrectionGuidelines(appState.correctionGuidelines);
+        if (appState.llmIdlingStop !== undefined) setLlmIdlingStop(appState.llmIdlingStop);
         // Force editor rebuild to apply restored settings (e.g. custom font)
         incrementEditorKey();
       } catch (error) {
@@ -394,6 +403,28 @@ export function useEditorSettings(
     });
   }, []);
 
+  const handleCorrectionConfigChange = useCallback((partial: Partial<CorrectionConfig>) => {
+    if (partial.mode !== undefined) {
+      setCorrectionMode(partial.mode);
+    }
+    if (partial.guidelines !== undefined) {
+      setCorrectionGuidelines(partial.guidelines);
+    }
+    void persistAppState({
+      correctionMode: partial.mode ?? correctionMode,
+      correctionGuidelines: partial.guidelines ?? correctionGuidelines,
+    }).catch((error) => {
+      console.error("Failed to persist correctionConfig:", error);
+    });
+  }, [correctionMode, correctionGuidelines]);
+
+  const handleLlmIdlingStopChange = useCallback((value: boolean) => {
+    setLlmIdlingStop(value);
+    void persistAppState({ llmIdlingStop: value }).catch((error) => {
+      console.error("Failed to persist llmIdlingStop:", error);
+    });
+  }, []);
+
   return {
     settings: {
       fontScale,
@@ -417,9 +448,12 @@ export function useEditorSettings(
       llmModelId,
       powerSaveMode,
       autoPowerSaveOnBattery,
+      llmIdlingStop,
       correctionConfig: {
         ...DEFAULT_CORRECTION_CONFIG,
         enabled: lintingEnabled,
+        mode: correctionMode,
+        guidelines: correctionGuidelines,
         ruleOverrides: lintingRuleConfigs,
         llm: {
           ...DEFAULT_CORRECTION_CONFIG.llm,
@@ -451,6 +485,8 @@ export function useEditorSettings(
       handleLlmModelIdChange,
       handlePowerSaveModeChange,
       handleAutoPowerSaveOnBatteryChange,
+      handleCorrectionConfigChange,
+      handleLlmIdlingStopChange,
     },
     setters: {
       setLineHeight,
