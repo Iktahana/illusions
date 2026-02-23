@@ -22,3 +22,11 @@ export {
 export { RuleRunner } from "./rule-runner";
 export type { LlmState, LlmControllerOptions } from "./llm-controller";
 export { LlmController } from "./llm-controller";
+
+export type {
+  ConfigChangeReason,
+  CorrectionModeId,
+  GuidelineId,
+  CorrectionConfig,
+} from "./correction-config";
+export { DEFAULT_CORRECTION_CONFIG } from "./correction-config";
