@@ -21,7 +21,6 @@ export interface LintingPluginOptions {
   ruleRunner: RuleRunner | null;
   nlpClient?: INlpClient | null;
   llmClient?: ILlmClient | null;
-  llmEnabled?: boolean;
   ignoredCorrections?: IgnoredCorrection[];
   onIssuesUpdated?: (issues: LintIssue[]) => void;
   debounceMs?: number;
@@ -44,7 +43,6 @@ export interface LintingSettingsUpdate {
   ruleRunner?: RuleRunner | null;
   nlpClient?: INlpClient | null;
   llmClient?: ILlmClient | null;
-  llmEnabled?: boolean;
   /** @deprecated Use changeReason instead */
   forceFullScan?: boolean;
   ignoredCorrections?: IgnoredCorrection[];

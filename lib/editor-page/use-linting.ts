@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { RuleRunner } from "@/lib/linting/rule-runner";
 import type { LintIssue, Severity } from "@/lib/linting/types";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
-import type { ILlmClient } from "@/lib/llm-client/types";
 import { getLlmClient } from "@/lib/llm-client/llm-client";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
@@ -250,7 +249,6 @@ export function useLinting(
   }, [lintingEnabled]);
 
   // Force re-run linting on the full document (not just visible paragraphs)
-  // Always provides llmClient for L1/L2 validation regardless of power-save/llmEnabled state
   const refreshLinting = useCallback(() => {
     if (!editorViewInstance || !lintingEnabled) return;
 
@@ -261,19 +259,12 @@ export function useLinting(
           ? getNlpClient()
           : null;
 
-        // Always provide llmClient when LLM is enabled — needed for L1/L2
-        // validation (false-positive filtering), not just L3 rules
-        const llmClient: ILlmClient | null = llmEnabled
-          ? getLlmClient()
-          : null;
-
         updateLintingSettings(
           editorViewInstance,
           {
             ruleRunner: ruleRunnerRef.current,
             nlpClient,
-            llmClient,
-            llmEnabled,
+            llmClient: getLlmClient(),
             llmModelId,
           },
           "manual-refresh",
@@ -283,7 +274,7 @@ export function useLinting(
       console.error("[useLinting] Failed to refresh linting:", err);
       setIsLinting(false);
     });
-  }, [editorViewInstance, lintingEnabled, llmEnabled, llmModelId]);
+  }, [editorViewInstance, lintingEnabled, llmModelId]);
 
   return {
     ruleRunner,

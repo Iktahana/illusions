@@ -104,12 +104,8 @@ export function createLintingPlugin(
   // When true, update() should immediately notify parent with empty issues
   let pendingIssuesClear = false;
 
-  // When true, the next scheduleLlmUpdate will run L1/L2 validation even if llmEnabled is false
-  let forceLlmValidation = false;
-
-  // L3 (LLM) state
+  // LLM state — always active when llmClient is available
   let currentLlmClient: ILlmClient | null = options.llmClient ?? null;
-  let llmEnabled = options.llmEnabled ?? false;
   let currentLlmModelId: string | null = null;
   let llmAbortController: AbortController | null = null;
   let llmIssueCache: Map<number, LintIssue[]> | null = null;
@@ -161,20 +157,6 @@ export function createLintingPlugin(
           // Update llmClient reference if provided
           if ('llmClient' in meta) {
             currentLlmClient = meta.llmClient ?? null;
-          }
-          // Update llmEnabled flag if provided
-          if ('llmEnabled' in meta) {
-            const wasEnabled = llmEnabled;
-            llmEnabled = meta.llmEnabled ?? false;
-
-            if (wasEnabled && !llmEnabled) {
-              // L3 just disabled — cancel in-flight work and clear L3 cache
-              if (llmAbortController) llmAbortController.abort();
-              if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
-              llmIssueCache = null;
-              llmInFlight = false;
-              // Keep validationCache — L1/L2 validation runs independently
-            }
           }
           // Update llmModelId for model loading before inference
           if ('llmModelId' in meta) {
@@ -407,7 +389,7 @@ export function createLintingPlugin(
 
               // Determine LLM validation state for the issue
               const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
-              const needsValidation = llmEnabled && !ruleConfig?.skipLlmValidation;
+              const needsValidation = currentLlmClient !== null && !ruleConfig?.skipLlmValidation;
               const vKey = needsValidation ? LintIssueValidator.issueKey(issue, paragraph.text) : undefined;
               const cachedResult = vKey !== undefined ? validationCache.get(vKey) : undefined;
 
@@ -468,12 +450,7 @@ export function createLintingPlugin(
         allParagraphs: ParagraphInfo[],
       ): void {
         if (!currentLlmClient) return;
-        const isForced = forceLlmValidation;
-        if (!isForced && !llmEnabled) return;
         if (llmInFlight) return;
-
-        // Consume the one-shot flag
-        forceLlmValidation = false;
 
         if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
 
@@ -541,8 +518,8 @@ export function createLintingPlugin(
 
             if (processingVersion !== version) return;
 
-            // --- Step 2: Run L3 (LLM) rules (only when llmEnabled) ---
-            if (llmEnabled && currentRuleRunner?.hasLlmRules()) {
+            // --- Step 2: Run L3 (LLM) rules ---
+            if (currentRuleRunner?.hasLlmRules()) {
               const sentences: Array<{ text: string; from: number; to: number }> = [];
               for (const para of allParagraphs) {
                 if (para.text.trim().length === 0) continue;
