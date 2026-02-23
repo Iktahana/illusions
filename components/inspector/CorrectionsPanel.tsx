@@ -115,14 +115,14 @@ function IssueCard({
   return (
     <div
       className={clsx(
-        "rounded-lg border transition-colors",
+        "relative rounded-lg border transition-colors",
         isActive
           ? "border-accent bg-accent/5"
           : "border-border bg-background-secondary hover:border-border-secondary"
       )}
     >
-      {/* Actions: top-right corner */}
-      <div className="flex items-center gap-1 float-right ml-2 mt-2 mr-2">
+      {/* Actions: top-right corner, absolutely positioned to avoid overlapping button */}
+      <div className="absolute top-1.5 right-1.5 flex items-center gap-1 z-10">
         <InfoTooltip
           content={`${issue.messageJa}${issue.reference ? `\n${issue.reference.standard}${issue.reference.section ? ` ${issue.reference.section}` : ""}` : ""}\n[${getRuleName(issue.ruleId)}]`}
           className="text-foreground-tertiary hover:text-foreground-secondary"
@@ -183,7 +183,7 @@ function IssueCard({
       <button
         type="button"
         onClick={() => onNavigateToIssue?.(issue)}
-        className="w-full text-left px-3 py-2"
+        className="w-full text-left px-3 py-2 pr-14"
       >
         <div className="flex items-start gap-2">
           {/* Severity dot + validation spinner */}
