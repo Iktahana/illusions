@@ -27,6 +27,7 @@ export interface EditorSettings {
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
   llmEnabled: boolean;
   llmModelId: string;
+  llmIdlingStop: boolean;
   powerSaveMode: boolean;
   autoPowerSaveOnBattery: boolean;
   /** Unified correction config derived from individual linting fields */
@@ -54,6 +55,7 @@ export interface EditorSettingsHandlers {
   handleLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
   handleLlmEnabledChange: (value: boolean) => void;
   handleLlmModelIdChange: (modelId: string) => void;
+  handleLlmIdlingStopChange: (value: boolean) => void;
   handlePowerSaveModeChange: (enabled: boolean) => void;
   handleAutoPowerSaveOnBatteryChange: (enabled: boolean) => void;
 }
@@ -103,6 +105,7 @@ export function useEditorSettings(
   const [lintingRuleConfigs, setLintingRuleConfigs] = useState<Record<string, { enabled: boolean; severity: Severity }>>({});
   const [llmEnabled, setLlmEnabled] = useState(false);
   const [llmModelId, setLlmModelId] = useState("qwen3-1.7b-q8");
+  const [llmIdlingStop, setLlmIdlingStop] = useState(false);
   const [powerSaveMode, setPowerSaveMode] = useState(false);
   const [autoPowerSaveOnBattery, setAutoPowerSaveOnBattery] = useState(true);
 
@@ -164,6 +167,9 @@ export function useEditorSettings(
         }
         if (typeof appState.llmModelId === "string") {
           setLlmModelId(appState.llmModelId);
+        }
+        if (typeof appState.llmIdlingStop === "boolean") {
+          setLlmIdlingStop(appState.llmIdlingStop);
         }
         if (appState.lintingRuleConfigs && typeof appState.lintingRuleConfigs === "object") {
           const isSeverity = (v: unknown): v is Severity =>
@@ -331,6 +337,13 @@ export function useEditorSettings(
     });
   }, []);
 
+  const handleLlmIdlingStopChange = useCallback((value: boolean) => {
+    setLlmIdlingStop(value);
+    void persistAppState({ llmIdlingStop: value }).catch((error) => {
+      console.error("Failed to persist llmIdlingStop:", error);
+    });
+  }, []);
+
   const handleLintingRuleConfigChange = useCallback((ruleId: string, config: { enabled: boolean; severity: Severity }) => {
     setLintingRuleConfigs(prev => {
       const next = { ...prev, [ruleId]: config };
@@ -415,6 +428,7 @@ export function useEditorSettings(
       lintingRuleConfigs,
       llmEnabled,
       llmModelId,
+      llmIdlingStop,
       powerSaveMode,
       autoPowerSaveOnBattery,
       correctionConfig: {
@@ -449,6 +463,7 @@ export function useEditorSettings(
       handleLintingRuleConfigsBatchChange,
       handleLlmEnabledChange,
       handleLlmModelIdChange,
+      handleLlmIdlingStopChange,
       handlePowerSaveModeChange,
       handleAutoPowerSaveOnBatteryChange,
     },

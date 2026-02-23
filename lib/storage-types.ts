@@ -81,7 +81,7 @@ export interface AppState {
   // LLM設定
   llmEnabled?: boolean;
   llmModelId?: string;
-
+  llmIdlingStop?: boolean;
 
   // 省電力モード
   powerSaveMode?: boolean;

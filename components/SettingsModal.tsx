@@ -89,6 +89,8 @@ interface SettingsModalProps {
   onLlmEnabledChange?: (value: boolean) => void;
   llmModelId?: string;
   onLlmModelIdChange?: (modelId: string) => void;
+  llmIdlingStop?: boolean;
+  onLlmIdlingStopChange?: (value: boolean) => void;
   // Power saving (Electron only)
   powerSaveMode?: boolean;
   onPowerSaveModeChange?: (value: boolean) => void;
@@ -156,6 +158,8 @@ export default function SettingsModal({
   onLlmEnabledChange,
   llmModelId,
   onLlmModelIdChange,
+  llmIdlingStop,
+  onLlmIdlingStopChange,
   powerSaveMode,
   onPowerSaveModeChange,
   autoPowerSaveOnBattery,
@@ -682,6 +686,8 @@ export default function SettingsModal({
                 onLlmEnabledChange={onLlmEnabledChange}
                 llmModelId={llmModelId ?? DEFAULT_MODEL_ID}
                 onLlmModelIdChange={onLlmModelIdChange}
+                llmIdlingStop={llmIdlingStop ?? false}
+                onLlmIdlingStopChange={onLlmIdlingStopChange}
               />
             )}
 

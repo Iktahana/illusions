@@ -94,7 +94,7 @@ export default function EditorPage() {
     posHighlightEnabled, posHighlightColors, verticalScrollBehavior,
     scrollSensitivity, compactMode, showSettingsModal,
     lintingEnabled, lintingRuleConfigs,
-    llmEnabled, llmModelId,
+    llmEnabled, llmModelId, llmIdlingStop,
     powerSaveMode, autoPowerSaveOnBattery,
   } = settings;
   const {
@@ -106,7 +106,7 @@ export default function EditorPage() {
     handleScrollSensitivityChange, handleToggleCompactMode, setShowSettingsModal,
     handleLintingEnabledChange, handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
-    handleLlmEnabledChange, handleLlmModelIdChange,
+    handleLlmEnabledChange, handleLlmModelIdChange, handleLlmIdlingStopChange,
     handlePowerSaveModeChange, handleAutoPowerSaveOnBatteryChange,
   } = settingsHandlers;
 
@@ -959,6 +959,8 @@ export default function EditorPage() {
           onLlmEnabledChange={handleLlmEnabledChange}
           llmModelId={llmModelId}
           onLlmModelIdChange={handleLlmModelIdChange}
+          llmIdlingStop={llmIdlingStop}
+          onLlmIdlingStopChange={handleLlmIdlingStopChange}
           initialCategory={settingsInitialCategory}
           powerSaveMode={powerSaveMode}
           onPowerSaveModeChange={handlePowerSaveModeChange}

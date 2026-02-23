@@ -16,6 +16,8 @@ interface LlmSettingsProps {
   onLlmEnabledChange?: (value: boolean) => void;
   llmModelId: string;
   onLlmModelIdChange?: (modelId: string) => void;
+  llmIdlingStop: boolean;
+  onLlmIdlingStopChange?: (value: boolean) => void;
 }
 
 /** Format byte count as human-readable string */
@@ -49,6 +51,8 @@ export function LlmSettings({
   onLlmEnabledChange,
   llmModelId,
   onLlmModelIdChange,
+  llmIdlingStop,
+  onLlmIdlingStopChange,
 }: LlmSettingsProps): React.ReactElement {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [modelStatuses, setModelStatuses] = useState<Map<string, LlmModelInfo>>(new Map());
@@ -249,6 +253,34 @@ export function LlmSettings({
             {toggleMessage}
           </p>
         )}
+
+        {/* LLM idling stop toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-medium text-foreground">
+              LLMアイドリングストップ
+            </h3>
+            <p className="text-xs text-foreground-tertiary mt-0.5">
+              LLMを使用していないとき自動的にアンロードし、システムリソースとバッテリーを節約します。
+            </p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={llmIdlingStop}
+            onClick={() => onLlmIdlingStopChange?.(!llmIdlingStop)}
+            className={clsx(
+              "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
+              llmIdlingStop ? "bg-accent" : "bg-foreground-muted"
+            )}
+          >
+            <span
+              className={clsx(
+                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm",
+                llmIdlingStop ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </div>
 
         {/* Model selector section */}
         <div className="pt-4 border-t border-border">
