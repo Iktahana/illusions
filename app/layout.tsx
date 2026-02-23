@@ -1,21 +1,14 @@
-"use client";
-
 import "./globals.css";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { EditorModeProvider } from "../contexts/EditorModeContext";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Analytics } from "@vercel/analytics/next";
-import { isElectronRenderer } from "@/lib/runtime-env";
 import { NotificationContainer } from "@/components/NotificationContainer";
+import AnalyticsLoader from "@/components/AnalyticsLoader";
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Detect if running in Electron environment
-  const isElectron = isElectronRenderer();
-
   return (
     <html lang="ja" suppressHydrationWarning>
       <head>
@@ -54,13 +47,8 @@ export default function RootLayout({
           <EditorModeProvider>{children}</EditorModeProvider>
         </ThemeProvider>
         <NotificationContainer />
-        {/* Only load analytics in web environment */}
-        {!isElectron && (
-          <>
-            <SpeedInsights />
-            <Analytics />
-          </>
-        )}
+        {/* Only load analytics in web environment (client-side check) */}
+        <AnalyticsLoader />
       </body>
     </html>
   );
