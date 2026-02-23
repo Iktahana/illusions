@@ -91,7 +91,7 @@ export class NotationConsistencyRule extends AbstractDocumentLintRule {
     for (const paragraph of paragraphs) {
       const maskedText = config.skipDialogue ? maskDialogue(paragraph.text) : paragraph.text;
       for (const variant of group.variants) {
-        const locations = this.findAllOccurrences(maskedText, variant);
+        const locations = this.findAllOccurrences(maskedText, variant, group.compoundExclusions);
         if (locations.length === 0) continue;
 
         const currentCount = variantCounts.get(variant) ?? 0;
@@ -151,6 +151,7 @@ export class NotationConsistencyRule extends AbstractDocumentLintRule {
   private findAllOccurrences(
     text: string,
     search: string,
+    compoundExclusions?: readonly string[],
   ): Array<{ from: number; to: number }> {
     const results: Array<{ from: number; to: number }> = [];
     let pos = 0;
@@ -159,11 +160,35 @@ export class NotationConsistencyRule extends AbstractDocumentLintRule {
       const index = text.indexOf(search, pos);
       if (index === -1) break;
 
+      // Skip if the match is part of a known compound word
+      if (compoundExclusions && this.isInsideCompound(text, index, search.length, compoundExclusions)) {
+        pos = index + search.length;
+        continue;
+      }
+
       results.push({ from: index, to: index + search.length });
       pos = index + search.length;
     }
 
     return results;
+  }
+
+  /** Check if a match at `index` is part of any compound exclusion word */
+  private isInsideCompound(
+    text: string,
+    index: number,
+    matchLen: number,
+    exclusions: readonly string[],
+  ): boolean {
+    for (const compound of exclusions) {
+      // Check every possible position of the compound around the match
+      const earliest = Math.max(0, index - compound.length + 1);
+      const latest = Math.min(text.length - compound.length, index + matchLen - 1);
+      for (let start = earliest; start <= latest; start++) {
+        if (text.startsWith(compound, start)) return true;
+      }
+    }
+    return false;
   }
 
   /**

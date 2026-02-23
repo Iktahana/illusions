@@ -22,6 +22,8 @@ export interface VariantGroup {
   readonly category: VariantCategory;
   /** All known variant forms (first is the "standard" form per government guidelines) */
   readonly variants: readonly string[];
+  /** Compound words containing a variant that should be excluded from matching */
+  readonly compoundExclusions?: readonly string[];
 }
 
 /**
@@ -53,11 +55,11 @@ export const VARIANT_GROUPS: ReadonlyArray<VariantGroup> = [
   // --- 漢字・かなの揺れ (Kanji/kana variation) ---
   { id: "kodomo", category: "kanji-kana", variants: ["子供", "子ども", "こども"] },
   { id: "dekiru", category: "kanji-kana", variants: ["出来る", "できる"] },
-  { id: "koto", category: "kanji-kana", variants: ["事", "こと"] },
-  { id: "mono", category: "kanji-kana", variants: ["物", "もの"] },
-  { id: "toki", category: "kanji-kana", variants: ["時", "とき"] },
-  { id: "tokoro", category: "kanji-kana", variants: ["所", "ところ"] },
-  { id: "tame", category: "kanji-kana", variants: ["為", "ため"] },
+  { id: "koto", category: "kanji-kana", variants: ["事", "こと"], compoundExclusions: ["事件", "事故", "事実", "事情", "事業", "事前", "事後", "事態", "事務", "事例", "事項", "火事", "知事", "大事", "食事", "返事", "工事", "記事", "刑事", "人事", "家事", "行事"] },
+  { id: "mono", category: "kanji-kana", variants: ["物", "もの"], compoundExclusions: ["物語", "物理", "物質", "物体", "物価", "物件", "物資", "人物", "動物", "植物", "食物", "建物", "荷物", "着物", "買物", "見物", "化物", "怪物"] },
+  { id: "toki", category: "kanji-kana", variants: ["時", "とき"], compoundExclusions: ["時間", "時代", "時計", "時期", "時点", "時刻", "時々", "時速", "時差", "臨時", "当時", "同時", "随時", "一時", "常時"] },
+  { id: "tokoro", category: "kanji-kana", variants: ["所", "ところ"], compoundExclusions: ["場所", "所長", "所属", "所有", "所得", "所在", "住所", "事務所", "研究所", "台所", "便所", "名所", "近所"] },
+  { id: "tame", category: "kanji-kana", variants: ["為", "ため"], compoundExclusions: ["ため息", "為替", "ため口", "ため池"] },
   { id: "hodo", category: "kanji-kana", variants: ["程", "ほど"] },
   { id: "yue", category: "kanji-kana", variants: ["故", "ゆえ"] },
   { id: "nado", category: "kanji-kana", variants: ["等", "など"] },
