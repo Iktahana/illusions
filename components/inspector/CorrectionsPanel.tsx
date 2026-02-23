@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, ChevronDown, ChevronRight, EyeOff, Info, ListFilter, RefreshCw, Settings, XCircle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, EyeOff, Info, Lightbulb, ListFilter, RefreshCw, Settings, XCircle } from "lucide-react";
 import clsx from "clsx";
 
 import { LINT_PRESETS, LINT_RULES_META, LINT_RULE_CATEGORIES } from "@/lib/linting/lint-presets";
@@ -207,13 +207,15 @@ function IssueCard({
                 {enriched.originalText}
               </p>
             ) : (
-              <p className="text-sm text-foreground leading-snug">
+              <p className="text-sm text-foreground leading-snug flex items-start gap-1">
+                <Lightbulb className="w-3.5 h-3.5 text-foreground-tertiary shrink-0 mt-0.5" />
                 {issue.messageJa}
               </p>
             )}
             {/* Secondary line: show message when we have original text but no fix */}
             {hasOriginal && !hasFix && (
-              <p className="text-xs text-foreground-tertiary mt-0.5">
+              <p className="text-xs text-foreground-tertiary mt-0.5 flex items-start gap-1">
+                <Lightbulb className="w-3 h-3 shrink-0 mt-0.5" />
                 {issue.messageJa}
               </p>
             )}
