@@ -73,4 +73,7 @@ export interface ILlmClient {
     used: number;
     models: Array<{ id: string; size: number }>;
   }>;
+
+  /** Enable or disable automatic model unloading after idle timeout */
+  setIdlingStop(enabled: boolean): Promise<void>;
 }

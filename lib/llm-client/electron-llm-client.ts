@@ -84,4 +84,9 @@ export class ElectronLlmClient implements ILlmClient {
     if (!window.electronAPI?.llm) throw new Error("LLM not available");
     return window.electronAPI.llm.getStorageUsage();
   }
+
+  async setIdlingStop(enabled: boolean): Promise<void> {
+    if (!window.electronAPI?.llm) throw new Error("LLM not available");
+    return window.electronAPI.llm.setIdlingStop(enabled);
+  }
 }

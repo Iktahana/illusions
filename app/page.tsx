@@ -121,6 +121,17 @@ export default function EditorPage() {
     onPowerSaveModeChange: handlePowerSaveModeChange,
   });
 
+  // --- Sync llmIdlingStop setting to LLM engine ---
+  useEffect(() => {
+    import("@/lib/llm-client/llm-client").then(({ getLlmClient }) => {
+      const client = getLlmClient();
+      if (!client.isAvailable()) return;
+      void client.setIdlingStop(llmIdlingStop).catch((err) => {
+        console.error("[page] Failed to sync llmIdlingStop:", err);
+      });
+    });
+  }, [llmIdlingStop]);
+
   // --- Panel state hook ---
   const { state: panelState, handlers: panelHandlers } = usePanelState({ setShowSettingsModal });
   const {

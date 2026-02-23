@@ -48,4 +48,9 @@ export class WebLlmClient implements ILlmClient {
   }> {
     throw new Error(UNAVAILABLE_MESSAGE);
   }
+
+  // no-op in web environment
+  async setIdlingStop(_enabled: boolean): Promise<void> {
+    // no-op
+  }
 }

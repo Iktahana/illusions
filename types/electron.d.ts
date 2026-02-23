@@ -173,6 +173,7 @@ declare global {
         callback: (progress: { modelId: string; progress: number }) => void,
       ) => void;
       removeDownloadProgressListener: () => void;
+      setIdlingStop: (enabled: boolean) => Promise<void>;
     };
     power?: {
       /** Listen for debounced power state changes from main process */
