@@ -172,6 +172,7 @@ export class RedundantExpressionRule extends AbstractLintRule {
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
     severity: "warning",
+    skipDialogue: true,
   };
 
   lint(text: string, config: LintRuleConfig): LintIssue[] {

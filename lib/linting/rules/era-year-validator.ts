@@ -84,6 +84,7 @@ export class EraYearValidatorRule extends AbstractLintRule {
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
     severity: "warning",
+    skipDialogue: true,
   };
 
   lint(text: string, config: LintRuleConfig): LintIssue[] {

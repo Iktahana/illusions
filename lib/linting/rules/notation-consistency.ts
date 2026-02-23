@@ -47,6 +47,7 @@ export class NotationConsistencyRule extends AbstractDocumentLintRule {
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
     severity: "warning",
+    skipDialogue: true,
   };
 
   lintDocument(

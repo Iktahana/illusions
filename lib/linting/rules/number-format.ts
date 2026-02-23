@@ -271,6 +271,7 @@ export class NumberFormatRule extends AbstractLintRule {
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
     severity: "warning",
+    skipDialogue: true,
     options: {
       isVertical: false,
     },
