@@ -1,28 +1,26 @@
 /**
  * LLM-based post-validator for L1/L2 lint issues.
- * Batch-sends issues to the LLM to filter out false positives.
+ * Sends issues to the LLM one at a time to filter out false positives.
  *
- * Prompt template: prompts/lint-validation/index.ts (ISSUE_VALIDATOR_PROMPT)
+ * Prompt template: prompts/lint-validation/index.ts (CANDIDATE_VALIDATOR_PROMPT)
  */
 
 import type { ILlmClient } from "@/lib/llm-client/types";
 import type { LintIssue } from "./types";
-import { ISSUE_VALIDATOR_PROMPT } from "@/prompts/lint-validation";
+import { CANDIDATE_VALIDATOR_PROMPT } from "@/prompts/lint-validation";
 
 /** Issue with its surrounding paragraph context */
 export interface ValidatableIssue extends LintIssue {
   paragraphText: string;
 }
 
-/** Maximum number of issues per LLM call (~50 tokens each) */
-const MAX_ISSUES_PER_BATCH = 50;
-
 /** Characters of context to include before/after the flagged text */
-const CONTEXT_CHARS = 30;
+const CONTEXT_CHARS = 50;
 
 /**
  * Post-validates L1/L2 lint issues using an LLM.
- * Issues judged as false positives are returned in a dismissed set.
+ * Issues judged as false positives are returned with valid=false.
+ * Each issue is sent as a separate LLM call.
  */
 export class LintIssueValidator {
   private mode: string = "novel";
@@ -41,12 +39,11 @@ export class LintIssueValidator {
   }
 
   /**
-   * Validate a batch of L1/L2 issues using the LLM.
+   * Validate issues one by one using the LLM.
    * Returns a Map of issue keys → { valid, reason } for all validated issues.
    *
-   * @param onIssueValidated - Optional callback fired immediately after each individual
-   *   issue result is parsed from the batch response. Use this for incremental UI updates
-   *   so results appear one-by-one rather than all at once.
+   * @param onIssueValidated - Optional callback fired immediately after each
+   *   issue result is parsed. Use this for incremental UI updates.
    */
   async validate(
     issues: ReadonlyArray<ValidatableIssue>,
@@ -58,44 +55,35 @@ export class LintIssueValidator {
 
     if (issues.length === 0) return results;
 
-    // Split into batches if needed
-    const batches: ValidatableIssue[][] = [];
-    for (let i = 0; i < issues.length; i += MAX_ISSUES_PER_BATCH) {
-      batches.push(issues.slice(i, i + MAX_ISSUES_PER_BATCH) as ValidatableIssue[]);
-    }
-
-    for (const batch of batches) {
+    for (const issue of issues) {
       if (signal?.aborted) break;
 
+      const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
+
       try {
-        const prompt = this.buildPrompt(batch);
+        const prompt = this.buildPrompt(issue);
         console.debug('[LintIssueValidator] prompt:\n', prompt);
         const result = await llmClient.infer(prompt, {
           signal,
-          maxTokens: batch.length * 60,
+          maxTokens: 60,
         });
         console.debug('[LintIssueValidator] raw LLM response:\n', result.text);
         console.debug('[LintIssueValidator] tokens used:', result.tokenCount);
-        const parsed = this.parseResponse(result.text, batch.length);
-        console.debug('[LintIssueValidator] parsed results:', parsed);
 
-        for (const entry of parsed) {
-          if (entry.id >= 0 && entry.id < batch.length) {
-            const issue = batch[entry.id];
-            const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
-            const flagged = issue.paragraphText.slice(issue.from, issue.to);
-            const verdict = entry.valid ? 'CONFIRMED' : 'DISMISSED';
-            console.debug(`[LintIssueValidator] ${verdict}:`, issue.ruleId, flagged,
-              'reason:', entry.reason ?? '(none)');
-            results.set(key, { valid: entry.valid, reason: entry.reason });
-            // Fire immediately so callers can update UI per-issue without waiting for full batch
-            onIssueValidated?.(key, entry.valid);
-          }
-        }
+        const parsed = this.parseResponse(result.text);
+        const valid = parsed ?? true; // fail-open if unparseable
+        const flagged = issue.paragraphText.slice(issue.from, issue.to);
+        const verdict = valid ? 'CONFIRMED' : 'DISMISSED';
+        console.debug(`[LintIssueValidator] ${verdict}:`, issue.ruleId, flagged);
+
+        results.set(key, { valid });
+        onIssueValidated?.(key, valid);
       } catch (error) {
         if ((error as Error).name === "AbortError") break;
-        console.warn("[LintIssueValidator] Batch validation failed:", error);
-        // On failure, keep all issues (fail-open)
+        console.warn("[LintIssueValidator] Validation failed:", error);
+        // On failure, keep the issue (fail-open)
+        results.set(key, { valid: true });
+        onIssueValidated?.(key, true);
       }
     }
 
@@ -103,77 +91,53 @@ export class LintIssueValidator {
   }
 
   /**
-   * Build the prompt for a batch of issues.
+   * Build the prompt for a single issue using CANDIDATE_VALIDATOR_PROMPT.
    */
-  private buildPrompt(issues: ReadonlyArray<ValidatableIssue>): string {
-    const issueLines: string[] = [];
+  private buildPrompt(issue: ValidatableIssue): string {
+    const flaggedText = issue.paragraphText.slice(issue.from, issue.to);
+    const contextBefore = issue.paragraphText.slice(
+      Math.max(0, issue.from - CONTEXT_CHARS),
+      issue.from,
+    );
+    const contextAfter = issue.paragraphText.slice(
+      issue.to,
+      Math.min(issue.paragraphText.length, issue.to + CONTEXT_CHARS),
+    );
 
-    for (let i = 0; i < issues.length; i++) {
-      const issue = issues[i];
-      const flaggedText = issue.paragraphText.slice(issue.from, issue.to);
-      const contextBefore = issue.paragraphText.slice(
-        Math.max(0, issue.from - CONTEXT_CHARS),
-        issue.from,
-      );
-      const contextAfter = issue.paragraphText.slice(
-        issue.to,
-        Math.min(issue.paragraphText.length, issue.to + CONTEXT_CHARS),
-      );
+    const context = `...${contextBefore}<<${flaggedText}>>${contextAfter}...`;
 
-      issueLines.push(
-        `[${i}] ルール: ${issue.ruleId}`,
-        `   箇所:「${flaggedText}」`,
-        `   理由: ${issue.messageJa}`,
-        `   前後:「...${contextBefore}<<${flaggedText}>>${contextAfter}...」`,
-        "",
-      );
-    }
-
-    return ISSUE_VALIDATOR_PROMPT
+    return CANDIDATE_VALIDATOR_PROMPT
       .replace("{{MODE}}", this.mode)
-      .replace("{{ISSUES}}", issueLines.join("\n"));
+      .replace("{{CONTEXT}}", context)
+      .replace("{{RULE_ID}}", issue.ruleId)
+      .replace("{{FROM}}", String(issue.from))
+      .replace("{{TO}}", String(issue.to))
+      .replace("{{MESSAGE_JA}}", issue.messageJa)
+      .replace("{{VALIDATION_HINT}}", "");
   }
 
   /**
-   * Parse the LLM response, extracting the JSON array of validation results.
-   * Handles malformed output gracefully.
+   * Parse the LLM response, extracting the valid boolean from a JSON object.
+   * Returns null if the response cannot be parsed.
    */
-  private parseResponse(
-    text: string,
-    expectedCount: number,
-  ): Array<{ id: number; valid: boolean; reason?: string }> {
-    // Try to extract a JSON array from the response
-    const jsonMatch = text.match(/\[[\s\S]*?\]/);
-    if (!jsonMatch) return [];
+  private parseResponse(text: string): boolean | null {
+    // Try to extract {"valid": true/false} from the response
+    const jsonMatch = text.match(/\{[^}]*"valid"\s*:\s*(true|false)[^}]*\}/);
+    if (!jsonMatch) return null;
 
     try {
       const parsed: unknown = JSON.parse(jsonMatch[0]);
-      if (!Array.isArray(parsed)) return [];
-
-      const results: Array<{ id: number; valid: boolean; reason?: string }> = [];
-      for (const item of parsed) {
-        if (
-          typeof item === "object" &&
-          item !== null &&
-          "id" in item &&
-          "valid" in item &&
-          typeof (item as Record<string, unknown>).id === "number" &&
-          typeof (item as Record<string, unknown>).valid === "boolean"
-        ) {
-          const entry = item as { id: number; valid: boolean; reason?: string };
-          if (entry.id >= 0 && entry.id < expectedCount) {
-            results.push({
-              id: entry.id,
-              valid: entry.valid,
-              reason: typeof entry.reason === "string" ? entry.reason : undefined,
-            });
-          }
-        }
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        "valid" in parsed &&
+        typeof (parsed as Record<string, unknown>).valid === "boolean"
+      ) {
+        return (parsed as { valid: boolean }).valid;
       }
-
-      return results;
+      return null;
     } catch {
-      return [];
+      return null;
     }
   }
 }
