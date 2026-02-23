@@ -141,6 +141,7 @@ export function useTabManager(options?: {
     isDirty: tabState.isDirty,
     isSaving: tabState.isSaving,
     lastSavedTime: tabState.lastSavedTime,
+    lastSaveWasAuto: tabState.lastSaveWasAuto,
     openFile: fileIO.openFile,
     saveFile: fileIO.saveFile,
     saveAsFile: fileIO.saveAsFile,

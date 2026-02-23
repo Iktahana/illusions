@@ -87,7 +87,8 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                         ...t,
                         lastSavedContent: sanitized,
                         isDirty: sanitizeMdiContent(t.content) !== sanitized,
-                        lastSavedTime: -Date.now(),
+                        lastSavedTime: Date.now(),
+                        lastSaveWasAuto: true,
                       }
                     : t,
                 ),
@@ -108,7 +109,8 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                           file: result.descriptor,
                           lastSavedContent: sanitized,
                           isDirty: sanitizeMdiContent(t.content) !== sanitized,
-                          lastSavedTime: -Date.now(),
+                          lastSavedTime: Date.now(),
+                          lastSaveWasAuto: true,
                         }
                       : t,
                   ),
