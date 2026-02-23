@@ -256,10 +256,13 @@ export class ProjectService {
   async openProject(): Promise<ProjectMode> {
     const rootDirHandle = await this.vfs.openDirectory();
 
-    // Read .illusions/project.json
-    const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions");
-    const projectJsonHandle = await illusionsDir.getFileHandle("project.json");
+    // Read .illusions/project.json (create if missing)
+    const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
+    const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
     const metadataText = await projectJsonHandle.read();
+    if (!metadataText.trim()) {
+      throw new Error(".illusions/project.json is empty — project may need to be re-created.");
+    }
     const metadata: ProjectConfig = JSON.parse(metadataText) as ProjectConfig;
 
     // Read workspace.json (create defaults if missing)
@@ -331,8 +334,8 @@ export class ProjectService {
     await mainFileHandle.write(content);
 
     // Update project.json lastModified
-    const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions");
-    const projectJsonHandle = await illusionsDir.getFileHandle("project.json");
+    const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
+    const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
     const updatedMetadata: ProjectConfig = {
       ...project.metadata,
       lastModified: Date.now(),
@@ -430,7 +433,7 @@ export class ProjectService {
     // Check .illusions directory
     let illusionsDir: VFSDirectoryHandle | null = null;
     try {
-      illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions");
+      illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
     } catch {
       errors.push(".illusions directory not found");
       return { valid: false, errors };

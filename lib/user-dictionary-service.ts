@@ -41,7 +41,7 @@ class UserDictionaryService {
   async loadEntries(): Promise<UserDictionaryEntry[]> {
     try {
       const rootDir = await this.vfs.getDirectoryHandle("");
-      const illusionsDir = await rootDir.getDirectoryHandle(".illusions");
+      const illusionsDir = await rootDir.getDirectoryHandle(".illusions", { create: true });
       const fileHandle = await illusionsDir.getFileHandle(USER_DICTIONARY_FILENAME);
       const raw = await fileHandle.read();
       const data: UserDictionaryFile = JSON.parse(raw);

@@ -41,7 +41,7 @@ class IgnoredCorrectionsService {
   async loadIgnoredCorrections(): Promise<IgnoredCorrection[]> {
     try {
       const rootDir = await this.vfs.getDirectoryHandle("");
-      const illusionsDir = await rootDir.getDirectoryHandle(".illusions");
+      const illusionsDir = await rootDir.getDirectoryHandle(".illusions", { create: true });
       const fileHandle = await illusionsDir.getFileHandle(IGNORED_CORRECTIONS_FILENAME);
       const raw = await fileHandle.read();
       const data: IgnoredCorrectionsFile = JSON.parse(raw);

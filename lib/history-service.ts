@@ -748,7 +748,7 @@ export class HistoryService {
    */
   private async getHistoryDirectory(): Promise<VFSDirectoryHandle> {
     const rootDir = await this.vfs.getDirectoryHandle("");
-    const illusionsDir = await rootDir.getDirectoryHandle(".illusions");
+    const illusionsDir = await rootDir.getDirectoryHandle(".illusions", { create: true });
     return illusionsDir.getDirectoryHandle(HISTORY_DIR_NAME);
   }
 
