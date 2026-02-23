@@ -1261,10 +1261,19 @@ function MilkdownEditor({
     if (action) handleContextMenuAction(action as ContextMenuAction);
   }, [hasSelection, handleContextMenuAction, mdiExtensionsEnabled, getLintIssueAtCoords]);
 
+  // Left-click on lint decoration → auto-switch to corrections tab
+  const handleEditorClick = useCallback((e: React.MouseEvent) => {
+    const issue = getLintIssueAtCoords(e.clientX, e.clientY);
+    if (issue) {
+      onShowLintHint?.(issue);
+    }
+  }, [getLintIssueAtCoords, onShowLintHint]);
+
   // Editor content wrapper - only use custom context menu on Web, native on Electron
   const editorContent = (
     <div
       ref={editorRef}
+      onClick={handleEditorClick}
       className={clsx(
         "editor-content-area",
         isVertical
