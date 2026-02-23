@@ -47,6 +47,7 @@ Available for macOS (Intel & Apple Silicon) and Windows
 
 ### 📊 Productivity
 - **Statistics panel**: Character count, paragraph count, manuscript pages (原稿用紙)
+- **Export to PDF/EPUB/DOCX**: Export your work to standard publishing formats
 - **Composition settings**: Font, size, line height, spacing
 - **Version history**: Browse and restore previous versions
 - **Diff viewer**: Compare changes between versions
@@ -257,6 +258,7 @@ The proofreading (linting) features in illusions comply with the following offic
 - ✅ Landing page with SEO optimization
 
 ### Recently Added
+- ✅ Export to PDF/EPUB/DOCX — export novels to standard publishing formats
 - ✅ Local LLM engine for AI proofreading (ローカルLLMによるAI校正)
 - ✅ Correction ignore feature — dismiss individual lint warnings
 - ✅ Dialogue-aware linting — skip dialogue content with per-rule toggle
@@ -272,7 +274,6 @@ The proofreading (linting) features in illusions comply with the following offic
 ### Planned
 - [ ] Real-time collaboration
 - [ ] Advanced AI grammar and style checking (local LLM integration in progress)
-- [ ] Export to PDF/EPUB
 - [ ] Custom themes and fonts
 - [ ] Plugin system
 - [ ] Mobile app (iOS/Android)
