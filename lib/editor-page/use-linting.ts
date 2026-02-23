@@ -46,7 +46,6 @@ import { WaveDashUnificationRule } from "@/lib/linting/rules/wave-dash-unificati
 import { IterationMarkRule } from "@/lib/linting/rules/iteration-mark-rule";
 import { BracketPeriodPlacementRule } from "@/lib/linting/rules/bracket-period-placement-rule";
 import { LargeNumberCommaRule } from "@/lib/linting/rules/large-number-comma-rule";
-import { ParagraphIndentationRule } from "@/lib/linting/rules/paragraph-indentation-rule";
 import { CounterCharacterRule } from "@/lib/linting/rules/counter-character-rule";
 import { VuKatakanaRule } from "@/lib/linting/rules/vu-katakana-rule";
 import { GairaiKanaTableRule } from "@/lib/linting/rules/gairai-kana-table-rule";
@@ -143,7 +142,6 @@ export function useLinting(
     runner.registerRule(new IterationMarkRule());
     runner.registerRule(new BracketPeriodPlacementRule());
     runner.registerRule(new LargeNumberCommaRule());
-    runner.registerRule(new ParagraphIndentationRule());
     runner.registerRule(new CounterCharacterRule());
     runner.registerRule(new VuKatakanaRule());
     runner.registerRule(new GairaiKanaTableRule());
