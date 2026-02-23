@@ -26,15 +26,6 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   trailingSlash: true,
   turbopack: {},
-  webpack(config) {
-    // Allow importing .md files as raw strings
-    config.module.rules.push({
-      test: /\.md$/,
-      type: "asset/source",
-    });
-    return config;
-  },
-
   // Note: After NLP backend migration, kuromoji is only used in:
   // 1. Server-side API routes (Next.js)
   // 2. Electron main process (Node.js)
