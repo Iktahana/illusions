@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, ExternalLink, ChevronDown, ChevronRight, Sparkles, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium } from "lucide-react";
+import { X, ExternalLink, ChevronDown, ChevronRight, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium } from "lucide-react";
 import type { Severity } from "@/lib/linting/types";
 import dynamic from "next/dynamic";
 
@@ -10,15 +10,10 @@ import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/po
 import { FEATURED_JAPANESE_FONTS } from "@/lib/fonts";
 import ColorPicker from "./ColorPicker";
 import LintingSettings from "./LintingSettings";
-import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 
 const PosHighlightPreview = dynamic(() => import("./PosHighlightPreview"), {
   ssr: false,
 });
-const LlmSettings = dynamic(
-  () => import("./LlmSettings").then((mod) => mod.LlmSettings),
-  { ssr: false },
-);
 const LICENSE_TEXT = process.env.NEXT_PUBLIC_LICENSE_TEXT || "";
 const TERMS_TEXT = process.env.NEXT_PUBLIC_TERMS_TEXT || "";
 
@@ -89,6 +84,8 @@ interface SettingsModalProps {
   onLlmEnabledChange?: (value: boolean) => void;
   llmModelId?: string;
   onLlmModelIdChange?: (modelId: string) => void;
+  llmIdlingStop?: boolean;
+  onLlmIdlingStopChange?: (value: boolean) => void;
   // Power saving (Electron only)
   powerSaveMode?: boolean;
   onPowerSaveModeChange?: (value: boolean) => void;
@@ -98,7 +95,7 @@ interface SettingsModalProps {
   initialCategory?: SettingsCategory;
 }
 
-export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "llm" | "power" | "about";
+export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "power" | "about";
 
 const SCROLL_BEHAVIORS = [
   {
@@ -156,6 +153,8 @@ export default function SettingsModal({
   onLlmEnabledChange,
   llmModelId,
   onLlmModelIdChange,
+  llmIdlingStop,
+  onLlmIdlingStopChange,
   powerSaveMode,
   onPowerSaveModeChange,
   autoPowerSaveOnBattery,
@@ -301,18 +300,6 @@ export default function SettingsModal({
               >
                 <SpellCheck className="w-4 h-4" />
                 校正
-              </button>
-              <button
-                onClick={() => setActiveCategory("llm")}
-                className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                  activeCategory === "llm"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground"
-                )}
-              >
-                <Sparkles className="w-4 h-4" />
-                AI機能
               </button>
               {isElectronRenderer() && (
                 <button
@@ -672,16 +659,11 @@ export default function SettingsModal({
                 onLintingRuleConfigChange={(id, cfg) => onLintingRuleConfigChange?.(id, cfg)}
                 onLintingRuleConfigsBatchChange={(cfgs) => onLintingRuleConfigsBatchChange?.(cfgs)}
                 llmEnabled={llmEnabled}
-              />
-            )}
-
-            {/* LLM section */}
-            {activeCategory === "llm" && (
-              <LlmSettings
-                llmEnabled={llmEnabled ?? false}
                 onLlmEnabledChange={onLlmEnabledChange}
-                llmModelId={llmModelId ?? DEFAULT_MODEL_ID}
+                llmModelId={llmModelId}
                 onLlmModelIdChange={onLlmModelIdChange}
+                llmIdlingStop={llmIdlingStop}
+                onLlmIdlingStopChange={onLlmIdlingStopChange}
               />
             )}
 

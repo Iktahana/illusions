@@ -6,16 +6,17 @@ import clsx from "clsx";
 import { getLlmClient } from "@/lib/llm-client/llm-client";
 import {
   LLM_MODEL_REGISTRY,
-  DEFAULT_MODEL_ID,
   getModelEntry,
 } from "@/lib/llm-client/model-registry";
-import type { LlmModelInfo, LlmModelStatus } from "@/lib/llm-client/types";
+import type { LlmModelInfo } from "@/lib/llm-client/types";
 
 interface LlmSettingsProps {
   llmEnabled: boolean;
   onLlmEnabledChange?: (value: boolean) => void;
   llmModelId: string;
   onLlmModelIdChange?: (modelId: string) => void;
+  llmIdlingStop?: boolean;
+  onLlmIdlingStopChange?: (value: boolean) => void;
 }
 
 /** Format byte count as human-readable string */
@@ -26,35 +27,18 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1_000_000).toFixed(0)} MB`;
 }
 
-/** Resolve status label and color for badge display */
-function getStatusBadge(status: LlmModelStatus): { label: string; className: string } {
-  switch (status) {
-    case "not-downloaded":
-      return { label: "未ダウンロード", className: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" };
-    case "downloading":
-      return { label: "ダウンロード中...", className: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" };
-    case "ready":
-      return { label: "ダウンロード済み", className: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" };
-    case "loading":
-      return { label: "読み込み中...", className: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300" };
-    case "loaded":
-      return { label: "使用中", className: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" };
-    case "error":
-      return { label: "エラー", className: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" };
-  }
-}
-
 export function LlmSettings({
   llmEnabled,
   onLlmEnabledChange,
   llmModelId,
   onLlmModelIdChange,
+  llmIdlingStop,
+  onLlmIdlingStopChange,
 }: LlmSettingsProps): React.ReactElement {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [modelStatuses, setModelStatuses] = useState<Map<string, LlmModelInfo>>(new Map());
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [storageUsed, setStorageUsed] = useState<number>(0);
   const [toggleMessage, setToggleMessage] = useState<string | null>(null);
 
   const selectedEntry = getModelEntry(llmModelId);
@@ -75,17 +59,6 @@ export function LlmSettings({
     }
   }, []);
 
-  /** Fetch storage usage */
-  const refreshStorageUsage = useCallback(async () => {
-    try {
-      const client = getLlmClient();
-      const usage = await client.getStorageUsage();
-      setStorageUsed(usage.used);
-    } catch {
-      // Silently fail
-    }
-  }, []);
-
   // Check availability and fetch initial data on mount
   useEffect(() => {
     const client = getLlmClient();
@@ -93,9 +66,8 @@ export function LlmSettings({
 
     if (client.isAvailable()) {
       void refreshModelStatuses();
-      void refreshStorageUsage();
     }
-  }, [refreshModelStatuses, refreshStorageUsage]);
+  }, [refreshModelStatuses]);
 
   // Clear toggle message after a delay
   useEffect(() => {
@@ -136,14 +108,13 @@ export function LlmSettings({
         setDownloadProgress(progress);
       });
       await refreshModelStatuses();
-      await refreshStorageUsage();
     } catch {
       // Error is tracked via model status
     } finally {
       setIsDownloading(false);
       setDownloadProgress(null);
     }
-  }, [isDownloading, llmModelId, refreshModelStatuses, refreshStorageUsage]);
+  }, [isDownloading, llmModelId, refreshModelStatuses]);
 
   /** Handle model deletion */
   const handleDelete = useCallback(async () => {
@@ -161,18 +132,17 @@ export function LlmSettings({
       const client = getLlmClient();
       await client.deleteModel(llmModelId);
       await refreshModelStatuses();
-      await refreshStorageUsage();
     } catch {
       // Error is tracked via model status
     }
-  }, [llmEnabled, llmModelId, onLlmEnabledChange, refreshModelStatuses, refreshStorageUsage]);
+  }, [llmEnabled, llmModelId, onLlmEnabledChange, refreshModelStatuses]);
 
   // If still checking availability
   if (isAvailable === null) {
     return (
       <div className="space-y-6">
         <div>
-          <h3 className="text-sm font-medium text-foreground">AI機能</h3>
+          <h3 className="text-sm font-medium text-foreground">AI校正</h3>
           <p className="text-xs text-foreground-tertiary mt-0.5">
             読み込み中...
           </p>
@@ -190,14 +160,6 @@ export function LlmSettings({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h3 className="text-sm font-medium text-foreground">AI機能</h3>
-        <p className="text-xs text-foreground-tertiary mt-0.5">
-          ローカルLLMを使用した高度な校正機能です。
-        </p>
-      </div>
-
       {/* Unavailable banner */}
       {!isAvailable && (
         <div className="rounded-lg border border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-900/20 px-4 py-3">
@@ -218,10 +180,10 @@ export function LlmSettings({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-medium text-foreground">
-              AI機能を有効にする
+              AI校正を有効にする
             </h3>
             <p className="text-xs text-foreground-tertiary mt-0.5">
-              有効にすると、選択したモデルがメモリに読み込まれます。無効にすると、モデルはメモリから解放されます。
+              ローカルLLMを使用して校正の精度を向上させます
             </p>
           </div>
           <button
@@ -250,6 +212,36 @@ export function LlmSettings({
           </p>
         )}
 
+        {/* Idling stop toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-medium text-foreground">
+              AIアイドリングストップ
+            </h3>
+            <p className="text-xs text-foreground-tertiary mt-0.5">
+              しばらく使わないとき、パソコンが重くならないようAIを自動で休ませます
+            </p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={llmIdlingStop ?? true}
+            onClick={() => onLlmIdlingStopChange?.(!llmIdlingStop)}
+            className={clsx(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              (llmIdlingStop ?? true) ? "bg-accent" : "bg-foreground-muted",
+              !llmEnabled && "opacity-60"
+            )}
+            disabled={!llmEnabled}
+          >
+            <span
+              className={clsx(
+                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm",
+                (llmIdlingStop ?? true) ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </div>
+
         {/* Model selector section */}
         <div className="pt-4 border-t border-border">
           <label className="block text-sm font-medium text-foreground mb-2">
@@ -273,35 +265,14 @@ export function LlmSettings({
           </select>
           {llmEnabled && (
             <p className="text-xs text-foreground-tertiary mt-1">
-              モデルを変更するにはAI機能を無効にしてください
+              モデルを変更するにはAI校正を無効にしてください
             </p>
           )}
         </div>
 
-        {/* Model status and actions */}
+        {/* Downloaded models */}
         {selectedEntry && (
           <div className="pt-4 border-t border-border space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium text-foreground">
-                モデル状態
-              </h4>
-              {selectedStatus && (
-                <span
-                  className={clsx(
-                    "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                    getStatusBadge(selectedStatus.status).className
-                  )}
-                >
-                  {getStatusBadge(selectedStatus.status).label}
-                </span>
-              )}
-              {!selectedStatus && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                  未ダウンロード
-                </span>
-              )}
-            </div>
-
             {/* Download progress bar */}
             {isDownloading && downloadProgress !== null && (
               <div className="space-y-1">
@@ -317,32 +288,35 @@ export function LlmSettings({
               </div>
             )}
 
-            {/* Action buttons */}
-            <div className="flex items-center gap-2">
-              {(!selectedStatus || selectedStatus.status === "not-downloaded") && (
-                <button
-                  onClick={() => void handleDownload()}
-                  disabled={isDownloading}
-                  className={clsx(
-                    "px-3 py-1.5 text-xs font-medium rounded-lg transition-colors",
-                    isDownloading
-                      ? "bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed"
-                      : "bg-accent text-accent-foreground hover:bg-accent-hover"
-                  )}
-                >
-                  {isDownloading ? "ダウンロード中..." : "ダウンロード"}
-                </button>
-              )}
+            {/* Not downloaded — show download button */}
+            {(!selectedStatus || selectedStatus.status === "not-downloaded") && !isDownloading && (
+              <button
+                onClick={() => void handleDownload()}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-foreground hover:bg-accent-hover transition-colors"
+              >
+                ダウンロード
+              </button>
+            )}
 
-              {isModelDownloaded && !llmEnabled && (
-                <button
-                  onClick={() => void handleDelete()}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                >
-                  削除
-                </button>
-              )}
-            </div>
+            {/* Downloaded — show model name + delete */}
+            {isModelDownloaded && (
+              <div>
+                <h4 className="text-sm font-medium text-foreground mb-2">
+                  ダウンロード済みモデル
+                </h4>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-foreground-secondary">
+                    {selectedEntry.nameJa} — {formatBytes(selectedEntry.size)}
+                  </span>
+                  <button
+                    onClick={() => void handleDelete()}
+                    className="text-xs text-red-600 dark:text-red-400 hover:underline transition-colors"
+                  >
+                    削除
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Model error */}
             {selectedStatus?.status === "error" && selectedStatus.error && (
@@ -350,25 +324,8 @@ export function LlmSettings({
                 {selectedStatus.error}
               </p>
             )}
-
-            {/* Model info */}
-            <div className="text-xs text-foreground-tertiary space-y-1">
-              <p>サイズ: 約 {formatBytes(selectedEntry.size)}</p>
-              <p>量子化: {selectedEntry.quantization}</p>
-              <p>必要メモリ: {selectedEntry.minRamMb} MB</p>
-            </div>
           </div>
         )}
-
-        {/* Storage usage */}
-        <div className="pt-4 border-t border-border">
-          <h4 className="text-sm font-medium text-foreground mb-2">
-            ストレージ使用量
-          </h4>
-          <p className="text-xs text-foreground-tertiary">
-            使用容量: {formatBytes(storageUsed)}
-          </p>
-        </div>
       </div>
     </div>
   );

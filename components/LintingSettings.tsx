@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, MessageSquareOff, MessageSquare } from "lucide-react";
 import clsx from "clsx";
 
+import dynamic from "next/dynamic";
+
 import type { Severity } from "@/lib/linting/types";
 import type { CorrectionConfig } from "@/lib/linting/correction-config";
 import {
@@ -16,7 +18,13 @@ import {
   CORRECTION_MODE_IDS,
   CORRECTION_MODES,
 } from "@/lib/linting/correction-modes";
+import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 import GuidelineList from "@/components/GuidelineList";
+
+const LlmSettings = dynamic(
+  () => import("./LlmSettings").then((mod) => mod.LlmSettings),
+  { ssr: false },
+);
 
 /** Set of rule IDs that belong to the AI category */
 const AI_RULE_IDS = new Set(
@@ -35,6 +43,11 @@ interface LintingSettingsProps {
   onLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }) => void;
   onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }>) => void;
   llmEnabled?: boolean;
+  onLlmEnabledChange?: (value: boolean) => void;
+  llmModelId?: string;
+  onLlmModelIdChange?: (modelId: string) => void;
+  llmIdlingStop?: boolean;
+  onLlmIdlingStopChange?: (value: boolean) => void;
   /** Optional correction config for mode selector and guideline priority UI. */
   correctionConfig?: CorrectionConfig;
   onCorrectionConfigChange?: (config: Partial<CorrectionConfig>) => void;
@@ -55,6 +68,11 @@ export default function LintingSettings({
   onLintingRuleConfigChange,
   onLintingRuleConfigsBatchChange,
   llmEnabled,
+  onLlmEnabledChange,
+  llmModelId,
+  onLlmModelIdChange,
+  llmIdlingStop,
+  onLlmIdlingStopChange,
   correctionConfig,
   onCorrectionConfigChange,
 }: LintingSettingsProps) {
@@ -185,6 +203,16 @@ export default function LintingSettings({
         </button>
       </div>
 
+      {/* AI校正 (LLM) settings */}
+      <LlmSettings
+        llmEnabled={llmEnabled ?? false}
+        onLlmEnabledChange={onLlmEnabledChange}
+        llmModelId={llmModelId ?? DEFAULT_MODEL_ID}
+        onLlmModelIdChange={onLlmModelIdChange}
+        llmIdlingStop={llmIdlingStop}
+        onLlmIdlingStopChange={onLlmIdlingStopChange}
+      />
+
       {/* Correction mode selector + guideline priority */}
       {showCorrectionConfig && correctionConfig && (
         <div
@@ -245,6 +273,8 @@ export default function LintingSettings({
           !lintingEnabled && "opacity-50 pointer-events-none"
         )}
       >
+        <h3 className="text-sm font-medium text-foreground">校正ルール</h3>
+
         {/* Preset dropdown + bulk actions */}
         <div className="flex items-center gap-2 flex-wrap">
           <select
@@ -344,7 +374,7 @@ export default function LintingSettings({
                           "flex items-center gap-2 px-3 py-2",
                           aiDisabled && "opacity-50",
                         )}
-                        title={aiDisabled ? "AI機能を有効にしてください" : undefined}
+                        title={aiDisabled ? "AI校正を有効にしてください" : undefined}
                       >
                         {/* Rule name */}
                         <div className="flex-1 min-w-0">
@@ -426,6 +456,7 @@ export default function LintingSettings({
           );
         })}
       </div>
+
     </div>
   );
 }

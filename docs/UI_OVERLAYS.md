@@ -92,7 +92,7 @@ All modal dialogs share a common base: `GlassDialog` — frosted-glass overlay w
 - **Characteristics**:
   - Large: `max-w-4xl`, `h-[80vh]`
   - Two-column: sidebar tabs + content area
-  - Tabs: エディタ, 縦書き, 品詞ハイライト, 校正, AI機能, illusionsについて
+  - Tabs: エディタ, 縦書き, 品詞ハイライト, 校正, AI校正, illusionsについて
   - Escape or backdrop click to close
 
 ### CreateProjectWizard
