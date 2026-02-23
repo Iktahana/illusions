@@ -170,7 +170,7 @@ export class AdverbFormConsistencyRule extends AbstractMorphologicalDocumentLint
           ruleId: this.id,
           severity: config.severity,
           message: `Inconsistent adverb form: '${occurrence.surface}' used here, but '${majoritySurface}' is more common in this document`,
-          messageJa: `文化庁「公用文作成の考え方」に基づき、「${occurrence.surface}」と「${majoritySurface}」が混在しています。多数派の「${majoritySurface}」への統一を検討してください`,
+          messageJa: `「${occurrence.surface}」と「${majoritySurface}」が混在しています。多数派の「${majoritySurface}」への統一を検討してください`,
           from: occurrence.from,
           to: occurrence.to,
           reference: STYLE_GUIDE_REF,

@@ -13,7 +13,7 @@ const CATEGORY_REFERENCES: Readonly<Record<VariantCategory, LintReference>> = {
     standard: '文化庁「送り仮名の付け方」(1973, 内閣告示第二号)',
   },
   "kanji-kana": {
-    standard: '文化庁「公用文作成の考え方」(2022)',
+    standard: "漢字・かな表記基準",
   },
   "katakana-chouon": {
     standard: '文化庁「外来語の表記」(1991, 内閣告示第二号)',
@@ -126,7 +126,7 @@ export class NotationConsistencyRule extends AbstractDocumentLintRule {
           ruleId: this.id,
           severity: config.severity,
           message: `Inconsistent notation: "${variant}" vs "${majorityVariant}" (${group.category})`,
-          messageJa: `「${reference.standard}に基づき、${categoryLabel}「${variant}」と「${majorityVariant}」の表記が混在しています。「${majorityVariant}」への統一を推奨します」`,
+          messageJa: `${categoryLabel}「${variant}」と「${majorityVariant}」の表記が混在しています。「${majorityVariant}」への統一を推奨します`,
           from: loc.from,
           to: loc.to,
           reference,

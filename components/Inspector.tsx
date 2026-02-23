@@ -50,6 +50,10 @@ export default function Inspector({
   onOpenLintingSettings,
   onApplyLintPreset,
   activeLintPresetId,
+  lintingEnabled = false,
+  onLintingEnabledChange,
+  lintingRuleConfigs,
+  onLintingRuleConfigChange,
   switchToCorrectionsTrigger = 0,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
@@ -377,6 +381,10 @@ export default function Inspector({
              onOpenLintingSettings={onOpenLintingSettings}
              onApplyLintPreset={onApplyLintPreset}
              activeLintPresetId={activeLintPresetId}
+             lintingEnabled={lintingEnabled}
+             onLintingEnabledChange={onLintingEnabledChange}
+             lintingRuleConfigs={lintingRuleConfigs}
+             onLintingRuleConfigChange={onLintingRuleConfigChange}
            />
          )}
          {activeTab === "stats" && (
@@ -401,6 +409,13 @@ export default function Inspector({
            />
          )}
        </div>
+
+      {/* Privacy notice */}
+      <div className={clsx("border-t border-border text-center", compactMode ? "px-3 py-2" : "px-4 py-3")}>
+        <p className="text-[10px] text-foreground-tertiary leading-relaxed">
+          illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
+        </p>
+      </div>
     </aside>
   );
 }

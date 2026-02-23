@@ -280,7 +280,7 @@ export class PunctuationRule extends AbstractLintRule {
             severity,
             message: `Mixed ${variant.nameEn} width: convert to ${minorityIsHalfWidth ? "full" : "half"}-width for consistency`,
             messageJa:
-              `「文化庁「公用文作成の考え方」に基づき、${variant.nameJa}の全角・半角が混在しています」`,
+              `${variant.nameJa}の全角・半角が混在しています`,
             from: i,
             to: i + 1,
             reference: BUNKACHO_REF,

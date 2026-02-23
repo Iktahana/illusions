@@ -151,21 +151,21 @@ export function StylePanel({
             )}
           />
           <span className="text-sm text-foreground-secondary">字</span>
+          <span className="text-sm text-foreground-secondary ml-auto">自動</span>
           <button
             onClick={() => onAutoCharsPerLineChange?.(!autoCharsPerLine)}
             className={clsx(
-              "ml-2 relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out",
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
               autoCharsPerLine ? "bg-accent" : "bg-border-secondary"
             )}
           >
             <span
               className={clsx(
-                "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition duration-200 ease-in-out",
-                autoCharsPerLine ? "translate-x-5" : "translate-x-0"
+                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm",
+                autoCharsPerLine ? "translate-x-6" : "translate-x-1"
               )}
             />
           </button>
-          <span className="text-sm text-foreground-secondary">自動</span>
         </div>
         <p className="text-xs text-foreground-tertiary mt-1">
           {autoCharsPerLine
@@ -186,7 +186,7 @@ export function StylePanel({
           >
             <span
               className={clsx(
-                "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
+                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm",
                 showParagraphNumbers ? "translate-x-6" : "translate-x-1"
               )}
             />

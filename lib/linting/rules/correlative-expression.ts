@@ -464,7 +464,7 @@ export class CorrelativeExpressionRule extends AbstractLintRule {
           message:
             `Correlative expression mismatch: "${pattern.adverb}" (${pattern.category}) requires a matching sentence ending (${pattern.expectedEndingsJa})`,
           messageJa:
-            `「文化庁「公用文作成の考え方」に基づき、呼応副詞「${pattern.adverb}」（${categoryLabel}）に対応する文末表現（${pattern.expectedEndingsJa}）がありません」`,
+            `呼応副詞「${pattern.adverb}」（${categoryLabel}）に対応する文末表現（${pattern.expectedEndingsJa}）がありません`,
           from: absoluteFrom,
           to: absoluteTo,
           reference: KOYOBUN_REF,

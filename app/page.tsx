@@ -95,7 +95,7 @@ export default function EditorPage() {
     scrollSensitivity, compactMode, showSettingsModal,
     lintingEnabled, lintingRuleConfigs,
     llmEnabled, llmModelId,
-    powerSaveMode,
+    powerSaveMode, autoPowerSaveOnBattery,
   } = settings;
   const {
     handleFontScaleChange, handleLineHeightChange, handleParagraphSpacingChange,
@@ -107,7 +107,7 @@ export default function EditorPage() {
     handleLintingEnabledChange, handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
     handleLlmEnabledChange, handleLlmModelIdChange,
-    handlePowerSaveModeChange,
+    handlePowerSaveModeChange, handleAutoPowerSaveOnBatteryChange,
   } = settingsHandlers;
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
@@ -115,6 +115,7 @@ export default function EditorPage() {
   // --- Power saving hook ---
   usePowerSaving({
     powerSaveMode,
+    autoPowerSaveOnBattery,
     onPowerSaveModeChange: handlePowerSaveModeChange,
   });
 
@@ -498,6 +499,8 @@ export default function EditorPage() {
     lintingRuleConfigs,
     editorViewInstance,
     llmEnabled,
+    powerSaveMode,
+    llmModelId,
   );
 
   // --- Ignored corrections hook ---
@@ -852,7 +855,7 @@ export default function EditorPage() {
       case "characters":
         return <Characters content={content} />;
       case "dictionary":
-        return <Dictionary content={content} initialSearchTerm={dictionarySearchTrigger.term} searchTriggerId={dictionarySearchTrigger.id} />;
+        return <Dictionary content={content} initialSearchTerm={dictionarySearchTrigger.term} searchTriggerId={dictionarySearchTrigger.id} editorMode={editorMode} />;
       case "wordfreq":
         return <WordFrequency content={content} filePath={currentFile?.path ?? undefined} onWordSearch={(word) => {
           setSearchInitialTerm(word);
@@ -959,6 +962,8 @@ export default function EditorPage() {
           initialCategory={settingsInitialCategory}
           powerSaveMode={powerSaveMode}
           onPowerSaveModeChange={handlePowerSaveModeChange}
+          autoPowerSaveOnBattery={autoPowerSaveOnBattery}
+          onAutoPowerSaveOnBatteryChange={handleAutoPowerSaveOnBatteryChange}
         />
 
         {/* Ruby dialog */}
@@ -1090,6 +1095,8 @@ export default function EditorPage() {
                 onParagraphSpacingChange={handleParagraphSpacingChange}
                 mdiExtensionsEnabled={mdiExtensionsEnabled}
                 gfmEnabled={gfmEnabled}
+                llmEnabled={llmEnabled}
+                llmModelId={llmModelId}
               />
               </ErrorBoundary>
             )}
@@ -1155,6 +1162,10 @@ export default function EditorPage() {
             onOpenLintingSettings={handleOpenLintingSettings}
             onApplyLintPreset={handleApplyLintPreset}
             activeLintPresetId={activeLintPresetId}
+            lintingEnabled={lintingEnabled}
+            onLintingEnabledChange={handleLintingEnabledChange}
+            lintingRuleConfigs={lintingRuleConfigs}
+            onLintingRuleConfigChange={handleLintingRuleConfigChange}
             switchToCorrectionsTrigger={switchToCorrectionsTrigger}
           />
           </ErrorBoundary>

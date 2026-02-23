@@ -327,7 +327,7 @@ export class NumberFormatRule extends AbstractLintRule {
         message:
           "In vertical writing, kanji numerals are recommended instead of Arabic numerals.",
         messageJa:
-          "文化庁「公用文作成の考え方」に基づき、縦書きでは漢数字の使用が推奨されます",
+          "縦書きでは漢数字の使用が推奨されます",
         from,
         to,
         reference: STANDARD_REF,
@@ -381,7 +381,7 @@ export class NumberFormatRule extends AbstractLintRule {
         message:
           "In horizontal writing, Arabic numerals are recommended instead of kanji numerals.",
         messageJa:
-          "文化庁「公用文作成の考え方」に基づき、横書きではアラビア数字の使用が推奨されます",
+          "横書きではアラビア数字の使用が推奨されます",
         from,
         to,
         reference: STANDARD_REF,
@@ -430,7 +430,7 @@ export class NumberFormatRule extends AbstractLintRule {
         message:
           "Large numbers should use comma separators in horizontal writing.",
         messageJa:
-          "文化庁「公用文作成の考え方」に基づき、横書きの大きな数字には桁区切りのカンマを使用してください",
+          "横書きの大きな数字には桁区切りのカンマを使用してください",
         from,
         to,
         reference: STANDARD_REF,

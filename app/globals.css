@@ -216,6 +216,20 @@ html:not(.dark) {
   animation: pulse-glow 2s infinite;
 }
 
+/* LLM status indicator blink (inferring state) */
+@keyframes llm-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.animate-llm-pulse {
+  animation: llm-pulse 1.2s ease-in-out infinite;
+}
+
 /* Save success toast animation */
 @keyframes save-toast-in {
   0% {
@@ -568,6 +582,11 @@ input[type="range"]::-moz-range-progress {
 .dark .search-result-current {
   background-color: rgba(255, 152, 0, 0.4);
   box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.2);
+}
+
+/* POS highlight color fade-in transition */
+[class^="pos-"] {
+  transition: color 0.3s ease;
 }
 
 /* POS highlight preview editor in settings modal */

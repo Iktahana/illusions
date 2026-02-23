@@ -92,6 +92,8 @@ export function useLinting(
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
   editorViewInstance: EditorView | null,
   llmEnabled: boolean = false,
+  powerSaveMode: boolean = false,
+  llmModelId: string = "qwen3-1.7b-q8",
 ): UseLintingResult {
   const ruleRunnerRef = useRef<RuleRunner | null>(null);
   const [lintIssues, setLintIssues] = useState<LintIssue[]>([]);
@@ -205,6 +207,7 @@ export function useLinting(
   }, [lintingEnabled]);
 
   // Force re-run linting on the full document (not just visible paragraphs)
+  // Always provides llmClient for L1/L2 validation regardless of power-save/llmEnabled state
   const refreshLinting = useCallback(() => {
     if (!editorViewInstance || !lintingEnabled) return;
 

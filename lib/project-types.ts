@@ -119,6 +119,36 @@ export interface IgnoredCorrectionsFile {
   ignoredCorrections: IgnoredCorrection[];
 }
 
+/**
+ * A single user dictionary entry.
+ * ユーザー辞書の1件分。
+ */
+export interface UserDictionaryEntry {
+  /** Unique identifier */
+  id: string;
+  /** Headword (見出し語) */
+  word: string;
+  /** Reading in kana (読み方) */
+  reading?: string;
+  /** Part of speech (品詞) — matches PosType values */
+  partOfSpeech?: string;
+  /** Definition (意味) — optional */
+  definition?: string;
+  /** Usage examples (用例) */
+  examples?: string;
+  /** Notes (メモ) */
+  notes?: string;
+}
+
+/**
+ * File format for .illusions/user-dictionary.json
+ * ユーザー辞書のファイルフォーマット。
+ */
+export interface UserDictionaryFile {
+  version: "1.0.0";
+  entries: UserDictionaryEntry[];
+}
+
 /** Type guard for project mode */
 export function isProjectMode(mode: EditorMode): mode is ProjectMode {
   return mode?.type === "project";
