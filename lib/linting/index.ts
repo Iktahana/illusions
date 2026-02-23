@@ -1,4 +1,5 @@
 export type {
+  CorrectionEngine,
   Severity,
   LintIssue,
   LintRule,

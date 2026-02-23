@@ -1,7 +1,7 @@
 import { AbstractLintRule } from "../base-rule";
 import { maskDialogue } from "../helpers/dialogue-mask";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -32,6 +32,7 @@ const STYLE_GUIDE_REF: LintReference = {
  */
 export class SentenceLengthRule extends AbstractLintRule {
   readonly id = "sentence-length";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Sentence Length";
   readonly nameJa = "長文の検出";
   readonly description =

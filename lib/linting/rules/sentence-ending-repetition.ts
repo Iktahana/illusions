@@ -1,6 +1,6 @@
 import { AbstractLintRule } from "../base-rule";
 import { isInDialogue } from "../helpers/dialogue-mask";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -103,6 +103,7 @@ function extractSentences(text: string): SentenceInfo[] {
  */
 export class SentenceEndingRepetitionRule extends AbstractLintRule {
   readonly id = "sentence-ending-repetition";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Sentence ending repetition";
   readonly nameJa = "文末表現の重複";
   readonly description =

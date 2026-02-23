@@ -1,10 +1,11 @@
 import type { ILlmClient } from "@/lib/llm-client/types";
 
 import { AbstractLlmLintRule } from "../base-rule";
-import type { LintIssue, LintRuleConfig } from "../types";
+import type { LintIssue, LintRuleConfig , CorrectionEngine} from "../types";
 
 export class HomophoneDetectionRule extends AbstractLlmLintRule {
   readonly id = "homophone-detection";
+  override engine: CorrectionEngine = "llm";
   readonly name = "Homophone Detection";
   readonly nameJa = "同音異義語の検出";
   readonly description =

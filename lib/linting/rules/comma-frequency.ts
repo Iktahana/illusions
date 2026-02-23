@@ -1,7 +1,7 @@
 import { AbstractLintRule } from "../base-rule";
 import { maskDialogue } from "../helpers/dialogue-mask";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -31,6 +31,7 @@ const STYLE_GUIDE_REF: LintReference = {
  */
 export class CommaFrequencyRule extends AbstractLintRule {
   readonly id = "comma-frequency";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Comma Frequency";
   readonly nameJa = "読点の頻度チェック";
   readonly description = "Flags sentences with too many or too few commas";

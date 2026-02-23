@@ -2,6 +2,7 @@ import type { ILlmClient } from "@/lib/llm-client/types";
 import type { Token } from "@/lib/nlp-client/types";
 
 import type {
+  CorrectionEngine,
   LintRule,
   LintRuleConfig,
   LintIssue,
@@ -23,6 +24,8 @@ export abstract class AbstractLintRule implements LintRule {
   abstract readonly descriptionJa: string;
   abstract readonly level: "L1" | "L2" | "L3";
   abstract readonly defaultConfig: LintRuleConfig;
+  /** Default engine for simple regex-based rules */
+  engine: CorrectionEngine = "regex";
 
   abstract lint(text: string, config: LintRuleConfig): LintIssue[];
 }
@@ -55,6 +58,9 @@ export abstract class AbstractMorphologicalLintRule
   extends AbstractLintRule
   implements MorphologicalLintRule
 {
+  /** Morphological rules use kuromoji tokenization */
+  override engine: CorrectionEngine = "morphological";
+
   abstract lintWithTokens(
     text: string,
     tokens: ReadonlyArray<Token>,
@@ -75,6 +81,9 @@ export abstract class AbstractMorphologicalDocumentLintRule
   extends AbstractLintRule
   implements MorphologicalDocumentLintRule
 {
+  /** Morphological document rules use kuromoji tokenization */
+  override engine: CorrectionEngine = "morphological";
+
   abstract lintDocumentWithTokens(
     paragraphs: ReadonlyArray<{
       text: string;
@@ -107,6 +116,8 @@ export abstract class AbstractLlmLintRule
   implements LlmLintRule
 {
   readonly level = "L3" as const;
+  /** LLM rules use language model inference */
+  override engine: CorrectionEngine = "llm";
 
   lint(_text: string, _config: LintRuleConfig): LintIssue[] {
     return []; // L3 rules only run via lintWithLlm()

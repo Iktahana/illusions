@@ -1,5 +1,5 @@
 import { AbstractLintRule } from "../base-rule";
-import type { LintIssue, LintRuleConfig, LintReference, Severity } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference, Severity , CorrectionEngine} from "../types";
 
 /** JIS X 4051:2004 reference for dialogue bracket rules */
 const JIS_REF: LintReference = {
@@ -16,6 +16,7 @@ const JIS_REF: LintReference = {
  */
 export class DialoguePunctuationRule extends AbstractLintRule {
   readonly id = "dialogue-punctuation";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Dialogue Punctuation";
   readonly nameJa = "台詞の約物チェック";
   readonly description = "Detects formatting errors in dialogue brackets";

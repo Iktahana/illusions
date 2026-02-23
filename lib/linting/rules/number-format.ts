@@ -1,6 +1,6 @@
 import { AbstractLintRule } from "../base-rule";
 import { maskDialogue } from "../helpers/dialogue-mask";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -262,6 +262,7 @@ function isKanjiException(
  */
 export class NumberFormatRule extends AbstractLintRule {
   readonly id = "number-format";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Number format consistency";
   readonly nameJa = "数字表記の統一";
   readonly description = "Check for mixed Arabic/Kanji numeral usage";

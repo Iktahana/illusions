@@ -1,6 +1,6 @@
 import { AbstractLintRule } from "../base-rule";
 import { maskDialogue } from "../helpers/dialogue-mask";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -74,6 +74,7 @@ const ERA_WESTERN_PATTERN =
  */
 export class EraYearValidatorRule extends AbstractLintRule {
   readonly id = "era-year-validator";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Era/Western year consistency";
   readonly nameJa = "元号・西暦の一致チェック";
   readonly description =

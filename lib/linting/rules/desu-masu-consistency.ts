@@ -2,7 +2,7 @@ import type { Token } from "@/lib/nlp-client/types";
 import { AbstractMorphologicalDocumentLintRule } from "../base-rule";
 import { isInDialogue } from "../helpers/dialogue-mask";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -179,6 +179,7 @@ function classifySentenceStyle(
  */
 export class DesuMasuConsistencyRule extends AbstractMorphologicalDocumentLintRule {
   readonly id = "desu-masu-consistency";
+  override engine: CorrectionEngine = "morphological";
   readonly name = "Desu/Masu Consistency";
   readonly nameJa = "敬体・常体の混在検出";
   readonly description =

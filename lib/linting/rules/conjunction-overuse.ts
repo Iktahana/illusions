@@ -3,7 +3,7 @@ import { AbstractMorphologicalLintRule } from "../base-rule";
 import { isInDialogue } from "../helpers/dialogue-mask";
 import type { SentenceSpan } from "../helpers/sentence-splitter";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -32,6 +32,7 @@ const STYLE_GUIDE_REF: LintReference = {
  */
 export class ConjunctionOveruseRule extends AbstractMorphologicalLintRule {
   readonly id = "conjunction-overuse";
+  override engine: CorrectionEngine = "morphological";
   readonly name = "Conjunction Overuse";
   readonly nameJa = "接続詞の多用検出";
   readonly description =

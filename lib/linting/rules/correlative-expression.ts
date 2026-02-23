@@ -2,7 +2,7 @@ import { AbstractLintRule } from "../base-rule";
 import { maskDialogue } from "../helpers/dialogue-mask";
 import type { SentenceSpan } from "../helpers/sentence-splitter";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -398,6 +398,7 @@ function findAllOccurrences(text: string, needle: string): number[] {
  */
 export class CorrelativeExpressionRule extends AbstractLintRule {
   readonly id = "correlative-expression";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Correlative expression consistency";
   readonly nameJa = "呼応表現の整合性";
   readonly description =
