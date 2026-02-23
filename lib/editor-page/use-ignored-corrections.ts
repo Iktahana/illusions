@@ -101,6 +101,14 @@ export function useIgnoredCorrections(
       const service = getIgnoredCorrectionsService();
 
       if (editorMode && isProjectMode(editorMode)) {
+        // Optimistic update: update UI immediately, then persist to VFS in background
+        setIgnoredCorrections((prev) => {
+          const already = prev.some(
+            (c) => c.ruleId === ruleId && c.text === text && c.context === context,
+          );
+          if (already) return prev;
+          return [...prev, { ruleId, text, context, addedAt: Date.now() }];
+        });
         service
           .addIgnoredCorrection(ruleId, text, context)
           .then(setIgnoredCorrections)

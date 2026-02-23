@@ -101,6 +101,9 @@ export function createLintingPlugin(
   // When true, the next scheduleViewportUpdate will scan ALL paragraphs (not just visible)
   let pendingFullScan = false;
 
+  // When true, the next scheduleViewportUpdate skips the debounce (fires immediately)
+  let immediateRebuild = false;
+
   // When true, the next scheduleLlmUpdate will run L1/L2 validation even if llmEnabled is false
   let forceLlmValidation = false;
 
@@ -193,6 +196,7 @@ export function createLintingPlugin(
                 // Trigger immediate decoration rebuild so ignored issues vanish instantly.
                 // Issue cache stays valid (no re-run needed), we just re-filter with new ignoredCorrections.
                 pendingFullScan = true;
+                immediateRebuild = true;
                 break;
               case "manual-refresh":
               case "mode-change":
@@ -296,6 +300,8 @@ export function createLintingPlugin(
         if (debounceTimer) clearTimeout(debounceTimer);
 
         const version = ++processingVersion;
+        const delay = immediateRebuild ? 0 : debounceMs;
+        immediateRebuild = false;
 
         debounceTimer = setTimeout(async () => {
           const state = lintingKey.getState(view.state);
@@ -459,7 +465,7 @@ export function createLintingPlugin(
           // Schedule L3 (LLM) linting with longer debounce
           scheduleLlmUpdate(view, allParagraphs);
 
-        }, debounceMs);
+        }, delay);
       }
 
       /**
