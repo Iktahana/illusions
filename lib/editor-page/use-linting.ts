@@ -6,6 +6,8 @@ import type { LintIssue, Severity } from "@/lib/linting/types";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import type { ILlmClient } from "@/lib/llm-client/types";
 import { getLlmClient } from "@/lib/llm-client/llm-client";
+import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
+import type { GuidelineId } from "@/lib/linting/correction-config";
 
 // Import all lint rules
 import { PunctuationRule } from "@/lib/linting/rules/punctuation-rules";
@@ -93,6 +95,7 @@ export function useLinting(
   llmEnabled: boolean = false,
   powerSaveMode: boolean = false,
   llmModelId: string = "qwen3-1.7b-q8",
+  correctionGuidelines?: GuidelineId[],
 ): UseLintingResult {
   const ruleRunnerRef = useRef<RuleRunner | null>(null);
   const [lintIssues, setLintIssues] = useState<LintIssue[]>([]);
@@ -171,6 +174,9 @@ export function useLinting(
     runner.registerRule(new ModifierLengthOrderRule());
     runner.registerRule(new KanjiVerbOneCharDo());
 
+    // Initialize guideline map for guideline-based filtering
+    runner.setGuidelineMap(RULE_GUIDELINE_MAP);
+
     ruleRunnerRef.current = runner;
   }
 
@@ -196,6 +202,27 @@ export function useLinting(
     setLintIssues(issues);
     setIsLinting(false);
   }, [lintingEnabled]);
+
+  // Sync active guidelines to RuleRunner and trigger re-lint when guidelines change
+  useEffect(() => {
+    if (!ruleRunner) return;
+    ruleRunner.setActiveGuidelines(correctionGuidelines ?? null);
+
+    // Trigger re-lint when guidelines change
+    if (editorViewInstance && lintingEnabled) {
+      import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
+        ({ updateLintingSettings }) => {
+          updateLintingSettings(
+            editorViewInstance,
+            { ruleRunner: ruleRunnerRef.current },
+            "guideline-change",
+          );
+        },
+      ).catch((err) => {
+        console.error("[useLinting] Failed to sync guidelines:", err);
+      });
+    }
+  }, [ruleRunner, correctionGuidelines, editorViewInstance, lintingEnabled]);
 
   // Clear issues when linting is disabled
   useEffect(() => {
