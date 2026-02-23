@@ -242,6 +242,25 @@ export function useLinting(
     });
   }, [correctionMode, editorViewInstance, lintingEnabled]);
 
+  // Sync llmEnabled, llmClient, and llmModelId to the decoration plugin
+  useEffect(() => {
+    if (!editorViewInstance || !lintingEnabled) return;
+
+    const llmClient: ILlmClient | null = llmEnabled ? getLlmClient() : null;
+
+    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
+      ({ updateLintingSettings }) => {
+        updateLintingSettings(editorViewInstance, {
+          llmClient,
+          llmEnabled,
+          llmModelId,
+        });
+      },
+    ).catch((err) => {
+      console.error("[useLinting] Failed to sync LLM settings:", err);
+    });
+  }, [editorViewInstance, lintingEnabled, llmEnabled, llmModelId]);
+
   // Clear issues when linting is disabled
   useEffect(() => {
     if (!lintingEnabled) {

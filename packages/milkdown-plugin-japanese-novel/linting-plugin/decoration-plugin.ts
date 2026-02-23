@@ -399,11 +399,18 @@ export function createLintingPlugin(
               // Pessimistic LLM validation: hide issues until LLM confirms them
               const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
               const needsValidation = llmEnabled && !ruleConfig?.skipLlmValidation;
+              console.debug('[Linting:pessimistic]', issue.ruleId, issueText,
+                { llmEnabled, skipLlmValidation: ruleConfig?.skipLlmValidation, needsValidation });
               if (needsValidation) {
                 const vKey = LintIssueValidator.issueKey(issue, paragraph.text);
                 const cachedResult = validationCache.get(vKey);
+                console.debug('[Linting:pessimistic] vKey=', vKey, 'cachedResult=', cachedResult);
                 // Skip unless LLM has explicitly confirmed this issue as valid
-                if (cachedResult !== true) continue;
+                if (cachedResult !== true) {
+                  console.debug('[Linting:pessimistic] HIDDEN (awaiting LLM):', issue.ruleId, issueText);
+                  continue;
+                }
+                console.debug('[Linting:pessimistic] SHOWN (LLM confirmed):', issue.ruleId, issueText);
               }
 
               const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
@@ -454,10 +461,12 @@ export function createLintingPlugin(
         view: EditorView,
         allParagraphs: ParagraphInfo[],
       ): void {
-        if (!currentLlmClient) return;
+        console.debug('[Linting:LLM] scheduleLlmUpdate called',
+          { hasClient: !!currentLlmClient, llmEnabled, llmInFlight, forceLlmValidation, modelId: currentLlmModelId });
+        if (!currentLlmClient) { console.debug('[Linting:LLM] BAIL: no llmClient'); return; }
         const isForced = forceLlmValidation;
-        if (!isForced && !llmEnabled) return;
-        if (llmInFlight) return;
+        if (!isForced && !llmEnabled) { console.debug('[Linting:LLM] BAIL: not enabled and not forced'); return; }
+        if (llmInFlight) { console.debug('[Linting:LLM] BAIL: already in flight'); return; }
 
         // Consume the one-shot flag
         forceLlmValidation = false;
@@ -473,8 +482,12 @@ export function createLintingPlugin(
 
           try {
             // Ensure model is loaded before inference
+            console.debug('[Linting:LLM] loadModel?', { modelId: currentLlmModelId });
             if (currentLlmModelId) {
               await currentLlmClient!.loadModel(currentLlmModelId);
+              console.debug('[Linting:LLM] model loaded OK');
+            } else {
+              console.warn('[Linting:LLM] currentLlmModelId is null — loadModel skipped!');
             }
 
             // --- Step 1: Validate L1/L2 issues ---
@@ -496,7 +509,9 @@ export function createLintingPlugin(
               }
             }
 
+            console.debug('[Linting:LLM] unvalidated issues:', unvalidatedIssues.length);
             if (unvalidatedIssues.length > 0) {
+              console.debug('[Linting:LLM] calling issueValidator.validate...');
               const dismissed = await issueValidator.validate(
                 unvalidatedIssues,
                 currentLlmClient!,
