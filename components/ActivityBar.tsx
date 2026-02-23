@@ -173,7 +173,7 @@ function SortableButton({ item, isActive, onClick, compactMode = false }: Sortab
           : "text-foreground-tertiary hover:text-foreground hover:bg-hover",
         isDragging
           ? "opacity-50 scale-105 cursor-grabbing z-50"
-          : "cursor-grab"
+          : "cursor-default active:cursor-pointer"
       )}
       title={item.tooltip}
       {...attributes}
