@@ -70,7 +70,7 @@ export default function EditorPage() {
     if (_skipAutoRestoreDetected !== null) return _skipAutoRestoreDetected;
 
     const params = new URLSearchParams(window.location.search);
-    _skipAutoRestoreDetected = params.has("welcome");
+    _skipAutoRestoreDetected = params.has("welcome") || params.has("pending-file");
     return _skipAutoRestoreDetected;
   });
 
@@ -257,17 +257,39 @@ export default function EditorPage() {
     });
   }, [onSystemFileOpen, incrementEditorKey]);
 
-  // Clean up ?welcome parameter from URL
+  // Clean up ?welcome and ?pending-file parameters from URL
   useEffect(() => {
     if (skipAutoRestore && typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      if (params.has("welcome")) {
-        params.delete("welcome");
+      let changed = false;
+      if (params.has("welcome")) { params.delete("welcome"); changed = true; }
+      if (params.has("pending-file")) { params.delete("pending-file"); changed = true; }
+      if (changed) {
         const cleanUrl = window.location.pathname + (params.toString() ? `?${params}` : "");
         window.history.replaceState({}, "", cleanUrl);
       }
     }
   }, [skipAutoRestore]);
+
+  // Pull pending file from main process (cold-start file association)
+  // This uses a pull model to avoid the race condition where the main process
+  // sends IPC before React hooks are mounted.
+  useEffect(() => {
+    if (!isElectron) return;
+    const api = window.electronAPI;
+    if (!api?.getPendingFile) return;
+
+    void api.getPendingFile().then((result) => {
+      if (!result) return;
+      if (result.type === "project") {
+        void handleOpenAsProject(result.projectPath, result.initialFile);
+      } else {
+        tabLoadSystemFile(result.path, result.content);
+        incrementEditorKey();
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
 
   // Ref-forwarding for useWebMenuHandlers
   const openRecentProjectRef = useRef<(projectId: string) => void>(() => {});

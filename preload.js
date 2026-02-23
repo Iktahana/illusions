@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('open-as-project', handler)
     return () => ipcRenderer.removeListener('open-as-project', handler)
   },
+  getPendingFile: () => ipcRenderer.invoke('get-pending-file'),
   onPasteAsPlaintext: (callback) => {
     const handler = () => callback()
     ipcRenderer.on('menu-paste-as-plaintext', handler)

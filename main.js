@@ -37,6 +37,28 @@ const isDev =
 
 const APP_NAME = 'illusions'
 
+// --- Single-instance lock ---
+// Ensure only one instance of the app is running. On Windows/Linux this prevents
+// duplicate windows when a user double-clicks a .mdi file while the app is already open.
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, commandLine) => {
+    // Focus existing window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+    // Extract .mdi path from argv (Windows/Linux pass file path as CLI argument)
+    const mdiArg = commandLine.find(a => a.endsWith('.mdi') && !a.startsWith('-'))
+    if (mdiArg) {
+      const resolvedPath = path.resolve(mdiArg)
+      void handleMdiFileOpen(resolvedPath)
+    }
+  })
+}
+
 // auto-updater のログ設定
 autoUpdater.logger = log
 autoUpdater.logger.transports.file.level = 'info'
@@ -495,7 +517,7 @@ async function rebuildApplicationMenu() {
 
 // 新しいウィンドウを作成（マルチウィンドウ対応）
 // showWelcome: true の場合、自動復元をスキップしてウェルカム画面を表示する
-async function createWindow({ showWelcome = false } = {}) {
+async function createWindow({ showWelcome = false, hasPendingFile = false } = {}) {
   const preloadPath = path.join(__dirname, 'preload.js')
 
   const newWindow = new BrowserWindow({
@@ -588,14 +610,17 @@ async function createWindow({ showWelcome = false } = {}) {
     }
   })
 
-  const welcomeQuery = showWelcome ? '?welcome' : ''
+  const queryParts = []
+  if (showWelcome) queryParts.push('welcome')
+  if (hasPendingFile) queryParts.push('pending-file')
+  const query = queryParts.length ? `?${queryParts.join('&')}` : ''
   if (isDev) {
-    newWindow.loadURL(`http://localhost:3020${welcomeQuery}`)
+    newWindow.loadURL(`http://localhost:3020${query}`)
     newWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
     // Next.js の静的出力 — app.getAppPath() はパッケージのルートを返す
     const filePath = path.join(app.getAppPath(), 'out', 'index.html')
-    const fileUrl = `file://${filePath}${welcomeQuery}`
+    const fileUrl = `file://${filePath}${query}`
     newWindow.loadURL(fileUrl)
   }
 
@@ -606,8 +631,8 @@ async function createWindow({ showWelcome = false } = {}) {
 }
 
 // 従来のコードに対応
-async function createMainWindow() {
-  return createWindow()
+async function createMainWindow({ hasPendingFile = false } = {}) {
+  return createWindow({ hasPendingFile })
 }
 
 async function installQuickLookPluginIfNeeded() {
@@ -1118,6 +1143,40 @@ ipcMain.handle('power:get-state', () => {
   return powerMonitor.isOnBatteryPower() ? 'battery' : 'ac'
 })
 
+// --- Pull-model pending file handler ---
+// Renderer calls this after hooks are mounted, eliminating the race condition
+// with the old did-finish-load push model.
+ipcMain.handle('get-pending-file', async () => {
+  if (!pendingFilePath) return null
+
+  const filePath = pendingFilePath
+  pendingFilePath = null
+
+  try {
+    const dirPath = path.dirname(filePath)
+    const isProject = await isProjectDirectory(dirPath)
+
+    if (isProject) {
+      return {
+        type: 'project',
+        projectPath: dirPath,
+        initialFile: path.basename(filePath),
+      }
+    }
+
+    // Standalone file: approve path for future saves and return content
+    dialogApprovedPaths.add(path.resolve(filePath))
+    const content = await fs.readFile(filePath, 'utf-8')
+    return {
+      type: 'standalone',
+      path: filePath,
+      content,
+    }
+  } catch (err) {
+    log.error('get-pending-file failed:', err)
+    return null
+  }
+})
 
 /**
  * Check if a directory contains a .illusions folder (project marker)
@@ -1207,16 +1266,13 @@ app.whenReady().then(async () => {
     })
   })
 
-  await createMainWindow()
-
-  // Handle pending file from open-file event (received before window was ready)
-  if (pendingFilePath) {
-    const fileToOpen = pendingFilePath
-    pendingFilePath = null
-    mainWindow.webContents.once('did-finish-load', async () => {
-      await handleMdiFileOpen(fileToOpen)
-    })
+  // Windows/Linux: check process.argv for .mdi file association
+  if (process.platform !== 'darwin' && !pendingFilePath) {
+    const mdiArg = process.argv.find(a => a.endsWith('.mdi') && !a.startsWith('-'))
+    if (mdiArg) pendingFilePath = path.resolve(mdiArg)
   }
+
+  await createMainWindow({ hasPendingFile: !!pendingFilePath })
 
   installQuickLookPluginIfNeeded()
 
