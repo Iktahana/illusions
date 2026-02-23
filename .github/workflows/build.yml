@@ -12,6 +12,10 @@ on:
     paths-ignore:
       - 'www/**'
       - '.github/workflows/deploy-www.yml'
+  pull_request:
+    paths-ignore:
+      - 'www/**'
+      - '.github/workflows/deploy-www.yml'
 
 permissions:
   contents: write
@@ -19,11 +23,11 @@ permissions:
 jobs:
   build-macos:
     name: Build (macOS ${{ matrix.arch }})
-    runs-on: macos-latest
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'macos-latest' }}
     strategy:
       matrix:
         arch: [x64, arm64]
-    environment: Apple
+    environment: ${{ github.event_name != 'pull_request' && 'Apple' || '' }}
     env:
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -45,7 +49,16 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      # --- Full build steps (push to main/alpha/beta/dev only) ---
+
       - name: Restore Electron caches
+        if: github.event_name != 'pull_request'
         uses: actions/cache@v4
         with:
           path: |
@@ -56,6 +69,7 @@ jobs:
             electron-${{ runner.os }}-${{ matrix.arch }}-
 
       - name: Restore Next.js cache
+        if: github.event_name != 'pull_request'
         uses: actions/cache@v4
         with:
           path: .next/cache
@@ -64,6 +78,7 @@ jobs:
             next-${{ runner.os }}-${{ matrix.arch }}-
 
       - name: Compute build version
+        if: github.event_name != 'pull_request'
         id: version
         shell: bash
         run: |
@@ -78,18 +93,19 @@ jobs:
           echo "Building version: ${FULL_VERSION}"
 
       - name: Update package.json version
+        if: github.event_name != 'pull_request'
         run: npm version ${{ steps.version.outputs.full }} --no-git-tag-version
 
-      - name: Install dependencies
-        run: npm install
-
       - name: Download local fonts
+        if: github.event_name != 'pull_request'
         run: npm run download:fonts
 
       - name: Build Quick Look plugin
+        if: github.event_name != 'pull_request'
         run: npm run build:quicklook
 
       - name: Verify Apple signing env
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           missing=()
@@ -106,11 +122,13 @@ jobs:
           fi
 
       - name: Build Electron application
+        if: github.event_name != 'pull_request'
         run: npm run electron:build -- --mac --${{ matrix.arch }} --publish never
         env:
           DEBUG: electron-builder
 
       - name: Upload build artifacts
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: illusions-macos-${{ matrix.arch }}-${{ steps.version.outputs.full }}
@@ -118,7 +136,7 @@ jobs:
 
   build-windows:
     name: Build (Windows NSIS)
-    runs-on: windows-latest
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
@@ -134,7 +152,16 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      # --- Full build steps (push to main/alpha/beta/dev only) ---
+
       - name: Restore Electron caches
+        if: github.event_name != 'pull_request'
         uses: actions/cache@v4
         with:
           path: |
@@ -145,6 +172,7 @@ jobs:
             electron-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Restore Next.js cache
+        if: github.event_name != 'pull_request'
         uses: actions/cache@v4
         with:
           path: .next/cache
@@ -153,6 +181,7 @@ jobs:
             next-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Compute build version
+        if: github.event_name != 'pull_request'
         id: version
         shell: bash
         run: |
@@ -167,21 +196,23 @@ jobs:
           echo "Building version: ${FULL_VERSION}"
 
       - name: Update package.json version
+        if: github.event_name != 'pull_request'
         run: npm version ${{ steps.version.outputs.full }} --no-git-tag-version
 
-      - name: Install dependencies
-        run: npm install
-
       - name: Download local fonts
+        if: github.event_name != 'pull_request'
         run: npm run download:fonts
 
       - name: Build Next.js (static export) and bundle Electron main process
+        if: github.event_name != 'pull_request'
         run: npm run type-check && npx cross-env ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron
 
       - name: Build NSIS installer
+        if: github.event_name != 'pull_request'
         run: npx electron-builder --win nsis --x64 --arm64 --publish never
 
       - name: Upload build artifacts
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: illusions-windows-${{ steps.version.outputs.full }}
@@ -189,7 +220,7 @@ jobs:
 
   build-windows-msix:
     name: Build (Windows Store)
-    runs-on: windows-latest
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
@@ -205,7 +236,16 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      # --- Full build steps (push to main/alpha/beta/dev only) ---
+
       - name: Restore Electron caches
+        if: github.event_name != 'pull_request'
         uses: actions/cache@v4
         with:
           path: |
@@ -216,6 +256,7 @@ jobs:
             electron-${{ runner.os }}-msix-
 
       - name: Restore Next.js cache
+        if: github.event_name != 'pull_request'
         uses: actions/cache@v4
         with:
           path: .next/cache
@@ -224,6 +265,7 @@ jobs:
             next-${{ runner.os }}-msix-
 
       - name: Compute build version
+        if: github.event_name != 'pull_request'
         id: version
         shell: bash
         run: |
@@ -241,21 +283,23 @@ jobs:
           echo "Building MSIX version: ${MSIX_VERSION}"
 
       - name: Update package.json version (4-part for MSIX)
+        if: github.event_name != 'pull_request'
         run: npm version ${{ steps.version.outputs.msix }} --no-git-tag-version
 
-      - name: Install dependencies
-        run: npm install
-
       - name: Download local fonts
+        if: github.event_name != 'pull_request'
         run: npm run download:fonts
 
       - name: Build Next.js (static export) and bundle Electron main process
+        if: github.event_name != 'pull_request'
         run: npm run type-check && npx cross-env ELECTRON_BUILD=1 next build --webpack && npm run bundle:electron
 
       - name: Build MSIX package
+        if: github.event_name != 'pull_request'
         run: npx electron-builder --win appx --x64 --arm64 --publish never
 
       - name: Upload MSIX artifacts
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: illusions-windows-msix-${{ steps.version.outputs.full }}
@@ -265,6 +309,7 @@ jobs:
 
   release:
     name: Create GitHub Release
+    if: github.event_name != 'pull_request'
     needs: [build-macos, build-windows, build-windows-msix]
     runs-on: ubuntu-latest
 
