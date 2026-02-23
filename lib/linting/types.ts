@@ -201,4 +201,48 @@ export interface CorrectionRule {
 
   /** Single entry point — receives full AnalysisContext */
   analyze(context: AnalysisContext, config: LintRuleConfig): CorrectionCandidate[];
+
+  /** Async entry point for LLM-based rules */
+  analyzeAsync?(
+    context: AnalysisContext,
+    config: LintRuleConfig,
+    llmClient: ILlmClient,
+    signal?: AbortSignal,
+  ): Promise<CorrectionCandidate[]>;
+}
+
+// ============================================================================
+// Conversion utilities between LintIssue and CorrectionCandidate
+// ============================================================================
+
+/** Convert a LintIssue to a CorrectionCandidate */
+export function issueToCandidate(issue: LintIssue, contextText: string): CorrectionCandidate {
+  return {
+    ruleId: issue.ruleId,
+    from: issue.from,
+    to: issue.to,
+    severity: issue.severity,
+    message: issue.message,
+    messageJa: issue.messageJa,
+    suggestion: issue.fix?.replacement,
+    reference: issue.reference,
+    context: contextText,
+    skipValidation: false,
+  };
+}
+
+/** Convert a CorrectionCandidate to a LintIssue */
+export function candidateToIssue(candidate: CorrectionCandidate): LintIssue {
+  return {
+    ruleId: candidate.ruleId,
+    from: candidate.from,
+    to: candidate.to,
+    severity: candidate.severity,
+    message: candidate.message,
+    messageJa: candidate.messageJa,
+    fix: candidate.suggestion
+      ? { label: "Fix", labelJa: "修正", replacement: candidate.suggestion }
+      : undefined,
+    reference: candidate.reference,
+  };
 }
