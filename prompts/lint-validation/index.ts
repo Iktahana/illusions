@@ -58,4 +58,4 @@ ${SHARED_RULES}
 {{VALIDATION_HINT}}
 
 ## 回答
-JSON: {"valid":true} または {"valid":false}`;
+JSON: {"valid":true,"reason":"16文字以内で理由を記述"} // validがtrueなら正しい指摘、falseなら誤検知`;

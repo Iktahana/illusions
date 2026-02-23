@@ -71,16 +71,17 @@ export class LintIssueValidator {
         console.debug('[LintIssueValidator] tokens used:', result.tokenCount);
 
         const parsed = this.parseResponse(result.text);
-        const valid = parsed ?? true; // fail-open if unparseable
+        const valid = parsed?.valid ?? true; // fail-open if unparseable
         const flagged = issue.paragraphText.slice(issue.from, issue.to);
         const verdict = valid ? 'CONFIRMED' : 'DISMISSED';
-        console.debug(`[LintIssueValidator] ${verdict}:`, issue.ruleId, flagged);
+        console.debug(`[LintIssueValidator] ${verdict}:`, issue.ruleId, flagged,
+          'reason:', parsed?.reason ?? '(none)');
 
-        results.set(key, { valid });
+        results.set(key, { valid, reason: parsed?.reason });
         onIssueValidated?.(key, valid);
       } catch (error) {
         if ((error as Error).name === "AbortError") break;
-        console.warn("[LintIssueValidator] Validation failed:", error);
+        console.warn("[LintIssueValidator] Validation failed for", issue.ruleId, ":", error);
         // On failure, keep the issue (fail-open)
         results.set(key, { valid: true });
         onIssueValidated?.(key, true);
@@ -117,11 +118,11 @@ export class LintIssueValidator {
   }
 
   /**
-   * Parse the LLM response, extracting the valid boolean from a JSON object.
+   * Parse the LLM response, extracting valid and optional reason from a JSON object.
    * Returns null if the response cannot be parsed.
    */
-  private parseResponse(text: string): boolean | null {
-    // Try to extract {"valid": true/false} from the response
+  private parseResponse(text: string): { valid: boolean; reason?: string } | null {
+    // Try to extract {"valid": true/false, "reason": "..."} from the response
     const jsonMatch = text.match(/\{[^}]*"valid"\s*:\s*(true|false)[^}]*\}/);
     if (!jsonMatch) return null;
 
@@ -133,7 +134,11 @@ export class LintIssueValidator {
         "valid" in parsed &&
         typeof (parsed as Record<string, unknown>).valid === "boolean"
       ) {
-        return (parsed as { valid: boolean }).valid;
+        const entry = parsed as { valid: boolean; reason?: unknown };
+        return {
+          valid: entry.valid,
+          reason: typeof entry.reason === "string" ? entry.reason : undefined,
+        };
       }
       return null;
     } catch {
