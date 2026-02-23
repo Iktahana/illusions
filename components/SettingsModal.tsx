@@ -34,13 +34,9 @@ interface CreditEntry {
   repository: string;
 }
 
-let creditsData: CreditEntry[] = [];
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  creditsData = require("@/generated/credits.json") as CreditEntry[];
-} catch {
-  // credits.json may not exist yet (before running generate:credits)
-}
+// Credits data is loaded lazily via dynamic import() to avoid:
+// 1. require() which breaks Next.js RSC client manifest registration
+// 2. Static ES import which fails tsc (credits.json is generated after type-check)
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -727,6 +723,13 @@ type AboutTab = "terms" | "license" | "credits";
 function AboutSection(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<AboutTab>("terms");
   const [expandedCredits, setExpandedCredits] = useState<Set<string>>(new Set());
+  const [creditsData, setCreditsData] = useState<CreditEntry[]>([]);
+
+  useEffect(() => {
+    import("@/generated/credits.json")
+      .then((mod) => setCreditsData(mod.default as CreditEntry[]))
+      .catch(() => { /* credits.json may not exist in dev */ });
+  }, []);
 
   // Group credits by license type
   const creditsByLicense = creditsData.reduce<Record<string, CreditEntry[]>>((acc, entry) => {
