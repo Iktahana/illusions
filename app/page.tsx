@@ -529,7 +529,7 @@ export default function EditorPage() {
   } = useTextStatistics(content);
 
   // --- Linting hook ---
-  const { ruleRunner, lintIssues, isLinting, handleLintIssuesUpdated, refreshLinting } = useLinting(
+  const { ruleRunner, lintIssues, isLinting, handleLintIssuesUpdated, handleNlpError, refreshLinting } = useLinting(
     lintingEnabled,
     lintingRuleConfigs,
     editorViewInstance,
@@ -1124,6 +1124,7 @@ export default function EditorPage() {
                 lintingEnabled={lintingEnabled}
                 lintingRuleRunner={ruleRunner}
                 onLintIssuesUpdated={handleLintIssuesUpdated}
+                onNlpError={handleNlpError}
                 verticalScrollBehavior={verticalScrollBehavior}
                 scrollSensitivity={scrollSensitivity}
                 onOpenRubyDialog={handleOpenRubyDialog}

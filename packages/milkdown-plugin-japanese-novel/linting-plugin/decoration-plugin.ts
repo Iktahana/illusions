@@ -71,7 +71,7 @@ function isIssueIgnored(
 export function createLintingPlugin(
   options: LintingPluginOptions
 ): Plugin<LintingPluginState> {
-  const { enabled, ruleRunner, nlpClient, onIssuesUpdated, debounceMs = 500 } = options;
+  const { enabled, ruleRunner, nlpClient, onIssuesUpdated, onNlpError, debounceMs = 500 } = options;
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let processingVersion = 0;
@@ -84,6 +84,11 @@ export function createLintingPlugin(
 
   // Ignored corrections list (updated dynamically via setMeta)
   let currentIgnoredCorrections: IgnoredCorrection[] = options.ignoredCorrections ?? [];
+
+  // NLP error state: tracks whether tokenization has failed.
+  // When true, L2 (morphological) rules are explicitly disabled
+  // and the user has been notified via onNlpError callback.
+  let nlpErrorFired = false;
 
   // Lint result cache: paragraph text -> LintIssue[]
   // Minimizes rule execution and prevents flicker on scroll
@@ -152,6 +157,8 @@ export function createLintingPlugin(
           // Update nlpClient reference if provided
           if ('nlpClient' in meta) {
             currentNlpClient = meta.nlpClient ?? null;
+            // Reset NLP error state when client changes (enables retry)
+            nlpErrorFired = false;
             // Clear caches when NLP client changes to avoid stale L2 results
             issueCache.clear();
             tokenCache.clear();
@@ -327,7 +334,7 @@ export function createLintingPlugin(
               if (version !== processingVersion) return;
 
               let issues: LintIssue[];
-              if (hasMorphRules && nlp) {
+              if (hasMorphRules && nlp && !nlpErrorFired) {
                 // Get or compute tokens for L2 rules
                 let tokens = tokenCache.get(paragraph.text);
                 if (!tokens) {
@@ -335,12 +342,22 @@ export function createLintingPlugin(
                     tokens = await nlp.tokenizeParagraph(paragraph.text);
                     tokenCache.set(paragraph.text, tokens);
                   } catch (err) {
-                    console.warn('[Linting] Tokenization failed, falling back to empty tokens:', err);
-                    tokens = [];
+                    const error = err instanceof Error ? err : new Error(String(err));
+                    console.error('[Linting] NLP tokenization failed — L2 rules disabled:', error);
+                    // Fire the error callback once per failure episode
+                    if (!nlpErrorFired) {
+                      nlpErrorFired = true;
+                      onNlpError?.(error);
+                    }
+                    // Fall back to L1-only rules (no tokens)
+                    issues = currentRuleRunner.runAll(paragraph.text);
+                    issueCache.set(paragraph.text, issues);
+                    continue;
                   }
                 }
                 issues = currentRuleRunner.runAllWithTokens(paragraph.text, tokens);
               } else {
+                // No NLP available or NLP has failed — run L1 rules only
                 issues = currentRuleRunner.runAll(paragraph.text);
               }
               issueCache.set(paragraph.text, issues);
@@ -353,9 +370,10 @@ export function createLintingPlugin(
           // Document-level rules are fast (L1/L2) so recomputing is acceptable
           documentIssueCache = null;
           if (currentRuleRunner.hasDocumentRules()) {
-            if (hasMorphRules && nlp) {
+            if (hasMorphRules && nlp && !nlpErrorFired) {
               // Tokenize all paragraphs for morphological document rules (use cache where possible)
               const paragraphsWithTokens = [];
+              let docNlpFailed = false;
               for (const p of allParagraphs) {
                 if (version !== processingVersion) return;
                 let tokens = tokenCache.get(p.text);
@@ -363,13 +381,27 @@ export function createLintingPlugin(
                   try {
                     tokens = await nlp.tokenizeParagraph(p.text);
                     tokenCache.set(p.text, tokens);
-                  } catch {
-                    tokens = [];
+                  } catch (err) {
+                    const error = err instanceof Error ? err : new Error(String(err));
+                    console.error('[Linting] NLP tokenization failed during document rules — L2 rules disabled:', error);
+                    if (!nlpErrorFired) {
+                      nlpErrorFired = true;
+                      onNlpError?.(error);
+                    }
+                    docNlpFailed = true;
+                    break;
                   }
                 }
                 paragraphsWithTokens.push({ text: p.text, index: p.index, tokens });
               }
-              documentIssueCache = currentRuleRunner.runDocumentWithTokens(paragraphsWithTokens);
+              if (!docNlpFailed) {
+                documentIssueCache = currentRuleRunner.runDocumentWithTokens(paragraphsWithTokens);
+              } else {
+                // Fall back to L1-only document rules
+                documentIssueCache = currentRuleRunner.runDocument(
+                  allParagraphs.map(p => ({ text: p.text, index: p.index }))
+                );
+              }
             } else {
               documentIssueCache = currentRuleRunner.runDocument(
                 allParagraphs.map(p => ({ text: p.text, index: p.index }))

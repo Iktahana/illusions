@@ -24,6 +24,9 @@ export interface LintingPluginOptions {
   llmEnabled?: boolean;
   ignoredCorrections?: IgnoredCorrection[];
   onIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
+  /** Callback fired when NLP tokenization fails (e.g., kuromoji init error).
+   *  Called once per failure episode (not per-paragraph). */
+  onNlpError?: (error: Error) => void;
   debounceMs?: number;
 }
 
