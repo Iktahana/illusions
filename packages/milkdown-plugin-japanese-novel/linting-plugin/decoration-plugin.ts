@@ -489,11 +489,6 @@ export function createLintingPlugin(
           if (llmAbortController) llmAbortController.abort();
           llmAbortController = new AbortController();
 
-          // Signal inferring state for the entire LLM pass (validation + L3)
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new Event("llm:inference-start"));
-          }
-
           try {
             // Ensure model is loaded before inference — bail if no modelId
             console.debug('[Linting:LLM] loadModel?', { modelId: currentLlmModelId });
@@ -600,10 +595,6 @@ export function createLintingPlugin(
             rebuildDecorationsWithLlm(view, allParagraphs);
           } finally {
             llmInFlight = false;
-            // Signal end of the entire LLM pass
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new Event("llm:inference-end"));
-            }
           }
         }, LLM_DEBOUNCE_MS);
       }
