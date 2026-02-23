@@ -391,6 +391,17 @@ export function createLintingPlugin(
                   isIssueIgnored(issue, issueText, paragraph.text, currentIgnoredCorrections)) {
                 continue;
               }
+
+              // Pessimistic LLM validation: hide issues until LLM confirms them
+              const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
+              const needsValidation = llmEnabled && !ruleConfig?.skipLlmValidation;
+              if (needsValidation) {
+                const vKey = LintIssueValidator.issueKey(issue, paragraph.text);
+                const cachedResult = validationCache.get(vKey);
+                // Skip unless LLM has explicitly confirmed this issue as valid
+                if (cachedResult !== true) continue;
+              }
+
               const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
               const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
               const from = paragraph.pos + 1 + issue.from + extraFrom;
@@ -403,20 +414,13 @@ export function createLintingPlugin(
                 })
               );
 
-              // Determine LLM validation state for the issue
-              const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
-              const needsValidation = llmEnabled && !ruleConfig?.skipLlmValidation;
-              const vKey = needsValidation ? LintIssueValidator.issueKey(issue, paragraph.text) : undefined;
-              const cachedResult = vKey !== undefined ? validationCache.get(vKey) : undefined;
-              const llmValidated = !needsValidation ? true : cachedResult;
-
-              // Collect issues with absolute positions for the callback
+              // Issues reaching here are either: validation not needed, or LLM-confirmed
               allIssues.push({
                 ...issue,
                 from,
                 to,
                 originalText: issueText,
-                llmValidated,
+                llmValidated: true,
               });
             }
           }
@@ -591,28 +595,27 @@ export function createLintingPlugin(
               continue;
             }
 
-            // Filter out LLM-dismissed false positives
-            const vKey = LintIssueValidator.issueKey(issue, paragraph.text);
-            if (validationCache.get(vKey) === false) continue;
+            // Pessimistic LLM validation: only show issues confirmed by LLM
+            const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
+            const needsValidation = !ruleConfig?.skipLlmValidation;
+            if (needsValidation) {
+              const vKey = LintIssueValidator.issueKey(issue, paragraph.text);
+              if (validationCache.get(vKey) !== true) continue;
+            }
 
             const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
             const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
             const from = paragraph.pos + 1 + issue.from + extraFrom;
             const to = paragraph.pos + 1 + issue.to + extraTo;
 
-            // After LLM pass, validation state is known from the cache
-            const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
-            const needsValidation = !ruleConfig?.skipLlmValidation;
-            const llmValidated = !needsValidation ? true : validationCache.get(vKey) ?? true;
-
             allDecorations.push(
               Decoration.inline(from, to, {
                 class: severityToClass(issue.severity),
-                'data-lint-issue': JSON.stringify({ ...issue, from, to, originalText: issueText, llmValidated }),
+                'data-lint-issue': JSON.stringify({ ...issue, from, to, originalText: issueText, llmValidated: true }),
               })
             );
 
-            allIssues.push({ ...issue, from, to, originalText: issueText, llmValidated });
+            allIssues.push({ ...issue, from, to, originalText: issueText, llmValidated: true });
           }
 
           // L3 issues from LLM cache (already have absolute positions)
