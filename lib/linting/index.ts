@@ -41,3 +41,13 @@ export {
   CORRECTION_MODE_IDS,
 } from "./correction-modes";
 export { getPresetForMode } from "./lint-presets";
+
+// Phase D exports — unified CorrectionRule interface
+export type {
+  AnalysisContext,
+  CorrectionCandidate,
+  CorrectionRule,
+} from "./types";
+export { AbstractCorrectionRule } from "./base-rule";
+export { CorrectionRuleRunner } from "./rule-runner";
+export { LlmValidator } from "./llm-validator";

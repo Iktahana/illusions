@@ -10,6 +10,9 @@ import type {
   MorphologicalLintRule,
   MorphologicalDocumentLintRule,
   LlmLintRule,
+  AnalysisContext,
+  CorrectionCandidate,
+  CorrectionRule,
 } from "./types";
 
 /**
@@ -129,4 +132,28 @@ export abstract class AbstractLlmLintRule
     llmClient: ILlmClient,
     signal?: AbortSignal,
   ): Promise<LintIssue[]>;
+}
+
+// ============================================================================
+// Unified AbstractCorrectionRule (Phase D)
+// ============================================================================
+
+/**
+ * Abstract base class for the unified CorrectionRule interface.
+ * New rules should extend this class instead of the legacy AbstractLintRule hierarchy.
+ *
+ * Existing rules that extend AbstractLintRule/AbstractMorphologicalLintRule/etc.
+ * are preserved for backward compatibility.
+ */
+export abstract class AbstractCorrectionRule implements CorrectionRule {
+  abstract readonly id: string;
+  abstract readonly engine: CorrectionEngine;
+  readonly scope: "paragraph" | "document" = "paragraph";
+  abstract readonly defaultConfig: LintRuleConfig;
+  readonly validationHint?: string;
+
+  abstract analyze(
+    context: AnalysisContext,
+    config: LintRuleConfig,
+  ): CorrectionCandidate[];
 }

@@ -151,3 +151,50 @@ export interface LlmLintRule extends LintRule {
 export function isLlmLintRule(rule: LintRule): rule is LlmLintRule {
   return "lintWithLlm" in rule;
 }
+
+// ============================================================================
+// Unified CorrectionRule interface (Phase D)
+// ============================================================================
+
+/** Unified context passed to all rules */
+export interface AnalysisContext {
+  /** The paragraph text (or full document text for document-scope rules) */
+  text: string;
+  /** Morphological tokens from NLP client (available for morphological rules) */
+  tokens?: Token[];
+  /** All paragraph texts (for document-scope rules) */
+  paragraphs?: string[];
+  /** Current correction mode (e.g. "novel", "official", "academic") */
+  mode: string;
+  /** Active guideline identifiers */
+  guidelines: string[];
+}
+
+/** Candidate issue from any rule, before LLM validation */
+export interface CorrectionCandidate {
+  ruleId: string;
+  from: number;
+  to: number;
+  severity: Severity;
+  message: string;
+  messageJa: string;
+  suggestion?: string;
+  reference?: LintReference;
+  /** Surrounding sentence text (at least one complete sentence) for LLM validation */
+  context: string;
+  /** When true, skip LLM validation (e.g. formatting/structural rules) */
+  skipValidation?: boolean;
+}
+
+/** Unified rule interface — replaces LintRule/DocumentLintRule/MorphologicalLintRule */
+export interface CorrectionRule {
+  id: string;
+  engine: CorrectionEngine;
+  scope: "paragraph" | "document";
+  defaultConfig: LintRuleConfig;
+  /** Optional extra hint for LLM validator */
+  validationHint?: string;
+
+  /** Single entry point — receives full AnalysisContext */
+  analyze(context: AnalysisContext, config: LintRuleConfig): CorrectionCandidate[];
+}
