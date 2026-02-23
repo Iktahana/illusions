@@ -132,13 +132,16 @@ export function useLinting(
             ? getLlmClient()
             : null;
 
-        updateLintingSettings(editorViewInstance, {
-          ruleRunner: ruleRunnerRef.current,
-          nlpClient,
-          llmClient,
-          llmEnabled,
-          forceFullScan: true,
-        });
+        updateLintingSettings(
+          editorViewInstance,
+          {
+            ruleRunner: ruleRunnerRef.current,
+            nlpClient,
+            llmClient,
+            llmEnabled,
+          },
+          "manual-refresh",
+        );
       },
     ).catch((err) => {
       console.error("[useLinting] Failed to refresh linting:", err);

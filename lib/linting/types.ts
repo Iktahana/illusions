@@ -3,6 +3,9 @@ import type { Token } from "@/lib/nlp-client/types";
 
 export type Severity = "error" | "warning" | "info";
 
+/** The underlying implementation engine for a correction rule */
+export type CorrectionEngine = "regex" | "morphological" | "llm";
+
 export interface LintReference {
   /** Standard name, e.g. "JIS X 4051:2004" */
   standard: string;
@@ -51,6 +54,8 @@ export interface LintRule {
   descriptionJa: string;
   /** Detection level: L1=regex, L2=morphological, L3=advanced */
   level: "L1" | "L2" | "L3";
+  /** The underlying implementation engine for this rule */
+  engine?: CorrectionEngine;
   defaultConfig: LintRuleConfig;
   /** Run the rule on text, return issues found */
   lint(text: string, config: LintRuleConfig): LintIssue[];

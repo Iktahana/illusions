@@ -1,6 +1,6 @@
 import { AbstractLintRule } from "../base-rule";
 import { maskDialogue } from "../helpers/dialogue-mask";
-import type { LintIssue, LintRuleConfig, LintReference, Severity } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference, Severity , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -141,6 +141,7 @@ function findAllOccurrences(text: string, needle: string): number[] {
  */
 export class ConjugationErrorRule extends AbstractLintRule {
   readonly id = "conjugation-errors";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Conjugation error detection";
   readonly nameJa = "活用の誤り検出";
   readonly description =
