@@ -42,16 +42,16 @@ export class LintIssueValidator {
 
   /**
    * Validate a batch of L1/L2 issues using the LLM.
-   * Returns a Set of issue keys that the LLM judged as false positives (dismissed).
+   * Returns a Map of issue keys → { valid, reason } for all validated issues.
    */
   async validate(
     issues: ReadonlyArray<ValidatableIssue>,
     llmClient: ILlmClient,
     signal?: AbortSignal,
-  ): Promise<Set<string>> {
-    const dismissed = new Set<string>();
+  ): Promise<Map<string, { valid: boolean; reason?: string }>> {
+    const results = new Map<string, { valid: boolean; reason?: string }>();
 
-    if (issues.length === 0) return dismissed;
+    if (issues.length === 0) return results;
 
     // Split into batches if needed
     const batches: ValidatableIssue[][] = [];
@@ -77,16 +77,12 @@ export class LintIssueValidator {
         for (const entry of parsed) {
           if (entry.id >= 0 && entry.id < batch.length) {
             const issue = batch[entry.id];
+            const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
             const flagged = issue.paragraphText.slice(issue.from, issue.to);
-            if (!entry.valid) {
-              const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
-              console.debug('[LintIssueValidator] DISMISSED:', issue.ruleId, flagged,
-                'reason:', entry.reason ?? '(none)');
-              dismissed.add(key);
-            } else {
-              console.debug('[LintIssueValidator] CONFIRMED:', issue.ruleId, flagged,
-                'reason:', entry.reason ?? '(none)');
-            }
+            const verdict = entry.valid ? 'CONFIRMED' : 'DISMISSED';
+            console.debug(`[LintIssueValidator] ${verdict}:`, issue.ruleId, flagged,
+              'reason:', entry.reason ?? '(none)');
+            results.set(key, { valid: entry.valid, reason: entry.reason });
           }
         }
       } catch (error) {
@@ -96,7 +92,7 @@ export class LintIssueValidator {
       }
     }
 
-    return dismissed;
+    return results;
   }
 
   /**

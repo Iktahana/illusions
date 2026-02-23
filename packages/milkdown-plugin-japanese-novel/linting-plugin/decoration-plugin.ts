@@ -521,7 +521,7 @@ export function createLintingPlugin(
             console.debug('[Linting:LLM] unvalidated issues:', unvalidatedIssues.length);
             if (unvalidatedIssues.length > 0) {
               console.debug('[Linting:LLM] calling issueValidator.validate...');
-              const dismissed = await issueValidator.validate(
+              const validationResults = await issueValidator.validate(
                 unvalidatedIssues,
                 currentLlmClient!,
                 llmAbortController!.signal,
@@ -530,14 +530,17 @@ export function createLintingPlugin(
               if (processingVersion !== version) return;
 
               // Update validation cache
-              console.debug('[Linting:LLM] validation done. dismissed:', dismissed.size, '/', unvalidatedIssues.length);
+              const dismissedCount = [...validationResults.values()].filter(r => !r.valid).length;
+              console.debug('[Linting:LLM] validation done. dismissed:', dismissedCount, '/', unvalidatedIssues.length);
               for (const issue of unvalidatedIssues) {
                 const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
-                const valid = !dismissed.has(key);
+                const result = validationResults.get(key);
+                const valid = result ? result.valid : true; // fail-open if missing
                 validationCache.set(key, valid);
-                console.debug('[Linting:LLM] cache set:', issue.ruleId,
-                  issue.paragraphText.slice(issue.from, issue.to),
-                  valid ? 'VALID' : 'DISMISSED');
+                const flagged = issue.paragraphText.slice(issue.from, issue.to);
+                console.debug('[Linting:LLM] cache set:', issue.ruleId, flagged,
+                  valid ? 'VALID' : 'DISMISSED',
+                  'reason:', result?.reason ?? '(no reason)');
               }
             }
 
