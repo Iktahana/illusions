@@ -659,7 +659,7 @@ export function createLintingPlugin(
 
             // Pessimistic LLM validation: only show issues confirmed by LLM
             const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
-            const needsValidation = !ruleConfig?.skipLlmValidation;
+            const needsValidation = llmEnabled && !ruleConfig?.skipLlmValidation;
             if (needsValidation) {
               const vKey = LintIssueValidator.issueKey(issue, paragraph.text);
               if (validationCache.get(vKey) !== true) continue;
