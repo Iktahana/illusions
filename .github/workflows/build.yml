@@ -205,7 +205,7 @@ jobs:
 
       - name: Build Next.js (static export) and bundle Electron main process
         if: github.event_name != 'pull_request'
-        run: npm run type-check && npx cross-env ELECTRON_BUILD=1 next build && npm run bundle:electron
+        run: npm run type-check && npm run generate:credits && npx cross-env ELECTRON_BUILD=1 next build && npm run bundle:electron
 
       - name: Build NSIS installer
         if: github.event_name != 'pull_request'
@@ -292,7 +292,7 @@ jobs:
 
       - name: Build Next.js (static export) and bundle Electron main process
         if: github.event_name != 'pull_request'
-        run: npm run type-check && npx cross-env ELECTRON_BUILD=1 next build && npm run bundle:electron
+        run: npm run type-check && npm run generate:credits && npx cross-env ELECTRON_BUILD=1 next build && npm run bundle:electron
 
       - name: Build MSIX package
         if: github.event_name != 'pull_request'
