@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Hook to track LLM model status for the status indicator dot.
  *
@@ -5,7 +7,7 @@
  * and listens for inference events dispatched by the LLM client.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { getLlmClient } from "@/lib/llm-client/llm-client";
 
 export type LlmStatusState = "off" | "loading" | "ready" | "inferring";
