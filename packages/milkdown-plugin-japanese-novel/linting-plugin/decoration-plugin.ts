@@ -487,8 +487,20 @@ export function createLintingPlugin(
           try {
             // Ensure model is loaded before inference
             if (currentLlmModelId) {
-              await currentLlmClient!.loadModel(currentLlmModelId);
+              try {
+                await currentLlmClient!.loadModel(currentLlmModelId);
+              } catch (loadErr) {
+                console.warn("[Linting] Failed to load LLM model:", loadErr);
+              }
             }
+
+            const modelReady = await currentLlmClient!.isModelLoaded();
+            if (!modelReady) {
+              console.debug("[Linting] LLM model not loaded, skipping validation & L3 rules");
+              return;
+            }
+
+            console.debug("[Linting] LLM model loaded, running validation & L3 rules");
 
             // --- Step 1: Validate L1/L2 issues ---
             const unvalidatedIssues: ValidatableIssue[] = [];
@@ -510,6 +522,7 @@ export function createLintingPlugin(
             }
 
             if (unvalidatedIssues.length > 0) {
+              console.debug(`[Linting] Validating ${unvalidatedIssues.length} L1/L2 issues via LLM...`);
               const dismissed = await issueValidator.validate(
                 unvalidatedIssues,
                 currentLlmClient!,
@@ -523,6 +536,7 @@ export function createLintingPlugin(
                 const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
                 validationCache.set(key, !dismissed.has(key));
               }
+              console.debug(`[Linting] Validation done: ${dismissed.size} dismissed out of ${unvalidatedIssues.length}`);
             }
 
             if (processingVersion !== version) return;
