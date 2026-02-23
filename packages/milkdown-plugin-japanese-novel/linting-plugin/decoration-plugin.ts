@@ -170,7 +170,12 @@ export function createLintingPlugin(
               if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
               llmIssueCache = null;
               llmInFlight = false;
-              // Keep validationCache — L1/L2 validation runs independently
+              // Rescan to show issues without pessimistic filter
+              pendingFullScan = true;
+            } else if (!wasEnabled && llmEnabled) {
+              // L3 just enabled — rescan to apply pessimistic filter
+              // (hide unvalidated issues until LLM confirms them)
+              pendingFullScan = true;
             }
           }
           // Update llmModelId if provided

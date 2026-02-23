@@ -327,6 +327,7 @@ export default function NovelEditor({
               onIgnoreCorrection={onIgnoreCorrection}
               mdiExtensionsEnabled={mdiExtensionsEnabled}
               gfmEnabled={gfmEnabled}
+              llmEnabled={llmEnabled}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -533,6 +534,7 @@ function MilkdownEditor({
   onIgnoreCorrection,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
+  llmEnabled = false,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
@@ -560,6 +562,7 @@ function MilkdownEditor({
   scrollSensitivity?: number;
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
+  llmEnabled?: boolean;
   onOpenDictionary?: (searchTerm?: string) => void;
   onShowLintHint?: (issue: LintIssue) => void;
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
@@ -732,13 +735,14 @@ function MilkdownEditor({
         {
           enabled: lintingEnabled,
           ruleRunner: lintingRuleRunner,
+          llmEnabled,
         },
         "rule-config-change",
       );
     }).catch(err => {
       console.error('[Editor] Failed to update linting settings:', err);
     });
-  }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
+  }, [editorViewInstance, lintingEnabled, lintingRuleRunner, llmEnabled]);
 
   // 選択範囲の変更を追跡する
   useEffect(() => {
