@@ -323,14 +323,31 @@ export default function EditorPage() {
     setShowRubyDialog(true);
   }, [editorViewInstance, setRubySelectedText, setShowRubyDialog]);
 
-  /** Apply Ruby markup by replacing the editor selection */
+  /** Apply Ruby markup by replacing the editor selection with ProseMirror nodes */
   const handleApplyRuby = useCallback((rubyMarkup: string) => {
     if (!editorViewInstance) return;
     const sel = rubySelectionRef.current;
     if (!sel) return;
     const { state, dispatch } = editorViewInstance;
-    const tr = state.tr.insertText(rubyMarkup, sel.from, sel.to);
-    dispatch(tr);
+    const rubyType = state.schema.nodes.ruby;
+
+    // Parse MDI ruby syntax {base|reading} into ProseMirror ruby nodes
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nodes: any[] = [];
+    const regex = /\{([^|}]+)\|([^}]+)\}|([^{]+)/g;
+    let m;
+    while ((m = regex.exec(rubyMarkup)) !== null) {
+      if (m[1] !== undefined && m[2] !== undefined) {
+        nodes.push(rubyType.create({ base: m[1], text: m[2] }));
+      } else if (m[3]) {
+        nodes.push(state.schema.text(m[3]));
+      }
+    }
+
+    if (nodes.length > 0) {
+      const tr = state.tr.replaceWith(sel.from, sel.to, nodes);
+      dispatch(tr);
+    }
     rubySelectionRef.current = null;
   }, [editorViewInstance]);
 
