@@ -3,7 +3,7 @@ import { AbstractMorphologicalLintRule } from "../base-rule";
 import { isInDialogue } from "../helpers/dialogue-mask";
 import type { SentenceSpan } from "../helpers/sentence-splitter";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -77,6 +77,7 @@ function hasPassiveVoice(sentenceTokens: ReadonlyArray<Token>): boolean {
  */
 export class PassiveOveruseRule extends AbstractMorphologicalLintRule {
   readonly id = "passive-overuse";
+  override engine: CorrectionEngine = "morphological";
   readonly name = "Passive Overuse";
   readonly nameJa = "受動態の多用検出";
   readonly description = "Flags consecutive passive-voice sentences";

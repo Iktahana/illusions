@@ -1,6 +1,6 @@
 import { AbstractLintRule } from "../base-rule";
 import { maskDialogue } from "../helpers/dialogue-mask";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 /** Reference for redundant expression detection */
 const STYLE_GUIDE_REF: LintReference = {
@@ -162,6 +162,7 @@ const REDUNDANT_EXPRESSIONS: ReadonlyArray<RedundantEntry> = [
  */
 export class RedundantExpressionRule extends AbstractLintRule {
   readonly id = "redundant-expression";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Redundant expression detection";
   readonly nameJa = "二重表現の検出";
   readonly description =
@@ -171,6 +172,7 @@ export class RedundantExpressionRule extends AbstractLintRule {
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
     severity: "warning",
+    skipDialogue: true,
   };
 
   lint(text: string, config: LintRuleConfig): LintIssue[] {

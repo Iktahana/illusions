@@ -1,5 +1,5 @@
 import { AbstractLintRule } from "../base-rule";
-import type { LintIssue, LintRuleConfig, LintReference, Severity } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference, Severity , CorrectionEngine} from "../types";
 
 /** JIS X 4051:2004 reference for punctuation rules */
 const JIS_REF: LintReference = {
@@ -65,6 +65,7 @@ const WIDTH_VARIANTS: readonly WidthVariant[] = [
  */
 export class PunctuationRule extends AbstractLintRule {
   readonly id = "punctuation-rules";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Punctuation conventions";
   readonly nameJa = "記号の作法";
   readonly description =

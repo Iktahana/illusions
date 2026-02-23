@@ -3,7 +3,7 @@ import { AbstractMorphologicalLintRule } from "../base-rule";
 import { isInDialogue } from "../helpers/dialogue-mask";
 import type { SentenceSpan } from "../helpers/sentence-splitter";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -55,6 +55,7 @@ function isTaigenDome(
  */
 export class TaigenDomeOveruseRule extends AbstractMorphologicalLintRule {
   readonly id = "taigen-dome-overuse";
+  override engine: CorrectionEngine = "morphological";
   readonly name = "Taigen-dome Overuse";
   readonly nameJa = "体言止めの多用検出";
   readonly description = "Flags consecutive sentences ending with nouns";

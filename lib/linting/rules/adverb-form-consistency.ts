@@ -5,7 +5,7 @@ import {
   type AdverbVariantGroup,
 } from "../data/adverb-variants";
 import { isInDialogue } from "../helpers/dialogue-mask";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -88,6 +88,7 @@ function getMajorityForm(
  */
 export class AdverbFormConsistencyRule extends AbstractMorphologicalDocumentLintRule {
   readonly id = "adverb-form-consistency";
+  override engine: CorrectionEngine = "morphological";
   readonly name = "Adverb Form Consistency";
   readonly nameJa = "副詞の漢字・ひらがな統一";
   readonly description =

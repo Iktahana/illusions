@@ -5,19 +5,25 @@ import { ChevronDown, ChevronRight, MessageSquareOff, MessageSquare } from "luci
 import clsx from "clsx";
 
 import type { Severity } from "@/lib/linting/types";
+import type { CorrectionConfig } from "@/lib/linting/correction-config";
 import {
   LINT_RULES_META,
   LINT_RULE_CATEGORIES,
   LINT_PRESETS,
   LINT_DEFAULT_CONFIGS,
 } from "@/lib/linting/lint-presets";
+import {
+  CORRECTION_MODE_IDS,
+  CORRECTION_MODES,
+} from "@/lib/linting/correction-modes";
+import GuidelineList from "@/components/GuidelineList";
 
 /** Set of rule IDs that belong to the AI category */
 const AI_RULE_IDS = new Set(
   LINT_RULE_CATEGORIES.find((c) => c.id === "ai")?.rules ?? [],
 );
 
-/** Map of rule ID → supportsSkipDialogue from metadata */
+/** Map of rule ID -> supportsSkipDialogue from metadata */
 const SKIP_DIALOGUE_SUPPORT = new Map(
   LINT_RULES_META.map((r) => [r.id, r.supportsSkipDialogue ?? false]),
 );
@@ -29,6 +35,9 @@ interface LintingSettingsProps {
   onLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }) => void;
   onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }>) => void;
   llmEnabled?: boolean;
+  /** Optional correction config for mode selector and guideline priority UI. */
+  correctionConfig?: CorrectionConfig;
+  onCorrectionConfigChange?: (config: Partial<CorrectionConfig>) => void;
 }
 
 /** Resolve the effective config for a rule, falling back to defaults */
@@ -46,6 +55,8 @@ export default function LintingSettings({
   onLintingRuleConfigChange,
   onLintingRuleConfigsBatchChange,
   llmEnabled,
+  correctionConfig,
+  onCorrectionConfigChange,
 }: LintingSettingsProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
@@ -128,6 +139,24 @@ export default function LintingSettings({
     return "";
   }, [lintingRuleConfigs]);
 
+  /** Handle correction mode change: update mode and reset guidelines to mode defaults */
+  const handleModeChange = (modeId: string) => {
+    if (!onCorrectionConfigChange) return;
+    const mode = CORRECTION_MODES[modeId as keyof typeof CORRECTION_MODES];
+    if (!mode) return;
+    onCorrectionConfigChange({
+      mode: mode.id,
+      guidelines: [...mode.defaultGuidelines],
+    });
+  };
+
+  /** Handle guideline priority list change */
+  const handleGuidelinesChange = (guidelines: CorrectionConfig["guidelines"]) => {
+    onCorrectionConfigChange?.({ guidelines });
+  };
+
+  const showCorrectionConfig = Boolean(correctionConfig && onCorrectionConfigChange);
+
   return (
     <div className="space-y-6">
       {/* Master toggle */}
@@ -155,6 +184,59 @@ export default function LintingSettings({
           />
         </button>
       </div>
+
+      {/* Correction mode selector + guideline priority */}
+      {showCorrectionConfig && correctionConfig && (
+        <div
+          className={clsx(
+            "space-y-4 pt-4 border-t border-border transition-opacity",
+            !lintingEnabled && "opacity-50 pointer-events-none",
+          )}
+        >
+          {/* Mode selector */}
+          <div>
+            <h4 className="text-sm font-medium text-foreground mb-2">校正モード</h4>
+            <div className="flex flex-wrap gap-2">
+              {CORRECTION_MODE_IDS.map((modeId) => {
+                const mode = CORRECTION_MODES[modeId];
+                const isActive = correctionConfig.mode === modeId;
+                return (
+                  <button
+                    key={modeId}
+                    onClick={() => handleModeChange(modeId)}
+                    className={clsx(
+                      "px-3 py-1.5 rounded-full text-xs font-medium transition-colors border",
+                      isActive
+                        ? "bg-accent text-white border-accent"
+                        : "bg-background text-foreground-secondary border-border hover:border-accent/50 hover:text-foreground",
+                    )}
+                    title={mode.descriptionJa}
+                  >
+                    {mode.nameJa}
+                  </button>
+                );
+              })}
+            </div>
+            {correctionConfig.mode && (
+              <p className="text-xs text-foreground-tertiary mt-1.5">
+                {CORRECTION_MODES[correctionConfig.mode].descriptionJa}
+              </p>
+            )}
+          </div>
+
+          {/* Guideline priority list */}
+          <div>
+            <h4 className="text-sm font-medium text-foreground mb-1">ガイドライン優先順位</h4>
+            <p className="text-xs text-foreground-tertiary mb-2">
+              上位のガイドラインが優先されます。不要なガイドラインはオフにしてください。
+            </p>
+            <GuidelineList
+              guidelines={correctionConfig.guidelines}
+              onChange={handleGuidelinesChange}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Rules section */}
       <div

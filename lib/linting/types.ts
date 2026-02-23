@@ -3,6 +3,9 @@ import type { Token } from "@/lib/nlp-client/types";
 
 export type Severity = "error" | "warning" | "info";
 
+/** The underlying implementation engine for a correction rule */
+export type CorrectionEngine = "regex" | "morphological" | "llm";
+
 export interface LintReference {
   /** Standard name, e.g. "JIS X 4051:2004" */
   standard: string;
@@ -53,6 +56,8 @@ export interface LintRule {
   descriptionJa: string;
   /** Detection level: L1=regex, L2=morphological, L3=advanced */
   level: "L1" | "L2" | "L3";
+  /** The underlying implementation engine for this rule */
+  engine?: CorrectionEngine;
   defaultConfig: LintRuleConfig;
   /** Run the rule on text, return issues found */
   lint(text: string, config: LintRuleConfig): LintIssue[];
@@ -147,4 +152,51 @@ export interface LlmLintRule extends LintRule {
  */
 export function isLlmLintRule(rule: LintRule): rule is LlmLintRule {
   return "lintWithLlm" in rule;
+}
+
+// ============================================================================
+// Unified CorrectionRule interface (Phase D)
+// ============================================================================
+
+/** Unified context passed to all rules */
+export interface AnalysisContext {
+  /** The paragraph text (or full document text for document-scope rules) */
+  text: string;
+  /** Morphological tokens from NLP client (available for morphological rules) */
+  tokens?: Token[];
+  /** All paragraph texts (for document-scope rules) */
+  paragraphs?: string[];
+  /** Current correction mode (e.g. "novel", "official", "academic") */
+  mode: string;
+  /** Active guideline identifiers */
+  guidelines: string[];
+}
+
+/** Candidate issue from any rule, before LLM validation */
+export interface CorrectionCandidate {
+  ruleId: string;
+  from: number;
+  to: number;
+  severity: Severity;
+  message: string;
+  messageJa: string;
+  suggestion?: string;
+  reference?: LintReference;
+  /** Surrounding sentence text (at least one complete sentence) for LLM validation */
+  context: string;
+  /** When true, skip LLM validation (e.g. formatting/structural rules) */
+  skipValidation?: boolean;
+}
+
+/** Unified rule interface — replaces LintRule/DocumentLintRule/MorphologicalLintRule */
+export interface CorrectionRule {
+  id: string;
+  engine: CorrectionEngine;
+  scope: "paragraph" | "document";
+  defaultConfig: LintRuleConfig;
+  /** Optional extra hint for LLM validator */
+  validationHint?: string;
+
+  /** Single entry point — receives full AnalysisContext */
+  analyze(context: AnalysisContext, config: LintRuleConfig): CorrectionCandidate[];
 }

@@ -19,7 +19,7 @@ import { LintIssueValidator } from '@/lib/linting/lint-issue-validator';
 import type { ValidatableIssue } from '@/lib/linting/lint-issue-validator';
 import type { ParagraphInfo } from '../shared/paragraph-helpers';
 import { getAtomOffset, collectParagraphs, findScrollContainer, getVisibleParagraphs } from '../shared/paragraph-helpers';
-import type { LintingPluginState, LintingPluginOptions } from './types';
+import type { LintingPluginState, LintingPluginOptions, LintingSettingsUpdate } from './types';
 
 export const lintingKey = new PluginKey<LintingPluginState>('linting');
 
@@ -131,7 +131,7 @@ export function createLintingPlugin(
 
       apply(tr, pluginState): LintingPluginState {
         // Update settings via meta
-        const meta = tr.getMeta(lintingKey) as Partial<LintingPluginState & { ruleRunner?: RuleRunner | null; nlpClient?: INlpClient | null; llmClient?: ILlmClient | null; llmEnabled?: boolean; llmModelId?: string; forceFullScan?: boolean; forceLlmValidation?: boolean; ignoredCorrections?: IgnoredCorrection[] }> | undefined;
+        const meta = tr.getMeta(lintingKey) as (LintingSettingsUpdate & Partial<LintingPluginState>) | undefined;
         if (meta) {
           // If decorations are included, apply directly
           if (meta.decorations !== undefined) {
@@ -159,10 +159,6 @@ export function createLintingPlugin(
           if ('llmClient' in meta) {
             currentLlmClient = meta.llmClient ?? null;
           }
-          // Update llmModelId if provided
-          if ('llmModelId' in meta && meta.llmModelId) {
-            currentLlmModelId = meta.llmModelId;
-          }
           // Update llmEnabled flag if provided
           if ('llmEnabled' in meta) {
             const wasEnabled = llmEnabled;
@@ -177,17 +173,43 @@ export function createLintingPlugin(
               // Keep validationCache — L1/L2 validation runs independently
             }
           }
-          // Force full scan flag
+          // Handle changeReason for smart cache invalidation
+          if (meta.changeReason) {
+            switch (meta.changeReason) {
+              case "ignored-correction":
+                // Only update ignoredCorrections and rebuild decorations — no cache clear, no re-run
+                // (ignoredCorrections update is handled below)
+                break;
+              case "manual-refresh":
+              case "mode-change":
+                // Clear all caches and force a full scan
+                issueCache.clear();
+                tokenCache.clear();
+                documentIssueCache = null;
+                pendingFullScan = true;
+                break;
+              case "rule-config-change":
+              case "guideline-change":
+                // Clear issue cache and force re-run (keep token cache)
+                issueCache.clear();
+                documentIssueCache = null;
+                pendingFullScan = true;
+                break;
+              case "model-change":
+                // Only validation cache needs clearing (no-op for now, handled in Phase A)
+                break;
+              case "text-edit":
+                // Re-run affected paragraphs only (handled via normal doc-changed path)
+                break;
+            }
+          }
+          // Force full scan flag (legacy, kept for backward compatibility)
           if (meta.forceFullScan) {
             issueCache.clear();
             tokenCache.clear();
             documentIssueCache = null;
             validationCache.clear();
             pendingFullScan = true;
-          }
-          // Force LLM validation on next update (e.g. manual refresh)
-          if (meta.forceLlmValidation) {
-            forceLlmValidation = true;
           }
           // Update ignoredCorrections list if provided
           if ('ignoredCorrections' in meta) {

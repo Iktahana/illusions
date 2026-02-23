@@ -2,7 +2,7 @@ import type { Token } from "@/lib/nlp-client/types";
 import { AbstractMorphologicalLintRule } from "../base-rule";
 import { COUNTER_MISMATCHES } from "../data/counter-words";
 import { isInDialogue } from "../helpers/dialogue-mask";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -126,6 +126,7 @@ function findNearbyNoun(
  */
 export class CounterWordMismatchRule extends AbstractMorphologicalLintRule {
   readonly id = "counter-word-mismatch";
+  override engine: CorrectionEngine = "morphological";
   readonly name = "Counter Word Mismatch";
   readonly nameJa = "助数詞の誤用検出";
   readonly description = "Validates number + counter word combinations";

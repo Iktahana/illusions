@@ -9,6 +9,8 @@ import type { RuleRunner, LintIssue } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
 import type { ILlmClient } from '@/lib/llm-client/types';
 import type { IgnoredCorrection } from '@/lib/project-types';
+import type { ConfigChangeReason } from '@/lib/linting/correction-config';
+import type { LintingSettingsUpdate } from './types';
 import { createLintingPlugin, lintingKey } from './decoration-plugin';
 
 // Export the plugin key for external use
@@ -58,21 +60,18 @@ export function linting(options: LintingOptions = {}) {
  *
  * @param view EditorView instance
  * @param settings Settings to update
+ * @param reason Optional reason for the change, enabling smart cache invalidation
  */
 export function updateLintingSettings(
   view: EditorView,
-  settings: {
-    enabled?: boolean;
-    ruleRunner?: RuleRunner | null;
-    nlpClient?: INlpClient | null;
-    llmClient?: ILlmClient | null;
-    llmEnabled?: boolean;
-    llmModelId?: string;
-    forceFullScan?: boolean;
-    forceLlmValidation?: boolean;
-    ignoredCorrections?: IgnoredCorrection[];
-  }
+  settings: LintingSettingsUpdate,
+  reason?: ConfigChangeReason
 ): void {
-  const tr = view.state.tr.setMeta(lintingKey, settings);
+  const meta: LintingSettingsUpdate = { ...settings };
+  // If a reason is provided as a separate argument, it takes precedence
+  if (reason !== undefined) {
+    meta.changeReason = reason;
+  }
+  const tr = view.state.tr.setMeta(lintingKey, meta);
   view.dispatch(tr);
 }
