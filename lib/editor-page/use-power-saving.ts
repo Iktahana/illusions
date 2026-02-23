@@ -13,6 +13,7 @@
 
 interface UsePowerSavingOptions {
   powerSaveMode: boolean;
+  autoPowerSaveOnBattery: boolean;
   onPowerSaveModeChange: (enabled: boolean) => void;
 }
 
