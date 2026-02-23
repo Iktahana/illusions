@@ -124,13 +124,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     tokenizeDocument: (paragraphs, onProgress) => {
       // Register progress listener if callback provided
       if (onProgress) {
-        const handler = (event, progress) => onProgress(progress);
+        // Remove any stale listeners from previous calls before registering
+        ipcRenderer.removeAllListeners('nlp:tokenize-progress');
+        const handler = (_event, progress) => onProgress(progress);
         ipcRenderer.on('nlp:tokenize-progress', handler);
 
-        // Auto-cleanup after 60 seconds
-        setTimeout(() => {
+        // Clean up on promise settlement instead of a fixed timeout
+        return ipcRenderer.invoke('nlp:tokenize-document', { paragraphs }).finally(() => {
           ipcRenderer.removeListener('nlp:tokenize-progress', handler);
-        }, 60000);
+        });
       }
 
       return ipcRenderer.invoke('nlp:tokenize-document', { paragraphs });
@@ -148,7 +150,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getStorageUsage: () => ipcRenderer.invoke('llm:get-storage-usage'),
     setIdlingStop: (enabled) => ipcRenderer.invoke('llm:set-idling-stop', { enabled }),
     onDownloadProgress: (callback) => {
-      ipcRenderer.on('llm:download-progress', (_event, progress) => callback(progress));
+      // Remove any stale listeners before registering to prevent duplicates on remount
+      ipcRenderer.removeAllListeners('llm:download-progress');
+      const handler = (_event, progress) => callback(progress);
+      ipcRenderer.on('llm:download-progress', handler);
+      // Return cleanup function for proper lifecycle management
+      return () => ipcRenderer.removeListener('llm:download-progress', handler);
     },
     removeDownloadProgressListener: () => {
       ipcRenderer.removeAllListeners('llm:download-progress');

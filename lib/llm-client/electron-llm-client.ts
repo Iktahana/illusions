@@ -25,8 +25,9 @@ export class ElectronLlmClient implements ILlmClient {
     onProgress?: (progress: number) => void,
   ): Promise<void> {
     if (!window.electronAPI?.llm) throw new Error("LLM not available");
+    let removeListener: (() => void) | undefined;
     if (onProgress) {
-      window.electronAPI.llm.onDownloadProgress((data) => {
+      removeListener = window.electronAPI.llm.onDownloadProgress((data) => {
         if (data.modelId === modelId) {
           onProgress(data.progress);
         }
@@ -35,8 +36,8 @@ export class ElectronLlmClient implements ILlmClient {
     try {
       await window.electronAPI.llm.downloadModel(modelId);
     } finally {
-      if (onProgress) {
-        window.electronAPI.llm.removeDownloadProgressListener();
+      if (removeListener) {
+        removeListener();
       }
     }
   }
