@@ -1299,9 +1299,14 @@ app.whenReady().then(async () => {
   })
 })
 
+let isQuitting = false
 app.on('before-quit', (event) => {
+  if (isQuitting) return
+  isQuitting = true
   event.preventDefault()
+  const forceQuitTimeout = setTimeout(() => app.exit(0), 5000)
   disposeLlmEngine().finally(() => {
+    clearTimeout(forceQuitTimeout)
     app.exit(0)
   })
 })

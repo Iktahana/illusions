@@ -44,6 +44,8 @@ class LlmEngine {
   #initialized = false;
   /** @type {Promise<any>} Serialization queue — ensures only one inference runs at a time */
   #inferQueue = Promise.resolve();
+  /** @type {number} Number of active inferences (guards against concurrent unload) */
+  #inferring = 0;
   /** @type {boolean} Whether to auto-unload model after idle timeout */
   #idlingStopEnabled = false;
   /** @type {ReturnType<typeof setTimeout> | null} */
@@ -250,9 +252,14 @@ class LlmEngine {
   }
 
   /**
-   * Unload model from memory, freeing VRAM/RAM
+   * Unload model from memory, freeing VRAM/RAM.
+   * Skips unload if inference is currently in progress.
    */
   async unloadModel() {
+    if (this.#inferring > 0) {
+      console.log('[LlmEngine] Skipping unload — inference in progress');
+      return;
+    }
     if (this.#idleTimer) {
       clearTimeout(this.#idleTimer);
       this.#idleTimer = null;
@@ -292,6 +299,18 @@ class LlmEngine {
 
     // Chain onto the queue so only one inference occupies the sequence at a time
     const result = this.#inferQueue.then(async () => {
+      // Guard: context may have been disposed between queue entry and execution
+      if (!this.#context) {
+        throw new Error('Model was unloaded before inference could start.');
+      }
+
+      this.#inferring++;
+      // Cancel idle timer while inference is active
+      if (this.#idleTimer) {
+        clearTimeout(this.#idleTimer);
+        this.#idleTimer = null;
+      }
+
       const { LlamaChatSession } = await import('node-llama-cpp');
       const sequence = this.#context.getSequence();
       const session = new LlamaChatSession({
@@ -309,6 +328,7 @@ class LlmEngine {
         return { text, tokenCount };
       } finally {
         session.dispose({ disposeSequence: true });
+        this.#inferring--;
         this.#resetIdleTimer();
       }
     });
