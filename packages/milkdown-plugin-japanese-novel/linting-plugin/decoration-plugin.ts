@@ -173,6 +173,10 @@ export function createLintingPlugin(
               // Keep validationCache — L1/L2 validation runs independently
             }
           }
+          // Update correctionMode for LLM validation context
+          if ('correctionMode' in meta && meta.correctionMode) {
+            issueValidator.setMode(meta.correctionMode);
+          }
           // Handle changeReason for smart cache invalidation
           if (meta.changeReason) {
             switch (meta.changeReason) {

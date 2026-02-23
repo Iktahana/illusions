@@ -1,5 +1,6 @@
 import type { CorrectionCandidate } from "./types";
 import type { ILlmClient } from "@/lib/llm-client/types";
+import { CANDIDATE_VALIDATOR_PROMPT } from "@/prompts/lint-validation";
 
 /**
  * LlmValidator — batch-validates CorrectionCandidates using an LLM.
@@ -7,9 +8,18 @@ import type { ILlmClient } from "@/lib/llm-client/types";
  * Candidates with skipValidation=true are passed through without calling the LLM.
  * Candidates that need validation are checked against the LLM to filter
  * false positives before they are shown to the user.
+ *
+ * Prompt template: prompts/lint-validation/index.ts (CANDIDATE_VALIDATOR_PROMPT)
  */
 export class LlmValidator {
+  private mode: string = "novel";
+
   constructor(private readonly llmClient: ILlmClient) {}
+
+  /** Set the current correction mode for context-aware validation */
+  setMode(mode: string): void {
+    this.mode = mode;
+  }
 
   /**
    * Validate a batch of candidates.
@@ -67,38 +77,41 @@ export class LlmValidator {
   }
 
   /**
-   * Build a compact validation prompt for a single candidate.
+   * Build a validation prompt for a single candidate.
    */
   private buildValidationPrompt(candidate: CorrectionCandidate): string {
-    const hint = candidate.ruleId
-      ? `ルールID: ${candidate.ruleId}`
-      : "";
-    const validationHint = "";
-
-    return `/no_think
-日本語校正の専門家として、以下の指摘が正しいか判定してください。
-
-## 文脈
-${candidate.context}
-
-## 指摘
-- 対象文字位置: ${candidate.from}–${candidate.to}
-- 問題: ${candidate.messageJa}
-${hint}
-${validationHint}
-
-## 指示
-この指摘は正しいですか？「YES」か「NO」のみ回答してください。`;
+    return CANDIDATE_VALIDATOR_PROMPT
+      .replace("{{MODE}}", this.mode)
+      .replace("{{CONTEXT}}", candidate.context)
+      .replace("{{RULE_ID}}", candidate.ruleId)
+      .replace("{{FROM}}", String(candidate.from))
+      .replace("{{TO}}", String(candidate.to))
+      .replace("{{MESSAGE_JA}}", candidate.messageJa)
+      .replace("{{VALIDATION_HINT}}", "");
   }
 
   /**
-   * Parse a YES/NO validation response.
+   * Parse a JSON {"valid": true/false} validation response.
    * Defaults to true (keep) if the response is ambiguous.
    */
   private parseValidationResponse(responseText: string): boolean {
-    const normalized = responseText.trim().toUpperCase();
-    if (normalized.startsWith("NO")) return false;
-    // Default to keeping the candidate for any other response
+    try {
+      const jsonMatch = responseText.match(/\{[\s\S]*?\}/);
+      if (jsonMatch) {
+        const parsed: unknown = JSON.parse(jsonMatch[0]);
+        if (
+          typeof parsed === "object" &&
+          parsed !== null &&
+          "valid" in parsed &&
+          typeof (parsed as Record<string, unknown>).valid === "boolean"
+        ) {
+          return (parsed as { valid: boolean }).valid;
+        }
+      }
+    } catch {
+      // Fall through to default
+    }
+    // Default to keeping the candidate for any ambiguous response
     return true;
   }
 }

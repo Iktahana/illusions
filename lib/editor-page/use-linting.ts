@@ -7,7 +7,7 @@ import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import type { ILlmClient } from "@/lib/llm-client/types";
 import { getLlmClient } from "@/lib/llm-client/llm-client";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
-import type { GuidelineId } from "@/lib/linting/correction-config";
+import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 
 // Import all lint rules
 import { PunctuationRule } from "@/lib/linting/rules/punctuation-rules";
@@ -96,6 +96,7 @@ export function useLinting(
   powerSaveMode: boolean = false,
   llmModelId: string = "qwen3-1.7b-q8",
   correctionGuidelines?: GuidelineId[],
+  correctionMode?: CorrectionModeId,
 ): UseLintingResult {
   const ruleRunnerRef = useRef<RuleRunner | null>(null);
   const [lintIssues, setLintIssues] = useState<LintIssue[]>([]);
@@ -223,6 +224,23 @@ export function useLinting(
       });
     }
   }, [ruleRunner, correctionGuidelines, editorViewInstance, lintingEnabled]);
+
+  // Sync correctionMode to the decoration plugin for LLM validation context
+  useEffect(() => {
+    if (!editorViewInstance || !lintingEnabled || !correctionMode) return;
+
+    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
+      ({ updateLintingSettings }) => {
+        updateLintingSettings(
+          editorViewInstance,
+          { correctionMode },
+          "mode-change",
+        );
+      },
+    ).catch((err) => {
+      console.error("[useLinting] Failed to sync correction mode:", err);
+    });
+  }, [correctionMode, editorViewInstance, lintingEnabled]);
 
   // Clear issues when linting is disabled
   useEffect(() => {

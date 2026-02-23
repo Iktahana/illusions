@@ -1,10 +1,13 @@
 /**
  * LLM-based post-validator for L1/L2 lint issues.
  * Batch-sends issues to the LLM to filter out false positives.
+ *
+ * Prompt template: prompts/lint-validation/index.ts (ISSUE_VALIDATOR_PROMPT)
  */
 
 import type { ILlmClient } from "@/lib/llm-client/types";
 import type { LintIssue } from "./types";
+import { ISSUE_VALIDATOR_PROMPT } from "@/prompts/lint-validation";
 
 /** Issue with its surrounding paragraph context */
 export interface ValidatableIssue extends LintIssue {
@@ -22,6 +25,13 @@ const CONTEXT_CHARS = 30;
  * Issues judged as false positives are returned in a dismissed set.
  */
 export class LintIssueValidator {
+  private mode: string = "novel";
+
+  /** Set the current correction mode for context-aware validation */
+  setMode(mode: string): void {
+    this.mode = mode;
+  }
+
   /**
    * Generate a stable cache key for a lint issue in its paragraph context.
    * Format: `ruleId:from:to:paragraphHash`
@@ -80,13 +90,7 @@ export class LintIssueValidator {
    * Build the prompt for a batch of issues.
    */
   private buildPrompt(issues: ReadonlyArray<ValidatableIssue>): string {
-    const lines: string[] = [
-      "/no_think",
-      "あなたは日本語校正AIです。以下の校正指摘が正しいか判定してください。",
-      "文脈を考慮し、誤検知(false positive)の場合はfalseとしてください。",
-      "",
-      "## 指摘一覧",
-    ];
+    const issueLines: string[] = [];
 
     for (let i = 0; i < issues.length; i++) {
       const issue = issues[i];
@@ -100,7 +104,7 @@ export class LintIssueValidator {
         Math.min(issue.paragraphText.length, issue.to + CONTEXT_CHARS),
       );
 
-      lines.push(
+      issueLines.push(
         `[${i}] ルール: ${issue.ruleId}`,
         `   箇所:「${flaggedText}」`,
         `   理由: ${issue.messageJa}`,
@@ -109,12 +113,9 @@ export class LintIssueValidator {
       );
     }
 
-    lines.push(
-      "## 回答",
-      `JSON配列のみ: [{"id":0,"valid":true},...]`,
-    );
-
-    return lines.join("\n");
+    return ISSUE_VALIDATOR_PROMPT
+      .replace("{{MODE}}", this.mode)
+      .replace("{{ISSUES}}", issueLines.join("\n"));
   }
 
   /**

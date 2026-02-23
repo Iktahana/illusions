@@ -504,6 +504,7 @@ export default function EditorPage() {
     powerSaveMode,
     llmModelId,
     correctionConfig.guidelines,
+    correctionConfig.mode,
   );
 
   // --- Ignored corrections hook ---
