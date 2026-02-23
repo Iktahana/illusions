@@ -190,8 +190,9 @@ export function createLintingPlugin(
           if (meta.changeReason) {
             switch (meta.changeReason) {
               case "ignored-correction":
-                // Only update ignoredCorrections and rebuild decorations — no cache clear, no re-run
-                // (ignoredCorrections update is handled below)
+                // Trigger immediate decoration rebuild so ignored issues vanish instantly.
+                // Issue cache stays valid (no re-run needed), we just re-filter with new ignoredCorrections.
+                pendingFullScan = true;
                 break;
               case "manual-refresh":
               case "mode-change":
