@@ -490,14 +490,14 @@ export function createLintingPlugin(
           }
 
           try {
-            // Ensure model is loaded before inference
+            // Ensure model is loaded before inference — bail if no modelId
             console.debug('[Linting:LLM] loadModel?', { modelId: currentLlmModelId });
-            if (currentLlmModelId) {
-              await currentLlmClient!.loadModel(currentLlmModelId);
-              console.debug('[Linting:LLM] model loaded OK');
-            } else {
-              console.warn('[Linting:LLM] currentLlmModelId is null — loadModel skipped!');
+            if (!currentLlmModelId) {
+              console.warn('[Linting:LLM] BAIL: no modelId — cannot load model');
+              return;
             }
+            await currentLlmClient!.loadModel(currentLlmModelId);
+            console.debug('[Linting:LLM] model loaded OK');
 
             // --- Step 1: Validate L1/L2 issues ---
             const unvalidatedIssues: ValidatableIssue[] = [];
