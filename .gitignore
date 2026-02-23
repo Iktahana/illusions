@@ -19,6 +19,8 @@
 !/build/mdi-icon.icns
 !/build/mdi-icon.ico
 !/build/mdi-icon.png
+!/build/appx/
+!/build/appx/*.png
 /dist*
 
 # electron
