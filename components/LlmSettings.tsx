@@ -324,6 +324,13 @@ export function LlmSettings({
                 {selectedStatus.error}
               </p>
             )}
+
+            {/* Model info */}
+            <div className="text-xs text-foreground-tertiary space-y-1">
+              <p>サイズ: 約 {formatBytes(selectedEntry.size)}</p>
+              <p>量子化: {selectedEntry.quantization}</p>
+              <p>必要メモリ: {selectedEntry.minRamMb} MB</p>
+            </div>
           </div>
         )}
       </div>

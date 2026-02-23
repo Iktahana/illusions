@@ -480,6 +480,9 @@ export function createLintingPlugin(
         // Consume the one-shot flag
         forceLlmValidation = false;
 
+        // Consume the one-shot flag
+        forceLlmValidation = false;
+
         if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
 
         llmDebounceTimer = setTimeout(async () => {
