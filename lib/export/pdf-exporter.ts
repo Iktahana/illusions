@@ -67,6 +67,12 @@ export async function generatePdf(
   );
 
   try {
+    // Register did-finish-load listener BEFORE loadURL to avoid race condition
+    // where data: URLs finish loading before the listener is attached (#513)
+    const loadPromise = new Promise<void>((resolve) => {
+      hiddenWin.webContents.once("did-finish-load", () => resolve());
+    });
+
     // Load HTML content into the hidden window.
     // Uses data: URL which is necessary for inline HTML rendering.
     // The CSP meta tag in the HTML itself blocks script execution.
@@ -74,12 +80,11 @@ export async function generatePdf(
       `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
     );
 
-    // Wait for content to render
-    await new Promise<void>((resolve) => {
-      hiddenWin.webContents.once("did-finish-load", () => resolve());
-      // Fallback timeout in case did-finish-load already fired
-      setTimeout(() => resolve(), 1000);
-    });
+    // Wait for did-finish-load to fire (guaranteed since listener was registered first)
+    await loadPromise;
+
+    // Brief delay to allow CSS paint to complete
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Map page size to physical dimensions in microns
     const pageSizes: Record<string, { width: number; height: number }> = {
