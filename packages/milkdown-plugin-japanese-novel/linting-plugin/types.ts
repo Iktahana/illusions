@@ -23,7 +23,7 @@ export interface LintingPluginOptions {
   llmClient?: ILlmClient | null;
   llmEnabled?: boolean;
   ignoredCorrections?: IgnoredCorrection[];
-  onIssuesUpdated?: (issues: LintIssue[]) => void;
+  onIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
   debounceMs?: number;
 }
 

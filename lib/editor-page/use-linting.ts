@@ -198,10 +198,13 @@ export function useLinting(
     }
   }, [ruleRunner, lintingRuleConfigs]);
 
-  const handleLintIssuesUpdated = useCallback((issues: LintIssue[]) => {
+  const handleLintIssuesUpdated = useCallback((issues: LintIssue[], options?: { llmPending?: boolean }) => {
     if (!lintingEnabled) return;
     setLintIssues(issues);
-    setIsLinting(false);
+    // Keep spinner active while LLM validation is still in progress
+    if (!options?.llmPending) {
+      setIsLinting(false);
+    }
   }, [lintingEnabled]);
 
   // Sync active guidelines to RuleRunner and trigger re-lint when guidelines change

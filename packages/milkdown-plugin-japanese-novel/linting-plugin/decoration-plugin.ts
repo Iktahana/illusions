@@ -370,6 +370,7 @@ export function createLintingPlugin(
           // Build decorations from all paragraphs that have cached results
           const allDecorations: Decoration[] = [];
           const allIssues: LintIssue[] = [];
+          let pendingLlmCount = 0;
 
           for (const paragraph of allParagraphs) {
             // Per-paragraph issues from cache
@@ -408,6 +409,7 @@ export function createLintingPlugin(
                 // Skip unless LLM has explicitly confirmed this issue as valid
                 if (cachedResult !== true) {
                   console.debug('[Linting:pessimistic] HIDDEN (awaiting LLM):', issue.ruleId, issueText);
+                  pendingLlmCount++;
                   continue;
                 }
                 console.debug('[Linting:pessimistic] SHOWN (LLM confirmed):', issue.ruleId, issueText);
@@ -443,8 +445,10 @@ export function createLintingPlugin(
           const tr = view.state.tr.setMeta(lintingKey, { decorations });
           view.dispatch(tr);
 
-          // Notify parent of all issues
-          onIssuesUpdated?.(allIssues);
+          // Notify parent of all issues (with pending flag if LLM validation is still needed)
+          const llmPending = pendingLlmCount > 0;
+          console.debug('[Linting:pessimistic] issues shown:', allIssues.length, 'pending LLM:', pendingLlmCount);
+          onIssuesUpdated?.(allIssues, { llmPending });
 
           // Schedule L3 (LLM) linting with longer debounce
           scheduleLlmUpdate(view, allParagraphs);
@@ -479,6 +483,11 @@ export function createLintingPlugin(
 
           if (llmAbortController) llmAbortController.abort();
           llmAbortController = new AbortController();
+
+          // Signal inferring state for the entire LLM pass (validation + L3)
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("llm:inference-start"));
+          }
 
           try {
             // Ensure model is loaded before inference
@@ -576,8 +585,14 @@ export function createLintingPlugin(
             if ((error as Error).name !== "AbortError") {
               console.error("LLM linting/validation failed:", error);
             }
+            // Still rebuild so validated L1/L2 issues appear even if L3 fails
+            rebuildDecorationsWithLlm(view, allParagraphs);
           } finally {
             llmInFlight = false;
+            // Signal end of the entire LLM pass
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("llm:inference-end"));
+            }
           }
         }, LLM_DEBOUNCE_MS);
       }
