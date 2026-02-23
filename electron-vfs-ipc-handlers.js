@@ -191,10 +191,11 @@ function registerVFSHandlers() {
     const homedir = normalizePath(os.homedir());
 
     // System root directories (Unix + macOS + Windows)
-    const denyExact = new Set([
+    // Treated as prefixes — block the directory itself AND any nested path
+    const denyPrefixes = [
       '/', '/etc', '/usr', '/bin', '/sbin', '/var', '/tmp', '/System',
       '/private', '/private/etc', '/private/var',
-    ]);
+    ];
 
     // Add Windows drive roots and system directories
     const driveLetterMatch = normalizedPath.match(/^([a-zA-Z]):?\/?$/);
@@ -210,9 +211,14 @@ function registerVFSHandlers() {
       '/.config/gcloud', '/Library/Keychains',
     ];
 
-    if (denyExact.has(normalizedPath)) return true;
+    // Treat denied roots as prefixes — block any nested path under them
+    if (denyPrefixes.some(dir => normalizedPath === dir || normalizedPath.startsWith(`${dir}/`))) return true;
     if (normalizedPath === homedir) return true;
-    if (windowsDenyPrefixes.some(p => normalizedPath.toLowerCase().startsWith(p.toLowerCase()))) return true;
+    const normalizedLower = normalizedPath.toLowerCase();
+    if (windowsDenyPrefixes.some(p => {
+      const pLower = p.toLowerCase();
+      return normalizedLower === pLower || normalizedLower.startsWith(`${pLower}/`);
+    })) return true;
     if (homeSensitiveSuffixes.some(s => normalizedPath.startsWith(homedir + s))) return true;
 
     return false;
