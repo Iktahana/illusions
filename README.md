@@ -258,6 +258,7 @@ The proofreading (linting) features in illusions comply with the following offic
 - ✅ Landing page with SEO optimization
 
 ### Recently Added
+- ✅ LLM idling stop — auto-unload AI model after 30s idle to reduce memory usage (AIアイドリングストップ)
 - ✅ Export to PDF/EPUB/DOCX — export novels to standard publishing formats
 - ✅ Local LLM engine for AI proofreading (ローカルLLMによるAI校正)
 - ✅ Correction ignore feature — dismiss individual lint warnings
