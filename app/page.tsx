@@ -94,9 +94,9 @@ export default function EditorPage() {
     posHighlightEnabled, posHighlightColors, verticalScrollBehavior,
     scrollSensitivity, compactMode, showSettingsModal,
     lintingEnabled, lintingRuleConfigs,
-    llmEnabled, llmModelId,
+    llmEnabled, llmModelId, llmIdlingStop,
     powerSaveMode, autoPowerSaveOnBattery,
-    llmIdlingStop, correctionConfig,
+    correctionConfig,
   } = settings;
   const {
     handleFontScaleChange, handleLineHeightChange, handleParagraphSpacingChange,
@@ -107,9 +107,9 @@ export default function EditorPage() {
     handleScrollSensitivityChange, handleToggleCompactMode, setShowSettingsModal,
     handleLintingEnabledChange, handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
-    handleLlmEnabledChange, handleLlmModelIdChange,
+    handleLlmEnabledChange, handleLlmModelIdChange, handleLlmIdlingStopChange,
     handlePowerSaveModeChange, handleAutoPowerSaveOnBatteryChange,
-    handleCorrectionConfigChange, handleLlmIdlingStopChange,
+    handleCorrectionConfigChange,
   } = settingsHandlers;
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
