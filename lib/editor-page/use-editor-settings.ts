@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
 import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 import type { Severity } from "@/lib/linting/types";
-import { notificationManager } from "@/lib/notification-manager";
 import type { CorrectionConfig } from "@/lib/linting/correction-config";
 import { DEFAULT_CORRECTION_CONFIG } from "@/lib/linting/correction-config";
 
@@ -29,7 +28,6 @@ export interface EditorSettings {
   llmEnabled: boolean;
   llmModelId: string;
   powerSaveMode: boolean;
-  autoPowerSaveOnBattery: boolean;
   /** Unified correction config derived from individual linting fields */
   correctionConfig: CorrectionConfig;
 }
@@ -56,7 +54,6 @@ export interface EditorSettingsHandlers {
   handleLlmEnabledChange: (value: boolean) => void;
   handleLlmModelIdChange: (modelId: string) => void;
   handlePowerSaveModeChange: (enabled: boolean) => void;
-  handleAutoPowerSaveOnBatteryChange: (enabled: boolean) => void;
 }
 
 export interface EditorSettingsSetters {
@@ -105,7 +102,6 @@ export function useEditorSettings(
   const [llmEnabled, setLlmEnabled] = useState(false);
   const [llmModelId, setLlmModelId] = useState("qwen3-1.7b-q8");
   const [powerSaveMode, setPowerSaveMode] = useState(false);
-  const [autoPowerSaveOnBattery, setAutoPowerSaveOnBattery] = useState(true);
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -183,7 +179,6 @@ export function useEditorSettings(
           setLintingRuleConfigs(sanitized);
         }
         if (appState.powerSaveMode !== undefined) setPowerSaveMode(appState.powerSaveMode);
-        if (appState.autoPowerSaveOnBattery !== undefined) setAutoPowerSaveOnBattery(appState.autoPowerSaveOnBattery);
         // Force editor rebuild to apply restored settings (e.g. custom font)
         incrementEditorKey();
       } catch (error) {
@@ -366,7 +361,6 @@ export function useEditorSettings(
       setPowerSaveMode(true);
       setLintingEnabled(false);
       setLlmEnabled(false);
-      notificationManager.warning("省電力モードが有効になりました。校正精度が低下する場合があります。");
     } else {
       // Restore previous state
       const stored = await fetchAppState();
@@ -386,16 +380,8 @@ export function useEditorSettings(
         await persistAppState({ powerSaveMode: false, prePowerSaveState: null });
       }
       setPowerSaveMode(false);
-      notificationManager.info("省電力モードを解除しました。");
     }
   }, [lintingEnabled, lintingRuleConfigs, llmEnabled]);
-
-  const handleAutoPowerSaveOnBatteryChange = useCallback((enabled: boolean) => {
-    setAutoPowerSaveOnBattery(enabled);
-    void persistAppState({ autoPowerSaveOnBattery: enabled }).catch((error) => {
-      console.error("Failed to persist autoPowerSaveOnBattery:", error);
-    });
-  }, []);
 
   return {
     settings: {
@@ -419,7 +405,6 @@ export function useEditorSettings(
       llmEnabled,
       llmModelId,
       powerSaveMode,
-      autoPowerSaveOnBattery,
       correctionConfig: {
         ...DEFAULT_CORRECTION_CONFIG,
         enabled: lintingEnabled,
@@ -453,7 +438,6 @@ export function useEditorSettings(
       handleLlmEnabledChange,
       handleLlmModelIdChange,
       handlePowerSaveModeChange,
-      handleAutoPowerSaveOnBatteryChange,
     },
     setters: {
       setLineHeight,

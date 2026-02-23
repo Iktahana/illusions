@@ -515,7 +515,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 1. **PM reviews** all agent outputs (commits, TypeScript check).
 2. **Run final verification**: `npx tsc --noEmit` on the feature branch.
 3. **Create PR** referencing the parent issue: `Closes #<parent>`.
-4. **Close sub-issues** with verification comments.
+4. **Verify sub-issues are closed** — each agent must have already closed its sub-issue upon completion. If any remain open, close them now with a verification comment.
 
 ## Sub-Issue Template
 ```markdown
@@ -548,6 +548,7 @@ Part of #<parent-issue-number>
 - **DO** follow all existing CLAUDE.md rules (language, TypeScript strict, etc.).
 - **DO** make atomic commits with sub-issue references.
 - **DO** run TypeScript check before reporting completion.
+- **DO** close the assigned sub-issue immediately upon completion — do NOT leave it open for the PM to close later. Use `gh issue close <number> --comment "..."` with a brief verification comment confirming acceptance criteria are met.
 
 ## Rules for PM
 - **DO NOT** write implementation code directly; delegate to agents.
@@ -608,9 +609,11 @@ grep -r "[\uac00-\ud7af]" src/  # Korean check
 
 ---
 
-**Version**: 2.3.0
-**Last Updated**: 2026-02-20
+**Version**: 2.3.1
+**Last Updated**: 2026-02-23
 **Status**: ✅ Production - All AI agents must follow these rules
+**Changes in 2.3.1**:
+- Agents must close their assigned sub-issue immediately upon completion (not leave it for PM)
 **Changes in 2.3.0**:
 - Added Git Worktree Isolation rule (CRITICAL) — every task must use a dedicated worktree
 - Updated checklists and quick commands to reflect worktree workflow
