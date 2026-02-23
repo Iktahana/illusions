@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import ElectronStorageProvider from "@/lib/electron-storage";
 import { getProjectManager } from "@/lib/project-manager";
+import { getStorageService } from "@/lib/storage-service";
 import { getProjectService } from "@/lib/project-service";
 import { getProjectUpgradeService } from "@/lib/project-upgrade";
 import { isStandaloneMode } from "@/lib/project-types";
@@ -298,8 +298,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     const loadRecentProjects = async () => {
       try {
         if (isElectron) {
-          const storage = new ElectronStorageProvider();
-          await storage.initialize();
+          const storage = getStorageService();
           const projects = await storage.getRecentProjects();
           if (!mounted) return;
 
@@ -357,8 +356,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
   const handleDeleteRecentProject = useCallback(async (projectId: string) => {
     try {
       if (isElectron) {
-        const storage = new ElectronStorageProvider();
-        await storage.initialize();
+        const storage = getStorageService();
         await storage.removeRecentProject(projectId);
 
         const updatedProjects = await storage.getRecentProjects();
@@ -401,8 +399,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       await loadProjectContent(project);
 
       if (isElectron && project.rootPath) {
-        const storage = new ElectronStorageProvider();
-        await storage.initialize();
+        const storage = getStorageService();
         await storage.addRecentProject({
           id: project.projectId,
           rootPath: project.rootPath,
@@ -440,8 +437,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     try {
       // Electron: restore from SQLite using VFS with stored rootPath
       if (isElectron) {
-        const storage = new ElectronStorageProvider();
-        await storage.initialize();
+        const storage = getStorageService();
         const projects = await storage.getRecentProjects();
         const project = projects.find((p) => p.id === projectId);
         if (!project) {
@@ -576,8 +572,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       setProjectMode(project);
       await loadProjectContent(project);
 
-      const storage = new ElectronStorageProvider();
-      await storage.initialize();
+      const storage = getStorageService();
       await storage.addRecentProject({
         id: project.projectId,
         rootPath: projectPath,
@@ -632,8 +627,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     await loadProjectContent(project);
 
     if (isElectron && project.rootPath) {
-      const storage = new ElectronStorageProvider();
-      await storage.initialize();
+      const storage = getStorageService();
       await storage.addRecentProject({
         id: project.projectId,
         rootPath: project.rootPath,

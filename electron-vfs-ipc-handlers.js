@@ -13,8 +13,28 @@ function registerVFSHandlers() {
   // Track the opened root directory per window for path validation
   const allowedRoots = new Map();
 
-  // Track paths that were selected via the native file dialog
-  const dialogApprovedPaths = new Set();
+  // Track paths that were selected via the native file dialog.
+  // Uses a bounded LRU map to prevent unbounded memory growth in long sessions.
+  const MAX_APPROVED_PATHS = 200;
+  const dialogApprovedPaths = new Map();
+
+  /**
+   * Add a path to the dialog-approved set with LRU eviction.
+   * When the map exceeds MAX_APPROVED_PATHS, the least recently added entry is evicted.
+   * @param {string} p - The path to approve
+   */
+  function approveDialogPath(p) {
+    // Delete first so re-insertion moves it to the end (most recent)
+    dialogApprovedPaths.delete(p);
+    dialogApprovedPaths.set(p, true);
+    // Evict oldest entry if over capacity
+    if (dialogApprovedPaths.size > MAX_APPROVED_PATHS) {
+      const oldest = dialogApprovedPaths.keys().next().value;
+      if (oldest !== undefined) {
+        dialogApprovedPaths.delete(oldest);
+      }
+    }
+  }
 
   /**
    * Normalize path separators to forward slashes for cross-platform compatibility.
@@ -63,7 +83,7 @@ function registerVFSHandlers() {
 
     // Update the allowed root for this window
     allowedRoots.set(event.sender.id, dirPath);
-    dialogApprovedPaths.add(dirPath);
+    approveDialogPath(dirPath);
 
     return {
       path: dirPath,
@@ -248,7 +268,7 @@ function registerVFSHandlers() {
     }
 
     // 3. Allow if path is dialog-approved or child of a dialog-approved path
-    const isDialogApproved = [...dialogApprovedPaths].some(approved => {
+    const isDialogApproved = [...dialogApprovedPaths.keys()].some(approved => {
       const normalizedApproved = normalizePath(approved);
       return normalizedResolved === normalizedApproved
         || normalizedResolved.startsWith(normalizedApproved + '/');

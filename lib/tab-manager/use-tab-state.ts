@@ -28,6 +28,8 @@ export interface UseTabStateReturn extends TabManagerCore {
   isSaving: boolean;
   /** Derived: timestamp of the last save on the active tab. */
   lastSavedTime: number | null;
+  /** Derived: whether the most recent save on the active tab was an auto-save. */
+  lastSaveWasAuto: boolean;
   /** Update a single tab by id. */
   updateTab: (tabId: TabId, updates: Partial<TabState>) => void;
   /** Find a tab by its file path. */
@@ -97,6 +99,7 @@ export function useTabState(): UseTabStateReturn {
   const isDirty = activeTab?.isDirty ?? false;
   const isSaving = activeTab?.isSaving ?? false;
   const lastSavedTime = activeTab?.lastSavedTime ?? null;
+  const lastSaveWasAuto = activeTab?.lastSaveWasAuto ?? false;
 
   const contentRef = useRef(content);
   contentRef.current = content;
@@ -267,6 +270,7 @@ export function useTabState(): UseTabStateReturn {
     isDirty,
     isSaving,
     lastSavedTime,
+    lastSaveWasAuto,
 
     // Helpers
     updateTab,

@@ -8,6 +8,7 @@
 import type { ILlmClient } from "@/lib/llm-client/types";
 import type { LintIssue } from "./types";
 import { CANDIDATE_VALIDATOR_PROMPT } from "@/prompts/lint-validation";
+import { hashString } from "@/lib/utils/hash-string";
 
 /** Issue with its surrounding paragraph context */
 export interface ValidatableIssue extends LintIssue {
@@ -145,14 +146,4 @@ export class LintIssueValidator {
       return null;
     }
   }
-}
-
-/** Simple string hash (same as decoration-plugin.ts hashString) */
-function hashString(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i);
-    hash = ((hash << 5) - hash + ch) | 0;
-  }
-  return (hash >>> 0).toString(16);
 }

@@ -8,6 +8,7 @@ import type {
   StorageSession,
   AppState,
   RecentFile,
+  RecentProject,
   EditorBuffer,
 } from "./storage-types";
 
@@ -38,8 +39,8 @@ export class ElectronStorageProvider implements IStorageService {
       loadEditorBuffer: () => Promise<EditorBuffer | null>;
       clearEditorBuffer: () => Promise<void>;
       clearAll: () => Promise<void>;
-      addRecentProject: (project: { id: string; rootPath: string; name: string }) => Promise<void>;
-      getRecentProjects: () => Promise<Array<{ id: string; rootPath: string; name: string }>>;
+      addRecentProject: (project: RecentProject) => Promise<void>;
+      getRecentProjects: () => Promise<RecentProject[]>;
       removeRecentProject: (projectId: string) => Promise<void>;
     };
   }
@@ -116,19 +117,13 @@ export class ElectronStorageProvider implements IStorageService {
     return api.clearAll();
   }
 
-  async addRecentProject(project: {
-    id: string;
-    rootPath: string;
-    name: string;
-  }): Promise<void> {
+  async addRecentProject(project: RecentProject): Promise<void> {
     await this.initialize();
     const api = this.getElectronAPI();
     return api.addRecentProject(project);
   }
 
-  async getRecentProjects(): Promise<
-    Array<{ id: string; rootPath: string; name: string }>
-  > {
+  async getRecentProjects(): Promise<RecentProject[]> {
     await this.initialize();
     const api = this.getElectronAPI();
     return api.getRecentProjects();

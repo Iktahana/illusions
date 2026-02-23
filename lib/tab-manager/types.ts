@@ -18,6 +18,7 @@ export interface UseTabManagerReturn {
   isDirty: boolean;
   isSaving: boolean;
   lastSavedTime: number | null;
+  lastSaveWasAuto: boolean;
   openFile: () => Promise<void>;
   saveFile: (isAutoSave?: boolean) => Promise<void>;
   saveAsFile: () => Promise<void>;
@@ -263,6 +264,7 @@ export function createNewTab(content?: string, fileType: SupportedFileExtension 
     lastSavedContent: c,
     isDirty: false,
     lastSavedTime: null,
+    lastSaveWasAuto: false,
     isSaving: false,
     isPreview: false,
     fileType,

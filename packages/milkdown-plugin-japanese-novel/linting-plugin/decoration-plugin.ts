@@ -15,6 +15,7 @@ import type { Token } from '@/lib/nlp-client/types';
 import type { ILlmClient } from '@/lib/llm-client/types';
 import type { IgnoredCorrection } from '@/lib/project-types';
 import { LRUCache } from '@/lib/utils/lru-cache';
+import { hashString } from '@/lib/utils/hash-string';
 import { LintIssueValidator } from '@/lib/linting/lint-issue-validator';
 import type { ValidatableIssue } from '@/lib/linting/lint-issue-validator';
 import type { ParagraphInfo } from '../shared/paragraph-helpers';
@@ -32,21 +33,6 @@ function severityToClass(severity: Severity): string {
     case 'warning': return 'lint-warning';
     case 'info': return 'lint-info';
   }
-}
-
-/**
- * Create the linting ProseMirror plugin.
- */
-/**
- * Simple string hash matching the one in use-ignored-corrections.ts.
- */
-function hashString(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i);
-    hash = ((hash << 5) - hash + ch) | 0;
-  }
-  return (hash >>> 0).toString(16);
 }
 
 /**
@@ -71,7 +57,7 @@ function isIssueIgnored(
 export function createLintingPlugin(
   options: LintingPluginOptions
 ): Plugin<LintingPluginState> {
-  const { enabled, ruleRunner, nlpClient, onIssuesUpdated, debounceMs = 500 } = options;
+  const { enabled, ruleRunner, nlpClient, onIssuesUpdated, onNlpError, debounceMs = 500 } = options;
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let processingVersion = 0;
@@ -84,6 +70,11 @@ export function createLintingPlugin(
 
   // Ignored corrections list (updated dynamically via setMeta)
   let currentIgnoredCorrections: IgnoredCorrection[] = options.ignoredCorrections ?? [];
+
+  // NLP error state: tracks whether tokenization has failed.
+  // When true, L2 (morphological) rules are explicitly disabled
+  // and the user has been notified via onNlpError callback.
+  let nlpErrorFired = false;
 
   // Lint result cache: paragraph text -> LintIssue[]
   // Minimizes rule execution and prevents flicker on scroll
@@ -152,6 +143,8 @@ export function createLintingPlugin(
           // Update nlpClient reference if provided
           if ('nlpClient' in meta) {
             currentNlpClient = meta.nlpClient ?? null;
+            // Reset NLP error state when client changes (enables retry)
+            nlpErrorFired = false;
             // Clear caches when NLP client changes to avoid stale L2 results
             issueCache.clear();
             tokenCache.clear();
@@ -327,7 +320,7 @@ export function createLintingPlugin(
               if (version !== processingVersion) return;
 
               let issues: LintIssue[];
-              if (hasMorphRules && nlp) {
+              if (hasMorphRules && nlp && !nlpErrorFired) {
                 // Get or compute tokens for L2 rules
                 let tokens = tokenCache.get(paragraph.text);
                 if (!tokens) {
@@ -335,12 +328,22 @@ export function createLintingPlugin(
                     tokens = await nlp.tokenizeParagraph(paragraph.text);
                     tokenCache.set(paragraph.text, tokens);
                   } catch (err) {
-                    console.warn('[Linting] Tokenization failed, falling back to empty tokens:', err);
-                    tokens = [];
+                    const error = err instanceof Error ? err : new Error(String(err));
+                    console.error('[Linting] NLP tokenization failed — L2 rules disabled:', error);
+                    // Fire the error callback once per failure episode
+                    if (!nlpErrorFired) {
+                      nlpErrorFired = true;
+                      onNlpError?.(error);
+                    }
+                    // Fall back to L1-only rules (no tokens)
+                    issues = currentRuleRunner.runAll(paragraph.text);
+                    issueCache.set(paragraph.text, issues);
+                    continue;
                   }
                 }
                 issues = currentRuleRunner.runAllWithTokens(paragraph.text, tokens);
               } else {
+                // No NLP available or NLP has failed — run L1 rules only
                 issues = currentRuleRunner.runAll(paragraph.text);
               }
               issueCache.set(paragraph.text, issues);
@@ -353,9 +356,10 @@ export function createLintingPlugin(
           // Document-level rules are fast (L1/L2) so recomputing is acceptable
           documentIssueCache = null;
           if (currentRuleRunner.hasDocumentRules()) {
-            if (hasMorphRules && nlp) {
+            if (hasMorphRules && nlp && !nlpErrorFired) {
               // Tokenize all paragraphs for morphological document rules (use cache where possible)
               const paragraphsWithTokens = [];
+              let docNlpFailed = false;
               for (const p of allParagraphs) {
                 if (version !== processingVersion) return;
                 let tokens = tokenCache.get(p.text);
@@ -363,13 +367,27 @@ export function createLintingPlugin(
                   try {
                     tokens = await nlp.tokenizeParagraph(p.text);
                     tokenCache.set(p.text, tokens);
-                  } catch {
-                    tokens = [];
+                  } catch (err) {
+                    const error = err instanceof Error ? err : new Error(String(err));
+                    console.error('[Linting] NLP tokenization failed during document rules — L2 rules disabled:', error);
+                    if (!nlpErrorFired) {
+                      nlpErrorFired = true;
+                      onNlpError?.(error);
+                    }
+                    docNlpFailed = true;
+                    break;
                   }
                 }
                 paragraphsWithTokens.push({ text: p.text, index: p.index, tokens });
               }
-              documentIssueCache = currentRuleRunner.runDocumentWithTokens(paragraphsWithTokens);
+              if (!docNlpFailed) {
+                documentIssueCache = currentRuleRunner.runDocumentWithTokens(paragraphsWithTokens);
+              } else {
+                // Fall back to L1-only document rules
+                documentIssueCache = currentRuleRunner.runDocument(
+                  allParagraphs.map(p => ({ text: p.text, index: p.index }))
+                );
+              }
             } else {
               documentIssueCache = currentRuleRunner.runDocument(
                 allParagraphs.map(p => ({ text: p.text, index: p.index }))
@@ -412,19 +430,14 @@ export function createLintingPlugin(
               // Pessimistic LLM validation: hide issues until LLM confirms them
               const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
               const needsValidation = llmEnabled && !ruleConfig?.skipLlmValidation;
-              console.debug('[Linting:pessimistic]', issue.ruleId, issueText,
-                { llmEnabled, skipLlmValidation: ruleConfig?.skipLlmValidation, needsValidation });
               if (needsValidation) {
                 const vKey = LintIssueValidator.issueKey(issue, paragraph.text);
                 const cachedResult = validationCache.get(vKey);
-                console.debug('[Linting:pessimistic] vKey=', vKey, 'cachedResult=', cachedResult);
                 // Skip unless LLM has explicitly confirmed this issue as valid
                 if (cachedResult !== true) {
-                  console.debug('[Linting:pessimistic] HIDDEN (awaiting LLM):', issue.ruleId, issueText);
                   pendingLlmCount++;
                   continue;
                 }
-                console.debug('[Linting:pessimistic] SHOWN (LLM confirmed):', issue.ruleId, issueText);
               }
 
               const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
@@ -459,7 +472,6 @@ export function createLintingPlugin(
 
           // Notify parent of all issues (with pending flag if LLM validation is still needed)
           const llmPending = pendingLlmCount > 0;
-          console.debug('[Linting:pessimistic] issues shown:', allIssues.length, 'pending LLM:', pendingLlmCount);
           onIssuesUpdated?.(allIssues, { llmPending });
 
           // Schedule L3 (LLM) linting with longer debounce
@@ -477,12 +489,10 @@ export function createLintingPlugin(
         view: EditorView,
         allParagraphs: ParagraphInfo[],
       ): void {
-        console.debug('[Linting:LLM] scheduleLlmUpdate called',
-          { hasClient: !!currentLlmClient, llmEnabled, llmInFlight, forceLlmValidation, modelId: currentLlmModelId });
-        if (!currentLlmClient) { console.debug('[Linting:LLM] BAIL: no llmClient'); return; }
+        if (!currentLlmClient) return;
         const isForced = forceLlmValidation;
-        if (!isForced && !llmEnabled) { console.debug('[Linting:LLM] BAIL: not enabled and not forced'); return; }
-        if (llmInFlight) { console.debug('[Linting:LLM] BAIL: already in flight'); return; }
+        if (!isForced && !llmEnabled) return;
+        if (llmInFlight) return;
 
         // Consume the one-shot flag
         forceLlmValidation = false;
@@ -501,13 +511,11 @@ export function createLintingPlugin(
 
           try {
             // Ensure model is loaded before inference — bail if no modelId
-            console.debug('[Linting:LLM] loadModel?', { modelId: currentLlmModelId });
             if (!currentLlmModelId) {
               console.warn('[Linting:LLM] BAIL: no modelId — cannot load model');
               return;
             }
             await currentLlmClient!.loadModel(currentLlmModelId);
-            console.debug('[Linting:LLM] model loaded OK');
 
             // --- Step 1: Validate L1/L2 issues ---
             const unvalidatedIssues: ValidatableIssue[] = [];
@@ -528,18 +536,14 @@ export function createLintingPlugin(
               }
             }
 
-            console.debug('[Linting:LLM] unvalidated issues:', unvalidatedIssues.length);
             if (unvalidatedIssues.length > 0) {
-              console.debug('[Linting:LLM] calling issueValidator.validate...');
-              let validatedCount = 0;
-              const validationResults = await issueValidator.validate(
+              await issueValidator.validate(
                 unvalidatedIssues,
                 currentLlmClient!,
                 llmAbortController!.signal,
                 (key, valid) => {
                   // Write to cache immediately and rebuild decorations per-result
                   // so each confirmed/dismissed issue appears in the UI right away
-                  validatedCount++;
                   validationCache.set(key, valid);
                   if (processingVersion === version) {
                     rebuildDecorationsWithLlm(view, allParagraphs, false);
@@ -550,8 +554,6 @@ export function createLintingPlugin(
               if (processingVersion !== version) return;
 
               // Write fail-open results for any issues not returned by the LLM
-              const dismissedCount = [...validationResults.values()].filter(r => !r.valid).length;
-              console.debug('[Linting:LLM] validation done. dismissed:', dismissedCount, '/', validatedCount);
               for (const issue of unvalidatedIssues) {
                 const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
                 if (!validationCache.has(key)) {

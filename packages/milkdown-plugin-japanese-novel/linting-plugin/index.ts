@@ -27,6 +27,9 @@ export interface LintingOptions {
   ignoredCorrections?: IgnoredCorrection[];
   /** Callback when lint issues are updated */
   onIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
+  /** Callback fired when NLP tokenization fails (e.g., kuromoji init error).
+   *  Called once per failure episode (not per-paragraph). */
+  onNlpError?: (error: Error) => void;
   /** Debounce time in milliseconds */
   debounceMs?: number;
 }
@@ -43,6 +46,7 @@ export function linting(options: LintingOptions = {}) {
     ruleRunner = null,
     nlpClient = null,
     onIssuesUpdated,
+    onNlpError,
     debounceMs = 500,
   } = options;
 
@@ -51,6 +55,7 @@ export function linting(options: LintingOptions = {}) {
     ruleRunner,
     nlpClient,
     onIssuesUpdated,
+    onNlpError,
     debounceMs,
   }));
 }

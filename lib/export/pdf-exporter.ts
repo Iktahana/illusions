@@ -46,21 +46,45 @@ export async function generatePdf(
       offscreen: true,
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
     },
   });
 
+  // Set a strict CSP header to block all script execution and data: URLs.
+  // This is a defense-in-depth measure alongside html:false in markdown-it
+  // and the CSP meta tag in the HTML document.
+  hiddenWin.webContents.session.webRequest.onHeadersReceived(
+    (details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          "Content-Security-Policy": [
+            "default-src 'none'; style-src 'unsafe-inline'; img-src 'self';",
+          ],
+        },
+      });
+    }
+  );
+
   try {
-    // Load HTML content into the hidden window
+    // Register did-finish-load listener BEFORE loadURL to avoid race condition
+    // where data: URLs finish loading before the listener is attached (#513)
+    const loadPromise = new Promise<void>((resolve) => {
+      hiddenWin.webContents.once("did-finish-load", () => resolve());
+    });
+
+    // Load HTML content into the hidden window.
+    // Uses data: URL which is necessary for inline HTML rendering.
+    // The CSP meta tag in the HTML itself blocks script execution.
     await hiddenWin.loadURL(
       `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
     );
 
-    // Wait for content to render
-    await new Promise<void>((resolve) => {
-      hiddenWin.webContents.once("did-finish-load", () => resolve());
-      // Fallback timeout in case did-finish-load already fired
-      setTimeout(() => resolve(), 1000);
-    });
+    // Wait for did-finish-load to fire (guaranteed since listener was registered first)
+    await loadPromise;
+
+    // Brief delay to allow CSS paint to complete
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Map page size to physical dimensions in microns
     const pageSizes: Record<string, { width: number; height: number }> = {

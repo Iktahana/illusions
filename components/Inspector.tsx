@@ -165,9 +165,10 @@ export default function Inspector({
   // 原稿用紙換算（400字/枚）
   const manuscriptPages = Math.ceil(charCount / 400);
 
-   const formatTime = (timestamp: number | null) => {
-     if (!timestamp) return "未保存";
+   const formatTime = (timestamp: number | null): string => {
+     if (!timestamp || timestamp <= 0) return "未保存";
      const date = new Date(timestamp);
+     if (isNaN(date.getTime())) return "未保存";
      const now = new Date();
      const diffMs = now.getTime() - date.getTime();
      const diffSecs = Math.floor(diffMs / 1000);
