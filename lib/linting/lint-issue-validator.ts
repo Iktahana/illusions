@@ -64,16 +64,23 @@ export class LintIssueValidator {
 
       try {
         const prompt = this.buildPrompt(batch);
+        console.debug('[LintIssueValidator] prompt:\n', prompt);
         const result = await llmClient.infer(prompt, {
           signal,
           maxTokens: batch.length * 30,
         });
+        console.debug('[LintIssueValidator] raw LLM response:\n', result.text);
+        console.debug('[LintIssueValidator] tokens used:', result.tokenCount);
         const parsed = this.parseResponse(result.text, batch.length);
+        console.debug('[LintIssueValidator] parsed results:', parsed);
 
         for (const entry of parsed) {
           if (entry.id >= 0 && entry.id < batch.length && !entry.valid) {
             const issue = batch[entry.id];
-            dismissed.add(LintIssueValidator.issueKey(issue, issue.paragraphText));
+            const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
+            console.debug('[LintIssueValidator] DISMISSED:', issue.ruleId,
+              issue.paragraphText.slice(issue.from, issue.to), key);
+            dismissed.add(key);
           }
         }
       } catch (error) {

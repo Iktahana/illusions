@@ -521,9 +521,14 @@ export function createLintingPlugin(
               if (processingVersion !== version) return;
 
               // Update validation cache
+              console.debug('[Linting:LLM] validation done. dismissed:', dismissed.size, '/', unvalidatedIssues.length);
               for (const issue of unvalidatedIssues) {
                 const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
-                validationCache.set(key, !dismissed.has(key));
+                const valid = !dismissed.has(key);
+                validationCache.set(key, valid);
+                console.debug('[Linting:LLM] cache set:', issue.ruleId,
+                  issue.paragraphText.slice(issue.from, issue.to),
+                  valid ? 'VALID' : 'DISMISSED');
               }
             }
 
