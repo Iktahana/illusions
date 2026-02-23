@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, ChevronDown, ChevronRight, EyeOff, Info, Lightbulb, ListFilter, RefreshCw, Settings, XCircle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, EyeOff, Info, Lightbulb, ListFilter, Loader2, RefreshCw, Settings, XCircle } from "lucide-react";
 import clsx from "clsx";
 
 import { LINT_PRESETS, LINT_RULES_META, LINT_RULE_CATEGORIES } from "@/lib/linting/lint-presets";
@@ -186,14 +186,21 @@ function IssueCard({
         className="w-full text-left px-3 py-2"
       >
         <div className="flex items-start gap-2">
-          {/* Severity dot */}
-          <span
-            className={clsx(
-              "w-2 h-2 rounded-full shrink-0 mt-1.5",
-              severityColor(issue.severity)
+          {/* Severity dot + validation spinner */}
+          <span className="relative shrink-0 mt-1.5 w-2 h-2">
+            <span
+              className={clsx(
+                "w-2 h-2 rounded-full block",
+                severityColor(issue.severity)
+              )}
+              title={SEVERITY_LABELS[issue.severity]}
+            />
+            {issue.llmValidated === undefined && (
+              <span className="absolute -top-0.5 -left-0.5" title="確認中">
+                <Loader2 className="w-3 h-3 animate-spin text-foreground-tertiary" />
+              </span>
             )}
-            title={SEVERITY_LABELS[issue.severity]}
-          />
+          </span>
           {/* Content: original → replacement or just message */}
           <div className="flex-1 min-w-0">
             {hasOriginal && hasFix ? (
@@ -252,12 +259,13 @@ export default function CorrectionsPanel({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const issueListRef = useRef<HTMLDivElement>(null);
 
-  const filteredIssues = useMemo(() =>
-    severityFilter === "all"
-      ? lintIssues
-      : lintIssues.filter((issue) => issue.severity === severityFilter),
-    [lintIssues, severityFilter]
-  );
+  const filteredIssues = useMemo(() => {
+    // Hide issues rejected by LLM validation
+    const validated = lintIssues.filter((issue) => issue.llmValidated !== false);
+    return severityFilter === "all"
+      ? validated
+      : validated.filter((issue) => issue.severity === severityFilter);
+  }, [lintIssues, severityFilter]);
 
   /** Sort issues based on the current sort mode */
   const sortedIssues = useMemo(() => {

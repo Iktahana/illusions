@@ -29,6 +29,8 @@ export interface LintIssue {
   reference?: LintReference;
   /** Original text at [from, to] when the issue was detected, used to verify before applying a fix */
   originalText?: string;
+  /** LLM validation state: undefined = pending, true = confirmed, false = rejected */
+  llmValidated?: boolean;
   /** Optional fix suggestion */
   fix?: {
     label: string;
