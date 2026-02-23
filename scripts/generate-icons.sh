@@ -226,11 +226,11 @@ else
   exit 1
 fi
 
-# Square310x310Logo — large Start tile
-if convert "$ICON_DIR/illusions.png" -resize 310x310 "$APPX_DIR/Square310x310Logo.png" 2>/dev/null; then
-  log_info "Generated appx/Square310x310Logo.png (310×310)"
+# LargeTile (Square310x310) — large Start tile
+if convert "$ICON_DIR/illusions.png" -resize 310x310 "$APPX_DIR/LargeTile.png" 2>/dev/null; then
+  log_info "Generated appx/LargeTile.png (310×310)"
 else
-  log_error "Failed to generate appx/Square310x310Logo.png"
+  log_error "Failed to generate appx/LargeTile.png"
   exit 1
 fi
 
