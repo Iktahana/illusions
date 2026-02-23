@@ -85,6 +85,10 @@ git branch -d feature/<branch-name>
 - Worktree directory naming convention: `illusions-work-<short-name>`
 - Always verify the worktree is removed after merge (`git worktree list`)
 - If a worktree is left behind from a previous session, ask the user before cleaning up
+- **NEVER remove a worktree without first verifying it contains no in-progress work**
+  - Check `git log main..<branch>` to see if there are unmerged commits
+  - Check `git status` inside the worktree for uncommitted changes
+  - Only remove if the branch has been fully merged OR the user explicitly confirms deletion
 
 # ============================================================================
 # 🟡 HIGH PRIORITY RULES
@@ -426,6 +430,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 ## Before Starting Work (Every Time!)
 - [ ] **Check for stale worktrees**: Run `git worktree list` to find leftover worktrees
 - [ ] **Check for old branches**: Run `git branch` to find feature branches
+- [ ] **Verify worktree status before cleanup**: For each stale worktree, check `git log main..<branch>` for unmerged commits and `git status` for uncommitted changes — NEVER remove a worktree with in-progress work without explicit user confirmation
 - [ ] **Ask user if cleanup needed**: If old worktrees/branches exist, ask user before proceeding
 - [ ] **Create a new worktree**: `git worktree add ../illusions-work-<name> -b feature/<name>`
 
