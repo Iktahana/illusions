@@ -48,6 +48,8 @@ export interface LintingSettingsUpdate {
   /** @deprecated Use changeReason instead */
   forceFullScan?: boolean;
   ignoredCorrections?: IgnoredCorrection[];
+  /** Model ID for LLM inference (required for loadModel before infer) */
+  llmModelId?: string | null;
   /** Current correction mode (novel, official, blog, academic, sns) for LLM validation */
   correctionMode?: string;
   /** Identifies the trigger for this change, enabling precise cache invalidation */

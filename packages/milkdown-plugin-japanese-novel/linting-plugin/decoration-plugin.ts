@@ -101,6 +101,9 @@ export function createLintingPlugin(
   // When true, the next scheduleViewportUpdate will scan ALL paragraphs (not just visible)
   let pendingFullScan = false;
 
+  // When true, update() should immediately notify parent with empty issues
+  let pendingIssuesClear = false;
+
   // When true, the next scheduleLlmUpdate will run L1/L2 validation even if llmEnabled is false
   let forceLlmValidation = false;
 
@@ -173,6 +176,10 @@ export function createLintingPlugin(
               // Keep validationCache — L1/L2 validation runs independently
             }
           }
+          // Update llmModelId for model loading before inference
+          if ('llmModelId' in meta) {
+            currentLlmModelId = meta.llmModelId ?? null;
+          }
           // Update correctionMode for LLM validation context
           if ('correctionMode' in meta && meta.correctionMode) {
             issueValidator.setMode(meta.correctionMode);
@@ -196,6 +203,7 @@ export function createLintingPlugin(
                 if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
                 llmInFlight = false;
                 pendingFullScan = true;
+                pendingIssuesClear = true;
                 break;
               case "rule-config-change":
               case "guideline-change":
@@ -235,8 +243,8 @@ export function createLintingPlugin(
             decorations: pluginState.decorations,
             enabled: meta.enabled ?? pluginState.enabled,
           };
-          // Clear decorations when disabled
-          if (meta.enabled === false) {
+          // Clear decorations when disabled or on refresh/mode-change
+          if (meta.enabled === false || pendingIssuesClear) {
             updated.decorations = DecorationSet.empty;
           }
           return updated;
@@ -685,6 +693,12 @@ export function createLintingPlugin(
           }
 
           if (!state?.enabled) return;
+
+          // Immediately notify parent to clear the issues list on refresh/mode-change
+          if (pendingIssuesClear) {
+            pendingIssuesClear = false;
+            onIssuesUpdated?.([]);
+          }
 
           // Full scan requested (e.g. ignored corrections changed)
           if (pendingFullScan) {

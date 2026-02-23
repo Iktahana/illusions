@@ -233,7 +233,7 @@ export function useLinting(
       ({ updateLintingSettings }) => {
         updateLintingSettings(
           editorViewInstance,
-          { correctionMode },
+          { correctionMode, llmModelId },
           "mode-change",
         );
       },
@@ -274,6 +274,7 @@ export function useLinting(
             nlpClient,
             llmClient,
             llmEnabled,
+            llmModelId,
           },
           "manual-refresh",
         );
@@ -282,7 +283,7 @@ export function useLinting(
       console.error("[useLinting] Failed to refresh linting:", err);
       setIsLinting(false);
     });
-  }, [editorViewInstance, lintingEnabled, llmEnabled]);
+  }, [editorViewInstance, lintingEnabled, llmEnabled, llmModelId]);
 
   return {
     ruleRunner,
