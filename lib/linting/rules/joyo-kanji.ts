@@ -126,6 +126,7 @@ export class JoyoKanjiRule extends AbstractLintRule {
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
     severity: "info",
+    skipDialogue: true,
     options: { allowJinmeiyo: true } satisfies JoyoKanjiOptions,
   };
 

@@ -151,6 +151,7 @@ export class ConjugationErrorRule extends AbstractLintRule {
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
     severity: "warning",
+    skipDialogue: true,
   };
 
   lint(text: string, config: LintRuleConfig): LintIssue[] {

@@ -102,6 +102,7 @@ export class ParticleNoRepetitionRule extends AbstractLintRule {
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
     severity: "info",
+    skipDialogue: true,
     options: {
       threshold: 4,
     },
