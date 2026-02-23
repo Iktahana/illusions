@@ -20,3 +20,11 @@ export {
   AbstractMorphologicalDocumentLintRule,
 } from "./base-rule";
 export { RuleRunner } from "./rule-runner";
+
+export type {
+  ConfigChangeReason,
+  CorrectionModeId,
+  GuidelineId,
+  CorrectionConfig,
+} from "./correction-config";
+export { DEFAULT_CORRECTION_CONFIG } from "./correction-config";
