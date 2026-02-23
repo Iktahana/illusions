@@ -79,7 +79,7 @@ export interface UseLintingResult {
   ruleRunner: RuleRunner;
   lintIssues: LintIssue[];
   isLinting: boolean;
-  handleLintIssuesUpdated: (issues: LintIssue[]) => void;
+  handleLintIssuesUpdated: (issues: LintIssue[], complete: boolean) => void;
   refreshLinting: () => void;
 }
 
@@ -197,10 +197,10 @@ export function useLinting(
     }
   }, [ruleRunner, lintingRuleConfigs]);
 
-  const handleLintIssuesUpdated = useCallback((issues: LintIssue[]) => {
+  const handleLintIssuesUpdated = useCallback((issues: LintIssue[], complete: boolean) => {
     if (!lintingEnabled) return;
     setLintIssues(issues);
-    setIsLinting(false);
+    if (complete) setIsLinting(false);
   }, [lintingEnabled]);
 
   // Sync active guidelines to RuleRunner and trigger re-lint when guidelines change
@@ -253,6 +253,7 @@ export function useLinting(
     if (!editorViewInstance || !lintingEnabled) return;
 
     setIsLinting(true);
+    setLintIssues([]);
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
       ({ updateLintingSettings }) => {
         const nlpClient = ruleRunnerRef.current?.hasMorphologicalRules()

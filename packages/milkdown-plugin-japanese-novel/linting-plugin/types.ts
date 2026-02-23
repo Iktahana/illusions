@@ -22,7 +22,7 @@ export interface LintingPluginOptions {
   nlpClient?: INlpClient | null;
   llmClient?: ILlmClient | null;
   ignoredCorrections?: IgnoredCorrection[];
-  onIssuesUpdated?: (issues: LintIssue[]) => void;
+  onIssuesUpdated?: (issues: LintIssue[], complete: boolean) => void;
   debounceMs?: number;
 }
 

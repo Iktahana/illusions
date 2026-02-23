@@ -431,10 +431,10 @@ export function createLintingPlugin(
           const tr = view.state.tr.setMeta(lintingKey, { decorations });
           view.dispatch(tr);
 
-          // Notify parent of all issues
-          onIssuesUpdated?.(allIssues);
+          // Notify parent — not complete yet if LLM client is available
+          onIssuesUpdated?.(allIssues, currentLlmClient === null);
 
-          // Schedule L3 (LLM) linting with longer debounce
+          // Schedule LLM validation + L3 rules
           scheduleLlmUpdate(view, allParagraphs);
 
         }, debounceMs);
@@ -474,6 +474,7 @@ export function createLintingPlugin(
             const modelReady = await currentLlmClient!.isModelLoaded();
             if (!modelReady) {
               console.debug("[Linting] LLM model not loaded, skipping validation & L3 rules");
+              onIssuesUpdated?.([], true);
               return;
             }
 
@@ -662,8 +663,8 @@ export function createLintingPlugin(
         const tr = view.state.tr.setMeta(lintingKey, { decorations });
         view.dispatch(tr);
 
-        // Notify parent of all issues
-        onIssuesUpdated?.(allIssues);
+        // Notify parent — LLM phase complete
+        onIssuesUpdated?.(allIssues, true);
       }
 
       return {
@@ -685,10 +686,9 @@ export function createLintingPlugin(
 
           if (!state?.enabled) return;
 
-          // Immediately notify parent to clear the issues list on refresh/mode-change
+          // Reset clear flag (decorations already cleared in apply())
           if (pendingIssuesClear) {
             pendingIssuesClear = false;
-            onIssuesUpdated?.([]);
           }
 
           // Full scan requested (e.g. ignored corrections changed)

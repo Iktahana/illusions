@@ -42,6 +42,8 @@ class LlmEngine {
   #modelsDir = null;
   /** @type {boolean} */
   #initialized = false;
+  /** @type {Promise<any>} Serialization queue — ensures only one inference runs at a time */
+  #inferQueue = Promise.resolve();
 
   async init() {
     if (this.#initialized) return;
@@ -266,7 +268,10 @@ class LlmEngine {
   }
 
   /**
-   * Run inference on the loaded model
+   * Run inference on the loaded model.
+   * Requests are serialized via a queue because the LlamaContext has only
+   * one sequence slot — concurrent getSequence() calls would throw
+   * "No sequences left".
    * @param {string} prompt
    * @param {{ maxTokens?: number }} [options]
    */
@@ -275,20 +280,32 @@ class LlmEngine {
       throw new Error('Model not loaded. Call loadModel() first.');
     }
 
-    const { LlamaChatSession } = await import('node-llama-cpp');
-    const session = new LlamaChatSession({
-      contextSequence: this.#context.getSequence(),
+    // Chain onto the queue so only one inference occupies the sequence at a time
+    const result = this.#inferQueue.then(async () => {
+      const { LlamaChatSession } = await import('node-llama-cpp');
+      const sequence = this.#context.getSequence();
+      const session = new LlamaChatSession({
+        contextSequence: sequence,
+      });
+
+      const maxTokens = options.maxTokens || 512;
+      let tokenCount = 0;
+
+      try {
+        const text = await session.prompt(prompt, {
+          maxTokens,
+          onToken: () => { tokenCount++; },
+        });
+        return { text, tokenCount };
+      } finally {
+        session.dispose({ disposeSequence: true });
+      }
     });
 
-    const maxTokens = options.maxTokens || 512;
-    let tokenCount = 0;
+    // Update queue — swallow errors so subsequent requests still run
+    this.#inferQueue = result.catch(() => {});
 
-    const text = await session.prompt(prompt, {
-      maxTokens,
-      onToken: () => { tokenCount++; },
-    });
-
-    return { text, tokenCount };
+    return result;
   }
 
   /**

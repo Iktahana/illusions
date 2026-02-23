@@ -1,21 +1,21 @@
 /**
  * LLM-based post-validator for L1/L2 lint issues.
- * Batch-sends issues to the LLM to filter out false positives.
+ * Validates each issue individually with concurrency control.
  *
- * Prompt template: prompts/lint-validation/index.ts (ISSUE_VALIDATOR_PROMPT)
+ * Prompt template: prompts/lint-validation/index.ts (CANDIDATE_VALIDATOR_PROMPT)
  */
 
 import type { ILlmClient } from "@/lib/llm-client/types";
 import type { LintIssue } from "./types";
-import { ISSUE_VALIDATOR_PROMPT } from "@/prompts/lint-validation";
+import { CANDIDATE_VALIDATOR_PROMPT } from "@/prompts/lint-validation";
 
 /** Issue with its surrounding paragraph context */
 export interface ValidatableIssue extends LintIssue {
   paragraphText: string;
 }
 
-/** Maximum number of issues per LLM call (~50 tokens each) */
-const MAX_ISSUES_PER_BATCH = 50;
+/** Max concurrent LLM inference calls */
+const CONCURRENCY_LIMIT = 3;
 
 /** Characters of context to include before/after the flagged text */
 const CONTEXT_CHARS = 30;
@@ -41,7 +41,7 @@ export class LintIssueValidator {
   }
 
   /**
-   * Validate a batch of L1/L2 issues using the LLM.
+   * Validate L1/L2 issues one-by-one with concurrency control.
    * Returns a Set of issue keys that the LLM judged as false positives (dismissed).
    */
   async validate(
@@ -52,109 +52,119 @@ export class LintIssueValidator {
     const dismissed = new Set<string>();
 
     if (issues.length === 0) return dismissed;
+    if (!llmClient.isAvailable()) return dismissed;
 
-    // Split into batches if needed
-    const batches: ValidatableIssue[][] = [];
-    for (let i = 0; i < issues.length; i += MAX_ISSUES_PER_BATCH) {
-      batches.push(issues.slice(i, i + MAX_ISSUES_PER_BATCH) as ValidatableIssue[]);
+    try {
+      const isLoaded = await llmClient.isModelLoaded();
+      if (!isLoaded) return dismissed;
+    } catch {
+      return dismissed;
     }
 
-    for (const batch of batches) {
-      if (signal?.aborted) break;
+    // Create one task per issue
+    const tasks = issues.map((issue) => async () => {
+      if (signal?.aborted) return;
 
       try {
-        const prompt = this.buildPrompt(batch);
+        const prompt = this.buildSinglePrompt(issue);
+        console.debug(`[LintIssueValidator] [${issue.ruleId}] Prompt:\n`, prompt);
+
         const result = await llmClient.infer(prompt, {
           signal,
-          maxTokens: batch.length * 30,
+          maxTokens: 60,
         });
-        const parsed = this.parseResponse(result.text, batch.length);
+        console.debug(`[LintIssueValidator] [${issue.ruleId}] Response:\n`, result.text);
 
-        for (const entry of parsed) {
-          if (entry.id >= 0 && entry.id < batch.length && !entry.valid) {
-            const issue = batch[entry.id];
-            dismissed.add(LintIssueValidator.issueKey(issue, issue.paragraphText));
-          }
+        const valid = this.parseSingleResponse(result.text);
+        if (valid === false) {
+          dismissed.add(LintIssueValidator.issueKey(issue, issue.paragraphText));
         }
       } catch (error) {
-        if ((error as Error).name === "AbortError") break;
-        console.warn("[LintIssueValidator] Batch validation failed:", error);
-        // On failure, keep all issues (fail-open)
+        if ((error as Error).name === "AbortError") return;
+        console.warn(`[LintIssueValidator] Validation failed for ${issue.ruleId}:`, error);
+        // Fail-open: keep the issue
       }
-    }
+    });
+
+    // Run with concurrency limit
+    await runConcurrent(tasks, CONCURRENCY_LIMIT, signal);
 
     return dismissed;
   }
 
   /**
-   * Build the prompt for a batch of issues.
+   * Build a prompt for a single issue using CANDIDATE_VALIDATOR_PROMPT.
    */
-  private buildPrompt(issues: ReadonlyArray<ValidatableIssue>): string {
-    const issueLines: string[] = [];
+  private buildSinglePrompt(issue: ValidatableIssue): string {
+    const flaggedText = issue.paragraphText.slice(issue.from, issue.to);
+    const contextBefore = issue.paragraphText.slice(
+      Math.max(0, issue.from - CONTEXT_CHARS),
+      issue.from,
+    );
+    const contextAfter = issue.paragraphText.slice(
+      issue.to,
+      Math.min(issue.paragraphText.length, issue.to + CONTEXT_CHARS),
+    );
 
-    for (let i = 0; i < issues.length; i++) {
-      const issue = issues[i];
-      const flaggedText = issue.paragraphText.slice(issue.from, issue.to);
-      const contextBefore = issue.paragraphText.slice(
-        Math.max(0, issue.from - CONTEXT_CHARS),
-        issue.from,
-      );
-      const contextAfter = issue.paragraphText.slice(
-        issue.to,
-        Math.min(issue.paragraphText.length, issue.to + CONTEXT_CHARS),
-      );
-
-      issueLines.push(
-        `[${i}] ルール: ${issue.ruleId}`,
-        `   箇所:「${flaggedText}」`,
-        `   理由: ${issue.messageJa}`,
-        `   前後:「...${contextBefore}<<${flaggedText}>>${contextAfter}...」`,
-        "",
-      );
-    }
-
-    return ISSUE_VALIDATOR_PROMPT
+    return CANDIDATE_VALIDATOR_PROMPT
       .replace("{{MODE}}", this.mode)
-      .replace("{{ISSUES}}", issueLines.join("\n"));
+      .replace("{{CONTEXT}}", `...${contextBefore}<<${flaggedText}>>${contextAfter}...`)
+      .replace("{{RULE_ID}}", issue.ruleId)
+      .replace("{{FROM}}–{{TO}}", `「${flaggedText}」`)
+      .replace("{{MESSAGE_JA}}", issue.messageJa ?? "")
+      .replace("{{VALIDATION_HINT}}", "");
   }
 
   /**
-   * Parse the LLM response, extracting the JSON array of validation results.
-   * Handles malformed output gracefully.
+   * Parse a single-issue LLM response: {"valid":true} or {"valid":false}.
+   * Returns null on parse failure (fail-open: issue is kept).
    */
-  private parseResponse(
-    text: string,
-    expectedCount: number,
-  ): Array<{ id: number; valid: boolean }> {
-    // Try to extract a JSON array from the response
-    const jsonMatch = text.match(/\[[\s\S]*?\]/);
-    if (!jsonMatch) return [];
+  private parseSingleResponse(text: string): boolean | null {
+    const match = text.match(/\{[\s\S]*?\}/);
+    if (!match) return null;
 
     try {
-      const parsed: unknown = JSON.parse(jsonMatch[0]);
-      if (!Array.isArray(parsed)) return [];
-
-      const results: Array<{ id: number; valid: boolean }> = [];
-      for (const item of parsed) {
-        if (
-          typeof item === "object" &&
-          item !== null &&
-          "id" in item &&
-          "valid" in item &&
-          typeof (item as Record<string, unknown>).id === "number" &&
-          typeof (item as Record<string, unknown>).valid === "boolean"
-        ) {
-          const entry = item as { id: number; valid: boolean };
-          if (entry.id >= 0 && entry.id < expectedCount) {
-            results.push(entry);
-          }
-        }
+      const parsed: unknown = JSON.parse(match[0]);
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        "valid" in parsed &&
+        typeof (parsed as Record<string, unknown>).valid === "boolean"
+      ) {
+        return (parsed as { valid: boolean }).valid;
       }
-
-      return results;
+      return null;
     } catch {
-      return [];
+      return null;
     }
+  }
+}
+
+/**
+ * Run async tasks with a concurrency limit.
+ */
+async function runConcurrent(
+  tasks: Array<() => Promise<void>>,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  const executing = new Set<Promise<void>>();
+
+  for (const task of tasks) {
+    if (signal?.aborted) break;
+
+    const p = task().finally(() => {
+      executing.delete(p);
+    });
+    executing.add(p);
+
+    if (executing.size >= limit) {
+      await Promise.race(executing);
+    }
+  }
+
+  if (executing.size > 0) {
+    await Promise.all(executing);
   }
 }
 

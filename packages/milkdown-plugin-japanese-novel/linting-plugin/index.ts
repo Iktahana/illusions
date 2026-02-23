@@ -26,7 +26,7 @@ export interface LintingOptions {
   /** Ignored corrections to filter out from decorations */
   ignoredCorrections?: IgnoredCorrection[];
   /** Callback when lint issues are updated */
-  onIssuesUpdated?: (issues: LintIssue[]) => void;
+  onIssuesUpdated?: (issues: LintIssue[], complete: boolean) => void;
   /** Debounce time in milliseconds */
   debounceMs?: number;
 }

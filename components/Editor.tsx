@@ -61,7 +61,7 @@ interface EditorProps {
   // リンティング設定
   lintingEnabled?: boolean;
   lintingRuleRunner?: RuleRunner | null;
-  onLintIssuesUpdated?: (issues: LintIssue[]) => void;
+  onLintIssuesUpdated?: (issues: LintIssue[], complete: boolean) => void;
   // スクロール設定
   verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
   scrollSensitivity?: number;
@@ -555,7 +555,7 @@ function MilkdownEditor({
   posHighlightColors?: Record<string, string>;
   lintingEnabled?: boolean;
   lintingRuleRunner?: RuleRunner | null;
-  onLintIssuesUpdated?: (issues: LintIssue[]) => void;
+  onLintIssuesUpdated?: (issues: LintIssue[], complete: boolean) => void;
   verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
   scrollSensitivity?: number;
   onOpenRubyDialog?: () => void;
@@ -669,7 +669,7 @@ function MilkdownEditor({
       .use(linting({
         enabled: false, // 初期化時は無効、後で動的に更新
         debounceMs: 500,
-        onIssuesUpdated: (issues) => onLintIssuesUpdatedRef.current?.(issues),
+        onIssuesUpdated: (issues, complete) => onLintIssuesUpdatedRef.current?.(issues, complete),
       }));
 
     return editor;
