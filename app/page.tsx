@@ -1036,10 +1036,6 @@ export default function EditorPage() {
               incrementEditorKey();
             }}
             onCloseTab={closeTab}
-            onNewTab={(fileType) => {
-              newTab(fileType);
-              incrementEditorKey();
-            }}
             onPinTab={pinTab}
           />
           <div ref={editorDomRef} className="flex-1 min-h-0">

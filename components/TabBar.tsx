@@ -3,15 +3,12 @@
 import { useCallback, useRef, useEffect } from "react";
 import { X } from "lucide-react";
 import type { TabId, TabState } from "@/lib/tab-types";
-import type { SupportedFileExtension } from "@/lib/project-types";
-import NewTabMenu from "./NewTabMenu";
 
 interface TabBarProps {
   tabs: TabState[];
   activeTabId: TabId;
   onSwitchTab: (tabId: TabId) => void;
   onCloseTab: (tabId: TabId) => void;
-  onNewTab: (fileType?: SupportedFileExtension) => void;
   onPinTab?: (tabId: TabId) => void;
   compactMode?: boolean;
 }
@@ -21,7 +18,6 @@ export default function TabBar({
   activeTabId,
   onSwitchTab,
   onCloseTab,
-  onNewTab,
   onPinTab,
   compactMode = false,
 }: TabBarProps) {
@@ -117,11 +113,6 @@ export default function TabBar({
         })}
       </div>
 
-      {/* New tab dropdown menu */}
-      <NewTabMenu
-        onNewTab={(fileType) => onNewTab(fileType)}
-        compactMode={compactMode}
-      />
     </div>
   );
 }
