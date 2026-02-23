@@ -74,14 +74,63 @@ if (!fs.existsSync(nodeModulesDest)) {
   fs.mkdirSync(nodeModulesDest, { recursive: true });
 }
 
-// Native/runtime modules that cannot be bundled by esbuild
+/**
+ * Collect a package and all its production dependencies (transitive).
+ * Handles hoisted dependencies by searching from the project root node_modules.
+ * @param {string} pkgName
+ * @param {Set<string>} collected
+ */
+function collectDepsRecursive(pkgName, collected) {
+  if (collected.has(pkgName)) return;
+  collected.add(pkgName);
+
+  // Try nested node_modules first (for version-conflicting deps), then hoisted
+  const pkgJsonPaths = [
+    join(projectRoot, 'node_modules', pkgName, 'package.json'),
+  ];
+  // Also check if the package is nested inside any of its dependents
+  for (const parent of collected) {
+    if (parent !== pkgName) {
+      pkgJsonPaths.unshift(
+        join(projectRoot, 'node_modules', parent, 'node_modules', pkgName, 'package.json')
+      );
+    }
+  }
+
+  for (const pkgJsonPath of pkgJsonPaths) {
+    if (fs.existsSync(pkgJsonPath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
+        const deps = pkg.dependencies || {};
+        for (const dep of Object.keys(deps)) {
+          collectDepsRecursive(dep, collected);
+        }
+      } catch {
+        // Ignore unreadable package.json
+      }
+      return;
+    }
+  }
+}
+
+// Root external modules that cannot be bundled by esbuild
 // kuromoji: dictionary loading at runtime; better-sqlite3: native addon; node-llama-cpp: native LLM inference
-// bindings + file-uri-to-path are runtime dependencies of better-sqlite3
-const runtimeDeps = [
-  'kuromoji', 'doublearray', 'zlibjs', 'async',
-  'better-sqlite3', 'bindings', 'file-uri-to-path',
+const externalRoots = [
+  'kuromoji',
+  'better-sqlite3',
   'node-llama-cpp',
 ];
+
+// Collect all transitive production dependencies
+const allDeps = new Set();
+for (const root of externalRoots) {
+  collectDepsRecursive(root, allDeps);
+}
+
+// Sort for deterministic output
+const runtimeDeps = [...allDeps].sort();
+
+console.log(`  Found ${runtimeDeps.length} packages to copy (${externalRoots.join(', ')} + transitive deps)`);
 
 /**
  * Recursively remove all .bin directories under a given path.
@@ -101,10 +150,27 @@ function removeDotBinDirs(dir) {
   }
 }
 
+/**
+ * Resolve the actual directory for a package, checking nested node_modules first.
+ * @param {string} dep
+ * @returns {string | null}
+ */
+function resolvePackageDir(dep) {
+  // Check nested locations under each external root
+  for (const root of externalRoots) {
+    const nested = join(projectRoot, 'node_modules', root, 'node_modules', dep);
+    if (fs.existsSync(nested)) return nested;
+  }
+  // Fall back to hoisted location
+  const hoisted = join(projectRoot, 'node_modules', dep);
+  if (fs.existsSync(hoisted)) return hoisted;
+  return null;
+}
+
 for (const dep of runtimeDeps) {
-  const src = join(projectRoot, 'node_modules', dep);
+  const src = resolvePackageDir(dep);
   const dest = join(nodeModulesDest, dep);
-  if (fs.existsSync(src)) {
+  if (src) {
     fs.cpSync(src, dest, { recursive: true });
     // Remove .bin directories that contain symlinks breaking macOS code signing
     removeDotBinDirs(dest);
@@ -120,5 +186,5 @@ console.log('');
 console.log('Bundle summary:');
 console.log('  • Main process: dist-main/main.js');
 console.log('  • Preload script: dist-main/preload.js');
-console.log('  • Runtime deps: dist-main/node_modules/{kuromoji,doublearray,zlibjs,async,better-sqlite3,bindings,file-uri-to-path,node-llama-cpp}');
+console.log(`  • Runtime deps: ${runtimeDeps.length} packages in dist-main/node_modules/`);
 console.log('');
