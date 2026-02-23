@@ -121,6 +121,16 @@ export interface StorageSession {
 }
 
 /**
+ * Recent project entry for project-based storage.
+ * Used by Electron (SQLite) to persist recently opened project directories.
+ */
+export interface RecentProject {
+  id: string;
+  rootPath: string;
+  name: string;
+}
+
+/**
  * プラットフォーム差分を吸収するストレージサービスの中核インターフェース。
  * 実装は Web（IndexedDB）/ Electron（SQLite）双方を扱う。
  */
@@ -189,6 +199,24 @@ export interface IStorageService {
    * エディタバッファを削除する。
    */
   clearEditorBuffer(): Promise<void>;
+
+  /**
+   * Add a project to the recent projects list.
+   * Electron: persists to SQLite. Web: no-op (uses ProjectManager instead).
+   */
+  addRecentProject(project: RecentProject): Promise<void>;
+
+  /**
+   * Get all recent projects.
+   * Electron: reads from SQLite. Web: returns empty array (uses ProjectManager instead).
+   */
+  getRecentProjects(): Promise<RecentProject[]>;
+
+  /**
+   * Remove a project from the recent projects list by its ID.
+   * Electron: removes from SQLite. Web: no-op (uses ProjectManager instead).
+   */
+  removeRecentProject(projectId: string): Promise<void>;
 
   /**
    * すべてのデータを削除する。取り扱い注意。

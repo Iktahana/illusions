@@ -11,6 +11,7 @@ import type {
   StorageSession,
   AppState,
   RecentFile,
+  RecentProject,
   EditorBuffer,
 } from "./storage-types";
 
@@ -311,6 +312,28 @@ export class WebStorageProvider implements IStorageService {
       console.error("エディタバッファの削除に失敗しました:", error);
       throw error;
     }
+  }
+
+  /**
+   * No-op for Web. Project handles are managed by ProjectManager via IndexedDB.
+   */
+  async addRecentProject(_project: RecentProject): Promise<void> {
+    // Web uses ProjectManager for directory handle persistence, not this API.
+  }
+
+  /**
+   * Returns empty array for Web. Project handles are managed by ProjectManager.
+   */
+  async getRecentProjects(): Promise<RecentProject[]> {
+    // Web uses ProjectManager for directory handle persistence, not this API.
+    return [];
+  }
+
+  /**
+   * No-op for Web. Project handles are managed by ProjectManager via IndexedDB.
+   */
+  async removeRecentProject(_projectId: string): Promise<void> {
+    // Web uses ProjectManager for directory handle persistence, not this API.
   }
 
   async clearAll(): Promise<void> {
