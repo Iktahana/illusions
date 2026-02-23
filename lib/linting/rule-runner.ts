@@ -1,7 +1,15 @@
 import type { ILlmClient } from "@/lib/llm-client/types";
 import type { Token } from "@/lib/nlp-client/types";
 
-import type { CorrectionEngine, LintRule, LintRuleConfig, LintIssue } from "./types";
+import type {
+  CorrectionEngine,
+  LintRule,
+  LintRuleConfig,
+  LintIssue,
+  AnalysisContext,
+  CorrectionCandidate,
+  CorrectionRule,
+} from "./types";
 import {
   isDocumentLintRule,
   isLlmLintRule,
@@ -238,5 +246,87 @@ export class RuleRunner {
     }
 
     return allIssues.sort((a, b) => a.from - b.from);
+  }
+}
+
+// ============================================================================
+// CorrectionRuleRunner (Phase D)
+// ============================================================================
+
+/**
+ * Unified rule runner for the new CorrectionRule interface.
+ * Provides a single code path — no L1/L2/L3 branching.
+ *
+ * Run in parallel with the legacy RuleRunner during migration;
+ * once all rules are migrated, RuleRunner can be removed.
+ */
+export class CorrectionRuleRunner {
+  private rules = new Map<string, CorrectionRule>();
+  private configs = new Map<string, LintRuleConfig>();
+
+  /** Register a rule. Uses the rule's defaultConfig if none has been set yet. */
+  register(rule: CorrectionRule): void {
+    this.rules.set(rule.id, rule);
+    if (!this.configs.has(rule.id)) {
+      this.configs.set(rule.id, { ...rule.defaultConfig });
+    }
+  }
+
+  /** Partially override the config for a specific rule. */
+  setConfig(ruleId: string, config: Partial<LintRuleConfig>): void {
+    const existing = this.configs.get(ruleId) ?? { enabled: true, severity: "warning" as const };
+    this.configs.set(ruleId, { ...existing, ...config });
+  }
+
+  /** Get the current merged config for a rule. */
+  getConfig(ruleId: string): LintRuleConfig {
+    return this.configs.get(ruleId) ?? { enabled: true, severity: "warning" as const };
+  }
+
+  /** Run all enabled paragraph-scope rules against the given context. */
+  analyzeParagraph(context: AnalysisContext): CorrectionCandidate[] {
+    const results: CorrectionCandidate[] = [];
+    for (const rule of this.rules.values()) {
+      const config = this.getConfig(rule.id);
+      if (!config.enabled) continue;
+      if (rule.scope !== "paragraph") continue;
+      // Skip morphological rules when no tokens are available
+      if (rule.engine === "morphological" && !context.tokens) continue;
+      try {
+        results.push(...rule.analyze(context, config));
+      } catch (e) {
+        console.error(`[CorrectionRuleRunner] Rule "${rule.id}" error:`, e);
+      }
+    }
+    return results;
+  }
+
+  /** Run all enabled document-scope rules against the given context. */
+  analyzeDocument(context: AnalysisContext): CorrectionCandidate[] {
+    const results: CorrectionCandidate[] = [];
+    for (const rule of this.rules.values()) {
+      const config = this.getConfig(rule.id);
+      if (!config.enabled) continue;
+      if (rule.scope !== "document") continue;
+      if (rule.engine === "morphological" && !context.tokens) continue;
+      try {
+        results.push(...rule.analyze(context, config));
+      } catch (e) {
+        console.error(`[CorrectionRuleRunner] Rule "${rule.id}" error:`, e);
+      }
+    }
+    return results;
+  }
+
+  /** Return all registered rules. */
+  getRegisteredRules(): CorrectionRule[] {
+    return Array.from(this.rules.values());
+  }
+
+  /** Return only enabled rules. */
+  getEnabledRules(): CorrectionRule[] {
+    return Array.from(this.rules.values()).filter(
+      (rule) => this.getConfig(rule.id).enabled,
+    );
   }
 }
