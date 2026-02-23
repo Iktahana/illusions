@@ -42,14 +42,4 @@ export {
 } from "./correction-modes";
 export { getPresetForMode } from "./lint-presets";
 
-// Phase D exports — unified CorrectionRule interface
-export type {
-  AnalysisContext,
-  CorrectionCandidate,
-  CorrectionRule,
-} from "./types";
-export { issueToCandidate, candidateToIssue } from "./types";
-export { AbstractCorrectionRule } from "./base-rule";
-export { CorrectionRuleRunner } from "./rule-runner";
-export { LlmValidator } from "./llm-validator";
 export { RULE_GUIDELINE_MAP } from "./lint-presets";
