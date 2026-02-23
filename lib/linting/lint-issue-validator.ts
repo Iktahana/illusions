@@ -43,11 +43,16 @@ export class LintIssueValidator {
   /**
    * Validate a batch of L1/L2 issues using the LLM.
    * Returns a Map of issue keys → { valid, reason } for all validated issues.
+   *
+   * @param onIssueValidated - Optional callback fired immediately after each individual
+   *   issue result is parsed from the batch response. Use this for incremental UI updates
+   *   so results appear one-by-one rather than all at once.
    */
   async validate(
     issues: ReadonlyArray<ValidatableIssue>,
     llmClient: ILlmClient,
     signal?: AbortSignal,
+    onIssueValidated?: (key: string, valid: boolean) => void,
   ): Promise<Map<string, { valid: boolean; reason?: string }>> {
     const results = new Map<string, { valid: boolean; reason?: string }>();
 
@@ -83,6 +88,8 @@ export class LintIssueValidator {
             console.debug(`[LintIssueValidator] ${verdict}:`, issue.ruleId, flagged,
               'reason:', entry.reason ?? '(none)');
             results.set(key, { valid: entry.valid, reason: entry.reason });
+            // Fire immediately so callers can update UI per-issue without waiting for full batch
+            onIssueValidated?.(key, entry.valid);
           }
         }
       } catch (error) {

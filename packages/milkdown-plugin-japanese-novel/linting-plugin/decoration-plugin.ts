@@ -524,26 +524,33 @@ export function createLintingPlugin(
             console.debug('[Linting:LLM] unvalidated issues:', unvalidatedIssues.length);
             if (unvalidatedIssues.length > 0) {
               console.debug('[Linting:LLM] calling issueValidator.validate...');
+              let validatedCount = 0;
               const validationResults = await issueValidator.validate(
                 unvalidatedIssues,
                 currentLlmClient!,
                 llmAbortController!.signal,
+                (key, valid) => {
+                  // Write to cache immediately and rebuild decorations per-result
+                  // so each confirmed/dismissed issue appears in the UI right away
+                  validatedCount++;
+                  validationCache.set(key, valid);
+                  if (processingVersion === version) {
+                    rebuildDecorationsWithLlm(view, allParagraphs, false);
+                  }
+                },
               );
 
               if (processingVersion !== version) return;
 
-              // Update validation cache
+              // Write fail-open results for any issues not returned by the LLM
               const dismissedCount = [...validationResults.values()].filter(r => !r.valid).length;
-              console.debug('[Linting:LLM] validation done. dismissed:', dismissedCount, '/', unvalidatedIssues.length);
+              console.debug('[Linting:LLM] validation done. dismissed:', dismissedCount, '/', validatedCount);
               for (const issue of unvalidatedIssues) {
                 const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
-                const result = validationResults.get(key);
-                const valid = result ? result.valid : true; // fail-open if missing
-                validationCache.set(key, valid);
-                const flagged = issue.paragraphText.slice(issue.from, issue.to);
-                console.debug('[Linting:LLM] cache set:', issue.ruleId, flagged,
-                  valid ? 'VALID' : 'DISMISSED',
-                  'reason:', result?.reason ?? '(no reason)');
+                if (!validationCache.has(key)) {
+                  // LLM didn't return a verdict for this issue — fail-open (keep it)
+                  validationCache.set(key, true);
+                }
               }
             }
 
@@ -605,10 +612,14 @@ export function createLintingPlugin(
       /**
        * Rebuild decorations merging L1/L2 cached issues + L3 (LLM) cached issues.
        * Called when L3 results arrive asynchronously after L1/L2 decorations are already shown.
+       *
+       * @param complete - Pass false when more results are still coming (keeps spinner active).
+       *   Defaults to true (LLM phase fully complete).
        */
       function rebuildDecorationsWithLlm(
         view: EditorView,
         allParagraphs: ParagraphInfo[],
+        complete: boolean = true,
       ): void {
         const allDecorations: Decoration[] = [];
         const allIssues: LintIssue[] = [];
@@ -697,8 +708,8 @@ export function createLintingPlugin(
         const tr = view.state.tr.setMeta(lintingKey, { decorations });
         view.dispatch(tr);
 
-        // Notify parent of all issues
-        onIssuesUpdated?.(allIssues);
+        // Notify parent — llmPending keeps spinner active for incremental updates
+        onIssuesUpdated?.(allIssues, { llmPending: !complete });
       }
 
       return {
