@@ -205,7 +205,8 @@
         "ja-JP",
         "en-US"
       ],
-      "backgroundColor": "#1a1a1a"
+      "backgroundColor": "#1a1a1a",
+      "assets": "build/appx"
     },
     "linux": {
       "icon": "build/icon.png",

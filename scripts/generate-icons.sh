@@ -195,7 +195,61 @@ fi
 echo ""
 
 # ============================================================================
-# SECTION 8: Verification
+# SECTION 8: Generate AppX/MSIX Tile Assets for Windows Store
+# ============================================================================
+echo "🏪 Generating AppX/MSIX tile assets for Windows Store..."
+
+APPX_DIR="$BUILD_DIR/appx"
+mkdir -p "$APPX_DIR"
+
+# Square44x44Logo — taskbar icon and small Start tile
+if convert "$ICON_DIR/illusions.png" -resize 44x44 "$APPX_DIR/Square44x44Logo.png" 2>/dev/null; then
+  log_info "Generated appx/Square44x44Logo.png (44×44)"
+else
+  log_error "Failed to generate appx/Square44x44Logo.png"
+  exit 1
+fi
+
+# StoreLogo — Microsoft Store listing icon
+if convert "$ICON_DIR/illusions.png" -resize 50x50 "$APPX_DIR/StoreLogo.png" 2>/dev/null; then
+  log_info "Generated appx/StoreLogo.png (50×50)"
+else
+  log_error "Failed to generate appx/StoreLogo.png"
+  exit 1
+fi
+
+# Square150x150Logo — medium Start tile
+if convert "$ICON_DIR/illusions.png" -resize 150x150 "$APPX_DIR/Square150x150Logo.png" 2>/dev/null; then
+  log_info "Generated appx/Square150x150Logo.png (150×150)"
+else
+  log_error "Failed to generate appx/Square150x150Logo.png"
+  exit 1
+fi
+
+# Square310x310Logo — large Start tile
+if convert "$ICON_DIR/illusions.png" -resize 310x310 "$APPX_DIR/Square310x310Logo.png" 2>/dev/null; then
+  log_info "Generated appx/Square310x310Logo.png (310×310)"
+else
+  log_error "Failed to generate appx/Square310x310Logo.png"
+  exit 1
+fi
+
+# Wide310x150Logo — wide Start tile (non-square 310:150 ratio)
+# Center the icon on a dark background to match the app tile color
+if convert -size 310x150 xc:"#1a1a1a" \
+  \( "$ICON_DIR/illusions.png" -resize 150x150 \) \
+  -gravity Center -composite \
+  "$APPX_DIR/Wide310x150Logo.png" 2>/dev/null; then
+  log_info "Generated appx/Wide310x150Logo.png (310×150)"
+else
+  log_error "Failed to generate appx/Wide310x150Logo.png"
+  exit 1
+fi
+
+echo ""
+
+# ============================================================================
+# SECTION 9: Verification
 # ============================================================================
 echo "🔍 Verifying generated files..."
 echo ""
@@ -212,8 +266,12 @@ echo "Electron Icons (build/):"
 ls -lh "$BUILD_DIR"/{icon,mdi-icon}.{png,ico,icns} 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
 echo ""
 
+echo "AppX/MSIX Tile Assets (build/appx/):"
+ls -lh "$APPX_DIR"/*.png 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
+echo ""
+
 # ============================================================================
-# SECTION 9: Size Comparison
+# SECTION 10: Size Comparison
 # ============================================================================
 echo "📊 Icon Size Summary:"
 echo ""
@@ -224,6 +282,9 @@ echo ""
 echo "  Original build/mdi-icon.png: $(ls -lh "$BUILD_DIR/mdi-icon.png" | awk '{print $5}')"
 echo "  Original build/mdi-icon.icns: $(ls -lh "$BUILD_DIR/mdi-icon.icns" | awk '{print $5}')"
 echo "  Original build/mdi-icon.ico: $(ls -lh "$BUILD_DIR/mdi-icon.ico" | awk '{print $5}')"
+echo ""
+echo "  AppX/MSIX Tile Assets:"
+ls -lh "$APPX_DIR"/*.png 2>/dev/null | awk '{print "    " $9 " (" $5 ")"}'
 echo ""
 
 log_info "Icon generation complete! ✨"
