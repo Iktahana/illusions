@@ -36,12 +36,15 @@ async function ensureProjectJson(
 ): Promise<{ metadata: ProjectConfig; illusionsDir: AnyDirectoryHandle }> {
   const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
 
+  // Use { create: true } so getFileHandle never throws ENOENT on the IPC layer.
+  // If the file was just created it will be empty → treat as "does not exist".
+  const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
   let metadataText: string | undefined;
   try {
-    const handle = await illusionsDir.getFileHandle("project.json");
-    metadataText = await readFileHandle(handle as Parameters<typeof readFileHandle>[0]);
+    const raw = await readFileHandle(projectJsonHandle as Parameters<typeof readFileHandle>[0]);
+    if (raw.trim()) metadataText = raw;
   } catch {
-    // project.json doesn't exist — create it
+    // read failed — treat as missing
   }
 
   if (metadataText) {
@@ -62,7 +65,7 @@ async function ensureProjectJson(
     editorSettings: getDefaultEditorSettings(ext),
   };
 
-  const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
+  // projectJsonHandle already exists (created empty above) — write defaults into it
   if ("write" in projectJsonHandle && typeof (projectJsonHandle as { write: unknown }).write === "function") {
     await (projectJsonHandle as { write: (s: string) => Promise<void> }).write(JSON.stringify(metadata, null, 2));
   } else {
