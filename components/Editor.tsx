@@ -61,7 +61,7 @@ interface EditorProps {
   // リンティング設定
   lintingEnabled?: boolean;
   lintingRuleRunner?: RuleRunner | null;
-  onLintIssuesUpdated?: (issues: LintIssue[], complete: boolean) => void;
+  onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
   // スクロール設定
   verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
   scrollSensitivity?: number;
@@ -327,6 +327,7 @@ export default function NovelEditor({
               onIgnoreCorrection={onIgnoreCorrection}
               mdiExtensionsEnabled={mdiExtensionsEnabled}
               gfmEnabled={gfmEnabled}
+              llmEnabled={llmEnabled}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -533,6 +534,7 @@ function MilkdownEditor({
   onIgnoreCorrection,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
+  llmEnabled = false,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
@@ -555,11 +557,12 @@ function MilkdownEditor({
   posHighlightColors?: Record<string, string>;
   lintingEnabled?: boolean;
   lintingRuleRunner?: RuleRunner | null;
-  onLintIssuesUpdated?: (issues: LintIssue[], complete: boolean) => void;
+  onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
   verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
   scrollSensitivity?: number;
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
+  llmEnabled?: boolean;
   onOpenDictionary?: (searchTerm?: string) => void;
   onShowLintHint?: (issue: LintIssue) => void;
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
@@ -669,7 +672,7 @@ function MilkdownEditor({
       .use(linting({
         enabled: false, // 初期化時は無効、後で動的に更新
         debounceMs: 500,
-        onIssuesUpdated: (issues, complete) => onLintIssuesUpdatedRef.current?.(issues, complete),
+        onIssuesUpdated: (issues, options) => onLintIssuesUpdatedRef.current?.(issues, options),
       }));
 
     return editor;
@@ -732,13 +735,14 @@ function MilkdownEditor({
         {
           enabled: lintingEnabled,
           ruleRunner: lintingRuleRunner,
+          llmEnabled,
         },
         "rule-config-change",
       );
     }).catch(err => {
       console.error('[Editor] Failed to update linting settings:', err);
     });
-  }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
+  }, [editorViewInstance, lintingEnabled, lintingRuleRunner, llmEnabled]);
 
   // 選択範囲の変更を追跡する
   useEffect(() => {

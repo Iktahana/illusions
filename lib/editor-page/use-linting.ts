@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { RuleRunner } from "@/lib/linting/rule-runner";
 import type { LintIssue, Severity } from "@/lib/linting/types";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
+import type { ILlmClient } from "@/lib/llm-client/types";
 import { getLlmClient } from "@/lib/llm-client/llm-client";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
@@ -79,7 +80,7 @@ export interface UseLintingResult {
   ruleRunner: RuleRunner;
   lintIssues: LintIssue[];
   isLinting: boolean;
-  handleLintIssuesUpdated: (issues: LintIssue[], complete: boolean) => void;
+  handleLintIssuesUpdated: (issues: LintIssue[]) => void;
   refreshLinting: () => void;
 }
 
@@ -197,10 +198,13 @@ export function useLinting(
     }
   }, [ruleRunner, lintingRuleConfigs]);
 
-  const handleLintIssuesUpdated = useCallback((issues: LintIssue[], complete: boolean) => {
+  const handleLintIssuesUpdated = useCallback((issues: LintIssue[], options?: { llmPending?: boolean }) => {
     if (!lintingEnabled) return;
     setLintIssues(issues);
-    if (complete) setIsLinting(false);
+    // Keep spinner active while LLM validation is still in progress
+    if (!options?.llmPending) {
+      setIsLinting(false);
+    }
   }, [lintingEnabled]);
 
   // Sync active guidelines to RuleRunner and trigger re-lint when guidelines change
@@ -232,7 +236,7 @@ export function useLinting(
       ({ updateLintingSettings }) => {
         updateLintingSettings(
           editorViewInstance,
-          { correctionMode, llmModelId },
+          { correctionMode },
           "mode-change",
         );
       },
@@ -240,6 +244,25 @@ export function useLinting(
       console.error("[useLinting] Failed to sync correction mode:", err);
     });
   }, [correctionMode, editorViewInstance, lintingEnabled]);
+
+  // Sync llmEnabled, llmClient, and llmModelId to the decoration plugin
+  useEffect(() => {
+    if (!editorViewInstance || !lintingEnabled) return;
+
+    const llmClient: ILlmClient | null = llmEnabled ? getLlmClient() : null;
+
+    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
+      ({ updateLintingSettings }) => {
+        updateLintingSettings(editorViewInstance, {
+          llmClient,
+          llmEnabled,
+          llmModelId,
+        });
+      },
+    ).catch((err) => {
+      console.error("[useLinting] Failed to sync LLM settings:", err);
+    });
+  }, [editorViewInstance, lintingEnabled, llmEnabled, llmModelId]);
 
   // Clear issues when linting is disabled
   useEffect(() => {
@@ -249,23 +272,29 @@ export function useLinting(
   }, [lintingEnabled]);
 
   // Force re-run linting on the full document (not just visible paragraphs)
+  // Always provides llmClient for L1/L2 validation regardless of power-save/llmEnabled state
   const refreshLinting = useCallback(() => {
     if (!editorViewInstance || !lintingEnabled) return;
 
     setIsLinting(true);
-    setLintIssues([]);
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
       ({ updateLintingSettings }) => {
         const nlpClient = ruleRunnerRef.current?.hasMorphologicalRules()
           ? getNlpClient()
           : null;
 
+        const llmClient: ILlmClient | null =
+          llmEnabled && ruleRunnerRef.current?.hasLlmRules()
+            ? getLlmClient()
+            : null;
+
         updateLintingSettings(
           editorViewInstance,
           {
             ruleRunner: ruleRunnerRef.current,
             nlpClient,
-            llmClient: getLlmClient(),
+            llmClient,
+            llmEnabled,
             llmModelId,
           },
           "manual-refresh",
@@ -275,7 +304,7 @@ export function useLinting(
       console.error("[useLinting] Failed to refresh linting:", err);
       setIsLinting(false);
     });
-  }, [editorViewInstance, lintingEnabled, llmModelId]);
+  }, [editorViewInstance, lintingEnabled, llmEnabled, llmModelId]);
 
   return {
     ruleRunner,

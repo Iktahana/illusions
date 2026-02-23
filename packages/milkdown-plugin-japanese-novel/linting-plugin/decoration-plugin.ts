@@ -101,11 +101,12 @@ export function createLintingPlugin(
   // When true, the next scheduleViewportUpdate will scan ALL paragraphs (not just visible)
   let pendingFullScan = false;
 
-  // When true, update() should immediately notify parent with empty issues
-  let pendingIssuesClear = false;
+  // When true, the next scheduleLlmUpdate will run L1/L2 validation even if llmEnabled is false
+  let forceLlmValidation = false;
 
-  // LLM state — always active when llmClient is available
+  // L3 (LLM) state
   let currentLlmClient: ILlmClient | null = options.llmClient ?? null;
+  let llmEnabled = options.llmEnabled ?? false;
   let currentLlmModelId: string | null = null;
   let llmAbortController: AbortController | null = null;
   let llmIssueCache: Map<number, LintIssue[]> | null = null;
@@ -158,7 +159,26 @@ export function createLintingPlugin(
           if ('llmClient' in meta) {
             currentLlmClient = meta.llmClient ?? null;
           }
-          // Update llmModelId for model loading before inference
+          // Update llmEnabled flag if provided
+          if ('llmEnabled' in meta) {
+            const wasEnabled = llmEnabled;
+            llmEnabled = meta.llmEnabled ?? false;
+
+            if (wasEnabled && !llmEnabled) {
+              // L3 just disabled — cancel in-flight work and clear L3 cache
+              if (llmAbortController) llmAbortController.abort();
+              if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
+              llmIssueCache = null;
+              llmInFlight = false;
+              // Rescan to show issues without pessimistic filter
+              pendingFullScan = true;
+            } else if (!wasEnabled && llmEnabled) {
+              // L3 just enabled — rescan to apply pessimistic filter
+              // (hide unvalidated issues until LLM confirms them)
+              pendingFullScan = true;
+            }
+          }
+          // Update llmModelId if provided
           if ('llmModelId' in meta) {
             currentLlmModelId = meta.llmModelId ?? null;
           }
@@ -179,13 +199,7 @@ export function createLintingPlugin(
                 issueCache.clear();
                 tokenCache.clear();
                 documentIssueCache = null;
-                validationCache.clear();
-                llmIssueCache = null;
-                if (llmAbortController) llmAbortController.abort();
-                if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
-                llmInFlight = false;
                 pendingFullScan = true;
-                pendingIssuesClear = true;
                 break;
               case "rule-config-change":
               case "guideline-change":
@@ -225,8 +239,8 @@ export function createLintingPlugin(
             decorations: pluginState.decorations,
             enabled: meta.enabled ?? pluginState.enabled,
           };
-          // Clear decorations when disabled or on refresh/mode-change
-          if (meta.enabled === false || pendingIssuesClear) {
+          // Clear decorations when disabled
+          if (meta.enabled === false) {
             updated.decorations = DecorationSet.empty;
           }
           return updated;
@@ -361,6 +375,7 @@ export function createLintingPlugin(
           // Build decorations from all paragraphs that have cached results
           const allDecorations: Decoration[] = [];
           const allIssues: LintIssue[] = [];
+          let pendingLlmCount = 0;
 
           for (const paragraph of allParagraphs) {
             // Per-paragraph issues from cache
@@ -387,19 +402,23 @@ export function createLintingPlugin(
                 continue;
               }
 
-              // Determine LLM validation state for the issue
+              // Pessimistic LLM validation: hide issues until LLM confirms them
               const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
-              const needsValidation = currentLlmClient !== null && !ruleConfig?.skipLlmValidation;
-              const vKey = needsValidation ? LintIssueValidator.issueKey(issue, paragraph.text) : undefined;
-              const cachedResult = vKey !== undefined ? validationCache.get(vKey) : undefined;
-
-              // Skip issues pending LLM validation — they will appear after
-              // rebuildDecorationsWithLlm runs once validation completes
-              if (needsValidation && cachedResult === undefined) continue;
-              // Skip issues dismissed by LLM validation
-              if (cachedResult === false) continue;
-
-              const llmValidated = !needsValidation ? true : cachedResult;
+              const needsValidation = llmEnabled && !ruleConfig?.skipLlmValidation;
+              console.debug('[Linting:pessimistic]', issue.ruleId, issueText,
+                { llmEnabled, skipLlmValidation: ruleConfig?.skipLlmValidation, needsValidation });
+              if (needsValidation) {
+                const vKey = LintIssueValidator.issueKey(issue, paragraph.text);
+                const cachedResult = validationCache.get(vKey);
+                console.debug('[Linting:pessimistic] vKey=', vKey, 'cachedResult=', cachedResult);
+                // Skip unless LLM has explicitly confirmed this issue as valid
+                if (cachedResult !== true) {
+                  console.debug('[Linting:pessimistic] HIDDEN (awaiting LLM):', issue.ruleId, issueText);
+                  pendingLlmCount++;
+                  continue;
+                }
+                console.debug('[Linting:pessimistic] SHOWN (LLM confirmed):', issue.ruleId, issueText);
+              }
 
               const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
               const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
@@ -413,13 +432,13 @@ export function createLintingPlugin(
                 })
               );
 
-              // Collect issues with absolute positions for the callback
+              // Issues reaching here are either: validation not needed, or LLM-confirmed
               allIssues.push({
                 ...issue,
                 from,
                 to,
                 originalText: issueText,
-                llmValidated,
+                llmValidated: true,
               });
             }
           }
@@ -431,10 +450,12 @@ export function createLintingPlugin(
           const tr = view.state.tr.setMeta(lintingKey, { decorations });
           view.dispatch(tr);
 
-          // Notify parent — not complete yet if LLM client is available
-          onIssuesUpdated?.(allIssues, currentLlmClient === null);
+          // Notify parent of all issues (with pending flag if LLM validation is still needed)
+          const llmPending = pendingLlmCount > 0;
+          console.debug('[Linting:pessimistic] issues shown:', allIssues.length, 'pending LLM:', pendingLlmCount);
+          onIssuesUpdated?.(allIssues, { llmPending });
 
-          // Schedule LLM validation + L3 rules
+          // Schedule L3 (LLM) linting with longer debounce
           scheduleLlmUpdate(view, allParagraphs);
 
         }, debounceMs);
@@ -449,8 +470,15 @@ export function createLintingPlugin(
         view: EditorView,
         allParagraphs: ParagraphInfo[],
       ): void {
-        if (!currentLlmClient) return;
-        if (llmInFlight) return;
+        console.debug('[Linting:LLM] scheduleLlmUpdate called',
+          { hasClient: !!currentLlmClient, llmEnabled, llmInFlight, forceLlmValidation, modelId: currentLlmModelId });
+        if (!currentLlmClient) { console.debug('[Linting:LLM] BAIL: no llmClient'); return; }
+        const isForced = forceLlmValidation;
+        if (!isForced && !llmEnabled) { console.debug('[Linting:LLM] BAIL: not enabled and not forced'); return; }
+        if (llmInFlight) { console.debug('[Linting:LLM] BAIL: already in flight'); return; }
+
+        // Consume the one-shot flag
+        forceLlmValidation = false;
 
         if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
 
@@ -462,23 +490,14 @@ export function createLintingPlugin(
           llmAbortController = new AbortController();
 
           try {
-            // Ensure model is loaded before inference
-            if (currentLlmModelId) {
-              try {
-                await currentLlmClient!.loadModel(currentLlmModelId);
-              } catch (loadErr) {
-                console.warn("[Linting] Failed to load LLM model:", loadErr);
-              }
-            }
-
-            const modelReady = await currentLlmClient!.isModelLoaded();
-            if (!modelReady) {
-              console.debug("[Linting] LLM model not loaded, skipping validation & L3 rules");
-              onIssuesUpdated?.([], true);
+            // Ensure model is loaded before inference — bail if no modelId
+            console.debug('[Linting:LLM] loadModel?', { modelId: currentLlmModelId });
+            if (!currentLlmModelId) {
+              console.warn('[Linting:LLM] BAIL: no modelId — cannot load model');
               return;
             }
-
-            console.debug("[Linting] LLM model loaded, running validation & L3 rules");
+            await currentLlmClient!.loadModel(currentLlmModelId);
+            console.debug('[Linting:LLM] model loaded OK');
 
             // --- Step 1: Validate L1/L2 issues ---
             const unvalidatedIssues: ValidatableIssue[] = [];
@@ -499,9 +518,10 @@ export function createLintingPlugin(
               }
             }
 
+            console.debug('[Linting:LLM] unvalidated issues:', unvalidatedIssues.length);
             if (unvalidatedIssues.length > 0) {
-              console.debug(`[Linting] Validating ${unvalidatedIssues.length} L1/L2 issues via LLM...`);
-              const dismissed = await issueValidator.validate(
+              console.debug('[Linting:LLM] calling issueValidator.validate...');
+              const validationResults = await issueValidator.validate(
                 unvalidatedIssues,
                 currentLlmClient!,
                 llmAbortController!.signal,
@@ -510,17 +530,27 @@ export function createLintingPlugin(
               if (processingVersion !== version) return;
 
               // Update validation cache
+              const dismissedCount = [...validationResults.values()].filter(r => !r.valid).length;
+              console.debug('[Linting:LLM] validation done. dismissed:', dismissedCount, '/', unvalidatedIssues.length);
               for (const issue of unvalidatedIssues) {
                 const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
-                validationCache.set(key, !dismissed.has(key));
+                const result = validationResults.get(key);
+                const valid = result ? result.valid : true; // fail-open if missing
+                validationCache.set(key, valid);
+                const flagged = issue.paragraphText.slice(issue.from, issue.to);
+                console.debug('[Linting:LLM] cache set:', issue.ruleId, flagged,
+                  valid ? 'VALID' : 'DISMISSED',
+                  'reason:', result?.reason ?? '(no reason)');
               }
-              console.debug(`[Linting] Validation done: ${dismissed.size} dismissed out of ${unvalidatedIssues.length}`);
             }
 
             if (processingVersion !== version) return;
 
-            // --- Step 2: Run L3 (LLM) rules ---
-            if (currentRuleRunner?.hasLlmRules()) {
+            // --- Step 2: Run L3 (LLM) rules (only when llmEnabled) ---
+            if (llmEnabled && currentRuleRunner?.hasLlmRules()) {
+              // Re-ensure model is loaded (may have been unloaded by idle timer)
+              await currentLlmClient!.loadModel(currentLlmModelId!);
+
               const sentences: Array<{ text: string; from: number; to: number }> = [];
               for (const para of allParagraphs) {
                 if (para.text.trim().length === 0) continue;
@@ -561,6 +591,8 @@ export function createLintingPlugin(
             if ((error as Error).name !== "AbortError") {
               console.error("LLM linting/validation failed:", error);
             }
+            // Still rebuild so validated L1/L2 issues appear even if L3 fails
+            rebuildDecorationsWithLlm(view, allParagraphs);
           } finally {
             llmInFlight = false;
           }
@@ -604,28 +636,27 @@ export function createLintingPlugin(
               continue;
             }
 
-            // Filter out LLM-dismissed false positives
-            const vKey = LintIssueValidator.issueKey(issue, paragraph.text);
-            if (validationCache.get(vKey) === false) continue;
+            // Pessimistic LLM validation: only show issues confirmed by LLM
+            const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
+            const needsValidation = !ruleConfig?.skipLlmValidation;
+            if (needsValidation) {
+              const vKey = LintIssueValidator.issueKey(issue, paragraph.text);
+              if (validationCache.get(vKey) !== true) continue;
+            }
 
             const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
             const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
             const from = paragraph.pos + 1 + issue.from + extraFrom;
             const to = paragraph.pos + 1 + issue.to + extraTo;
 
-            // After LLM pass, validation state is known from the cache
-            const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
-            const needsValidation = !ruleConfig?.skipLlmValidation;
-            const llmValidated = !needsValidation ? true : validationCache.get(vKey) ?? true;
-
             allDecorations.push(
               Decoration.inline(from, to, {
                 class: severityToClass(issue.severity),
-                'data-lint-issue': JSON.stringify({ ...issue, from, to, originalText: issueText, llmValidated }),
+                'data-lint-issue': JSON.stringify({ ...issue, from, to, originalText: issueText, llmValidated: true }),
               })
             );
 
-            allIssues.push({ ...issue, from, to, originalText: issueText, llmValidated });
+            allIssues.push({ ...issue, from, to, originalText: issueText, llmValidated: true });
           }
 
           // L3 issues from LLM cache (already have absolute positions)
@@ -663,8 +694,8 @@ export function createLintingPlugin(
         const tr = view.state.tr.setMeta(lintingKey, { decorations });
         view.dispatch(tr);
 
-        // Notify parent — LLM phase complete
-        onIssuesUpdated?.(allIssues, true);
+        // Notify parent of all issues
+        onIssuesUpdated?.(allIssues);
       }
 
       return {
@@ -685,11 +716,6 @@ export function createLintingPlugin(
           }
 
           if (!state?.enabled) return;
-
-          // Reset clear flag (decorations already cleared in apply())
-          if (pendingIssuesClear) {
-            pendingIssuesClear = false;
-          }
 
           // Full scan requested (e.g. ignored corrections changed)
           if (pendingFullScan) {

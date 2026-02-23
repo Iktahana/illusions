@@ -21,8 +21,9 @@ export interface LintingPluginOptions {
   ruleRunner: RuleRunner | null;
   nlpClient?: INlpClient | null;
   llmClient?: ILlmClient | null;
+  llmEnabled?: boolean;
   ignoredCorrections?: IgnoredCorrection[];
-  onIssuesUpdated?: (issues: LintIssue[], complete: boolean) => void;
+  onIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
   debounceMs?: number;
 }
 
@@ -43,13 +44,14 @@ export interface LintingSettingsUpdate {
   ruleRunner?: RuleRunner | null;
   nlpClient?: INlpClient | null;
   llmClient?: ILlmClient | null;
+  llmEnabled?: boolean;
   /** @deprecated Use changeReason instead */
   forceFullScan?: boolean;
   ignoredCorrections?: IgnoredCorrection[];
-  /** Model ID for LLM inference (required for loadModel before infer) */
-  llmModelId?: string | null;
   /** Current correction mode (novel, official, blog, academic, sns) for LLM validation */
   correctionMode?: string;
+  /** LLM model ID to load before inference */
+  llmModelId?: string | null;
   /** Identifies the trigger for this change, enabling precise cache invalidation */
   changeReason?: ConfigChangeReason;
 }
