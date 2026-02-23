@@ -46,6 +46,7 @@ import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
 import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
 import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
+import { getLlmClient } from "@/lib/llm-client/llm-client";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
@@ -120,6 +121,15 @@ export default function EditorPage() {
     autoPowerSaveOnBattery,
     onPowerSaveModeChange: handlePowerSaveModeChange,
   });
+
+  // --- Sync llmIdlingStop setting to LLM engine ---
+  useEffect(() => {
+    const client = getLlmClient();
+    if (!client.isAvailable()) return;
+    void client.setIdlingStop(llmIdlingStop).catch((err) => {
+      console.error("[page] Failed to sync llmIdlingStop:", err);
+    });
+  }, [llmIdlingStop]);
 
   // --- Panel state hook ---
   const { state: panelState, handlers: panelHandlers } = usePanelState({ setShowSettingsModal });

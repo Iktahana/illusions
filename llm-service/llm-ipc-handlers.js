@@ -73,6 +73,11 @@ function registerLlmHandlers() {
     await ensureInit();
     return llmEngine.getStorageUsage();
   });
+
+  ipcMain.handle('llm:set-idling-stop', async (_event, { enabled }) => {
+    await ensureInit();
+    llmEngine.setIdlingStop(Boolean(enabled));
+  });
 }
 
 async function disposeLlmEngine() {

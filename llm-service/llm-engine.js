@@ -44,6 +44,12 @@ class LlmEngine {
   #initialized = false;
   /** @type {Promise<any>} Serialization queue — ensures only one inference runs at a time */
   #inferQueue = Promise.resolve();
+  /** @type {boolean} Whether to auto-unload model after idle timeout */
+  #idlingStopEnabled = false;
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  #idleTimer = null;
+  /** Idle timeout before auto-unloading (30 seconds) */
+  #IDLE_TIMEOUT_MS = 30_000;
 
   async init() {
     if (this.#initialized) return;
@@ -247,6 +253,10 @@ class LlmEngine {
    * Unload model from memory, freeing VRAM/RAM
    */
   async unloadModel() {
+    if (this.#idleTimer) {
+      clearTimeout(this.#idleTimer);
+      this.#idleTimer = null;
+    }
     if (this.#context) {
       await this.#context.dispose();
       this.#context = null;
@@ -299,6 +309,7 @@ class LlmEngine {
         return { text, tokenCount };
       } finally {
         session.dispose({ disposeSequence: true });
+        this.#resetIdleTimer();
       }
     });
 
@@ -329,9 +340,45 @@ class LlmEngine {
   }
 
   /**
+   * Enable or disable automatic model unloading after idle timeout.
+   * @param {boolean} enabled
+   */
+  setIdlingStop(enabled) {
+    this.#idlingStopEnabled = enabled;
+    if (!enabled) {
+      if (this.#idleTimer) {
+        clearTimeout(this.#idleTimer);
+        this.#idleTimer = null;
+      }
+    } else if (this.isLoaded()) {
+      // Model already loaded — start the idle timer immediately
+      this.#resetIdleTimer();
+    }
+  }
+
+  /**
+   * Reset the idle timer. If the timer fires, the model is automatically unloaded.
+   */
+  #resetIdleTimer() {
+    if (!this.#idlingStopEnabled) return;
+    if (this.#idleTimer) clearTimeout(this.#idleTimer);
+    this.#idleTimer = setTimeout(async () => {
+      this.#idleTimer = null;
+      if (this.isLoaded()) {
+        console.log('[LlmEngine] Idle timeout — unloading model');
+        await this.unloadModel();
+      }
+    }, this.#IDLE_TIMEOUT_MS);
+  }
+
+  /**
    * Full cleanup — call on app quit
    */
   async dispose() {
+    if (this.#idleTimer) {
+      clearTimeout(this.#idleTimer);
+      this.#idleTimer = null;
+    }
     await this.unloadModel();
     this.#initialized = false;
   }
