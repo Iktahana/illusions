@@ -23,6 +23,8 @@ import {
 export class RuleRunner {
   private rules: Map<string, LintRule> = new Map();
   private configs: Map<string, LintRuleConfig> = new Map();
+  private activeGuidelines: Set<string> | null = null;
+  private guidelineMap: Map<string, string | undefined> = new Map();
 
   /** Register a rule. Sets default config if none exists yet. */
   registerRule(rule: LintRule): void {
@@ -42,6 +44,24 @@ export class RuleRunner {
     return this.configs.get(ruleId);
   }
 
+  /** Set the mapping from rule ID to guideline ID. */
+  setGuidelineMap(map: Map<string, string | undefined>): void {
+    this.guidelineMap = map;
+  }
+
+  /** Set the active guidelines. Pass null to disable guideline filtering. */
+  setActiveGuidelines(guidelines: string[] | null): void {
+    this.activeGuidelines = guidelines ? new Set(guidelines) : null;
+  }
+
+  /** Check if a rule is allowed to run based on active guidelines. */
+  private isRuleAllowedByGuideline(ruleId: string): boolean {
+    if (this.activeGuidelines === null) return true; // no filtering
+    const guidelineId = this.guidelineMap.get(ruleId);
+    if (guidelineId === undefined) return true; // universal rules always run
+    return this.activeGuidelines.has(guidelineId);
+  }
+
   /** Run all enabled rules on the given text. Returns issues sorted by position. */
   runAll(text: string): LintIssue[] {
     const issues: LintIssue[] = [];
@@ -49,6 +69,7 @@ export class RuleRunner {
     for (const rule of this.rules.values()) {
       const config = this.configs.get(rule.id);
       if (!config?.enabled) continue;
+      if (!this.isRuleAllowedByGuideline(rule.id)) continue;
       issues.push(...rule.lint(text, config));
     }
 
@@ -62,6 +83,7 @@ export class RuleRunner {
 
     const config = this.configs.get(ruleId);
     if (!config?.enabled) return [];
+    if (!this.isRuleAllowedByGuideline(ruleId)) return [];
 
     return rule.lint(text, config);
   }
@@ -76,6 +98,7 @@ export class RuleRunner {
       if (!isDocumentLintRule(rule)) continue;
       const config = this.configs.get(rule.id);
       if (!config?.enabled) continue;
+      if (!this.isRuleAllowedByGuideline(rule.id)) continue;
 
       const ruleResults = rule.lintDocument(paragraphs, config);
       for (const { paragraphIndex, issues } of ruleResults) {
@@ -119,6 +142,7 @@ export class RuleRunner {
     for (const rule of this.rules.values()) {
       const config = this.configs.get(rule.id);
       if (!config?.enabled) continue;
+      if (!this.isRuleAllowedByGuideline(rule.id)) continue;
 
       if (isMorphologicalLintRule(rule)) {
         issues.push(...rule.lintWithTokens(text, tokens, config));
@@ -147,6 +171,7 @@ export class RuleRunner {
     for (const rule of this.rules.values()) {
       const config = this.configs.get(rule.id);
       if (!config?.enabled) continue;
+      if (!this.isRuleAllowedByGuideline(rule.id)) continue;
 
       let ruleResults: Array<{ paragraphIndex: number; issues: LintIssue[] }>;
 
@@ -228,6 +253,7 @@ export class RuleRunner {
 
       const config = this.configs.get(id);
       if (!config?.enabled) continue;
+      if (!this.isRuleAllowedByGuideline(id)) continue;
       if (!isLlmLintRule(rule)) continue;
 
       try {
