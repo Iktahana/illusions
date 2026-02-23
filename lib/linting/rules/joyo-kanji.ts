@@ -2,7 +2,7 @@ import { AbstractLintRule } from "../base-rule";
 import { JINMEIYO_KANJI_SET } from "../data/jinmeiyo-kanji";
 import { JOYO_KANJI_SET } from "../data/joyo-kanji";
 import { maskDialogue } from "../helpers/dialogue-mask";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -117,6 +117,7 @@ const CJK_KANJI_REGEX = /[\u4e00-\u9fff\u3400-\u4dbf\u{20000}-\u{2a6df}]/gu;
  */
 export class JoyoKanjiRule extends AbstractLintRule {
   readonly id = "joyo-kanji";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Joyo kanji validation";
   readonly nameJa = "常用漢字バリデーション";
   readonly description = "Detect kanji outside the official Joyo kanji set";
@@ -125,6 +126,7 @@ export class JoyoKanjiRule extends AbstractLintRule {
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
     severity: "info",
+    skipDialogue: true,
     options: { allowJinmeiyo: true } satisfies JoyoKanjiOptions,
   };
 

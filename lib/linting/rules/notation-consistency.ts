@@ -1,6 +1,6 @@
 import { AbstractDocumentLintRule } from "../base-rule";
 import { maskDialogue } from "../helpers/dialogue-mask";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 import {
   VARIANT_GROUPS,
   VARIANT_CATEGORY_LABELS,
@@ -38,6 +38,7 @@ interface VariantLocation {
  */
 export class NotationConsistencyRule extends AbstractDocumentLintRule {
   readonly id = "notation-consistency";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Notation consistency";
   readonly nameJa = "表記ゆれの検出";
   readonly description = "Detect inconsistent notation variants across the document";
@@ -46,6 +47,7 @@ export class NotationConsistencyRule extends AbstractDocumentLintRule {
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
     severity: "warning",
+    skipDialogue: true,
   };
 
   lintDocument(

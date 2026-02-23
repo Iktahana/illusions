@@ -1,7 +1,7 @@
 import { AbstractLintRule } from "../base-rule";
 import { maskDialogue } from "../helpers/dialogue-mask";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -92,6 +92,7 @@ function countParticleNo(sentence: string): number {
  */
 export class ParticleNoRepetitionRule extends AbstractLintRule {
   readonly id = "particle-no-repetition";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Excessive particle の usage";
   readonly nameJa = "助詞「の」の連続使用";
   readonly description =
@@ -101,6 +102,7 @@ export class ParticleNoRepetitionRule extends AbstractLintRule {
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
     severity: "info",
+    skipDialogue: true,
     options: {
       threshold: 4,
     },

@@ -1,6 +1,6 @@
 import { AbstractLintRule } from "../base-rule";
 import { maskDialogue } from "../helpers/dialogue-mask";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 /** Reference for verbose expression checks */
 const STYLE_GUIDE_REF: LintReference = {
@@ -73,6 +73,7 @@ const VERBOSE_PATTERNS: ReadonlyArray<VerbosePattern> = [
  */
 export class VerboseExpressionRule extends AbstractLintRule {
   readonly id = "verbose-expression";
+  override engine: CorrectionEngine = "regex";
   readonly name = "Verbose expression simplification";
   readonly nameJa = "冗長表現の簡略化";
   readonly description = "Detect verbose expressions and suggest concise alternatives";
@@ -81,6 +82,7 @@ export class VerboseExpressionRule extends AbstractLintRule {
   readonly defaultConfig: LintRuleConfig = {
     enabled: true,
     severity: "info",
+    skipDialogue: true,
   };
 
   lint(text: string, config: LintRuleConfig): LintIssue[] {

@@ -515,10 +515,11 @@ export default function EditorPage() {
 
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
       ({ updateLintingSettings }) => {
-        updateLintingSettings(editorViewInstance, {
-          ignoredCorrections,
-          forceFullScan: true,
-        });
+        updateLintingSettings(
+          editorViewInstance,
+          { ignoredCorrections },
+          "ignored-correction",
+        );
       },
     ).catch((err) => {
       console.error("[page] Failed to sync ignored corrections:", err);

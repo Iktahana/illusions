@@ -727,10 +727,14 @@ function MilkdownEditor({
     if (!editorViewInstance) return;
 
     import('@/packages/milkdown-plugin-japanese-novel/linting-plugin').then(({ updateLintingSettings }) => {
-      updateLintingSettings(editorViewInstance, {
-        enabled: lintingEnabled,
-        ruleRunner: lintingRuleRunner,
-      });
+      updateLintingSettings(
+        editorViewInstance,
+        {
+          enabled: lintingEnabled,
+          ruleRunner: lintingRuleRunner,
+        },
+        "rule-config-change",
+      );
     }).catch(err => {
       console.error('[Editor] Failed to update linting settings:', err);
     });

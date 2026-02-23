@@ -11,8 +11,8 @@ interface UsePowerSavingOptions {
 
 /**
  * Listens for Electron powerMonitor events and manages power saving mode.
- * - On battery (>1min debounced): shows in-app notification with action buttons
- * - On AC (>1min debounced): auto-disables power saving mode with info notification
+ * - On battery: shows in-app notification with action buttons
+ * - On AC: auto-disables power saving mode with info notification
  * - No-op on web platform
  */
 export function usePowerSaving({

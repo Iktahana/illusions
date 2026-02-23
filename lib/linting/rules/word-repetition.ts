@@ -3,7 +3,7 @@ import { AbstractMorphologicalLintRule } from "../base-rule";
 import { isInDialogue } from "../helpers/dialogue-mask";
 import type { SentenceSpan } from "../helpers/sentence-splitter";
 import { splitIntoSentences } from "../helpers/sentence-splitter";
-import type { LintIssue, LintRuleConfig, LintReference } from "../types";
+import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -103,6 +103,7 @@ function extractContentWords(
  */
 export class WordRepetitionRule extends AbstractMorphologicalLintRule {
   readonly id = "word-repetition";
+  override engine: CorrectionEngine = "morphological";
   readonly name = "Word Repetition";
   readonly nameJa = "近接語句の反復検出";
   readonly description =

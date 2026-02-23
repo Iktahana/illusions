@@ -5,6 +5,8 @@ import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
 import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 import type { Severity } from "@/lib/linting/types";
 import { notificationManager } from "@/lib/notification-manager";
+import type { CorrectionConfig } from "@/lib/linting/correction-config";
+import { DEFAULT_CORRECTION_CONFIG } from "@/lib/linting/correction-config";
 
 export interface EditorSettings {
   fontScale: number;
@@ -28,6 +30,8 @@ export interface EditorSettings {
   llmModelId: string;
   powerSaveMode: boolean;
   autoPowerSaveOnBattery: boolean;
+  /** Unified correction config derived from individual linting fields */
+  correctionConfig: CorrectionConfig;
 }
 
 export interface EditorSettingsHandlers {
@@ -416,6 +420,16 @@ export function useEditorSettings(
       llmModelId,
       powerSaveMode,
       autoPowerSaveOnBattery,
+      correctionConfig: {
+        ...DEFAULT_CORRECTION_CONFIG,
+        enabled: lintingEnabled,
+        ruleOverrides: lintingRuleConfigs,
+        llm: {
+          ...DEFAULT_CORRECTION_CONFIG.llm,
+          modelId: llmModelId,
+          validationEnabled: llmEnabled,
+        },
+      },
     },
     handlers: {
       handleFontScaleChange,
