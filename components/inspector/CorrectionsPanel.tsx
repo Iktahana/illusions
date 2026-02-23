@@ -410,7 +410,7 @@ export default function CorrectionsPanel({
       {sortedIssues.map((issue, index) => {
         const globalIndex = issueIndexMap.get(issue) ?? index;
         return (
-          <div key={`${issue.ruleId}-${issue.from}-${issue.to}-${index}`} data-issue-index={globalIndex}>
+          <div key={`${issue.ruleId}-${issue.from}-${issue.to}-${index}`} data-issue-index={globalIndex} className="animate-fade-in">
             <IssueCard
               issue={issue}
               isActive={activeDisplayIndex === globalIndex}
@@ -468,7 +468,7 @@ export default function CorrectionsPanel({
                 {group.issues.map((issue, index) => {
                   const globalIndex = issueIndexMap.get(issue) ?? index;
                   return (
-                    <div key={`${issue.ruleId}-${issue.from}-${issue.to}-${index}`} data-issue-index={globalIndex}>
+                    <div key={`${issue.ruleId}-${issue.from}-${issue.to}-${index}`} data-issue-index={globalIndex} className="animate-fade-in">
                       <IssueCard
                         issue={issue}
                         isActive={activeDisplayIndex === globalIndex}
