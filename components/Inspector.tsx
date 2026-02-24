@@ -399,8 +399,8 @@ export default function Inspector({
 
       {/* Privacy notice */}
       <div className={clsx("border-t border-border text-center text-[10px] text-foreground-tertiary leading-tight", compactMode ? "px-3 py-1.5" : "px-4 py-2")}>
-        <p>illusionsはあなたの作品の無断保存およびAI学習への利用は行いません</p>
-        <a href="https://github.com/Iktahana/illusions/issues/new" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground-secondary transition-colors">AIに関する不適切な提案を報告</a>
+        <p className="mb-1">illusionsはあなたの作品の無断保存およびAI学習への利用は行いません</p>
+        <a href="https://github.com/Iktahana/illusions/issues/new" target="_blank" rel="noopener noreferrer" className="hover:text-foreground-secondary transition-colors">AIに関する不適切な提案を報告</a>
       </div>
     </aside>
   );
