@@ -410,6 +410,9 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           fileContent = await vfs.readFile(vfsPath);
         } catch (error) {
           console.error("ファイルの読み込みに失敗しました:", error);
+          notificationManager.error(
+            `ファイルを開けませんでした: ${vfsPath.split("/").pop() || vfsPath}`
+          );
           return;
         }
 
