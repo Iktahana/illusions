@@ -6,45 +6,9 @@
  */
 
 import { getVFS } from "./vfs";
+import { AsyncMutex } from "./async-mutex";
 
 import type { VirtualFileSystem, VFSDirectoryHandle } from "./vfs/types";
-
-// -----------------------------------------------------------------------
-// AsyncMutex
-// -----------------------------------------------------------------------
-
-/**
- * Simple async mutex to serialize index read-modify-write operations.
- * Prevents TOCTOU race conditions when multiple snapshots are created concurrently.
- *
- * インデックスの読み書き操作を直列化するシンプルな非同期ミューテックス。
- * 複数のスナップショットが同時に作成される際のTOCTOUレースコンディションを防止する。
- */
-class AsyncMutex {
-  private queue: (() => void)[] = [];
-  private locked = false;
-
-  async acquire(): Promise<() => void> {
-    if (!this.locked) {
-      this.locked = true;
-      return () => this.release();
-    }
-    return new Promise<() => void>((resolve) => {
-      this.queue.push(() => {
-        resolve(() => this.release());
-      });
-    });
-  }
-
-  private release(): void {
-    const next = this.queue.shift();
-    if (next) {
-      next();
-    } else {
-      this.locked = false;
-    }
-  }
-}
 
 // -----------------------------------------------------------------------
 // Constants

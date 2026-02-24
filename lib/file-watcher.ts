@@ -38,13 +38,42 @@ const MAX_CONSECUTIVE_FAILURES = 5;
  * Tracks paths that were recently saved by the application,
  * so watchers can ignore self-triggered change events.
  *
+ * A periodic cleanup timer evicts expired entries every 5 minutes
+ * to prevent unbounded memory growth in long-running sessions.
+ *
  * アプリケーション自身による保存を追跡し、
  * ウォッチャーが自身のトリガーによる変更イベントを無視できるようにする。
+ * 5分ごとに期限切れエントリを削除し、長時間セッションでのメモリ増大を防止する。
  */
 const saveSuppression = new Map<string, number>();
 
 /** Default suppression duration in milliseconds */
 const SAVE_SUPPRESSION_MS = 3000;
+
+/** Interval for periodic cleanup of expired suppression entries (5 minutes) */
+const SUPPRESSION_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
+/**
+ * Remove all expired entries from the saveSuppression map.
+ * Called periodically to prevent unbounded growth.
+ *
+ * 期限切れのエントリをsaveSuppressionマップから削除する。
+ * メモリの無制限な増加を防ぐため定期的に呼び出される。
+ */
+function cleanupExpiredSuppressions(): void {
+  const now = Date.now();
+  for (const [filePath, until] of saveSuppression) {
+    if (now >= until) {
+      saveSuppression.delete(filePath);
+    }
+  }
+}
+
+// Start periodic cleanup timer (unref so it does not keep the process alive)
+const suppressionCleanupTimer = setInterval(cleanupExpiredSuppressions, SUPPRESSION_CLEANUP_INTERVAL_MS);
+if (typeof suppressionCleanupTimer === "object" && "unref" in suppressionCleanupTimer) {
+  suppressionCleanupTimer.unref();
+}
 
 /**
  * Suppress file watch notifications for the given path.

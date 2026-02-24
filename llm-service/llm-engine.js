@@ -12,22 +12,22 @@ const MODEL_REGISTRY = [
     id: 'qwen3-0.6b-q8',
     fileName: 'Qwen3-0.6B-Q8_0.gguf',
     url: 'https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf',
-    size: 596_049_920,
-    sha256: '',
+    size: 639_446_688,
+    sha256: '9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031',
   },
   {
     id: 'qwen3-1.7b-q8',
     fileName: 'Qwen3-1.7B-Q8_0.gguf',
     url: 'https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf',
-    size: 1_720_574_976,
-    sha256: '',
+    size: 1_834_426_016,
+    sha256: '061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a',
   },
   {
     id: 'qwen3-4b-q4km',
     fileName: 'Qwen3-4B-Q4_K_M.gguf',
     url: 'https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
-    size: 2_500_000_000,
-    sha256: '',
+    size: 2_497_280_256,
+    sha256: '7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5',
   },
 ];
 
@@ -44,6 +44,8 @@ class LlmEngine {
   #initialized = false;
   /** @type {Promise<any>} Serialization queue — ensures only one inference runs at a time */
   #inferQueue = Promise.resolve();
+  /** @type {number} Number of active inferences (guards against concurrent unload) */
+  #inferring = 0;
   /** @type {boolean} Whether to auto-unload model after idle timeout */
   #idlingStopEnabled = false;
   /** @type {ReturnType<typeof setTimeout> | null} */
@@ -178,20 +180,28 @@ class LlmEngine {
       await new Promise((resolve) => fileStream.on('finish', resolve));
     }
 
-    // SHA256 verification (skip if sha256 is empty — not yet filled)
-    if (entry.sha256) {
-      const hash = crypto.createHash('sha256');
-      await new Promise((resolve, reject) => {
-        const stream = createReadStream(tmpPath);
-        stream.on('data', (chunk) => hash.update(chunk));
-        stream.on('end', resolve);
-        stream.on('error', reject);
-      });
-      const digest = hash.digest('hex');
-      if (digest !== entry.sha256) {
-        await fs.unlink(tmpPath);
-        throw new Error(`SHA256 mismatch for ${entry.fileName}`);
-      }
+    // SHA256 integrity verification — reject empty hashes as a security measure
+    if (!entry.sha256) {
+      await fs.unlink(tmpPath);
+      throw new Error(
+        `SHA-256 hash is missing for ${entry.fileName}. ` +
+        'Refusing to accept an unverified model file.'
+      );
+    }
+    const hash = crypto.createHash('sha256');
+    await new Promise((resolve, reject) => {
+      const stream = createReadStream(tmpPath);
+      stream.on('data', (chunk) => hash.update(chunk));
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
+    const digest = hash.digest('hex');
+    if (digest !== entry.sha256) {
+      await fs.unlink(tmpPath);
+      throw new Error(
+        `SHA-256 mismatch for ${entry.fileName}: ` +
+        `expected ${entry.sha256}, got ${digest}`
+      );
     }
 
     // Atomic rename
@@ -250,9 +260,14 @@ class LlmEngine {
   }
 
   /**
-   * Unload model from memory, freeing VRAM/RAM
+   * Unload model from memory, freeing VRAM/RAM.
+   * Skips unload if inference is currently in progress.
    */
   async unloadModel() {
+    if (this.#inferring > 0) {
+      console.log('[LlmEngine] Skipping unload — inference in progress');
+      return;
+    }
     if (this.#idleTimer) {
       clearTimeout(this.#idleTimer);
       this.#idleTimer = null;
@@ -292,6 +307,18 @@ class LlmEngine {
 
     // Chain onto the queue so only one inference occupies the sequence at a time
     const result = this.#inferQueue.then(async () => {
+      // Guard: context may have been disposed between queue entry and execution
+      if (!this.#context) {
+        throw new Error('Model was unloaded before inference could start.');
+      }
+
+      this.#inferring++;
+      // Cancel idle timer while inference is active
+      if (this.#idleTimer) {
+        clearTimeout(this.#idleTimer);
+        this.#idleTimer = null;
+      }
+
       const { LlamaChatSession } = await import('node-llama-cpp');
       const sequence = this.#context.getSequence();
       const session = new LlamaChatSession({
@@ -309,6 +336,7 @@ class LlmEngine {
         return { text, tokenCount };
       } finally {
         session.dispose({ disposeSequence: true });
+        this.#inferring--;
         this.#resetIdleTimer();
       }
     });

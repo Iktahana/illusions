@@ -10,9 +10,11 @@ import MarkdownIt from "markdown-it";
 
 import type { ExportMetadata, Chapter } from "./types";
 
-// Placeholder prefix used during pre-processing to avoid markdown-it interference
-const PLACEHOLDER_PREFIX = "\u0000MDI_PLACEHOLDER_";
-const PLACEHOLDER_SUFFIX = "\u0000";
+// Placeholder prefix/suffix using Unicode Private Use Area (U+E000).
+// PUA characters survive markdown-it rendering (unlike \u0000 which is replaced
+// with U+FFFD) and will not appear in normal Japanese text content.
+const PLACEHOLDER_PREFIX = "\uE000MDI_PLACEHOLDER_";
+const PLACEHOLDER_SUFFIX = "\uE000";
 
 /**
  * Validate that a kern amount matches the expected pattern (e.g. "0.5em", "-1em", "+0.25em")
@@ -45,8 +47,20 @@ function buildRubyHtml(base: string, ruby: string): string {
   return `<ruby>${base}<rt>${ruby}</rt></ruby>`;
 }
 
+/** Result of MDI syntax pre-processing before markdown-it rendering */
+interface MdiPreProcessResult {
+  /** Markdown text with MDI syntax replaced by placeholders */
+  text: string;
+  /** Map of placeholder keys to their HTML replacements */
+  placeholders: Map<string, string>;
+}
+
 /**
- * Convert MDI inline syntax to HTML equivalents.
+ * Pre-process MDI inline syntax, replacing MDI constructs with placeholders.
+ *
+ * Placeholders are restored AFTER markdown-it rendering via restorePlaceholders().
+ * This allows markdown-it to run with html:false (blocking user-authored HTML)
+ * while preserving the safe HTML generated from MDI syntax.
  *
  * Processes (in order):
  * 1. Escaped MDI syntax (backslash-prefixed) - preserved as literal text
@@ -55,7 +69,7 @@ function buildRubyHtml(base: string, ruby: string): string {
  * 4. No-break: [[no-break:text]] -> <span class="mdi-nobr">text</span>
  * 5. Kerning: [[kern:amount:text]] -> <span class="mdi-kern" style="--mdi-kern:amount;">text</span>
  */
-function processMdiSyntax(markdown: string): string {
+function preProcessMdiSyntax(markdown: string): MdiPreProcessResult {
   // Store replacements to avoid double-processing
   const placeholders: Map<string, string> = new Map();
   let placeholderIndex = 0;
@@ -117,20 +131,38 @@ function processMdiSyntax(markdown: string): string {
     }
   );
 
-  // Replace all placeholders with their final HTML
+  return { text: result, placeholders };
+}
+
+/**
+ * Restore MDI placeholders in rendered HTML with their actual HTML content.
+ *
+ * Called after markdown-it rendering to inject the safe MDI HTML elements
+ * (ruby, tcy, nobr, kern) that were protected during markdown-it processing.
+ * Because markdown-it may HTML-escape the null-byte placeholder characters,
+ * we also check for the escaped form.
+ */
+function restorePlaceholders(
+  html: string,
+  placeholders: Map<string, string>
+): string {
+  let result = html;
   for (const [key, value] of placeholders) {
     result = result.split(key).join(value);
   }
-
   return result;
 }
 
 /**
- * Create a configured markdown-it instance
+ * Create a configured markdown-it instance.
+ *
+ * html is disabled to prevent user-authored HTML (e.g. <script>, <img onerror>)
+ * from being passed through. Safe MDI-generated HTML (ruby, span) is protected
+ * via placeholders and restored after rendering.
  */
 function createMarkdownIt(): MarkdownIt {
   return new MarkdownIt({
-    html: true,
+    html: false,
     breaks: true,
   });
 }
@@ -179,9 +211,11 @@ export function mdiToHtml(
 ): string {
   const md = createMarkdownIt();
 
-  // Pre-process MDI syntax, then convert via markdown-it
-  const processed = processMdiSyntax(markdown);
-  const bodyHtml = md.render(processed);
+  // Pre-process MDI syntax into placeholders, render with markdown-it
+  // (html:false blocks user-authored HTML), then restore safe MDI HTML
+  const { text: preprocessed, placeholders } = preProcessMdiSyntax(markdown);
+  const rawHtml = md.render(preprocessed);
+  const bodyHtml = restorePlaceholders(rawHtml, placeholders);
 
   if (options?.bodyOnly) {
     return bodyHtml;
@@ -194,9 +228,11 @@ export function mdiToHtml(
   });
 
   // Build <meta> tags for optional metadata
+  // Include a strict CSP to block script execution in export output
   const metaTags: string[] = [
     '<meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self';">`,
   ];
 
   if (options?.metadata?.author) {

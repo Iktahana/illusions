@@ -12,6 +12,8 @@ export interface TabState {
   lastSavedContent: string;
   isDirty: boolean;
   lastSavedTime: number | null;
+  /** Whether the most recent save was an auto-save (used to suppress toast). */
+  lastSaveWasAuto: boolean;
   isSaving: boolean;
   isPreview: boolean;
   fileType: SupportedFileExtension;

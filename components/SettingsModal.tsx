@@ -911,14 +911,44 @@ function renderMarkdown(md: string): string {
   return html.join("\n");
 }
 
+/** Sanitize href to only allow safe protocols (http, https, mailto) */
+function sanitizeHref(url: string): string {
+  const trimmed = url.trim();
+  // Allow relative URLs (starting with / or #) and safe absolute protocols
+  if (trimmed.startsWith("/") || trimmed.startsWith("#")) {
+    return trimmed;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    const safeProtocols = ["http:", "https:", "mailto:"];
+    if (safeProtocols.includes(parsed.protocol)) {
+      return trimmed;
+    }
+  } catch {
+    // Not a valid absolute URL — allow as relative path if it has no colon-based scheme
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) {
+      return trimmed;
+    }
+  }
+  // Unsafe protocol detected — strip the href
+  return "";
+}
+
 /** Render inline markdown: bold, links, code */
 function inlineFormat(text: string): string {
   // Bold **text**
   text = text.replace(/\*\*(.+?)\*\*/g, '<strong class="text-foreground font-semibold">$1</strong>');
-  // Links [text](url)
+  // Links [text](url) — sanitize href to prevent XSS via javascript: or data: URLs
   text = text.replace(
     /\[(.+?)\]\((.+?)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-accent hover:text-accent-hover underline">$1</a>'
+    (_match: string, linkText: string, url: string) => {
+      const safeUrl = sanitizeHref(url);
+      if (safeUrl) {
+        return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-accent hover:text-accent-hover underline">${linkText}</a>`;
+      }
+      // Unsafe URL — render as plain text without a link
+      return linkText;
+    }
   );
   // Inline code `text`
   text = text.replace(/`(.+?)`/g, '<code class="text-xs bg-background px-1 py-0.5 rounded">$1</code>');

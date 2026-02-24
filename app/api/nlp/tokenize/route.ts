@@ -11,6 +11,9 @@ import type { ParagraphTokenizeRequest, ParagraphTokenizeResponse } from '@/lib/
 
 const WEB_DIC_PATH = process.cwd() + '/public/dict';
 
+/** Maximum text length for single paragraph tokenization (matches Electron IPC limit) */
+const MAX_TEXT_LENGTH = 1_000_000;
+
 export async function POST(request: NextRequest) {
   try {
     const body: ParagraphTokenizeRequest = await request.json();
@@ -20,6 +23,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid text parameter' },
         { status: 400 }
+      );
+    }
+
+    if (text.length > MAX_TEXT_LENGTH) {
+      return NextResponse.json(
+        { error: `Text exceeds maximum length of ${MAX_TEXT_LENGTH} characters` },
+        { status: 413 }
       );
     }
 

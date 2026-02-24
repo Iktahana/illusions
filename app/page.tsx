@@ -149,7 +149,7 @@ export default function EditorPage() {
 
   const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReadyPromise: vfsGate.promise });
   const {
-    content, setContent, currentFile, isDirty, isSaving, lastSavedTime,
+    content, setContent, currentFile, isDirty, isSaving, lastSavedTime, lastSaveWasAuto,
     openFile: tabOpenFile, saveFile, saveAsFile,
     newFile: tabNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen,
     _loadSystemFile: tabLoadSystemFile,
@@ -323,8 +323,8 @@ export default function EditorPage() {
   useEffect(() => {
     if (lastSavedTime && prevLastSavedTimeRef.current !== lastSavedTime) {
       if (prevLastSavedTimeRef.current !== null) {
-        // Only show toast for manual saves (positive timestamp)
-        if (lastSavedTime > 0) {
+        // Only show toast for manual saves
+        if (!lastSaveWasAuto) {
           setShowSaveToast(true);
           setSaveToastExiting(false);
 
@@ -346,7 +346,7 @@ export default function EditorPage() {
       }
       prevLastSavedTimeRef.current = lastSavedTime;
     }
-  }, [lastSavedTime]);
+  }, [lastSavedTime, lastSaveWasAuto]);
 
   /** Open the Ruby dialog with current editor selection */
   const handleOpenRubyDialog = useCallback(() => {
@@ -530,7 +530,7 @@ export default function EditorPage() {
   } = useTextStatistics(content);
 
   // --- Linting hook ---
-  const { ruleRunner, lintIssues, isLinting, handleLintIssuesUpdated, refreshLinting } = useLinting(
+  const { ruleRunner, lintIssues, isLinting, handleLintIssuesUpdated, handleNlpError, refreshLinting } = useLinting(
     lintingEnabled,
     lintingRuleConfigs,
     editorViewInstance,
@@ -1050,6 +1050,7 @@ export default function EditorPage() {
                 onShowAllSearchResults={handleShowAllSearchResults}
                 lintingRuleRunner={ruleRunner}
                 onLintIssuesUpdated={handleLintIssuesUpdated}
+                onNlpError={handleNlpError}
                 onOpenRubyDialog={handleOpenRubyDialog}
                 onToggleTcy={handleToggleTcy}
                 onOpenDictionary={handleOpenDictionary}

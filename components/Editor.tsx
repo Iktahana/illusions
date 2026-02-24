@@ -57,6 +57,7 @@ interface EditorProps {
   // リンティング設定
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
+  onNlpError?: (error: Error) => void;
   // 書式コールバック
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
@@ -84,6 +85,7 @@ export default function NovelEditor({
   onShowAllSearchResults,
   lintingRuleRunner,
   onLintIssuesUpdated,
+  onNlpError,
   onOpenRubyDialog,
   onToggleTcy,
   onOpenDictionary,
@@ -277,6 +279,7 @@ export default function NovelEditor({
               savedScrollProgressRef={savedScrollProgressRef}
               lintingRuleRunner={lintingRuleRunner}
               onLintIssuesUpdated={onLintIssuesUpdated}
+              onNlpError={onNlpError}
               onOpenRubyDialog={onOpenRubyDialog}
               onToggleTcy={onToggleTcy}
               onOpenDictionary={onOpenDictionary}
@@ -460,6 +463,7 @@ function MilkdownEditor({
   savedScrollProgressRef,
   lintingRuleRunner,
   onLintIssuesUpdated,
+  onNlpError,
   onOpenRubyDialog,
   onToggleTcy,
   onOpenDictionary,
@@ -480,6 +484,7 @@ function MilkdownEditor({
   savedScrollProgressRef: RefObject<number>;
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
+  onNlpError?: (error: Error) => void;
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
   onOpenDictionary?: (searchTerm?: string) => void;
@@ -507,6 +512,7 @@ function MilkdownEditor({
   const onInsertTextRef = useRef(onInsertText);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onLintIssuesUpdatedRef = useRef(onLintIssuesUpdated);
+  const onNlpErrorRef = useRef(onNlpError);
 
   // コールバックが変わったら ref を更新する
 
@@ -525,6 +531,10 @@ function MilkdownEditor({
   useEffect(() => {
     onLintIssuesUpdatedRef.current = onLintIssuesUpdated;
   }, [onLintIssuesUpdated]);
+
+  useEffect(() => {
+    onNlpErrorRef.current = onNlpError;
+  }, [onNlpError]);
 
   // 縦書き: ブラウザの自動スクロールを防止するための保存位置
   const savedScrollPosRef = useRef({ left: 0, top: 0 });
@@ -600,6 +610,7 @@ function MilkdownEditor({
         enabled: false, // 初期化時は無効、後で動的に更新
         debounceMs: 500,
         onIssuesUpdated: (issues, options) => onLintIssuesUpdatedRef.current?.(issues, options),
+        onNlpError: (error) => onNlpErrorRef.current?.(error),
       }));
 
     return editor;

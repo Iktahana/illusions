@@ -735,7 +735,7 @@ ipcMain.handle('open-file', async () => {
   if (canceled || !filePaths[0]) return null
   const filePath = filePaths[0]
   // Approve opened file path so it can be saved back without a new dialog
-  dialogApprovedPaths.add(path.resolve(filePath))
+  approveDialogPath(path.resolve(filePath))
   const content = await fs.readFile(filePath, 'utf-8')
   return { path: filePath, content }
 })
@@ -743,7 +743,27 @@ ipcMain.handle('open-file', async () => {
 // --- save-file path security validation ---
 // Tracks file paths that have been approved via native dialog or system file association.
 // Paths provided directly by the renderer must be in this set or they will be rejected.
-const dialogApprovedPaths = new Set()
+// Uses a bounded LRU set to prevent unbounded memory growth in long sessions.
+const MAX_APPROVED_PATHS = 200
+const dialogApprovedPaths = new Map()
+
+/**
+ * Add a path to the dialog-approved set with LRU eviction.
+ * When the set exceeds MAX_APPROVED_PATHS, the least recently added entry is evicted.
+ * @param {string} p - The resolved file path to approve
+ */
+function approveDialogPath(p) {
+  // Delete first so re-insertion moves it to the end (most recent)
+  dialogApprovedPaths.delete(p)
+  dialogApprovedPaths.set(p, true)
+  // Evict oldest entry if over capacity
+  if (dialogApprovedPaths.size > MAX_APPROVED_PATHS) {
+    const oldest = dialogApprovedPaths.keys().next().value
+    if (oldest !== undefined) {
+      dialogApprovedPaths.delete(oldest)
+    }
+  }
+}
 
 /**
  * Check whether a normalized path points to a system-sensitive location.
@@ -888,7 +908,7 @@ ipcMain.handle('save-file', async (_event, filePath, content, fileType) => {
     const dialogValidationError = validateSaveFilePath(target, { skipApproval: true })
     if (dialogValidationError) return dialogValidationError
     // Approve this dialog-selected path for future saves
-    dialogApprovedPaths.add(path.resolve(target))
+    approveDialogPath(path.resolve(target))
   }
   try {
     log.info(`ファイル保存を試行中: ${target}`)
@@ -1165,7 +1185,7 @@ ipcMain.handle('get-pending-file', async () => {
     }
 
     // Standalone file: approve path for future saves and return content
-    dialogApprovedPaths.add(path.resolve(filePath))
+    approveDialogPath(path.resolve(filePath))
     const content = await fs.readFile(filePath, 'utf-8')
     return {
       type: 'standalone',
@@ -1220,7 +1240,7 @@ async function handleMdiFileOpen(filePath) {
       // Open as standalone file
       log.info('Opening as standalone file:', filePath)
       // Approve system-opened file path for future saves
-      dialogApprovedPaths.add(path.resolve(filePath))
+      approveDialogPath(path.resolve(filePath))
       const content = await fs.readFile(filePath, 'utf-8')
       targetWindow.webContents.send('open-file-from-system', { path: filePath, content })
     }
@@ -1253,7 +1273,7 @@ app.whenReady().then(async () => {
         'Content-Security-Policy': [
           [
             "default-src 'self'",
-            `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+            `script-src 'self'${isDev ? " 'unsafe-eval'" : ''}`,
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: blob:",
             "font-src 'self' data: https://fonts.gstatic.com",
@@ -1299,9 +1319,14 @@ app.whenReady().then(async () => {
   })
 })
 
+let isQuitting = false
 app.on('before-quit', (event) => {
+  if (isQuitting) return
+  isQuitting = true
   event.preventDefault()
+  const forceQuitTimeout = setTimeout(() => app.exit(0), 5000)
   disposeLlmEngine().finally(() => {
+    clearTimeout(forceQuitTimeout)
     app.exit(0)
   })
 })

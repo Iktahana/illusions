@@ -10,20 +10,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getIgnoredCorrectionsService } from "@/lib/ignored-corrections-service";
 import { isProjectMode, isStandaloneMode } from "@/lib/project-types";
+import { hashString } from "@/lib/utils/hash-string";
 import type { EditorMode, IgnoredCorrection } from "@/lib/project-types";
-
-/**
- * Simple string hash for paragraph context.
- * Produces a short hex hash to identify a specific paragraph.
- */
-function hashString(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i);
-    hash = ((hash << 5) - hash + ch) | 0;
-  }
-  return (hash >>> 0).toString(16);
-}
 
 export interface UseIgnoredCorrectionsResult {
   ignoredCorrections: IgnoredCorrection[];

@@ -222,6 +222,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
                 lastSavedContent: fileContent,
                 isDirty: false,
                 lastSavedTime: Date.now(),
+                lastSaveWasAuto: false,
                 isSaving: false,
                 isPreview: serialized.isPreview ?? false,
                 fileType: serialized.fileType ?? inferFileType(serialized.fileName),

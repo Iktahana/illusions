@@ -176,7 +176,7 @@ declare global {
       }>;
       onDownloadProgress: (
         callback: (progress: { modelId: string; progress: number }) => void,
-      ) => void;
+      ) => () => void;
       removeDownloadProgressListener: () => void;
       setIdlingStop: (enabled: boolean) => Promise<void>;
     };

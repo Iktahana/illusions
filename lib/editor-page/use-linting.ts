@@ -8,6 +8,7 @@ import type { ILlmClient } from "@/lib/llm-client/types";
 import { getLlmClient } from "@/lib/llm-client/llm-client";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
+import { notificationManager } from "@/lib/notification-manager";
 
 // Import all lint rules
 import { PunctuationRule } from "@/lib/linting/rules/punctuation-rules";
@@ -81,6 +82,9 @@ export interface UseLintingResult {
   lintIssues: LintIssue[];
   isLinting: boolean;
   handleLintIssuesUpdated: (issues: LintIssue[]) => void;
+  /** Callback for the decoration plugin to invoke when NLP tokenization fails.
+   *  Shows a user-visible notification (in Japanese) and logs the error. */
+  handleNlpError: (error: Error) => void;
   refreshLinting: () => void;
 }
 
@@ -207,6 +211,15 @@ export function useLinting(
     }
   }, [lintingEnabled]);
 
+  // Handle NLP tokenization errors — show a user-visible notification
+  const handleNlpError = useCallback((error: Error) => {
+    console.error("[useLinting] NLP initialization/tokenization failed:", error);
+    notificationManager.warning(
+      "形態素解析の初期化に失敗しました。一部の校正ルール（L2）が無効になっています。",
+      15000,
+    );
+  }, []);
+
   // Sync active guidelines to RuleRunner and trigger re-lint when guidelines change
   useEffect(() => {
     if (!ruleRunner) return;
@@ -311,6 +324,7 @@ export function useLinting(
     lintIssues,
     isLinting,
     handleLintIssuesUpdated,
+    handleNlpError,
     refreshLinting,
   };
 }
