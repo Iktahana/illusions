@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/Users/Junpei/Repositories/illusions && npx tsx scripts/generate-credits.ts 2>&1)",
+      "Bash(cd:*)",
+      "Bash(head:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(tail:*)"
+    ]
+  }
+}
