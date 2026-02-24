@@ -11,7 +11,7 @@ A professional-grade Japanese novel editor with vertical writing, ruby notation,
 (Works on latest Chrome/Edge/Safari)
 
 **デスクトップ版**: [Download Latest Release](https://github.com/Iktahana/illusions/releases/latest)
-Available for macOS (Intel & Apple Silicon) and Windows
+Available for macOS (Intel & Apple Silicon) and Windows (installer or Microsoft Store)
 
 ---
 
@@ -57,6 +57,7 @@ Available for macOS (Intel & Apple Silicon) and Windows
 - **Auto-commit & push**: Automatic version control
 - **Branch & tag management**: Organize your writing milestones
 - **Cross-platform**: Electron app works on macOS, Windows, Linux
+- **AI status report**: View AI model status, storage usage, and diagnostics in the Settings panel
 
 ---
 
@@ -81,6 +82,8 @@ Simply visit https://illusions.app/ in your browser.
    - This is normal for unsigned applications
    - Click **"More info"** → **"Run anyway"** to proceed with installation
 4. Launch the app and start writing!
+
+> **Tip**: To skip the SmartScreen warning, install from the **Microsoft Store** instead (search "illusions novel editor").
 
 **Why does Windows show this warning?**
 - illusions is currently distributed without a Windows code signing certificate
@@ -258,6 +261,8 @@ The proofreading (linting) features in illusions comply with the following offic
 - ✅ Landing page with SEO optimization
 
 ### Recently Added
+- ✅ AI report in settings panel — view AI model status, storage usage, and system diagnostics (AIレポート)
+- ✅ Microsoft Store packaging — Windows `.appx` build target and tile assets for Store distribution
 - ✅ LLM idling stop — auto-unload AI model after 30s idle to reduce memory usage (AIアイドリングストップ)
 - ✅ Export to PDF/EPUB/DOCX — export novels to standard publishing formats
 - ✅ Local LLM engine for AI proofreading (ローカルLLMによるAI校正)
