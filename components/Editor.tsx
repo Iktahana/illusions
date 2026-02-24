@@ -1097,9 +1097,10 @@ function MilkdownEditor({
       if (userScrollingRef.current || isModeSwitchingRef.current || programmaticScrollRef?.current) {
         // User interaction, mode switch, or programmatic navigation: save position
         savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
-      } else if (isPointerDown) {
-        // Mouse drag (text selection): browser may fire native caret-scroll-into-view
-        // which computes wrong positions in vertical-rl. Detect large jumps and revert them.
+      } else if (isPointerDown && isVertical) {
+        // Mouse drag (text selection) in vertical-rl: browser may fire native caret-scroll-into-view
+        // which computes wrong positions. Detect large jumps and revert them.
+        // Only applies to vertical mode — horizontal selection scrolls are legitimate.
         const dx = Math.abs(container.scrollLeft - savedScrollPosRef.current.left);
         const dy = Math.abs(container.scrollTop - savedScrollPosRef.current.top);
         if (dx > 50 || dy > 50) {
@@ -1112,6 +1113,9 @@ function MilkdownEditor({
           // Small movement → legitimate edge-drag scroll, allow
           savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
         }
+      } else if (isPointerDown) {
+        // Horizontal mode pointer drag: save position normally
+        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
       } else {
         // Browser auto-scroll (e.g., DOM update): revert
         isReverting = true;
