@@ -69,6 +69,27 @@ function registerLlmHandlers() {
     });
   });
 
+  ipcMain.handle('llm:infer-batch', async (_event, params) => {
+    if (!params || !Array.isArray(params.prompts)) {
+      throw new Error('Invalid prompts parameter');
+    }
+    for (const p of params.prompts) {
+      if (typeof p !== 'string') {
+        throw new Error('Each prompt must be a string');
+      }
+      if (p.length > 100_000) {
+        throw new Error('Prompt too long (max 100,000 characters)');
+      }
+    }
+    if (params.prompts.length > 8) {
+      throw new Error('Batch size exceeds maximum (8)');
+    }
+    await ensureInit();
+    return llmEngine.inferBatch(params.prompts, {
+      maxTokens: typeof params.maxTokens === 'number' ? params.maxTokens : undefined,
+    });
+  });
+
   ipcMain.handle('llm:get-storage-usage', async () => {
     await ensureInit();
     return llmEngine.getStorageUsage();

@@ -170,6 +170,10 @@ declare global {
         prompt: string,
         options?: { maxTokens?: number },
       ) => Promise<{ text: string; tokenCount: number }>;
+      inferBatch: (
+        prompts: string[],
+        options?: { maxTokens?: number },
+      ) => Promise<Array<{ text: string; tokenCount: number }>>;
       getStorageUsage: () => Promise<{
         used: number;
         models: Array<{ id: string; size: number }>;

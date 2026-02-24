@@ -255,7 +255,7 @@ class LlmEngine {
     const { getLlama } = await import('node-llama-cpp');
     const llama = await getLlama();
     this.#model = await llama.loadModel({ modelPath });
-    this.#context = await this.#model.createContext();
+    this.#context = await this.#model.createContext({ sequences: 8 });
     this.#modelId = modelId;
   }
 
@@ -345,6 +345,58 @@ class LlmEngine {
     this.#inferQueue = result.catch(() => {});
 
     return result;
+  }
+
+  /**
+   * Run batch inference — multiple prompts decoded in parallel using
+   * separate context sequences. Requires the context to have been created
+   * with `sequences` > 1 (see loadModel).
+   * @param {string[]} prompts
+   * @param {{ maxTokens?: number }} [options]
+   * @returns {Promise<Array<{ text: string; tokenCount: number }>>}
+   */
+  async inferBatch(prompts, options = {}) {
+    if (!this.#model || !this.#context) {
+      throw new Error('Model not loaded. Call loadModel() first.');
+    }
+    if (!Array.isArray(prompts) || prompts.length === 0) {
+      return [];
+    }
+
+    // Wait for any ongoing single infer to finish
+    await this.#inferQueue;
+
+    this.#inferring++;
+    if (this.#idleTimer) {
+      clearTimeout(this.#idleTimer);
+      this.#idleTimer = null;
+    }
+
+    const maxTokens = options.maxTokens || 512;
+    const { LlamaChatSession } = await import('node-llama-cpp');
+
+    try {
+      const results = await Promise.all(
+        prompts.map(async (prompt) => {
+          const sequence = this.#context.getSequence();
+          const session = new LlamaChatSession({ contextSequence: sequence });
+          let tokenCount = 0;
+          try {
+            const text = await session.prompt(prompt, {
+              maxTokens,
+              onToken: () => { tokenCount++; },
+            });
+            return { text, tokenCount };
+          } finally {
+            session.dispose({ disposeSequence: true });
+          }
+        })
+      );
+      return results;
+    } finally {
+      this.#inferring--;
+      this.#resetIdleTimer();
+    }
   }
 
   /**

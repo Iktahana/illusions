@@ -78,6 +78,22 @@ export class ElectronLlmClient implements ILlmClient {
     }
   }
 
+  async inferBatch(
+    prompts: string[],
+    options?: { signal?: AbortSignal; maxTokens?: number },
+  ): Promise<LlmInferenceResult[]> {
+    if (!window.electronAPI?.llm) throw new Error("LLM not available");
+    window.dispatchEvent(new Event("llm:inference-start"));
+    try {
+      // AbortSignal cannot cross IPC boundary directly
+      return await window.electronAPI.llm.inferBatch(prompts, {
+        maxTokens: options?.maxTokens,
+      });
+    } finally {
+      window.dispatchEvent(new Event("llm:inference-end"));
+    }
+  }
+
   async getStorageUsage(): Promise<{
     used: number;
     models: Array<{ id: string; size: number }>;
