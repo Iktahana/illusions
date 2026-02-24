@@ -100,7 +100,9 @@ export default function SettingsModal({
   } = useLintingSettings();
   const {
     llmEnabled, llmModelId, llmIdlingStop,
+    characterExtractionBatchSize, characterExtractionConcurrency,
     onLlmEnabledChange, onLlmModelIdChange, onLlmIdlingStopChange,
+    onCharacterExtractionBatchSizeChange, onCharacterExtractionConcurrencyChange,
   } = useLlmSettings();
   const {
     powerSaveMode, autoPowerSaveOnBattery,
@@ -609,6 +611,10 @@ export default function SettingsModal({
                 onLlmModelIdChange={onLlmModelIdChange}
                 llmIdlingStop={llmIdlingStop}
                 onLlmIdlingStopChange={onLlmIdlingStopChange}
+                characterExtractionBatchSize={characterExtractionBatchSize}
+                onCharacterExtractionBatchSizeChange={onCharacterExtractionBatchSizeChange}
+                characterExtractionConcurrency={characterExtractionConcurrency}
+                onCharacterExtractionConcurrencyChange={onCharacterExtractionConcurrencyChange}
                 correctionConfig={correctionConfig}
                 onCorrectionConfigChange={onCorrectionConfigChange}
               />

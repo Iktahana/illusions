@@ -84,6 +84,10 @@ export interface AppState {
   llmModelId?: string;
   llmIdlingStop?: boolean;
 
+  // Character extraction settings
+  characterExtractionBatchSize?: number;
+  characterExtractionConcurrency?: number;
+
   // 校正モード設定
   correctionMode?: CorrectionModeId;
   correctionGuidelines?: GuidelineId[];

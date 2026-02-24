@@ -17,6 +17,10 @@ interface LlmSettingsProps {
   onLlmModelIdChange?: (modelId: string) => void;
   llmIdlingStop?: boolean;
   onLlmIdlingStopChange?: (value: boolean) => void;
+  characterExtractionBatchSize?: number;
+  onCharacterExtractionBatchSizeChange?: (value: number) => void;
+  characterExtractionConcurrency?: number;
+  onCharacterExtractionConcurrencyChange?: (value: number) => void;
 }
 
 /** Format byte count as human-readable string */
@@ -34,6 +38,10 @@ export function LlmSettings({
   onLlmModelIdChange,
   llmIdlingStop,
   onLlmIdlingStopChange,
+  characterExtractionBatchSize,
+  onCharacterExtractionBatchSizeChange,
+  characterExtractionConcurrency,
+  onCharacterExtractionConcurrencyChange,
 }: LlmSettingsProps): React.ReactElement {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [modelStatuses, setModelStatuses] = useState<Map<string, LlmModelInfo>>(new Map());
@@ -333,6 +341,59 @@ export function LlmSettings({
             </div>
           </div>
         )}
+
+        {/* Character extraction settings */}
+        <div className="pt-4 border-t border-border space-y-4">
+          <h3 className="text-sm font-medium text-foreground">人物抽出設定</h3>
+
+          {/* Batch size slider */}
+          <div className={clsx(!llmEnabled && "opacity-60")}>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-foreground-secondary">
+                バッチサイズ
+              </label>
+              <span className="text-xs text-foreground-tertiary">
+                {characterExtractionBatchSize ?? 3}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={10}
+              value={characterExtractionBatchSize ?? 3}
+              onChange={(e) => onCharacterExtractionBatchSizeChange?.(Number(e.target.value))}
+              disabled={!llmEnabled}
+              className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none cursor-pointer accent-accent"
+            />
+            <p className="text-xs text-foreground-tertiary mt-1">
+              1回のAI呼び出しで処理する段落数
+            </p>
+          </div>
+
+          {/* Concurrency slider */}
+          <div className={clsx(!llmEnabled && "opacity-60")}>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-foreground-secondary">
+                並列数
+              </label>
+              <span className="text-xs text-foreground-tertiary">
+                {characterExtractionConcurrency ?? 4}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={8}
+              value={characterExtractionConcurrency ?? 4}
+              onChange={(e) => onCharacterExtractionConcurrencyChange?.(Number(e.target.value))}
+              disabled={!llmEnabled}
+              className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none cursor-pointer accent-accent"
+            />
+            <p className="text-xs text-foreground-tertiary mt-1">
+              同時に実行するAI推論の数
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
