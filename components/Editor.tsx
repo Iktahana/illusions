@@ -881,12 +881,17 @@ function MilkdownEditor({
           editorDom.style.height = `${targetHeight}px`;
           editorDom.style.maxHeight = `${targetHeight}px`;
           editorDom.style.minHeight = `${targetHeight}px`;
+          // Prevent browser caret-scroll on .ProseMirror itself (contenteditable + fixed height
+          // makes it implicitly scrollable in vertical-rl). clip prevents scrolling without
+          // creating a new formatting context, so layout is unaffected.
+          editorDom.style.overflow = 'clip';
         } else {
           // 横書き: 幅を制限（1行あたりの文字数）し、中央寄せ
           const targetWidth = charSize * charsPerLine;
           editorDom.style.width = `${targetWidth}px`;
           editorDom.style.maxWidth = `${targetWidth}px`;
           editorDom.style.margin = '0 auto'; // 中央寄せ
+          editorDom.style.overflow = '';
         }
       }
 
@@ -1076,35 +1081,12 @@ function MilkdownEditor({
 
     // Track user-initiated scroll sources
     const onWheel = () => markUserScroll();
-    let enforceRAF: number | null = null;
     const onPointerDown = () => {
       // マウスボタンが押されている間はドラッグ選択の可能性がある
       isPointerDown = true;
-
-      // In vertical mode, start a rAF loop to enforce scroll position BEFORE paint.
-      // Browser's native caret-scroll-into-view fires between frames and computes wrong
-      // positions in vertical-rl. Reverting in the scroll handler is too late (flicker).
-      // The rAF loop catches jumps before the browser paints them.
-      if (isVertical) {
-        const enforceBeforePaint = () => {
-          if (!isPointerDown) return;
-          const dx = Math.abs(container.scrollLeft - savedScrollPosRef.current.left);
-          const dy = Math.abs(container.scrollTop - savedScrollPosRef.current.top);
-          if (dx > 50 || dy > 50) {
-            container.scrollLeft = savedScrollPosRef.current.left;
-            container.scrollTop = savedScrollPosRef.current.top;
-          }
-          enforceRAF = requestAnimationFrame(enforceBeforePaint);
-        };
-        enforceRAF = requestAnimationFrame(enforceBeforePaint);
-      }
     };
     const onPointerUp = () => {
       isPointerDown = false;
-      if (enforceRAF !== null) {
-        cancelAnimationFrame(enforceRAF);
-        enforceRAF = null;
-      }
     };
     const onTouchStart = () => markUserScroll();
 
@@ -1152,7 +1134,6 @@ function MilkdownEditor({
       container.removeEventListener('touchstart', onTouchStart);
       container.removeEventListener('scroll', onScroll);
       if (userScrollTimer) clearTimeout(userScrollTimer);
-      if (enforceRAF !== null) cancelAnimationFrame(enforceRAF);
     };
   }, [isVertical, scrollContainerRef, isModeSwitchingRef, savedScrollPosRef, userScrollingRef]);
 
@@ -1368,6 +1349,7 @@ function MilkdownEditor({
           minHeight: '100%',
           display: 'flex',
           alignItems: 'center',
+          overflow: 'clip' as const, // Prevent browser caret-scroll on intermediate elements
         }),
       }}
     >
