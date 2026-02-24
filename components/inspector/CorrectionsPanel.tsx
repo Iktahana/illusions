@@ -8,18 +8,15 @@ import clsx from "clsx";
 import { LINT_PRESETS, LINT_RULES_META, LINT_RULE_CATEGORIES } from "@/lib/linting/lint-presets";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import InfoTooltip from "./InfoTooltip";
+import { useLintingSettings, usePosHighlightSettings } from "@/contexts/EditorSettingsContext";
 
 import type { LintIssue, Severity } from "@/lib/linting";
-import type { LintRulePresetConfig } from "@/lib/linting/lint-presets";
 import type { SeverityFilter, EnrichedLintIssue } from "./types";
 
 /** Sort mode for the issue list */
 type SortMode = "position" | "severity" | "category";
 
 interface CorrectionsPanelProps {
-  posHighlightEnabled: boolean;
-  onPosHighlightEnabledChange?: (enabled: boolean) => void;
-  posHighlightColors?: Record<string, string>;
   onOpenPosHighlightSettings?: () => void;
   lintIssues: (LintIssue | EnrichedLintIssue)[];
   onNavigateToIssue?: (issue: LintIssue) => void;
@@ -31,10 +28,6 @@ interface CorrectionsPanelProps {
   onOpenLintingSettings?: () => void;
   onApplyLintPreset?: (presetId: string) => void;
   activeLintPresetId?: string;
-  lintingEnabled?: boolean;
-  onLintingEnabledChange?: (enabled: boolean) => void;
-  lintingRuleConfigs?: Record<string, LintRulePresetConfig>;
-  onLintingRuleConfigChange?: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
 }
 
 const SEVERITY_LABELS: Record<Severity, string> = {
@@ -235,9 +228,6 @@ function IssueCard({
 
 /** Panel for displaying lint corrections and POS highlighting controls */
 export default function CorrectionsPanel({
-  posHighlightEnabled,
-  onPosHighlightEnabledChange,
-  posHighlightColors = {},
   onOpenPosHighlightSettings,
   lintIssues,
   onNavigateToIssue,
@@ -249,11 +239,15 @@ export default function CorrectionsPanel({
   onOpenLintingSettings,
   onApplyLintPreset,
   activeLintPresetId = "",
-  lintingEnabled = false,
-  onLintingEnabledChange,
-  lintingRuleConfigs = {},
-  onLintingRuleConfigChange,
 }: CorrectionsPanelProps): React.JSX.Element {
+  const {
+    posHighlightEnabled, posHighlightColors,
+    onPosHighlightEnabledChange,
+  } = usePosHighlightSettings();
+  const {
+    lintingEnabled, lintingRuleConfigs,
+    onLintingEnabledChange, onLintingRuleConfigChange,
+  } = useLintingSettings();
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("category");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -446,21 +440,19 @@ export default function CorrectionsPanel({
                 <span className="text-xs text-foreground-tertiary">{group.issues.length}件</span>
               </button>
               {/* Disable entire group */}
-              {onLintingRuleConfigChange && (
-                <InfoTooltip
-                  content={`「${group.categoryName}」のルールをすべて無効にする`}
-                  className="text-foreground-tertiary hover:text-foreground-secondary"
+              <InfoTooltip
+                content={`「${group.categoryName}」のルールをすべて無効にする`}
+                className="text-foreground-tertiary hover:text-foreground-secondary"
+              >
+                <button
+                  type="button"
+                  onClick={() => handleDisableGroup(group)}
+                  className="p-1.5 mr-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
+                  aria-label={`${group.categoryName}をすべて無効にする`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => handleDisableGroup(group)}
-                    className="p-1.5 mr-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
-                    aria-label={`${group.categoryName}をすべて無効にする`}
-                  >
-                    <EyeOff className="w-3.5 h-3.5" />
-                  </button>
-                </InfoTooltip>
-              )}
+                  <EyeOff className="w-3.5 h-3.5" />
+                </button>
+              </InfoTooltip>
             </div>
             {/* Group body */}
             {!isCollapsed && (

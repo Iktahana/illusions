@@ -33,6 +33,14 @@ import { localPreferences } from "@/lib/local-preferences";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
 import { useLlmStatus } from "@/lib/hooks/use-llm-status";
 import type { LlmStatusState } from "@/lib/hooks/use-llm-status";
+import {
+  useTypographySettings,
+  useLintingSettings,
+  useLlmSettings,
+  usePosHighlightSettings,
+  useScrollSettings,
+  useUISettings,
+} from "@/contexts/EditorSettingsContext";
 
 interface EditorProps {
   initialContent?: string;
@@ -40,40 +48,21 @@ interface EditorProps {
   onInsertText?: (text: string) => void;
   onSelectionChange?: (charCount: number) => void;
   className?: string;
-  fontScale?: number;
-  lineHeight?: number;
-  paragraphSpacing?: number;
-  textIndent?: number;
-  fontFamily?: string;
-  charsPerLine?: number;
-  onCharsPerLineChange?: (chars: number) => void;
   searchOpenTrigger?: number;
   searchInitialTerm?: string;
-  showParagraphNumbers?: boolean;
   onEditorViewReady?: (view: EditorView) => void;
   /** Ref that external code sets to true before programmatic scrolling */
   programmaticScrollRef?: React.RefObject<boolean>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onShowAllSearchResults?: (matches: any[], searchTerm: string) => void;
-  // 品詞着色設定
-  posHighlightEnabled?: boolean;
-  posHighlightColors?: Record<string, string>;
   // リンティング設定
-  lintingEnabled?: boolean;
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
-  // スクロール設定
-  verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
-  scrollSensitivity?: number;
   // 書式コールバック
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
   // 辞書
   onOpenDictionary?: (searchTerm?: string) => void;
-  // ツールバーからの設定変更
-  onFontScaleChange?: (v: number) => void;
-  onLineHeightChange?: (v: number) => void;
-  onParagraphSpacingChange?: (v: number) => void;
   // 校正提示表示コールバック
   onShowLintHint?: (issue: LintIssue) => void;
   // 校正無視コールバック
@@ -81,9 +70,6 @@ interface EditorProps {
   // Editor mode controls
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
-  // LLM status indicator
-  llmEnabled?: boolean;
-  llmModelId?: string;
 }
 
 export default function NovelEditor({
@@ -92,39 +78,31 @@ export default function NovelEditor({
   onInsertText,
   onSelectionChange,
   className,
-  fontScale = 100,
-  lineHeight = 1.8,
-  paragraphSpacing = 0.5,
-  textIndent = 1,
-  fontFamily = 'Noto Serif JP',
-  charsPerLine = 40,
-  onCharsPerLineChange,
   searchOpenTrigger = 0,
   searchInitialTerm,
-  showParagraphNumbers = false,
   onEditorViewReady,
   programmaticScrollRef,
   onShowAllSearchResults,
-  posHighlightEnabled = false,
-  posHighlightColors = {},
-  lintingEnabled = false,
   lintingRuleRunner,
   onLintIssuesUpdated,
-  verticalScrollBehavior = "auto",
-  scrollSensitivity = 1.0,
   onOpenRubyDialog,
   onToggleTcy,
   onOpenDictionary,
   onShowLintHint,
   onIgnoreCorrection,
-  onFontScaleChange,
-  onLineHeightChange,
-  onParagraphSpacingChange,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
-  llmEnabled = false,
-  llmModelId = "",
 }: EditorProps) {
+  const {
+    fontScale, lineHeight, paragraphSpacing, textIndent, fontFamily,
+    charsPerLine, autoCharsPerLine, showParagraphNumbers,
+    onFontScaleChange, onLineHeightChange, onParagraphSpacingChange,
+    onCharsPerLineChange,
+  } = useTypographySettings();
+  const { lintingEnabled } = useLintingSettings();
+  const { llmEnabled, llmModelId } = useLlmSettings();
+  const { posHighlightEnabled, posHighlightColors } = usePosHighlightSettings();
+  const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
   const [isVertical, setIsVertical] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -244,7 +222,7 @@ export default function NovelEditor({
 
   // Add window resize listener to auto-adjust chars per line
   useEffect(() => {
-    if (!onCharsPerLineChange) return;
+    if (!autoCharsPerLine) return;
 
     // Calculate on mount
     const timer = setTimeout(calculateOptimalCharsPerLine, 100);
@@ -260,7 +238,7 @@ export default function NovelEditor({
       clearTimeout(timer);
       window.removeEventListener('resize', handleResize);
     };
-  }, [calculateOptimalCharsPerLine, onCharsPerLineChange]);
+  }, [calculateOptimalCharsPerLine, autoCharsPerLine]);
 
   return (
     <div className={clsx("flex flex-col h-full min-h-0 relative", className)}>
@@ -268,15 +246,7 @@ export default function NovelEditor({
       <EditorToolbar
         isVertical={isVertical}
         onToggleVertical={handleToggleVertical}
-        fontScale={fontScale}
-        lineHeight={lineHeight}
-        paragraphSpacing={paragraphSpacing}
-        onFontScaleChange={onFontScaleChange ?? (() => {})}
-        onLineHeightChange={onLineHeightChange ?? (() => {})}
-        onParagraphSpacingChange={onParagraphSpacingChange ?? (() => {})}
         onSearchClick={handleSearchToggle}
-        llmEnabled={llmEnabled}
-        llmModelId={llmModelId}
       />
 
       {/* エディタ領域 */}
@@ -298,28 +268,16 @@ export default function NovelEditor({
               onInsertText={onInsertText}
               onSelectionChange={onSelectionChange}
               isVertical={isVertical}
-              fontScale={fontScale}
-              lineHeight={lineHeight}
-              paragraphSpacing={paragraphSpacing}
-              textIndent={textIndent}
-              fontFamily={fontFamily}
-              charsPerLine={charsPerLine}
               scrollContainerRef={scrollContainerRef}
               onEditorViewReady={(view) => {
                 setEditorViewInstance(view);
                 onEditorViewReady?.(view);
               }}
-              showParagraphNumbers={showParagraphNumbers}
               programmaticScrollRef={programmaticScrollRef}
               isModeSwitchingRef={isModeSwitchingRef}
               savedScrollProgressRef={savedScrollProgressRef}
-              posHighlightEnabled={posHighlightEnabled}
-              posHighlightColors={posHighlightColors}
-              lintingEnabled={lintingEnabled}
               lintingRuleRunner={lintingRuleRunner}
               onLintIssuesUpdated={onLintIssuesUpdated}
-              verticalScrollBehavior={verticalScrollBehavior}
-              scrollSensitivity={scrollSensitivity}
               onOpenRubyDialog={onOpenRubyDialog}
               onToggleTcy={onToggleTcy}
               onOpenDictionary={onOpenDictionary}
@@ -327,7 +285,6 @@ export default function NovelEditor({
               onIgnoreCorrection={onIgnoreCorrection}
               mdiExtensionsEnabled={mdiExtensionsEnabled}
               gfmEnabled={gfmEnabled}
-              llmEnabled={llmEnabled}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -433,28 +390,17 @@ function LlmStatusDot({ status }: { status: LlmStatusState }) {
 function EditorToolbar({
   isVertical,
   onToggleVertical,
-  fontScale,
-  lineHeight,
-  paragraphSpacing,
-  onFontScaleChange,
-  onLineHeightChange,
-  onParagraphSpacingChange,
   onSearchClick,
-  llmEnabled = false,
-  llmModelId = "",
 }: {
   isVertical: boolean;
   onToggleVertical: () => void;
-  fontScale: number;
-  lineHeight: number;
-  paragraphSpacing: number;
-  onFontScaleChange: (v: number) => void;
-  onLineHeightChange: (v: number) => void;
-  onParagraphSpacingChange: (v: number) => void;
   onSearchClick: () => void;
-  llmEnabled?: boolean;
-  llmModelId?: string;
 }) {
+  const {
+    fontScale, lineHeight, paragraphSpacing,
+    onFontScaleChange, onLineHeightChange, onParagraphSpacingChange,
+  } = useTypographySettings();
+  const { llmEnabled, llmModelId } = useLlmSettings();
   const llmStatus = useLlmStatus(llmEnabled, llmModelId);
   // Options matching the 書式 menu ranges/steps
   const fontScaleOptions = Array.from({ length: 13 }, (_, i) => 50 + i * 10); // 50–170
@@ -508,25 +454,13 @@ function MilkdownEditor({
   onInsertText,
   onSelectionChange,
   isVertical,
-  fontScale,
-  lineHeight,
-  paragraphSpacing,
-  textIndent,
-  fontFamily,
-  charsPerLine,
   scrollContainerRef,
   onEditorViewReady,
   programmaticScrollRef,
-  showParagraphNumbers,
   isModeSwitchingRef,
   savedScrollProgressRef,
-  posHighlightEnabled,
-  posHighlightColors,
-  lintingEnabled,
   lintingRuleRunner,
   onLintIssuesUpdated,
-  verticalScrollBehavior = "auto",
-  scrollSensitivity = 1.0,
   onOpenRubyDialog,
   onToggleTcy,
   onOpenDictionary,
@@ -534,41 +468,35 @@ function MilkdownEditor({
   onIgnoreCorrection,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
-  llmEnabled = false,
 }: {
   initialContent: string;
   onChange?: (content: string) => void;
   onInsertText?: (text: string) => void;
   onSelectionChange?: (charCount: number) => void;
   isVertical: boolean;
-  fontScale: number;
-  lineHeight: number;
-  paragraphSpacing: number;
-  textIndent: number;
-  fontFamily: string;
-  charsPerLine: number;
   scrollContainerRef: RefObject<HTMLDivElement>;
   onEditorViewReady?: (view: EditorView) => void;
   programmaticScrollRef?: React.RefObject<boolean>;
-  showParagraphNumbers: boolean;
   isModeSwitchingRef: MutableRefObject<boolean>;
   savedScrollProgressRef: RefObject<number>;
-  posHighlightEnabled?: boolean;
-  posHighlightColors?: Record<string, string>;
-  lintingEnabled?: boolean;
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
-  verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
-  scrollSensitivity?: number;
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
-  llmEnabled?: boolean;
   onOpenDictionary?: (searchTerm?: string) => void;
   onShowLintHint?: (issue: LintIssue) => void;
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
 }) {
+  const {
+    fontScale, lineHeight, paragraphSpacing, textIndent, fontFamily,
+    charsPerLine, showParagraphNumbers,
+  } = useTypographySettings();
+  const { lintingEnabled } = useLintingSettings();
+  const { llmEnabled } = useLlmSettings();
+  const { posHighlightEnabled, posHighlightColors } = usePosHighlightSettings();
+  const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const [hasSelection, setHasSelection] = useState(false);

@@ -2,13 +2,20 @@
 
 import { useState, useEffect, useRef } from "react";
 import { X, ExternalLink, ChevronDown, ChevronRight, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium } from "lucide-react";
-import type { Severity } from "@/lib/linting/types";
-import type { CorrectionConfig } from "@/lib/linting/correction-config";
 import dynamic from "next/dynamic";
 
 import { isElectronRenderer } from "@/lib/runtime-env";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import { FEATURED_JAPANESE_FONTS } from "@/lib/fonts";
+import {
+  useTypographySettings,
+  useLintingSettings,
+  useLlmSettings,
+  usePosHighlightSettings,
+  useScrollSettings,
+  usePowerSettings,
+  useUISettings,
+} from "@/contexts/EditorSettingsContext";
 import ColorPicker from "./ColorPicker";
 import LintingSettings from "./LintingSettings";
 
@@ -41,56 +48,6 @@ interface CreditEntry {
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // Editor settings
-  fontScale: number;
-  onFontScaleChange: (value: number) => void;
-  lineHeight: number;
-  onLineHeightChange: (value: number) => void;
-  paragraphSpacing: number;
-  onParagraphSpacingChange: (value: number) => void;
-  textIndent: number;
-  onTextIndentChange: (value: number) => void;
-  fontFamily: string;
-  onFontFamilyChange: (value: string) => void;
-  charsPerLine: number;
-  onCharsPerLineChange: (value: number) => void;
-  autoCharsPerLine: boolean;
-  onAutoCharsPerLineChange: (value: boolean) => void;
-  showParagraphNumbers: boolean;
-  onShowParagraphNumbersChange: (value: boolean) => void;
-  autoSave: boolean;
-  onAutoSaveChange: (value: boolean) => void;
-  // Vertical scroll settings
-  verticalScrollBehavior: "auto" | "mouse" | "trackpad";
-  onVerticalScrollBehaviorChange: (value: "auto" | "mouse" | "trackpad") => void;
-  scrollSensitivity: number;
-  onScrollSensitivityChange: (value: number) => void;
-  // POS highlight settings
-  posHighlightEnabled: boolean;
-  onPosHighlightEnabledChange: (value: boolean) => void;
-  posHighlightColors: Record<string, string>;
-  onPosHighlightColorsChange: (value: Record<string, string>) => void;
-  // Linting settings
-  lintingEnabled?: boolean;
-  onLintingEnabledChange?: (value: boolean) => void;
-  lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity }>;
-  onLintingRuleConfigChange?: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
-  onLintingRuleConfigsBatchChange?: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
-  // LLM settings
-  llmEnabled?: boolean;
-  onLlmEnabledChange?: (value: boolean) => void;
-  llmModelId?: string;
-  onLlmModelIdChange?: (modelId: string) => void;
-  llmIdlingStop?: boolean;
-  onLlmIdlingStopChange?: (value: boolean) => void;
-  // Correction config
-  correctionConfig?: CorrectionConfig;
-  onCorrectionConfigChange?: (partial: Partial<CorrectionConfig>) => void;
-  // Power saving (Electron only)
-  powerSaveMode?: boolean;
-  onPowerSaveModeChange?: (value: boolean) => void;
-  autoPowerSaveOnBattery?: boolean;
-  onAutoPowerSaveOnBatteryChange?: (value: boolean) => void;
   /** Open modal on a specific tab */
   initialCategory?: SettingsCategory;
 }
@@ -118,51 +75,37 @@ const SCROLL_BEHAVIORS = [
 export default function SettingsModal({
   isOpen,
   onClose,
-  fontScale,
-  onFontScaleChange,
-  lineHeight,
-  onLineHeightChange,
-  paragraphSpacing,
-  onParagraphSpacingChange,
-  textIndent,
-  onTextIndentChange,
-  fontFamily,
-  onFontFamilyChange,
-  charsPerLine,
-  onCharsPerLineChange,
-  autoCharsPerLine,
-  onAutoCharsPerLineChange,
-  showParagraphNumbers,
-  onShowParagraphNumbersChange,
-  autoSave,
-  onAutoSaveChange,
-  verticalScrollBehavior,
-  onVerticalScrollBehaviorChange,
-  scrollSensitivity,
-  onScrollSensitivityChange,
-  posHighlightEnabled,
-  onPosHighlightEnabledChange,
-  posHighlightColors,
-  onPosHighlightColorsChange,
-  lintingEnabled = false,
-  onLintingEnabledChange,
-  lintingRuleConfigs = {},
-  onLintingRuleConfigChange,
-  onLintingRuleConfigsBatchChange,
-  llmEnabled,
-  onLlmEnabledChange,
-  llmModelId,
-  onLlmModelIdChange,
-  llmIdlingStop,
-  onLlmIdlingStopChange,
-  correctionConfig,
-  onCorrectionConfigChange,
-  powerSaveMode,
-  onPowerSaveModeChange,
-  autoPowerSaveOnBattery,
-  onAutoPowerSaveOnBatteryChange,
   initialCategory,
 }: SettingsModalProps) {
+  const {
+    fontScale, lineHeight, paragraphSpacing, textIndent, fontFamily,
+    charsPerLine, autoCharsPerLine, showParagraphNumbers,
+    onFontScaleChange, onLineHeightChange, onParagraphSpacingChange,
+    onTextIndentChange, onFontFamilyChange, onCharsPerLineChange,
+    onAutoCharsPerLineChange, onShowParagraphNumbersChange,
+  } = useTypographySettings();
+  const { autoSave, onAutoSaveChange } = useUISettings();
+  const {
+    verticalScrollBehavior, scrollSensitivity,
+    onVerticalScrollBehaviorChange, onScrollSensitivityChange,
+  } = useScrollSettings();
+  const {
+    posHighlightEnabled, posHighlightColors,
+    onPosHighlightEnabledChange, onPosHighlightColorsChange,
+  } = usePosHighlightSettings();
+  const {
+    lintingEnabled, lintingRuleConfigs, correctionConfig,
+    onLintingEnabledChange, onLintingRuleConfigChange,
+    onLintingRuleConfigsBatchChange, onCorrectionConfigChange,
+  } = useLintingSettings();
+  const {
+    llmEnabled, llmModelId, llmIdlingStop,
+    onLlmEnabledChange, onLlmModelIdChange, onLlmIdlingStopChange,
+  } = useLlmSettings();
+  const {
+    powerSaveMode, autoPowerSaveOnBattery,
+    onPowerSaveModeChange, onAutoPowerSaveOnBatteryChange,
+  } = usePowerSettings();
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(initialCategory ?? "editor");
   const modalRef = useRef<HTMLDivElement>(null);
 

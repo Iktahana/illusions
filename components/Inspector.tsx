@@ -32,9 +32,6 @@ export default function Inspector({
   charTypeAnalysis,
   charUsageRates,
   readabilityAnalysis,
-  posHighlightEnabled = false,
-  onPosHighlightEnabledChange,
-  posHighlightColors,
   onOpenPosHighlightSettings,
   onHistoryRestore,
   activeFileName,
@@ -50,10 +47,6 @@ export default function Inspector({
   onOpenLintingSettings,
   onApplyLintPreset,
   activeLintPresetId,
-  lintingEnabled = false,
-  onLintingEnabledChange,
-  lintingRuleConfigs,
-  onLintingRuleConfigChange,
   switchToCorrectionsTrigger = 0,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
@@ -367,9 +360,6 @@ export default function Inspector({
          {activeTab === "ai" && <AIPanel />}
          {activeTab === "corrections" && (
            <CorrectionsPanel
-             posHighlightEnabled={posHighlightEnabled}
-             onPosHighlightEnabledChange={onPosHighlightEnabledChange}
-             posHighlightColors={posHighlightColors}
              onOpenPosHighlightSettings={onOpenPosHighlightSettings}
              lintIssues={lintIssues ?? []}
              onNavigateToIssue={onNavigateToIssue}
@@ -381,10 +371,6 @@ export default function Inspector({
              onOpenLintingSettings={onOpenLintingSettings}
              onApplyLintPreset={onApplyLintPreset}
              activeLintPresetId={activeLintPresetId}
-             lintingEnabled={lintingEnabled}
-             onLintingEnabledChange={onLintingEnabledChange}
-             lintingRuleConfigs={lintingRuleConfigs}
-             onLintingRuleConfigChange={onLintingRuleConfigChange}
            />
          )}
          {activeTab === "stats" && (

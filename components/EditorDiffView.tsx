@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { X } from "lucide-react";
 import { computeDiff, getDiffStats } from "@/lib/diff-service";
+import { useTypographySettings } from "@/contexts/EditorSettingsContext";
 
 import type { DiffChunk } from "@/lib/diff-service";
 
@@ -15,13 +16,6 @@ interface EditorDiffViewProps {
   snapshotLabel: string;
   /** Close callback */
   onClose: () => void;
-  /** Editor styling props */
-  fontScale?: number;
-  lineHeight?: number;
-  fontFamily?: string;
-  charsPerLine?: number;
-  textIndent?: number;
-  paragraphSpacing?: number;
 }
 
 export default function EditorDiffView({
@@ -29,13 +23,8 @@ export default function EditorDiffView({
   currentContent,
   snapshotLabel,
   onClose,
-  fontScale = 100,
-  lineHeight = 1.8,
-  fontFamily = "Noto Serif JP",
-  charsPerLine = 40,
-  textIndent = 1,
-  paragraphSpacing = 0.5,
 }: EditorDiffViewProps) {
+  const { fontScale, lineHeight, fontFamily, charsPerLine, textIndent, paragraphSpacing } = useTypographySettings();
   const chunks = useMemo(
     () => computeDiff(snapshotContent, currentContent),
     [snapshotContent, currentContent]
