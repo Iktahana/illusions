@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Plus, Trash2, Edit2, Check, X, Sparkles, Loader2 } from "lucide-react";
 
 import { CharacterExtractor } from "@/lib/character-extraction";
@@ -8,6 +8,7 @@ import type { ExtractionProgress } from "@/lib/character-extraction";
 import { getLlmClient } from "@/lib/llm-client/llm-client";
 import { LlmController } from "@/lib/linting/llm-controller";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
+import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
 import { useLlmSettings } from "@/contexts/EditorSettingsContext";
 
 interface Character {
@@ -33,6 +34,7 @@ export default function Characters({ content }: CharactersProps) {
   } = useLlmSettings();
 
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -43,6 +45,34 @@ export default function Characters({ content }: CharactersProps) {
     personality: "",
     relationships: "",
   });
+
+  // Restore characters from persistent storage on mount
+  useEffect(() => {
+    const restore = async () => {
+      try {
+        const appState = await fetchAppState();
+        if (appState?.characters && appState.characters.length > 0) {
+          setCharacters(appState.characters);
+        }
+      } catch (err) {
+        console.error("Failed to restore characters:", err);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    void restore();
+  }, []);
+
+  // Persist characters to storage on change (debounced)
+  useEffect(() => {
+    if (!isLoaded) return; // skip initial empty state
+
+    const timer = setTimeout(() => {
+      void persistAppState({ characters });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [characters, isLoaded]);
 
   // LLM extraction state
   const [isExtracting, setIsExtracting] = useState(false);
