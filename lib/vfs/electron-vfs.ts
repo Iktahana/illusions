@@ -58,11 +58,13 @@ interface ElectronVFSBridge {
 
 /**
  * Join path segments using "/" separator, handling trailing/leading slashes.
+ * Normalizes Windows backslashes to forward slashes for consistent IPC communication.
  */
 function joinPath(base: string, ...parts: string[]): string {
-  const normalizedBase = base.replace(/\/+$/, "");
+  // First, normalize any backslashes in the base to forward slashes
+  const normalizedBase = base.replace(/\\/g, "/").replace(/\/+$/, "");
   const normalizedParts = parts.map((p) =>
-    p.replace(/^\/+|\/+$/g, "")
+    p.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "")
   ).filter((p) => p.length > 0);
   return [normalizedBase, ...normalizedParts].join("/");
 }

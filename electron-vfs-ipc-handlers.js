@@ -56,7 +56,10 @@ function registerVFSHandlers() {
     if (!allowedRoot) {
       throw new Error('ディレクトリが開かれていません');
     }
-    const resolved = path.resolve(requestedPath);
+    // Normalize the incoming path to use forward slashes to avoid issues with
+    // mixed path separators on Windows (which can cause path.resolve to misbehave)
+    const normalizedInput = requestedPath.replace(/\\/g, '/');
+    const resolved = path.resolve(normalizedInput);
 
     // Normalize paths for consistent comparison across platforms
     const normalizedResolved = normalizePath(resolved);
