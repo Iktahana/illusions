@@ -1270,10 +1270,14 @@ app.whenReady().then(async () => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
+        // Note: 'unsafe-inline' is required in script-src because Next.js App Router
+        // static export generates inline <script> tags for RSC flight data.
+        // Removing it causes a white screen. XSS is mitigated by contextIsolation
+        // + nodeIntegration:false + file:// protocol.
         'Content-Security-Policy': [
           [
             "default-src 'self'",
-            `script-src 'self'${isDev && !app.isPackaged ? " 'unsafe-eval' 'unsafe-inline'" : ''}`,
+            `script-src 'self' 'unsafe-inline'${isDev && !app.isPackaged ? " 'unsafe-eval'" : ''}`,
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: blob:",
             "font-src 'self' data: https://fonts.gstatic.com",
