@@ -68,7 +68,9 @@ export default function Characters({ content }: CharactersProps) {
     if (!isLoaded) return; // skip initial empty state
 
     const timer = setTimeout(() => {
-      void persistAppState({ characters });
+      void persistAppState({ characters }).catch((err) => {
+        console.error("Failed to persist characters:", err);
+      });
     }, 500);
 
     return () => clearTimeout(timer);
@@ -204,6 +206,8 @@ export default function Characters({ content }: CharactersProps) {
           signal: abortController.signal,
           onProgress: setExtractionProgress,
         });
+
+        if (abortController.signal.aborted) return;
 
         // Merge with existing characters, avoiding duplicates
         const newChars = result

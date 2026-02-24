@@ -94,8 +94,12 @@ export class CharacterExtractor {
       });
     }
 
-    if (signal?.aborted || allExtracted.length === 0) {
-      return allExtracted.flat();
+    if (signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    if (allExtracted.length === 0) {
+      return [];
     }
 
     // Step 3: Merge/deduplicate
@@ -139,10 +143,16 @@ export class CharacterExtractor {
 
     const mergedResults: ExtractedCharacter[] = [];
     for (let i = 0; i < chunks.length; i++) {
-      if (signal?.aborted) break;
+      if (signal?.aborted) {
+        throw new DOMException("Aborted", "AbortError");
+      }
       const merged = await this.runMerger(chunks[i], { signal, maxTokens });
       mergedResults.push(...merged);
       onProgress?.({ phase: "merging", current: i + 1, total: chunks.length });
+    }
+
+    if (signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
     }
 
     // If still too many, recurse

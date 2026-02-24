@@ -201,8 +201,12 @@ export function useEditorSettings(
         if (appState.correctionMode) setCorrectionMode(appState.correctionMode);
         if (appState.correctionGuidelines) setCorrectionGuidelines(appState.correctionGuidelines);
         if (appState.llmIdlingStop !== undefined) setLlmIdlingStop(appState.llmIdlingStop);
-        if (typeof appState.characterExtractionBatchSize === "number") setCharacterExtractionBatchSize(appState.characterExtractionBatchSize);
-        if (typeof appState.characterExtractionConcurrency === "number") setCharacterExtractionConcurrency(appState.characterExtractionConcurrency);
+        if (typeof appState.characterExtractionBatchSize === "number") {
+          setCharacterExtractionBatchSize(Math.min(Math.max(appState.characterExtractionBatchSize, 1), 10));
+        }
+        if (typeof appState.characterExtractionConcurrency === "number") {
+          setCharacterExtractionConcurrency(Math.min(Math.max(appState.characterExtractionConcurrency, 1), 8));
+        }
         // Force editor rebuild to apply restored settings (e.g. custom font)
         incrementEditorKey();
       } catch (error) {
