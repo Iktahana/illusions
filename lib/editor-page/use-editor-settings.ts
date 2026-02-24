@@ -28,6 +28,8 @@ export interface EditorSettings {
   llmEnabled: boolean;
   llmModelId: string;
   llmIdlingStop: boolean;
+  characterExtractionBatchSize: number;
+  characterExtractionConcurrency: number;
   powerSaveMode: boolean;
   autoPowerSaveOnBattery: boolean;
   /** Unified correction config derived from individual linting fields */
@@ -56,6 +58,8 @@ export interface EditorSettingsHandlers {
   handleLlmEnabledChange: (value: boolean) => void;
   handleLlmModelIdChange: (modelId: string) => void;
   handleLlmIdlingStopChange: (value: boolean) => void;
+  handleCharacterExtractionBatchSizeChange: (value: number) => void;
+  handleCharacterExtractionConcurrencyChange: (value: number) => void;
   handlePowerSaveModeChange: (enabled: boolean) => void;
   handleAutoPowerSaveOnBatteryChange: (enabled: boolean) => void;
   handleCorrectionConfigChange: (partial: Partial<CorrectionConfig>) => void;
@@ -107,6 +111,8 @@ export function useEditorSettings(
   const [llmEnabled, setLlmEnabled] = useState(false);
   const [llmModelId, setLlmModelId] = useState("qwen3-1.7b-q8");
   const [llmIdlingStop, setLlmIdlingStop] = useState(true);
+  const [characterExtractionBatchSize, setCharacterExtractionBatchSize] = useState(3);
+  const [characterExtractionConcurrency, setCharacterExtractionConcurrency] = useState(4);
   const [powerSaveMode, setPowerSaveMode] = useState(false);
   const [autoPowerSaveOnBattery, setAutoPowerSaveOnBattery] = useState(true);
   const [correctionMode, setCorrectionMode] = useState<CorrectionModeId>("novel");
@@ -195,6 +201,12 @@ export function useEditorSettings(
         if (appState.correctionMode) setCorrectionMode(appState.correctionMode);
         if (appState.correctionGuidelines) setCorrectionGuidelines(appState.correctionGuidelines);
         if (appState.llmIdlingStop !== undefined) setLlmIdlingStop(appState.llmIdlingStop);
+        if (typeof appState.characterExtractionBatchSize === "number") {
+          setCharacterExtractionBatchSize(Math.min(Math.max(appState.characterExtractionBatchSize, 1), 10));
+        }
+        if (typeof appState.characterExtractionConcurrency === "number") {
+          setCharacterExtractionConcurrency(Math.min(Math.max(appState.characterExtractionConcurrency, 1), 8));
+        }
         // Force editor rebuild to apply restored settings (e.g. custom font)
         incrementEditorKey();
       } catch (error) {
@@ -350,6 +362,22 @@ export function useEditorSettings(
     });
   }, []);
 
+  const handleCharacterExtractionBatchSizeChange = useCallback((value: number) => {
+    const clamped = Math.max(1, Math.min(10, value));
+    setCharacterExtractionBatchSize(clamped);
+    void persistAppState({ characterExtractionBatchSize: clamped }).catch((error) => {
+      console.error("Failed to persist characterExtractionBatchSize:", error);
+    });
+  }, []);
+
+  const handleCharacterExtractionConcurrencyChange = useCallback((value: number) => {
+    const clamped = Math.max(1, Math.min(8, value));
+    setCharacterExtractionConcurrency(clamped);
+    void persistAppState({ characterExtractionConcurrency: clamped }).catch((error) => {
+      console.error("Failed to persist characterExtractionConcurrency:", error);
+    });
+  }, []);
+
   const handleLintingRuleConfigChange = useCallback((ruleId: string, config: { enabled: boolean; severity: Severity }) => {
     setLintingRuleConfigs(prev => {
       const next = { ...prev, [ruleId]: config };
@@ -449,6 +477,8 @@ export function useEditorSettings(
     llmEnabled,
     llmModelId,
     llmIdlingStop,
+    characterExtractionBatchSize,
+    characterExtractionConcurrency,
     powerSaveMode,
     autoPowerSaveOnBattery,
     correctionConfig: {
@@ -469,6 +499,7 @@ export function useEditorSettings(
     posHighlightEnabled, posHighlightColors, verticalScrollBehavior,
     scrollSensitivity, compactMode, showSettingsModal,
     lintingEnabled, lintingRuleConfigs, llmEnabled, llmModelId, llmIdlingStop,
+    characterExtractionBatchSize, characterExtractionConcurrency,
     powerSaveMode, autoPowerSaveOnBattery, correctionMode, correctionGuidelines,
   ]);
 
@@ -494,6 +525,8 @@ export function useEditorSettings(
     handleLlmEnabledChange,
     handleLlmModelIdChange,
     handleLlmIdlingStopChange,
+    handleCharacterExtractionBatchSizeChange,
+    handleCharacterExtractionConcurrencyChange,
     handlePowerSaveModeChange,
     handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange,
@@ -507,6 +540,7 @@ export function useEditorSettings(
     handleLintingEnabledChange, handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange, handleLlmEnabledChange,
     handleLlmModelIdChange, handleLlmIdlingStopChange,
+    handleCharacterExtractionBatchSizeChange, handleCharacterExtractionConcurrencyChange,
     handlePowerSaveModeChange, handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange,
   ]);

@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Trash2, Edit2, Check, X, Sparkles } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Plus, Trash2, Edit2, Check, X, Sparkles, Loader2 } from "lucide-react";
+
+import { CharacterExtractor } from "@/lib/character-extraction";
+import type { ExtractionProgress } from "@/lib/character-extraction";
+import { getLlmClient } from "@/lib/llm-client/llm-client";
+import { LlmController } from "@/lib/linting/llm-controller";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
+import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
+import { useLlmSettings } from "@/contexts/EditorSettingsContext";
 
 interface Character {
   id: string;
   name: string;
+  aliases: string[];
   description: string;
   appearance: string;
   personality: string;
@@ -18,7 +26,15 @@ interface CharactersProps {
 }
 
 export default function Characters({ content }: CharactersProps) {
+  const {
+    llmEnabled,
+    llmModelId,
+    characterExtractionBatchSize,
+    characterExtractionConcurrency,
+  } = useLlmSettings();
+
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -30,12 +46,50 @@ export default function Characters({ content }: CharactersProps) {
     relationships: "",
   });
 
+  // Restore characters from persistent storage on mount
+  useEffect(() => {
+    const restore = async () => {
+      try {
+        const appState = await fetchAppState();
+        if (appState?.characters && appState.characters.length > 0) {
+          setCharacters(appState.characters);
+        }
+      } catch (err) {
+        console.error("Failed to restore characters:", err);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    void restore();
+  }, []);
+
+  // Persist characters to storage on change (debounced)
+  useEffect(() => {
+    if (!isLoaded) return; // skip initial empty state
+
+    const timer = setTimeout(() => {
+      void persistAppState({ characters }).catch((err) => {
+        console.error("Failed to persist characters:", err);
+      });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [characters, isLoaded]);
+
+  // LLM extraction state
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionProgress, setExtractionProgress] =
+    useState<ExtractionProgress | null>(null);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const handleAddCharacter = () => {
     if (!newCharacter.name?.trim()) return;
 
     const character: Character = {
       id: Date.now().toString(),
       name: newCharacter.name.trim(),
+      aliases: [],
       description: newCharacter.description?.trim() || "",
       appearance: newCharacter.appearance?.trim() || "",
       personality: newCharacter.personality?.trim() || "",
@@ -80,21 +134,18 @@ export default function Characters({ content }: CharactersProps) {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const handleAutoExtract = async () => {
-    if (!content) {
-      return;
-    }
+  /** NLP-based extraction fallback (kuromoji proper noun detection) */
+  const handleNlpExtract = useCallback(async () => {
+    if (!content) return;
 
     try {
       const nlpClient = getNlpClient();
       const tokens = await nlpClient.tokenizeParagraph(content);
 
-      // Extract proper nouns (固有名詞): pos === "名詞" && pos_detail_1 === "固有名詞"
       const properNouns = new Map<string, boolean>();
 
       for (const token of tokens) {
         if (token.pos === "名詞" && token.pos_detail_1 === "固有名詞") {
-          // Only add if not already exists as a character
           const alreadyExists = characters.some(
             (c) => c.name.toLowerCase() === token.surface.toLowerCase()
           );
@@ -105,25 +156,126 @@ export default function Characters({ content }: CharactersProps) {
         }
       }
 
-      // Add extracted names as new characters
       const newNames = Array.from(properNouns.keys());
-      for (const name of newNames) {
-        const character: Character = {
-          id: Date.now().toString() + Math.random(),
-          name: name,
-          description: "",
-          appearance: "",
-          personality: "",
-          relationships: "",
-        };
+      const newChars: Character[] = newNames.map((name) => ({
+        id: Date.now().toString() + Math.random(),
+        name,
+        aliases: [],
+        description: "",
+        appearance: "",
+        personality: "",
+        relationships: "",
+      }));
 
-        setCharacters((prev) => [...prev, character]);
+      if (newChars.length > 0) {
+        setCharacters((prev) => [...prev, ...newChars]);
       }
-
     } catch (err) {
-      console.error("自動抽出に失敗しました:", err);
+      console.error("NLP auto-extraction failed:", err);
+      setExtractionError("固有名詞の抽出に失敗しました");
     }
-  };
+  }, [content, characters]);
+
+  /** LLM-based extraction with batch decoding */
+  const handleLlmExtract = useCallback(async () => {
+    if (!content) return;
+
+    setIsExtracting(true);
+    setExtractionProgress(null);
+    setExtractionError(null);
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    try {
+      const llmClient = getLlmClient();
+      const controller = new LlmController(llmClient, llmModelId);
+
+      await controller.requestValidation(async () => {
+        const paragraphs = content
+          .split(/\n+/)
+          .map((p) => p.trim())
+          .filter((p) => p.length > 0);
+
+        if (paragraphs.length === 0) return;
+
+        const extractor = new CharacterExtractor(llmClient);
+        const result = await extractor.extract(paragraphs, {
+          batchSize: characterExtractionBatchSize,
+          concurrency: characterExtractionConcurrency,
+          signal: abortController.signal,
+          onProgress: setExtractionProgress,
+        });
+
+        if (abortController.signal.aborted) return;
+
+        // Merge with existing characters, avoiding duplicates
+        const newChars = result
+          .filter(
+            (ec) =>
+              !characters.some(
+                (c) =>
+                  c.name === ec.name ||
+                  ec.aliases.some(
+                    (a) => a.toLowerCase() === c.name.toLowerCase()
+                  )
+              )
+          )
+          .map((ec) => ({
+            id: Date.now().toString() + Math.random(),
+            name: ec.name,
+            aliases: ec.aliases,
+            description: ec.description,
+            appearance: "",
+            personality: "",
+            relationships: "",
+          }));
+
+        if (newChars.length > 0) {
+          setCharacters((prev) => [...prev, ...newChars]);
+        }
+      });
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        setExtractionError("LLMによる抽出に失敗しました");
+        console.error("LLM character extraction failed:", err);
+      }
+    } finally {
+      setIsExtracting(false);
+      setExtractionProgress(null);
+      abortControllerRef.current = null;
+    }
+  }, [
+    content,
+    characters,
+    llmModelId,
+    characterExtractionBatchSize,
+    characterExtractionConcurrency,
+  ]);
+
+  /** Auto-extract: use LLM if available, otherwise fall back to NLP */
+  const handleAutoExtract = useCallback(async () => {
+    if (!content) return;
+
+    const llmClient = getLlmClient();
+    if (llmEnabled && llmClient.isAvailable()) {
+      await handleLlmExtract();
+    } else {
+      await handleNlpExtract();
+    }
+  }, [content, llmEnabled, handleLlmExtract, handleNlpExtract]);
+
+  /** Cancel ongoing extraction */
+  const handleCancelExtract = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
+
+  /** Format progress text */
+  const progressText = extractionProgress
+    ? extractionProgress.phase === "extracting"
+      ? `抽出中... ${extractionProgress.current}/${extractionProgress.total}`
+      : `統合中... ${extractionProgress.current}/${extractionProgress.total}`
+    : "処理中...";
 
   return (
     <div className="h-full bg-background-secondary border-r border-border flex flex-col">
@@ -141,16 +293,44 @@ export default function Characters({ content }: CharactersProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {/* 自動検出ボタン */}
-        <button
-          onClick={handleAutoExtract}
-          className="w-full px-4 py-3 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-          title="文章から人物を自動検出"
-        >
-          <Sparkles className="w-4 h-4" />
-          自動検出
-        </button>
-        {/* 新規追加フォーム */}
+        {/* Auto-extract / Cancel button */}
+        {isExtracting ? (
+          <button
+            onClick={handleCancelExtract}
+            className="w-full px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+            title="抽出をキャンセル"
+          >
+            <Loader2 className="w-4 h-4 animate-spin" />
+            {progressText}
+          </button>
+        ) : (
+          <button
+            onClick={() => void handleAutoExtract()}
+            disabled={!content}
+            className="w-full px-4 py-3 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="文章から人物を自動検出"
+          >
+            <Sparkles className="w-4 h-4" />
+            自動検出
+          </button>
+        )}
+
+        {/* Extraction error banner */}
+        {extractionError && (
+          <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+            <p className="text-xs text-red-600 dark:text-red-400">
+              {extractionError}
+            </p>
+            <button
+              onClick={() => setExtractionError(null)}
+              className="p-0.5 hover:bg-red-100 dark:hover:bg-red-900/40 rounded text-red-500"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
+        {/* New character form */}
         {isAddingNew && (
           <div className="bg-background-elevated border border-border rounded-lg p-3 space-y-2">
             <div className="flex items-center justify-between mb-2">
@@ -226,7 +406,7 @@ export default function Characters({ content }: CharactersProps) {
           </div>
         )}
 
-        {/* 人物リスト */}
+        {/* Character list */}
         {characters.length === 0 && !isAddingNew ? (
           <div className="text-center py-8 text-foreground-secondary text-sm">
             <p>まだ登場人物が追加されていません</p>
@@ -248,6 +428,11 @@ export default function Characters({ content }: CharactersProps) {
                     <h3 className="font-semibold text-foreground truncate">
                       {character.name}
                     </h3>
+                    {character.aliases.length > 0 && (
+                      <p className="text-xs text-foreground-tertiary mt-0.5">
+                        別名: {character.aliases.join("、")}
+                      </p>
+                    )}
                     {character.description && (
                       <p className="text-sm text-foreground-secondary mt-1 line-clamp-2">
                         {character.description}

@@ -68,6 +68,12 @@ export interface ILlmClient {
     options?: { signal?: AbortSignal; maxTokens?: number },
   ): Promise<LlmInferenceResult>;
 
+  /** Run batch inference with multiple prompts decoded in parallel. */
+  inferBatch(
+    prompts: string[],
+    options?: { signal?: AbortSignal; maxTokens?: number },
+  ): Promise<LlmInferenceResult[]>;
+
   /** Get disk usage for downloaded models */
   getStorageUsage(): Promise<{
     used: number;

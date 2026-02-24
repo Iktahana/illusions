@@ -147,6 +147,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     unloadModel: () => ipcRenderer.invoke('llm:unload-model'),
     isModelLoaded: () => ipcRenderer.invoke('llm:is-model-loaded'),
     infer: (prompt, options) => ipcRenderer.invoke('llm:infer', { prompt, ...options }),
+    inferBatch: (prompts, options) => ipcRenderer.invoke('llm:infer-batch', { prompts, ...options }),
     getStorageUsage: () => ipcRenderer.invoke('llm:get-storage-usage'),
     setIdlingStop: (enabled) => ipcRenderer.invoke('llm:set-idling-stop', { enabled }),
     onDownloadProgress: (callback) => {

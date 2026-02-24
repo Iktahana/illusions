@@ -42,6 +42,13 @@ export class WebLlmClient implements ILlmClient {
     throw new Error(UNAVAILABLE_MESSAGE);
   }
 
+  async inferBatch(
+    _prompts: string[],
+    _options?: { signal?: AbortSignal; maxTokens?: number },
+  ): Promise<LlmInferenceResult[]> {
+    throw new Error(UNAVAILABLE_MESSAGE);
+  }
+
   async getStorageUsage(): Promise<{
     used: number;
     models: Array<{ id: string; size: number }>;

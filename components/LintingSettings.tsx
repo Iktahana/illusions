@@ -48,6 +48,10 @@ interface LintingSettingsProps {
   onLlmModelIdChange?: (modelId: string) => void;
   llmIdlingStop?: boolean;
   onLlmIdlingStopChange?: (value: boolean) => void;
+  characterExtractionBatchSize?: number;
+  onCharacterExtractionBatchSizeChange?: (value: number) => void;
+  characterExtractionConcurrency?: number;
+  onCharacterExtractionConcurrencyChange?: (value: number) => void;
   /** Optional correction config for mode selector and guideline priority UI. */
   correctionConfig?: CorrectionConfig;
   onCorrectionConfigChange?: (config: Partial<CorrectionConfig>) => void;
@@ -73,6 +77,10 @@ export default function LintingSettings({
   onLlmModelIdChange,
   llmIdlingStop,
   onLlmIdlingStopChange,
+  characterExtractionBatchSize,
+  onCharacterExtractionBatchSizeChange,
+  characterExtractionConcurrency,
+  onCharacterExtractionConcurrencyChange,
   correctionConfig,
   onCorrectionConfigChange,
 }: LintingSettingsProps) {
@@ -211,6 +219,10 @@ export default function LintingSettings({
         onLlmModelIdChange={onLlmModelIdChange}
         llmIdlingStop={llmIdlingStop}
         onLlmIdlingStopChange={onLlmIdlingStopChange}
+        characterExtractionBatchSize={characterExtractionBatchSize}
+        onCharacterExtractionBatchSizeChange={onCharacterExtractionBatchSizeChange}
+        characterExtractionConcurrency={characterExtractionConcurrency}
+        onCharacterExtractionConcurrencyChange={onCharacterExtractionConcurrencyChange}
       />
 
       {/* Correction mode selector + guideline priority */}
