@@ -85,6 +85,7 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
       console.error("保存に失敗しました:", error);
       const message = getErrorMessage(error);
       notificationManager.error(`保存に失敗しました: ${message}`);
+      setPendingCloseTabId(null);
       return;
     }
 
