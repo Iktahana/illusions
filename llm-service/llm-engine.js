@@ -294,9 +294,9 @@ class LlmEngine {
 
   /**
    * Run inference on the loaded model.
-   * Requests are serialized via a queue because the LlamaContext has only
-   * one sequence slot — concurrent getSequence() calls would throw
-   * "No sequences left".
+   * Requests are serialized via a queue so that single-prompt callers
+   * do not contend for the same sequence slot. For parallel inference
+   * use inferBatch() instead.
    * @param {string} prompt
    * @param {{ maxTokens?: number }} [options]
    */
