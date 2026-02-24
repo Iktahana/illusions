@@ -202,13 +202,7 @@
       "languages": [
         "ja-JP"
       ],
-      "backgroundColor": "#1a1a1a",
-      "assets": {
-        "logoScale150": "build/assets/microsoft/Logo.png",
-        "square150x150Logo": "build/assets/microsoft/MediumTile.png",
-        "square310x310Logo": "build/assets/microsoft/LargeTile.png",
-        "storeLogo": "build/assets/microsoft/StoreLogo.png"
-      }
+      "backgroundColor": "#1a1a1a"
     },
     "linux": {
       "icon": "build/icon.png",
