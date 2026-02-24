@@ -1,89 +1,97 @@
 # illusions Documentation
 
-Complete documentation for the illusions Japanese novel editor.
+Documentation for the illusions Japanese novel editor.
 
 ---
 
-## 📚 Table of Contents
+## Architecture
 
-### Architecture & Systems
-- **[Storage System](STORAGE.md)** - Storage architecture and API reference
-- **[NLP Backend](architecture/nlp-backend-architecture.md)** - Japanese text processing system
-- **[Notification System](architecture/notification-system.md)** - Toast notification API
+System architecture and design documents.
 
-### Development Guides
-- **[Theme Colors](guides/THEME_COLORS.md)** - Theming system and color variables
-- **[Claude Code Review Setup](setup/CLAUDE_REVIEW_SETUP.md)** - Configure automated PR reviews
+| Document | Description | Key Files |
+|----------|-------------|-----------|
+| [Storage System](architecture/storage-system.md) | Unified storage service (SQLite / IndexedDB) | `lib/storage-service.ts`, `lib/electron-storage.ts` |
+| [Virtual File System](architecture/vfs.md) | VFS abstraction with security sandbox | `lib/vfs/`, `electron-vfs-ipc-handlers.js` |
+| [LLM Engine](architecture/llm-engine.md) | Dual LLM engine (local + online) | `llm-service/`, `lib/llm-client/` |
+| [Tab Manager](architecture/tab-manager.md) | Multi-tab state management and persistence | `lib/tab-manager/` |
+| [Export System](architecture/export-system.md) | MDI export pipeline (PDF/EPUB/DOCX/TXT) | `lib/export/` |
+| [File Watcher](architecture/file-watcher.md) | External file change detection | `lib/file-watcher.ts` |
+| [History Service](architecture/history-service.md) | Snapshot history with character-level diff | `lib/history-service.ts`, `lib/diff-service.ts` |
+| [Project Lifecycle](architecture/project-lifecycle.md) | Project vs standalone mode management | `lib/project-service.ts`, `lib/project-manager.ts` |
+| [NLP Backend](architecture/nlp-backend-architecture.md) | Japanese text processing (kuromoji) | `lib/nlp-backend/`, `lib/nlp-client/` |
+| [Notification System](architecture/notification-system.md) | Toast notification API | `lib/notification-manager.ts` |
+| [Correction AI System](architecture/correction-ai-system.ja.md) | AI-powered proofreading architecture | `lib/linting/`, `llm-service/` |
+
+## Guides
+
+Development guides and how-to documents.
+
+| Guide | Description |
+|-------|-------------|
+| [Milkdown Plugin Development](guides/milkdown-plugin.md) | Custom ProseMirror nodes, linting decorations, plugin architecture |
+| [Writing Linting Rules](guides/linting-rules.md) | L1/L2/document-level rule hierarchy, presets, adding new rules |
+| [Keyboard Shortcuts](guides/keyboard-shortcuts.md) | Full shortcut table, menu structure, platform differences |
+| [Theme Colors](guides/THEME_COLORS.md) | Theming system and CSS custom properties |
+
+## References
+
+Reference materials and component catalogs.
+
+| Reference | Description |
+|-----------|-------------|
+| [UI Overlays](references/ui-overlays.md) | All overlay components (dialogs, toasts, menus, tooltips) |
+| [Japanese Standards (PDFs)](references/) | JIS X 4051, JTF style guide, joyo kanji table, etc. |
+
+## Setup
+
+Configuration and setup guides.
+
+| Guide | Description |
+|-------|-------------|
+| [Claude Code Review Setup](setup/CLAUDE_REVIEW_SETUP.md) | Automated PR review with Claude |
+
+## Project Root
+
+| File | Description |
+|------|-------------|
+| [README.md](../README.md) | Project overview, features, installation |
+| [CLAUDE.md](../CLAUDE.md) | AI agent rules and code review standards |
+| [MDI.md](../MDI.md) | MDI file format syntax specification |
+| [TERMS.md](../TERMS.md) | Terms of service |
 
 ---
 
-## 🚀 Quick Links
-
-### For Users
-- Main README: [../README.md](../README.md) - Features, installation, and setup
-
-### For Developers
-- [Storage API Reference](STORAGE.md)
-- [NLP Backend Architecture](architecture/nlp-backend-architecture.md)
-- [Code Review Standards](../CLAUDE.md)
-- [GitHub Actions Setup](setup/CLAUDE_REVIEW_SETUP.md)
-
----
-
-## 📖 Documentation Structure
+## Directory Structure
 
 ```
 docs/
-├── README.md                              # This file
-├── STORAGE.md                             # Storage system documentation
+├── README.md                              # This index file
 ├── architecture/                          # System architecture
+│   ├── correction-ai-system.ja.md         # AI proofreading system
+│   ├── export-system.md                   # Export pipeline
+│   ├── file-watcher.md                    # File change detection
+│   ├── history-service.md                 # Snapshot history
+│   ├── llm-engine.md                      # LLM engine (local + online)
 │   ├── nlp-backend-architecture.md        # NLP processing
-│   └── notification-system.md             # Notification API
+│   ├── notification-system.md             # Notification API
+│   ├── project-lifecycle.md               # Project management
+│   ├── storage-system.md                  # Storage service
+│   ├── tab-manager.md                     # Tab management
+│   └── vfs.md                             # Virtual file system
 ├── guides/                                # Development guides
+│   ├── keyboard-shortcuts.md              # Shortcuts reference
+│   ├── linting-rules.md                   # Linting rule development
+│   ├── milkdown-plugin.md                 # Plugin development
 │   └── THEME_COLORS.md                    # Theming system
-└── setup/                                 # Setup and configuration
-    └── CLAUDE_REVIEW_SETUP.md             # Claude Code Review configuration
+├── references/                            # Reference materials
+│   ├── ui-overlays.md                     # UI overlay components
+│   └── *.pdf                              # Japanese language standards
+├── setup/                                 # Setup guides
+│   └── CLAUDE_REVIEW_SETUP.md             # Claude review config
+└── archive/                               # Archived documents
+    └── bug-verification-2026-02-15.md     # Historical bug report
 ```
 
 ---
 
-## 🔍 Finding What You Need
-
-### I want to...
-
-**Get started with the project**
-→ Read [Main README](../README.md)
-
-**Understand how storage works**
-→ Read [Storage Documentation](STORAGE.md)
-
-**Learn about Japanese text processing**
-→ Read [NLP Backend Architecture](architecture/nlp-backend-architecture.md)
-
-**Show notifications to users**
-→ Read [Notification System](architecture/notification-system.md)
-
-**Customize the theme**
-→ Read [Theme Colors Guide](guides/THEME_COLORS.md)
-
-**Set up automated PR reviews**
-→ Read [Claude Code Review Setup](setup/CLAUDE_REVIEW_SETUP.md)
-
-**Contribute code**
-→ Read [Code Review Standards](../CLAUDE.md)
-
----
-
-## 📝 Contributing to Documentation
-
-When adding new documentation:
-
-1. Place architecture docs in `architecture/`
-2. Place guides in `guides/`
-3. Update this README with links
-4. Use English or Japanese only (no other languages in code/docs)
-5. Follow the existing format and structure
-
----
-
-**Last Updated**: 2026-02-06
+**Last Updated**: 2026-02-25

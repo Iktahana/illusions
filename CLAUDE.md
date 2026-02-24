@@ -265,12 +265,7 @@ async function saveFile(path: string, content: string) {
 ```
 
 ### Documentation References
-- Quick nav: `docs/STORAGE_INDEX.md`
-- Integration: `docs/STORAGE_INTEGRATION.md`
-- API reference: `docs/STORAGE_QUICK_REFERENCE.md`
-- Architecture: `docs/STORAGE_ARCHITECTURE.md`
-- Electron checklist: `docs/ELECTRON_INTEGRATION_CHECKLIST.md`
-- Code examples: `lib/storage-service-examples.ts`
+- Storage system: `docs/architecture/storage-system.md`
 
 ## 8. Electron-Specific Rules
 # ----------------------------------------------------------------------------
@@ -582,8 +577,7 @@ Part of #<parent-issue-number>
 ## File Locations for Reference
 - Code review standards: `CLAUDE.md`
 - Quick guide: `AI_RULES_GUIDE.md`
-- Storage documentation: `docs/STORAGE_INDEX.md`
-- Electron integration: `docs/ELECTRON_INTEGRATION_CHECKLIST.md`
+- Storage documentation: `docs/architecture/storage-system.md`
 
 ## Quick Commands Reference
 ```bash
