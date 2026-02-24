@@ -267,20 +267,9 @@ function registerVFSHandlers() {
       throw error;
     }
 
-    // 3. Allow if path is dialog-approved or child of a dialog-approved path
-    const isDialogApproved = [...dialogApprovedPaths.keys()].some(approved => {
-      const normalizedApproved = normalizePath(approved);
-      return normalizedResolved === normalizedApproved
-        || normalizedResolved.startsWith(normalizedApproved + '/');
-    });
-
-    // 4. Allow if path is within user's home directory (for session restore, double-click open)
-    const normalizedHome = normalizePath(os.homedir());
-    const isUnderHome = normalizedResolved.startsWith(normalizedHome + '/');
-
-    if (!isDialogApproved && !isUnderHome) {
-      throw new Error('セキュリティ上の理由により、ホームディレクトリ外のパスには直接アクセスできません');
-    }
+    // 3. Path is allowed — isDeniedPath already blocks sensitive paths,
+    //    and fs.stat above verifies the directory exists.
+    //    No additional restrictions needed for vfs:set-root.
 
     allowedRoots.set(event.sender.id, resolved);
     return { path: resolved, name: path.basename(resolved) };

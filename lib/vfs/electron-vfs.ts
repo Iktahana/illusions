@@ -429,8 +429,13 @@ export class ElectronVFS implements VirtualFileSystem {
           rootPath
         );
       }
-    } catch {
-      // Bridge may not be available yet
+    } catch (error: unknown) {
+      // Bridge may not be available during early initialization — that's expected.
+      // But security/validation errors from the main process must propagate.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("bridge") && !message.includes("not available")) {
+        throw error;
+      }
     }
   }
 
