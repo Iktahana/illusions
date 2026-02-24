@@ -23,6 +23,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "generate:credits": "npx tsx scripts/generate-credits.ts",
+    "generate:store-assets": "node scripts/generate-store-assets.mjs",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
@@ -188,7 +189,7 @@
           "ext": "mdi",
           "name": "illusions MDI Document",
           "icon": "build/mdi-icon.ico",
-          "description": "illusions の illusions MDI Document"
+          "description": "illusions MDI Document"
         }
       ]
     },
@@ -197,12 +198,17 @@
       "publisher": "CN=700D90DC-B687-4899-8C1E-2E1B85A6195C",
       "publisherDisplayName": "幾田花",
       "applicationId": "IllusionsApp",
-      "displayName": "illusions - 日本語小説向き執筆・AI校正ツール",
+      "displayName": "illusions「幻」 - 執筆・AI校正ツール",
       "languages": [
-        "ja-JP",
-        "en-US"
+        "ja-JP"
       ],
-      "backgroundColor": "#1a1a1a"
+      "backgroundColor": "#1a1a1a",
+      "assets": {
+        "logoScale150": "build/assets/microsoft/Logo.png",
+        "square150x150Logo": "build/assets/microsoft/MediumTile.png",
+        "square310x310Logo": "build/assets/microsoft/LargeTile.png",
+        "storeLogo": "build/assets/microsoft/StoreLogo.png"
+      }
     },
     "linux": {
       "icon": "build/icon.png",
@@ -211,7 +217,7 @@
           "ext": "mdi",
           "name": "illusions MDI Document",
           "icon": "build/mdi-icon.png",
-          "description": "illusions の illusions MDI Document"
+          "description": "illusions MDI Document"
         }
       ]
     }
