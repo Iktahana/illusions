@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { saveMdiFile } from "../mdi-file";
 import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../file-watcher";
+import { notificationManager } from "../notification-manager";
 import type { TabManagerCore } from "./types";
 import { AUTO_SAVE_INTERVAL, sanitizeMdiContent } from "./types";
 
@@ -121,6 +122,9 @@ export function useAutoSave(params: UseAutoSaveParams): void {
             console.error(
               `自動保存に失敗しました (${tab.file?.name}):`,
               error,
+            );
+            notificationManager.warning(
+              `自動保存に失敗しました: ${tab.file?.name ?? "不明なファイル"}`
             );
           } finally {
             savingTabIdsRef.current.delete(tab.id);
