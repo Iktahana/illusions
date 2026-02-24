@@ -252,6 +252,9 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         "Failed to load project main file:",
         error
       );
+      notificationManager.error(
+        "プロジェクトのメインファイルを読み込めませんでした。ファイルが移動または削除された可能性があります。"
+      );
     }
   }, [isElectron, tabLoadSystemFile, incrementEditorKey]);
 
