@@ -1076,12 +1076,35 @@ function MilkdownEditor({
 
     // Track user-initiated scroll sources
     const onWheel = () => markUserScroll();
+    let enforceRAF: number | null = null;
     const onPointerDown = () => {
       // マウスボタンが押されている間はドラッグ選択の可能性がある
       isPointerDown = true;
+
+      // In vertical mode, start a rAF loop to enforce scroll position BEFORE paint.
+      // Browser's native caret-scroll-into-view fires between frames and computes wrong
+      // positions in vertical-rl. Reverting in the scroll handler is too late (flicker).
+      // The rAF loop catches jumps before the browser paints them.
+      if (isVertical) {
+        const enforceBeforePaint = () => {
+          if (!isPointerDown) return;
+          const dx = Math.abs(container.scrollLeft - savedScrollPosRef.current.left);
+          const dy = Math.abs(container.scrollTop - savedScrollPosRef.current.top);
+          if (dx > 50 || dy > 50) {
+            container.scrollLeft = savedScrollPosRef.current.left;
+            container.scrollTop = savedScrollPosRef.current.top;
+          }
+          enforceRAF = requestAnimationFrame(enforceBeforePaint);
+        };
+        enforceRAF = requestAnimationFrame(enforceBeforePaint);
+      }
     };
     const onPointerUp = () => {
       isPointerDown = false;
+      if (enforceRAF !== null) {
+        cancelAnimationFrame(enforceRAF);
+        enforceRAF = null;
+      }
     };
     const onTouchStart = () => markUserScroll();
 
@@ -1129,6 +1152,7 @@ function MilkdownEditor({
       container.removeEventListener('touchstart', onTouchStart);
       container.removeEventListener('scroll', onScroll);
       if (userScrollTimer) clearTimeout(userScrollTimer);
+      if (enforceRAF !== null) cancelAnimationFrame(enforceRAF);
     };
   }, [isVertical, scrollContainerRef, isModeSwitchingRef, savedScrollPosRef, userScrollingRef]);
 
