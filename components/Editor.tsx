@@ -192,7 +192,7 @@ export default function NovelEditor({
     if (charSize <= 0) return;
 
     // Get available space (subtract padding)
-    const padding = 128; // px-16 = 64px * 2 for left and right
+    const padding = 128; // 64px * 2 for left and right
     const availableWidth = container.clientWidth - padding;
 
     if (isVertical) {
@@ -259,6 +259,9 @@ export default function NovelEditor({
           overflowY: 'auto',
           // Disable browser scroll anchoring to prevent auto-scroll adjustment during DOM updates in vertical mode
           overflowAnchor: 'none',
+          // In vertical-rl, padding on child elements causes Chromium to miscalculate scrollWidth.
+          // Move horizontal padding to the scroll container itself, where the browser handles it correctly.
+          ...(isVertical ? { paddingLeft: 64, paddingRight: 64 } : {}),
         }}
       >
         <MilkdownProvider>
@@ -805,12 +808,17 @@ function MilkdownEditor({
           editorDom.style.height = `${targetHeight}px`;
           editorDom.style.maxHeight = `${targetHeight}px`;
           editorDom.style.minHeight = `${targetHeight}px`;
+          // Prevent browser caret-scroll on .ProseMirror itself (contenteditable + fixed height
+          // makes it implicitly scrollable in vertical-rl). clip prevents scrolling without
+          // creating a new formatting context, so layout is unaffected.
+          editorDom.style.overflow = 'clip';
         } else {
           // 横書き: 幅を制限（1行あたりの文字数）し、中央寄せ
           const targetWidth = charSize * charsPerLine;
           editorDom.style.width = `${targetWidth}px`;
           editorDom.style.maxWidth = `${targetWidth}px`;
           editorDom.style.margin = '0 auto'; // 中央寄せ
+          editorDom.style.overflow = '';
         }
       }
 
@@ -822,8 +830,8 @@ function MilkdownEditor({
           if (!container) return;
 
           const containerWidth = container.clientWidth;
-          // パディング（px-16 = 左右 64px）
-          const padding = 128; // 64px * 2
+          // clientWidth includes scroll container's own padding (64px * 2)
+          const padding = 128;
           const minWidth = containerWidth - padding;
 
           // ProseMirror に最小幅を設定
@@ -920,7 +928,7 @@ function MilkdownEditor({
 
     const observer = new ResizeObserver(() => {
       const containerWidth = container.clientWidth;
-      const padding = 128; // 64px * 2
+      const padding = 128; // scroll container's own padding (64px * 2)
       const minWidth = containerWidth - padding;
       editorDom.style.minWidth = `${minWidth}px`;
     });
@@ -1013,8 +1021,27 @@ function MilkdownEditor({
     const onScroll = () => {
       if (isReverting) return;
 
-      if (userScrollingRef.current || isModeSwitchingRef.current || isPointerDown || programmaticScrollRef?.current) {
-        // User interaction, mode switch, mouse drag, or programmatic navigation: save position
+      if (userScrollingRef.current || isModeSwitchingRef.current || programmaticScrollRef?.current) {
+        // User interaction, mode switch, or programmatic navigation: save position
+        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
+      } else if (isPointerDown && isVertical) {
+        // Mouse drag (text selection) in vertical-rl: browser may fire native caret-scroll-into-view
+        // which computes wrong positions. Detect large jumps and revert them.
+        // Only applies to vertical mode — horizontal selection scrolls are legitimate.
+        const dx = Math.abs(container.scrollLeft - savedScrollPosRef.current.left);
+        const dy = Math.abs(container.scrollTop - savedScrollPosRef.current.top);
+        if (dx > 50 || dy > 50) {
+          // Large jump → browser auto-scroll in vertical-rl, revert
+          isReverting = true;
+          container.scrollLeft = savedScrollPosRef.current.left;
+          container.scrollTop = savedScrollPosRef.current.top;
+          requestAnimationFrame(() => { isReverting = false; });
+        } else {
+          // Small movement → legitimate edge-drag scroll, allow
+          savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
+        }
+      } else if (isPointerDown) {
+        // Horizontal mode pointer drag: save position normally
         savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
       } else {
         // Browser auto-scroll (e.g., DOM update): revert
@@ -1242,7 +1269,7 @@ function MilkdownEditor({
       className={clsx(
         "editor-content-area",
         isVertical
-          ? "px-16 py-8 min-w-fit"
+          ? "py-8 min-w-fit"
           : "p-8 mx-auto"
       )}
       style={{
@@ -1253,6 +1280,7 @@ function MilkdownEditor({
           minHeight: '100%',
           display: 'flex',
           alignItems: 'center',
+          overflow: 'clip' as const, // Prevent browser caret-scroll on intermediate elements
         }),
       }}
     >
