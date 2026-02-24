@@ -39,7 +39,6 @@ import {
   useLlmSettings,
   usePosHighlightSettings,
   useScrollSettings,
-  useUISettings,
 } from "@/contexts/EditorSettingsContext";
 
 interface EditorProps {

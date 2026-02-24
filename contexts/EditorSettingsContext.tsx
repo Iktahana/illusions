@@ -31,8 +31,13 @@ export function EditorSettingsProvider({
   settings,
   handlers,
 }: EditorSettingsProviderProps): React.JSX.Element {
+  const value = useMemo(
+    () => ({ settings, handlers }),
+    [settings, handlers],
+  );
+
   return (
-    <EditorSettingsContext.Provider value={{ settings, handlers }}>
+    <EditorSettingsContext.Provider value={value}>
       {children}
     </EditorSettingsContext.Provider>
   );
