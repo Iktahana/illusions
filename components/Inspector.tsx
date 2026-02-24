@@ -398,16 +398,10 @@ export default function Inspector({
        </div>
 
       {/* Privacy notice */}
-      <div className={clsx("border-t border-border text-center", compactMode ? "px-3 py-2" : "px-4 py-3")}>
-        <p className="text-[10px] text-foreground-tertiary leading-relaxed">
-          illusionsはあなたの作品の無断保存
-          <br />
-          およびAI学習への利用は行いません
-        </p>
-        <a href="https://github.com/Iktahana/illusions/issues/new" target="_blank" rel="noopener noreferrer" className="text-[6px] text-foreground-tertiary underline hover:text-foreground-secondary transition-colors mt-1 inline-block">
-          AIに関する不適切な提案を報告
-        </a>
-      </div>
+      <section aria-label="プライバシーに関するお知らせ" className={clsx("border-t border-border text-center text-[10px] text-foreground-tertiary leading-tight", compactMode ? "px-3 py-1.5" : "px-4 py-2")}>
+        <p className="mb-1">illusionsはあなたの作品の無断保存およびAI学習への利用は行いません</p>
+        <a href="https://github.com/Iktahana/illusions/issues/new" target="_blank" rel="noopener noreferrer" className="hover:text-foreground-secondary transition-colors" aria-label="AIに関する不適切な提案をGitHubで報告する">AIに関する不適切な提案を報告</a>
+      </section>
     </aside>
   );
 }
