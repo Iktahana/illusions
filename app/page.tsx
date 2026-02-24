@@ -38,6 +38,7 @@ import { useGlobalShortcuts } from "@/lib/use-global-shortcuts";
 import { isElectronRenderer } from "@/lib/runtime-env";
 import WebMenuBar from "@/components/WebMenuBar";
 import { useEditorMode } from "@/contexts/EditorModeContext";
+import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { getAvailableFeatures } from "@/lib/feature-detection";
 import { isProjectMode, isStandaloneMode } from "@/lib/project-types";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
@@ -854,22 +855,6 @@ export default function EditorPage() {
             content={content}
             onChapterClick={handleChapterClick}
             onInsertText={handleInsertText}
-            fontScale={fontScale}
-            onFontScaleChange={handleFontScaleChange}
-            lineHeight={lineHeight}
-            onLineHeightChange={handleLineHeightChange}
-            paragraphSpacing={paragraphSpacing}
-            onParagraphSpacingChange={handleParagraphSpacingChange}
-            textIndent={textIndent}
-            onTextIndentChange={handleTextIndentChange}
-            fontFamily={fontFamily}
-            onFontFamilyChange={handleFontFamilyChange}
-            charsPerLine={charsPerLine}
-            onCharsPerLineChange={handleCharsPerLineChange}
-            autoCharsPerLine={autoCharsPerLine}
-            onAutoCharsPerLineChange={handleAutoCharsPerLineChange}
-            showParagraphNumbers={showParagraphNumbers}
-            onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
           />
           </ErrorBoundary>
         );
@@ -904,6 +889,7 @@ export default function EditorPage() {
   };
 
     return (
+      <EditorSettingsProvider settings={settings} handlers={settingsHandlers}>
       <div className="h-screen flex flex-col overflow-hidden relative">
          {/* Dynamic title update */}
         <TitleUpdater currentFile={currentFile} isDirty={isDirty} />
@@ -961,50 +947,7 @@ export default function EditorPage() {
             setShowSettingsModal(false);
             setSettingsInitialCategory(undefined);
           }}
-          fontScale={fontScale}
-          onFontScaleChange={handleFontScaleChange}
-          lineHeight={lineHeight}
-          onLineHeightChange={handleLineHeightChange}
-          paragraphSpacing={paragraphSpacing}
-          onParagraphSpacingChange={handleParagraphSpacingChange}
-          textIndent={textIndent}
-          onTextIndentChange={handleTextIndentChange}
-          fontFamily={fontFamily}
-          onFontFamilyChange={handleFontFamilyChange}
-          charsPerLine={charsPerLine}
-          onCharsPerLineChange={handleCharsPerLineChange}
-          autoCharsPerLine={autoCharsPerLine}
-          onAutoCharsPerLineChange={handleAutoCharsPerLineChange}
-          showParagraphNumbers={showParagraphNumbers}
-          onShowParagraphNumbersChange={handleShowParagraphNumbersChange}
-          autoSave={autoSave}
-          onAutoSaveChange={handleAutoSaveChange}
-          verticalScrollBehavior={verticalScrollBehavior}
-          onVerticalScrollBehaviorChange={handleVerticalScrollBehaviorChange}
-          scrollSensitivity={scrollSensitivity}
-          onScrollSensitivityChange={handleScrollSensitivityChange}
-          posHighlightEnabled={posHighlightEnabled}
-          onPosHighlightEnabledChange={handlePosHighlightEnabledChange}
-          posHighlightColors={posHighlightColors}
-          onPosHighlightColorsChange={handlePosHighlightColorsChange}
-          lintingEnabled={lintingEnabled}
-          onLintingEnabledChange={handleLintingEnabledChange}
-          lintingRuleConfigs={lintingRuleConfigs}
-          onLintingRuleConfigChange={handleLintingRuleConfigChange}
-          onLintingRuleConfigsBatchChange={handleLintingRuleConfigsBatchChange}
-          llmEnabled={llmEnabled}
-          onLlmEnabledChange={handleLlmEnabledChange}
-          llmModelId={llmModelId}
-          onLlmModelIdChange={handleLlmModelIdChange}
-          llmIdlingStop={llmIdlingStop}
-          onLlmIdlingStopChange={handleLlmIdlingStopChange}
-          correctionConfig={correctionConfig}
-          onCorrectionConfigChange={handleCorrectionConfigChange}
           initialCategory={settingsInitialCategory}
-          powerSaveMode={powerSaveMode}
-          onPowerSaveModeChange={handlePowerSaveModeChange}
-          autoPowerSaveOnBattery={autoPowerSaveOnBattery}
-          onAutoPowerSaveOnBatteryChange={handleAutoPowerSaveOnBatteryChange}
         />
 
         {/* Ruby dialog */}
@@ -1091,12 +1034,6 @@ export default function EditorPage() {
                 currentContent={editorDiff.currentContent}
                 snapshotLabel={editorDiff.label}
                 onClose={() => setEditorDiff(null)}
-                fontScale={fontScale}
-                lineHeight={lineHeight}
-                fontFamily={fontFamily}
-                charsPerLine={charsPerLine}
-                textIndent={textIndent}
-                paragraphSpacing={paragraphSpacing}
               />
             ) : (
               <ErrorBoundary sectionName="エディタ">
@@ -1106,39 +1043,21 @@ export default function EditorPage() {
                 onChange={handleChange}
                 onInsertText={handleInsertText}
                 onSelectionChange={setSelectedCharCount}
-                fontScale={fontScale}
-                lineHeight={lineHeight}
-                paragraphSpacing={paragraphSpacing}
-                textIndent={textIndent}
-                fontFamily={fontFamily}
-                charsPerLine={charsPerLine}
-                onCharsPerLineChange={autoCharsPerLine ? handleCharsPerLineChange : undefined}
                 searchOpenTrigger={searchOpenTrigger}
                 searchInitialTerm={searchInitialTerm}
-                showParagraphNumbers={showParagraphNumbers}
                 onEditorViewReady={setEditorViewInstance}
                 programmaticScrollRef={programmaticScrollRef}
                 onShowAllSearchResults={handleShowAllSearchResults}
-                posHighlightEnabled={posHighlightEnabled}
-                posHighlightColors={posHighlightColors}
-                lintingEnabled={lintingEnabled}
                 lintingRuleRunner={ruleRunner}
                 onLintIssuesUpdated={handleLintIssuesUpdated}
                 onNlpError={handleNlpError}
-                verticalScrollBehavior={verticalScrollBehavior}
-                scrollSensitivity={scrollSensitivity}
                 onOpenRubyDialog={handleOpenRubyDialog}
                 onToggleTcy={handleToggleTcy}
                 onOpenDictionary={handleOpenDictionary}
                 onShowLintHint={handleShowLintHint}
                 onIgnoreCorrection={handleIgnoreCorrection}
-                onFontScaleChange={handleFontScaleChange}
-                onLineHeightChange={handleLineHeightChange}
-                onParagraphSpacingChange={handleParagraphSpacingChange}
                 mdiExtensionsEnabled={mdiExtensionsEnabled}
                 gfmEnabled={gfmEnabled}
-                llmEnabled={llmEnabled}
-                llmModelId={llmModelId}
               />
               </ErrorBoundary>
             )}
@@ -1183,9 +1102,6 @@ export default function EditorPage() {
             charTypeAnalysis={charTypeAnalysis}
             charUsageRates={charUsageRates}
             readabilityAnalysis={readabilityAnalysis}
-            posHighlightEnabled={posHighlightEnabled}
-            onPosHighlightEnabledChange={handlePosHighlightEnabledChange}
-            posHighlightColors={posHighlightColors}
             onOpenPosHighlightSettings={handleOpenPosHighlightSettings}
             activeFileName={currentFile?.name}
             currentContent={content}
@@ -1204,15 +1120,12 @@ export default function EditorPage() {
             onOpenLintingSettings={handleOpenLintingSettings}
             onApplyLintPreset={handleApplyLintPreset}
             activeLintPresetId={activeLintPresetId}
-            lintingEnabled={lintingEnabled}
-            onLintingEnabledChange={handleLintingEnabledChange}
-            lintingRuleConfigs={lintingRuleConfigs}
-            onLintingRuleConfigChange={handleLintingRuleConfigChange}
             switchToCorrectionsTrigger={switchToCorrectionsTrigger}
           />
           </ErrorBoundary>
         </ResizablePanel>
       </div>
     </div>
+      </EditorSettingsProvider>
   );
 }

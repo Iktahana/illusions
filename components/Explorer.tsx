@@ -19,22 +19,6 @@ export default function Explorer({
   onChapterClick,
   onInsertText,
   compactMode = false,
-  fontScale = 100,
-  onFontScaleChange,
-  lineHeight = 1.8,
-  onLineHeightChange,
-  paragraphSpacing = 0.5,
-  onParagraphSpacingChange,
-  textIndent = 1,
-  onTextIndentChange,
-  fontFamily = 'Noto Serif JP',
-  onFontFamilyChange,
-  charsPerLine = 40,
-  onCharsPerLineChange,
-  autoCharsPerLine = true,
-  onAutoCharsPerLineChange,
-  showParagraphNumbers = false,
-  onShowParagraphNumbersChange,
 }: ExplorerProps) {
   const [activeTab, setActiveTab] = useState<Tab>("chapters");
 
@@ -100,24 +84,7 @@ export default function Explorer({
         {activeTab === "settings" && <div className={compactMode ? "p-3" : "p-4"}><SettingsPanel /></div>}
         {activeTab === "style" && (
           <div className={compactMode ? "p-3" : "p-4"}>
-            <StylePanel
-              fontScale={fontScale}
-              onFontScaleChange={onFontScaleChange}
-              lineHeight={lineHeight}
-              onLineHeightChange={onLineHeightChange}
-              paragraphSpacing={paragraphSpacing}
-              onParagraphSpacingChange={onParagraphSpacingChange}
-              textIndent={textIndent}
-              onTextIndentChange={onTextIndentChange}
-              fontFamily={fontFamily}
-              onFontFamilyChange={onFontFamilyChange}
-              charsPerLine={charsPerLine}
-              onCharsPerLineChange={onCharsPerLineChange}
-              autoCharsPerLine={autoCharsPerLine}
-              onAutoCharsPerLineChange={onAutoCharsPerLineChange}
-              showParagraphNumbers={showParagraphNumbers}
-              onShowParagraphNumbersChange={onShowParagraphNumbersChange}
-            />
+            <StylePanel />
           </div>
         )}
       </div>

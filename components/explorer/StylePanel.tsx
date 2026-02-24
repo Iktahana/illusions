@@ -2,45 +2,18 @@
 
 import clsx from "clsx";
 import { FontSelector } from "./FontSelector";
-
-export interface StylePanelProps {
-  fontScale?: number;
-  onFontScaleChange?: (scale: number) => void;
-  lineHeight?: number;
-  onLineHeightChange?: (height: number) => void;
-  paragraphSpacing?: number;
-  onParagraphSpacingChange?: (spacing: number) => void;
-  textIndent?: number;
-  onTextIndentChange?: (indent: number) => void;
-  fontFamily?: string;
-  onFontFamilyChange?: (family: string) => void;
-  charsPerLine?: number;
-  onCharsPerLineChange?: (chars: number) => void;
-  autoCharsPerLine?: boolean;
-  onAutoCharsPerLineChange?: (value: boolean) => void;
-  showParagraphNumbers?: boolean;
-  onShowParagraphNumbersChange?: (show: boolean) => void;
-}
+import { useTypographySettings } from "@/contexts/EditorSettingsContext";
 
 /** Panel for adjusting typography and display settings */
-export function StylePanel({
-  fontScale = 100,
-  onFontScaleChange,
-  lineHeight = 1.8,
-  onLineHeightChange,
-  paragraphSpacing = 0.5,
-  onParagraphSpacingChange,
-  textIndent = 1,
-  onTextIndentChange,
-  fontFamily = 'Noto Serif JP',
-  onFontFamilyChange,
-  charsPerLine = 40,
-  onCharsPerLineChange,
-  autoCharsPerLine = true,
-  onAutoCharsPerLineChange,
-  showParagraphNumbers = false,
-  onShowParagraphNumbersChange,
-}: StylePanelProps) {
+export function StylePanel() {
+  const {
+    fontScale, lineHeight, paragraphSpacing, textIndent, fontFamily,
+    charsPerLine, autoCharsPerLine, showParagraphNumbers,
+    onFontScaleChange, onLineHeightChange, onParagraphSpacingChange,
+    onTextIndentChange, onFontFamilyChange, onCharsPerLineChange,
+    onAutoCharsPerLineChange, onShowParagraphNumbersChange,
+  } = useTypographySettings();
+
   return (
     <div className="space-y-4">
       <div>
@@ -49,7 +22,7 @@ export function StylePanel({
         </label>
         <FontSelector
           value={fontFamily}
-          onChange={(font) => onFontFamilyChange?.(font)}
+          onChange={(font) => onFontFamilyChange(font)}
         />
       </div>
 
@@ -63,7 +36,7 @@ export function StylePanel({
           max="200"
           step="5"
           value={fontScale}
-          onChange={(e) => onFontScaleChange?.(Number(e.target.value))}
+          onChange={(e) => onFontScaleChange(Number(e.target.value))}
           className="w-full"
         />
         <div className="flex justify-between text-xs text-foreground-tertiary mt-1">
@@ -83,7 +56,7 @@ export function StylePanel({
           max="2.5"
           step="0.1"
           value={lineHeight}
-          onChange={(e) => onLineHeightChange?.(Number(e.target.value))}
+          onChange={(e) => onLineHeightChange(Number(e.target.value))}
           className="w-full"
         />
         <div className="flex justify-between text-xs text-foreground-tertiary mt-1">
@@ -103,7 +76,7 @@ export function StylePanel({
           max="2"
           step="0.1"
           value={paragraphSpacing}
-          onChange={(e) => onParagraphSpacingChange?.(Number(e.target.value))}
+          onChange={(e) => onParagraphSpacingChange(Number(e.target.value))}
           className="w-full"
         />
         <div className="flex justify-between text-xs text-foreground-tertiary mt-1">
@@ -123,7 +96,7 @@ export function StylePanel({
             min="0"
             step="0.5"
             value={textIndent}
-            onChange={(e) => onTextIndentChange?.(Number(e.target.value))}
+            onChange={(e) => onTextIndentChange(Number(e.target.value))}
             className="w-20 px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground"
           />
           <span className="text-sm text-foreground-secondary">字</span>
@@ -144,7 +117,7 @@ export function StylePanel({
             step="1"
             value={charsPerLine}
             disabled={autoCharsPerLine}
-            onChange={(e) => onCharsPerLineChange?.(Number(e.target.value))}
+            onChange={(e) => onCharsPerLineChange(Number(e.target.value))}
             className={clsx(
               "w-20 px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground",
               autoCharsPerLine && "opacity-50 cursor-not-allowed"
@@ -153,7 +126,7 @@ export function StylePanel({
           <span className="text-sm text-foreground-secondary">字</span>
           <span className="text-sm text-foreground-secondary ml-auto">自動</span>
           <button
-            onClick={() => onAutoCharsPerLineChange?.(!autoCharsPerLine)}
+            onClick={() => onAutoCharsPerLineChange(!autoCharsPerLine)}
             className={clsx(
               "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
               autoCharsPerLine ? "bg-accent" : "bg-border-secondary"
@@ -178,7 +151,7 @@ export function StylePanel({
         <label className="flex items-center justify-between text-sm font-medium text-foreground-secondary mb-2">
           <span>段落番号</span>
           <button
-            onClick={() => onShowParagraphNumbersChange?.(!showParagraphNumbers)}
+            onClick={() => onShowParagraphNumbersChange(!showParagraphNumbers)}
             className={clsx(
               "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2",
               showParagraphNumbers ? "bg-accent" : "bg-border-secondary"

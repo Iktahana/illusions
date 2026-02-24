@@ -1,5 +1,4 @@
 import type { LintIssue, Severity } from "@/lib/linting";
-import type { LintRulePresetConfig } from "@/lib/linting/lint-presets";
 
 export type Tab = "ai" | "corrections" | "stats" | "history";
 
@@ -62,9 +61,6 @@ export interface InspectorProps {
     avgSentenceLength: number;
     avgPunctuationSpacing: number;
   };
-  posHighlightEnabled?: boolean;
-  onPosHighlightEnabledChange?: (enabled: boolean) => void;
-  posHighlightColors?: Record<string, string>;
   onOpenPosHighlightSettings?: () => void;
   onHistoryRestore?: (content: string) => void;
   activeFileName?: string;
@@ -80,10 +76,6 @@ export interface InspectorProps {
   onOpenLintingSettings?: () => void;
   onApplyLintPreset?: (presetId: string) => void;
   activeLintPresetId?: string;
-  lintingEnabled?: boolean;
-  onLintingEnabledChange?: (enabled: boolean) => void;
-  lintingRuleConfigs?: Record<string, LintRulePresetConfig>;
-  onLintingRuleConfigChange?: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
   /** Monotonically increasing trigger to switch to the corrections tab from outside */
   switchToCorrectionsTrigger?: number;
 }

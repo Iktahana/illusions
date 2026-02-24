@@ -8,23 +8,6 @@ export interface ExplorerProps {
   onChapterClick?: (anchorId: string) => void;
   onInsertText?: (text: string) => void;
   compactMode?: boolean;
-  // Style settings
-  fontScale?: number;
-  onFontScaleChange?: (scale: number) => void;
-  lineHeight?: number;
-  onLineHeightChange?: (height: number) => void;
-  paragraphSpacing?: number;
-  onParagraphSpacingChange?: (spacing: number) => void;
-  textIndent?: number;
-  onTextIndentChange?: (indent: number) => void;
-  fontFamily?: string;
-  onFontFamilyChange?: (family: string) => void;
-  charsPerLine?: number;
-  onCharsPerLineChange?: (chars: number) => void;
-  autoCharsPerLine?: boolean;
-  onAutoCharsPerLineChange?: (value: boolean) => void;
-  showParagraphNumbers?: boolean;
-  onShowParagraphNumbersChange?: (show: boolean) => void;
 }
 
 /** Represents a file or directory in the virtual file tree */
