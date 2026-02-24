@@ -402,7 +402,7 @@ export default function Inspector({
         <p className="text-[10px] text-foreground-tertiary leading-relaxed">
           illusionsはあなたの作品の無断保存およびAI学習への利用は行いません
           <br />
-          <a href="https://github.com/Iktahana/illusions/issues/new" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground-secondary transition-colors">AIに関する不適切な提案を報告</a>
+          <a href="https://github.com/Iktahana/illusions/issues/new" target="_blank" rel="noopener noreferrer" className="text-[6px] underline hover:text-foreground-secondary transition-colors">AIに関する不適切な提案を報告</a>
         </p>
       </div>
     </aside>
