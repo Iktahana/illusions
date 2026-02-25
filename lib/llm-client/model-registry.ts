@@ -5,6 +5,7 @@ export const LLM_MODEL_REGISTRY: readonly LlmModelEntry[] = [
     id: "qwen3-0.6b-q8",
     name: "Qwen3 0.6B (Q8_0)",
     nameJa: "Qwen3 0.6B（軽量）",
+    descriptionJa: "Alibaba Cloud Qwen チーム開発。軽量で高速な汎用モデル",
     url: "https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf",
     fileName: "Qwen3-0.6B-Q8_0.gguf",
     size: 639_446_688,
@@ -17,6 +18,7 @@ export const LLM_MODEL_REGISTRY: readonly LlmModelEntry[] = [
     id: "qwen3-1.7b-q8",
     name: "Qwen3 1.7B (Q8_0)",
     nameJa: "Qwen3 1.7B（推奨）",
+    descriptionJa: "Alibaba Cloud Qwen チーム開発。バランスの良い推奨モデル",
     url: "https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf",
     fileName: "Qwen3-1.7B-Q8_0.gguf",
     size: 1_834_426_016,
@@ -30,6 +32,7 @@ export const LLM_MODEL_REGISTRY: readonly LlmModelEntry[] = [
     id: "qwen3-4b-q4km",
     name: "Qwen3 4B (Q4_K_M)",
     nameJa: "Qwen3 4B（高精度）",
+    descriptionJa: "Alibaba Cloud Qwen チーム開発。高精度な大規模モデル",
     url: "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
     fileName: "Qwen3-4B-Q4_K_M.gguf",
     size: 2_497_280_256,
@@ -37,6 +40,19 @@ export const LLM_MODEL_REGISTRY: readonly LlmModelEntry[] = [
       "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
     quantization: "Q4_K_M",
     minRamMb: 4096,
+  },
+  {
+    id: "gemma2-swallow-9b-q4km",
+    name: "Gemma-2-Llama-Swallow 9B (Q4_K_M)",
+    nameJa: "Swallow 9B（日本語特化）",
+    descriptionJa: "東京科学大学の研究成果。日本語能力と思考力を強化した推論型LLM",
+    url: "https://huggingface.co/mmnga/Gemma-2-Llama-Swallow-9b-it-v0.1-gguf/resolve/main/Gemma-2-Llama-Swallow-9b-it-v0.1-Q4_K_M.gguf",
+    fileName: "Gemma-2-Llama-Swallow-9b-it-v0.1-Q4_K_M.gguf",
+    size: 5_761_059_136,
+    sha256:
+      "53cb4b802be7f122a79dd525697278bcb38376db36568537341deb6948fb888d",
+    quantization: "Q4_K_M",
+    minRamMb: 8192,
   },
 ] as const;
 

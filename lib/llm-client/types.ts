@@ -2,6 +2,7 @@ export interface LlmModelEntry {
   readonly id: string;
   readonly name: string;
   readonly nameJa: string;
+  readonly descriptionJa?: string;
   readonly url: string;
   readonly fileName: string;
   readonly size: number;

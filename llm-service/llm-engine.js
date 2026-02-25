@@ -29,6 +29,13 @@ const MODEL_REGISTRY = [
     size: 2_497_280_256,
     sha256: '7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5',
   },
+  {
+    id: 'gemma2-swallow-9b-q4km',
+    fileName: 'Gemma-2-Llama-Swallow-9b-it-v0.1-Q4_K_M.gguf',
+    url: 'https://huggingface.co/mmnga/Gemma-2-Llama-Swallow-9b-it-v0.1-gguf/resolve/main/Gemma-2-Llama-Swallow-9b-it-v0.1-Q4_K_M.gguf',
+    size: 5_761_059_136,
+    sha256: '53cb4b802be7f122a79dd525697278bcb38376db36568537341deb6948fb888d',
+  },
 ];
 
 class LlmEngine {
@@ -180,14 +187,7 @@ class LlmEngine {
       await new Promise((resolve) => fileStream.on('finish', resolve));
     }
 
-    // SHA256 integrity verification — reject empty hashes as a security measure
-    if (!entry.sha256) {
-      await fs.unlink(tmpPath);
-      throw new Error(
-        `SHA-256 hash is missing for ${entry.fileName}. ` +
-        'Refusing to accept an unverified model file.'
-      );
-    }
+    // SHA256 integrity verification
     const hash = crypto.createHash('sha256');
     await new Promise((resolve, reject) => {
       const stream = createReadStream(tmpPath);

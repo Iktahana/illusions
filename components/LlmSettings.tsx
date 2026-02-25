@@ -296,14 +296,20 @@ export function LlmSettings({
               </div>
             )}
 
-            {/* Not downloaded — show download button */}
+            {/* Not downloaded — show download button or unavailable badge */}
             {(!selectedStatus || selectedStatus.status === "not-downloaded") && !isDownloading && (
-              <button
-                onClick={() => void handleDownload()}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-foreground hover:bg-accent-hover transition-colors"
-              >
-                ダウンロード
-              </button>
+              selectedEntry.url === "" ? (
+                <span className="px-3 py-1.5 text-xs font-medium rounded-lg bg-foreground-muted text-foreground-tertiary">
+                  準備中
+                </span>
+              ) : (
+                <button
+                  onClick={() => void handleDownload()}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-foreground hover:bg-accent-hover transition-colors"
+                >
+                  ダウンロード
+                </button>
+              )
             )}
 
             {/* Downloaded — show model name + delete */}
@@ -335,6 +341,9 @@ export function LlmSettings({
 
             {/* Model info */}
             <div className="text-xs text-foreground-tertiary space-y-1">
+              {selectedEntry.descriptionJa && (
+                <p>{selectedEntry.descriptionJa}</p>
+              )}
               <p>サイズ: 約 {formatBytes(selectedEntry.size)}</p>
               <p>量子化: {selectedEntry.quantization}</p>
               <p>必要メモリ: {selectedEntry.minRamMb} MB</p>
