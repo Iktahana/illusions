@@ -48,8 +48,9 @@ export const LLM_MODEL_REGISTRY: readonly LlmModelEntry[] = [
     descriptionJa: "東京科学大学の研究成果。日本語能力と思考力を強化した推論型LLM",
     url: "https://huggingface.co/mmnga/Gemma-2-Llama-Swallow-9b-it-v0.1-gguf/resolve/main/Gemma-2-Llama-Swallow-9b-it-v0.1-Q4_K_M.gguf",
     fileName: "Gemma-2-Llama-Swallow-9b-it-v0.1-Q4_K_M.gguf",
-    size: 5_760_000_000,
-    sha256: "",
+    size: 5_761_059_136,
+    sha256:
+      "53cb4b802be7f122a79dd525697278bcb38376db36568537341deb6948fb888d",
     quantization: "Q4_K_M",
     minRamMb: 8192,
   },

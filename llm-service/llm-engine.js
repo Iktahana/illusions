@@ -33,8 +33,8 @@ const MODEL_REGISTRY = [
     id: 'gemma2-swallow-9b-q4km',
     fileName: 'Gemma-2-Llama-Swallow-9b-it-v0.1-Q4_K_M.gguf',
     url: 'https://huggingface.co/mmnga/Gemma-2-Llama-Swallow-9b-it-v0.1-gguf/resolve/main/Gemma-2-Llama-Swallow-9b-it-v0.1-Q4_K_M.gguf',
-    size: 5_760_000_000,
-    sha256: '',
+    size: 5_761_059_136,
+    sha256: '53cb4b802be7f122a79dd525697278bcb38376db36568537341deb6948fb888d',
   },
 ];
 
@@ -187,23 +187,21 @@ class LlmEngine {
       await new Promise((resolve) => fileStream.on('finish', resolve));
     }
 
-    // SHA256 integrity verification — skip when hash is not published yet
-    if (entry.sha256) {
-      const hash = crypto.createHash('sha256');
-      await new Promise((resolve, reject) => {
-        const stream = createReadStream(tmpPath);
-        stream.on('data', (chunk) => hash.update(chunk));
-        stream.on('end', resolve);
-        stream.on('error', reject);
-      });
-      const digest = hash.digest('hex');
-      if (digest !== entry.sha256) {
-        await fs.unlink(tmpPath);
-        throw new Error(
-          `SHA-256 mismatch for ${entry.fileName}: ` +
-          `expected ${entry.sha256}, got ${digest}`
-        );
-      }
+    // SHA256 integrity verification
+    const hash = crypto.createHash('sha256');
+    await new Promise((resolve, reject) => {
+      const stream = createReadStream(tmpPath);
+      stream.on('data', (chunk) => hash.update(chunk));
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
+    const digest = hash.digest('hex');
+    if (digest !== entry.sha256) {
+      await fs.unlink(tmpPath);
+      throw new Error(
+        `SHA-256 mismatch for ${entry.fileName}: ` +
+        `expected ${entry.sha256}, got ${digest}`
+      );
     }
 
     // Atomic rename
