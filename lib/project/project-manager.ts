@@ -16,10 +16,10 @@
  * 復元したハンドルの権限が失効する場合があり、再要求が必要になる。
  */
 
-import { getWebStorageDatabase } from "./web-storage";
-import { PermissionManager, getPermissionManager } from "./permission-manager";
-import type { StoredProjectHandle } from "./web-storage";
-import type { PermissionStatus } from "./permission-manager";
+import { getWebStorageDatabase } from "../storage/web-storage";
+import { PermissionManager, getPermissionManager } from "../services/permission-manager";
+import type { StoredProjectHandle } from "../storage/web-storage";
+import type { PermissionStatus } from "../services/permission-manager";
 
 /**
  * Result of restoring a project handle from IndexedDB.

@@ -1,6 +1,6 @@
 // Electron preload API の型定義
 
-import type { StorageSession, AppState, RecentFile, EditorBuffer } from "@/lib/storage-types";
+import type { StorageSession, AppState, RecentFile, EditorBuffer } from "@/lib/storage/storage-types";
 import type { Token, WordEntry, TokenizeProgress } from "@/lib/nlp-client/types";
 import type { VFSWatchEvent } from "@/lib/vfs/types";
 

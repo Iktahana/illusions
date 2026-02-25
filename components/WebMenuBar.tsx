@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useRef, useMemo } from 'react';
-import { WEB_MENU_STRUCTURE } from '@/lib/menu-definitions';
+import { WEB_MENU_STRUCTURE } from '@/lib/menu/menu-definitions';
 import { MenuDropdown } from './WebMenuBar/MenuDropdown';
 
-import type { MenuSection, MenuItem } from '@/lib/menu-definitions';
+import type { MenuSection, MenuItem } from '@/lib/menu/menu-definitions';
 
 interface RecentProjectInfo {
   projectId: string;

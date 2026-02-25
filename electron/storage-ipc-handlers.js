@@ -5,7 +5,7 @@
  */
 
 const { ipcMain } = require('electron');
-const { ElectronStorageManager } = require('./lib/electron-storage-manager');
+const { ElectronStorageManager } = require('../lib/storage/electron-storage-manager');
 
 let storageManager = null;
 

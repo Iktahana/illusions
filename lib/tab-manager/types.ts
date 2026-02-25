@@ -1,10 +1,10 @@
 "use client";
 
 import type { MutableRefObject, Dispatch, SetStateAction } from "react";
-import type { MdiFileDescriptor } from "../mdi-file";
-import type { SupportedFileExtension } from "../project-types";
-import type { TabId, TabState } from "../tab-types";
-import { getRandomillusionstory } from "../illusion-stories";
+import type { MdiFileDescriptor } from "../project/mdi-file";
+import type { SupportedFileExtension } from "../project/project-types";
+import type { TabId, TabState } from "./tab-types";
+import { getRandomillusionstory } from "../project/illusion-stories";
 
 // ---------------------------------------------------------------------------
 // Public return type (must stay identical to the original useTabManager)

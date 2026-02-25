@@ -1,4 +1,4 @@
-import { AsyncMutex } from "./async-mutex";
+import { AsyncMutex } from "../utils/async-mutex";
 import { getStorageService } from "./storage-service";
 
 import type { AppState } from "./storage-types";

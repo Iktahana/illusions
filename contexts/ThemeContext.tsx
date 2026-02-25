@@ -1,9 +1,9 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { localPreferences } from "@/lib/local-preferences";
+import { localPreferences } from "@/lib/storage/local-preferences";
 
-import type { ThemeMode } from "@/lib/local-preferences";
+import type { ThemeMode } from "@/lib/storage/local-preferences";
 
 type Theme = "light" | "dark";
 

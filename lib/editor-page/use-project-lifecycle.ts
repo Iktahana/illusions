@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getProjectManager } from "@/lib/project-manager";
-import { getStorageService } from "@/lib/storage-service";
-import { getProjectService } from "@/lib/project-service";
-import { getProjectUpgradeService } from "@/lib/project-upgrade";
-import { isStandaloneMode } from "@/lib/project-types";
+import { getProjectManager } from "@/lib/project/project-manager";
+import { getStorageService } from "@/lib/storage/storage-service";
+import { getProjectService } from "@/lib/project/project-service";
+import { getProjectUpgradeService } from "@/lib/project/project-upgrade";
+import { isStandaloneMode } from "@/lib/project/project-types";
 import { getVFS } from "@/lib/vfs";
-import { notificationManager } from "@/lib/notification-manager";
+import { notificationManager } from "@/lib/services/notification-manager";
 
-import type { EditorMode, ProjectMode, StandaloneMode, ProjectConfig, SupportedFileExtension } from "@/lib/project-types";
+import type { EditorMode, ProjectMode, StandaloneMode, ProjectConfig, SupportedFileExtension } from "@/lib/project/project-types";
 import type { VFSDirectoryHandle } from "@/lib/vfs/types";
-import { getDefaultEditorSettings, getDefaultWorkspaceState } from "@/lib/project-types";
+import { getDefaultEditorSettings, getDefaultWorkspaceState } from "@/lib/project/project-types";
 import { chars } from "./types";
 import type { RecentProjectEntry, PermissionPromptState } from "./types";
 
@@ -270,7 +270,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         const workspaceText = await readFileHandle(workspaceJsonHandle as Parameters<typeof readFileHandle>[0]);
         workspaceState = JSON.parse(workspaceText) as ProjectMode["workspaceState"];
       } catch {
-        const { getDefaultWorkspaceState } = await import("@/lib/project-types");
+        const { getDefaultWorkspaceState } = await import("@/lib/project/project-types");
         workspaceState = getDefaultWorkspaceState();
       }
 
@@ -553,7 +553,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         const wsText = await readFileHandle(wsHandle as Parameters<typeof readFileHandle>[0]);
         workspaceState = JSON.parse(wsText) as ProjectMode["workspaceState"];
       } catch {
-        const { getDefaultWorkspaceState } = await import("@/lib/project-types");
+        const { getDefaultWorkspaceState } = await import("@/lib/project/project-types");
         workspaceState = getDefaultWorkspaceState();
       }
 

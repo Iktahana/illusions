@@ -13,9 +13,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock the storage-types module for isElectronEnvironment
 let mockIsElectronValue = false;
-vi.mock("@/lib/storage-types", async (importOriginal) => {
+vi.mock("@/lib/storage/storage-types", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("@/lib/storage-types")>();
+    await importOriginal<typeof import("@/lib/storage/storage-types")>();
   return {
     ...actual,
     isElectronEnvironment: () => mockIsElectronValue,
@@ -23,7 +23,7 @@ vi.mock("@/lib/storage-types", async (importOriginal) => {
 });
 
 // Mock web-storage to avoid Dexie/IndexedDB dependency
-vi.mock("@/lib/web-storage", () => {
+vi.mock("@/lib/storage/web-storage", () => {
   class MockWebStorageProvider {
     _provider = "web";
     initialize = vi.fn();
@@ -32,7 +32,7 @@ vi.mock("@/lib/web-storage", () => {
 });
 
 // Mock electron-storage to avoid window.electronAPI dependency
-vi.mock("@/lib/electron-storage", () => {
+vi.mock("@/lib/storage/electron-storage", () => {
   class MockElectronStorageProvider {
     _provider = "electron";
     initialize = vi.fn();
@@ -48,7 +48,7 @@ import {
   createStorageService,
   getStorageService,
   resetStorageService,
-} from "@/lib/storage-service";
+} from "@/lib/storage/storage-service";
 
 describe("StorageService factory", () => {
   beforeEach(() => {

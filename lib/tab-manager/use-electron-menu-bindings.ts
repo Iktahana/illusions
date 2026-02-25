@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { saveMdiFile } from "../mdi-file";
+import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
-import { suppressFileWatch } from "../file-watcher";
-import type { SupportedFileExtension } from "../project-types";
-import type { TabId, TabState } from "../tab-types";
+import { suppressFileWatch } from "../services/file-watcher";
+import type { SupportedFileExtension } from "../project/project-types";
+import type { TabId, TabState } from "./tab-types";
 import { sanitizeMdiContent } from "./types";
 import type { TabManagerCore } from "./types";
 

@@ -6,7 +6,7 @@ import clsx from "clsx";
 import { ChaptersPanel } from "./explorer/ChaptersPanel";
 import { SettingsPanel } from "./explorer/SettingsPanel";
 import { StylePanel } from "./explorer/StylePanel";
-import { localPreferences } from "@/lib/local-preferences";
+import { localPreferences } from "@/lib/storage/local-preferences";
 import type { Tab, ExplorerProps } from "./explorer/types";
 
 // Re-export for backward compatibility with existing consumers

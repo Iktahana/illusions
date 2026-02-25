@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
-import { isElectronRenderer } from "@/lib/runtime-env";
-import { notificationManager } from "@/lib/notification-manager";
+import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { notificationManager } from "@/lib/services/notification-manager";
 import { mdiToPlainText, mdiToRubyText } from "./txt-exporter";
 import type { ExportFormat } from "./types";
 

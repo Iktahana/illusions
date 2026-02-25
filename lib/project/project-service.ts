@@ -5,15 +5,15 @@
  * プロジェクトの作成・開閉・保存を管理するサービス。
  */
 
-import { getVFS } from "./vfs";
+import { getVFS } from "../vfs";
 import { getProjectManager } from "./project-manager";
-import { isElectronRenderer } from "./runtime-env";
+import { isElectronRenderer } from "../utils/runtime-env";
 import {
   getDefaultEditorSettings,
   getDefaultWorkspaceState,
 } from "./project-types";
 
-import type { VirtualFileSystem, VFSDirectoryHandle } from "./vfs/types";
+import type { VirtualFileSystem, VFSDirectoryHandle } from "../vfs/types";
 import type { ProjectManager } from "./project-manager";
 import type {
   ProjectMode,

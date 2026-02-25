@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { notificationManager } from '@/lib/notification-manager';
+import { notificationManager } from '@/lib/services/notification-manager';
 import { Notification } from './Notification';
 import type { NotificationItem } from '@/types/notification';
 

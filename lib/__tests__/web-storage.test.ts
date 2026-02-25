@@ -22,7 +22,7 @@ import type {
   RecentFile,
   EditorBuffer,
   StorageSession,
-} from "@/lib/storage-types";
+} from "@/lib/storage/storage-types";
 
 // -----------------------------------------------------------------------
 // In-memory table mock (simulates a Dexie Table)
@@ -107,7 +107,7 @@ vi.mock("dexie", () => {
 });
 
 // Now import the real provider — its Dexie base class is our FakeDexie
-import { WebStorageProvider } from "@/lib/web-storage";
+import { WebStorageProvider } from "@/lib/storage/web-storage";
 
 // -----------------------------------------------------------------------
 // Test helpers

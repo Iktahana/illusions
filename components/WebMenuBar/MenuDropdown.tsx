@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { MenuSection } from '@/lib/menu-definitions';
+import { MenuSection } from '@/lib/menu/menu-definitions';
 import { MenuItem } from './MenuItem';
 
 interface MenuDropdownProps {

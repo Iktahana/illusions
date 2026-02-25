@@ -2,10 +2,10 @@
 
 import { useMemo } from "react";
 import { X } from "lucide-react";
-import { computeDiff, getDiffStats } from "@/lib/diff-service";
+import { computeDiff, getDiffStats } from "@/lib/services/diff-service";
 import { useTypographySettings } from "@/contexts/EditorSettingsContext";
 
-import type { DiffChunk } from "@/lib/diff-service";
+import type { DiffChunk } from "@/lib/services/diff-service";
 
 interface EditorDiffViewProps {
   /** Snapshot content (old) */

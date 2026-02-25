@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2, Edit2, BookOpen, ChevronDown, ChevronRight, Search, Globe, ExternalLink } from "lucide-react";
 import GlassDialog from "@/components/GlassDialog";
-import type { UserDictionaryEntry } from "@/lib/project-types";
-import type { EditorMode } from "@/lib/project-types";
-import { isProjectMode, isStandaloneMode } from "@/lib/project-types";
-import { getUserDictionaryService } from "@/lib/user-dictionary-service";
+import type { UserDictionaryEntry } from "@/lib/project/project-types";
+import type { EditorMode } from "@/lib/project/project-types";
+import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
+import { getUserDictionaryService } from "@/lib/services/user-dictionary-service";
 
 // Predefined POS values matching PosType
 const POS_OPTIONS = [

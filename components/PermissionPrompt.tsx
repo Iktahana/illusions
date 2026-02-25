@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { getPermissionManager } from "@/lib/permission-manager";
+import { getPermissionManager } from "@/lib/services/permission-manager";
 import GlassDialog from "@/components/GlassDialog";
 
 interface PermissionPromptProps {

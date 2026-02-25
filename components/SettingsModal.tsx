@@ -4,9 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import { X, ExternalLink, ChevronDown, ChevronRight, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium } from "lucide-react";
 import dynamic from "next/dynamic";
 
-import { isElectronRenderer } from "@/lib/runtime-env";
+import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
-import { FEATURED_JAPANESE_FONTS } from "@/lib/fonts";
+import { FEATURED_JAPANESE_FONTS } from "@/lib/utils/fonts";
 import {
   useTypographySettings,
   useLintingSettings,

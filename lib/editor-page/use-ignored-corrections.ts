@@ -8,10 +8,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getIgnoredCorrectionsService } from "@/lib/ignored-corrections-service";
-import { isProjectMode, isStandaloneMode } from "@/lib/project-types";
+import { getIgnoredCorrectionsService } from "@/lib/services/ignored-corrections-service";
+import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
 import { hashString } from "@/lib/utils/hash-string";
-import type { EditorMode, IgnoredCorrection } from "@/lib/project-types";
+import type { EditorMode, IgnoredCorrection } from "@/lib/project/project-types";
 
 export interface UseIgnoredCorrectionsResult {
   ignoredCorrections: IgnoredCorrection[];

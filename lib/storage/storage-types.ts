@@ -5,7 +5,7 @@
 
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import type { Severity } from "@/lib/linting/types";
-import type { TabPersistenceState } from "./tab-types";
+import type { TabPersistenceState } from "../tab-manager/tab-types";
 
 /**
  * 最近使ったファイルの項目。

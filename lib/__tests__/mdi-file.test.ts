@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const mockGetRuntimeEnvironment = vi.fn<() => string>();
 const mockIsBrowser = vi.fn<() => boolean>();
 
-vi.mock("@/lib/runtime-env", () => ({
+vi.mock("@/lib/utils/runtime-env", () => ({
   getRuntimeEnvironment: () => mockGetRuntimeEnvironment(),
   isBrowser: () => mockIsBrowser(),
 }));
@@ -30,13 +30,13 @@ vi.mock("@/lib/runtime-env", () => ({
 // Import module under test (after mocks are registered)
 // -----------------------------------------------------------------------
 
-import { openMdiFile, saveMdiFile } from "@/lib/mdi-file";
+import { openMdiFile, saveMdiFile } from "@/lib/project/mdi-file";
 
 import type {
   MdiFileDescriptor,
   OpenMdiResult,
   SaveMdiParams,
-} from "@/lib/mdi-file";
+} from "@/lib/project/mdi-file";
 
 // -----------------------------------------------------------------------
 // Mock helpers

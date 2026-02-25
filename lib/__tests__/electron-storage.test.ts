@@ -19,8 +19,8 @@ import type {
   RecentFile,
   EditorBuffer,
   StorageSession,
-} from "@/lib/storage-types";
-import { ElectronStorageProvider } from "@/lib/electron-storage";
+} from "@/lib/storage/storage-types";
+import { ElectronStorageProvider } from "@/lib/storage/electron-storage";
 
 // -----------------------------------------------------------------------
 // Mock helpers

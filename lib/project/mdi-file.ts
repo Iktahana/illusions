@@ -1,6 +1,6 @@
 // クロスプラットフォームな .mdi ファイルの開閉/保存
 
-import { getRuntimeEnvironment, isBrowser } from "./runtime-env";
+import { getRuntimeEnvironment, isBrowser } from "../utils/runtime-env";
 import type { SupportedFileExtension } from "./project-types";
 
 export interface MdiFileDescriptor {

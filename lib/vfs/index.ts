@@ -9,7 +9,7 @@
  * Follows the same singleton factory pattern as StorageService and NlpClient.
  */
 
-import { isElectronRenderer } from "../runtime-env";
+import { isElectronRenderer } from "../utils/runtime-env";
 import { ElectronVFS } from "./electron-vfs";
 import { WebVFS } from "./web-vfs";
 

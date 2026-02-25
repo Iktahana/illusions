@@ -4,7 +4,7 @@
  */
 
 import type { LintRuleConfig } from "./types";
-import type { IgnoredCorrection } from "@/lib/project-types";
+import type { IgnoredCorrection } from "@/lib/project/project-types";
 
 /**
  * Identifies what triggered a config change, enabling smart cache invalidation

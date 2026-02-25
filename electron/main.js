@@ -9,10 +9,10 @@ const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { autoUpdater } = require('electron-updater')
 const log = require('electron-log')
-const { registerNlpHandlers } = require('./nlp-service/nlp-ipc-handlers')
-const { registerLlmHandlers, disposeLlmEngine } = require('./llm-service/llm-ipc-handlers')
-const { registerStorageHandlers, getStorageManager } = require('./electron-storage-ipc-handlers')
-const { registerVFSHandlers } = require('./electron-vfs-ipc-handlers')
+const { registerNlpHandlers } = require('./nlp/nlp-ipc-handlers')
+const { registerLlmHandlers, disposeLlmEngine } = require('./llm/llm-ipc-handlers')
+const { registerStorageHandlers, getStorageManager } = require('./storage-ipc-handlers')
+const { registerVFSHandlers } = require('./vfs-ipc-handlers')
 
 // Configure module resolution paths for ASAR environment
 if (app.isPackaged) {
@@ -944,7 +944,7 @@ ipcMain.handle('export-pdf', async (_event, content, options) => {
     return { success: false, error: 'Invalid content' }
   }
   try {
-    const { generatePdf } = require('./lib/export/pdf-exporter')
+    const { generatePdf } = require('../lib/export/pdf-exporter')
     const pdfBuffer = await generatePdf(content, options || {})
 
     const { filePath } = await dialog.showSaveDialog({
@@ -968,7 +968,7 @@ ipcMain.handle('export-epub', async (_event, content, options) => {
     return { success: false, error: 'Invalid content' }
   }
   try {
-    const { generateEpub } = require('./lib/export/epub-exporter')
+    const { generateEpub } = require('../lib/export/epub-exporter')
     const epubBuffer = await generateEpub(content, options || {})
 
     const { filePath } = await dialog.showSaveDialog({
@@ -992,7 +992,7 @@ ipcMain.handle('export-docx', async (_event, content, options) => {
     return { success: false, error: 'Invalid content' }
   }
   try {
-    const { generateDocx } = require('./lib/export/docx-exporter')
+    const { generateDocx } = require('../lib/export/docx-exporter')
     const docxBuffer = await generateDocx(content, options || {})
 
     const { filePath } = await dialog.showSaveDialog({

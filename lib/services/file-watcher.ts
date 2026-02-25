@@ -8,10 +8,10 @@
  * Electron: IPCを通じてネイティブファイル監視を使用。
  */
 
-import { isElectronRenderer } from "./runtime-env";
-import { getVFS } from "./vfs";
+import { isElectronRenderer } from "../utils/runtime-env";
+import { getVFS } from "../vfs";
 
-import type { VirtualFileSystem, VFSWatchEvent } from "./vfs/types";
+import type { VirtualFileSystem, VFSWatchEvent } from "../vfs/types";
 
 // -----------------------------------------------------------------------
 // Constants

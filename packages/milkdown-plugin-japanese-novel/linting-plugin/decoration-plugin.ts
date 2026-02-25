@@ -13,7 +13,7 @@ import type { RuleRunner, LintIssue, Severity } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
 import type { Token } from '@/lib/nlp-client/types';
 import type { ILlmClient } from '@/lib/llm-client/types';
-import type { IgnoredCorrection } from '@/lib/project-types';
+import type { IgnoredCorrection } from '@/lib/project/project-types';
 import { LRUCache } from '@/lib/utils/lru-cache';
 import { hashString } from '@/lib/utils/hash-string';
 import { LintIssueValidator } from '@/lib/linting/lint-issue-validator';

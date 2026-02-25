@@ -13,7 +13,7 @@ import {
   Folder
 } from "lucide-react";
 import clsx from "clsx";
-import { localPreferences } from "@/lib/local-preferences";
+import { localPreferences } from "@/lib/storage/local-preferences";
 import {
   DndContext,
   PointerSensor,

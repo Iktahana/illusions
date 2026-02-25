@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback } from "react";
-import { saveMdiFile } from "../mdi-file";
+import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
-import { suppressFileWatch } from "../file-watcher";
-import { notificationManager } from "../notification-manager";
-import type { TabId, TabState } from "../tab-types";
+import { suppressFileWatch } from "../services/file-watcher";
+import { notificationManager } from "../services/notification-manager";
+import type { TabId, TabState } from "./tab-types";
 import { sanitizeMdiContent, getErrorMessage } from "./types";
 import type { TabManagerCore } from "./types";
 

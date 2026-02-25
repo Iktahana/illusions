@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { NotificationItem } from '@/types/notification';
-import { notificationManager } from '@/lib/notification-manager';
+import { notificationManager } from '@/lib/services/notification-manager';
 import {
   AlertCircle,
   AlertTriangle,
