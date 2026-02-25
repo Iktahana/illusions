@@ -25,7 +25,7 @@ console.log('📦 Bundling Electron main process...');
 
 // Bundle main process
 await esbuild.build({
-  entryPoints: [join(projectRoot, 'main.js')],
+  entryPoints: [join(projectRoot, 'electron', 'main.js')],
   bundle: true,
   platform: 'node',
   target: 'node20',
@@ -52,7 +52,7 @@ console.log('📦 Bundling Electron preload script...');
 
 // Bundle preload script
 await esbuild.build({
-  entryPoints: [join(projectRoot, 'preload.js')],
+  entryPoints: [join(projectRoot, 'electron', 'preload.js')],
   bundle: true,
   platform: 'node',
   target: 'node20',

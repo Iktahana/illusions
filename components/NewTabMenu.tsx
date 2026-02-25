@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
-import type { SupportedFileExtension } from "@/lib/project-types";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 
 interface NewTabMenuProps {
   onNewTab: (fileType: SupportedFileExtension) => void;

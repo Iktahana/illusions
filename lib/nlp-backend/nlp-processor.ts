@@ -9,7 +9,7 @@
 import kuromoji from 'kuromoji';
 import type { Token, WordEntry } from '../nlp-client/types';
 import { NlpCache } from './nlp-cache';
-import type { UserDictionaryEntry } from '../project-types';
+import type { UserDictionaryEntry } from '../project/project-types';
 
 // Noise characters to strip before tokenization
 const NOISE_CHARS = new Set(['\n', '\r']);

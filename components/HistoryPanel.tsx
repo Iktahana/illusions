@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Pin, Plus, RotateCcw, Loader2, History, Bookmark, GitCompare, MoreVertical, ChevronDown, ChevronRight } from "lucide-react";
 import clsx from "clsx";
-import { getHistoryService } from "@/lib/history-service";
+import { getHistoryService } from "@/lib/services/history-service";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
-import type { SnapshotEntry, SnapshotType } from "@/lib/history-service";
+import type { SnapshotEntry, SnapshotType } from "@/lib/services/history-service";
 
 // -----------------------------------------------------------------------
 // Constants

@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect } from "react";
 
-import { persistAppState } from "@/lib/app-state-manager";
+import { persistAppState } from "@/lib/storage/app-state-manager";
 import { getVFS } from "@/lib/vfs";
 
 interface UseElectronEventsParams {

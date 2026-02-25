@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getStorageService } from "../storage-service";
-import { fetchAppState, persistAppState } from "../app-state-manager";
-import type { TabState, SerializedTab, TabPersistenceState } from "../tab-types";
+import { getStorageService } from "../storage/storage-service";
+import { fetchAppState, persistAppState } from "../storage/app-state-manager";
+import type { TabState, SerializedTab, TabPersistenceState } from "./tab-types";
 import type { TabManagerCore } from "./types";
 import {
   DEMO_FILE_NAME,

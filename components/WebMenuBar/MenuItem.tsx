@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { MenuItem as MenuItemType, formatAccelerator } from '@/lib/menu-definitions';
+import { MenuItem as MenuItemType, formatAccelerator } from '@/lib/menu/menu-definitions';
 
 interface MenuItemProps {
   item: MenuItemType;

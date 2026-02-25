@@ -10,10 +10,10 @@ import {
   FolderPlus,
 } from "lucide-react";
 import clsx from "clsx";
-import { useContextMenu } from "@/lib/use-context-menu";
+import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import ContextMenu from "@/components/ContextMenu";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { isElectronRenderer } from "@/lib/runtime-env";
+import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import type { FileTreeEntry, EditingEntry } from "./types";
 
 interface FilesPanelProps {

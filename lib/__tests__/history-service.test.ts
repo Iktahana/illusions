@@ -164,14 +164,14 @@ import {
   HistoryService,
   getHistoryService,
   resetHistoryService,
-} from "@/lib/history-service";
+} from "@/lib/services/history-service";
 
 import type {
   SnapshotEntry,
   HistoryIndex,
   CreateSnapshotOptions,
   RestoreResult,
-} from "@/lib/history-service";
+} from "@/lib/services/history-service";
 
 // -----------------------------------------------------------------------
 // Test suite

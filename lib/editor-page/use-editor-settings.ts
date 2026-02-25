@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
+import { fetchAppState, persistAppState } from "@/lib/storage/app-state-manager";
 import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 import type { Severity } from "@/lib/linting/types";
 import type { CorrectionConfig, CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";

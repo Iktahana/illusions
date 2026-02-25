@@ -8,9 +8,9 @@
  * スタンドアロンモード: localStorage
  */
 
-import { getVFS } from "./vfs";
-import type { VirtualFileSystem } from "./vfs/types";
-import type { UserDictionaryEntry, UserDictionaryFile } from "./project-types";
+import { getVFS } from "../vfs";
+import type { VirtualFileSystem } from "../vfs/types";
+import type { UserDictionaryEntry, UserDictionaryFile } from "../project/project-types";
 
 // -----------------------------------------------------------------------
 // Constants

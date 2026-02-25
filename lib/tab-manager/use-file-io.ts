@@ -6,16 +6,16 @@ import { useCallback, useRef } from "react";
 import {
   openMdiFile,
   saveMdiFile,
-} from "../mdi-file";
-import type { MdiFileDescriptor } from "../mdi-file";
-import { notificationManager } from "../notification-manager";
-import { getStorageService } from "../storage-service";
-import { persistAppState } from "../app-state-manager";
-import { getHistoryService } from "../history-service";
+} from "../project/mdi-file";
+import type { MdiFileDescriptor } from "../project/mdi-file";
+import { notificationManager } from "../services/notification-manager";
+import { getStorageService } from "../storage/storage-service";
+import { persistAppState } from "../storage/app-state-manager";
+import { getHistoryService } from "../services/history-service";
 import { getVFS } from "../vfs";
-import { suppressFileWatch } from "../file-watcher";
-import type { SupportedFileExtension } from "../project-types";
-import type { TabId, TabState } from "../tab-types";
+import { suppressFileWatch } from "../services/file-watcher";
+import type { SupportedFileExtension } from "../project/project-types";
+import type { TabId, TabState } from "./tab-types";
 import {
   generateTabId,
   inferFileType,

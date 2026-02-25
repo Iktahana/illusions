@@ -5,10 +5,10 @@
  * 履歴管理サービス。自動スナップショット、マイルストーン、復元を管理する。
  */
 
-import { getVFS } from "./vfs";
-import { AsyncMutex } from "./async-mutex";
+import { getVFS } from "../vfs";
+import { AsyncMutex } from "../utils/async-mutex";
 
-import type { VirtualFileSystem, VFSDirectoryHandle } from "./vfs/types";
+import type { VirtualFileSystem, VFSDirectoryHandle } from "../vfs/types";
 
 // -----------------------------------------------------------------------
 // Constants

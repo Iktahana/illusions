@@ -5,13 +5,13 @@ import { Bot, AlertCircle, BarChart3, Edit2, X, History } from "lucide-react";
 import clsx from "clsx";
 
 import { useEditorMode } from "@/contexts/EditorModeContext";
-import { localPreferences } from "@/lib/local-preferences";
+import { localPreferences } from "@/lib/storage/local-preferences";
 import HistoryPanel from "./HistoryPanel";
 import AIPanel from "./inspector/AIPanel";
 import CorrectionsPanel from "./inspector/CorrectionsPanel";
 import StatsPanel from "./inspector/StatsPanel";
 
-import type { ProjectMode } from "@/lib/project-types";
+import type { ProjectMode } from "@/lib/project/project-types";
 import type { InspectorProps } from "./inspector/types";
 import type { Tab } from "./inspector/types";
 import { isValidTab, getMdiExtension, getBaseName } from "./inspector/types";

@@ -6,7 +6,7 @@ import clsx from "clsx";
 
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import type { WordEntry } from "@/lib/nlp-client/types";
-import { useContextMenu } from "@/lib/use-context-menu";
+import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import ContextMenu from "@/components/ContextMenu";
 import { getVFS } from "@/lib/vfs";
 

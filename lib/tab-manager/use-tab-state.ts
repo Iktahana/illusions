@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { MdiFileDescriptor } from "../mdi-file";
-import type { SupportedFileExtension } from "../project-types";
-import type { TabId, TabState } from "../tab-types";
+import type { MdiFileDescriptor } from "../project/mdi-file";
+import type { SupportedFileExtension } from "../project/project-types";
+import type { TabId, TabState } from "./tab-types";
 import { createNewTab } from "./types";
 import type { TabManagerCore } from "./types";
 import { useEditorMode } from "@/contexts/EditorModeContext";
-import { isElectronRenderer } from "../runtime-env";
+import { isElectronRenderer } from "../utils/runtime-env";
 
 // ---------------------------------------------------------------------------
 // Return type

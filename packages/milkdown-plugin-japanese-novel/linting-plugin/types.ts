@@ -8,7 +8,7 @@ import type { LintIssue } from '@/lib/linting';
 import type { RuleRunner } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
 import type { ILlmClient } from '@/lib/llm-client/types';
-import type { IgnoredCorrection } from '@/lib/project-types';
+import type { IgnoredCorrection } from '@/lib/project/project-types';
 import type { ConfigChangeReason } from '@/lib/linting/correction-config';
 
 export type { ConfigChangeReason };

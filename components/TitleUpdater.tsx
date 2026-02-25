@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import type { MdiFileDescriptor } from "@/lib/mdi-file";
+import type { MdiFileDescriptor } from "@/lib/project/mdi-file";
 
 interface TitleUpdaterProps {
   currentFile: MdiFileDescriptor | null;

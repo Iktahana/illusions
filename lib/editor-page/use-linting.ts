@@ -8,7 +8,7 @@ import type { ILlmClient } from "@/lib/llm-client/types";
 import { getLlmClient } from "@/lib/llm-client/llm-client";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
-import { notificationManager } from "@/lib/notification-manager";
+import { notificationManager } from "@/lib/services/notification-manager";
 
 // Import all lint rules
 import { PunctuationRule } from "@/lib/linting/rules/punctuation-rules";

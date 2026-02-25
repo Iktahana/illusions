@@ -8,7 +8,7 @@ import type { ExtractionProgress } from "@/lib/character-extraction";
 import { getLlmClient } from "@/lib/llm-client/llm-client";
 import { LlmController } from "@/lib/linting/llm-controller";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
-import { fetchAppState, persistAppState } from "@/lib/app-state-manager";
+import { fetchAppState, persistAppState } from "@/lib/storage/app-state-manager";
 import { useLlmSettings } from "@/contexts/EditorSettingsContext";
 
 interface Character {

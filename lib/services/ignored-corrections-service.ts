@@ -8,9 +8,9 @@
  * スタンドアロンモード: localStorage
  */
 
-import { getVFS } from "./vfs";
-import type { VirtualFileSystem } from "./vfs/types";
-import type { IgnoredCorrection, IgnoredCorrectionsFile } from "./project-types";
+import { getVFS } from "../vfs";
+import type { VirtualFileSystem } from "../vfs/types";
+import type { IgnoredCorrection, IgnoredCorrectionsFile } from "../project/project-types";
 
 // -----------------------------------------------------------------------
 // Constants

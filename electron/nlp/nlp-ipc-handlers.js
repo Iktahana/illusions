@@ -13,7 +13,7 @@
 
 const { ipcMain } = require('electron');
 const path = require('path');
-const { nlpProcessor } = require('../lib/nlp-backend/nlp-processor');
+const { nlpProcessor } = require('../../lib/nlp-backend/nlp-processor');
 
 /**
  * Get default dictionary path for Electron environment.

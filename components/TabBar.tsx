@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useEffect } from "react";
 import { X } from "lucide-react";
-import type { TabId, TabState } from "@/lib/tab-types";
+import type { TabId, TabState } from "@/lib/tab-manager/tab-types";
 
 interface TabBarProps {
   tabs: TabState[];

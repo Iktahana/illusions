@@ -2,8 +2,8 @@
 
 import React, { createContext, useContext, useCallback, useMemo, useState } from "react";
 
-import type { EditorMode, ProjectMode, StandaloneMode } from "@/lib/project-types";
-import { isProjectMode, isStandaloneMode } from "@/lib/project-types";
+import type { EditorMode, ProjectMode, StandaloneMode } from "@/lib/project/project-types";
+import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
 
 interface EditorModeContextType {
   editorMode: EditorMode;

@@ -10,8 +10,8 @@ import {
   ensureLocalFontAvailable,
   isElectronRuntime,
   loadGoogleFont,
-} from "@/lib/fonts";
-import type { FontInfo, SystemFontInfo } from "@/lib/fonts";
+} from "@/lib/utils/fonts";
+import type { FontInfo, SystemFontInfo } from "@/lib/utils/fonts";
 
 interface FontSelectorProps {
   value: string;

@@ -1,5 +1,5 @@
-import type { MdiFileDescriptor } from "./mdi-file";
-import type { SupportedFileExtension } from "./project-types";
+import type { MdiFileDescriptor } from "../project/mdi-file";
+import type { SupportedFileExtension } from "../project/project-types";
 
 /** Unique identifier for a tab */
 export type TabId = string;

@@ -1,7 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import type { ContextMenuState } from "@/lib/use-context-menu";
+import type { ContextMenuState } from "@/lib/hooks/use-context-menu";
 
 interface ContextMenuProps {
   menu: ContextMenuState;

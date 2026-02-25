@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { isElectronRenderer } from "./runtime-env";
+import { isElectronRenderer } from "../utils/runtime-env";
 
 /**
  * Electron メニューイベントのハンドラを登録する Hook
