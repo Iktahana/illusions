@@ -58,6 +58,8 @@ Available for macOS (Intel & Apple Silicon) and Windows (installer or Microsoft 
 - **Branch & tag management**: Organize your writing milestones
 - **Cross-platform**: Electron app works on macOS, Windows, Linux
 - **AI status report**: View AI model status, storage usage, and diagnostics in the Settings panel
+- **LLM-based character extraction** (キャラクター抽出) — automatically extracts characters (name, aliases, description) from novel text using batched LLM inference
+- **Multiple LLM model options** — Qwen3 (0.6B / 1.7B / 4B) and Gemma-2-Llama-Swallow 9B (日本語特化, 東京科学大学), selectable in Settings
 
 ---
 
@@ -180,6 +182,8 @@ illusions/
 │   ├── web-storage.ts        # Web storage provider
 │   ├── linting/              # Japanese text linting framework
 │   ├── nlp-client/           # NLP client abstraction
+│   ├── llm-client/           # LLM client abstraction + model registry
+│   ├── character-extraction/ # LLM-based character extraction
 │   ├── git/                  # Git service (isomorphic-git)
 │   ├── github/               # GitHub API integration
 │   └── hooks/                # React hooks
@@ -261,6 +265,9 @@ The proofreading (linting) features in illusions comply with the following offic
 - ✅ Landing page with SEO optimization
 
 ### Recently Added
+- ✅ LLM-based character extraction — automatically extract characters from novel text with batched LLM inference (キャラクター抽出)
+- ✅ Gemma-2-Llama-Swallow 9B model — Japanese-optimised reasoning LLM by 東京科学大学, available in LLM settings (日本語特化モデル)
+- ✅ Error notifications for file operation failures — toast alerts on save/load errors
 - ✅ AI report in settings panel — view AI model status, storage usage, and system diagnostics (AIレポート)
 - ✅ Microsoft Store packaging — Windows `.appx` build target and tile assets for Store distribution
 - ✅ LLM idling stop — auto-unload AI model after 30s idle to reduce memory usage (AIアイドリングストップ)
