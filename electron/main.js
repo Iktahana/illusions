@@ -1329,10 +1329,12 @@ app.on('before-quit', (event) => {
   isQuitting = true
   event.preventDefault()
   const forceQuitTimeout = setTimeout(() => app.exit(0), 5000)
-  disposeLlmEngine().finally(() => {
-    clearTimeout(forceQuitTimeout)
-    app.exit(0)
-  })
+  disposeLlmEngine()
+    .catch((err) => console.error('[before-quit] LLM disposal error:', err))
+    .finally(() => {
+      clearTimeout(forceQuitTimeout)
+      app.exit(0)
+    })
 })
 
 app.on('window-all-closed', () => {
