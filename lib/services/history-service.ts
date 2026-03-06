@@ -443,7 +443,8 @@ export class HistoryService {
         (s) => s.sourceFile === sourceFile
       );
 
-      if (fileSnapshots.length <= MAX_SNAPSHOTS_PER_FILE) {
+      const autoCount = fileSnapshots.filter((s) => s.type === "auto").length;
+      if (autoCount <= MAX_SNAPSHOTS_PER_FILE) {
         return;
       }
 
