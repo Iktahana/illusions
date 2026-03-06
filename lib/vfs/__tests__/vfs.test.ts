@@ -474,6 +474,23 @@ describe("ElectronVFS", () => {
         "content"
       );
     });
+
+    it("should recognize Windows UNC paths as absolute", async () => {
+      mockBridge.openDirectory.mockResolvedValue({
+        path: "C:\\Users\\test\\project",
+        name: "project",
+      });
+      mockBridge.readFile.mockResolvedValue("unc content");
+
+      const vfs = new ElectronVFS();
+      await vfs.openDirectory();
+      const content = await vfs.readFile("\\\\server\\share\\file.txt");
+
+      expect(content).toBe("unc content");
+      expect(mockBridge.readFile).toHaveBeenCalledWith(
+        "\\\\server\\share\\file.txt"
+      );
+    });
   });
 
   describe("getFileMetadata", () => {

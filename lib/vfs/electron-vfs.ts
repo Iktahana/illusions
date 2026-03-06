@@ -90,13 +90,11 @@ function dirname(path: string): string {
 
 /**
  * Check if a path is absolute.
- * Handles both Unix ("/path") and Windows ("C:\path", "D:/path") formats.
+ * Handles both Unix ("/path") and Windows ("C:\path", "D:/path", "\\server\share") formats.
  */
 function isAbsolutePath(p: string): boolean {
-  if (p.startsWith("/")) return true;
-  // Windows absolute path: drive letter followed by : and a separator
-  if (/^[a-zA-Z]:[/\\]/.test(p)) return true;
-  return false;
+  // Unix absolute path, or Windows UNC path (\\server\share)
+  return p.startsWith("/") || p.startsWith("\\\\") || /^[a-zA-Z]:[/\\]/.test(p);
 }
 
 /**
