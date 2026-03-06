@@ -89,6 +89,17 @@ function dirname(path: string): string {
 }
 
 /**
+ * Check if a path is absolute.
+ * Handles both Unix ("/path") and Windows ("C:\path", "D:/path") formats.
+ */
+function isAbsolutePath(p: string): boolean {
+  if (p.startsWith("/")) return true;
+  // Windows absolute path: drive letter followed by : and a separator
+  if (/^[a-zA-Z]:[/\\]/.test(p)) return true;
+  return false;
+}
+
+/**
  * Get the Electron VFS bridge from window.electronAPI.
  * @throws Error if the bridge is not available
  */
@@ -456,8 +467,8 @@ export class ElectronVFS implements VirtualFileSystem {
    * @throws Error if no root path is available and path is relative
    */
   private resolvePath(path: string): string {
-    // Absolute path - use as-is
-    if (path.startsWith("/")) {
+    // Absolute path - use as-is (Unix "/" or Windows "C:\", "D:/", etc.)
+    if (isAbsolutePath(path)) {
       return path;
     }
     // Relative path - join with root

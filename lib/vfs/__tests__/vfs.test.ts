@@ -417,6 +417,63 @@ describe("ElectronVFS", () => {
         "content"
       );
     });
+
+    it("should recognize Windows absolute paths with backslashes", async () => {
+      mockBridge.readFile.mockResolvedValue("win content");
+
+      const vfs = new ElectronVFS();
+      const content = await vfs.readFile("C:\\Users\\test\\file.txt");
+
+      expect(content).toBe("win content");
+      expect(mockBridge.readFile).toHaveBeenCalledWith(
+        "C:\\Users\\test\\file.txt"
+      );
+    });
+
+    it("should recognize Windows absolute paths with forward slashes", async () => {
+      mockBridge.readFile.mockResolvedValue("win content");
+
+      const vfs = new ElectronVFS();
+      const content = await vfs.readFile("G:/マイドライブ/原稿/幻.mdi");
+
+      expect(content).toBe("win content");
+      expect(mockBridge.readFile).toHaveBeenCalledWith(
+        "G:/マイドライブ/原稿/幻.mdi"
+      );
+    });
+
+    it("should not double-prefix Windows absolute paths with root", async () => {
+      mockBridge.openDirectory.mockResolvedValue({
+        path: "C:\\Users\\test\\project",
+        name: "project",
+      });
+      mockBridge.mkdir.mockResolvedValue(undefined);
+      mockBridge.writeFile.mockResolvedValue(undefined);
+
+      const vfs = new ElectronVFS();
+      await vfs.openDirectory();
+      await vfs.writeFile("C:\\Users\\test\\project\\file.mdi", "content");
+
+      // Should NOT prepend rootPath to an already-absolute Windows path
+      expect(mockBridge.writeFile).toHaveBeenCalledWith(
+        "C:\\Users\\test\\project\\file.mdi",
+        "content"
+      );
+    });
+
+    it("should handle Windows paths with mixed separators", async () => {
+      mockBridge.mkdir.mockResolvedValue(undefined);
+      mockBridge.writeFile.mockResolvedValue(undefined);
+
+      const vfs = new ElectronVFS();
+      await vfs.writeFile("G:\\マイドライブ\\原稿\\幻/幻.mdi", "content");
+
+      // Should be treated as absolute (not joined with root)
+      expect(mockBridge.writeFile).toHaveBeenCalledWith(
+        "G:\\マイドライブ\\原稿\\幻/幻.mdi",
+        "content"
+      );
+    });
   });
 
   describe("getFileMetadata", () => {
