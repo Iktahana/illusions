@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Bot, AlertCircle, BarChart3, Edit2, X, History } from "lucide-react";
+import { AlertCircle, BarChart3, Edit2, X, History } from "lucide-react";
 import clsx from "clsx";
 
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import HistoryPanel from "./HistoryPanel";
-import AIPanel from "./inspector/AIPanel";
 import CorrectionsPanel from "./inspector/CorrectionsPanel";
 import StatsPanel from "./inspector/StatsPanel";
 
@@ -52,7 +51,7 @@ export default function Inspector({
   const { editorMode, isProject } = useEditorMode();
   const projectMode = isProject ? (editorMode as ProjectMode) : null;
 
-  const [activeTab, setActiveTab] = useState<Tab>("ai");
+  const [activeTab, setActiveTab] = useState<Tab>("corrections");
   const hasLoadedRef = useRef(false);
   const [isTabReady, setIsTabReady] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -107,7 +106,7 @@ export default function Inspector({
   // プロジェクトモードでない場合に履歴タブが選択されていたらフォールバック
   useEffect(() => {
     if (!isProject && activeTab === "history") {
-      setActiveTab("ai");
+      setActiveTab("corrections");
     }
   }, [isProject, activeTab]);
 
@@ -297,20 +296,6 @@ export default function Inspector({
       {/* タブ */}
       <div ref={tabBarRef} className={clsx("border-b border-border flex items-center", compactMode ? "h-10" : "h-12")}>
         <button
-          onClick={() => setActiveTab("ai")}
-          className={clsx(
-            "flex-1 h-full flex items-center justify-center text-sm transition-colors",
-            showLabels ? "gap-2" : "gap-0",
-            activeTab === "ai"
-              ? "text-foreground border-b-2 border-accent"
-              : "text-foreground-tertiary hover:text-foreground-secondary"
-          )}
-          title="AI"
-        >
-          <Bot className="w-4 h-4 shrink-0" />
-          {showLabels && <span>AI</span>}
-        </button>
-        <button
           onClick={() => setActiveTab("corrections")}
           className={clsx(
             "flex-1 h-full flex items-center justify-center text-sm transition-colors",
@@ -358,7 +343,6 @@ export default function Inspector({
 
        {/* 本文 */}
        <div className={clsx("flex-1 overflow-y-auto", compactMode ? "p-3" : "p-4")}>
-         {activeTab === "ai" && <AIPanel />}
          {activeTab === "corrections" && (
            <CorrectionsPanel
              onOpenPosHighlightSettings={onOpenPosHighlightSettings}
@@ -397,11 +381,6 @@ export default function Inspector({
          )}
        </div>
 
-      {/* Privacy notice */}
-      <section aria-label="プライバシーに関するお知らせ" className={clsx("border-t border-border text-center text-[10px] text-foreground-tertiary leading-tight", compactMode ? "px-3 py-1.5" : "px-4 py-2")}>
-        <p className="mb-1">illusionsはあなたの作品の無断保存およびAI学習への利用は行いません</p>
-        <a href="https://github.com/Iktahana/illusions/issues/new" target="_blank" rel="noopener noreferrer" className="hover:text-foreground-secondary transition-colors" aria-label="AIに関する不適切な提案をGitHubで報告する">AIに関する不適切な提案を報告</a>
-      </section>
-    </aside>
+      </aside>
   );
 }

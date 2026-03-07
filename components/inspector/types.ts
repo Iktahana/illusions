@@ -1,10 +1,10 @@
 import type { LintIssue, Severity } from "@/lib/linting";
 
-export type Tab = "ai" | "corrections" | "stats" | "history";
+export type Tab = "corrections" | "stats" | "history";
 
 /** Returns true when the value is a supported inspector tab. */
 export const isValidTab = (value: string | null): value is Tab =>
-  value === "ai" || value === "corrections" || value === "stats" || value === "history";
+  value === "corrections" || value === "stats" || value === "history";
 
 const MDI_EXTENSION = ".mdi";
 
