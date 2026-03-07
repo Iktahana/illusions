@@ -950,7 +950,8 @@ function inlineFormat(text: string): string {
     (_match: string, linkText: string, url: string) => {
       const safeUrl = sanitizeHref(url);
       if (safeUrl) {
-        return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-accent hover:text-accent-hover underline">${linkText}</a>`;
+        const escapedUrl = safeUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+        return `<a href="${escapedUrl}" target="_blank" rel="noopener noreferrer" class="text-accent hover:text-accent-hover underline">${linkText}</a>`;
       }
       // Unsafe URL — render as plain text without a link
       return linkText;
