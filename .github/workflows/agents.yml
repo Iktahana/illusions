@@ -1,0 +1,260 @@
+name: AI Agents
+
+on:
+  pull_request:
+    types: [opened]
+  push:
+    branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "docs/**"
+      - "www/**"
+      - ".github/workflows/**"
+      - "*.md"
+  # NOTE: This references the build workflow by its `name:` field ("Desktop Build and Release").
+  # If that name changes, this trigger will silently stop firing.
+  workflow_run:
+    workflows: ["Desktop Build and Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: 'Which agent to run manually'
+        type: choice
+        options:
+          - ci-failure-handler
+      run_id:
+        description: 'Workflow Run ID for ci-failure-handler (blank = latest failure)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # PR Reviewer — posts a review prompt comment on new PRs
+  # ---------------------------------------------------------------------------
+  pr-reviewer:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Review Available
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REPO=${{ github.repository }}
+          PR_NUM=${{ github.event.pull_request.number }}
+
+          # Dedup: skip if bot already commented on this PR
+          EXISTING=$(gh pr view "$PR_NUM" --repo "$REPO" --json comments --jq \
+            '[.comments[] | select(.body | contains("Copilot Review Ready"))] | length')
+
+          if [ "$EXISTING" != "0" ]; then
+            echo "Review comment already exists, skipping."
+            exit 0
+          fi
+
+          gh pr comment "$PR_NUM" --repo "$REPO" --body "$(cat <<'EOF'
+          👋 **Copilot Review Ready**
+
+          このPRをレビューするには、GitHub Copilot Chat で `@reviewer` を呼び出してください：
+
+          ```
+          @reviewer この PR をレビューしてください
+          ```
+
+          **レビュー基準：**
+          - ✅ データ破損、クラッシュ、セキュリティ問題
+          - ⚠️ パフォーマンスの軽微な改善提案
+          - ❌ スタイルの好み、些細なフォーマット（指摘しません）
+          EOF
+          )"
+
+  # ---------------------------------------------------------------------------
+  # CI Failure Handler — creates an issue when the build workflow fails
+  # ---------------------------------------------------------------------------
+  ci-failure-handler:
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.agent == 'ci-failure-handler')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine Workflow Run ID
+        id: info
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            INPUT_ID="${{ github.event.inputs.run_id }}"
+            if [ -z "$INPUT_ID" ]; then
+              RUN_ID=$(gh run list --repo "${{ github.repository }}" --status failure --limit 1 --json databaseId --jq '.[0].databaseId')
+            else
+              RUN_ID=$INPUT_ID
+            fi
+          else
+            RUN_ID=${{ github.event.workflow_run.id }}
+          fi
+          echo "RUN_ID=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Check for duplicate issue
+        id: dedup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_ID: ${{ steps.info.outputs.RUN_ID }}
+        run: |
+          # Search for open issues that already reference this run ID
+          COUNT=$(gh issue list --repo "${{ github.repository }}" --state open --search "Run #$WORKFLOW_ID" --json number --jq 'length')
+          if [ "$COUNT" != "0" ]; then
+            echo "Issue already exists for Run #$WORKFLOW_ID, skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Analyze logs and create issue
+        if: steps.dedup.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_ID: ${{ steps.info.outputs.RUN_ID }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Fetching logs for workflow run: $WORKFLOW_ID"
+
+          gh run view "$WORKFLOW_ID" --repo "$REPO" --log-failed > failure_log.txt 2>&1 || true
+
+          if [ ! -s failure_log.txt ]; then
+            echo "ログが空のため、Issue の作成をスキップします。"
+            exit 0
+          fi
+
+          # Extract error lines and surrounding context
+          ERROR_LINES=$(grep -A 3 "##\[error\]" failure_log.txt | head -n 40 || true)
+          LOG_TAIL=$(tail -n 60 failure_log.txt | head -n 50)
+
+          # Get workflow metadata
+          WORKFLOW_NAME=$(gh run view "$WORKFLOW_ID" --repo "$REPO" --json name --jq '.name' 2>/dev/null || echo "Unknown")
+          COMMIT_MSG="${{ github.event.workflow_run.head_commit.message }}"
+
+          # Ensure labels exist (create if missing)
+          gh label create "ci-failure" --repo "$REPO" --color "D73A49" --description "CI/CD failure" 2>/dev/null || true
+
+          BODY=$(cat <<BODY_EOF
+          ## CI ビルドが失敗しました
+
+          **Workflow**: \`$WORKFLOW_NAME\`
+          **Run ID**: [#$WORKFLOW_ID](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
+          **Commit**: $COMMIT_MSG
+
+          ---
+
+          ## エラーログ
+
+          \`\`\`
+          $ERROR_LINES
+          \`\`\`
+
+          <details>
+          <summary>ログ末尾（詳細）</summary>
+
+          \`\`\`
+          $LOG_TAIL
+          \`\`\`
+
+          </details>
+
+          [完全なログを確認](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
+
+          ---
+
+          *この Issue は CI Failure Handler により自動作成されました。*
+          BODY_EOF
+          )
+
+          gh issue create \
+            --repo "$REPO" \
+            --title "CI Failure: $WORKFLOW_NAME (Run #$WORKFLOW_ID)" \
+            --label "ci-failure" \
+            --body "$BODY"
+
+  # ---------------------------------------------------------------------------
+  # README Updater — creates an issue for Copilot to update README on push
+  # ---------------------------------------------------------------------------
+  readme-updater:
+    if: |
+      github.event_name == 'push' &&
+      github.actor != 'github-actions[bot]' &&
+      github.actor != 'copilot-swe-agent[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+
+      - name: Collect recent changes
+        id: changes
+        run: |
+          COMMITS=$(git log --oneline -10)
+          DIFF_STAT=$(git diff --stat HEAD~5 -- '*.ts' '*.tsx' 'package.json' 2>/dev/null || echo "No diff available")
+
+          # Write to multiline output
+          {
+            echo "commits<<COMMITS_EOF"
+            echo "$COMMITS"
+            echo "COMMITS_EOF"
+            echo "diff_stat<<DIFF_EOF"
+            echo "$DIFF_STAT"
+            echo "DIFF_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create issue for Copilot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Close any existing open README update issues to avoid duplicates
+          gh issue list \
+            --label "copilot" \
+            --label "documentation" \
+            --state open \
+            --json number \
+            --jq '.[].number' | while read -r num; do
+            gh issue close "$num" --comment "Superseded by a newer push." || true
+          done
+
+          # Create a new issue and assign Copilot
+          gh issue create \
+            --title "docs: update README.md to reflect recent changes" \
+            --label "copilot,documentation" \
+            --body "$(cat <<'EOF'
+          ## Task
+
+          Update `README.md` to reflect the latest code changes pushed to `main`.
+
+          ## Recent Commits
+
+          ```
+          ${{ steps.changes.outputs.commits }}
+          ```
+
+          ## Changed Files
+
+          ```
+          ${{ steps.changes.outputs.diff_stat }}
+          ```
+
+          ## Instructions
+
+          Follow the instructions in `.github/agents/readme-updater.agent.md`:
+
+          1. Read the diff of the recent commits listed above.
+          2. Determine if any user-facing features were added, removed, or changed.
+          3. If changes are docs-only or internal refactoring with no user-facing impact, close this issue with "No README update needed".
+          4. Otherwise, make **minimal, surgical edits** to `README.md` — do NOT rewrite the entire file.
+          5. Commit with message: `docs: update README to reflect recent changes`
+
+          **Language rules**: English and Japanese only. No Chinese or Korean.
+          EOF
+          )"
