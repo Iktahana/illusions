@@ -40,6 +40,11 @@ jobs:
           sparse-checkout: package.json
           sparse-checkout-cone-mode: false
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Compute version strings
         id: version
         run: |
@@ -50,10 +55,14 @@ jobs:
           else
             FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}"
           fi
+          # MSIX requires exactly four numeric parts (x.y.z.w); strip any prerelease suffix
+          # by always using revision 0 as the fourth component
+          MSIX_REVISION=0
+          MSIX_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}.${MSIX_REVISION}"
           echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "msix=${FULL_VERSION}.0" >> "$GITHUB_OUTPUT"
+          echo "msix=${MSIX_VERSION}" >> "$GITHUB_OUTPUT"
           echo "branch=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
-          echo "Version: ${FULL_VERSION} | MSIX: ${FULL_VERSION}.0 | Branch: ${BRANCH_NAME}"
+          echo "Version: ${FULL_VERSION} | MSIX: ${MSIX_VERSION} | Branch: ${BRANCH_NAME}"
 
   # ---------------------------------------------------------------------------
   # Pre-flight checks — verify signing credentials before any build starts

@@ -107,7 +107,7 @@ jobs:
           # List remote branches merged into main, excluding protected branches
           MERGED=$(gh api "repos/$REPO/branches?per_page=100" \
             --jq '.[].name' \
-            | grep -vE '^(main|master|develop|release/.*)$' \
+            | grep -vE '^(main|master|develop|alpha|beta|dev|gh-pages|release/.*)$' \
             || true)
 
           if [ -z "$MERGED" ]; then
