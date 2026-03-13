@@ -42,9 +42,6 @@ const REPO = 'Iktahana/illusions'
 const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`
 const MICROSOFT_STORE_URL = 'https://apps.microsoft.com/detail/9mtc0ct16xg1'
 
-/** Client-side GitHub token is intentionally disabled to avoid leaking secrets */
-const GITHUB_TOKEN = ''
-
 /** Format bytes to human-readable string */
 function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) {
