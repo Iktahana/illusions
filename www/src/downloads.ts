@@ -366,7 +366,16 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
 
   const version = release.tag_name.replace(/^v/, '')
 
-  const heroInfo = bestAsset ? heroButtonInfo(bestAsset) : null
+  const heroInfo =
+    currentOS === 'windows'
+      ? {
+          href: MICROSOFT_STORE_URL,
+          label: 'Microsoft Store から入手',
+          icon: iconMicrosoftStore,
+        }
+      : bestAsset
+        ? heroButtonInfo(bestAsset)
+        : null
 
   // For Windows, show Microsoft Store button
   const isWindowsOS = currentOS === 'windows'
