@@ -376,29 +376,38 @@ jobs:
 
       - name: Install msstore-cli
         shell: pwsh
+        env:
+          MSSTORE_CLI_VERSION: "v0.3.9"
         run: |
-          $release = Invoke-RestMethod "https://api.github.com/repos/microsoft/msstore-cli/releases/latest"
-          $asset = $release.assets | Where-Object { $_.name -match "^msstore-win-x64\.zip$" }
-          if (-not $asset) { throw "msstore-cli release asset not found" }
-          Invoke-WebRequest $asset.browser_download_url -OutFile msstore.zip
+          $url = "https://github.com/microsoft/msstore-cli/releases/download/$env:MSSTORE_CLI_VERSION/msstore-win-x64.zip"
+          Invoke-WebRequest $url -OutFile msstore.zip
           Expand-Archive msstore.zip -DestinationPath "$env:LOCALAPPDATA\msstore-cli" -Force
           echo "$env:LOCALAPPDATA\msstore-cli" >> $env:GITHUB_PATH
 
       - name: Configure msstore-cli credentials
         shell: pwsh
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
         run: |
           msstore configure `
-            --tenantId ${{ secrets.MSSTORE_TENANT_ID }} `
-            --clientId ${{ secrets.MSSTORE_CLIENT_ID }} `
-            --clientSecret ${{ secrets.MSSTORE_CLIENT_SECRET }} `
-            --sellerId ${{ secrets.MSSTORE_SELLER_ID }}
+            --tenantId $env:MSSTORE_TENANT_ID `
+            --clientId $env:MSSTORE_CLIENT_ID `
+            --clientSecret $env:MSSTORE_CLIENT_SECRET `
+            --sellerId $env:MSSTORE_SELLER_ID
 
       - name: Submit to Microsoft Store
         shell: pwsh
         env:
           STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
         run: |
-          $packages = (Get-ChildItem msix-packages\*.appx | Select-Object -ExpandProperty FullName) -join ","
+          $appxFiles = Get-ChildItem msix-packages\*.appx
+          if ($appxFiles.Count -eq 0) {
+            throw "No .appx packages found in msix-packages/"
+          }
+          $packages = ($appxFiles | Select-Object -ExpandProperty FullName) -join ","
           msstore submission update $env:STORE_PRODUCT_ID --packages $packages --delete-pending-submission
           msstore submission publish $env:STORE_PRODUCT_ID
 
