@@ -326,7 +326,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
             <span class="download-item-filename">公式ストアから入手</span>
           </div>
           <div class="download-item-meta">
-            <span class="download-item-icon">${iconMicrosoftStore}</span>
+            <span class="platform-icon">${iconMicrosoftStore}</span>
             <span class="download-icon">↗</span>
           </div>
         </a>
@@ -366,30 +366,41 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
 
   const version = release.tag_name.replace(/^v/, '')
 
-  const heroInfo =
-    currentOS === 'windows'
-      ? {
-          href: MICROSOFT_STORE_URL,
-          label: 'Microsoft Store から入手',
-          icon: iconMicrosoftStore,
-        }
-      : bestAsset
-        ? heroButtonInfo(bestAsset)
-        : null
+  interface HeroCta {
+    href: string
+    label: string
+    icon: string
+    isExternal: boolean
+    meta?: string
+  }
 
-  // For Windows, show Microsoft Store button
-  const isWindowsOS = currentOS === 'windows'
-  const heroDownloadUrl = isWindowsOS ? MICROSOFT_STORE_URL : (bestAsset?.url ?? '')
-  const heroDownloadIsStore = isWindowsOS
-  const storeLabel = 'Microsoft Store から入手'
+  const heroCta: HeroCta | null = (() => {
+    if (currentOS === 'windows') {
+      return {
+        href: MICROSOFT_STORE_URL,
+        label: 'Microsoft Store から入手',
+        icon: iconMicrosoftStore,
+        isExternal: true,
+      }
+    }
+    if (!bestAsset) return null
+    const { icon, label } = heroButtonInfo(bestAsset)
+    return {
+      href: bestAsset.url,
+      label,
+      icon,
+      isExternal: false,
+      meta: `v${version} · ${bestAsset.size}`,
+    }
+  })()
 
-  const heroDownloadHtml = heroInfo && (isWindowsOS || bestAsset)
+  const heroDownloadHtml = heroCta
     ? `
       <div class="hero-download">
-        <a href="${heroDownloadUrl}" class="btn-hero-download" ${!heroDownloadIsStore ? 'download' : 'target="_blank" rel="noopener"'}>
-          <span class="btn-hero-download-icon">${heroInfo.icon}</span>
-          <span class="btn-hero-download-label">${isWindowsOS ? storeLabel : heroInfo.label}</span>
-          ${!isWindowsOS ? `<span class="btn-hero-download-meta">v${version} · ${bestAsset!.size}</span>` : ''}
+        <a href="${heroCta.href}" class="btn-hero-download" ${heroCta.isExternal ? 'target="_blank" rel="noopener"' : 'download'}>
+          <span class="btn-hero-download-icon">${heroCta.icon}</span>
+          <span class="btn-hero-download-label">${heroCta.label}</span>
+          ${heroCta.meta ? `<span class="btn-hero-download-meta">${heroCta.meta}</span>` : ''}
         </a>
         <p class="hero-download-hint">他のプラットフォームは下記をご覧ください</p>
         <a href="https://github.com/Iktahana/illusions" class="github-link" target="_blank">
