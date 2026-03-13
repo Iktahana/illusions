@@ -3,11 +3,21 @@ name: Publish Release Tweet
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      release_notes:
+        description: 'Release notes or summary'
+        required: true
+        type: string
 
 jobs:
   tweet:
     name: Post to Twitter/X
-    if: ${{ !github.event.release.prerelease }}
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +36,6 @@ jobs:
           X_API_SECRET: ${{ secrets.X_API_SECRET }}
           X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
           X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
-          RELEASE_VERSION: ${{ github.event.release.tag_name }}
-          RELEASE_NOTES: ${{ github.event.release.body }}
+          RELEASE_VERSION: ${{ github.event.release.tag_name || github.event.inputs.release_version }}
+          RELEASE_NOTES: ${{ github.event.release.body || github.event.inputs.release_notes }}
         run: python scripts/publish_tweet.py
