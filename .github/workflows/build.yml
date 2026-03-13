@@ -221,6 +221,8 @@ jobs:
   build-windows-msix:
     name: Build (Windows Store)
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
+    outputs:
+      version: ${{ steps.version.outputs.full }}
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
@@ -306,6 +308,62 @@ jobs:
           path: |
             dist-electron/*.appx
             dist-electron/*.appx.blockmap
+
+  publish-windows-store:
+    name: Publish to Microsoft Store
+    if: |
+      github.event_name != 'pull_request' &&
+      github.ref == 'refs/heads/main'
+    needs: [build-windows-msix]
+    runs-on: windows-latest
+    environment: MicrosoftStore
+
+    steps:
+      - name: Download MSIX artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: illusions-windows-msix-${{ needs.build-windows-msix.outputs.version }}
+          path: msix-packages
+
+      - name: Install msstore-cli
+        shell: pwsh
+        run: |
+          $release = Invoke-RestMethod "https://api.github.com/repos/microsoft/msstore-cli/releases/latest"
+          $asset = $release.assets | Where-Object { $_.name -match "^msstore-win-x64\.zip$" }
+          if (-not $asset) { throw "msstore-cli release asset not found" }
+          Invoke-WebRequest $asset.browser_download_url -OutFile msstore.zip
+          Expand-Archive msstore.zip -DestinationPath "$env:LOCALAPPDATA\msstore-cli" -Force
+          echo "$env:LOCALAPPDATA\msstore-cli" >> $env:GITHUB_PATH
+
+      - name: Configure msstore-cli credentials
+        shell: pwsh
+        run: |
+          msstore configure `
+            --tenantId ${{ secrets.MSSTORE_TENANT_ID }} `
+            --clientId ${{ secrets.MSSTORE_CLIENT_ID }} `
+            --clientSecret ${{ secrets.MSSTORE_CLIENT_SECRET }} `
+            --sellerId ${{ secrets.MSSTORE_SELLER_ID }}
+
+      - name: Submit to Microsoft Store
+        shell: pwsh
+        env:
+          STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
+        run: |
+          $packages = (Get-ChildItem msix-packages\*.appx | Select-Object -ExpandProperty FullName) -join ","
+          msstore submission update $env:STORE_PRODUCT_ID --packages $packages --delete-pending-submission
+          msstore submission publish $env:STORE_PRODUCT_ID
+
+      # TODO: Microsoft Store Flight (beta) support — see issue #626
+      # - name: Submit to Microsoft Store Flight (beta)
+      #   if: github.ref == 'refs/heads/beta'
+      #   shell: pwsh
+      #   env:
+      #     STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
+      #     STORE_FLIGHT_ID: ${{ vars.STORE_FLIGHT_ID }}
+      #   run: |
+      #     $packages = (Get-ChildItem msix-packages\*.appx | Select-Object -ExpandProperty FullName) -join ","
+      #     msstore flight submission update $env:STORE_PRODUCT_ID $env:STORE_FLIGHT_ID --packages $packages --delete-pending-submission
+      #     msstore flight submission publish $env:STORE_PRODUCT_ID $env:STORE_FLIGHT_ID
 
   release:
     name: Create GitHub Release
