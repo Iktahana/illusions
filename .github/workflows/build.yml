@@ -282,7 +282,7 @@ jobs:
           name: windows-build-output
           path: |
             .next/**
-            electron-dist/**
+            dist-main/**
             out/**
           retention-days: 1
 
