@@ -3,7 +3,7 @@ import os
 from openai import OpenAI
 
 
-def summarize_release_notes(version: str, notes: str) -> str:
+def summarize_release_notes(notes: str) -> str:
     """GitHub Models API (gpt-4o-mini) で release notes を日本語ツイート用に要約"""
     client = OpenAI(
         base_url="https://models.inference.ai.azure.com",
@@ -34,7 +34,7 @@ def summarize_release_notes(version: str, notes: str) -> str:
 
 def post_tweet(version: str, notes: str) -> None:
     """要約を含むツイートをX（Twitter）に投稿"""
-    summary = summarize_release_notes(version, notes)
+    summary = summarize_release_notes(notes)
 
     # 指定のフォーマットで日本語ツイート作成
     tweet_text = (
@@ -43,10 +43,12 @@ def post_tweet(version: str, notes: str) -> None:
         f"ダウンロード：https://www.illusions.app/downloads/"
     )
 
-    # 280 字超過時の安全弁
-    if len(tweet_text) > 280:
+    # Twitter の実際の文字数カウント（URL短縮・全角等）とのズレを考慮して
+    # 安全側の上限 240 字を適用する
+    MAX_FALLBACK_SUMMARY_LEN = 30
+    if len(tweet_text) > 240:
         # 概要部分を短縮
-        summary = summary[:30] + "..." if len(summary) > 30 else summary
+        summary = summary[:MAX_FALLBACK_SUMMARY_LEN] + "..." if len(summary) > MAX_FALLBACK_SUMMARY_LEN else summary
         tweet_text = (
             f"【リリース】illusions {version} リリース。"
             f"詳細：{summary} "
