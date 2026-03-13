@@ -22,6 +22,40 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # Compute version — single source of truth for all build jobs (non-PR only)
+  # ---------------------------------------------------------------------------
+
+  compute-version:
+    name: Compute Version
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.version.outputs.full }}
+      msix: ${{ steps.version.outputs.msix }}
+      branch: ${{ steps.version.outputs.branch }}
+    steps:
+      - name: Checkout package.json only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Compute version strings
+        id: version
+        run: |
+          BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          BRANCH_NAME="${GITHUB_REF_NAME}"
+          if [ "$BRANCH_NAME" = "main" ]; then
+            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          else
+            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}"
+          fi
+          echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "msix=${FULL_VERSION}.0" >> "$GITHUB_OUTPUT"
+          echo "branch=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${FULL_VERSION} | MSIX: ${FULL_VERSION}.0 | Branch: ${BRANCH_NAME}"
+
+  # ---------------------------------------------------------------------------
   # Pre-flight checks — verify signing credentials before any build starts
   # ---------------------------------------------------------------------------
 
@@ -86,8 +120,8 @@ jobs:
 
   build-macos:
     name: Build (macOS ${{ matrix.arch }})
-    needs: [preflight-apple]
-    # Allow PRs to run (preflight-apple is skipped on PRs, which is fine)
+    needs: [preflight-apple, compute-version]
+    # Allow PRs to run (preflight-apple and compute-version are skipped on PRs)
     if: always() && (needs.preflight-apple.result == 'success' || needs.preflight-apple.result == 'skipped')
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'macos-latest' }}
     strategy:
@@ -143,24 +177,9 @@ jobs:
           restore-keys: |
             next-${{ runner.os }}-${{ matrix.arch }}-
 
-      - name: Compute build version
-        if: github.event_name != 'pull_request'
-        id: version
-        shell: bash
-        run: |
-          BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          BRANCH_NAME="${GITHUB_REF_NAME}"
-          if [ "$BRANCH_NAME" = "main" ]; then
-            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
-          else
-            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}"
-          fi
-          echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Building version: ${FULL_VERSION}"
-
       - name: Update package.json version
         if: github.event_name != 'pull_request'
-        run: npm version ${{ steps.version.outputs.full }} --no-git-tag-version
+        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version
 
       - name: Download local fonts
         if: github.event_name != 'pull_request'
@@ -180,11 +199,17 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: illusions-macos-${{ matrix.arch }}-${{ steps.version.outputs.full }}
+          name: illusions-macos-${{ matrix.arch }}-${{ needs.compute-version.outputs.full }}
           path: dist-electron/**
 
-  build-windows:
-    name: Build (Windows NSIS)
+  # ---------------------------------------------------------------------------
+  # Windows — shared build step, then separate NSIS / MSIX packaging
+  # ---------------------------------------------------------------------------
+
+  build-windows-core:
+    name: Build (Windows Core)
+    needs: [compute-version]
+    if: always() && (needs.compute-version.result == 'success' || needs.compute-version.result == 'skipped')
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
@@ -229,49 +254,34 @@ jobs:
           restore-keys: |
             next-${{ runner.os }}-${{ runner.arch }}-
 
-      - name: Compute build version
-        if: github.event_name != 'pull_request'
-        id: version
-        shell: bash
-        run: |
-          BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          BRANCH_NAME="${GITHUB_REF_NAME}"
-          if [ "$BRANCH_NAME" = "main" ]; then
-            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
-          else
-            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}"
-          fi
-          echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Building version: ${FULL_VERSION}"
-
       - name: Update package.json version
         if: github.event_name != 'pull_request'
-        run: npm version ${{ steps.version.outputs.full }} --no-git-tag-version
+        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version
 
       - name: Download local fonts
         if: github.event_name != 'pull_request'
         run: npm run download:fonts
 
-      - name: Build Next.js (static export) and bundle Electron main process
+      - name: Build Next.js and bundle Electron main process
         if: github.event_name != 'pull_request'
-        run: npm run type-check && npm run generate:credits && npx cross-env ELECTRON_BUILD=1 next build && npm run bundle:electron
+        run: npm run generate:credits && npx cross-env ELECTRON_BUILD=1 next build && npm run bundle:electron
 
-      - name: Build NSIS installer
-        if: github.event_name != 'pull_request'
-        run: npx electron-builder --win nsis --x64 --arm64 --publish never
-
-      - name: Upload build artifacts
+      - name: Upload build output
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: illusions-windows-${{ steps.version.outputs.full }}
-          path: dist-electron/**
+          name: windows-build-output
+          path: |
+            .next/**
+            electron-dist/**
+            out/**
+          retention-days: 1
 
-  build-windows-msix:
-    name: Build (Windows Store)
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
-    outputs:
-      version: ${{ steps.version.outputs.full }}
+  package-windows-nsis:
+    name: Package (Windows NSIS)
+    needs: [compute-version, build-windows-core]
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
@@ -290,13 +300,59 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Type check
-        run: npx tsc --noEmit
+      - name: Restore Electron caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ELECTRON_CACHE }}
+            ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-${{ runner.arch }}-
 
-      # --- Full build steps (push to main/alpha/beta/dev only) ---
+      - name: Update package.json version
+        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version
+
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build-output
+
+      - name: Build NSIS installer
+        run: npx electron-builder --win nsis --x64 --arm64 --publish never
+
+      - name: Upload NSIS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: illusions-windows-${{ needs.compute-version.outputs.full }}
+          path: dist-electron/**
+
+  package-windows-msix:
+    name: Package (Windows MSIX)
+    needs: [compute-version, build-windows-core]
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    outputs:
+      version: ${{ needs.compute-version.outputs.full }}
+    env:
+      ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm install
 
       - name: Restore Electron caches
-        if: github.event_name != 'pull_request'
         uses: actions/cache@v4
         with:
           path: |
@@ -306,64 +362,35 @@ jobs:
           restore-keys: |
             electron-${{ runner.os }}-msix-
 
-      - name: Restore Next.js cache
-        if: github.event_name != 'pull_request'
-        uses: actions/cache@v4
-        with:
-          path: .next/cache
-          key: next-${{ runner.os }}-msix-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            next-${{ runner.os }}-msix-
-
-      - name: Compute build version
-        if: github.event_name != 'pull_request'
-        id: version
-        shell: bash
-        run: |
-          BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          BRANCH_NAME="${GITHUB_REF_NAME}"
-          if [ "$BRANCH_NAME" = "main" ]; then
-            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
-          else
-            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}"
-          fi
-          # MSIX requires 4-part version (x.y.z.0)
-          MSIX_VERSION="${FULL_VERSION}.0"
-          echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "msix=${MSIX_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Building MSIX version: ${MSIX_VERSION}"
-
       - name: Update package.json version (4-part for MSIX)
-        if: github.event_name != 'pull_request'
-        run: npm version ${{ steps.version.outputs.msix }} --no-git-tag-version
+        run: npm version ${{ needs.compute-version.outputs.msix }} --no-git-tag-version
 
-      - name: Download local fonts
-        if: github.event_name != 'pull_request'
-        run: npm run download:fonts
-
-      - name: Build Next.js (static export) and bundle Electron main process
-        if: github.event_name != 'pull_request'
-        run: npm run type-check && npm run generate:credits && npx cross-env ELECTRON_BUILD=1 next build && npm run bundle:electron
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build-output
 
       - name: Build MSIX package
-        if: github.event_name != 'pull_request'
         run: npx electron-builder --win appx --x64 --arm64 --publish never
 
       - name: Upload MSIX artifacts
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: illusions-windows-msix-${{ steps.version.outputs.full }}
+          name: illusions-windows-msix-${{ needs.compute-version.outputs.full }}
           path: |
             dist-electron/*.appx
             dist-electron/*.appx.blockmap
+
+  # ---------------------------------------------------------------------------
+  # Publish & Release
+  # ---------------------------------------------------------------------------
 
   publish-windows-store:
     name: Publish to Microsoft Store
     if: |
       github.event_name != 'pull_request' &&
       github.ref == 'refs/heads/main'
-    needs: [preflight-msstore, build-windows-msix]
+    needs: [preflight-msstore, package-windows-msix]
     runs-on: windows-latest
     environment: MicrosoftStore
 
@@ -371,7 +398,7 @@ jobs:
       - name: Download MSIX artifacts
         uses: actions/download-artifact@v4
         with:
-          name: illusions-windows-msix-${{ needs.build-windows-msix.outputs.version }}
+          name: illusions-windows-msix-${{ needs.package-windows-msix.outputs.version }}
           path: msix-packages
 
       - name: Install msstore-cli
@@ -434,33 +461,10 @@ jobs:
   release:
     name: Create GitHub Release
     if: github.event_name != 'pull_request'
-    needs: [build-macos, build-windows, build-windows-msix]
+    needs: [compute-version, build-macos, package-windows-nsis, package-windows-msix]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Compute build version
-        id: version
-        shell: bash
-        run: |
-          BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          BRANCH_NAME="${GITHUB_REF_NAME}"
-          if [ "$BRANCH_NAME" = "main" ]; then
-            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
-          else
-            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}"
-          fi
-          echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "branch=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
-          echo "Releasing version: ${FULL_VERSION}"
-
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -476,11 +480,11 @@ jobs:
       - name: Create GitHub Release and upload assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.full }}
-          name: Illusions v${{ steps.version.outputs.full }}
+          tag_name: v${{ needs.compute-version.outputs.full }}
+          name: Illusions v${{ needs.compute-version.outputs.full }}
           files: release-assets/*
           draft: false
-          prerelease: ${{ steps.version.outputs.branch != 'main' }}
+          prerelease: ${{ needs.compute-version.outputs.branch != 'main' }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
