@@ -21,8 +21,74 @@ permissions:
   contents: write
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Pre-flight checks — verify signing credentials before any build starts
+  # ---------------------------------------------------------------------------
+
+  preflight-apple:
+    name: Pre-flight (Apple Signing)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: Apple
+    env:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      TEAM_ID: ${{ vars.TEAM_ID }}
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+    steps:
+      - name: Verify Apple signing credentials
+        run: |
+          missing=()
+          [ -z "$APPLE_ID" ] && missing+=("APPLE_ID")
+          [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] && missing+=("APPLE_APP_SPECIFIC_PASSWORD")
+          if [ -z "$TEAM_ID" ] && [ -z "$APPLE_TEAM_ID" ]; then
+            missing+=("TEAM_ID / APPLE_TEAM_ID")
+          fi
+          [ -z "$CSC_LINK" ] && missing+=("CSC_LINK")
+          [ -z "$CSC_KEY_PASSWORD" ] && missing+=("CSC_KEY_PASSWORD")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing Apple signing credentials: ${missing[*]}"
+            exit 1
+          fi
+          echo "All Apple signing credentials verified"
+
+  preflight-msstore:
+    name: Pre-flight (Microsoft Store)
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: MicrosoftStore
+    env:
+      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+      MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+      STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
+    steps:
+      - name: Verify Microsoft Store credentials
+        run: |
+          missing=()
+          [ -z "$MSSTORE_TENANT_ID" ] && missing+=("MSSTORE_TENANT_ID")
+          [ -z "$MSSTORE_CLIENT_ID" ] && missing+=("MSSTORE_CLIENT_ID")
+          [ -z "$MSSTORE_CLIENT_SECRET" ] && missing+=("MSSTORE_CLIENT_SECRET")
+          [ -z "$MSSTORE_SELLER_ID" ] && missing+=("MSSTORE_SELLER_ID")
+          [ -z "$STORE_PRODUCT_ID" ] && missing+=("STORE_PRODUCT_ID")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing Microsoft Store credentials: ${missing[*]}"
+            exit 1
+          fi
+          echo "All Microsoft Store credentials verified"
+
+  # ---------------------------------------------------------------------------
+  # Build jobs
+  # ---------------------------------------------------------------------------
+
   build-macos:
     name: Build (macOS ${{ matrix.arch }})
+    needs: [preflight-apple]
+    # Allow PRs to run (preflight-apple is skipped on PRs, which is fine)
+    if: always() && (needs.preflight-apple.result == 'success' || needs.preflight-apple.result == 'skipped')
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'macos-latest' }}
     strategy:
       matrix:
@@ -103,23 +169,6 @@ jobs:
       - name: Build Quick Look plugin
         if: github.event_name != 'pull_request'
         run: npm run build:quicklook
-
-      - name: Verify Apple signing env
-        if: github.event_name != 'pull_request'
-        shell: bash
-        run: |
-          missing=()
-          [ -z "$APPLE_ID" ] && missing+=("APPLE_ID")
-          [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] && missing+=("APPLE_APP_SPECIFIC_PASSWORD")
-          if [ -z "$TEAM_ID" ] && [ -z "$APPLE_TEAM_ID" ]; then
-            missing+=("TEAM_ID/APPLE_TEAM_ID")
-          fi
-          [ -z "$CSC_LINK" ] && missing+=("CSC_LINK")
-          [ -z "$CSC_KEY_PASSWORD" ] && missing+=("CSC_KEY_PASSWORD")
-          if [ ${#missing[@]} -ne 0 ]; then
-            echo "::error::Missing required signing env: ${missing[*]}"
-            exit 1
-          fi
 
       - name: Build Electron application
         if: github.event_name != 'pull_request'
@@ -221,6 +270,8 @@ jobs:
   build-windows-msix:
     name: Build (Windows Store)
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
+    outputs:
+      version: ${{ steps.version.outputs.full }}
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
@@ -306,6 +357,71 @@ jobs:
           path: |
             dist-electron/*.appx
             dist-electron/*.appx.blockmap
+
+  publish-windows-store:
+    name: Publish to Microsoft Store
+    if: |
+      github.event_name != 'pull_request' &&
+      github.ref == 'refs/heads/main'
+    needs: [preflight-msstore, build-windows-msix]
+    runs-on: windows-latest
+    environment: MicrosoftStore
+
+    steps:
+      - name: Download MSIX artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: illusions-windows-msix-${{ needs.build-windows-msix.outputs.version }}
+          path: msix-packages
+
+      - name: Install msstore-cli
+        shell: pwsh
+        env:
+          MSSTORE_CLI_VERSION: "v0.3.9"
+        run: |
+          $url = "https://github.com/microsoft/msstore-cli/releases/download/$env:MSSTORE_CLI_VERSION/msstore-win-x64.zip"
+          Invoke-WebRequest $url -OutFile msstore.zip
+          Expand-Archive msstore.zip -DestinationPath "$env:LOCALAPPDATA\msstore-cli" -Force
+          echo "$env:LOCALAPPDATA\msstore-cli" >> $env:GITHUB_PATH
+
+      - name: Configure msstore-cli credentials
+        shell: pwsh
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+        run: |
+          msstore configure `
+            --tenantId $env:MSSTORE_TENANT_ID `
+            --clientId $env:MSSTORE_CLIENT_ID `
+            --clientSecret $env:MSSTORE_CLIENT_SECRET `
+            --sellerId $env:MSSTORE_SELLER_ID
+
+      - name: Submit to Microsoft Store
+        shell: pwsh
+        env:
+          STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
+        run: |
+          $appxFiles = Get-ChildItem msix-packages\*.appx
+          if ($appxFiles.Count -eq 0) {
+            throw "No .appx packages found in msix-packages/"
+          }
+          $packages = ($appxFiles | Select-Object -ExpandProperty FullName) -join ","
+          msstore submission update $env:STORE_PRODUCT_ID --packages $packages --delete-pending-submission
+          msstore submission publish $env:STORE_PRODUCT_ID
+
+      # TODO: Microsoft Store Flight (beta) support — see issue #626
+      # - name: Submit to Microsoft Store Flight (beta)
+      #   if: github.ref == 'refs/heads/beta'
+      #   shell: pwsh
+      #   env:
+      #     STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
+      #     STORE_FLIGHT_ID: ${{ vars.STORE_FLIGHT_ID }}
+      #   run: |
+      #     $packages = (Get-ChildItem msix-packages\*.appx | Select-Object -ExpandProperty FullName) -join ","
+      #     msstore flight submission update $env:STORE_PRODUCT_ID $env:STORE_FLIGHT_ID --packages $packages --delete-pending-submission
+      #     msstore flight submission publish $env:STORE_PRODUCT_ID $env:STORE_FLIGHT_ID
 
   release:
     name: Create GitHub Release
