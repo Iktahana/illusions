@@ -392,7 +392,7 @@ jobs:
           MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
           MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
         run: |
-          msstore configure `
+          msstore reconfigure `
             --tenantId $env:MSSTORE_TENANT_ID `
             --clientId $env:MSSTORE_CLIENT_ID `
             --clientSecret $env:MSSTORE_CLIENT_SECRET `
