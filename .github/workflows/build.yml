@@ -403,13 +403,20 @@ jobs:
         env:
           STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
         run: |
-          $appxFiles = Get-ChildItem msix-packages\*.appx
+          $appxFiles = Get-ChildItem "msix-packages\*.appx"
           if ($appxFiles.Count -eq 0) {
             throw "No .appx packages found in msix-packages/"
           }
-          $packages = ($appxFiles | Select-Object -ExpandProperty FullName) -join ","
-          msstore submission update $env:STORE_PRODUCT_ID --packages $packages --delete-pending-submission
-          msstore submission publish $env:STORE_PRODUCT_ID
+          Write-Host "Found $($appxFiles.Count) .appx package(s):"
+          $appxFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
+
+          # Bundle .appx files into a single .msixupload for multi-arch submission
+          $uploadFile = "msix-packages\illusions.msixupload"
+          Compress-Archive -Path $appxFiles.FullName -DestinationPath $uploadFile -Force
+          Write-Host "Created bundle: $uploadFile"
+
+          # Publish using the MSIX-specific high-level command
+          msstore publish "$uploadFile" -id $env:STORE_PRODUCT_ID -v
 
       # TODO: Microsoft Store Flight (beta) support — see issue #626
       # - name: Submit to Microsoft Store Flight (beta)
@@ -419,9 +426,10 @@ jobs:
       #     STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
       #     STORE_FLIGHT_ID: ${{ vars.STORE_FLIGHT_ID }}
       #   run: |
-      #     $packages = (Get-ChildItem msix-packages\*.appx | Select-Object -ExpandProperty FullName) -join ","
-      #     msstore flight submission update $env:STORE_PRODUCT_ID $env:STORE_FLIGHT_ID --packages $packages --delete-pending-submission
-      #     msstore flight submission publish $env:STORE_PRODUCT_ID $env:STORE_FLIGHT_ID
+      #     $appxFiles = Get-ChildItem "msix-packages\*.appx"
+      #     $uploadFile = "msix-packages\illusions.msixupload"
+      #     Compress-Archive -Path $appxFiles.FullName -DestinationPath $uploadFile -Force
+      #     msstore publish "$uploadFile" -id $env:STORE_PRODUCT_ID -f $env:STORE_FLIGHT_ID -v
 
   release:
     name: Create GitHub Release
