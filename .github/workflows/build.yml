@@ -379,7 +379,7 @@ jobs:
         env:
           MSSTORE_CLI_VERSION: "v0.3.9"
         run: |
-          $url = "https://github.com/microsoft/msstore-cli/releases/download/$env:MSSTORE_CLI_VERSION/msstore-win-x64.zip"
+          $url = "https://github.com/microsoft/msstore-cli/releases/download/$env:MSSTORE_CLI_VERSION/MSStoreCLI-win-x64.zip"
           Invoke-WebRequest $url -OutFile msstore.zip
           Expand-Archive msstore.zip -DestinationPath "$env:LOCALAPPDATA\msstore-cli" -Force
           echo "$env:LOCALAPPDATA\msstore-cli" >> $env:GITHUB_PATH
