@@ -21,8 +21,74 @@ permissions:
   contents: write
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Pre-flight checks — verify signing credentials before any build starts
+  # ---------------------------------------------------------------------------
+
+  preflight-apple:
+    name: Pre-flight (Apple Signing)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: Apple
+    env:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      TEAM_ID: ${{ vars.TEAM_ID }}
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+    steps:
+      - name: Verify Apple signing credentials
+        run: |
+          missing=()
+          [ -z "$APPLE_ID" ] && missing+=("APPLE_ID")
+          [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] && missing+=("APPLE_APP_SPECIFIC_PASSWORD")
+          if [ -z "$TEAM_ID" ] && [ -z "$APPLE_TEAM_ID" ]; then
+            missing+=("TEAM_ID / APPLE_TEAM_ID")
+          fi
+          [ -z "$CSC_LINK" ] && missing+=("CSC_LINK")
+          [ -z "$CSC_KEY_PASSWORD" ] && missing+=("CSC_KEY_PASSWORD")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing Apple signing credentials: ${missing[*]}"
+            exit 1
+          fi
+          echo "All Apple signing credentials verified"
+
+  preflight-msstore:
+    name: Pre-flight (Microsoft Store)
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: MicrosoftStore
+    env:
+      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+      MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+      STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
+    steps:
+      - name: Verify Microsoft Store credentials
+        run: |
+          missing=()
+          [ -z "$MSSTORE_TENANT_ID" ] && missing+=("MSSTORE_TENANT_ID")
+          [ -z "$MSSTORE_CLIENT_ID" ] && missing+=("MSSTORE_CLIENT_ID")
+          [ -z "$MSSTORE_CLIENT_SECRET" ] && missing+=("MSSTORE_CLIENT_SECRET")
+          [ -z "$MSSTORE_SELLER_ID" ] && missing+=("MSSTORE_SELLER_ID")
+          [ -z "$STORE_PRODUCT_ID" ] && missing+=("STORE_PRODUCT_ID")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing Microsoft Store credentials: ${missing[*]}"
+            exit 1
+          fi
+          echo "All Microsoft Store credentials verified"
+
+  # ---------------------------------------------------------------------------
+  # Build jobs
+  # ---------------------------------------------------------------------------
+
   build-macos:
     name: Build (macOS ${{ matrix.arch }})
+    needs: [preflight-apple]
+    # Allow PRs to run (preflight-apple is skipped on PRs, which is fine)
+    if: always() && (needs.preflight-apple.result == 'success' || needs.preflight-apple.result == 'skipped')
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'macos-latest' }}
     strategy:
       matrix:
@@ -103,23 +169,6 @@ jobs:
       - name: Build Quick Look plugin
         if: github.event_name != 'pull_request'
         run: npm run build:quicklook
-
-      - name: Verify Apple signing env
-        if: github.event_name != 'pull_request'
-        shell: bash
-        run: |
-          missing=()
-          [ -z "$APPLE_ID" ] && missing+=("APPLE_ID")
-          [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] && missing+=("APPLE_APP_SPECIFIC_PASSWORD")
-          if [ -z "$TEAM_ID" ] && [ -z "$APPLE_TEAM_ID" ]; then
-            missing+=("TEAM_ID/APPLE_TEAM_ID")
-          fi
-          [ -z "$CSC_LINK" ] && missing+=("CSC_LINK")
-          [ -z "$CSC_KEY_PASSWORD" ] && missing+=("CSC_KEY_PASSWORD")
-          if [ ${#missing[@]} -ne 0 ]; then
-            echo "::error::Missing required signing env: ${missing[*]}"
-            exit 1
-          fi
 
       - name: Build Electron application
         if: github.event_name != 'pull_request'
@@ -314,7 +363,7 @@ jobs:
     if: |
       github.event_name != 'pull_request' &&
       github.ref == 'refs/heads/main'
-    needs: [build-windows-msix]
+    needs: [preflight-msstore, build-windows-msix]
     runs-on: windows-latest
     environment: MicrosoftStore
 
