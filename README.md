@@ -95,7 +95,7 @@ Simply visit https://illusions.app/ in your browser.
 ### For Developers
 
 #### Prerequisites
-- Node.js 18+ 
+- Node.js 22+
 - npm or yarn
 
 #### Installation
