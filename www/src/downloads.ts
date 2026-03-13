@@ -4,7 +4,7 @@ import iconApple from '~icons/mdi/apple?raw'
 import iconWindows from '~icons/mdi/microsoft-windows?raw'
 import iconLinux from '~icons/mdi/linux?raw'
 import iconGithub from '~icons/mdi/github?raw'
-import iconMicrosoftStore from '~icons/mdi/microsoft?raw'
+import iconMicrosoft from '~icons/mdi/microsoft?raw'
 import { getRandomBackgroundImage } from './bg-images'
 
 // GitHub release asset type
@@ -326,7 +326,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
             <span class="download-item-filename">公式ストアから入手</span>
           </div>
           <div class="download-item-meta">
-            <span class="platform-icon">${iconMicrosoftStore}</span>
+            <span class="platform-icon">${iconMicrosoft}</span>
             <span class="download-icon">↗</span>
           </div>
         </a>
@@ -379,7 +379,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
       return {
         href: MICROSOFT_STORE_URL,
         label: 'Microsoft Store から入手',
-        icon: iconMicrosoftStore,
+        icon: iconMicrosoft,
         isExternal: true,
       }
     }
