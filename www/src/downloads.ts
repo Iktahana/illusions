@@ -42,6 +42,9 @@ const REPO = 'Iktahana/illusions'
 const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`
 const MICROSOFT_STORE_URL = 'https://apps.microsoft.com/detail/9mtc0ct16xg1'
 
+/** Build-time injected GitHub token (optional) for authenticated API requests */
+const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN || ''
+
 /** Format bytes to human-readable string */
 function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) {
@@ -458,7 +461,15 @@ if (bgImageUrl) {
 renderPage(null, null)
 
 // Fetch latest release
-fetch(API_URL)
+const fetchOptions: RequestInit = {}
+if (GITHUB_TOKEN) {
+  fetchOptions.headers = {
+    'Authorization': `token ${GITHUB_TOKEN}`,
+    'Accept': 'application/vnd.github.v3+json',
+  }
+}
+
+fetch(API_URL, fetchOptions)
   .then(async (res) => {
     if (!res.ok) {
       throw new Error(`GitHub API returned ${res.status}`)
