@@ -461,12 +461,11 @@ if (bgImageUrl) {
 renderPage(null, null)
 
 // Fetch latest release
-const fetchOptions: RequestInit = {}
-if (GITHUB_TOKEN) {
-  fetchOptions.headers = {
-    'Authorization': `token ${GITHUB_TOKEN}`,
-    'Accept': 'application/vnd.github.v3+json',
-  }
+const fetchOptions: RequestInit = {
+  headers: {
+    // クライアント側ではアクセストークンを送信しない
+    Accept: 'application/vnd.github.v3+json',
+  },
 }
 
 fetch(API_URL, fetchOptions)
