@@ -26,6 +26,9 @@ dist-ssr
 # Build artifact (copied from ../TERMS.md by vite plugin)
 public/TERMS.md
 
+# Release data (pre-fetched at build time by CI)
+public/release-data.json
+
 # Environment variables (secrets should not be committed)
 .env
 .env.local

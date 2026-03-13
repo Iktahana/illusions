@@ -38,10 +38,7 @@ interface DownloadAsset {
 }
 
 const REPO = 'Iktahana/illusions'
-const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`
-
-/** Build-time injected GitHub token (optional) for authenticated API requests */
-const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN || ''
+const RELEASE_DATA_URL = '/release-data.json'
 
 /** Format bytes to human-readable string */
 function formatSize(bytes: number): string {
@@ -415,19 +412,11 @@ if (bgImageUrl) {
 // Show loading state immediately
 renderPage(null, null)
 
-// Fetch latest release
-const fetchOptions: RequestInit = {}
-if (GITHUB_TOKEN) {
-  fetchOptions.headers = {
-    'Authorization': `token ${GITHUB_TOKEN}`,
-    'Accept': 'application/vnd.github.v3+json',
-  }
-}
-
-fetch(API_URL, fetchOptions)
+// Fetch latest release (pre-fetched at build time, served as static JSON)
+fetch(RELEASE_DATA_URL)
   .then(async (res) => {
     if (!res.ok) {
-      throw new Error(`GitHub API returned ${res.status}`)
+      throw new Error(`リリース情報の読み込みに失敗しました (${res.status})`)
     }
     const data = (await res.json()) as GitHubRelease
     renderPage(data, null)
