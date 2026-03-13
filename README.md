@@ -1,8 +1,8 @@
 # illusions - 日本語小説エディタ
 
-縦書き、ルビ、AI校正支援。Windows, macOS, Chromeで動作する執筆環境。文章分析から校正まで、小説家のための機能を凝縮。
+縦書き、ルビ。Windows, macOS, Chromeで動作する執筆環境。文章分析から校正まで、小説家のための機能を凝縮。
 
-A professional-grade Japanese novel editor with vertical writing, ruby notation, and AI proofreading support.
+A professional-grade Japanese novel editor with vertical writing, ruby notation, and Japanese NLP proofreading support.
 
 ## 🌐 オンラインで試す / Try It Online
 
@@ -22,7 +22,6 @@ Available for macOS (Intel & Apple Silicon) and Windows (installer or Microsoft 
 - **Vertical writing mode** (縦書き) for traditional Japanese novels
 - **Ruby notation support** (ルビ) - furigana for kanji
 - **Tate-chu-yoko** (縦中横) - horizontal text in vertical writing
-- **AI proofreading support** - grammar and style suggestions powered by local LLM engine
 - **Auto-save** every 2 seconds
 - **Japanese NLP** integration for text analysis
 - **POS (Part-of-Speech) highlighting** for Japanese grammar review with live demo preview
@@ -254,7 +253,6 @@ The proofreading (linting) features in illusions comply with the following offic
 - ✅ Milkdown editor with vertical writing
 - ✅ Ruby notation (ルビ) support
 - ✅ Tate-chu-yoko (縦中横) support
-- ✅ AI proofreading support
 - ✅ Auto-save and crash recovery
 - ✅ Storage abstraction (Electron + Web)
 - ✅ GitHub integration with OAuth
@@ -272,7 +270,6 @@ The proofreading (linting) features in illusions comply with the following offic
 - ✅ Microsoft Store packaging — Windows `.appx` build target and tile assets for Store distribution
 - ✅ LLM idling stop — auto-unload AI model after 30s idle to reduce memory usage (AIアイドリングストップ)
 - ✅ Export to PDF/EPUB/DOCX — export novels to standard publishing formats
-- ✅ Local LLM engine for AI proofreading (ローカルLLMによるAI校正)
 - ✅ Correction ignore feature — dismiss individual lint warnings
 - ✅ Dialogue-aware linting — skip dialogue content with per-rule toggle
 - ✅ Live demo preview for POS highlight settings
