@@ -497,3 +497,44 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Post-release notifications — runs after a successful GitHub release (main only)
+  # To add a new notification channel, add a new step in this job.
+  # ---------------------------------------------------------------------------
+
+  post-release-notifications:
+    name: Post-release Notifications
+    needs: [compute-version, release]
+    if: |
+      github.event_name != 'pull_request' &&
+      needs.compute-version.outputs.branch == 'main' &&
+      needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+
+    steps:
+      - name: Fetch release notes from GitHub API
+        id: fetch-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BODY=$(gh api \
+            "repos/${{ github.repository }}/releases/tags/v${{ needs.compute-version.outputs.full }}" \
+            --jq '.body')
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$BODY" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger Twitter/X post
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: v${{ needs.compute-version.outputs.full }}
+          RELEASE_NOTES: ${{ steps.fetch-notes.outputs.body }}
+        run: |
+          gh workflow run publish-tweet.yml \
+            --ref main \
+            -f release_version="$RELEASE_VERSION" \
+            -f release_notes="$RELEASE_NOTES"
