@@ -4,7 +4,7 @@ import iconApple from '~icons/mdi/apple?raw'
 import iconWindows from '~icons/mdi/microsoft-windows?raw'
 import iconLinux from '~icons/mdi/linux?raw'
 import iconGithub from '~icons/mdi/github?raw'
-import iconMicrosoftStore from '~icons/mdi/microsoft-store?raw'
+import iconMicrosoftStore from '~icons/mdi/microsoft?raw'
 import { getRandomBackgroundImage } from './bg-images'
 
 // GitHub release asset type
