@@ -25,3 +25,8 @@ dist-ssr
 
 # Build artifact (copied from ../TERMS.md by vite plugin)
 public/TERMS.md
+
+# Environment variables (secrets should not be committed)
+.env
+.env.local
+.env.*.local
