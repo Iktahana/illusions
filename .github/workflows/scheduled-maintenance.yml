@@ -1,0 +1,137 @@
+name: Scheduled Maintenance
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Daily at 00:00 UTC
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Run a specific maintenance task (or all)'
+        type: choice
+        options:
+          - all
+          - update-latest-tag
+          - branch-cleanup
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Update the `latest` git tag to point to the most recent stable release
+  # ---------------------------------------------------------------------------
+  update-latest-tag:
+    if: |
+      github.event_name == 'schedule' ||
+      github.event.inputs.task == 'all' ||
+      github.event.inputs.task == 'update-latest-tag'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find latest stable release
+        id: find-latest
+        run: |
+          # Get all tags sorted by version
+          # Filter out beta/dev versions, only keep stable releases (e.g., v0.0.113)
+          LATEST_STABLE=$(git tag -l 'v*.*.*' | \
+            grep -v -e '-beta' -e '-dev' -e '-alpha' -e '-rc' | \
+            sort -V | \
+            tail -1)
+
+          if [ -z "$LATEST_STABLE" ]; then
+            echo "❌ No stable release found"
+            exit 1
+          fi
+
+          echo "latest_version=$LATEST_STABLE" >> $GITHUB_OUTPUT
+          echo "✅ Latest stable release: $LATEST_STABLE"
+
+      - name: Update latest tag
+        env:
+          LATEST_VERSION: ${{ steps.find-latest.outputs.latest_version }}
+        run: |
+          # Check if 'latest' tag exists
+          if git rev-parse latest >/dev/null 2>&1; then
+            CURRENT_LATEST=$(git rev-parse latest)
+            NEW_LATEST=$(git rev-parse $LATEST_VERSION)
+
+            if [ "$CURRENT_LATEST" = "$NEW_LATEST" ]; then
+              echo "ℹ️ 'latest' tag already points to $LATEST_VERSION"
+              exit 0
+            fi
+
+            echo "📝 Updating 'latest' tag from $(git describe --tags $CURRENT_LATEST) to $LATEST_VERSION"
+            git tag -f latest $LATEST_VERSION
+          else
+            echo "🆕 Creating 'latest' tag pointing to $LATEST_VERSION"
+            git tag latest $LATEST_VERSION
+          fi
+
+          # Push the updated tag
+          git push origin latest --force
+          echo "✅ Successfully updated 'latest' tag to $LATEST_VERSION"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Update Latest Tag Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.find-latest.outputs.latest_version }}" != "" ]; then
+            echo "- ✅ Latest stable version: \`${{ steps.find-latest.outputs.latest_version }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- 🏷️ Tag \`latest\` updated" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ No stable release found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Delete remote branches that have been fully merged into main
+  # ---------------------------------------------------------------------------
+  branch-cleanup:
+    if: |
+      github.event_name == 'schedule' ||
+      github.event.inputs.task == 'all' ||
+      github.event.inputs.task == 'branch-cleanup'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete merged branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Fetching merged branches..."
+
+          # List remote branches merged into main, excluding protected branches
+          MERGED=$(gh api "repos/$REPO/branches?per_page=100" \
+            --jq '.[].name' \
+            | grep -vE '^(main|master|develop|release/.*)$' \
+            || true)
+
+          if [ -z "$MERGED" ]; then
+            echo "No candidate branches found."
+            exit 0
+          fi
+
+          DELETED=0
+          SKIPPED=0
+
+          for BRANCH in $MERGED; do
+            # Check if branch is merged into main
+            STATUS=$(gh api "repos/$REPO/compare/main...$BRANCH" \
+              --jq '.status' 2>/dev/null || echo "error")
+
+            if [ "$STATUS" = "behind" ] || [ "$STATUS" = "identical" ]; then
+              echo "Deleting merged branch: $BRANCH"
+              gh api -X DELETE "repos/$REPO/git/refs/heads/$BRANCH" 2>/dev/null && DELETED=$((DELETED + 1)) || true
+            else
+              SKIPPED=$((SKIPPED + 1))
+            fi
+          done
+
+          echo ""
+          echo "=== Summary ==="
+          echo "Deleted: $DELETED"
+          echo "Skipped: $SKIPPED"
