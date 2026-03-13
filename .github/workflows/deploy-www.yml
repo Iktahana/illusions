@@ -28,7 +28,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: www/package-lock.json
 
@@ -36,11 +36,17 @@ jobs:
         working-directory: ./www
         run: npm ci
 
+      - name: Fetch latest release data
+        run: |
+          curl -sSf \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/Iktahana/illusions/releases/latest" \
+            -o www/public/release-data.json || exit 1
+
       - name: Build
         working-directory: ./www
         run: npm run build
-        env:
-          VITE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
