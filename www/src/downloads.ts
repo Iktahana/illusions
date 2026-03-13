@@ -4,6 +4,7 @@ import iconApple from '~icons/mdi/apple?raw'
 import iconWindows from '~icons/mdi/microsoft-windows?raw'
 import iconLinux from '~icons/mdi/linux?raw'
 import iconGithub from '~icons/mdi/github?raw'
+import iconMicrosoftStore from '~icons/mdi/microsoft-store?raw'
 import { getRandomBackgroundImage } from './bg-images'
 
 // GitHub release asset type
@@ -39,6 +40,7 @@ interface DownloadAsset {
 
 const REPO = 'Iktahana/illusions'
 const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`
+const MICROSOFT_STORE_URL = 'https://apps.microsoft.com/detail/9mtc0ct16xg1'
 
 /** Format bytes to human-readable string */
 function formatSize(bytes: number): string {
@@ -314,6 +316,23 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
   const platformCardsHtml = sortedKeys.map((key) => {
     const platform = platforms.get(key)!
     const isCurrent = key === currentOS
+
+    // Add Microsoft Store link at the top of Windows downloads
+    const storeItemHtml = key === 'windows'
+      ? `
+        <a href="${MICROSOFT_STORE_URL}" class="download-item" target="_blank" rel="noopener">
+          <div class="download-item-info">
+            <span class="download-item-label">Microsoft Store</span>
+            <span class="download-item-filename">公式ストアから入手</span>
+          </div>
+          <div class="download-item-meta">
+            <span class="download-item-icon">${iconMicrosoftStore}</span>
+            <span class="download-icon">↗</span>
+          </div>
+        </a>
+      `
+      : ''
+
     const assetsHtml = platform.assets
       .map(
         (asset) => `
@@ -339,7 +358,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
           ${isCurrent ? '<span class="platform-badge">お使いのOS</span>' : ''}
         </div>
         <div class="download-list">
-          ${assetsHtml}
+          ${storeItemHtml}${assetsHtml}
         </div>
       </div>
     `
@@ -349,13 +368,19 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
 
   const heroInfo = bestAsset ? heroButtonInfo(bestAsset) : null
 
-  const heroDownloadHtml = bestAsset && heroInfo
+  // For Windows, show Microsoft Store button
+  const isWindowsOS = currentOS === 'windows'
+  const heroDownloadUrl = isWindowsOS ? MICROSOFT_STORE_URL : (bestAsset?.url ?? '')
+  const heroDownloadIsStore = isWindowsOS
+  const storeLabel = 'Microsoft Store から入手'
+
+  const heroDownloadHtml = heroInfo && (isWindowsOS || bestAsset)
     ? `
       <div class="hero-download">
-        <a href="${bestAsset.url}" class="btn-hero-download" download>
+        <a href="${heroDownloadUrl}" class="btn-hero-download" ${!heroDownloadIsStore ? 'download' : 'target="_blank" rel="noopener"'}>
           <span class="btn-hero-download-icon">${heroInfo.icon}</span>
-          <span class="btn-hero-download-label">${heroInfo.label}</span>
-          <span class="btn-hero-download-meta">v${version} · ${bestAsset.size}</span>
+          <span class="btn-hero-download-label">${isWindowsOS ? storeLabel : heroInfo.label}</span>
+          ${!isWindowsOS ? `<span class="btn-hero-download-meta">v${version} · ${bestAsset!.size}</span>` : ''}
         </a>
         <p class="hero-download-hint">他のプラットフォームは下記をご覧ください</p>
         <a href="https://github.com/Iktahana/illusions" class="github-link" target="_blank">

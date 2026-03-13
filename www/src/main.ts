@@ -24,11 +24,6 @@ if (bgImageUrl) {
   console.info('No background images available, using gradient fallback')
 }
 
-const ua = navigator.userAgent.toLowerCase()
-const isApple = ua.includes('mac') || ua.includes('iphone') || ua.includes('ipad')
-const downloadIcon = isApple ? iconApple : iconWindows
-const downloadLabel = isApple ? 'macOS版をダウンロード' : 'Windows版をダウンロード'
-
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div class="hero">
     <div class="title-logo">${logoSvg}</div>
@@ -39,8 +34,9 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 
     <div class="cta-buttons">
       <a href="/downloads" class="btn btn-primary">
-        <span class="btn-icon">${downloadIcon}</span>
-        ${downloadLabel}
+        <span class="btn-icon">${iconApple}</span>
+        <span class="btn-icon">${iconWindows}</span>
+        ダウンロード
       </a>
       <a href="https://illusions.app" class="btn btn-secondary" target="_blank">
         <span class="btn-icon">${iconChrome}</span>
