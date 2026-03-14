@@ -6,15 +6,18 @@
   color-scheme: dark; /* www landing page is always dark-themed */
 
   /* Unified color palette */
-  --color-bg:          #0c0b0a;
-  --color-surface:     #1a1815;
-  --color-surface-hover: #221f1b;
-  --color-border:      rgba(210, 195, 170, 0.12);
-  --color-border-hover: rgba(210, 195, 170, 0.28);
-  --color-text:        #e8e0d5;
-  --color-text-muted:  rgba(232, 224, 213, 0.5);
-  --color-accent:      #c9a96e;
-  --color-accent-dim:  rgba(201, 169, 110, 0.15);
+  --color-bg:             #0c0b0a;
+  --color-surface:        #1a1815;
+  --color-surface-hover:  #221f1b;
+  --color-border:         rgba(210, 195, 170, 0.12);
+  --color-border-hover:   rgba(210, 195, 170, 0.28);
+  --color-text:           #e8e0d5;
+  --color-text-muted:     rgba(232, 224, 213, 0.5);
+  --color-accent:         #c9a96e;
+  --color-accent-dim:     rgba(201, 169, 110, 0.15);
+  --color-accent-hover:   #d4b878;
+  --color-border-strong:  rgba(210, 195, 170, 0.45);
+  --shadow-accent:        0 4px 16px rgba(201, 169, 110, 0.3);
 
   color: var(--color-text);
   --bg-image: none;
@@ -166,10 +169,10 @@ h1 {
 }
 
 .btn-primary:hover {
-  background: #d4b878;
-  border-color: #d4b878;
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(201, 169, 110, 0.3);
+  box-shadow: var(--shadow-accent);
 }
 
 .btn-secondary {
@@ -180,7 +183,7 @@ h1 {
 
 .btn-secondary:hover {
   background: var(--color-surface);
-  border-color: rgba(210, 195, 170, 0.45);
+  border-color: var(--color-border-strong);
   transform: translateY(-1px);
 }
 
