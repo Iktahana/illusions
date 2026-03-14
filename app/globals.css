@@ -9,117 +9,118 @@
 @tailwind utilities;
 
 /* Prevent flash of white on initial load - default to dark theme */
+/* Hex must match --background dark mode value (16 13 9 = #100d09) */
 html {
-  background-color: #0a0a0a;
+  background-color: #100d09;
   color-scheme: dark;
 }
 
 :root {
   /* Background colors (RGB channels for Tailwind opacity support) */
-  --background: 255 255 255;
-  --background-secondary: 248 250 252;
-  --background-tertiary: 241 245 249;
-  --background-elevated: 255 255 255;
+  --background: 251 248 244;
+  --background-secondary: 244 240 232;
+  --background-tertiary: 234 228 218;
+  --background-elevated: 255 253 249;
 
   /* Text colors */
-  --foreground: 15 23 42;
-  --foreground-secondary: 71 85 105;
-  --foreground-tertiary: 100 116 139;
-  --foreground-muted: 148 163 184;
+  --foreground: 24 18 10;
+  --foreground-secondary: 72 60 44;
+  --foreground-tertiary: 114 98 78;
+  --foreground-muted: 162 146 124;
 
   /* Border colors */
-  --border: 226 232 240;
-  --border-secondary: 203 213 225;
+  --border: 218 208 192;
+  --border-secondary: 198 186 168;
 
-  /* Accent colors */
-  --accent: 99 102 241;
+  /* Accent colors — warm amber-sepia */
+  --accent: 142 100 64;
   --accent-foreground: 255 255 255;
-  --accent-light: 238 242 255;
-  --accent-hover: 79 70 229;
+  --accent-light: 238 226 208;
+  --accent-hover: 112 76 46;
 
   /* Interactive states */
-  --hover: 241 245 249;
-  --active: 224 231 255;
+  --hover: 240 234 222;
+  --active: 226 214 196;
 
   /* Status colors */
-  --success: 16 185 129;
-  --warning: 245 158 11;
-  --error: 239 68 68;
-  --info: 59 130 246;
+  --success: 22 163 74;
+  --warning: 202 138 4;
+  --error: 220 38 38;
+  --info: 37 99 235;
   
   /* Progress bar colors for light mode */
-  --progress-readability: #6366f1;
-  --progress-kanji: #ef4444;
-  --progress-hiragana: #3b82f6;
-  --progress-katakana: #10b981;
-  --progress-other: #71717a;
+  --progress-readability: #8c6440;
+  --progress-kanji: #dc2626;
+  --progress-hiragana: #2563eb;
+  --progress-katakana: #16a34a;
+  --progress-other: #78716c;
   
   /* Part-of-Speech (品詞) highlighting colors */
-  --pos-verb: #22c55e;
-  --pos-verb-intransitive: #16a34a;
-  --pos-verb-transitive: #4ade80;
-  --pos-particle: #a855f7;
-  --pos-auxiliary: #8b5cf6;
-  --pos-adjective: #3b82f6;
-  --pos-adverb: #f97316;
-  --pos-conjunction: #14b8a6;
-  --pos-interjection: #ec4899;
-  --pos-adnominal: #6366f1;
+  --pos-verb: #16a34a;
+  --pos-verb-intransitive: #15803d;
+  --pos-verb-transitive: #22c55e;
+  --pos-particle: #9333ea;
+  --pos-auxiliary: #7c3aed;
+  --pos-adjective: #2563eb;
+  --pos-adverb: #ea580c;
+  --pos-conjunction: #0d9488;
+  --pos-interjection: #db2777;
+  --pos-adnominal: #8c6440;
   --pos-noun: inherit;
 }
 
 .dark {
-  /* Background colors - darker for better contrast (RGB channels) */
-  --background: 10 10 10;
-  --background-secondary: 26 26 26;
-  --background-tertiary: 42 42 42;
-  --background-elevated: 26 26 26;
+  /* Background colors - warm dark tones (RGB channels) */
+  --background: 16 13 9;
+  --background-secondary: 30 25 18;
+  --background-tertiary: 46 39 28;
+  --background-elevated: 30 25 18;
 
-  /* Text colors - brighter for better contrast */
-  --foreground: 255 255 255;
-  --foreground-secondary: 229 229 229;
-  --foreground-tertiary: 179 179 179;
-  --foreground-muted: 128 128 128;
+  /* Text colors — warm off-white */
+  --foreground: 248 242 230;
+  --foreground-secondary: 214 204 188;
+  --foreground-tertiary: 168 156 138;
+  --foreground-muted: 116 106 92;
 
-  /* Border colors - more visible */
-  --border: 51 51 51;
-  --border-secondary: 64 64 64;
+  /* Border colors */
+  --border: 56 47 34;
+  --border-secondary: 74 62 46;
 
-  /* Accent colors - brighter and more vibrant */
-  --accent: 129 140 248;
-  --accent-foreground: 255 255 255;
-  --accent-light: 67 56 202;
-  --accent-hover: 99 102 241;
+  /* Accent colors — warm copper-amber */
+  --accent: 196 154 110;
+  --accent-foreground: 16 13 9;
+  --accent-light: 64 46 28;
+  --accent-hover: 218 174 130;
 
   /* Interactive states */
-  --hover: 31 31 31;
-  --active: 67 56 202;
+  --hover: 38 32 24;
+  --active: 60 49 34;
 
-   /* Status colors - brighter for better visibility */
-   --success: 52 211 153;
-   --warning: 251 191 36;
-   --error: 248 113 113;
-   --info: 96 165 250;
+  /* Status colors — slightly muted for warm dark bg */
+  --success: 52 211 153;
+  --warning: 251 191 36;
+  --error: 248 113 113;
+  --info: 96 165 250;
    
-   /* Progress bar colors for dark mode */
-   --progress-readability: #818cf8;
-   --progress-kanji: #f87171;
-   --progress-hiragana: #60a5fa;
-   --progress-katakana: #34d399;
-   --progress-other: #a1a1aa;
+  /* Progress bar colors for dark mode */
+  --progress-readability: #c49a6e;
+  --progress-kanji: #f87171;
+  --progress-hiragana: #60a5fa;
+  --progress-katakana: #34d399;
+  --progress-other: #a8a29e;
    
-   /* Part-of-Speech highlighting colors - dark mode (slightly brighter) */
-   --pos-verb: #4ade80;
-   --pos-verb-intransitive: #22c55e;
-   --pos-verb-transitive: #86efac;
-   --pos-particle: #c084fc;
-   --pos-auxiliary: #a78bfa;
-   --pos-adjective: #60a5fa;
-   --pos-adverb: #fb923c;
-   --pos-conjunction: #2dd4bf;
-   --pos-interjection: #f472b6;
-   --pos-adnominal: #818cf8;
-   --pos-noun: inherit;
+  /* Part-of-Speech highlighting colors - dark mode */
+  --pos-verb: #4ade80;
+  --pos-verb-intransitive: #22c55e;
+  --pos-verb-transitive: #86efac;
+  --pos-particle: #c084fc;
+  --pos-auxiliary: #a78bfa;
+  --pos-adjective: #60a5fa;
+  --pos-adverb: #fb923c;
+  --pos-conjunction: #2dd4bf;
+  --pos-interjection: #f472b6;
+  --pos-adnominal: #c49a6e;
+  --pos-noun: inherit;
 }
 
 body {
@@ -130,8 +131,9 @@ body {
 }
 
 /* Override default background after theme is determined */
+/* Hex must match --background light mode value (251 248 244 = #fbf8f4) */
 html:not(.dark) {
-  background-color: #ffffff;
+  background-color: #fbf8f4;
   color-scheme: light;
 }
 
@@ -530,7 +532,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.15);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 3px rgba(142, 100, 64, 0.15);
 }
 
 input[type="range"]::-webkit-slider-thumb:active {
@@ -560,7 +562,7 @@ input[type="range"]::-moz-range-thumb {
 
 input[type="range"]::-moz-range-thumb:hover {
   transform: scale(1.15);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 3px rgba(142, 100, 64, 0.15);
 }
 
 input[type="range"]::-moz-range-thumb:active {
