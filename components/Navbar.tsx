@@ -41,7 +41,7 @@ export default function Navbar({
   const showToast = saveSuccessAt != null;
 
   return (
-    <nav className="h-14 border-b border-border bg-background flex items-center justify-between px-4 relative">
+    <nav className="h-14 border-b border-border bg-background/95 backdrop-blur-sm flex items-center justify-between px-4 relative">
       <div className="flex items-center gap-3">
         <FileText className="w-6 h-6 text-foreground-secondary" />
         <span className="text-lg font-semibold text-foreground">illusions</span>
