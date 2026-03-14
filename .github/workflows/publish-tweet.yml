@@ -22,6 +22,7 @@ jobs:
     name: Post to Twitter/X
     if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
     runs-on: ubuntu-latest
+    environment: X.com
     steps:
       - uses: actions/checkout@v4
 
@@ -38,7 +39,7 @@ jobs:
           X_API_KEY: ${{ secrets.X_API_KEY }}
           X_API_SECRET: ${{ secrets.X_API_SECRET }}
           X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
-          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.ACCESS_TOKEN_SECRET }}
           RELEASE_VERSION: ${{ github.event.release.tag_name || github.event.inputs.release_version }}
           RELEASE_NOTES: ${{ github.event.release.body || github.event.inputs.release_notes }}
         run: python scripts/publish_tweet.py
