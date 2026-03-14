@@ -97,32 +97,6 @@ jobs:
           fi
           echo "All Apple signing credentials verified"
 
-  preflight-msstore:
-    name: Pre-flight (Microsoft Store)
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment: MicrosoftStore
-    env:
-      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-      MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
-      STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
-    steps:
-      - name: Verify Microsoft Store credentials
-        run: |
-          missing=()
-          [ -z "$MSSTORE_TENANT_ID" ] && missing+=("MSSTORE_TENANT_ID")
-          [ -z "$MSSTORE_CLIENT_ID" ] && missing+=("MSSTORE_CLIENT_ID")
-          [ -z "$MSSTORE_CLIENT_SECRET" ] && missing+=("MSSTORE_CLIENT_SECRET")
-          [ -z "$MSSTORE_SELLER_ID" ] && missing+=("MSSTORE_SELLER_ID")
-          [ -z "$STORE_PRODUCT_ID" ] && missing+=("STORE_PRODUCT_ID")
-          if [ ${#missing[@]} -ne 0 ]; then
-            echo "::error::Missing Microsoft Store credentials: ${missing[*]}"
-            exit 1
-          fi
-          echo "All Microsoft Store credentials verified"
-
   # ---------------------------------------------------------------------------
   # Build jobs
   # ---------------------------------------------------------------------------
@@ -393,79 +367,6 @@ jobs:
   # ---------------------------------------------------------------------------
   # Publish & Release
   # ---------------------------------------------------------------------------
-
-  publish-windows-store:
-    name: Publish to Microsoft Store
-    if: |
-      github.event_name != 'pull_request' &&
-      github.ref == 'refs/heads/main'
-    needs: [preflight-msstore, package-windows-msix]
-    runs-on: windows-latest
-    environment: MicrosoftStore
-
-    steps:
-      - name: Download MSIX artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: illusions-windows-msix-${{ needs.package-windows-msix.outputs.version }}
-          path: msix-packages
-
-      - name: Install msstore-cli
-        shell: pwsh
-        env:
-          MSSTORE_CLI_VERSION: "v0.3.9"
-        run: |
-          $url = "https://github.com/microsoft/msstore-cli/releases/download/$env:MSSTORE_CLI_VERSION/MSStoreCLI-win-x64.zip"
-          Invoke-WebRequest $url -OutFile msstore.zip
-          Expand-Archive msstore.zip -DestinationPath "$env:LOCALAPPDATA\msstore-cli" -Force
-          echo "$env:LOCALAPPDATA\msstore-cli" >> $env:GITHUB_PATH
-
-      - name: Configure msstore-cli credentials
-        shell: pwsh
-        env:
-          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
-        run: |
-          msstore reconfigure `
-            --tenantId $env:MSSTORE_TENANT_ID `
-            --clientId $env:MSSTORE_CLIENT_ID `
-            --clientSecret $env:MSSTORE_CLIENT_SECRET `
-            --sellerId $env:MSSTORE_SELLER_ID
-
-      - name: Submit to Microsoft Store
-        shell: pwsh
-        env:
-          STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
-        run: |
-          $appxFiles = Get-ChildItem "msix-packages\*.appx"
-          if ($appxFiles.Count -eq 0) {
-            throw "No .appx packages found in msix-packages/"
-          }
-          Write-Host "Found $($appxFiles.Count) .appx package(s):"
-          $appxFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
-
-          # Bundle .appx files into a single .msixupload for multi-arch submission
-          $uploadFile = "msix-packages\illusions.msixupload"
-          Compress-Archive -Path $appxFiles.FullName -DestinationPath $uploadFile -Force
-          Write-Host "Created bundle: $uploadFile"
-
-          # Publish using the MSIX-specific high-level command
-          msstore publish "$uploadFile" -id $env:STORE_PRODUCT_ID -v
-
-      # TODO: Microsoft Store Flight (beta) support — see issue #626
-      # - name: Submit to Microsoft Store Flight (beta)
-      #   if: github.ref == 'refs/heads/beta'
-      #   shell: pwsh
-      #   env:
-      #     STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
-      #     STORE_FLIGHT_ID: ${{ vars.STORE_FLIGHT_ID }}
-      #   run: |
-      #     $appxFiles = Get-ChildItem "msix-packages\*.appx"
-      #     $uploadFile = "msix-packages\illusions.msixupload"
-      #     Compress-Archive -Path $appxFiles.FullName -DestinationPath $uploadFile -Force
-      #     msstore publish "$uploadFile" -id $env:STORE_PRODUCT_ID -f $env:STORE_FLIGHT_ID -v
 
   release:
     name: Create GitHub Release

@@ -1,0 +1,153 @@
+name: Microsoft Store Weekly Submit
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Every Sunday at 00:00 UTC
+  workflow_dispatch:
+    inputs:
+      force_resubmit:
+        description: 'Force re-submission even if already submitted'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # To create submission marker tags
+
+env:
+  MSSTORE_CLI_VERSION: "v0.3.9"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Check whether the latest stable release has been submitted yet
+  # ---------------------------------------------------------------------------
+
+  check-new-version:
+    name: Check for Unsubmitted Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      should_submit: ${{ steps.check.outputs.should_submit }}
+    steps:
+      - name: Check for unsubmitted stable release
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE_RESUBMIT: ${{ inputs.force_resubmit }}
+        run: |
+          # Get the latest stable (non-prerelease, non-draft) release
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/releases" \
+            --jq '[.[] | select(.prerelease == false and .draft == false)][0].tag_name')
+
+          if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
+            echo "No stable release found — skipping submission."
+            echo "should_submit=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Latest stable release: $LATEST"
+          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
+
+          # Skip the marker check when force_resubmit is requested
+          if [ "$FORCE_RESUBMIT" = "true" ]; then
+            echo "Force re-submission requested — skipping marker check."
+            echo "should_submit=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Check whether a submission marker tag already exists for this version
+          MARKER="ms-store-$LATEST"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$MARKER" > /dev/null 2>&1; then
+            echo "Version $LATEST already submitted to Microsoft Store (marker tag: $MARKER)."
+            echo "should_submit=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version $LATEST has not been submitted yet."
+            echo "should_submit=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Download .appx assets from the release and submit to the Microsoft Store
+  # ---------------------------------------------------------------------------
+
+  submit-to-store:
+    name: Submit to Microsoft Store
+    needs: check-new-version
+    if: needs.check-new-version.outputs.should_submit == 'true'
+    runs-on: windows-latest
+    environment: MicrosoftStore
+    env:
+      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+      MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+      STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
+      VERSION: ${{ needs.check-new-version.outputs.version }}
+
+    steps:
+      - name: Download MSIX packages from GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          New-Item -ItemType Directory -Path msix-packages -Force | Out-Null
+          gh release download $env:VERSION --pattern "*.appx" --dir msix-packages --repo $env:GITHUB_REPOSITORY
+
+          $appxFiles = Get-ChildItem "msix-packages\*.appx"
+          if ($appxFiles.Count -eq 0) {
+            throw "No .appx packages found in release $env:VERSION. Cannot submit to Microsoft Store."
+          }
+          Write-Host "Downloaded $($appxFiles.Count) .appx package(s):"
+          $appxFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
+
+      - name: Install msstore-cli
+        shell: pwsh
+        run: |
+          $url = "https://github.com/microsoft/msstore-cli/releases/download/$env:MSSTORE_CLI_VERSION/MSStoreCLI-win-x64.zip"
+          Invoke-WebRequest $url -OutFile msstore.zip
+          Expand-Archive msstore.zip -DestinationPath "$env:LOCALAPPDATA\msstore-cli" -Force
+          echo "$env:LOCALAPPDATA\msstore-cli" >> $env:GITHUB_PATH
+
+      - name: Configure msstore-cli credentials
+        shell: pwsh
+        run: |
+          msstore reconfigure `
+            --tenantId $env:MSSTORE_TENANT_ID `
+            --clientId $env:MSSTORE_CLIENT_ID `
+            --clientSecret $env:MSSTORE_CLIENT_SECRET `
+            --sellerId $env:MSSTORE_SELLER_ID
+
+      - name: Submit to Microsoft Store
+        shell: pwsh
+        run: |
+          $appxFiles = Get-ChildItem "msix-packages\*.appx"
+
+          # Bundle multiple .appx files into a single .msixupload for multi-arch submission
+          $uploadFile = "msix-packages\illusions.msixupload"
+          Compress-Archive -Path $appxFiles.FullName -DestinationPath $uploadFile -Force
+          Write-Host "Created bundle: $uploadFile"
+
+          msstore publish "$uploadFile" -id $env:STORE_PRODUCT_ID -v
+
+      - name: Create submission marker tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Resolve the commit SHA — handles both lightweight and annotated tags
+          REF_DATA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION")
+          OBJECT_TYPE=$(echo "$REF_DATA" | jq -r '.object.type')
+          OBJECT_SHA=$(echo "$REF_DATA" | jq -r '.object.sha')
+
+          if [ "$OBJECT_TYPE" = "tag" ]; then
+            # Annotated tag: dereference the tag object to get the underlying commit SHA
+            SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$OBJECT_SHA" --jq '.object.sha')
+          else
+            SHA="$OBJECT_SHA"
+          fi
+
+          # Create a marker tag so future runs know this version was submitted
+          MARKER="ms-store-$VERSION"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$MARKER" \
+            -f "sha=$SHA"
+
+          echo "Created submission marker tag: $MARKER"
