@@ -1,5 +1,6 @@
 import { AbstractLintRule } from "../base-rule";
 import { isInDialogue } from "../helpers/dialogue-mask";
+import { splitIntoSentences } from "../helpers/sentence-splitter";
 import type { LintIssue, LintRuleConfig, LintReference , CorrectionEngine} from "../types";
 
 // ---------------------------------------------------------------------------
@@ -22,37 +23,25 @@ const STYLE_GUIDE_REF: LintReference = {
 interface SentenceInfo {
   /** Start offset in the original text (inclusive) */
   from: number;
-  /** End offset in the original text (exclusive, includes the 。) */
+  /** End offset in the original text (exclusive, includes the delimiter) */
   to: number;
-  /** Detected ending pattern (last 2 characters before 。), or null if too short */
+  /** Detected ending pattern (last 2 characters before the delimiter), or null if too short */
   endingPattern: string | null;
 }
 
 /**
- * Find all sentence boundaries by locating 。 positions in the text,
- * then extract sentence information including ending patterns.
+ * Extract sentences from text using the shared sentence splitter,
+ * then compute ending patterns for each sentence.
  *
  * Handles edge cases:
- * - Empty sentences (consecutive 。。) are skipped
- * - Dialogue endings (」。) extract the pattern from before 」
+ * - Dialogue endings (」) extract the pattern from before 」
  * - Very short sentences (fewer than 2 characters) get a null pattern
  */
 function extractSentences(text: string): SentenceInfo[] {
-  const sentences: SentenceInfo[] = [];
-  let sentenceStart = 0;
+  const spans = splitIntoSentences(text);
 
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] !== "。") continue;
-
-    // Extract the sentence content (text before 。)
-    const content = text.slice(sentenceStart, i);
-
-    // Skip empty sentences (e.g., consecutive 。。 or leading 。)
-    const trimmed = content.trim();
-    if (trimmed.length === 0) {
-      sentenceStart = i + 1;
-      continue;
-    }
+  return spans.map((span) => {
+    const trimmed = span.text.trim();
 
     // Determine the effective ending text, stripping trailing 」 for dialogue
     let effectiveEnding = trimmed;
@@ -69,16 +58,12 @@ function extractSentences(text: string): SentenceInfo[] {
       endingPattern = effectiveEnding;
     }
 
-    sentences.push({
-      from: sentenceStart,
-      to: i + 1, // Include the 。 character
+    return {
+      from: span.from,
+      to: span.to + 1, // Include the delimiter character
       endingPattern,
-    });
-
-    sentenceStart = i + 1;
-  }
-
-  return sentences;
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -94,8 +79,9 @@ function extractSentences(text: string): SentenceInfo[] {
  * rhythm and reduce readability in Japanese prose.
  *
  * Detection strategy:
- * 1. Find sentence boundaries by locating 。 positions
- * 2. Extract the last 2 characters before 。 as the "ending pattern"
+ * 1. Find sentence boundaries using the shared sentence splitter
+ *    (splits on 。！？!? and newlines)
+ * 2. Extract the last 2 characters before the delimiter as the "ending pattern"
  * 3. Track consecutive runs of the same pattern
  * 4. Flag runs that meet or exceed the threshold
  *
