@@ -9,6 +9,16 @@
 import MarkdownIt from "markdown-it";
 
 import type { ExportMetadata, Chapter } from "./types";
+import {
+  MDI_RUBY_RE,
+  MDI_TCY_RE,
+  MDI_NOBR_RE,
+  MDI_KERN_RE,
+  MDI_ESC_BRACE_RE,
+  MDI_ESC_CARET_RE,
+  MDI_ESC_BRACKET_RE,
+  MDI_KERN_AMOUNT_RE,
+} from "./mdi-parser";
 
 // Placeholder prefix/suffix using Unicode Private Use Area (U+E000).
 // PUA characters survive markdown-it rendering (unlike \u0000 which is replaced
@@ -20,7 +30,7 @@ const PLACEHOLDER_SUFFIX = "\uE000";
  * Validate that a kern amount matches the expected pattern (e.g. "0.5em", "-1em", "+0.25em")
  */
 function isValidKernAmount(amount: string): boolean {
-  return /^[+-]?\d+(\.\d+)?em$/.test(amount);
+  return MDI_KERN_AMOUNT_RE.test(amount);
 }
 
 /**
@@ -85,41 +95,39 @@ function preProcessMdiSyntax(markdown: string): MdiPreProcessResult {
 
   // 1. Handle escaped MDI syntax (backslash before special chars)
   // Escape sequences: \{, \^, \[
-  result = result.replace(/\\(\{)/g, (_match, char) =>
+  result = result.replace(MDI_ESC_BRACE_RE, (_match, char) =>
     addPlaceholder(char as string)
   );
-  result = result.replace(/\\(\^)/g, (_match, char) =>
+  result = result.replace(MDI_ESC_CARET_RE, (_match, char) =>
     addPlaceholder(char as string)
   );
-  result = result.replace(/\\(\[)/g, (_match, char) =>
+  result = result.replace(MDI_ESC_BRACKET_RE, (_match, char) =>
     addPlaceholder(char as string)
   );
 
   // 2. Ruby: {base|ruby}
-  // Match {non-empty-base|non-empty-ruby} but not escaped
   result = result.replace(
-    /\{([^{}|]+)\|([^{}|]+)\}/g,
+    MDI_RUBY_RE,
     (_match, base: string, ruby: string) => addPlaceholder(buildRubyHtml(base, ruby))
   );
 
   // 3. Tate-chu-yoko: ^text^
-  // Match ^non-empty-text^ but not escaped
   result = result.replace(
-    /\^([^^]+)\^/g,
+    MDI_TCY_RE,
     (_match, text: string) =>
       addPlaceholder(`<span class="mdi-tcy">${text}</span>`)
   );
 
   // 4. No-break: [[no-break:text]]
   result = result.replace(
-    /\[\[no-break:([^\]]+)\]\]/g,
+    MDI_NOBR_RE,
     (_match, text: string) =>
       addPlaceholder(`<span class="mdi-nobr">${text}</span>`)
   );
 
   // 5. Kerning: [[kern:amount:text]]
   result = result.replace(
-    /\[\[kern:([^:\]]+):([^\]]+)\]\]/g,
+    MDI_KERN_RE,
     (_match, amount: string, text: string) => {
       if (!isValidKernAmount(amount)) {
         // Invalid kern amount: return the original text unmodified
