@@ -17,7 +17,7 @@
 // ---------------------------------------------------------------------------
 
 /** Ruby annotation: {base|ruby} */
-export const MDI_RUBY_RE = /\{([^|{}]+)\|([^}]+)\}/g;
+export const MDI_RUBY_RE = /\{([^|{}]+)\|([^|}]+)\}/g;
 
 /** Tate-chu-yoko: ^text^ */
 export const MDI_TCY_RE = /\^([^^]+)\^/g;

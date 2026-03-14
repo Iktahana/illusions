@@ -60,7 +60,9 @@ function extractSentences(text: string): SentenceInfo[] {
 
     return {
       from: span.from,
-      to: span.to + 1, // Include the delimiter character
+      // splitIntoSentences() sets `to` to the delimiter position (exclusive
+      // end of sentence text); +1 includes the delimiter in the issue range
+      to: span.to + 1,
       endingPattern,
     };
   });
