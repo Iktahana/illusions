@@ -14,6 +14,9 @@ on:
         required: true
         type: string
 
+permissions:
+  models: read
+
 jobs:
   tweet:
     name: Post to Twitter/X

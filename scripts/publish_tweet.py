@@ -74,6 +74,15 @@ if __name__ == "__main__":
     version = os.environ.get("RELEASE_VERSION", "unknown")
     notes = os.environ.get("RELEASE_NOTES", "")
 
+    missing = [
+        key
+        for key in ("X_API_KEY", "X_API_SECRET", "X_ACCESS_TOKEN", "X_ACCESS_TOKEN_SECRET")
+        if not os.environ.get(key)
+    ]
+    if missing:
+        print(f"Error: Missing required secrets: {', '.join(missing)}")
+        raise SystemExit(1)
+
     if not notes:
         print("Warning: RELEASE_NOTES is empty")
 
