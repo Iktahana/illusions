@@ -16,7 +16,7 @@ interface GlassDialogProps {
 }
 
 const GLASS_CLASSES =
-  "rounded-xl bg-background-elevated border border-border shadow-xl";
+  "rounded-xl bg-background-elevated border border-border shadow-2xl animate-scale-in";
 
 const DEFAULT_PANEL = "mx-4 w-full max-w-md p-6";
 
@@ -41,7 +41,7 @@ export default function GlassDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
       aria-label={ariaLabel}

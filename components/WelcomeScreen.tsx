@@ -98,8 +98,14 @@ export default function WelcomeScreen({
   }, [isProjectModeSupported]);
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-background p-4">
-      <div className="flex w-full max-w-lg flex-col items-center gap-8">
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-background p-4">
+      {/* Ambient gradient glow — decorative, non-interactive */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-1/3 h-[480px] w-[640px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/[0.06] blur-3xl"
+      />
+
+      <div className="relative flex w-full max-w-lg flex-col items-center gap-8 animate-fade-in">
         {/* Restore error banner */}
         {restoreError && (
           <div className="w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 flex items-center justify-between gap-3">
@@ -123,7 +129,7 @@ export default function WelcomeScreen({
             <img
               src="./logo/illusions.min.svg"
               alt="illusions"
-              className="h-16 w-auto dark:invert"
+              className="h-16 w-auto dark:invert drop-shadow-sm"
             />
           </div>
           <p className="mt-2 text-sm text-foreground-secondary">
@@ -138,9 +144,9 @@ export default function WelcomeScreen({
             onClick={onCreateProject}
             disabled={!isProjectModeSupported}
             className={clsx(
-              "flex flex-col items-center gap-2 rounded-xl border border-border p-5 transition-colors",
+              "flex flex-col items-center gap-2 rounded-xl border border-border p-5 transition-all duration-200",
               isProjectModeSupported
-                ? "hover:bg-hover hover:border-border-secondary cursor-pointer"
+                ? "hover:bg-hover hover:border-border-secondary hover:shadow-md hover:scale-[1.02] active:scale-[0.99] cursor-pointer"
                 : "cursor-not-allowed opacity-50"
             )}
           >
@@ -155,9 +161,9 @@ export default function WelcomeScreen({
             onClick={onOpenProject}
             disabled={!isProjectModeSupported}
             className={clsx(
-              "flex flex-col items-center gap-2 rounded-xl border border-border p-5 transition-colors",
+              "flex flex-col items-center gap-2 rounded-xl border border-border p-5 transition-all duration-200",
               isProjectModeSupported
-                ? "hover:bg-hover hover:border-border-secondary cursor-pointer"
+                ? "hover:bg-hover hover:border-border-secondary hover:shadow-md hover:scale-[1.02] active:scale-[0.99] cursor-pointer"
                 : "cursor-not-allowed opacity-50"
             )}
           >
@@ -170,7 +176,7 @@ export default function WelcomeScreen({
           <button
             type="button"
             onClick={onOpenStandaloneFile}
-            className="flex flex-col items-center gap-2 rounded-xl border border-border p-5 transition-colors hover:bg-hover hover:border-border-secondary cursor-pointer"
+            className="flex flex-col items-center gap-2 rounded-xl border border-border p-5 transition-all duration-200 hover:bg-hover hover:border-border-secondary hover:shadow-md hover:scale-[1.02] active:scale-[0.99] cursor-pointer"
           >
             <FileText className="h-6 w-6 text-accent" />
             <span className="text-sm font-medium text-foreground">
