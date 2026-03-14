@@ -61,8 +61,9 @@ function extractSentences(text: string): SentenceInfo[] {
     return {
       from: span.from,
       // splitIntoSentences() sets `to` to the delimiter position (exclusive
-      // end of sentence text); +1 includes the delimiter in the issue range
-      to: span.to + 1,
+      // end of sentence text). When there is a delimiter character at that
+      // position, include it in the issue range; otherwise keep `to` as-is.
+      to: span.to < text.length ? span.to + 1 : span.to,
       endingPattern,
     };
   });
