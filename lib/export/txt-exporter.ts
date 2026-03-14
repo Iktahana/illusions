@@ -6,6 +6,8 @@
  * - With ruby: ruby text placed in fullwidth parentheses（）
  */
 
+import { stripMdiInlineSyntax, replaceMdiWithRubyText } from "./mdi-parser";
+
 /**
  * Convert MDI markdown to plain text without ruby annotations.
  * Strips all MDI syntax and markdown formatting.
@@ -13,17 +15,8 @@
 export function mdiToPlainText(content: string): string {
   let result = content;
 
-  // Ruby: {base|ruby} → base (discard ruby)
-  result = result.replace(/\{([^|{}]+)\|[^}]+\}/g, "$1");
-
-  // Tate-chu-yoko: ^text^ → text
-  result = result.replace(/\^([^^]+)\^/g, "$1");
-
-  // No-break: [[no-break:text]] → text
-  result = result.replace(/\[\[no-break:([^\]]+)\]\]/g, "$1");
-
-  // Kerning: [[kern:val:text]] → text
-  result = result.replace(/\[\[kern:[^:\]]+:([^\]]+)\]\]/g, "$1");
+  // Strip all MDI inline syntax (ruby, tcy, nobr, kern)
+  result = stripMdiInlineSyntax(result);
 
   // Strip markdown formatting
   result = stripMarkdown(result);
@@ -38,24 +31,8 @@ export function mdiToPlainText(content: string): string {
 export function mdiToRubyText(content: string): string {
   let result = content;
 
-  // Ruby: {base|ruby} → base（ruby）
-  // Remove dots in split ruby (e.g. とう.きょう → とうきょう)
-  result = result.replace(
-    /\{([^|{}]+)\|([^}]+)\}/g,
-    (_match, base: string, ruby: string) => {
-      const cleanRuby = ruby.replace(/\./g, "");
-      return `${base}\uFF08${cleanRuby}\uFF09`;
-    },
-  );
-
-  // Tate-chu-yoko: ^text^ → text
-  result = result.replace(/\^([^^]+)\^/g, "$1");
-
-  // No-break: [[no-break:text]] → text
-  result = result.replace(/\[\[no-break:([^\]]+)\]\]/g, "$1");
-
-  // Kerning: [[kern:val:text]] → text
-  result = result.replace(/\[\[kern:[^:\]]+:([^\]]+)\]\]/g, "$1");
+  // Replace MDI inline syntax with ruby text representation
+  result = replaceMdiWithRubyText(result);
 
   // Strip markdown formatting
   result = stripMarkdown(result);

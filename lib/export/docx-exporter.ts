@@ -14,6 +14,7 @@ import {
   AlignmentType,
 } from 'docx';
 import type { ExportMetadata } from './types';
+import { replaceMdiWithRubyText } from './mdi-parser';
 
 export interface DocxExportOptions {
   metadata: ExportMetadata;
@@ -181,23 +182,8 @@ function createParagraph(text: string): Paragraph {
 function parseInlineFormatting(text: string): TextRun[] {
   const runs: TextRun[] = [];
 
-  // Process MDI ruby: {base|ruby} -> base(ruby)
-  let processed = text.replace(
-    /\{([^|{}]+)\|([^}]+)\}/g,
-    (_match, base: string, ruby: string) => {
-      const cleanRuby = ruby.replace(/\./g, '');
-      return `${base}\uFF08${cleanRuby}\uFF09`;
-    }
-  );
-
-  // Process tate-chu-yoko: ^text^ -> text (just remove markers in DOCX)
-  processed = processed.replace(/\^([^^]+)\^/g, '$1');
-
-  // Process no-break: [[no-break:text]] -> text
-  processed = processed.replace(/\[\[no-break:([^\]]+)\]\]/g, '$1');
-
-  // Process kerning: [[kern:val:text]] -> text
-  processed = processed.replace(/\[\[kern:[^:\]]+:([^\]]+)\]\]/g, '$1');
+  // Process all MDI inline syntax via shared parser (ruby → fullwidth parens)
+  let processed = replaceMdiWithRubyText(text);
 
   // Now parse bold/italic markdown
   // Split by bold-italic (***text***), bold (**text**), and italic (*text*) markers

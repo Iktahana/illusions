@@ -71,4 +71,27 @@ describe("sentence-ending-repetition", () => {
     const issues = rule.lint(text, config);
     expect(issues.length).toBeGreaterThan(0);
   });
+
+  // -----------------------------------------------------------------------
+  // Sentences ending with ！ and ？ (shared sentence splitter support)
+  // -----------------------------------------------------------------------
+  it("should detect repetition in sentences ending with ！", () => {
+    const text = "すごいです！素晴らしいです！見事です！";
+    const issues = rule.lint(text, config);
+    expect(issues.length).toBeGreaterThan(0);
+    expect(issues[0].ruleId).toBe("sentence-ending-repetition");
+  });
+
+  it("should detect repetition in sentences ending with ？", () => {
+    const text = "本当ですか？本当ですか？本当ですか？";
+    const issues = rule.lint(text, config);
+    expect(issues.length).toBeGreaterThan(0);
+    expect(issues[0].ruleId).toBe("sentence-ending-repetition");
+  });
+
+  it("should not flag mixed delimiters with different endings", () => {
+    const text = "彼は行きます。驚きました！走りますか？";
+    const issues = rule.lint(text, config);
+    expect(issues).toHaveLength(0);
+  });
 });
