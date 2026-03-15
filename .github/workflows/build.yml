@@ -266,8 +266,14 @@ jobs:
   package-windows-nsis:
     name: Build (Windows NSIS)
     needs: [compute-version, build-windows-core]
-    # Allow PRs to run (compute-version and build-windows-core are skipped/no-op on PRs)
-    if: always() && (needs.build-windows-core.result == 'success' || needs.build-windows-core.result == 'skipped')
+    # Allow PRs to run (compute-version and build-windows-core are skipped/no-op on PRs),
+    # but require successful compute-version and build-windows-core for non-PR events.
+    if: >
+      always() &&
+      (
+        github.event_name == 'pull_request' ||
+        (needs.build-windows-core.result == 'success' && needs.compute-version.result == 'success')
+      )
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
