@@ -6,7 +6,13 @@
       "Bash(head:*)",
       "Bash(grep:*)",
       "Bash(find:*)",
-      "Bash(tail:*)"
+      "Bash(tail:*)",
+      "Bash(git checkout:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh secret:*)",
+      "Bash(gh api:*)",
+      "Bash(git add:*)"
     ]
   }
 }
