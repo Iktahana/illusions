@@ -293,6 +293,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Type check (PR only)
+        if: github.event_name == 'pull_request'
+        run: npx tsc --noEmit
+
       # --- Full packaging steps (push to main/alpha/beta/dev only) ---
 
       - name: Restore Electron caches
