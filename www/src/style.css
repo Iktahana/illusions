@@ -13,11 +13,11 @@
   --color-border-hover:   rgba(210, 195, 170, 0.28);
   --color-text:           #e8e0d5;
   --color-text-muted:     rgba(232, 224, 213, 0.5);
-  --color-accent:         #c9a96e;
-  --color-accent-dim:     rgba(201, 169, 110, 0.15);
-  --color-accent-hover:   #d4b878;
+  --color-accent:         #ffffff;
+  --color-accent-dim:     rgba(255, 255, 255, 0.1);
+  --color-accent-hover:   #ffffff;
   --color-border-strong:  rgba(210, 195, 170, 0.45);
-  --shadow-accent:        0 4px 16px rgba(201, 169, 110, 0.3);
+  --shadow-accent:        0 4px 16px rgba(255, 255, 255, 0.15);
 
   color: var(--color-text);
   --bg-image: none;
@@ -91,7 +91,7 @@ h1 {
   width: 100%;
   height: auto;
   /* Soft, ink-like diffusion instead of hard neon glow */
-  filter: drop-shadow(0 2px 12px rgba(201, 169, 110, 0.25))
+  filter: drop-shadow(0 2px 12px rgba(255, 255, 255, 0.1))
           drop-shadow(0 0 40px rgba(232, 224, 213, 0.08));
 }
 
@@ -402,13 +402,13 @@ h1 {
   border-radius: 10px;
   text-decoration: none;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 12px rgba(201, 169, 110, 0.25);
+  box-shadow: 0 2px 12px rgba(255, 255, 255, 0.1);
 }
 
 .btn-hero-download:hover {
-  background: #d4b878;
+  background: #f0f0f0;
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(201, 169, 110, 0.35);
+  box-shadow: 0 6px 24px rgba(255, 255, 255, 0.2);
 }
 
 .btn-hero-download-icon {
@@ -454,7 +454,7 @@ h1 {
 
 .release-version {
   background: var(--color-accent-dim);
-  border: 1px solid rgba(201, 169, 110, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 0.25rem 0.75rem;
   border-radius: 20px;
   font-weight: 600;
@@ -499,7 +499,7 @@ h1 {
 }
 
 .platform-current {
-  border-color: rgba(201, 169, 110, 0.35);
+  border-color: rgba(255, 255, 255, 0.2);
   background: var(--color-surface-hover);
 }
 
@@ -535,7 +535,7 @@ h1 {
 .platform-badge {
   font-size: 0.75rem;
   background: var(--color-accent-dim);
-  border: 1px solid rgba(201, 169, 110, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: var(--color-accent);
   padding: 0.2rem 0.6rem;
   border-radius: 12px;
