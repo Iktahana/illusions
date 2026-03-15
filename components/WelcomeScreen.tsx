@@ -194,7 +194,7 @@ export default function WelcomeScreen({
             すべての機能を利用するには、デスクトップ版をお試しください。
           </p>
           <a
-            href="https://download.illusions.app"
+            href="https://www.illusions.app/downloads/"
             target="_blank"
             rel="noopener noreferrer"
             className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover"

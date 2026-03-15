@@ -264,10 +264,18 @@ jobs:
           retention-days: 1
 
   package-windows-nsis:
-    name: Package (Windows NSIS)
+    name: Build (Windows NSIS)
     needs: [compute-version, build-windows-core]
-    if: github.event_name != 'pull_request'
-    runs-on: windows-latest
+    # Allow PRs to run (build-windows-core runs in type-check-only mode on PRs; compute-version is skipped),
+    # but require successful compute-version and build-windows-core for non-PR events before packaging.
+    if: >
+      always() &&
+      needs.build-windows-core.result == 'success' &&
+      (
+        github.event_name == 'pull_request' ||
+        needs.compute-version.result == 'success'
+      )
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
@@ -286,7 +294,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # --- Full packaging steps (push to main/alpha/beta/dev only) ---
+
       - name: Restore Electron caches
+        if: github.event_name != 'pull_request'
         uses: actions/cache@v4
         with:
           path: |
@@ -297,27 +308,39 @@ jobs:
             electron-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Update package.json version
+        if: github.event_name != 'pull_request'
         run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version
 
       - name: Download build output
+        if: github.event_name != 'pull_request'
         uses: actions/download-artifact@v4
         with:
           name: windows-build-output
 
       - name: Build NSIS installer
+        if: github.event_name != 'pull_request'
         run: npx electron-builder --win nsis --x64 --arm64 --publish never
 
       - name: Upload NSIS artifacts
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: illusions-windows-${{ needs.compute-version.outputs.full }}
           path: dist-electron/**
 
   package-windows-msix:
-    name: Package (Windows MSIX)
+    name: Build (Windows Store)
     needs: [compute-version, build-windows-core]
-    if: github.event_name != 'pull_request'
-    runs-on: windows-latest
+    # Allow PRs to run: build-windows-core runs on PRs (type-check-only mode; compute-version is skipped).
+    # For non-PR events, require successful compute-version and build-windows-core before packaging.
+    if: >
+      always() &&
+      needs.build-windows-core.result == 'success' &&
+      (
+        github.event_name == 'pull_request' ||
+        needs.compute-version.result == 'success'
+      )
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     outputs:
       version: ${{ needs.compute-version.outputs.full }}
     env:
@@ -338,7 +361,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # --- Full packaging steps (push to main/alpha/beta/dev only) ---
+
       - name: Restore Electron caches
+        if: github.event_name != 'pull_request'
         uses: actions/cache@v4
         with:
           path: |
@@ -349,17 +375,21 @@ jobs:
             electron-${{ runner.os }}-msix-
 
       - name: Update package.json version (4-part for MSIX)
+        if: github.event_name != 'pull_request'
         run: npm version ${{ needs.compute-version.outputs.msix }} --no-git-tag-version
 
       - name: Download build output
+        if: github.event_name != 'pull_request'
         uses: actions/download-artifact@v4
         with:
           name: windows-build-output
 
       - name: Build MSIX package
+        if: github.event_name != 'pull_request'
         run: npx electron-builder --win appx --x64 --arm64 --publish never
 
       - name: Upload MSIX artifacts
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: illusions-windows-msix-${{ needs.compute-version.outputs.full }}
