@@ -331,7 +331,14 @@ jobs:
     name: Build (Windows Store)
     needs: [compute-version, build-windows-core]
     # Allow PRs to run (compute-version and build-windows-core are skipped/no-op on PRs)
-    if: always() && (needs.build-windows-core.result == 'success' || needs.build-windows-core.result == 'skipped')
+    if: |
+      always() && (
+        (github.event_name == 'pull_request' &&
+          (needs.build-windows-core.result == 'success' || needs.build-windows-core.result == 'skipped')) ||
+        (github.event_name != 'pull_request' &&
+          needs.compute-version.result == 'success' &&
+          needs.build-windows-core.result == 'success')
+      )
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     outputs:
       version: ${{ needs.compute-version.outputs.full }}
