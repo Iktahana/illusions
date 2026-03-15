@@ -266,13 +266,14 @@ jobs:
   package-windows-nsis:
     name: Build (Windows NSIS)
     needs: [compute-version, build-windows-core]
-    # Allow PRs to run (compute-version is skipped and build-windows-core runs in type-check-only mode on PRs),
+    # Allow PRs to run (build-windows-core runs in type-check-only mode on PRs; compute-version is skipped),
     # but require successful compute-version and build-windows-core for non-PR events before packaging.
     if: >
       always() &&
+      needs.build-windows-core.result == 'success' &&
       (
         github.event_name == 'pull_request' ||
-        (needs.build-windows-core.result == 'success' && needs.compute-version.result == 'success')
+        needs.compute-version.result == 'success'
       )
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     env:
@@ -292,10 +293,6 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-
-      - name: Type check (PR only)
-        if: github.event_name == 'pull_request'
-        run: npx tsc --noEmit
 
       # --- Full packaging steps (push to main/alpha/beta/dev only) ---
 
@@ -334,14 +331,14 @@ jobs:
   package-windows-msix:
     name: Build (Windows Store)
     needs: [compute-version, build-windows-core]
-    # Allow PRs to run (compute-version and build-windows-core are skipped/no-op on PRs)
-    if: |
-      always() && (
-        (github.event_name == 'pull_request' &&
-          (needs.build-windows-core.result == 'success' || needs.build-windows-core.result == 'skipped')) ||
-        (github.event_name != 'pull_request' &&
-          needs.compute-version.result == 'success' &&
-          needs.build-windows-core.result == 'success')
+    # Allow PRs to run: build-windows-core runs on PRs (type-check-only mode; compute-version is skipped).
+    # For non-PR events, require successful compute-version and build-windows-core before packaging.
+    if: >
+      always() &&
+      needs.build-windows-core.result == 'success' &&
+      (
+        github.event_name == 'pull_request' ||
+        needs.compute-version.result == 'success'
       )
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     outputs:
