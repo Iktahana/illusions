@@ -54,6 +54,9 @@ jobs:
               - '!MDI.md'
               - '!.github/workflows/deploy-www.yml'
 
+  # NOTE: All desktop jobs run only when desktop_changed=true.
+  # PRs that touch only www/ or documentation are intentionally skipped.
+
   # ---------------------------------------------------------------------------
   # Compute version — single source of truth for all build jobs (non-PR only)
   # ---------------------------------------------------------------------------
