@@ -46,27 +46,13 @@ jobs:
         with:
           filters: |
             desktop_changed:
-              - 'app/**'
-              - 'components/**'
-              - 'contexts/**'
-              - 'electron/**'
-              - 'lib/**'
-              - 'packages/**'
-              - 'scripts/**'
-              - 'types/**'
-              - 'prompts/**'
-              - 'build/**'
-              - 'quicklook/**'
-              - 'public/**'
-              - 'package.json'
-              - 'package-lock.json'
-              - 'tsconfig.json'
-              - 'next.config.ts'
-              - 'vitest.config.ts'
-              - 'tailwind.config.ts'
-              - 'postcss.config.mjs'
-              - '.github/workflows/build.yml'
-              - '!www/**' # Explicitly exclude standalone www/ changes from desktop builds
+              - '**'
+              - '!www/**' # www/ のみの変更ではデスクトップビルドを実行しない
+              - '!docs/**'
+              - '!README.md'
+              - '!TERMS.md'
+              - '!MDI.md'
+              - '!.github/workflows/deploy-www.yml'
 
   # ---------------------------------------------------------------------------
   # Compute version — single source of truth for all build jobs (non-PR only)
