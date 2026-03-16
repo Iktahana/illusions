@@ -25,12 +25,44 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # Detect which areas changed — used to avoid bumping desktop version when
+  # only www/ assets are touched
+  # ---------------------------------------------------------------------------
+
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      desktop: ${{ steps.filter.outputs.desktop }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Filter paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            desktop:
+              - '**'
+              - '!www/**'
+              - '!.github/workflows/deploy-www.yml'
+
+  # ---------------------------------------------------------------------------
   # Compute version — single source of truth for all build jobs (non-PR only)
   # ---------------------------------------------------------------------------
 
   compute-version:
     name: Compute Version
-    if: github.event_name != 'pull_request'
+    needs: detect-changes
+    if: |
+      github.event_name != 'pull_request' &&
+      (
+        needs.detect-changes.outputs.desktop == 'true' ||
+        startsWith(github.ref, 'refs/tags/')
+      )
     runs-on: ubuntu-latest
     outputs:
       full: ${{ steps.version.outputs.full }}
@@ -73,7 +105,13 @@ jobs:
 
   preflight-apple:
     name: Pre-flight (Apple Signing)
-    if: github.event_name != 'pull_request'
+    needs: detect-changes
+    if: |
+      github.event_name != 'pull_request' &&
+      (
+        needs.detect-changes.outputs.desktop == 'true' ||
+        startsWith(github.ref, 'refs/tags/')
+      )
     runs-on: ubuntu-latest
     environment: Apple
     env:
@@ -106,9 +144,13 @@ jobs:
 
   build-macos:
     name: Build (macOS ${{ matrix.arch }})
-    needs: [preflight-apple, compute-version]
+    needs: [preflight-apple, compute-version, detect-changes]
     # Allow PRs to run (preflight-apple and compute-version are skipped on PRs)
-    if: always() && (needs.preflight-apple.result == 'success' || needs.preflight-apple.result == 'skipped')
+    if: |
+      always() &&
+      (needs.preflight-apple.result == 'success' || needs.preflight-apple.result == 'skipped') &&
+      (needs.compute-version.result == 'success' || needs.compute-version.result == 'skipped') &&
+      (needs.detect-changes.outputs.desktop == 'true' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'macos-latest' }}
     strategy:
       matrix:
@@ -194,8 +236,11 @@ jobs:
 
   build-windows-core:
     name: Build (Windows Core)
-    needs: [compute-version]
-    if: always() && (needs.compute-version.result == 'success' || needs.compute-version.result == 'skipped')
+    needs: [compute-version, detect-changes]
+    if: |
+      always() &&
+      (needs.compute-version.result == 'success' || needs.compute-version.result == 'skipped') &&
+      (needs.detect-changes.outputs.desktop == 'true' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
@@ -265,7 +310,7 @@ jobs:
 
   package-windows-nsis:
     name: Build (Windows NSIS)
-    needs: [compute-version, build-windows-core]
+    needs: [compute-version, build-windows-core, detect-changes]
     # Allow PRs to run (build-windows-core runs in type-check-only mode on PRs; compute-version is skipped),
     # but require successful compute-version and build-windows-core for non-PR events before packaging.
     if: >
@@ -275,6 +320,8 @@ jobs:
         github.event_name == 'pull_request' ||
         needs.compute-version.result == 'success'
       )
+      &&
+      (needs.detect-changes.outputs.desktop == 'true' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
@@ -330,7 +377,7 @@ jobs:
 
   package-windows-msix:
     name: Build (Windows Store)
-    needs: [compute-version, build-windows-core]
+    needs: [compute-version, build-windows-core, detect-changes]
     # Allow PRs to run: build-windows-core runs on PRs (type-check-only mode; compute-version is skipped).
     # For non-PR events, require successful compute-version and build-windows-core before packaging.
     if: >
@@ -340,6 +387,8 @@ jobs:
         github.event_name == 'pull_request' ||
         needs.compute-version.result == 'success'
       )
+      &&
+      (needs.detect-changes.outputs.desktop == 'true' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     outputs:
       version: ${{ needs.compute-version.outputs.full }}
@@ -403,8 +452,10 @@ jobs:
 
   release:
     name: Create GitHub Release
-    if: github.event_name != 'pull_request'
-    needs: [compute-version, build-macos, package-windows-nsis, package-windows-msix]
+    if: |
+      github.event_name != 'pull_request' &&
+      (needs.detect-changes.outputs.desktop == 'true' || startsWith(github.ref, 'refs/tags/'))
+    needs: [compute-version, build-macos, package-windows-nsis, package-windows-msix, detect-changes]
     runs-on: ubuntu-latest
 
     steps:
@@ -439,9 +490,10 @@ jobs:
 
   post-release-notifications:
     name: Post-release Notifications
-    needs: [compute-version, release]
+    needs: [compute-version, release, detect-changes]
     if: |
       github.event_name != 'pull_request' &&
+      (needs.detect-changes.outputs.desktop == 'true' || startsWith(github.ref, 'refs/tags/')) &&
       needs.compute-version.outputs.branch == 'main' &&
       needs.release.result == 'success'
     runs-on: ubuntu-latest
