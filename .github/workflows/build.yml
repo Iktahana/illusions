@@ -53,6 +53,7 @@ jobs:
               - '!TERMS.md'
               - '!MDI.md'
               - '!.github/workflows/deploy-www.yml'
+              - '!.github/workflows/build.yml'
 
   # NOTE: All desktop jobs run only when desktop_changed=true.
   # PRs that touch only www/ or documentation are intentionally skipped.
@@ -66,7 +67,6 @@ jobs:
     needs: detect-changes
     if: |
       github.event_name != 'pull_request' &&
-      needs.detect-changes.result == 'success' &&
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ubuntu-latest
     outputs:
@@ -113,7 +113,6 @@ jobs:
     needs: detect-changes
     if: |
       github.event_name != 'pull_request' &&
-      needs.detect-changes.result == 'success' &&
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ubuntu-latest
     environment: Apple
@@ -149,6 +148,8 @@ jobs:
     name: Build (macOS ${{ matrix.arch }})
     needs: [detect-changes, preflight-apple, compute-version]
     # Allow PRs to run (preflight-apple and compute-version are skipped on PRs)
+    # always() keeps the job running for PR type-checks while still requiring
+    # detect-changes to succeed and report desktop_changed=true.
     if: |
       always() &&
       (needs.preflight-apple.result == 'success' || needs.preflight-apple.result == 'skipped') &&
