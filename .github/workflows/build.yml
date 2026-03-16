@@ -52,7 +52,7 @@ jobs:
               - '!README.md'
               - '!TERMS.md'
               - '!MDI.md'
-              - '!.github/workflows/deploy-www.yml'
+              - '!.github/workflows/deploy-www.yml' # Web CD changes should not gate desktop builds
               # Keep build.yml included so workflow edits validate desktop builds
 
   # NOTE: All desktop jobs run only when desktop_changed=true.
@@ -150,7 +150,11 @@ jobs:
     # Allow PRs to run (preflight-apple and compute-version are skipped on PRs)
     # always() keeps PR type-checks running while still requiring detect-changes
     # to succeed AND report desktop_changed=true.
-    # detect-changes guards both PR type-checks (desktop files only) and release builds.
+    # Condition summary:
+    # - always(): keep PR type-check-only runs alive
+    # - preflight-apple: must succeed or be skipped
+    # - compute-version: must succeed for non-PR events
+    # - desktop_changed: ensure only desktop-affecting changes trigger builds
     if: |
       always() &&
       (needs.preflight-apple.result == 'success' || needs.preflight-apple.result == 'skipped') &&
