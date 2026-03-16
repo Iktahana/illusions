@@ -6,19 +6,19 @@
   color-scheme: dark; /* www landing page is always dark-themed */
 
   /* Unified color palette */
-  --color-bg:             #0a0b0c;
-  --color-surface:        #141518;
-  --color-surface-hover:  #1b1d21;
-  --color-border:         rgba(196, 200, 208, 0.16);
-  --color-border-hover:   rgba(200, 206, 216, 0.32);
-  --color-text:           #e9eaec;
-  --color-text-muted:     rgba(233, 234, 236, 0.58);
-  --color-accent:         #ffffff;
-  --color-accent-dim:     rgba(255, 255, 255, 0.12);
-  --color-accent-hover:   #ffffff;
-  --color-border-strong:  rgba(200, 206, 216, 0.5);
-  --shadow-accent:        0 4px 16px rgba(255, 255, 255, 0.12);
-
+  --color-bg:                 #0a0b0c;
+  --color-surface:            #141518;
+  --color-surface-hover:      #1b1d21;
+  --color-border:             rgba(196, 200, 208, 0.16);
+  --color-border-hover:       rgba(200, 206, 216, 0.32);
+  --color-text:               #e9eaec;
+  --color-text-muted:         rgba(233, 234, 236, 0.58);
+  --color-accent:             #ffffff;
+  --color-accent-dim:         rgba(255, 255, 255, 0.12);
+  --color-accent-hover:       #ffffff;
+  --color-accent-foreground:  #0a0b0c;
+  --color-border-strong:      rgba(200, 206, 216, 0.5);
+  --shadow-accent:            0 4px 16px rgba(255, 255, 255, 0.12);
   color: var(--color-text);
   --bg-image: none;
 
@@ -398,7 +398,7 @@ h1 {
   gap: 0.4rem;
   padding: 1.25rem 3rem;
   background: var(--color-accent);
-  color: #0a0b0c;
+  color: var(--color-accent-foreground);
   border-radius: 10px;
   text-decoration: none;
   transition: all 0.2s ease;
