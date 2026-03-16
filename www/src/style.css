@@ -6,19 +6,19 @@
   color-scheme: dark; /* www landing page is always dark-themed */
 
   /* Unified color palette */
-  --color-bg:             #0c0b0a;
-  --color-surface:        #1a1815;
-  --color-surface-hover:  #221f1b;
-  --color-border:         rgba(210, 195, 170, 0.12);
-  --color-border-hover:   rgba(210, 195, 170, 0.28);
-  --color-text:           #e8e0d5;
-  --color-text-muted:     rgba(232, 224, 213, 0.5);
-  --color-accent:         #ffffff;
-  --color-accent-dim:     rgba(255, 255, 255, 0.1);
-  --color-accent-hover:   #ffffff;
-  --color-border-strong:  rgba(210, 195, 170, 0.45);
-  --shadow-accent:        0 4px 16px rgba(255, 255, 255, 0.15);
-
+  --color-bg:                 #0a0b0c;
+  --color-surface:            #141518;
+  --color-surface-hover:      #1b1d21;
+  --color-border:             rgba(196, 200, 208, 0.16);
+  --color-border-hover:       rgba(200, 206, 216, 0.32);
+  --color-text:               #e9eaec;
+  --color-text-muted:         rgba(233, 234, 236, 0.58);
+  --color-accent:             #ffffff;
+  --color-accent-dim:         rgba(255, 255, 255, 0.12);
+  --color-accent-hover:       #ffffff;
+  --color-accent-foreground:  #0a0b0c;
+  --color-border-strong:      rgba(200, 206, 216, 0.5);
+  --shadow-accent:            0 4px 16px rgba(255, 255, 255, 0.12);
   color: var(--color-text);
   --bg-image: none;
 
@@ -50,11 +50,11 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  /* Warm dark overlay — less "void black", more "ink" */
+  /* Neutral overlay to keep the snow-country monochrome mood */
   background: linear-gradient(
     to bottom,
-    rgba(12, 11, 10, 0.88) 0%,
-    rgba(10, 9, 8, 0.92) 100%
+    rgba(8, 9, 10, 0.88) 0%,
+    rgba(6, 7, 9, 0.92) 100%
   );
   z-index: -1;
 }
@@ -164,7 +164,7 @@ h1 {
 
 .btn-primary {
   background: var(--color-accent);
-  color: #0c0b0a;
+  color: var(--color-accent-foreground);
   border-color: var(--color-accent);
 }
 
@@ -398,7 +398,7 @@ h1 {
   gap: 0.4rem;
   padding: 1.25rem 3rem;
   background: var(--color-accent);
-  color: #0c0b0a;
+  color: var(--color-accent-foreground);
   border-radius: 10px;
   text-decoration: none;
   transition: all 0.2s ease;
