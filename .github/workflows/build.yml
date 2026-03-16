@@ -66,6 +66,7 @@ jobs:
               - 'tailwind.config.ts'
               - 'postcss.config.mjs'
               - '.github/workflows/build.yml'
+              - '!www/**' # Explicitly exclude standalone www/ changes from desktop builds
 
   # ---------------------------------------------------------------------------
   # Compute version — single source of truth for all build jobs (non-PR only)
@@ -160,7 +161,7 @@ jobs:
     if: |
       always() &&
       (needs.preflight-apple.result == 'success' || needs.preflight-apple.result == 'skipped') &&
-      (needs.compute-version.result == 'success' || needs.compute-version.result == 'skipped') &&
+      (github.event_name == 'pull_request' || needs.compute-version.result == 'success') &&
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'macos-latest' }}
     strategy:
@@ -250,7 +251,7 @@ jobs:
     needs: [compute-version, detect-changes]
     if: |
       always() &&
-      (needs.compute-version.result == 'success' || needs.compute-version.result == 'skipped') &&
+      (github.event_name == 'pull_request' || needs.compute-version.result == 'success') &&
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     env:
