@@ -164,7 +164,7 @@ h1 {
 
 .btn-primary {
   background: var(--color-accent);
-  color: #0a0b0c;
+  color: var(--color-accent-foreground);
   border-color: var(--color-accent);
 }
 
