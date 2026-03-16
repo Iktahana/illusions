@@ -53,6 +53,7 @@ jobs:
               - '!TERMS.md'
               - '!MDI.md'
               - '!.github/workflows/deploy-www.yml'
+              # Keep build.yml included so workflow edits validate desktop builds
 
   # NOTE: All desktop jobs run only when desktop_changed=true.
   # PRs that touch only www/ or documentation are intentionally skipped.
@@ -149,6 +150,7 @@ jobs:
     # Allow PRs to run (preflight-apple and compute-version are skipped on PRs)
     # always() keeps PR type-checks running while still requiring detect-changes
     # to succeed AND report desktop_changed=true.
+    # detect-changes guards both PR type-checks (desktop files only) and release builds.
     if: |
       always() &&
       (needs.preflight-apple.result == 'success' || needs.preflight-apple.result == 'skipped') &&
