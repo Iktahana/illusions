@@ -9,52 +9,52 @@
 @tailwind utilities;
 
 /* Prevent flash of white on initial load - default to dark theme */
-/* Hex must match --background dark mode value (16 13 9 = #100d09) */
+/* Hex must match --background dark mode value (8 8 8 = #080808) */
 html {
-  background-color: #100d09;
+  background-color: #080808;
   color-scheme: dark;
 }
 
 :root {
-  /* Background colors (RGB channels for Tailwind opacity support) */
-  --background: 251 248 244;
-  --background-secondary: 244 240 232;
-  --background-tertiary: 234 228 218;
-  --background-elevated: 255 253 249;
+  /* Background colors — snow white (RGB channels for Tailwind opacity support) */
+  --background: 252 252 252;
+  --background-secondary: 245 245 245;
+  --background-tertiary: 235 235 235;
+  --background-elevated: 255 255 255;
 
-  /* Text colors */
-  --foreground: 24 18 10;
-  --foreground-secondary: 72 60 44;
-  --foreground-tertiary: 114 98 78;
-  --foreground-muted: 162 146 124;
+  /* Text colors — pure black */
+  --foreground: 12 12 12;
+  --foreground-secondary: 60 60 60;
+  --foreground-tertiary: 110 110 110;
+  --foreground-muted: 160 160 160;
 
-  /* Border colors */
-  --border: 218 208 192;
-  --border-secondary: 198 186 168;
+  /* Border colors — neutral gray */
+  --border: 210 210 210;
+  --border-secondary: 188 188 188;
 
-  /* Accent colors — warm amber-sepia */
-  --accent: 142 100 64;
-  --accent-foreground: 255 255 255;
-  --accent-light: 238 226 208;
-  --accent-hover: 112 76 46;
+  /* Accent colors — near-black */
+  --accent: 20 20 20;
+  --accent-foreground: 252 252 252;
+  --accent-light: 230 230 230;
+  --accent-hover: 0 0 0;
 
   /* Interactive states */
-  --hover: 240 234 222;
-  --active: 226 214 196;
+  --hover: 240 240 240;
+  --active: 225 225 225;
 
   /* Status colors */
   --success: 22 163 74;
   --warning: 202 138 4;
   --error: 220 38 38;
   --info: 37 99 235;
-  
+
   /* Progress bar colors for light mode */
-  --progress-readability: #8c6440;
+  --progress-readability: #141414;
   --progress-kanji: #dc2626;
   --progress-hiragana: #2563eb;
   --progress-katakana: #16a34a;
   --progress-other: #78716c;
-  
+
   /* Part-of-Speech (品詞) highlighting colors */
   --pos-verb: #16a34a;
   --pos-verb-intransitive: #15803d;
@@ -65,50 +65,50 @@ html {
   --pos-adverb: #ea580c;
   --pos-conjunction: #0d9488;
   --pos-interjection: #db2777;
-  --pos-adnominal: #8c6440;
+  --pos-adnominal: #525252;
   --pos-noun: inherit;
 }
 
 .dark {
-  /* Background colors - warm dark tones (RGB channels) */
-  --background: 16 13 9;
-  --background-secondary: 30 25 18;
-  --background-tertiary: 46 39 28;
-  --background-elevated: 30 25 18;
+  /* Background colors — winter night black */
+  --background: 8 8 8;
+  --background-secondary: 18 18 18;
+  --background-tertiary: 30 30 30;
+  --background-elevated: 18 18 18;
 
-  /* Text colors — warm off-white */
-  --foreground: 248 242 230;
-  --foreground-secondary: 214 204 188;
-  --foreground-tertiary: 168 156 138;
-  --foreground-muted: 116 106 92;
+  /* Text colors — snow white */
+  --foreground: 242 242 242;
+  --foreground-secondary: 200 200 200;
+  --foreground-tertiary: 150 150 150;
+  --foreground-muted: 100 100 100;
 
-  /* Border colors */
-  --border: 56 47 34;
-  --border-secondary: 74 62 46;
+  /* Border colors — neutral dark gray */
+  --border: 45 45 45;
+  --border-secondary: 60 60 60;
 
-  /* Accent colors — warm copper-amber */
-  --accent: 196 154 110;
-  --accent-foreground: 16 13 9;
-  --accent-light: 64 46 28;
-  --accent-hover: 218 174 130;
+  /* Accent colors — pure white */
+  --accent: 240 240 240;
+  --accent-foreground: 8 8 8;
+  --accent-light: 40 40 40;
+  --accent-hover: 255 255 255;
 
   /* Interactive states */
-  --hover: 38 32 24;
-  --active: 60 49 34;
+  --hover: 25 25 25;
+  --active: 40 40 40;
 
-  /* Status colors — slightly muted for warm dark bg */
+  /* Status colors — slightly brightened for dark bg */
   --success: 52 211 153;
   --warning: 251 191 36;
   --error: 248 113 113;
   --info: 96 165 250;
-   
+
   /* Progress bar colors for dark mode */
-  --progress-readability: #c49a6e;
+  --progress-readability: #d4d4d4;
   --progress-kanji: #f87171;
   --progress-hiragana: #60a5fa;
   --progress-katakana: #34d399;
   --progress-other: #a8a29e;
-   
+
   /* Part-of-Speech highlighting colors - dark mode */
   --pos-verb: #4ade80;
   --pos-verb-intransitive: #22c55e;
@@ -119,7 +119,7 @@ html {
   --pos-adverb: #fb923c;
   --pos-conjunction: #2dd4bf;
   --pos-interjection: #f472b6;
-  --pos-adnominal: #c49a6e;
+  --pos-adnominal: #a3a3a3;
   --pos-noun: inherit;
 }
 
@@ -131,9 +131,9 @@ body {
 }
 
 /* Override default background after theme is determined */
-/* Hex must match --background light mode value (251 248 244 = #fbf8f4) */
+/* Hex must match --background light mode value (252 252 252 = #fcfcfc) */
 html:not(.dark) {
-  background-color: #fbf8f4;
+  background-color: #fcfcfc;
   color-scheme: light;
 }
 
@@ -541,7 +541,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.15);
-  box-shadow: 0 0 0 3px rgba(142, 100, 64, 0.15);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.15);
 }
 
 input[type="range"]::-webkit-slider-thumb:active {
@@ -571,7 +571,7 @@ input[type="range"]::-moz-range-thumb {
 
 input[type="range"]::-moz-range-thumb:hover {
   transform: scale(1.15);
-  box-shadow: 0 0 0 3px rgba(142, 100, 64, 0.15);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.15);
 }
 
 input[type="range"]::-moz-range-thumb:active {
