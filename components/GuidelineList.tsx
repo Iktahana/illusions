@@ -191,8 +191,8 @@ export default function GuidelineList({ guidelines, onChange }: GuidelineListPro
             >
               <span
                 className={clsx(
-                  "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm",
-                  isEnabled ? "translate-x-5" : "translate-x-0.5",
+                  "inline-block h-3.5 w-3.5 transform rounded-full transition-transform shadow-sm",
+                  isEnabled ? "translate-x-5 bg-accent-foreground" : "translate-x-0.5 bg-white",
                 )}
               />
             </button>

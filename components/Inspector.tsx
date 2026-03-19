@@ -196,7 +196,7 @@ export default function Inspector({
                     : isSaving
                     ? 'bg-background text-foreground-tertiary cursor-wait border border-border'
                     : isDirty
-                    ? 'bg-accent text-white hover:bg-accent-hover'
+                    ? 'bg-accent text-accent-foreground hover:bg-accent-hover'
                     : 'bg-background text-foreground-muted cursor-not-allowed opacity-50 border border-border'
                 }`}
                 title={
