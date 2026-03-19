@@ -42,6 +42,21 @@ const REPO = 'Iktahana/illusions'
 const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`
 const MICROSOFT_STORE_URL = 'https://apps.microsoft.com/detail/9mtc0ct16xg1'
 
+/** Escape special HTML characters to prevent XSS in innerHTML contexts */
+function esc(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/** Validate a URL from external sources; only allow https:// to block javascript: and data: XSS vectors */
+function safeUrl(url: string): string {
+  return url.startsWith('https://') ? url : '#'
+}
+
 /** Format bytes to human-readable string */
 function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) {
@@ -336,10 +351,10 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
     const assetsHtml = platform.assets
       .map(
         (asset) => `
-        <a href="${asset.url}" class="download-item" download>
+        <a href="${safeUrl(asset.url)}" class="download-item" download>
           <div class="download-item-info">
             <span class="download-item-label">${asset.label}</span>
-            <span class="download-item-filename">${asset.name}</span>
+            <span class="download-item-filename">${esc(asset.name)}</span>
           </div>
           <div class="download-item-meta">
             <span class="download-item-size">${asset.size}</span>
@@ -397,10 +412,10 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
   const heroDownloadHtml = heroCta
     ? `
       <div class="hero-download">
-        <a href="${heroCta.href}" class="btn-hero-download" ${heroCta.isExternal ? 'target="_blank" rel="noopener"' : 'download'}>
+        <a href="${safeUrl(heroCta.href)}" class="btn-hero-download" ${heroCta.isExternal ? 'target="_blank" rel="noopener"' : 'download'}>
           <span class="btn-hero-download-icon">${heroCta.icon}</span>
           <span class="btn-hero-download-label">${heroCta.label}</span>
-          ${heroCta.meta ? `<span class="btn-hero-download-meta">${heroCta.meta}</span>` : ''}
+          ${heroCta.meta ? `<span class="btn-hero-download-meta">${esc(heroCta.meta)}</span>` : ''}
         </a>
         <p class="hero-download-hint">他のプラットフォームは下記をご覧ください</p>
         <a href="https://github.com/Iktahana/illusions" class="github-link" target="_blank">
@@ -420,9 +435,9 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
       ${heroDownloadHtml}
 
       <div class="release-info">
-        <span class="release-version">v${version}</span>
+        <span class="release-version">v${esc(version)}</span>
         <span class="release-date">${formatDate(release.published_at)}</span>
-        <a href="${release.html_url}" class="release-link" target="_blank" rel="noopener">
+        <a href="${safeUrl(release.html_url)}" class="release-link" target="_blank" rel="noopener">
           リリースノート →
         </a>
       </div>
