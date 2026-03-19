@@ -19,8 +19,11 @@ import {
 import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
 import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import clsx from "clsx";
-import { Type, AlignLeft, Search } from "lucide-react";
+import { Type, AlignLeft, Search, Play, Pause, Square } from "lucide-react";
 import { EditorView } from "@milkdown/prose/view";
+import { useSpeech } from "@/lib/hooks/use-speech";
+import type { SpeechState } from "@/lib/hooks/use-speech";
+import { stripMarkdown } from "@/lib/utils/strip-markdown";
 import { AllSelection, Plugin, PluginKey } from "@milkdown/prose/state";
 import { $prose } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "./BubbleMenu";
@@ -112,6 +115,7 @@ export default function NovelEditor({
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
+  const { state: speechState, speak, pause, resume, stop } = useSpeech();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   // Ref to indicate a mode switch is in progress (for scroll restoration)
@@ -141,6 +145,21 @@ export default function NovelEditor({
   const handleSearchOpen = useCallback(() => {
     setIsSearchOpen(true);
   }, []);
+
+  const handleSpeakAll = useCallback(() => {
+    speak(stripMarkdown(initialContent));
+  }, [speak, initialContent]);
+
+  const handleSpeakSelection = useCallback(() => {
+    if (!editorViewInstance) return;
+    const { from, to } = editorViewInstance.state.selection;
+    const selectedText = editorViewInstance.state.doc.textBetween(from, to, '\n');
+    if (selectedText.trim()) {
+      speak(stripMarkdown(selectedText));
+    } else {
+      speak(stripMarkdown(initialContent));
+    }
+  }, [speak, editorViewInstance, initialContent]);
 
   // 親からのトリガーで検索ダイアログを開く（ショートカット）
   useEffect(() => {
@@ -248,6 +267,12 @@ export default function NovelEditor({
         isVertical={isVertical}
         onToggleVertical={handleToggleVertical}
         onSearchClick={handleSearchToggle}
+        speechState={speechState}
+        onSpeakAll={handleSpeakAll}
+        onSpeakSelection={handleSpeakSelection}
+        onSpeechPause={pause}
+        onSpeechResume={resume}
+        onSpeechStop={stop}
       />
 
       {/* エディタ領域 */}
@@ -396,10 +421,22 @@ function EditorToolbar({
   isVertical,
   onToggleVertical,
   onSearchClick,
+  speechState,
+  onSpeakAll: _onSpeakAll,
+  onSpeakSelection,
+  onSpeechPause,
+  onSpeechResume,
+  onSpeechStop,
 }: {
   isVertical: boolean;
   onToggleVertical: () => void;
   onSearchClick: () => void;
+  speechState: SpeechState;
+  onSpeakAll: () => void;
+  onSpeakSelection: () => void;
+  onSpeechPause: () => void;
+  onSpeechResume: () => void;
+  onSpeechStop: () => void;
 }) {
   const {
     fontScale, lineHeight, paragraphSpacing,
@@ -439,6 +476,28 @@ function EditorToolbar({
       <div className="flex items-center gap-4">
         {/* LLM status indicator */}
         <LlmStatusDot status={llmStatus} />
+
+        {/* 読み上げ */}
+        {speechState.isSupported && (
+          <>
+            <button
+              onClick={speechState.isPlaying ? onSpeechPause : (speechState.isPaused ? onSpeechResume : onSpeakSelection)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
+              title={speechState.isPlaying ? "一時停止" : (speechState.isPaused ? "再生" : "再生")}
+            >
+              {speechState.isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            </button>
+            {(speechState.isPlaying || speechState.isPaused) && (
+              <button
+                onClick={onSpeechStop}
+                className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
+                title="停止"
+              >
+                <Square className="w-4 h-4" />
+              </button>
+            )}
+          </>
+        )}
 
         {/* 検索 */}
         <button
