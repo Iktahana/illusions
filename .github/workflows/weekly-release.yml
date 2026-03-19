@@ -1,0 +1,157 @@
+name: Weekly Release
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'   # Every Monday 00:00 UTC = 09:00 JST
+  workflow_dispatch:        # Manual trigger
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  weekly-release-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if dev is ahead of main
+        id: check-diff
+        run: |
+          git fetch origin
+          AHEAD=$(git log origin/main..origin/dev --oneline | wc -l | tr -d ' ')
+          echo "ahead=$AHEAD" >> $GITHUB_OUTPUT
+          echo "dev is $AHEAD commit(s) ahead of main"
+
+      - name: Skip if no changes
+        if: steps.check-diff.outputs.ahead == '0'
+        run: |
+          echo "No new commits in dev. Skipping weekly release."
+
+      - name: Check latest dev CI status
+        id: check-ci
+        if: steps.check-diff.outputs.ahead != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runs = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'dev',
+              event: 'push',
+              status: 'completed',
+              per_page: 5
+            });
+            const buildRuns = runs.data.workflow_runs.filter(r =>
+              r.path === '.github/workflows/build.yml'
+            );
+            const latest = buildRuns[0];
+            const isGreen = latest?.conclusion === 'success';
+            console.log(`Latest dev build: ${latest?.conclusion ?? 'none'}`);
+            core.setOutput('green', isGreen ? 'true' : 'false');
+
+      - name: Close old weekly release PRs
+        if: steps.check-diff.outputs.ahead != '0' && steps.check-ci.outputs.green == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              base: 'main',
+            });
+            const weeklyPRs = prs.filter(pr =>
+              pr.labels.some(l => l.name === 'weekly-release')
+            );
+            for (const pr of weeklyPRs) {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                state: 'closed',
+              });
+              console.log(`Closed old weekly PR #${pr.number}`);
+            }
+
+      - name: Create weekly release PR
+        if: steps.check-diff.outputs.ahead != '0' && steps.check-ci.outputs.green == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date().toISOString().slice(0, 10);
+            const { execSync } = require('child_process');
+            const commits = execSync(
+              'git log origin/main..origin/dev --oneline --no-merges'
+            ).toString().trim();
+
+            // Ensure weekly-release label exists
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'weekly-release',
+              });
+            } catch {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'weekly-release',
+                color: '0075ca',
+                description: 'Weekly scheduled release PR',
+              });
+            }
+
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `chore(release): weekly release (${today})`,
+              head: 'dev',
+              base: 'main',
+              body: [
+                `## Weekly Release - ${today}`,
+                '',
+                '### Changes',
+                '```',
+                commits || '(no commits)',
+                '```',
+                '',
+                '> This PR was created automatically by the weekly release workflow.',
+                '> Merge when ready to release.',
+              ].join('\n'),
+            });
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: ['weekly-release'],
+            });
+            console.log(`Created PR #${pr.number}: ${pr.html_url}`);
+
+      - name: Create issue on CI failure
+        if: steps.check-diff.outputs.ahead != '0' && steps.check-ci.outputs.green != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date().toISOString().slice(0, 10);
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `週次リリーススキップ: dev CI 失敗 (${today})`,
+              body: [
+                '## 週次自動リリースをスキップしました',
+                '',
+                'dev ブランチの CI が失敗しているため、今週のリリース PR の作成をスキップしました。',
+                '',
+                '### 対応手順',
+                '1. dev ブランチの CI 失敗原因を修正する',
+                '2. 修正後、[Weekly Release workflow](../actions/workflows/weekly-release.yml) を workflow_dispatch で手動トリガー',
+                '',
+                '次の月曜日に自動的に再試行されます。',
+              ].join('\n'),
+              labels: ['ci-failure'],
+            });

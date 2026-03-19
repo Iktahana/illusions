@@ -54,14 +54,21 @@ Single source of truth for all AI assistants (Cursor, Claude, etc.)
 
 ---
 
-### 2. Git Branch & Worktree Isolation
+### 2. Branch Strategy & Release Cadence
 
-**`main` is a protected branch — NEVER merge into it directly.**
+**Branch model:**
 
-- All development happens on `dev` or feature branches
-- **DO NOT** merge feature branches directly into `main` — always target `dev` first
-- `main` is updated only via controlled releases from `dev`
-- PRs must target `dev` (not `main`) unless it is a hotfix explicitly approved by the user
+```
+feature/<name>  →  dev  →  (weekly PR, every Monday)  →  main
+hotfix/<name>   →  main  (emergency only, then cherry-pick to dev)
+```
+
+- **`main`**: production branch — receives merges only via weekly release PR
+- **`dev`**: integration branch — all feature/fix PRs target `dev` (not `main`)
+- **Weekly release**: every Monday 09:00 JST, a GitHub Actions workflow auto-creates a `dev → main` PR; human merges it
+- **Hotfix**: branch from `main`, merge directly to `main` for immediate release, then `git cherry-pick` or `git merge main` into `dev`
+
+### 3. Git Worktree Isolation
 
 **Every task MUST use a dedicated git worktree.**
 
@@ -69,7 +76,7 @@ Single source of truth for all AI assistants (Cursor, Claude, etc.)
 - **DO** create a new worktree + branch for each task before writing any code
 - **DO** clean up (remove) the worktree and delete the branch after merging
 
-**Workflow:**
+**Workflow (normal feature):**
 ```bash
 # 1. Create worktree with a new feature branch
 git worktree add ../illusions-work-<short-name> -b feature/<branch-name>
@@ -77,10 +84,26 @@ cd ../illusions-work-<short-name>
 
 # 2. Do all implementation work inside the worktree
 
-# 3. After merging to main, clean up
+# 3. Open PR targeting dev (NOT main)
+gh pr create --base dev --title "feat: ..."
+
+# 4. After merging to dev, clean up
 cd /path/to/illusions
 git worktree remove ../illusions-work-<short-name>
 git branch -d feature/<branch-name>
+```
+
+**Workflow (hotfix):**
+```bash
+# 1. Branch from main
+git worktree add ../illusions-work-hotfix-<name> -b hotfix/<name>
+
+# 2. Implement fix, then open PR targeting main
+gh pr create --base main --title "fix: ..."
+
+# 3. After merging to main, also apply to dev
+git checkout dev
+git merge main   # or: git cherry-pick <commit>
 ```
 
 **Rules:**
@@ -283,10 +306,11 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 - [ ] React hooks dependency arrays correct
 
 ### After Completing Work
-- [ ] Merge feature branch to `dev` via PR (NOT to `main`)
+- [ ] Merge feature branch to **dev** via PR (or to `main` for hotfixes)
 - [ ] `git worktree remove ../illusions-work-<name>`
 - [ ] `git branch -d feature/<name>`
 - [ ] `git worktree list` — only main worktree remains
+- [ ] Wait for the weekly Monday PR to carry the change to `main` (or trigger `weekly-release.yml` manually)
 
 ### Priority Levels
 
@@ -406,4 +430,4 @@ grep -r "[\uac00-\ud7af]" src/   # Korean
 
 ---
 
-**Version**: 2.4.0 | **Last Updated**: 2026-03-19 | **Status**: ✅ Production
+**Version**: 2.5.0 | **Last Updated**: 2026-03-19 | **Status**: ✅ Production

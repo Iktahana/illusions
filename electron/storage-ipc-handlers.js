@@ -32,7 +32,7 @@ function registerStorageHandlers() {
   // セッション読み込み
   ipcMain.handle('storage:load-session', async () => {
     try {
-      return manager.loadSession();
+      return await manager.loadSession();
     } catch (error) {
       console.error('[Storage IPC] loadSession failed:', error);
       throw error;
@@ -52,7 +52,7 @@ function registerStorageHandlers() {
   // AppState 読み込み
   ipcMain.handle('storage:load-app-state', async () => {
     try {
-      return manager.loadAppState();
+      return await manager.loadAppState();
     } catch (error) {
       console.error('[Storage IPC] loadAppState failed:', error);
       throw error;
