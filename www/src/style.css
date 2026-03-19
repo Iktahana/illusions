@@ -5,20 +5,20 @@
 
   color-scheme: dark; /* www landing page is always dark-themed */
 
-  /* Unified color palette */
-  --color-bg:                 #0a0b0c;
-  --color-surface:            #141518;
-  --color-surface-hover:      #1b1d21;
-  --color-border:             rgba(196, 200, 208, 0.16);
-  --color-border-hover:       rgba(200, 206, 216, 0.32);
-  --color-text:               #e9eaec;
-  --color-text-muted:         rgba(233, 234, 236, 0.58);
+  /* Snow-country monochrome palette — pure black/white, no blue-gray tints */
+  --color-bg:                 #060606;
+  --color-surface:            rgba(255, 255, 255, 0.04);
+  --color-surface-hover:      rgba(255, 255, 255, 0.08);
+  --color-border:             rgba(255, 255, 255, 0.12);
+  --color-border-hover:       rgba(255, 255, 255, 0.30);
+  --color-text:               #f0f0f0;
+  --color-text-muted:         rgba(240, 240, 240, 0.50);
   --color-accent:             #ffffff;
-  --color-accent-dim:         rgba(255, 255, 255, 0.12);
-  --color-accent-hover:       #ffffff;
-  --color-accent-foreground:  #0a0b0c;
-  --color-border-strong:      rgba(200, 206, 216, 0.5);
-  --shadow-accent:            0 4px 16px rgba(255, 255, 255, 0.12);
+  --color-accent-dim:         rgba(255, 255, 255, 0.10);
+  --color-accent-hover:       #f0f0f0;
+  --color-accent-foreground:  #060606;
+  --color-border-strong:      rgba(255, 255, 255, 0.50);
+  --shadow-accent:            0 4px 24px rgba(255, 255, 255, 0.18);
   color: var(--color-text);
   --bg-image: none;
 
@@ -50,11 +50,12 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  /* Neutral overlay to keep the snow-country monochrome mood */
+  /* Lighter overlay — let the snow-country landscape breathe through */
   background: linear-gradient(
     to bottom,
-    rgba(8, 9, 10, 0.88) 0%,
-    rgba(6, 7, 9, 0.92) 100%
+    rgba(4, 4, 5, 0.62) 0%,
+    rgba(4, 4, 5, 0.78) 60%,
+    rgba(4, 4, 5, 0.90) 100%
   );
   z-index: -1;
 }
@@ -90,9 +91,9 @@ h1 {
 .title-logo svg {
   width: 100%;
   height: auto;
-  /* Soft, ink-like diffusion instead of hard neon glow */
-  filter: drop-shadow(0 2px 12px rgba(255, 255, 255, 0.1))
-          drop-shadow(0 0 40px rgba(232, 224, 213, 0.08));
+  /* Crisp snow-light glow — pure white diffusion */
+  filter: drop-shadow(0 1px 8px rgba(255, 255, 255, 0.15))
+          drop-shadow(0 0 48px rgba(255, 255, 255, 0.06));
 }
 
 .title-logo svg path {
@@ -232,6 +233,9 @@ h1 {
   padding: 1.75rem;
   color: var(--color-text);
   transition: border-color 0.2s ease, background 0.2s ease;
+  /* Subtle glass effect — frosted winter air */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .feature-card:hover {
@@ -269,6 +273,8 @@ h1 {
   max-width: 800px;
   margin: 0 auto;
   line-height: 1.8;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .policy-content h2 {
@@ -402,13 +408,13 @@ h1 {
   border-radius: 10px;
   text-decoration: none;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 12px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 16px rgba(255, 255, 255, 0.12);
 }
 
 .btn-hero-download:hover {
-  background: #f0f0f0;
+  background: #ebebeb;
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(255, 255, 255, 0.2);
+  box-shadow: 0 6px 28px rgba(255, 255, 255, 0.22);
 }
 
 .btn-hero-download-icon {
@@ -454,7 +460,7 @@ h1 {
 
 .release-version {
   background: var(--color-accent-dim);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.20);
   padding: 0.25rem 0.75rem;
   border-radius: 20px;
   font-weight: 600;
@@ -491,6 +497,8 @@ h1 {
   border-radius: 10px;
   padding: 1.5rem;
   transition: border-color 0.2s ease, background 0.2s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .platform-card:hover {
@@ -499,7 +507,7 @@ h1 {
 }
 
 .platform-current {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.22);
   background: var(--color-surface-hover);
 }
 
