@@ -35,8 +35,13 @@ export function useSpeech(): {
   const [state, setState] = useState<SpeechState>({
     isPlaying: false,
     isPaused: false,
-    isSupported: checkSupport(),
+    isSupported: false, // Start false for SSR; updated after mount
   });
+
+  // Detect support on the client after mount (window is not available during SSR).
+  useEffect(() => {
+    setState((prev) => ({ ...prev, isSupported: checkSupport() }));
+  }, []);
 
   // Cancel any ongoing speech on unmount to avoid dangling utterances.
   useEffect(() => {
