@@ -227,15 +227,21 @@ h1 {
   display: grid;
   grid-template-rows: subgrid;
   grid-row: span 3;
-  background: var(--color-surface);
+  /* Fallback for browsers without backdrop-filter: use opaque background */
+  background: rgba(12, 12, 12, 0.82);
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 1.75rem;
   color: var(--color-text);
   transition: border-color 0.2s ease, background 0.2s ease;
-  /* Subtle glass effect — frosted winter air */
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .feature-card {
+    background: var(--color-surface);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
 }
 
 .feature-card:hover {
@@ -266,15 +272,22 @@ h1 {
 
 .policy-content {
   text-align: left;
-  background: var(--color-surface);
+  /* Fallback for browsers without backdrop-filter */
+  background: rgba(12, 12, 12, 0.82);
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 2.5rem;
   max-width: 800px;
   margin: 0 auto;
   line-height: 1.8;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .policy-content {
+    background: var(--color-surface);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
 }
 
 .policy-content h2 {
@@ -492,13 +505,20 @@ h1 {
 }
 
 .platform-card {
-  background: var(--color-surface);
+  /* Fallback for browsers without backdrop-filter */
+  background: rgba(12, 12, 12, 0.82);
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 1.5rem;
   transition: border-color 0.2s ease, background 0.2s ease;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .platform-card {
+    background: var(--color-surface);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
 }
 
 .platform-card:hover {

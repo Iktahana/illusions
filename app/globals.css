@@ -541,7 +541,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.15);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0 0 3px rgb(var(--accent) / 0.2);
 }
 
 input[type="range"]::-webkit-slider-thumb:active {
@@ -571,7 +571,7 @@ input[type="range"]::-moz-range-thumb {
 
 input[type="range"]::-moz-range-thumb:hover {
   transform: scale(1.15);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0 0 3px rgb(var(--accent) / 0.2);
 }
 
 input[type="range"]::-moz-range-thumb:active {
