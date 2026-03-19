@@ -206,8 +206,8 @@ export function LlmSettings({
           >
             <span
               className={clsx(
-                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm",
-                llmEnabled ? "translate-x-6" : "translate-x-1"
+                "inline-block h-4 w-4 transform rounded-full transition-transform shadow-sm",
+                llmEnabled ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"
               )}
             />
           </button>
@@ -243,8 +243,8 @@ export function LlmSettings({
           >
             <span
               className={clsx(
-                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm",
-                (llmIdlingStop ?? true) ? "translate-x-6" : "translate-x-1"
+                "inline-block h-4 w-4 transform rounded-full transition-transform shadow-sm",
+                (llmIdlingStop ?? true) ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"
               )}
             />
           </button>

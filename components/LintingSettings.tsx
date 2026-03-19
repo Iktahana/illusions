@@ -204,8 +204,8 @@ export default function LintingSettings({
         >
           <span
             className={clsx(
-              "inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm",
-              lintingEnabled ? "translate-x-6" : "translate-x-1"
+              "inline-block h-4 w-4 transform rounded-full transition-transform shadow-sm",
+              lintingEnabled ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"
             )}
           />
         </button>
@@ -247,7 +247,7 @@ export default function LintingSettings({
                     className={clsx(
                       "px-3 py-1.5 rounded-full text-xs font-medium transition-colors border",
                       isActive
-                        ? "bg-accent text-white border-accent"
+                        ? "bg-accent text-accent-foreground border-accent"
                         : "bg-background text-foreground-secondary border-border hover:border-accent/50 hover:text-foreground",
                     )}
                     title={mode.descriptionJa}
@@ -361,8 +361,8 @@ export default function LintingSettings({
                 >
                   <span
                     className={clsx(
-                      "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm",
-                      allEnabled ? "translate-x-5" : "translate-x-0.5"
+                      "inline-block h-3.5 w-3.5 transform rounded-full transition-transform shadow-sm",
+                      allEnabled ? "translate-x-5 bg-accent-foreground" : "translate-x-0.5 bg-white"
                     )}
                   />
                 </button>
@@ -454,8 +454,8 @@ export default function LintingSettings({
                         >
                           <span
                             className={clsx(
-                              "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm",
-                              config.enabled ? "translate-x-5" : "translate-x-0.5"
+                              "inline-block h-3.5 w-3.5 transform rounded-full transition-transform shadow-sm",
+                              config.enabled ? "translate-x-5 bg-accent-foreground" : "translate-x-0.5 bg-white"
                             )}
                           />
                         </button>

@@ -112,7 +112,7 @@ export default function ColorPicker({ value, onChange, label }: ColorPickerProps
             <button
               type="button"
               onClick={() => handleSelectColor(customColor)}
-              className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium bg-accent text-white rounded hover:bg-accent-hover"
+              className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium bg-accent text-accent-foreground rounded hover:bg-accent-hover"
             >
               OK
             </button>

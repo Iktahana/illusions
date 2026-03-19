@@ -216,7 +216,7 @@ export default function RubyDialog({
             </button>
             <button
               onClick={handleApply}
-              className="px-4 py-2 text-sm font-medium bg-accent text-white rounded hover:bg-accent-hover transition-colors"
+              className="px-4 py-2 text-sm font-medium bg-accent text-accent-foreground rounded hover:bg-accent-hover transition-colors"
             >
               適用
             </button>
