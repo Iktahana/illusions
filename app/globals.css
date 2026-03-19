@@ -505,7 +505,7 @@ html:not(.dark) {
   }
 }
 
-/* 拉動條樣式 (Input Range) */
+/* Range input styles */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -517,7 +517,7 @@ input[type="range"] {
   cursor: pointer;
 }
 
-/* Webkit 瀏覽器 (Chrome, Safari, Edge) - 軌道 */
+/* Webkit (Chrome, Safari, Edge) - track */
 input[type="range"]::-webkit-slider-runnable-track {
   width: 100%;
   height: 6px;
@@ -526,7 +526,7 @@ input[type="range"]::-webkit-slider-runnable-track {
   cursor: pointer;
 }
 
-/* Webkit 瀏覽器 (Chrome, Safari, Edge) - 滑塊 */
+/* Webkit (Chrome, Safari, Edge) - thumb */
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -548,7 +548,7 @@ input[type="range"]::-webkit-slider-thumb:active {
   transform: scale(1.05);
 }
 
-/* Firefox - 軌道 */
+/* Firefox - track */
 input[type="range"]::-moz-range-track {
   width: 100%;
   height: 6px;
@@ -558,7 +558,7 @@ input[type="range"]::-moz-range-track {
   cursor: pointer;
 }
 
-/* Firefox - 滑塊 */
+/* Firefox - thumb */
 input[type="range"]::-moz-range-thumb {
   width: 16px;
   height: 16px;
@@ -578,7 +578,7 @@ input[type="range"]::-moz-range-thumb:active {
   transform: scale(1.05);
 }
 
-/* Firefox - 進度條 */
+/* Firefox - progress fill */
 input[type="range"]::-moz-range-progress {
   background-color: rgb(var(--accent));
 }
