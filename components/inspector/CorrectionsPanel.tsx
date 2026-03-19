@@ -642,7 +642,7 @@ export default function CorrectionsPanel({
               "flex-1 flex items-center justify-center px-2 py-1.5 rounded transition-colors",
               severityFilter === option.value
                 ? "bg-accent text-white"
-                : "bg-background-secondary text-foreground-tertiary hover:text-foreground-secondary border border-border"
+                : "bg-background-tertiary text-foreground-secondary hover:text-foreground border border-border-secondary"
             )}
           >
             {option.icon}
