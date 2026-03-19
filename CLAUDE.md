@@ -54,7 +54,14 @@ Single source of truth for all AI assistants (Cursor, Claude, etc.)
 
 ---
 
-### 2. Git Worktree Isolation
+### 2. Git Branch & Worktree Isolation
+
+**`main` is a protected branch — NEVER merge into it directly.**
+
+- All development happens on `dev` or feature branches
+- **DO NOT** merge feature branches directly into `main` — always target `dev` first
+- `main` is updated only via controlled releases from `dev`
+- PRs must target `dev` (not `main`) unless it is a hotfix explicitly approved by the user
 
 **Every task MUST use a dedicated git worktree.**
 
@@ -276,7 +283,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 - [ ] React hooks dependency arrays correct
 
 ### After Completing Work
-- [ ] Merge feature branch to main via PR
+- [ ] Merge feature branch to `dev` via PR (NOT to `main`)
 - [ ] `git worktree remove ../illusions-work-<name>`
 - [ ] `git branch -d feature/<name>`
 - [ ] `git worktree list` — only main worktree remains
