@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 export interface SpeechState {
   isPlaying: boolean;
@@ -25,9 +25,14 @@ function findJapaneseVoice(): SpeechSynthesisVoice | undefined {
   return voices.find((v) => v.lang === "ja-JP") ?? undefined;
 }
 
+export interface SpeechCallbacks {
+  onBoundary?: (charIndex: number, charLength: number) => void;
+  onEnd?: () => void;
+}
+
 export function useSpeech(): {
   state: SpeechState;
-  speak: (text: string) => void;
+  speak: (text: string, callbacks?: SpeechCallbacks) => void;
   pause: () => void;
   resume: () => void;
   stop: () => void;
@@ -37,6 +42,10 @@ export function useSpeech(): {
     isPaused: false,
     isSupported: false, // Start false for SSR; updated after mount
   });
+
+  // Store callbacks in refs so they can be updated without recreating the utterance.
+  const onBoundaryRef = useRef<SpeechCallbacks["onBoundary"]>(undefined);
+  const onEndRef = useRef<SpeechCallbacks["onEnd"]>(undefined);
 
   // Detect support on the client after mount (window is not available during SSR).
   useEffect(() => {
@@ -52,10 +61,13 @@ export function useSpeech(): {
     };
   }, []);
 
-  const speak = useCallback((text: string) => {
+  const speak = useCallback((text: string, callbacks?: SpeechCallbacks) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       return;
     }
+
+    onBoundaryRef.current = callbacks?.onBoundary;
+    onEndRef.current = callbacks?.onEnd;
 
     // Cancel whatever is currently playing before starting new speech.
     window.speechSynthesis.cancel();
@@ -74,10 +86,12 @@ export function useSpeech(): {
 
     utterance.onend = () => {
       setState({ isPlaying: false, isPaused: false, isSupported: true });
+      onEndRef.current?.();
     };
 
     utterance.onerror = () => {
       setState({ isPlaying: false, isPaused: false, isSupported: true });
+      onEndRef.current?.();
     };
 
     utterance.onpause = () => {
@@ -86,6 +100,11 @@ export function useSpeech(): {
 
     utterance.onresume = () => {
       setState({ isPlaying: true, isPaused: false, isSupported: true });
+    };
+
+    utterance.onboundary = (e) => {
+      const charLength = (e as SpeechSynthesisEvent & { charLength?: number }).charLength ?? 1;
+      onBoundaryRef.current?.(e.charIndex, charLength);
     };
 
     window.speechSynthesis.speak(utterance);
@@ -107,6 +126,7 @@ export function useSpeech(): {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       setState((prev) => ({ ...prev, isPlaying: false, isPaused: false }));
+      onEndRef.current?.();
     }
   }, []);
 

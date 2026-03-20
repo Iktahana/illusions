@@ -604,6 +604,17 @@ input[type="range"]::-moz-range-progress {
   box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.2);
 }
 
+/* Speech reading highlight */
+.speech-reading {
+  background-color: rgba(99, 179, 237, 0.45);
+  border-radius: 2px;
+  transition: background-color 0.1s ease;
+}
+
+.dark .speech-reading {
+  background-color: rgba(99, 179, 237, 0.3);
+}
+
 /* POS highlight color fade-in transition */
 [class^="pos-"] {
   transition: color 0.3s ease;
