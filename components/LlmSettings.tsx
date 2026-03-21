@@ -199,7 +199,7 @@ export function LlmSettings({
             aria-checked={llmEnabled}
             onClick={handleToggle}
             className={clsx(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
               llmEnabled ? "bg-accent" : "bg-foreground-muted",
               !canToggleOn && !llmEnabled && "opacity-60"
             )}
@@ -235,7 +235,7 @@ export function LlmSettings({
             aria-checked={llmIdlingStop ?? true}
             onClick={() => onLlmIdlingStopChange?.(!llmIdlingStop)}
             className={clsx(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
               (llmIdlingStop ?? true) ? "bg-accent" : "bg-foreground-muted",
               !llmEnabled && "opacity-60"
             )}

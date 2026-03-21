@@ -160,3 +160,18 @@ export function useUISettings() {
     setShowSettingsModal: handlers.setShowSettingsModal,
   }), [settings, handlers]);
 }
+
+/** Speech / TTS configuration */
+export function useSpeechSettings() {
+  const { settings, handlers } = useEditorSettingsContext();
+  return useMemo(() => ({
+    speechVoiceURI: settings.speechVoiceURI,
+    speechRate: settings.speechRate,
+    speechPitch: settings.speechPitch,
+    speechVolume: settings.speechVolume,
+    onSpeechVoiceURIChange: handlers.handleSpeechVoiceURIChange,
+    onSpeechRateChange: handlers.handleSpeechRateChange,
+    onSpeechPitchChange: handlers.handleSpeechPitchChange,
+    onSpeechVolumeChange: handlers.handleSpeechVolumeChange,
+  }), [settings, handlers]);
+}

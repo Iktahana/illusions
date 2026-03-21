@@ -34,6 +34,10 @@ export interface EditorSettings {
   autoPowerSaveOnBattery: boolean;
   /** Unified correction config derived from individual linting fields */
   correctionConfig: CorrectionConfig;
+  speechVoiceURI: string;
+  speechRate: number;
+  speechPitch: number;
+  speechVolume: number;
 }
 
 export interface EditorSettingsHandlers {
@@ -63,6 +67,10 @@ export interface EditorSettingsHandlers {
   handlePowerSaveModeChange: (enabled: boolean) => void;
   handleAutoPowerSaveOnBatteryChange: (enabled: boolean) => void;
   handleCorrectionConfigChange: (partial: Partial<CorrectionConfig>) => void;
+  handleSpeechVoiceURIChange: (value: string) => void;
+  handleSpeechRateChange: (value: number) => void;
+  handleSpeechPitchChange: (value: number) => void;
+  handleSpeechVolumeChange: (value: number) => void;
 }
 
 export interface EditorSettingsSetters {
@@ -117,6 +125,10 @@ export function useEditorSettings(
   const [autoPowerSaveOnBattery, setAutoPowerSaveOnBattery] = useState(true);
   const [correctionMode, setCorrectionMode] = useState<CorrectionModeId>("novel");
   const [correctionGuidelines, setCorrectionGuidelines] = useState<GuidelineId[]>(DEFAULT_CORRECTION_CONFIG.guidelines);
+  const [speechVoiceURI, setSpeechVoiceURI] = useState("");
+  const [speechRate, setSpeechRate] = useState(1.0);
+  const [speechPitch, setSpeechPitch] = useState(1.0);
+  const [speechVolume, setSpeechVolume] = useState(1.0);
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -207,6 +219,10 @@ export function useEditorSettings(
         if (typeof appState.characterExtractionConcurrency === "number") {
           setCharacterExtractionConcurrency(Math.min(Math.max(appState.characterExtractionConcurrency, 1), 8));
         }
+        if (typeof appState.speechVoiceURI === "string") setSpeechVoiceURI(appState.speechVoiceURI);
+        if (typeof appState.speechRate === "number") setSpeechRate(appState.speechRate);
+        if (typeof appState.speechPitch === "number") setSpeechPitch(appState.speechPitch);
+        if (typeof appState.speechVolume === "number") setSpeechVolume(appState.speechVolume);
         // Force editor rebuild to apply restored settings (e.g. custom font)
         incrementEditorKey();
       } catch (error) {
@@ -456,6 +472,34 @@ export function useEditorSettings(
     });
   }, [correctionMode, correctionGuidelines]);
 
+  const handleSpeechVoiceURIChange = useCallback((value: string) => {
+    setSpeechVoiceURI(value);
+    void persistAppState({ speechVoiceURI: value }).catch((error) => {
+      console.error("Failed to persist speechVoiceURI:", error);
+    });
+  }, []);
+
+  const handleSpeechRateChange = useCallback((value: number) => {
+    setSpeechRate(value);
+    void persistAppState({ speechRate: value }).catch((error) => {
+      console.error("Failed to persist speechRate:", error);
+    });
+  }, []);
+
+  const handleSpeechPitchChange = useCallback((value: number) => {
+    setSpeechPitch(value);
+    void persistAppState({ speechPitch: value }).catch((error) => {
+      console.error("Failed to persist speechPitch:", error);
+    });
+  }, []);
+
+  const handleSpeechVolumeChange = useCallback((value: number) => {
+    setSpeechVolume(value);
+    void persistAppState({ speechVolume: value }).catch((error) => {
+      console.error("Failed to persist speechVolume:", error);
+    });
+  }, []);
+
   const settings = useMemo<EditorSettings>(() => ({
     fontScale,
     lineHeight,
@@ -481,6 +525,10 @@ export function useEditorSettings(
     characterExtractionConcurrency,
     powerSaveMode,
     autoPowerSaveOnBattery,
+    speechVoiceURI,
+    speechRate,
+    speechPitch,
+    speechVolume,
     correctionConfig: {
       ...DEFAULT_CORRECTION_CONFIG,
       enabled: lintingEnabled,
@@ -501,6 +549,7 @@ export function useEditorSettings(
     lintingEnabled, lintingRuleConfigs, llmEnabled, llmModelId, llmIdlingStop,
     characterExtractionBatchSize, characterExtractionConcurrency,
     powerSaveMode, autoPowerSaveOnBattery, correctionMode, correctionGuidelines,
+    speechVoiceURI, speechRate, speechPitch, speechVolume,
   ]);
 
   const handlers = useMemo<EditorSettingsHandlers>(() => ({
@@ -530,6 +579,10 @@ export function useEditorSettings(
     handlePowerSaveModeChange,
     handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange,
+    handleSpeechVoiceURIChange,
+    handleSpeechRateChange,
+    handleSpeechPitchChange,
+    handleSpeechVolumeChange,
   }), [
     handleFontScaleChange, handleLineHeightChange, handleParagraphSpacingChange,
     handleTextIndentChange, handleFontFamilyChange, handleCharsPerLineChange,
@@ -543,6 +596,8 @@ export function useEditorSettings(
     handleCharacterExtractionBatchSizeChange, handleCharacterExtractionConcurrencyChange,
     handlePowerSaveModeChange, handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange,
+    handleSpeechVoiceURIChange, handleSpeechRateChange,
+    handleSpeechPitchChange, handleSpeechVolumeChange,
   ]);
 
   return {

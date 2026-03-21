@@ -112,6 +112,12 @@ export interface AppState {
     llmEnabled: boolean;
   } | null;
 
+  // 朗読（TTS）設定
+  speechVoiceURI?: string;
+  speechRate?: number;
+  speechPitch?: number;
+  speechVolume?: number;
+
   // タブの永続化
   openTabs?: TabPersistenceState;
 }

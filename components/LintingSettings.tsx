@@ -198,7 +198,7 @@ export default function LintingSettings({
         <button
           onClick={() => onLintingEnabledChange(!lintingEnabled)}
           className={clsx(
-            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+            "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
             lintingEnabled ? "bg-accent" : "bg-foreground-muted"
           )}
         >

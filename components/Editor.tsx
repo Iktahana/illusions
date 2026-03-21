@@ -19,14 +19,20 @@ import {
 import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
 import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import clsx from "clsx";
-import { Type, AlignLeft, Search } from "lucide-react";
-import { EditorView } from "@milkdown/prose/view";
+import { Type, AlignLeft, Search, BookAudio, Pause } from "lucide-react";
+import { EditorView, Decoration } from "@milkdown/prose/view";
+import { Node as ProsemirrorNode } from "@milkdown/prose/model";
+import { useSpeech } from "@/lib/hooks/use-speech";
+import type { SpeechState } from "@/lib/hooks/use-speech";
+import { stripMarkdown } from "@/lib/utils/strip-markdown";
 import { AllSelection, Plugin, PluginKey } from "@milkdown/prose/state";
 import { $prose } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "./BubbleMenu";
 import SearchDialog from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
 import { searchHighlightPlugin } from "@/lib/editor-page/search-highlight-plugin";
+import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin";
+import { scrollToSpeechTarget, cancelSpeechScroll } from "@/lib/editor-page/speech-auto-scroll";
 import EditorContextMenu, { type ContextMenuAction } from "./EditorContextMenu";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { localPreferences } from "@/lib/storage/local-preferences";
@@ -39,6 +45,7 @@ import {
   useLlmSettings,
   usePosHighlightSettings,
   useScrollSettings,
+  useSpeechSettings,
 } from "@/contexts/EditorSettingsContext";
 
 interface EditorProps {
@@ -104,6 +111,7 @@ export default function NovelEditor({
   const { llmEnabled, llmModelId } = useLlmSettings();
   const { posHighlightEnabled, posHighlightColors } = usePosHighlightSettings();
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
+  const { speechVoiceURI, speechRate, speechPitch, speechVolume } = useSpeechSettings();
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
   const [isVertical, setIsVertical] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -112,14 +120,26 @@ export default function NovelEditor({
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
+  const { state: speechState, speakSegments, pause, stop } = useSpeech({
+    voiceURI: speechVoiceURI,
+    rate: speechRate,
+    pitch: speechPitch,
+    volume: speechVolume,
+  });
+  const editorViewRef = useRef<EditorView | null>(null);
+  const speechMapRef = useRef<{ text: string; positions: number[] } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  
+
   // Ref to indicate a mode switch is in progress (for scroll restoration)
   const isModeSwitchingRef = useRef(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    editorViewRef.current = editorViewInstance;
+  }, [editorViewInstance]);
 
   // 変更時に縦書き状態を localStorage に保存する
   useEffect(() => {
@@ -141,6 +161,89 @@ export default function NovelEditor({
   const handleSearchOpen = useCallback(() => {
     setIsSearchOpen(true);
   }, []);
+
+  const clearHighlight = useCallback(() => {
+    cancelSpeechScroll();
+    const view = editorViewRef.current;
+    if (!view) return;
+    view.dispatch(view.state.tr.setMeta("speechDecorations", []));
+  }, []);
+
+  const startSpeechFromCursor = useCallback(() => {
+    stop();
+    clearHighlight();
+    const view = editorViewRef.current;
+    if (!view) return;
+    const { head } = view.state.selection;
+    const docSize = view.state.doc.content.size;
+    const startPos = head > 1 ? head : 1;
+    const map = buildSpeechMap(view.state.doc, startPos, docSize);
+    const segments = buildSegments(map.text);
+    const chunks = buildSpeechChunks(map.text, segments);
+    speechMapRef.current = map;
+
+    speakSegments(
+      chunks.map((c) => c.speech),
+      {
+        onSegmentStart(index) {
+          const v = editorViewRef.current;
+          const m = speechMapRef.current;
+          if (!v || !m) return;
+          const chunk = chunks[index];
+          const from = m.positions[chunk.highlightStart];
+          const to = (m.positions[chunk.highlightEnd - 1] ?? from) + 1;
+          if (from == null) return;
+          const deco = Decoration.inline(from, to, { class: "speech-reading" });
+          // Set programmatic scroll flag BEFORE dispatch so the scroll guard
+          // does not revert any browser scroll triggered by the DOM update.
+          if (programmaticScrollRef) {
+            (programmaticScrollRef as React.MutableRefObject<boolean>).current = true;
+          }
+          v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
+          requestAnimationFrame(() => {
+            const target = v.dom.querySelector(".speech-reading") as HTMLElement | null;
+            const container = scrollContainerRef.current;
+            if (target && container) {
+              scrollToSpeechTarget({ container, target, isVertical, programmaticScrollRef });
+            } else if (programmaticScrollRef) {
+              // No scroll needed — clear flag
+              (programmaticScrollRef as React.MutableRefObject<boolean>).current = false;
+            }
+          });
+        },
+        onEnd() {
+          clearHighlight();
+          speechMapRef.current = null;
+        },
+      },
+    );
+  }, [speakSegments, stop, clearHighlight, isVertical, programmaticScrollRef]);
+
+  const handleSpeakToggle = useCallback(() => {
+    if (speechState.isPlaying) {
+      pause();
+      return;
+    }
+    startSpeechFromCursor();
+  }, [speechState.isPlaying, pause, startSpeechFromCursor]);
+
+  // Restart speech from clicked position when clicking during playback
+  const speechPlayingRef = useRef(false);
+  speechPlayingRef.current = speechState.isPlaying;
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const handleClick = () => {
+      if (!speechPlayingRef.current) return;
+      // Wait for ProseMirror to update selection from the click
+      requestAnimationFrame(() => {
+        startSpeechFromCursor();
+      });
+    };
+    container.addEventListener("click", handleClick);
+    return () => container.removeEventListener("click", handleClick);
+  }, [startSpeechFromCursor]);
 
   // 親からのトリガーで検索ダイアログを開く（ショートカット）
   useEffect(() => {
@@ -248,6 +351,8 @@ export default function NovelEditor({
         isVertical={isVertical}
         onToggleVertical={handleToggleVertical}
         onSearchClick={handleSearchToggle}
+        speechState={speechState}
+        onSpeakToggle={handleSpeakToggle}
       />
 
       {/* エディタ領域 */}
@@ -374,6 +479,70 @@ const LLM_STATUS_LABELS: Record<LlmStatusState, string> = {
   inferring: "AI: 推論中",
 };
 
+/**
+ * Splits flat TTS text into segments delimited by Unicode punctuation and whitespace.
+ * Each segment is a contiguous run of non-punctuation/non-space characters,
+ * identified by [start, end) indices into the original text.
+ */
+const SEGMENT_SPLIT_RE = /[\p{P}\s\u3000]/u;
+
+function buildSegments(text: string): Array<{ start: number; end: number }> {
+  const segments: Array<{ start: number; end: number }> = [];
+  let segStart = -1;
+  for (let i = 0; i < text.length; i++) {
+    if (SEGMENT_SPLIT_RE.test(text[i])) {
+      if (segStart >= 0) {
+        segments.push({ start: segStart, end: i });
+        segStart = -1;
+      }
+    } else {
+      if (segStart < 0) segStart = i;
+    }
+  }
+  if (segStart >= 0) segments.push({ start: segStart, end: text.length });
+  return segments;
+}
+
+/**
+ * Builds speech chunks from segments. Each chunk contains:
+ * - speech: text to speak (segment + trailing punctuation for natural TTS pauses)
+ * - highlightStart/End: [start, end) indices into flat text for decoration
+ */
+function buildSpeechChunks(
+  text: string,
+  segments: Array<{ start: number; end: number }>,
+): Array<{ speech: string; highlightStart: number; highlightEnd: number }> {
+  if (segments.length === 0) return [];
+  return segments.map((seg, i) => {
+    // Include leading punctuation for the first chunk, trailing punctuation for all
+    const speechStart = i === 0 ? 0 : seg.start;
+    const speechEnd = i < segments.length - 1 ? segments[i + 1].start : text.length;
+    return {
+      speech: text.slice(speechStart, speechEnd),
+      highlightStart: seg.start,
+      highlightEnd: seg.end,
+    };
+  });
+}
+
+/** Maps each char in flat text to its doc position. Block boundaries are skipped. */
+function buildSpeechMap(doc: ProsemirrorNode, from: number, to: number): { text: string; positions: number[] } {
+  const chars: string[] = [];
+  const positions: number[] = [];
+  doc.nodesBetween(from, to, (node, pos) => {
+    if (node.isText) {
+      const s = Math.max(pos, from);
+      const e = Math.min(pos + node.nodeSize, to);
+      for (let i = s; i < e; i++) {
+        chars.push(node.text![i - pos]);
+        positions.push(i);
+      }
+    }
+    return true;
+  });
+  return { text: chars.join(""), positions };
+}
+
 function LlmStatusDot({ status }: { status: LlmStatusState }) {
   const dotClass = clsx(
     "w-2.5 h-2.5 rounded-full shrink-0 transition-colors",
@@ -396,10 +565,14 @@ function EditorToolbar({
   isVertical,
   onToggleVertical,
   onSearchClick,
+  speechState,
+  onSpeakToggle,
 }: {
   isVertical: boolean;
   onToggleVertical: () => void;
   onSearchClick: () => void;
+  speechState: SpeechState;
+  onSpeakToggle: () => void;
 }) {
   const {
     fontScale, lineHeight, paragraphSpacing,
@@ -439,6 +612,17 @@ function EditorToolbar({
       <div className="flex items-center gap-4">
         {/* LLM status indicator */}
         <LlmStatusDot status={llmStatus} />
+
+        {/* 読み上げ */}
+        {speechState.isSupported && (
+          <button
+            onClick={onSpeakToggle}
+            className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
+            title={speechState.isPlaying ? "朗読を停止" : "朗読"}
+          >
+            {speechState.isPlaying ? <Pause className="w-4 h-4" /> : <BookAudio className="w-4 h-4" />}
+          </button>
+        )}
 
         {/* 検索 */}
         <button
@@ -603,6 +787,7 @@ function MilkdownEditor({
       .use(cursor)
       .use(verticalScrollPlugin)
       .use($prose(() => searchHighlightPlugin))
+      .use($prose(() => speechHighlightPlugin))
       .use(posHighlight({
         enabled: false, // 初期化時は無効、後で動的に更新
         colors: {},
