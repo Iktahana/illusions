@@ -607,8 +607,7 @@ input[type="range"]::-moz-range-progress {
 /* Speech reading highlight */
 .speech-reading {
   background-color: rgba(99, 179, 237, 0.45);
-  border-radius: 2px;
-  transition: background-color 0.1s ease;
+  transition: background-color 0.15s ease;
 }
 
 .dark .speech-reading {
