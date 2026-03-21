@@ -8,21 +8,39 @@ export interface SpeechState {
   isSupported: boolean;
 }
 
+export interface SpeechConfig {
+  voiceURI?: string;
+  rate?: number;
+  pitch?: number;
+  volume?: number;
+}
+
 /** Returns true when the Web Speech API is available in the current environment. */
 function checkSupport(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window;
 }
 
 /**
- * Finds the best available Japanese voice, falling back to undefined
- * if no ja-JP voice is installed.
+ * Finds a Japanese voice, preferring the one matching the given voiceURI.
+ * Falls back to the first ja-JP voice if no match or no URI specified.
  */
-function findJapaneseVoice(): SpeechSynthesisVoice | undefined {
+function findJapaneseVoice(voiceURI?: string): SpeechSynthesisVoice | undefined {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     return undefined;
   }
   const voices = window.speechSynthesis.getVoices();
+  if (voiceURI) {
+    const match = voices.find((v) => v.voiceURI === voiceURI && v.lang === "ja-JP");
+    if (match) return match;
+  }
   return voices.find((v) => v.lang === "ja-JP") ?? undefined;
+}
+
+/** Apply config (rate, pitch, volume) to an utterance */
+function applyConfig(utterance: SpeechSynthesisUtterance, config?: SpeechConfig): void {
+  utterance.rate = config?.rate ?? 1.0;
+  utterance.pitch = config?.pitch ?? 1.0;
+  utterance.volume = config?.volume ?? 1.0;
 }
 
 export interface SpeechCallbacks {
@@ -35,7 +53,7 @@ export interface SegmentCallbacks {
   onEnd?: () => void;
 }
 
-export function useSpeech(): {
+export function useSpeech(config?: SpeechConfig): {
   state: SpeechState;
   speak: (text: string, callbacks?: SpeechCallbacks) => void;
   speakSegments: (segments: string[], callbacks?: SegmentCallbacks) => void;
@@ -48,6 +66,10 @@ export function useSpeech(): {
     isPaused: false,
     isSupported: false, // Start false for SSR; updated after mount
   });
+
+  // Store config in a ref to avoid recreating callbacks when settings change.
+  const configRef = useRef(config);
+  configRef.current = config;
 
   // Store callbacks in refs so they can be updated without recreating the utterance.
   const onBoundaryRef = useRef<SpeechCallbacks["onBoundary"]>(undefined);
@@ -79,13 +101,15 @@ export function useSpeech(): {
     // Cancel whatever is currently playing before starting new speech.
     window.speechSynthesis.cancel();
 
+    const cfg = configRef.current;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "ja-JP";
 
-    const voice = findJapaneseVoice();
+    const voice = findJapaneseVoice(cfg?.voiceURI);
     if (voice !== undefined) {
       utterance.voice = voice;
     }
+    applyConfig(utterance, cfg);
 
     utterance.onstart = () => {
       setState({ isPlaying: true, isPaused: false, isSupported: true });
@@ -128,11 +152,13 @@ export function useSpeech(): {
 
     window.speechSynthesis.cancel();
 
-    const voice = findJapaneseVoice();
+    const cfg = configRef.current;
+    const voice = findJapaneseVoice(cfg?.voiceURI);
     const utterances = segments.map((text, i) => {
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "ja-JP";
       if (voice) u.voice = voice;
+      applyConfig(u, cfg);
 
       u.onstart = () => {
         setState({ isPlaying: true, isPaused: false, isSupported: true });

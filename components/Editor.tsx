@@ -32,6 +32,7 @@ import SearchDialog from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
 import { searchHighlightPlugin } from "@/lib/editor-page/search-highlight-plugin";
 import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin";
+import { scrollToSpeechTarget, cancelSpeechScroll } from "@/lib/editor-page/speech-auto-scroll";
 import EditorContextMenu, { type ContextMenuAction } from "./EditorContextMenu";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { localPreferences } from "@/lib/storage/local-preferences";
@@ -44,6 +45,7 @@ import {
   useLlmSettings,
   usePosHighlightSettings,
   useScrollSettings,
+  useSpeechSettings,
 } from "@/contexts/EditorSettingsContext";
 
 interface EditorProps {
@@ -109,6 +111,7 @@ export default function NovelEditor({
   const { llmEnabled, llmModelId } = useLlmSettings();
   const { posHighlightEnabled, posHighlightColors } = usePosHighlightSettings();
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
+  const { speechVoiceURI, speechRate, speechPitch, speechVolume } = useSpeechSettings();
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
   const [isVertical, setIsVertical] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -117,7 +120,12 @@ export default function NovelEditor({
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
-  const { state: speechState, speakSegments, pause, resume, stop } = useSpeech();
+  const { state: speechState, speakSegments, pause, resume, stop } = useSpeech({
+    voiceURI: speechVoiceURI,
+    rate: speechRate,
+    pitch: speechPitch,
+    volume: speechVolume,
+  });
   const editorViewRef = useRef<EditorView | null>(null);
   const speechMapRef = useRef<{ text: string; positions: number[] } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -155,6 +163,7 @@ export default function NovelEditor({
   }, []);
 
   const clearHighlight = useCallback(() => {
+    cancelSpeechScroll();
     const view = editorViewRef.current;
     if (!view) return;
     view.dispatch(view.state.tr.setMeta("speechDecorations", []));
@@ -196,7 +205,11 @@ export default function NovelEditor({
           const deco = Decoration.inline(from, to, { class: "speech-reading" });
           v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
           requestAnimationFrame(() => {
-            v.dom.querySelector(".speech-reading")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            const target = v.dom.querySelector(".speech-reading") as HTMLElement | null;
+            const container = scrollContainerRef.current;
+            if (target && container) {
+              scrollToSpeechTarget({ container, target, isVertical });
+            }
           });
         },
         onEnd() {
