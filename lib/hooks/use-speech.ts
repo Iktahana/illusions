@@ -30,9 +30,15 @@ export interface SpeechCallbacks {
   onEnd?: () => void;
 }
 
+export interface SegmentCallbacks {
+  onSegmentStart?: (index: number) => void;
+  onEnd?: () => void;
+}
+
 export function useSpeech(): {
   state: SpeechState;
   speak: (text: string, callbacks?: SpeechCallbacks) => void;
+  speakSegments: (segments: string[], callbacks?: SegmentCallbacks) => void;
   pause: () => void;
   resume: () => void;
   stop: () => void;
@@ -46,6 +52,7 @@ export function useSpeech(): {
   // Store callbacks in refs so they can be updated without recreating the utterance.
   const onBoundaryRef = useRef<SpeechCallbacks["onBoundary"]>(undefined);
   const onEndRef = useRef<SpeechCallbacks["onEnd"]>(undefined);
+  const onSegmentStartRef = useRef<SegmentCallbacks["onSegmentStart"]>(undefined);
 
   // Detect support on the client after mount (window is not available during SSR).
   useEffect(() => {
@@ -110,6 +117,51 @@ export function useSpeech(): {
     window.speechSynthesis.speak(utterance);
   }, []);
 
+  const speakSegments = useCallback((segments: string[], callbacks?: SegmentCallbacks) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
+    }
+    if (segments.length === 0) return;
+
+    onSegmentStartRef.current = callbacks?.onSegmentStart;
+    onEndRef.current = callbacks?.onEnd;
+
+    window.speechSynthesis.cancel();
+
+    const voice = findJapaneseVoice();
+    const utterances = segments.map((text, i) => {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "ja-JP";
+      if (voice) u.voice = voice;
+
+      u.onstart = () => {
+        setState({ isPlaying: true, isPaused: false, isSupported: true });
+        onSegmentStartRef.current?.(i);
+      };
+      u.onpause = () => {
+        setState({ isPlaying: false, isPaused: true, isSupported: true });
+      };
+      u.onresume = () => {
+        setState({ isPlaying: true, isPaused: false, isSupported: true });
+      };
+      u.onerror = () => {
+        window.speechSynthesis.cancel();
+        setState({ isPlaying: false, isPaused: false, isSupported: true });
+        onEndRef.current?.();
+      };
+      return u;
+    });
+
+    // Only the last utterance's onend resets state and fires callback
+    utterances[utterances.length - 1].onend = () => {
+      setState({ isPlaying: false, isPaused: false, isSupported: true });
+      onEndRef.current?.();
+    };
+
+    // Queue all utterances — speechSynthesis plays them in order
+    utterances.forEach((u) => window.speechSynthesis.speak(u));
+  }, []);
+
   const pause = useCallback(() => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.pause();
@@ -130,5 +182,5 @@ export function useSpeech(): {
     }
   }, []);
 
-  return { state, speak, pause, resume, stop };
+  return { state, speak, speakSegments, pause, resume, stop };
 }

@@ -23,7 +23,7 @@ import { Type, AlignLeft, Search, Play, Pause } from "lucide-react";
 import { EditorView, Decoration } from "@milkdown/prose/view";
 import { Node as ProsemirrorNode } from "@milkdown/prose/model";
 import { useSpeech } from "@/lib/hooks/use-speech";
-import type { SpeechState, SpeechCallbacks } from "@/lib/hooks/use-speech";
+import type { SpeechState } from "@/lib/hooks/use-speech";
 import { stripMarkdown } from "@/lib/utils/strip-markdown";
 import { AllSelection, Plugin, PluginKey } from "@milkdown/prose/state";
 import { $prose } from "@milkdown/utils";
@@ -117,10 +117,9 @@ export default function NovelEditor({
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
-  const { state: speechState, speak, pause, resume, stop } = useSpeech();
+  const { state: speechState, speakSegments, pause, resume, stop } = useSpeech();
   const editorViewRef = useRef<EditorView | null>(null);
   const speechMapRef = useRef<{ text: string; positions: number[] } | null>(null);
-  const speechSegmentsRef = useRef<Array<{ start: number; end: number }>>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Ref to indicate a mode switch is in progress (for scroll restoration)
@@ -180,36 +179,33 @@ export default function NovelEditor({
     const startPos = head > 1 ? head : 1;
     const map = buildSpeechMap(view.state.doc, startPos, docSize);
     const segments = buildSegments(map.text);
+    const chunks = buildSpeechChunks(map.text, segments);
     speechMapRef.current = map;
-    speechSegmentsRef.current = segments;
-    const callbacks: SpeechCallbacks = {
-      onBoundary(charIndex) {
-        const v = editorViewRef.current;
-        const m = speechMapRef.current;
-        const segs = speechSegmentsRef.current;
-        if (!v || !m) return;
-        // Find the segment that contains charIndex; fall back to the next segment
-        const seg =
-          segs.find((s) => s.start <= charIndex && charIndex < s.end) ??
-          segs.find((s) => s.start > charIndex);
-        if (!seg) return;
-        const from = m.positions[seg.start];
-        const to = (m.positions[seg.end - 1] ?? from) + 1;
-        if (from == null) return;
-        const deco = Decoration.inline(from, to, { class: "speech-reading" });
-        v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
-        requestAnimationFrame(() => {
-          v.dom.querySelector(".speech-reading")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-        });
+
+    speakSegments(
+      chunks.map((c) => c.speech),
+      {
+        onSegmentStart(index) {
+          const v = editorViewRef.current;
+          const m = speechMapRef.current;
+          if (!v || !m) return;
+          const chunk = chunks[index];
+          const from = m.positions[chunk.highlightStart];
+          const to = (m.positions[chunk.highlightEnd - 1] ?? from) + 1;
+          if (from == null) return;
+          const deco = Decoration.inline(from, to, { class: "speech-reading" });
+          v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
+          requestAnimationFrame(() => {
+            v.dom.querySelector(".speech-reading")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          });
+        },
+        onEnd() {
+          clearHighlight();
+          speechMapRef.current = null;
+        },
       },
-      onEnd() {
-        clearHighlight();
-        speechMapRef.current = null;
-        speechSegmentsRef.current = [];
-      },
-    };
-    speak(map.text, callbacks);
-  }, [speechState.isPlaying, speechState.isPaused, speak, pause, resume, stop, clearHighlight]);
+    );
+  }, [speechState.isPlaying, speechState.isPaused, speakSegments, pause, resume, stop, clearHighlight]);
 
   // 親からのトリガーで検索ダイアログを開く（ショートカット）
   useEffect(() => {
@@ -467,6 +463,28 @@ function buildSegments(text: string): Array<{ start: number; end: number }> {
   }
   if (segStart >= 0) segments.push({ start: segStart, end: text.length });
   return segments;
+}
+
+/**
+ * Builds speech chunks from segments. Each chunk contains:
+ * - speech: text to speak (segment + trailing punctuation for natural TTS pauses)
+ * - highlightStart/End: [start, end) indices into flat text for decoration
+ */
+function buildSpeechChunks(
+  text: string,
+  segments: Array<{ start: number; end: number }>,
+): Array<{ speech: string; highlightStart: number; highlightEnd: number }> {
+  if (segments.length === 0) return [];
+  return segments.map((seg, i) => {
+    // Include leading punctuation for the first chunk, trailing punctuation for all
+    const speechStart = i === 0 ? 0 : seg.start;
+    const speechEnd = i < segments.length - 1 ? segments[i + 1].start : text.length;
+    return {
+      speech: text.slice(speechStart, speechEnd),
+      highlightStart: seg.start,
+      highlightEnd: seg.end,
+    };
+  });
 }
 
 /** Maps each char in flat text to its doc position. Block boundaries are skipped. */
