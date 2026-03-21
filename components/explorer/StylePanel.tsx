@@ -128,7 +128,7 @@ export function StylePanel() {
           <button
             onClick={() => onAutoCharsPerLineChange(!autoCharsPerLine)}
             className={clsx(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
               autoCharsPerLine ? "bg-accent" : "bg-border-secondary"
             )}
           >
@@ -153,7 +153,7 @@ export function StylePanel() {
           <button
             onClick={() => onShowParagraphNumbersChange(!showParagraphNumbers)}
             className={clsx(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2",
+              "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2",
               showParagraphNumbers ? "bg-accent" : "bg-border-secondary"
             )}
           >

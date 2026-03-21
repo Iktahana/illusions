@@ -493,7 +493,7 @@ export default function CorrectionsPanel({
           <button
             onClick={() => onLintingEnabledChange?.(!lintingEnabled)}
             className={clsx(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
               lintingEnabled ? "bg-accent" : "bg-foreground-muted"
             )}
           >
@@ -519,7 +519,7 @@ export default function CorrectionsPanel({
           <button
             onClick={() => onPosHighlightEnabledChange?.(!posHighlightEnabled)}
             className={clsx(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
               posHighlightEnabled ? "bg-accent" : "bg-foreground-muted"
             )}
           >

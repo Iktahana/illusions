@@ -455,7 +455,7 @@ export default function SettingsModal({
                   <button
                     onClick={() => onShowParagraphNumbersChange(!showParagraphNumbers)}
                     className={clsx(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                      "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
                       showParagraphNumbers ? "bg-accent" : "bg-border-secondary"
                     )}
                   >
@@ -479,7 +479,7 @@ export default function SettingsModal({
                   <button
                     onClick={() => onAutoSaveChange(!autoSave)}
                     className={clsx(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                      "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
                       autoSave ? "bg-accent" : "bg-border-secondary"
                     )}
                   >
@@ -577,7 +577,7 @@ export default function SettingsModal({
                     <button
                       onClick={() => onPosHighlightEnabledChange(!posHighlightEnabled)}
                       className={clsx(
-                        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                        "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
                         posHighlightEnabled ? "bg-accent" : "bg-border-secondary"
                       )}
                     >
