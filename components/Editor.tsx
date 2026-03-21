@@ -169,12 +169,7 @@ export default function NovelEditor({
     view.dispatch(view.state.tr.setMeta("speechDecorations", []));
   }, []);
 
-  const handleSpeakToggle = useCallback(() => {
-    if (speechState.isPlaying) {
-      pause();
-      return;
-    }
-    // Paused or stopped: always start fresh from cursor position
+  const startSpeechFromCursor = useCallback(() => {
     stop();
     clearHighlight();
     const view = editorViewRef.current;
@@ -214,7 +209,33 @@ export default function NovelEditor({
         },
       },
     );
-  }, [speechState.isPlaying, speakSegments, pause, stop, clearHighlight]);
+  }, [speakSegments, stop, clearHighlight]);
+
+  const handleSpeakToggle = useCallback(() => {
+    if (speechState.isPlaying) {
+      pause();
+      return;
+    }
+    startSpeechFromCursor();
+  }, [speechState.isPlaying, pause, startSpeechFromCursor]);
+
+  // Restart speech from clicked position when clicking during playback
+  const speechPlayingRef = useRef(false);
+  speechPlayingRef.current = speechState.isPlaying;
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const handleClick = () => {
+      if (!speechPlayingRef.current) return;
+      // Wait for ProseMirror to update selection from the click
+      requestAnimationFrame(() => {
+        startSpeechFromCursor();
+      });
+    };
+    container.addEventListener("click", handleClick);
+    return () => container.removeEventListener("click", handleClick);
+  }, [startSpeechFromCursor]);
 
   // 親からのトリガーで検索ダイアログを開く（ショートカット）
   useEffect(() => {
