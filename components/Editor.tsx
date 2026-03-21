@@ -199,7 +199,7 @@ export default function NovelEditor({
             const target = v.dom.querySelector(".speech-reading") as HTMLElement | null;
             const container = scrollContainerRef.current;
             if (target && container) {
-              scrollToSpeechTarget({ container, target, isVertical });
+              scrollToSpeechTarget({ container, target, isVertical, programmaticScrollRef });
             }
           });
         },
@@ -209,7 +209,7 @@ export default function NovelEditor({
         },
       },
     );
-  }, [speakSegments, stop, clearHighlight]);
+  }, [speakSegments, stop, clearHighlight, isVertical, programmaticScrollRef]);
 
   const handleSpeakToggle = useCallback(() => {
     if (speechState.isPlaying) {
