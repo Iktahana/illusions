@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FolderTree, Settings, Palette } from "lucide-react";
+import { FolderTree, Palette } from "lucide-react";
 import clsx from "clsx";
 import { ChaptersPanel } from "./explorer/ChaptersPanel";
-import { SettingsPanel } from "./explorer/SettingsPanel";
 import { StylePanel } from "./explorer/StylePanel";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { Tab, ExplorerProps } from "./explorer/types";
@@ -24,7 +23,7 @@ export default function Explorer({
 
   useEffect(() => {
     const savedTab = localPreferences.getLeftTab();
-    if (savedTab === "chapters" || savedTab === "settings" || savedTab === "style") {
+    if (savedTab === "chapters" || savedTab === "style") {
       setActiveTab(savedTab as Tab);
     }
   }, []);
@@ -51,19 +50,6 @@ export default function Explorer({
           <span className="hidden sm:inline">章</span>
         </button>
         <button
-          onClick={() => setActiveTab("settings")}
-          className={clsx(
-            "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
-            activeTab === "settings"
-              ? "text-foreground border-b-2 border-accent"
-              : "text-foreground hover:text-foreground"
-          )}
-          title="設定"
-        >
-          <Settings className="w-4 h-4" />
-          <span className="hidden sm:inline">設定</span>
-        </button>
-        <button
           onClick={() => setActiveTab("style")}
           className={clsx(
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
@@ -81,7 +67,6 @@ export default function Explorer({
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === "chapters" && <div className={compactMode ? "p-3" : "p-4"}><ChaptersPanel content={content} onChapterClick={onChapterClick} onInsertText={onInsertText} /></div>}
-        {activeTab === "settings" && <div className={compactMode ? "p-3" : "p-4"}><SettingsPanel /></div>}
         {activeTab === "style" && (
           <div className={compactMode ? "p-3" : "p-4"}>
             <StylePanel />

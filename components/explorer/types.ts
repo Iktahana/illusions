@@ -1,5 +1,5 @@
 /** Tab identifiers for the Explorer sidebar */
-export type Tab = "chapters" | "settings" | "style";
+export type Tab = "chapters" | "style";
 
 /** Props for the main Explorer component */
 export interface ExplorerProps {
