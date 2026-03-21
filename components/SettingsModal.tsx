@@ -99,9 +99,9 @@ export default function SettingsModal({
     onLintingRuleConfigsBatchChange, onCorrectionConfigChange,
   } = useLintingSettings();
   const {
-    llmEnabled, llmModelId, llmIdlingStop,
+    llmEnabled,
     characterExtractionBatchSize, characterExtractionConcurrency,
-    onLlmEnabledChange, onLlmModelIdChange, onLlmIdlingStopChange,
+    onLlmEnabledChange,
     onCharacterExtractionBatchSizeChange, onCharacterExtractionConcurrencyChange,
   } = useLlmSettings();
   const {
@@ -607,10 +607,6 @@ export default function SettingsModal({
                 onLintingRuleConfigsBatchChange={(cfgs) => onLintingRuleConfigsBatchChange?.(cfgs)}
                 llmEnabled={llmEnabled}
                 onLlmEnabledChange={onLlmEnabledChange}
-                llmModelId={llmModelId}
-                onLlmModelIdChange={onLlmModelIdChange}
-                llmIdlingStop={llmIdlingStop}
-                onLlmIdlingStopChange={onLlmIdlingStopChange}
                 characterExtractionBatchSize={characterExtractionBatchSize}
                 onCharacterExtractionBatchSizeChange={onCharacterExtractionBatchSizeChange}
                 characterExtractionConcurrency={characterExtractionConcurrency}

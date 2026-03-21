@@ -1,86 +1,49 @@
-export interface LlmModelEntry {
-  readonly id: string;
-  readonly name: string;
-  readonly nameJa: string;
-  readonly descriptionJa?: string;
-  readonly url: string;
-  readonly fileName: string;
-  readonly size: number;
-  readonly sha256: string;
-  readonly quantization: string;
-  readonly minRamMb: number;
-  readonly recommended?: boolean;
+/** Available cloud AI providers */
+export type LlmProvider = "openai" | "anthropic" | "google";
+
+/** Configuration for a cloud LLM provider */
+export interface LlmProviderConfig {
+  provider: LlmProvider;
+  /** Model identifier, e.g. "gpt-4o-mini", "claude-haiku-4-5-20251001", "gemini-2.0-flash" */
+  model: string;
+  /** API key for the provider */
+  apiKey: string;
 }
 
-export interface LlmConfig {
-  modelId: string;
-  enabled: boolean;
-}
-
-export type LlmModelStatus =
-  | "not-downloaded"
-  | "downloading"
-  | "ready"
-  | "loading"
-  | "loaded"
-  | "error";
-
-export interface LlmModelInfo {
-  id: string;
-  status: LlmModelStatus;
-  downloadProgress?: number;
-  filePath?: string;
-  error?: string;
-}
-
+/** Result of a single LLM inference call */
 export interface LlmInferenceResult {
   text: string;
   tokenCount: number;
 }
 
+/**
+ * Cloud LLM client interface.
+ *
+ * All inference is done via cloud APIs — no local model lifecycle management.
+ * Clients are always "available" as long as a valid provider config is set.
+ */
 export interface ILlmClient {
-  /** Check if LLM features are available in this environment */
+  /** Returns true if a provider config with API key is set */
   isAvailable(): boolean;
 
-  /** Get list of available models with their download status */
-  getModels(): Promise<LlmModelInfo[]>;
+  /** Returns the current provider config, or null if not configured */
+  getProviderConfig(): LlmProviderConfig | null;
 
-  /** Download a model with progress reporting */
-  downloadModel(
-    modelId: string,
-    onProgress?: (progress: number) => void,
-  ): Promise<void>;
-
-  /** Delete a downloaded model */
-  deleteModel(modelId: string): Promise<void>;
-
-  /** Load model into memory (VRAM/RAM). Must be called before infer(). */
-  loadModel(modelId: string): Promise<void>;
-
-  /** Unload model from memory, freeing VRAM/RAM. */
-  unloadModel(): Promise<void>;
-
-  /** Check if a model is currently loaded */
-  isModelLoaded(): Promise<boolean>;
-
-  /** Run inference. Model must be loaded first. Supports AbortSignal for cancellation. */
+  /**
+   * Run a single inference call.
+   * Throws with a Japanese error message on network or API errors.
+   */
   infer(
     prompt: string,
     options?: { signal?: AbortSignal; maxTokens?: number },
   ): Promise<LlmInferenceResult>;
 
-  /** Run batch inference with multiple prompts decoded in parallel. */
+  /**
+   * Run multiple inference calls in parallel via Promise.all.
+   * Throws with a Japanese error message on network or API errors.
+   */
   inferBatch(
     prompts: string[],
     options?: { signal?: AbortSignal; maxTokens?: number },
   ): Promise<LlmInferenceResult[]>;
-
-  /** Get disk usage for downloaded models */
-  getStorageUsage(): Promise<{
-    used: number;
-    models: Array<{ id: string; size: number }>;
-  }>;
-
-  /** Enable or disable automatic model unloading after idle timeout */
-  setIdlingStop(enabled: boolean): Promise<void>;
 }

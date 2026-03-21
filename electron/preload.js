@@ -140,27 +140,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     analyzeWordFrequency: (text) => ipcRenderer.invoke('nlp:analyze-word-frequency', text),
   },
   llm: {
-    getModels: () => ipcRenderer.invoke('llm:get-models'),
-    downloadModel: (modelId) => ipcRenderer.invoke('llm:download-model', modelId),
-    deleteModel: (modelId) => ipcRenderer.invoke('llm:delete-model', modelId),
-    loadModel: (modelId) => ipcRenderer.invoke('llm:load-model', modelId),
-    unloadModel: () => ipcRenderer.invoke('llm:unload-model'),
-    isModelLoaded: () => ipcRenderer.invoke('llm:is-model-loaded'),
-    infer: (prompt, options) => ipcRenderer.invoke('llm:infer', { prompt, ...options }),
-    inferBatch: (prompts, options) => ipcRenderer.invoke('llm:infer-batch', { prompts, ...options }),
-    getStorageUsage: () => ipcRenderer.invoke('llm:get-storage-usage'),
-    setIdlingStop: (enabled) => ipcRenderer.invoke('llm:set-idling-stop', { enabled }),
-    onDownloadProgress: (callback) => {
-      // Remove any stale listeners before registering to prevent duplicates on remount
-      ipcRenderer.removeAllListeners('llm:download-progress');
-      const handler = (_event, progress) => callback(progress);
-      ipcRenderer.on('llm:download-progress', handler);
-      // Return cleanup function for proper lifecycle management
-      return () => ipcRenderer.removeListener('llm:download-progress', handler);
-    },
-    removeDownloadProgressListener: () => {
-      ipcRenderer.removeAllListeners('llm:download-progress');
-    },
+    saveProviderConfig: (config) => ipcRenderer.invoke('llm:save-provider-config', config),
+    loadProviderConfig: () => ipcRenderer.invoke('llm:load-provider-config'),
+    deleteProviderConfig: () => ipcRenderer.invoke('llm:delete-provider-config'),
   },
   storage: {
     saveSession: (session) => ipcRenderer.invoke('storage:save-session', session),

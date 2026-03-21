@@ -18,7 +18,6 @@ import {
   CORRECTION_MODE_IDS,
   CORRECTION_MODES,
 } from "@/lib/linting/correction-modes";
-import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 import GuidelineList from "@/components/GuidelineList";
 
 const LlmSettings = dynamic(
@@ -44,10 +43,6 @@ interface LintingSettingsProps {
   onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }>) => void;
   llmEnabled?: boolean;
   onLlmEnabledChange?: (value: boolean) => void;
-  llmModelId?: string;
-  onLlmModelIdChange?: (modelId: string) => void;
-  llmIdlingStop?: boolean;
-  onLlmIdlingStopChange?: (value: boolean) => void;
   characterExtractionBatchSize?: number;
   onCharacterExtractionBatchSizeChange?: (value: number) => void;
   characterExtractionConcurrency?: number;
@@ -73,10 +68,6 @@ export default function LintingSettings({
   onLintingRuleConfigsBatchChange,
   llmEnabled,
   onLlmEnabledChange,
-  llmModelId,
-  onLlmModelIdChange,
-  llmIdlingStop,
-  onLlmIdlingStopChange,
   characterExtractionBatchSize,
   onCharacterExtractionBatchSizeChange,
   characterExtractionConcurrency,
@@ -215,10 +206,6 @@ export default function LintingSettings({
       <LlmSettings
         llmEnabled={llmEnabled ?? false}
         onLlmEnabledChange={onLlmEnabledChange}
-        llmModelId={llmModelId ?? DEFAULT_MODEL_ID}
-        onLlmModelIdChange={onLlmModelIdChange}
-        llmIdlingStop={llmIdlingStop}
-        onLlmIdlingStopChange={onLlmIdlingStopChange}
         characterExtractionBatchSize={characterExtractionBatchSize}
         onCharacterExtractionBatchSizeChange={onCharacterExtractionBatchSizeChange}
         characterExtractionConcurrency={characterExtractionConcurrency}

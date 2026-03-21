@@ -43,7 +43,10 @@ export interface CorrectionConfig {
   guidelines: GuidelineId[];
   ruleOverrides: Record<string, Partial<LintRuleConfig>>;
   llm: {
-    modelId: string;
+    /** Cloud AI provider, e.g. "anthropic" | "openai" | "google" */
+    provider: string;
+    /** Model identifier, e.g. "claude-haiku-4-5-20251001" */
+    model: string;
     cooldownMs: number;
     validationEnabled: boolean;
   };
@@ -57,7 +60,8 @@ export const DEFAULT_CORRECTION_CONFIG: CorrectionConfig = {
   guidelines: ["joyo-kanji-2010", "novel-manuscript"],
   ruleOverrides: {},
   llm: {
-    modelId: "",
+    provider: "anthropic",
+    model: "claude-haiku-4-5-20251001",
     cooldownMs: 60_000,
     validationEnabled: true,
   },

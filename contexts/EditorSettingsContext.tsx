@@ -103,13 +103,9 @@ export function useLlmSettings() {
   const { settings, handlers } = useEditorSettingsContext();
   return useMemo(() => ({
     llmEnabled: settings.llmEnabled,
-    llmModelId: settings.llmModelId,
-    llmIdlingStop: settings.llmIdlingStop,
     characterExtractionBatchSize: settings.characterExtractionBatchSize,
     characterExtractionConcurrency: settings.characterExtractionConcurrency,
     onLlmEnabledChange: handlers.handleLlmEnabledChange,
-    onLlmModelIdChange: handlers.handleLlmModelIdChange,
-    onLlmIdlingStopChange: handlers.handleLlmIdlingStopChange,
     onCharacterExtractionBatchSizeChange: handlers.handleCharacterExtractionBatchSizeChange,
     onCharacterExtractionConcurrencyChange: handlers.handleCharacterExtractionConcurrencyChange,
   }), [settings, handlers]);

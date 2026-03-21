@@ -152,37 +152,20 @@ declare global {
       isAvailable: () => Promise<boolean>;
     };
     llm?: {
-      getModels: () => Promise<
-        Array<{
-          id: string;
-          status: "not-downloaded" | "downloading" | "ready" | "loading" | "loaded" | "error";
-          downloadProgress?: number;
-          filePath?: string;
-          error?: string;
-        }>
-      >;
-      downloadModel: (modelId: string) => Promise<void>;
-      deleteModel: (modelId: string) => Promise<void>;
-      loadModel: (modelId: string) => Promise<void>;
-      unloadModel: () => Promise<void>;
-      isModelLoaded: () => Promise<boolean>;
-      infer: (
-        prompt: string,
-        options?: { maxTokens?: number },
-      ) => Promise<{ text: string; tokenCount: number }>;
-      inferBatch: (
-        prompts: string[],
-        options?: { maxTokens?: number },
-      ) => Promise<Array<{ text: string; tokenCount: number }>>;
-      getStorageUsage: () => Promise<{
-        used: number;
-        models: Array<{ id: string; size: number }>;
-      }>;
-      onDownloadProgress: (
-        callback: (progress: { modelId: string; progress: number }) => void,
-      ) => () => void;
-      removeDownloadProgressListener: () => void;
-      setIdlingStop: (enabled: boolean) => Promise<void>;
+      /** Encrypt and persist the provider config (API key encrypted via safeStorage) */
+      saveProviderConfig: (config: {
+        provider: string;
+        model: string;
+        apiKey: string;
+      }) => Promise<void>;
+      /** Decrypt and return the stored provider config, or null if not set */
+      loadProviderConfig: () => Promise<{
+        provider: string;
+        model: string;
+        apiKey: string;
+      } | null>;
+      /** Remove the stored provider config */
+      deleteProviderConfig: () => Promise<void>;
     };
     power?: {
       /** Listen for debounced power state changes from main process */

@@ -1,111 +1,138 @@
 // @ts-check
 'use strict';
 
-const { ipcMain } = require('electron');
-const { LlmEngine } = require('./llm-engine');
+/**
+ * LLM IPC Handlers — Cloud API key management
+ *
+ * Handles secure storage and retrieval of cloud AI provider configuration.
+ * API keys are encrypted at rest via Electron safeStorage (OS keychain).
+ *
+ * Channels:
+ *   llm:save-provider-config  — encrypt and persist provider config
+ *   llm:load-provider-config  — decrypt and return provider config
+ *   llm:delete-provider-config — remove stored config
+ */
 
-/** @type {LlmEngine | null} */
-let llmEngine = null;
+const path = require('path');
+const fs = require('fs/promises');
+const { ipcMain, safeStorage, app } = require('electron');
 
-async function ensureInit() {
-  if (!llmEngine) {
-    llmEngine = new LlmEngine();
-    await llmEngine.init();
+const VALID_PROVIDERS = ['openai', 'anthropic', 'google'];
+const CONFIG_FILE_NAME = 'llm-provider-config.json';
+
+/** @returns {string} Path to the encrypted config file */
+function getConfigFilePath() {
+  return path.join(app.getPath('userData'), CONFIG_FILE_NAME);
+}
+
+/**
+ * Persist provider config with the API key encrypted via safeStorage.
+ * @param {{ provider: string; model: string; apiKey: string }} config
+ */
+async function saveProviderConfig(config) {
+  const configPath = getConfigFilePath();
+
+  let encryptedKey = null;
+  if (safeStorage.isEncryptionAvailable()) {
+    const buf = safeStorage.encryptString(config.apiKey);
+    encryptedKey = buf.toString('base64');
+  } else {
+    // Fallback: store plain (not recommended, but better than losing the config)
+    encryptedKey = Buffer.from(config.apiKey).toString('base64');
+  }
+
+  const stored = {
+    provider: config.provider,
+    model: config.model,
+    encryptedKey,
+    encrypted: safeStorage.isEncryptionAvailable(),
+  };
+
+  await fs.writeFile(configPath, JSON.stringify(stored, null, 2), 'utf8');
+}
+
+/**
+ * Load and decrypt the provider config.
+ * Returns null if not found.
+ * @returns {Promise<{ provider: string; model: string; apiKey: string } | null>}
+ */
+async function loadProviderConfig() {
+  const configPath = getConfigFilePath();
+
+  let raw;
+  try {
+    raw = await fs.readFile(configPath, 'utf8');
+  } catch {
+    return null;
+  }
+
+  let stored;
+  try {
+    stored = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (!stored || typeof stored.provider !== 'string' || typeof stored.encryptedKey !== 'string') {
+    return null;
+  }
+
+  let apiKey;
+  try {
+    if (stored.encrypted && safeStorage.isEncryptionAvailable()) {
+      const buf = Buffer.from(stored.encryptedKey, 'base64');
+      apiKey = safeStorage.decryptString(buf);
+    } else {
+      apiKey = Buffer.from(stored.encryptedKey, 'base64').toString('utf8');
+    }
+  } catch {
+    return null;
+  }
+
+  return {
+    provider: stored.provider,
+    model: stored.model ?? '',
+    apiKey,
+  };
+}
+
+/** Delete the stored config file */
+async function deleteProviderConfig() {
+  const configPath = getConfigFilePath();
+  try {
+    await fs.unlink(configPath);
+  } catch {
+    // File may not exist — ignore
   }
 }
 
 function registerLlmHandlers() {
-  ipcMain.handle('llm:get-models', async () => {
-    await ensureInit();
-    return llmEngine.getModels();
-  });
-
-  ipcMain.handle('llm:download-model', async (event, modelId) => {
-    if (typeof modelId !== 'string' || modelId.length === 0) {
-      throw new Error('Invalid modelId parameter');
+  ipcMain.handle('llm:save-provider-config', async (_event, config) => {
+    if (
+      !config ||
+      typeof config.provider !== 'string' ||
+      !VALID_PROVIDERS.includes(config.provider) ||
+      typeof config.model !== 'string' ||
+      config.model.length === 0 ||
+      typeof config.apiKey !== 'string' ||
+      config.apiKey.length === 0
+    ) {
+      throw new Error('プロバイダー設定が無効です。provider、model、apiKey をすべて指定してください。');
     }
-    await ensureInit();
-    await llmEngine.downloadModel(modelId, (progress) => {
-      event.sender.send('llm:download-progress', progress);
-    });
+    await saveProviderConfig(config);
   });
 
-  ipcMain.handle('llm:delete-model', async (_event, modelId) => {
-    if (typeof modelId !== 'string' || modelId.length === 0) {
-      throw new Error('Invalid modelId parameter');
-    }
-    await ensureInit();
-    await llmEngine.deleteModel(modelId);
+  ipcMain.handle('llm:load-provider-config', async () => {
+    return loadProviderConfig();
   });
 
-  ipcMain.handle('llm:load-model', async (_event, modelId) => {
-    if (typeof modelId !== 'string' || modelId.length === 0) {
-      throw new Error('Invalid modelId parameter');
-    }
-    await ensureInit();
-    await llmEngine.loadModel(modelId);
-  });
-
-  ipcMain.handle('llm:unload-model', async () => {
-    await ensureInit();
-    await llmEngine.unloadModel();
-  });
-
-  ipcMain.handle('llm:is-model-loaded', async () => {
-    await ensureInit();
-    return llmEngine.isLoaded();
-  });
-
-  ipcMain.handle('llm:infer', async (_event, params) => {
-    if (!params || typeof params.prompt !== 'string') {
-      throw new Error('Invalid prompt parameter');
-    }
-    if (params.prompt.length > 100_000) {
-      throw new Error('Prompt too long (max 100,000 characters)');
-    }
-    await ensureInit();
-    return llmEngine.infer(params.prompt, {
-      maxTokens: typeof params.maxTokens === 'number' ? params.maxTokens : undefined,
-    });
-  });
-
-  ipcMain.handle('llm:infer-batch', async (_event, params) => {
-    if (!params || !Array.isArray(params.prompts)) {
-      throw new Error('Invalid prompts parameter');
-    }
-    for (const p of params.prompts) {
-      if (typeof p !== 'string') {
-        throw new Error('Each prompt must be a string');
-      }
-      if (p.length > 100_000) {
-        throw new Error('Prompt too long (max 100,000 characters)');
-      }
-    }
-    if (params.prompts.length > 8) {
-      throw new Error('Batch size exceeds maximum (8)');
-    }
-    await ensureInit();
-    return llmEngine.inferBatch(params.prompts, {
-      maxTokens: typeof params.maxTokens === 'number' ? params.maxTokens : undefined,
-    });
-  });
-
-  ipcMain.handle('llm:get-storage-usage', async () => {
-    await ensureInit();
-    return llmEngine.getStorageUsage();
-  });
-
-  ipcMain.handle('llm:set-idling-stop', async (_event, { enabled }) => {
-    await ensureInit();
-    llmEngine.setIdlingStop(Boolean(enabled));
+  ipcMain.handle('llm:delete-provider-config', async () => {
+    await deleteProviderConfig();
   });
 }
 
-async function disposeLlmEngine() {
-  if (llmEngine) {
-    await llmEngine.dispose();
-    llmEngine = null;
-  }
+function disposeLlmEngine() {
+  // No local engine to dispose — no-op
 }
 
 module.exports = { registerLlmHandlers, disposeLlmEngine };

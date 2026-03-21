@@ -1,46 +1,39 @@
 /**
  * LLM Client Factory
  *
- * Automatically selects the appropriate LLM client based on environment:
- * - Electron: Uses ElectronLlmClient (IPC communication)
- * - Web: Uses WebLlmClient (stub, not available)
+ * Returns a CloudLlmClient configured with the given provider config.
+ * Works in all environments (Electron and web).
  */
 
-import type { ILlmClient } from "./types";
-import { ElectronLlmClient } from "./electron-llm-client";
-import { WebLlmClient } from "./web-llm-client";
+import type { ILlmClient, LlmProviderConfig } from "./types";
+import { CloudLlmClient } from "./cloud-llm-client";
 
 let cachedClient: ILlmClient | null = null;
 
 /**
- * Get the appropriate LLM client for current environment
+ * Get the LLM client for the current provider config.
  *
- * @returns Singleton LLM client instance
+ * Pass a config to update the active provider.
+ * Call with no argument to get the current cached client (or a null-config client).
+ *
+ * @returns CloudLlmClient instance
  */
-export function getLlmClient(): ILlmClient {
+export function getLlmClient(config?: LlmProviderConfig | null): ILlmClient {
+  if (config !== undefined) {
+    cachedClient = new CloudLlmClient(config ?? null);
+    return cachedClient;
+  }
+
   if (cachedClient) {
     return cachedClient;
   }
 
-  // Detect environment
-  const isElectron =
-    typeof window !== "undefined" &&
-    window.electronAPI?.isElectron === true;
-
-  let client: ILlmClient;
-
-  if (isElectron) {
-    client = new ElectronLlmClient();
-  } else {
-    client = new WebLlmClient();
-  }
-
-  cachedClient = client;
-  return client;
+  cachedClient = new CloudLlmClient(null);
+  return cachedClient;
 }
 
 /**
- * Reset the cached client (useful for testing)
+ * Reset the cached client (useful for testing or after config changes).
  */
 export function resetLlmClient(): void {
   cachedClient = null;

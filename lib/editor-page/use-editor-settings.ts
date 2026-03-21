@@ -2,7 +2,6 @@ import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { fetchAppState, persistAppState } from "@/lib/storage/app-state-manager";
-import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 import type { Severity } from "@/lib/linting/types";
 import type { CorrectionConfig, CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import { DEFAULT_CORRECTION_CONFIG } from "@/lib/linting/correction-config";
@@ -26,8 +25,6 @@ export interface EditorSettings {
   lintingEnabled: boolean;
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
   llmEnabled: boolean;
-  llmModelId: string;
-  llmIdlingStop: boolean;
   characterExtractionBatchSize: number;
   characterExtractionConcurrency: number;
   powerSaveMode: boolean;
@@ -56,8 +53,6 @@ export interface EditorSettingsHandlers {
   handleLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
   handleLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
   handleLlmEnabledChange: (value: boolean) => void;
-  handleLlmModelIdChange: (modelId: string) => void;
-  handleLlmIdlingStopChange: (value: boolean) => void;
   handleCharacterExtractionBatchSizeChange: (value: number) => void;
   handleCharacterExtractionConcurrencyChange: (value: number) => void;
   handlePowerSaveModeChange: (enabled: boolean) => void;
@@ -109,8 +104,6 @@ export function useEditorSettings(
   const [lintingEnabled, setLintingEnabled] = useState(true);
   const [lintingRuleConfigs, setLintingRuleConfigs] = useState<Record<string, { enabled: boolean; severity: Severity }>>({});
   const [llmEnabled, setLlmEnabled] = useState(false);
-  const [llmModelId, setLlmModelId] = useState("qwen3-1.7b-q8");
-  const [llmIdlingStop, setLlmIdlingStop] = useState(true);
   const [characterExtractionBatchSize, setCharacterExtractionBatchSize] = useState(3);
   const [characterExtractionConcurrency, setCharacterExtractionConcurrency] = useState(4);
   const [powerSaveMode, setPowerSaveMode] = useState(false);
@@ -174,12 +167,6 @@ export function useEditorSettings(
         if (typeof appState.llmEnabled === "boolean") {
           setLlmEnabled(appState.llmEnabled);
         }
-        if (typeof appState.llmModelId === "string") {
-          setLlmModelId(appState.llmModelId);
-        }
-        if (typeof appState.llmIdlingStop === "boolean") {
-          setLlmIdlingStop(appState.llmIdlingStop);
-        }
         if (appState.lintingRuleConfigs && typeof appState.lintingRuleConfigs === "object") {
           const isSeverity = (v: unknown): v is Severity =>
             v === "error" || v === "warning" || v === "info";
@@ -200,7 +187,6 @@ export function useEditorSettings(
         if (appState.autoPowerSaveOnBattery !== undefined) setAutoPowerSaveOnBattery(appState.autoPowerSaveOnBattery);
         if (appState.correctionMode) setCorrectionMode(appState.correctionMode);
         if (appState.correctionGuidelines) setCorrectionGuidelines(appState.correctionGuidelines);
-        if (appState.llmIdlingStop !== undefined) setLlmIdlingStop(appState.llmIdlingStop);
         if (typeof appState.characterExtractionBatchSize === "number") {
           setCharacterExtractionBatchSize(Math.min(Math.max(appState.characterExtractionBatchSize, 1), 10));
         }
@@ -348,20 +334,6 @@ export function useEditorSettings(
     });
   }, []);
 
-  const handleLlmModelIdChange = useCallback((modelId: string) => {
-    setLlmModelId(modelId);
-    void persistAppState({ llmModelId: modelId }).catch((error) => {
-      console.error("Failed to persist llmModelId:", error);
-    });
-  }, []);
-
-  const handleLlmIdlingStopChange = useCallback((value: boolean) => {
-    setLlmIdlingStop(value);
-    void persistAppState({ llmIdlingStop: value }).catch((error) => {
-      console.error("Failed to persist llmIdlingStop:", error);
-    });
-  }, []);
-
   const handleCharacterExtractionBatchSizeChange = useCallback((value: number) => {
     const clamped = Math.max(1, Math.min(10, value));
     setCharacterExtractionBatchSize(clamped);
@@ -475,8 +447,6 @@ export function useEditorSettings(
     lintingEnabled,
     lintingRuleConfigs,
     llmEnabled,
-    llmModelId,
-    llmIdlingStop,
     characterExtractionBatchSize,
     characterExtractionConcurrency,
     powerSaveMode,
@@ -489,7 +459,6 @@ export function useEditorSettings(
       ruleOverrides: lintingRuleConfigs,
       llm: {
         ...DEFAULT_CORRECTION_CONFIG.llm,
-        modelId: llmModelId,
         validationEnabled: llmEnabled,
       },
     },
@@ -498,7 +467,7 @@ export function useEditorSettings(
     charsPerLine, autoCharsPerLine, showParagraphNumbers, autoSave,
     posHighlightEnabled, posHighlightColors, verticalScrollBehavior,
     scrollSensitivity, compactMode, showSettingsModal,
-    lintingEnabled, lintingRuleConfigs, llmEnabled, llmModelId, llmIdlingStop,
+    lintingEnabled, lintingRuleConfigs, llmEnabled,
     characterExtractionBatchSize, characterExtractionConcurrency,
     powerSaveMode, autoPowerSaveOnBattery, correctionMode, correctionGuidelines,
   ]);
@@ -523,8 +492,6 @@ export function useEditorSettings(
     handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
     handleLlmEnabledChange,
-    handleLlmModelIdChange,
-    handleLlmIdlingStopChange,
     handleCharacterExtractionBatchSizeChange,
     handleCharacterExtractionConcurrencyChange,
     handlePowerSaveModeChange,
@@ -539,7 +506,6 @@ export function useEditorSettings(
     handleScrollSensitivityChange, handleToggleCompactMode, setShowSettingsModal,
     handleLintingEnabledChange, handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange, handleLlmEnabledChange,
-    handleLlmModelIdChange, handleLlmIdlingStopChange,
     handleCharacterExtractionBatchSizeChange, handleCharacterExtractionConcurrencyChange,
     handlePowerSaveModeChange, handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange,

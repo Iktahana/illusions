@@ -10,7 +10,7 @@ const { promisify } = require('util')
 const { autoUpdater } = require('electron-updater')
 const log = require('electron-log')
 const { registerNlpHandlers } = require('./nlp/nlp-ipc-handlers')
-const { registerLlmHandlers, disposeLlmEngine } = require('./llm/llm-ipc-handlers')
+const { registerLlmHandlers } = require('./llm/llm-ipc-handlers')
 const { registerStorageHandlers, getStorageManager } = require('./storage-ipc-handlers')
 const { registerVFSHandlers } = require('./vfs-ipc-handlers')
 
@@ -1329,12 +1329,8 @@ app.on('before-quit', (event) => {
   isQuitting = true
   event.preventDefault()
   const forceQuitTimeout = setTimeout(() => app.exit(0), 5000)
-  disposeLlmEngine()
-    .catch((err) => console.error('[before-quit] LLM disposal error:', err))
-    .finally(() => {
-      clearTimeout(forceQuitTimeout)
-      app.exit(0)
-    })
+  clearTimeout(forceQuitTimeout)
+  app.exit(0)
 })
 
 app.on('window-all-closed', () => {
