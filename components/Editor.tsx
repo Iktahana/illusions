@@ -194,12 +194,20 @@ export default function NovelEditor({
           const to = (m.positions[chunk.highlightEnd - 1] ?? from) + 1;
           if (from == null) return;
           const deco = Decoration.inline(from, to, { class: "speech-reading" });
+          // Set programmatic scroll flag BEFORE dispatch so the scroll guard
+          // does not revert any browser scroll triggered by the DOM update.
+          if (programmaticScrollRef) {
+            (programmaticScrollRef as React.MutableRefObject<boolean>).current = true;
+          }
           v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
           requestAnimationFrame(() => {
             const target = v.dom.querySelector(".speech-reading") as HTMLElement | null;
             const container = scrollContainerRef.current;
             if (target && container) {
               scrollToSpeechTarget({ container, target, isVertical, programmaticScrollRef });
+            } else if (programmaticScrollRef) {
+              // No scroll needed — clear flag
+              (programmaticScrollRef as React.MutableRefObject<boolean>).current = false;
             }
           });
         },

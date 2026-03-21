@@ -13,6 +13,13 @@ function easeOutCubic(t: number): number {
 
 let activeAnimationId: number | null = null;
 
+/** Clear the programmatic scroll flag (used when no scroll animation is needed). */
+function clearProgrammaticFlag(ref?: { current: boolean | null } | null): void {
+  if (ref) {
+    ref.current = false;
+  }
+}
+
 /**
  * Cancel any in-progress scroll animation.
  */
@@ -67,6 +74,7 @@ export function scrollToSpeechTarget({
 
     if (targetCenterX > leftThreshold && targetCenterX < rightThreshold) {
       // Target is in the comfortable zone — no scroll needed
+      clearProgrammaticFlag(programmaticScrollRef);
       return;
     }
 
@@ -84,6 +92,7 @@ export function scrollToSpeechTarget({
     const bottomThreshold = viewportHeight * (1 - edgeThreshold);
 
     if (targetCenterY > topThreshold && targetCenterY < bottomThreshold) {
+      clearProgrammaticFlag(programmaticScrollRef);
       return;
     }
 
@@ -106,7 +115,10 @@ function animateScroll(
 
   const start = container[prop];
   const delta = targetValue - start;
-  if (Math.abs(delta) < 1) return;
+  if (Math.abs(delta) < 1) {
+    clearProgrammaticFlag(programmaticScrollRef);
+    return;
+  }
 
   // Signal to the scroll guard that this is a programmatic scroll
   if (programmaticScrollRef) {
