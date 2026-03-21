@@ -120,7 +120,7 @@ export default function NovelEditor({
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
-  const { state: speechState, speakSegments, pause, resume, stop } = useSpeech({
+  const { state: speechState, speakSegments, pause, stop } = useSpeech({
     voiceURI: speechVoiceURI,
     rate: speechRate,
     pitch: speechPitch,
@@ -174,11 +174,7 @@ export default function NovelEditor({
       pause();
       return;
     }
-    if (speechState.isPaused) {
-      resume();
-      return;
-    }
-    // Stopped state: start fresh from cursor position
+    // Paused or stopped: always start fresh from cursor position
     stop();
     clearHighlight();
     const view = editorViewRef.current;
@@ -218,7 +214,7 @@ export default function NovelEditor({
         },
       },
     );
-  }, [speechState.isPlaying, speechState.isPaused, speakSegments, pause, resume, stop, clearHighlight]);
+  }, [speechState.isPlaying, speakSegments, pause, stop, clearHighlight]);
 
   // 親からのトリガーで検索ダイアログを開く（ショートカット）
   useEffect(() => {
