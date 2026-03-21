@@ -76,6 +76,7 @@ import { LiteraryStyleExclusionRule } from "@/lib/linting/rules/literary-style-e
 import { ExcessiveHonorificRule } from "@/lib/linting/rules/excessive-honorific-rule";
 import { ModifierLengthOrderRule } from "@/lib/linting/rules/modifier-length-order-rule";
 import { KanjiVerbOneCharDo } from "@/lib/linting/rules/kanji-verb-one-char-do";
+import { ConfusableKanjiRule } from "@/lib/linting/rules/confusable-kanji-rule";
 
 export interface UseLintingResult {
   ruleRunner: RuleRunner;
@@ -178,6 +179,8 @@ export function useLinting(
     runner.registerRule(new ExcessiveHonorificRule());
     runner.registerRule(new ModifierLengthOrderRule());
     runner.registerRule(new KanjiVerbOneCharDo());
+    // Preset dictionary: confusable kanji, okurigana errors, misused expressions (GH#680)
+    runner.registerRule(new ConfusableKanjiRule());
 
     // Initialize guideline map for guideline-based filtering
     runner.setGuidelineMap(RULE_GUIDELINE_MAP);
