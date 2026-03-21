@@ -19,7 +19,7 @@ import {
 import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
 import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import clsx from "clsx";
-import { Type, AlignLeft, Search, BookAudio, AudioLines } from "lucide-react";
+import { Type, AlignLeft, Search, BookAudio, Pause } from "lucide-react";
 import { EditorView, Decoration } from "@milkdown/prose/view";
 import { Node as ProsemirrorNode } from "@milkdown/prose/model";
 import { useSpeech } from "@/lib/hooks/use-speech";
@@ -595,7 +595,7 @@ function EditorToolbar({
             className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
             title={speechState.isPlaying ? "朗読を停止" : "朗読"}
           >
-            {speechState.isPlaying ? <AudioLines className="w-4 h-4" /> : <BookAudio className="w-4 h-4" />}
+            {speechState.isPlaying ? <Pause className="w-4 h-4" /> : <BookAudio className="w-4 h-4" />}
           </button>
         )}
 
