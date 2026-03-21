@@ -117,9 +117,10 @@ export default function NovelEditor({
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
-  const { state: speechState, speak, pause, stop } = useSpeech();
+  const { state: speechState, speak, pause, resume, stop } = useSpeech();
   const editorViewRef = useRef<EditorView | null>(null);
   const speechMapRef = useRef<{ text: string; positions: number[] } | null>(null);
+  const speechSegmentsRef = useRef<Array<{ start: number; end: number }>>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Ref to indicate a mode switch is in progress (for scroll restoration)
@@ -165,6 +166,11 @@ export default function NovelEditor({
       pause();
       return;
     }
+    if (speechState.isPaused) {
+      resume();
+      return;
+    }
+    // Stopped state: start fresh from cursor position
     stop();
     clearHighlight();
     const view = editorViewRef.current;
@@ -173,16 +179,23 @@ export default function NovelEditor({
     const docSize = view.state.doc.content.size;
     const startPos = head > 1 ? head : 1;
     const map = buildSpeechMap(view.state.doc, startPos, docSize);
+    const segments = buildSegments(map.text);
     speechMapRef.current = map;
+    speechSegmentsRef.current = segments;
     const callbacks: SpeechCallbacks = {
-      onBoundary(charIndex, charLength) {
+      onBoundary(charIndex) {
         const v = editorViewRef.current;
         const m = speechMapRef.current;
+        const segs = speechSegmentsRef.current;
         if (!v || !m) return;
-        const from = m.positions[charIndex];
-        const lastIdx = Math.min(charIndex + charLength - 1, m.positions.length - 1);
-        const to = (m.positions[lastIdx] ?? from) + 1;
-        if (from == null || from < 0) return;
+        // Find the segment that contains charIndex; fall back to the next segment
+        const seg =
+          segs.find((s) => s.start <= charIndex && charIndex < s.end) ??
+          segs.find((s) => s.start > charIndex);
+        if (!seg) return;
+        const from = m.positions[seg.start];
+        const to = (m.positions[seg.end - 1] ?? from) + 1;
+        if (from == null) return;
         const deco = Decoration.inline(from, to, { class: "speech-reading" });
         v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
         requestAnimationFrame(() => {
@@ -192,10 +205,11 @@ export default function NovelEditor({
       onEnd() {
         clearHighlight();
         speechMapRef.current = null;
+        speechSegmentsRef.current = [];
       },
     };
     speak(map.text, callbacks);
-  }, [speechState.isPlaying, speak, pause, stop, clearHighlight]);
+  }, [speechState.isPlaying, speechState.isPaused, speak, pause, resume, stop, clearHighlight]);
 
   // 親からのトリガーで検索ダイアログを開く（ショートカット）
   useEffect(() => {
@@ -430,6 +444,30 @@ const LLM_STATUS_LABELS: Record<LlmStatusState, string> = {
   ready: "AI: 準備完了",
   inferring: "AI: 推論中",
 };
+
+/**
+ * Splits flat TTS text into segments delimited by Unicode punctuation and whitespace.
+ * Each segment is a contiguous run of non-punctuation/non-space characters,
+ * identified by [start, end) indices into the original text.
+ */
+const SEGMENT_SPLIT_RE = /[\p{P}\s\u3000]/u;
+
+function buildSegments(text: string): Array<{ start: number; end: number }> {
+  const segments: Array<{ start: number; end: number }> = [];
+  let segStart = -1;
+  for (let i = 0; i < text.length; i++) {
+    if (SEGMENT_SPLIT_RE.test(text[i])) {
+      if (segStart >= 0) {
+        segments.push({ start: segStart, end: i });
+        segStart = -1;
+      }
+    } else {
+      if (segStart < 0) segStart = i;
+    }
+  }
+  if (segStart >= 0) segments.push({ start: segStart, end: text.length });
+  return segments;
+}
 
 /** Maps each char in flat text to its doc position. Block boundaries are skipped. */
 function buildSpeechMap(doc: ProsemirrorNode, from: number, to: number): { text: string; positions: number[] } {
