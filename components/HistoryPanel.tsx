@@ -551,7 +551,7 @@ export default function HistoryPanel({
             "flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors",
             creatingSnapshot
               ? "bg-background text-foreground-muted cursor-wait border border-border"
-              : "bg-accent text-white hover:bg-accent-hover"
+              : "bg-accent text-accent-foreground hover:bg-accent-hover"
           )}
         >
           {creatingSnapshot ? (
