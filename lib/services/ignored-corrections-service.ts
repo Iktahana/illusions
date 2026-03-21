@@ -1,15 +1,17 @@
 /**
  * Ignored corrections service.
  * CRUD operations for .illusions/ignored-corrections.json (project mode)
- * and localStorage (standalone mode).
+ * and StorageService key-value store (standalone mode).
  *
  * 無視された校正指摘の管理サービス。
  * プロジェクトモード: .illusions/ignored-corrections.json
- * スタンドアロンモード: localStorage
+ * スタンドアロンモード: StorageService (IndexedDB / SQLite)
  */
 
 import { getVFS } from "../vfs";
+import { getStorageService } from "../storage/storage-service";
 import type { VirtualFileSystem } from "../vfs/types";
+import type { IStorageService } from "../storage/storage-types";
 import type { IgnoredCorrection, IgnoredCorrectionsFile } from "../project/project-types";
 
 // -----------------------------------------------------------------------
@@ -25,9 +27,11 @@ const STANDALONE_STORAGE_PREFIX = "illusions-ignored-corrections:";
 
 class IgnoredCorrectionsService {
   private vfs: VirtualFileSystem;
+  private storage: IStorageService;
 
   constructor() {
     this.vfs = getVFS();
+    this.storage = getStorageService();
   }
 
   // -------------------------------------------------------------------
@@ -109,17 +113,16 @@ class IgnoredCorrectionsService {
   }
 
   // -------------------------------------------------------------------
-  // Standalone mode (localStorage)
+  // Standalone mode (StorageService key-value store)
   // -------------------------------------------------------------------
 
   /**
-   * Load ignored corrections from localStorage for a specific file.
+   * Load ignored corrections from StorageService for a specific file.
    */
-  loadIgnoredCorrectionsStandalone(fileName: string): IgnoredCorrection[] {
-    if (typeof window === "undefined") return [];
+  async loadIgnoredCorrectionsStandalone(fileName: string): Promise<IgnoredCorrection[]> {
     try {
       const key = STANDALONE_STORAGE_PREFIX + fileName;
-      const raw = localStorage.getItem(key);
+      const raw = await this.storage.getItem(key);
       if (!raw) return [];
       const data: IgnoredCorrectionsFile = JSON.parse(raw);
       return data.ignoredCorrections ?? [];
@@ -129,31 +132,30 @@ class IgnoredCorrectionsService {
   }
 
   /**
-   * Save ignored corrections to localStorage for a specific file.
+   * Save ignored corrections to StorageService for a specific file.
    */
-  saveIgnoredCorrectionsStandalone(
+  async saveIgnoredCorrectionsStandalone(
     fileName: string,
     corrections: IgnoredCorrection[],
-  ): void {
-    if (typeof window === "undefined") return;
+  ): Promise<void> {
     const key = STANDALONE_STORAGE_PREFIX + fileName;
     const data: IgnoredCorrectionsFile = {
       version: "1.0.0",
       ignoredCorrections: corrections,
     };
-    localStorage.setItem(key, JSON.stringify(data));
+    await this.storage.setItem(key, JSON.stringify(data));
   }
 
   /**
    * Add an ignored correction in standalone mode.
    */
-  addIgnoredCorrectionStandalone(
+  async addIgnoredCorrectionStandalone(
     fileName: string,
     ruleId: string,
     text: string,
     context?: string,
-  ): IgnoredCorrection[] {
-    const corrections = this.loadIgnoredCorrectionsStandalone(fileName);
+  ): Promise<IgnoredCorrection[]> {
+    const corrections = await this.loadIgnoredCorrectionsStandalone(fileName);
     const exists = corrections.some(
       (c) => c.ruleId === ruleId && c.text === text && c.context === context,
     );
@@ -166,24 +168,24 @@ class IgnoredCorrectionsService {
       ...(context !== undefined ? { context } : {}),
     };
     corrections.push(entry);
-    this.saveIgnoredCorrectionsStandalone(fileName, corrections);
+    await this.saveIgnoredCorrectionsStandalone(fileName, corrections);
     return corrections;
   }
 
   /**
    * Remove an ignored correction in standalone mode.
    */
-  removeIgnoredCorrectionStandalone(
+  async removeIgnoredCorrectionStandalone(
     fileName: string,
     ruleId: string,
     text: string,
     context?: string,
-  ): IgnoredCorrection[] {
-    const corrections = this.loadIgnoredCorrectionsStandalone(fileName);
+  ): Promise<IgnoredCorrection[]> {
+    const corrections = await this.loadIgnoredCorrectionsStandalone(fileName);
     const filtered = corrections.filter(
       (c) => !(c.ruleId === ruleId && c.text === text && c.context === context),
     );
-    this.saveIgnoredCorrectionsStandalone(fileName, filtered);
+    await this.saveIgnoredCorrectionsStandalone(fileName, filtered);
     return filtered;
   }
 }

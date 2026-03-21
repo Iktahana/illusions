@@ -32,6 +32,11 @@ interface StoredEditorBuffer {
   fileHandle?: FileSystemFileHandle; // シリアライズ性のため、ハンドルは別フィールドで保持
 }
 
+interface StoredKvItem {
+  key: string;
+  value: string;
+}
+
 /**
  * Stored project handle for directory-based project persistence.
  * FileSystemDirectoryHandle is stored via Structured Clone Algorithm in IndexedDB.
@@ -53,6 +58,7 @@ class WebStorageDatabase extends Dexie {
   recentFiles!: Table<StoredRecentFile, string>;
   editorBuffer!: Table<StoredEditorBuffer, string>;
   projectHandles!: Table<StoredProjectHandle, string>;
+  kvStore!: Table<StoredKvItem, string>;
 
   constructor() {
     super("illusionsStorage");
@@ -70,6 +76,15 @@ class WebStorageDatabase extends Dexie {
       recentFiles: "id, path",
       editorBuffer: "id",
       projectHandles: "projectId, lastAccessedAt",
+    });
+
+    // v3: Add generic key-value store for standalone mode data
+    this.version(3).stores({
+      appState: "id",
+      recentFiles: "id, path",
+      editorBuffer: "id",
+      projectHandles: "projectId, lastAccessedAt",
+      kvStore: "key",
     });
   }
 }
@@ -336,6 +351,22 @@ export class WebStorageProvider implements IStorageService {
     // Web uses ProjectManager for directory handle persistence, not this API.
   }
 
+  async setItem(key: string, value: string): Promise<void> {
+    await this.initialize();
+    await this.db.kvStore.put({ key, value });
+  }
+
+  async getItem(key: string): Promise<string | null> {
+    await this.initialize();
+    const item = await this.db.kvStore.get(key);
+    return item?.value ?? null;
+  }
+
+  async removeItem(key: string): Promise<void> {
+    await this.initialize();
+    await this.db.kvStore.delete(key);
+  }
+
   async clearAll(): Promise<void> {
     await this.initialize();
 
@@ -345,6 +376,7 @@ export class WebStorageProvider implements IStorageService {
         this.db.recentFiles.clear(),
         this.db.editorBuffer.clear(),
         this.db.projectHandles.clear(),
+        this.db.kvStore.clear(),
       ]);
     } catch (error) {
       console.error("ストレージの全削除に失敗しました:", error);

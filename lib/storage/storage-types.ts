@@ -233,6 +233,26 @@ export interface IStorageService {
    */
   removeRecentProject(projectId: string): Promise<void>;
 
+  // -------------------------------------------------------------------
+  // Generic key-value store (standalone mode data, etc.)
+  // -------------------------------------------------------------------
+
+  /**
+   * Store a value by key. Replaces any existing value for the same key.
+   * スタンドアロンモードのデータなど、汎用キーバリューストア。
+   */
+  setItem(key: string, value: string): Promise<void>;
+
+  /**
+   * Retrieve a value by key. Returns null if the key does not exist.
+   */
+  getItem(key: string): Promise<string | null>;
+
+  /**
+   * Remove a value by key.
+   */
+  removeItem(key: string): Promise<void>;
+
   /**
    * すべてのデータを削除する。取り扱い注意。
    */

@@ -1,15 +1,17 @@
 /**
  * User dictionary service.
  * CRUD operations for .illusions/user-dictionary.json (project mode)
- * and localStorage (standalone mode).
+ * and StorageService key-value store (standalone mode).
  *
  * ユーザー辞書の管理サービス。
  * プロジェクトモード: .illusions/user-dictionary.json
- * スタンドアロンモード: localStorage
+ * スタンドアロンモード: StorageService (IndexedDB / SQLite)
  */
 
 import { getVFS } from "../vfs";
+import { getStorageService } from "../storage/storage-service";
 import type { VirtualFileSystem } from "../vfs/types";
+import type { IStorageService } from "../storage/storage-types";
 import type { UserDictionaryEntry, UserDictionaryFile } from "../project/project-types";
 
 // -----------------------------------------------------------------------
@@ -25,9 +27,11 @@ const STANDALONE_STORAGE_PREFIX = "illusions-user-dictionary:";
 
 class UserDictionaryService {
   private vfs: VirtualFileSystem;
+  private storage: IStorageService;
 
   constructor() {
     this.vfs = getVFS();
+    this.storage = getStorageService();
   }
 
   // -------------------------------------------------------------------
@@ -107,17 +111,16 @@ class UserDictionaryService {
   }
 
   // -------------------------------------------------------------------
-  // Standalone mode (localStorage)
+  // Standalone mode (StorageService key-value store)
   // -------------------------------------------------------------------
 
   /**
-   * Load user dictionary entries from localStorage for a specific file.
+   * Load user dictionary entries from StorageService for a specific file.
    */
-  loadEntriesStandalone(fileName: string): UserDictionaryEntry[] {
-    if (typeof window === "undefined") return [];
+  async loadEntriesStandalone(fileName: string): Promise<UserDictionaryEntry[]> {
     try {
       const key = STANDALONE_STORAGE_PREFIX + fileName;
-      const raw = localStorage.getItem(key);
+      const raw = await this.storage.getItem(key);
       if (!raw) return [];
       const data: UserDictionaryFile = JSON.parse(raw);
       return data.entries ?? [];
@@ -127,64 +130,63 @@ class UserDictionaryService {
   }
 
   /**
-   * Save user dictionary entries to localStorage for a specific file.
+   * Save user dictionary entries to StorageService for a specific file.
    */
-  saveEntriesStandalone(
+  async saveEntriesStandalone(
     fileName: string,
     entries: UserDictionaryEntry[],
-  ): void {
-    if (typeof window === "undefined") return;
+  ): Promise<void> {
     const key = STANDALONE_STORAGE_PREFIX + fileName;
     const data: UserDictionaryFile = {
       version: "1.0.0",
       entries,
     };
-    localStorage.setItem(key, JSON.stringify(data));
+    await this.storage.setItem(key, JSON.stringify(data));
   }
 
   /**
    * Add an entry in standalone mode.
    */
-  addEntryStandalone(
+  async addEntryStandalone(
     fileName: string,
     entry: UserDictionaryEntry,
-  ): UserDictionaryEntry[] {
-    const entries = this.loadEntriesStandalone(fileName);
+  ): Promise<UserDictionaryEntry[]> {
+    const entries = await this.loadEntriesStandalone(fileName);
     const exists = entries.some((e) => e.id === entry.id);
     if (exists) return entries;
 
     entries.push(entry);
     entries.sort((a, b) => a.word.localeCompare(b.word));
-    this.saveEntriesStandalone(fileName, entries);
+    await this.saveEntriesStandalone(fileName, entries);
     return entries;
   }
 
   /**
    * Update an entry in standalone mode.
    */
-  updateEntryStandalone(
+  async updateEntryStandalone(
     fileName: string,
     id: string,
     updates: Partial<UserDictionaryEntry>,
-  ): UserDictionaryEntry[] {
-    const entries = this.loadEntriesStandalone(fileName);
+  ): Promise<UserDictionaryEntry[]> {
+    const entries = await this.loadEntriesStandalone(fileName);
     const updated = entries.map((e) =>
       e.id === id ? { ...e, ...updates } : e,
     );
-    this.saveEntriesStandalone(fileName, updated);
+    await this.saveEntriesStandalone(fileName, updated);
     return updated;
   }
 
   /**
    * Remove an entry in standalone mode.
    */
-  removeEntryStandalone(
+  async removeEntryStandalone(
     fileName: string,
     id: string,
-  ): UserDictionaryEntry[] {
-    const entries = this.loadEntriesStandalone(fileName);
+  ): Promise<UserDictionaryEntry[]> {
+    const entries = await this.loadEntriesStandalone(fileName);
     const filtered = entries.filter((e) => e.id !== id);
-    this.saveEntriesStandalone(fileName, filtered);
+    await this.saveEntriesStandalone(fileName, filtered);
     return filtered;
   }
 }

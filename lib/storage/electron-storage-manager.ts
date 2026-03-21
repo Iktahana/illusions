@@ -92,6 +92,12 @@ export class ElectronStorageManager {
         data TEXT NOT NULL,
         updated_at INTEGER NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS kv_store (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
     `);
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -392,6 +398,32 @@ export class ElectronStorageManager {
     stmt.run(projectId);
   }
 
+  // -------------------------------------------------------------------
+  // Generic key-value store
+  // -------------------------------------------------------------------
+
+  setItem(key: string, value: string): void {
+    const db = this.ensureInitialized();
+    const stmt = db.prepare(`
+      INSERT OR REPLACE INTO kv_store (key, value, updated_at)
+      VALUES (?, ?, ?)
+    `);
+    stmt.run(key, value, Date.now());
+  }
+
+  getItem(key: string): string | null {
+    const db = this.ensureInitialized();
+    const stmt = db.prepare("SELECT value FROM kv_store WHERE key = ?");
+    const row = stmt.get(key) as { value: string } | undefined;
+    return row?.value ?? null;
+  }
+
+  removeItem(key: string): void {
+    const db = this.ensureInitialized();
+    const stmt = db.prepare("DELETE FROM kv_store WHERE key = ?");
+    stmt.run(key);
+  }
+
   /**
    * すべてのデータを削除する
    */
@@ -402,6 +434,7 @@ export class ElectronStorageManager {
       DELETE FROM recent_files;
       DELETE FROM editor_buffer;
       DELETE FROM recent_projects;
+      DELETE FROM kv_store;
     `);
   }
 
