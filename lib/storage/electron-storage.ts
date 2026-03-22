@@ -42,6 +42,9 @@ export class ElectronStorageProvider implements IStorageService {
       addRecentProject: (project: RecentProject) => Promise<void>;
       getRecentProjects: () => Promise<RecentProject[]>;
       removeRecentProject: (projectId: string) => Promise<void>;
+      setItem: (key: string, value: string) => Promise<void>;
+      getItem: (key: string) => Promise<string | null>;
+      removeItem: (key: string) => Promise<void>;
     };
   }
 
@@ -133,6 +136,24 @@ export class ElectronStorageProvider implements IStorageService {
     await this.initialize();
     const api = this.getElectronAPI();
     return api.removeRecentProject(projectId);
+  }
+
+  async setItem(key: string, value: string): Promise<void> {
+    await this.initialize();
+    const api = this.getElectronAPI();
+    return api.setItem(key, value);
+  }
+
+  async getItem(key: string): Promise<string | null> {
+    await this.initialize();
+    const api = this.getElectronAPI();
+    return api.getItem(key);
+  }
+
+  async removeItem(key: string): Promise<void> {
+    await this.initialize();
+    const api = this.getElectronAPI();
+    return api.removeItem(key);
   }
 }
 

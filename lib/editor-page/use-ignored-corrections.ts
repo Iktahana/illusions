@@ -1,6 +1,6 @@
 /**
  * React hook for managing ignored corrections.
- * Loads from VFS (project mode) or localStorage (standalone mode),
+ * Loads from VFS (project mode) or StorageService (standalone mode),
  * and provides methods to add/remove/check ignored corrections.
  *
  * 無視された校正指摘を管理するReactフック。
@@ -68,9 +68,15 @@ export function useIgnoredCorrections(
           if (!cancelled) setIgnoredCorrections([]);
         });
     } else if (isStandaloneMode(editorMode)) {
-      setIgnoredCorrections(
-        service.loadIgnoredCorrectionsStandalone(editorMode.fileName),
-      );
+      service
+        .loadIgnoredCorrectionsStandalone(editorMode.fileName)
+        .then((data) => {
+          if (!cancelled) setIgnoredCorrections(data);
+        })
+        .catch((err) => {
+          console.warn("[useIgnoredCorrections] Failed to load standalone:", err);
+          if (!cancelled) setIgnoredCorrections([]);
+        });
     }
 
     return () => {
@@ -104,13 +110,25 @@ export function useIgnoredCorrections(
             console.error("[useIgnoredCorrections] Failed to add:", err),
           );
       } else if (editorMode && isStandaloneMode(editorMode)) {
-        const updated = service.addIgnoredCorrectionStandalone(
-          editorMode.fileName,
-          ruleId,
-          text,
-          context,
-        );
-        setIgnoredCorrections(updated);
+        // Optimistic update for standalone mode too
+        setIgnoredCorrections((prev) => {
+          const already = prev.some(
+            (c) => c.ruleId === ruleId && c.text === text && c.context === context,
+          );
+          if (already) return prev;
+          return [...prev, { ruleId, text, context, addedAt: Date.now() }];
+        });
+        service
+          .addIgnoredCorrectionStandalone(
+            editorMode.fileName,
+            ruleId,
+            text,
+            context,
+          )
+          .then(setIgnoredCorrections)
+          .catch((err) =>
+            console.error("[useIgnoredCorrections] Failed to add standalone:", err),
+          );
       }
     },
     [editorMode],
@@ -128,13 +146,17 @@ export function useIgnoredCorrections(
             console.error("[useIgnoredCorrections] Failed to remove:", err),
           );
       } else if (editorMode && isStandaloneMode(editorMode)) {
-        const updated = service.removeIgnoredCorrectionStandalone(
-          editorMode.fileName,
-          ruleId,
-          text,
-          context,
-        );
-        setIgnoredCorrections(updated);
+        service
+          .removeIgnoredCorrectionStandalone(
+            editorMode.fileName,
+            ruleId,
+            text,
+            context,
+          )
+          .then(setIgnoredCorrections)
+          .catch((err) =>
+            console.error("[useIgnoredCorrections] Failed to remove standalone:", err),
+          );
       }
     },
     [editorMode],
