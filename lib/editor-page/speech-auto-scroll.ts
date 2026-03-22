@@ -35,7 +35,7 @@ interface SpeechScrollOptions {
   target: HTMLElement;
   isVertical: boolean;
   /** Ref to signal programmatic scrolling to the scroll-guard in Editor.tsx */
-  programmaticScrollRef?: React.RefObject<boolean>;
+  programmaticScrollRef?: React.MutableRefObject<boolean>;
   /** Duration in ms (default 400) */
   duration?: number;
   /** How far from the edge (0-1) the target must be before triggering a scroll.
@@ -109,7 +109,7 @@ function animateScroll(
   prop: "scrollLeft" | "scrollTop",
   targetValue: number,
   duration: number,
-  programmaticScrollRef?: React.RefObject<boolean>,
+  programmaticScrollRef?: React.MutableRefObject<boolean>,
 ): void {
   cancelSpeechScroll();
 
@@ -122,7 +122,7 @@ function animateScroll(
 
   // Signal to the scroll guard that this is a programmatic scroll
   if (programmaticScrollRef) {
-    (programmaticScrollRef as { current: boolean }).current = true;
+    programmaticScrollRef.current = true;
   }
 
   const startTime = performance.now();
@@ -140,7 +140,7 @@ function animateScroll(
       activeAnimationId = null;
       // Clear the programmatic scroll flag after animation completes
       if (programmaticScrollRef) {
-        (programmaticScrollRef as { current: boolean }).current = false;
+        programmaticScrollRef.current = false;
       }
     }
   }
