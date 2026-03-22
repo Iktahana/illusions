@@ -35,7 +35,7 @@ interface EditorProps {
   searchInitialTerm?: string;
   onEditorViewReady?: (view: EditorView) => void;
   /** Ref that external code sets to true before programmatic scrolling */
-  programmaticScrollRef?: React.RefObject<boolean>;
+  programmaticScrollRef?: React.MutableRefObject<boolean>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onShowAllSearchResults?: (matches: any[], searchTerm: string) => void;
   // リンティング設定
@@ -169,7 +169,7 @@ export default function NovelEditor({
           // Set programmatic scroll flag BEFORE dispatch so the scroll guard
           // does not revert any browser scroll triggered by the DOM update.
           if (programmaticScrollRef) {
-            (programmaticScrollRef as React.MutableRefObject<boolean>).current = true;
+            programmaticScrollRef.current = true;
           }
           v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
           requestAnimationFrame(() => {
@@ -179,7 +179,7 @@ export default function NovelEditor({
               scrollToSpeechTarget({ container, target, isVertical, programmaticScrollRef });
             } else if (programmaticScrollRef) {
               // No scroll needed — clear flag
-              (programmaticScrollRef as React.MutableRefObject<boolean>).current = false;
+              programmaticScrollRef.current = false;
             }
           });
         },

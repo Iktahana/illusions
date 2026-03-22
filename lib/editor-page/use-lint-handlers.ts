@@ -40,6 +40,14 @@ export function useLintHandlers({
     });
   }, [editorViewInstance, lintIssues]);
 
+  // Timeout ref for navigate-to-issue scroll reset; cleared on unmount
+  const navigateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (navigateTimeoutRef.current) clearTimeout(navigateTimeoutRef.current);
+    };
+  }, []);
+
   // Cursor → issue sync: track which issue the cursor is on
   const [activeLintIssueIndex, setActiveLintIssueIndex] = useState<number | null>(null);
 
@@ -108,7 +116,7 @@ export function useLintHandlers({
       }
 
       // Reset the flag after smooth scroll completes
-      setTimeout(() => {
+      navigateTimeoutRef.current = setTimeout(() => {
         programmaticScrollRef.current = false;
       }, 500);
 

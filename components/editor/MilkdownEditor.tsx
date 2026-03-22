@@ -42,7 +42,7 @@ interface MilkdownEditorProps {
   isVertical: boolean;
   scrollContainerRef: RefObject<HTMLDivElement>;
   onEditorViewReady?: (view: EditorView) => void;
-  programmaticScrollRef?: React.RefObject<boolean>;
+  programmaticScrollRef?: React.MutableRefObject<boolean>;
   isModeSwitchingRef: MutableRefObject<boolean>;
   savedScrollProgressRef: RefObject<number>;
   lintingRuleRunner?: RuleRunner | null;
@@ -693,9 +693,6 @@ export default function MilkdownEditor({
           break;
         case "code":
           execute(toggleInlineCodeCommand.key);
-          break;
-        case "link":
-          execute(toggleStrongCommand.key);
           break;
         default:
           break;
