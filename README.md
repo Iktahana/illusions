@@ -32,7 +32,8 @@ Also runs in the browser — visit [illusions.app](https://www.illusions.app) to
 ### 🎨 Interface
 - **Three-column layout**: Explorer | Editor | Inspector
 - **Activity Bar**: Quick access to Projects, GitHub, Settings
-- **Theme system**: Automatic light/dark mode support
+- **Snow-country monochrome theme**: Minimalist light/dark mode with warm stone palette
+- **Glassmorphism UI**: Frosted glass effects, micro-interactions, and ambient glow
 - **Design system dialogs**: Custom GlassDialog-based alerts and confirmations (no native browser dialogs)
 - **Responsive design**: Optimized for various screen sizes
 
@@ -56,6 +57,7 @@ Also runs in the browser — visit [illusions.app](https://www.illusions.app) to
 - **Auto-commit & push**: Automatic version control
 - **Branch & tag management**: Organize your writing milestones
 - **Cross-platform**: Electron app works on macOS, Windows, Linux
+- **Web Speech API read-aloud** (読み上げ) — browser-native text-to-speech with voice selection and playback controls
 - **AI status report**: View AI model status, storage usage, and diagnostics in the Settings panel
 - **LLM-based character extraction** (キャラクター抽出) — automatically extracts characters (name, aliases, description) from novel text using batched LLM inference
 - **Multiple LLM model options** — Qwen3 (0.6B / 1.7B / 4B) and Gemma-2-Llama-Swallow 9B (日本語特化, 東京科学大学), selectable in Settings
@@ -173,25 +175,37 @@ illusions/
 │   └── page.tsx              # Main editor page
 ├── components/               # React components
 │   ├── Editor.tsx            # Milkdown editor
-│   ├── Explorer.tsx          # Left sidebar
-│   ├── Inspector.tsx         # Right sidebar
+│   ├── Explorer.tsx          # Left sidebar (file tree)
+│   ├── Inspector.tsx         # Right sidebar (stats & tools)
 │   ├── ActivityBar.tsx       # Left activity bar
-│   └── github/               # GitHub integration UI
+│   └── explorer/             # Explorer sub-components
+├── contexts/                 # React context providers
+├── electron/                 # Electron main process
+│   ├── main.js               # Main process entry
+│   ├── preload.js            # Preload script (secure IPC)
+│   ├── llm/                  # LLM inference backend
+│   ├── nlp/                  # NLP backend (kuromoji)
+│   └── storage-ipc-handlers.js
 ├── lib/                      # Core libraries
-│   ├── storage-service.ts    # Storage factory
-│   ├── electron-storage.ts   # Electron storage provider
-│   ├── web-storage.ts        # Web storage provider
+│   ├── storage/              # Storage abstraction layer
+│   ├── services/             # App services (history, notifications, etc.)
 │   ├── linting/              # Japanese text linting framework
 │   ├── nlp-client/           # NLP client abstraction
+│   ├── nlp-backend/          # NLP backend logic
 │   ├── llm-client/           # LLM client abstraction + model registry
 │   ├── character-extraction/ # LLM-based character extraction
-│   ├── git/                  # Git service (isomorphic-git)
-│   ├── github/               # GitHub API integration
-│   └── hooks/                # React hooks
-├── nlp-service/              # Electron NLP backend
+│   ├── export/               # PDF/EPUB/DOCX export
+│   ├── hooks/                # React hooks
+│   ├── project/              # Project management
+│   ├── tab-manager/          # Multi-tab management
+│   ├── vfs/                  # Virtual file system
+│   └── utils/                # Utility functions
+├── packages/                 # Internal packages
+│   └── milkdown-plugin-japanese-novel/
+├── www/                      # Landing page (Vite)
 ├── types/                    # TypeScript type definitions
-├── docs/                     # Documentation
-└── main.js                   # Electron main process
+├── scripts/                  # Build and utility scripts
+└── docs/                     # Documentation
 ```
 
 ---
@@ -227,11 +241,16 @@ illusions/
 
 ## 📖 Documentation
 
-- **[Quick Start Guide](docs/guides/QUICKSTART.md)** - Get started in 5 minutes
-- **[Storage Documentation](docs/STORAGE.md)** - Storage architecture and API
+- **[Storage Architecture](docs/architecture/storage-system.md)** - Storage system design and API
 - **[NLP Backend Architecture](docs/architecture/nlp-backend-architecture.md)** - Japanese text processing
 - **[Notification System](docs/architecture/notification-system.md)** - Toast notification API
+- **[Export System](docs/architecture/export-system.md)** - PDF/EPUB/DOCX export
+- **[Tab Manager](docs/architecture/tab-manager.md)** - Multi-tab architecture
+- **[VFS Architecture](docs/architecture/vfs.md)** - Virtual file system
+- **[LLM Engine](docs/architecture/llm-engine.md)** - Local LLM inference
 - **[Theme Colors Guide](docs/guides/THEME_COLORS.md)** - Theming system
+- **[Linting Rules](docs/guides/linting-rules.md)** - Japanese text linting rules
+- **[Keyboard Shortcuts](docs/guides/keyboard-shortcuts.md)** - Key bindings
 
 ### 📐 校正基準 / Proofreading Standards
 
@@ -251,7 +270,7 @@ The proofreading (linting) features in illusions comply with the following offic
 
 ## 🎯 Features Roadmap
 
-### Current Release (v0.1.0)
+### Current Release (v0.1.2)
 - ✅ Milkdown editor with vertical writing
 - ✅ Ruby notation (ルビ) support
 - ✅ Tate-chu-yoko (縦中横) support
@@ -266,6 +285,8 @@ The proofreading (linting) features in illusions comply with the following offic
 
 ### Recently Added
 - ✅ Read-aloud (音読) — Web Speech API text-to-speech with word highlight and auto-scroll; configurable Japanese voice, rate, and pitch (音読・ハイライト・自動スクロール)
+- ✅ Snow-country monochrome theme — minimalist warm stone palette for app and landing page
+- ✅ Weekly release PR workflow — automated Monday `dev → main` release cycle with auto-cleanup
 - ✅ LLM-based character extraction — automatically extract characters from novel text with batched LLM inference (キャラクター抽出)
 - ✅ Gemma-2-Llama-Swallow 9B model — Japanese-optimised reasoning LLM by 東京科学大学, available in LLM settings (日本語特化モデル)
 - ✅ Error notifications for file operation failures — toast alerts on save/load errors

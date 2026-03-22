@@ -493,3 +493,88 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # ---------------------------------------------------------------------------
+  # Microsoft Store submission — runs immediately after release (main only)
+  # ---------------------------------------------------------------------------
+
+  submit-to-ms-store:
+    name: Submit to Microsoft Store
+    needs: [detect-changes, compute-version, release]
+    if: |
+      github.event_name != 'pull_request' &&
+      github.ref == 'refs/heads/main' &&
+      needs.detect-changes.outputs.desktop_changed == 'true'
+    runs-on: windows-latest
+    environment: MicrosoftStore
+    env:
+      MSSTORE_CLI_VERSION: "v0.3.9"
+      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+      MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+      STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
+      VERSION: v${{ needs.compute-version.outputs.full }}
+
+    steps:
+      - name: Download MSIX packages from GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          New-Item -ItemType Directory -Path msix-packages -Force | Out-Null
+          gh release download $env:VERSION --pattern "*.appx" --dir msix-packages --repo $env:GITHUB_REPOSITORY
+
+          $appxFiles = Get-ChildItem "msix-packages\*.appx"
+          if ($appxFiles.Count -eq 0) {
+            throw "No .appx packages found in release $env:VERSION. Cannot submit to Microsoft Store."
+          }
+          Write-Host "Downloaded $($appxFiles.Count) .appx package(s):"
+          $appxFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
+
+      - name: Install msstore-cli
+        shell: pwsh
+        run: |
+          $url = "https://github.com/microsoft/msstore-cli/releases/download/$env:MSSTORE_CLI_VERSION/MSStoreCLI-win-x64.zip"
+          Invoke-WebRequest $url -OutFile msstore.zip
+          Expand-Archive msstore.zip -DestinationPath "$env:LOCALAPPDATA\msstore-cli" -Force
+          echo "$env:LOCALAPPDATA\msstore-cli" >> $env:GITHUB_PATH
+
+      - name: Configure msstore-cli credentials
+        shell: pwsh
+        run: |
+          msstore reconfigure `
+            --tenantId $env:MSSTORE_TENANT_ID `
+            --clientId $env:MSSTORE_CLIENT_ID `
+            --clientSecret $env:MSSTORE_CLIENT_SECRET `
+            --sellerId $env:MSSTORE_SELLER_ID
+
+      - name: Submit to Microsoft Store
+        shell: pwsh
+        run: |
+          $appxFiles = Get-ChildItem "msix-packages\*.appx"
+          $uploadFile = "msix-packages\illusions.msixupload"
+          Compress-Archive -Path $appxFiles.FullName -DestinationPath $uploadFile -Force
+          Write-Host "Created bundle: $uploadFile"
+          msstore publish "$uploadFile" -id $env:STORE_PRODUCT_ID -v
+
+      - name: Create submission marker tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REF_DATA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION")
+          OBJECT_TYPE=$(echo "$REF_DATA" | jq -r '.object.type')
+          OBJECT_SHA=$(echo "$REF_DATA" | jq -r '.object.sha')
+
+          if [ "$OBJECT_TYPE" = "tag" ]; then
+            SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$OBJECT_SHA" --jq '.object.sha')
+          else
+            SHA="$OBJECT_SHA"
+          fi
+
+          MARKER="ms-store-$VERSION"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$MARKER" \
+            -f "sha=$SHA"
+          echo "Created submission marker tag: $MARKER"
+

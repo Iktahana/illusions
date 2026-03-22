@@ -110,6 +110,9 @@ declare global {
       addRecentProject: (project: { id: string; rootPath: string; name: string }) => Promise<void>;
       getRecentProjects: () => Promise<Array<{ id: string; rootPath: string; name: string }>>;
       removeRecentProject: (projectId: string) => Promise<void>;
+      setItem: (key: string, value: string) => Promise<void>;
+      getItem: (key: string) => Promise<string | null>;
+      removeItem: (key: string) => Promise<void>;
     };
     nlp?: {
       /**

@@ -89,7 +89,7 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
         const entries = await dictService.loadEntries();
         setUserEntries(entries);
       } else if (editorMode && isStandaloneMode(editorMode)) {
-        const entries = dictService.loadEntriesStandalone(editorMode.fileName);
+        const entries = await dictService.loadEntriesStandalone(editorMode.fileName);
         setUserEntries(entries);
       }
     } catch {
@@ -102,7 +102,7 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
       if (editorMode && isProjectMode(editorMode)) {
         await dictService.saveEntries(entries);
       } else if (editorMode && isStandaloneMode(editorMode)) {
-        dictService.saveEntriesStandalone(editorMode.fileName, entries);
+        await dictService.saveEntriesStandalone(editorMode.fileName, entries);
       }
     } catch {
       // Silently fail
