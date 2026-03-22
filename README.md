@@ -4,14 +4,13 @@
 
 A professional-grade Japanese novel editor with vertical writing, ruby notation, and Japanese NLP proofreading support.
 
-## 🌐 オンラインで試す / Try It Online
+## 🌐 公式サイト / Official Website
 
-**🌍 ランディングページ**: https://www.illusions.app/
-**Chrome版**: https://illusions.app/
-(Works on latest Chrome/Edge/Safari)
+🌍 **Website**: https://www.illusions.app
+📥 **Downloads**: https://www.illusions.app/downloads
 
-**デスクトップ版**: [Download Latest Release](https://github.com/Iktahana/illusions/releases/latest)
-Available for macOS (Intel & Apple Silicon) and Windows (installer or Microsoft Store)
+Available for **macOS** (Intel & Apple Silicon) and **Windows** (installer or Microsoft Store).
+Also runs in the browser — visit [illusions.app](https://www.illusions.app) to try it online (Chrome / Edge / Safari).
 
 ---
 
@@ -23,6 +22,7 @@ Available for macOS (Intel & Apple Silicon) and Windows (installer or Microsoft 
 - **Ruby notation support** (ルビ) - furigana for kanji
 - **Tate-chu-yoko** (縦中横) - horizontal text in vertical writing
 - **Auto-save** every 2 seconds
+- **Read-aloud (音読)**: Web Speech API text-to-speech with word highlight, auto-scroll, and configurable Japanese voice, rate, and pitch
 - **Japanese NLP** integration for text analysis
 - **POS (Part-of-Speech) highlighting** for Japanese grammar review with live demo preview
 - **Word frequency analysis** for vocabulary insights
@@ -69,17 +69,17 @@ Available for macOS (Intel & Apple Silicon) and Windows (installer or Microsoft 
 ### For Users
 
 #### Chrome版 / Web Version
-Simply visit https://illusions.app/ in your browser.
+Simply visit https://www.illusions.app in your browser.
 
 #### Desktop Version
 
 ##### macOS
-1. Download the `.dmg` file from [GitHub Releases](https://github.com/Iktahana/illusions/releases/latest)
+1. Download the `.dmg` file from [illusions.app/downloads](https://www.illusions.app/downloads)
 2. Open the DMG and drag illusions to your Applications folder
 3. Launch the app and start writing!
 
 ##### Windows
-1. Download the `.exe` installer from [GitHub Releases](https://github.com/Iktahana/illusions/releases/latest)
+1. Download the `.exe` installer from [illusions.app/downloads](https://www.illusions.app/downloads)
 2. Run the installer
 3. **Important**: You may see a Windows SmartScreen warning saying "Unknown Publisher"
    - This is normal for unsigned applications
@@ -94,7 +94,9 @@ Simply visit https://illusions.app/ in your browser.
 - The app is completely safe and open-source - you can review the code on GitHub
 - We plan to add code signing in the future as the project grows
 
-### For Developers
+---
+
+## 🛠️ For Developers
 
 #### Prerequisites
 - Node.js 22+
@@ -282,9 +284,8 @@ The proofreading (linting) features in illusions comply with the following offic
 - ✅ Landing page with SEO optimization
 
 ### Recently Added
-- ✅ Web Speech API read-aloud — browser-native text-to-speech with voice selection (読み上げ機能)
+- ✅ Read-aloud (音読) — Web Speech API text-to-speech with word highlight and auto-scroll; configurable Japanese voice, rate, and pitch (音読・ハイライト・自動スクロール)
 - ✅ Snow-country monochrome theme — minimalist warm stone palette for app and landing page
-- ✅ Glassmorphism UI polish — frosted glass effects, micro-interactions, ambient glow
 - ✅ Weekly release PR workflow — automated Monday `dev → main` release cycle with auto-cleanup
 - ✅ LLM-based character extraction — automatically extract characters from novel text with batched LLM inference (キャラクター抽出)
 - ✅ Gemma-2-Llama-Swallow 9B model — Japanese-optimised reasoning LLM by 東京科学大学, available in LLM settings (日本語特化モデル)
