@@ -40,6 +40,7 @@
     "better-sqlite3": "^12.6.2",
     "browserify-zlib": "^0.2.0",
     "buffer": "^6.0.3",
+    "dockview-react": "^5.1.0",
     "docx": "^9.5.3",
     "electron-log": "^5.4.3",
     "electron-store": "^11.0.2",

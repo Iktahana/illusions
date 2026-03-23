@@ -21,6 +21,7 @@ import Characters from "@/components/Characters";
 import Dictionary from "@/components/Dictionary";
 import Outline from "@/components/Outline";
 import WelcomeScreen from "@/components/WelcomeScreen";
+import PopoutEditorWindow from "@/components/PopoutEditorWindow";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
@@ -29,7 +30,13 @@ import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
 import { useTabManager } from "@/lib/hooks/use-tab-manager";
 import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
-import TabBar from "@/components/TabBar";
+import { DockviewReact } from "dockview-react";
+import {
+  dockviewTabComponents,
+} from "@/lib/dockview/dockview-components";
+import { useDockviewAdapter } from "@/lib/dockview/use-dockview-adapter";
+import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence";
+import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
@@ -59,7 +66,31 @@ import type { SupportedFileExtension } from "@/lib/project/project-types";
 // Each Electron BrowserWindow has its own JS context, so no cross-window contamination.
 let _skipAutoRestoreDetected: boolean | null = null;
 
+// Module-level popout detection (checked once per window context)
+let _popoutBufferInfo: { bufferId: string; fileName: string; fileType: SupportedFileExtension } | null = null;
+let _popoutDetected = false;
+
+function detectPopoutMode(): typeof _popoutBufferInfo {
+  if (_popoutDetected) return _popoutBufferInfo;
+  _popoutDetected = true;
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const bufferId = params.get("popout-buffer");
+  if (!bufferId) return null;
+  _popoutBufferInfo = {
+    bufferId,
+    fileName: params.get("fileName") ?? "新規ファイル",
+    fileType: (params.get("fileType") ?? ".mdi") as SupportedFileExtension,
+  };
+  return _popoutBufferInfo;
+}
+
 export default function EditorPage() {
+  // Early check: if this is a popout window, render simplified editor
+  const popoutInfo = detectPopoutMode();
+  if (popoutInfo) {
+    return <PopoutEditorWindow {...popoutInfo} />;
+  }
   const { editorMode, setProjectMode, setStandaloneMode, resetMode } = useEditorMode();
   const { themeMode, setThemeMode } = useTheme();
 
@@ -155,6 +186,14 @@ export default function EditorPage() {
     openProjectFile, pinTab,
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
   } = tabManager;
+
+  // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
+  const {
+    handleDockviewReady,
+    dockviewApi,
+    splitEditor,
+  } = useDockviewAdapter({ tabManager });
+  useDockviewPersistence({ dockviewApi });
 
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -546,6 +585,8 @@ export default function EditorPage() {
     switchToIndex,
     tabs,
     activeTabId,
+    splitEditorRight: useCallback(() => splitEditor("right"), [splitEditor]),
+    splitEditorDown: useCallback(() => splitEditor("down"), [splitEditor]),
   });
 
   // Detect feature availability after mount to avoid SSR hydration mismatch
@@ -799,52 +840,85 @@ export default function EditorPage() {
         )}
 
         <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
-          <TabBar
-            compactMode={compactMode}
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onSwitchTab={(tabId) => {
-              switchTab(tabId);
-              incrementEditorKey();
+          <DockviewReact
+            className="flex-1"
+            components={{
+              editor: ({ api: panelApi, params: panelParams }) => {
+                // Each dockview panel receives its own params.
+                // Only the panel matching the active tab renders the full interactive editor;
+                // other panels show a read-only content snapshot.
+                const panelBufferId = panelParams?.bufferId ?? activeTabId;
+                const isActivePanel = panelBufferId === activeTabId;
+
+                if (editorDiff && isActivePanel) {
+                  return (
+                    <EditorDiffView
+                      snapshotContent={editorDiff.snapshotContent}
+                      currentContent={editorDiff.currentContent}
+                      snapshotLabel={editorDiff.label}
+                      onClose={() => setEditorDiff(null)}
+                    />
+                  );
+                }
+
+                if (isActivePanel) {
+                  return (
+                    <ErrorBoundary sectionName="エディタ">
+                      <div ref={editorDomRef} className="h-full">
+                        <NovelEditor
+                          key={`tab-${panelBufferId}-${editorKey}`}
+                          initialContent={content}
+                          onChange={handleChange}
+                          onInsertText={handleInsertText}
+                          onSelectionChange={setSelectedCharCount}
+                          searchOpenTrigger={searchOpenTrigger}
+                          searchInitialTerm={searchInitialTerm}
+                          onEditorViewReady={setEditorViewInstance}
+                          programmaticScrollRef={programmaticScrollRef}
+                          onShowAllSearchResults={handleShowAllSearchResults}
+                          lintingRuleRunner={ruleRunner}
+                          onLintIssuesUpdated={handleLintIssuesUpdated}
+                          onNlpError={handleNlpError}
+                          onOpenRubyDialog={handleOpenRubyDialog}
+                          onToggleTcy={handleToggleTcy}
+                          onOpenDictionary={handleOpenDictionary}
+                          onShowLintHint={handleShowLintHint}
+                          onIgnoreCorrection={handleIgnoreCorrection}
+                          mdiExtensionsEnabled={mdiExtensionsEnabled}
+                          gfmEnabled={gfmEnabled}
+                        />
+                      </div>
+                    </ErrorBoundary>
+                  );
+                }
+
+                // Non-active panel: render a lightweight read-only editor
+                // that activates the tab when clicked
+                const panelTab = tabs.find((t) => t.id === panelBufferId);
+                const panelFileType = panelTab?.fileType ?? ".mdi";
+                return (
+                  <div
+                    className="h-full cursor-pointer"
+                    onClick={() => {
+                      switchTab(panelBufferId);
+                      panelApi.setActive();
+                    }}
+                  >
+                    <ErrorBoundary sectionName="エディタ">
+                      <NovelEditor
+                        key={`tab-${panelBufferId}-inactive`}
+                        initialContent={panelTab?.lastSavedContent ?? ""}
+                        mdiExtensionsEnabled={panelFileType === ".mdi"}
+                        gfmEnabled={panelFileType !== ".txt"}
+                      />
+                    </ErrorBoundary>
+                  </div>
+                );
+              },
             }}
-            onCloseTab={closeTab}
-            onPinTab={pinTab}
+            tabComponents={dockviewTabComponents}
+            onReady={handleDockviewReady}
           />
-          <div ref={editorDomRef} className="flex-1 min-h-0">
-            {editorDiff ? (
-              <EditorDiffView
-                snapshotContent={editorDiff.snapshotContent}
-                currentContent={editorDiff.currentContent}
-                snapshotLabel={editorDiff.label}
-                onClose={() => setEditorDiff(null)}
-              />
-            ) : (
-              <ErrorBoundary sectionName="エディタ">
-              <NovelEditor
-                key={`tab-${activeTabId}-${editorKey}`}
-                initialContent={content}
-                onChange={handleChange}
-                onInsertText={handleInsertText}
-                onSelectionChange={setSelectedCharCount}
-                searchOpenTrigger={searchOpenTrigger}
-                searchInitialTerm={searchInitialTerm}
-                onEditorViewReady={setEditorViewInstance}
-                programmaticScrollRef={programmaticScrollRef}
-                onShowAllSearchResults={handleShowAllSearchResults}
-                lintingRuleRunner={ruleRunner}
-                onLintIssuesUpdated={handleLintIssuesUpdated}
-                onNlpError={handleNlpError}
-                onOpenRubyDialog={handleOpenRubyDialog}
-                onToggleTcy={handleToggleTcy}
-                onOpenDictionary={handleOpenDictionary}
-                onShowLintHint={handleShowLintHint}
-                onIgnoreCorrection={handleIgnoreCorrection}
-                mdiExtensionsEnabled={mdiExtensionsEnabled}
-                gfmEnabled={gfmEnabled}
-              />
-              </ErrorBoundary>
-            )}
-          </div>
 
            {/* Save complete toast */}
           {showSaveToast && (

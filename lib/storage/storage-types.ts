@@ -6,6 +6,7 @@
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import type { Severity } from "@/lib/linting/types";
 import type { TabPersistenceState } from "../tab-manager/tab-types";
+import type { DockviewLayoutState } from "../dockview/types";
 
 /**
  * 最近使ったファイルの項目。
@@ -120,6 +121,9 @@ export interface AppState {
 
   // タブの永続化
   openTabs?: TabPersistenceState;
+
+  // Dockview レイアウトの永続化
+  dockviewLayout?: DockviewLayoutState;
 }
 
 /**
