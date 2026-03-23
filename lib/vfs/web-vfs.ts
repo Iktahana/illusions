@@ -117,7 +117,7 @@ class WebVFSFileHandle implements VFSFileHandle {
   async write(content: string): Promise<void> {
     // FileSystemFileHandle.createWritable() is not in the base TS types,
     // but is available in browsers that support File System Access API.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const writable = await (this.handle as unknown as { createWritable(): Promise<WritableStream & { write(data: string): Promise<void>; close(): Promise<void> }> }).createWritable();
     await writable.write(content);
     await writable.close();
@@ -172,7 +172,7 @@ class WebVFSDirectoryHandle implements VFSDirectoryHandle {
     options?: { recursive?: boolean }
   ): Promise<void> {
     // FileSystemDirectoryHandle.removeEntry is part of the File System Access API
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     await (this.handle as unknown as { removeEntry(name: string, options?: { recursive?: boolean }): Promise<void> }).removeEntry(name, {
       recursive: options?.recursive ?? false,
     });
@@ -180,7 +180,7 @@ class WebVFSDirectoryHandle implements VFSDirectoryHandle {
 
   async *entries(): AsyncIterable<[string, VFSEntry]> {
     // FileSystemDirectoryHandle is an AsyncIterable in supporting browsers
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const iterable = this.handle as unknown as AsyncIterable<[string, FileSystemHandle & { kind: "file" | "directory" }]>;
     for await (const [entryName, entryHandle] of iterable) {
       const entryPath = joinPath(this.path, entryName);
@@ -285,7 +285,7 @@ export class WebVFS implements VirtualFileSystem {
     const root = this.ensureRoot();
     try {
       const fileHandle = await resolveFileHandle(root, path, true);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  
       const writable = await (fileHandle as unknown as { createWritable(): Promise<WritableStream & { write(data: string): Promise<void>; close(): Promise<void> }> }).createWritable();
       await writable.write(content);
       await writable.close();
@@ -311,7 +311,7 @@ export class WebVFS implements VirtualFileSystem {
 
     try {
       const parentHandle = await resolveDirectoryHandle(root, segments);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  
       await (parentHandle as unknown as { removeEntry(name: string): Promise<void> }).removeEntry(fileName);
     } catch (error) {
       throw new Error(
@@ -394,7 +394,7 @@ export class WebVFS implements VirtualFileSystem {
     }
     const dirName = segments.pop()!;
     const parentHandle = await resolveDirectoryHandle(root, segments);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     await (parentHandle as unknown as { removeEntry(name: string, options?: { recursive?: boolean }): Promise<void> }).removeEntry(dirName, { recursive: true });
   }
 
@@ -435,7 +435,7 @@ export class WebVFS implements VirtualFileSystem {
           : await resolveDirectoryHandle(root, segments);
 
       const entries: VFSEntry[] = [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  
       const iterable = dirHandle as unknown as AsyncIterable<[string, FileSystemHandle & { kind: "file" | "directory" }]>;
       for await (const [entryName, entryHandle] of iterable) {
         entries.push({

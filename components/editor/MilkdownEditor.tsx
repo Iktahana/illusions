@@ -650,14 +650,25 @@ export default function MilkdownEditor({
     };
   }, [isVertical, scrollContainerRef, isModeSwitchingRef, savedScrollPosRef, userScrollingRef]);
 
+  // Union of all Milkdown command keys used in handleFormat.
+  // Each .key property is a branded CmdKey<T> string exported by @milkdown.
+  type MilkdownCommandKey =
+    | typeof toggleStrongCommand.key
+    | typeof toggleEmphasisCommand.key
+    | typeof toggleInlineCodeCommand.key
+    | typeof wrapInHeadingCommand.key
+    | typeof wrapInBlockquoteCommand.key
+    | typeof wrapInBulletListCommand.key
+    | typeof wrapInOrderedListCommand.key
+    | typeof toggleStrikethroughCommand.key;
+
   // BubbleMenu からの書式コマンドを処理する
   const handleFormat = (format: FormatType, level?: number) => {
     try {
       const editor = get();
       if (!editor) return;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const execute = (commandKey: any, payload?: unknown) => {
+      const execute = (commandKey: MilkdownCommandKey, payload?: unknown): void => {
         editor.action((ctx) => {
           const commands = ctx.get(commandsCtx);
           commands.call(commandKey, payload);
