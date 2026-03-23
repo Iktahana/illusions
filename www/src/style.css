@@ -1,5 +1,5 @@
 :root {
-  font-family: "Hina Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  font-family: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   line-height: 1.6;
   font-weight: 400;
 
@@ -22,7 +22,7 @@
   color: var(--color-text);
   --bg-image: none;
 
-  /* font-synthesis is intentionally omitted: Hina Mincho only ships weight 400,
+  /* font-synthesis is intentionally omitted: Zen Old Mincho only ships weight 400,
      so browser synthetic bold/italic is needed for headings and emphasis. */
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
