@@ -6,11 +6,9 @@ import { fetchAppState, persistAppState } from "../storage/app-state-manager";
 import type { TabState, SerializedTab, TabPersistenceState } from "./tab-types";
 import type { TabManagerCore } from "./types";
 import {
-  DEMO_FILE_NAME,
   TAB_PERSIST_DEBOUNCE,
   generateTabId,
   inferFileType,
-  loadDemoContent,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -60,9 +58,6 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
   const tabPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Only persist in Electron (Web has limited persistence)
-    if (!isElectron) return;
-
     if (tabPersistTimerRef.current) {
       clearTimeout(tabPersistTimerRef.current);
     }
@@ -89,7 +84,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         clearTimeout(tabPersistTimerRef.current);
       }
     };
-  }, [tabs, activeTabId, isElectron]);
+  }, [tabs, activeTabId]);
 
   // --- Storage initialization & demo content ------------------------------
 
@@ -98,20 +93,21 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
       try {
         const storage = getStorageService();
         await storage.initialize();
-        const session = await storage.loadSession();
         const appState = await storage.loadAppState();
-        const hasSeenDemo = appState?.hasSeenDemo ?? false;
-
-        const hasEditedFiles = Boolean(
-          session &&
-            (session.recentFiles.length > 0 ||
-              session.editorBuffer ||
-              appState?.lastOpenedMdiPath),
-        );
 
         if (!skipAutoRestore) {
+          // Check if we have previously saved tab state
+          const savedOpenTabs = appState?.openTabs;
+
           // Web: restore file handle from editor buffer
           if (!isElectron) {
+            // If saved state explicitly has 0 tabs, restore empty state
+            if (savedOpenTabs && savedOpenTabs.tabs.length === 0) {
+              setTabs([]);
+              setActiveTabId("");
+              return;
+            }
+
             const buffer = await storage.loadEditorBuffer();
             if (buffer?.fileHandle) {
               try {
@@ -136,9 +132,6 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
                   ),
                 );
                 setWasAutoRecovered(true);
-                if (!hasSeenDemo) {
-                  await persistAppState({ hasSeenDemo: true });
-                }
                 return;
               } catch (error) {
                 console.warn(
@@ -149,31 +142,6 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
               }
             }
           }
-
-          // Demo content on first use
-          if (!hasSeenDemo && !hasEditedFiles) {
-            const demoContent = await loadDemoContent();
-            if (demoContent) {
-              setTabs((prev) =>
-                prev.map((tab, i) =>
-                  i === 0
-                    ? {
-                        ...tab,
-                        file: {
-                          path: null,
-                          handle: null,
-                          name: DEMO_FILE_NAME,
-                        },
-                        content: demoContent,
-                        lastSavedContent: demoContent,
-                        fileType: inferFileType(DEMO_FILE_NAME),
-                      }
-                    : tab,
-                ),
-              );
-              await persistAppState({ hasSeenDemo: true });
-            }
-          }
         }
       } catch (error) {
         console.error("ストレージの初期化に失敗しました:", error);
@@ -181,7 +149,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     };
 
     void initializeStorage();
-  }, [isElectron, skipAutoRestore, setTabs]);
+  }, [isElectron, skipAutoRestore, setTabs, setActiveTabId]);
 
   // --- Restore tabs from AppState on mount (Electron only) ----------------
   // Wait for VFS root to be set so that the main process has a registered
@@ -203,7 +171,14 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
         const appState = await fetchAppState();
         const openTabs = appState?.openTabs;
-        if (!openTabs || openTabs.tabs.length === 0) return;
+        if (!openTabs) return;
+
+        // Saved state explicitly has 0 tabs — restore empty state
+        if (openTabs.tabs.length === 0) {
+          setTabs([]);
+          setActiveTabId("");
+          return;
+        }
 
         const restoredTabs: TabState[] = [];
         for (const serialized of openTabs.tabs) {

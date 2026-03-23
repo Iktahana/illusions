@@ -14,8 +14,8 @@ import { isElectronRenderer } from "../utils/runtime-env";
 // ---------------------------------------------------------------------------
 
 export interface UseTabStateReturn extends TabManagerCore {
-  /** Derived: active tab object (falls back to tabs[0]). */
-  activeTab: TabState;
+  /** Derived: active tab object (null when no tabs are open). */
+  activeTab: TabState | null;
   /** Derived: file descriptor of the active tab. */
   currentFile: MdiFileDescriptor | null;
   /** Derived: content string of the active tab. */
@@ -93,7 +93,7 @@ export function useTabState(): UseTabStateReturn {
 
   // --- Derived state from active tab --------------------------------------
 
-  const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0] ?? null;
   const currentFile = activeTab?.file ?? null;
   const content = activeTab?.content ?? "";
   const isDirty = activeTab?.isDirty ?? false;
@@ -171,9 +171,8 @@ export function useTabState(): UseTabStateReturn {
 
     const remaining = current.filter((t) => t.id !== tabId);
     if (remaining.length === 0) {
-      const emptyTab = createNewTab(undefined, ".mdi");
-      setTabs([emptyTab]);
-      setActiveTabId(emptyTab.id);
+      setTabs([]);
+      setActiveTabId("");
       return;
     }
 
