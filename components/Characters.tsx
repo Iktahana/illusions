@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Plus, Trash2, Edit2, Check, X, Sparkles, Loader2 } from "lucide-react";
 
-import type { ExtractionProgress } from "@/lib/character-extraction";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { fetchAppState, persistAppState } from "@/lib/storage/app-state-manager";
 import { useCharacterExtractionSettings } from "@/contexts/EditorSettingsContext";
@@ -71,10 +70,8 @@ export default function Characters({ content }: CharactersProps) {
     return () => clearTimeout(timer);
   }, [characters, isLoaded]);
 
-  // LLM extraction state
+  // Extraction state
   const [isExtracting, setIsExtracting] = useState(false);
-  const [extractionProgress, setExtractionProgress] =
-    useState<ExtractionProgress | null>(null);
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -183,13 +180,6 @@ export default function Characters({ content }: CharactersProps) {
     abortControllerRef.current?.abort();
   }, []);
 
-  /** Format progress text */
-  const progressText = extractionProgress
-    ? extractionProgress.phase === "extracting"
-      ? `抽出中... ${extractionProgress.current}/${extractionProgress.total}`
-      : `統合中... ${extractionProgress.current}/${extractionProgress.total}`
-    : "処理中...";
-
   return (
     <div className="h-full bg-background-secondary border-r border-border flex flex-col">
       {/* Header */}
@@ -214,7 +204,7 @@ export default function Characters({ content }: CharactersProps) {
             title="抽出をキャンセル"
           >
             <Loader2 className="w-4 h-4 animate-spin" />
-            {progressText}
+            処理中...
           </button>
         ) : (
           <button
