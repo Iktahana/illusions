@@ -30,6 +30,15 @@ import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
 import { useTabManager } from "@/lib/hooks/use-tab-manager";
 import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
 import TabBar from "@/components/TabBar";
+import { DockviewReact } from "dockview-react";
+import {
+  dockviewComponents,
+  dockviewTabComponents,
+} from "@/lib/dockview/dockview-components";
+import { useDockviewAdapter } from "@/lib/dockview/use-dockview-adapter";
+import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence";
+import { BufferStoreProvider, BufferStore } from "@/lib/dockview/buffer-store";
+import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
@@ -155,6 +164,14 @@ export default function EditorPage() {
     openProjectFile, pinTab,
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
   } = tabManager;
+
+  // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
+  const {
+    handleDockviewReady,
+    dockviewApi,
+    splitEditor,
+  } = useDockviewAdapter({ tabManager });
+  useDockviewPersistence({ dockviewApi });
 
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -798,52 +815,54 @@ export default function EditorPage() {
         )}
 
         <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
-          <TabBar
-            compactMode={compactMode}
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onSwitchTab={(tabId) => {
-              switchTab(tabId);
-              incrementEditorKey();
+          <DockviewReact
+            className="flex-1"
+            components={{
+              editor: () => {
+                // Render the actual editor inside the dockview panel
+                if (editorDiff) {
+                  return (
+                    <EditorDiffView
+                      snapshotContent={editorDiff.snapshotContent}
+                      currentContent={editorDiff.currentContent}
+                      snapshotLabel={editorDiff.label}
+                      onClose={() => setEditorDiff(null)}
+                    />
+                  );
+                }
+                return (
+                  <ErrorBoundary sectionName="エディタ">
+                    <div ref={editorDomRef} className="h-full">
+                      <NovelEditor
+                        key={`tab-${activeTabId}-${editorKey}`}
+                        initialContent={content}
+                        onChange={handleChange}
+                        onInsertText={handleInsertText}
+                        onSelectionChange={setSelectedCharCount}
+                        searchOpenTrigger={searchOpenTrigger}
+                        searchInitialTerm={searchInitialTerm}
+                        onEditorViewReady={setEditorViewInstance}
+                        programmaticScrollRef={programmaticScrollRef}
+                        onShowAllSearchResults={handleShowAllSearchResults}
+                        lintingRuleRunner={ruleRunner}
+                        onLintIssuesUpdated={handleLintIssuesUpdated}
+                        onNlpError={handleNlpError}
+                        onOpenRubyDialog={handleOpenRubyDialog}
+                        onToggleTcy={handleToggleTcy}
+                        onOpenDictionary={handleOpenDictionary}
+                        onShowLintHint={handleShowLintHint}
+                        onIgnoreCorrection={handleIgnoreCorrection}
+                        mdiExtensionsEnabled={mdiExtensionsEnabled}
+                        gfmEnabled={gfmEnabled}
+                      />
+                    </div>
+                  </ErrorBoundary>
+                );
+              },
             }}
-            onCloseTab={closeTab}
-            onPinTab={pinTab}
+            tabComponents={dockviewTabComponents}
+            onReady={handleDockviewReady}
           />
-          <div ref={editorDomRef} className="flex-1 min-h-0">
-            {editorDiff ? (
-              <EditorDiffView
-                snapshotContent={editorDiff.snapshotContent}
-                currentContent={editorDiff.currentContent}
-                snapshotLabel={editorDiff.label}
-                onClose={() => setEditorDiff(null)}
-              />
-            ) : (
-              <ErrorBoundary sectionName="エディタ">
-              <NovelEditor
-                key={`tab-${activeTabId}-${editorKey}`}
-                initialContent={content}
-                onChange={handleChange}
-                onInsertText={handleInsertText}
-                onSelectionChange={setSelectedCharCount}
-                searchOpenTrigger={searchOpenTrigger}
-                searchInitialTerm={searchInitialTerm}
-                onEditorViewReady={setEditorViewInstance}
-                programmaticScrollRef={programmaticScrollRef}
-                onShowAllSearchResults={handleShowAllSearchResults}
-                lintingRuleRunner={ruleRunner}
-                onLintIssuesUpdated={handleLintIssuesUpdated}
-                onNlpError={handleNlpError}
-                onOpenRubyDialog={handleOpenRubyDialog}
-                onToggleTcy={handleToggleTcy}
-                onOpenDictionary={handleOpenDictionary}
-                onShowLintHint={handleShowLintHint}
-                onIgnoreCorrection={handleIgnoreCorrection}
-                mdiExtensionsEnabled={mdiExtensionsEnabled}
-                gfmEnabled={gfmEnabled}
-              />
-              </ErrorBoundary>
-            )}
-          </div>
 
            {/* Save complete toast */}
           {showSaveToast && (
