@@ -7,7 +7,6 @@ import type { DecorationSet } from '@milkdown/prose/view';
 import type { LintIssue } from '@/lib/linting';
 import type { RuleRunner } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
-import type { ILlmClient } from '@/lib/llm-client/types';
 import type { IgnoredCorrection } from '@/lib/project/project-types';
 import type { ConfigChangeReason } from '@/lib/linting/correction-config';
 
@@ -20,10 +19,8 @@ export interface LintingPluginOptions {
   enabled: boolean;
   ruleRunner: RuleRunner | null;
   nlpClient?: INlpClient | null;
-  llmClient?: ILlmClient | null;
-  llmEnabled?: boolean;
   ignoredCorrections?: IgnoredCorrection[];
-  onIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
+  onIssuesUpdated?: (issues: LintIssue[]) => void;
   /** Callback fired when NLP tokenization fails (e.g., kuromoji init error).
    *  Called once per failure episode (not per-paragraph). */
   onNlpError?: (error: Error) => void;
@@ -46,15 +43,9 @@ export interface LintingSettingsUpdate {
   enabled?: boolean;
   ruleRunner?: RuleRunner | null;
   nlpClient?: INlpClient | null;
-  llmClient?: ILlmClient | null;
-  llmEnabled?: boolean;
   /** @deprecated Use changeReason instead */
   forceFullScan?: boolean;
   ignoredCorrections?: IgnoredCorrection[];
-  /** Current correction mode (novel, official, blog, academic, sns) for LLM validation */
-  correctionMode?: string;
-  /** LLM model ID to load before inference */
-  llmModelId?: string | null;
   /** Identifies the trigger for this change, enabling precise cache invalidation */
   changeReason?: ConfigChangeReason;
 }

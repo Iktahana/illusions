@@ -21,8 +21,6 @@ export {
   AbstractMorphologicalDocumentLintRule,
 } from "./base-rule";
 export { RuleRunner } from "./rule-runner";
-export type { LlmState, LlmControllerOptions } from "./llm-controller";
-export { LlmController } from "./llm-controller";
 
 export type {
   ConfigChangeReason,

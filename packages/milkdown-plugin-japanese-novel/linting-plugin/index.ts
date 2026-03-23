@@ -7,7 +7,6 @@ import type { EditorView } from '@milkdown/prose/view';
 import { $prose } from '@milkdown/utils';
 import type { RuleRunner, LintIssue } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
-import type { ILlmClient } from '@/lib/llm-client/types';
 import type { IgnoredCorrection } from '@/lib/project/project-types';
 import type { ConfigChangeReason } from '@/lib/linting/correction-config';
 import type { LintingSettingsUpdate } from './types';
@@ -26,7 +25,7 @@ export interface LintingOptions {
   /** Ignored corrections to filter out from decorations */
   ignoredCorrections?: IgnoredCorrection[];
   /** Callback when lint issues are updated */
-  onIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
+  onIssuesUpdated?: (issues: LintIssue[]) => void;
   /** Callback fired when NLP tokenization fails (e.g., kuromoji init error).
    *  Called once per failure episode (not per-paragraph). */
   onNlpError?: (error: Error) => void;

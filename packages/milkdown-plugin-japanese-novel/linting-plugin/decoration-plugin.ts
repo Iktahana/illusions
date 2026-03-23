@@ -12,13 +12,9 @@ import type { EditorView } from '@milkdown/prose/view';
 import type { RuleRunner, LintIssue, Severity } from '@/lib/linting';
 import type { INlpClient } from '@/lib/nlp-client/types';
 import type { Token } from '@/lib/nlp-client/types';
-import type { ILlmClient } from '@/lib/llm-client/types';
 import type { IgnoredCorrection } from '@/lib/project/project-types';
 import { LRUCache } from '@/lib/utils/lru-cache';
 import { hashString } from '@/lib/utils/hash-string';
-import { LintIssueValidator } from '@/lib/linting/lint-issue-validator';
-import type { ValidatableIssue } from '@/lib/linting/lint-issue-validator';
-import type { ParagraphInfo } from '../shared/paragraph-helpers';
 import { getAtomOffset, collectParagraphs, findScrollContainer, getVisibleParagraphs } from '../shared/paragraph-helpers';
 import type { LintingPluginState, LintingPluginOptions, LintingSettingsUpdate } from './types';
 
@@ -95,23 +91,6 @@ export function createLintingPlugin(
   // When true, the next scheduleViewportUpdate skips the debounce (fires immediately)
   let immediateRebuild = false;
 
-  // When true, the next scheduleLlmUpdate will run L1/L2 validation even if llmEnabled is false
-  let forceLlmValidation = false;
-
-  // L3 (LLM) state
-  let currentLlmClient: ILlmClient | null = options.llmClient ?? null;
-  let llmEnabled = options.llmEnabled ?? false;
-  let currentLlmModelId: string | null = null;
-  let llmAbortController: AbortController | null = null;
-  let llmIssueCache: Map<number, LintIssue[]> | null = null;
-  let llmDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-  const LLM_DEBOUNCE_MS = 8000;
-  let llmInFlight = false;
-
-  // LLM validation of L1/L2 issues: cache and validator instance
-  const validationCache = new LRUCache<string, boolean>(500);
-  const issueValidator = new LintIssueValidator();
-
   return new Plugin<LintingPluginState>({
     key: lintingKey,
 
@@ -138,7 +117,6 @@ export function createLintingPlugin(
             issueCache.clear();
             tokenCache.clear();
             documentIssueCache = null;
-            validationCache.clear();
           }
           // Update nlpClient reference if provided
           if ('nlpClient' in meta) {
@@ -149,38 +127,6 @@ export function createLintingPlugin(
             issueCache.clear();
             tokenCache.clear();
             documentIssueCache = null;
-            validationCache.clear();
-          }
-          // Update llmClient reference if provided
-          if ('llmClient' in meta) {
-            currentLlmClient = meta.llmClient ?? null;
-          }
-          // Update llmEnabled flag if provided
-          if ('llmEnabled' in meta) {
-            const wasEnabled = llmEnabled;
-            llmEnabled = meta.llmEnabled ?? false;
-
-            if (wasEnabled && !llmEnabled) {
-              // L3 just disabled — cancel in-flight work and clear L3 cache
-              if (llmAbortController) llmAbortController.abort();
-              if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
-              llmIssueCache = null;
-              llmInFlight = false;
-              // Rescan to show issues without pessimistic filter
-              pendingFullScan = true;
-            } else if (!wasEnabled && llmEnabled) {
-              // L3 just enabled — rescan to apply pessimistic filter
-              // (hide unvalidated issues until LLM confirms them)
-              pendingFullScan = true;
-            }
-          }
-          // Update llmModelId if provided
-          if ('llmModelId' in meta) {
-            currentLlmModelId = meta.llmModelId ?? null;
-          }
-          // Update correctionMode for LLM validation context
-          if ('correctionMode' in meta && meta.correctionMode) {
-            issueValidator.setMode(meta.correctionMode);
           }
           // Handle changeReason for smart cache invalidation
           if (meta.changeReason) {
@@ -206,9 +152,6 @@ export function createLintingPlugin(
                 documentIssueCache = null;
                 pendingFullScan = true;
                 break;
-              case "model-change":
-                // Only validation cache needs clearing (no-op for now, handled in Phase A)
-                break;
               case "text-edit":
                 // Re-run affected paragraphs only (handled via normal doc-changed path)
                 break;
@@ -219,7 +162,6 @@ export function createLintingPlugin(
             issueCache.clear();
             tokenCache.clear();
             documentIssueCache = null;
-            validationCache.clear();
             pendingFullScan = true;
           }
           // Update ignoredCorrections list if provided
@@ -231,7 +173,6 @@ export function createLintingPlugin(
             issueCache.clear();
             tokenCache.clear();
             documentIssueCache = null;
-            validationCache.clear();
           }
           const updated: LintingPluginState = {
             decorations: pluginState.decorations,
@@ -400,7 +341,6 @@ export function createLintingPlugin(
           // Build decorations from all paragraphs that have cached results
           const allDecorations: Decoration[] = [];
           const allIssues: LintIssue[] = [];
-          let pendingLlmCount = 0;
 
           for (const paragraph of allParagraphs) {
             // Per-paragraph issues from cache
@@ -427,19 +367,6 @@ export function createLintingPlugin(
                 continue;
               }
 
-              // Pessimistic LLM validation: hide issues until LLM confirms them
-              const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
-              const needsValidation = llmEnabled && !ruleConfig?.skipLlmValidation;
-              if (needsValidation) {
-                const vKey = LintIssueValidator.issueKey(issue, paragraph.text);
-                const cachedResult = validationCache.get(vKey);
-                // Skip unless LLM has explicitly confirmed this issue as valid
-                if (cachedResult !== true) {
-                  pendingLlmCount++;
-                  continue;
-                }
-              }
-
               const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
               const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
               const from = paragraph.pos + 1 + issue.from + extraFrom;
@@ -452,13 +379,11 @@ export function createLintingPlugin(
                 })
               );
 
-              // Issues reaching here are either: validation not needed, or LLM-confirmed
               allIssues.push({
                 ...issue,
                 from,
                 to,
                 originalText: issueText,
-                llmValidated: true,
               });
             }
           }
@@ -470,255 +395,10 @@ export function createLintingPlugin(
           const tr = view.state.tr.setMeta(lintingKey, { decorations });
           view.dispatch(tr);
 
-          // Notify parent of all issues (with pending flag if LLM validation is still needed)
-          const llmPending = pendingLlmCount > 0;
-          onIssuesUpdated?.(allIssues, { llmPending });
-
-          // Schedule L3 (LLM) linting with longer debounce
-          scheduleLlmUpdate(view, allParagraphs);
+          // Notify parent of all issues
+          onIssuesUpdated?.(allIssues);
 
         }, delay);
-      }
-
-      /**
-       * Schedule LLM pass: L1/L2 validation + L3 linting with a long debounce.
-       * Validation filters false positives from L1/L2 issues.
-       * L3 results are merged with existing L1/L2 decorations when they arrive.
-       */
-      function scheduleLlmUpdate(
-        view: EditorView,
-        allParagraphs: ParagraphInfo[],
-      ): void {
-        if (!currentLlmClient) return;
-        const isForced = forceLlmValidation;
-        if (!isForced && !llmEnabled) return;
-        if (llmInFlight) return;
-
-        // Consume the one-shot flag
-        forceLlmValidation = false;
-
-        // Consume the one-shot flag
-        forceLlmValidation = false;
-
-        if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
-
-        llmDebounceTimer = setTimeout(async () => {
-          const version = processingVersion;
-          llmInFlight = true;
-
-          if (llmAbortController) llmAbortController.abort();
-          llmAbortController = new AbortController();
-
-          try {
-            // Ensure model is loaded before inference — bail if no modelId
-            if (!currentLlmModelId) {
-              console.warn('[Linting:LLM] BAIL: no modelId — cannot load model');
-              return;
-            }
-            await currentLlmClient!.loadModel(currentLlmModelId);
-
-            // --- Step 1: Validate L1/L2 issues ---
-            const unvalidatedIssues: ValidatableIssue[] = [];
-            for (const paragraph of allParagraphs) {
-              const perParaIssues = issueCache.get(paragraph.text) ?? [];
-              const docIssues = documentIssueCache?.get(paragraph.index) ?? [];
-              const combined = [...perParaIssues, ...docIssues];
-
-              for (const issue of combined) {
-                // Skip rules that opt out of LLM validation
-                const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
-                if (ruleConfig?.skipLlmValidation) continue;
-
-                const key = LintIssueValidator.issueKey(issue, paragraph.text);
-                if (validationCache.has(key)) continue;
-
-                unvalidatedIssues.push({ ...issue, paragraphText: paragraph.text });
-              }
-            }
-
-            if (unvalidatedIssues.length > 0) {
-              await issueValidator.validate(
-                unvalidatedIssues,
-                currentLlmClient!,
-                llmAbortController!.signal,
-                (key, valid) => {
-                  // Write to cache immediately and rebuild decorations per-result
-                  // so each confirmed/dismissed issue appears in the UI right away
-                  validationCache.set(key, valid);
-                  if (processingVersion === version) {
-                    rebuildDecorationsWithLlm(view, allParagraphs, false);
-                  }
-                },
-              );
-
-              if (processingVersion !== version) return;
-
-              // Write fail-open results for any issues not returned by the LLM
-              for (const issue of unvalidatedIssues) {
-                const key = LintIssueValidator.issueKey(issue, issue.paragraphText);
-                if (!validationCache.has(key)) {
-                  // LLM didn't return a verdict for this issue — fail-open (keep it)
-                  validationCache.set(key, true);
-                }
-              }
-            }
-
-            if (processingVersion !== version) return;
-
-            // --- Step 2: Run L3 (LLM) rules (only when llmEnabled) ---
-            if (llmEnabled && currentRuleRunner?.hasLlmRules()) {
-              // Re-ensure model is loaded (may have been unloaded by idle timer)
-              await currentLlmClient!.loadModel(currentLlmModelId!);
-
-              const sentences: Array<{ text: string; from: number; to: number }> = [];
-              for (const para of allParagraphs) {
-                if (para.text.trim().length === 0) continue;
-                const from = para.pos + 1;
-                const to = from + para.text.length;
-                sentences.push({ text: para.text, from, to });
-              }
-
-              if (sentences.length > 0) {
-                const issues = await currentRuleRunner!.runLlmRules(
-                  sentences,
-                  currentLlmClient!,
-                  llmAbortController!.signal,
-                );
-
-                if (processingVersion !== version) return;
-
-                llmIssueCache = new Map();
-                for (const issue of issues) {
-                  for (let i = 0; i < allParagraphs.length; i++) {
-                    const para = allParagraphs[i];
-                    const paraFrom = para.pos + 1;
-                    const paraTo = paraFrom + para.text.length;
-                    if (issue.from >= paraFrom && issue.to <= paraTo) {
-                      const existing = llmIssueCache.get(i) ?? [];
-                      existing.push(issue);
-                      llmIssueCache.set(i, existing);
-                      break;
-                    }
-                  }
-                }
-              }
-            }
-
-            // Rebuild decorations with validation results + L3 issues merged in
-            rebuildDecorationsWithLlm(view, allParagraphs);
-          } catch (error) {
-            if ((error as Error).name !== "AbortError") {
-              console.error("LLM linting/validation failed:", error);
-            }
-            // Still rebuild so validated L1/L2 issues appear even if L3 fails
-            rebuildDecorationsWithLlm(view, allParagraphs);
-          } finally {
-            llmInFlight = false;
-          }
-        }, LLM_DEBOUNCE_MS);
-      }
-
-      /**
-       * Rebuild decorations merging L1/L2 cached issues + L3 (LLM) cached issues.
-       * Called when L3 results arrive asynchronously after L1/L2 decorations are already shown.
-       *
-       * @param complete - Pass false when more results are still coming (keeps spinner active).
-       *   Defaults to true (LLM phase fully complete).
-       */
-      function rebuildDecorationsWithLlm(
-        view: EditorView,
-        allParagraphs: ParagraphInfo[],
-        complete: boolean = true,
-      ): void {
-        const allDecorations: Decoration[] = [];
-        const allIssues: LintIssue[] = [];
-
-        for (let i = 0; i < allParagraphs.length; i++) {
-          const paragraph = allParagraphs[i];
-
-          // L1/L2 per-paragraph issues from cache
-          const perParagraphIssues = issueCache.get(paragraph.text);
-          // L1/L2 document-level issues for this paragraph
-          const docLevelIssues = documentIssueCache?.get(paragraph.index);
-
-          // Combine L1/L2 sources
-          const combinedIssues: LintIssue[] = [];
-          if (perParagraphIssues) {
-            combinedIssues.push(...perParagraphIssues);
-          }
-          if (docLevelIssues) {
-            combinedIssues.push(...docLevelIssues);
-          }
-
-          // L1/L2 issues (paragraph-relative positions)
-          for (const issue of combinedIssues) {
-            // Filter out ignored corrections
-            const issueText = paragraph.text.slice(issue.from, issue.to);
-            if (currentIgnoredCorrections.length > 0 &&
-                isIssueIgnored(issue, issueText, paragraph.text, currentIgnoredCorrections)) {
-              continue;
-            }
-
-            // Pessimistic LLM validation: only show issues confirmed by LLM
-            const ruleConfig = currentRuleRunner?.getConfig(issue.ruleId);
-            const needsValidation = llmEnabled && !ruleConfig?.skipLlmValidation;
-            if (needsValidation) {
-              const vKey = LintIssueValidator.issueKey(issue, paragraph.text);
-              if (validationCache.get(vKey) !== true) continue;
-            }
-
-            const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
-            const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
-            const from = paragraph.pos + 1 + issue.from + extraFrom;
-            const to = paragraph.pos + 1 + issue.to + extraTo;
-
-            allDecorations.push(
-              Decoration.inline(from, to, {
-                class: severityToClass(issue.severity),
-                'data-lint-issue': JSON.stringify({ ...issue, from, to, originalText: issueText, llmValidated: true }),
-              })
-            );
-
-            allIssues.push({ ...issue, from, to, originalText: issueText, llmValidated: true });
-          }
-
-          // L3 issues from LLM cache (already have absolute positions)
-          const llmIssues = llmIssueCache?.get(i);
-          if (llmIssues) {
-            for (const issue of llmIssues) {
-              if (issue.from < issue.to) {
-                // Filter out ignored L3 corrections
-                const l3IssueText = paragraph.text.slice(
-                  issue.from - (paragraph.pos + 1),
-                  issue.to - (paragraph.pos + 1),
-                );
-                if (currentIgnoredCorrections.length > 0 &&
-                    isIssueIgnored(issue, l3IssueText, paragraph.text, currentIgnoredCorrections)) {
-                  continue;
-                }
-                const issueWithOriginal = { ...issue, originalText: l3IssueText };
-                allDecorations.push(
-                  Decoration.inline(issue.from, issue.to, {
-                    class: severityToClass(issue.severity),
-                    'data-lint-issue': JSON.stringify(issueWithOriginal),
-                  })
-                );
-
-                allIssues.push(issueWithOriginal);
-              }
-            }
-          }
-        }
-
-        // Apply decorations
-        const decorations = allDecorations.length > 0
-          ? DecorationSet.create(view.state.doc, allDecorations)
-          : DecorationSet.empty;
-        const tr = view.state.tr.setMeta(lintingKey, { decorations });
-        view.dispatch(tr);
-
-        // Notify parent — llmPending keeps spinner active for incremental updates
-        onIssuesUpdated?.(allIssues, { llmPending: !complete });
       }
 
       return {
@@ -732,7 +412,6 @@ export function createLintingPlugin(
               issueCache.clear();
               tokenCache.clear();
               documentIssueCache = null;
-              validationCache.clear();
               scheduleViewportUpdate(view);
             }
             return;
@@ -754,15 +433,10 @@ export function createLintingPlugin(
         destroy() {
           if (debounceTimer) clearTimeout(debounceTimer);
           if (scrollTimer) clearTimeout(scrollTimer);
-          if (llmDebounceTimer) clearTimeout(llmDebounceTimer);
-          if (llmAbortController) llmAbortController.abort();
           scrollContainer.removeEventListener('scroll', handleScroll);
           issueCache.clear();
           tokenCache.clear();
           documentIssueCache = null;
-          validationCache.clear();
-          llmIssueCache = null;
-          llmInFlight = false;
         },
       };
     },

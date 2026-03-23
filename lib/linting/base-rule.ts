@@ -1,4 +1,3 @@
-import type { ILlmClient } from "@/lib/llm-client/types";
 import type { Token } from "@/lib/nlp-client/types";
 
 import type {
@@ -9,7 +8,6 @@ import type {
   DocumentLintRule,
   MorphologicalLintRule,
   MorphologicalDocumentLintRule,
-  LlmLintRule,
 } from "./types";
 
 /**
@@ -22,7 +20,7 @@ export abstract class AbstractLintRule implements LintRule {
   abstract readonly nameJa: string;
   abstract readonly description: string;
   abstract readonly descriptionJa: string;
-  abstract readonly level: "L1" | "L2" | "L3";
+  abstract readonly level: "L1" | "L2";
   abstract readonly defaultConfig: LintRuleConfig;
   /** Default engine for simple regex-based rules */
   engine: CorrectionEngine = "regex";
@@ -101,28 +99,4 @@ export abstract class AbstractMorphologicalDocumentLintRule
   ): Array<{ paragraphIndex: number; issues: LintIssue[] }> {
     return [];
   }
-}
-
-/**
- * Abstract base class for LLM-based lint rules (L3).
- * Subclasses implement lintWithLlm(). The sync lint() is a no-op.
- */
-export abstract class AbstractLlmLintRule
-  extends AbstractLintRule
-  implements LlmLintRule
-{
-  readonly level = "L3" as const;
-  /** LLM rules use language model inference */
-  override engine: CorrectionEngine = "llm";
-
-  lint(_text: string, _config: LintRuleConfig): LintIssue[] {
-    return []; // L3 rules only run via lintWithLlm()
-  }
-
-  abstract lintWithLlm(
-    sentences: ReadonlyArray<{ text: string; from: number; to: number }>,
-    config: LintRuleConfig,
-    llmClient: ILlmClient,
-    signal?: AbortSignal,
-  ): Promise<LintIssue[]>;
 }

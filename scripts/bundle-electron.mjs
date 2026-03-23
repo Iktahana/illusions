@@ -37,8 +37,6 @@ await esbuild.build({
     'kuromoji',
     // better-sqlite3 is a native module
     'better-sqlite3',
-    // node-llama-cpp is a native module for local LLM inference
-    'node-llama-cpp',
   ],
   format: 'cjs',
   minify: false, // Keep readable for debugging
@@ -114,11 +112,10 @@ function collectDepsRecursive(pkgName, collected) {
 }
 
 // Root external modules that cannot be bundled by esbuild
-// kuromoji: dictionary loading at runtime; better-sqlite3: native addon; node-llama-cpp: native LLM inference
+// kuromoji: dictionary loading at runtime; better-sqlite3: native addon
 const externalRoots = [
   'kuromoji',
   'better-sqlite3',
-  'node-llama-cpp',
 ];
 
 // Collect all transitive production dependencies
