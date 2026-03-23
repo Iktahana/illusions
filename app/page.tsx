@@ -563,6 +563,8 @@ export default function EditorPage() {
     switchToIndex,
     tabs,
     activeTabId,
+    splitEditorRight: useCallback(() => splitEditor("right"), [splitEditor]),
+    splitEditorDown: useCallback(() => splitEditor("down"), [splitEditor]),
   });
 
   // Detect feature availability after mount to avoid SSR hydration mismatch

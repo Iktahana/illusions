@@ -28,6 +28,9 @@ interface UseKeyboardShortcutsParams {
   switchToIndex: (index: number) => void;
   tabs: TabInfo[];
   activeTabId: string;
+  // Split editor operations
+  splitEditorRight?: () => void;
+  splitEditorDown?: () => void;
 }
 
 /**
@@ -53,6 +56,8 @@ export function useKeyboardShortcuts({
   switchToIndex,
   tabs,
   activeTabId,
+  splitEditorRight,
+  splitEditorDown,
 }: UseKeyboardShortcutsParams): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -108,7 +113,23 @@ export function useKeyboardShortcuts({
       const isTabJump = (isMac ? event.metaKey : event.ctrlKey) &&
         !event.shiftKey && event.key >= "1" && event.key <= "9";
 
-      if (isTcyShortcut) {
+      // Cmd+\ (macOS) / Ctrl+\ (Windows/Linux): Split editor right
+      const isSplitRight = isMac
+        ? event.metaKey && !event.shiftKey && event.key === "\\"
+        : event.ctrlKey && !event.shiftKey && event.key === "\\";
+
+      // Shift+Cmd+\ (macOS) / Shift+Ctrl+\ (Windows/Linux): Split editor down
+      const isSplitDown = isMac
+        ? event.shiftKey && event.metaKey && event.key === "\\"
+        : event.shiftKey && event.ctrlKey && event.key === "\\";
+
+      if (isSplitRight && splitEditorRight) {
+        event.preventDefault();
+        splitEditorRight();
+      } else if (isSplitDown && splitEditorDown) {
+        event.preventDefault();
+        splitEditorDown();
+      } else if (isTcyShortcut) {
         event.preventDefault();
         handleToggleTcy();
       } else if (isRubyShortcut) {
@@ -160,5 +181,5 @@ export function useKeyboardShortcuts({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [saveFile, handlePasteAsPlaintext, handleToggleCompactMode, handleOpenRubyDialog, handleToggleTcy, isElectron, nextTab, prevTab, newTab, closeTab, tabs, activeTabId, switchToIndex, setShowSettingsModal, incrementEditorKey, setSearchOpenTrigger]);
+  }, [saveFile, handlePasteAsPlaintext, handleToggleCompactMode, handleOpenRubyDialog, handleToggleTcy, isElectron, nextTab, prevTab, newTab, closeTab, tabs, activeTabId, switchToIndex, setShowSettingsModal, incrementEditorKey, setSearchOpenTrigger, splitEditorRight, splitEditorDown]);
 }
