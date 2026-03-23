@@ -68,6 +68,31 @@ body::before {
   padding: 2rem;
 }
 
+.top-nav {
+  position: fixed;
+  top: 0;
+  right: 0;
+  padding: 1rem 1.5rem;
+  z-index: 100;
+}
+
+.nav-login-link {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-accent-foreground);
+  text-decoration: none;
+  padding: 0.5rem 1.1rem;
+  background: var(--color-accent);
+  border-radius: 6px;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nav-login-link:hover {
+  background: var(--color-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-accent);
+}
+
 .hero {
   text-align: center;
   color: white;
