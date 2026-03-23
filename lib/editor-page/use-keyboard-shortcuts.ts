@@ -34,6 +34,10 @@ interface UseKeyboardShortcutsParams {
   // Split editor operations
   splitEditorRight?: () => void;
   splitEditorDown?: () => void;
+  // Panel toggle operations
+  toggleExplorer?: () => void;
+  toggleSearch?: () => void;
+  toggleOutline?: () => void;
 }
 
 /**
@@ -59,6 +63,9 @@ export function useKeyboardShortcuts({
   activeTabId,
   splitEditorRight,
   splitEditorDown,
+  toggleExplorer,
+  toggleSearch,
+  toggleOutline,
 }: UseKeyboardShortcutsParams): void {
   const { effectiveBindings } = useKeymap();
 
@@ -99,6 +106,9 @@ export function useKeyboardShortcuts({
       "file.closeTab": closeTabHandler,
       "view.splitRight": splitEditorRight,
       "view.splitDown": splitEditorDown,
+      "panel.explorer": toggleExplorer,
+      "panel.search": toggleSearch,
+      "panel.outline": toggleOutline,
       ...tabHandlers,
     };
   }, [
@@ -120,6 +130,9 @@ export function useKeyboardShortcuts({
     activeTabId,
     splitEditorRight,
     splitEditorDown,
+    toggleExplorer,
+    toggleSearch,
+    toggleOutline,
   ]);
 
   useKeymapListener(handlers, effectiveBindings);

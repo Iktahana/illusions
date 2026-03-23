@@ -572,6 +572,9 @@ export default function EditorPage() {
     activeTabId,
     splitEditorRight: useCallback(() => splitEditor("right"), [splitEditor]),
     splitEditorDown: useCallback(() => splitEditor("down"), [splitEditor]),
+    toggleExplorer: useCallback(() => setTopView(topView === "explorer" ? "none" : "explorer"), [setTopView, topView]),
+    toggleSearch: useCallback(() => setTopView(topView === "search" ? "none" : "search"), [setTopView, topView]),
+    toggleOutline: useCallback(() => setTopView(topView === "outline" ? "none" : "outline"), [setTopView, topView]),
   });
 
   // Detect feature availability after mount to avoid SSR hydration mismatch
