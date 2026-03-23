@@ -10,10 +10,10 @@
 @import "dockview-core/dist/styles/dockview.css";
 
 /* ------------------------------------------------------------------ */
-/* Light mode (default :root)                                         */
+/* illusions custom theme — light mode (default)                       */
 /* ------------------------------------------------------------------ */
 
-:root {
+.dockview-theme-illusions {
   /* Editor content area background */
   --dv-group-view-background-color: rgb(var(--background));
 
@@ -63,10 +63,10 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Dark mode                                                          */
+/* illusions custom theme — dark mode                                  */
 /* ------------------------------------------------------------------ */
 
-.dark {
+.dark .dockview-theme-illusions {
   --dv-group-view-background-color: rgb(var(--background));
   --dv-tabs-and-actions-container-background-color: rgb(var(--background-secondary));
 

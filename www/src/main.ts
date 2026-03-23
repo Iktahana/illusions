@@ -26,6 +26,9 @@ if (bgImageUrl) {
 }
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
+  <nav class="top-nav">
+    <a href="https://my.illusions.app" class="nav-login-link">ログイン / 新規登録</a>
+  </nav>
   <div class="hero">
     <div class="title-logo">${logoSvg}</div>
     <p class="tagline">

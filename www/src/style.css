@@ -1,5 +1,5 @@
 :root {
-  font-family: "Hina Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  font-family: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   line-height: 1.6;
   font-weight: 400;
 
@@ -22,7 +22,7 @@
   color: var(--color-text);
   --bg-image: none;
 
-  /* font-synthesis is intentionally omitted: Hina Mincho only ships weight 400,
+  /* font-synthesis is intentionally omitted: Zen Old Mincho only ships weight 400,
      so browser synthetic bold/italic is needed for headings and emphasis. */
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -66,6 +66,31 @@ body::before {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
+}
+
+.top-nav {
+  position: fixed;
+  top: 0;
+  right: 0;
+  padding: 1rem 1.5rem;
+  z-index: 100;
+}
+
+.nav-login-link {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-accent-foreground);
+  text-decoration: none;
+  padding: 0.5rem 1.1rem;
+  background: var(--color-accent);
+  border-radius: 6px;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nav-login-link:hover {
+  background: var(--color-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-accent);
 }
 
 .hero {
