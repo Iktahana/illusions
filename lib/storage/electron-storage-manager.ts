@@ -59,13 +59,12 @@ export class ElectronStorageManager {
       throw new Error("better-sqlite3 モジュールが利用できません");
     }
 
-    this.db = new DatabaseModule(this.dbPath);
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    this.db!.pragma("journal_mode = WAL");
+    const db = new DatabaseModule(this.dbPath);
+    this.db = db;
+    db.pragma("journal_mode = WAL");
 
     // 必要ならテーブルを作成
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    this.db!.exec(`
+    db.exec(`
       CREATE TABLE IF NOT EXISTS app_state (
         id TEXT PRIMARY KEY,
         data TEXT NOT NULL,
@@ -100,8 +99,7 @@ export class ElectronStorageManager {
       );
     `);
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return this.db!;
+    return db;
   }
 
   /**

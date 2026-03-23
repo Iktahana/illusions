@@ -10,7 +10,7 @@ import {
 import clsx from "clsx";
 import type { EditorView } from "@milkdown/prose/view";
 import { useSpeech } from "@/lib/hooks/use-speech";
-import SearchDialog from "./SearchDialog";
+import SearchDialog, { type SearchMatch } from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
 import EditorToolbar from "./editor/EditorToolbar";
 import MilkdownEditor from "./editor/MilkdownEditor";
@@ -36,8 +36,7 @@ interface EditorProps {
   onEditorViewReady?: (view: EditorView) => void;
   /** Ref that external code sets to true before programmatic scrolling */
   programmaticScrollRef?: React.MutableRefObject<boolean>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onShowAllSearchResults?: (matches: any[], searchTerm: string) => void;
+  onShowAllSearchResults?: (matches: SearchMatch[], searchTerm: string) => void;
   // リンティング設定
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
