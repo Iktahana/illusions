@@ -101,6 +101,12 @@ export default function NovelEditor({
   const editorViewRef = useRef<EditorView | null>(null);
   const speechMapRef = useRef<{ text: string; positions: number[] } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  /** Doc position to resume TTS from after the current chunk ends. null = no continuation. */
+  const speechContinuationPosRef = useRef<number | null>(null);
+  /** Stable ref to startSpeechFromPos, allowing onEnd to recurse without circular deps. */
+  const startSpeechFromPosRef = useRef<((pos: number) => void) | null>(null);
+  /** Max doc-position range processed per TTS chunk (~5 000 Japanese chars). */
+  const MAX_SPEECH_CHUNK_RANGE = 10_000;
 
   // Ref to indicate a mode switch is in progress (for scroll restoration)
   const isModeSwitchingRef = useRef(false);
@@ -141,18 +147,21 @@ export default function NovelEditor({
     view.dispatch(view.state.tr.setMeta("speechDecorations", []));
   }, []);
 
-  const startSpeechFromCursor = useCallback(() => {
+  const startSpeechFromPos = useCallback((startPos: number) => {
     stop();
     clearHighlight();
     const view = editorViewRef.current;
     if (!view) return;
-    const { head } = view.state.selection;
     const docSize = view.state.doc.content.size;
-    const startPos = head > 1 ? head : 1;
-    const map = buildSpeechMap(view.state.doc, startPos, docSize);
+    // Limit the range to avoid allocating huge arrays and thousands of utterances
+    // on long documents. Continuation is handled lazily in onEnd.
+    const endPos = Math.min(startPos + MAX_SPEECH_CHUNK_RANGE, docSize);
+    const map = buildSpeechMap(view.state.doc, startPos, endPos);
     const segments = buildSegments(map.text);
     const chunks = buildSpeechChunks(map.text, segments);
+    if (chunks.length === 0) return;
     speechMapRef.current = map;
+    speechContinuationPosRef.current = endPos < docSize ? endPos : null;
 
     speakSegments(
       chunks.map((c) => c.speech),
@@ -186,10 +195,28 @@ export default function NovelEditor({
         onEnd() {
           clearHighlight();
           speechMapRef.current = null;
+          // Lazily load the next chunk so the full document is read without
+          // pre-allocating all utterances upfront.
+          const nextPos = speechContinuationPosRef.current;
+          speechContinuationPosRef.current = null;
+          if (nextPos !== null) {
+            startSpeechFromPosRef.current?.(nextPos);
+          }
         },
       },
     );
-  }, [speakSegments, stop, clearHighlight, isVertical, programmaticScrollRef]);
+  }, [speakSegments, stop, clearHighlight, isVertical, programmaticScrollRef, MAX_SPEECH_CHUNK_RANGE]);
+
+  // Keep the ref in sync so onEnd can call startSpeechFromPos without a circular dep
+  startSpeechFromPosRef.current = startSpeechFromPos;
+
+  const startSpeechFromCursor = useCallback(() => {
+    const view = editorViewRef.current;
+    if (!view) return;
+    const { head } = view.state.selection;
+    const startPos = head > 1 ? head : 1;
+    startSpeechFromPos(startPos);
+  }, [startSpeechFromPos]);
 
   const handleSpeakToggle = useCallback(() => {
     if (speechState.isPlaying) {
