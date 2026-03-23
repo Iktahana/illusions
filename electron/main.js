@@ -1047,6 +1047,94 @@ ipcMain.handle('new-window', async () => {
    return newWin ? true : false
  })
 
+// --- Editor popout window (split editor → independent window) ---
+
+ipcMain.handle('editor:popout-panel', async (_event, payload) => {
+  if (!payload || typeof payload.bufferId !== 'string') return false
+
+  const { bufferId, content, fileName, fileType } = payload
+  const preloadPath = path.join(__dirname, 'preload.js')
+
+  const popoutWin = new BrowserWindow({
+    width: 900,
+    height: 700,
+    show: false,
+    backgroundColor: '#0f172a',
+    webPreferences: {
+      preload: preloadPath,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  })
+
+  // Navigation guards (same as createWindow)
+  popoutWin.webContents.on('will-navigate', (event, navigationUrl) => {
+    const parsedUrl = new URL(navigationUrl)
+    if (parsedUrl.protocol === 'file:') return
+    if (isDev && parsedUrl.hostname === 'localhost') return
+    event.preventDefault()
+  })
+  popoutWin.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
+  })
+
+  // Track in allWindows
+  allWindows.add(popoutWin)
+
+  popoutWin.once('ready-to-show', () => {
+    popoutWin?.show()
+  })
+
+  // On close: notify other windows that this popout's buffer was released, remove from tracking
+  popoutWin.on('closed', () => {
+    allWindows.delete(popoutWin)
+    if (mainWindow === popoutWin) {
+      mainWindow = allWindows.values().next().value || null
+    }
+  })
+
+  // Encode buffer info as query params
+  const encodedName = encodeURIComponent(fileName || '')
+  const encodedType = encodeURIComponent(fileType || '.mdi')
+  const query = `popout-buffer=${encodeURIComponent(bufferId)}&fileName=${encodedName}&fileType=${encodedType}`
+
+  if (isDev) {
+    popoutWin.loadURL(`http://localhost:3020?${query}`)
+  } else {
+    const filePath = path.join(app.getAppPath(), 'out', 'index.html')
+    popoutWin.loadURL(`file://${filePath}?${query}`)
+  }
+
+  // Set window title
+  popoutWin.setTitle(fileName || '新規ファイル')
+
+  return true
+})
+
+// Buffer content sync: broadcast to all OTHER windows
+ipcMain.on('editor:buffer-sync', (event, data) => {
+  const senderId = event.sender.id
+  for (const win of allWindows) {
+    if (!win.isDestroyed() && win.webContents.id !== senderId) {
+      win.webContents.send('editor:buffer-sync-broadcast', data)
+    }
+  }
+})
+
+// Buffer close: broadcast to all OTHER windows
+ipcMain.on('editor:buffer-close', (event, bufferId) => {
+  const senderId = event.sender.id
+  for (const win of allWindows) {
+    if (!win.isDestroyed() && win.webContents.id !== senderId) {
+      win.webContents.send('editor:buffer-close-broadcast', bufferId)
+    }
+  }
+})
+
 // 辞書ポップアップウィンドウを開く
 ipcMain.handle('open-dictionary-popup', (_event, url, title) => {
   // Validate URL: only allow https

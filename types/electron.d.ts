@@ -195,6 +195,21 @@ declare global {
       /** Remove all power state change listeners */
       removeOnPowerStateChange: () => void;
     };
+    /** Split editor popout window IPC */
+    editor?: {
+      /** Pop out a buffer to a new Electron window */
+      popoutPanel: (bufferId: string, content: string, fileName: string, fileType: string) => Promise<boolean>;
+      /** Send buffer content change to other windows */
+      sendBufferSync: (bufferId: string, content: string) => void;
+      /** Listen for buffer content changes from other windows */
+      onBufferSync: (callback: (data: { bufferId: string; content: string }) => void) => (() => void);
+      /** Notify that a buffer was closed in this window */
+      sendBufferClose: (bufferId: string) => void;
+      /** Listen for buffer close events from other windows */
+      onBufferClose: (callback: (bufferId: string) => void) => (() => void);
+      /** Remove all editor sync listeners */
+      removeAllListeners: () => void;
+    };
   }
 
   interface Window {

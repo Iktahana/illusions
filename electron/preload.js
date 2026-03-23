@@ -209,4 +209,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeAllListeners('power:state-changed')
     },
   },
+  editor: {
+    popoutPanel: (bufferId, content, fileName, fileType) =>
+      ipcRenderer.invoke('editor:popout-panel', { bufferId, content, fileName, fileType }),
+    sendBufferSync: (bufferId, content) =>
+      ipcRenderer.send('editor:buffer-sync', { bufferId, content }),
+    onBufferSync: (callback) => {
+      const handler = (_event, data) => callback(data)
+      ipcRenderer.on('editor:buffer-sync-broadcast', handler)
+      return () => ipcRenderer.removeListener('editor:buffer-sync-broadcast', handler)
+    },
+    sendBufferClose: (bufferId) =>
+      ipcRenderer.send('editor:buffer-close', bufferId),
+    onBufferClose: (callback) => {
+      const handler = (_event, bufferId) => callback(bufferId)
+      ipcRenderer.on('editor:buffer-close-broadcast', handler)
+      return () => ipcRenderer.removeListener('editor:buffer-close-broadcast', handler)
+    },
+    removeAllListeners: () => {
+      ipcRenderer.removeAllListeners('editor:buffer-sync-broadcast')
+      ipcRenderer.removeAllListeners('editor:buffer-close-broadcast')
+    },
+  },
 })

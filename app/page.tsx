@@ -21,6 +21,7 @@ import Characters from "@/components/Characters";
 import Dictionary from "@/components/Dictionary";
 import Outline from "@/components/Outline";
 import WelcomeScreen from "@/components/WelcomeScreen";
+import PopoutEditorWindow from "@/components/PopoutEditorWindow";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
@@ -68,7 +69,31 @@ import type { SupportedFileExtension } from "@/lib/project/project-types";
 // Each Electron BrowserWindow has its own JS context, so no cross-window contamination.
 let _skipAutoRestoreDetected: boolean | null = null;
 
+// Module-level popout detection (checked once per window context)
+let _popoutBufferInfo: { bufferId: string; fileName: string; fileType: SupportedFileExtension } | null = null;
+let _popoutDetected = false;
+
+function detectPopoutMode(): typeof _popoutBufferInfo {
+  if (_popoutDetected) return _popoutBufferInfo;
+  _popoutDetected = true;
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const bufferId = params.get("popout-buffer");
+  if (!bufferId) return null;
+  _popoutBufferInfo = {
+    bufferId,
+    fileName: params.get("fileName") ?? "新規ファイル",
+    fileType: (params.get("fileType") ?? ".mdi") as SupportedFileExtension,
+  };
+  return _popoutBufferInfo;
+}
+
 export default function EditorPage() {
+  // Early check: if this is a popout window, render simplified editor
+  const popoutInfo = detectPopoutMode();
+  if (popoutInfo) {
+    return <PopoutEditorWindow {...popoutInfo} />;
+  }
   const { editorMode, setProjectMode, setStandaloneMode, resetMode } = useEditorMode();
   const { themeMode, setThemeMode } = useTheme();
 
@@ -170,6 +195,7 @@ export default function EditorPage() {
     handleDockviewReady,
     dockviewApi,
     splitEditor,
+    popoutPanel,
   } = useDockviewAdapter({ tabManager });
   useDockviewPersistence({ dockviewApi });
 

@@ -34,6 +34,8 @@ export interface UseDockviewAdapterReturn {
   splitEditor: (direction: "right" | "down") => void;
   /** Close the currently active panel's group if it has no other panels */
   closeGroup: () => void;
+  /** Pop out the active panel to a new window (Electron: BrowserWindow, Web: window.open) */
+  popoutPanel: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -253,10 +255,78 @@ export function useDockviewAdapter({
     }
   }, []);
 
+  // -- Popout panel to new window ------------------------------------------
+
+  const popoutPanel = useCallback(() => {
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (!activeTab) return;
+
+    const electronAPI = window.electronAPI;
+    const content = tabManager.content ?? "";
+    const fileName = activeTab.file?.name ?? `新規ファイル${activeTab.fileType}`;
+    const fileType = activeTab.fileType;
+
+    if (electronAPI?.editor?.popoutPanel) {
+      // Electron: pop out to a new BrowserWindow via IPC
+      void electronAPI.editor.popoutPanel(activeTab.id, content, fileName, fileType);
+    } else {
+      // Web fallback: open in a new browser window
+      const params = new URLSearchParams({
+        "popout-buffer": activeTab.id,
+        fileName,
+        fileType,
+      });
+      window.open(`${window.location.origin}?${params.toString()}`, "_blank", "width=900,height=700");
+    }
+  }, [tabs, activeTabId, tabManager.content]);
+
+  // -- Cross-window buffer sync (Electron IPC) -----------------------------
+
+  useEffect(() => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI?.editor) return;
+
+    const unsubSync = electronAPI.editor.onBufferSync((data) => {
+      // Another window changed a buffer — if we have a tab with this ID, update content
+      const matchingTab = tabs.find((t) => t.id === data.bufferId);
+      if (matchingTab && data.content !== tabManager.content) {
+        // Update via tab manager's setContent (this will trigger re-render)
+        if (data.bufferId === activeTabId) {
+          tabManager.setContent(data.content);
+        }
+      }
+    });
+
+    const unsubClose = electronAPI.editor.onBufferClose((_bufferId) => {
+      // Another window closed this buffer — no action needed for now,
+      // the buffer still exists in this window's tab manager
+    });
+
+    return () => {
+      if (typeof unsubSync === "function") unsubSync();
+      if (typeof unsubClose === "function") unsubClose();
+    };
+  }, [tabs, activeTabId, tabManager]);
+
+  // Broadcast content changes to other windows
+  useEffect(() => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI?.editor?.sendBufferSync) return;
+    if (!activeTabId || !tabManager.content) return;
+
+    // Debounce to avoid flooding IPC on every keystroke
+    const timer = setTimeout(() => {
+      electronAPI.editor!.sendBufferSync(activeTabId, tabManager.content);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [activeTabId, tabManager.content]);
+
   return {
     handleDockviewReady,
     dockviewApi,
     splitEditor,
     closeGroup,
+    popoutPanel,
   };
 }

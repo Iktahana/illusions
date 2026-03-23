@@ -127,6 +127,46 @@ export function DockviewTabHeader({
     }
   }, [buffer?.isPreview]);
 
+  const handleContextMenu = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const electronAPI = window.electronAPI;
+      if (electronAPI?.showContextMenu) {
+        // Electron: use native context menu
+        const action = await electronAPI.showContextMenu([
+          { label: "新しいウィンドウで開く", action: "popout" },
+          { type: "separator" },
+          { label: "閉じる", action: "close" },
+        ]);
+        if (action === "popout" && buffer && electronAPI.editor?.popoutPanel) {
+          void electronAPI.editor.popoutPanel(
+            params.bufferId,
+            buffer.content,
+            buffer.file?.name ?? `新規ファイル${buffer.fileType}`,
+            buffer.fileType,
+          );
+        } else if (action === "close") {
+          api.close();
+        }
+      } else if (buffer) {
+        // Web fallback: directly pop out (simple approach)
+        const urlParams = new URLSearchParams({
+          "popout-buffer": params.bufferId,
+          fileName: buffer.file?.name ?? `新規ファイル${buffer.fileType}`,
+          fileType: buffer.fileType,
+        });
+        window.open(
+          `${window.location.origin}?${urlParams.toString()}`,
+          "_blank",
+          "width=900,height=700",
+        );
+      }
+    },
+    [api, buffer, params.bufferId],
+  );
+
   return (
     <div
       className={`
@@ -141,6 +181,7 @@ export function DockviewTabHeader({
       `}
       onMouseDown={handleMiddleClick}
       onDoubleClick={handleDoubleClick}
+      onContextMenu={handleContextMenu}
     >
       {/* Dirty indicator */}
       {buffer?.isDirty && (
