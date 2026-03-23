@@ -7,6 +7,20 @@ import iconGithub from '~icons/mdi/github?raw'
 import iconMicrosoft from '~icons/mdi/microsoft?raw'
 import { getRandomBackgroundImage } from './bg-images'
 
+declare function gtag(command: 'event', action: string, params: Record<string, string>): void
+
+/** Track download clicks in Google Analytics */
+function trackDownload(type: 'hero' | 'platform' | 'store', platform: string, filename: string, version: string): void {
+  if (typeof gtag === 'function') {
+    gtag('event', 'download', {
+      download_type: type,
+      platform,
+      filename,
+      version,
+    })
+  }
+}
+
 // GitHub release asset type
 interface ReleaseAsset {
   name: string
@@ -335,7 +349,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
     // Add Microsoft Store link at the top of Windows downloads
     const storeItemHtml = key === 'windows'
       ? `
-        <a href="${MICROSOFT_STORE_URL}" class="download-item" target="_blank" rel="noopener">
+        <a href="${MICROSOFT_STORE_URL}" class="download-item" data-platform="windows" data-filename="Microsoft Store" target="_blank" rel="noopener">
           <div class="download-item-info">
             <span class="download-item-label">Microsoft Store</span>
             <span class="download-item-filename">公式ストアから入手</span>
@@ -351,7 +365,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
     const assetsHtml = platform.assets
       .map(
         (asset) => `
-        <a href="${safeUrl(asset.url)}" class="download-item" download>
+        <a href="${safeUrl(asset.url)}" class="download-item" data-platform="${key}" data-filename="${esc(asset.name)}" download>
           <div class="download-item-info">
             <span class="download-item-label">${asset.label}</span>
             <span class="download-item-filename">${esc(asset.name)}</span>
@@ -412,7 +426,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
   const heroDownloadHtml = heroCta
     ? `
       <div class="hero-download">
-        <a href="${safeUrl(heroCta.href)}" class="btn-hero-download" ${heroCta.isExternal ? 'target="_blank" rel="noopener"' : 'download'}>
+        <a href="${safeUrl(heroCta.href)}" class="btn-hero-download" data-platform="${currentOS}" data-filename="${heroCta.isExternal ? 'Microsoft Store' : esc(bestAsset?.name ?? '')}" ${heroCta.isExternal ? 'target="_blank" rel="noopener"' : 'download'}>
           <span class="btn-hero-download-icon">${heroCta.icon}</span>
           <span class="btn-hero-download-label">${heroCta.label}</span>
           ${heroCta.meta ? `<span class="btn-hero-download-meta">${esc(heroCta.meta)}</span>` : ''}
@@ -454,6 +468,31 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
       </div>
     </div>
   `
+
+  // Bind GA download tracking events
+  const heroBtn = app.querySelector<HTMLAnchorElement>('.btn-hero-download')
+  if (heroBtn) {
+    heroBtn.addEventListener('click', () => {
+      trackDownload(
+        heroBtn.dataset.filename === 'Microsoft Store' ? 'store' : 'hero',
+        heroBtn.dataset.platform ?? 'unknown',
+        heroBtn.dataset.filename ?? 'unknown',
+        version,
+      )
+    })
+  }
+
+  app.querySelectorAll<HTMLAnchorElement>('.download-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      const isStore = item.dataset.filename === 'Microsoft Store'
+      trackDownload(
+        isStore ? 'store' : 'platform',
+        item.dataset.platform ?? 'unknown',
+        item.dataset.filename ?? 'unknown',
+        version,
+      )
+    })
+  })
 }
 
 // Background image setup (same as main page)

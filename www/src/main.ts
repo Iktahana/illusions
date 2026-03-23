@@ -5,6 +5,7 @@ import iconApple from '~icons/mdi/apple?raw'
 import iconWindows from '~icons/mdi/microsoft-windows?raw'
 import iconChrome from '~icons/mdi/google-chrome?raw'
 import iconGithub from '~icons/mdi/github?raw'
+import iconTwitter from '~icons/mdi/twitter?raw'
 
 // ランダムな背景画像を取得
 const bgImageUrl = getRandomBackgroundImage()
@@ -66,6 +67,10 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <a href="https://github.com/Iktahana/illusions" class="github-link" target="_blank">
       <span class="github-link-icon">${iconGithub}</span>
       GitHub
+    </a>
+    <a href="https://x.com/illusionsapp" class="github-link" target="_blank" rel="noopener">
+      <span class="github-link-icon">${iconTwitter}</span>
+      X
     </a>
   </div>
 `

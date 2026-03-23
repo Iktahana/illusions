@@ -1,5 +1,5 @@
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  font-family: "Hina Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   line-height: 1.6;
   font-weight: 400;
 
@@ -22,7 +22,7 @@
   color: var(--color-text);
   --bg-image: none;
 
-  font-synthesis: none;
+
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -197,6 +197,10 @@ h1 {
   color: var(--color-text-muted);
   text-decoration: none;
   transition: color 0.2s ease;
+}
+
+.github-link + .github-link {
+  margin-left: 1.2rem;
 }
 
 .github-link:hover {
