@@ -20,23 +20,23 @@
   /* Editor content area background */
   --dv-group-view-background-color: rgb(var(--background));
 
-  /* Tab bar background */
-  --dv-tabs-and-actions-container-background-color: rgb(var(--background-secondary));
+  /* Tab bar background — pure white for clean appearance */
+  --dv-tabs-and-actions-container-background-color: #ffffff;
 
   /* Active group, visible (selected) tab */
   --dv-activegroup-visiblepanel-tab-background-color: rgb(var(--background));
   --dv-activegroup-visiblepanel-tab-color: rgb(var(--foreground));
 
   /* Active group, hidden (unselected) tabs */
-  --dv-activegroup-hiddenpanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-activegroup-hiddenpanel-tab-background-color: #ffffff;
   --dv-activegroup-hiddenpanel-tab-color: rgb(var(--foreground-tertiary));
 
   /* Inactive group, visible tab */
-  --dv-inactivegroup-visiblepanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-inactivegroup-visiblepanel-tab-background-color: #ffffff;
   --dv-inactivegroup-visiblepanel-tab-color: rgb(var(--foreground-secondary));
 
   /* Inactive group, hidden tabs */
-  --dv-inactivegroup-hiddenpanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-inactivegroup-hiddenpanel-tab-background-color: #ffffff;
   --dv-inactivegroup-hiddenpanel-tab-color: rgb(var(--foreground-muted));
 
   /* Tab divider */
@@ -104,6 +104,10 @@
    CSS variables on .dockview-theme-illusions are not inherited by dockview
    internals in some builds, so we override the computed styles directly. */
 .dockview-theme-illusions .dv-tabs-and-actions-container {
+  background-color: #ffffff;
+}
+
+.dark .dockview-theme-illusions .dv-tabs-and-actions-container {
   background-color: rgb(var(--background-secondary));
 }
 
@@ -117,6 +121,11 @@
 }
 
 .dockview-theme-illusions .dv-default-tab.dv-inactive-tab {
+  background-color: #ffffff;
+  color: rgb(var(--foreground-tertiary));
+}
+
+.dark .dockview-theme-illusions .dv-default-tab.dv-inactive-tab {
   background-color: rgb(var(--background-secondary));
   color: rgb(var(--foreground-tertiary));
 }
