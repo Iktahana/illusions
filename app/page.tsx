@@ -826,7 +826,7 @@ export default function EditorPage() {
 
         <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
           <DockviewReact
-            className="flex-1"
+            className="flex-1 dockview-theme-illusions"
             components={{
               editor: ({ api: panelApi, params: panelParams }) => {
                 // Each dockview panel receives its own params.
