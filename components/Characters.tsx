@@ -1,22 +1,15 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Plus, Trash2, Edit2, Check, X, Sparkles, Loader2 } from "lucide-react";
+import { Plus, X, Sparkles, Loader2 } from "lucide-react";
 
 import type { ExtractionProgress } from "@/lib/character-extraction";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { fetchAppState, persistAppState } from "@/lib/storage/app-state-manager";
 import { useCharacterExtractionSettings } from "@/contexts/EditorSettingsContext";
-
-interface Character {
-  id: string;
-  name: string;
-  aliases: string[];
-  description: string;
-  appearance: string;
-  personality: string;
-  relationships: string;
-}
+import CharacterCard from "./Characters/CharacterCard";
+import NewCharacterForm from "./Characters/NewCharacterForm";
+import type { Character } from "./Characters/types";
 
 interface CharactersProps {
   content?: string;
@@ -245,78 +238,12 @@ export default function Characters({ content }: CharactersProps) {
 
         {/* New character form */}
         {isAddingNew && (
-          <div className="bg-background-elevated border border-border rounded-lg p-3 space-y-2">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-foreground">新しい人物</h3>
-              <div className="flex gap-1">
-                <button
-                  onClick={handleAddCharacter}
-                  className="p-1 hover:bg-hover rounded text-success"
-                  title="追加"
-                >
-                  <Check className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleCancelAdd}
-                  className="p-1 hover:bg-hover rounded text-foreground-secondary"
-                  title="キャンセル"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <input
-              type="text"
-              placeholder="名前 *"
-              value={newCharacter.name || ""}
-              onChange={(e) =>
-                setNewCharacter({ ...newCharacter, name: e.target.value })
-              }
-              className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-              autoFocus
-            />
-
-            <textarea
-              placeholder="簡単な説明"
-              value={newCharacter.description || ""}
-              onChange={(e) =>
-                setNewCharacter({ ...newCharacter, description: e.target.value })
-              }
-              className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-              rows={2}
-            />
-
-            <textarea
-              placeholder="外見"
-              value={newCharacter.appearance || ""}
-              onChange={(e) =>
-                setNewCharacter({ ...newCharacter, appearance: e.target.value })
-              }
-              className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-              rows={2}
-            />
-
-            <textarea
-              placeholder="性格"
-              value={newCharacter.personality || ""}
-              onChange={(e) =>
-                setNewCharacter({ ...newCharacter, personality: e.target.value })
-              }
-              className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-              rows={2}
-            />
-
-            <textarea
-              placeholder="関係性"
-              value={newCharacter.relationships || ""}
-              onChange={(e) =>
-                setNewCharacter({ ...newCharacter, relationships: e.target.value })
-              }
-              className="w-full px-2 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-              rows={2}
-            />
-          </div>
+          <NewCharacterForm
+            newCharacter={newCharacter}
+            onCharacterChange={setNewCharacter}
+            onAdd={handleAddCharacter}
+            onCancel={handleCancelAdd}
+          />
         )}
 
         {/* Character list */}
@@ -327,189 +254,16 @@ export default function Characters({ content }: CharactersProps) {
           </div>
         ) : (
           characters.map((character) => (
-            <div
+            <CharacterCard
               key={character.id}
-              className="bg-background-elevated border border-border rounded-lg overflow-hidden"
-            >
-              {/* Header */}
-              <div
-                className="p-3 cursor-pointer hover:bg-hover transition-colors"
-                onClick={() => toggleExpand(character.id)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-foreground truncate">
-                      {character.name}
-                    </h3>
-                    {character.aliases.length > 0 && (
-                      <p className="text-xs text-foreground-tertiary mt-0.5">
-                        別名: {character.aliases.join("、")}
-                      </p>
-                    )}
-                    {character.description && (
-                      <p className="text-sm text-foreground-secondary mt-1 line-clamp-2">
-                        {character.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleDeleteCharacter(character.id)}
-                      className="p-1 hover:bg-background rounded text-foreground-tertiary hover:text-danger transition-colors"
-                      title="削除"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Expanded Details */}
-              {expandedId === character.id && (
-                <div className="border-t border-border p-3 space-y-3 bg-background">
-                  {editingId === character.id ? (
-                    // Edit Mode
-                    <div className="space-y-2">
-                      <div className="flex justify-end gap-1 mb-2">
-                        <button
-                          onClick={() => setEditingId(null)}
-                          className="p-1 hover:bg-hover rounded text-success"
-                          title="完了"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                          名前
-                        </label>
-                        <input
-                          type="text"
-                          value={character.name}
-                          onChange={(e) =>
-                            handleUpdateCharacter(character.id, {
-                              name: e.target.value,
-                            })
-                          }
-                          className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                          説明
-                        </label>
-                        <textarea
-                          value={character.description}
-                          onChange={(e) =>
-                            handleUpdateCharacter(character.id, {
-                              description: e.target.value,
-                            })
-                          }
-                          className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-                          rows={2}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                          外見
-                        </label>
-                        <textarea
-                          value={character.appearance}
-                          onChange={(e) =>
-                            handleUpdateCharacter(character.id, {
-                              appearance: e.target.value,
-                            })
-                          }
-                          className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-                          rows={2}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                          性格
-                        </label>
-                        <textarea
-                          value={character.personality}
-                          onChange={(e) =>
-                            handleUpdateCharacter(character.id, {
-                              personality: e.target.value,
-                            })
-                          }
-                          className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-                          rows={2}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-                          関係性
-                        </label>
-                        <textarea
-                          value={character.relationships}
-                          onChange={(e) =>
-                            handleUpdateCharacter(character.id, {
-                              relationships: e.target.value,
-                            })
-                          }
-                          className="w-full px-2 py-1.5 bg-background-elevated border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-                          rows={2}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    // View Mode
-                    <div className="space-y-3">
-                      <div className="flex justify-end">
-                        <button
-                          onClick={() => setEditingId(character.id)}
-                          className="p-1 hover:bg-hover rounded text-foreground-secondary hover:text-foreground"
-                          title="編集"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {character.appearance && (
-                        <div>
-                          <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
-                            外見
-                          </h4>
-                          <p className="text-sm text-foreground whitespace-pre-wrap">
-                            {character.appearance}
-                          </p>
-                        </div>
-                      )}
-
-                      {character.personality && (
-                        <div>
-                          <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
-                            性格
-                          </h4>
-                          <p className="text-sm text-foreground whitespace-pre-wrap">
-                            {character.personality}
-                          </p>
-                        </div>
-                      )}
-
-                      {character.relationships && (
-                        <div>
-                          <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
-                            関係性
-                          </h4>
-                          <p className="text-sm text-foreground whitespace-pre-wrap">
-                            {character.relationships}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+              character={character}
+              editingId={editingId}
+              expandedId={expandedId}
+              onToggleExpand={toggleExpand}
+              onDelete={handleDeleteCharacter}
+              onUpdate={handleUpdateCharacter}
+              onSetEditingId={setEditingId}
+            />
           ))
         )}
       </div>
