@@ -5,6 +5,7 @@ import iconWindows from '~icons/mdi/microsoft-windows?raw'
 import iconLinux from '~icons/mdi/linux?raw'
 import iconGithub from '~icons/mdi/github?raw'
 import iconMicrosoft from '~icons/mdi/microsoft?raw'
+import iconMicrosoftStore from '/icon-microsoft-store.svg?raw'
 import { getRandomBackgroundImage } from './bg-images'
 
 declare function gtag(command: 'event', action: string, params: Record<string, string>): void
@@ -351,11 +352,11 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
       ? `
         <a href="${MICROSOFT_STORE_URL}" class="download-item" data-platform="windows" data-filename="Microsoft Store" target="_blank" rel="noopener noreferrer">
           <div class="download-item-info">
-            <span class="download-item-label">Microsoft Store</span>
-            <span class="download-item-filename">公式ストアから入手</span>
+            <span class="download-item-label"><strong>Microsoft Store（おすすめ）</strong></span>
+            <span class="download-item-filename">Microsoft Storeから入手</span>
           </div>
           <div class="download-item-meta">
-            <span class="platform-icon">${iconMicrosoft}</span>
+            <span class="platform-icon">${iconMicrosoftStore}</span>
             <span class="download-icon">↗</span>
           </div>
         </a>
