@@ -10,7 +10,7 @@ import { FEATURED_JAPANESE_FONTS } from "@/lib/utils/fonts";
 import {
   useTypographySettings,
   useLintingSettings,
-  useLlmSettings,
+  useCharacterExtractionSettings,
   usePosHighlightSettings,
   useScrollSettings,
   usePowerSettings,
@@ -100,11 +100,9 @@ export default function SettingsModal({
     onLintingRuleConfigsBatchChange, onCorrectionConfigChange,
   } = useLintingSettings();
   const {
-    llmEnabled, llmModelId, llmIdlingStop,
     characterExtractionBatchSize, characterExtractionConcurrency,
-    onLlmEnabledChange, onLlmModelIdChange, onLlmIdlingStopChange,
     onCharacterExtractionBatchSizeChange, onCharacterExtractionConcurrencyChange,
-  } = useLlmSettings();
+  } = useCharacterExtractionSettings();
   const {
     powerSaveMode, autoPowerSaveOnBattery,
     onPowerSaveModeChange, onAutoPowerSaveOnBatteryChange,
@@ -638,12 +636,6 @@ export default function SettingsModal({
                 lintingRuleConfigs={lintingRuleConfigs}
                 onLintingRuleConfigChange={(id, cfg) => onLintingRuleConfigChange?.(id, cfg)}
                 onLintingRuleConfigsBatchChange={(cfgs) => onLintingRuleConfigsBatchChange?.(cfgs)}
-                llmEnabled={llmEnabled}
-                onLlmEnabledChange={onLlmEnabledChange}
-                llmModelId={llmModelId}
-                onLlmModelIdChange={onLlmModelIdChange}
-                llmIdlingStop={llmIdlingStop}
-                onLlmIdlingStopChange={onLlmIdlingStopChange}
                 characterExtractionBatchSize={characterExtractionBatchSize}
                 onCharacterExtractionBatchSizeChange={onCharacterExtractionBatchSizeChange}
                 characterExtractionConcurrency={characterExtractionConcurrency}

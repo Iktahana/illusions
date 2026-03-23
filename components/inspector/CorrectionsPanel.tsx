@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, ChevronDown, ChevronRight, EyeOff, Info, Lightbulb, ListFilter, Loader2, RefreshCw, Settings, XCircle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, EyeOff, Info, Lightbulb, ListFilter, RefreshCw, Settings, XCircle } from "lucide-react";
 import clsx from "clsx";
 
 import { LINT_PRESETS, LINT_RULES_META, LINT_RULE_CATEGORIES } from "@/lib/linting/lint-presets";
@@ -188,11 +188,6 @@ function IssueCard({
               )}
               title={SEVERITY_LABELS[issue.severity]}
             />
-            {issue.llmValidated === undefined && (
-              <span className="absolute -top-0.5 -left-0.5" title="確認中">
-                <Loader2 className="w-3 h-3 animate-spin text-foreground-tertiary" />
-              </span>
-            )}
           </span>
           {/* Content: original → replacement or just message */}
           <div className="flex-1 min-w-0">
@@ -254,11 +249,9 @@ export default function CorrectionsPanel({
   const issueListRef = useRef<HTMLDivElement>(null);
 
   const filteredIssues = useMemo(() => {
-    // Hide issues rejected by LLM validation
-    const validated = lintIssues.filter((issue) => issue.llmValidated !== false);
     return severityFilter === "all"
-      ? validated
-      : validated.filter((issue) => issue.severity === severityFilter);
+      ? lintIssues
+      : lintIssues.filter((issue) => issue.severity === severityFilter);
   }, [lintIssues, severityFilter]);
 
   /** Sort issues based on the current sort mode */

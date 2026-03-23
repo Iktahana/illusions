@@ -29,7 +29,6 @@ import type { RuleRunner, LintIssue } from "@/lib/linting";
 import {
   useTypographySettings,
   useLintingSettings,
-  useLlmSettings,
   usePosHighlightSettings,
   useScrollSettings,
 } from "@/contexts/EditorSettingsContext";
@@ -46,7 +45,7 @@ interface MilkdownEditorProps {
   isModeSwitchingRef: MutableRefObject<boolean>;
   savedScrollProgressRef: RefObject<number>;
   lintingRuleRunner?: RuleRunner | null;
-  onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
+  onLintIssuesUpdated?: (issues: LintIssue[]) => void;
   onNlpError?: (error: Error) => void;
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
@@ -84,7 +83,6 @@ export default function MilkdownEditor({
     charsPerLine, showParagraphNumbers,
   } = useTypographySettings();
   const { lintingEnabled } = useLintingSettings();
-  const { llmEnabled } = useLlmSettings();
   const { posHighlightEnabled, posHighlightColors } = usePosHighlightSettings();
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
   const editorRef = useRef<HTMLDivElement>(null);
@@ -196,7 +194,7 @@ export default function MilkdownEditor({
       .use(linting({
         enabled: false, // 初期化時は無効、後で動的に更新
         debounceMs: 500,
-        onIssuesUpdated: (issues, options) => onLintIssuesUpdatedRef.current?.(issues, options),
+        onIssuesUpdated: (issues) => onLintIssuesUpdatedRef.current?.(issues),
         onNlpError: (error) => onNlpErrorRef.current?.(error),
       }));
 
@@ -260,14 +258,13 @@ export default function MilkdownEditor({
         {
           enabled: lintingEnabled,
           ruleRunner: lintingRuleRunner,
-          llmEnabled,
         },
         "rule-config-change",
       );
     }).catch(err => {
       console.error('[Editor] Failed to update linting settings:', err);
     });
-  }, [editorViewInstance, lintingEnabled, lintingRuleRunner, llmEnabled]);
+  }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
 
   // 選択範囲の変更を追跡する
   useEffect(() => {
