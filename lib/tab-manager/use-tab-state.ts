@@ -14,8 +14,8 @@ import { isElectronRenderer } from "../utils/runtime-env";
 // ---------------------------------------------------------------------------
 
 export interface UseTabStateReturn extends TabManagerCore {
-  /** Derived: active tab object (null when no tabs are open). */
-  activeTab: TabState | null;
+  /** Derived: active tab object (falls back to tabs[0]). Undefined while persistence is loading. */
+  activeTab: TabState | undefined;
   /** Derived: file descriptor of the active tab. */
   currentFile: MdiFileDescriptor | null;
   /** Derived: content string of the active tab. */
@@ -75,9 +75,10 @@ export function useTabState(): UseTabStateReturn {
 
   // --- Core state ---------------------------------------------------------
 
-  const [initialTab] = useState(() => createNewTab());
-  const [tabs, setTabs] = useState<TabState[]>([initialTab]);
-  const [activeTabId, setActiveTabId] = useState<TabId>(initialTab.id);
+  // Start empty — useTabPersistence populates the first tab after loading saved state,
+  // preventing a brief flash of randomly-generated tab content on cold start.
+  const [tabs, setTabs] = useState<TabState[]>([]);
+  const [activeTabId, setActiveTabId] = useState<TabId>("");
   const [pendingCloseTabId, setPendingCloseTabId] = useState<TabId | null>(
     null,
   );
@@ -93,7 +94,7 @@ export function useTabState(): UseTabStateReturn {
 
   // --- Derived state from active tab --------------------------------------
 
-  const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0] ?? null;
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
   const currentFile = activeTab?.file ?? null;
   const content = activeTab?.content ?? "";
   const isDirty = activeTab?.isDirty ?? false;

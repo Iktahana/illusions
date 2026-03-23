@@ -7,6 +7,7 @@ import type { TabState, SerializedTab, TabPersistenceState } from "./tab-types";
 import type { TabManagerCore } from "./types";
 import {
   TAB_PERSIST_DEBOUNCE,
+  createNewTab,
   generateTabId,
   inferFileType,
 } from "./types";
@@ -39,6 +40,10 @@ export interface UseTabPersistenceReturn {
  * Handles two responsibilities:
  * 1. Persist open tabs to AppState (debounced, Electron only).
  * 2. Restore tabs from AppState / storage on mount.
+ *
+ * Coordinates with useTabState which starts with an empty tabs array.
+ * This hook is responsible for populating the first tab after determining
+ * the correct initial state (saved tabs, Web buffer restore, or a blank default).
  */
 export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersistenceReturn {
   const {
@@ -87,6 +92,10 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
   }, [tabs, activeTabId]);
 
   // --- Storage initialization & Web file restore --------------------------
+  //
+  // This effect always ensures at least one tab exists after storage loads.
+  // For Electron, restoreTabs (below) may override the tab set here when
+  // file-backed saved tabs are found.
 
   useEffect(() => {
     const initializeStorage = async () => {
@@ -95,56 +104,65 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         await storage.initialize();
         const appState = await storage.loadAppState();
 
-        if (!skipAutoRestore) {
-          // Check if we have previously saved tab state
-          const savedOpenTabs = appState?.openTabs;
+        // Check if we have previously saved tab state
+        const savedOpenTabs = appState?.openTabs;
 
+        // If saved state explicitly has 0 tabs, restore empty state — no tab needed.
+        const savedEmpty = savedOpenTabs && savedOpenTabs.tabs.length === 0;
+
+        // Determine the initial tab using a local variable to make the
+        // fallback logic explicit and avoid multiple setTabs calls.
+        let initialTab: TabState | null = null;
+
+        if (!skipAutoRestore && !isElectron && !savedEmpty) {
           // Web: restore file handle from editor buffer
-          if (!isElectron) {
-            // If saved state explicitly has 0 tabs, restore empty state
-            if (savedOpenTabs && savedOpenTabs.tabs.length === 0) {
-              setTabs([]);
-              setActiveTabId("");
-              return;
-            }
-
-            const buffer = await storage.loadEditorBuffer();
-            if (buffer?.fileHandle) {
-              try {
-                const file = await buffer.fileHandle.getFile();
-                const fileContent = await file.text();
-                setTabs((prev) =>
-                  prev.map((tab, i) =>
-                    i === 0
-                      ? {
-                          ...tab,
-                          file: {
-                            path: null,
-                            handle: buffer.fileHandle!,
-                            name: file.name,
-                          },
-                          content: fileContent,
-                          lastSavedContent: fileContent,
-                          lastSavedTime: Date.now(),
-                          fileType: inferFileType(file.name),
-                        }
-                      : tab,
-                  ),
-                );
-                setWasAutoRecovered(true);
-                return;
-              } catch (error) {
-                console.warn(
-                  "前回のファイルを復元できませんでした:",
-                  error,
-                );
-                await storage.clearEditorBuffer();
-              }
+          const buffer = await storage.loadEditorBuffer();
+          if (buffer?.fileHandle) {
+            try {
+              const file = await buffer.fileHandle.getFile();
+              const fileContent = await file.text();
+              initialTab = {
+                id: generateTabId(),
+                file: { path: null, handle: buffer.fileHandle, name: file.name },
+                content: fileContent,
+                lastSavedContent: fileContent,
+                isDirty: false,
+                lastSavedTime: Date.now(),
+                lastSaveWasAuto: false,
+                isSaving: false,
+                isPreview: false,
+                fileType: inferFileType(file.name),
+              };
+              setWasAutoRecovered(true);
+            } catch (error) {
+              console.warn("前回のファイルを復元できませんでした:", error);
+              await storage.clearEditorBuffer();
             }
           }
         }
+
+        // Fallback: create a default blank tab when no restore path fired.
+        // Skip if saved state was explicitly empty (user closed all tabs).
+        // For Electron (non-skipAutoRestore), restoreTabs handles the case where
+        // file-backed tabs were previously saved; skip creating a fallback here
+        // to avoid a visible flash before restoreTabs completes.
+        if (!initialTab && !savedEmpty && (!isElectron || skipAutoRestore)) {
+          initialTab = createNewTab();
+        }
+
+        if (initialTab) {
+          const tab = initialTab;
+          // Use functional updates so a concurrently-running restoreTabs (Electron)
+          // that already set tabs is not overridden.
+          setTabs((prev) => (prev.length > 0 ? prev : [tab]));
+          setActiveTabId((prev) => (prev === "" ? tab.id : prev));
+        }
       } catch (error) {
         console.error("ストレージの初期化に失敗しました:", error);
+        // Ensure at least one tab even on storage error
+        const errorTab = createNewTab();
+        setTabs((prev) => (prev.length > 0 ? prev : [errorTab]));
+        setActiveTabId((prev) => (prev === "" ? errorTab.id : prev));
       }
     };
 
@@ -171,14 +189,11 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
         const appState = await fetchAppState();
         const openTabs = appState?.openTabs;
+        // No saved state at all: first use — initializeStorage handles default tab.
         if (!openTabs) return;
 
-        // Saved state explicitly has 0 tabs — restore empty state
-        if (openTabs.tabs.length === 0) {
-          setTabs([]);
-          setActiveTabId("");
-          return;
-        }
+        // Saved state is explicitly empty (user closed all tabs last session).
+        if (openTabs.tabs.length === 0) return;
 
         const restoredTabs: TabState[] = [];
         for (const serialized of openTabs.tabs) {
@@ -218,6 +233,11 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
             restoredTabs.length - 1,
           );
           setActiveTabId(restoredTabs[activeIdx].id);
+        } else {
+          // Saved tabs were all untitled (no file path) — create a default tab.
+          const defaultTab = createNewTab();
+          setTabs((prev) => (prev.length > 0 ? prev : [defaultTab]));
+          setActiveTabId((prev) => (prev === "" ? defaultTab.id : prev));
         }
       } catch (error) {
         console.error("タブの復元に失敗しました:", error);
