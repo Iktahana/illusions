@@ -64,12 +64,12 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       </div>
     </div>
 
-    <a href="https://github.com/Iktahana/illusions" class="github-link" target="_blank">
-      <span class="github-link-icon">${iconGithub}</span>
+    <a href="https://github.com/Iktahana/illusions" class="social-link" target="_blank" rel="noopener noreferrer">
+      <span class="social-link-icon">${iconGithub}</span>
       GitHub
     </a>
-    <a href="https://x.com/illusionsapp" class="github-link" target="_blank" rel="noopener">
-      <span class="github-link-icon">${iconX}</span>
+    <a href="https://x.com/illusionsapp" class="social-link" target="_blank" rel="noopener noreferrer">
+      <span class="social-link-icon">${iconX}</span>
       @illusionsapp
     </a>
   </div>

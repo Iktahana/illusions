@@ -188,7 +188,7 @@ h1 {
   transform: translateY(-1px);
 }
 
-.github-link {
+.social-link {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -199,21 +199,21 @@ h1 {
   transition: color 0.2s ease;
 }
 
-.github-link + .github-link {
+.social-link + .social-link {
   margin-left: 1.2rem;
 }
 
-.github-link:hover {
+.social-link:hover {
   color: var(--color-text);
 }
 
-.github-link-icon {
+.social-link-icon {
   display: flex;
   width: 1rem;
   height: 1rem;
 }
 
-.github-link-icon svg {
+.social-link-icon svg {
   width: 100%;
   height: 100%;
   fill: currentColor;

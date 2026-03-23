@@ -426,14 +426,14 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
   const heroDownloadHtml = heroCta
     ? `
       <div class="hero-download">
-        <a href="${safeUrl(heroCta.href)}" class="btn-hero-download" data-platform="${currentOS}" data-filename="${heroCta.isExternal ? 'Microsoft Store' : esc(bestAsset?.name ?? '')}" ${heroCta.isExternal ? 'target="_blank" rel="noopener"' : 'download'}>
+        <a href="${safeUrl(heroCta.href)}" class="btn-hero-download" data-platform="${currentOS}" data-filename="${heroCta.isExternal ? 'Microsoft Store' : esc(bestAsset?.name || 'unknown')}" ${heroCta.isExternal ? 'target="_blank" rel="noopener"' : 'download'}>
           <span class="btn-hero-download-icon">${heroCta.icon}</span>
           <span class="btn-hero-download-label">${heroCta.label}</span>
           ${heroCta.meta ? `<span class="btn-hero-download-meta">${esc(heroCta.meta)}</span>` : ''}
         </a>
         <p class="hero-download-hint">他のプラットフォームは下記をご覧ください</p>
-        <a href="https://github.com/Iktahana/illusions" class="github-link" target="_blank">
-          <span class="github-link-icon">${iconGithub}</span>
+        <a href="https://github.com/Iktahana/illusions" class="social-link" target="_blank" rel="noopener noreferrer">
+          <span class="social-link-icon">${iconGithub}</span>
           GitHub
         </a>
       </div>
