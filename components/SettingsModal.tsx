@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, ExternalLink, ChevronDown, ChevronRight, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium, AudioLines } from "lucide-react";
+import { X, ExternalLink, ChevronDown, ChevronRight, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium, AudioLines, Keyboard } from "lucide-react";
 import dynamic from "next/dynamic";
 
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
@@ -19,6 +19,7 @@ import {
 } from "@/contexts/EditorSettingsContext";
 import ColorPicker from "./ColorPicker";
 import LintingSettings from "./LintingSettings";
+import KeymapSettings from "./KeymapSettings";
 
 const PosHighlightPreview = dynamic(() => import("./PosHighlightPreview"), {
   ssr: false,
@@ -53,7 +54,7 @@ interface SettingsModalProps {
   initialCategory?: SettingsCategory;
 }
 
-export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "speech" | "power" | "about";
+export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "speech" | "keymap" | "power" | "about";
 
 const SCROLL_BEHAVIORS = [
   {
@@ -278,6 +279,18 @@ export default function SettingsModal({
               >
                 <AudioLines className="w-4 h-4" />
                 聴写/朗読
+              </button>
+              <button
+                onClick={() => setActiveCategory("keymap")}
+                className={clsx(
+                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
+                  activeCategory === "keymap"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                )}
+              >
+                <Keyboard className="w-4 h-4" />
+                キーマップ
               </button>
               {isElectronRenderer() && (
                 <button
@@ -751,6 +764,14 @@ export default function SettingsModal({
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Keymap section */}
+            {activeCategory === "keymap" && (
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-foreground mb-1">キーマップ</h3>
+                <KeymapSettings />
               </div>
             )}
 
