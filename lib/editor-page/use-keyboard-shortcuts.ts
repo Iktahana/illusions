@@ -164,6 +164,10 @@ export function useKeyboardShortcuts({
         incrementEditorKey();
       } else if (isCloseTabShortcut) {
         event.preventDefault();
+        if (tabs.length === 0) {
+          window.close();
+          return;
+        }
         if (tabs.length === 1 && !tabs[0].file && !tabs[0].isDirty) {
           window.close();
           return;
