@@ -11,7 +11,7 @@ interface SearchDialogProps {
   onClose: () => void;
   onShowAllResults?: (matches: SearchMatch[], searchTerm: string) => void;
   initialSearchTerm?: string;
-  programmaticScrollRef?: React.RefObject<boolean>;
+  programmaticScrollRef?: React.MutableRefObject<boolean>;
 }
 
 interface SearchMatch {
@@ -134,7 +134,7 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
 
       // Allow the scroll guard to accept our programmatic scroll
       if (programmaticScrollRef) {
-        (programmaticScrollRef as React.MutableRefObject<boolean>).current = true;
+        programmaticScrollRef.current = true;
       }
 
       const tr2 = state.tr
@@ -171,7 +171,7 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
       // Reset the flag after smooth scroll completes
       setTimeout(() => {
         if (programmaticScrollRef) {
-          (programmaticScrollRef as React.MutableRefObject<boolean>).current = false;
+          programmaticScrollRef.current = false;
         }
       }, 500);
     }

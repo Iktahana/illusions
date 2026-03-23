@@ -16,7 +16,7 @@ interface SearchResultsProps {
   matches?: SearchMatch[];
   searchTerm?: string;
   onClose: () => void;
-  programmaticScrollRef?: React.RefObject<boolean>;
+  programmaticScrollRef?: React.MutableRefObject<boolean>;
 }
 
 export default function SearchResults({ 
@@ -141,7 +141,7 @@ export default function SearchResults({
 
     // Allow the scroll guard to accept our programmatic scroll
     if (programmaticScrollRef) {
-      (programmaticScrollRef as React.MutableRefObject<boolean>).current = true;
+      programmaticScrollRef.current = true;
     }
 
     // Pass decoration info via meta
@@ -182,7 +182,7 @@ export default function SearchResults({
     // Reset the flag after smooth scroll completes
     setTimeout(() => {
       if (programmaticScrollRef) {
-        (programmaticScrollRef as React.MutableRefObject<boolean>).current = false;
+        programmaticScrollRef.current = false;
       }
     }, 500);
 
