@@ -16,6 +16,14 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import type { FileTreeEntry, EditingEntry } from "./types";
 
+/** Returns the OS-specific file manager name for context menu labels. */
+function getFileManagerName(): string {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  if (/Mac/.test(ua)) return "Finder";
+  if (/Win/.test(ua)) return "Explorer";
+  return "ファイルマネージャー";
+}
+
 interface FilesPanelProps {
   projectName?: string;
   onFileClick?: (vfsPath: string) => void;
@@ -565,7 +573,7 @@ export function FilesPanel({
       { label: "パソコンに保存", action: "download" },
       ...(isElectronRenderer() ? [
         { label: "", action: "_separator" },
-        { label: "Finder で表示", action: "reveal-in-finder" },
+        { label: `${getFileManagerName()} で表示`, action: "reveal-in-finder" },
       ] : []),
     ];
     const result = await showContextMenu(e, items);
@@ -586,7 +594,7 @@ export function FilesPanel({
       { label: "削除", action: "delete" },
       ...(isElectronRenderer() ? [
         { label: "", action: "_separator" },
-        { label: "Finder で開く", action: "open-in-finder" },
+        { label: `${getFileManagerName()} で開く`, action: "open-in-finder" },
       ] : []),
     ];
     const result = await showContextMenu(e, items);
