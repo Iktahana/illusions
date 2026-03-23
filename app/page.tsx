@@ -647,6 +647,7 @@ export default function EditorPage() {
             matches={searchResults?.matches}
             searchTerm={searchResults?.searchTerm}
             onClose={handleCloseSearchResults}
+            programmaticScrollRef={programmaticScrollRef}
           />
         );
       case "outline":

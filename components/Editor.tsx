@@ -384,6 +384,7 @@ export default function NovelEditor({
         onClose={() => setIsSearchOpen(false)}
         onShowAllResults={onShowAllSearchResults}
         initialSearchTerm={searchInitialTerm}
+        programmaticScrollRef={programmaticScrollRef}
       />
     </div>
   );
