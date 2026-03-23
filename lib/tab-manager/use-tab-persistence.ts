@@ -6,11 +6,9 @@ import { fetchAppState, persistAppState } from "../storage/app-state-manager";
 import type { TabState, SerializedTab, TabPersistenceState } from "./tab-types";
 import type { TabManagerCore } from "./types";
 import {
-  DEMO_FILE_NAME,
   TAB_PERSIST_DEBOUNCE,
   generateTabId,
   inferFileType,
-  loadDemoContent,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -91,69 +89,21 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     };
   }, [tabs, activeTabId, isElectron]);
 
-  // --- Storage initialization & demo content ------------------------------
+  // --- Storage initialization & Web file restore --------------------------
 
   useEffect(() => {
     const initializeStorage = async () => {
       try {
         const storage = getStorageService();
         await storage.initialize();
-        const session = await storage.loadSession();
-        const appState = await storage.loadAppState();
-        const hasSeenDemo = appState?.hasSeenDemo ?? false;
 
-        const hasEditedFiles = Boolean(
-          session &&
-            (session.recentFiles.length > 0 ||
-              session.editorBuffer ||
-              appState?.lastOpenedMdiPath),
-        );
-
-        if (!skipAutoRestore) {
+        if (!skipAutoRestore && !isElectron) {
           // Web: restore file handle from editor buffer
-          if (!isElectron) {
-            const buffer = await storage.loadEditorBuffer();
-            if (buffer?.fileHandle) {
-              try {
-                const file = await buffer.fileHandle.getFile();
-                const fileContent = await file.text();
-                setTabs((prev) =>
-                  prev.map((tab, i) =>
-                    i === 0
-                      ? {
-                          ...tab,
-                          file: {
-                            path: null,
-                            handle: buffer.fileHandle!,
-                            name: file.name,
-                          },
-                          content: fileContent,
-                          lastSavedContent: fileContent,
-                          lastSavedTime: Date.now(),
-                          fileType: inferFileType(file.name),
-                        }
-                      : tab,
-                  ),
-                );
-                setWasAutoRecovered(true);
-                if (!hasSeenDemo) {
-                  await persistAppState({ hasSeenDemo: true });
-                }
-                return;
-              } catch (error) {
-                console.warn(
-                  "前回のファイルを復元できませんでした:",
-                  error,
-                );
-                await storage.clearEditorBuffer();
-              }
-            }
-          }
-
-          // Demo content on first use
-          if (!hasSeenDemo && !hasEditedFiles) {
-            const demoContent = await loadDemoContent();
-            if (demoContent) {
+          const buffer = await storage.loadEditorBuffer();
+          if (buffer?.fileHandle) {
+            try {
+              const file = await buffer.fileHandle.getFile();
+              const fileContent = await file.text();
               setTabs((prev) =>
                 prev.map((tab, i) =>
                   i === 0
@@ -161,17 +111,25 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
                         ...tab,
                         file: {
                           path: null,
-                          handle: null,
-                          name: DEMO_FILE_NAME,
+                          handle: buffer.fileHandle!,
+                          name: file.name,
                         },
-                        content: demoContent,
-                        lastSavedContent: demoContent,
-                        fileType: inferFileType(DEMO_FILE_NAME),
+                        content: fileContent,
+                        lastSavedContent: fileContent,
+                        lastSavedTime: Date.now(),
+                        fileType: inferFileType(file.name),
                       }
                     : tab,
                 ),
               );
-              await persistAppState({ hasSeenDemo: true });
+              setWasAutoRecovered(true);
+              return;
+            } catch (error) {
+              console.warn(
+                "前回のファイルを復元できませんでした:",
+                error,
+              );
+              await storage.clearEditorBuffer();
             }
           }
         }
