@@ -1416,12 +1416,8 @@ app.whenReady().then(async () => {
   })
 })
 
-let isQuitting = false
-app.on('before-quit', (event) => {
-  if (isQuitting) return
-  isQuitting = true
-  event.preventDefault()
-  app.exit(0)
+app.on('before-quit', () => {
+  // No async cleanup needed — let Electron quit normally
 })
 
 app.on('window-all-closed', () => {
