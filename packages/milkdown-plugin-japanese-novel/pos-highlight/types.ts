@@ -64,6 +64,8 @@ export interface PosHighlightSettings {
   enabled: boolean;
   /** 品詞ごとの色設定 */
   colors: PosColorConfig;
+  /** 非表示にする品詞タイプ */
+  disabledTypes?: string[];
 }
 
 /**
