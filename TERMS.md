@@ -33,6 +33,6 @@
 
 ---
 
-**Developer:** 幾田花 ([Iktahana](https://github.com/Iktahana)  
+**Developer:** 幾田花 ([Iktahana](https://github.com/Iktahana)）
 **License:** GNU AGPL v3.0  
 **Project:** [illusions](https://github.com/iktahana/illusions)
