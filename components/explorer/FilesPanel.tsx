@@ -534,6 +534,7 @@ export function FilesPanel({
 
   // ---- Context menu handlers ----
   const onFileContextMenu = useCallback(async (e: React.MouseEvent, fullPath: string) => {
+    e.stopPropagation();
     contextTargetRef.current = { path: fullPath, kind: "file" };
     const items = [
       { label: "名前の変更", action: "rename" },
@@ -552,6 +553,7 @@ export function FilesPanel({
   }, [showContextMenu, handleContextAction]);
 
   const onFolderContextMenu = useCallback(async (e: React.MouseEvent, fullPath: string) => {
+    e.stopPropagation();
     contextTargetRef.current = { path: fullPath, kind: "directory" };
     const items = [
       { label: "名前の変更", action: "rename" },
@@ -569,6 +571,28 @@ export function FilesPanel({
     const result = await showContextMenu(e, items);
     if (result) {
       void handleContextAction(result, fullPath, "directory");
+    }
+  }, [showContextMenu, handleContextAction]);
+
+  /** Show root-level context menu when right-clicking the empty area below the file tree */
+  const onEmptyAreaContextMenu = useCallback(async (e: React.MouseEvent) => {
+    // Only fire when the click target is the container itself (not a bubbled child event)
+    if (e.target !== e.currentTarget) return;
+    e.preventDefault();
+    contextTargetRef.current = { path: "/", kind: "directory" };
+    const items = [
+      { label: "新規 MDI ファイル", action: "new-file-mdi" },
+      { label: "新規 Markdown ファイル", action: "new-file-md" },
+      { label: "新規テキストファイル", action: "new-file-txt" },
+      { label: "新規フォルダ", action: "new-folder" },
+      ...(isElectronRenderer() ? [
+        { label: "", action: "_separator" },
+        { label: "Finder で開く", action: "open-in-finder" },
+      ] : []),
+    ];
+    const result = await showContextMenu(e, items);
+    if (result) {
+      void handleContextAction(result, "/", "directory");
     }
   }, [showContextMenu, handleContextAction]);
 
@@ -720,6 +744,7 @@ export function FilesPanel({
         e.preventDefault();
         void handleTreeDrop(e, "/", "directory");
       }}
+      onContextMenu={(e) => { void onEmptyAreaContextMenu(e); }}
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-foreground">ファイル</h3>
