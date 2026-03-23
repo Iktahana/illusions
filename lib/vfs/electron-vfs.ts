@@ -67,8 +67,9 @@ function getVFSBridge(): ElectronVFSBridge {
     throw new Error("Electron API is not available (window.electronAPI is undefined).");
   }
 
-  // Access the vfs sub-object on electronAPI
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // Access the vfs sub-object on electronAPI.
+  // electronAPI is typed by electron.d.ts but its vfs shape differs from
+  // ElectronVFSBridge, so we cast through unknown to get the stricter type.
   const vfsBridge = (api as unknown as { vfs?: ElectronVFSBridge }).vfs;
   if (!vfsBridge) {
     throw new Error(
