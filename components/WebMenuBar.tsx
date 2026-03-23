@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useRef, useMemo } from 'react';
-import { WEB_MENU_STRUCTURE } from '@/lib/menu/menu-definitions';
+import { WEB_MENU_STRUCTURE, ACTION_TO_COMMAND_ID } from '@/lib/menu/menu-definitions';
 import { MenuDropdown } from './WebMenuBar/MenuDropdown';
+import { useKeymap } from '@/contexts/KeymapContext';
+import { toWebMenuAccelerator } from '@/lib/keymap/keymap-utils';
 
 import type { MenuSection, MenuItem } from '@/lib/menu/menu-definitions';
 
@@ -25,6 +27,7 @@ interface WebMenuBarProps {
 export default function WebMenuBar({ onMenuAction, recentProjects, checkedState }: WebMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const menuRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const { effectiveBindings } = useKeymap();
 
   // Checked state map: action → boolean
   const checkedMap = useMemo<Record<string, boolean>>(() => {
@@ -35,7 +38,7 @@ export default function WebMenuBar({ onMenuAction, recentProjects, checkedState 
     return map;
   }, [checkedState]);
 
-  // Inject recent projects and checked state into the menu structure
+  // Inject recent projects, checked state, and dynamic accelerators into the menu structure
   const menuStructure = useMemo<MenuSection[]>(() => {
     return WEB_MENU_STRUCTURE.map((section) => {
       const items = section.items.map((item): MenuItem => {
@@ -56,12 +59,23 @@ export default function WebMenuBar({ onMenuAction, recentProjects, checkedState 
           return { ...item, checked: checkedMap[item.action] };
         }
 
+        // Inject dynamic accelerator from keymap registry
+        if (item.action) {
+          const commandId = ACTION_TO_COMMAND_ID[item.action];
+          if (commandId) {
+            const accelerator = toWebMenuAccelerator(effectiveBindings[commandId]);
+            if (accelerator) {
+              return { ...item, accelerator };
+            }
+          }
+        }
+
         return item;
       });
 
       return { ...section, items };
     });
-  }, [recentProjects, checkedMap]);
+  }, [recentProjects, checkedMap, effectiveBindings]);
 
   const handleMenuClick = (index: number) => {
     setOpenMenu(openMenu === index ? null : index);

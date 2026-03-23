@@ -140,6 +140,18 @@ export function toElectronAccelerator(binding: KeyBinding | null): string | unde
 }
 
 /**
+ * Converts a KeyBinding to a web menu accelerator string in "Ctrl+Shift+S" format.
+ * Uses "Ctrl" (not "CmdOrCtrl") so that formatAccelerator() in menu-definitions can
+ * apply the macOS symbol transformation (Ctrl+ → ⌘).
+ */
+export function toWebMenuAccelerator(binding: KeyBinding | null): string | undefined {
+  if (!binding) return undefined;
+  const mods = binding.modifiers.map(m => m === "CmdOrCtrl" ? "Ctrl" : m);
+  const key = binding.key === "+" ? "+" : binding.key.toUpperCase();
+  return [...mods, key].join("+");
+}
+
+/**
  * Builds a KeyBinding from a keyboard event.
  * Used by the KeybindingInput recording component.
  */

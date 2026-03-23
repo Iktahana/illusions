@@ -2,6 +2,7 @@
  * Menu definitions for Web menu bar
  * Mirrors Electron native menu structure
  */
+import type { CommandId } from "@/lib/keymap/command-ids";
 
 const APP_VERSION = (() => {
   const v = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
@@ -87,6 +88,26 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
     ]
   }
 ];
+
+/**
+ * Maps menu action strings to their corresponding CommandIds in the keymap registry.
+ * Used by WebMenuBar to inject dynamic accelerator strings from user overrides.
+ */
+export const ACTION_TO_COMMAND_ID: Partial<Record<string, CommandId>> = {
+  "new-window": "file.newWindow",
+  "open-file": "file.open",
+  "save-file": "file.save",
+  "save-as": "file.saveAs",
+  "close-window": "file.closeTab",
+  "undo": "edit.undo",
+  "redo": "edit.redo",
+  "paste-plaintext": "edit.pasteAsPlaintext",
+  "select-all": "edit.selectAll",
+  "reset-zoom": "view.resetZoom",
+  "zoom-in": "view.zoomIn",
+  "zoom-out": "view.zoomOut",
+  "toggle-compact-mode": "view.compactMode",
+};
 
 /**
  * Format accelerator for display
