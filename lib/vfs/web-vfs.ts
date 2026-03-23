@@ -13,6 +13,7 @@ import type {
   VFSFileMetadata,
   VirtualFileSystem,
 } from "./types";
+import { joinPath } from "./path-utils";
 
 // -----------------------------------------------------------------------
 // Helpers
@@ -24,16 +25,6 @@ import type {
  */
 function splitPath(path: string): string[] {
   return path.split("/").filter((segment) => segment.length > 0);
-}
-
-/**
- * Join path segments with "/", ensuring no double slashes.
- */
-function joinPath(...parts: string[]): string {
-  return parts
-    .map((p) => p.replace(/^\/+|\/+$/g, ""))
-    .filter((p) => p.length > 0)
-    .join("/");
 }
 
 /**
