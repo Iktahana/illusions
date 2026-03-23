@@ -30,15 +30,12 @@ import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
 import { useTabManager } from "@/lib/hooks/use-tab-manager";
 import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
-import TabBar from "@/components/TabBar";
 import { DockviewReact } from "dockview-react";
 import {
-  dockviewComponents,
   dockviewTabComponents,
 } from "@/lib/dockview/dockview-components";
 import { useDockviewAdapter } from "@/lib/dockview/use-dockview-adapter";
 import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence";
-import { BufferStoreProvider, BufferStore } from "@/lib/dockview/buffer-store";
 import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
@@ -195,7 +192,6 @@ export default function EditorPage() {
     handleDockviewReady,
     dockviewApi,
     splitEditor,
-    popoutPanel,
   } = useDockviewAdapter({ tabManager });
   useDockviewPersistence({ dockviewApi });
 
@@ -846,9 +842,14 @@ export default function EditorPage() {
           <DockviewReact
             className="flex-1"
             components={{
-              editor: () => {
-                // Render the actual editor inside the dockview panel
-                if (editorDiff) {
+              editor: ({ api: panelApi, params: panelParams }) => {
+                // Each dockview panel receives its own params.
+                // Only the panel matching the active tab renders the full interactive editor;
+                // other panels show a read-only content snapshot.
+                const panelBufferId = panelParams?.bufferId ?? activeTabId;
+                const isActivePanel = panelBufferId === activeTabId;
+
+                if (editorDiff && isActivePanel) {
                   return (
                     <EditorDiffView
                       snapshotContent={editorDiff.snapshotContent}
@@ -858,33 +859,59 @@ export default function EditorPage() {
                     />
                   );
                 }
+
+                if (isActivePanel) {
+                  return (
+                    <ErrorBoundary sectionName="エディタ">
+                      <div ref={editorDomRef} className="h-full">
+                        <NovelEditor
+                          key={`tab-${panelBufferId}-${editorKey}`}
+                          initialContent={content}
+                          onChange={handleChange}
+                          onInsertText={handleInsertText}
+                          onSelectionChange={setSelectedCharCount}
+                          searchOpenTrigger={searchOpenTrigger}
+                          searchInitialTerm={searchInitialTerm}
+                          onEditorViewReady={setEditorViewInstance}
+                          programmaticScrollRef={programmaticScrollRef}
+                          onShowAllSearchResults={handleShowAllSearchResults}
+                          lintingRuleRunner={ruleRunner}
+                          onLintIssuesUpdated={handleLintIssuesUpdated}
+                          onNlpError={handleNlpError}
+                          onOpenRubyDialog={handleOpenRubyDialog}
+                          onToggleTcy={handleToggleTcy}
+                          onOpenDictionary={handleOpenDictionary}
+                          onShowLintHint={handleShowLintHint}
+                          onIgnoreCorrection={handleIgnoreCorrection}
+                          mdiExtensionsEnabled={mdiExtensionsEnabled}
+                          gfmEnabled={gfmEnabled}
+                        />
+                      </div>
+                    </ErrorBoundary>
+                  );
+                }
+
+                // Non-active panel: render a lightweight read-only editor
+                // that activates the tab when clicked
+                const panelTab = tabs.find((t) => t.id === panelBufferId);
+                const panelFileType = panelTab?.fileType ?? ".mdi";
                 return (
-                  <ErrorBoundary sectionName="エディタ">
-                    <div ref={editorDomRef} className="h-full">
+                  <div
+                    className="h-full cursor-pointer"
+                    onClick={() => {
+                      switchTab(panelBufferId);
+                      panelApi.setActive();
+                    }}
+                  >
+                    <ErrorBoundary sectionName="エディタ">
                       <NovelEditor
-                        key={`tab-${activeTabId}-${editorKey}`}
-                        initialContent={content}
-                        onChange={handleChange}
-                        onInsertText={handleInsertText}
-                        onSelectionChange={setSelectedCharCount}
-                        searchOpenTrigger={searchOpenTrigger}
-                        searchInitialTerm={searchInitialTerm}
-                        onEditorViewReady={setEditorViewInstance}
-                        programmaticScrollRef={programmaticScrollRef}
-                        onShowAllSearchResults={handleShowAllSearchResults}
-                        lintingRuleRunner={ruleRunner}
-                        onLintIssuesUpdated={handleLintIssuesUpdated}
-                        onNlpError={handleNlpError}
-                        onOpenRubyDialog={handleOpenRubyDialog}
-                        onToggleTcy={handleToggleTcy}
-                        onOpenDictionary={handleOpenDictionary}
-                        onShowLintHint={handleShowLintHint}
-                        onIgnoreCorrection={handleIgnoreCorrection}
-                        mdiExtensionsEnabled={mdiExtensionsEnabled}
-                        gfmEnabled={gfmEnabled}
+                        key={`tab-${panelBufferId}-inactive`}
+                        initialContent={panelTab?.lastSavedContent ?? ""}
+                        mdiExtensionsEnabled={panelFileType === ".mdi"}
+                        gfmEnabled={panelFileType !== ".txt"}
                       />
-                    </div>
-                  </ErrorBoundary>
+                    </ErrorBoundary>
+                  </div>
                 );
               },
             }}

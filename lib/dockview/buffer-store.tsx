@@ -244,15 +244,8 @@ export function useBuffers(): BufferState[] {
     [store],
   );
   const getSnapshot = useCallback(() => store.getBuffers(), [store]);
-  // Use version as external store subscription trigger
-  const version = useSyncExternalStore(
-    subscribe,
-    useCallback(() => store.getVersion(), [store]),
-    useCallback(() => store.getVersion(), [store]),
-  );
-  // Return fresh array on version change
-  void version;
-  return store.getBuffers();
+  const getServerSnapshot = useCallback(() => [] as BufferState[], []);
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
 /**
@@ -264,10 +257,10 @@ export function useBuffer(bufferId: BufferId | null): BufferState | undefined {
     (cb: () => void) => store.subscribeStore(cb),
     [store],
   );
-  useSyncExternalStore(
-    subscribe,
-    useCallback(() => store.getVersion(), [store]),
-    useCallback(() => store.getVersion(), [store]),
+  const getSnapshot = useCallback(
+    () => (bufferId ? store.getBuffer(bufferId) : undefined),
+    [store, bufferId],
   );
-  return bufferId ? store.getBuffer(bufferId) : undefined;
+  const getServerSnapshot = useCallback(() => undefined, []);
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

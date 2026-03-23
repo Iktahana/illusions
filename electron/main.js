@@ -1112,6 +1112,13 @@ ipcMain.handle('editor:popout-panel', async (_event, payload) => {
   // Set window title
   popoutWin.setTitle(fileName || '新規ファイル')
 
+  // Send initial content to the popout window after it finishes loading
+  popoutWin.webContents.once('did-finish-load', () => {
+    if (!popoutWin.isDestroyed() && content) {
+      popoutWin.webContents.send('editor:buffer-sync-broadcast', { bufferId, content })
+    }
+  })
+
   return true
 })
 

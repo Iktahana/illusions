@@ -8,8 +8,8 @@
  * the existing openTabs field for backward compatibility.
  */
 
-import { useEffect, useRef, useCallback } from "react";
-import type { DockviewApi, SerializedDockview } from "dockview-react";
+import { useEffect, useRef } from "react";
+import type { DockviewApi } from "dockview-react";
 import type { DockviewLayoutState } from "./types";
 import { getStorageService } from "@/lib/storage/storage-service";
 

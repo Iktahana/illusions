@@ -23,9 +23,6 @@ interface PopoutEditorWindowProps {
   fileType: SupportedFileExtension;
 }
 
-/** Default settings for popout — minimal setup */
-const DEFAULT_SETTINGS_OVERRIDES = {} as const;
-
 export default function PopoutEditorWindow({
   bufferId,
   fileName,

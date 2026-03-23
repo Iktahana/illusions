@@ -106,6 +106,13 @@ export function useDockviewAdapter({
     [],
   );
 
+  // -- Pending split tracking -----------------------------------------------
+
+  const pendingSplitRef = useRef<{
+    direction: "right" | "down";
+    referencePanel: string;
+  } | null>(null);
+
   // -- Sync tab state changes → dockview ------------------------------------
 
   useEffect(() => {
@@ -117,6 +124,9 @@ export function useDockviewAdapter({
     const prevTabs = prevTabsRef.current;
     const prevTabIds = new Set(prevTabs.map((t) => t.id));
     const currentTabIds = new Set(tabs.map((t) => t.id));
+
+    // Detect newly added tabs (before updating prevTabsRef)
+    const newlyAddedTabs = tabs.filter((t) => !prevTabIds.has(t.id));
 
     // Add new tabs
     for (const tab of tabs) {
@@ -167,6 +177,26 @@ export function useDockviewAdapter({
       }
     }
 
+    // Handle pending split: position the newly created tab in the split location
+    const pendingSplit = pendingSplitRef.current;
+    if (pendingSplit && newlyAddedTabs.length > 0) {
+      const targetTab = newlyAddedTabs[newlyAddedTabs.length - 1];
+      const newPanel = api.getPanel(targetTab.id);
+      const refPanel = api.getPanel(pendingSplit.referencePanel);
+
+      if (newPanel && refPanel) {
+        try {
+          newPanel.api.moveTo({
+            group: refPanel.group,
+            position: pendingSplit.direction === "right" ? "right" : "bottom",
+          });
+        } catch {
+          // Position move failed; panel remains in default group
+        }
+      }
+      pendingSplitRef.current = null;
+    }
+
     // Sync active tab
     if (activeTabId !== prevActiveTabRef.current) {
       const activePanel = api.getPanel(activeTabId);
@@ -190,17 +220,14 @@ export function useDockviewAdapter({
       const activePanel = api.activePanel;
       if (!activePanel) return;
 
-      // Create a new tab with the same content as the active tab
       const activeTab = tabs.find((t) => t.id === activeTabId);
       if (!activeTab) return;
 
-      // Create a new tab in the tab manager
+      // Create a new empty tab with the same file type.
+      // The new panel will be positioned in the split direction
+      // by the sync effect above (via pendingSplitRef).
       newTab(activeTab.fileType);
 
-      // The new tab will be synced to dockview in the next effect,
-      // but we need to position it. We'll handle this in the sync effect
-      // by tracking a pending split direction.
-      // For now, store the pending split info.
       pendingSplitRef.current = {
         direction,
         referencePanel: activePanel.id,
@@ -208,39 +235,6 @@ export function useDockviewAdapter({
     },
     [tabs, activeTabId, newTab],
   );
-
-  const pendingSplitRef = useRef<{
-    direction: "right" | "down";
-    referencePanel: string;
-  } | null>(null);
-
-  // Handle pending splits: when a new tab is added and there's a pending split,
-  // move the new panel to the split position
-  useEffect(() => {
-    const api = apiRef.current;
-    const pendingSplit = pendingSplitRef.current;
-    if (!api || !pendingSplit) return;
-
-    const prevTabIds = new Set(prevTabsRef.current.map((t) => t.id));
-    const newTabs = tabs.filter((t) => !prevTabIds.has(t.id));
-    if (newTabs.length === 0) return;
-
-    const newTab = newTabs[newTabs.length - 1];
-    const newPanel = api.getPanel(newTab.id);
-    const refPanel = api.getPanel(pendingSplit.referencePanel);
-
-    if (newPanel && refPanel) {
-      // Move the new panel to create a split
-      newPanel.api.moveTo({
-        group: refPanel.group,
-        position:
-          pendingSplit.direction === "right" ? "right" : "bottom",
-      });
-    }
-
-    pendingSplitRef.current = null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabs]);
 
   // -- Close group ----------------------------------------------------------
 
@@ -250,8 +244,12 @@ export function useDockviewAdapter({
     const activePanel = api.activePanel;
     if (!activePanel) return;
     const group = activePanel.group;
-    if (group.panels.length === 0) {
-      api.removeGroup(group);
+    if (group.panels.length <= 1) {
+      // Close the panel first, then remove the empty group
+      activePanel.api.close();
+      if (group.panels.length === 0) {
+        api.removeGroup(group);
+      }
     }
   }, []);
 
@@ -282,45 +280,44 @@ export function useDockviewAdapter({
 
   // -- Cross-window buffer sync (Electron IPC) -----------------------------
 
+  const { content: tabContent, setContent: tabSetContent } = tabManager;
+
   useEffect(() => {
     const electronAPI = window.electronAPI;
     if (!electronAPI?.editor) return;
 
     const unsubSync = electronAPI.editor.onBufferSync((data) => {
-      // Another window changed a buffer — if we have a tab with this ID, update content
-      const matchingTab = tabs.find((t) => t.id === data.bufferId);
-      if (matchingTab && data.content !== tabManager.content) {
-        // Update via tab manager's setContent (this will trigger re-render)
-        if (data.bufferId === activeTabId) {
-          tabManager.setContent(data.content);
-        }
+      // Another window changed a buffer — update if it's our active tab
+      if (data.bufferId === activeTabId) {
+        tabSetContent(data.content);
       }
     });
 
-    const unsubClose = electronAPI.editor.onBufferClose((_bufferId) => {
-      // Another window closed this buffer — no action needed for now,
-      // the buffer still exists in this window's tab manager
+    const unsubClose = electronAPI.editor.onBufferClose(() => {
+      // Another window closed this buffer — no action needed for now
     });
 
     return () => {
       if (typeof unsubSync === "function") unsubSync();
       if (typeof unsubClose === "function") unsubClose();
     };
-  }, [tabs, activeTabId, tabManager]);
+  }, [activeTabId, tabSetContent]);
 
   // Broadcast content changes to other windows
   useEffect(() => {
     const electronAPI = window.electronAPI;
     if (!electronAPI?.editor?.sendBufferSync) return;
-    if (!activeTabId || !tabManager.content) return;
+    if (!activeTabId) return;
+
+    const content = tabContent ?? "";
 
     // Debounce to avoid flooding IPC on every keystroke
     const timer = setTimeout(() => {
-      electronAPI.editor!.sendBufferSync(activeTabId, tabManager.content);
+      electronAPI.editor!.sendBufferSync(activeTabId, content);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [activeTabId, tabManager.content]);
+  }, [activeTabId, tabContent]);
 
   return {
     handleDockviewReady,
