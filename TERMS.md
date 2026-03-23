@@ -1,6 +1,4 @@
-利用規約およびプライバシーポリシー (Terms of Service & Privacy Policy)
----
-
+# 利用規約およびプライバシーポリシー (Terms of Service & Privacy Policy)
 
 本ソフトウェア「**illusions**」をご利用いただき、ありがとうございます。本アプリは創作の自由とプライバシーを尊重するために設計された執筆ツールです。ご利用の前に、以下の条項をご確認ください。
 
@@ -33,6 +31,6 @@
 
 ---
 
-**Developer:** 幾田花 ([Iktahana](https://github.com/Iktahana)  
+**Developer:** 幾田花 ([Iktahana](https://github.com/Iktahana)）
 **License:** GNU AGPL v3.0  
 **Project:** [illusions](https://github.com/iktahana/illusions)
