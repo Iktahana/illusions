@@ -56,7 +56,6 @@ import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
-import { KeymapProvider } from "@/contexts/KeymapContext";
 
 import type { ActivityBarView } from "@/components/ActivityBar";
 import type { EditorView } from "@milkdown/prose/view";
@@ -699,7 +698,6 @@ export default function EditorPage() {
   };
 
     return (
-      <KeymapProvider>
       <EditorSettingsProvider settings={settings} handlers={settingsHandlers}>
       <div className="h-screen flex flex-col overflow-hidden relative">
          {/* Dynamic title update */}
@@ -971,6 +969,5 @@ export default function EditorPage() {
       </div>
     </div>
       </EditorSettingsProvider>
-      </KeymapProvider>
   );
 }
