@@ -92,7 +92,7 @@ export default function NovelEditor({
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
-  const { state: speechState, speakSegments, pause, stop } = useSpeech({
+  const { state: speechState, speakSegments, pause, resume, stop } = useSpeech({
     voiceURI: speechVoiceURI,
     rate: speechRate,
     pitch: speechPitch,
@@ -196,8 +196,12 @@ export default function NovelEditor({
       pause();
       return;
     }
+    if (speechState.isPaused) {
+      resume();
+      return;
+    }
     startSpeechFromCursor();
-  }, [speechState.isPlaying, pause, startSpeechFromCursor]);
+  }, [speechState.isPlaying, speechState.isPaused, pause, resume, startSpeechFromCursor]);
 
   // Restart speech from clicked position when clicking during playback
   const speechPlayingRef = useRef(false);
