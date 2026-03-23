@@ -388,4 +388,3 @@ export default function NovelEditor({
     </div>
   );
 }
-

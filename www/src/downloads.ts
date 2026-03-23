@@ -349,7 +349,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
     // Add Microsoft Store link at the top of Windows downloads
     const storeItemHtml = key === 'windows'
       ? `
-        <a href="${MICROSOFT_STORE_URL}" class="download-item" data-platform="windows" data-filename="Microsoft Store" target="_blank" rel="noopener">
+        <a href="${MICROSOFT_STORE_URL}" class="download-item" data-platform="windows" data-filename="Microsoft Store" target="_blank" rel="noopener noreferrer">
           <div class="download-item-info">
             <span class="download-item-label">Microsoft Store</span>
             <span class="download-item-filename">公式ストアから入手</span>
@@ -426,7 +426,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
   const heroDownloadHtml = heroCta
     ? `
       <div class="hero-download">
-        <a href="${safeUrl(heroCta.href)}" class="btn-hero-download" data-platform="${currentOS}" data-filename="${heroCta.isExternal ? 'Microsoft Store' : esc(bestAsset?.name || 'unknown')}" ${heroCta.isExternal ? 'target="_blank" rel="noopener"' : 'download'}>
+        <a href="${safeUrl(heroCta.href)}" class="btn-hero-download" data-platform="${currentOS}" data-filename="${heroCta.isExternal ? 'Microsoft Store' : esc(bestAsset?.name || 'unknown')}" ${heroCta.isExternal ? 'target="_blank" rel="noopener noreferrer"' : 'download'}>
           <span class="btn-hero-download-icon">${heroCta.icon}</span>
           <span class="btn-hero-download-label">${heroCta.label}</span>
           ${heroCta.meta ? `<span class="btn-hero-download-meta">${esc(heroCta.meta)}</span>` : ''}

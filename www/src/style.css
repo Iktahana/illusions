@@ -22,7 +22,8 @@
   color: var(--color-text);
   --bg-image: none;
 
-
+  /* font-synthesis is intentionally omitted: Hina Mincho only ships weight 400,
+     so browser synthetic bold/italic is needed for headings and emphasis. */
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
