@@ -98,18 +98,12 @@ export function useLintingSettings() {
   }), [settings, handlers]);
 }
 
-/** LLM configuration */
-export function useLlmSettings() {
+/** Character extraction settings */
+export function useCharacterExtractionSettings() {
   const { settings, handlers } = useEditorSettingsContext();
   return useMemo(() => ({
-    llmEnabled: settings.llmEnabled,
-    llmModelId: settings.llmModelId,
-    llmIdlingStop: settings.llmIdlingStop,
     characterExtractionBatchSize: settings.characterExtractionBatchSize,
     characterExtractionConcurrency: settings.characterExtractionConcurrency,
-    onLlmEnabledChange: handlers.handleLlmEnabledChange,
-    onLlmModelIdChange: handlers.handleLlmModelIdChange,
-    onLlmIdlingStopChange: handlers.handleLlmIdlingStopChange,
     onCharacterExtractionBatchSizeChange: handlers.handleCharacterExtractionBatchSizeChange,
     onCharacterExtractionConcurrencyChange: handlers.handleCharacterExtractionConcurrencyChange,
   }), [settings, handlers]);

@@ -4,8 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { RuleRunner } from "@/lib/linting/rule-runner";
 import type { LintIssue, Severity } from "@/lib/linting/types";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
-import type { ILlmClient } from "@/lib/llm-client/types";
-import { getLlmClient } from "@/lib/llm-client/llm-client";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import { notificationManager } from "@/lib/services/notification-manager";
@@ -33,8 +31,6 @@ import { TaigenDomeOveruseRule } from "@/lib/linting/rules/taigen-dome-overuse";
 import { PassiveOveruseRule } from "@/lib/linting/rules/passive-overuse";
 import { CounterWordMismatchRule } from "@/lib/linting/rules/counter-word-mismatch";
 import { AdverbFormConsistencyRule } from "@/lib/linting/rules/adverb-form-consistency";
-import { HomophoneDetectionRule } from "@/lib/linting/rules/homophone-detection";
-
 // New rules from official Japanese language standards (#438)
 import { MixedWidthSpacingRule } from "@/lib/linting/rules/mixed-width-spacing-rule";
 import { BracketSpacingRule } from "@/lib/linting/rules/bracket-spacing-rule";
@@ -96,9 +92,7 @@ export function useLinting(
   lintingEnabled: boolean,
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
   editorViewInstance: EditorView | null,
-  llmEnabled: boolean = false,
   powerSaveMode: boolean = false,
-  llmModelId: string = "qwen3-1.7b-q8",
   correctionGuidelines?: GuidelineId[],
   correctionMode?: CorrectionModeId,
 ): UseLintingResult {
@@ -131,9 +125,6 @@ export function useLinting(
     runner.registerRule(new PassiveOveruseRule());
     runner.registerRule(new CounterWordMismatchRule());
     runner.registerRule(new AdverbFormConsistencyRule());
-
-    // L3 rules (LLM-based)
-    runner.registerRule(new HomophoneDetectionRule());
 
     // New rules from official Japanese language standards (#438)
     // Notation (約物・表記) — JTF / 公用文 / 外来語の表記 / 現代仮名遣い
@@ -202,13 +193,10 @@ export function useLinting(
     }
   }, [ruleRunner, lintingRuleConfigs]);
 
-  const handleLintIssuesUpdated = useCallback((issues: LintIssue[], options?: { llmPending?: boolean }) => {
+  const handleLintIssuesUpdated = useCallback((issues: LintIssue[]) => {
     if (!lintingEnabled) return;
     setLintIssues(issues);
-    // Keep spinner active while LLM validation is still in progress
-    if (!options?.llmPending) {
-      setIsLinting(false);
-    }
+    setIsLinting(false);
   }, [lintingEnabled]);
 
   // Handle NLP tokenization errors — show a user-visible notification
@@ -241,42 +229,6 @@ export function useLinting(
     }
   }, [ruleRunner, correctionGuidelines, editorViewInstance, lintingEnabled]);
 
-  // Sync correctionMode to the decoration plugin for LLM validation context
-  useEffect(() => {
-    if (!editorViewInstance || !lintingEnabled || !correctionMode) return;
-
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
-      ({ updateLintingSettings }) => {
-        updateLintingSettings(
-          editorViewInstance,
-          { correctionMode },
-          "mode-change",
-        );
-      },
-    ).catch((err) => {
-      console.error("[useLinting] Failed to sync correction mode:", err);
-    });
-  }, [correctionMode, editorViewInstance, lintingEnabled]);
-
-  // Sync llmEnabled, llmClient, and llmModelId to the decoration plugin
-  useEffect(() => {
-    if (!editorViewInstance || !lintingEnabled) return;
-
-    const llmClient: ILlmClient | null = llmEnabled ? getLlmClient() : null;
-
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
-      ({ updateLintingSettings }) => {
-        updateLintingSettings(editorViewInstance, {
-          llmClient,
-          llmEnabled,
-          llmModelId,
-        });
-      },
-    ).catch((err) => {
-      console.error("[useLinting] Failed to sync LLM settings:", err);
-    });
-  }, [editorViewInstance, lintingEnabled, llmEnabled, llmModelId]);
-
   // Clear issues when linting is disabled
   useEffect(() => {
     if (!lintingEnabled) {
@@ -285,7 +237,6 @@ export function useLinting(
   }, [lintingEnabled]);
 
   // Force re-run linting on the full document (not just visible paragraphs)
-  // Always provides llmClient for L1/L2 validation regardless of power-save/llmEnabled state
   const refreshLinting = useCallback(() => {
     if (!editorViewInstance || !lintingEnabled) return;
 
@@ -296,19 +247,11 @@ export function useLinting(
           ? getNlpClient()
           : null;
 
-        const llmClient: ILlmClient | null =
-          llmEnabled && ruleRunnerRef.current?.hasLlmRules()
-            ? getLlmClient()
-            : null;
-
         updateLintingSettings(
           editorViewInstance,
           {
             ruleRunner: ruleRunnerRef.current,
             nlpClient,
-            llmClient,
-            llmEnabled,
-            llmModelId,
           },
           "manual-refresh",
         );
@@ -317,7 +260,7 @@ export function useLinting(
       console.error("[useLinting] Failed to refresh linting:", err);
       setIsLinting(false);
     });
-  }, [editorViewInstance, lintingEnabled, llmEnabled, llmModelId]);
+  }, [editorViewInstance, lintingEnabled]);
 
   return {
     ruleRunner,
