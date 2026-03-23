@@ -178,6 +178,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     addRecentProject: (project) => ipcRenderer.invoke('storage:add-recent-project', project),
     getRecentProjects: () => ipcRenderer.invoke('storage:get-recent-projects'),
     removeRecentProject: (projectId) => ipcRenderer.invoke('storage:remove-recent-project', projectId),
+    setItem: (key, value) => ipcRenderer.invoke('storage:set-item', key, value),
+    getItem: (key) => ipcRenderer.invoke('storage:get-item', key),
+    removeItem: (key) => ipcRenderer.invoke('storage:remove-item', key),
   },
   vfs: {
     openDirectory: () => ipcRenderer.invoke('vfs:open-directory'),

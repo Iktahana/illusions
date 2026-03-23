@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bold, Italic, Strikethrough, Quote, List, ListOrdered, Heading1, Heading2, Heading3, Code, Link as LinkIcon } from "lucide-react";
+import { Bold, Italic, Strikethrough, Quote, List, ListOrdered, Heading1, Heading2, Heading3, Code } from "lucide-react";
 import clsx from "clsx";
 import { EditorView } from "@milkdown/prose/view";
 
@@ -11,16 +11,15 @@ interface BubbleMenuProps {
   isVertical?: boolean;
 }
 
-export type FormatType = 
-  | "bold" 
-  | "italic" 
-  | "strikethrough" 
-  | "heading" 
-  | "bulletList" 
-  | "orderedList" 
+export type FormatType =
+  | "bold"
+  | "italic"
+  | "strikethrough"
+  | "heading"
+  | "bulletList"
+  | "orderedList"
   | "blockquote"
-  | "code"
-  | "link";
+  | "code";
 
 export default function BubbleMenu({ editorView, onFormat, isVertical = false }: BubbleMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -114,7 +113,6 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
     { icon: List, label: "箇条書き", format: "bulletList" },
     { icon: ListOrdered, label: "番号付き", format: "orderedList" },
     { icon: Code, label: "コード", format: "code" },
-    { icon: LinkIcon, label: "リンク", format: "link" },
   ];
 
   return (
