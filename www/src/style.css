@@ -245,6 +245,22 @@ h1 {
   fill: currentColor;
 }
 
+.site-footer {
+  margin-top: 3rem;
+}
+
+.site-footer a {
+  font-size: 0.75rem;
+  color: var(--color-text);
+  opacity: 0.5;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.site-footer a:hover {
+  opacity: 0.75;
+}
+
 .features {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
