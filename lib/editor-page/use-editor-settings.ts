@@ -18,6 +18,7 @@ export interface EditorSettings {
   autoSave: boolean;
   posHighlightEnabled: boolean;
   posHighlightColors: Record<string, string>;
+  posHighlightDisabledTypes: string[];
   verticalScrollBehavior: "auto" | "mouse" | "trackpad";
   scrollSensitivity: number;
   compactMode: boolean;
@@ -48,6 +49,7 @@ export interface EditorSettingsHandlers {
   handleAutoSaveChange: (value: boolean) => void;
   handlePosHighlightEnabledChange: (value: boolean) => void;
   handlePosHighlightColorsChange: (value: Record<string, string>) => void;
+  handlePosHighlightDisabledTypesChange: (value: string[]) => void;
   handleVerticalScrollBehaviorChange: (value: "auto" | "mouse" | "trackpad") => void;
   handleScrollSensitivityChange: (value: number) => void;
   handleToggleCompactMode: () => void;
@@ -103,6 +105,7 @@ export function useEditorSettings(
   const [autoSave, setAutoSave] = useState(true);
   const [posHighlightEnabled, setPosHighlightEnabled] = useState(false);
   const [posHighlightColors, setPosHighlightColors] = useState<Record<string, string>>({});
+  const [posHighlightDisabledTypes, setPosHighlightDisabledTypes] = useState<string[]>([]);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [verticalScrollBehavior, setVerticalScrollBehavior] = useState<"auto" | "mouse" | "trackpad">("auto");
   const [scrollSensitivity, setScrollSensitivity] = useState(1.0);
@@ -160,6 +163,9 @@ export function useEditorSettings(
         }
         if (appState.posHighlightColors && typeof appState.posHighlightColors === "object") {
           setPosHighlightColors(appState.posHighlightColors);
+        }
+        if (Array.isArray(appState.posHighlightDisabledTypes)) {
+          setPosHighlightDisabledTypes(appState.posHighlightDisabledTypes);
         }
         if (appState.verticalScrollBehavior) {
           setVerticalScrollBehavior(appState.verticalScrollBehavior);
@@ -303,6 +309,13 @@ export function useEditorSettings(
     setPosHighlightColors(value);
     void persistAppState({ posHighlightColors: value }).catch((error) => {
       console.error("Failed to persist posHighlightColors:", error);
+    });
+  }, []);
+
+  const handlePosHighlightDisabledTypesChange = useCallback((value: string[]) => {
+    setPosHighlightDisabledTypes(value);
+    void persistAppState({ posHighlightDisabledTypes: value }).catch((error) => {
+      console.error("Failed to persist posHighlightDisabledTypes:", error);
     });
   }, []);
 
@@ -466,6 +479,7 @@ export function useEditorSettings(
     autoSave,
     posHighlightEnabled,
     posHighlightColors,
+    posHighlightDisabledTypes,
     verticalScrollBehavior,
     scrollSensitivity,
     compactMode,
@@ -490,7 +504,7 @@ export function useEditorSettings(
   }), [
     fontScale, lineHeight, paragraphSpacing, textIndent, fontFamily,
     charsPerLine, autoCharsPerLine, showParagraphNumbers, autoSave,
-    posHighlightEnabled, posHighlightColors, verticalScrollBehavior,
+    posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes, verticalScrollBehavior,
     scrollSensitivity, compactMode, showSettingsModal,
     lintingEnabled, lintingRuleConfigs,
     characterExtractionBatchSize, characterExtractionConcurrency,
@@ -510,6 +524,7 @@ export function useEditorSettings(
     handleAutoSaveChange,
     handlePosHighlightEnabledChange,
     handlePosHighlightColorsChange,
+    handlePosHighlightDisabledTypesChange,
     handleVerticalScrollBehaviorChange,
     handleScrollSensitivityChange,
     handleToggleCompactMode,
@@ -531,7 +546,8 @@ export function useEditorSettings(
     handleTextIndentChange, handleFontFamilyChange, handleCharsPerLineChange,
     handleAutoCharsPerLineChange, handleShowParagraphNumbersChange,
     handleAutoSaveChange, handlePosHighlightEnabledChange,
-    handlePosHighlightColorsChange, handleVerticalScrollBehaviorChange,
+    handlePosHighlightColorsChange, handlePosHighlightDisabledTypesChange,
+    handleVerticalScrollBehaviorChange,
     handleScrollSensitivityChange, handleToggleCompactMode, setShowSettingsModal,
     handleLintingEnabledChange, handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,

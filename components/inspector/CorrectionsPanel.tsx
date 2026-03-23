@@ -236,8 +236,8 @@ export default function CorrectionsPanel({
   activeLintPresetId = "",
 }: CorrectionsPanelProps): React.JSX.Element {
   const {
-    posHighlightEnabled, posHighlightColors,
-    onPosHighlightEnabledChange,
+    posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes,
+    onPosHighlightEnabledChange, onPosHighlightDisabledTypesChange,
   } = usePosHighlightSettings();
   const {
     lintingEnabled, lintingRuleConfigs,
@@ -527,15 +527,35 @@ export default function CorrectionsPanel({
         {posHighlightEnabled && (
           <div className="mt-2 space-y-2">
             <div className="flex flex-wrap gap-x-3 gap-y-1">
-              {POS_LEGEND_ITEMS.map(({ key, label }) => (
-                <span key={key} className="inline-flex items-center gap-1 text-xs text-foreground-secondary">
-                  <span
-                    className="inline-block w-2.5 h-2.5 rounded-sm"
-                    style={{ backgroundColor: posHighlightColors[key] || DEFAULT_POS_COLORS[key] || "#000" }}
-                  />
-                  {label}
-                </span>
-              ))}
+              {POS_LEGEND_ITEMS.map(({ key, label }) => {
+                const isDisabled = posHighlightDisabledTypes.includes(key);
+                return (
+                  <button
+                    key={key}
+                    className={clsx(
+                      "inline-flex items-center gap-1 text-xs transition-opacity cursor-pointer",
+                      isDisabled ? "opacity-40 text-foreground-muted" : "text-foreground-secondary"
+                    )}
+                    title={isDisabled ? "クリックで表示" : "クリックで非表示"}
+                    onClick={() => {
+                      const next = isDisabled
+                        ? posHighlightDisabledTypes.filter(t => t !== key)
+                        : [...posHighlightDisabledTypes, key];
+                      onPosHighlightDisabledTypesChange(next);
+                    }}
+                  >
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-sm"
+                      style={{
+                        backgroundColor: isDisabled
+                          ? "#ccc"
+                          : (posHighlightColors[key] || DEFAULT_POS_COLORS[key] || "#000"),
+                      }}
+                    />
+                    {label}
+                  </button>
+                );
+              })}
             </div>
             {onOpenPosHighlightSettings && (
               <button

@@ -61,6 +61,7 @@ export interface AppState {
   // 品詞着色設定
   posHighlightEnabled?: boolean;
   posHighlightColors?: Record<string, string>;
+  posHighlightDisabledTypes?: string[];
 
   // プロジェクト管理
   currentProjectId?: string;

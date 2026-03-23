@@ -115,8 +115,10 @@ export function usePosHighlightSettings() {
   return useMemo(() => ({
     posHighlightEnabled: settings.posHighlightEnabled,
     posHighlightColors: settings.posHighlightColors,
+    posHighlightDisabledTypes: settings.posHighlightDisabledTypes,
     onPosHighlightEnabledChange: handlers.handlePosHighlightEnabledChange,
     onPosHighlightColorsChange: handlers.handlePosHighlightColorsChange,
+    onPosHighlightDisabledTypesChange: handlers.handlePosHighlightDisabledTypesChange,
   }), [settings, handlers]);
 }
 
