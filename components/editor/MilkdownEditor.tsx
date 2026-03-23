@@ -85,7 +85,7 @@ export default function MilkdownEditor({
   } = useTypographySettings();
   const { lintingEnabled } = useLintingSettings();
   const { llmEnabled } = useLlmSettings();
-  const { posHighlightEnabled, posHighlightColors } = usePosHighlightSettings();
+  const { posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes } = usePosHighlightSettings();
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
@@ -244,11 +244,12 @@ export default function MilkdownEditor({
       updatePosHighlightSettings(editorViewInstance, {
         enabled: posHighlightEnabled,
         colors: posHighlightColors,
+        disabledTypes: posHighlightDisabledTypes,
       });
     }).catch(err => {
       console.error('[Editor] Failed to update POS highlight settings:', err);
     });
-  }, [editorViewInstance, posHighlightEnabled, posHighlightColors]);
+  }, [editorViewInstance, posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes]);
 
   // linting 設定を動的に更新（Editor を再作成せずに）
   useEffect(() => {
