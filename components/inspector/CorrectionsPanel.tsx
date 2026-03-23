@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, ChevronDown, ChevronRight, ListFilter, RefreshCw, Settings, XCircle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, EyeOff, Info, ListFilter, RefreshCw, Settings, XCircle } from "lucide-react";
 import clsx from "clsx";
 
 import { LINT_PRESETS, LINT_RULE_CATEGORIES } from "@/lib/linting/lint-presets";
