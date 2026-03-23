@@ -7,6 +7,7 @@ import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-con
 import type { Severity } from "@/lib/linting/types";
 import type { TabPersistenceState } from "../tab-manager/tab-types";
 import type { DockviewLayoutState } from "../dockview/types";
+import type { KeymapOverrides } from "../keymap/keymap-types";
 
 /**
  * 最近使ったファイルの項目。
@@ -119,6 +120,9 @@ export interface AppState {
 
   // Dockview レイアウトの永続化
   dockviewLayout?: DockviewLayoutState;
+
+  // キーマップのユーザーカスタマイズ（デフォルトとの差分のみ保存）
+  keymapOverrides?: KeymapOverrides;
 }
 
 /**
