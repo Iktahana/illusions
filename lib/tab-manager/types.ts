@@ -4,7 +4,6 @@ import type { MutableRefObject, Dispatch, SetStateAction } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, TabState } from "./tab-types";
-import { getRandomillusionstory } from "../project/illusion-stories";
 
 // ---------------------------------------------------------------------------
 // Public return type (must stay identical to the original useTabManager)
@@ -256,7 +255,7 @@ export function getErrorMessage(error: unknown): string {
 }
 
 export function createNewTab(content?: string, fileType: SupportedFileExtension = ".mdi"): TabState {
-  const c = content ?? (fileType === ".mdi" ? getRandomillusionstory() : "");
+  const c = content ?? "";
   return {
     id: generateTabId(),
     file: null,
