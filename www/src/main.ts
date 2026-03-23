@@ -75,5 +75,9 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <span class="social-link-icon">${iconX}</span>
       @illusionsapp
     </a>
+
+    <footer class="site-footer">
+      <a href="https://github.com/Iktahana/illusions/blob/main/TERMS.md" target="_blank" rel="noopener noreferrer">プライバシー・利用規約</a>
+    </footer>
   </div>
 `
