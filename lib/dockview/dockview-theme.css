@@ -1,0 +1,115 @@
+/**
+ * Dockview theme overrides for illusions.
+ * Maps dockview CSS variables to illusions theme tokens.
+ *
+ * Note: illusions uses Tailwind RGB channel format (e.g. "252 252 252"),
+ * so we use rgb() wrappers here.
+ */
+
+/* Import dockview base styles */
+@import "dockview-core/dist/styles/dockview.css";
+
+/* ------------------------------------------------------------------ */
+/* illusions custom theme — light mode (default)                       */
+/* ------------------------------------------------------------------ */
+
+.dockview-theme-illusions {
+  /* Editor content area background */
+  --dv-group-view-background-color: rgb(var(--background));
+
+  /* Tab bar background */
+  --dv-tabs-and-actions-container-background-color: rgb(var(--background-secondary));
+
+  /* Active group, visible (selected) tab */
+  --dv-activegroup-visiblepanel-tab-background-color: rgb(var(--background));
+  --dv-activegroup-visiblepanel-tab-color: rgb(var(--foreground));
+
+  /* Active group, hidden (unselected) tabs */
+  --dv-activegroup-hiddenpanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-activegroup-hiddenpanel-tab-color: rgb(var(--foreground-tertiary));
+
+  /* Inactive group, visible tab */
+  --dv-inactivegroup-visiblepanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-inactivegroup-visiblepanel-tab-color: rgb(var(--foreground-secondary));
+
+  /* Inactive group, hidden tabs */
+  --dv-inactivegroup-hiddenpanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-inactivegroup-hiddenpanel-tab-color: rgb(var(--foreground-muted));
+
+  /* Tab divider */
+  --dv-tab-divider-color: rgb(var(--border));
+
+  /* Separator between groups */
+  --dv-separator-border: rgb(var(--border));
+
+  /* Sash (drag handle between split panes) */
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: rgb(var(--accent));
+
+  /* Drag overlay */
+  --dv-drag-over-background-color: rgba(var(--accent), 0.08);
+  --dv-drag-over-border-color: rgb(var(--accent));
+
+  /* Scrollbar */
+  --dv-tabs-container-scrollbar-color: rgb(var(--foreground-muted));
+
+  /* Icon hover */
+  --dv-icon-hover-background-color: rgb(var(--hover));
+
+  /* Tab sizing */
+  --dv-tabs-and-actions-container-height: 33px;
+  --dv-tabs-and-actions-container-font-size: 12px;
+  --dv-tab-font-size: 12px;
+}
+
+/* ------------------------------------------------------------------ */
+/* illusions custom theme — dark mode                                  */
+/* ------------------------------------------------------------------ */
+
+.dark .dockview-theme-illusions {
+  --dv-group-view-background-color: rgb(var(--background));
+  --dv-tabs-and-actions-container-background-color: rgb(var(--background-secondary));
+
+  --dv-activegroup-visiblepanel-tab-background-color: rgb(var(--background));
+  --dv-activegroup-visiblepanel-tab-color: rgb(var(--foreground));
+  --dv-activegroup-hiddenpanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-activegroup-hiddenpanel-tab-color: rgb(var(--foreground-tertiary));
+
+  --dv-inactivegroup-visiblepanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-inactivegroup-visiblepanel-tab-color: rgb(var(--foreground-secondary));
+  --dv-inactivegroup-hiddenpanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-inactivegroup-hiddenpanel-tab-color: rgb(var(--foreground-muted));
+
+  --dv-tab-divider-color: rgb(var(--border));
+  --dv-separator-border: rgb(var(--border));
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: rgb(var(--accent));
+  --dv-drag-over-background-color: rgba(var(--accent), 0.08);
+  --dv-drag-over-border-color: rgb(var(--accent));
+  --dv-tabs-container-scrollbar-color: rgb(var(--foreground-muted));
+  --dv-icon-hover-background-color: rgb(var(--hover));
+
+  /* Floating panel shadow for dark mode */
+  --dv-floating-box-shadow: 8px 8px 16px 0px rgba(0, 0, 0, 0.6);
+}
+
+/* ------------------------------------------------------------------ */
+/* Layout refinements                                                 */
+/* ------------------------------------------------------------------ */
+
+/* Hide the default dockview watermark (empty state) */
+.dv-dockview .dv-watermark {
+  display: none;
+}
+
+/* Make tab close button smaller to match illusions style */
+.dv-dockview .dv-default-tab .dv-default-tab-action {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+/* Reduce padding on tab items */
+.dv-dockview .dv-default-tab {
+  padding: 0 8px;
+}

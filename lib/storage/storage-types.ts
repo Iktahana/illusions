@@ -6,6 +6,7 @@
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import type { Severity } from "@/lib/linting/types";
 import type { TabPersistenceState } from "../tab-manager/tab-types";
+import type { DockviewLayoutState } from "../dockview/types";
 
 /**
  * 最近使ったファイルの項目。
@@ -120,6 +121,9 @@ export interface AppState {
 
   // タブの永続化
   openTabs?: TabPersistenceState;
+
+  // Dockview レイアウトの永続化
+  dockviewLayout?: DockviewLayoutState;
 }
 
 /**
@@ -238,6 +242,26 @@ export interface IStorageService {
    * Electron: removes from SQLite. Web: no-op (uses ProjectManager instead).
    */
   removeRecentProject(projectId: string): Promise<void>;
+
+  // -------------------------------------------------------------------
+  // Generic key-value store (standalone mode data, etc.)
+  // -------------------------------------------------------------------
+
+  /**
+   * Store a value by key. Replaces any existing value for the same key.
+   * スタンドアロンモードのデータなど、汎用キーバリューストア。
+   */
+  setItem(key: string, value: string): Promise<void>;
+
+  /**
+   * Retrieve a value by key. Returns null if the key does not exist.
+   */
+  getItem(key: string): Promise<string | null>;
+
+  /**
+   * Remove a value by key.
+   */
+  removeItem(key: string): Promise<void>;
 
   /**
    * すべてのデータを削除する。取り扱い注意。

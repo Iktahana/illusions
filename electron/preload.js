@@ -178,6 +178,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     addRecentProject: (project) => ipcRenderer.invoke('storage:add-recent-project', project),
     getRecentProjects: () => ipcRenderer.invoke('storage:get-recent-projects'),
     removeRecentProject: (projectId) => ipcRenderer.invoke('storage:remove-recent-project', projectId),
+    setItem: (key, value) => ipcRenderer.invoke('storage:set-item', key, value),
+    getItem: (key) => ipcRenderer.invoke('storage:get-item', key),
+    removeItem: (key) => ipcRenderer.invoke('storage:remove-item', key),
   },
   vfs: {
     openDirectory: () => ipcRenderer.invoke('vfs:open-directory'),
@@ -204,6 +207,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getPowerState: () => ipcRenderer.invoke('power:get-state'),
     removeOnPowerStateChange: () => {
       ipcRenderer.removeAllListeners('power:state-changed')
+    },
+  },
+  editor: {
+    popoutPanel: (bufferId, content, fileName, fileType) =>
+      ipcRenderer.invoke('editor:popout-panel', { bufferId, content, fileName, fileType }),
+    sendBufferSync: (bufferId, content) =>
+      ipcRenderer.send('editor:buffer-sync', { bufferId, content }),
+    onBufferSync: (callback) => {
+      const handler = (_event, data) => callback(data)
+      ipcRenderer.on('editor:buffer-sync-broadcast', handler)
+      return () => ipcRenderer.removeListener('editor:buffer-sync-broadcast', handler)
+    },
+    sendBufferClose: (bufferId) =>
+      ipcRenderer.send('editor:buffer-close', bufferId),
+    onBufferClose: (callback) => {
+      const handler = (_event, bufferId) => callback(bufferId)
+      ipcRenderer.on('editor:buffer-close-broadcast', handler)
+      return () => ipcRenderer.removeListener('editor:buffer-close-broadcast', handler)
+    },
+    removeAllListeners: () => {
+      ipcRenderer.removeAllListeners('editor:buffer-sync-broadcast')
+      ipcRenderer.removeAllListeners('editor:buffer-close-broadcast')
     },
   },
 })

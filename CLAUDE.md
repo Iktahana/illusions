@@ -37,21 +37,6 @@ Single source of truth for all AI assistants (Cursor, Claude, etc.)
 - Buttons, labels, placeholders, tooltips
 - Error messages, update notifications
 
-**Standard UI Translations:**
-
-| English | Japanese |
-|---------|----------|
-| File | ファイル |
-| Edit | 編集 |
-| View | 表示 |
-| Save | 保存 |
-| Open | 開く |
-| Close | 閉じる |
-| Quit | を終了 |
-| Word Count | 文字数 |
-| Paragraph Count | 段落数 |
-| Reading Time | 読了時間 |
-
 ---
 
 ### 2. Branch Strategy & Release Cadence
@@ -76,7 +61,7 @@ hotfix/<name>   →  main  (emergency only, then cherry-pick to dev)
 - **DO** create a new worktree + branch for each task before writing any code
 - **DO** clean up (remove) the worktree and delete the branch after merging
 
-**Workflow (normal feature):**
+**Workflow:**
 ```bash
 # 1. Create worktree with a new feature branch
 git worktree add ../illusions-work-<short-name> -b feature/<branch-name>
@@ -84,26 +69,10 @@ cd ../illusions-work-<short-name>
 
 # 2. Do all implementation work inside the worktree
 
-# 3. Open PR targeting dev (NOT main)
-gh pr create --base dev --title "feat: ..."
-
-# 4. After merging to dev, clean up
+# 3. After completing work, clean up
 cd /path/to/illusions
 git worktree remove ../illusions-work-<short-name>
 git branch -d feature/<branch-name>
-```
-
-**Workflow (hotfix):**
-```bash
-# 1. Branch from main
-git worktree add ../illusions-work-hotfix-<name> -b hotfix/<name>
-
-# 2. Implement fix, then open PR targeting main
-gh pr create --base main --title "fix: ..."
-
-# 3. After merging to main, also apply to dev
-git checkout dev
-git merge main   # or: git cherry-pick <commit>
 ```
 
 **Rules:**
@@ -243,7 +212,7 @@ const session = await storage.loadSession();
 All commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-<type>(<scope>): <subject> (#issue)
+<type>(<scope>): <subject>
 
 <body>
 
@@ -251,37 +220,6 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ```
 
 **Types:** `feat`, `fix`, `refactor`, `docs`, `style`, `test`, `chore`
-
-**Issue References (CRITICAL):**
-- General reference: `feat: add feature (#123)`
-- Closes issue: `fix: resolve bug (closes #456)`
-- Part of larger: `feat: implement component (part of #789)`
-
-**Example:**
-```
-feat: add glassmorphism to all dialogs (#234)
-
-- Create reusable GlassDialog component
-- Apply frosted glass effect with backdrop-blur-xl
-
-Closes #234
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
-```
-
-### 14. Issue Closing Policy
-
-**CRITICAL**: Never close GitHub Issues manually. Always close via PR merge.
-
-- Use `Closes #<issue>` or `Fixes #<issue>` in the **PR description body**
-- GitHub auto-closes the issue when the PR is merged to the default branch
-- Do NOT use `gh issue close` or close from the GitHub UI
-
-### 15. Testing Standards (Future)
-
-- **Unit Tests**: All utility functions
-- **Component Tests**: Critical components
-- **E2E Tests**: Main user flows
 
 ---
 
@@ -296,7 +234,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ### Before Committing
 - [ ] On feature branch (not main)
 - [ ] Atomic commits (unrelated changes split)
-- [ ] Conventional Commits format with issue reference
+- [ ] Conventional Commits format
 - [ ] All code/docs in English or Japanese only
 - [ ] All user-facing text in Japanese
 - [ ] No hardcoded secrets
@@ -306,11 +244,9 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 - [ ] React hooks dependency arrays correct
 
 ### After Completing Work
-- [ ] Merge feature branch to **dev** via PR (or to `main` for hotfixes)
 - [ ] `git worktree remove ../illusions-work-<name>`
 - [ ] `git branch -d feature/<name>`
 - [ ] `git worktree list` — only main worktree remains
-- [ ] Wait for the weekly Monday PR to carry the change to `main` (or trigger `weekly-release.yml` manually)
 
 ### Priority Levels
 
@@ -321,113 +257,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 > Note: Users may communicate with agents in any language. Do NOT instruct users to use English or Japanese.
 
----
-
-## 🔴 PM WORKFLOW - Multi-Agent Task Coordination (CRITICAL)
-
-The lead agent acts as **Project Manager (PM)**. It does NOT write code directly for feature work. Instead, it plans, creates GitHub sub-issues, and dispatches specialist agents to implement each sub-issue in parallel.
-
-### Phase 1: Planning & Issue Decomposition
-1. Read the parent GitHub issue to understand full scope.
-2. Explore the codebase to identify affected files, dependencies, and patterns.
-3. Decompose work into independent sub-issues (aim for parallelizable units).
-4. Create sub-issues on GitHub under the parent issue:
-   - Title: English or Japanese (per language rules)
-   - Body: Detailed spec with affected files, acceptance criteria, code snippets
-   - Label: same as parent issue
-   - Reference parent: "Part of #<parent>" in the body
-5. **Wait for user approval** before dispatching agents.
-
-### Phase 2: Agent Dispatch
-1. Create a single feature branch from `main` for the entire parent issue.
-2. Dispatch agents in parallel using the Task tool:
-   - Each agent receives: sub-issue number, full spec, branch name, file list
-   - Agents work on **non-overlapping files** to avoid merge conflicts
-   - If two sub-issues touch the same file, they must be sequenced (blocked)
-3. Each agent must:
-   - Work on the designated feature branch
-   - Make atomic commits referencing the sub-issue (`feat: ... #<sub-issue>`)
-   - Run `npx tsc --noEmit` before finishing
-   - NOT touch files outside its assigned scope
-
-### Phase 3: Integration & Verification
-1. PM reviews all agent outputs (commits, TypeScript check).
-2. Run final verification: `npx tsc --noEmit` on the feature branch.
-3. Create PR referencing the parent issue: `Closes #<parent>`.
-4. Verify all sub-issues are closed by agents.
-
-### Sub-Issue Template
-```markdown
-## Summary
-<1-2 sentence description>
-
-Part of #<parent-issue-number>
-
-## Affected Files
-| File | Action | Purpose |
-|------|--------|---------|
-| `path/to/file.ts` | MODIFY | Description |
-
-## Detailed Spec
-<Exact changes needed, including code snippets where helpful>
-
-## Acceptance Criteria
-- [ ] Criterion 1
-- [ ] Criterion 2
-- [ ] `npx tsc --noEmit` passes with zero errors
-
-## Dependencies
-- Blocked by: #<issue> (if any)
-- Blocks: #<issue> (if any)
-```
-
-### Rules for Agents
-- **DO NOT** create new files unless the sub-issue explicitly requires it
-- **DO NOT** modify files outside the sub-issue scope
-- **DO** follow all CLAUDE.md rules (language, TypeScript strict, etc.)
-- **DO** make atomic commits with sub-issue references
-- **DO** run TypeScript check before reporting completion
-- **DO** close the assigned sub-issue immediately upon completion — use `gh issue close <number> --comment "..."` with acceptance criteria confirmation
-
-### Rules for PM
-- **DO NOT** write implementation code directly; delegate to agents
-- **DO** review agent output and catch cross-cutting issues
-- **DO** sequence dependent sub-issues (use `blockedBy` / `blocks`)
-- **DO** create the feature branch before dispatching agents
-- **DO** wait for user approval after creating sub-issues
-
----
-
-## 🎯 QUICK COMMANDS
-
-```bash
-# Check for stale worktrees and branches
-git worktree list
-git branch | grep -E "feature/|feat/|work/"
-
-# Create worktree + feature branch
-git worktree add ../illusions-work-my-feature -b feature/my-feature
-cd ../illusions-work-my-feature
-
-# Commit (stage specific files only)
-git add src/specific-file.ts
-git commit -m "feat: add specific feature (#123)"
-
-# Merge and cleanup (from main worktree)
-cd /path/to/illusions
-git worktree remove ../illusions-work-my-feature
-git branch -d feature/my-feature
-
-# Language compliance check
-grep -r "[\u4e00-\u9fff]" src/   # Chinese
-grep -r "[\uac00-\ud7af]" src/   # Korean
-```
-
 **Key file references:**
 - Storage docs: `docs/architecture/storage-system.md`
 - MDI syntax: `MDI.md`
 - Electron types: `types/electron.d.ts`
-
----
-
-**Version**: 2.5.0 | **Last Updated**: 2026-03-19 | **Status**: ✅ Production

@@ -169,6 +169,36 @@ function registerStorageHandlers() {
     }
   });
 
+  // KV Store: set
+  ipcMain.handle('storage:set-item', async (_event, key, value) => {
+    try {
+      manager.setItem(key, value);
+    } catch (error) {
+      console.error('[Storage IPC] setItem failed:', error);
+      throw error;
+    }
+  });
+
+  // KV Store: get
+  ipcMain.handle('storage:get-item', async (_event, key) => {
+    try {
+      return manager.getItem(key);
+    } catch (error) {
+      console.error('[Storage IPC] getItem failed:', error);
+      throw error;
+    }
+  });
+
+  // KV Store: remove
+  ipcMain.handle('storage:remove-item', async (_event, key) => {
+    try {
+      manager.removeItem(key);
+    } catch (error) {
+      console.error('[Storage IPC] removeItem failed:', error);
+      throw error;
+    }
+  });
+
 }
 
 module.exports = { registerStorageHandlers, getStorageManager };

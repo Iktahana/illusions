@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Fragment } from "@milkdown/prose/model";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import Explorer, { FilesPanel } from "@/components/Explorer";
@@ -22,15 +21,22 @@ import Characters from "@/components/Characters";
 import Dictionary from "@/components/Dictionary";
 import Outline from "@/components/Outline";
 import WelcomeScreen from "@/components/WelcomeScreen";
+import PopoutEditorWindow from "@/components/PopoutEditorWindow";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
-import { LINT_PRESETS, LINT_RULES_META, LINT_DEFAULT_CONFIGS } from "@/lib/linting/lint-presets";
-import { notificationManager } from "@/lib/services/notification-manager";
 import RubyDialog from "@/components/RubyDialog";
+import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
+import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
 import { useTabManager } from "@/lib/hooks/use-tab-manager";
 import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
-import TabBar from "@/components/TabBar";
+import { DockviewReact } from "dockview-react";
+import {
+  dockviewTabComponents,
+} from "@/lib/dockview/dockview-components";
+import { useDockviewAdapter } from "@/lib/dockview/use-dockview-adapter";
+import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence";
+import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
@@ -53,7 +59,6 @@ import { usePanelState } from "@/lib/editor-page/use-panel-state";
 
 import type { ActivityBarView } from "@/components/ActivityBar";
 import type { EditorView } from "@milkdown/prose/view";
-import type { LintIssue } from "@/lib/linting/types";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 
 // Module-level flag: persists across React StrictMode/HMR remounts,
@@ -61,7 +66,31 @@ import type { SupportedFileExtension } from "@/lib/project/project-types";
 // Each Electron BrowserWindow has its own JS context, so no cross-window contamination.
 let _skipAutoRestoreDetected: boolean | null = null;
 
+// Module-level popout detection (checked once per window context)
+let _popoutBufferInfo: { bufferId: string; fileName: string; fileType: SupportedFileExtension } | null = null;
+let _popoutDetected = false;
+
+function detectPopoutMode(): typeof _popoutBufferInfo {
+  if (_popoutDetected) return _popoutBufferInfo;
+  _popoutDetected = true;
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const bufferId = params.get("popout-buffer");
+  if (!bufferId) return null;
+  _popoutBufferInfo = {
+    bufferId,
+    fileName: params.get("fileName") ?? "新規ファイル",
+    fileType: (params.get("fileType") ?? ".mdi") as SupportedFileExtension,
+  };
+  return _popoutBufferInfo;
+}
+
 export default function EditorPage() {
+  // Early check: if this is a popout window, render simplified editor
+  const popoutInfo = detectPopoutMode();
+  if (popoutInfo) {
+    return <PopoutEditorWindow {...popoutInfo} />;
+  }
   const { editorMode, setProjectMode, setStandaloneMode, resetMode } = useEditorMode();
   const { themeMode, setThemeMode } = useTheme();
 
@@ -158,6 +187,14 @@ export default function EditorPage() {
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
   } = tabManager;
 
+  // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
+  const {
+    handleDockviewReady,
+    dockviewApi,
+    splitEditor,
+  } = useDockviewAdapter({ tabManager });
+  useDockviewPersistence({ dockviewApi });
+
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const activeFileType = activeTab?.fileType ?? ".mdi";
@@ -177,7 +214,13 @@ export default function EditorPage() {
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const programmaticScrollRef = useRef(false);
-  const rubySelectionRef = useRef<{ from: number; to: number } | null>(null);
+
+  // --- Ruby/TCY hook ---
+  const { handleOpenRubyDialog, handleApplyRuby, handleToggleTcy } = useRubyTcy({
+    editorViewInstance,
+    setRubySelectedText: panelHandlers.setRubySelectedText,
+    setShowRubyDialog: panelHandlers.setShowRubyDialog,
+  });
 
   // --- Project lifecycle hook ---
   const projectLifecycle = useProjectLifecycle({
@@ -348,73 +391,6 @@ export default function EditorPage() {
     }
   }, [lastSavedTime, lastSaveWasAuto]);
 
-  /** Open the Ruby dialog with current editor selection */
-  const handleOpenRubyDialog = useCallback(() => {
-    if (!editorViewInstance) return;
-    const { state } = editorViewInstance;
-    const { from, to } = state.selection;
-    if (from === to) return; // No selection
-    const text = state.doc.textBetween(from, to);
-    if (!text.trim()) return;
-    rubySelectionRef.current = { from, to };
-    setRubySelectedText(text);
-    setShowRubyDialog(true);
-  }, [editorViewInstance, setRubySelectedText, setShowRubyDialog]);
-
-  /** Apply Ruby markup by replacing the editor selection with ProseMirror nodes */
-  const handleApplyRuby = useCallback((rubyMarkup: string) => {
-    if (!editorViewInstance) return;
-    const sel = rubySelectionRef.current;
-    if (!sel) return;
-    const { state, dispatch } = editorViewInstance;
-    const rubyNodeType = state.schema.nodes.ruby;
-    if (!rubyNodeType) {
-      // Fallback: insert as plain text if ruby node type is not available
-      const tr = state.tr.insertText(rubyMarkup, sel.from, sel.to);
-      dispatch(tr);
-      rubySelectionRef.current = null;
-      return;
-    }
-    // Parse ruby markup: mixed text and {base|reading} segments
-    const RUBY_RE = /\{([^|]+)\|([^}]+)\}/g;
-    const nodes: import("@milkdown/prose/model").Node[] = [];
-    let lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = RUBY_RE.exec(rubyMarkup)) !== null) {
-      if (m.index > lastIndex) {
-        nodes.push(state.schema.text(rubyMarkup.slice(lastIndex, m.index)));
-      }
-      nodes.push(rubyNodeType.create({ base: m[1], text: m[2] }));
-      lastIndex = m.index + m[0].length;
-    }
-    if (lastIndex < rubyMarkup.length) {
-      nodes.push(state.schema.text(rubyMarkup.slice(lastIndex)));
-    }
-    const fragment = Fragment.from(nodes);
-    const tr = state.tr.replaceWith(sel.from, sel.to, fragment);
-    dispatch(tr);
-    rubySelectionRef.current = null;
-  }, [editorViewInstance]);
-
-  /** Wrap selected text with tcy syntax: ^text^ */
-  const handleToggleTcy = useCallback(() => {
-    if (!editorViewInstance) return;
-    const { state, dispatch } = editorViewInstance;
-    const { from, to } = state.selection;
-    if (from === to) return;
-    const text = state.doc.textBetween(from, to);
-    if (!text.trim()) return;
-    // Toggle: if already wrapped in ^...^, unwrap; otherwise wrap
-    if (text.startsWith("^") && text.endsWith("^") && text.length >= 2) {
-      const unwrapped = text.slice(1, -1);
-      const tr = state.tr.insertText(unwrapped, from, to);
-      dispatch(tr);
-    } else {
-      const tr = state.tr.insertText(`^${text}^`, from, to);
-      dispatch(tr);
-    }
-  }, [editorViewInstance]);
-
   // Recovery notification: fade-out after 5s, then dismiss
   useEffect(() => {
     if (wasAutoRecovered && !dismissedRecovery && !recoveryExiting) {
@@ -564,180 +540,25 @@ export default function EditorPage() {
     });
   }, [editorViewInstance, ignoredCorrections]);
 
-  // Enrich lint issues with original text from the document
-  const enrichedLintIssues = useMemo(() => {
-    if (!editorViewInstance || lintIssues.length === 0) return lintIssues;
-    const doc = editorViewInstance.state.doc;
-    return lintIssues.map((issue: LintIssue) => {
-      try {
-        const originalText = doc.textBetween(
-          issue.from,
-          Math.min(issue.to, doc.content.size),
-        );
-        return { ...issue, originalText };
-      } catch {
-        return issue;
-      }
-    });
-  }, [editorViewInstance, lintIssues]);
-
-  // Cursor → issue sync: track which issue the cursor is on
-  const [activeLintIssueIndex, setActiveLintIssueIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!editorViewInstance || enrichedLintIssues.length === 0) {
-      setActiveLintIssueIndex(null);
-      return;
-    }
-    const dom = editorViewInstance.dom as HTMLElement;
-    const handler = () => {
-      const pos = editorViewInstance.state.selection.from;
-      const idx = enrichedLintIssues.findIndex(
-        (i: LintIssue) => pos >= i.from && pos <= i.to,
-      );
-      setActiveLintIssueIndex(idx >= 0 ? idx : null);
-    };
-    dom.addEventListener("mouseup", handler);
-    dom.addEventListener("keyup", handler);
-    return () => {
-      dom.removeEventListener("mouseup", handler);
-      dom.removeEventListener("keyup", handler);
-    };
-  }, [editorViewInstance, enrichedLintIssues]);
-
-  /** Navigate to a lint issue in the editor */
-  const handleNavigateToIssue = useCallback((issue: LintIssue) => {
-    if (!editorViewInstance) return;
-    void import("@milkdown/prose/state").then(({ TextSelection }) => {
-      const { state, dispatch } = editorViewInstance;
-      const clampedTo = Math.min(issue.to, state.doc.content.size);
-      const clampedFrom = Math.min(issue.from, clampedTo);
-      const selection = TextSelection.create(state.doc, clampedFrom, clampedTo);
-
-      // Allow the scroll protection to accept our programmatic scroll
-      programmaticScrollRef.current = true;
-
-      dispatch(state.tr.setSelection(selection).scrollIntoView());
-
-      // DOM-level scroll for vertical writing mode
-      try {
-        const coords = editorViewInstance.coordsAtPos(clampedFrom);
-        const scrollContainer = editorViewInstance.dom.closest(
-          ".flex-1.bg-background-secondary"
-        ) as HTMLElement | null;
-        if (scrollContainer) {
-          const containerRect = scrollContainer.getBoundingClientRect();
-          const offsetY = coords.top - containerRect.top + scrollContainer.scrollTop;
-          const offsetX = coords.left - containerRect.left + scrollContainer.scrollLeft;
-          scrollContainer.scrollTo({
-            left: offsetX - containerRect.width / 2,
-            top: offsetY - containerRect.height / 2,
-            behavior: "smooth",
-          });
-        }
-      } catch {
-        // fallback
-        try {
-          const domResult = editorViewInstance.domAtPos(clampedFrom);
-          const target = domResult.node instanceof HTMLElement
-            ? domResult.node
-            : domResult.node.parentElement;
-          target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-        } catch {
-          // ignore
-        }
-      }
-
-      // Reset the flag after smooth scroll completes
-      setTimeout(() => {
-        programmaticScrollRef.current = false;
-      }, 500);
-
-      editorViewInstance.focus();
-    });
-  }, [editorViewInstance]);
-
-  /** Navigate to a lint issue from context menu (also switches Inspector to corrections tab) */
-  const handleShowLintHint = useCallback((issue: LintIssue) => {
-    triggerSwitchToCorrections();
-    handleNavigateToIssue(issue);
-  }, [handleNavigateToIssue, triggerSwitchToCorrections]);
-
-  /** Handle ignoring a correction (single or all identical) */
-  const handleIgnoreCorrection = useCallback((issue: LintIssue, ignoreAll: boolean) => {
-    if (!editorViewInstance) return;
-    // Extract original text from the document
-    let issueText: string;
-    try {
-      issueText = editorViewInstance.state.doc.textBetween(
-        issue.from,
-        Math.min(issue.to, editorViewInstance.state.doc.content.size),
-      );
-    } catch {
-      return;
-    }
-    if (!issueText) return;
-
-    if (ignoreAll) {
-      // Ignore all occurrences: no context hash
-      ignoreCorrection(issue.ruleId, issueText);
-    } else {
-      // Ignore single occurrence: compute context hash from paragraph text
-      // Find the paragraph containing this issue
-      let paragraphText: string | undefined;
-      editorViewInstance.state.doc.descendants((node, pos) => {
-        if (paragraphText) return false;
-        if (node.type.name === "paragraph" && node.textContent) {
-          const paraEnd = pos + node.nodeSize;
-          if (issue.from >= pos && issue.to <= paraEnd) {
-            paragraphText = node.textContent;
-            return false;
-          }
-        }
-        return true;
-      });
-      ignoreCorrection(issue.ruleId, issueText, paragraphText);
-    }
-  }, [editorViewInstance, ignoreCorrection]);
-
-  /** Apply a lint fix by replacing the text range */
-  const handleApplyFix = useCallback((issue: LintIssue & { originalText?: string }) => {
-    if (!editorViewInstance || !issue.fix) return;
-    const { state, dispatch } = editorViewInstance;
-    if (issue.to > state.doc.content.size) {
-      notificationManager.warning("テキストが変更されたため修正を適用できません");
-      return;
-    }
-    const currentText = state.doc.textBetween(issue.from, issue.to, "");
-    if (issue.originalText && currentText !== issue.originalText) {
-      notificationManager.warning("テキストが変更されたため修正を適用できません");
-      return;
-    }
-    const tr = state.tr.insertText(issue.fix.replacement, issue.from, issue.to);
-    dispatch(tr);
-  }, [editorViewInstance]);
-
-  /** Apply a lint preset from the Inspector dropdown */
-  const handleApplyLintPreset = useCallback((presetId: string) => {
-    const preset = LINT_PRESETS[presetId];
-    if (preset) {
-      handleLintingRuleConfigsBatchChange({ ...preset.configs });
-    }
-  }, [handleLintingRuleConfigsBatchChange]);
-
-  /** Detect which preset matches the current linting config */
-  const activeLintPresetId = useMemo(() => {
-    for (const [id, preset] of Object.entries(LINT_PRESETS)) {
-      const allMatch = LINT_RULES_META.every((rule) => {
-        const current = lintingRuleConfigs[rule.id] ?? LINT_DEFAULT_CONFIGS[rule.id] ?? { enabled: true, severity: "warning" };
-        const presetCfg = preset.configs[rule.id];
-        if (!presetCfg) return false;
-        return current.enabled === presetCfg.enabled && current.severity === presetCfg.severity;
-      });
-      if (allMatch) return id;
-    }
-    return "";
-  }, [lintingRuleConfigs]);
+  // --- Lint handlers hook ---
+  const {
+    enrichedLintIssues,
+    activeLintIssueIndex,
+    handleNavigateToIssue,
+    handleShowLintHint,
+    handleIgnoreCorrection,
+    handleApplyFix,
+    handleApplyLintPreset,
+    activeLintPresetId,
+  } = useLintHandlers({
+    editorViewInstance,
+    lintIssues,
+    lintingRuleConfigs,
+    handleLintingRuleConfigsBatchChange,
+    ignoreCorrection,
+    triggerSwitchToCorrections,
+    programmaticScrollRef,
+  });
 
   const fileName = currentFile?.name ?? "新規ファイル";
 
@@ -764,6 +585,8 @@ export default function EditorPage() {
     switchToIndex,
     tabs,
     activeTabId,
+    splitEditorRight: useCallback(() => splitEditor("right"), [splitEditor]),
+    splitEditorDown: useCallback(() => splitEditor("down"), [splitEditor]),
   });
 
   // Detect feature availability after mount to avoid SSR hydration mismatch
@@ -865,6 +688,7 @@ export default function EditorPage() {
             matches={searchResults?.matches}
             searchTerm={searchResults?.searchTerm}
             onClose={handleCloseSearchResults}
+            programmaticScrollRef={programmaticScrollRef}
           />
         );
       case "outline":
@@ -1016,52 +840,85 @@ export default function EditorPage() {
         )}
 
         <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
-          <TabBar
-            compactMode={compactMode}
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onSwitchTab={(tabId) => {
-              switchTab(tabId);
-              incrementEditorKey();
+          <DockviewReact
+            className="flex-1 dockview-theme-illusions"
+            components={{
+              editor: ({ api: panelApi, params: panelParams }) => {
+                // Each dockview panel receives its own params.
+                // Only the panel matching the active tab renders the full interactive editor;
+                // other panels show a read-only content snapshot.
+                const panelBufferId = panelParams?.bufferId ?? activeTabId;
+                const isActivePanel = panelBufferId === activeTabId;
+
+                if (editorDiff && isActivePanel) {
+                  return (
+                    <EditorDiffView
+                      snapshotContent={editorDiff.snapshotContent}
+                      currentContent={editorDiff.currentContent}
+                      snapshotLabel={editorDiff.label}
+                      onClose={() => setEditorDiff(null)}
+                    />
+                  );
+                }
+
+                if (isActivePanel) {
+                  return (
+                    <ErrorBoundary sectionName="エディタ">
+                      <div ref={editorDomRef} className="h-full">
+                        <NovelEditor
+                          key={`tab-${panelBufferId}-${editorKey}`}
+                          initialContent={content}
+                          onChange={handleChange}
+                          onInsertText={handleInsertText}
+                          onSelectionChange={setSelectedCharCount}
+                          searchOpenTrigger={searchOpenTrigger}
+                          searchInitialTerm={searchInitialTerm}
+                          onEditorViewReady={setEditorViewInstance}
+                          programmaticScrollRef={programmaticScrollRef}
+                          onShowAllSearchResults={handleShowAllSearchResults}
+                          lintingRuleRunner={ruleRunner}
+                          onLintIssuesUpdated={handleLintIssuesUpdated}
+                          onNlpError={handleNlpError}
+                          onOpenRubyDialog={handleOpenRubyDialog}
+                          onToggleTcy={handleToggleTcy}
+                          onOpenDictionary={handleOpenDictionary}
+                          onShowLintHint={handleShowLintHint}
+                          onIgnoreCorrection={handleIgnoreCorrection}
+                          mdiExtensionsEnabled={mdiExtensionsEnabled}
+                          gfmEnabled={gfmEnabled}
+                        />
+                      </div>
+                    </ErrorBoundary>
+                  );
+                }
+
+                // Non-active panel: render a lightweight read-only editor
+                // that activates the tab when clicked
+                const panelTab = tabs.find((t) => t.id === panelBufferId);
+                const panelFileType = panelTab?.fileType ?? ".mdi";
+                return (
+                  <div
+                    className="h-full cursor-pointer"
+                    onClick={() => {
+                      switchTab(panelBufferId);
+                      panelApi.setActive();
+                    }}
+                  >
+                    <ErrorBoundary sectionName="エディタ">
+                      <NovelEditor
+                        key={`tab-${panelBufferId}-inactive`}
+                        initialContent={panelTab?.lastSavedContent ?? ""}
+                        mdiExtensionsEnabled={panelFileType === ".mdi"}
+                        gfmEnabled={panelFileType !== ".txt"}
+                      />
+                    </ErrorBoundary>
+                  </div>
+                );
+              },
             }}
-            onCloseTab={closeTab}
-            onPinTab={pinTab}
+            tabComponents={dockviewTabComponents}
+            onReady={handleDockviewReady}
           />
-          <div ref={editorDomRef} className="flex-1 min-h-0">
-            {editorDiff ? (
-              <EditorDiffView
-                snapshotContent={editorDiff.snapshotContent}
-                currentContent={editorDiff.currentContent}
-                snapshotLabel={editorDiff.label}
-                onClose={() => setEditorDiff(null)}
-              />
-            ) : (
-              <ErrorBoundary sectionName="エディタ">
-              <NovelEditor
-                key={`tab-${activeTabId}-${editorKey}`}
-                initialContent={content}
-                onChange={handleChange}
-                onInsertText={handleInsertText}
-                onSelectionChange={setSelectedCharCount}
-                searchOpenTrigger={searchOpenTrigger}
-                searchInitialTerm={searchInitialTerm}
-                onEditorViewReady={setEditorViewInstance}
-                programmaticScrollRef={programmaticScrollRef}
-                onShowAllSearchResults={handleShowAllSearchResults}
-                lintingRuleRunner={ruleRunner}
-                onLintIssuesUpdated={handleLintIssuesUpdated}
-                onNlpError={handleNlpError}
-                onOpenRubyDialog={handleOpenRubyDialog}
-                onToggleTcy={handleToggleTcy}
-                onOpenDictionary={handleOpenDictionary}
-                onShowLintHint={handleShowLintHint}
-                onIgnoreCorrection={handleIgnoreCorrection}
-                mdiExtensionsEnabled={mdiExtensionsEnabled}
-                gfmEnabled={gfmEnabled}
-              />
-              </ErrorBoundary>
-            )}
-          </div>
 
            {/* Save complete toast */}
           {showSaveToast && (
