@@ -230,6 +230,47 @@ let menuUiState = {
   autoCharsPerLine: true,
 }
 
+// Keymap overrides synced from renderer (only differences from defaults)
+let keymapOverrides = {}
+
+/**
+ * Default Electron accelerator strings keyed by CommandId.
+ * Mirrors the defaults in lib/keymap/shortcut-registry.ts.
+ */
+const DEFAULT_ACCELERATORS = {
+  'file.save': 'CmdOrCtrl+S',
+  'file.saveAs': 'CmdOrCtrl+Shift+S',
+  'file.open': 'CmdOrCtrl+O',
+  'file.newWindow': 'CmdOrCtrl+N',
+  'file.newTab': 'CmdOrCtrl+T',
+  'file.closeTab': 'CmdOrCtrl+W',
+  'edit.undo': 'CmdOrCtrl+Z',
+  'edit.redo': 'CmdOrCtrl+Y',
+  'edit.pasteAsPlaintext': 'CmdOrCtrl+Shift+V',
+  'edit.selectAll': 'CmdOrCtrl+A',
+  'view.compactMode': 'CmdOrCtrl+Shift+M',
+}
+
+/**
+ * Resolves the Electron accelerator for a command, applying user overrides.
+ * @param {string} commandId
+ * @returns {string | undefined}
+ */
+function resolveAccelerator(commandId) {
+  const override = keymapOverrides[commandId]
+  if (override === null) return undefined // intentionally unbound
+  if (override) {
+    // Convert KeyBinding { modifiers: [...], key: "s" } to "CmdOrCtrl+Shift+S"
+    const keyMap = {
+      Tab: 'Tab', Escape: 'Escape', Backspace: 'Backspace', Delete: 'Delete',
+      Enter: 'Return', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
+    }
+    const key = keyMap[override.key] ?? override.key.toUpperCase()
+    return [...override.modifiers, key].join('+')
+  }
+  return DEFAULT_ACCELERATORS[commandId]
+}
+
 function buildApplicationMenu(recentProjects = []) {
   const isMac = process.platform === 'darwin'
 
@@ -265,7 +306,7 @@ function buildApplicationMenu(recentProjects = []) {
     submenu: [
       {
         label: '新規ウィンドウ',
-        accelerator: 'CmdOrCtrl+N',
+        accelerator: resolveAccelerator('file.newWindow'),
         click: () => {
           createWindow({ showWelcome: true })
         },
@@ -290,21 +331,21 @@ function buildApplicationMenu(recentProjects = []) {
       { type: 'separator' },
       {
         label: 'ファイルを開く...',
-        accelerator: 'CmdOrCtrl+O',
+        accelerator: resolveAccelerator('file.open'),
         click: () => {
           sendToFocused('menu-open-triggered')
         },
       },
       {
         label: '保存',
-        accelerator: 'CmdOrCtrl+S',
+        accelerator: resolveAccelerator('file.save'),
         click: () => {
           sendToFocused('menu-save-triggered')
         },
       },
       {
         label: '別名で保存...',
-        accelerator: 'Shift+CmdOrCtrl+S',
+        accelerator: resolveAccelerator('file.saveAs'),
         click: () => {
           sendToFocused('menu-save-as-triggered')
         },
@@ -330,14 +371,14 @@ function buildApplicationMenu(recentProjects = []) {
       { type: 'separator' },
       {
         label: '新しいタブ',
-        accelerator: 'CmdOrCtrl+T',
+        accelerator: resolveAccelerator('file.newTab'),
         click: () => {
           sendToFocused('menu-new-tab')
         },
       },
       {
         label: 'タブを閉じる',
-        accelerator: 'CmdOrCtrl+W',
+        accelerator: resolveAccelerator('file.closeTab'),
         click: () => {
           sendToFocused('menu-close-tab')
         },
@@ -359,7 +400,7 @@ function buildApplicationMenu(recentProjects = []) {
        { role: 'paste', label: '貼り付け' },
        {
          label: 'プレーンテキストとして貼り付け',
-         accelerator: 'Shift+CmdOrCtrl+V',
+         accelerator: resolveAccelerator('edit.pasteAsPlaintext'),
          click: () => {
            sendToFocused('menu-paste-as-plaintext')
          },
@@ -444,7 +485,7 @@ function buildApplicationMenu(recentProjects = []) {
         label: 'コンパクトモード',
         type: 'checkbox',
         checked: menuUiState.compactMode,
-        accelerator: 'CmdOrCtrl+Shift+M',
+        accelerator: resolveAccelerator('view.compactMode'),
         click: () => {
           sendToFocused('menu-toggle-compact-mode')
         },
@@ -1036,6 +1077,12 @@ ipcMain.handle('menu:rebuild', async () => {
 // Sync UI state from renderer to update menu checked states
 ipcMain.handle('menu:sync-ui-state', async (_event, state) => {
   menuUiState = { ...menuUiState, ...state }
+  await rebuildApplicationMenu()
+  return true
+})
+
+ipcMain.handle('menu:update-keymap-overrides', async (_event, overrides) => {
+  keymapOverrides = overrides ?? {}
   await rebuildApplicationMenu()
   return true
 })

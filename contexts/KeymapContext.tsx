@@ -73,23 +73,34 @@ export function KeymapProvider({ children }: KeymapProviderProps): React.JSX.Ele
     [defaultBindings, overrides],
   );
 
+  /** Notifies Electron main process to rebuild native menu with new accelerators */
+  const syncElectronMenu = useCallback(async (next: KeymapOverrides) => {
+    if (typeof window !== "undefined") {
+      const api = (window as Window & { electronAPI?: { updateKeymapOverrides?: (o: KeymapOverrides) => Promise<boolean> } }).electronAPI;
+      await api?.updateKeymapOverrides?.(next);
+    }
+  }, []);
+
   const setOverride = useCallback(async (id: CommandId, binding: KeyBinding | null) => {
     const next: KeymapOverrides = { ...overrides, [id]: binding };
     setOverrides(next);
     await saveKeymapOverrides(next);
-  }, [overrides]);
+    await syncElectronMenu(next);
+  }, [overrides, syncElectronMenu]);
 
   const resetOverride = useCallback(async (id: CommandId) => {
     const next = { ...overrides };
     delete next[id];
     setOverrides(next);
     await saveKeymapOverrides(next);
-  }, [overrides]);
+    await syncElectronMenu(next);
+  }, [overrides, syncElectronMenu]);
 
   const resetAll = useCallback(async () => {
     setOverrides({});
     await saveKeymapOverrides({});
-  }, []);
+    await syncElectronMenu({});
+  }, [syncElectronMenu]);
 
   const value = useMemo<KeymapContextValue>(
     () => ({ effectiveBindings, overrides, setOverride, resetOverride, resetAll }),
