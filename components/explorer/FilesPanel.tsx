@@ -21,6 +21,8 @@ interface FilesPanelProps {
   onFileClick?: (vfsPath: string) => void;
   onFileDoubleClick?: (vfsPath: string) => void;
   onFileMiddleClick?: (vfsPath: string) => void;
+  /** Increment to trigger a new file creation at root with default name. */
+  newFileTrigger?: number;
 }
 
 /** File tree panel for browsing and managing project files */
@@ -29,6 +31,7 @@ export function FilesPanel({
   onFileClick,
   onFileDoubleClick,
   onFileMiddleClick,
+  newFileTrigger,
 }: FilesPanelProps) {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(["/"]));
   const [tree, setTree] = useState<FileTreeEntry[] | null>(null);
@@ -120,9 +123,17 @@ export function FilesPanel({
         } else {
           input.select();
         }
-      } else if (editing.kind === "new-file" && editing.currentName.startsWith(".")) {
-        // Extension pre-filled: place cursor at the start (before the extension)
-        input.setSelectionRange(0, 0);
+      } else if (editing.kind === "new-file") {
+        const dotIndex = editing.currentName.lastIndexOf(".");
+        if (dotIndex > 0) {
+          // Name with extension (e.g. "新規ファイル.mdi"): select filename part
+          input.setSelectionRange(0, dotIndex);
+        } else if (editing.currentName.startsWith(".")) {
+          // Extension only (e.g. ".mdi"): place cursor at start
+          input.setSelectionRange(0, 0);
+        } else {
+          input.select();
+        }
       } else {
         input.select();
       }
@@ -240,7 +251,10 @@ export function FilesPanel({
 
   const handleNewFile = useCallback(async (parentPath: string, name: string) => {
     if (!name.trim()) { setEditing(null); return; }
-    const filePath = parentPath === "/" ? `/${name}` : `${parentPath}/${name}`;
+    // Auto-add .mdi extension if no extension provided
+    const hasExtension = /\.\w+$/.test(name);
+    const finalName = hasExtension ? name : `${name}.mdi`;
+    const filePath = parentPath === "/" ? `/${finalName}` : `${parentPath}/${finalName}`;
     try {
       const { getVFS } = await import("@/lib/vfs");
       const vfs = getVFS();
@@ -280,6 +294,15 @@ export function FilesPanel({
     setEditing({ parentPath, kind: "new-file", currentName: defaultExtension ?? "" });
     refresh();
   }, [refresh]);
+
+  // External trigger: create new file at root with default name
+  const newFileTriggerRef = useRef(newFileTrigger ?? 0);
+  useEffect(() => {
+    if (newFileTrigger != null && newFileTrigger !== newFileTriggerRef.current) {
+      newFileTriggerRef.current = newFileTrigger;
+      startNewFile("/", "新規ファイル.mdi");
+    }
+  }, [newFileTrigger, startNewFile]);
 
   const startNewFolder = useCallback((parentPath: string) => {
     setExpandedDirs(prev => { const next = new Set(prev); next.add(parentPath); return next; });
