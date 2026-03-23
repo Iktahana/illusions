@@ -124,7 +124,6 @@ export default function EditorPage() {
     posHighlightEnabled, posHighlightColors, verticalScrollBehavior,
     scrollSensitivity, compactMode, showSettingsModal,
     lintingEnabled, lintingRuleConfigs,
-    llmEnabled, llmModelId, llmIdlingStop,
     powerSaveMode, autoPowerSaveOnBattery,
     correctionConfig,
   } = settings;
@@ -137,7 +136,6 @@ export default function EditorPage() {
     handleScrollSensitivityChange, handleToggleCompactMode, setShowSettingsModal,
     handleLintingEnabledChange, handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
-    handleLlmEnabledChange, handleLlmModelIdChange, handleLlmIdlingStopChange,
     handlePowerSaveModeChange, handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange,
   } = settingsHandlers;
@@ -150,17 +148,6 @@ export default function EditorPage() {
     autoPowerSaveOnBattery,
     onPowerSaveModeChange: handlePowerSaveModeChange,
   });
-
-  // --- Sync llmIdlingStop setting to LLM engine ---
-  useEffect(() => {
-    import("@/lib/llm-client/llm-client").then(({ getLlmClient }) => {
-      const client = getLlmClient();
-      if (!client.isAvailable()) return;
-      void client.setIdlingStop(llmIdlingStop).catch((err) => {
-        console.error("[page] Failed to sync llmIdlingStop:", err);
-      });
-    });
-  }, [llmIdlingStop]);
 
   // --- Panel state hook ---
   const { state: panelState, handlers: panelHandlers } = usePanelState({ setShowSettingsModal });
@@ -510,9 +497,7 @@ export default function EditorPage() {
     lintingEnabled,
     lintingRuleConfigs,
     editorViewInstance,
-    llmEnabled,
     powerSaveMode,
-    llmModelId,
     correctionConfig.guidelines,
     correctionConfig.mode,
   );

@@ -3,13 +3,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Plus, Trash2, Edit2, Check, X, Sparkles, Loader2 } from "lucide-react";
 
-import { CharacterExtractor } from "@/lib/character-extraction";
 import type { ExtractionProgress } from "@/lib/character-extraction";
-import { getLlmClient } from "@/lib/llm-client/llm-client";
-import { LlmController } from "@/lib/linting/llm-controller";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { fetchAppState, persistAppState } from "@/lib/storage/app-state-manager";
-import { useLlmSettings } from "@/contexts/EditorSettingsContext";
+import { useCharacterExtractionSettings } from "@/contexts/EditorSettingsContext";
 
 interface Character {
   id: string;
@@ -27,11 +24,9 @@ interface CharactersProps {
 
 export default function Characters({ content }: CharactersProps) {
   const {
-    llmEnabled,
-    llmModelId,
     characterExtractionBatchSize,
     characterExtractionConcurrency,
-  } = useLlmSettings();
+  } = useCharacterExtractionSettings();
 
   const [characters, setCharacters] = useState<Character[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -177,93 +172,11 @@ export default function Characters({ content }: CharactersProps) {
   }, [content, characters]);
 
   /** LLM-based extraction with batch decoding */
-  const handleLlmExtract = useCallback(async () => {
-    if (!content) return;
-
-    setIsExtracting(true);
-    setExtractionProgress(null);
-    setExtractionError(null);
-
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
-    try {
-      const llmClient = getLlmClient();
-      const controller = new LlmController(llmClient, llmModelId);
-
-      await controller.requestValidation(async () => {
-        const paragraphs = content
-          .split(/\n+/)
-          .map((p) => p.trim())
-          .filter((p) => p.length > 0);
-
-        if (paragraphs.length === 0) return;
-
-        const extractor = new CharacterExtractor(llmClient);
-        const result = await extractor.extract(paragraphs, {
-          batchSize: characterExtractionBatchSize,
-          concurrency: characterExtractionConcurrency,
-          signal: abortController.signal,
-          onProgress: setExtractionProgress,
-        });
-
-        if (abortController.signal.aborted) return;
-
-        // Merge with existing characters, avoiding duplicates
-        const newChars = result
-          .filter(
-            (ec) =>
-              !characters.some(
-                (c) =>
-                  c.name === ec.name ||
-                  ec.aliases.some(
-                    (a) => a.toLowerCase() === c.name.toLowerCase()
-                  )
-              )
-          )
-          .map((ec) => ({
-            id: Date.now().toString() + Math.random(),
-            name: ec.name,
-            aliases: ec.aliases,
-            description: ec.description,
-            appearance: "",
-            personality: "",
-            relationships: "",
-          }));
-
-        if (newChars.length > 0) {
-          setCharacters((prev) => [...prev, ...newChars]);
-        }
-      });
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        setExtractionError("LLMによる抽出に失敗しました");
-        console.error("LLM character extraction failed:", err);
-      }
-    } finally {
-      setIsExtracting(false);
-      setExtractionProgress(null);
-      abortControllerRef.current = null;
-    }
-  }, [
-    content,
-    characters,
-    llmModelId,
-    characterExtractionBatchSize,
-    characterExtractionConcurrency,
-  ]);
-
-  /** Auto-extract: use LLM if available, otherwise fall back to NLP */
+  /** Auto-extract: use NLP-based extraction (LLM extraction will be available via online API in the future) */
   const handleAutoExtract = useCallback(async () => {
     if (!content) return;
-
-    const llmClient = getLlmClient();
-    if (llmEnabled && llmClient.isAvailable()) {
-      await handleLlmExtract();
-    } else {
-      await handleNlpExtract();
-    }
-  }, [content, llmEnabled, handleLlmExtract, handleNlpExtract]);
+    await handleNlpExtract();
+  }, [content, handleNlpExtract]);
 
   /** Cancel ongoing extraction */
   const handleCancelExtract = useCallback(() => {

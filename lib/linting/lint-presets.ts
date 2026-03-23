@@ -38,11 +38,6 @@ export const LINT_RULES_META: LintRuleMeta[] = [
   { id: "passive-overuse", nameJa: "受動態の多用検出", descriptionJa: "受動態が連続して使われている箇所を検出します" },
   { id: "counter-word-mismatch", nameJa: "助数詞の誤用検出", descriptionJa: "助数詞と数えられる対象の組み合わせの誤りを検出します" },
   { id: "adverb-form-consistency", nameJa: "副詞の漢字・ひらがな統一", descriptionJa: "副詞の漢字表記とひらがな表記の混在を検出します", guidelineId: "novel-manuscript" },
-  {
-    id: "homophone-detection",
-    nameJa: "同音異義語の検出",
-    descriptionJa: "LLMによる文脈分析で、同音異義語の誤用を検出します",
-  },
 
   // ---------------------------------------------------------------------------
   // #438 rules: okurigana-1973
@@ -172,7 +167,6 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
       "official-style-copula", "literary-style-exclusion", "excessive-honorific",
     ],
   },
-  { id: "ai", nameJa: "AI校正", rules: ["homophone-detection"] },
 ];
 
 /** Per-rule config shape used in presets and settings */
@@ -180,26 +174,25 @@ export interface LintRulePresetConfig {
   enabled: boolean;
   severity: Severity;
   skipDialogue?: boolean;
-  skipLlmValidation?: boolean;
 }
 
 /** Default configs per rule (matching each rule's defaultConfig) -- used as standard mode */
 export const LINT_DEFAULT_CONFIGS: Record<string, LintRulePresetConfig> = {
   // --- Existing rules ---
-  "punctuation-rules": { enabled: true, severity: "warning", skipLlmValidation: true },
-  "number-format": { enabled: true, severity: "warning", skipDialogue: true, skipLlmValidation: true },
-  "joyo-kanji": { enabled: true, severity: "info", skipDialogue: true, skipLlmValidation: true },
-  "era-year-validator": { enabled: true, severity: "warning", skipLlmValidation: true },
+  "punctuation-rules": { enabled: true, severity: "warning" },
+  "number-format": { enabled: true, severity: "warning", skipDialogue: true },
+  "joyo-kanji": { enabled: true, severity: "info", skipDialogue: true },
+  "era-year-validator": { enabled: true, severity: "warning" },
   "particle-no-repetition": { enabled: true, severity: "info", skipDialogue: true },
   "conjugation-errors": { enabled: true, severity: "warning", skipDialogue: true },
-  "redundant-expression": { enabled: true, severity: "warning", skipDialogue: true, skipLlmValidation: true },
+  "redundant-expression": { enabled: true, severity: "warning", skipDialogue: true },
   "verbose-expression": { enabled: true, severity: "info", skipDialogue: true },
   "sentence-ending-repetition": { enabled: true, severity: "info", skipDialogue: true },
   "notation-consistency": { enabled: true, severity: "warning", skipDialogue: true },
   "correlative-expression": { enabled: true, severity: "warning", skipDialogue: true },
   "sentence-length": { enabled: true, severity: "info", skipDialogue: true },
-  "dash-format": { enabled: true, severity: "warning", skipLlmValidation: true },
-  "dialogue-punctuation": { enabled: true, severity: "warning", skipLlmValidation: true },
+  "dash-format": { enabled: true, severity: "warning" },
+  "dialogue-punctuation": { enabled: true, severity: "warning" },
   "comma-frequency": { enabled: true, severity: "info", skipDialogue: true },
   "desu-masu-consistency": { enabled: true, severity: "warning", skipDialogue: true },
   "conjunction-overuse": { enabled: true, severity: "info", skipDialogue: true },
@@ -208,8 +201,6 @@ export const LINT_DEFAULT_CONFIGS: Record<string, LintRulePresetConfig> = {
   "passive-overuse": { enabled: true, severity: "info", skipDialogue: true },
   "counter-word-mismatch": { enabled: true, severity: "warning" },
   "adverb-form-consistency": { enabled: true, severity: "info" },
-  "homophone-detection": { enabled: true, severity: "warning" },
-
   // --- #438 rules: okurigana-1973 ---
   "verb-okurigana-strict": { enabled: true, severity: "warning" },
   "fixed-okurigana-noun": { enabled: true, severity: "info" },
@@ -276,20 +267,20 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
     nameJa: "寛容モード",
     configs: {
       // --- Existing rules ---
-      "punctuation-rules": { enabled: true, severity: "info", skipLlmValidation: true },
-      "number-format": { enabled: false, severity: "info", skipDialogue: true, skipLlmValidation: true },
-      "joyo-kanji": { enabled: false, severity: "info", skipDialogue: true, skipLlmValidation: true },
-      "era-year-validator": { enabled: false, severity: "info", skipLlmValidation: true },
+      "punctuation-rules": { enabled: true, severity: "info" },
+      "number-format": { enabled: false, severity: "info", skipDialogue: true },
+      "joyo-kanji": { enabled: false, severity: "info", skipDialogue: true },
+      "era-year-validator": { enabled: false, severity: "info" },
       "particle-no-repetition": { enabled: false, severity: "info", skipDialogue: true },
       "conjugation-errors": { enabled: true, severity: "warning", skipDialogue: true },
-      "redundant-expression": { enabled: true, severity: "info", skipDialogue: true, skipLlmValidation: true },
+      "redundant-expression": { enabled: true, severity: "info", skipDialogue: true },
       "verbose-expression": { enabled: false, severity: "info", skipDialogue: true },
       "sentence-ending-repetition": { enabled: false, severity: "info", skipDialogue: true },
       "notation-consistency": { enabled: false, severity: "info", skipDialogue: true },
       "correlative-expression": { enabled: true, severity: "info", skipDialogue: true },
       "sentence-length": { enabled: false, severity: "info", skipDialogue: true },
-      "dash-format": { enabled: false, severity: "info", skipLlmValidation: true },
-      "dialogue-punctuation": { enabled: true, severity: "warning", skipLlmValidation: true },
+      "dash-format": { enabled: false, severity: "info" },
+      "dialogue-punctuation": { enabled: true, severity: "warning" },
       "comma-frequency": { enabled: false, severity: "info" },
       "desu-masu-consistency": { enabled: false, severity: "info" },
       "conjunction-overuse": { enabled: false, severity: "info" },
@@ -298,7 +289,6 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "passive-overuse": { enabled: false, severity: "info" },
       "counter-word-mismatch": { enabled: false, severity: "info" },
       "adverb-form-consistency": { enabled: false, severity: "info" },
-      "homophone-detection": { enabled: false, severity: "info" },
       // --- #438 rules ---
       "verb-okurigana-strict": { enabled: false, severity: "info" },
       "fixed-okurigana-noun": { enabled: false, severity: "info" },
@@ -350,20 +340,20 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
     nameJa: "厳格モード",
     configs: {
       // --- Existing rules ---
-      "punctuation-rules": { enabled: true, severity: "error", skipLlmValidation: true },
-      "number-format": { enabled: true, severity: "error", skipLlmValidation: true },
-      "joyo-kanji": { enabled: true, severity: "warning", skipLlmValidation: true },
-      "era-year-validator": { enabled: true, severity: "error", skipLlmValidation: true },
+      "punctuation-rules": { enabled: true, severity: "error" },
+      "number-format": { enabled: true, severity: "error" },
+      "joyo-kanji": { enabled: true, severity: "warning" },
+      "era-year-validator": { enabled: true, severity: "error" },
       "particle-no-repetition": { enabled: true, severity: "warning" },
       "conjugation-errors": { enabled: true, severity: "error" },
-      "redundant-expression": { enabled: true, severity: "error", skipLlmValidation: true },
+      "redundant-expression": { enabled: true, severity: "error" },
       "verbose-expression": { enabled: true, severity: "warning" },
       "sentence-ending-repetition": { enabled: true, severity: "warning", skipDialogue: true },
       "notation-consistency": { enabled: true, severity: "error" },
       "correlative-expression": { enabled: true, severity: "error" },
       "sentence-length": { enabled: true, severity: "warning" },
-      "dash-format": { enabled: true, severity: "error", skipLlmValidation: true },
-      "dialogue-punctuation": { enabled: true, severity: "error", skipLlmValidation: true },
+      "dash-format": { enabled: true, severity: "error" },
+      "dialogue-punctuation": { enabled: true, severity: "error" },
       "comma-frequency": { enabled: true, severity: "warning" },
       "desu-masu-consistency": { enabled: true, severity: "error", skipDialogue: true },
       "conjunction-overuse": { enabled: true, severity: "warning", skipDialogue: true },
@@ -372,7 +362,6 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "passive-overuse": { enabled: true, severity: "warning", skipDialogue: true },
       "counter-word-mismatch": { enabled: true, severity: "error" },
       "adverb-form-consistency": { enabled: true, severity: "warning" },
-      "homophone-detection": { enabled: true, severity: "error" },
       // --- #438 rules ---
       "verb-okurigana-strict": { enabled: true, severity: "error" },
       "fixed-okurigana-noun": { enabled: true, severity: "warning" },
@@ -420,20 +409,20 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
     nameJa: "小説モード",
     configs: {
       // --- Existing rules ---
-      "punctuation-rules": { enabled: true, severity: "warning", skipLlmValidation: true },
-      "number-format": { enabled: false, severity: "info", skipDialogue: true, skipLlmValidation: true },
-      "joyo-kanji": { enabled: false, severity: "info", skipDialogue: true, skipLlmValidation: true },
-      "era-year-validator": { enabled: false, severity: "info", skipLlmValidation: true },
+      "punctuation-rules": { enabled: true, severity: "warning" },
+      "number-format": { enabled: false, severity: "info", skipDialogue: true },
+      "joyo-kanji": { enabled: false, severity: "info", skipDialogue: true },
+      "era-year-validator": { enabled: false, severity: "info" },
       "particle-no-repetition": { enabled: true, severity: "info", skipDialogue: true },
       "conjugation-errors": { enabled: true, severity: "warning", skipDialogue: true },
-      "redundant-expression": { enabled: true, severity: "warning", skipDialogue: true, skipLlmValidation: true },
+      "redundant-expression": { enabled: true, severity: "warning", skipDialogue: true },
       "verbose-expression": { enabled: true, severity: "info", skipDialogue: true },
       "sentence-ending-repetition": { enabled: true, severity: "warning", skipDialogue: true },
       "notation-consistency": { enabled: true, severity: "warning", skipDialogue: true },
       "correlative-expression": { enabled: true, severity: "warning", skipDialogue: true },
       "sentence-length": { enabled: true, severity: "info", skipDialogue: true },
-      "dash-format": { enabled: true, severity: "warning", skipLlmValidation: true },
-      "dialogue-punctuation": { enabled: true, severity: "warning", skipLlmValidation: true },
+      "dash-format": { enabled: true, severity: "warning" },
+      "dialogue-punctuation": { enabled: true, severity: "warning" },
       "comma-frequency": { enabled: false, severity: "info" },
       "desu-masu-consistency": { enabled: false, severity: "info" },
       "conjunction-overuse": { enabled: true, severity: "info" },
@@ -442,7 +431,6 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "passive-overuse": { enabled: true, severity: "info" },
       "counter-word-mismatch": { enabled: false, severity: "warning" },
       "adverb-form-consistency": { enabled: true, severity: "info" },
-      "homophone-detection": { enabled: true, severity: "warning" },
       // --- #438 rules: creative writing = disable official/formal rules ---
       "verb-okurigana-strict": { enabled: false, severity: "info" },
       "fixed-okurigana-noun": { enabled: false, severity: "info" },
@@ -493,20 +481,20 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
     nameJa: "公用文モード",
     configs: {
       // --- Existing rules ---
-      "punctuation-rules": { enabled: true, severity: "error", skipLlmValidation: true },
-      "number-format": { enabled: true, severity: "error", skipLlmValidation: true },
-      "joyo-kanji": { enabled: true, severity: "warning", skipLlmValidation: true },
-      "era-year-validator": { enabled: true, severity: "error", skipLlmValidation: true },
+      "punctuation-rules": { enabled: true, severity: "error" },
+      "number-format": { enabled: true, severity: "error" },
+      "joyo-kanji": { enabled: true, severity: "warning" },
+      "era-year-validator": { enabled: true, severity: "error" },
       "particle-no-repetition": { enabled: true, severity: "warning" },
       "conjugation-errors": { enabled: true, severity: "error" },
-      "redundant-expression": { enabled: true, severity: "error", skipLlmValidation: true },
+      "redundant-expression": { enabled: true, severity: "error" },
       "verbose-expression": { enabled: true, severity: "warning" },
       "sentence-ending-repetition": { enabled: true, severity: "info" },
       "notation-consistency": { enabled: true, severity: "error" },
       "correlative-expression": { enabled: true, severity: "error" },
       "sentence-length": { enabled: true, severity: "warning" },
-      "dash-format": { enabled: true, severity: "error", skipLlmValidation: true },
-      "dialogue-punctuation": { enabled: true, severity: "warning", skipLlmValidation: true },
+      "dash-format": { enabled: true, severity: "error" },
+      "dialogue-punctuation": { enabled: true, severity: "warning" },
       "comma-frequency": { enabled: true, severity: "warning" },
       "desu-masu-consistency": { enabled: true, severity: "error" },
       "conjunction-overuse": { enabled: true, severity: "warning" },
@@ -515,7 +503,6 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "passive-overuse": { enabled: true, severity: "warning" },
       "counter-word-mismatch": { enabled: true, severity: "error" },
       "adverb-form-consistency": { enabled: true, severity: "warning" },
-      "homophone-detection": { enabled: true, severity: "warning" },
       // --- #438 rules: official/formal = enable all formal rules ---
       "verb-okurigana-strict": { enabled: true, severity: "error" },
       "fixed-okurigana-noun": { enabled: true, severity: "warning" },
