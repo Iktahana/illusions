@@ -14,7 +14,7 @@ interface SearchDialogProps {
   programmaticScrollRef?: React.MutableRefObject<boolean>;
 }
 
-interface SearchMatch {
+export interface SearchMatch {
   from: number;
   to: number;
 }

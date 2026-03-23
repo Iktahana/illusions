@@ -44,7 +44,6 @@ export interface ProjectMetadata {
  */
 export interface AppState {
   lastOpenedMdiPath?: string;
-  hasSeenDemo?: boolean;
   sidebarTab?: "chapters" | "settings" | "style";
   inspectorTab?: "ai" | "corrections" | "stats" | "versions" | "history";
 

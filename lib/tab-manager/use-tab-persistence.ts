@@ -86,7 +86,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     };
   }, [tabs, activeTabId]);
 
-  // --- Storage initialization & demo content ------------------------------
+  // --- Storage initialization & Web file restore --------------------------
 
   useEffect(() => {
     const initializeStorage = async () => {
