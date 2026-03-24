@@ -43,6 +43,7 @@ import { useEditorMode } from "@/contexts/EditorModeContext";
 import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
+import { isEditorTab } from "@/lib/tab-manager/tab-types";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
@@ -180,7 +181,8 @@ export default function EditorPage() {
 
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
-  const activeFileType = activeTab?.fileType ?? ".mdi";
+  const activeEditorTab = activeTab && isEditorTab(activeTab) ? activeTab : undefined;
+  const activeFileType = activeEditorTab?.fileType ?? ".mdi";
   const mdiExtensionsEnabled = activeFileType === ".mdi";
   const gfmEnabled = activeFileType !== ".txt";
 
@@ -232,7 +234,7 @@ export default function EditorPage() {
   } = projectLifecycle;
 
   // Unsaved warning hook (project mode transitions only; tabs handle per-tab dirty checks)
-  const anyDirty = tabs.some((t) => t.isDirty);
+  const anyDirty = tabs.some((t) => isEditorTab(t) && t.isDirty);
   const unsavedWarning = useUnsavedWarning(
     anyDirty,
     saveFile,
@@ -265,7 +267,7 @@ export default function EditorPage() {
   const getExportContent = useCallback(() => content, [content]);
   const getExportTitle = useCallback(() => {
     const tab = tabs.find((t) => t.id === activeTabId);
-    const name = tab?.file?.name ?? "untitled";
+    const name = (tab && isEditorTab(tab) ? tab.file?.name : undefined) ?? "untitled";
     return name.replace(/\.[^.]+$/, "");
   }, [tabs, activeTabId]);
 
@@ -822,7 +824,8 @@ export default function EditorPage() {
                 // Non-active panel: render a lightweight read-only editor
                 // that activates the tab when clicked
                 const panelTab = tabs.find((t) => t.id === panelBufferId);
-                const panelFileType = panelTab?.fileType ?? ".mdi";
+                const panelEditorTab = panelTab && isEditorTab(panelTab) ? panelTab : undefined;
+                const panelFileType = panelEditorTab?.fileType ?? ".mdi";
                 return (
                   <div
                     className="h-full cursor-pointer"
@@ -834,7 +837,7 @@ export default function EditorPage() {
                     <ErrorBoundary sectionName="エディタ">
                       <NovelEditor
                         key={`tab-${panelBufferId}-inactive`}
-                        initialContent={panelTab?.lastSavedContent ?? ""}
+                        initialContent={panelEditorTab?.lastSavedContent ?? ""}
                         mdiExtensionsEnabled={panelFileType === ".mdi"}
                         gfmEnabled={panelFileType !== ".txt"}
                       />

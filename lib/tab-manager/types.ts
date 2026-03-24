@@ -3,7 +3,7 @@
 import type { MutableRefObject, Dispatch, SetStateAction } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension } from "../project/project-types";
-import type { TabId, TabState } from "./tab-types";
+import type { TabId, TabState, EditorTabState } from "./tab-types";
 
 // ---------------------------------------------------------------------------
 // Public return type (must stay identical to the original useTabManager)
@@ -38,6 +38,14 @@ export interface UseTabManagerReturn {
   switchToIndex: (index: number) => void;
   openProjectFile: (vfsPath: string, options?: { preview?: boolean }) => Promise<void>;
   pinTab: (tabId: TabId) => void;
+  newTerminalTab: () => void;
+  openDiffTab: (
+    sourceTabId: TabId,
+    sourceFileName: string,
+    localContent: string,
+    remoteContent: string,
+    remoteTimestamp: number,
+  ) => void;
 
   // Close-tab unsaved warning flow
   pendingCloseTabId: TabId | null;
@@ -253,9 +261,10 @@ export function getErrorMessage(error: unknown): string {
   return message;
 }
 
-export function createNewTab(content?: string, fileType: SupportedFileExtension = ".mdi"): TabState {
+export function createNewTab(content?: string, fileType: SupportedFileExtension = ".mdi"): EditorTabState {
   const c = content ?? "";
   return {
+    tabKind: "editor",
     id: generateTabId(),
     file: null,
     content: c,
@@ -266,6 +275,8 @@ export function createNewTab(content?: string, fileType: SupportedFileExtension 
     isSaving: false,
     isPreview: false,
     fileType,
+    fileSyncStatus: "clean",
+    conflictDiskContent: null,
   };
 }
 

@@ -5,6 +5,7 @@ import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
+import { isEditorTab } from "./tab-types";
 import type { TabManagerCore } from "./types";
 import { AUTO_SAVE_INTERVAL, sanitizeMdiContent } from "./types";
 
@@ -55,6 +56,9 @@ export function useAutoSave(params: UseAutoSaveParams): void {
     autoSaveTimerRef.current = setInterval(() => {
       const currentTabs = tabsRef.current;
       for (const tab of currentTabs) {
+        // Skip non-editor tabs (terminal, diff) and conflicted editor tabs
+        if (!isEditorTab(tab)) continue;
+        if (tab.fileSyncStatus === "conflicted") continue;
         if (!tab.isDirty || !tab.file || tab.isSaving) continue;
 
         // Active tab: use the normal saveFile path
@@ -83,7 +87,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
               if (!mountedRef.current) return;
               setTabs((prev) =>
                 prev.map((t) =>
-                  t.id === tab.id
+                  t.id === tab.id && isEditorTab(t)
                     ? {
                         ...t,
                         lastSavedContent: sanitized,
@@ -104,7 +108,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                 if (!mountedRef.current) return;
                 setTabs((prev) =>
                   prev.map((t) =>
-                    t.id === tab.id
+                    t.id === tab.id && isEditorTab(t)
                       ? {
                           ...t,
                           file: result.descriptor,
