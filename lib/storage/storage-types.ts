@@ -124,6 +124,9 @@ export interface AppState {
 
   // Dockview レイアウトの永続化
   dockviewLayout?: DockviewLayoutState;
+
+  // キーマップオーバーライド
+  keymapOverrides?: Record<string, { modifiers: string[]; key: string } | null>;
 }
 
 /**

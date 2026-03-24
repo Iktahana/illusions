@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   FileText,
   Settings,
@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { localPreferences } from "@/lib/storage/local-preferences";
+import { useKeymap } from "@/contexts/KeymapContext";
+import { formatBinding } from "@/lib/keymap/keymap-utils";
+import type { CommandId } from "@/lib/keymap/command-ids";
 import {
   DndContext,
   PointerSensor,
@@ -40,6 +43,14 @@ interface ActivityBarItem {
   tooltip: string;
 }
 
+/** Maps ActivityBarView IDs to their keyboard shortcut CommandId */
+const VIEW_TO_COMMAND_ID: Partial<Record<ActivityBarView, CommandId>> = {
+  explorer: "panel.explorer",
+  search: "panel.search",
+  outline: "panel.outline",
+  settings: "nav.settings",
+};
+
 /** Top group: primary navigation (document/project structure) */
 const DEFAULT_TOP_ITEMS: ActivityBarItem[] = [
   {
@@ -52,19 +63,19 @@ const DEFAULT_TOP_ITEMS: ActivityBarItem[] = [
     id: "explorer",
     icon: Layers,
     label: "エクスプローラー",
-    tooltip: "エクスプローラー (Ctrl+Shift+E)"
+    tooltip: "エクスプローラー"
   },
   {
     id: "search",
     icon: Search,
     label: "検索",
-    tooltip: "検索 (Ctrl+Shift+F)"
+    tooltip: "検索"
   },
   {
     id: "outline",
     icon: Book,
     label: "アウトライン",
-    tooltip: "アウトライン (Ctrl+Shift+O)"
+    tooltip: "アウトライン"
   },
 ];
 
@@ -92,7 +103,7 @@ const DEFAULT_BOTTOM_ITEMS: ActivityBarItem[] = [
     id: "settings",
     icon: Settings,
     label: "設定",
-    tooltip: "設定 (Ctrl+,)"
+    tooltip: "設定"
   },
 ];
 
@@ -220,6 +231,27 @@ export default function ActivityBar({
     loadOrder(() => localPreferences.getSidebarBottomOrder(), DEFAULT_BOTTOM_ITEMS)
   );
 
+  const { effectiveBindings } = useKeymap();
+
+  /** Adds the keyboard shortcut to the tooltip if this view has a CommandId */
+  const withTooltip = useCallback((item: ActivityBarItem): ActivityBarItem => {
+    const commandId = VIEW_TO_COMMAND_ID[item.id];
+    if (!commandId) return item;
+    const binding = effectiveBindings[commandId];
+    const shortcut = formatBinding(binding);
+    if (shortcut === "未設定") return item;
+    return { ...item, tooltip: `${item.label} (${shortcut})` };
+  }, [effectiveBindings]);
+
+  const topItemsWithTooltips = useMemo(
+    () => topItems.map(withTooltip),
+    [topItems, withTooltip]
+  );
+  const bottomItemsWithTooltips = useMemo(
+    () => bottomItems.map(withTooltip),
+    [bottomItems, withTooltip]
+  );
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor)
@@ -269,7 +301,7 @@ export default function ActivityBar({
           items={topItems.map((item) => item.id)}
           strategy={verticalListSortingStrategy}
         >
-          {topItems.map((item) => (
+          {topItemsWithTooltips.map((item) => (
             <SortableButton
               key={item.id}
               item={item}
@@ -290,7 +322,7 @@ export default function ActivityBar({
           items={bottomItems.map((item) => item.id)}
           strategy={verticalListSortingStrategy}
         >
-          {bottomItems.map((item) => (
+          {bottomItemsWithTooltips.map((item) => (
             <SortableButton
               key={item.id}
               item={item}
