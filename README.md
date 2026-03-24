@@ -7,8 +7,6 @@
 
 ## ダウンロード / Downloads
 
-
-
 <div style="display: flex; gap: 8px; height: 48px;">
   <a href="https://github.com/Iktahana/illusions/releases/latest" style="text-decoration: none; display: flex; align-items: center; border-radius: 4px; overflow: hidden;">
     <div style="background-color: #666; padding: 0 16px; height: 100%; display: flex; align-items: center; color: white; font-weight: bold; font-size: 14px; gap: 8px;">
