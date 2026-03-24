@@ -28,6 +28,14 @@ if (bgImageUrl) {
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <nav class="top-nav">
     <a href="https://my.illusions.app" class="nav-login-link">ログイン / 新規登録</a>
+    <button class="hamburger" id="hamburger-btn" aria-label="メニューを開く" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+    <div class="mobile-menu" id="mobile-menu">
+      <a href="https://my.illusions.app" class="mobile-menu-link">ログイン / 新規登録</a>
+    </div>
   </nav>
   <div class="hero">
     <div class="title-logo">${logoSvg}</div>
@@ -81,3 +89,26 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     </footer>
   </div>
 `
+
+// Hamburger menu toggle
+const hamburgerBtn = document.getElementById('hamburger-btn')
+const mobileMenu = document.getElementById('mobile-menu')
+
+hamburgerBtn?.addEventListener('click', () => {
+  const isOpen = hamburgerBtn.classList.toggle('is-open')
+  hamburgerBtn.setAttribute('aria-expanded', String(isOpen))
+  mobileMenu?.classList.toggle('is-open')
+})
+
+// Close menu when clicking outside
+document.addEventListener('click', (e) => {
+  if (
+    mobileMenu?.classList.contains('is-open') &&
+    !hamburgerBtn?.contains(e.target as Node) &&
+    !mobileMenu.contains(e.target as Node)
+  ) {
+    hamburgerBtn?.classList.remove('is-open')
+    hamburgerBtn?.setAttribute('aria-expanded', 'false')
+    mobileMenu.classList.remove('is-open')
+  }
+})
