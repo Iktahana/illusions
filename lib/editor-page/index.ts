@@ -9,6 +9,8 @@ export { useUpgradeBanner } from "./use-upgrade-banner";
 export { useChapters } from "./use-chapters";
 export { useAutoRestore } from "./use-auto-restore";
 export { usePermissions } from "./use-permissions";
+export { useProjectInitialization } from "./use-project-initialization";
+export { useFileOpening } from "./use-file-opening";
 
 export type { TextStatisticsResult } from "./use-text-statistics";
 export type { EditorSettings, EditorSettingsHandlers, EditorSettingsSetters, UseEditorSettingsResult } from "./use-editor-settings";
@@ -16,4 +18,6 @@ export type { DisplaySettings, DisplaySettingsHandlers, DisplaySettingsSetters, 
 export type { AiSettings, AiSettingsHandlers, UseAiSettingsResult } from "./use-ai-settings";
 export type { ProjectLifecycleState, ProjectLifecycleHandlers, ProjectLifecycleUpgrade, UseProjectLifecycleResult } from "./use-project-lifecycle";
 export type { UsePermissionsResult } from "./use-permissions";
+export type { UseProjectInitializationResult } from "./use-project-initialization";
+export type { UseFileOpeningResult } from "./use-file-opening";
 export type { RecentProjectEntry, PermissionPromptState } from "./types";

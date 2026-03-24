@@ -1,18 +1,16 @@
 import { useCallback, useRef, useState } from "react";
 
 import { getStorageService } from "@/lib/storage/storage-service";
-import { getProjectService } from "@/lib/project/project-service";
 import { getProjectUpgradeService } from "@/lib/project/project-upgrade";
-import { isStandaloneMode, getDefaultWorkspaceState } from "@/lib/project/project-types";
-import { getVFS } from "@/lib/vfs";
-import { notificationManager } from "@/lib/services/notification-manager";
+import { isStandaloneMode } from "@/lib/project/project-types";
 
 import type { EditorMode, ProjectMode, StandaloneMode } from "@/lib/project/project-types";
-import { ensureProjectJson, readFileHandle } from "./project-file-utils";
 import { useUpgradeBanner } from "./use-upgrade-banner";
 import { useRecentProjects } from "./use-recent-projects";
 import { useAutoRestore } from "./use-auto-restore";
 import { usePermissions } from "./use-permissions";
+import { useProjectInitialization } from "./use-project-initialization";
+import { useFileOpening } from "./use-file-opening";
 
 export type { RecentProjectEntry } from "./types";
 
@@ -74,16 +72,15 @@ export interface UseProjectLifecycleResult {
 }
 
 /**
- * Manages the full project lifecycle: loading recent projects,
- * auto-restoring, creating/opening/upgrading projects, and
- * handling permission prompts.
+ * Thin orchestration hook that manages the full project lifecycle.
  *
- * Delegates to:
- * - {@link useUpgradeBanner} for upgrade banner state
- * - {@link useRecentProjects} for recent project list management
- * - {@link useAutoRestore} for startup session restore
- * - {@link usePermissions} for permission prompt state and handlers
- * - {@link ensureProjectJson} / {@link readFileHandle} for file I/O helpers
+ * Delegates to focused sub-hooks:
+ * - {@link useUpgradeBanner} — upgrade banner state
+ * - {@link useRecentProjects} — recent project list management
+ * - {@link useAutoRestore} — startup session restore
+ * - {@link usePermissions} — permission prompt state and handlers
+ * - {@link useProjectInitialization} — VFS setup and project content loading
+ * - {@link useFileOpening} — file/project open dialog handlers
  */
 export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProjectLifecycleResult {
   const {
@@ -136,110 +133,16 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     onNoRestore,
   );
 
-  // --- Internal helpers ---
+  // VFS setup and project content loading
+  const { loadProjectContent, openRestoredProject } = useProjectInitialization({
+    isElectron,
+    isAutoRestoringRef,
+    tabLoadSystemFile,
+    incrementEditorKey,
+    setProjectMode,
+  });
 
-  /** Load a project's main file content into the editor */
-  const loadProjectContent = useCallback(async (project: ProjectMode) => {
-    try {
-      const projectService = getProjectService();
-      const mainContent = await projectService.readProjectContent(project);
-      const mainFileName = project.metadata.mainFile;
-
-      if (isElectron && project.rootPath) {
-        tabLoadSystemFile(`${project.rootPath}/${mainFileName}`, mainContent);
-      } else {
-        tabLoadSystemFile(mainFileName, mainContent);
-      }
-
-      incrementEditorKey();
-    } catch (error) {
-      console.error("Failed to load project main file:", error);
-      notificationManager.error(
-        "プロジェクトのメインファイルを読み込めませんでした。ファイルが移動または削除された可能性があります。"
-      );
-    }
-  }, [isElectron, tabLoadSystemFile, incrementEditorKey]);
-
-  /** Read project.json from a restored directory handle and enter project mode */
-  const openRestoredProject = useCallback(async (handle: FileSystemDirectoryHandle) => {
-    try {
-      const { metadata, illusionsDir } = await ensureProjectJson(handle);
-
-      let workspaceState: ProjectMode["workspaceState"];
-      try {
-        const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json");
-        const workspaceText = await readFileHandle(workspaceJsonHandle as Parameters<typeof readFileHandle>[0]);
-        workspaceState = JSON.parse(workspaceText) as ProjectMode["workspaceState"];
-      } catch {
-        workspaceState = getDefaultWorkspaceState();
-      }
-
-      const mainFileHandle = await handle.getFileHandle(metadata.mainFile);
-
-      const project: ProjectMode = {
-        type: "project",
-        projectId: metadata.projectId,
-        name: metadata.name,
-        rootHandle: handle,
-        mainFileHandle,
-        metadata,
-        workspaceState,
-      };
-
-      setProjectMode(project);
-      // Skip loading main file during auto-restore on Electron — tab persistence
-      // will restore the previously open tabs (or empty state).
-      // On Web, always load so the main file is available.
-      if (!isAutoRestoringRef.current || !isElectron) {
-        await loadProjectContent(project);
-      }
-    } catch (error) {
-      console.error("Failed to load restored project:", error);
-    }
-  }, [setProjectMode, loadProjectContent, isElectron]);
-
-  // --- Handlers ---
-
-  const handleCreateProject = useCallback(() => {
-    setShowCreateWizard(true);
-  }, []);
-
-  const handleOpenProject = useCallback(async () => {
-    try {
-      const projectService = getProjectService();
-      const project = await projectService.openProject();
-      setProjectMode(project);
-      await loadProjectContent(project);
-
-      if (isElectron && project.rootPath) {
-        const storage = getStorageService();
-        await storage.addRecentProject({
-          id: project.projectId,
-          rootPath: project.rootPath,
-          name: project.name,
-        });
-        void window.electronAPI?.rebuildMenu?.();
-      }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      if (error instanceof Error && error.message.includes("cancelled")) return;
-      console.error("Failed to open project:", error);
-    }
-  }, [setProjectMode, isElectron, loadProjectContent]);
-
-  const handleOpenStandaloneFile = useCallback(async () => {
-    try {
-      const projectService = getProjectService();
-      const standalone = await projectService.openStandaloneFile();
-      setStandaloneMode(standalone);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      console.error("Failed to open file:", error);
-    }
-  }, [setStandaloneMode]);
-
-  // Permission prompt state and handlers (usePermissions needs openRestoredProject,
-  // so it must be declared after openRestoredProject)
+  // Permission prompt state and handlers
   const {
     showPermissionPrompt,
     permissionPromptData,
@@ -249,110 +152,24 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     setPermissionPromptData,
   } = usePermissions(openRestoredProject);
 
-  const handleOpenRecentProject = useCallback(async (projectId: string) => {
-    try {
-      if (isElectron) {
-        const storage = getStorageService();
-        const projects = await storage.getRecentProjects();
-        const project = projects.find((p) => p.id === projectId);
-        if (!project) {
-          if (!isAutoRestoringRef.current) {
-            notificationManager.error("このプロジェクトが見つかりませんでした。");
-          }
-          return;
-        }
-
-        try {
-          const vfs = getVFS();
-          if ("setRootPath" in vfs) {
-            await (vfs as { setRootPath: (p: string) => Promise<void> }).setRootPath(project.rootPath);
-          }
-          signalVfsReady();
-          const rootDirHandle = await vfs.getDirectoryHandle("");
-          const { metadata, illusionsDir } = await ensureProjectJson(rootDirHandle);
-
-          let workspaceState: ProjectMode["workspaceState"];
-          try {
-            const wsHandle = await illusionsDir.getFileHandle("workspace.json");
-            const wsText = await readFileHandle(wsHandle as Parameters<typeof readFileHandle>[0]);
-            workspaceState = JSON.parse(wsText) as ProjectMode["workspaceState"];
-          } catch {
-            workspaceState = getDefaultWorkspaceState();
-          }
-
-          const mainFileHandle = await rootDirHandle.getFileHandle(metadata.mainFile);
-          const nativeMainFileHandle = mainFileHandle as unknown as FileSystemFileHandle;
-          const nativeRootHandle = rootDirHandle as unknown as FileSystemDirectoryHandle;
-
-          const restoredProject: ProjectMode = {
-            type: "project",
-            projectId: metadata.projectId,
-            name: metadata.name,
-            rootHandle: nativeRootHandle,
-            mainFileHandle: nativeMainFileHandle,
-            metadata,
-            workspaceState,
-            rootPath: project.rootPath,
-          };
-
-          setProjectMode(restoredProject);
-          // Skip loading main file during auto-restore on Electron — tab persistence
-          // will restore the previously open tabs (or empty state).
-          // On Web, always load so the main file is available.
-          if (!isAutoRestoringRef.current || !isElectron) {
-            await loadProjectContent(restoredProject);
-          }
-        } catch (error) {
-          signalVfsReady();
-          console.error("Failed to load project:", error);
-          console.error("Project path:", project.rootPath);
-
-          const isFileNotFound = error && typeof error === "object" &&
-            ("code" in error && (error as { code: string }).code === "ENOENT");
-
-          const message = isFileNotFound
-            ? `プロジェクトが見つかりませんでした。\n\nパス: ${project.rootPath}\n\nフォルダが移動または削除された可能性があります。\n最近のプロジェクト一覧から削除しますか?`
-            : "このプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。";
-
-          if (!isAutoRestoringRef.current) {
-            if (isFileNotFound) {
-              setConfirmRemoveRecent({ projectId, message });
-            } else {
-              notificationManager.error(message);
-            }
-          }
-        }
-        return;
-      }
-
-      // Web: restore from IndexedDB project handles
-      const { getProjectManager } = await import("@/lib/project/project-manager");
-      const projectManager = getProjectManager();
-      const restoreResult = await projectManager.restoreProjectHandle(projectId);
-
-      if (!restoreResult.success || !restoreResult.handle) {
-        console.error("Failed to restore project handle:", restoreResult.error);
-        if (!isAutoRestoringRef.current) {
-          notificationManager.error("このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。");
-        }
-        return;
-      }
-
-      if (restoreResult.permissionStatus.status === "prompt-required") {
-        setPermissionPromptData({
-          projectName: projectId,
-          handle: restoreResult.handle,
-          projectId,
-        });
-        setShowPermissionPrompt(true);
-        return;
-      }
-
-      await openRestoredProject(restoreResult.handle);
-    } catch (error) {
-      console.error("Failed to open recent project:", error);
-    }
-  }, [isElectron, setProjectMode, openRestoredProject, loadProjectContent, signalVfsReady, setPermissionPromptData, setShowPermissionPrompt]);
+  // File/project open dialog handlers
+  const {
+    handleOpenProject,
+    handleOpenStandaloneFile,
+    handleOpenRecentProject,
+    handleOpenAsProject,
+  } = useFileOpening({
+    isElectron,
+    isAutoRestoringRef,
+    setProjectMode,
+    setStandaloneMode,
+    setConfirmRemoveRecent,
+    setPermissionPromptData,
+    setShowPermissionPrompt,
+    signalVfsReady,
+    loadProjectContent,
+    openRestoredProject,
+  });
 
   // Auto-restore the last opened project on startup
   useAutoRestore({
@@ -365,55 +182,9 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     handleOpenRecentProject,
   });
 
-  const handleOpenAsProject = useCallback(async (projectPath: string, initialFile: string) => {
-    try {
-      const vfs = getVFS();
-      if ("setRootPath" in vfs) {
-        await (vfs as { setRootPath: (p: string) => Promise<void> }).setRootPath(projectPath);
-      }
-
-      const rootDirHandle = await vfs.getDirectoryHandle("");
-      const { metadata, illusionsDir } = await ensureProjectJson(rootDirHandle, initialFile);
-
-      let workspaceState: ProjectMode["workspaceState"];
-      try {
-        const wsHandle = await illusionsDir.getFileHandle("workspace.json");
-        const wsText = await readFileHandle(wsHandle as Parameters<typeof readFileHandle>[0]);
-        workspaceState = JSON.parse(wsText) as ProjectMode["workspaceState"];
-      } catch {
-        workspaceState = getDefaultWorkspaceState();
-      }
-
-      const initialFileHandle = await rootDirHandle.getFileHandle(initialFile);
-      const nativeMainFileHandle = initialFileHandle as unknown as FileSystemFileHandle;
-      const nativeRootHandle = rootDirHandle as unknown as FileSystemDirectoryHandle;
-
-      const project: ProjectMode = {
-        type: "project",
-        projectId: metadata.projectId,
-        name: metadata.name,
-        rootHandle: nativeRootHandle,
-        mainFileHandle: nativeMainFileHandle,
-        metadata,
-        workspaceState,
-        rootPath: projectPath,
-      };
-
-      setProjectMode(project);
-      await loadProjectContent(project);
-
-      const storage = getStorageService();
-      await storage.addRecentProject({
-        id: project.projectId,
-        rootPath: projectPath,
-        name: project.name,
-      });
-      void window.electronAPI?.rebuildMenu?.();
-    } catch (error) {
-      console.error("[Open as Project] Failed to open project:", error);
-      notificationManager.error("プロジェクトを開けませんでした。.illusionsフォルダが正しく設定されているか確認してください。");
-    }
-  }, [setProjectMode, loadProjectContent]);
+  const handleCreateProject = useCallback(() => {
+    setShowCreateWizard(true);
+  }, []);
 
   const handleProjectCreated = useCallback(async (project: ProjectMode) => {
     setProjectMode(project);
