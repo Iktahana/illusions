@@ -288,9 +288,10 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       };
 
       setProjectMode(project);
-      // Skip loading main file during auto-restore — tab persistence
+      // Skip loading main file during auto-restore on Electron — tab persistence
       // will restore the previously open tabs (or empty state).
-      if (!isAutoRestoringRef.current) {
+      // On Web, always load so the main file is available.
+      if (!isAutoRestoringRef.current || !isElectron) {
         await loadProjectContent(project);
       }
     } catch (error) {
@@ -488,9 +489,10 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
           };
 
           setProjectMode(restoredProject);
-          // Skip loading main file during auto-restore — tab persistence
+          // Skip loading main file during auto-restore on Electron — tab persistence
           // will restore the previously open tabs (or empty state).
-          if (!isAutoRestoringRef.current) {
+          // On Web, always load so the main file is available.
+          if (!isAutoRestoringRef.current || !isElectron) {
             await loadProjectContent(restoredProject);
           }
         } catch (error) {

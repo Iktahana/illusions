@@ -163,11 +163,11 @@ export function useKeyboardShortcuts({
         newTab();
         incrementEditorKey();
       } else if (isCloseTabShortcut) {
-        event.preventDefault();
         if (tabs.length === 0) {
-          window.close();
+          // No internal tabs open — let the browser handle Cmd/Ctrl+W naturally
           return;
         }
+        event.preventDefault();
         if (tabs.length === 1 && !tabs[0].file && !tabs[0].isDirty) {
           window.close();
           return;
