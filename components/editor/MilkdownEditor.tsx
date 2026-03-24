@@ -288,14 +288,16 @@ export default function MilkdownEditor({
     onSelectionChangeRef.current?.(count);
   }, [editorViewInstance]);
 
-  // 選択変更のスケジューリング（10ms デバウンス）
-  const timersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  // 選択変更のスケジューリング（10ms デバウンス、前回のタイマーをキャンセル）
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleUpdate = useCallback(() => {
-    const id = setTimeout(() => {
-      timersRef.current.delete(id);
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
       updateSelectionCount();
     }, 10);
-    timersRef.current.add(id);
   }, [updateSelectionCount]);
 
   // 選択範囲の変更を追跡する
@@ -315,8 +317,10 @@ export default function MilkdownEditor({
       editorDom.removeEventListener("mouseup", scheduleUpdate);
       editorDom.removeEventListener("keyup", scheduleUpdate);
       document.removeEventListener("selectionchange", scheduleUpdate);
-      timersRef.current.forEach(clearTimeout);
-      timersRef.current.clear();
+      if (debounceTimerRef.current !== null) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
     };
   }, [editorViewInstance, scheduleUpdate, updateSelectionCount]);
 
