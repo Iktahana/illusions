@@ -74,6 +74,9 @@ import { ModifierLengthOrderRule } from "@/lib/linting/rules/modifier-length-ord
 import { KanjiVerbOneCharDo } from "@/lib/linting/rules/kanji-verb-one-char-do";
 // Manuscript Editing 2nd Edition rules (#777)
 import { createManuscriptL1Rules } from "@/lib/linting/rules/json-l1/manuscript-l1-rules";
+// JSON-driven L1 rules from JTF, gendai-kanazukai, and nihongo-hyouki (#782)
+import { createJtfL1Rules } from "@/lib/linting/rules/json-l1/jtf-l1-rules";
+import { createGendaiKanazukaiL1Rules, createNihongoHyoukiL1Rules } from "@/lib/linting/rules/json-l1";
 
 export interface UseLintingResult {
   ruleRunner: RuleRunner;
@@ -174,6 +177,19 @@ export function useLinting(
 
     // Manuscript Editing 2nd Edition rules (#777)
     for (const rule of createManuscriptL1Rules()) {
+      runner.registerRule(rule);
+    }
+
+    // JTF日本語標準スタイルガイド L1 rules (#782)
+    for (const rule of createJtfL1Rules()) {
+      runner.registerRule(rule);
+    }
+    // 現代仮名遣い L1 rules (#782)
+    for (const rule of createGendaiKanazukaiL1Rules()) {
+      runner.registerRule(rule);
+    }
+    // 日本語表記ルールブック L1 rules (#782)
+    for (const rule of createNihongoHyoukiL1Rules()) {
       runner.registerRule(rule);
     }
 
