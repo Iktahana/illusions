@@ -547,6 +547,10 @@ if (cached) {
 
   fetch(API_URL, { headers: { Accept: 'application/vnd.github.v3+json' } })
     .then(async (res) => {
+      if (res.status === 403 || res.status === 429) {
+        window.location.href = 'https://github.com/Iktahana/illusions/blob/main/README.md'
+        return
+      }
       if (!res.ok) {
         throw new Error(`GitHub API returned ${res.status}`)
       }
