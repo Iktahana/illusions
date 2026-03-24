@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { getStorageService } from "@/lib/storage/storage-service";
 import { getProjectService } from "@/lib/project/project-service";
@@ -8,10 +8,11 @@ import { getVFS } from "@/lib/vfs";
 import { notificationManager } from "@/lib/services/notification-manager";
 
 import type { EditorMode, ProjectMode, StandaloneMode } from "@/lib/project/project-types";
-import type { PermissionPromptState } from "./types";
 import { ensureProjectJson, readFileHandle } from "./project-file-utils";
 import { useUpgradeBanner } from "./use-upgrade-banner";
 import { useRecentProjects } from "./use-recent-projects";
+import { useAutoRestore } from "./use-auto-restore";
+import { usePermissions } from "./use-permissions";
 
 export type { RecentProjectEntry } from "./types";
 
@@ -38,7 +39,7 @@ export interface ProjectLifecycleState {
   recentProjects: import("./types").RecentProjectEntry[];
   showCreateWizard: boolean;
   showPermissionPrompt: boolean;
-  permissionPromptData: PermissionPromptState | null;
+  permissionPromptData: import("./types").PermissionPromptState | null;
   isRestoring: boolean;
   restoreError: string | null;
   confirmRemoveRecent: { projectId: string; message: string } | null;
@@ -80,6 +81,8 @@ export interface UseProjectLifecycleResult {
  * Delegates to:
  * - {@link useUpgradeBanner} for upgrade banner state
  * - {@link useRecentProjects} for recent project list management
+ * - {@link useAutoRestore} for startup session restore
+ * - {@link usePermissions} for permission prompt state and handlers
  * - {@link ensureProjectJson} / {@link readFileHandle} for file I/O helpers
  */
 export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProjectLifecycleResult {
@@ -98,8 +101,6 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
 
   // UI state
   const [showCreateWizard, setShowCreateWizard] = useState(false);
-  const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
-  const [permissionPromptData, setPermissionPromptData] = useState<PermissionPromptState | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const isAutoRestoringRef = useRef(false);
@@ -195,7 +196,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     } catch (error) {
       console.error("Failed to load restored project:", error);
     }
-  }, [setProjectMode, loadProjectContent]);
+  }, [setProjectMode, loadProjectContent, isElectron]);
 
   // --- Handlers ---
 
@@ -236,6 +237,17 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       console.error("Failed to open file:", error);
     }
   }, [setStandaloneMode]);
+
+  // Permission prompt state and handlers (usePermissions needs openRestoredProject,
+  // so it must be declared after openRestoredProject)
+  const {
+    showPermissionPrompt,
+    permissionPromptData,
+    handlePermissionGranted,
+    handlePermissionDenied,
+    setShowPermissionPrompt,
+    setPermissionPromptData,
+  } = usePermissions(openRestoredProject);
 
   const handleOpenRecentProject = useCallback(async (projectId: string) => {
     try {
@@ -340,7 +352,18 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     } catch (error) {
       console.error("Failed to open recent project:", error);
     }
-  }, [isElectron, setProjectMode, openRestoredProject, loadProjectContent, signalVfsReady]);
+  }, [isElectron, setProjectMode, openRestoredProject, loadProjectContent, signalVfsReady, setPermissionPromptData, setShowPermissionPrompt]);
+
+  // Auto-restore the last opened project on startup
+  useAutoRestore({
+    autoRestoreProjectId,
+    isElectron,
+    isAutoRestoringRef,
+    setIsRestoring,
+    setRestoreError,
+    signalVfsReady,
+    handleOpenRecentProject,
+  });
 
   const handleOpenAsProject = useCallback(async (projectPath: string, initialFile: string) => {
     try {
@@ -392,37 +415,6 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     }
   }, [setProjectMode, loadProjectContent]);
 
-  // Auto-restore the last opened project on startup
-  const autoRestoreTriggeredRef = useRef(false);
-  useEffect(() => {
-    if (!autoRestoreProjectId || autoRestoreTriggeredRef.current) return;
-    autoRestoreTriggeredRef.current = true;
-
-    let timerId: ReturnType<typeof setTimeout> | undefined;
-    isAutoRestoringRef.current = true;
-    void (async () => {
-      try {
-        await handleOpenRecentProject(autoRestoreProjectId);
-      } catch {
-        // handleOpenRecentProject catches its own errors internally
-      }
-      isAutoRestoringRef.current = false;
-      signalVfsReady();
-      timerId = setTimeout(() => {
-        setIsRestoring((prev) => {
-          if (prev && isElectron) {
-            setRestoreError("前回のプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。");
-          }
-          return false;
-        });
-      }, 200);
-    })();
-
-    return () => {
-      if (timerId !== undefined) clearTimeout(timerId);
-    };
-  }, [autoRestoreProjectId, handleOpenRecentProject, isElectron, signalVfsReady]);
-
   const handleProjectCreated = useCallback(async (project: ProjectMode) => {
     setProjectMode(project);
     setShowCreateWizard(false);
@@ -438,19 +430,6 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       void window.electronAPI?.rebuildMenu?.();
     }
   }, [setProjectMode, isElectron, loadProjectContent]);
-
-  const handlePermissionGranted = useCallback(() => {
-    if (permissionPromptData) {
-      void openRestoredProject(permissionPromptData.handle);
-    }
-    setShowPermissionPrompt(false);
-    setPermissionPromptData(null);
-  }, [permissionPromptData, openRestoredProject]);
-
-  const handlePermissionDenied = useCallback(() => {
-    setShowPermissionPrompt(false);
-    setPermissionPromptData(null);
-  }, []);
 
   const handleUpgrade = useCallback(async () => {
     if (!isStandaloneMode(editorMode)) return;
