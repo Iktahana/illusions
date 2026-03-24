@@ -267,41 +267,42 @@ export default function MilkdownEditor({
     });
   }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
 
+  // 選択文字数を更新する（editorViewInstance が変わったときだけ再生成）
+  const updateSelectionCount = useCallback(() => {
+    if (!editorViewInstance) return;
+    const { state } = editorViewInstance;
+    const { selection } = state;
+    const { from, to } = selection;
+
+    // 選択がない場合は 0
+    if (from === to) {
+      setHasSelection(false);
+      onSelectionChangeRef.current?.(0);
+      return;
+    }
+
+    // 選択文字列の文字数を数える（空白は除外）
+    const selectedText = state.doc.textBetween(from, to);
+    const count = selectedText.replace(/\s/g, "").length;
+    setHasSelection(count > 0);
+    onSelectionChangeRef.current?.(count);
+  }, [editorViewInstance]);
+
+  // 選択変更のスケジューリング（10ms デバウンス）
+  const timersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const scheduleUpdate = useCallback(() => {
+    const id = setTimeout(() => {
+      timersRef.current.delete(id);
+      updateSelectionCount();
+    }, 10);
+    timersRef.current.add(id);
+  }, [updateSelectionCount]);
+
   // 選択範囲の変更を追跡する
   useEffect(() => {
     if (!editorViewInstance) return;
 
-    const updateSelectionCount = () => {
-      const { state } = editorViewInstance;
-      const { selection } = state;
-      const { from, to } = selection;
-
-      // 選択がない場合は 0
-      if (from === to) {
-        setHasSelection(false);
-        onSelectionChangeRef.current?.(0);
-        return;
-      }
-
-      // 選択文字列の文字数を数える（空白は除外）
-      const selectedText = state.doc.textBetween(from, to);
-      const count = selectedText.replace(/\s/g, "").length;
-      setHasSelection(count > 0);
-      onSelectionChangeRef.current?.(count);
-    };
-
-    // 選択変更を購読
     const editorDom = editorViewInstance.dom;
-
-    const timers = new Set<ReturnType<typeof setTimeout>>();
-
-    const scheduleUpdate = () => {
-      const id = setTimeout(() => {
-        timers.delete(id);
-        updateSelectionCount();
-      }, 10);
-      timers.add(id);
-    };
 
     editorDom.addEventListener("mouseup", scheduleUpdate);
     editorDom.addEventListener("keyup", scheduleUpdate);
@@ -314,10 +315,10 @@ export default function MilkdownEditor({
       editorDom.removeEventListener("mouseup", scheduleUpdate);
       editorDom.removeEventListener("keyup", scheduleUpdate);
       document.removeEventListener("selectionchange", scheduleUpdate);
-      timers.forEach(clearTimeout);
-      timers.clear();
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current.clear();
     };
-  }, [editorViewInstance]);
+  }, [editorViewInstance, scheduleUpdate, updateSelectionCount]);
 
   // 不要なアニメーションを避けるため、直前のスタイル値を保持する
   const prevStyleRef = useRef({ charsPerLine, isVertical, fontFamily, fontScale, lineHeight });
