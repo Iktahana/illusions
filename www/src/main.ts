@@ -94,21 +94,23 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 const hamburgerBtn = document.getElementById('hamburger-btn')
 const mobileMenu = document.getElementById('mobile-menu')
 
-hamburgerBtn?.addEventListener('click', () => {
-  const isOpen = hamburgerBtn.classList.toggle('is-open')
-  hamburgerBtn.setAttribute('aria-expanded', String(isOpen))
-  mobileMenu?.classList.toggle('is-open')
-})
+if (hamburgerBtn && mobileMenu) {
+  hamburgerBtn.addEventListener('click', () => {
+    const isOpen = hamburgerBtn.classList.toggle('is-open')
+    hamburgerBtn.setAttribute('aria-expanded', String(isOpen))
+    mobileMenu.classList.toggle('is-open')
+  })
 
-// Close menu when clicking outside
-document.addEventListener('click', (e) => {
-  if (
-    mobileMenu?.classList.contains('is-open') &&
-    !hamburgerBtn?.contains(e.target as Node) &&
-    !mobileMenu.contains(e.target as Node)
-  ) {
-    hamburgerBtn?.classList.remove('is-open')
-    hamburgerBtn?.setAttribute('aria-expanded', 'false')
-    mobileMenu.classList.remove('is-open')
-  }
-})
+  // Close menu when clicking outside
+  document.addEventListener('click', (e) => {
+    if (
+      mobileMenu.classList.contains('is-open') &&
+      !hamburgerBtn.contains(e.target as Node) &&
+      !mobileMenu.contains(e.target as Node)
+    ) {
+      hamburgerBtn.classList.remove('is-open')
+      hamburgerBtn.setAttribute('aria-expanded', 'false')
+      mobileMenu.classList.remove('is-open')
+    }
+  })
+}
