@@ -2,12 +2,14 @@ import type { Token } from "@/lib/nlp-client/types";
 
 import type {
   CorrectionEngine,
+  JsonRuleMeta,
   LintRule,
   LintRuleConfig,
   LintIssue,
   DocumentLintRule,
   MorphologicalLintRule,
   MorphologicalDocumentLintRule,
+  RuleLevel,
 } from "./types";
 
 /**
@@ -20,7 +22,7 @@ export abstract class AbstractLintRule implements LintRule {
   abstract readonly nameJa: string;
   abstract readonly description: string;
   abstract readonly descriptionJa: string;
-  abstract readonly level: "L1" | "L2";
+  abstract readonly level: RuleLevel;
   abstract readonly defaultConfig: LintRuleConfig;
   /** Default engine for simple regex-based rules */
   engine: CorrectionEngine = "regex";
@@ -98,5 +100,41 @@ export abstract class AbstractMorphologicalDocumentLintRule
     _config: LintRuleConfig,
   ): Array<{ paragraphIndex: number; issues: LintIssue[] }> {
     return [];
+  }
+}
+
+/**
+ * Abstract base class for data-driven L1 (regex) lint rules.
+ * These rules are configured via JsonRuleMeta loaded from rules.json.
+ */
+export abstract class AbstractL1Rule extends AbstractLintRule {
+  readonly meta: JsonRuleMeta;
+  readonly id: string;
+  readonly name: string;
+  readonly nameJa: string;
+  readonly description: string;
+  readonly descriptionJa: string;
+  readonly level: RuleLevel = "L1";
+  readonly defaultConfig: LintRuleConfig;
+
+  constructor(
+    meta: JsonRuleMeta,
+    config: {
+      id: string;
+      name: string;
+      nameJa: string;
+      description: string;
+      descriptionJa: string;
+      defaultConfig: LintRuleConfig;
+    },
+  ) {
+    super();
+    this.meta = meta;
+    this.id = config.id;
+    this.name = config.name;
+    this.nameJa = config.nameJa;
+    this.description = config.description;
+    this.descriptionJa = config.descriptionJa;
+    this.defaultConfig = config.defaultConfig;
   }
 }

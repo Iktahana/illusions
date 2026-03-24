@@ -1,5 +1,7 @@
 export type {
   CorrectionEngine,
+  JsonRuleMeta,
+  RuleLevel,
   Severity,
   LintIssue,
   LintRule,
@@ -15,6 +17,7 @@ export {
   isMorphologicalDocumentLintRule,
 } from "./types";
 export {
+  AbstractL1Rule,
   AbstractLintRule,
   AbstractDocumentLintRule,
   AbstractMorphologicalLintRule,

@@ -3,8 +3,26 @@ import type { Token } from "@/lib/nlp-client/types";
 
 export type Severity = "error" | "warning" | "info";
 
+/** Detection level: L1=regex, L2=morphological, L3=LLM-assisted */
+export type RuleLevel = "L1" | "L2" | "L3";
+
 /** The underlying implementation engine for a correction rule */
 export type CorrectionEngine = "regex" | "morphological";
+
+/**
+ * Metadata for a JSON-driven lint rule.
+ * Used by data-driven L1 rules loaded from rules.json.
+ */
+export interface JsonRuleMeta {
+  ruleId: string;
+  level: RuleLevel;
+  description: string;
+  patternLogic: string;
+  positiveExample: string;
+  negativeExample: string;
+  sourceReference: string;
+  bookTitle: string;
+}
 
 export interface LintReference {
   /** Standard name, e.g. "JIS X 4051:2004" */
@@ -52,8 +70,8 @@ export interface LintRule {
   nameJa: string;
   description: string;
   descriptionJa: string;
-  /** Detection level: L1=regex, L2=morphological */
-  level: "L1" | "L2";
+  /** Detection level: L1=regex, L2=morphological, L3=LLM-assisted */
+  level: RuleLevel;
   /** The underlying implementation engine for this rule */
   engine?: CorrectionEngine;
   defaultConfig: LintRuleConfig;
