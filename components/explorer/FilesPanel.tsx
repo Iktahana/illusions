@@ -737,7 +737,7 @@ export function FilesPanel({
 
   return (
     <div
-      className="space-y-1"
+      className="space-y-1 min-h-full"
       onDragOver={(e) => { e.preventDefault(); }}
       onDrop={(e) => {
         // Fallback: drops that miss any specific item -> treat as root drop
