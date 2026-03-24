@@ -38,7 +38,7 @@ export function useRecentProjects(
             projectId: p.id,
             name: p.name,
             lastAccessedAt: Date.now(),
-            rootDirName: p.rootPath.split("/").pop(),
+            rootDirName: p.rootPath.split(/[/\\]/).filter(Boolean).pop(),
           }));
           setRecentProjects(entries);
 
@@ -90,7 +90,7 @@ export function useRecentProjects(
           projectId: p.id,
           name: p.name,
           lastAccessedAt: Date.now(),
-          rootDirName: p.rootPath.split("/").pop(),
+          rootDirName: p.rootPath.split(/[/\\]/).filter(Boolean).pop(),
         }));
         setRecentProjects(entries);
       } else {

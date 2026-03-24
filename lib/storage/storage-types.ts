@@ -110,7 +110,7 @@ export interface AppState {
   prePowerSaveState?: {
     lintingEnabled: boolean;
     lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
-    llmEnabled: boolean;
+    llmEnabled?: boolean;
   } | null;
 
   // 朗読（TTS）設定

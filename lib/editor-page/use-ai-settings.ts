@@ -170,15 +170,18 @@ export function useAiSettings(): UseAiSettingsResult {
       const stored = await fetchAppState();
       const prev = stored?.prePowerSaveState;
       if (prev) {
+        // Default llmEnabled to current value for older stored snapshots that
+        // predate the field (persisted before this field was added).
+        const nextLlmEnabled = typeof prev.llmEnabled === "boolean" ? prev.llmEnabled : llmEnabled;
         setLintingEnabled(prev.lintingEnabled);
         setLintingRuleConfigs(prev.lintingRuleConfigs);
-        setLlmEnabled(prev.llmEnabled);
+        setLlmEnabled(nextLlmEnabled);
         await persistAppState({
           powerSaveMode: false,
           prePowerSaveState: null,
           lintingEnabled: prev.lintingEnabled,
           lintingRuleConfigs: prev.lintingRuleConfigs,
-          llmEnabled: prev.llmEnabled,
+          llmEnabled: nextLlmEnabled,
         });
       } else {
         await persistAppState({ powerSaveMode: false, prePowerSaveState: null });
@@ -221,7 +224,7 @@ export function useAiSettings(): UseAiSettingsResult {
         guidelines: correctionGuidelines,
         ruleOverrides: lintingRuleConfigs,
         llm: {
-          ...DEFAULT_CORRECTION_CONFIG.llm,
+          ...(DEFAULT_CORRECTION_CONFIG.llm ?? {}),
           modelId: llmModelId,
           validationEnabled: llmEnabled,
         },
