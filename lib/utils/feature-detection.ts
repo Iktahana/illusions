@@ -52,8 +52,10 @@ export function isFileSystemHandleSupported(): boolean {
     // createWritable は FileSystemFileHandle のメソッドなので prototype を確認
     const hasCreateWritable =
       hasFileHandle &&
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      typeof (window as any).FileSystemFileHandle?.prototype?.createWritable !== "undefined";
+      typeof (
+        (window as Window & { FileSystemFileHandle?: { prototype?: { createWritable?: unknown } } })
+          .FileSystemFileHandle?.prototype?.createWritable
+      ) !== "undefined";
 
     return hasFileHandle && hasDirHandle && hasCreateWritable;
   } catch (error) {
