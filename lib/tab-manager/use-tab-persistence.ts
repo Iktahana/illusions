@@ -58,11 +58,23 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
   const [wasAutoRecovered, setWasAutoRecovered] = useState(false);
 
+  // Gate persistence until after the initial restore has completed to
+  // prevent the empty initial tabs state from overwriting saved tab data
+  // before the async restore path (which may wait on vfsReadyPromise) runs.
+  const storageInitializedRef = useRef(false);
+
   // --- Persist open tabs to AppState (debounced) --------------------------
 
   const tabPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    // Skip persisting empty state until after storage has been initialized.
+    // This prevents a race on Electron where the 1s debounce fires before
+    // restoreTabs finishes awaiting vfsReadyPromise (up to 5s), which would
+    // overwrite the saved tabs with [] and cause a blank editor on next open.
+    if (!storageInitializedRef.current && tabs.length === 0) return;
+
+
     if (tabPersistTimerRef.current) {
       clearTimeout(tabPersistTimerRef.current);
     }
@@ -163,6 +175,12 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         const errorTab = createNewTab();
         setTabs((prev) => (prev.length > 0 ? prev : [errorTab]));
         setActiveTabId((prev) => (prev === "" ? errorTab.id : prev));
+      } finally {
+        // For Web (and Electron with skipAutoRestore), restore is complete here.
+        // Electron's restoreTabs sets this flag after vfsReadyPromise resolves.
+        if (!isElectron || skipAutoRestore) {
+          storageInitializedRef.current = true;
+        }
       }
     };
 
@@ -241,6 +259,9 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         }
       } catch (error) {
         console.error("タブの復元に失敗しました:", error);
+      } finally {
+        // Allow tab persistence after Electron restore completes (or errors).
+        storageInitializedRef.current = true;
       }
     };
 
