@@ -73,8 +73,7 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
   useEffect(() => {
     if (!isElectron || typeof window === "undefined") return;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsubscribe = (window as any).electronAPI?.onPasteAsPlaintext?.(() => {
+    const unsubscribe = window.electronAPI?.onPasteAsPlaintext?.(() => {
       void handlePasteAsPlaintext();
     });
 

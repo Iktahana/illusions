@@ -49,6 +49,7 @@ declare global {
     revealInFileManager?: (filePath: string) => Promise<boolean>;
     openExternal?: (url: string) => Promise<boolean>;
     onMenuShowInFileManager?: (callback: () => void) => (() => void) | void;
+    onPasteAsPlaintext?: (callback: () => void) => (() => void) | void;
     onToggleCompactMode?: (callback: () => void) => (() => void) | void;
     onFormatChange?: (callback: (setting: string, action: string) => void) => (() => void) | void;
     onThemeChange?: (callback: (mode: "auto" | "light" | "dark") => void) => (() => void) | void;
