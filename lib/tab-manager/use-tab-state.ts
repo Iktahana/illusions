@@ -172,9 +172,8 @@ export function useTabState(): UseTabStateReturn {
 
     const remaining = current.filter((t) => t.id !== tabId);
     if (remaining.length === 0) {
-      const emptyTab = createNewTab(undefined, ".mdi");
-      setTabs([emptyTab]);
-      setActiveTabId(emptyTab.id);
+      setTabs([]);
+      setActiveTabId("");
       return;
     }
 
