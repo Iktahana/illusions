@@ -82,8 +82,12 @@ export const headingAnchorSchema = $nodeSchema('heading', (ctx) => {
         // 見出しの本文からID生成用テキストを抽出
         let textContent = ''
         if (node.children && Array.isArray(node.children)) {
-          textContent = node.children
-            .map((child: any) => child.value || '')
+          textContent = (node.children as unknown[])
+            .map((child) =>
+              (child !== null && typeof child === 'object' && 'value' in child)
+                ? String((child as { value: unknown }).value)
+                : ''
+            )
             .join('')
         }
         
