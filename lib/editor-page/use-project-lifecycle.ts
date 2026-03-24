@@ -1,97 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getProjectManager } from "@/lib/project/project-manager";
 import { getStorageService } from "@/lib/storage/storage-service";
 import { getProjectService } from "@/lib/project/project-service";
 import { getProjectUpgradeService } from "@/lib/project/project-upgrade";
-import { isStandaloneMode } from "@/lib/project/project-types";
+import { isStandaloneMode, getDefaultWorkspaceState } from "@/lib/project/project-types";
 import { getVFS } from "@/lib/vfs";
 import { notificationManager } from "@/lib/services/notification-manager";
 
-import type { EditorMode, ProjectMode, StandaloneMode, ProjectConfig, SupportedFileExtension } from "@/lib/project/project-types";
-import type { VFSDirectoryHandle } from "@/lib/vfs/types";
-import { getDefaultEditorSettings, getDefaultWorkspaceState } from "@/lib/project/project-types";
-import { chars } from "./types";
-import type { RecentProjectEntry, PermissionPromptState } from "./types";
+import type { EditorMode, ProjectMode, StandaloneMode } from "@/lib/project/project-types";
+import type { PermissionPromptState } from "./types";
+import { ensureProjectJson, readFileHandle } from "./project-file-utils";
+import { useUpgradeBanner } from "./use-upgrade-banner";
+import { useRecentProjects } from "./use-recent-projects";
 
-/** A directory handle that works for both VFS and Web File System Access API */
-type AnyDirectoryHandle = VFSDirectoryHandle | FileSystemDirectoryHandle;
-
-/** Read text from a file handle (VFS or Web) */
-async function readFileHandle(handle: { read?: () => Promise<string>; getFile?: () => Promise<File> }): Promise<string> {
-  if (typeof handle.read === "function") {
-    return handle.read();
-  }
-  const file = await handle.getFile!();
-  return file.text();
-}
-
-/**
- * Read or auto-create .illusions/project.json.
- * If .illusions/ or project.json doesn't exist, creates them with sensible defaults.
- */
-async function ensureProjectJson(
-  rootDirHandle: AnyDirectoryHandle,
-  mainFile?: string,
-): Promise<{ metadata: ProjectConfig; illusionsDir: AnyDirectoryHandle }> {
-  const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
-
-  // Use { create: true } so getFileHandle never throws ENOENT on the IPC layer.
-  // If the file was just created it will be empty → treat as "does not exist".
-  const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
-  let metadataText: string | undefined;
-  try {
-    const raw = await readFileHandle(projectJsonHandle as Parameters<typeof readFileHandle>[0]);
-    if (raw.trim()) metadataText = raw;
-  } catch {
-    // read failed — treat as missing
-  }
-
-  if (metadataText) {
-    return { metadata: JSON.parse(metadataText) as ProjectConfig, illusionsDir };
-  }
-
-  // Auto-create project.json with defaults
-  const dirName = rootDirHandle.name || "Untitled";
-  const ext = (mainFile?.match(/\.\w+$/)?.[0] ?? ".mdi") as SupportedFileExtension;
-  const metadata: ProjectConfig = {
-    version: "1.0.0",
-    projectId: crypto.randomUUID(),
-    name: dirName,
-    mainFile: mainFile ?? `${dirName}${ext}`,
-    mainFileExtension: ext,
-    createdAt: Date.now(),
-    lastModified: Date.now(),
-    editorSettings: getDefaultEditorSettings(ext),
-  };
-
-  // projectJsonHandle already exists (created empty above) — write defaults into it
-  if ("write" in projectJsonHandle && typeof (projectJsonHandle as { write: unknown }).write === "function") {
-    await (projectJsonHandle as { write: (s: string) => Promise<void> }).write(JSON.stringify(metadata, null, 2));
-  } else {
-    const writable = await (projectJsonHandle as FileSystemFileHandle).createWritable();
-    await writable.write(JSON.stringify(metadata, null, 2));
-    await writable.close();
-  }
-
-  // Also create workspace.json
-  try {
-    const wsHandle = await illusionsDir.getFileHandle("workspace.json", { create: true });
-    const wsData = JSON.stringify(getDefaultWorkspaceState(), null, 2);
-    if ("write" in wsHandle && typeof (wsHandle as { write: unknown }).write === "function") {
-      await (wsHandle as { write: (s: string) => Promise<void> }).write(wsData);
-    } else {
-      const writable = await (wsHandle as FileSystemFileHandle).createWritable();
-      await writable.write(wsData);
-      await writable.close();
-    }
-  } catch {
-    // workspace.json creation is best-effort
-  }
-
-  console.info("[Project] Auto-created .illusions/project.json for:", dirName);
-  return { metadata, illusionsDir };
-}
+export type { RecentProjectEntry } from "./types";
 
 interface UseProjectLifecycleParams {
   editorMode: EditorMode;
@@ -113,7 +35,7 @@ interface UseProjectLifecycleParams {
 }
 
 export interface ProjectLifecycleState {
-  recentProjects: RecentProjectEntry[];
+  recentProjects: import("./types").RecentProjectEntry[];
   showCreateWizard: boolean;
   showPermissionPrompt: boolean;
   permissionPromptData: PermissionPromptState | null;
@@ -154,6 +76,11 @@ export interface UseProjectLifecycleResult {
  * Manages the full project lifecycle: loading recent projects,
  * auto-restoring, creating/opening/upgrading projects, and
  * handling permission prompts.
+ *
+ * Delegates to:
+ * - {@link useUpgradeBanner} for upgrade banner state
+ * - {@link useRecentProjects} for recent project list management
+ * - {@link ensureProjectJson} / {@link readFileHandle} for file I/O helpers
  */
 export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProjectLifecycleResult {
   const {
@@ -169,8 +96,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     onVfsReady,
   } = params;
 
-  // State
-  const [recentProjects, setRecentProjects] = useState<RecentProjectEntry[]>([]);
+  // UI state
   const [showCreateWizard, setShowCreateWizard] = useState(false);
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
   const [permissionPromptData, setPermissionPromptData] = useState<PermissionPromptState | null>(null);
@@ -178,7 +104,6 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const isAutoRestoringRef = useRef(false);
   const [confirmRemoveRecent, setConfirmRemoveRecent] = useState<{ projectId: string; message: string } | null>(null);
-  const [autoRestoreProjectId, setAutoRestoreProjectId] = useState<string | null>(null);
 
   // VFS readiness signal: ensures onVfsReady is called exactly once
   const vfsReadyFiredRef = useRef(false);
@@ -191,42 +116,24 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     onVfsReadyRef.current?.();
   }, []);
 
-  // Upgrade banner state
-  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
-  const [upgradeBannerDismissed, setUpgradeBannerDismissed] = useState(false);
-  const standaloneSaveCountRef = useRef(0);
-  // Tracks whether we've seen a prior save (so we skip the initial load)
-  const upgradeSaveInitializedRef = useRef(false);
+  // Upgrade banner
+  const { showUpgradeBanner, upgradeBannerDismissed, handleUpgradeDismiss } = useUpgradeBanner(
+    editorMode,
+    content,
+    lastSavedTime,
+  );
 
-  // Track save count to trigger UpgradeBanner in standalone mode
-  useEffect(() => {
-    if (!lastSavedTime) return;
-    if (!upgradeSaveInitializedRef.current) {
-      // First time seeing lastSavedTime; skip (this is initial load, not a user save)
-      upgradeSaveInitializedRef.current = true;
-      return;
-    }
-    if (!isStandaloneMode(editorMode) || upgradeBannerDismissed) return;
+  // Recent projects + auto-restore trigger
+  const onNoRestore = useCallback(() => {
+    setIsRestoring(false);
+    signalVfsReady();
+  }, [signalVfsReady]);
 
-    standaloneSaveCountRef.current += 1;
-    // Show banner on 1st save or subsequent saves
-    if (standaloneSaveCountRef.current >= 1) {
-      setShowUpgradeBanner(true);
-    }
-  }, [lastSavedTime, editorMode, upgradeBannerDismissed]);
-
-  // Track character count to trigger UpgradeBanner at 5,000 characters
-  useEffect(() => {
-    if (!isStandaloneMode(editorMode) || upgradeBannerDismissed) return;
-    if (chars(content) >= 5000) {
-      setShowUpgradeBanner(true);
-    }
-  }, [content, editorMode, upgradeBannerDismissed]);
-
-  // Reset save count tracking when editor mode changes
-  useEffect(() => {
-    standaloneSaveCountRef.current = 0;
-  }, [editorMode]);
+  const { recentProjects, autoRestoreProjectId, handleDeleteRecentProject } = useRecentProjects(
+    isElectron,
+    skipAutoRestore,
+    onNoRestore,
+  );
 
   // --- Internal helpers ---
 
@@ -238,20 +145,14 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       const mainFileName = project.metadata.mainFile;
 
       if (isElectron && project.rootPath) {
-        tabLoadSystemFile(
-          `${project.rootPath}/${mainFileName}`,
-          mainContent
-        );
+        tabLoadSystemFile(`${project.rootPath}/${mainFileName}`, mainContent);
       } else {
         tabLoadSystemFile(mainFileName, mainContent);
       }
 
       incrementEditorKey();
     } catch (error) {
-      console.error(
-        "Failed to load project main file:",
-        error
-      );
+      console.error("Failed to load project main file:", error);
       notificationManager.error(
         "プロジェクトのメインファイルを読み込めませんでした。ファイルが移動または削除された可能性があります。"
       );
@@ -263,18 +164,15 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     try {
       const { metadata, illusionsDir } = await ensureProjectJson(handle);
 
-      // Read workspace.json (defaults if missing)
       let workspaceState: ProjectMode["workspaceState"];
       try {
         const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json");
         const workspaceText = await readFileHandle(workspaceJsonHandle as Parameters<typeof readFileHandle>[0]);
         workspaceState = JSON.parse(workspaceText) as ProjectMode["workspaceState"];
       } catch {
-        const { getDefaultWorkspaceState } = await import("@/lib/project/project-types");
         workspaceState = getDefaultWorkspaceState();
       }
 
-      // Get main file handle
       const mainFileHandle = await handle.getFileHandle(metadata.mainFile);
 
       const project: ProjectMode = {
@@ -288,112 +186,23 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       };
 
       setProjectMode(project);
-      await loadProjectContent(project);
+      // Skip loading main file during auto-restore on Electron — tab persistence
+      // will restore the previously open tabs (or empty state).
+      // On Web, always load so the main file is available.
+      if (!isAutoRestoringRef.current || !isElectron) {
+        await loadProjectContent(project);
+      }
     } catch (error) {
       console.error("Failed to load restored project:", error);
     }
   }, [setProjectMode, loadProjectContent]);
 
-  // --- Load recent projects on mount ---
-  useEffect(() => {
-    let mounted = true;
-
-    const loadRecentProjects = async () => {
-      try {
-        if (isElectron) {
-          const storage = getStorageService();
-          const projects = await storage.getRecentProjects();
-          if (!mounted) return;
-
-          const entries: RecentProjectEntry[] = projects.map((p) => ({
-            projectId: p.id,
-            name: p.name,
-            lastAccessedAt: Date.now(),
-            rootDirName: p.rootPath.split("/").pop(),
-          }));
-          setRecentProjects(entries);
-
-          if (!skipAutoRestore && projects.length > 0) {
-            setAutoRestoreProjectId(projects[0].id);
-          } else {
-            setIsRestoring(false);
-            signalVfsReady();
-          }
-        } else {
-          const projectManager = getProjectManager();
-          const handles = await projectManager.listProjectHandles();
-          if (!mounted) return;
-
-          const entries: RecentProjectEntry[] = handles.map((h) => ({
-            projectId: h.projectId,
-            name: h.name ?? h.rootDirName ?? h.projectId,
-            lastAccessedAt: h.lastAccessedAt,
-            rootDirName: h.rootDirName,
-          }));
-          setRecentProjects(entries);
-
-          if (!skipAutoRestore && handles.length > 0) {
-            setAutoRestoreProjectId(handles[0].projectId);
-          } else {
-            setIsRestoring(false);
-            signalVfsReady();
-          }
-        }
-      } catch (error) {
-        console.error("Failed to load recent projects:", error);
-        setIsRestoring(false);
-        signalVfsReady();
-      }
-    };
-
-    void loadRecentProjects();
-
-    return () => {
-      mounted = false;
-    };
-  }, [isElectron, skipAutoRestore, signalVfsReady]);
-
   // --- Handlers ---
 
-  /** Delete a recent project from the list */
-  const handleDeleteRecentProject = useCallback(async (projectId: string) => {
-    try {
-      if (isElectron) {
-        const storage = getStorageService();
-        await storage.removeRecentProject(projectId);
-
-        const updatedProjects = await storage.getRecentProjects();
-        const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
-          projectId: p.id,
-          name: p.name,
-          lastAccessedAt: Date.now(),
-          rootDirName: p.rootPath.split("/").pop(),
-        }));
-        setRecentProjects(entries);
-      } else {
-        const projectManager = getProjectManager();
-        await projectManager.removeProjectHandle(projectId);
-
-        const handles = await projectManager.listProjectHandles();
-        const entries: RecentProjectEntry[] = handles.map((h) => ({
-          projectId: h.projectId,
-          name: h.name ?? h.rootDirName ?? h.projectId,
-          lastAccessedAt: h.lastAccessedAt,
-          rootDirName: h.rootDirName,
-        }));
-        setRecentProjects(entries);
-      }
-    } catch (error) {
-      console.error("Failed to delete recent project:", error);
-    }
-  }, [isElectron]);
-
-  /** Show the CreateProjectWizard dialog */
   const handleCreateProject = useCallback(() => {
     setShowCreateWizard(true);
   }, []);
 
-  /** Open an existing project from directory picker */
   const handleOpenProject = useCallback(async () => {
     try {
       const projectService = getProjectService();
@@ -411,34 +220,25 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         void window.electronAPI?.rebuildMenu?.();
       }
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-      if (error instanceof Error && error.message.includes("cancelled")) {
-        return;
-      }
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (error instanceof Error && error.message.includes("cancelled")) return;
       console.error("Failed to open project:", error);
     }
   }, [setProjectMode, isElectron, loadProjectContent]);
 
-  /** Open a standalone file via the existing file-open flow */
   const handleOpenStandaloneFile = useCallback(async () => {
     try {
       const projectService = getProjectService();
       const standalone = await projectService.openStandaloneFile();
       setStandaloneMode(standalone);
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
+      if (error instanceof DOMException && error.name === "AbortError") return;
       console.error("Failed to open file:", error);
     }
   }, [setStandaloneMode]);
 
-  /** Open a recently-stored project by its ID */
   const handleOpenRecentProject = useCallback(async (projectId: string) => {
     try {
-      // Electron: restore from SQLite using VFS with stored rootPath
       if (isElectron) {
         const storage = getStorageService();
         const projects = await storage.getRecentProjects();
@@ -469,8 +269,8 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
           }
 
           const mainFileHandle = await rootDirHandle.getFileHandle(metadata.mainFile);
-          const nativeMainFileHandle = (mainFileHandle as unknown as FileSystemFileHandle);
-          const nativeRootHandle = (rootDirHandle as unknown as FileSystemDirectoryHandle);
+          const nativeMainFileHandle = mainFileHandle as unknown as FileSystemFileHandle;
+          const nativeRootHandle = rootDirHandle as unknown as FileSystemDirectoryHandle;
 
           const restoredProject: ProjectMode = {
             type: "project",
@@ -484,14 +284,19 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
           };
 
           setProjectMode(restoredProject);
-          await loadProjectContent(restoredProject);
+          // Skip loading main file during auto-restore on Electron — tab persistence
+          // will restore the previously open tabs (or empty state).
+          // On Web, always load so the main file is available.
+          if (!isAutoRestoringRef.current || !isElectron) {
+            await loadProjectContent(restoredProject);
+          }
         } catch (error) {
           signalVfsReady();
           console.error("Failed to load project:", error);
           console.error("Project path:", project.rootPath);
 
-          const isFileNotFound = error && typeof error === 'object' &&
-            ('code' in error && (error as { code: string }).code === 'ENOENT');
+          const isFileNotFound = error && typeof error === "object" &&
+            ("code" in error && (error as { code: string }).code === "ENOENT");
 
           const message = isFileNotFound
             ? `プロジェクトが見つかりませんでした。\n\nパス: ${project.rootPath}\n\nフォルダが移動または削除された可能性があります。\n最近のプロジェクト一覧から削除しますか?`
@@ -509,6 +314,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       }
 
       // Web: restore from IndexedDB project handles
+      const { getProjectManager } = await import("@/lib/project/project-manager");
       const projectManager = getProjectManager();
       const restoreResult = await projectManager.restoreProjectHandle(projectId);
 
@@ -536,7 +342,6 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     }
   }, [isElectron, setProjectMode, openRestoredProject, loadProjectContent, signalVfsReady]);
 
-  /** Open a project from a file system path (when .mdi file is double-clicked in a project directory) */
   const handleOpenAsProject = useCallback(async (projectPath: string, initialFile: string) => {
     try {
       const vfs = getVFS();
@@ -553,13 +358,12 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         const wsText = await readFileHandle(wsHandle as Parameters<typeof readFileHandle>[0]);
         workspaceState = JSON.parse(wsText) as ProjectMode["workspaceState"];
       } catch {
-        const { getDefaultWorkspaceState } = await import("@/lib/project/project-types");
         workspaceState = getDefaultWorkspaceState();
       }
 
       const initialFileHandle = await rootDirHandle.getFileHandle(initialFile);
-      const nativeMainFileHandle = (initialFileHandle as unknown as FileSystemFileHandle);
-      const nativeRootHandle = (rootDirHandle as unknown as FileSystemDirectoryHandle);
+      const nativeMainFileHandle = initialFileHandle as unknown as FileSystemFileHandle;
+      const nativeRootHandle = rootDirHandle as unknown as FileSystemDirectoryHandle;
 
       const project: ProjectMode = {
         type: "project",
@@ -581,7 +385,6 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         rootPath: projectPath,
         name: project.name,
       });
-
       void window.electronAPI?.rebuildMenu?.();
     } catch (error) {
       console.error("[Open as Project] Failed to open project:", error);
@@ -604,9 +407,6 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         // handleOpenRecentProject catches its own errors internally
       }
       isAutoRestoringRef.current = false;
-      // Signal that VFS root has been initialized (or restore failed).
-      // Tab restoration depends on this to avoid race conditions with
-      // vfs:read-file IPC calls that require an allowed root.
       signalVfsReady();
       timerId = setTimeout(() => {
         setIsRestoring((prev) => {
@@ -623,7 +423,6 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     };
   }, [autoRestoreProjectId, handleOpenRecentProject, isElectron, signalVfsReady]);
 
-  /** Called when the CreateProjectWizard successfully creates a project */
   const handleProjectCreated = useCallback(async (project: ProjectMode) => {
     setProjectMode(project);
     setShowCreateWizard(false);
@@ -640,7 +439,6 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     }
   }, [setProjectMode, isElectron, loadProjectContent]);
 
-  /** Called when permission is granted for a restored project */
   const handlePermissionGranted = useCallback(() => {
     if (permissionPromptData) {
       void openRestoredProject(permissionPromptData.handle);
@@ -649,35 +447,22 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     setPermissionPromptData(null);
   }, [permissionPromptData, openRestoredProject]);
 
-  /** Called when permission is denied for a restored project */
   const handlePermissionDenied = useCallback(() => {
     setShowPermissionPrompt(false);
     setPermissionPromptData(null);
   }, []);
 
-  // --- Upgrade banner handlers ---
-
-  /** Handle upgrading from standalone to project mode */
   const handleUpgrade = useCallback(async () => {
     if (!isStandaloneMode(editorMode)) return;
     try {
       const upgradeService = getProjectUpgradeService();
       const project = await upgradeService.upgradeToProject(editorMode, content);
       setProjectMode(project);
-      setShowUpgradeBanner(false);
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
+      if (error instanceof DOMException && error.name === "AbortError") return;
       console.error("Failed to upgrade to project:", error);
     }
   }, [editorMode, content, setProjectMode]);
-
-  /** Dismiss the upgrade banner for this session */
-  const handleUpgradeDismiss = useCallback(() => {
-    setShowUpgradeBanner(false);
-    setUpgradeBannerDismissed(true);
-  }, []);
 
   return {
     state: {

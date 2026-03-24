@@ -4,7 +4,6 @@ import type { MutableRefObject, Dispatch, SetStateAction } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, TabState } from "./tab-types";
-import { getRandomillusionstory } from "../project/illusion-stories";
 
 // ---------------------------------------------------------------------------
 // Public return type (must stay identical to the original useTabManager)
@@ -54,7 +53,6 @@ export interface UseTabManagerReturn {
 
 export const AUTO_SAVE_INTERVAL = 5000;
 export const TAB_PERSIST_DEBOUNCE = 1000;
-export const DEMO_FILE_NAME = "鏡地獄.mdi";
 
 // ---------------------------------------------------------------------------
 // Shared refs / setters passed between sub-hooks
@@ -256,7 +254,7 @@ export function getErrorMessage(error: unknown): string {
 }
 
 export function createNewTab(content?: string, fileType: SupportedFileExtension = ".mdi"): TabState {
-  const c = content ?? (fileType === ".mdi" ? getRandomillusionstory() : "");
+  const c = content ?? "";
   return {
     id: generateTabId(),
     file: null,
@@ -271,17 +269,3 @@ export function createNewTab(content?: string, fileType: SupportedFileExtension 
   };
 }
 
-export async function loadDemoContent(): Promise<string | null> {
-  if (typeof window === "undefined") return null;
-  try {
-    // Use relative path for Electron file:// protocol compatibility
-    const basePath = window.location.protocol === "file:" ? "." : "";
-    const response = await fetch(`${basePath}/demo/鏡地獄.mdi`);
-    if (response.ok) {
-      return await response.text();
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}

@@ -26,6 +26,7 @@ import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
 import RubyDialog from "@/components/RubyDialog";
+import { EmptyEditorState } from "@/components/EmptyEditorState";
 import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
 import { useTabManager } from "@/lib/hooks/use-tab-manager";
@@ -193,6 +194,7 @@ export default function EditorPage() {
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [recoveryExiting, setRecoveryExiting] = useState(false);
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
+  const [newFileTrigger, setNewFileTrigger] = useState(0);
   const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [saveToastExiting, setSaveToastExiting] = useState(false);
@@ -654,6 +656,7 @@ export default function EditorPage() {
                   void openProjectFile(vfsPath, { preview: false });
                   incrementEditorKey();
                 }}
+                newFileTrigger={newFileTrigger}
               />
             </div>
           </aside>
@@ -828,6 +831,21 @@ export default function EditorPage() {
         )}
 
         <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
+          {tabs.length === 0 && (
+            <div className="absolute inset-0 z-10">
+              <EmptyEditorState
+                onNewFile={() => {
+                  if (isProjectMode(editorMode)) {
+                    setTopView("files");
+                    setNewFileTrigger(prev => prev + 1);
+                  } else {
+                    newTab();
+                  }
+                }}
+                onOpenFile={() => void openFile()}
+              />
+            </div>
+          )}
           <DockviewReact
             className="flex-1 dockview-theme-illusions"
             components={{

@@ -45,7 +45,6 @@ export interface ProjectMetadata {
  */
 export interface AppState {
   lastOpenedMdiPath?: string;
-  hasSeenDemo?: boolean;
   sidebarTab?: "chapters" | "settings" | "style";
   inspectorTab?: "ai" | "corrections" | "stats" | "versions" | "history";
 
@@ -82,6 +81,11 @@ export interface AppState {
   lintingEnabled?: boolean;
   lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>;
 
+  // LLM設定
+  llmEnabled?: boolean;
+  llmModelId?: string;
+  llmIdlingStop?: boolean;
+
   // Character extraction settings
   characterExtractionBatchSize?: number;
   characterExtractionConcurrency?: number;
@@ -107,6 +111,7 @@ export interface AppState {
   prePowerSaveState?: {
     lintingEnabled: boolean;
     lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
+    llmEnabled?: boolean;
   } | null;
 
   // 朗読（TTS）設定
