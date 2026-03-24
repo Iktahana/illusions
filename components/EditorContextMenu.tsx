@@ -5,6 +5,8 @@ import { Scissors, Copy, ClipboardPaste, Search, CheckSquare, Languages, ALargeS
 import type { ReactNode, MouseEvent } from "react";
 
 import type { LintIssue } from "@/lib/linting";
+import { useKeymap } from "@/contexts/KeymapContext";
+import { formatBinding } from "@/lib/keymap/keymap-utils";
 
 export type ContextMenuAction =
   | "cut"
@@ -68,7 +70,9 @@ export default function EditorContextMenu({
   lintIssueAtCursor,
   onContextMenuOpen,
 }: EditorContextMenuProps) {
-  // Detect platform for keyboard shortcuts
+  const { effectiveBindings } = useKeymap();
+
+  // Detect platform for native shortcuts (cut/copy/paste are browser built-ins not in registry)
   const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
   const cmdKey = isMac ? "⌘" : "Ctrl+";
 
@@ -128,7 +132,7 @@ export default function EditorContextMenu({
           <MenuItem
             icon={<ClipboardPaste className="w-4 h-4" />}
             label="プレーンテキストとして貼り付け"
-            shortcut={`Shift+${cmdKey}V`}
+            shortcut={formatBinding(effectiveBindings["edit.pasteAsPlaintext"])}
             onClick={() => onAction("paste-plaintext")}
           />
 
@@ -138,14 +142,14 @@ export default function EditorContextMenu({
           <MenuItem
             icon={<Languages className="w-4 h-4" />}
             label="ルビ"
-            shortcut={`Shift+${cmdKey}R`}
+            shortcut={formatBinding(effectiveBindings["format.ruby"])}
             onClick={() => onAction("ruby")}
             disabled={!hasSelection}
           />
           <MenuItem
             icon={<ALargeSmall className="w-4 h-4" />}
             label="縦中横"
-            shortcut={`Shift+${cmdKey}T`}
+            shortcut={formatBinding(effectiveBindings["format.tcy"])}
             onClick={() => onAction("tcy")}
             disabled={!hasSelection}
           />
@@ -156,7 +160,7 @@ export default function EditorContextMenu({
           <MenuItem
             icon={<Search className="w-4 h-4" />}
             label="検索"
-            shortcut={`${cmdKey}F`}
+            shortcut={formatBinding(effectiveBindings["nav.search"])}
             onClick={() => onAction("find")}
           />
           <MenuItem

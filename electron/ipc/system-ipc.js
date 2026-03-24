@@ -49,6 +49,14 @@ function registerSystemHandlers() {
     return true
   })
 
+  // Sync keymap overrides from renderer to update menu accelerators
+  ipcMain.handle('menu:update-keymap-overrides', async (_event, overrides) => {
+    const { setKeymapOverrides, rebuildApplicationMenu } = require('../menu')
+    setKeymapOverrides(overrides)
+    await rebuildApplicationMenu()
+    return true
+  })
+
   // safeStorage: OS-level encryption (macOS Keychain / Windows DPAPI)
   ipcMain.handle('safe-storage:encrypt', (_event, plaintext) => {
     if (typeof plaintext !== 'string' || !plaintext) return null

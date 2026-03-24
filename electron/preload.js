@@ -79,6 +79,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   rebuildMenu: () => ipcRenderer.invoke('menu:rebuild'),
   syncMenuUiState: (state) => ipcRenderer.invoke('menu:sync-ui-state', state),
+  updateKeymapOverrides: (overrides) => ipcRenderer.invoke('menu:update-keymap-overrides', overrides),
   onMenuShowInFileManager: (callback) => {
     const handler = () => callback()
     ipcRenderer.on('menu-show-in-file-manager', handler)

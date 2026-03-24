@@ -3,6 +3,7 @@
 import type { StorageSession, AppState, RecentFile, EditorBuffer } from "@/lib/storage/storage-types";
 import type { Token, WordEntry, TokenizeProgress } from "@/lib/nlp-client/types";
 import type { VFSWatchEvent } from "@/lib/vfs/types";
+import type { KeymapOverrides } from "@/lib/keymap/keymap-types";
 
 export {}
 
@@ -43,6 +44,7 @@ declare global {
     onMenuOpenRecentProject?: (callback: (projectId: string) => void) => (() => void) | void;
     rebuildMenu?: () => Promise<boolean>;
     syncMenuUiState?: (state: { compactMode?: boolean; showParagraphNumbers?: boolean; themeMode?: string; autoCharsPerLine?: boolean }) => Promise<boolean>;
+    updateKeymapOverrides?: (overrides: KeymapOverrides) => Promise<boolean>;
     showInFileManager?: (dirPath: string) => Promise<boolean>;
     revealInFileManager?: (filePath: string) => Promise<boolean>;
     openExternal?: (url: string) => Promise<boolean>;
