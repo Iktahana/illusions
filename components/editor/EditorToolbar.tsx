@@ -30,7 +30,7 @@ export default function EditorToolbar({
   const paragraphSpacingOptions = Array.from({ length: 31 }, (_, i) => +(i * 0.1).toFixed(1)); // 0–3.0
 
   return (
-    <div className="h-12 border-b border-border bg-background flex items-center justify-between px-4">
+    <div className="h-12 border-y border-border bg-background-secondary flex items-center justify-between px-4">
       <div className="flex items-center gap-4">
         {/* 縦書き/横書き */}
          <button

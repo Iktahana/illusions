@@ -288,7 +288,12 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       };
 
       setProjectMode(project);
-      await loadProjectContent(project);
+      // Skip loading main file during auto-restore on Electron — tab persistence
+      // will restore the previously open tabs (or empty state).
+      // On Web, always load so the main file is available.
+      if (!isAutoRestoringRef.current || !isElectron) {
+        await loadProjectContent(project);
+      }
     } catch (error) {
       console.error("Failed to load restored project:", error);
     }
@@ -484,7 +489,12 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
           };
 
           setProjectMode(restoredProject);
-          await loadProjectContent(restoredProject);
+          // Skip loading main file during auto-restore on Electron — tab persistence
+          // will restore the previously open tabs (or empty state).
+          // On Web, always load so the main file is available.
+          if (!isAutoRestoringRef.current || !isElectron) {
+            await loadProjectContent(restoredProject);
+          }
         } catch (error) {
           signalVfsReady();
           console.error("Failed to load project:", error);

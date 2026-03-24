@@ -63,9 +63,6 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
   const tabPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Only persist in Electron (Web has limited persistence)
-    if (!isElectron) return;
-
     if (tabPersistTimerRef.current) {
       clearTimeout(tabPersistTimerRef.current);
     }
@@ -92,7 +89,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         clearTimeout(tabPersistTimerRef.current);
       }
     };
-  }, [tabs, activeTabId, isElectron]);
+  }, [tabs, activeTabId]);
 
   // --- Storage initialization & Web file restore --------------------------
   //
@@ -105,12 +102,19 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
       try {
         const storage = getStorageService();
         await storage.initialize();
+        const appState = await storage.loadAppState();
+
+        // Check if we have previously saved tab state
+        const savedOpenTabs = appState?.openTabs;
+
+        // If saved state explicitly has 0 tabs, restore empty state — no tab needed.
+        const savedEmpty = savedOpenTabs && savedOpenTabs.tabs.length === 0;
 
         // Determine the initial tab using a local variable to make the
         // fallback logic explicit and avoid multiple setTabs calls.
         let initialTab: TabState | null = null;
 
-        if (!skipAutoRestore && !isElectron) {
+        if (!skipAutoRestore && !isElectron && !savedEmpty) {
           // Web: restore file handle from editor buffer
           const buffer = await storage.loadEditorBuffer();
           if (buffer?.fileHandle) {
@@ -138,10 +142,11 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         }
 
         // Fallback: create a default blank tab when no restore path fired.
+        // Skip if saved state was explicitly empty (user closed all tabs).
         // For Electron (non-skipAutoRestore), restoreTabs handles the case where
         // file-backed tabs were previously saved; skip creating a fallback here
         // to avoid a visible flash before restoreTabs completes.
-        if (!initialTab && (!isElectron || skipAutoRestore)) {
+        if (!initialTab && !savedEmpty && (!isElectron || skipAutoRestore)) {
           initialTab = createNewTab();
         }
 
@@ -184,7 +189,6 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
         const appState = await fetchAppState();
         const openTabs = appState?.openTabs;
-
         // No saved state at all: first use — initializeStorage handles default tab.
         if (!openTabs) return;
 
