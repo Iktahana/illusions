@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, memo, useState } from "react";
 import { Plus, Trash2, Edit2, BookOpen, ChevronDown, ChevronRight, Search, Globe, ExternalLink } from "lucide-react";
 import type { UserDictionaryEntry } from "@/lib/project/project-types";
 import type { EditorMode } from "@/lib/project/project-types";
@@ -50,7 +50,7 @@ interface DictionaryProps {
   editorMode?: EditorMode;
 }
 
-export default function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }: DictionaryProps) {
+function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }: DictionaryProps) {
   const [activeTab, setActiveTab] = useState<"user" | "web">("web");
   const [userEntries, setUserEntries] = useState<UserDictionaryEntry[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -108,13 +108,13 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
 
   // --- Modal handlers ---
 
-  const handleOpenAddDialog = () => {
+  const handleOpenAddDialog = useCallback(() => {
     setEditingEntry(null);
     setFormData(EMPTY_FORM);
     setIsDialogOpen(true);
-  };
+  }, []);
 
-  const handleOpenEditDialog = (entry: UserDictionaryEntry) => {
+  const handleOpenEditDialog = useCallback((entry: UserDictionaryEntry) => {
     setEditingEntry(entry);
     setFormData({
       word: entry.word,
@@ -125,13 +125,13 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
       notes: entry.notes ?? "",
     });
     setIsDialogOpen(true);
-  };
+  }, []);
 
-  const handleCloseDialog = () => {
+  const handleCloseDialog = useCallback(() => {
     setIsDialogOpen(false);
     setEditingEntry(null);
     setFormData(EMPTY_FORM);
-  };
+  }, []);
 
   const handleSaveEntry = async () => {
     if (!formData.word?.trim()) return;
@@ -172,23 +172,27 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
     handleCloseDialog();
   };
 
-  const handleDeleteEntry = async (id: string) => {
+  const handleDeleteEntry = useCallback(async (id: string) => {
     const updated = userEntries.filter((e) => e.id !== id);
     setUserEntries(updated);
     if (expandedId === id) setExpandedId(null);
     await persistEntries(updated);
-  };
+  }, [userEntries, expandedId, persistEntries]);
 
-  const toggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  }, []);
 
-  // Filtered entries
-  const filteredEntries = userEntries.filter(
-    (entry) =>
-      entry.word.toLowerCase().includes(activeSearchQuery.toLowerCase()) ||
-      entry.reading?.toLowerCase().includes(activeSearchQuery.toLowerCase()) ||
-      entry.definition?.toLowerCase().includes(activeSearchQuery.toLowerCase()),
+  // Filtered entries — memoized to avoid re-filtering on unrelated renders
+  const filteredEntries = useMemo(
+    () =>
+      userEntries.filter(
+        (entry) =>
+          entry.word.toLowerCase().includes(activeSearchQuery.toLowerCase()) ||
+          entry.reading?.toLowerCase().includes(activeSearchQuery.toLowerCase()) ||
+          entry.definition?.toLowerCase().includes(activeSearchQuery.toLowerCase()),
+      ),
+    [userEntries, activeSearchQuery],
   );
 
   return (
@@ -470,3 +474,5 @@ export default function Dictionary({ content, initialSearchTerm, searchTriggerId
     </div>
   );
 }
+
+export default memo(Dictionary);
