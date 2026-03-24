@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useTheme } from "@/contexts/ThemeContext";
-import Explorer, { FilesPanel } from "@/components/Explorer";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
@@ -12,16 +11,12 @@ import ResizablePanel from "@/components/ResizablePanel";
 import TitleUpdater from "@/components/TitleUpdater";
 import ActivityBar from "@/components/ActivityBar";
 import SidebarSplitter from "@/components/SidebarSplitter";
-import SearchResults from "@/components/SearchResults";
 import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import UpgradeToProjectBanner from "@/components/UpgradeToProjectBanner";
-import WordFrequency from "@/components/WordFrequency";
-import Characters from "@/components/Characters";
-import Dictionary from "@/components/Dictionary";
-import Outline from "@/components/Outline";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import PopoutEditorWindow from "@/components/PopoutEditorWindow";
+import SidebarPanel from "@/components/SidebarPanel";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
@@ -57,8 +52,8 @@ import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
+import { useSaveToast } from "@/lib/editor-page/use-save-toast";
 
-import type { ActivityBarView } from "@/components/ActivityBar";
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 
@@ -196,10 +191,7 @@ export default function EditorPage() {
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
   const [newFileTrigger, setNewFileTrigger] = useState(0);
   const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
-  const [showSaveToast, setShowSaveToast] = useState(false);
-  const [saveToastExiting, setSaveToastExiting] = useState(false);
   const [selectedCharCount, setSelectedCharCount] = useState(0);
-  const prevLastSavedTimeRef = useRef<number | null>(null);
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const programmaticScrollRef = useRef(false);
@@ -351,34 +343,8 @@ export default function EditorPage() {
     editorDomRef
   );
 
-  // Save toast: show when lastSavedTime updates (skip auto-save / initial load)
-  useEffect(() => {
-    if (lastSavedTime && prevLastSavedTimeRef.current !== lastSavedTime) {
-      if (prevLastSavedTimeRef.current !== null) {
-        // Only show toast for manual saves
-        if (!lastSaveWasAuto) {
-          setShowSaveToast(true);
-          setSaveToastExiting(false);
-
-          let exitTimer: ReturnType<typeof setTimeout> | null = null;
-          const hideTimer = setTimeout(() => {
-            setSaveToastExiting(true);
-            exitTimer = setTimeout(() => {
-              setShowSaveToast(false);
-              setSaveToastExiting(false);
-            }, 150);
-          }, 1200);
-
-          prevLastSavedTimeRef.current = lastSavedTime;
-          return () => {
-            clearTimeout(hideTimer);
-            if (exitTimer) clearTimeout(exitTimer);
-          };
-        }
-      }
-      prevLastSavedTimeRef.current = lastSavedTime;
-    }
-  }, [lastSavedTime, lastSaveWasAuto]);
+  // --- Save toast hook ---
+  const { showSaveToast, saveToastExiting } = useSaveToast({ lastSavedTime, lastSaveWasAuto });
 
   // Recovery notification: fade-out after 5s, then dismiss
   useEffect(() => {
@@ -636,72 +602,27 @@ export default function EditorPage() {
   }
 
   // --- Editor view (project or standalone mode) ---
-  const renderPanel = (view: ActivityBarView) => {
-    switch (view) {
-      case "files":
-        return (
-          <aside className="h-full bg-background border-r border-border flex flex-col">
-            <div className="p-4 flex-1 overflow-y-auto">
-              <FilesPanel
-                projectName={isProjectMode(editorMode) ? editorMode.name : undefined}
-                onFileClick={(vfsPath) => {
-                  void openProjectFile(vfsPath, { preview: true });
-                  incrementEditorKey();
-                }}
-                onFileDoubleClick={(vfsPath) => {
-                  void openProjectFile(vfsPath, { preview: false });
-                  incrementEditorKey();
-                }}
-                onFileMiddleClick={(vfsPath) => {
-                  void openProjectFile(vfsPath, { preview: false });
-                  incrementEditorKey();
-                }}
-                newFileTrigger={newFileTrigger}
-              />
-            </div>
-          </aside>
-        );
-      case "explorer":
-        return (
-          <ErrorBoundary sectionName="エクスプローラ">
-          <Explorer
-            compactMode={compactMode}
-            content={content}
-            onChapterClick={handleChapterClick}
-            onInsertText={handleInsertText}
-          />
-          </ErrorBoundary>
-        );
-      case "search":
-        return (
-          <SearchResults
-            editorView={editorViewInstance}
-            matches={searchResults?.matches}
-            searchTerm={searchResults?.searchTerm}
-            onClose={handleCloseSearchResults}
-            programmaticScrollRef={programmaticScrollRef}
-          />
-        );
-      case "outline":
-        return (
-          <Outline
-            content={content}
-            onHeadingClick={handleChapterClick}
-          />
-        );
-      case "characters":
-        return <Characters content={content} />;
-      case "dictionary":
-        return <Dictionary content={content} initialSearchTerm={dictionarySearchTrigger.term} searchTriggerId={dictionarySearchTrigger.id} editorMode={editorMode} />;
-      case "wordfreq":
-        return <WordFrequency content={content} filePath={currentFile?.path ?? undefined} onWordSearch={(word) => {
-          setSearchInitialTerm(word);
-          setSearchOpenTrigger(prev => prev + 1);
-        }} />;
-      default:
-        return null;
-    }
-  };
+  // Shared props forwarded to every SidebarPanel instance
+  const sidebarPanelProps = {
+    content,
+    editorMode,
+    compactMode,
+    onChapterClick: handleChapterClick,
+    onInsertText: handleInsertText,
+    searchResults,
+    onCloseSearchResults: handleCloseSearchResults,
+    programmaticScrollRef,
+    editorViewInstance,
+    dictionarySearchTrigger,
+    currentFilePath: currentFile?.path ?? undefined,
+    newFileTrigger,
+    openProjectFile,
+    incrementEditorKey,
+    onWordSearch: (word: string) => {
+      setSearchInitialTerm(word);
+      setSearchOpenTrigger(prev => prev + 1);
+    },
+  } as const;
 
     return (
       <EditorSettingsProvider settings={settings} handlers={settingsHandlers}>
@@ -819,8 +740,8 @@ export default function EditorPage() {
           {(topView !== "none" || bottomView !== "none") && (
             <ResizablePanel side="left" defaultWidth={compactMode ? 200 : 256} minWidth={compactMode ? 160 : 200} maxWidth={compactMode ? 320 : 400}>
               {(() => {
-                const topPanel = topView !== "none" ? renderPanel(topView) : null;
-                const bottomPanel = bottomView !== "none" ? renderPanel(bottomView) : null;
+                const topPanel = topView !== "none" ? <SidebarPanel view={topView} {...sidebarPanelProps} /> : null;
+                const bottomPanel = bottomView !== "none" ? <SidebarPanel view={bottomView} {...sidebarPanelProps} /> : null;
 
                 if (topPanel && bottomPanel) {
                   return <SidebarSplitter top={topPanel} bottom={bottomPanel} />;

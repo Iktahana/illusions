@@ -23,6 +23,7 @@ import { $prose } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "../BubbleMenu";
 import { searchHighlightPlugin } from "@/lib/editor-page/search-highlight-plugin";
 import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin";
+import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
 import EditorContextMenu, { type ContextMenuAction } from "../EditorContextMenu";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
@@ -87,14 +88,12 @@ export default function MilkdownEditor({
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
-  const [hasSelection, setHasSelection] = useState(false);
   const [lintIssueAtCursor, setLintIssueAtCursor] = useState<LintIssue | null>(null);
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
   // 初期内容はマウント時に固定（ファイル切り替えでコンポーネントが再マウントされたときだけ変わる）
   const initialContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
   const onInsertTextRef = useRef(onInsertText);
-  const onSelectionChangeRef = useRef(onSelectionChange);
   const onLintIssuesUpdatedRef = useRef(onLintIssuesUpdated);
   const onNlpErrorRef = useRef(onNlpError);
 
@@ -107,10 +106,6 @@ export default function MilkdownEditor({
   useEffect(() => {
     onInsertTextRef.current = onInsertText;
   }, [onInsertText]);
-
-  useEffect(() => {
-    onSelectionChangeRef.current = onSelectionChange;
-  }, [onSelectionChange]);
 
   useEffect(() => {
     onLintIssuesUpdatedRef.current = onLintIssuesUpdated;
@@ -267,62 +262,11 @@ export default function MilkdownEditor({
     });
   }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
 
-  // 選択文字数を更新する（editorViewInstance が変わったときだけ再生成）
-  const updateSelectionCount = useCallback(() => {
-    if (!editorViewInstance) return;
-    const { state } = editorViewInstance;
-    const { selection } = state;
-    const { from, to } = selection;
-
-    // 選択がない場合は 0
-    if (from === to) {
-      setHasSelection(false);
-      onSelectionChangeRef.current?.(0);
-      return;
-    }
-
-    // 選択文字列の文字数を数える（空白は除外）
-    const selectedText = state.doc.textBetween(from, to);
-    const count = selectedText.replace(/\s/g, "").length;
-    setHasSelection(count > 0);
-    onSelectionChangeRef.current?.(count);
-  }, [editorViewInstance]);
-
-  // 選択変更のスケジューリング（10ms デバウンス、前回のタイマーをキャンセル）
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scheduleUpdate = useCallback(() => {
-    if (debounceTimerRef.current !== null) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    debounceTimerRef.current = setTimeout(() => {
-      debounceTimerRef.current = null;
-      updateSelectionCount();
-    }, 10);
-  }, [updateSelectionCount]);
-
-  // 選択範囲の変更を追跡する
-  useEffect(() => {
-    if (!editorViewInstance) return;
-
-    const editorDom = editorViewInstance.dom;
-
-    editorDom.addEventListener("mouseup", scheduleUpdate);
-    editorDom.addEventListener("keyup", scheduleUpdate);
-    document.addEventListener("selectionchange", scheduleUpdate);
-
-    // 初期値
-    updateSelectionCount();
-
-    return () => {
-      editorDom.removeEventListener("mouseup", scheduleUpdate);
-      editorDom.removeEventListener("keyup", scheduleUpdate);
-      document.removeEventListener("selectionchange", scheduleUpdate);
-      if (debounceTimerRef.current !== null) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
-      }
-    };
-  }, [editorViewInstance, scheduleUpdate, updateSelectionCount]);
+  // 選択文字数の追跡
+  const { hasSelection } = useSelectionTracking({
+    editorViewInstance,
+    onSelectionChange: onSelectionChange,
+  });
 
   // 不要なアニメーションを避けるため、直前のスタイル値を保持する
   const prevStyleRef = useRef({ charsPerLine, isVertical, fontFamily, fontScale, lineHeight });
