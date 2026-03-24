@@ -83,6 +83,19 @@ export const LINT_RULES_META: LintRuleMeta[] = [
   { id: "iteration-mark", nameJa: "繰り返し符号「々」の制限", descriptionJa: "平仮名・片仮名の後に「々」が使われている無効な用法を検出します", guidelineId: "jis-x-4051" },
 
   // ---------------------------------------------------------------------------
+  // #777 rules: editors-rulebook (原稿編集 第2版)
+  // ---------------------------------------------------------------------------
+  { id: "me2-kanji-font", nameJa: "旧字体検出", descriptionJa: "常用漢字表の通用字体を使用し、旧字体を検出します", guidelineId: "editors-rulebook" },
+  { id: "me2-katakana-foreign", nameJa: "外来語・擬音語の片仮名表記", descriptionJa: "外来語・擬声語・擬音語は片仮名で表記します", guidelineId: "editors-rulebook" },
+  { id: "me2-foreign-long-vowel", nameJa: "外来語末尾の長音符号", descriptionJa: "3音以上の外来語の末尾の長音符号「ー」を省略しません", guidelineId: "editors-rulebook" },
+  { id: "me2-vertical-numbers", nameJa: "縦組の漢数字使用", descriptionJa: "縦組では漢数字を使用します", guidelineId: "editors-rulebook" },
+  { id: "me2-horizontal-numbers", nameJa: "横組のアラビア数字使用", descriptionJa: "横組ではアラビア数字を使用します", guidelineId: "editors-rulebook" },
+  { id: "me2-unit-symbols", nameJa: "単位記号の表記", descriptionJa: "横組では数値と欧字単位記号の間にスペースを入れます", guidelineId: "editors-rulebook" },
+  { id: "me2-currency-percent", nameJa: "通貨・百分率記号の密着", descriptionJa: "通貨記号・百分率記号は数字に密着させます", guidelineId: "editors-rulebook" },
+  { id: "me2-punctuation-consistency", nameJa: "句読点セットの統一", descriptionJa: "句読点セットが統一されているか確認します", guidelineId: "editors-rulebook" },
+  { id: "me2-repetition-marks", nameJa: "くり返し符号の用法", descriptionJa: "くり返し符号（々、ゝ、ゞ）の適切な使用をチェックします", guidelineId: "editors-rulebook" },
+
+  // ---------------------------------------------------------------------------
   // #438 rules: jtf-style-3
   // ---------------------------------------------------------------------------
   { id: "mixed-width-spacing", nameJa: "和欧文字間のスペース禁止", descriptionJa: "日本語文字とASCII文字の間にある半角スペースを検出します", guidelineId: "jtf-style-3" },
@@ -129,6 +142,11 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
       "nakaguro-usage", "large-number-comma", "counter-character",
       "list-formatting-consistency", "katakana-chouon", "vu-katakana",
       "gairai-kana-table",
+      // #777 rules (原稿編集 第2版)
+      "me2-katakana-foreign", "me2-foreign-long-vowel",
+      "me2-vertical-numbers", "me2-horizontal-numbers",
+      "me2-unit-symbols", "me2-currency-percent",
+      "me2-punctuation-consistency", "me2-repetition-marks",
     ],
   },
   {
@@ -141,6 +159,8 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
       "ji-zu-kana", "historical-kana-detection", "long-vowel-kana",
       "formal-noun-opening", "auxiliary-verb-opening", "conjunction-opening",
       "kanji-verb-one-char-do", "pronoun-kanji", "prefix-script-matching",
+      // #777 rules (原稿編集 第2版)
+      "me2-kanji-font",
     ],
   },
   {
@@ -244,6 +264,17 @@ export const LINT_DEFAULT_CONFIGS: Record<string, LintRulePresetConfig> = {
   "counter-character": { enabled: true, severity: "info" },
   "list-formatting-consistency": { enabled: true, severity: "info" },
 
+  // --- #777 rules: editors-rulebook (原稿編集 第2版) ---
+  "me2-kanji-font": { enabled: true, severity: "warning" },
+  "me2-katakana-foreign": { enabled: true, severity: "info" },
+  "me2-foreign-long-vowel": { enabled: true, severity: "warning" },
+  "me2-vertical-numbers": { enabled: false, severity: "info" },
+  "me2-horizontal-numbers": { enabled: false, severity: "info" },
+  "me2-unit-symbols": { enabled: false, severity: "info" },
+  "me2-currency-percent": { enabled: true, severity: "warning" },
+  "me2-punctuation-consistency": { enabled: true, severity: "warning" },
+  "me2-repetition-marks": { enabled: true, severity: "info" },
+
   // --- #438 rules: Universal ---
   "double-negative": { enabled: true, severity: "warning" },
   "conjunctive-ga-overuse": { enabled: true, severity: "info" },
@@ -330,6 +361,16 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "particle-kara-yori": { enabled: false, severity: "info" },
       "suru-beki-conjugation": { enabled: true, severity: "info" },
       "conjunction-hierarchy": { enabled: false, severity: "info" },
+      // --- #777 rules (原稿編集 第2版) ---
+      "me2-kanji-font": { enabled: true, severity: "info" },
+      "me2-katakana-foreign": { enabled: false, severity: "info" },
+      "me2-foreign-long-vowel": { enabled: false, severity: "info" },
+      "me2-vertical-numbers": { enabled: false, severity: "info" },
+      "me2-horizontal-numbers": { enabled: false, severity: "info" },
+      "me2-unit-symbols": { enabled: false, severity: "info" },
+      "me2-currency-percent": { enabled: true, severity: "info" },
+      "me2-punctuation-consistency": { enabled: false, severity: "info" },
+      "me2-repetition-marks": { enabled: false, severity: "info" },
     },
   },
   standard: {
@@ -403,6 +444,16 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "particle-kara-yori": { enabled: true, severity: "warning" },
       "suru-beki-conjugation": { enabled: true, severity: "error" },
       "conjunction-hierarchy": { enabled: true, severity: "warning" },
+      // --- #777 rules (原稿編集 第2版) ---
+      "me2-kanji-font": { enabled: true, severity: "error" },
+      "me2-katakana-foreign": { enabled: true, severity: "warning" },
+      "me2-foreign-long-vowel": { enabled: true, severity: "warning" },
+      "me2-vertical-numbers": { enabled: false, severity: "info" },
+      "me2-horizontal-numbers": { enabled: false, severity: "info" },
+      "me2-unit-symbols": { enabled: false, severity: "info" },
+      "me2-currency-percent": { enabled: true, severity: "error" },
+      "me2-punctuation-consistency": { enabled: true, severity: "error" },
+      "me2-repetition-marks": { enabled: true, severity: "warning" },
     },
   },
   novel: {
@@ -472,6 +523,16 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "particle-kara-yori": { enabled: false, severity: "info" },
       "suru-beki-conjugation": { enabled: true, severity: "info" },
       "conjunction-hierarchy": { enabled: false, severity: "info" },
+      // --- #777 rules (原稿編集 第2版) ---
+      "me2-kanji-font": { enabled: true, severity: "info" },
+      "me2-katakana-foreign": { enabled: false, severity: "info" },
+      "me2-foreign-long-vowel": { enabled: true, severity: "info" },
+      "me2-vertical-numbers": { enabled: false, severity: "info" },
+      "me2-horizontal-numbers": { enabled: false, severity: "info" },
+      "me2-unit-symbols": { enabled: false, severity: "info" },
+      "me2-currency-percent": { enabled: true, severity: "info" },
+      "me2-punctuation-consistency": { enabled: true, severity: "info" },
+      "me2-repetition-marks": { enabled: true, severity: "info" },
     },
   },
   // The official preset intentionally omits skipDialogue on most rules because
@@ -544,6 +605,16 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "particle-kara-yori": { enabled: true, severity: "warning" },
       "suru-beki-conjugation": { enabled: true, severity: "error" },
       "conjunction-hierarchy": { enabled: true, severity: "warning" },
+      // --- #777 rules (原稿編集 第2版) ---
+      "me2-kanji-font": { enabled: true, severity: "warning" },
+      "me2-katakana-foreign": { enabled: true, severity: "warning" },
+      "me2-foreign-long-vowel": { enabled: true, severity: "warning" },
+      "me2-vertical-numbers": { enabled: false, severity: "info" },
+      "me2-horizontal-numbers": { enabled: false, severity: "info" },
+      "me2-unit-symbols": { enabled: false, severity: "info" },
+      "me2-currency-percent": { enabled: true, severity: "warning" },
+      "me2-punctuation-consistency": { enabled: true, severity: "warning" },
+      "me2-repetition-marks": { enabled: true, severity: "warning" },
     },
   },
 };

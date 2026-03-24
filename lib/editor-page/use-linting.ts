@@ -72,6 +72,8 @@ import { LiteraryStyleExclusionRule } from "@/lib/linting/rules/literary-style-e
 import { ExcessiveHonorificRule } from "@/lib/linting/rules/excessive-honorific-rule";
 import { ModifierLengthOrderRule } from "@/lib/linting/rules/modifier-length-order-rule";
 import { KanjiVerbOneCharDo } from "@/lib/linting/rules/kanji-verb-one-char-do";
+// Manuscript Editing 2nd Edition rules (#777)
+import { createManuscriptL1Rules } from "@/lib/linting/rules/json-l1/manuscript-l1-rules";
 
 export interface UseLintingResult {
   ruleRunner: RuleRunner;
@@ -169,6 +171,11 @@ export function useLinting(
     runner.registerRule(new ExcessiveHonorificRule());
     runner.registerRule(new ModifierLengthOrderRule());
     runner.registerRule(new KanjiVerbOneCharDo());
+
+    // Manuscript Editing 2nd Edition rules (#777)
+    for (const rule of createManuscriptL1Rules()) {
+      runner.registerRule(rule);
+    }
 
     // Initialize guideline map for guideline-based filtering
     runner.setGuidelineMap(RULE_GUIDELINE_MAP);
