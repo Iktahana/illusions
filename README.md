@@ -15,8 +15,7 @@
       <img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/apple.svg" width="20" height="20" alt="Apple" style="filter: brightness(0) invert(1);">
       MACOS
     </div>
-    <div style="background-color: #222; padding: 0 24px; height: 100%; display: flex; align-items: center; color: white; font-weight: bold; font-size: 14px;">DOWNLOAD</div>
-  </a>
+     </a>
 </div>
 
 <div style="display: flex; gap: 8px; height: 48px;">
@@ -25,7 +24,6 @@
       <img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/windows.svg" width="20" height="20" alt="Windows" style="filter: brightness(0) invert(1);">
       WINDOWS
     </div>
-    <div style="background-color: #222; padding: 0 24px; height: 100%; display: flex; align-items: center; color: white; font-weight: bold; font-size: 14px;">DOWNLOAD</div>
   </a>
 </div>
 
@@ -35,7 +33,6 @@
       <img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/googlechrome.svg" width="20" height="20" alt="Chrome" style="filter: brightness(0) invert(1);">
       CHROME
     </div>
-    <div style="background-color: #222; padding: 0 24px; height: 100%; display: flex; align-items: center; color: white; font-weight: bold; font-size: 14px;">OPEN IN BROWSER</div>
   </a>
 </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { AlertCircle, BarChart3, Edit2, X, History } from "lucide-react";
 import clsx from "clsx";
 
@@ -14,6 +14,20 @@ import type { ProjectMode } from "@/lib/project/project-types";
 import type { InspectorProps } from "./inspector/types";
 import type { Tab } from "./inspector/types";
 import { isValidTab, getMdiExtension, getBaseName } from "./inspector/types";
+
+function formatTime(timestamp: number | null): string {
+  if (!timestamp || timestamp <= 0) return "未保存";
+  const date = new Date(timestamp);
+  if (isNaN(date.getTime())) return "未保存";
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+
+  if (diffSecs < 60) return "今";
+  if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}分前`;
+  if (diffSecs < 86400) return `${Math.floor(diffSecs / 3600)}時間前`;
+  return date.toLocaleDateString();
+}
 
 export default function Inspector({
   className,
@@ -133,12 +147,12 @@ export default function Inspector({
     }
   }, [isEditingFileName]);
 
-  const handleStartEdit = () => {
+  const handleStartEdit = useCallback(() => {
     setIsEditingFileName(true);
     setEditedBaseName(baseName);
-  };
+  }, [baseName]);
 
-  const handleSaveFileName = () => {
+  const handleSaveFileName = useCallback(() => {
     const trimmedBase = editedBaseName.trim();
     if (trimmedBase) {
       const newName = extension ? `${trimmedBase}${extension}` : trimmedBase;
@@ -147,29 +161,15 @@ export default function Inspector({
       }
     }
     setIsEditingFileName(false);
-  };
+  }, [editedBaseName, extension, fileName, onFileNameChange]);
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     setEditedBaseName(baseName);
     setIsEditingFileName(false);
-  };
+  }, [baseName]);
 
   // 原稿用紙換算（400字/枚）
   const manuscriptPages = Math.ceil(charCount / 400);
-
-   const formatTime = (timestamp: number | null): string => {
-     if (!timestamp || timestamp <= 0) return "未保存";
-     const date = new Date(timestamp);
-     if (isNaN(date.getTime())) return "未保存";
-     const now = new Date();
-     const diffMs = now.getTime() - date.getTime();
-     const diffSecs = Math.floor(diffMs / 1000);
-
-     if (diffSecs < 60) return "今";
-     if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}分前`;
-     if (diffSecs < 86400) return `${Math.floor(diffSecs / 3600)}時間前`;
-     return date.toLocaleDateString();
-   };
 
   return (
     <aside

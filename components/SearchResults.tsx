@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Search, X, Replace, ReplaceAll, ChevronRight, ChevronDown } from "lucide-react";
 import { EditorView, Decoration } from "@milkdown/prose/view";
 import { TextSelection } from "@milkdown/prose/state";
@@ -96,34 +96,34 @@ export default function SearchResults({
     dispatch(tr);
   }, [searchTerm, caseSensitive, editorView]);
   // Get context text for match
-  const getMatchContext = (match: SearchMatch): { before: string; text: string; after: string } => {
+  const getMatchContext = useCallback((match: SearchMatch): { before: string; text: string; after: string } => {
     if (!editorView) {
       return { before: "", text: "", after: "" };
     }
 
     const { state } = editorView;
     const { doc } = state;
-    
+
     // Get match text
     const matchText = doc.textBetween(match.from, match.to);
-    
+
     // Get surrounding text (30 characters before and after)
     const contextLength = 30;
     const beforeStart = Math.max(0, match.from - contextLength);
     const afterEnd = Math.min(doc.content.size, match.to + contextLength);
-    
+
     const beforeText = doc.textBetween(beforeStart, match.from);
     const afterText = doc.textBetween(match.to, afterEnd);
-    
+
     return {
       before: beforeText.length > contextLength ? "..." + beforeText.slice(-contextLength) : beforeText,
       text: matchText,
       after: afterText.length > contextLength ? afterText.slice(0, contextLength) + "..." : afterText,
     };
-  };
+  }, [editorView]);
 
   // Jump to specified match and highlight
-  const goToMatch = (match: SearchMatch, index: number) => {
+  const goToMatch = useCallback((match: SearchMatch, index: number) => {
     if (!editorView) return;
 
     const { state, dispatch } = editorView;
@@ -187,10 +187,10 @@ export default function SearchResults({
     }, 500);
 
     editorView.focus();
-  };
+  }, [editorView, matches, programmaticScrollRef]);
 
   // Replace single match
-  const replaceMatch = (match: SearchMatch) => {
+  const replaceMatch = useCallback((match: SearchMatch) => {
     if (!editorView) return;
 
     const { state, dispatch } = editorView;
@@ -206,10 +206,10 @@ export default function SearchResults({
       setSearchTerm(searchTerm + " ");
       setTimeout(() => setSearchTerm(searchTerm.trim()), 0);
     }, 100);
-  };
+  }, [editorView, replaceTerm, searchTerm]);
 
   // Replace all matches
-  const replaceAllMatches = () => {
+  const replaceAllMatches = useCallback(() => {
     if (!editorView || matches.length === 0) return;
 
     const { state, dispatch } = editorView;
@@ -231,7 +231,7 @@ export default function SearchResults({
     setMatches([]);
     setSearchTerm("");
     setReplaceTerm("");
-  };
+  }, [editorView, matches, replaceTerm]);
 
   return (
     <div className="h-full bg-background-secondary border-r border-border flex flex-col">

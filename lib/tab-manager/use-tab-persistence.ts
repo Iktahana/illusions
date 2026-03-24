@@ -74,6 +74,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     // overwrite the saved tabs with [] and cause a blank editor on next open.
     if (!storageInitializedRef.current && tabs.length === 0) return;
 
+
     if (tabPersistTimerRef.current) {
       clearTimeout(tabPersistTimerRef.current);
     }
