@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, MessageSquareOff, MessageSquare } from "lucide-react";
 import clsx from "clsx";
 
@@ -63,7 +63,7 @@ export default function LintingSettings({
 }: LintingSettingsProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
-  const toggleGroup = (groupId: string) => {
+  const toggleGroup = useCallback((groupId: string) => {
     setCollapsedGroups(prev => {
       const next = new Set(prev);
       if (next.has(groupId)) {
@@ -73,17 +73,17 @@ export default function LintingSettings({
       }
       return next;
     });
-  };
+  }, []);
 
   /** Toggle all rules in a category */
-  const toggleCategoryEnabled = (ruleIds: string[], enabled: boolean) => {
+  const toggleCategoryEnabled = useCallback((ruleIds: string[], enabled: boolean) => {
     const next = { ...lintingRuleConfigs };
     for (const ruleId of ruleIds) {
       const current = getConfig(ruleId, next);
       next[ruleId] = { ...current, enabled };
     }
     onLintingRuleConfigsBatchChange(next);
-  };
+  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange]);
 
   /** Check if all rules in a category are enabled */
   const isCategoryAllEnabled = (ruleIds: string[]): boolean =>
@@ -93,36 +93,37 @@ export default function LintingSettings({
   const categoryEnabledCount = (ruleIds: string[]): number =>
     ruleIds.filter(id => getConfig(id, lintingRuleConfigs).enabled).length;
 
-  const handleApplyPreset = (presetId: string) => {
+  const handleApplyPreset = useCallback((presetId: string) => {
     const preset = LINT_PRESETS[presetId];
     if (preset) {
       onLintingRuleConfigsBatchChange({ ...preset.configs });
     }
-  };
+  }, [onLintingRuleConfigsBatchChange]);
 
-  const handleEnableAll = () => {
+  const handleEnableAll = useCallback(() => {
     const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; }> = {};
     for (const rule of LINT_RULES_META) {
       const current = getConfig(rule.id, lintingRuleConfigs);
       next[rule.id] = { ...current, enabled: true };
     }
     onLintingRuleConfigsBatchChange(next);
-  };
+  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange]);
 
-  const handleDisableAll = () => {
+  const handleDisableAll = useCallback(() => {
     const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; }> = {};
     for (const rule of LINT_RULES_META) {
       const current = getConfig(rule.id, lintingRuleConfigs);
       next[rule.id] = { ...current, enabled: false };
     }
     onLintingRuleConfigsBatchChange(next);
-  };
+  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange]);
 
-  const handleResetDefaults = () => {
+  const handleResetDefaults = useCallback(() => {
     onLintingRuleConfigsBatchChange({ ...LINT_DEFAULT_CONFIGS });
-  };
+  }, [onLintingRuleConfigsBatchChange]);
 
-  const ruleMetaMap = new Map(LINT_RULES_META.map(r => [r.id, r]));
+  // Memoized map to avoid recreation on every render (LINT_RULES_META is a module-level constant)
+  const ruleMetaMap = useMemo(() => new Map(LINT_RULES_META.map(r => [r.id, r])), []);
 
   /** Detect which preset matches the current config (if any) */
   const activePresetId = useMemo(() => {
@@ -143,7 +144,7 @@ export default function LintingSettings({
   }, [lintingRuleConfigs]);
 
   /** Handle correction mode change: update mode and reset guidelines to mode defaults */
-  const handleModeChange = (modeId: string) => {
+  const handleModeChange = useCallback((modeId: string) => {
     if (!onCorrectionConfigChange) return;
     const mode = CORRECTION_MODES[modeId as keyof typeof CORRECTION_MODES];
     if (!mode) return;
@@ -151,12 +152,12 @@ export default function LintingSettings({
       mode: mode.id,
       guidelines: [...mode.defaultGuidelines],
     });
-  };
+  }, [onCorrectionConfigChange]);
 
   /** Handle guideline priority list change */
-  const handleGuidelinesChange = (guidelines: CorrectionConfig["guidelines"]) => {
+  const handleGuidelinesChange = useCallback((guidelines: CorrectionConfig["guidelines"]) => {
     onCorrectionConfigChange?.({ guidelines });
-  };
+  }, [onCorrectionConfigChange]);
 
   const showCorrectionConfig = Boolean(correctionConfig && onCorrectionConfigChange);
 

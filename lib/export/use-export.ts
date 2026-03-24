@@ -18,10 +18,9 @@ interface UseExportParams {
  */
 async function saveTxtFile(text: string, suggestedName: string): Promise<boolean> {
   // Try File System Access API first (Chromium browsers + Electron)
-  if ("showSaveFilePicker" in window) {
+  if (hasShowSaveFilePicker(window)) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const handle = await (window as any).showSaveFilePicker({
+      const handle = await window.showSaveFilePicker({
         suggestedName,
         types: [
           {
@@ -206,4 +205,15 @@ export function useExport({ getContent, getTitle }: UseExportParams): {
   }, [isElectron, exportAs]);
 
   return { exportAs };
+}
+
+/**
+ * Type guard: checks whether window has the File System Access API showSaveFilePicker method.
+ */
+function hasShowSaveFilePicker(
+  w: Window
+): w is Window & {
+  showSaveFilePicker: (options?: object) => Promise<FileSystemFileHandle>;
+} {
+  return "showSaveFilePicker" in w;
 }

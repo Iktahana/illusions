@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, memo } from "react";
 import { Plus, X, Sparkles, Loader2 } from "lucide-react";
 
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
@@ -14,7 +14,7 @@ interface CharactersProps {
   content?: string;
 }
 
-export default function Characters({ content }: CharactersProps) {
+function Characters({ content }: CharactersProps) {
   const {
     characterExtractionBatchSize,
     characterExtractionConcurrency,
@@ -68,7 +68,7 @@ export default function Characters({ content }: CharactersProps) {
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const handleAddCharacter = () => {
+  const handleAddCharacter = useCallback(() => {
     if (!newCharacter.name?.trim()) return;
 
     const character: Character = {
@@ -81,7 +81,7 @@ export default function Characters({ content }: CharactersProps) {
       relationships: newCharacter.relationships?.trim() || "",
     };
 
-    setCharacters([...characters, character]);
+    setCharacters((prev) => [...prev, character]);
     setNewCharacter({
       name: "",
       description: "",
@@ -90,21 +90,21 @@ export default function Characters({ content }: CharactersProps) {
       relationships: "",
     });
     setIsAddingNew(false);
-  };
+  }, [newCharacter]);
 
-  const handleDeleteCharacter = (id: string) => {
-    setCharacters(characters.filter((c) => c.id !== id));
-    if (expandedId === id) setExpandedId(null);
-    if (editingId === id) setEditingId(null);
-  };
+  const handleDeleteCharacter = useCallback((id: string) => {
+    setCharacters((prev) => prev.filter((c) => c.id !== id));
+    setExpandedId((prev) => (prev === id ? null : prev));
+    setEditingId((prev) => (prev === id ? null : prev));
+  }, []);
 
-  const handleUpdateCharacter = (id: string, updates: Partial<Character>) => {
-    setCharacters(
-      characters.map((c) => (c.id === id ? { ...c, ...updates } : c))
+  const handleUpdateCharacter = useCallback((id: string, updates: Partial<Character>) => {
+    setCharacters((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
     );
-  };
+  }, []);
 
-  const handleCancelAdd = () => {
+  const handleCancelAdd = useCallback(() => {
     setIsAddingNew(false);
     setNewCharacter({
       name: "",
@@ -113,11 +113,11 @@ export default function Characters({ content }: CharactersProps) {
       personality: "",
       relationships: "",
     });
-  };
+  }, []);
 
-  const toggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  }, []);
 
   /** NLP-based extraction fallback (kuromoji proper noun detection) */
   const handleNlpExtract = useCallback(async () => {
@@ -260,3 +260,5 @@ export default function Characters({ content }: CharactersProps) {
     </div>
   );
 }
+
+export default memo(Characters);

@@ -110,6 +110,9 @@ export default function NovelEditor({
   // Ref to indicate a mode switch is in progress (for scroll restoration)
   const isModeSwitchingRef = useRef(false);
 
+  /** Cache for DOM character-width measurement (invalidated when font settings change) */
+  const charSizeCacheRef = useRef<{ fontFamily: string; fontScale: number; lineHeight: number; size: number } | null>(null);
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -279,20 +282,35 @@ export default function NovelEditor({
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    // Measure character width
-    const measureEl = document.createElement('span');
-    measureEl.style.cssText = `
-      position: absolute;
-      visibility: hidden;
-      white-space: nowrap;
-      font-family: "${fontFamily}", serif;
-      font-size: ${fontScale}%;
-      line-height: ${lineHeight};
-    `;
-    measureEl.textContent = '国'; // Measure with full-width character
-    document.body.appendChild(measureEl);
-    const charSize = measureEl.offsetWidth;
-    document.body.removeChild(measureEl);
+    // Use cached charSize when font settings are unchanged (avoids DOM element creation on every resize)
+    let charSize: number;
+    const cache = charSizeCacheRef.current;
+    if (
+      cache &&
+      cache.fontFamily === fontFamily &&
+      cache.fontScale === fontScale &&
+      cache.lineHeight === lineHeight
+    ) {
+      charSize = cache.size;
+    } else {
+      // Measure character width via a temporary DOM element
+      const measureEl = document.createElement('span');
+      measureEl.style.cssText = `
+        position: absolute;
+        visibility: hidden;
+        white-space: nowrap;
+        font-family: "${fontFamily}", serif;
+        font-size: ${fontScale}%;
+        line-height: ${lineHeight};
+      `;
+      measureEl.textContent = '国'; // Measure with full-width character
+      document.body.appendChild(measureEl);
+      charSize = measureEl.offsetWidth;
+      document.body.removeChild(measureEl);
+
+      // Cache the result for subsequent resize events with the same font settings
+      charSizeCacheRef.current = { fontFamily, fontScale, lineHeight, size: charSize };
+    }
 
     if (charSize <= 0) return;
 
@@ -333,15 +351,18 @@ export default function NovelEditor({
     // Calculate on mount
     const timer = setTimeout(calculateOptimalCharsPerLine, 100);
 
-    // Calculate on window resize
+    // Debounce resize events to 300ms to avoid excessive recalculation during window drag
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     const handleResize = () => {
-      calculateOptimalCharsPerLine();
+      if (resizeTimer !== null) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(calculateOptimalCharsPerLine, 300);
     };
 
     window.addEventListener('resize', handleResize);
 
     return () => {
       clearTimeout(timer);
+      if (resizeTimer !== null) clearTimeout(resizeTimer);
       window.removeEventListener('resize', handleResize);
     };
   }, [calculateOptimalCharsPerLine, autoCharsPerLine]);
