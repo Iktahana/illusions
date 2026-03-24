@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useCallback } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 
@@ -65,19 +66,19 @@ function LicenseBadge({ license }: { license: GuidelineLicense }) {
  * Reordering uses up/down arrow buttons (no external DnD dependency required).
  */
 export default function GuidelineList({ guidelines, onChange }: GuidelineListProps) {
-  const enabledSet = new Set(guidelines);
+  const enabledSet = useMemo(() => new Set(guidelines), [guidelines]);
 
   /**
    * Build the full display order:
    * 1. Enabled guidelines in their current priority order.
    * 2. Disabled guidelines in canonical order (appended at the end).
    */
-  const displayOrder: GuidelineId[] = [
+  const displayOrder = useMemo<GuidelineId[]>(() => [
     ...guidelines,
     ...ALL_GUIDELINE_IDS.filter((id) => !enabledSet.has(id)),
-  ];
+  ], [guidelines, enabledSet]);
 
-  const handleToggle = (id: GuidelineId) => {
+  const handleToggle = useCallback((id: GuidelineId) => {
     if (enabledSet.has(id)) {
       // Disable: remove from the enabled list
       onChange(guidelines.filter((g) => g !== id));
@@ -85,23 +86,23 @@ export default function GuidelineList({ guidelines, onChange }: GuidelineListPro
       // Enable: append to the end of the enabled list
       onChange([...guidelines, id]);
     }
-  };
+  }, [enabledSet, guidelines, onChange]);
 
-  const handleMoveUp = (id: GuidelineId) => {
+  const handleMoveUp = useCallback((id: GuidelineId) => {
     const idx = guidelines.indexOf(id);
     if (idx <= 0) return;
     const next = [...guidelines];
     [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
     onChange(next);
-  };
+  }, [guidelines, onChange]);
 
-  const handleMoveDown = (id: GuidelineId) => {
+  const handleMoveDown = useCallback((id: GuidelineId) => {
     const idx = guidelines.indexOf(id);
     if (idx < 0 || idx >= guidelines.length - 1) return;
     const next = [...guidelines];
     [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
     onChange(next);
-  };
+  }, [guidelines, onChange]);
 
   return (
     <div className="divide-y divide-border border border-border rounded-lg overflow-hidden">
