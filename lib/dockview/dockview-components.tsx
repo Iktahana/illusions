@@ -5,13 +5,12 @@
  */
 
 import { useCallback, useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { X, Terminal, GitCompare } from "lucide-react";
 import type {
   IDockviewPanelProps,
   IDockviewPanelHeaderProps,
-  DockviewApi,
 } from "dockview-react";
-import type { EditorPanelParams, BufferId } from "./types";
+import type { EditorPanelParams, TerminalPanelParams, DiffPanelParams, BufferId } from "./types";
 import {
   useBufferStoreInstance,
   useBuffer,
@@ -214,13 +213,181 @@ export function DockviewTabHeader({
 }
 
 // ---------------------------------------------------------------------------
+// TerminalPanel — placeholder content component for terminal tabs
+// ---------------------------------------------------------------------------
+
+export function TerminalPanel({
+  api,
+  params,
+}: IDockviewPanelProps<TerminalPanelParams>) {
+  return (
+    <div
+      className="flex items-center justify-center h-full text-foreground-secondary text-sm"
+      data-panel-id={api.id}
+      data-session-id={params.sessionId}
+    >
+      ターミナル（実装予定）
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TerminalTabHeader — tab header for terminal tabs
+// ---------------------------------------------------------------------------
+
+export function TerminalTabHeader({
+  api,
+  params,
+}: IDockviewPanelHeaderProps<TerminalPanelParams>) {
+  const isActive = api.isActive;
+  const label = api.title;
+
+  const handleClose = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      api.close();
+    },
+    [api],
+  );
+
+  const handleMiddleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        api.close();
+      }
+    },
+    [api],
+  );
+
+  return (
+    <div
+      className={`
+        group relative flex items-center gap-1.5 px-3 h-full
+        text-xs whitespace-nowrap transition-colors duration-100
+        cursor-pointer select-none
+        ${isActive ? "text-foreground" : "text-foreground-secondary hover:text-foreground"}
+      `}
+      onMouseDown={handleMiddleClick}
+    >
+      {/* Terminal icon */}
+      <Terminal size={12} className="shrink-0" />
+
+      {/* Tab label */}
+      <span className="truncate">{label}</span>
+
+      {/* Close button */}
+      <span
+        role="button"
+        tabIndex={-1}
+        className={`
+          shrink-0 w-4 h-4 flex items-center justify-center rounded-sm
+          hover:bg-hover-strong transition-colors
+          ${isActive ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100"}
+        `}
+        onClick={handleClose}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <X size={12} />
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DiffPanel — placeholder content component for diff tabs
+// ---------------------------------------------------------------------------
+
+export function DiffPanel({
+  api,
+  params,
+}: IDockviewPanelProps<DiffPanelParams>) {
+  return (
+    <div
+      className="flex items-center justify-center h-full text-foreground-secondary text-sm"
+      data-panel-id={api.id}
+      data-source-tab-id={params.sourceTabId}
+    >
+      差分表示（実装予定）
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DiffTabHeader — tab header for diff tabs
+// ---------------------------------------------------------------------------
+
+export function DiffTabHeader({
+  api,
+  params,
+}: IDockviewPanelHeaderProps<DiffPanelParams>) {
+  const isActive = api.isActive;
+  const label = api.title;
+
+  const handleClose = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      api.close();
+    },
+    [api],
+  );
+
+  const handleMiddleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        api.close();
+      }
+    },
+    [api],
+  );
+
+  return (
+    <div
+      className={`
+        group relative flex items-center gap-1.5 px-3 h-full
+        text-xs whitespace-nowrap transition-colors duration-100
+        cursor-pointer select-none
+        ${isActive ? "text-foreground" : "text-foreground-secondary hover:text-foreground"}
+      `}
+      onMouseDown={handleMiddleClick}
+    >
+      {/* Diff icon */}
+      <GitCompare size={12} className="shrink-0" />
+
+      {/* Tab label (source file name) */}
+      <span className="truncate">{label}</span>
+
+      {/* Close button */}
+      <span
+        role="button"
+        tabIndex={-1}
+        className={`
+          shrink-0 w-4 h-4 flex items-center justify-center rounded-sm
+          hover:bg-hover-strong transition-colors
+          ${isActive ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100"}
+        `}
+        onClick={handleClose}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <X size={12} />
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component registry for DockviewReact
 // ---------------------------------------------------------------------------
 
 export const dockviewComponents = {
   editor: EditorPanel,
+  terminal: TerminalPanel,
+  diff: DiffPanel,
 };
 
 export const dockviewTabComponents = {
   default: DockviewTabHeader,
+  terminal: TerminalTabHeader,
+  diff: DiffTabHeader,
 };

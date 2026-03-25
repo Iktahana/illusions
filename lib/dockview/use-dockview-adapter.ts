@@ -14,9 +14,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DockviewApi } from "dockview-react";
 import type { TabId, TabState } from "@/lib/tab-manager/tab-types";
-import { isEditorTab } from "@/lib/tab-manager/tab-types";
+import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
 import type { UseTabManagerReturn } from "@/lib/tab-manager/types";
-import type { EditorPanelParams } from "./types";
+import type { EditorPanelParams, TerminalPanelParams, DiffPanelParams } from "./types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,18 +65,33 @@ export function useDockviewAdapter({
       apiRef.current = api;
       setDockviewApi(api);
 
-      // Initialize dockview with current tabs (editor tabs only for now)
+      // Initialize dockview with current tabs, branching by tabKind
       for (const tab of tabs) {
-        if (!isEditorTab(tab)) continue;
-        api.addPanel<EditorPanelParams>({
-          id: tab.id,
-          component: "editor",
-          title: tab.file?.name ?? `新規ファイル${tab.fileType}`,
-          params: {
-            bufferId: tab.id,
-            isPreview: tab.isPreview,
-          },
-        });
+        if (isEditorTab(tab)) {
+          api.addPanel<EditorPanelParams>({
+            id: tab.id,
+            component: "editor",
+            title: tab.file?.name ?? `新規ファイル${tab.fileType}`,
+            params: {
+              bufferId: tab.id,
+              isPreview: tab.isPreview,
+            },
+          });
+        } else if (isTerminalTab(tab)) {
+          api.addPanel<TerminalPanelParams>({
+            id: tab.id,
+            component: "terminal",
+            title: tab.label,
+            params: { sessionId: tab.sessionId },
+          });
+        } else if (isDiffTab(tab)) {
+          api.addPanel<DiffPanelParams>({
+            id: tab.id,
+            component: "diff",
+            title: tab.sourceFileName,
+            params: { sourceTabId: tab.sourceTabId },
+          });
+        }
       }
 
       // Set active panel
@@ -130,23 +145,34 @@ export function useDockviewAdapter({
     // Detect newly added tabs (before updating prevTabsRef)
     const newlyAddedTabs = tabs.filter((t) => !prevTabIds.has(t.id));
 
-    // Add new tabs (editor tabs only for now)
+    // Add new tabs, branching by tabKind
     for (const tab of tabs) {
-      if (!isEditorTab(tab)) continue;
-      if (!prevTabIds.has(tab.id)) {
-        try {
+      if (prevTabIds.has(tab.id)) continue;
+      try {
+        if (isEditorTab(tab)) {
           api.addPanel<EditorPanelParams>({
             id: tab.id,
             component: "editor",
             title: tab.file?.name ?? `新規ファイル${tab.fileType}`,
-            params: {
-              bufferId: tab.id,
-              isPreview: tab.isPreview,
-            },
+            params: { bufferId: tab.id, isPreview: tab.isPreview },
           });
-        } catch {
-          // Panel may already exist (e.g. from onReady initialization)
+        } else if (isTerminalTab(tab)) {
+          api.addPanel<TerminalPanelParams>({
+            id: tab.id,
+            component: "terminal",
+            title: tab.label,
+            params: { sessionId: tab.sessionId },
+          });
+        } else if (isDiffTab(tab)) {
+          api.addPanel<DiffPanelParams>({
+            id: tab.id,
+            component: "diff",
+            title: tab.sourceFileName,
+            params: { sourceTabId: tab.sourceTabId },
+          });
         }
+      } catch {
+        // Panel may already exist (e.g. from onReady initialization)
       }
     }
 
@@ -164,20 +190,28 @@ export function useDockviewAdapter({
       }
     }
 
-    // Update titles for changed editor tabs
+    // Update titles for changed tabs, branching by tabKind
     for (const tab of tabs) {
-      if (!isEditorTab(tab)) continue;
       const panel = api.getPanel(tab.id);
-      if (panel) {
+      if (!panel) continue;
+
+      if (isEditorTab(tab)) {
         const title = tab.file?.name ?? `新規ファイル${tab.fileType}`;
         if (panel.title !== title) {
           panel.api.setTitle(title);
         }
-        // Update params if needed
         panel.api.updateParameters({
           bufferId: tab.id,
           isPreview: tab.isPreview,
         });
+      } else if (isTerminalTab(tab)) {
+        if (panel.title !== tab.label) {
+          panel.api.setTitle(tab.label);
+        }
+      } else if (isDiffTab(tab)) {
+        if (panel.title !== tab.sourceFileName) {
+          panel.api.setTitle(tab.sourceFileName);
+        }
       }
     }
 
@@ -227,10 +261,13 @@ export function useDockviewAdapter({
       const activeTab = tabs.find((t) => t.id === activeTabId);
       if (!activeTab) return;
 
+      // Split is only supported for editor tabs
+      if (!isEditorTab(activeTab)) return;
+
       // Create a new empty tab with the same file type.
       // The new panel will be positioned in the split direction
       // by the sync effect above (via pendingSplitRef).
-      newTab(isEditorTab(activeTab) ? activeTab.fileType : undefined);
+      newTab(activeTab.fileType);
 
       pendingSplitRef.current = {
         direction,
@@ -282,7 +319,7 @@ export function useDockviewAdapter({
     }
   }, [tabs, activeTabId, tabManager.content]);
 
-  // -- Cross-window buffer sync (Electron IPC) -----------------------------
+  // -- Cross-window buffer sync (Electron IPC, editor tabs only) -----------
 
   const { content: tabContent, setContent: tabSetContent } = tabManager;
 
@@ -291,8 +328,9 @@ export function useDockviewAdapter({
     if (!electronAPI?.editor) return;
 
     const unsubSync = electronAPI.editor.onBufferSync((data) => {
-      // Another window changed a buffer — update if it's our active tab
-      if (data.bufferId === activeTabId) {
+      // Another window changed a buffer — update if it's our active editor tab
+      const activeTab = tabs.find((t) => t.id === activeTabId);
+      if (data.bufferId === activeTabId && activeTab && isEditorTab(activeTab)) {
         tabSetContent(data.content);
       }
     });
@@ -305,13 +343,17 @@ export function useDockviewAdapter({
       if (typeof unsubSync === "function") unsubSync();
       if (typeof unsubClose === "function") unsubClose();
     };
-  }, [activeTabId, tabSetContent]);
+  }, [activeTabId, tabs, tabSetContent]);
 
-  // Broadcast content changes to other windows
+  // Broadcast content changes to other windows (editor tabs only)
   useEffect(() => {
     const electronAPI = window.electronAPI;
     if (!electronAPI?.editor?.sendBufferSync) return;
     if (!activeTabId) return;
+
+    // Only broadcast for editor tabs
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (!activeTab || !isEditorTab(activeTab)) return;
 
     const content = tabContent ?? "";
 
@@ -321,7 +363,7 @@ export function useDockviewAdapter({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [activeTabId, tabContent]);
+  }, [activeTabId, tabs, tabContent]);
 
   return {
     handleDockviewReady,

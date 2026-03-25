@@ -21,6 +21,7 @@ import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
 import RubyDialog from "@/components/RubyDialog";
+import DesktopOnlyDialog from "@/components/DesktopOnlyDialog";
 import { EmptyEditorState } from "@/components/EmptyEditorState";
 import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
@@ -29,6 +30,8 @@ import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
 import { DockviewReact } from "dockview-react";
 import {
   dockviewTabComponents,
+  TerminalPanel,
+  DiffPanel,
 } from "@/lib/dockview/dockview-components";
 import { useDockviewAdapter } from "@/lib/dockview/use-dockview-adapter";
 import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence";
@@ -167,7 +170,7 @@ export default function EditorPage() {
     newFile: tabNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen,
     _loadSystemFile: tabLoadSystemFile,
     tabs, activeTabId, newTab, closeTab, switchTab, nextTab, prevTab, switchToIndex,
-    openProjectFile, pinTab,
+    openProjectFile, pinTab, newTerminalTab,
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
   } = tabManager;
 
@@ -179,6 +182,17 @@ export default function EditorPage() {
   } = useDockviewAdapter({ tabManager });
   useDockviewPersistence({ dockviewApi });
 
+  // --- New terminal tab callback ---
+  const handleNewTerminalTab = useCallback(() => {
+    if (isElectronRenderer()) {
+      // Electron: create a real terminal tab via the tab manager
+      newTerminalTab();
+    } else {
+      // Web: show desktop-only dialog since terminal requires native PTY
+      setShowDesktopOnlyDialog(true);
+    }
+  }, [newTerminalTab]);
+
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const activeEditorTab = activeTab && isEditorTab(activeTab) ? activeTab : undefined;
@@ -188,6 +202,7 @@ export default function EditorPage() {
 
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
+  const [showDesktopOnlyDialog, setShowDesktopOnlyDialog] = useState(false);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [recoveryExiting, setRecoveryExiting] = useState(false);
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
@@ -653,6 +668,13 @@ export default function EditorPage() {
           onCancel={handleCloseTabCancel}
         />
 
+        {/* Desktop-only feature dialog (shown to web users for terminal) */}
+        <DesktopOnlyDialog
+          isOpen={showDesktopOnlyDialog}
+          onClose={() => setShowDesktopOnlyDialog(false)}
+          featureName="ターミナル"
+        />
+
         {/* 最近のプロジェクト削除確認ダイアログ */}
         <ConfirmDialog
           isOpen={confirmRemoveRecent !== null}
@@ -845,6 +867,9 @@ export default function EditorPage() {
                   </div>
                 );
               },
+              // Placeholder components for Phase 2/4 implementation
+              terminal: TerminalPanel,
+              diff: DiffPanel,
             }}
             tabComponents={dockviewTabComponents}
             onReady={handleDockviewReady}

@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useRef, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Terminal, GitCompare } from "lucide-react";
 import type { TabId, TabState } from "@/lib/tab-manager/tab-types";
-import { isEditorTab } from "@/lib/tab-manager/tab-types";
+import { isEditorTab, isTerminalTab } from "@/lib/tab-manager/tab-types";
 
 interface TabBarProps {
   tabs: TabState[];
@@ -62,8 +62,25 @@ export default function TabBar({
       >
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
-          const editorTab = isEditorTab(tab) ? tab : undefined;
-          const label = editorTab?.file?.name ?? `新規ファイル${editorTab?.fileType ?? ""}`;
+
+          // Determine label, icon, and style modifiers based on tab kind
+          let label: string;
+          let icon: React.ReactNode = null;
+          let isDirty = false;
+          let isPreview = false;
+
+          if (isEditorTab(tab)) {
+            label = tab.file?.name ?? `新規ファイル${tab.fileType}`;
+            isDirty = tab.isDirty;
+            isPreview = tab.isPreview;
+          } else if (isTerminalTab(tab)) {
+            label = tab.label;
+            icon = <Terminal size={12} className="shrink-0" />;
+          } else {
+            // isDiffTab(tab) — exhaustive check
+            label = tab.sourceFileName;
+            icon = <GitCompare size={12} className="shrink-0" />;
+          }
 
           return (
             <button
@@ -83,19 +100,22 @@ export default function TabBar({
               `}
               onClick={() => onSwitchTab(tab.id)}
               onDoubleClick={() => {
-                if (editorTab?.isPreview) onPinTab?.(tab.id);
+                if (isPreview) onPinTab?.(tab.id);
               }}
               onMouseDown={(e) => handleMiddleClick(e, tab.id)}
             >
-              {/* Dirty indicator */}
-              {editorTab?.isDirty && (
+              {/* Dirty indicator (editor tabs only) */}
+              {isDirty && (
                 <span className="w-1.5 h-1.5 rounded-full bg-warning shrink-0" />
               )}
 
-              {/* Tab label */}
-              <span className={`truncate flex-1 text-left${editorTab?.isPreview ? " italic opacity-75" : ""}`}>{label}</span>
+              {/* Icon (terminal / diff tabs) */}
+              {icon}
 
-              {/* Close button */}
+              {/* Tab label */}
+              <span className={`truncate flex-1 text-left${isPreview ? " italic opacity-75" : ""}`}>{label}</span>
+
+              {/* Close button (shared across all tab kinds) */}
               <span
                 role="button"
                 tabIndex={-1}
