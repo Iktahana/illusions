@@ -180,6 +180,8 @@ export function useTabManager(options?: {
     newTerminalTab: tabState.newTerminalTab,
     updateTerminalTab: tabState.updateTerminalTab,
     openDiffTab: tabState.openDiffTab,
+    forceCloseTab: tabState.forceCloseTab,
+    updateTab: tabState.updateTab,
 
     // Close-tab dialog
     pendingCloseTabId: tabState.pendingCloseTabId,

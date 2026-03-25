@@ -51,6 +51,16 @@ export interface UseTabManagerReturn {
     remoteContent: string,
     remoteTimestamp: number,
   ) => void;
+  /**
+   * Force-close a tab without dirty check.
+   * Used by diff tab conflict resolution to close tabs programmatically.
+   */
+  forceCloseTab: (tabId: TabId) => void;
+  /**
+   * Update a single editor tab by id.
+   * Used by diff tab conflict resolution to update source tab content.
+   */
+  updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
 
   // Close-tab unsaved warning flow
   pendingCloseTabId: TabId | null;
