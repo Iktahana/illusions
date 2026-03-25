@@ -418,6 +418,7 @@ export default function NovelEditor({
               onIgnoreCorrection={onIgnoreCorrection}
               mdiExtensionsEnabled={mdiExtensionsEnabled}
               gfmEnabled={gfmEnabled}
+              onStartSpeech={startSpeechFromCursor}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>

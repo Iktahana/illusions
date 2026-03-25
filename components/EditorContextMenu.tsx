@@ -1,7 +1,7 @@
 "use client";
 
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { Scissors, Copy, ClipboardPaste, Search, CheckSquare, Languages, ALargeSmall, Globe, BookOpen, AlertCircle, EyeOff } from "lucide-react";
+import { Scissors, Copy, ClipboardPaste, Search, CheckSquare, Languages, ALargeSmall, Globe, BookOpen, AlertCircle, EyeOff, Play } from "lucide-react";
 import type { ReactNode, MouseEvent } from "react";
 
 import type { LintIssue } from "@/lib/linting";
@@ -21,7 +21,8 @@ export type ContextMenuAction =
   | "dictionary"
   | "show-lint-hint"
   | "ignore-correction"
-  | "ignore-correction-all";
+  | "ignore-correction-all"
+  | "start-speech";
 
 interface EditorContextMenuProps {
   children: ReactNode;
@@ -176,6 +177,16 @@ export default function EditorContextMenu({
             shortcut=""
             onClick={() => onAction("dictionary")}
             disabled={!hasSelection}
+          />
+
+          <Separator />
+
+          {/* 朗読 */}
+          <MenuItem
+            icon={<Play className="w-4 h-4" />}
+            label="開始朗読"
+            shortcut=""
+            onClick={() => onAction("start-speech")}
           />
 
           <Separator />
