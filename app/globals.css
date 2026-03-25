@@ -4,6 +4,9 @@
 /* Japanese novel plugin styles (vertical, manuscript, ruby, tcy) */
 @import '../packages/milkdown-plugin-japanese-novel/styles/index.css';
 
+/* xterm.js terminal styles */
+@import '@xterm/xterm/css/xterm.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

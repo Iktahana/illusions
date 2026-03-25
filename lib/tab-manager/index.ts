@@ -163,6 +163,7 @@ export function useTabManager(options?: {
     openProjectFile: fileIO.openProjectFile,
     pinTab: tabState.pinTab,
     newTerminalTab: tabState.newTerminalTab,
+    updateTerminalTab: tabState.updateTerminalTab,
     openDiffTab: tabState.openDiffTab,
 
     // Close-tab dialog
