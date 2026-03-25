@@ -15,6 +15,8 @@ import {
   useBufferStoreInstance,
   useBuffer,
 } from "./buffer-store";
+import { useTerminalTabContext } from "@/contexts/TerminalTabContext";
+import RealTerminalPanel from "@/components/TerminalPanel";
 
 // ---------------------------------------------------------------------------
 // EditorPanel — content component rendered inside each dockview panel
@@ -213,20 +215,31 @@ export function DockviewTabHeader({
 }
 
 // ---------------------------------------------------------------------------
-// TerminalPanel — placeholder content component for terminal tabs
+// TerminalPanel — xterm.js content component for terminal tabs
 // ---------------------------------------------------------------------------
 
 export function TerminalPanel({
   api,
   params,
 }: IDockviewPanelProps<TerminalPanelParams>) {
+  const { getTerminalTabBySessionId, setTerminalTabExited } = useTerminalTabContext();
+  const tab = getTerminalTabBySessionId(params.sessionId);
+
+  const handleExit = useCallback(
+    (exitCode: number) => {
+      setTerminalTabExited(params.sessionId, exitCode);
+    },
+    [params.sessionId, setTerminalTabExited],
+  );
+
   return (
-    <div
-      className="flex items-center justify-center h-full text-foreground-secondary text-sm"
-      data-panel-id={api.id}
-      data-session-id={params.sessionId}
-    >
-      ターミナル（実装予定）
+    <div className="h-full w-full overflow-hidden" data-panel-id={api.id}>
+      <RealTerminalPanel
+        sessionId={params.sessionId}
+        status={tab?.status ?? "connecting"}
+        exitCode={tab?.exitCode ?? null}
+        onExit={handleExit}
+      />
     </div>
   );
 }
