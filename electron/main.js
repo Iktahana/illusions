@@ -33,6 +33,8 @@ const {
 } = require('./ipc/file-ipc')
 const { registerShellHandlers } = require('./ipc/shell-ipc')
 const { registerSystemHandlers } = require('./ipc/system-ipc')
+const { registerPtyHandlers } = require('./ipc/pty-ipc')
+const { killAllSessions, killSessionsForWindow } = require('./ipc/terminal-session-registry')
 
 // --- Single-instance lock ---
 // Ensure only one instance of the app is running. On Windows/Linux this prevents
@@ -115,6 +117,7 @@ app.whenReady().then(async () => {
   registerFileHandlers()
   registerShellHandlers()
   registerSystemHandlers()
+  registerPtyHandlers()
 
   // Power state monitoring
   powerMonitor.on('on-ac', () => broadcastPowerState('ac'))
@@ -134,7 +137,20 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', () => {
-  // Cleanup handled by individual IPC modules
+  // Kill all active PTY sessions before the process exits
+  killAllSessions()
+})
+
+// Kill PTY sessions for a window when it is closed
+app.on('browser-window-created', (_event, win) => {
+  win.on('closed', () => {
+    killSessionsForWindow(win.webContents.id)
+  })
+
+  // Kill orphaned PTYs if the renderer crashes
+  win.webContents.on('destroyed', () => {
+    killSessionsForWindow(win.webContents.id)
+  })
 })
 
 app.on('window-all-closed', () => {
