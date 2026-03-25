@@ -16,7 +16,9 @@ import {
   useBuffer,
 } from "./buffer-store";
 import { useTerminalTabContext } from "@/contexts/TerminalTabContext";
+import { useDiffTabContext } from "@/contexts/DiffTabContext";
 import RealTerminalPanel from "@/components/TerminalPanel";
+import DiffView from "@/components/DiffView";
 
 // ---------------------------------------------------------------------------
 // EditorPanel — content component rendered inside each dockview panel
@@ -308,21 +310,45 @@ export function TerminalTabHeader({
 }
 
 // ---------------------------------------------------------------------------
-// DiffPanel — placeholder content component for diff tabs
+// DiffPanel — real diff content component using DiffView
 // ---------------------------------------------------------------------------
 
 export function DiffPanel({
   api,
   params,
 }: IDockviewPanelProps<DiffPanelParams>) {
+  const { getDiffTabBySourceTabId, acceptDiskContent, keepEditorContent, closeDiffTab } =
+    useDiffTabContext();
+
+  const tab = getDiffTabBySourceTabId(params.sourceTabId);
+
+  const handleAcceptDisk = useCallback(() => {
+    acceptDiskContent(api.id);
+  }, [acceptDiskContent, api.id]);
+
+  const handleKeepEditor = useCallback(() => {
+    keepEditorContent(api.id);
+  }, [keepEditorContent, api.id]);
+
+  const handleClose = useCallback(() => {
+    closeDiffTab(api.id);
+  }, [closeDiffTab, api.id]);
+
+  if (!tab) {
+    return (
+      <div className="flex items-center justify-center h-full text-foreground-muted text-sm">
+        差分データが見つかりません
+      </div>
+    );
+  }
+
   return (
-    <div
-      className="flex items-center justify-center h-full text-foreground-secondary text-sm"
-      data-panel-id={api.id}
-      data-source-tab-id={params.sourceTabId}
-    >
-      差分表示（実装予定）
-    </div>
+    <DiffView
+      tab={tab}
+      onAcceptDisk={handleAcceptDisk}
+      onKeepEditor={handleKeepEditor}
+      onClose={handleClose}
+    />
   );
 }
 

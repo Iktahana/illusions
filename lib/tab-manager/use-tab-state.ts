@@ -192,6 +192,15 @@ export function useTabState(): UseTabStateReturn {
       remoteContent: string,
       remoteTimestamp: number,
     ) => {
+      // Prevent duplicate: if a diff tab for this source already exists, switch to it.
+      const existing = tabsRef.current.find(
+        (t): t is DiffTabState => t.tabKind === "diff" && t.sourceTabId === sourceTabId,
+      );
+      if (existing) {
+        setActiveTabId(existing.id);
+        return;
+      }
+
       const tab: DiffTabState = {
         tabKind: "diff",
         id: generateTabId(),
@@ -204,7 +213,7 @@ export function useTabState(): UseTabStateReturn {
       setTabs((prev) => [...prev, tab]);
       setActiveTabId(tab.id);
     },
-    [],
+    [tabsRef],
   );
 
   const switchTab = useCallback((tabId: TabId) => {

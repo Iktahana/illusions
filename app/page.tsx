@@ -46,10 +46,12 @@ import { useEditorMode } from "@/contexts/EditorModeContext";
 import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
-import { isEditorTab, isTerminalTab } from "@/lib/tab-manager/tab-types";
-import type { TerminalTabState } from "@/lib/tab-manager/tab-types";
+import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
+import type { TerminalTabState, DiffTabState } from "@/lib/tab-manager/tab-types";
 import { TerminalTabContext } from "@/contexts/TerminalTabContext";
 import type { TerminalTabContextValue } from "@/contexts/TerminalTabContext";
+import { DiffTabContext } from "@/contexts/DiffTabContext";
+import type { DiffTabContextValue } from "@/contexts/DiffTabContext";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
@@ -173,7 +175,8 @@ export default function EditorPage() {
     newFile: tabNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen,
     _loadSystemFile: tabLoadSystemFile,
     tabs, activeTabId, newTab, closeTab, switchTab, nextTab, prevTab, switchToIndex,
-    openProjectFile, pinTab, newTerminalTab, updateTerminalTab,
+    openProjectFile, pinTab, newTerminalTab, updateTerminalTab, openDiffTab,
+    forceCloseTab, updateTab,
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
   } = tabManager;
 
@@ -283,6 +286,93 @@ export default function EditorPage() {
     killTerminalSession,
   };
 
+  // --- DiffTabContext value: exposes diff tab state and conflict resolution to panel components ---
+
+  const getDiffTabById = useCallback(
+    (tabId: string) =>
+      tabsRef.current.find((t): t is DiffTabState => isDiffTab(t) && t.id === tabId),
+    [],
+  );
+
+  const getDiffTabBySourceTabId = useCallback(
+    (sourceTabId: string) =>
+      tabsRef.current.find(
+        (t): t is DiffTabState => isDiffTab(t) && t.sourceTabId === sourceTabId,
+      ),
+    [],
+  );
+
+  /**
+   * Accept disk content: update the source editor tab with the remote content,
+   * clear its conflict state, then force-close the diff tab.
+   */
+  const acceptDiskContent = useCallback(
+    (diffTabId: string) => {
+      const diffTab = tabsRef.current.find(
+        (t): t is DiffTabState => isDiffTab(t) && t.id === diffTabId,
+      );
+      if (!diffTab) return;
+
+      const sourceTab = tabsRef.current.find(
+        (t) => isEditorTab(t) && t.id === diffTab.sourceTabId,
+      );
+      if (sourceTab && isEditorTab(sourceTab)) {
+        updateTab(sourceTab.id, {
+          content: diffTab.remoteContent,
+          lastSavedContent: diffTab.remoteContent,
+          isDirty: false,
+          fileSyncStatus: "clean",
+          conflictDiskContent: null,
+        });
+      }
+      forceCloseTab(diffTabId);
+    },
+    [updateTab, forceCloseTab],
+  );
+
+  /**
+   * Keep editor content: clear the conflict state on the source tab,
+   * then force-close the diff tab.
+   */
+  const keepEditorContent = useCallback(
+    (diffTabId: string) => {
+      const diffTab = tabsRef.current.find(
+        (t): t is DiffTabState => isDiffTab(t) && t.id === diffTabId,
+      );
+      if (!diffTab) return;
+
+      const sourceTab = tabsRef.current.find(
+        (t) => isEditorTab(t) && t.id === diffTab.sourceTabId,
+      );
+      if (sourceTab && isEditorTab(sourceTab)) {
+        updateTab(sourceTab.id, {
+          fileSyncStatus: "clean",
+          conflictDiskContent: null,
+        });
+      }
+      forceCloseTab(diffTabId);
+    },
+    [updateTab, forceCloseTab],
+  );
+
+  /**
+   * Close only the diff tab; source tab conflict state is preserved.
+   */
+  const closeDiffTab = useCallback(
+    (diffTabId: string) => {
+      forceCloseTab(diffTabId);
+    },
+    [forceCloseTab],
+  );
+
+  const diffTabContextValue: DiffTabContextValue = {
+    getDiffTabById,
+    getDiffTabBySourceTabId,
+    acceptDiskContent,
+    keepEditorContent,
+    closeDiffTab,
+  };
+
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const activeEditorTab = activeTab && isEditorTab(activeTab) ? activeTab : undefined;
@@ -357,6 +447,32 @@ export default function EditorPage() {
       incrementEditorKey();
     }
   }, [wasAutoRecovered, incrementEditorKey]);
+
+  // --- Auto-close diff tabs when their source editor tab is closed ---
+  // Tracks the previous tab id set to detect removals.
+  const prevTabIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const currentTabIds = new Set(tabs.map((t) => t.id));
+    const removedTabIds = new Set(
+      [...prevTabIdsRef.current].filter((id) => !currentTabIds.has(id)),
+    );
+
+    if (removedTabIds.size > 0) {
+      // For each removed tab, find any diff tab that references it as sourceTabId
+      const orphanedDiffTabIds = tabs
+        .filter(
+          (t): t is DiffTabState =>
+            isDiffTab(t) && removedTabIds.has(t.sourceTabId),
+        )
+        .map((t) => t.id);
+
+      for (const diffTabId of orphanedDiffTabIds) {
+        forceCloseTab(diffTabId);
+      }
+    }
+
+    prevTabIdsRef.current = currentTabIds;
+  }, [tabs, forceCloseTab]);
 
   // With tabs, open/new don't need unsaved warnings (they create new tabs)
   const openFile = useCallback(async () => {
@@ -739,6 +855,7 @@ export default function EditorPage() {
   } as const;
 
     return (
+      <DiffTabContext.Provider value={diffTabContextValue}>
       <TerminalTabContext.Provider value={terminalTabContextValue}>
       <EditorSettingsProvider settings={settings} handlers={settingsHandlers}>
       <div className="h-screen flex flex-col overflow-hidden relative">
@@ -1047,5 +1164,6 @@ export default function EditorPage() {
     </div>
       </EditorSettingsProvider>
       </TerminalTabContext.Provider>
+      </DiffTabContext.Provider>
   );
 }
