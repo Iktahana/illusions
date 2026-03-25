@@ -1076,11 +1076,12 @@ export default function EditorPage() {
             className="flex-1 dockview-theme-illusions"
             components={{
               editor: ({ api: panelApi, params: panelParams }) => {
-                // All dynamic values are read from panelParams (not parent closures)
+                // Identity/layout values come from panelParams (updated via updateParameters)
                 // because dockview-react captures the component function once per panel.
+                // Content is read from tabsRef (a stable ref object whose .current is
+                // always fresh, even inside a stale closure) to avoid triggering
+                // dockview re-renders on every keystroke.
                 const panelBufferId = panelParams?.bufferId ?? "";
-                const panelContent = panelParams?.content ?? "";
-                const panelLastSavedContent = panelParams?.lastSavedContent ?? "";
                 const panelFilePath = panelParams?.filePath ?? "";
                 const panelFileType = (panelParams?.fileType ?? ".mdi") as string;
                 const panelEditorKey = panelParams?.editorKey ?? 0;
@@ -1088,6 +1089,12 @@ export default function EditorPage() {
                 const isActivePanel = panelBufferId === panelActiveTabId;
                 const panelMdiEnabled = panelFileType === ".mdi";
                 const panelGfmEnabled = panelFileType !== ".txt";
+
+                // Look up content from the live tabs ref (not params)
+                const liveTab = tabsRef.current.find((t) => t.id === panelBufferId);
+                const liveEditorTab = liveTab && isEditorTab(liveTab) ? liveTab : undefined;
+                const panelContent = liveEditorTab?.content ?? "";
+                const panelLastSavedContent = liveEditorTab?.lastSavedContent ?? "";
 
                 if (editorDiff && isActivePanel) {
                   return (
