@@ -16,7 +16,8 @@ import type { DockviewApi, IDockviewPanel } from "dockview-react";
 import type { TabId, TabState } from "@/lib/tab-manager/tab-types";
 import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
 import type { UseTabManagerReturn } from "@/lib/tab-manager/types";
-import type { EditorPanelParams, TerminalPanelParams, DiffPanelParams } from "./types";
+import type { EditorPanelParams, TerminalPanelParams, DiffPanelParams, SimplifiedGroupLayout } from "./types";
+import { loadDockviewLayout } from "./use-dockview-persistence";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -87,6 +88,81 @@ function positionTerminalPanel(
 }
 
 // ---------------------------------------------------------------------------
+// Layout restoration helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply a saved simplified layout to the current dockview state.
+ * Matches panels to saved groups by file path and uses moveTo() to redistribute.
+ */
+function applySimplifiedLayout(
+  api: DockviewApi,
+  layout: SimplifiedGroupLayout,
+  tabs: TabState[],
+): void {
+  // Build filePath → panelId lookup from current tabs
+  const panelIdByPath = new Map<string, string>();
+  for (const tab of tabs) {
+    if (isEditorTab(tab) && tab.file?.path) {
+      panelIdByPath.set(tab.file.path, tab.id);
+    }
+  }
+
+  // Skip if only one group (default layout, nothing to do)
+  if (layout.groups.length <= 1) return;
+
+  // All panels start in the first group (default). We need to move panels
+  // from groups[1..n] to new split groups.
+  // Strategy: for each subsequent saved group, pick a reference panel from
+  // the first group, then move the target panels to create new groups.
+
+  for (let i = 1; i < layout.groups.length; i++) {
+    const savedGroup = layout.groups[i];
+    const direction = layout.orientation === "HORIZONTAL" ? "right" : "bottom";
+
+    let firstPanelInGroup: IDockviewPanel | null = null;
+
+    for (const filePath of savedGroup.tabPaths) {
+      if (!filePath) continue;
+      const panelId = panelIdByPath.get(filePath);
+      if (!panelId) continue;
+      const panel = api.getPanel(panelId);
+      if (!panel) continue;
+
+      if (!firstPanelInGroup) {
+        // First panel in this group: split to create a new group
+        try {
+          // Find a reference panel that's still in the default group
+          const refPanel = api.panels.find(
+            (p) => p.id !== panelId && p.group !== panel.group,
+          ) ?? api.panels[0];
+          if (refPanel && refPanel.id !== panelId) {
+            panel.api.moveTo({
+              group: refPanel.group,
+              position: direction,
+            });
+          }
+          firstPanelInGroup = panel;
+        } catch {
+          // Move failed; skip this group
+          break;
+        }
+      } else {
+        // Subsequent panels: move into the same group as the first panel
+        try {
+          panel.api.moveTo({
+            group: firstPanelInGroup.group,
+            position: "center",
+          });
+        } catch {
+          // Move failed; panel stays where it is
+        }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
@@ -102,6 +178,10 @@ export function useDockviewAdapter({
   // Track previous tab state for diffing
   const prevTabsRef = useRef<TabState[]>([]);
   const prevActiveTabRef = useRef<TabId>("");
+
+  // Layout restoration state
+  const savedLayoutRef = useRef<SimplifiedGroupLayout | null>(null);
+  const layoutAppliedRef = useRef(false);
 
   const { tabs, activeTabId, switchTab, closeTab, newTab } = tabManager;
 
@@ -174,6 +254,19 @@ export function useDockviewAdapter({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only run once on mount
     [],
   );
+
+  // -- Pre-load saved layout for restoration --------------------------------
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadDockviewLayout().then((state) => {
+      if (cancelled) return;
+      if (state?.simplifiedLayout) {
+        savedLayoutRef.current = state.simplifiedLayout;
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // -- Pending split tracking -----------------------------------------------
 
@@ -278,6 +371,21 @@ export function useDockviewAdapter({
         if (panel.title !== tab.sourceFileName) {
           panel.api.setTitle(tab.sourceFileName);
         }
+      }
+    }
+
+    // Apply saved layout after initial tab restoration (only once)
+    if (
+      !layoutAppliedRef.current &&
+      savedLayoutRef.current &&
+      prevTabs.length === 0 &&
+      tabs.length > 0
+    ) {
+      layoutAppliedRef.current = true;
+      try {
+        applySimplifiedLayout(api, savedLayoutRef.current, tabs);
+      } catch (err) {
+        console.warn("[dockview-adapter] Failed to restore layout:", err);
       }
     }
 

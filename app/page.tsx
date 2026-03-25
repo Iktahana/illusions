@@ -116,6 +116,13 @@ export default function EditorPage() {
     setEditorKey(prev => prev + 1);
   }, []);
 
+  // Ref for dockview layout flush — populated after useDockviewPersistence,
+  // consumed by useTabManager's close handler via stable callback.
+  const flushLayoutStateRef = useRef<(() => Promise<void>) | undefined>(undefined);
+  const stableFlushLayoutState = useCallback(async () => {
+    await flushLayoutStateRef.current?.();
+  }, []);
+
   // Deferred promise gate: tab restoration waits until VFS root is set
   const [vfsGate] = useState(() => {
     let resolve!: () => void;
@@ -170,7 +177,7 @@ export default function EditorPage() {
     handleOpenLintingSettings, handleOpenPosHighlightSettings, triggerSwitchToCorrections,
   } = panelHandlers;
 
-  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReadyPromise: vfsGate.promise });
+  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReadyPromise: vfsGate.promise, flushLayoutState: stableFlushLayoutState });
   const {
     content, setContent, currentFile, isDirty, isSaving, lastSavedTime, lastSaveWasAuto,
     openFile: tabOpenFile, saveFile, saveAsFile,
@@ -213,7 +220,8 @@ export default function EditorPage() {
     dockviewApi,
     splitEditor,
   } = useDockviewAdapter({ tabManager: tabManagerWithPtyCleanup, editorKey });
-  useDockviewPersistence({ dockviewApi });
+  const { flushLayoutState } = useDockviewPersistence({ dockviewApi, tabs: tabManagerWithPtyCleanup.tabs });
+  flushLayoutStateRef.current = flushLayoutState;
 
   // --- New terminal tab callback ---
   const handleNewTerminalTab = useCallback(() => {

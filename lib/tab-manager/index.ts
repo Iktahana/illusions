@@ -25,6 +25,8 @@ export function useTabManager(options?: {
   skipAutoRestore?: boolean;
   autoSave?: boolean;
   vfsReadyPromise?: Promise<void>;
+  /** External flush callback for dockview layout persistence. */
+  flushLayoutState?: () => Promise<void>;
 }): UseTabManagerReturn {
   const skipAutoRestore = options?.skipAutoRestore ?? false;
   const autoSaveEnabled = options?.autoSave ?? true;
@@ -86,6 +88,10 @@ export function useTabManager(options?: {
     ((path: string, content: string) => void) | null
   >(null);
 
+  // flushTabState is provided by useTabPersistence below; use a ref so the
+  // menu bindings can call it in the async onSaveBeforeClose handler.
+  const flushTabStateRef = useRef<(() => Promise<void>) | undefined>(undefined);
+
   useElectronMenuBindings({
     tabs: tabState.tabs,
     setTabs: tabState.setTabs,
@@ -102,6 +108,8 @@ export function useTabManager(options?: {
     loadSystemFile: fileIO.loadSystemFile,
     updateTab: tabState.updateTab,
     systemFileOpenHandlerRef,
+    flushTabState: flushTabStateRef.current,
+    flushLayoutState: options?.flushLayoutState,
   });
 
   // --- File watch integration (external change detection) -----------------
@@ -120,7 +128,7 @@ export function useTabManager(options?: {
 
   // --- Tab persistence (save/restore to AppState) -------------------------
 
-  const { wasAutoRecovered } = useTabPersistence({
+  const { wasAutoRecovered, flushTabState: _flushTabState } = useTabPersistence({
     tabs: tabState.tabs,
     setTabs: tabState.setTabs,
     activeTabId: tabState.activeTabId,
@@ -132,6 +140,9 @@ export function useTabManager(options?: {
     skipAutoRestore,
     vfsReadyPromise: options?.vfsReadyPromise,
   });
+
+  // Update the ref so useElectronMenuBindings can access flushTabState
+  flushTabStateRef.current = _flushTabState;
 
   // --- Backward compat alias: newFile === newTab --------------------------
   const newFile = tabState.newTab;
@@ -189,5 +200,8 @@ export function useTabManager(options?: {
     handleCloseTabSave: closeDialog.handleCloseTabSave,
     handleCloseTabDiscard: closeDialog.handleCloseTabDiscard,
     handleCloseTabCancel: tabState.handleCloseTabCancel,
+
+    // Persistence flush
+    flushTabState: _flushTabState,
   };
 }
