@@ -119,6 +119,33 @@ export interface AppState {
   speechPitch?: number;
   speechVolume?: number;
 
+  // ターミナル設定
+  terminalFontFamily?: string;
+  terminalFontSize?: number;
+  terminalLineHeight?: number;
+  terminalCursorStyle?: "block" | "underline" | "bar";
+  terminalCursorBlink?: boolean;
+  terminalScrollback?: number;
+  terminalCopyOnSelect?: boolean;
+  terminalMacOptionIsMeta?: boolean;
+  terminalDefaultShell?: string;
+  terminalColorBlack?: string;
+  terminalColorRed?: string;
+  terminalColorGreen?: string;
+  terminalColorYellow?: string;
+  terminalColorBlue?: string;
+  terminalColorMagenta?: string;
+  terminalColorCyan?: string;
+  terminalColorWhite?: string;
+  terminalColorBrightBlack?: string;
+  terminalColorBrightRed?: string;
+  terminalColorBrightGreen?: string;
+  terminalColorBrightYellow?: string;
+  terminalColorBrightBlue?: string;
+  terminalColorBrightMagenta?: string;
+  terminalColorBrightCyan?: string;
+  terminalColorBrightWhite?: string;
+
   // タブの永続化
   openTabs?: TabPersistenceState;
 

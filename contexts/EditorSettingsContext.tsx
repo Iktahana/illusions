@@ -171,3 +171,31 @@ export function useSpeechSettings() {
     onSpeechVolumeChange: handlers.handleSpeechVolumeChange,
   }), [settings, handlers]);
 }
+
+/** Terminal configuration */
+export function useTerminalSettings() {
+  const { settings, handlers } = useEditorSettingsContext();
+  return useMemo(() => ({
+    terminalFontFamily: settings.terminalFontFamily,
+    terminalFontSize: settings.terminalFontSize,
+    terminalLineHeight: settings.terminalLineHeight,
+    terminalCursorStyle: settings.terminalCursorStyle,
+    terminalCursorBlink: settings.terminalCursorBlink,
+    terminalScrollback: settings.terminalScrollback,
+    terminalCopyOnSelect: settings.terminalCopyOnSelect,
+    terminalMacOptionIsMeta: settings.terminalMacOptionIsMeta,
+    terminalDefaultShell: settings.terminalDefaultShell,
+    terminalAnsiColors: settings.terminalAnsiColors,
+    onTerminalFontFamilyChange: handlers.handleTerminalFontFamilyChange,
+    onTerminalFontSizeChange: handlers.handleTerminalFontSizeChange,
+    onTerminalLineHeightChange: handlers.handleTerminalLineHeightChange,
+    onTerminalCursorStyleChange: handlers.handleTerminalCursorStyleChange,
+    onTerminalCursorBlinkChange: handlers.handleTerminalCursorBlinkChange,
+    onTerminalScrollbackChange: handlers.handleTerminalScrollbackChange,
+    onTerminalCopyOnSelectChange: handlers.handleTerminalCopyOnSelectChange,
+    onTerminalMacOptionIsMetaChange: handlers.handleTerminalMacOptionIsMetaChange,
+    onTerminalDefaultShellChange: handlers.handleTerminalDefaultShellChange,
+    onTerminalAnsiColorChange: handlers.handleTerminalAnsiColorChange,
+    onTerminalAnsiColorsReset: handlers.handleTerminalAnsiColorsReset,
+  }), [settings, handlers]);
+}

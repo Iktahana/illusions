@@ -13,6 +13,7 @@ import type { Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
 
 import type { TerminalStatus } from "@/lib/tab-manager/tab-types";
+import { useTerminalSettings } from "@/contexts/EditorSettingsContext";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -46,30 +47,30 @@ function resolveThemeColor(property: string, fallback: string): string {
   return `rgb(${raw})`;
 }
 
-function buildXtermTheme(): Record<string, string> {
+function buildXtermTheme(ansiColors: Record<string, string>): Record<string, string> {
   return {
     background: resolveThemeColor("--background", "#080808"),
     foreground: resolveThemeColor("--foreground", "#f2f2f2"),
     cursor: resolveThemeColor("--foreground", "#f2f2f2"),
     cursorAccent: resolveThemeColor("--background", "#080808"),
     selectionBackground: resolveThemeColor("--accent-light", "#e6e6e6"),
-    // ANSI colors use sensible defaults for Japanese text legibility
-    black: "#000000",
-    red: "#dc2626",
-    green: "#16a34a",
-    yellow: "#ca8a04",
-    blue: "#2563eb",
-    magenta: "#9333ea",
-    cyan: "#0d9488",
-    white: "#d4d4d4",
-    brightBlack: "#737373",
-    brightRed: "#ef4444",
-    brightGreen: "#22c55e",
-    brightYellow: "#eab308",
-    brightBlue: "#3b82f6",
-    brightMagenta: "#a855f7",
-    brightCyan: "#14b8a6",
-    brightWhite: "#f5f5f5",
+    // ANSI colors from user settings
+    black: ansiColors.black ?? "#000000",
+    red: ansiColors.red ?? "#dc2626",
+    green: ansiColors.green ?? "#16a34a",
+    yellow: ansiColors.yellow ?? "#ca8a04",
+    blue: ansiColors.blue ?? "#2563eb",
+    magenta: ansiColors.magenta ?? "#9333ea",
+    cyan: ansiColors.cyan ?? "#0d9488",
+    white: ansiColors.white ?? "#d4d4d4",
+    brightBlack: ansiColors.brightBlack ?? "#737373",
+    brightRed: ansiColors.brightRed ?? "#ef4444",
+    brightGreen: ansiColors.brightGreen ?? "#22c55e",
+    brightYellow: ansiColors.brightYellow ?? "#eab308",
+    brightBlue: ansiColors.brightBlue ?? "#3b82f6",
+    brightMagenta: ansiColors.brightMagenta ?? "#a855f7",
+    brightCyan: ansiColors.brightCyan ?? "#14b8a6",
+    brightWhite: ansiColors.brightWhite ?? "#f5f5f5",
   };
 }
 
@@ -91,6 +92,19 @@ export default function TerminalPanel({
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
 
+  // User terminal settings
+  const {
+    terminalFontFamily,
+    terminalFontSize,
+    terminalLineHeight,
+    terminalCursorStyle,
+    terminalCursorBlink,
+    terminalScrollback,
+    terminalCopyOnSelect,
+    terminalMacOptionIsMeta,
+    terminalAnsiColors,
+  } = useTerminalSettings();
+
   // ---------------------------------------------------------------------------
   // Terminal initialization and PTY attachment
   // ---------------------------------------------------------------------------
@@ -110,15 +124,17 @@ export default function TerminalPanel({
       import("@xterm/addon-fit"),
     ]);
 
-    // Create terminal instance
+    // Create terminal instance with user settings
     const terminal = new XTerm({
-      theme: buildXtermTheme(),
-      fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
-      fontSize: 14,
-      lineHeight: 1.4,
-      cursorBlink: true,
+      theme: buildXtermTheme(terminalAnsiColors),
+      fontFamily: terminalFontFamily,
+      fontSize: terminalFontSize,
+      lineHeight: terminalLineHeight,
+      cursorStyle: terminalCursorStyle,
+      cursorBlink: terminalCursorBlink,
+      scrollback: terminalScrollback,
       allowTransparency: false,
-      scrollback: 5000,
+      macOptionIsMeta: terminalMacOptionIsMeta,
     });
 
     const fitAddon = new FitAddon();
@@ -127,6 +143,18 @@ export default function TerminalPanel({
     // Open terminal in the container element
     terminal.open(containerRef.current);
     fitAddon.fit();
+
+    // Copy-on-select: copy selected text to clipboard when selection changes
+    if (terminalCopyOnSelect) {
+      terminal.onSelectionChange(() => {
+        const selection = terminal.getSelection();
+        if (selection) {
+          void navigator.clipboard.writeText(selection).catch(() => {
+            // Clipboard write failed (e.g. no focus)
+          });
+        }
+      });
+    }
 
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
@@ -195,6 +223,7 @@ export default function TerminalPanel({
         // Ignore
       }
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- settings are captured at init time; terminal is recreated on sessionId change
   }, [sessionId, onExit]);
 
   useEffect(() => {

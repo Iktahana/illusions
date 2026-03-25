@@ -225,7 +225,8 @@ export default function EditorPage() {
       // Spawn the PTY session; update the tab's sessionId once we have it
       void (async () => {
         const cwd = isProjectMode(editorMode) ? editorMode.rootPath : undefined;
-        const result = await ptyApi.spawn({ cwd });
+        const shell = settings.terminalDefaultShell || undefined;
+        const result = await ptyApi.spawn({ cwd, shell });
         if ("error" in result) return;
         const { sessionId } = result;
         // Update the most recently created terminal tab with an empty sessionId
@@ -241,7 +242,7 @@ export default function EditorPage() {
       // Web: show desktop-only dialog since terminal requires native PTY
       setShowDesktopOnlyDialog(true);
     }
-  }, [newTerminalTab, editorMode]);
+  }, [newTerminalTab, editorMode, settings.terminalDefaultShell]);
 
   // --- PTY exit event listener: update tab status when process exits ---
   useEffect(() => {

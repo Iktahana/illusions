@@ -24,6 +24,16 @@ export interface DisplaySettings {
   speechRate: number;
   speechPitch: number;
   speechVolume: number;
+  terminalFontFamily: string;
+  terminalFontSize: number;
+  terminalLineHeight: number;
+  terminalCursorStyle: "block" | "underline" | "bar";
+  terminalCursorBlink: boolean;
+  terminalScrollback: number;
+  terminalCopyOnSelect: boolean;
+  terminalMacOptionIsMeta: boolean;
+  terminalDefaultShell: string;
+  terminalAnsiColors: Record<string, string>;
 }
 
 export interface DisplaySettingsHandlers {
@@ -47,6 +57,17 @@ export interface DisplaySettingsHandlers {
   handleSpeechRateChange: (value: number) => void;
   handleSpeechPitchChange: (value: number) => void;
   handleSpeechVolumeChange: (value: number) => void;
+  handleTerminalFontFamilyChange: (value: string) => void;
+  handleTerminalFontSizeChange: (value: number) => void;
+  handleTerminalLineHeightChange: (value: number) => void;
+  handleTerminalCursorStyleChange: (value: "block" | "underline" | "bar") => void;
+  handleTerminalCursorBlinkChange: (value: boolean) => void;
+  handleTerminalScrollbackChange: (value: number) => void;
+  handleTerminalCopyOnSelectChange: (value: boolean) => void;
+  handleTerminalMacOptionIsMetaChange: (value: boolean) => void;
+  handleTerminalDefaultShellChange: (value: string) => void;
+  handleTerminalAnsiColorChange: (key: string, value: string) => void;
+  handleTerminalAnsiColorsReset: () => void;
 }
 
 export interface DisplaySettingsSetters {
@@ -97,6 +118,35 @@ export function useDisplaySettings(
   const [scrollSensitivity, setScrollSensitivity] = useState(1.0);
   const [compactMode, setCompactMode] = useState(false);
 
+  // Terminal settings
+  const [terminalFontFamily, setTerminalFontFamily] = useState("'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace");
+  const [terminalFontSize, setTerminalFontSize] = useState(14);
+  const [terminalLineHeight, setTerminalLineHeight] = useState(1.4);
+  const [terminalCursorStyle, setTerminalCursorStyle] = useState<"block" | "underline" | "bar">("block");
+  const [terminalCursorBlink, setTerminalCursorBlink] = useState(true);
+  const [terminalScrollback, setTerminalScrollback] = useState(5000);
+  const [terminalCopyOnSelect, setTerminalCopyOnSelect] = useState(false);
+  const [terminalMacOptionIsMeta, setTerminalMacOptionIsMeta] = useState(false);
+  const [terminalDefaultShell, setTerminalDefaultShell] = useState("");
+  const [terminalAnsiColors, setTerminalAnsiColors] = useState<Record<string, string>>({
+    black: "#000000",
+    red: "#dc2626",
+    green: "#16a34a",
+    yellow: "#ca8a04",
+    blue: "#2563eb",
+    magenta: "#9333ea",
+    cyan: "#0d9488",
+    white: "#d4d4d4",
+    brightBlack: "#737373",
+    brightRed: "#ef4444",
+    brightGreen: "#22c55e",
+    brightYellow: "#eab308",
+    brightBlue: "#3b82f6",
+    brightMagenta: "#a855f7",
+    brightCyan: "#14b8a6",
+    brightWhite: "#f5f5f5",
+  });
+
   /** Apply values from a loaded app state object */
   const applyPersistedDisplaySettings = useCallback((appState: Record<string, unknown>) => {
     if (typeof appState.fontScale === "number") setFontScale(appState.fontScale);
@@ -124,6 +174,34 @@ export function useDisplaySettings(
     if (typeof appState.speechRate === "number") setSpeechRate(appState.speechRate);
     if (typeof appState.speechPitch === "number") setSpeechPitch(appState.speechPitch);
     if (typeof appState.speechVolume === "number") setSpeechVolume(appState.speechVolume);
+    // Terminal settings
+    if (typeof appState.terminalFontFamily === "string") setTerminalFontFamily(appState.terminalFontFamily);
+    if (typeof appState.terminalFontSize === "number") setTerminalFontSize(appState.terminalFontSize);
+    if (typeof appState.terminalLineHeight === "number") setTerminalLineHeight(appState.terminalLineHeight);
+    if (appState.terminalCursorStyle === "block" || appState.terminalCursorStyle === "underline" || appState.terminalCursorStyle === "bar") {
+      setTerminalCursorStyle(appState.terminalCursorStyle);
+    }
+    if (typeof appState.terminalCursorBlink === "boolean") setTerminalCursorBlink(appState.terminalCursorBlink);
+    if (typeof appState.terminalScrollback === "number") setTerminalScrollback(appState.terminalScrollback);
+    if (typeof appState.terminalCopyOnSelect === "boolean") setTerminalCopyOnSelect(appState.terminalCopyOnSelect);
+    if (typeof appState.terminalMacOptionIsMeta === "boolean") setTerminalMacOptionIsMeta(appState.terminalMacOptionIsMeta);
+    if (typeof appState.terminalDefaultShell === "string") setTerminalDefaultShell(appState.terminalDefaultShell);
+    // Restore individual ANSI colors
+    const colorKeys = ["Black", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan", "White",
+      "BrightBlack", "BrightRed", "BrightGreen", "BrightYellow", "BrightBlue", "BrightMagenta", "BrightCyan", "BrightWhite"] as const;
+    const restoredColors: Record<string, string> = {};
+    let hasRestoredColor = false;
+    for (const key of colorKeys) {
+      const stateKey = `terminalColor${key}`;
+      if (typeof (appState as Record<string, unknown>)[stateKey] === "string") {
+        const camel = key.charAt(0).toLowerCase() + key.slice(1);
+        restoredColors[camel] = (appState as Record<string, unknown>)[stateKey] as string;
+        hasRestoredColor = true;
+      }
+    }
+    if (hasRestoredColor) {
+      setTerminalAnsiColors((prev) => ({ ...prev, ...restoredColors }));
+    }
   }, []);
 
   const handleFontScaleChange = useCallback((value: number) => {
@@ -234,6 +312,85 @@ export function useDisplaySettings(
     void persistAppState({ speechVolume: value }).catch((e) => console.error("Failed to persist speechVolume:", e));
   }, []);
 
+  // --- Terminal handlers ---
+
+  const handleTerminalFontFamilyChange = useCallback((value: string) => {
+    setTerminalFontFamily(value);
+    void persistAppState({ terminalFontFamily: value }).catch((e) => console.error("Failed to persist terminalFontFamily:", e));
+  }, []);
+
+  const handleTerminalFontSizeChange = useCallback((value: number) => {
+    setTerminalFontSize(value);
+    void persistAppState({ terminalFontSize: value }).catch((e) => console.error("Failed to persist terminalFontSize:", e));
+  }, []);
+
+  const handleTerminalLineHeightChange = useCallback((value: number) => {
+    setTerminalLineHeight(value);
+    void persistAppState({ terminalLineHeight: value }).catch((e) => console.error("Failed to persist terminalLineHeight:", e));
+  }, []);
+
+  const handleTerminalCursorStyleChange = useCallback((value: "block" | "underline" | "bar") => {
+    setTerminalCursorStyle(value);
+    void persistAppState({ terminalCursorStyle: value }).catch((e) => console.error("Failed to persist terminalCursorStyle:", e));
+  }, []);
+
+  const handleTerminalCursorBlinkChange = useCallback((value: boolean) => {
+    setTerminalCursorBlink(value);
+    void persistAppState({ terminalCursorBlink: value }).catch((e) => console.error("Failed to persist terminalCursorBlink:", e));
+  }, []);
+
+  const handleTerminalScrollbackChange = useCallback((value: number) => {
+    setTerminalScrollback(value);
+    void persistAppState({ terminalScrollback: value }).catch((e) => console.error("Failed to persist terminalScrollback:", e));
+  }, []);
+
+  const handleTerminalCopyOnSelectChange = useCallback((value: boolean) => {
+    setTerminalCopyOnSelect(value);
+    void persistAppState({ terminalCopyOnSelect: value }).catch((e) => console.error("Failed to persist terminalCopyOnSelect:", e));
+  }, []);
+
+  const handleTerminalMacOptionIsMetaChange = useCallback((value: boolean) => {
+    setTerminalMacOptionIsMeta(value);
+    void persistAppState({ terminalMacOptionIsMeta: value }).catch((e) => console.error("Failed to persist terminalMacOptionIsMeta:", e));
+  }, []);
+
+  const handleTerminalDefaultShellChange = useCallback((value: string) => {
+    setTerminalDefaultShell(value);
+    void persistAppState({ terminalDefaultShell: value }).catch((e) => console.error("Failed to persist terminalDefaultShell:", e));
+  }, []);
+
+  const handleTerminalAnsiColorChange = useCallback((key: string, value: string) => {
+    setTerminalAnsiColors((prev) => {
+      const next = { ...prev, [key]: value };
+      // Persist as individual fields: terminalColorBlack, terminalColorRed, etc.
+      const capitalKey = key.charAt(0).toUpperCase() + key.slice(1);
+      void persistAppState({ [`terminalColor${capitalKey}`]: value } as Record<string, string>).catch((e) =>
+        console.error(`Failed to persist terminalColor${capitalKey}:`, e),
+      );
+      return next;
+    });
+  }, []);
+
+  const DEFAULT_ANSI_COLORS: Record<string, string> = {
+    black: "#000000", red: "#dc2626", green: "#16a34a", yellow: "#ca8a04",
+    blue: "#2563eb", magenta: "#9333ea", cyan: "#0d9488", white: "#d4d4d4",
+    brightBlack: "#737373", brightRed: "#ef4444", brightGreen: "#22c55e", brightYellow: "#eab308",
+    brightBlue: "#3b82f6", brightMagenta: "#a855f7", brightCyan: "#14b8a6", brightWhite: "#f5f5f5",
+  };
+
+  const handleTerminalAnsiColorsReset = useCallback(() => {
+    setTerminalAnsiColors(DEFAULT_ANSI_COLORS);
+    // Persist all reset colors
+    const batch: Record<string, string> = {};
+    for (const [key, val] of Object.entries(DEFAULT_ANSI_COLORS)) {
+      const capitalKey = key.charAt(0).toUpperCase() + key.slice(1);
+      batch[`terminalColor${capitalKey}`] = val;
+    }
+    void persistAppState(batch as Record<string, string>).catch((e) =>
+      console.error("Failed to persist terminal color reset:", e),
+    );
+  }, []);
+
   return {
     displaySettings: {
       fontScale,
@@ -256,6 +413,16 @@ export function useDisplaySettings(
       speechRate,
       speechPitch,
       speechVolume,
+      terminalFontFamily,
+      terminalFontSize,
+      terminalLineHeight,
+      terminalCursorStyle,
+      terminalCursorBlink,
+      terminalScrollback,
+      terminalCopyOnSelect,
+      terminalMacOptionIsMeta,
+      terminalDefaultShell,
+      terminalAnsiColors,
     },
     displayHandlers: {
       handleFontScaleChange,
@@ -278,6 +445,17 @@ export function useDisplaySettings(
       handleSpeechRateChange,
       handleSpeechPitchChange,
       handleSpeechVolumeChange,
+      handleTerminalFontFamilyChange,
+      handleTerminalFontSizeChange,
+      handleTerminalLineHeightChange,
+      handleTerminalCursorStyleChange,
+      handleTerminalCursorBlinkChange,
+      handleTerminalScrollbackChange,
+      handleTerminalCopyOnSelectChange,
+      handleTerminalMacOptionIsMetaChange,
+      handleTerminalDefaultShellChange,
+      handleTerminalAnsiColorChange,
+      handleTerminalAnsiColorsReset,
     },
     displaySetters: {
       setLineHeight,
