@@ -77,7 +77,7 @@ export default function SidebarPanel({
   switch (view) {
     case "files":
       return (
-        <aside className="h-full bg-background border-r border-border flex flex-col">
+        <aside className="h-full bg-background flex flex-col">
           <div className="p-4 flex-1 overflow-y-auto">
             <FilesPanel
               projectName={isProjectMode(editorMode) ? editorMode.name : undefined}
