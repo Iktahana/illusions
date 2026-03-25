@@ -120,7 +120,7 @@ export function useDisplaySettings(
 
   // Terminal settings
   const [terminalFontFamily, setTerminalFontFamily] = useState("'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace");
-  const [terminalFontSize, setTerminalFontSize] = useState(14);
+  const [terminalFontSize, setTerminalFontSize] = useState(12);
   const [terminalLineHeight, setTerminalLineHeight] = useState(1.4);
   const [terminalCursorStyle, setTerminalCursorStyle] = useState<"block" | "underline" | "bar">("block");
   const [terminalCursorBlink, setTerminalCursorBlink] = useState(true);
