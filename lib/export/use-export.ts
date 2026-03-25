@@ -11,6 +11,9 @@ interface UseExportParams {
   getContent: () => string;
   /** Returns the document title (file name or fallback) */
   getTitle: () => string;
+  /** Returns true when the active tab is an editor tab.
+   *  Export operations no-op when false (e.g. terminal or diff tab is active). */
+  getIsEditorTabActive: () => boolean;
 }
 
 /**
@@ -56,13 +59,16 @@ async function saveTxtFile(text: string, suggestedName: string): Promise<boolean
  * Hook that provides export functionality and registers Electron menu handlers.
  * Handles PDF, EPUB, DOCX, TXT export with progress notifications.
  */
-export function useExport({ getContent, getTitle }: UseExportParams): {
+export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExportParams): {
   exportAs: (format: ExportFormat) => Promise<void>;
 } {
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
   const exportAs = useCallback(
     async (format: ExportFormat) => {
+      // No-op when a non-editor tab (terminal, diff) is active
+      if (!getIsEditorTabActive()) return;
+
       const content = getContent();
       if (!content.trim()) {
         notificationManager.warning("エクスポートするコンテンツがありません");
@@ -172,7 +178,7 @@ export function useExport({ getContent, getTitle }: UseExportParams): {
         );
       }
     },
-    [getContent, getTitle, isElectron]
+    [getContent, getTitle, getIsEditorTabActive, isElectron]
   );
 
   // Register Electron menu event handlers

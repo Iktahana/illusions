@@ -200,6 +200,10 @@ export default function EditorPage() {
   const mdiExtensionsEnabled = activeFileType === ".mdi";
   const gfmEnabled = activeFileType !== ".txt";
 
+  // Stable ref so export / shortcut callbacks can read the current value without re-creating
+  const isEditorTabActiveRef = useRef<boolean>(!!activeEditorTab);
+  isEditorTabActiveRef.current = !!activeEditorTab;
+
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
   const [showDesktopOnlyDialog, setShowDesktopOnlyDialog] = useState(false);
@@ -289,6 +293,7 @@ export default function EditorPage() {
   const { exportAs } = useExport({
     getContent: getExportContent,
     getTitle: getExportTitle,
+    getIsEditorTabActive: useCallback(() => isEditorTabActiveRef.current, []),
   });
 
   // System file open: tab manager handles loading; we just update editor key
@@ -352,6 +357,7 @@ export default function EditorPage() {
     editorView: editorViewInstance,
     fontScale,
     onFontScaleChange: (scale: number) => fontScaleChangeRef.current(scale),
+    isEditorTabActive: !!activeEditorTab,
   });
 
   // Global shortcuts for Web (only when not in Electron)
@@ -555,6 +561,7 @@ export default function EditorPage() {
     switchToIndex,
     tabs,
     activeTabId,
+    isEditorTabActive: !!activeEditorTab,
     splitEditorRight: useCallback(() => splitEditor("right"), [splitEditor]),
     splitEditorDown: useCallback(() => splitEditor("down"), [splitEditor]),
     toggleExplorer: useCallback(() => setTopView(topView === "explorer" ? "none" : "explorer"), [setTopView, topView]),
@@ -899,41 +906,50 @@ export default function EditorPage() {
             onToggleCollapse={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
           >
           <ErrorBoundary sectionName="インスペクタ">
-          <Inspector
-            compactMode={compactMode}
-            charCount={charCount}
-            selectedCharCount={selectedCharCount}
-            paragraphCount={paragraphCount}
-            fileName={fileName}
-            isDirty={isDirty}
-            isSaving={isSaving}
-            lastSavedTime={lastSavedTime}
-            onSaveFile={saveFile}
-            onFileNameChange={updateFileName}
-            sentenceCount={sentenceCount}
-            charTypeAnalysis={charTypeAnalysis}
-            charUsageRates={charUsageRates}
-            readabilityAnalysis={readabilityAnalysis}
-            onOpenPosHighlightSettings={handleOpenPosHighlightSettings}
-            activeFileName={currentFile?.name}
-            currentContent={content}
-            onHistoryRestore={(restoredContent: string) => {
-              setContent(restoredContent);
-              incrementEditorKey();
-            }}
-            onCompareInEditor={setEditorDiff}
-            lintIssues={enrichedLintIssues}
-            onNavigateToIssue={handleNavigateToIssue}
-            onApplyFix={handleApplyFix}
-            onIgnoreCorrection={handleIgnoreCorrection}
-            onRefreshLinting={refreshLinting}
-            isLinting={isLinting}
-            activeLintIssueIndex={activeLintIssueIndex}
-            onOpenLintingSettings={handleOpenLintingSettings}
-            onApplyLintPreset={handleApplyLintPreset}
-            activeLintPresetId={activeLintPresetId}
-            switchToCorrectionsTrigger={switchToCorrectionsTrigger}
-          />
+          {activeEditorTab ? (
+            <Inspector
+              compactMode={compactMode}
+              charCount={charCount}
+              selectedCharCount={selectedCharCount}
+              paragraphCount={paragraphCount}
+              fileName={fileName}
+              isDirty={isDirty}
+              isSaving={isSaving}
+              lastSavedTime={lastSavedTime}
+              onSaveFile={saveFile}
+              onFileNameChange={updateFileName}
+              sentenceCount={sentenceCount}
+              charTypeAnalysis={charTypeAnalysis}
+              charUsageRates={charUsageRates}
+              readabilityAnalysis={readabilityAnalysis}
+              onOpenPosHighlightSettings={handleOpenPosHighlightSettings}
+              activeFileName={currentFile?.name}
+              currentContent={content}
+              onHistoryRestore={(restoredContent: string) => {
+                setContent(restoredContent);
+                incrementEditorKey();
+              }}
+              onCompareInEditor={setEditorDiff}
+              lintIssues={enrichedLintIssues}
+              onNavigateToIssue={handleNavigateToIssue}
+              onApplyFix={handleApplyFix}
+              onIgnoreCorrection={handleIgnoreCorrection}
+              onRefreshLinting={refreshLinting}
+              isLinting={isLinting}
+              activeLintIssueIndex={activeLintIssueIndex}
+              onOpenLintingSettings={handleOpenLintingSettings}
+              onApplyLintPreset={handleApplyLintPreset}
+              activeLintPresetId={activeLintPresetId}
+              switchToCorrectionsTrigger={switchToCorrectionsTrigger}
+            />
+          ) : (
+            // Non-editor tab (terminal / diff): inspector is unavailable
+            <div className="h-full flex items-center justify-center p-4">
+              <p className="text-foreground-secondary text-sm text-center">
+                インスペクタはエディタタブでのみ使用できます
+              </p>
+            </div>
+          )}
           </ErrorBoundary>
         </ResizablePanel>
       </div>
