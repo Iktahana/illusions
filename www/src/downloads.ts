@@ -538,27 +538,27 @@ function saveCache(data: GitHubRelease): void {
   }
 }
 
-// Serve from cache immediately if available, otherwise show loading
+// Stale-while-revalidate: render cached data immediately, then refresh in background
 const cached = loadCache()
-if (cached) {
-  renderPage(cached, null)
-} else {
-  renderPage(null, null)
+renderPage(cached, null)
 
-  fetch(API_URL, { headers: { Accept: 'application/vnd.github.v3+json' } })
-    .then(async (res) => {
-      if (res.status === 403 || res.status === 429) {
+fetch(API_URL, { headers: { Accept: 'application/vnd.github.v3+json' } })
+  .then(async (res) => {
+    if (res.status === 403 || res.status === 429) {
+      if (!cached) {
         window.location.href = 'https://github.com/Iktahana/illusions/blob/main/README.md'
-        return
       }
-      if (!res.ok) {
-        throw new Error(`GitHub API returned ${res.status}`)
-      }
-      const data = (await res.json()) as GitHubRelease
-      saveCache(data)
-      renderPage(data, null)
-    })
-    .catch((err: Error) => {
+      return
+    }
+    if (!res.ok) {
+      throw new Error(`GitHub API returned ${res.status}`)
+    }
+    const data = (await res.json()) as GitHubRelease
+    saveCache(data)
+    renderPage(data, null)
+  })
+  .catch((err: Error) => {
+    if (!cached) {
       renderPage(null, err.message)
-    })
-}
+    }
+  })
