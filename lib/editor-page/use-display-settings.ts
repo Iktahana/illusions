@@ -24,6 +24,8 @@ export interface DisplaySettings {
   speechRate: number;
   speechPitch: number;
   speechVolume: number;
+  terminalBackground: string;
+  terminalForeground: string;
   terminalFontFamily: string;
   terminalFontSize: number;
   terminalLineHeight: number;
@@ -57,6 +59,8 @@ export interface DisplaySettingsHandlers {
   handleSpeechRateChange: (value: number) => void;
   handleSpeechPitchChange: (value: number) => void;
   handleSpeechVolumeChange: (value: number) => void;
+  handleTerminalBackgroundChange: (value: string) => void;
+  handleTerminalForegroundChange: (value: string) => void;
   handleTerminalFontFamilyChange: (value: string) => void;
   handleTerminalFontSizeChange: (value: number) => void;
   handleTerminalLineHeightChange: (value: number) => void;
@@ -119,6 +123,8 @@ export function useDisplaySettings(
   const [compactMode, setCompactMode] = useState(false);
 
   // Terminal settings
+  const [terminalBackground, setTerminalBackground] = useState("#000000");
+  const [terminalForeground, setTerminalForeground] = useState("#f2f2f2");
   const [terminalFontFamily, setTerminalFontFamily] = useState("'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace");
   const [terminalFontSize, setTerminalFontSize] = useState(12);
   const [terminalLineHeight, setTerminalLineHeight] = useState(1.4);
@@ -175,6 +181,8 @@ export function useDisplaySettings(
     if (typeof appState.speechPitch === "number") setSpeechPitch(appState.speechPitch);
     if (typeof appState.speechVolume === "number") setSpeechVolume(appState.speechVolume);
     // Terminal settings
+    if (typeof appState.terminalBackground === "string") setTerminalBackground(appState.terminalBackground);
+    if (typeof appState.terminalForeground === "string") setTerminalForeground(appState.terminalForeground);
     if (typeof appState.terminalFontFamily === "string") setTerminalFontFamily(appState.terminalFontFamily);
     if (typeof appState.terminalFontSize === "number") setTerminalFontSize(appState.terminalFontSize);
     if (typeof appState.terminalLineHeight === "number") setTerminalLineHeight(appState.terminalLineHeight);
@@ -314,6 +322,16 @@ export function useDisplaySettings(
 
   // --- Terminal handlers ---
 
+  const handleTerminalBackgroundChange = useCallback((value: string) => {
+    setTerminalBackground(value);
+    void persistAppState({ terminalBackground: value }).catch((e) => console.error("Failed to persist terminalBackground:", e));
+  }, []);
+
+  const handleTerminalForegroundChange = useCallback((value: string) => {
+    setTerminalForeground(value);
+    void persistAppState({ terminalForeground: value }).catch((e) => console.error("Failed to persist terminalForeground:", e));
+  }, []);
+
   const handleTerminalFontFamilyChange = useCallback((value: string) => {
     setTerminalFontFamily(value);
     void persistAppState({ terminalFontFamily: value }).catch((e) => console.error("Failed to persist terminalFontFamily:", e));
@@ -413,6 +431,8 @@ export function useDisplaySettings(
       speechRate,
       speechPitch,
       speechVolume,
+      terminalBackground,
+      terminalForeground,
       terminalFontFamily,
       terminalFontSize,
       terminalLineHeight,
@@ -445,6 +465,8 @@ export function useDisplaySettings(
       handleSpeechRateChange,
       handleSpeechPitchChange,
       handleSpeechVolumeChange,
+      handleTerminalBackgroundChange,
+      handleTerminalForegroundChange,
       handleTerminalFontFamilyChange,
       handleTerminalFontSizeChange,
       handleTerminalLineHeightChange,

@@ -176,6 +176,8 @@ export function useSpeechSettings() {
 export function useTerminalSettings() {
   const { settings, handlers } = useEditorSettingsContext();
   return useMemo(() => ({
+    terminalBackground: settings.terminalBackground,
+    terminalForeground: settings.terminalForeground,
     terminalFontFamily: settings.terminalFontFamily,
     terminalFontSize: settings.terminalFontSize,
     terminalLineHeight: settings.terminalLineHeight,
@@ -186,6 +188,8 @@ export function useTerminalSettings() {
     terminalMacOptionIsMeta: settings.terminalMacOptionIsMeta,
     terminalDefaultShell: settings.terminalDefaultShell,
     terminalAnsiColors: settings.terminalAnsiColors,
+    onTerminalBackgroundChange: handlers.handleTerminalBackgroundChange,
+    onTerminalForegroundChange: handlers.handleTerminalForegroundChange,
     onTerminalFontFamilyChange: handlers.handleTerminalFontFamilyChange,
     onTerminalFontSizeChange: handlers.handleTerminalFontSizeChange,
     onTerminalLineHeightChange: handlers.handleTerminalLineHeightChange,

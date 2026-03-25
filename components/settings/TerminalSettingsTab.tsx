@@ -40,6 +40,8 @@ const FONT_OPTIONS = [
  */
 export default function TerminalSettingsTab(): React.ReactElement {
   const {
+    terminalBackground,
+    terminalForeground,
     terminalFontFamily,
     terminalFontSize,
     terminalLineHeight,
@@ -50,6 +52,8 @@ export default function TerminalSettingsTab(): React.ReactElement {
     terminalMacOptionIsMeta,
     terminalDefaultShell,
     terminalAnsiColors,
+    onTerminalBackgroundChange,
+    onTerminalForegroundChange,
     onTerminalFontFamilyChange,
     onTerminalFontSizeChange,
     onTerminalLineHeightChange,
@@ -261,6 +265,54 @@ export default function TerminalSettingsTab(): React.ReactElement {
 
       <div className="border-t border-border" />
 
+      {/* 背景・前景カラー */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-foreground">カラー</h3>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              背景色
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={terminalBackground}
+                onChange={(e) => onTerminalBackgroundChange(e.target.value)}
+                className="w-10 h-10 rounded border border-border cursor-pointer bg-transparent"
+              />
+              <input
+                type="text"
+                value={terminalBackground}
+                onChange={(e) => onTerminalBackgroundChange(e.target.value)}
+                className="flex-1 px-3 py-2 border border-border-secondary rounded-lg bg-background text-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              前景色（テキスト）
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={terminalForeground}
+                onChange={(e) => onTerminalForegroundChange(e.target.value)}
+                className="w-10 h-10 rounded border border-border cursor-pointer bg-transparent"
+              />
+              <input
+                type="text"
+                value={terminalForeground}
+                onChange={(e) => onTerminalForegroundChange(e.target.value)}
+                className="flex-1 px-3 py-2 border border-border-secondary rounded-lg bg-background text-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-border" />
+
       {/* ANSI カラー設定 */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -313,9 +365,9 @@ export default function TerminalSettingsTab(): React.ReactElement {
         </div>
 
         {/* Preview */}
-        <div className="mt-4 p-4 rounded-lg border border-border bg-background overflow-hidden">
-          <p className="text-xs text-foreground-tertiary mb-2">プレビュー</p>
-          <div className="font-mono text-sm leading-relaxed space-y-0.5" style={{ fontFamily: terminalFontFamily, fontSize: `${terminalFontSize}px` }}>
+        <div className="mt-4 p-4 rounded-lg border border-border overflow-hidden" style={{ backgroundColor: terminalBackground }}>
+          <p className="text-xs mb-2" style={{ color: terminalForeground, opacity: 0.5 }}>プレビュー</p>
+          <div className="font-mono text-sm leading-relaxed space-y-0.5" style={{ fontFamily: terminalFontFamily, fontSize: `${terminalFontSize}px`, color: terminalForeground }}>
             {ANSI_COLOR_LABELS.slice(0, 8).map(({ key, label }) => (
               <span key={key} className="inline-block mr-3" style={{ color: terminalAnsiColors[key] }}>
                 {label}

@@ -120,6 +120,8 @@ export interface AppState {
   speechVolume?: number;
 
   // ターミナル設定
+  terminalBackground?: string;
+  terminalForeground?: string;
   terminalFontFamily?: string;
   terminalFontSize?: number;
   terminalLineHeight?: number;

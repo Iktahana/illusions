@@ -47,12 +47,16 @@ function resolveThemeColor(property: string, fallback: string): string {
   return `rgb(${raw})`;
 }
 
-function buildXtermTheme(ansiColors: Record<string, string>): Record<string, string> {
+function buildXtermTheme(
+  ansiColors: Record<string, string>,
+  background: string,
+  foreground: string,
+): Record<string, string> {
   return {
-    background: resolveThemeColor("--background", "#080808"),
-    foreground: resolveThemeColor("--foreground", "#f2f2f2"),
-    cursor: resolveThemeColor("--foreground", "#f2f2f2"),
-    cursorAccent: resolveThemeColor("--background", "#080808"),
+    background,
+    foreground,
+    cursor: foreground,
+    cursorAccent: background,
     selectionBackground: resolveThemeColor("--accent-light", "#e6e6e6"),
     // ANSI colors from user settings
     black: ansiColors.black ?? "#000000",
@@ -94,6 +98,8 @@ export default function TerminalPanel({
 
   // User terminal settings
   const {
+    terminalBackground,
+    terminalForeground,
     terminalFontFamily,
     terminalFontSize,
     terminalLineHeight,
@@ -126,7 +132,7 @@ export default function TerminalPanel({
 
     // Create terminal instance with user settings
     const terminal = new XTerm({
-      theme: buildXtermTheme(terminalAnsiColors),
+      theme: buildXtermTheme(terminalAnsiColors, terminalBackground, terminalForeground),
       fontFamily: terminalFontFamily,
       fontSize: terminalFontSize,
       lineHeight: terminalLineHeight,
