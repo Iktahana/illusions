@@ -277,6 +277,10 @@ export default function NovelEditor({
     setIsVertical(!isVertical);
   }, [isVertical, scrollContainerRef]);
 
+  // Ref to avoid including charsPerLine in the useCallback deps (prevents recalc loop)
+  const charsPerLineRef = useRef(charsPerLine);
+  charsPerLineRef.current = charsPerLine;
+
   // Calculate optimal chars per line based on editor width and font size
   const calculateOptimalCharsPerLine = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -329,7 +333,7 @@ export default function NovelEditor({
       // Clamp: max 40 characters
       const clamped = Math.min(40, optimalChars);
 
-      if (clamped !== charsPerLine) {
+      if (clamped !== charsPerLineRef.current) {
         onCharsPerLineChange?.(clamped);
       }
     } else {
@@ -338,11 +342,11 @@ export default function NovelEditor({
       // Clamp: max 40 characters
       const clamped = Math.min(40, optimalChars);
 
-      if (clamped !== charsPerLine) {
+      if (clamped !== charsPerLineRef.current) {
         onCharsPerLineChange?.(clamped);
       }
     }
-  }, [fontFamily, fontScale, lineHeight, isVertical, charsPerLine, onCharsPerLineChange, scrollContainerRef]);
+  }, [fontFamily, fontScale, lineHeight, isVertical, onCharsPerLineChange, scrollContainerRef]);
 
   // Add window resize listener to auto-adjust chars per line
   useEffect(() => {
