@@ -26,6 +26,9 @@ interface UseKeyboardShortcutsParams {
   switchToIndex: (index: number) => void;
   tabs: TabState[];
   activeTabId: string;
+  /** Whether the currently active tab is an editor tab.
+   *  Editor-only commands (Ruby, TCY, search, paste-as-plaintext) no-op when false. */
+  isEditorTabActive: boolean;
   // Split editor operations
   splitEditorRight?: () => void;
   splitEditorDown?: () => void;
@@ -56,6 +59,7 @@ export function useKeyboardShortcuts({
   switchToIndex,
   tabs,
   activeTabId,
+  isEditorTabActive,
   splitEditorRight,
   splitEditorDown,
   toggleExplorer,
@@ -91,12 +95,13 @@ export function useKeyboardShortcuts({
 
     return {
       "file.save": () => void saveFile(),
-      "edit.pasteAsPlaintext": () => void handlePasteAsPlaintext(),
+      // Editor-only commands: no-op when a terminal or diff tab is active
+      "edit.pasteAsPlaintext": isEditorTabActive ? () => void handlePasteAsPlaintext() : undefined,
       "view.compactMode": handleToggleCompactMode,
-      "format.ruby": handleOpenRubyDialog,
-      "format.tcy": handleToggleTcy,
+      "format.ruby": isEditorTabActive ? handleOpenRubyDialog : undefined,
+      "format.tcy": isEditorTabActive ? handleToggleTcy : undefined,
       "nav.settings": () => setShowSettingsModal(true),
-      "nav.search": () => setSearchOpenTrigger(prev => prev + 1),
+      "nav.search": isEditorTabActive ? () => setSearchOpenTrigger(prev => prev + 1) : undefined,
       "nav.nextTab": () => { nextTab(); incrementEditorKey(); },
       "nav.prevTab": () => { prevTab(); incrementEditorKey(); },
       "file.newTab": isElectron ? undefined : () => { newTab(); incrementEditorKey(); },
@@ -125,6 +130,7 @@ export function useKeyboardShortcuts({
     switchToIndex,
     tabs,
     activeTabId,
+    isEditorTabActive,
     splitEditorRight,
     splitEditorDown,
     toggleExplorer,
