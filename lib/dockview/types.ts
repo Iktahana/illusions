@@ -73,12 +73,30 @@ export interface SerializedBuffer {
   isPreview: boolean;
 }
 
+/**
+ * Simplified, ID-independent layout descriptor.
+ * Uses file paths as stable keys so layout survives tab ID regeneration on restart.
+ */
+export interface SimplifiedGroupLayout {
+  /** Each group and its tab file paths in order */
+  groups: Array<{
+    tabPaths: (string | null)[];
+    activeTabPath: string | null;
+  }>;
+  /** Root grid orientation */
+  orientation: "HORIZONTAL" | "VERTICAL";
+  /** Relative sizes of each group (proportional) */
+  sizes: number[];
+}
+
 /** Full layout state persisted to AppState */
 export interface DockviewLayoutState {
   /** Dockview's own serialized layout (groups, panels, orientations) */
   dockviewJson: SerializedDockview;
   /** Buffer metadata for each open document */
   buffers: SerializedBuffer[];
+  /** Simplified layout for ID-independent restoration */
+  simplifiedLayout?: SimplifiedGroupLayout;
 }
 
 // ---------------------------------------------------------------------------

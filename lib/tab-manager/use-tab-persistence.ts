@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getStorageService } from "../storage/storage-service";
 import { fetchAppState, persistAppState } from "../storage/app-state-manager";
 import type { TabState, SerializedTab, TabPersistenceState, EditorTabState } from "./tab-types";
@@ -12,6 +12,7 @@ import {
   generateTabId,
   inferFileType,
 } from "./types";
+import { getVFS } from "../vfs";
 
 // ---------------------------------------------------------------------------
 // Params
@@ -31,6 +32,8 @@ export interface UseTabPersistenceParams extends TabManagerCore {
 export interface UseTabPersistenceReturn {
   /** Whether the session was auto-recovered from a saved buffer. */
   wasAutoRecovered: boolean;
+  /** Immediately flush pending tab state to storage (cancels debounce). */
+  flushTabState: () => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,6 +55,8 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     setTabs,
     activeTabId,
     setActiveTabId,
+    tabsRef,
+    activeTabIdRef,
     isElectron,
     skipAutoRestore,
     vfsReadyPromise,
@@ -68,6 +73,34 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
   const tabPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /** Build and persist the current tab state immediately. */
+  const persistTabStateNow = useCallback(async () => {
+    const currentTabs = tabsRef.current;
+    const currentActiveId = activeTabIdRef.current;
+    const editorTabs = currentTabs.filter(isEditorTab);
+    const serializedTabs: SerializedTab[] = editorTabs.map((t) => ({
+      filePath: t.file?.path ?? null,
+      fileName: t.file?.name ?? "新規ファイル",
+      isPreview: t.isPreview || undefined,
+      fileType: t.fileType,
+    }));
+    const activeEditorIndex = editorTabs.findIndex((t) => t.id === currentActiveId);
+    const state: TabPersistenceState = {
+      tabs: serializedTabs,
+      activeIndex: Math.max(0, activeEditorIndex),
+    };
+    await persistAppState({ openTabs: state });
+  }, [tabsRef, activeTabIdRef]);
+
+  /** Flush pending tab state: cancel debounce and persist immediately. */
+  const flushTabState = useCallback(async () => {
+    if (tabPersistTimerRef.current) {
+      clearTimeout(tabPersistTimerRef.current);
+      tabPersistTimerRef.current = null;
+    }
+    await persistTabStateNow();
+  }, [persistTabStateNow]);
+
   useEffect(() => {
     // Skip persisting empty state until after storage has been initialized.
     // This prevents a race on Electron where the 1s debounce fires before
@@ -80,20 +113,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     }
 
     tabPersistTimerRef.current = setTimeout(() => {
-      // Only persist editor tabs; terminal and diff tabs are transient
-      const editorTabs = tabs.filter(isEditorTab);
-      const serializedTabs: SerializedTab[] = editorTabs.map((t) => ({
-        filePath: t.file?.path ?? null,
-        fileName: t.file?.name ?? "新規ファイル",
-        isPreview: t.isPreview || undefined,
-        fileType: t.fileType,
-      }));
-      const activeEditorIndex = editorTabs.findIndex((t) => t.id === activeTabId);
-      const state: TabPersistenceState = {
-        tabs: serializedTabs,
-        activeIndex: Math.max(0, activeEditorIndex),
-      };
-      void persistAppState({ openTabs: state }).catch((error) => {
+      void persistTabStateNow().catch((error) => {
         console.error("タブ状態の保存に失敗しました:", error);
       });
     }, TAB_PERSIST_DEBOUNCE);
@@ -103,7 +123,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         clearTimeout(tabPersistTimerRef.current);
       }
     };
-  }, [tabs, activeTabId]);
+  }, [tabs, activeTabId, persistTabStateNow]);
 
   // --- Storage initialization & Web file restore --------------------------
   //
@@ -222,8 +242,8 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         for (const serialized of openTabs.tabs) {
           if (serialized.filePath) {
             try {
-              const fileContent =
-                await window.electronAPI!.vfs!.readFile(serialized.filePath);
+              const vfs = getVFS();
+              const fileContent = await vfs.readFile(serialized.filePath);
               restoredTabs.push({
                 tabKind: "editor",
                 id: generateTabId(),
@@ -276,5 +296,5 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     void restoreTabs();
   }, [isElectron, skipAutoRestore, setTabs, setActiveTabId, vfsReadyPromise]);
 
-  return { wasAutoRecovered };
+  return { wasAutoRecovered, flushTabState };
 }

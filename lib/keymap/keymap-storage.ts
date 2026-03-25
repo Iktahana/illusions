@@ -1,4 +1,5 @@
 import { getStorageService } from "@/lib/storage/storage-service";
+import { persistAppState } from "@/lib/storage/app-state-manager";
 import type { KeymapOverrides } from "./keymap-types";
 
 /**
@@ -6,9 +7,7 @@ import type { KeymapOverrides } from "./keymap-types";
  * Overrides are stored as part of AppState.keymapOverrides.
  */
 export async function saveKeymapOverrides(overrides: KeymapOverrides): Promise<void> {
-  const storage = getStorageService();
-  const appState = await storage.loadAppState() ?? {};
-  await storage.saveAppState({ ...appState, keymapOverrides: overrides });
+  await persistAppState({ keymapOverrides: overrides });
 }
 
 /**
