@@ -10,7 +10,8 @@ import {
   BarChart3,
   Users,
   BookOpen,
-  Folder
+  Folder,
+  Terminal,
 } from "lucide-react";
 import clsx from "clsx";
 import { localPreferences } from "@/lib/storage/local-preferences";
@@ -99,16 +100,18 @@ const DEFAULT_BOTTOM_ITEMS: ActivityBarItem[] = [
     label: "語彙統計",
     tooltip: "語彙統計"
   },
-  {
-    id: "settings",
-    icon: Settings,
-    label: "設定",
-    tooltip: "設定"
-  },
 ];
 
-/** Set of view IDs that belong to the bottom group */
-const BOTTOM_VIEW_IDS = new Set(DEFAULT_BOTTOM_ITEMS.map((item) => item.id));
+/** Settings item — rendered separately (non-sortable, always last) */
+const SETTINGS_ITEM: ActivityBarItem = {
+  id: "settings",
+  icon: Settings,
+  label: "設定",
+  tooltip: "設定"
+};
+
+/** Set of view IDs that belong to the bottom group (including settings) */
+const BOTTOM_VIEW_IDS = new Set([...DEFAULT_BOTTOM_ITEMS.map((item) => item.id), SETTINGS_ITEM.id]);
 
 /** Check whether a view belongs to the bottom group */
 export function isBottomView(view: ActivityBarView): boolean {
@@ -215,6 +218,8 @@ interface ActivityBarProps {
   onTopViewChange: (view: ActivityBarView) => void;
   onBottomViewChange: (view: ActivityBarView) => void;
   compactMode?: boolean;
+  /** Callback to create a new terminal tab (Electron only). */
+  onNewTerminal?: () => void;
 }
 
 export default function ActivityBar({
@@ -223,6 +228,7 @@ export default function ActivityBar({
   onTopViewChange,
   onBottomViewChange,
   compactMode = false,
+  onNewTerminal,
 }: ActivityBarProps) {
   const [topItems, setTopItems] = useState<ActivityBarItem[]>(() =>
     loadOrder(() => localPreferences.getSidebarTopOrder(), DEFAULT_TOP_ITEMS)
@@ -250,6 +256,11 @@ export default function ActivityBar({
   const bottomItemsWithTooltips = useMemo(
     () => bottomItems.map(withTooltip),
     [bottomItems, withTooltip]
+  );
+
+  const settingsWithTooltip = useMemo(
+    () => withTooltip(SETTINGS_ITEM),
+    [withTooltip]
   );
 
   const sensors = useSensors(
@@ -334,6 +345,49 @@ export default function ActivityBar({
             />
           ))}
         </SortableContext>
+
+        {/* Terminal button (Electron only, non-sortable) */}
+        {onNewTerminal && (
+          <button
+            onClick={onNewTerminal}
+            className={clsx(
+              "flex items-center justify-center rounded-md transition-all relative group",
+              compactMode ? "w-8 h-8" : "w-10 h-10",
+              "text-foreground-tertiary hover:text-foreground hover:bg-hover",
+              "cursor-default active:cursor-pointer"
+            )}
+            title="新規ターミナル"
+          >
+            <Terminal className="w-5 h-5" />
+            <span className="absolute left-full ml-2 px-2 py-1 bg-background-elevated border border-border text-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+              新規ターミナル
+            </span>
+          </button>
+        )}
+
+        {/* Settings button (non-sortable, always last) */}
+        <button
+          onClick={() => {
+            onBottomViewChange(bottomView === "settings" ? "none" : "settings");
+          }}
+          className={clsx(
+            "flex items-center justify-center rounded-md transition-all relative group",
+            compactMode ? "w-8 h-8" : "w-10 h-10",
+            bottomView === "settings"
+              ? "bg-accent text-accent-foreground"
+              : "text-foreground-tertiary hover:text-foreground hover:bg-hover",
+            "cursor-default active:cursor-pointer"
+          )}
+          title={settingsWithTooltip.tooltip}
+        >
+          <Settings className="w-5 h-5" />
+          {bottomView === "settings" && (
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-accent-foreground rounded-r" />
+          )}
+          <span className="absolute left-full ml-2 px-2 py-1 bg-background-elevated border border-border text-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+            {settingsWithTooltip.tooltip}
+          </span>
+        </button>
       </div>
     </DndContext>
   );

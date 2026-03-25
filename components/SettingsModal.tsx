@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium, AudioLines, Keyboard } from "lucide-react";
+import { X, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium, AudioLines, Keyboard, Terminal } from "lucide-react";
 import clsx from "clsx";
 
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
@@ -13,6 +13,7 @@ import LintingSettingsTab from "./settings/LintingSettingsTab";
 import SpeechSettingsTab from "./settings/SpeechSettingsTab";
 import KeymapSettingsTab from "./settings/KeymapSettingsTab";
 import PowerSettingsTab from "./settings/PowerSettingsTab";
+import TerminalSettingsTab from "./settings/TerminalSettingsTab";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ interface SettingsModalProps {
   initialCategory?: SettingsCategory;
 }
 
-export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "speech" | "keymap" | "power" | "about";
+export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "speech" | "keymap" | "terminal" | "power" | "about";
 
 export default function SettingsModal({
   isOpen,
@@ -170,6 +171,20 @@ export default function SettingsModal({
               </button>
               {isElectronRenderer() && (
                 <button
+                  onClick={() => setActiveCategory("terminal")}
+                  className={clsx(
+                    "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
+                    activeCategory === "terminal"
+                      ? "bg-accent text-accent-foreground"
+                      : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                  )}
+                >
+                  <Terminal className="w-4 h-4" />
+                  ターミナル
+                </button>
+              )}
+              {isElectronRenderer() && (
+                <button
                   onClick={() => setActiveCategory("power")}
                   className={clsx(
                     "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
@@ -208,6 +223,7 @@ export default function SettingsModal({
             {activeCategory === "linting" && <LintingSettingsTab />}
             {activeCategory === "speech" && <SpeechSettingsTab />}
             {activeCategory === "keymap" && <KeymapSettingsTab />}
+            {activeCategory === "terminal" && <TerminalSettingsTab />}
             {activeCategory === "power" && <PowerSettingsTab />}
             {activeCategory === "about" && <AboutSection />}
           </div>

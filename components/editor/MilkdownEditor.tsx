@@ -55,6 +55,7 @@ interface MilkdownEditorProps {
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
+  onStartSpeech?: () => void;
 }
 
 export default function MilkdownEditor({
@@ -78,6 +79,7 @@ export default function MilkdownEditor({
   onIgnoreCorrection,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
+  onStartSpeech,
 }: MilkdownEditorProps) {
   const {
     fontScale, lineHeight, paragraphSpacing, textIndent, fontFamily,
@@ -751,10 +753,13 @@ export default function MilkdownEditor({
           onIgnoreCorrection?.(lintIssueAtCursor, true);
         }
         break;
+      case "start-speech":
+        onStartSpeech?.();
+        break;
       default:
         break;
     }
-  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary, lintIssueAtCursor, onShowLintHint, onIgnoreCorrection]);
+  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary, lintIssueAtCursor, onShowLintHint, onIgnoreCorrection, onStartSpeech]);
 
   // Electron: native OS context menu via IPC
   const handleElectronContextMenu = useCallback(async (e: React.MouseEvent) => {
@@ -785,6 +790,8 @@ export default function MilkdownEditor({
         { label: 'Googleで検索', action: 'google-search' },
         { label: '辞書で調べる', action: 'dictionary' },
       ] : []),
+      { label: '-', action: '_separator' },
+      { label: '開始朗読', action: 'start-speech' },
       { label: '-', action: '_separator' },
       { label: 'すべて選択', action: 'select-all', accelerator: 'CmdOrCtrl+A' },
     ];

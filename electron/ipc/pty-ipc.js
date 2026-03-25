@@ -150,7 +150,7 @@ function registerPtyHandlers() {
     // Resolve shell
     const shell = (typeof options.shell === 'string' && options.shell) || resolveDefaultShell()
     if (!shellExists(shell)) {
-      return { error: `シェルが見つかりません: ${shell}` }
+      return { error: `Shellが見つかりません: ${shell}` }
     }
 
     // Resolve cwd

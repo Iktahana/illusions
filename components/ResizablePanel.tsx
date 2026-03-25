@@ -88,6 +88,8 @@ export default function ResizablePanel({
       className={clsx(
         "relative flex-shrink-0",
         !isResizing && "transition-all duration-300 ease-in-out",
+        !isCollapsed && (side === "right" ? "border-l" : "border-r"),
+        "border-border",
         className
       )}
       style={{ width: isCollapsed ? '0px' : `${width}px` }}

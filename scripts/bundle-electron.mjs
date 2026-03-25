@@ -37,6 +37,8 @@ await esbuild.build({
     'kuromoji',
     // better-sqlite3 is a native module
     'better-sqlite3',
+    // node-pty is a native module for terminal support
+    'node-pty',
   ],
   format: 'cjs',
   minify: false, // Keep readable for debugging

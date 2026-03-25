@@ -277,6 +277,10 @@ export default function NovelEditor({
     setIsVertical(!isVertical);
   }, [isVertical, scrollContainerRef]);
 
+  // Ref to avoid including charsPerLine in useCallback deps (prevents recalc loop)
+  const charsPerLineRef = useRef(charsPerLine);
+  charsPerLineRef.current = charsPerLine;
+
   // Calculate optimal chars per line based on editor width and font size
   const calculateOptimalCharsPerLine = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -329,7 +333,7 @@ export default function NovelEditor({
       // Clamp: max 40 characters
       const clamped = Math.min(40, optimalChars);
 
-      if (clamped !== charsPerLine) {
+      if (clamped !== charsPerLineRef.current) {
         onCharsPerLineChange?.(clamped);
       }
     } else {
@@ -338,11 +342,12 @@ export default function NovelEditor({
       // Clamp: max 40 characters
       const clamped = Math.min(40, optimalChars);
 
-      if (clamped !== charsPerLine) {
+      if (clamped !== charsPerLineRef.current) {
         onCharsPerLineChange?.(clamped);
       }
     }
-  }, [fontFamily, fontScale, lineHeight, isVertical, charsPerLine, onCharsPerLineChange, scrollContainerRef]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- charsPerLine read via ref to break recalc loop
+  }, [fontFamily, fontScale, lineHeight, isVertical, onCharsPerLineChange, scrollContainerRef]);
 
   // Add window resize listener to auto-adjust chars per line
   useEffect(() => {
@@ -418,6 +423,7 @@ export default function NovelEditor({
               onIgnoreCorrection={onIgnoreCorrection}
               mdiExtensionsEnabled={mdiExtensionsEnabled}
               gfmEnabled={gfmEnabled}
+              onStartSpeech={startSpeechFromCursor}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
