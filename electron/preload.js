@@ -209,4 +209,40 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeAllListeners('editor:buffer-close-broadcast')
     },
   },
+  pty: {
+    /** Spawn a new PTY session. Returns { sessionId } or { error }. */
+    spawn: (options) => ipcRenderer.invoke('pty:spawn', options),
+    /** Re-attach to an existing session and retrieve buffered output. */
+    attach: (sessionId) => ipcRenderer.invoke('pty:attach', sessionId),
+    /** Write keystroke data to a PTY session. */
+    write: (sessionId, data) => ipcRenderer.invoke('pty:write', { sessionId, data }),
+    /** Resize the terminal dimensions. */
+    resize: (sessionId, cols, rows) => ipcRenderer.invoke('pty:resize', { sessionId, cols, rows }),
+    /** Kill a PTY session (idempotent). */
+    kill: (sessionId) => ipcRenderer.invoke('pty:kill', sessionId),
+    /** Query the state of a PTY session. */
+    status: (sessionId) => ipcRenderer.invoke('pty:status', sessionId),
+    /**
+     * Listen for PTY output data pushed from main process.
+     * Returns a cleanup function that removes the listener.
+     * @param {function({ sessionId: string, data: string }): void} callback
+     * @returns {() => void}
+     */
+    onData: (callback) => {
+      const handler = (_event, payload) => callback(payload)
+      ipcRenderer.on('pty:data', handler)
+      return () => ipcRenderer.removeListener('pty:data', handler)
+    },
+    /**
+     * Listen for PTY process exit notification.
+     * Returns a cleanup function that removes the listener.
+     * @param {function({ sessionId: string, exitCode: number }): void} callback
+     * @returns {() => void}
+     */
+    onExit: (callback) => {
+      const handler = (_event, payload) => callback(payload)
+      ipcRenderer.on('pty:exit', handler)
+      return () => ipcRenderer.removeListener('pty:exit', handler)
+    },
+  },
 })

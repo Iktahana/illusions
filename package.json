@@ -52,7 +52,8 @@
     "path-browserify": "^1.0.1",
     "process": "^0.11.10",
     "stream-browserify": "^3.0.0",
-    "util": "^0.12.5"
+    "util": "^0.12.5",
+    "node-pty": "^1.0.0"
   },
   "devDependencies": {
     "@electron/notarize": "^2.5.0",
@@ -117,7 +118,8 @@
       "!www/**/*"
     ],
     "asarUnpack": [
-      "dist-main/node_modules/**"
+      "dist-main/node_modules/**",
+      "node_modules/node-pty/**"
     ],
     "publish": [
       {
