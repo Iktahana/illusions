@@ -68,6 +68,10 @@ export interface UseTabManagerReturn {
   handleCloseTabSave: () => Promise<void>;
   handleCloseTabDiscard: () => void;
   handleCloseTabCancel: () => void;
+
+  // Persistence flush (for save-before-close)
+  /** Immediately flush pending tab state to storage. */
+  flushTabState: () => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

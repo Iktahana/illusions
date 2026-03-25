@@ -5,12 +5,15 @@
  *
  * Uses the existing StorageService AppState for persistence.
  * Layout is serialized via dockview's toJSON() and stored alongside
- * the existing openTabs field for backward compatibility.
+ * a simplified layout descriptor for ID-independent restoration.
  */
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { DockviewApi } from "dockview-react";
-import type { DockviewLayoutState } from "./types";
+import type { DockviewLayoutState, SimplifiedGroupLayout } from "./types";
+import type { TabState } from "@/lib/tab-manager/tab-types";
+import { isEditorTab } from "@/lib/tab-manager/tab-types";
+import { persistAppState } from "@/lib/storage/app-state-manager";
 import { getStorageService } from "@/lib/storage/storage-service";
 
 // ---------------------------------------------------------------------------
@@ -20,19 +23,113 @@ import { getStorageService } from "@/lib/storage/storage-service";
 const LAYOUT_PERSIST_DEBOUNCE = 2000;
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract a simplified, ID-independent layout from the current dockview state.
+ * Uses file paths as stable keys so the layout survives tab ID regeneration.
+ */
+function extractSimplifiedLayout(
+  api: DockviewApi,
+  tabs: TabState[],
+): SimplifiedGroupLayout | undefined {
+  const groups = api.groups;
+  if (groups.length <= 1) return undefined; // Single group = default layout, no need to save
+
+  // Build panelId → filePath lookup
+  const pathByPanelId = new Map<string, string | null>();
+  for (const tab of tabs) {
+    if (isEditorTab(tab)) {
+      pathByPanelId.set(tab.id, tab.file?.path ?? null);
+    }
+  }
+
+  // Extract orientation from serialized JSON (the API doesn't expose it directly)
+  let orientation: "HORIZONTAL" | "VERTICAL" = "HORIZONTAL";
+  try {
+    const json = api.toJSON();
+    const rawOrientation = String(json.grid.orientation);
+    orientation = rawOrientation === "VERTICAL" ? "VERTICAL" : "HORIZONTAL";
+  } catch {
+    // Fall back to default
+  }
+
+  const simplifiedGroups: SimplifiedGroupLayout["groups"] = [];
+  const sizes: number[] = [];
+
+  for (const group of groups) {
+    const tabPaths = group.panels.map((p) => pathByPanelId.get(p.id) ?? null);
+    const activePanel = group.activePanel;
+    const activeTabPath = activePanel ? (pathByPanelId.get(activePanel.id) ?? null) : null;
+    simplifiedGroups.push({ tabPaths, activeTabPath });
+    sizes.push(group.api.height > 0 ? group.api.width : group.api.width);
+  }
+
+  // Normalize sizes to proportional values
+  const totalSize = sizes.reduce((sum, s) => sum + s, 0);
+  const normalizedSizes = totalSize > 0 ? sizes.map((s) => s / totalSize) : sizes;
+
+  return {
+    groups: simplifiedGroups,
+    orientation,
+    sizes: normalizedSizes,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
 export interface UseDockviewPersistenceOptions {
   dockviewApi: DockviewApi | null;
+  /** Current tab state for extracting file paths */
+  tabs?: TabState[];
   enabled?: boolean;
+}
+
+export interface UseDockviewPersistenceReturn {
+  /** Immediately flush pending layout state to storage (cancels debounce). */
+  flushLayoutState: () => Promise<void>;
 }
 
 export function useDockviewPersistence({
   dockviewApi,
+  tabs = [],
   enabled = true,
-}: UseDockviewPersistenceOptions): void {
+}: UseDockviewPersistenceOptions): UseDockviewPersistenceReturn {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const apiRef = useRef<DockviewApi | null>(null);
+  apiRef.current = dockviewApi;
+  const tabsRef = useRef<TabState[]>(tabs);
+  tabsRef.current = tabs;
+
+  /** Serialize and persist the current layout immediately. */
+  const persistLayoutNow = useCallback(async () => {
+    const api = apiRef.current;
+    if (!api) return;
+    try {
+      const layoutJson = api.toJSON();
+      const simplified = extractSimplifiedLayout(api, tabsRef.current);
+      const layoutState: DockviewLayoutState = {
+        dockviewJson: layoutJson,
+        buffers: [],
+        simplifiedLayout: simplified,
+      };
+      await persistAppState({ dockviewLayout: layoutState });
+    } catch (err) {
+      console.warn("[dockview-persistence] Failed to serialize layout:", err);
+    }
+  }, []);
+
+  /** Flush pending layout state: cancel debounce and persist immediately. */
+  const flushLayoutState = useCallback(async () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    await persistLayoutNow();
+  }, [persistLayoutNow]);
 
   // Save layout on changes (debounced)
   useEffect(() => {
@@ -43,20 +140,9 @@ export function useDockviewPersistence({
         clearTimeout(debounceTimerRef.current);
       }
       debounceTimerRef.current = setTimeout(() => {
-        try {
-          const layoutJson = dockviewApi.toJSON();
-          const layoutState: DockviewLayoutState = {
-            dockviewJson: layoutJson,
-            buffers: [], // Buffer metadata managed by tab persistence
-          };
-          void getStorageService()
-            .saveAppState({ dockviewLayout: layoutState })
-            .catch((err) => {
-              console.warn("[dockview-persistence] Failed to save layout:", err);
-            });
-        } catch (err) {
-          console.warn("[dockview-persistence] Failed to serialize layout:", err);
-        }
+        void persistLayoutNow().catch((err) => {
+          console.warn("[dockview-persistence] Failed to save layout:", err);
+        });
       }, LAYOUT_PERSIST_DEBOUNCE);
     });
 
@@ -66,7 +152,9 @@ export function useDockviewPersistence({
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [dockviewApi, enabled]);
+  }, [dockviewApi, enabled, persistLayoutNow]);
+
+  return { flushLayoutState };
 }
 
 // ---------------------------------------------------------------------------
