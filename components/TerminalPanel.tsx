@@ -319,9 +319,9 @@ export default function TerminalPanel({
   return (
     <div
       ref={containerRef}
-      className="h-full w-full overflow-hidden"
+      className="h-full w-full overflow-hidden terminal-panel-container"
       data-session-id={sessionId}
-      style={{ padding: "4px" }}
+      style={{ padding: "4px", backgroundColor: "#000000" }}
     />
   );
 }

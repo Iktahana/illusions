@@ -151,3 +151,23 @@
 .dockview-theme-illusions .dv-void-container.dv-draggable {
   cursor: default;
 }
+
+/* Terminal panel: force black background on the group view and tab bar
+   so the white app theme doesn't bleed through around the terminal. */
+.dv-groupview:has(.terminal-panel-container) {
+  background-color: #000000;
+}
+
+.dv-groupview:has(.terminal-panel-container) .dv-tabs-and-actions-container {
+  background-color: #1a1a1a;
+}
+
+.dv-groupview:has(.terminal-panel-container) .dv-default-tab.dv-active-tab {
+  background-color: #000000;
+  color: #f2f2f2;
+}
+
+.dv-groupview:has(.terminal-panel-container) .dv-default-tab.dv-inactive-tab {
+  background-color: #1a1a1a;
+  color: #a0a0a0;
+}
