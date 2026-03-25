@@ -80,6 +80,14 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
     mainWindow = newWindow
   }
 
+  newWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[Main] Renderer process gone:', details.reason, details.exitCode)
+  })
+
+  newWindow.webContents.on('console-message', (_event, level, message) => {
+    if (level >= 2) console.log(`[Renderer] ${message}`)
+  })
+
   newWindow.once('ready-to-show', () => {
     newWindow?.show()
   })
