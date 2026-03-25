@@ -156,13 +156,15 @@ app.on('before-quit', () => {
 
 // Kill PTY sessions for a window when it is closed
 app.on('browser-window-created', (_event, win) => {
+  const wcId = win.webContents.id
+
   win.on('closed', () => {
-    killSessionsForWindow(win.webContents.id)
+    killSessionsForWindow(wcId)
   })
 
   // Kill orphaned PTYs if the renderer crashes
   win.webContents.on('destroyed', () => {
-    killSessionsForWindow(win.webContents.id)
+    killSessionsForWindow(wcId)
   })
 })
 
