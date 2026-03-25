@@ -123,8 +123,6 @@ export function useDockviewAdapter({
             params: {
               bufferId: tab.id,
               isPreview: tab.isPreview,
-              content: tab.content,
-              lastSavedContent: tab.lastSavedContent,
               filePath: tab.file?.path ?? "",
               fileType: tab.fileType,
               editorKey,
@@ -211,8 +209,6 @@ export function useDockviewAdapter({
             params: {
               bufferId: tab.id,
               isPreview: tab.isPreview,
-              content: tab.content,
-              lastSavedContent: tab.lastSavedContent,
               filePath: tab.file?.path ?? "",
               fileType: tab.fileType,
               editorKey,
@@ -268,8 +264,6 @@ export function useDockviewAdapter({
         panel.api.updateParameters({
           bufferId: tab.id,
           isPreview: tab.isPreview,
-          content: tab.content,
-          lastSavedContent: tab.lastSavedContent,
           filePath: tab.file?.path ?? "",
           fileType: tab.fileType,
           editorKey,
