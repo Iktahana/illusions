@@ -45,6 +45,8 @@ export interface DisplaySettingsHandlers {
   handleTextIndentChange: (value: number) => void;
   handleFontFamilyChange: (value: string) => void;
   handleCharsPerLineChange: (value: number) => void;
+  /** Lightweight setter for auto-calculation — updates value + persists, NO editor remount */
+  handleAutoCharsPerLineCalc: (value: number) => void;
   handleAutoCharsPerLineChange: (value?: boolean) => void;
   handleShowParagraphNumbersChange: (value: boolean) => void;
   handleAutoSaveChange: (value: boolean) => void;
@@ -249,6 +251,15 @@ export function useDisplaySettings(
     void persistAppState({ charsPerLine: clamped }).catch((e) => console.error("Failed to persist charsPerLine:", e));
   }, [incrementEditorKey]);
 
+  // Lightweight setter for auto-calculation: updates value + persists but does NOT
+  // remount the editor. MilkdownEditor's useEffect applies CSS constraints reactively,
+  // so a full remount is unnecessary and would cause a visible "twitch" on tab switch.
+  const handleAutoCharsPerLineCalc = useCallback((value: number) => {
+    const clamped = Math.max(1, value);
+    setCharsPerLine(clamped);
+    void persistAppState({ charsPerLine: clamped }).catch((e) => console.error("Failed to persist charsPerLine:", e));
+  }, []);
+
   const handleAutoCharsPerLineChange = useCallback((value?: boolean) => {
     setAutoCharsPerLine((prev) => {
       const next = value !== undefined ? value : !prev;
@@ -451,6 +462,7 @@ export function useDisplaySettings(
       handleTextIndentChange,
       handleFontFamilyChange,
       handleCharsPerLineChange,
+      handleAutoCharsPerLineCalc,
       handleAutoCharsPerLineChange,
       handleShowParagraphNumbersChange,
       handleAutoSaveChange,

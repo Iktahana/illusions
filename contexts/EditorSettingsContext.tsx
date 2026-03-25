@@ -79,6 +79,7 @@ export function useTypographySettings() {
     onTextIndentChange: handlers.handleTextIndentChange,
     onFontFamilyChange: handlers.handleFontFamilyChange,
     onCharsPerLineChange: handlers.handleCharsPerLineChange,
+    onAutoCharsPerLineCalc: handlers.handleAutoCharsPerLineCalc,
     onAutoCharsPerLineChange: handlers.handleAutoCharsPerLineChange,
     onShowParagraphNumbersChange: handlers.handleShowParagraphNumbersChange,
   }), [settings, handlers]);

@@ -174,7 +174,7 @@ export default function Inspector({
   return (
     <aside
       className={clsx(
-        "h-full bg-background border-l border-border flex flex-col transition-opacity duration-150",
+        "h-full bg-background flex flex-col transition-opacity duration-150",
         !isTabReady && "opacity-0 pointer-events-none",
         className
       )}

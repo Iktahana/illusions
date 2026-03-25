@@ -50,7 +50,7 @@
   --dv-active-sash-color: rgb(var(--accent));
 
   /* Drag overlay */
-  --dv-drag-over-background-color: rgba(var(--accent), 0.08);
+  --dv-drag-over-background-color: rgb(var(--accent) / 0.08);
   --dv-drag-over-border-color: rgb(var(--accent));
 
   /* Scrollbar */
@@ -87,7 +87,7 @@
   --dv-separator-border: rgb(var(--border));
   --dv-sash-color: transparent;
   --dv-active-sash-color: rgb(var(--accent));
-  --dv-drag-over-background-color: rgba(var(--accent), 0.08);
+  --dv-drag-over-background-color: rgb(var(--accent) / 0.08);
   --dv-drag-over-border-color: rgb(var(--accent));
   --dv-tabs-container-scrollbar-color: rgb(var(--foreground-muted));
   --dv-icon-hover-background-color: rgb(var(--hover));
@@ -150,6 +150,21 @@
 /* Override grab cursor on empty tab bar area */
 .dockview-theme-illusions .dv-void-container.dv-draggable {
   cursor: default;
+}
+
+/* Ensure separator between split editor groups uses the theme border color */
+.dockview-theme-illusions .dv-split-view-container.dv-separator-border .dv-view:not(:first-child)::before {
+  background-color: rgb(var(--border));
+}
+
+/* Remove any unexpected borders/outlines on group views and resize containers */
+.dockview-theme-illusions .dv-resize-container {
+  border: none;
+  outline: none;
+}
+
+.dockview-theme-illusions .dv-groupview {
+  outline: none;
 }
 
 /* Terminal panel: force black background on the group view and tab bar
