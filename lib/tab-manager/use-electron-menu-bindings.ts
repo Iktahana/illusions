@@ -31,6 +31,10 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
   systemFileOpenHandlerRef: React.MutableRefObject<
     ((path: string, content: string) => void) | null
   >;
+  /** Immediately flush pending tab state to storage. */
+  flushTabState?: () => Promise<void>;
+  /** Immediately flush pending dockview layout to storage. */
+  flushLayoutState?: () => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +64,8 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     loadSystemFile,
     updateTab,
     systemFileOpenHandlerRef,
+    flushTabState,
+    flushLayoutState,
   } = params;
 
   // Stable refs for callbacks that change frequently
@@ -75,11 +81,23 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     window.electronAPI.setDirty(anyDirty);
   }, [tabs, isElectron]);
 
+  // Stable refs for flush callbacks
+  const flushTabStateRef = useRef(flushTabState);
+  flushTabStateRef.current = flushTabState;
+  const flushLayoutStateRef = useRef(flushLayoutState);
+  flushLayoutStateRef.current = flushLayoutState;
+
   // Save all dirty tabs before Electron window close
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onSaveBeforeClose) return;
 
     const cleanup = window.electronAPI.onSaveBeforeClose(async () => {
+      // Flush debounced persistence state before saving files
+      await Promise.all([
+        flushTabStateRef.current?.(),
+        flushLayoutStateRef.current?.(),
+      ]);
+
       for (const tab of tabsRef.current) {
         if (!isEditorTab(tab)) continue;
         if (!tab.isDirty || !tab.file) continue;
