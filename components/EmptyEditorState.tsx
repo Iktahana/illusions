@@ -5,10 +5,11 @@ import { useCallback } from "react";
 interface EmptyEditorStateProps {
   onNewFile: () => void;
   onOpenFile: () => void;
+  onNewTerminal?: () => void;
 }
 
 /** VS Code-like empty editor watermark shown when all tabs are closed. */
-export function EmptyEditorState({ onNewFile, onOpenFile }: EmptyEditorStateProps) {
+export function EmptyEditorState({ onNewFile, onOpenFile, onNewTerminal }: EmptyEditorStateProps) {
   const handleNewFile = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -23,6 +24,14 @@ export function EmptyEditorState({ onNewFile, onOpenFile }: EmptyEditorStateProp
       onOpenFile();
     },
     [onOpenFile],
+  );
+
+  const handleNewTerminal = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      onNewTerminal?.();
+    },
+    [onNewTerminal],
   );
 
   return (
@@ -51,6 +60,14 @@ export function EmptyEditorState({ onNewFile, onOpenFile }: EmptyEditorStateProp
           >
             ファイルを開く
           </button>
+          {onNewTerminal && (
+            <button
+              className="hover:text-foreground transition-colors cursor-pointer"
+              onClick={handleNewTerminal}
+            >
+              新規ターミナル
+            </button>
+          )}
         </div>
       </div>
     </div>

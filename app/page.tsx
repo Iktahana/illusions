@@ -62,6 +62,8 @@ import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
 import { useSaveToast } from "@/lib/editor-page/use-save-toast";
+import { useContextMenu } from "@/lib/hooks/use-context-menu";
+import ContextMenu from "@/components/ContextMenu";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
@@ -222,7 +224,8 @@ export default function EditorPage() {
       newTerminalTab();
       // Spawn the PTY session; update the tab's sessionId once we have it
       void (async () => {
-        const result = await ptyApi.spawn();
+        const cwd = isProjectMode(editorMode) ? editorMode.rootPath : undefined;
+        const result = await ptyApi.spawn({ cwd });
         if ("error" in result) return;
         const { sessionId } = result;
         // Update the most recently created terminal tab with an empty sessionId
@@ -238,7 +241,7 @@ export default function EditorPage() {
       // Web: show desktop-only dialog since terminal requires native PTY
       setShowDesktopOnlyDialog(true);
     }
-  }, [newTerminalTab]);
+  }, [newTerminalTab, editorMode]);
 
   // --- PTY exit event listener: update tab status when process exits ---
   useEffect(() => {
@@ -384,10 +387,11 @@ export default function EditorPage() {
   const isEditorTabActiveRef = useRef<boolean>(!!activeEditorTab);
   isEditorTabActiveRef.current = !!activeEditorTab;
 
-  // Auto-collapse right panel when no editor tab is active, restore on editor tab open
+  // Auto-collapse right panel when all tabs are closed, restore when a tab opens
   const rightPanelUserPrefRef = useRef(isRightPanelCollapsed);
+  const hasTabs = tabs.length > 0;
   useEffect(() => {
-    if (!activeEditorTab) {
+    if (!hasTabs) {
       // Save user preference before auto-collapsing
       rightPanelUserPrefRef.current = isRightPanelCollapsed;
       setIsRightPanelCollapsed(true);
@@ -396,16 +400,16 @@ export default function EditorPage() {
       setIsRightPanelCollapsed(rightPanelUserPrefRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!activeEditorTab]);
+  }, [hasTabs]);
 
   // Track user's explicit toggle (not auto-collapse)
   const handleToggleRightPanel = useCallback(() => {
     const next = !isRightPanelCollapsed;
     setIsRightPanelCollapsed(next);
-    if (activeEditorTab) {
+    if (hasTabs) {
       rightPanelUserPrefRef.current = next;
     }
-  }, [isRightPanelCollapsed, setIsRightPanelCollapsed, activeEditorTab]);
+  }, [isRightPanelCollapsed, setIsRightPanelCollapsed, hasTabs]);
 
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
@@ -416,6 +420,7 @@ export default function EditorPage() {
   const [newFileTrigger, setNewFileTrigger] = useState(0);
   const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
   const [selectedCharCount, setSelectedCharCount] = useState(0);
+  const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const programmaticScrollRef = useRef(false);
@@ -507,6 +512,39 @@ export default function EditorPage() {
     tabNewFile(fileType);
     incrementEditorKey();
   }, [tabNewFile, incrementEditorKey]);
+
+  // --- Tab bar empty area context menu ---
+  const handleTabBarContextMenu = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    // Only show on the void (empty) area of the tab bar
+    if (!target.closest(".dv-void-container") && !target.classList.contains("dv-void-container")) return;
+
+    const items = [
+      { label: "新規ファイル", action: "new-file" },
+      { label: "ファイルを開く…", action: "open-file" },
+      ...(isElectron ? [{ label: "新規ターミナル", action: "new-terminal" }] : []),
+    ];
+    void showTabBarMenu(e, items);
+  }, [showTabBarMenu, isElectron]);
+
+  const handleTabBarMenuAction = useCallback((action: string) => {
+    switch (action) {
+      case "new-file":
+        if (isProjectMode(editorMode)) {
+          setTopView("files");
+          setNewFileTrigger(prev => prev + 1);
+        } else {
+          newTab();
+        }
+        break;
+      case "open-file":
+        void openFile();
+        break;
+      case "new-terminal":
+        handleNewTerminalTab();
+        break;
+    }
+  }, [editorMode, newTab, openFile, handleNewTerminalTab, setTopView, setNewFileTrigger]);
 
   // Electron menu "New" and "Open" bindings (with safety checks)
   useElectronMenuHandlers(newFile, openFile);
@@ -996,6 +1034,7 @@ export default function EditorPage() {
                setBottomView(view);
              }
            }}
+           onNewTerminal={isElectron ? handleNewTerminalTab : undefined}
          />
 
            {/* Left side panel */}
@@ -1026,9 +1065,12 @@ export default function EditorPage() {
                   }
                 }}
                 onOpenFile={() => void openFile()}
+                onNewTerminal={isElectron ? handleNewTerminalTab : undefined}
               />
             </div>
           )}
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+          <div className="flex-1 flex flex-col overflow-hidden" onContextMenu={handleTabBarContextMenu}>
           <DockviewReact
             className="flex-1 dockview-theme-illusions"
             components={{
@@ -1038,6 +1080,9 @@ export default function EditorPage() {
                 // other panels show a read-only content snapshot.
                 const panelBufferId = panelParams?.bufferId ?? activeTabId;
                 const isActivePanel = panelBufferId === activeTabId;
+                // Derive file path for the key so preview tab replacements trigger remount
+                const panelTabForKey = tabs.find((t) => t.id === panelBufferId);
+                const panelFilePath = panelTabForKey && isEditorTab(panelTabForKey) ? panelTabForKey.file?.path ?? "" : "";
 
                 if (editorDiff && isActivePanel) {
                   return (
@@ -1055,7 +1100,7 @@ export default function EditorPage() {
                     <ErrorBoundary sectionName="エディタ">
                       <div ref={editorDomRef} className="h-full">
                         <NovelEditor
-                          key={`tab-${panelBufferId}-${editorKey}`}
+                          key={`tab-${panelBufferId}-${panelFilePath}-${editorKey}`}
                           initialContent={content}
                           onChange={handleChange}
                           onInsertText={handleInsertText}
@@ -1096,7 +1141,7 @@ export default function EditorPage() {
                   >
                     <ErrorBoundary sectionName="エディタ">
                       <NovelEditor
-                        key={`tab-${panelBufferId}-inactive`}
+                        key={`tab-${panelBufferId}-${panelFilePath}-inactive`}
                         initialContent={panelEditorTab?.lastSavedContent ?? ""}
                         mdiExtensionsEnabled={panelFileType === ".mdi"}
                         gfmEnabled={panelFileType !== ".txt"}
@@ -1112,6 +1157,14 @@ export default function EditorPage() {
             tabComponents={dockviewTabComponents}
             onReady={handleDockviewReady}
           />
+          {tabBarMenu && (
+            <ContextMenu
+              menu={tabBarMenu}
+              onAction={handleTabBarMenuAction}
+              onClose={closeTabBarMenu}
+            />
+          )}
+          </div>
 
            {/* Save complete toast */}
           {showSaveToast && (

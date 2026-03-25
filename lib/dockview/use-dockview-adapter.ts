@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DockviewApi } from "dockview-react";
+import type { DockviewApi, IDockviewPanel } from "dockview-react";
 import type { TabId, TabState } from "@/lib/tab-manager/tab-types";
 import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
 import type { UseTabManagerReturn } from "@/lib/tab-manager/types";
@@ -37,6 +37,51 @@ export interface UseDockviewAdapterReturn {
   closeGroup: () => void;
   /** Pop out the active panel to a new window (Electron: BrowserWindow, Web: window.open) */
   popoutPanel: () => void;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Position a newly added terminal panel in the bottom split.
+ * - If another terminal already exists, move into its group ("center").
+ * - Otherwise, split below an existing editor panel ("bottom").
+ */
+function positionTerminalPanel(
+  api: DockviewApi,
+  newPanel: IDockviewPanel,
+  tabs: TabState[],
+): void {
+  // Look for an existing terminal panel to group with
+  for (const panel of api.panels) {
+    if (panel.id === newPanel.id) continue;
+    const tab = tabs.find((t) => t.id === panel.id);
+    if (tab && isTerminalTab(tab)) {
+      try {
+        newPanel.api.moveTo({
+          group: panel.group,
+          position: "center",
+        });
+      } catch {
+        // Move failed; panel stays in default group
+      }
+      return;
+    }
+  }
+
+  // No terminal group yet — split below the active (or first) editor panel
+  const refPanel = api.activePanel ?? api.panels[0];
+  if (refPanel && refPanel.id !== newPanel.id) {
+    try {
+      newPanel.api.moveTo({
+        group: refPanel.group,
+        position: "bottom",
+      });
+    } catch {
+      // Move failed; panel stays in default group
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -157,12 +202,14 @@ export function useDockviewAdapter({
             params: { bufferId: tab.id, isPreview: tab.isPreview },
           });
         } else if (isTerminalTab(tab)) {
-          api.addPanel<TerminalPanelParams>({
+          // Add terminal panel then move it to the bottom split (like VS Code)
+          const termPanel = api.addPanel<TerminalPanelParams>({
             id: tab.id,
             component: "terminal",
             title: tab.label,
             params: { sessionId: tab.sessionId },
           });
+          positionTerminalPanel(api, termPanel, tabs);
         } else if (isDiffTab(tab)) {
           api.addPanel<DiffPanelParams>({
             id: tab.id,
@@ -208,6 +255,7 @@ export function useDockviewAdapter({
         if (panel.title !== tab.label) {
           panel.api.setTitle(tab.label);
         }
+        panel.api.updateParameters({ sessionId: tab.sessionId });
       } else if (isDiffTab(tab)) {
         if (panel.title !== tab.sourceFileName) {
           panel.api.setTitle(tab.sourceFileName);

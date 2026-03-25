@@ -146,3 +146,8 @@
 .dv-dockview .dv-default-tab {
   padding: 0 8px;
 }
+
+/* Override grab cursor on empty tab bar area */
+.dockview-theme-illusions .dv-void-container.dv-draggable {
+  cursor: default;
+}
