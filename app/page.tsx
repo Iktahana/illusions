@@ -46,7 +46,10 @@ import { useEditorMode } from "@/contexts/EditorModeContext";
 import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
-import { isEditorTab } from "@/lib/tab-manager/tab-types";
+import { isEditorTab, isTerminalTab } from "@/lib/tab-manager/tab-types";
+import type { TerminalTabState } from "@/lib/tab-manager/tab-types";
+import { TerminalTabContext } from "@/contexts/TerminalTabContext";
+import type { TerminalTabContextValue } from "@/contexts/TerminalTabContext";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
@@ -170,28 +173,115 @@ export default function EditorPage() {
     newFile: tabNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen,
     _loadSystemFile: tabLoadSystemFile,
     tabs, activeTabId, newTab, closeTab, switchTab, nextTab, prevTab, switchToIndex,
-    openProjectFile, pinTab, newTerminalTab,
+    openProjectFile, pinTab, newTerminalTab, updateTerminalTab,
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
   } = tabManager;
+
+  // Ref that always holds the latest tabs array (avoids stale closures in PTY callbacks)
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
+  // Ref that always holds the latest updateTerminalTab (avoids re-subscribing)
+  const updateTerminalTabRef = useRef(updateTerminalTab);
+  updateTerminalTabRef.current = updateTerminalTab;
+
+  // --- Tab close wrapper: kill PTY session when a terminal tab closes ---
+  const handleCloseTabWithPtyCleanup = useCallback(
+    (tabId: string) => {
+      // Look up the tab before closing it
+      const tab = tabsRef.current.find((t) => t.id === tabId);
+      if (tab && isTerminalTab(tab) && tab.sessionId) {
+        void window.electronAPI?.pty?.kill(tab.sessionId);
+      }
+      closeTab(tabId);
+    },
+    [closeTab],
+  );
+
+  // Patched tabManager passed to the dockview adapter so that panel close
+  // triggers PTY kill before removing the tab from state.
+  const tabManagerWithPtyCleanup = { ...tabManager, closeTab: handleCloseTabWithPtyCleanup };
 
   // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
   const {
     handleDockviewReady,
     dockviewApi,
     splitEditor,
-  } = useDockviewAdapter({ tabManager });
+  } = useDockviewAdapter({ tabManager: tabManagerWithPtyCleanup });
   useDockviewPersistence({ dockviewApi });
 
   // --- New terminal tab callback ---
   const handleNewTerminalTab = useCallback(() => {
     if (isElectronRenderer()) {
-      // Electron: create a real terminal tab via the tab manager
+      const ptyApi = window.electronAPI?.pty;
+      if (!ptyApi) return;
+      // Create the tab first (shows "connecting" state immediately)
       newTerminalTab();
+      // Spawn the PTY session; update the tab's sessionId once we have it
+      void (async () => {
+        const result = await ptyApi.spawn();
+        if ("error" in result) return;
+        const { sessionId } = result;
+        // Update the most recently created terminal tab with an empty sessionId
+        const targetTab = tabsRef.current
+          .slice()
+          .reverse()
+          .find((t) => isTerminalTab(t) && (t as TerminalTabState).sessionId === "");
+        if (targetTab) {
+          updateTerminalTabRef.current(targetTab.id, { sessionId, status: "running" });
+        }
+      })();
     } else {
       // Web: show desktop-only dialog since terminal requires native PTY
       setShowDesktopOnlyDialog(true);
     }
   }, [newTerminalTab]);
+
+  // --- PTY exit event listener: update tab status when process exits ---
+  useEffect(() => {
+    if (!isElectronRenderer()) return;
+    const ptyApi = window.electronAPI?.pty;
+    if (!ptyApi) return;
+
+    const unsubExit = ptyApi.onExit(({ sessionId, exitCode }) => {
+      // Find the terminal tab with this sessionId and mark it as exited
+      const tab = tabsRef.current.find(
+        (t) => isTerminalTab(t) && (t as TerminalTabState).sessionId === sessionId,
+      );
+      if (tab) {
+        updateTerminalTabRef.current(tab.id, { status: "exited", exitCode });
+      }
+    });
+
+    return unsubExit;
+  // Subscribe once on mount; use refs to avoid stale closures
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- TerminalTabContext value: exposes terminal tab state to dockview panel components ---
+  const getTerminalTabBySessionId = useCallback(
+    (sessionId: string) =>
+      tabsRef.current.find(
+        (t): t is TerminalTabState => isTerminalTab(t) && t.sessionId === sessionId,
+      ),
+    [],
+  );
+  const setTerminalTabExited = useCallback((sessionId: string, exitCode: number) => {
+    const tab = tabsRef.current.find(
+      (t): t is TerminalTabState => isTerminalTab(t) && t.sessionId === sessionId,
+    );
+    if (tab) {
+      updateTerminalTabRef.current(tab.id, { status: "exited", exitCode });
+    }
+  }, []);
+  const killTerminalSession = useCallback((sessionId: string) => {
+    void window.electronAPI?.pty?.kill(sessionId);
+  }, []);
+  const terminalTabContextValue: TerminalTabContextValue = {
+    getTerminalTabBySessionId,
+    setTerminalTabExited,
+    killTerminalSession,
+  };
 
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -649,6 +739,7 @@ export default function EditorPage() {
   } as const;
 
     return (
+      <TerminalTabContext.Provider value={terminalTabContextValue}>
       <EditorSettingsProvider settings={settings} handlers={settingsHandlers}>
       <div className="h-screen flex flex-col overflow-hidden relative">
          {/* Dynamic title update */}
@@ -955,5 +1046,6 @@ export default function EditorPage() {
       </div>
     </div>
       </EditorSettingsProvider>
+      </TerminalTabContext.Provider>
   );
 }

@@ -3,7 +3,7 @@
 import type { MutableRefObject, Dispatch, SetStateAction } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension } from "../project/project-types";
-import type { TabId, TabState, EditorTabState } from "./tab-types";
+import type { TabId, TabState, EditorTabState, TerminalTabState } from "./tab-types";
 
 // ---------------------------------------------------------------------------
 // Public return type (must stay identical to the original useTabManager)
@@ -39,6 +39,11 @@ export interface UseTabManagerReturn {
   openProjectFile: (vfsPath: string, options?: { preview?: boolean }) => Promise<void>;
   pinTab: (tabId: TabId) => void;
   newTerminalTab: () => void;
+  /** Update mutable fields on a terminal tab (e.g. status, exitCode after PTY exits). */
+  updateTerminalTab: (
+    tabId: TabId,
+    updates: Partial<Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">>,
+  ) => void;
   openDiffTab: (
     sourceTabId: TabId,
     sourceFileName: string,

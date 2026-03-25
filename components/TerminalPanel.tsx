@@ -1,0 +1,292 @@
+"use client";
+
+/**
+ * TerminalPanel — xterm.js renderer component for embedded terminal tabs.
+ *
+ * Lifecycle:
+ *  - Mount: creates Terminal, attaches FitAddon, connects to PTY session via IPC
+ *  - Unmount: unsubscribes from data events, disposes xterm instance (PTY session is NOT killed)
+ */
+
+import { useEffect, useRef, useState, useCallback } from "react";
+import type { Terminal } from "@xterm/xterm";
+import type { FitAddon } from "@xterm/addon-fit";
+
+import type { TerminalStatus } from "@/lib/tab-manager/tab-types";
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+export interface TerminalPanelProps {
+  /** PTY session ID (empty string while connecting) */
+  sessionId: string;
+  /** Current status of the terminal tab */
+  status: TerminalStatus;
+  /** Exit code reported by the PTY process (null when still running) */
+  exitCode: number | null;
+  /** Called when the PTY process exits so the parent can update tab state */
+  onExit?: (exitCode: number) => void;
+}
+
+// ---------------------------------------------------------------------------
+// xterm theme — mirrors app CSS custom properties
+// Dark theme: bg #080808, fg #f2f2f2
+// Light theme: bg #fcfcfc, fg #0c0c0c
+// We derive the appropriate values from the document root at mount time.
+// ---------------------------------------------------------------------------
+
+function resolveThemeColor(property: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(property)
+    .trim();
+  if (!raw) return fallback;
+  // CSS values are in "R G B" space-separated format (used with rgb())
+  return `rgb(${raw})`;
+}
+
+function buildXtermTheme(): Record<string, string> {
+  return {
+    background: resolveThemeColor("--background", "#080808"),
+    foreground: resolveThemeColor("--foreground", "#f2f2f2"),
+    cursor: resolveThemeColor("--foreground", "#f2f2f2"),
+    cursorAccent: resolveThemeColor("--background", "#080808"),
+    selectionBackground: resolveThemeColor("--accent-light", "#e6e6e6"),
+    // ANSI colors use sensible defaults for Japanese text legibility
+    black: "#000000",
+    red: "#dc2626",
+    green: "#16a34a",
+    yellow: "#ca8a04",
+    blue: "#2563eb",
+    magenta: "#9333ea",
+    cyan: "#0d9488",
+    white: "#d4d4d4",
+    brightBlack: "#737373",
+    brightRed: "#ef4444",
+    brightGreen: "#22c55e",
+    brightYellow: "#eab308",
+    brightBlue: "#3b82f6",
+    brightMagenta: "#a855f7",
+    brightCyan: "#14b8a6",
+    brightWhite: "#f5f5f5",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// TerminalPanel component
+// ---------------------------------------------------------------------------
+
+export default function TerminalPanel({
+  sessionId,
+  status,
+  exitCode,
+  onExit,
+}: TerminalPanelProps): React.JSX.Element {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const terminalRef = useRef<Terminal | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const cleanupDataRef = useRef<(() => void) | null>(null);
+  const cleanupExitRef = useRef<(() => void) | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const [initError, setInitError] = useState<string | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // Terminal initialization and PTY attachment
+  // ---------------------------------------------------------------------------
+
+  const initTerminal = useCallback(async () => {
+    if (!containerRef.current || !sessionId) return;
+
+    const ptyApi = window.electronAPI?.pty;
+    if (!ptyApi) {
+      setInitError("PTY APIが利用できません。Electron環境でのみ使用できます。");
+      return;
+    }
+
+    // Dynamic imports to avoid SSR issues
+    const [{ Terminal: XTerm }, { FitAddon }] = await Promise.all([
+      import("@xterm/xterm"),
+      import("@xterm/addon-fit"),
+    ]);
+
+    // Create terminal instance
+    const terminal = new XTerm({
+      theme: buildXtermTheme(),
+      fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
+      fontSize: 14,
+      lineHeight: 1.4,
+      cursorBlink: true,
+      allowTransparency: false,
+      scrollback: 5000,
+    });
+
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+
+    // Open terminal in the container element
+    terminal.open(containerRef.current);
+    fitAddon.fit();
+
+    terminalRef.current = terminal;
+    fitAddonRef.current = fitAddon;
+
+    // --- Attach to PTY session ---
+    const attachResult = await ptyApi.attach(sessionId);
+
+    if ("error" in attachResult) {
+      setInitError(`セッションへの接続に失敗しました: ${attachResult.error}`);
+      terminal.dispose();
+      terminalRef.current = null;
+      fitAddonRef.current = null;
+      return;
+    }
+
+    // Write buffered output from before attach
+    if (attachResult.outputBuffer) {
+      terminal.write(attachResult.outputBuffer);
+    }
+
+    // Subscribe to live PTY data events (filter by sessionId)
+    const unsubData = ptyApi.onData((payload) => {
+      if (payload.sessionId !== sessionId) return;
+      terminal.write(payload.data);
+    });
+    cleanupDataRef.current = unsubData;
+
+    // Subscribe to PTY exit events
+    const unsubExit = ptyApi.onExit((payload) => {
+      if (payload.sessionId !== sessionId) return;
+      onExit?.(payload.exitCode);
+    });
+    cleanupExitRef.current = unsubExit;
+
+    // Forward keystrokes to PTY
+    terminal.onData((data) => {
+      void ptyApi.write(sessionId, data);
+    });
+
+    // ResizeObserver: fit terminal on container resize
+    const observer = new ResizeObserver(() => {
+      if (!fitAddonRef.current || !terminalRef.current) return;
+      try {
+        fitAddonRef.current.fit();
+        const dims = fitAddonRef.current.proposeDimensions();
+        if (dims) {
+          void ptyApi.resize(sessionId, dims.cols, dims.rows);
+        }
+      } catch {
+        // Ignore resize errors (e.g. terminal disposed)
+      }
+    });
+    observer.observe(containerRef.current);
+    resizeObserverRef.current = observer;
+
+    // Fit once more after layout settles
+    requestAnimationFrame(() => {
+      if (!fitAddonRef.current || !terminalRef.current) return;
+      try {
+        fitAddonRef.current.fit();
+        const dims = fitAddonRef.current.proposeDimensions();
+        if (dims) {
+          void ptyApi.resize(sessionId, dims.cols, dims.rows);
+        }
+      } catch {
+        // Ignore
+      }
+    });
+  }, [sessionId, onExit]);
+
+  useEffect(() => {
+    if (status !== "running" && status !== "connecting") return;
+    if (!sessionId) return;
+
+    void initTerminal();
+
+    return () => {
+      // Cleanup data and exit listeners
+      cleanupDataRef.current?.();
+      cleanupDataRef.current = null;
+      cleanupExitRef.current?.();
+      cleanupExitRef.current = null;
+
+      // Cleanup ResizeObserver
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
+
+      // Dispose xterm (detaches from DOM, releases resources)
+      // Note: do NOT kill the PTY session here — it should survive tab switches
+      terminalRef.current?.dispose();
+      terminalRef.current = null;
+      fitAddonRef.current = null;
+    };
+  }, [sessionId, status, initTerminal]);
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  if (status === "connecting") {
+    return (
+      <div className="flex items-center justify-center h-full gap-3 text-foreground-secondary text-sm">
+        {/* Spinner */}
+        <svg
+          className="animate-spin h-4 w-4"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+          />
+        </svg>
+        <span>接続中...</span>
+      </div>
+    );
+  }
+
+  if (status === "exited") {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-2 text-foreground-secondary text-sm">
+        <span>
+          プロセスが終了しました
+          {exitCode !== null ? ` (code: ${exitCode})` : ""}
+        </span>
+      </div>
+    );
+  }
+
+  if (status === "error" || initError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-2 text-error text-sm p-4">
+        <span className="font-medium">エラーが発生しました</span>
+        {initError && (
+          <span className="text-foreground-secondary text-xs text-center max-w-md">
+            {initError}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // Running state: render xterm container
+  return (
+    <div
+      ref={containerRef}
+      className="h-full w-full overflow-hidden"
+      data-session-id={sessionId}
+      style={{ padding: "4px" }}
+    />
+  );
+}

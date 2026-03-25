@@ -41,6 +41,8 @@ export interface UseTabStateReturn extends TabManagerCore {
   newTab: (fileType?: SupportedFileExtension) => void;
   /** Open a new terminal tab with placeholder values. */
   newTerminalTab: () => void;
+  /** Update a terminal tab's mutable fields (status, exitCode, sessionId). */
+  updateTerminalTab: (tabId: TabId, updates: Partial<Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">>) => void;
   /** Open a diff tab for the given source tab. */
   openDiffTab: (
     sourceTabId: TabId,
@@ -166,6 +168,21 @@ export function useTabState(): UseTabStateReturn {
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(tab.id);
   }, []);
+
+  const updateTerminalTab = useCallback(
+    (
+      tabId: TabId,
+      updates: Partial<Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">>,
+    ) => {
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== tabId || t.tabKind !== "terminal") return t;
+          return { ...t, ...updates };
+        }),
+      );
+    },
+    [],
+  );
 
   const openDiffTab = useCallback(
     (
@@ -343,6 +360,7 @@ export function useTabState(): UseTabStateReturn {
     // Tab CRUD
     newTab,
     newTerminalTab,
+    updateTerminalTab,
     openDiffTab,
     switchTab,
     nextTab: nextTabFn,
