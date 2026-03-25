@@ -180,6 +180,71 @@ declare global {
       /** Remove all editor sync listeners */
       removeAllListeners: () => void;
     };
+    /** PTY session management */
+    pty?: {
+      /**
+       * Spawn a new PTY session in the main process.
+       * @param options - Optional spawn configuration
+       * @returns sessionId on success, or error message
+       */
+      spawn: (options?: {
+        cwd?: string;
+        shell?: string;
+        cols?: number;
+        rows?: number;
+      }) => Promise<{ sessionId: string } | { error: string }>;
+      /**
+       * Re-attach to an existing session and retrieve its output ring buffer.
+       * @param sessionId - ID returned by spawn
+       */
+      attach: (sessionId: string) => Promise<
+        | { sessionId: string; status: 'active' | 'exited' | 'killed'; exitCode: number | null; outputBuffer: string }
+        | { error: string }
+      >;
+      /**
+       * Write keystroke data to a PTY session (max 64 KB).
+       * @param sessionId - Target session ID
+       * @param data - Raw input string
+       */
+      write: (sessionId: string, data: string) => Promise<{ ok: boolean }>;
+      /**
+       * Resize the terminal dimensions.
+       * @param sessionId - Target session ID
+       * @param cols - Column count (1–500)
+       * @param rows - Row count (1–500)
+       */
+      resize: (sessionId: string, cols: number, rows: number) => Promise<{ ok: boolean }>;
+      /**
+       * Kill a PTY session (idempotent).
+       * @param sessionId - Target session ID
+       */
+      kill: (sessionId: string) => Promise<{ ok: boolean }>;
+      /**
+       * Query the current state of a PTY session.
+       * @param sessionId - Target session ID
+       */
+      status: (sessionId: string) => Promise<
+        | {
+            sessionId: string;
+            status: 'active' | 'exited' | 'killed';
+            exitCode: number | null;
+            shell: string;
+            cwd: string;
+            createdAt: number;
+          }
+        | { error: string }
+      >;
+      /**
+       * Listen for PTY output data pushed from the main process.
+       * Returns a cleanup function that removes the listener.
+       */
+      onData: (callback: (payload: { sessionId: string; data: string }) => void) => () => void;
+      /**
+       * Listen for PTY process exit notifications.
+       * Returns a cleanup function that removes the listener.
+       */
+      onExit: (callback: (payload: { sessionId: string; exitCode: number }) => void) => () => void;
+    };
   }
 
   interface Window {
