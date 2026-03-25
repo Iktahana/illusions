@@ -977,7 +977,7 @@ export default function EditorPage() {
 
            {/* Left side panel */}
           {(topView !== "none" || bottomView !== "none") && (
-            <ResizablePanel side="left" defaultWidth={compactMode ? 200 : 256} minWidth={compactMode ? 160 : 200} maxWidth={compactMode ? 320 : 400}>
+            <ResizablePanel side="left" defaultWidth={compactMode ? 200 : 256} minWidth={compactMode ? 160 : 200} maxWidth={compactMode ? 320 : 400} className="border-r border-border">
               {(() => {
                 const topPanel = topView !== "none" ? <SidebarPanel view={topView} {...sidebarPanelProps} /> : null;
                 const bottomPanel = bottomView !== "none" ? <SidebarPanel view={bottomView} {...sidebarPanelProps} /> : null;
@@ -1103,14 +1103,14 @@ export default function EditorPage() {
            )}
          </main>
 
-          {/* Right side panel: statistics (always visible) */}
+          {/* Right side panel: statistics (auto-collapse when no tabs open) */}
           <ResizablePanel
             side="right"
             defaultWidth={compactMode ? 200 : 256}
             minWidth={compactMode ? 160 : 200}
             maxWidth={compactMode ? 320 : 400}
             collapsible={true}
-            isCollapsed={isRightPanelCollapsed}
+            isCollapsed={isRightPanelCollapsed || tabs.length === 0}
             onToggleCollapse={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
           >
           <ErrorBoundary sectionName="インスペクタ">
