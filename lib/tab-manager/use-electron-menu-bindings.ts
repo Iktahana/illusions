@@ -5,7 +5,8 @@ import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../services/file-watcher";
 import type { SupportedFileExtension } from "../project/project-types";
-import type { TabId, TabState } from "./tab-types";
+import type { TabId, TabState, EditorTabState } from "./tab-types";
+import { isEditorTab } from "./tab-types";
 import { sanitizeMdiContent } from "./types";
 import type { TabManagerCore } from "./types";
 
@@ -25,7 +26,7 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
   /** Load a system file into a tab. */
   loadSystemFile: (path: string, content: string) => void;
   /** Update a single tab by id. */
-  updateTab: (tabId: TabId, updates: Partial<TabState>) => void;
+  updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
   /** Register a handler for system file open events. */
   systemFileOpenHandlerRef: React.MutableRefObject<
     ((path: string, content: string) => void) | null
@@ -70,7 +71,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
   // Dirty state → Electron title dot
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.setDirty) return;
-    const anyDirty = tabs.some((t) => t.isDirty);
+    const anyDirty = tabs.some((t) => isEditorTab(t) && t.isDirty);
     window.electronAPI.setDirty(anyDirty);
   }, [tabs, isElectron]);
 
@@ -80,6 +81,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
 
     const cleanup = window.electronAPI.onSaveBeforeClose(async () => {
       for (const tab of tabsRef.current) {
+        if (!isEditorTab(tab)) continue;
         if (!tab.isDirty || !tab.file) continue;
         try {
           const sanitized = sanitizeMdiContent(tab.content);
@@ -131,6 +133,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
       if (!vfs.isRootOpen()) return;
 
       for (const tab of tabsRef.current) {
+        if (!isEditorTab(tab)) continue;
         if (!tab.file?.path || tab.isSaving) continue;
         if (tab.isDirty) continue;
         try {
@@ -178,10 +181,11 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
       const activeId = activeTabIdRef.current;
       const active = current.find((t) => t.id === activeId);
 
-      // Single empty clean tab → close window
+      // Single empty clean editor tab → close window
       if (
         current.length === 1 &&
         active &&
+        isEditorTab(active) &&
         !active.file &&
         !active.isDirty
       ) {
@@ -207,7 +211,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
   useEffect(() => {
     if (isElectron) return;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      const anyDirty = tabsRef.current.some((t) => t.isDirty);
+      const anyDirty = tabsRef.current.some((t) => isEditorTab(t) && t.isDirty);
       if (anyDirty) {
         event.preventDefault();
         event.returnValue = "";

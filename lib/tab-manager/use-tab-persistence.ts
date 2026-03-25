@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { getStorageService } from "../storage/storage-service";
 import { fetchAppState, persistAppState } from "../storage/app-state-manager";
-import type { TabState, SerializedTab, TabPersistenceState } from "./tab-types";
+import type { TabState, SerializedTab, TabPersistenceState, EditorTabState } from "./tab-types";
+import { isEditorTab } from "./tab-types";
 import type { TabManagerCore } from "./types";
 import {
   TAB_PERSIST_DEBOUNCE,
@@ -79,16 +80,18 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     }
 
     tabPersistTimerRef.current = setTimeout(() => {
-      const serializedTabs: SerializedTab[] = tabs.map((t) => ({
+      // Only persist editor tabs; terminal and diff tabs are transient
+      const editorTabs = tabs.filter(isEditorTab);
+      const serializedTabs: SerializedTab[] = editorTabs.map((t) => ({
         filePath: t.file?.path ?? null,
         fileName: t.file?.name ?? "新規ファイル",
         isPreview: t.isPreview || undefined,
         fileType: t.fileType,
       }));
-      const activeIndex = tabs.findIndex((t) => t.id === activeTabId);
+      const activeEditorIndex = editorTabs.findIndex((t) => t.id === activeTabId);
       const state: TabPersistenceState = {
         tabs: serializedTabs,
-        activeIndex: Math.max(0, activeIndex),
+        activeIndex: Math.max(0, activeEditorIndex),
       };
       void persistAppState({ openTabs: state }).catch((error) => {
         console.error("タブ状態の保存に失敗しました:", error);
@@ -123,7 +126,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
         // Determine the initial tab using a local variable to make the
         // fallback logic explicit and avoid multiple setTabs calls.
-        let initialTab: TabState | null = null;
+        let initialTab: EditorTabState | null = null;
 
         if (!skipAutoRestore && !isElectron && !savedEmpty) {
           // Web: restore file handle from editor buffer
@@ -133,6 +136,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
               const file = await buffer.fileHandle.getFile();
               const fileContent = await file.text();
               initialTab = {
+                tabKind: "editor",
                 id: generateTabId(),
                 file: { path: null, handle: buffer.fileHandle, name: file.name },
                 content: fileContent,
@@ -143,6 +147,8 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
                 isSaving: false,
                 isPreview: false,
                 fileType: inferFileType(file.name),
+                fileSyncStatus: "clean",
+                conflictDiskContent: null,
               };
               setWasAutoRecovered(true);
             } catch (error) {
@@ -212,13 +218,14 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         // Saved state is explicitly empty (user closed all tabs last session).
         if (openTabs.tabs.length === 0) return;
 
-        const restoredTabs: TabState[] = [];
+        const restoredTabs: EditorTabState[] = [];
         for (const serialized of openTabs.tabs) {
           if (serialized.filePath) {
             try {
               const fileContent =
                 await window.electronAPI!.vfs!.readFile(serialized.filePath);
               restoredTabs.push({
+                tabKind: "editor",
                 id: generateTabId(),
                 file: {
                   path: serialized.filePath,
@@ -233,6 +240,8 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
                 isSaving: false,
                 isPreview: serialized.isPreview ?? false,
                 fileType: serialized.fileType ?? inferFileType(serialized.fileName),
+                fileSyncStatus: "clean",
+                conflictDiskContent: null,
               });
             } catch (error) {
               console.warn(

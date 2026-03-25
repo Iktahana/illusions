@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DockviewApi } from "dockview-react";
 import type { TabId, TabState } from "@/lib/tab-manager/tab-types";
+import { isEditorTab } from "@/lib/tab-manager/tab-types";
 import type { UseTabManagerReturn } from "@/lib/tab-manager/types";
 import type { EditorPanelParams } from "./types";
 
@@ -64,8 +65,9 @@ export function useDockviewAdapter({
       apiRef.current = api;
       setDockviewApi(api);
 
-      // Initialize dockview with current tabs
+      // Initialize dockview with current tabs (editor tabs only for now)
       for (const tab of tabs) {
+        if (!isEditorTab(tab)) continue;
         api.addPanel<EditorPanelParams>({
           id: tab.id,
           component: "editor",
@@ -128,8 +130,9 @@ export function useDockviewAdapter({
     // Detect newly added tabs (before updating prevTabsRef)
     const newlyAddedTabs = tabs.filter((t) => !prevTabIds.has(t.id));
 
-    // Add new tabs
+    // Add new tabs (editor tabs only for now)
     for (const tab of tabs) {
+      if (!isEditorTab(tab)) continue;
       if (!prevTabIds.has(tab.id)) {
         try {
           api.addPanel<EditorPanelParams>({
@@ -161,8 +164,9 @@ export function useDockviewAdapter({
       }
     }
 
-    // Update titles for changed tabs
+    // Update titles for changed editor tabs
     for (const tab of tabs) {
+      if (!isEditorTab(tab)) continue;
       const panel = api.getPanel(tab.id);
       if (panel) {
         const title = tab.file?.name ?? `新規ファイル${tab.fileType}`;
@@ -226,7 +230,7 @@ export function useDockviewAdapter({
       // Create a new empty tab with the same file type.
       // The new panel will be positioned in the split direction
       // by the sync effect above (via pendingSplitRef).
-      newTab(activeTab.fileType);
+      newTab(isEditorTab(activeTab) ? activeTab.fileType : undefined);
 
       pendingSplitRef.current = {
         direction,
@@ -257,7 +261,7 @@ export function useDockviewAdapter({
 
   const popoutPanel = useCallback(() => {
     const activeTab = tabs.find((t) => t.id === activeTabId);
-    if (!activeTab) return;
+    if (!activeTab || !isEditorTab(activeTab)) return;
 
     const electronAPI = window.electronAPI;
     const content = tabManager.content ?? "";

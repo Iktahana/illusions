@@ -3,8 +3,9 @@
 import { useCallback, useRef, useState } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension } from "../project/project-types";
-import type { TabId, TabState } from "./tab-types";
-import { createNewTab } from "./types";
+import type { TabId, TabState, EditorTabState, TerminalTabState, DiffTabState } from "./tab-types";
+import { isEditorTab } from "./tab-types";
+import { createNewTab, generateTabId } from "./types";
 import type { TabManagerCore } from "./types";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import { isElectronRenderer } from "../utils/runtime-env";
@@ -31,13 +32,23 @@ export interface UseTabStateReturn extends TabManagerCore {
   /** Derived: whether the most recent save on the active tab was an auto-save. */
   lastSaveWasAuto: boolean;
   /** Update a single tab by id. */
-  updateTab: (tabId: TabId, updates: Partial<TabState>) => void;
+  updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
   /** Find a tab by its file path. */
-  findTabByPath: (path: string) => TabState | undefined;
+  findTabByPath: (path: string) => EditorTabState | undefined;
 
   // Tab CRUD operations
-  /** Create a new empty tab. */
+  /** Create a new empty editor tab. */
   newTab: (fileType?: SupportedFileExtension) => void;
+  /** Open a new terminal tab with placeholder values. */
+  newTerminalTab: () => void;
+  /** Open a diff tab for the given source tab. */
+  openDiffTab: (
+    sourceTabId: TabId,
+    sourceFileName: string,
+    localContent: string,
+    remoteContent: string,
+    remoteTimestamp: number,
+  ) => void;
   /** Switch to an existing tab by id. */
   switchTab: (tabId: TabId) => void;
   /** Switch to the next tab. */
@@ -95,12 +106,14 @@ export function useTabState(): UseTabStateReturn {
   // --- Derived state from active tab --------------------------------------
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
-  const currentFile = activeTab?.file ?? null;
-  const content = activeTab?.content ?? "";
-  const isDirty = activeTab?.isDirty ?? false;
-  const isSaving = activeTab?.isSaving ?? false;
-  const lastSavedTime = activeTab?.lastSavedTime ?? null;
-  const lastSaveWasAuto = activeTab?.lastSaveWasAuto ?? false;
+  // Editor-tab specific fields — fall back safely for non-editor tabs
+  const editorActiveTab = activeTab && isEditorTab(activeTab) ? activeTab : undefined;
+  const currentFile = editorActiveTab?.file ?? null;
+  const content = editorActiveTab?.content ?? "";
+  const isDirty = editorActiveTab?.isDirty ?? false;
+  const isSaving = editorActiveTab?.isSaving ?? false;
+  const lastSavedTime = editorActiveTab?.lastSavedTime ?? null;
+  const lastSaveWasAuto = editorActiveTab?.lastSaveWasAuto ?? false;
 
   const contentRef = useRef(content);
   contentRef.current = content;
@@ -108,19 +121,24 @@ export function useTabState(): UseTabStateReturn {
   // --- Helpers ------------------------------------------------------------
 
   const updateTab = useCallback(
-    (tabId: TabId, updates: Partial<TabState>) => {
+    (tabId: TabId, updates: Partial<EditorTabState>) => {
       setTabs((prev) =>
-        prev.map((tab) =>
-          tab.id === tabId ? { ...tab, ...updates } : tab,
-        ),
+        prev.map((tab): TabState => {
+          if (tab.id !== tabId || !isEditorTab(tab)) return tab;
+          return { ...tab, ...updates };
+        }),
       );
     },
     [],
   );
 
   const findTabByPath = useCallback(
-    (path: string): TabState | undefined =>
-      tabsRef.current.find((t) => t.file?.path === path),
+    (path: string): EditorTabState | undefined => {
+      const tab = tabsRef.current.find(
+        (t) => isEditorTab(t) && t.file?.path === path,
+      );
+      return tab && isEditorTab(tab) ? tab : undefined;
+    },
     [],
   );
 
@@ -131,6 +149,46 @@ export function useTabState(): UseTabStateReturn {
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(tab.id);
   }, []);
+
+  const newTerminalTab = useCallback(() => {
+    const tab: TerminalTabState = {
+      tabKind: "terminal",
+      id: generateTabId(),
+      sessionId: "",
+      label: "ターミナル",
+      cwd: "",
+      shell: "",
+      status: "connecting",
+      exitCode: null,
+      createdAt: Date.now(),
+      source: "user",
+    };
+    setTabs((prev) => [...prev, tab]);
+    setActiveTabId(tab.id);
+  }, []);
+
+  const openDiffTab = useCallback(
+    (
+      sourceTabId: TabId,
+      sourceFileName: string,
+      localContent: string,
+      remoteContent: string,
+      remoteTimestamp: number,
+    ) => {
+      const tab: DiffTabState = {
+        tabKind: "diff",
+        id: generateTabId(),
+        sourceTabId,
+        sourceFileName,
+        localContent,
+        remoteContent,
+        remoteTimestamp,
+      };
+      setTabs((prev) => [...prev, tab]);
+      setActiveTabId(tab.id);
+    },
+    [],
+  );
 
   const switchTab = useCallback((tabId: TabId) => {
     if (tabsRef.current.some((t) => t.id === tabId)) {
@@ -188,7 +246,8 @@ export function useTabState(): UseTabStateReturn {
     (tabId: TabId) => {
       const tab = tabsRef.current.find((t) => t.id === tabId);
       if (!tab) return;
-      if (tab.isDirty) {
+      // Only editor tabs can have unsaved changes
+      if (isEditorTab(tab) && tab.isDirty) {
         setPendingCloseTabId(tabId);
         return;
       }
@@ -200,7 +259,7 @@ export function useTabState(): UseTabStateReturn {
   const pinTab = useCallback(
     (tabId: TabId) => {
       const tab = tabsRef.current.find((t) => t.id === tabId);
-      if (tab?.isPreview) {
+      if (tab && isEditorTab(tab) && tab.isPreview) {
         updateTab(tabId, { isPreview: false });
       }
     },
@@ -213,6 +272,7 @@ export function useTabState(): UseTabStateReturn {
     setTabs((prev) =>
       prev.map((tab) => {
         if (tab.id !== activeTabIdRef.current) return tab;
+        if (!isEditorTab(tab)) return tab;
         const dirty = newContent !== tab.lastSavedContent;
         return {
           ...tab,
@@ -229,6 +289,7 @@ export function useTabState(): UseTabStateReturn {
     setTabs((prev) =>
       prev.map((tab) => {
         if (tab.id !== activeTabIdRef.current) return tab;
+        if (!isEditorTab(tab)) return tab;
         const file: MdiFileDescriptor = tab.file
           ? { ...tab.file, name: newName }
           : { path: null, handle: null, name: newName };
@@ -242,8 +303,11 @@ export function useTabState(): UseTabStateReturn {
   const pendingCloseTab = pendingCloseTabId
     ? tabs.find((t) => t.id === pendingCloseTabId)
     : null;
+  const pendingCloseEditorTab =
+    pendingCloseTab && isEditorTab(pendingCloseTab) ? pendingCloseTab : null;
   const pendingCloseFileName =
-    pendingCloseTab?.file?.name ?? `新規ファイル${pendingCloseTab?.fileType ?? ".mdi"}`;
+    pendingCloseEditorTab?.file?.name ??
+    `新規ファイル${pendingCloseEditorTab?.fileType ?? ".mdi"}`;
 
   const handleCloseTabCancel = useCallback(() => {
     setPendingCloseTabId(null);
@@ -278,6 +342,8 @@ export function useTabState(): UseTabStateReturn {
 
     // Tab CRUD
     newTab,
+    newTerminalTab,
+    openDiffTab,
     switchTab,
     nextTab: nextTabFn,
     prevTab: prevTabFn,

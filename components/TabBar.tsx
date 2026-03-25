@@ -3,6 +3,7 @@
 import { useCallback, useRef, useEffect } from "react";
 import { X } from "lucide-react";
 import type { TabId, TabState } from "@/lib/tab-manager/tab-types";
+import { isEditorTab } from "@/lib/tab-manager/tab-types";
 
 interface TabBarProps {
   tabs: TabState[];
@@ -43,7 +44,9 @@ export default function TabBar({
     [onCloseTab],
   );
 
-  if (tabs.length <= 1 && !tabs[0]?.file && !tabs[0]?.isDirty) {
+  const firstTab = tabs[0];
+  const firstEditorTab = firstTab && isEditorTab(firstTab) ? firstTab : undefined;
+  if (tabs.length <= 1 && !firstEditorTab?.file && !firstEditorTab?.isDirty) {
     // Single untitled clean tab → hide tab bar
     return null;
   }
@@ -59,7 +62,8 @@ export default function TabBar({
       >
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
-          const label = tab.file?.name ?? `新規ファイル${tab.fileType}`;
+          const editorTab = isEditorTab(tab) ? tab : undefined;
+          const label = editorTab?.file?.name ?? `新規ファイル${editorTab?.fileType ?? ""}`;
 
           return (
             <button
@@ -79,17 +83,17 @@ export default function TabBar({
               `}
               onClick={() => onSwitchTab(tab.id)}
               onDoubleClick={() => {
-                if (tab.isPreview) onPinTab?.(tab.id);
+                if (editorTab?.isPreview) onPinTab?.(tab.id);
               }}
               onMouseDown={(e) => handleMiddleClick(e, tab.id)}
             >
               {/* Dirty indicator */}
-              {tab.isDirty && (
+              {editorTab?.isDirty && (
                 <span className="w-1.5 h-1.5 rounded-full bg-warning shrink-0" />
               )}
 
               {/* Tab label */}
-              <span className={`truncate flex-1 text-left${tab.isPreview ? " italic opacity-75" : ""}`}>{label}</span>
+              <span className={`truncate flex-1 text-left${editorTab?.isPreview ? " italic opacity-75" : ""}`}>{label}</span>
 
               {/* Close button */}
               <span

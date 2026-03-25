@@ -162,6 +162,8 @@ export function useTabManager(options?: {
     switchToIndex: tabState.switchToIndex,
     openProjectFile: fileIO.openProjectFile,
     pinTab: tabState.pinTab,
+    newTerminalTab: tabState.newTerminalTab,
+    openDiffTab: tabState.openDiffTab,
 
     // Close-tab dialog
     pendingCloseTabId: tabState.pendingCloseTabId,
