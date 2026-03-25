@@ -8,6 +8,7 @@ import { useAutoSave } from "./use-auto-save";
 import { useElectronMenuBindings } from "./use-electron-menu-bindings";
 import { useTabPersistence } from "./use-tab-persistence";
 import { useCloseDialog } from "./use-close-dialog";
+import { useFileWatchIntegration } from "./use-file-watch-integration";
 
 // Re-export the return type so consumers can import from this module
 export type { UseTabManagerReturn } from "./types";
@@ -101,6 +102,20 @@ export function useTabManager(options?: {
     loadSystemFile: fileIO.loadSystemFile,
     updateTab: tabState.updateTab,
     systemFileOpenHandlerRef,
+  });
+
+  // --- File watch integration (external change detection) -----------------
+
+  useFileWatchIntegration({
+    tabs: tabState.tabs,
+    setTabs: tabState.setTabs,
+    activeTabId: tabState.activeTabId,
+    setActiveTabId: tabState.setActiveTabId,
+    tabsRef: tabState.tabsRef,
+    activeTabIdRef: tabState.activeTabIdRef,
+    isProjectRef: tabState.isProjectRef,
+    isElectron: tabState.isElectron,
+    openDiffTab: tabState.openDiffTab,
   });
 
   // --- Tab persistence (save/restore to AppState) -------------------------
