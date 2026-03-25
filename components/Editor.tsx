@@ -80,7 +80,7 @@ export default function NovelEditor({
   const {
     fontScale, lineHeight, fontFamily,
     charsPerLine, autoCharsPerLine,
-    onCharsPerLineChange,
+    onAutoCharsPerLineCalc,
   } = useTypographySettings();
   const { speechVoiceURI, speechRate, speechPitch, speechVolume } = useSpeechSettings();
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
@@ -277,14 +277,19 @@ export default function NovelEditor({
     setIsVertical(!isVertical);
   }, [isVertical, scrollContainerRef]);
 
-  // Ref to avoid including charsPerLine in useCallback deps (prevents recalc loop)
+  // Refs to avoid including charsPerLine / callback in useCallback deps (prevents recalc loop)
   const charsPerLineRef = useRef(charsPerLine);
   charsPerLineRef.current = charsPerLine;
+  const onAutoCharsPerLineCalcRef = useRef(onAutoCharsPerLineCalc);
+  onAutoCharsPerLineCalcRef.current = onAutoCharsPerLineCalc;
 
   // Calculate optimal chars per line based on editor width and font size
   const calculateOptimalCharsPerLine = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
+
+    // Skip calculation when container is not visible (e.g., hidden dockview panel)
+    if (container.clientWidth <= 0 || container.clientHeight <= 0) return;
 
     // Use cached charSize when font settings are unchanged (avoids DOM element creation on every resize)
     let charSize: number;
@@ -324,17 +329,16 @@ export default function NovelEditor({
 
     if (isVertical) {
       // For vertical writing: calculate based on available height
-      // Get visible height (subtract toolbar height)
-      const toolbarHeight = 48; // h-12 = 48px
+      // Only subtract topPadding (pt-12); toolbar is outside the scroll container
       const topPadding = 48; // pt-12 = 48px
-      const availableHeight = container.clientHeight - toolbarHeight - topPadding;
+      const availableHeight = container.clientHeight - topPadding;
 
       const optimalChars = Math.max(10, Math.floor(availableHeight / charSize));
       // Clamp: max 40 characters
       const clamped = Math.min(40, optimalChars);
 
       if (clamped !== charsPerLineRef.current) {
-        onCharsPerLineChange?.(clamped);
+        onAutoCharsPerLineCalcRef.current?.(clamped);
       }
     } else {
       // For horizontal writing: calculate based on available width
@@ -343,11 +347,11 @@ export default function NovelEditor({
       const clamped = Math.min(40, optimalChars);
 
       if (clamped !== charsPerLineRef.current) {
-        onCharsPerLineChange?.(clamped);
+        onAutoCharsPerLineCalcRef.current?.(clamped);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- charsPerLine read via ref to break recalc loop
-  }, [fontFamily, fontScale, lineHeight, isVertical, onCharsPerLineChange, scrollContainerRef]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- charsPerLine & callback read via refs to break recalc loop
+  }, [fontFamily, fontScale, lineHeight, isVertical, scrollContainerRef]);
 
   // Add window resize listener to auto-adjust chars per line
   useEffect(() => {
