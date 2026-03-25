@@ -159,7 +159,10 @@ function registerVFSHandlers() {
         type: stats.isDirectory() ? 'directory' : 'text/plain',
       };
     } catch (error) {
-      console.error('[VFS IPC] stat failed:', error);
+      // ENOENT is expected when callers use stat to check existence before creating
+      if (error?.code !== 'ENOENT') {
+        console.error('[VFS IPC] stat failed:', error);
+      }
       throw error;
     }
   });
