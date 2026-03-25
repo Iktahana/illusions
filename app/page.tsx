@@ -384,6 +384,29 @@ export default function EditorPage() {
   const isEditorTabActiveRef = useRef<boolean>(!!activeEditorTab);
   isEditorTabActiveRef.current = !!activeEditorTab;
 
+  // Auto-collapse right panel when no editor tab is active, restore on editor tab open
+  const rightPanelUserPrefRef = useRef(isRightPanelCollapsed);
+  useEffect(() => {
+    if (!activeEditorTab) {
+      // Save user preference before auto-collapsing
+      rightPanelUserPrefRef.current = isRightPanelCollapsed;
+      setIsRightPanelCollapsed(true);
+    } else {
+      // Restore to user's last explicit preference
+      setIsRightPanelCollapsed(rightPanelUserPrefRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!activeEditorTab]);
+
+  // Track user's explicit toggle (not auto-collapse)
+  const handleToggleRightPanel = useCallback(() => {
+    const next = !isRightPanelCollapsed;
+    setIsRightPanelCollapsed(next);
+    if (activeEditorTab) {
+      rightPanelUserPrefRef.current = next;
+    }
+  }, [isRightPanelCollapsed, setIsRightPanelCollapsed, activeEditorTab]);
+
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
   const [showDesktopOnlyDialog, setShowDesktopOnlyDialog] = useState(false);
@@ -1111,7 +1134,7 @@ export default function EditorPage() {
             maxWidth={compactMode ? 320 : 400}
             collapsible={true}
             isCollapsed={isRightPanelCollapsed || tabs.length === 0}
-            onToggleCollapse={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
+            onToggleCollapse={handleToggleRightPanel}
           >
           <ErrorBoundary sectionName="インスペクタ">
           {activeEditorTab ? (
