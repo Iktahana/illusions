@@ -32,10 +32,22 @@ export interface BufferState {
 // Dockview panel params
 // ---------------------------------------------------------------------------
 
-/** Params stored in each dockview panel, linking it to a buffer */
+/** Params stored in each dockview panel, linking it to a buffer.
+ *  Identity/layout fields are passed via updateParameters() to bypass stale closures
+ *  (dockview-react captures the component function once per panel).
+ *  Content is NOT included here — it is read from a stable tabsRef to avoid
+ *  triggering dockview re-renders on every keystroke. */
 export interface EditorPanelParams {
   bufferId: BufferId;
   isPreview: boolean;
+  /** File path for React key derivation */
+  filePath: string;
+  /** File extension (".mdi" | ".md" | ".txt") */
+  fileType: string;
+  /** Monotonic counter to force editor remount */
+  editorKey: number;
+  /** Currently active tab ID for isActivePanel check */
+  activeTabId: string;
 }
 
 /** Params for a terminal panel */

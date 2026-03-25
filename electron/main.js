@@ -36,11 +36,20 @@ const { registerSystemHandlers } = require('./ipc/system-ipc')
 const { registerPtyHandlers } = require('./ipc/pty-ipc')
 const { killAllSessions, killSessionsForWindow } = require('./ipc/terminal-session-registry')
 
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught exception:', err)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] Unhandled rejection:', reason)
+})
+
 // --- Single-instance lock ---
 // Ensure only one instance of the app is running. On Windows/Linux this prevents
 // duplicate windows when a user double-clicks a .mdi file while the app is already open.
 const gotTheLock = app.requestSingleInstanceLock()
+console.log('[DEBUG] Single instance lock:', gotTheLock)
 if (!gotTheLock) {
+  console.log('[DEBUG] Another instance is running, quitting.')
   app.quit()
 } else {
   app.on('second-instance', (_event, commandLine) => {
@@ -72,7 +81,9 @@ app.on('open-file', async (event, filePath) => {
   }
 })
 
+console.log('[DEBUG] Waiting for app ready...')
 app.whenReady().then(async () => {
+  console.log('[DEBUG] App is ready, creating window...')
   // Content Security Policy
   const { session } = require('electron')
   const { isDev } = require('./app-constants')
@@ -106,7 +117,9 @@ app.whenReady().then(async () => {
     if (mdiArg) setPendingFilePath(path.resolve(mdiArg))
   }
 
+  console.log('[DEBUG] Calling createMainWindow...')
   await createMainWindow({ hasPendingFile: !!getPendingFilePath() })
+  console.log('[DEBUG] Window created successfully')
 
   installQuickLookPluginIfNeeded()
 
