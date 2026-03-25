@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useEffect } from "react";
-import { X, Terminal, GitCompare } from "lucide-react";
+import { X, Terminal, GitCompare, AlertTriangle } from "lucide-react";
 import type { TabId, TabState } from "@/lib/tab-manager/tab-types";
 import { isEditorTab, isTerminalTab } from "@/lib/tab-manager/tab-types";
 
@@ -68,11 +68,13 @@ export default function TabBar({
           let icon: React.ReactNode = null;
           let isDirty = false;
           let isPreview = false;
+          let isConflicted = false;
 
           if (isEditorTab(tab)) {
             label = tab.file?.name ?? `新規ファイル${tab.fileType}`;
             isDirty = tab.isDirty;
             isPreview = tab.isPreview;
+            isConflicted = tab.fileSyncStatus === "conflicted";
           } else if (isTerminalTab(tab)) {
             label = tab.label;
             icon = <Terminal size={12} className="shrink-0" />;
@@ -104,8 +106,17 @@ export default function TabBar({
               }}
               onMouseDown={(e) => handleMiddleClick(e, tab.id)}
             >
-              {/* Dirty indicator (editor tabs only) */}
-              {isDirty && (
+              {/* Conflict warning icon (editor tabs with external changes) */}
+              {isConflicted && (
+                <AlertTriangle
+                  size={12}
+                  className="shrink-0 text-warning"
+                  aria-label="外部変更との競合"
+                />
+              )}
+
+              {/* Dirty indicator (editor tabs only, hidden when conflicted) */}
+              {isDirty && !isConflicted && (
                 <span className="w-1.5 h-1.5 rounded-full bg-warning shrink-0" />
               )}
 
