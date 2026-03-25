@@ -5,7 +5,8 @@ import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
-import type { TabId, TabState } from "./tab-types";
+import type { TabId, TabState, EditorTabState } from "./tab-types";
+import { isEditorTab } from "./tab-types";
 import { sanitizeMdiContent, getErrorMessage } from "./types";
 import type { TabManagerCore } from "./types";
 
@@ -19,7 +20,7 @@ export interface UseCloseDialogParams extends TabManagerCore {
   /** Clear the pending close tab id. */
   setPendingCloseTabId: React.Dispatch<React.SetStateAction<TabId | null>>;
   /** Update a single tab by id. */
-  updateTab: (tabId: TabId, updates: Partial<TabState>) => void;
+  updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
   /** Force-close a tab without dirty check. */
   forceCloseTab: (tabId: TabId) => void;
 }
@@ -54,8 +55,11 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
 
   const handleCloseTabSave = useCallback(async () => {
     if (!pendingCloseTabId) return;
-    const tab = tabsRef.current.find((t) => t.id === pendingCloseTabId);
-    if (!tab) return;
+    const rawTab = tabsRef.current.find((t) => t.id === pendingCloseTabId);
+    if (!rawTab) return;
+    // pendingCloseTabId is only set for editor tabs (see closeTab guard in useTabState)
+    if (!isEditorTab(rawTab)) return;
+    const tab = rawTab;
 
     try {
       const sanitized = sanitizeMdiContent(tab.content);

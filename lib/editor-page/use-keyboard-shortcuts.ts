@@ -1,17 +1,12 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useMemo } from "react";
 
-import type { MdiFileDescriptor } from "@/lib/project/mdi-file";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 import type { CommandId } from "@/lib/keymap/command-ids";
 import { useKeymapListener } from "@/lib/keymap/use-keymap-listener";
 import { useKeymap } from "@/contexts/KeymapContext";
-
-interface TabInfo {
-  id: string;
-  file: MdiFileDescriptor | null;
-  isDirty: boolean;
-}
+import type { TabState } from "@/lib/tab-manager/tab-types";
+import { isEditorTab } from "@/lib/tab-manager/tab-types";
 
 interface UseKeyboardShortcutsParams {
   isElectron: boolean;
@@ -29,7 +24,7 @@ interface UseKeyboardShortcutsParams {
   newTab: (fileType?: SupportedFileExtension) => void;
   closeTab: (tabId: string) => void;
   switchToIndex: (index: number) => void;
-  tabs: TabInfo[];
+  tabs: TabState[];
   activeTabId: string;
   // Split editor operations
   splitEditorRight?: () => void;
@@ -85,7 +80,9 @@ export function useKeyboardShortcuts({
     const closeTabHandler = isElectron
       ? undefined
       : () => {
-          if (tabs.length === 1 && !tabs[0]?.file && !tabs[0]?.isDirty) {
+          if (tabs.length === 0) return;
+          const firstTab = tabs[0];
+          if (tabs.length === 1 && firstTab && isEditorTab(firstTab) && !firstTab.file && !firstTab.isDirty) {
             window.close();
             return;
           }
