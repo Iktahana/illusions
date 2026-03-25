@@ -277,7 +277,7 @@ export default function NovelEditor({
     setIsVertical(!isVertical);
   }, [isVertical, scrollContainerRef]);
 
-  // Ref to avoid including charsPerLine in the useCallback deps (prevents recalc loop)
+  // Ref to avoid including charsPerLine in useCallback deps (prevents recalc loop)
   const charsPerLineRef = useRef(charsPerLine);
   charsPerLineRef.current = charsPerLine;
 
@@ -346,6 +346,7 @@ export default function NovelEditor({
         onCharsPerLineChange?.(clamped);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- charsPerLine read via ref to break recalc loop
   }, [fontFamily, fontScale, lineHeight, isVertical, onCharsPerLineChange, scrollContainerRef]);
 
   // Add window resize listener to auto-adjust chars per line
