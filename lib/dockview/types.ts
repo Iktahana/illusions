@@ -38,6 +38,16 @@ export interface EditorPanelParams {
   isPreview: boolean;
 }
 
+/** Params for a terminal panel */
+export interface TerminalPanelParams {
+  sessionId: string;
+}
+
+/** Params for a diff panel */
+export interface DiffPanelParams {
+  sourceTabId: string;
+}
+
 // ---------------------------------------------------------------------------
 // Layout persistence
 // ---------------------------------------------------------------------------
