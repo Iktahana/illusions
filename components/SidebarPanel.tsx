@@ -83,15 +83,12 @@ export default function SidebarPanel({
               projectName={isProjectMode(editorMode) ? editorMode.name : undefined}
               onFileClick={(vfsPath) => {
                 void openProjectFile(vfsPath, { preview: true });
-                incrementEditorKey();
               }}
               onFileDoubleClick={(vfsPath) => {
                 void openProjectFile(vfsPath, { preview: false });
-                incrementEditorKey();
               }}
               onFileMiddleClick={(vfsPath) => {
                 void openProjectFile(vfsPath, { preview: false });
-                incrementEditorKey();
               }}
               newFileTrigger={newFileTrigger}
             />

@@ -24,6 +24,8 @@ import type { EditorPanelParams, TerminalPanelParams, DiffPanelParams } from "./
 
 export interface UseDockviewAdapterOptions {
   tabManager: UseTabManagerReturn;
+  /** Monotonic counter to force editor remount (e.g. after settings change) */
+  editorKey: number;
 }
 
 export interface UseDockviewAdapterReturn {
@@ -90,6 +92,7 @@ function positionTerminalPanel(
 
 export function useDockviewAdapter({
   tabManager,
+  editorKey,
 }: UseDockviewAdapterOptions): UseDockviewAdapterReturn {
   const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
   const apiRef = useRef<DockviewApi | null>(null);
@@ -120,6 +123,12 @@ export function useDockviewAdapter({
             params: {
               bufferId: tab.id,
               isPreview: tab.isPreview,
+              content: tab.content,
+              lastSavedContent: tab.lastSavedContent,
+              filePath: tab.file?.path ?? "",
+              fileType: tab.fileType,
+              editorKey,
+              activeTabId,
             },
           });
         } else if (isTerminalTab(tab)) {
@@ -199,7 +208,16 @@ export function useDockviewAdapter({
             id: tab.id,
             component: "editor",
             title: tab.file?.name ?? `新規ファイル${tab.fileType}`,
-            params: { bufferId: tab.id, isPreview: tab.isPreview },
+            params: {
+              bufferId: tab.id,
+              isPreview: tab.isPreview,
+              content: tab.content,
+              lastSavedContent: tab.lastSavedContent,
+              filePath: tab.file?.path ?? "",
+              fileType: tab.fileType,
+              editorKey,
+              activeTabId,
+            },
           });
         } else if (isTerminalTab(tab)) {
           // Add terminal panel then move it to the bottom split (like VS Code)
@@ -250,6 +268,12 @@ export function useDockviewAdapter({
         panel.api.updateParameters({
           bufferId: tab.id,
           isPreview: tab.isPreview,
+          content: tab.content,
+          lastSavedContent: tab.lastSavedContent,
+          filePath: tab.file?.path ?? "",
+          fileType: tab.fileType,
+          editorKey,
+          activeTabId,
         });
       } else if (isTerminalTab(tab)) {
         if (panel.title !== tab.label) {
@@ -294,7 +318,7 @@ export function useDockviewAdapter({
     prevTabsRef.current = tabs;
     prevActiveTabRef.current = activeTabId;
     isSyncingRef.current = false;
-  }, [tabs, activeTabId]);
+  }, [tabs, activeTabId, editorKey]);
 
   // -- Split editor ---------------------------------------------------------
 

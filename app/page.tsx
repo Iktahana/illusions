@@ -212,7 +212,7 @@ export default function EditorPage() {
     handleDockviewReady,
     dockviewApi,
     splitEditor,
-  } = useDockviewAdapter({ tabManager: tabManagerWithPtyCleanup });
+  } = useDockviewAdapter({ tabManager: tabManagerWithPtyCleanup, editorKey });
   useDockviewPersistence({ dockviewApi });
 
   // --- New terminal tab callback ---
@@ -1076,14 +1076,18 @@ export default function EditorPage() {
             className="flex-1 dockview-theme-illusions"
             components={{
               editor: ({ api: panelApi, params: panelParams }) => {
-                // Each dockview panel receives its own params.
-                // Only the panel matching the active tab renders the full interactive editor;
-                // other panels show a read-only content snapshot.
-                const panelBufferId = panelParams?.bufferId ?? activeTabId;
-                const isActivePanel = panelBufferId === activeTabId;
-                // Derive file path for the key so preview tab replacements trigger remount
-                const panelTabForKey = tabs.find((t) => t.id === panelBufferId);
-                const panelFilePath = panelTabForKey && isEditorTab(panelTabForKey) ? panelTabForKey.file?.path ?? "" : "";
+                // All dynamic values are read from panelParams (not parent closures)
+                // because dockview-react captures the component function once per panel.
+                const panelBufferId = panelParams?.bufferId ?? "";
+                const panelContent = panelParams?.content ?? "";
+                const panelLastSavedContent = panelParams?.lastSavedContent ?? "";
+                const panelFilePath = panelParams?.filePath ?? "";
+                const panelFileType = (panelParams?.fileType ?? ".mdi") as string;
+                const panelEditorKey = panelParams?.editorKey ?? 0;
+                const panelActiveTabId = panelParams?.activeTabId ?? "";
+                const isActivePanel = panelBufferId === panelActiveTabId;
+                const panelMdiEnabled = panelFileType === ".mdi";
+                const panelGfmEnabled = panelFileType !== ".txt";
 
                 if (editorDiff && isActivePanel) {
                   return (
@@ -1101,8 +1105,8 @@ export default function EditorPage() {
                     <ErrorBoundary sectionName="エディタ">
                       <div ref={editorDomRef} className="h-full">
                         <NovelEditor
-                          key={`tab-${panelBufferId}-${panelFilePath}-${editorKey}`}
-                          initialContent={content}
+                          key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}`}
+                          initialContent={panelContent}
                           onChange={handleChange}
                           onInsertText={handleInsertText}
                           onSelectionChange={setSelectedCharCount}
@@ -1119,8 +1123,8 @@ export default function EditorPage() {
                           onOpenDictionary={handleOpenDictionary}
                           onShowLintHint={handleShowLintHint}
                           onIgnoreCorrection={handleIgnoreCorrection}
-                          mdiExtensionsEnabled={mdiExtensionsEnabled}
-                          gfmEnabled={gfmEnabled}
+                          mdiExtensionsEnabled={panelMdiEnabled}
+                          gfmEnabled={panelGfmEnabled}
                         />
                       </div>
                     </ErrorBoundary>
@@ -1129,9 +1133,6 @@ export default function EditorPage() {
 
                 // Non-active panel: render a lightweight read-only editor
                 // that activates the tab when clicked
-                const panelTab = tabs.find((t) => t.id === panelBufferId);
-                const panelEditorTab = panelTab && isEditorTab(panelTab) ? panelTab : undefined;
-                const panelFileType = panelEditorTab?.fileType ?? ".mdi";
                 return (
                   <div
                     className="h-full cursor-pointer"
@@ -1143,9 +1144,9 @@ export default function EditorPage() {
                     <ErrorBoundary sectionName="エディタ">
                       <NovelEditor
                         key={`tab-${panelBufferId}-${panelFilePath}-inactive`}
-                        initialContent={panelEditorTab?.lastSavedContent ?? ""}
-                        mdiExtensionsEnabled={panelFileType === ".mdi"}
-                        gfmEnabled={panelFileType !== ".txt"}
+                        initialContent={panelLastSavedContent}
+                        mdiExtensionsEnabled={panelMdiEnabled}
+                        gfmEnabled={panelGfmEnabled}
                       />
                     </ErrorBoundary>
                   </div>
