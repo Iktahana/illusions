@@ -118,7 +118,8 @@ function applySimplifiedLayout(
 
   for (let i = 1; i < layout.groups.length; i++) {
     const savedGroup = layout.groups[i];
-    const direction = layout.orientation === "HORIZONTAL" ? "right" : "bottom";
+    // In dockview, HORIZONTAL orientation = horizontal split bar = panels stacked top-bottom
+    const direction = layout.orientation === "HORIZONTAL" ? "bottom" : "right";
 
     let firstPanelInGroup: IDockviewPanel | null = null;
 
