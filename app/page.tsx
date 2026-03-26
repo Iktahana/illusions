@@ -646,11 +646,8 @@ export default function EditorPage() {
     isEditorTabActive: !!activeEditorTab,
   });
 
-  // Global shortcuts for Web (only when not in Electron)
-  useGlobalShortcuts(
-    !isElectron ? handleMenuAction : () => {},
-    editorDomRef
-  );
+  // Block browser reload (Ctrl/Cmd+R) regardless of focus
+  useGlobalShortcuts();
 
   // --- Save toast hook ---
   const { showSaveToast, saveToastExiting } = useSaveToast({ lastSavedTime, lastSaveWasAuto });
@@ -853,6 +850,7 @@ export default function EditorPage() {
     toggleExplorer: useCallback(() => setTopView(topView === "explorer" ? "none" : "explorer"), [setTopView, topView]),
     toggleSearch: useCallback(() => setTopView(topView === "search" ? "none" : "search"), [setTopView, topView]),
     toggleOutline: useCallback(() => setTopView(topView === "outline" ? "none" : "outline"), [setTopView, topView]),
+    handleMenuAction: !isElectron ? handleMenuAction : undefined,
   });
 
   // Detect feature availability after mount to avoid SSR hydration mismatch
