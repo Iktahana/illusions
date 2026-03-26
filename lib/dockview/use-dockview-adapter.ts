@@ -183,7 +183,7 @@ export function useDockviewAdapter({
   const savedLayoutRef = useRef<SimplifiedGroupLayout | null>(null);
   const layoutAppliedRef = useRef(false);
 
-  const { tabs, activeTabId, switchTab, closeTab, newTab } = tabManager;
+  const { tabs, activeTabId, switchTab, closeTab, cloneTab } = tabManager;
 
   // -- onReady callback -----------------------------------------------------
 
@@ -438,17 +438,17 @@ export function useDockviewAdapter({
       // Split is only supported for editor tabs
       if (!isEditorTab(activeTab)) return;
 
-      // Create a new empty tab with the same file type.
+      // Clone the active tab's content and file association into a new tab.
       // The new panel will be positioned in the split direction
       // by the sync effect above (via pendingSplitRef).
-      newTab(activeTab.fileType);
+      cloneTab(activeTab);
 
       pendingSplitRef.current = {
         direction,
         referencePanel: activePanel.id,
       };
     },
-    [tabs, activeTabId, newTab],
+    [tabs, activeTabId, cloneTab],
   );
 
   // -- Close group ----------------------------------------------------------

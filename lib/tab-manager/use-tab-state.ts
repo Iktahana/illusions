@@ -39,6 +39,8 @@ export interface UseTabStateReturn extends TabManagerCore {
   // Tab CRUD operations
   /** Create a new empty editor tab. */
   newTab: (fileType?: SupportedFileExtension) => void;
+  /** Create a new editor tab pre-populated with content and file association from a source tab. */
+  cloneTab: (source: EditorTabState) => void;
   /** Open a new terminal tab with placeholder values. */
   newTerminalTab: () => void;
   /** Update a terminal tab's mutable fields (status, exitCode, sessionId). */
@@ -148,6 +150,14 @@ export function useTabState(): UseTabStateReturn {
 
   const newTab = useCallback((fileType?: SupportedFileExtension) => {
     const tab = createNewTab(undefined, fileType);
+    setTabs((prev) => [...prev, tab]);
+    setActiveTabId(tab.id);
+  }, []);
+
+  const cloneTab = useCallback((source: EditorTabState) => {
+    const tab = createNewTab(source.content, source.fileType);
+    // Copy the file descriptor so the cloned tab is associated with the same document.
+    tab.file = source.file;
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(tab.id);
   }, []);
@@ -368,6 +378,7 @@ export function useTabState(): UseTabStateReturn {
 
     // Tab CRUD
     newTab,
+    cloneTab,
     newTerminalTab,
     updateTerminalTab,
     openDiffTab,
