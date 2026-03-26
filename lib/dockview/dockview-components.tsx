@@ -19,6 +19,8 @@ import { useTerminalTabContext } from "@/contexts/TerminalTabContext";
 import { useDiffTabContext } from "@/contexts/DiffTabContext";
 import RealTerminalPanel from "@/components/TerminalPanel";
 import DiffView from "@/components/DiffView";
+import ContextMenu from "@/components/ContextMenu";
+import { useContextMenu } from "@/lib/hooks/use-context-menu";
 
 // ---------------------------------------------------------------------------
 // EditorPanel — content component rendered inside each dockview panel
@@ -275,6 +277,28 @@ export function TerminalTabHeader({
     [api],
   );
 
+  const handleContextMenu = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const electronAPI = window.electronAPI;
+      if (electronAPI?.showContextMenu) {
+        // Electron: use native context menu
+        const action = await electronAPI.showContextMenu([
+          { label: "閉じる", action: "close" },
+        ]);
+        if (action === "close") {
+          api.close();
+        }
+      } else {
+        // Web fallback: close directly
+        api.close();
+      }
+    },
+    [api],
+  );
+
   return (
     <div
       className={`
@@ -284,6 +308,7 @@ export function TerminalTabHeader({
         ${isActive ? "text-foreground" : "text-foreground-secondary hover:text-foreground"}
       `}
       onMouseDown={handleMiddleClick}
+      onContextMenu={handleContextMenu}
     >
       {/* Terminal icon */}
       <Terminal size={12} className="shrink-0" />
@@ -381,6 +406,28 @@ export function DiffTabHeader({
     [api],
   );
 
+  const handleContextMenu = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const electronAPI = window.electronAPI;
+      if (electronAPI?.showContextMenu) {
+        // Electron: use native context menu
+        const action = await electronAPI.showContextMenu([
+          { label: "閉じる", action: "close" },
+        ]);
+        if (action === "close") {
+          api.close();
+        }
+      } else {
+        // Web fallback: close directly
+        api.close();
+      }
+    },
+    [api],
+  );
+
   return (
     <div
       className={`
@@ -390,6 +437,7 @@ export function DiffTabHeader({
         ${isActive ? "text-foreground" : "text-foreground-secondary hover:text-foreground"}
       `}
       onMouseDown={handleMiddleClick}
+      onContextMenu={handleContextMenu}
     >
       {/* Diff icon */}
       <GitCompare size={12} className="shrink-0" />
