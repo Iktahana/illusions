@@ -483,7 +483,8 @@ export function useDockviewAdapter({
       // Electron: pop out to a new BrowserWindow via IPC
       void electronAPI.editor.popoutPanel(activeTab.id, content, fileName, fileType);
     } else {
-      // Web fallback: open in a new browser window
+      // Web fallback: store content in sessionStorage so the popout can read it
+      sessionStorage.setItem(`popout-content-${activeTab.id}`, content);
       const params = new URLSearchParams({
         "popout-buffer": activeTab.id,
         fileName,

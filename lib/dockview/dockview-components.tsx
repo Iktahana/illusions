@@ -104,6 +104,7 @@ export function DockviewTabHeader({
 }: IDockviewPanelHeaderProps<EditorPanelParams>) {
   const buffer = useBuffer(params.bufferId);
   const isActive = api.isActive;
+  const { menu: contextMenu, show: showContextMenu, close: closeContextMenu } = useContextMenu();
 
   const label = buffer?.file?.name ?? `新規ファイル${buffer?.fileType ?? ".mdi"}`;
 
@@ -137,36 +138,51 @@ export function DockviewTabHeader({
       e.preventDefault();
       e.stopPropagation();
 
-      const electronAPI = window.electronAPI;
-      if (electronAPI?.showContextMenu) {
-        // Electron: use native context menu
-        const action = await electronAPI.showContextMenu([
-          { label: "新しいウィンドウで開く", action: "popout" },
-          { label: "-", action: "_separator" },
-          { label: "閉じる", action: "close" },
-        ]);
-        if (action === "popout" && buffer && electronAPI.editor?.popoutPanel) {
+      const menuItems = [
+        { label: "新しいウィンドウで開く", action: "popout" },
+        { label: "閉じる", action: "close" },
+      ];
+
+      // show() handles Electron (native menu) and Web (HTML overlay) automatically.
+      // For Electron it returns the chosen action immediately; for Web it returns null
+      // and the action is delivered via onContextMenuAction below.
+      const action = await showContextMenu(e, menuItems);
+      if (action) {
+        void handleContextMenuAction(action);
+      }
+    },
+    [api, buffer, params.bufferId, showContextMenu],  // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  /** Execute the action selected from the context menu (both Electron and Web paths). */
+  const handleContextMenuAction = useCallback(
+    (action: string) => {
+      if (action === "popout" && buffer) {
+        const electronAPI = window.electronAPI;
+        if (electronAPI?.editor?.popoutPanel) {
+          // Electron: use native popout IPC
           void electronAPI.editor.popoutPanel(
             params.bufferId,
             buffer.content,
             buffer.file?.name ?? `新規ファイル${buffer.fileType}`,
             buffer.fileType,
           );
-        } else if (action === "close") {
-          api.close();
+        } else {
+          // Web: store content in sessionStorage so the popout can read it
+          sessionStorage.setItem(`popout-content-${params.bufferId}`, buffer.content);
+          const urlParams = new URLSearchParams({
+            "popout-buffer": params.bufferId,
+            fileName: buffer.file?.name ?? `新規ファイル${buffer.fileType}`,
+            fileType: buffer.fileType,
+          });
+          window.open(
+            `${window.location.origin}?${urlParams.toString()}`,
+            "_blank",
+            "width=900,height=700",
+          );
         }
-      } else if (buffer) {
-        // Web fallback: directly pop out (simple approach)
-        const urlParams = new URLSearchParams({
-          "popout-buffer": params.bufferId,
-          fileName: buffer.file?.name ?? `新規ファイル${buffer.fileType}`,
-          fileType: buffer.fileType,
-        });
-        window.open(
-          `${window.location.origin}?${urlParams.toString()}`,
-          "_blank",
-          "width=900,height=700",
-        );
+      } else if (action === "close") {
+        api.close();
       }
     },
     [api, buffer, params.bufferId],
@@ -214,6 +230,15 @@ export function DockviewTabHeader({
       >
         <X size={12} />
       </span>
+
+      {/* Web context menu overlay (null in Electron — native menu is used instead) */}
+      {contextMenu && (
+        <ContextMenu
+          menu={contextMenu}
+          onAction={handleContextMenuAction}
+          onClose={closeContextMenu}
+        />
+      )}
     </div>
   );
 }
