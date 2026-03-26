@@ -12,6 +12,7 @@ import {
   loadGoogleFont,
 } from "@/lib/utils/fonts";
 import type { FontInfo, SystemFontInfo } from "@/lib/utils/fonts";
+import { detectOSPlatform } from "@/lib/utils/runtime-env";
 
 interface FontSelectorProps {
   value: string;
@@ -24,19 +25,7 @@ export function FontSelector({ value, onChange }: FontSelectorProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const isElectron = useMemo(() => isElectronRuntime(), []);
-  const platform = useMemo(() => {
-    if (typeof navigator === 'undefined') {
-      return null;
-    }
-    const ua = navigator.userAgent.toLowerCase();
-    if (ua.includes('mac')) {
-      return 'mac';
-    }
-    if (ua.includes('win')) {
-      return 'windows';
-    }
-    return null;
-  }, []);
+  const platform = useMemo(() => detectOSPlatform(), []);
 
   const systemFonts = useMemo(() => {
     if (!isElectron) {

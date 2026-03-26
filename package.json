@@ -209,11 +209,24 @@
     },
     "linux": {
       "icon": "build/icon.png",
+      "category": "Office",
+      "desktop": {
+        "Name": "illusions",
+        "Comment": "AI-powered Japanese novel editor",
+        "Keywords": "novel;writing;japanese;editor;ai;",
+        "MimeType": "application/x-mdi"
+      },
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "deb", "arch": ["x64"] },
+        { "target": "rpm", "arch": ["x64"] }
+      ],
       "fileAssociations": [
         {
           "ext": "mdi",
           "name": "illusions MDI Document",
-          "icon": "build/mdi-icon.png",
+          "icon": "build/mdi-icon",
+          "mimeType": "application/x-mdi",
           "description": "illusions MDI Document"
         }
       ]

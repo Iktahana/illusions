@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 
 import { useKeymap } from '@/contexts/KeymapContext';
 import { matchesEvent } from '@/lib/keymap/keymap-utils';
+import { isMacOS } from '@/lib/utils/runtime-env';
 
 /**
  * Global keyboard shortcuts for the Web menu bar.
@@ -19,8 +20,7 @@ export function useGlobalShortcuts(
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = typeof navigator !== 'undefined' &&
-                    navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const isMac = isMacOS();
       const modifier = isMac ? e.metaKey : e.ctrlKey;
 
       // Ctrl/Cmd + R: Block browser reload (always, regardless of focus)

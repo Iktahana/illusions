@@ -2,6 +2,8 @@
 
 export type RuntimeEnvironment = "browser" | "electron-renderer" | "unknown";
 
+export type OSPlatform = "mac" | "windows" | "linux";
+
 /**
  * ブラウザ相当の環境で動いているか判定する
  */
@@ -32,4 +34,32 @@ export function getRuntimeEnvironment(): RuntimeEnvironment {
     return "browser";
   }
   return "unknown";
+}
+
+/**
+ * OS プラットフォームを判定する (userAgentData 優先、UA フォールバック)
+ */
+export function detectOSPlatform(): OSPlatform | null {
+  if (typeof navigator === "undefined") return null;
+  const nav = navigator as Navigator & {
+    userAgentData?: { platform?: string };
+  };
+  if (nav.userAgentData?.platform) {
+    const p = nav.userAgentData.platform.toLowerCase();
+    if (p === "macos") return "mac";
+    if (p === "windows") return "windows";
+    if (p === "linux") return "linux";
+  }
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes("mac")) return "mac";
+  if (ua.includes("win")) return "windows";
+  if (ua.includes("linux")) return "linux";
+  return null;
+}
+
+/**
+ * macOS で動作しているか判定する
+ */
+export function isMacOS(): boolean {
+  return detectOSPlatform() === "mac";
 }
