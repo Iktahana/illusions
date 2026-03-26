@@ -23,6 +23,7 @@ declare global {
     openDictionaryPopup?: (url: string, title: string) => Promise<boolean>;
     showContextMenu?: (items: Array<{ type?: string; label?: string; action?: string; accelerator?: string }>) => Promise<string | null>;
     onSaveBeforeClose?: (callback: () => void) => (() => void) | void;
+    onFlushStateBeforeClose?: (callback: () => void) => (() => void) | void;
     onOpenFileFromSystem?: (
       callback: (payload: { path: string; content: string }) => void
     ) => (() => void) | void;
