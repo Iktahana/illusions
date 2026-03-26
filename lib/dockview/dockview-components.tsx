@@ -133,27 +133,6 @@ export function DockviewTabHeader({
     }
   }, [buffer?.isPreview]);
 
-  const handleContextMenu = useCallback(
-    async (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const menuItems = [
-        { label: "新しいウィンドウで開く", action: "popout" },
-        { label: "閉じる", action: "close" },
-      ];
-
-      // show() handles Electron (native menu) and Web (HTML overlay) automatically.
-      // For Electron it returns the chosen action immediately; for Web it returns null
-      // and the action is delivered via onContextMenuAction below.
-      const action = await showContextMenu(e, menuItems);
-      if (action) {
-        void handleContextMenuAction(action);
-      }
-    },
-    [api, buffer, params.bufferId, showContextMenu],  // eslint-disable-line react-hooks/exhaustive-deps
-  );
-
   /** Execute the action selected from the context menu (both Electron and Web paths). */
   const handleContextMenuAction = useCallback(
     (action: string) => {
@@ -186,6 +165,27 @@ export function DockviewTabHeader({
       }
     },
     [api, buffer, params.bufferId],
+  );
+
+  const handleContextMenu = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const menuItems = [
+        { label: "新しいウィンドウで開く", action: "popout" },
+        { label: "閉じる", action: "close" },
+      ];
+
+      // show() handles Electron (native menu) and Web (HTML overlay) automatically.
+      // For Electron it returns the chosen action immediately; for Web it returns null
+      // and the action is delivered via onContextMenuAction below.
+      const action = await showContextMenu(e, menuItems);
+      if (action) {
+        void handleContextMenuAction(action);
+      }
+    },
+    [handleContextMenuAction, showContextMenu],
   );
 
   return (
