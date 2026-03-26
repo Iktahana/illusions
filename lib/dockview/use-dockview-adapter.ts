@@ -182,6 +182,10 @@ export function useDockviewAdapter({
   // Layout restoration state
   const savedLayoutRef = useRef<SimplifiedGroupLayout | null>(null);
   const layoutAppliedRef = useRef(false);
+  // Counter incremented when the async layout pre-load completes, so
+  // the layout-restoration effect re-evaluates without causing the sync
+  // effect to re-run (which would duplicate addPanel calls).
+  const [layoutReadyTick, setLayoutReadyTick] = useState(0);
 
   const { tabs, activeTabId, switchTab, closeTab, newTab } = tabManager;
 
@@ -263,6 +267,7 @@ export function useDockviewAdapter({
       if (cancelled) return;
       if (state?.simplifiedLayout) {
         savedLayoutRef.current = state.simplifiedLayout;
+        setLayoutReadyTick((t) => t + 1);
       }
     });
     return () => { cancelled = true; };
@@ -276,6 +281,9 @@ export function useDockviewAdapter({
   } | null>(null);
 
   // -- Sync tab state changes → dockview ------------------------------------
+  // dockviewApi is included in deps so this effect re-runs when the API
+  // becomes available — prevents a race where tabs are restored (from SQLite)
+  // before DockviewReact fires onReady, which would leave panels un-created.
 
   useEffect(() => {
     const api = apiRef.current;
@@ -374,21 +382,6 @@ export function useDockviewAdapter({
       }
     }
 
-    // Apply saved layout after initial tab restoration (only once)
-    if (
-      !layoutAppliedRef.current &&
-      savedLayoutRef.current &&
-      prevTabs.length === 0 &&
-      tabs.length > 0
-    ) {
-      layoutAppliedRef.current = true;
-      try {
-        applySimplifiedLayout(api, savedLayoutRef.current, tabs);
-      } catch (err) {
-        console.warn("[dockview-adapter] Failed to restore layout:", err);
-      }
-    }
-
     // Handle pending split: position the newly created tab in the split location
     const pendingSplit = pendingSplitRef.current;
     if (pendingSplit && newlyAddedTabs.length > 0) {
@@ -420,7 +413,27 @@ export function useDockviewAdapter({
     prevTabsRef.current = tabs;
     prevActiveTabRef.current = activeTabId;
     isSyncingRef.current = false;
-  }, [tabs, activeTabId, editorKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- dockviewApi triggers re-sync after onReady
+  }, [tabs, activeTabId, editorKey, dockviewApi]);
+
+  // -- Restore saved layout (separate effect to avoid sync effect interference) --
+  // Using a dedicated effect prevents savedLayout changes from re-triggering
+  // the sync effect, which would cause duplicate addPanel calls and break rendering.
+
+  const tabsRef = useRef<TabState[]>(tabs);
+  tabsRef.current = tabs;
+  const hasTabsForLayout = tabs.length > 0;
+
+  useEffect(() => {
+    if (!dockviewApi || !savedLayoutRef.current || layoutAppliedRef.current || !hasTabsForLayout) return;
+
+    layoutAppliedRef.current = true;
+    try {
+      applySimplifiedLayout(dockviewApi, savedLayoutRef.current, tabsRef.current);
+    } catch (err) {
+      console.warn("[dockview-adapter] Failed to restore layout:", err);
+    }
+  }, [dockviewApi, layoutReadyTick, hasTabsForLayout]);
 
   // -- Split editor ---------------------------------------------------------
 
