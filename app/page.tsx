@@ -235,7 +235,17 @@ export default function EditorPage() {
         const cwd = isProjectMode(editorMode) ? editorMode.rootPath : undefined;
         const shell = settings.terminalDefaultShell || undefined;
         const result = await ptyApi.spawn({ cwd, shell });
-        if ("error" in result) return;
+        if ("error" in result) {
+          // PTY spawn failed — remove the stuck "connecting" tab
+          const stuckTab = tabsRef.current
+            .slice()
+            .reverse()
+            .find((t) => isTerminalTab(t) && (t as TerminalTabState).sessionId === "");
+          if (stuckTab) {
+            forceCloseTab(stuckTab.id);
+          }
+          return;
+        }
         const { sessionId } = result;
         // Update the most recently created terminal tab with an empty sessionId
         const targetTab = tabsRef.current
