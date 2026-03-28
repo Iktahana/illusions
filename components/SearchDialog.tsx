@@ -108,8 +108,11 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
     while (searchIndex < haystack.length) {
       const matchIndex = haystack.indexOf(searchStr, searchIndex);
       if (matchIndex === -1) break;
+      const endCharIndex = matchIndex + searchTerm.length - 1;
+      if (endCharIndex >= posMap.length) break;
+      // posMap maps character index → ProseMirror offset; +1 converts to exclusive end
       const from = posMap[matchIndex];
-      const to = posMap[matchIndex + searchTerm.length - 1] + 1;
+      const to = posMap[endCharIndex] + 1;
       foundMatches.push({ from, to });
       searchIndex = matchIndex + 1;
     }
