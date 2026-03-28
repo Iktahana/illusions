@@ -394,6 +394,7 @@ export default function NovelEditor({
               onOpenRubyDialog={onOpenRubyDialog}
               onToggleTcy={onToggleTcy}
               onOpenDictionary={onOpenDictionary}
+              onOpenSearch={handleSearchOpen}
               onShowLintHint={onShowLintHint}
               onIgnoreCorrection={onIgnoreCorrection}
               mdiExtensionsEnabled={mdiExtensionsEnabled}

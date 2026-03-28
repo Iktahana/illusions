@@ -25,6 +25,7 @@ interface EditorContextMenuProps {
   children: ReactNode;
   onAction: (action: ContextMenuAction) => void;
   hasSelection?: boolean;
+  mdiExtensionsEnabled?: boolean;
   lintIssueAtCursor?: LintIssue | null;
   onContextMenuOpen?: (e: MouseEvent) => void;
 }
@@ -65,6 +66,7 @@ export default function EditorContextMenu({
   children,
   onAction,
   hasSelection = false,
+  mdiExtensionsEnabled = false,
   lintIssueAtCursor,
   onContextMenuOpen,
 }: EditorContextMenuProps) {
@@ -134,23 +136,26 @@ export default function EditorContextMenu({
 
           <Separator />
 
-          {/* 書式 */}
-          <MenuItem
-            icon={<Languages className="w-4 h-4" />}
-            label="ルビ"
-            shortcut={`Shift+${cmdKey}R`}
-            onClick={() => onAction("ruby")}
-            disabled={!hasSelection}
-          />
-          <MenuItem
-            icon={<ALargeSmall className="w-4 h-4" />}
-            label="縦中横"
-            shortcut={`Shift+${cmdKey}T`}
-            onClick={() => onAction("tcy")}
-            disabled={!hasSelection}
-          />
-
-          <Separator />
+          {/* 書式 — only shown when MDI extensions are active */}
+          {mdiExtensionsEnabled && (
+            <>
+              <MenuItem
+                icon={<Languages className="w-4 h-4" />}
+                label="ルビ"
+                shortcut={`Shift+${cmdKey}R`}
+                onClick={() => onAction("ruby")}
+                disabled={!hasSelection}
+              />
+              <MenuItem
+                icon={<ALargeSmall className="w-4 h-4" />}
+                label="縦中横"
+                shortcut={`Shift+${cmdKey}T`}
+                onClick={() => onAction("tcy")}
+                disabled={!hasSelection}
+              />
+              <Separator />
+            </>
+          )}
 
           {/* 検索・調べる */}
           <MenuItem

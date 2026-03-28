@@ -51,6 +51,7 @@ interface MilkdownEditorProps {
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
   onOpenDictionary?: (searchTerm?: string) => void;
+  onOpenSearch?: () => void;
   onShowLintHint?: (issue: LintIssue) => void;
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
   mdiExtensionsEnabled?: boolean;
@@ -74,6 +75,7 @@ export default function MilkdownEditor({
   onOpenRubyDialog,
   onToggleTcy,
   onOpenDictionary,
+  onOpenSearch,
   onShowLintHint,
   onIgnoreCorrection,
   mdiExtensionsEnabled = true,
@@ -746,9 +748,7 @@ export default function MilkdownEditor({
         });
         break;
       case "find":
-        // Trigger search dialog (you'll need to expose this functionality)
-        // For now, we'll use the browser's default find
-        document.execCommand("find");
+        onOpenSearch?.();
         break;
       case "select-all": {
         const { state: st, dispatch: dp } = editorViewInstance;
@@ -796,7 +796,7 @@ export default function MilkdownEditor({
       default:
         break;
     }
-  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary, lintIssueAtCursor, onShowLintHint, onIgnoreCorrection]);
+  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary, onOpenSearch, lintIssueAtCursor, onShowLintHint, onIgnoreCorrection]);
 
   // Electron: native OS context menu via IPC
   const handleElectronContextMenu = useCallback(async (e: React.MouseEvent) => {
@@ -952,6 +952,7 @@ export default function MilkdownEditor({
         <EditorContextMenu
           onAction={handleContextMenuAction}
           hasSelection={hasSelection}
+          mdiExtensionsEnabled={mdiExtensionsEnabled}
           lintIssueAtCursor={lintIssueAtCursor}
           onContextMenuOpen={(e) => setLintIssueAtCursor(getLintIssueAtCoords(e.clientX, e.clientY))}
         >
