@@ -93,6 +93,7 @@ export function useRecentProjects(
           rootDirName: p.rootPath.split(/[/\\]/).filter(Boolean).pop(),
         }));
         setRecentProjects(entries);
+        void window.electronAPI?.rebuildMenu?.();
       } else {
         const projectManager = getProjectManager();
         await projectManager.removeProjectHandle(projectId);

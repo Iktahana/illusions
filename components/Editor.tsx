@@ -90,6 +90,8 @@ export default function NovelEditor({
   });
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  // コンテキストメニューの「検索」で渡された初期検索語
+  const [contextMenuSearchTerm, setContextMenuSearchTerm] = useState<string | undefined>(undefined);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const { state: speechState, speakSegments, pause, resume, stop } = useSpeech({
     voiceURI: speechVoiceURI,
@@ -139,6 +141,12 @@ export default function NovelEditor({
   };
 
   const handleSearchOpen = useCallback(() => {
+    setIsSearchOpen(true);
+  }, []);
+
+  /** コンテキストメニューの「検索」アクションを処理する。選択テキストを初期検索語として渡す。 */
+  const handleFind = useCallback((initialTerm?: string) => {
+    setContextMenuSearchTerm(initialTerm);
     setIsSearchOpen(true);
   }, []);
 
@@ -428,6 +436,7 @@ export default function NovelEditor({
               mdiExtensionsEnabled={mdiExtensionsEnabled}
               gfmEnabled={gfmEnabled}
               onStartSpeech={startSpeechFromCursor}
+              onFind={handleFind}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -444,7 +453,7 @@ export default function NovelEditor({
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onShowAllResults={onShowAllSearchResults}
-        initialSearchTerm={searchInitialTerm}
+        initialSearchTerm={contextMenuSearchTerm ?? searchInitialTerm}
         programmaticScrollRef={programmaticScrollRef}
       />
     </div>

@@ -1,10 +1,14 @@
 'use client';
 
-import { useState, useRef, useMemo } from 'react';
-import { WEB_MENU_STRUCTURE } from '@/lib/menu/menu-definitions';
+import { useState, useRef, useMemo, useEffect } from 'react';
+import { WEB_MENU_STRUCTURE, ACTION_TO_COMMAND_ID } from '@/lib/menu/menu-definitions';
+import { SHORTCUT_REGISTRY } from '@/lib/keymap/shortcut-registry';
+import { loadKeymapOverrides } from '@/lib/keymap/keymap-storage';
+import { toWebMenuAccelerator } from '@/lib/keymap/keymap-utils';
 import { MenuDropdown } from './WebMenuBar/MenuDropdown';
 
 import type { MenuSection, MenuItem } from '@/lib/menu/menu-definitions';
+import type { KeymapOverrides } from '@/lib/keymap/keymap-types';
 
 interface RecentProjectInfo {
   projectId: string;
@@ -26,6 +30,14 @@ export default function WebMenuBar({ onMenuAction, recentProjects, checkedState 
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const menuRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
+  // Load user keymap overrides so accelerator labels reflect customizations
+  const [keymapOverrides, setKeymapOverrides] = useState<KeymapOverrides>({});
+  useEffect(() => {
+    loadKeymapOverrides().then(setKeymapOverrides).catch(() => {
+      // Silently fall back to defaults if overrides cannot be loaded
+    });
+  }, []);
+
   // Checked state map: action → boolean
   const checkedMap = useMemo<Record<string, boolean>>(() => {
     const map: Record<string, boolean> = {};
@@ -35,8 +47,24 @@ export default function WebMenuBar({ onMenuAction, recentProjects, checkedState 
     return map;
   }, [checkedState]);
 
-  // Inject recent projects and checked state into the menu structure
+  // Inject recent projects, checked state, and dynamic accelerators into the menu structure
   const menuStructure = useMemo<MenuSection[]>(() => {
+    /**
+     * Resolves the accelerator string for a menu item by looking up the effective
+     * key binding (user override if present, otherwise registry default).
+     */
+    function resolveAccelerator(action: string | undefined): string | undefined {
+      if (!action) return undefined;
+      const commandId = ACTION_TO_COMMAND_ID[action];
+      if (!commandId) return undefined;
+      // User override takes precedence; null override means intentionally unbound
+      const effectiveBinding =
+        commandId in keymapOverrides
+          ? keymapOverrides[commandId]
+          : SHORTCUT_REGISTRY[commandId]?.defaultBinding;
+      return toWebMenuAccelerator(effectiveBinding ?? null);
+    }
+
     return WEB_MENU_STRUCTURE.map((section) => {
       const items = section.items.map((item): MenuItem => {
         // Inject recent projects submenu
@@ -53,15 +81,17 @@ export default function WebMenuBar({ onMenuAction, recentProjects, checkedState 
 
         // Inject checked state for checkbox items
         if (item.type === 'checkbox' && item.action && item.action in checkedMap) {
-          return { ...item, checked: checkedMap[item.action] };
+          return { ...item, checked: checkedMap[item.action], accelerator: resolveAccelerator(item.action) };
         }
 
-        return item;
+        // Replace hardcoded accelerator with the effective user binding
+        const accelerator = resolveAccelerator(item.action) ?? item.accelerator;
+        return { ...item, accelerator };
       });
 
       return { ...section, items };
     });
-  }, [recentProjects, checkedMap]);
+  }, [recentProjects, checkedMap, keymapOverrides]);
 
   const handleMenuClick = (index: number) => {
     setOpenMenu(openMenu === index ? null : index);
