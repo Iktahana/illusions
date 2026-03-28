@@ -3,6 +3,7 @@
  * Mirrors Electron native menu structure
  */
 import type { CommandId } from "@/lib/keymap/command-ids";
+import { isMacOS } from "@/lib/utils/runtime-env";
 
 const APP_VERSION = (() => {
   const v = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
@@ -119,7 +120,7 @@ export function formatAccelerator(accelerator: string): string {
     return accelerator;
   }
   
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const isMac = isMacOS();
   
   if (isMac) {
     return accelerator

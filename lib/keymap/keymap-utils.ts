@@ -1,16 +1,5 @@
 import type { KeyBinding } from "./keymap-types";
-
-/**
- * Detects if the current platform is macOS.
- */
-function isMacPlatform(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
-  if (nav.userAgentData?.platform) {
-    return nav.userAgentData.platform === "macOS";
-  }
-  return /mac/i.test(navigator.userAgent);
-}
+import { isMacOS } from "@/lib/utils/runtime-env";
 
 /**
  * Returns the platform-specific display string for a key binding.
@@ -19,7 +8,7 @@ function isMacPlatform(): boolean {
 export function formatBinding(binding: KeyBinding | null): string {
   if (!binding) return "未設定";
 
-  const isMac = isMacPlatform();
+  const isMac = isMacOS();
   const parts: string[] = [];
 
   for (const mod of binding.modifiers) {
@@ -67,7 +56,7 @@ function formatKey(key: string, isMac: boolean): string {
 export function matchesEvent(binding: KeyBinding | null, event: KeyboardEvent): boolean {
   if (!binding) return false;
 
-  const isMac = isMacPlatform();
+  const isMac = isMacOS();
 
   for (const mod of binding.modifiers) {
     if (mod === "CmdOrCtrl") {
@@ -159,7 +148,7 @@ export function buildBindingFromEvent(event: KeyboardEvent): KeyBinding | null {
   const modifierKeys = new Set(["Control", "Meta", "Shift", "Alt"]);
   if (modifierKeys.has(event.key)) return null;
 
-  const isMac = isMacPlatform();
+  const isMac = isMacOS();
   const modifiers: KeyBinding["modifiers"] = [];
 
   if (isMac ? event.metaKey : event.ctrlKey) modifiers.push("CmdOrCtrl");

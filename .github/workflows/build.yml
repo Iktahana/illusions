@@ -190,6 +190,7 @@ jobs:
         run: npm install
 
       - name: Type check
+        if: github.event_name == 'pull_request'
         run: npx tsc --noEmit
 
       # --- Full build steps (push to main/alpha/beta/dev only) ---
@@ -270,6 +271,7 @@ jobs:
         run: npm install
 
       - name: Type check
+        if: github.event_name == 'pull_request'
         run: npx tsc --noEmit
 
       # --- Full build steps (push to main/alpha/beta/dev only) ---
@@ -456,6 +458,87 @@ jobs:
             dist-electron/*.appx.blockmap
 
   # ---------------------------------------------------------------------------
+  # Linux
+  # ---------------------------------------------------------------------------
+
+  build-linux:
+    name: Build (Linux)
+    needs: [detect-changes, compute-version]
+    if: |
+      always() &&
+      (github.event_name == 'pull_request' || needs.compute-version.result == 'success') &&
+      needs.detect-changes.outputs.desktop_changed == 'true'
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type check
+        if: github.event_name == 'pull_request'
+        run: npx tsc --noEmit
+
+      # --- Full build steps (push to main/alpha/beta/dev only) ---
+
+      - name: Install rpm build tools
+        if: github.event_name != 'pull_request'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Restore Electron caches
+        if: github.event_name != 'pull_request'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ELECTRON_CACHE }}
+            ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: electron-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-x64-
+
+      - name: Restore Next.js cache
+        if: github.event_name != 'pull_request'
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            next-${{ runner.os }}-x64-
+
+      - name: Update package.json version
+        if: github.event_name != 'pull_request'
+        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version
+
+      - name: Download local fonts
+        if: github.event_name != 'pull_request'
+        run: npm run download:fonts
+
+      - name: Build Electron application
+        if: github.event_name != 'pull_request'
+        run: npm run electron:build -- --linux --x64 --publish never
+        env:
+          DEBUG: electron-builder
+
+      - name: Upload build artifacts
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: illusions-linux-x64-${{ needs.compute-version.outputs.full }}
+          path: dist-electron/**
+
+  # ---------------------------------------------------------------------------
   # Publish & Release
   # ---------------------------------------------------------------------------
 
@@ -465,7 +548,7 @@ jobs:
       github.event_name != 'pull_request' &&
       github.ref != 'refs/heads/dev' &&
       needs.detect-changes.outputs.desktop_changed == 'true'
-    needs: [detect-changes, compute-version, build-macos, package-windows-nsis, package-windows-msix]
+    needs: [detect-changes, compute-version, build-macos, package-windows-nsis, package-windows-msix, build-linux]
     runs-on: ubuntu-latest
 
     steps:
@@ -478,7 +561,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-assets
-          find dist-electron -type f \( -name "*.yml" -o -name "*.exe" -o -name "*.exe.blockmap" -o -name "*.dmg" -o -name "*.dmg.blockmap" -o -name "*-mac.zip" -o -name "*-mac.zip.blockmap" -o -name "*.appx" -o -name "*.appx.blockmap" \) -exec cp {} release-assets/ \;
+          find dist-electron -type f \( -name "*.yml" -o -name "*.exe" -o -name "*.exe.blockmap" -o -name "*.dmg" -o -name "*.dmg.blockmap" -o -name "*-mac.zip" -o -name "*-mac.zip.blockmap" -o -name "*.appx" -o -name "*.appx.blockmap" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) -exec cp {} release-assets/ \;
           ls -lh release-assets/
 
       - name: Create GitHub Release and upload assets
