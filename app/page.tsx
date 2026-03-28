@@ -187,6 +187,7 @@ export default function EditorPage() {
     openProjectFile, pinTab, newTerminalTab, updateTerminalTab, openDiffTab,
     forceCloseTab, updateTab,
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
+    flushTabState,
   } = tabManager;
 
   // Ref that always holds the latest tabs array (avoids stale closures in PTY callbacks)
@@ -579,6 +580,20 @@ export default function EditorPage() {
       incrementEditorKey();
     });
   }, [onSystemFileOpen, incrementEditorKey]);
+
+  // Flush debounced tab/layout state on page refresh.
+  // Electron: the normal quit flow uses IPC flush, but Cmd+R bypasses it.
+  // Web: browser refresh would lose any debounced changes still in-flight.
+  // Fire-and-forget is acceptable — Electron IPC queues synchronously,
+  // and browsers allow brief async completion (IndexedDB) after beforeunload.
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      void flushTabState();
+      void stableFlushLayoutState();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [flushTabState, stableFlushLayoutState]);
 
   // Clean up ?welcome and ?pending-file parameters from URL
   useEffect(() => {
@@ -1043,7 +1058,7 @@ export default function EditorPage() {
                setBottomView(view);
              }
            }}
-           onNewTerminal={isElectron ? handleNewTerminalTab : undefined}
+           onNewTerminal={handleNewTerminalTab}
          />
 
            {/* Left side panel */}
@@ -1074,7 +1089,7 @@ export default function EditorPage() {
                   }
                 }}
                 onOpenFile={() => void openFile()}
-                onNewTerminal={isElectron ? handleNewTerminalTab : undefined}
+                onNewTerminal={handleNewTerminalTab}
               />
             </div>
           )}

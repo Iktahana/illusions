@@ -28,15 +28,15 @@
   --dv-activegroup-visiblepanel-tab-color: rgb(var(--foreground));
 
   /* Active group, hidden (unselected) tabs */
-  --dv-activegroup-hiddenpanel-tab-background-color: #ffffff;
+  --dv-activegroup-hiddenpanel-tab-background-color: rgb(var(--background-tertiary));
   --dv-activegroup-hiddenpanel-tab-color: rgb(var(--foreground-tertiary));
 
   /* Inactive group, visible tab */
-  --dv-inactivegroup-visiblepanel-tab-background-color: #ffffff;
+  --dv-inactivegroup-visiblepanel-tab-background-color: rgb(var(--background-tertiary));
   --dv-inactivegroup-visiblepanel-tab-color: rgb(var(--foreground-secondary));
 
   /* Inactive group, hidden tabs */
-  --dv-inactivegroup-hiddenpanel-tab-background-color: #ffffff;
+  --dv-inactivegroup-hiddenpanel-tab-background-color: rgb(var(--background-tertiary));
   --dv-inactivegroup-hiddenpanel-tab-color: rgb(var(--foreground-muted));
 
   /* Tab divider */
@@ -75,12 +75,12 @@
 
   --dv-activegroup-visiblepanel-tab-background-color: rgb(var(--background));
   --dv-activegroup-visiblepanel-tab-color: rgb(var(--foreground));
-  --dv-activegroup-hiddenpanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-activegroup-hiddenpanel-tab-background-color: rgb(var(--background-tertiary));
   --dv-activegroup-hiddenpanel-tab-color: rgb(var(--foreground-tertiary));
 
-  --dv-inactivegroup-visiblepanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-inactivegroup-visiblepanel-tab-background-color: rgb(var(--background-tertiary));
   --dv-inactivegroup-visiblepanel-tab-color: rgb(var(--foreground-secondary));
-  --dv-inactivegroup-hiddenpanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-inactivegroup-hiddenpanel-tab-background-color: rgb(var(--background-tertiary));
   --dv-inactivegroup-hiddenpanel-tab-color: rgb(var(--foreground-muted));
 
   --dv-tab-divider-color: rgb(var(--border));
@@ -121,12 +121,12 @@
 }
 
 .dockview-theme-illusions .dv-default-tab.dv-inactive-tab {
-  background-color: #ffffff;
+  background-color: rgb(var(--background-tertiary));
   color: rgb(var(--foreground-tertiary));
 }
 
 .dark .dockview-theme-illusions .dv-default-tab.dv-inactive-tab {
-  background-color: rgb(var(--background-secondary));
+  background-color: rgb(var(--background-tertiary));
   color: rgb(var(--foreground-tertiary));
 }
 
