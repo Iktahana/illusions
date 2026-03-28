@@ -25,17 +25,41 @@ export interface MenuSection {
   items: MenuItem[];
 }
 
+/**
+ * Default accelerator for each menu action.
+ * This is the single source of truth for keyboard shortcuts displayed in the
+ * Web menu bar.  Pass overrides via the `acceleratorOverrides` prop on
+ * `<WebMenuBar>` to reflect user-customised keymaps at runtime.
+ */
+export const DEFAULT_ACTION_ACCELERATORS: Record<string, string> = {
+  'new-window':       'Ctrl+N',
+  'open-file':        'Ctrl+O',
+  'save-file':        'Ctrl+S',
+  'save-as':          'Shift+Ctrl+S',
+  'close-window':     'Ctrl+W',
+  'undo':             'Ctrl+Z',
+  'redo':             'Ctrl+Y',
+  'cut':              'Ctrl+X',
+  'copy':             'Ctrl+C',
+  'paste':            'Ctrl+V',
+  'paste-plaintext':  'Shift+Ctrl+V',
+  'select-all':       'Ctrl+A',
+  'reset-zoom':       'Ctrl+0',
+  'zoom-in':          'Ctrl++',
+  'zoom-out':         'Ctrl+-',
+};
+
 export const WEB_MENU_STRUCTURE: MenuSection[] = [
   {
     label: 'ファイル',
     items: [
-      { label: '新規ウィンドウ', accelerator: 'Ctrl+N', action: 'new-window' },
+      { label: '新規ウィンドウ', action: 'new-window' },
       { label: '最近のプロジェクトを開く', action: 'open-recent-project', submenu: [] },
       { label: 'プロジェクトを開く', action: 'open-project' },
       { type: 'separator' },
-      { label: 'ファイルを開く...', accelerator: 'Ctrl+O', action: 'open-file' },
-      { label: '保存', accelerator: 'Ctrl+S', action: 'save-file' },
-      { label: '別名で保存...', accelerator: 'Shift+Ctrl+S', action: 'save-as' },
+      { label: 'ファイルを開く...', action: 'open-file' },
+      { label: '保存', action: 'save-file' },
+      { label: '別名で保存...', action: 'save-as' },
       { type: 'separator' },
       {
         label: 'エクスポート',
@@ -49,29 +73,29 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
         ],
       },
       { type: 'separator' },
-      { label: '閉じる', accelerator: 'Ctrl+W', action: 'close-window' },
+      { label: '閉じる', action: 'close-window' },
     ]
   },
   {
     label: '編集',
     items: [
-      { label: '元に戻す', accelerator: 'Ctrl+Z', action: 'undo' },
-      { label: 'やり直す', accelerator: 'Ctrl+Y', action: 'redo' },
+      { label: '元に戻す', action: 'undo' },
+      { label: 'やり直す', action: 'redo' },
       { type: 'separator' },
-      { label: '切り取り', accelerator: 'Ctrl+X', action: 'cut' },
-      { label: 'コピー', accelerator: 'Ctrl+C', action: 'copy' },
-      { label: '貼り付け', accelerator: 'Ctrl+V', action: 'paste' },
-      { label: 'プレーンテキストとして貼り付け', accelerator: 'Shift+Ctrl+V', action: 'paste-plaintext' },
+      { label: '切り取り', action: 'cut' },
+      { label: 'コピー', action: 'copy' },
+      { label: '貼り付け', action: 'paste' },
+      { label: 'プレーンテキストとして貼り付け', action: 'paste-plaintext' },
       { type: 'separator' },
-      { label: 'すべて選択', accelerator: 'Ctrl+A', action: 'select-all' },
+      { label: 'すべて選択', action: 'select-all' },
     ]
   },
   {
     label: '表示',
     items: [
-      { label: '実際のサイズ', accelerator: 'Ctrl+0', action: 'reset-zoom' },
-      { label: '拡大', accelerator: 'Ctrl++', action: 'zoom-in' },
-      { label: '縮小', accelerator: 'Ctrl+-', action: 'zoom-out' },
+      { label: '実際のサイズ', action: 'reset-zoom' },
+      { label: '拡大', action: 'zoom-in' },
+      { label: '縮小', action: 'zoom-out' },
     ]
   },
   {

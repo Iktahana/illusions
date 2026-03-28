@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useMemo } from 'react';
-import { WEB_MENU_STRUCTURE } from '@/lib/menu/menu-definitions';
+import { WEB_MENU_STRUCTURE, DEFAULT_ACTION_ACCELERATORS } from '@/lib/menu/menu-definitions';
 import { MenuDropdown } from './WebMenuBar/MenuDropdown';
 
 import type { MenuSection, MenuItem } from '@/lib/menu/menu-definitions';
@@ -20,11 +20,18 @@ interface WebMenuBarProps {
   onMenuAction: (action: string) => void;
   recentProjects?: RecentProjectInfo[];
   checkedState?: MenuCheckedState;
+  acceleratorOverrides?: Record<string, string>;
 }
 
-export default function WebMenuBar({ onMenuAction, recentProjects, checkedState }: WebMenuBarProps) {
+export default function WebMenuBar({ onMenuAction, recentProjects, checkedState, acceleratorOverrides }: WebMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const menuRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Merge default accelerators with user overrides
+  const effectiveAccelerators = useMemo<Record<string, string>>(() => {
+    if (!acceleratorOverrides) return DEFAULT_ACTION_ACCELERATORS;
+    return { ...DEFAULT_ACTION_ACCELERATORS, ...acceleratorOverrides };
+  }, [acceleratorOverrides]);
 
   // Checked state map: action → boolean
   const checkedMap = useMemo<Record<string, boolean>>(() => {
@@ -35,12 +42,17 @@ export default function WebMenuBar({ onMenuAction, recentProjects, checkedState 
     return map;
   }, [checkedState]);
 
-  // Inject recent projects and checked state into the menu structure
+  // Inject accelerators, recent projects, and checked state into the menu structure
   const menuStructure = useMemo<MenuSection[]>(() => {
     return WEB_MENU_STRUCTURE.map((section) => {
       const items = section.items.map((item): MenuItem => {
+        // Inject accelerator from effective keymap
+        const withAccelerator: MenuItem = item.action && item.action in effectiveAccelerators
+          ? { ...item, accelerator: effectiveAccelerators[item.action] }
+          : item;
+
         // Inject recent projects submenu
-        if (item.action === 'open-recent-project' && section.label === 'ファイル') {
+        if (withAccelerator.action === 'open-recent-project' && section.label === 'ファイル') {
           const submenuItems: MenuItem[] =
             recentProjects && recentProjects.length > 0
               ? recentProjects.map((p) => ({
@@ -48,20 +60,20 @@ export default function WebMenuBar({ onMenuAction, recentProjects, checkedState 
                   action: `open-recent-project:${p.projectId}`,
                 }))
               : [];
-          return { ...item, submenu: submenuItems };
+          return { ...withAccelerator, submenu: submenuItems };
         }
 
         // Inject checked state for checkbox items
-        if (item.type === 'checkbox' && item.action && item.action in checkedMap) {
-          return { ...item, checked: checkedMap[item.action] };
+        if (withAccelerator.type === 'checkbox' && withAccelerator.action && withAccelerator.action in checkedMap) {
+          return { ...withAccelerator, checked: checkedMap[withAccelerator.action] };
         }
 
-        return item;
+        return withAccelerator;
       });
 
       return { ...section, items };
     });
-  }, [recentProjects, checkedMap]);
+  }, [recentProjects, checkedMap, effectiveAccelerators]);
 
   const handleMenuClick = (index: number) => {
     setOpenMenu(openMenu === index ? null : index);
