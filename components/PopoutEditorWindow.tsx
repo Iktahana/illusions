@@ -87,7 +87,10 @@ export default function PopoutEditorWindow({
       ) {
         contentRef.current = msg.content;
         setContent(msg.content);
-        setEditorKey((k) => k + 1);
+        // Full remount only for initial content load; ongoing changes just update state
+        if (msg.type === "buffer-content") {
+          setEditorKey((k) => k + 1);
+        }
       }
     };
 

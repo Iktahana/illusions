@@ -100,8 +100,17 @@ export function DockviewTabHeader({
 }: IDockviewPanelHeaderProps<EditorPanelParams>) {
   const buffer = useBuffer(params.bufferId);
   const isActive = api.isActive;
+  const popoutCleanupRef = useRef<(() => void) | null>(null);
 
   const label = buffer?.file?.name ?? `新規ファイル${buffer?.fileType ?? ".mdi"}`;
+
+  // Clean up popout channel listener on unmount
+  useEffect(() => {
+    return () => {
+      popoutCleanupRef.current?.();
+      popoutCleanupRef.current = null;
+    };
+  }, []);
 
   const handleClose = useCallback(
     (e: React.MouseEvent) => {
@@ -164,7 +173,8 @@ export function DockviewTabHeader({
           "width=900,height=700",
         );
         // Send initial content via BroadcastChannel when popout signals readiness
-        respondWithContentOnReady(params.bufferId, buffer.content);
+        popoutCleanupRef.current?.();
+        popoutCleanupRef.current = respondWithContentOnReady(params.bufferId, buffer.content);
       }
     },
     [api, buffer, params.bufferId],

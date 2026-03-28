@@ -56,6 +56,9 @@ export function useDockviewAdapter({
 
   // Track whether we're syncing to prevent loops
   const isSyncingRef = useRef(false);
+
+  // Cleanup ref for web popout respondWithContentOnReady
+  const popoutCleanupRef = useRef<(() => void) | null>(null);
   // Track previous tab state for diffing
   const prevTabsRef = useRef<TabState[]>([]);
   const prevActiveTabRef = useRef<TabId>("");
@@ -282,7 +285,8 @@ export function useDockviewAdapter({
       });
       window.open(`${window.location.origin}?${params.toString()}`, "_blank", "width=900,height=700");
       // Send initial content via BroadcastChannel when popout signals readiness
-      respondWithContentOnReady(activeTab.id, content);
+      popoutCleanupRef.current?.();
+      popoutCleanupRef.current = respondWithContentOnReady(activeTab.id, content);
     }
   }, [tabs, activeTabId, tabManager.content]);
 
@@ -333,6 +337,7 @@ export function useDockviewAdapter({
     // Skip if Electron IPC handles sync
     if (window.electronAPI?.editor) return;
     if (!isBroadcastChannelAvailable()) return;
+    if (!activeTabId) return;
 
     const channel = new BroadcastChannel(WEB_POPOUT_CHANNEL_NAME);
 
@@ -343,32 +348,29 @@ export function useDockviewAdapter({
       }
     };
 
-    return () => {
-      channel.close();
-    };
-  }, [activeTabId, tabSetContent]);
-
-  // Broadcast content changes to web popout windows
-  useEffect(() => {
-    if (window.electronAPI?.editor?.sendBufferSync) return;
-    if (!isBroadcastChannelAvailable()) return;
-    if (!activeTabId) return;
-
+    // Broadcast current content to popout windows (debounced)
     const content = tabContent ?? "";
-
-    // Debounce to avoid flooding BroadcastChannel on every keystroke
     const timer = setTimeout(() => {
-      const channel = new BroadcastChannel(WEB_POPOUT_CHANNEL_NAME);
       channel.postMessage({
         type: "buffer-change",
         bufferId: activeTabId,
         content,
       } satisfies WebPopoutMessage);
-      channel.close();
     }, 300);
 
-    return () => clearTimeout(timer);
-  }, [activeTabId, tabContent]);
+    return () => {
+      clearTimeout(timer);
+      channel.close();
+    };
+  }, [activeTabId, tabContent, tabSetContent]);
+
+  // Clean up web popout listener on unmount
+  useEffect(() => {
+    return () => {
+      popoutCleanupRef.current?.();
+      popoutCleanupRef.current = null;
+    };
+  }, []);
 
   return {
     handleDockviewReady,
