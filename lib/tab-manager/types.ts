@@ -3,8 +3,7 @@
 import type { MutableRefObject, Dispatch, SetStateAction } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension } from "../project/project-types";
-import type { TabId, TabState } from "./tab-types";
-import { getRandomillusionstory } from "../project/illusion-stories";
+import type { TabId, TabState, EditorTabState, TerminalTabState } from "./tab-types";
 
 // ---------------------------------------------------------------------------
 // Public return type (must stay identical to the original useTabManager)
@@ -32,6 +31,8 @@ export interface UseTabManagerReturn {
   tabs: TabState[];
   activeTabId: TabId;
   newTab: (fileType?: SupportedFileExtension) => void;
+  /** Create a new editor tab pre-populated with content and file association from a source tab. */
+  cloneTab: (source: EditorTabState) => void;
   closeTab: (tabId: TabId) => void;
   switchTab: (tabId: TabId) => void;
   nextTab: () => void;
@@ -39,6 +40,29 @@ export interface UseTabManagerReturn {
   switchToIndex: (index: number) => void;
   openProjectFile: (vfsPath: string, options?: { preview?: boolean }) => Promise<void>;
   pinTab: (tabId: TabId) => void;
+  newTerminalTab: () => void;
+  /** Update mutable fields on a terminal tab (e.g. status, exitCode after PTY exits). */
+  updateTerminalTab: (
+    tabId: TabId,
+    updates: Partial<Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">>,
+  ) => void;
+  openDiffTab: (
+    sourceTabId: TabId,
+    sourceFileName: string,
+    localContent: string,
+    remoteContent: string,
+    remoteTimestamp: number,
+  ) => void;
+  /**
+   * Force-close a tab without dirty check.
+   * Used by diff tab conflict resolution to close tabs programmatically.
+   */
+  forceCloseTab: (tabId: TabId) => void;
+  /**
+   * Update a single editor tab by id.
+   * Used by diff tab conflict resolution to update source tab content.
+   */
+  updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
 
   // Close-tab unsaved warning flow
   pendingCloseTabId: TabId | null;
@@ -46,6 +70,10 @@ export interface UseTabManagerReturn {
   handleCloseTabSave: () => Promise<void>;
   handleCloseTabDiscard: () => void;
   handleCloseTabCancel: () => void;
+
+  // Persistence flush (for save-before-close)
+  /** Immediately flush pending tab state to storage. */
+  flushTabState: () => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -54,7 +82,6 @@ export interface UseTabManagerReturn {
 
 export const AUTO_SAVE_INTERVAL = 5000;
 export const TAB_PERSIST_DEBOUNCE = 1000;
-export const DEMO_FILE_NAME = "鏡地獄.mdi";
 
 // ---------------------------------------------------------------------------
 // Shared refs / setters passed between sub-hooks
@@ -255,9 +282,10 @@ export function getErrorMessage(error: unknown): string {
   return message;
 }
 
-export function createNewTab(content?: string, fileType: SupportedFileExtension = ".mdi"): TabState {
-  const c = content ?? (fileType === ".mdi" ? getRandomillusionstory() : "");
+export function createNewTab(content?: string, fileType: SupportedFileExtension = ".mdi"): EditorTabState {
+  const c = content ?? "";
   return {
+    tabKind: "editor",
     id: generateTabId(),
     file: null,
     content: c,
@@ -268,20 +296,8 @@ export function createNewTab(content?: string, fileType: SupportedFileExtension 
     isSaving: false,
     isPreview: false,
     fileType,
+    fileSyncStatus: "clean",
+    conflictDiskContent: null,
   };
 }
 
-export async function loadDemoContent(): Promise<string | null> {
-  if (typeof window === "undefined") return null;
-  try {
-    // Use relative path for Electron file:// protocol compatibility
-    const basePath = window.location.protocol === "file:" ? "." : "";
-    const response = await fetch(`${basePath}/demo/鏡地獄.mdi`);
-    if (response.ok) {
-      return await response.text();
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}

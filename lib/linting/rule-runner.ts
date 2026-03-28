@@ -1,4 +1,3 @@
-import type { ILlmClient } from "@/lib/llm-client/types";
 import type { Token } from "@/lib/nlp-client/types";
 
 import type {
@@ -9,7 +8,6 @@ import type {
 } from "./types";
 import {
   isDocumentLintRule,
-  isLlmLintRule,
   isMorphologicalLintRule,
   isMorphologicalDocumentLintRule,
 } from "./types";
@@ -207,19 +205,6 @@ export class RuleRunner {
   }
 
   /**
-   * Check if any enabled rule requires LLM inference.
-   */
-  hasLlmRules(): boolean {
-    for (const [id, rule] of this.rules) {
-      const config = this.configs.get(id);
-      if (config?.enabled && isLlmLintRule(rule)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
    * Returns all rules for the given engine type.
    * Engine field acts as implementation metadata, not architectural boundary.
    */
@@ -232,42 +217,5 @@ export class RuleRunner {
    */
   hasRulesForEngine(engine: CorrectionEngine): boolean {
     return Array.from(this.rules.values()).some(r => this.configs.get(r.id)?.enabled !== false && r.engine === engine);
-  }
-
-  /**
-   * Run all enabled L3 (LLM) rules on the given sentences.
-   * Returns aggregated issues from all L3 rules.
-   */
-  async runLlmRules(
-    sentences: ReadonlyArray<{ text: string; from: number; to: number }>,
-    llmClient: ILlmClient,
-    signal?: AbortSignal,
-  ): Promise<LintIssue[]> {
-    const allIssues: LintIssue[] = [];
-
-    for (const [id, rule] of this.rules) {
-      if (signal?.aborted) break;
-
-      const config = this.configs.get(id);
-      if (!config?.enabled) continue;
-      if (!this.isRuleAllowedByGuideline(id)) continue;
-      if (!isLlmLintRule(rule)) continue;
-
-      try {
-        const issues = await rule.lintWithLlm(
-          sentences,
-          config,
-          llmClient,
-          signal,
-        );
-        allIssues.push(...issues);
-      } catch (error) {
-        if ((error as Error).name === "AbortError") break;
-        console.error(`L3 rule "${id}" failed:`, error);
-        // Don't let one rule failure break all L3 linting
-      }
-    }
-
-    return allIssues.sort((a, b) => a.from - b.from);
   }
 }

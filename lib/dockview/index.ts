@@ -10,6 +10,7 @@ export type {
   BufferState,
   EditorPanelParams,
   DockviewLayoutState,
+  SimplifiedGroupLayout,
   SerializedBuffer,
   BufferChangeEvent,
 } from "./types";

@@ -16,11 +16,21 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import type { FileTreeEntry, EditingEntry } from "./types";
 
+/** Returns the OS-specific file manager name for context menu labels. */
+function getFileManagerName(): string {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  if (/Mac/.test(ua)) return "Finder";
+  if (/Win/.test(ua)) return "Explorer";
+  return "ファイルマネージャー";
+}
+
 interface FilesPanelProps {
   projectName?: string;
   onFileClick?: (vfsPath: string) => void;
   onFileDoubleClick?: (vfsPath: string) => void;
   onFileMiddleClick?: (vfsPath: string) => void;
+  /** Increment to trigger a new file creation at root with default name. */
+  newFileTrigger?: number;
 }
 
 /** File tree panel for browsing and managing project files */
@@ -29,6 +39,7 @@ export function FilesPanel({
   onFileClick,
   onFileDoubleClick,
   onFileMiddleClick,
+  newFileTrigger,
 }: FilesPanelProps) {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(["/"]));
   const [tree, setTree] = useState<FileTreeEntry[] | null>(null);
@@ -120,9 +131,17 @@ export function FilesPanel({
         } else {
           input.select();
         }
-      } else if (editing.kind === "new-file" && editing.currentName.startsWith(".")) {
-        // Extension pre-filled: place cursor at the start (before the extension)
-        input.setSelectionRange(0, 0);
+      } else if (editing.kind === "new-file") {
+        const dotIndex = editing.currentName.lastIndexOf(".");
+        if (dotIndex > 0) {
+          // Name with extension (e.g. "新規ファイル.mdi"): select filename part
+          input.setSelectionRange(0, dotIndex);
+        } else if (editing.currentName.startsWith(".")) {
+          // Extension only (e.g. ".mdi"): place cursor at start
+          input.setSelectionRange(0, 0);
+        } else {
+          input.select();
+        }
       } else {
         input.select();
       }
@@ -240,7 +259,10 @@ export function FilesPanel({
 
   const handleNewFile = useCallback(async (parentPath: string, name: string) => {
     if (!name.trim()) { setEditing(null); return; }
-    const filePath = parentPath === "/" ? `/${name}` : `${parentPath}/${name}`;
+    // Auto-add .mdi extension if no extension provided
+    const hasExtension = /\.\w+$/.test(name);
+    const finalName = hasExtension ? name : `${name}.mdi`;
+    const filePath = parentPath === "/" ? `/${finalName}` : `${parentPath}/${finalName}`;
     try {
       const { getVFS } = await import("@/lib/vfs");
       const vfs = getVFS();
@@ -280,6 +302,15 @@ export function FilesPanel({
     setEditing({ parentPath, kind: "new-file", currentName: defaultExtension ?? "" });
     refresh();
   }, [refresh]);
+
+  // External trigger: create new file at root with default name
+  const newFileTriggerRef = useRef(newFileTrigger ?? 0);
+  useEffect(() => {
+    if (newFileTrigger != null && newFileTrigger !== newFileTriggerRef.current) {
+      newFileTriggerRef.current = newFileTrigger;
+      startNewFile("/", "新規ファイル.mdi");
+    }
+  }, [newFileTrigger, startNewFile]);
 
   const startNewFolder = useCallback((parentPath: string) => {
     setExpandedDirs(prev => { const next = new Set(prev); next.add(parentPath); return next; });
@@ -534,6 +565,7 @@ export function FilesPanel({
 
   // ---- Context menu handlers ----
   const onFileContextMenu = useCallback(async (e: React.MouseEvent, fullPath: string) => {
+    e.stopPropagation();
     contextTargetRef.current = { path: fullPath, kind: "file" };
     const items = [
       { label: "名前の変更", action: "rename" },
@@ -542,7 +574,7 @@ export function FilesPanel({
       { label: "パソコンに保存", action: "download" },
       ...(isElectronRenderer() ? [
         { label: "", action: "_separator" },
-        { label: "Finder で表示", action: "reveal-in-finder" },
+        { label: `${getFileManagerName()} で表示`, action: "reveal-in-finder" },
       ] : []),
     ];
     const result = await showContextMenu(e, items);
@@ -552,15 +584,42 @@ export function FilesPanel({
   }, [showContextMenu, handleContextAction]);
 
   const onFolderContextMenu = useCallback(async (e: React.MouseEvent, fullPath: string) => {
+    e.stopPropagation();
     contextTargetRef.current = { path: fullPath, kind: "directory" };
+    const isRoot = fullPath === "/";
     const items = [
-      { label: "名前の変更", action: "rename" },
+      // Rename and delete are not available for the root folder
+      ...(!isRoot ? [{ label: "名前の変更", action: "rename" }] : []),
       { label: "新規 MDI ファイル", action: "new-file-mdi" },
       { label: "新規 Markdown ファイル", action: "new-file-md" },
       { label: "新規テキストファイル", action: "new-file-txt" },
       { label: "新規フォルダ", action: "new-folder" },
-      { label: "", action: "_separator" },
-      { label: "削除", action: "delete" },
+      ...(!isRoot ? [
+        { label: "", action: "_separator" },
+        { label: "削除", action: "delete" },
+      ] : []),
+      ...(isElectronRenderer() ? [
+        { label: "", action: "_separator" },
+        { label: `${getFileManagerName()} で開く`, action: "open-in-finder" },
+      ] : []),
+    ];
+    const result = await showContextMenu(e, items);
+    if (result) {
+      void handleContextAction(result, fullPath, "directory");
+    }
+  }, [showContextMenu, handleContextAction]);
+
+  /** Show root-level context menu when right-clicking the empty area below the file tree */
+  const onEmptyAreaContextMenu = useCallback(async (e: React.MouseEvent) => {
+    // Only fire when the click target is the container itself (not a bubbled child event)
+    if (e.target !== e.currentTarget) return;
+    e.preventDefault();
+    contextTargetRef.current = { path: "/", kind: "directory" };
+    const items = [
+      { label: "新規 MDI ファイル", action: "new-file-mdi" },
+      { label: "新規 Markdown ファイル", action: "new-file-md" },
+      { label: "新規テキストファイル", action: "new-file-txt" },
+      { label: "新規フォルダ", action: "new-folder" },
       ...(isElectronRenderer() ? [
         { label: "", action: "_separator" },
         { label: "Finder で開く", action: "open-in-finder" },
@@ -568,7 +627,7 @@ export function FilesPanel({
     ];
     const result = await showContextMenu(e, items);
     if (result) {
-      void handleContextAction(result, fullPath, "directory");
+      void handleContextAction(result, "/", "directory");
     }
   }, [showContextMenu, handleContextAction]);
 
@@ -713,13 +772,14 @@ export function FilesPanel({
 
   return (
     <div
-      className="space-y-1"
+      className="space-y-1 min-h-full"
       onDragOver={(e) => { e.preventDefault(); }}
       onDrop={(e) => {
         // Fallback: drops that miss any specific item -> treat as root drop
         e.preventDefault();
         void handleTreeDrop(e, "/", "directory");
       }}
+      onContextMenu={(e) => { void onEmptyAreaContextMenu(e); }}
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-foreground">ファイル</h3>

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useTheme } from "@/contexts/ThemeContext";
-import Explorer, { FilesPanel } from "@/components/Explorer";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
@@ -12,20 +11,18 @@ import ResizablePanel from "@/components/ResizablePanel";
 import TitleUpdater from "@/components/TitleUpdater";
 import ActivityBar from "@/components/ActivityBar";
 import SidebarSplitter from "@/components/SidebarSplitter";
-import SearchResults from "@/components/SearchResults";
 import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import UpgradeToProjectBanner from "@/components/UpgradeToProjectBanner";
-import WordFrequency from "@/components/WordFrequency";
-import Characters from "@/components/Characters";
-import Dictionary from "@/components/Dictionary";
-import Outline from "@/components/Outline";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import PopoutEditorWindow from "@/components/PopoutEditorWindow";
+import SidebarPanel from "@/components/SidebarPanel";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import SettingsModal from "@/components/SettingsModal";
 import RubyDialog from "@/components/RubyDialog";
+import DesktopOnlyDialog from "@/components/DesktopOnlyDialog";
+import { EmptyEditorState } from "@/components/EmptyEditorState";
 import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
 import { useTabManager } from "@/lib/hooks/use-tab-manager";
@@ -33,6 +30,8 @@ import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
 import { DockviewReact } from "dockview-react";
 import {
   dockviewTabComponents,
+  TerminalPanel,
+  DiffPanel,
 } from "@/lib/dockview/dockview-components";
 import { useDockviewAdapter } from "@/lib/dockview/use-dockview-adapter";
 import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence";
@@ -47,6 +46,12 @@ import { useEditorMode } from "@/contexts/EditorModeContext";
 import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
+import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
+import type { TerminalTabState, DiffTabState } from "@/lib/tab-manager/tab-types";
+import { TerminalTabContext } from "@/contexts/TerminalTabContext";
+import type { TerminalTabContextValue } from "@/contexts/TerminalTabContext";
+import { DiffTabContext } from "@/contexts/DiffTabContext";
+import type { DiffTabContextValue } from "@/contexts/DiffTabContext";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
@@ -56,8 +61,10 @@ import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
+import { useSaveToast } from "@/lib/editor-page/use-save-toast";
+import { useContextMenu } from "@/lib/hooks/use-context-menu";
+import ContextMenu from "@/components/ContextMenu";
 
-import type { ActivityBarView } from "@/components/ActivityBar";
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 
@@ -109,6 +116,13 @@ export default function EditorPage() {
     setEditorKey(prev => prev + 1);
   }, []);
 
+  // Ref for dockview layout flush — populated after useDockviewPersistence,
+  // consumed by useTabManager's close handler via stable callback.
+  const flushLayoutStateRef = useRef<(() => Promise<void>) | undefined>(undefined);
+  const stableFlushLayoutState = useCallback(async () => {
+    await flushLayoutStateRef.current?.();
+  }, []);
+
   // Deferred promise gate: tab restoration waits until VFS root is set
   const [vfsGate] = useState(() => {
     let resolve!: () => void;
@@ -124,7 +138,6 @@ export default function EditorPage() {
     posHighlightEnabled, posHighlightColors, verticalScrollBehavior,
     scrollSensitivity, compactMode, showSettingsModal,
     lintingEnabled, lintingRuleConfigs,
-    llmEnabled, llmModelId, llmIdlingStop,
     powerSaveMode, autoPowerSaveOnBattery,
     correctionConfig,
   } = settings;
@@ -137,7 +150,6 @@ export default function EditorPage() {
     handleScrollSensitivityChange, handleToggleCompactMode, setShowSettingsModal,
     handleLintingEnabledChange, handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
-    handleLlmEnabledChange, handleLlmModelIdChange, handleLlmIdlingStopChange,
     handlePowerSaveModeChange, handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange,
   } = settingsHandlers;
@@ -150,17 +162,6 @@ export default function EditorPage() {
     autoPowerSaveOnBattery,
     onPowerSaveModeChange: handlePowerSaveModeChange,
   });
-
-  // --- Sync llmIdlingStop setting to LLM engine ---
-  useEffect(() => {
-    import("@/lib/llm-client/llm-client").then(({ getLlmClient }) => {
-      const client = getLlmClient();
-      if (!client.isAvailable()) return;
-      void client.setIdlingStop(llmIdlingStop).catch((err) => {
-        console.error("[page] Failed to sync llmIdlingStop:", err);
-      });
-    });
-  }, [llmIdlingStop]);
 
   // --- Panel state hook ---
   const { state: panelState, handlers: panelHandlers } = usePanelState({ setShowSettingsModal });
@@ -176,41 +177,270 @@ export default function EditorPage() {
     handleOpenLintingSettings, handleOpenPosHighlightSettings, triggerSwitchToCorrections,
   } = panelHandlers;
 
-  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReadyPromise: vfsGate.promise });
+  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReadyPromise: vfsGate.promise, flushLayoutState: stableFlushLayoutState });
   const {
     content, setContent, currentFile, isDirty, isSaving, lastSavedTime, lastSaveWasAuto,
     openFile: tabOpenFile, saveFile, saveAsFile,
     newFile: tabNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen,
     _loadSystemFile: tabLoadSystemFile,
     tabs, activeTabId, newTab, closeTab, switchTab, nextTab, prevTab, switchToIndex,
-    openProjectFile, pinTab,
+    openProjectFile, pinTab, newTerminalTab, updateTerminalTab, openDiffTab,
+    forceCloseTab, updateTab,
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
+    flushTabState,
   } = tabManager;
+
+  // Ref that always holds the latest tabs array (avoids stale closures in PTY callbacks)
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
+  // Ref that always holds the latest updateTerminalTab (avoids re-subscribing)
+  const updateTerminalTabRef = useRef(updateTerminalTab);
+  updateTerminalTabRef.current = updateTerminalTab;
+
+  // --- Tab close wrapper: kill PTY session when a terminal tab closes ---
+  const handleCloseTabWithPtyCleanup = useCallback(
+    (tabId: string) => {
+      // Look up the tab before closing it
+      const tab = tabsRef.current.find((t) => t.id === tabId);
+      if (tab && isTerminalTab(tab) && tab.sessionId) {
+        void window.electronAPI?.pty?.kill(tab.sessionId);
+      }
+      closeTab(tabId);
+    },
+    [closeTab],
+  );
+
+  // Patched tabManager passed to the dockview adapter so that panel close
+  // triggers PTY kill before removing the tab from state.
+  const tabManagerWithPtyCleanup = { ...tabManager, closeTab: handleCloseTabWithPtyCleanup };
 
   // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
   const {
     handleDockviewReady,
     dockviewApi,
     splitEditor,
-  } = useDockviewAdapter({ tabManager });
-  useDockviewPersistence({ dockviewApi });
+  } = useDockviewAdapter({ tabManager: tabManagerWithPtyCleanup, editorKey });
+  const { flushLayoutState } = useDockviewPersistence({ dockviewApi, tabs: tabManagerWithPtyCleanup.tabs });
+  flushLayoutStateRef.current = flushLayoutState;
+
+  // --- New terminal tab callback ---
+  const handleNewTerminalTab = useCallback(() => {
+    if (isElectronRenderer()) {
+      const ptyApi = window.electronAPI?.pty;
+      if (!ptyApi) return;
+      // Create the tab first (shows "connecting" state immediately)
+      newTerminalTab();
+      // Spawn the PTY session; update the tab's sessionId once we have it
+      void (async () => {
+        const cwd = isProjectMode(editorMode) ? editorMode.rootPath : undefined;
+        const shell = settings.terminalDefaultShell || undefined;
+        const result = await ptyApi.spawn({ cwd, shell });
+        if ("error" in result) {
+          // PTY spawn failed — remove the stuck "connecting" tab
+          const stuckTab = tabsRef.current
+            .slice()
+            .reverse()
+            .find((t) => isTerminalTab(t) && (t as TerminalTabState).sessionId === "");
+          if (stuckTab) {
+            forceCloseTab(stuckTab.id);
+          }
+          return;
+        }
+        const { sessionId } = result;
+        // Update the most recently created terminal tab with an empty sessionId
+        const targetTab = tabsRef.current
+          .slice()
+          .reverse()
+          .find((t) => isTerminalTab(t) && (t as TerminalTabState).sessionId === "");
+        if (targetTab) {
+          updateTerminalTabRef.current(targetTab.id, { sessionId, status: "running" });
+        }
+      })();
+    } else {
+      // Web: show desktop-only dialog since terminal requires native PTY
+      setShowDesktopOnlyDialog(true);
+    }
+  }, [newTerminalTab, editorMode, settings.terminalDefaultShell]);
+
+  // --- PTY exit event listener: update tab status when process exits ---
+  useEffect(() => {
+    if (!isElectronRenderer()) return;
+    const ptyApi = window.electronAPI?.pty;
+    if (!ptyApi) return;
+
+    const unsubExit = ptyApi.onExit(({ sessionId, exitCode }) => {
+      // Find the terminal tab with this sessionId and mark it as exited
+      const tab = tabsRef.current.find(
+        (t) => isTerminalTab(t) && (t as TerminalTabState).sessionId === sessionId,
+      );
+      if (tab) {
+        updateTerminalTabRef.current(tab.id, { status: "exited", exitCode });
+      }
+    });
+
+    return unsubExit;
+  // Subscribe once on mount; use refs to avoid stale closures
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- TerminalTabContext value: exposes terminal tab state to dockview panel components ---
+  const getTerminalTabBySessionId = useCallback(
+    (sessionId: string) =>
+      tabsRef.current.find(
+        (t): t is TerminalTabState => isTerminalTab(t) && t.sessionId === sessionId,
+      ),
+    [],
+  );
+  const setTerminalTabExited = useCallback((sessionId: string, exitCode: number) => {
+    const tab = tabsRef.current.find(
+      (t): t is TerminalTabState => isTerminalTab(t) && t.sessionId === sessionId,
+    );
+    if (tab) {
+      updateTerminalTabRef.current(tab.id, { status: "exited", exitCode });
+    }
+  }, []);
+  const killTerminalSession = useCallback((sessionId: string) => {
+    void window.electronAPI?.pty?.kill(sessionId);
+  }, []);
+  const terminalTabContextValue: TerminalTabContextValue = {
+    getTerminalTabBySessionId,
+    setTerminalTabExited,
+    killTerminalSession,
+  };
+
+  // --- DiffTabContext value: exposes diff tab state and conflict resolution to panel components ---
+
+  const getDiffTabById = useCallback(
+    (tabId: string) =>
+      tabsRef.current.find((t): t is DiffTabState => isDiffTab(t) && t.id === tabId),
+    [],
+  );
+
+  const getDiffTabBySourceTabId = useCallback(
+    (sourceTabId: string) =>
+      tabsRef.current.find(
+        (t): t is DiffTabState => isDiffTab(t) && t.sourceTabId === sourceTabId,
+      ),
+    [],
+  );
+
+  /**
+   * Accept disk content: update the source editor tab with the remote content,
+   * clear its conflict state, then force-close the diff tab.
+   */
+  const acceptDiskContent = useCallback(
+    (diffTabId: string) => {
+      const diffTab = tabsRef.current.find(
+        (t): t is DiffTabState => isDiffTab(t) && t.id === diffTabId,
+      );
+      if (!diffTab) return;
+
+      const sourceTab = tabsRef.current.find(
+        (t) => isEditorTab(t) && t.id === diffTab.sourceTabId,
+      );
+      if (sourceTab && isEditorTab(sourceTab)) {
+        updateTab(sourceTab.id, {
+          content: diffTab.remoteContent,
+          lastSavedContent: diffTab.remoteContent,
+          isDirty: false,
+          fileSyncStatus: "clean",
+          conflictDiskContent: null,
+        });
+      }
+      forceCloseTab(diffTabId);
+    },
+    [updateTab, forceCloseTab],
+  );
+
+  /**
+   * Keep editor content: clear the conflict state on the source tab,
+   * then force-close the diff tab.
+   */
+  const keepEditorContent = useCallback(
+    (diffTabId: string) => {
+      const diffTab = tabsRef.current.find(
+        (t): t is DiffTabState => isDiffTab(t) && t.id === diffTabId,
+      );
+      if (!diffTab) return;
+
+      const sourceTab = tabsRef.current.find(
+        (t) => isEditorTab(t) && t.id === diffTab.sourceTabId,
+      );
+      if (sourceTab && isEditorTab(sourceTab)) {
+        updateTab(sourceTab.id, {
+          fileSyncStatus: "clean",
+          conflictDiskContent: null,
+        });
+      }
+      forceCloseTab(diffTabId);
+    },
+    [updateTab, forceCloseTab],
+  );
+
+  /**
+   * Close only the diff tab; source tab conflict state is preserved.
+   */
+  const closeDiffTab = useCallback(
+    (diffTabId: string) => {
+      forceCloseTab(diffTabId);
+    },
+    [forceCloseTab],
+  );
+
+  const diffTabContextValue: DiffTabContextValue = {
+    getDiffTabById,
+    getDiffTabBySourceTabId,
+    acceptDiskContent,
+    keepEditorContent,
+    closeDiffTab,
+  };
 
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
-  const activeFileType = activeTab?.fileType ?? ".mdi";
+  const activeEditorTab = activeTab && isEditorTab(activeTab) ? activeTab : undefined;
+  const activeFileType = activeEditorTab?.fileType ?? ".mdi";
   const mdiExtensionsEnabled = activeFileType === ".mdi";
   const gfmEnabled = activeFileType !== ".txt";
 
+  // Stable ref so export / shortcut callbacks can read the current value without re-creating
+  const isEditorTabActiveRef = useRef<boolean>(!!activeEditorTab);
+  isEditorTabActiveRef.current = !!activeEditorTab;
+
+  // Auto-collapse right panel when all tabs are closed, restore when a tab opens
+  const rightPanelUserPrefRef = useRef(isRightPanelCollapsed);
+  const hasTabs = tabs.length > 0;
+  useEffect(() => {
+    if (!hasTabs) {
+      // Save user preference before auto-collapsing
+      rightPanelUserPrefRef.current = isRightPanelCollapsed;
+      setIsRightPanelCollapsed(true);
+    } else {
+      // Restore to user's last explicit preference
+      setIsRightPanelCollapsed(rightPanelUserPrefRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasTabs]);
+
+  // Track user's explicit toggle (not auto-collapse)
+  const handleToggleRightPanel = useCallback(() => {
+    const next = !isRightPanelCollapsed;
+    setIsRightPanelCollapsed(next);
+    if (hasTabs) {
+      rightPanelUserPrefRef.current = next;
+    }
+  }, [isRightPanelCollapsed, setIsRightPanelCollapsed, hasTabs]);
+
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
+  const [showDesktopOnlyDialog, setShowDesktopOnlyDialog] = useState(false);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [recoveryExiting, setRecoveryExiting] = useState(false);
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
+  const [newFileTrigger, setNewFileTrigger] = useState(0);
   const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
-  const [showSaveToast, setShowSaveToast] = useState(false);
-  const [saveToastExiting, setSaveToastExiting] = useState(false);
   const [selectedCharCount, setSelectedCharCount] = useState(0);
-  const prevLastSavedTimeRef = useRef<number | null>(null);
+  const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const programmaticScrollRef = useRef(false);
@@ -251,7 +481,7 @@ export default function EditorPage() {
   } = projectLifecycle;
 
   // Unsaved warning hook (project mode transitions only; tabs handle per-tab dirty checks)
-  const anyDirty = tabs.some((t) => t.isDirty);
+  const anyDirty = tabs.some((t) => isEditorTab(t) && t.isDirty);
   const unsavedWarning = useUnsavedWarning(
     anyDirty,
     saveFile,
@@ -266,6 +496,32 @@ export default function EditorPage() {
     }
   }, [wasAutoRecovered, incrementEditorKey]);
 
+  // --- Auto-close diff tabs when their source editor tab is closed ---
+  // Tracks the previous tab id set to detect removals.
+  const prevTabIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const currentTabIds = new Set(tabs.map((t) => t.id));
+    const removedTabIds = new Set(
+      [...prevTabIdsRef.current].filter((id) => !currentTabIds.has(id)),
+    );
+
+    if (removedTabIds.size > 0) {
+      // For each removed tab, find any diff tab that references it as sourceTabId
+      const orphanedDiffTabIds = tabs
+        .filter(
+          (t): t is DiffTabState =>
+            isDiffTab(t) && removedTabIds.has(t.sourceTabId),
+        )
+        .map((t) => t.id);
+
+      for (const diffTabId of orphanedDiffTabIds) {
+        forceCloseTab(diffTabId);
+      }
+    }
+
+    prevTabIdsRef.current = currentTabIds;
+  }, [tabs, forceCloseTab]);
+
   // With tabs, open/new don't need unsaved warnings (they create new tabs)
   const openFile = useCallback(async () => {
     await tabOpenFile();
@@ -277,6 +533,39 @@ export default function EditorPage() {
     incrementEditorKey();
   }, [tabNewFile, incrementEditorKey]);
 
+  // --- Tab bar empty area context menu ---
+  const handleTabBarContextMenu = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    // Only show on the void (empty) area of the tab bar
+    if (!target.closest(".dv-void-container") && !target.classList.contains("dv-void-container")) return;
+
+    const items = [
+      { label: "新規ファイル", action: "new-file" },
+      { label: "ファイルを開く…", action: "open-file" },
+      ...(isElectron ? [{ label: "新規ターミナル", action: "new-terminal" }] : []),
+    ];
+    void showTabBarMenu(e, items);
+  }, [showTabBarMenu, isElectron]);
+
+  const handleTabBarMenuAction = useCallback((action: string) => {
+    switch (action) {
+      case "new-file":
+        if (isProjectMode(editorMode)) {
+          setTopView("files");
+          setNewFileTrigger(prev => prev + 1);
+        } else {
+          newTab();
+        }
+        break;
+      case "open-file":
+        void openFile();
+        break;
+      case "new-terminal":
+        handleNewTerminalTab();
+        break;
+    }
+  }, [editorMode, newTab, openFile, handleNewTerminalTab, setTopView, setNewFileTrigger]);
+
   // Electron menu "New" and "Open" bindings (with safety checks)
   useElectronMenuHandlers(newFile, openFile);
 
@@ -284,13 +573,14 @@ export default function EditorPage() {
   const getExportContent = useCallback(() => content, [content]);
   const getExportTitle = useCallback(() => {
     const tab = tabs.find((t) => t.id === activeTabId);
-    const name = tab?.file?.name ?? "untitled";
+    const name = (tab && isEditorTab(tab) ? tab.file?.name : undefined) ?? "untitled";
     return name.replace(/\.[^.]+$/, "");
   }, [tabs, activeTabId]);
 
   const { exportAs } = useExport({
     getContent: getExportContent,
     getTitle: getExportTitle,
+    getIsEditorTabActive: useCallback(() => isEditorTabActiveRef.current, []),
   });
 
   // System file open: tab manager handles loading; we just update editor key
@@ -300,6 +590,21 @@ export default function EditorPage() {
       incrementEditorKey();
     });
   }, [onSystemFileOpen, incrementEditorKey]);
+
+  // Flush debounced tab/layout state on page refresh.
+  // Electron: the normal quit flow uses IPC flush, but Cmd+R bypasses it.
+  // Web: browser refresh would lose any debounced changes still in-flight.
+  // ここでの beforeunload フックは「ベストエフォート」でのフラッシュ用セーフティネット。
+  // beforeunload 中の非同期処理（IndexedDB 等）の完了は仕様上保証されないため、
+  // 確実にフラッシュしたい処理は visibilitychange/pagehide 側を主経路として扱うこと。
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      void flushTabState();
+      void stableFlushLayoutState();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [flushTabState, stableFlushLayoutState]);
 
   // Clean up ?welcome and ?pending-file parameters from URL
   useEffect(() => {
@@ -346,50 +651,22 @@ export default function EditorPage() {
     onOpen: openFile,
     onSave: saveFile,
     onSaveAs: saveAsFile,
-    onOpenProject: () => void handleOpenProject(),
-    onOpenRecentProject: (projectId: string) => openRecentProjectRef.current(projectId),
+    onOpenProject: () => void unsavedWarning.confirmBeforeAction(() => handleOpenProject()),
+    onOpenRecentProject: (projectId: string) => void unsavedWarning.confirmBeforeAction(() => openRecentProjectRef.current(projectId)),
     onCloseWindow: () => window.close(),
     onToggleCompactMode: () => toggleCompactModeRef.current(),
     onExport: (format) => void exportAs(format),
     editorView: editorViewInstance,
     fontScale,
     onFontScaleChange: (scale: number) => fontScaleChangeRef.current(scale),
+    isEditorTabActive: !!activeEditorTab,
   });
 
-  // Global shortcuts for Web (only when not in Electron)
-  useGlobalShortcuts(
-    !isElectron ? handleMenuAction : () => {},
-    editorDomRef
-  );
+  // Block browser reload (Ctrl/Cmd+R) regardless of focus
+  useGlobalShortcuts();
 
-  // Save toast: show when lastSavedTime updates (skip auto-save / initial load)
-  useEffect(() => {
-    if (lastSavedTime && prevLastSavedTimeRef.current !== lastSavedTime) {
-      if (prevLastSavedTimeRef.current !== null) {
-        // Only show toast for manual saves
-        if (!lastSaveWasAuto) {
-          setShowSaveToast(true);
-          setSaveToastExiting(false);
-
-          let exitTimer: ReturnType<typeof setTimeout> | null = null;
-          const hideTimer = setTimeout(() => {
-            setSaveToastExiting(true);
-            exitTimer = setTimeout(() => {
-              setShowSaveToast(false);
-              setSaveToastExiting(false);
-            }, 150);
-          }, 1200);
-
-          prevLastSavedTimeRef.current = lastSavedTime;
-          return () => {
-            clearTimeout(hideTimer);
-            if (exitTimer) clearTimeout(exitTimer);
-          };
-        }
-      }
-      prevLastSavedTimeRef.current = lastSavedTime;
-    }
-  }, [lastSavedTime, lastSaveWasAuto]);
+  // --- Save toast hook ---
+  const { showSaveToast, saveToastExiting } = useSaveToast({ lastSavedTime, lastSaveWasAuto });
 
   // Recovery notification: fade-out after 5s, then dismiss
   useEffect(() => {
@@ -510,9 +787,7 @@ export default function EditorPage() {
     lintingEnabled,
     lintingRuleConfigs,
     editorViewInstance,
-    llmEnabled,
     powerSaveMode,
-    llmModelId,
     correctionConfig.guidelines,
     correctionConfig.mode,
   );
@@ -585,8 +860,13 @@ export default function EditorPage() {
     switchToIndex,
     tabs,
     activeTabId,
+    isEditorTabActive: !!activeEditorTab,
     splitEditorRight: useCallback(() => splitEditor("right"), [splitEditor]),
     splitEditorDown: useCallback(() => splitEditor("down"), [splitEditor]),
+    toggleExplorer: useCallback(() => setTopView(topView === "explorer" ? "none" : "explorer"), [setTopView, topView]),
+    toggleSearch: useCallback(() => setTopView(topView === "search" ? "none" : "search"), [setTopView, topView]),
+    toggleOutline: useCallback(() => setTopView(topView === "outline" ? "none" : "outline"), [setTopView, topView]),
+    handleMenuAction: !isElectron ? handleMenuAction : undefined,
   });
 
   // Detect feature availability after mount to avoid SSR hydration mismatch
@@ -646,73 +926,31 @@ export default function EditorPage() {
   }
 
   // --- Editor view (project or standalone mode) ---
-  const renderPanel = (view: ActivityBarView) => {
-    switch (view) {
-      case "files":
-        return (
-          <aside className="h-full bg-background border-r border-border flex flex-col">
-            <div className="p-4 flex-1 overflow-y-auto">
-              <FilesPanel
-                projectName={isProjectMode(editorMode) ? editorMode.name : undefined}
-                onFileClick={(vfsPath) => {
-                  void openProjectFile(vfsPath, { preview: true });
-                  incrementEditorKey();
-                }}
-                onFileDoubleClick={(vfsPath) => {
-                  void openProjectFile(vfsPath, { preview: false });
-                  incrementEditorKey();
-                }}
-                onFileMiddleClick={(vfsPath) => {
-                  void openProjectFile(vfsPath, { preview: false });
-                  incrementEditorKey();
-                }}
-              />
-            </div>
-          </aside>
-        );
-      case "explorer":
-        return (
-          <ErrorBoundary sectionName="エクスプローラ">
-          <Explorer
-            compactMode={compactMode}
-            content={content}
-            onChapterClick={handleChapterClick}
-            onInsertText={handleInsertText}
-          />
-          </ErrorBoundary>
-        );
-      case "search":
-        return (
-          <SearchResults
-            editorView={editorViewInstance}
-            matches={searchResults?.matches}
-            searchTerm={searchResults?.searchTerm}
-            onClose={handleCloseSearchResults}
-            programmaticScrollRef={programmaticScrollRef}
-          />
-        );
-      case "outline":
-        return (
-          <Outline
-            content={content}
-            onHeadingClick={handleChapterClick}
-          />
-        );
-      case "characters":
-        return <Characters content={content} />;
-      case "dictionary":
-        return <Dictionary content={content} initialSearchTerm={dictionarySearchTrigger.term} searchTriggerId={dictionarySearchTrigger.id} editorMode={editorMode} />;
-      case "wordfreq":
-        return <WordFrequency content={content} filePath={currentFile?.path ?? undefined} onWordSearch={(word) => {
-          setSearchInitialTerm(word);
-          setSearchOpenTrigger(prev => prev + 1);
-        }} />;
-      default:
-        return null;
-    }
-  };
+  // Shared props forwarded to every SidebarPanel instance
+  const sidebarPanelProps = {
+    content,
+    editorMode,
+    compactMode,
+    onChapterClick: handleChapterClick,
+    onInsertText: handleInsertText,
+    searchResults,
+    onCloseSearchResults: handleCloseSearchResults,
+    programmaticScrollRef,
+    editorViewInstance,
+    dictionarySearchTrigger,
+    currentFilePath: currentFile?.path ?? undefined,
+    newFileTrigger,
+    openProjectFile,
+    incrementEditorKey,
+    onWordSearch: (word: string) => {
+      setSearchInitialTerm(word);
+      setSearchOpenTrigger(prev => prev + 1);
+    },
+  } as const;
 
     return (
+      <DiffTabContext.Provider value={diffTabContextValue}>
+      <TerminalTabContext.Provider value={terminalTabContextValue}>
       <EditorSettingsProvider settings={settings} handlers={settingsHandlers}>
       <div className="h-screen flex flex-col overflow-hidden relative">
          {/* Dynamic title update */}
@@ -737,6 +975,13 @@ export default function EditorPage() {
           onSave={handleCloseTabSave}
           onDiscard={handleCloseTabDiscard}
           onCancel={handleCloseTabCancel}
+        />
+
+        {/* Desktop-only feature dialog (shown to web users for terminal) */}
+        <DesktopOnlyDialog
+          isOpen={showDesktopOnlyDialog}
+          onClose={() => setShowDesktopOnlyDialog(false)}
+          featureName="ターミナル"
         />
 
         {/* 最近のプロジェクト削除確認ダイアログ */}
@@ -822,14 +1067,15 @@ export default function EditorPage() {
                setBottomView(view);
              }
            }}
+           onNewTerminal={handleNewTerminalTab}
          />
 
            {/* Left side panel */}
           {(topView !== "none" || bottomView !== "none") && (
-            <ResizablePanel side="left" defaultWidth={compactMode ? 200 : 256} minWidth={compactMode ? 160 : 200} maxWidth={compactMode ? 320 : 400}>
+            <ResizablePanel side="left" defaultWidth={compactMode ? 200 : 256} minWidth={compactMode ? 160 : 200} maxWidth={compactMode ? 320 : 400} className="">
               {(() => {
-                const topPanel = topView !== "none" ? renderPanel(topView) : null;
-                const bottomPanel = bottomView !== "none" ? renderPanel(bottomView) : null;
+                const topPanel = topView !== "none" ? <SidebarPanel view={topView} {...sidebarPanelProps} /> : null;
+                const bottomPanel = bottomView !== "none" ? <SidebarPanel view={bottomView} {...sidebarPanelProps} /> : null;
 
                 if (topPanel && bottomPanel) {
                   return <SidebarSplitter top={topPanel} bottom={bottomPanel} />;
@@ -840,15 +1086,47 @@ export default function EditorPage() {
         )}
 
         <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
+          {tabs.length === 0 && (
+            <div className="absolute inset-0 z-10">
+              <EmptyEditorState
+                onNewFile={() => {
+                  if (isProjectMode(editorMode)) {
+                    setTopView("files");
+                    setNewFileTrigger(prev => prev + 1);
+                  } else {
+                    newTab();
+                  }
+                }}
+                onOpenFile={() => void openFile()}
+                onNewTerminal={handleNewTerminalTab}
+              />
+            </div>
+          )}
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+          <div className="flex-1 flex flex-col overflow-hidden" onContextMenu={handleTabBarContextMenu}>
           <DockviewReact
             className="flex-1 dockview-theme-illusions"
             components={{
               editor: ({ api: panelApi, params: panelParams }) => {
-                // Each dockview panel receives its own params.
-                // Only the panel matching the active tab renders the full interactive editor;
-                // other panels show a read-only content snapshot.
-                const panelBufferId = panelParams?.bufferId ?? activeTabId;
-                const isActivePanel = panelBufferId === activeTabId;
+                // Identity/layout values come from panelParams (updated via updateParameters)
+                // because dockview-react captures the component function once per panel.
+                // Content is read from tabsRef (a stable ref object whose .current is
+                // always fresh, even inside a stale closure) to avoid triggering
+                // dockview re-renders on every keystroke.
+                const panelBufferId = panelParams?.bufferId ?? "";
+                const panelFilePath = panelParams?.filePath ?? "";
+                const panelFileType = (panelParams?.fileType ?? ".mdi") as string;
+                const panelEditorKey = panelParams?.editorKey ?? 0;
+                const panelActiveTabId = panelParams?.activeTabId ?? "";
+                const isActivePanel = panelBufferId === panelActiveTabId;
+                const panelMdiEnabled = panelFileType === ".mdi";
+                const panelGfmEnabled = panelFileType !== ".txt";
+
+                // Look up content from the live tabs ref (not params)
+                const liveTab = tabsRef.current.find((t) => t.id === panelBufferId);
+                const liveEditorTab = liveTab && isEditorTab(liveTab) ? liveTab : undefined;
+                const panelContent = liveEditorTab?.content ?? "";
+                const panelLastSavedContent = liveEditorTab?.lastSavedContent ?? "";
 
                 if (editorDiff && isActivePanel) {
                   return (
@@ -866,8 +1144,8 @@ export default function EditorPage() {
                     <ErrorBoundary sectionName="エディタ">
                       <div ref={editorDomRef} className="h-full">
                         <NovelEditor
-                          key={`tab-${panelBufferId}-${editorKey}`}
-                          initialContent={content}
+                          key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}`}
+                          initialContent={panelContent}
                           onChange={handleChange}
                           onInsertText={handleInsertText}
                           onSelectionChange={setSelectedCharCount}
@@ -884,8 +1162,8 @@ export default function EditorPage() {
                           onOpenDictionary={handleOpenDictionary}
                           onShowLintHint={handleShowLintHint}
                           onIgnoreCorrection={handleIgnoreCorrection}
-                          mdiExtensionsEnabled={mdiExtensionsEnabled}
-                          gfmEnabled={gfmEnabled}
+                          mdiExtensionsEnabled={panelMdiEnabled}
+                          gfmEnabled={panelGfmEnabled}
                         />
                       </div>
                     </ErrorBoundary>
@@ -894,8 +1172,6 @@ export default function EditorPage() {
 
                 // Non-active panel: render a lightweight read-only editor
                 // that activates the tab when clicked
-                const panelTab = tabs.find((t) => t.id === panelBufferId);
-                const panelFileType = panelTab?.fileType ?? ".mdi";
                 return (
                   <div
                     className="h-full cursor-pointer"
@@ -906,19 +1182,30 @@ export default function EditorPage() {
                   >
                     <ErrorBoundary sectionName="エディタ">
                       <NovelEditor
-                        key={`tab-${panelBufferId}-inactive`}
-                        initialContent={panelTab?.lastSavedContent ?? ""}
-                        mdiExtensionsEnabled={panelFileType === ".mdi"}
-                        gfmEnabled={panelFileType !== ".txt"}
+                        key={`tab-${panelBufferId}-${panelFilePath}-inactive`}
+                        initialContent={panelLastSavedContent}
+                        mdiExtensionsEnabled={panelMdiEnabled}
+                        gfmEnabled={panelGfmEnabled}
                       />
                     </ErrorBoundary>
                   </div>
                 );
               },
+              // Placeholder components for Phase 2/4 implementation
+              terminal: TerminalPanel,
+              diff: DiffPanel,
             }}
             tabComponents={dockviewTabComponents}
             onReady={handleDockviewReady}
           />
+          {tabBarMenu && (
+            <ContextMenu
+              menu={tabBarMenu}
+              onAction={handleTabBarMenuAction}
+              onClose={closeTabBarMenu}
+            />
+          )}
+          </div>
 
            {/* Save complete toast */}
           {showSaveToast && (
@@ -933,56 +1220,67 @@ export default function EditorPage() {
            )}
          </main>
 
-          {/* Right side panel: statistics (always visible) */}
+          {/* Right side panel: statistics (auto-collapse when no tabs open) */}
           <ResizablePanel
             side="right"
             defaultWidth={compactMode ? 200 : 256}
             minWidth={compactMode ? 160 : 200}
             maxWidth={compactMode ? 320 : 400}
             collapsible={true}
-            isCollapsed={isRightPanelCollapsed}
-            onToggleCollapse={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
+            isCollapsed={isRightPanelCollapsed || tabs.length === 0}
+            onToggleCollapse={handleToggleRightPanel}
           >
           <ErrorBoundary sectionName="インスペクタ">
-          <Inspector
-            compactMode={compactMode}
-            charCount={charCount}
-            selectedCharCount={selectedCharCount}
-            paragraphCount={paragraphCount}
-            fileName={fileName}
-            isDirty={isDirty}
-            isSaving={isSaving}
-            lastSavedTime={lastSavedTime}
-            onSaveFile={saveFile}
-            onFileNameChange={updateFileName}
-            sentenceCount={sentenceCount}
-            charTypeAnalysis={charTypeAnalysis}
-            charUsageRates={charUsageRates}
-            readabilityAnalysis={readabilityAnalysis}
-            onOpenPosHighlightSettings={handleOpenPosHighlightSettings}
-            activeFileName={currentFile?.name}
-            currentContent={content}
-            onHistoryRestore={(restoredContent: string) => {
-              setContent(restoredContent);
-              incrementEditorKey();
-            }}
-            onCompareInEditor={setEditorDiff}
-            lintIssues={enrichedLintIssues}
-            onNavigateToIssue={handleNavigateToIssue}
-            onApplyFix={handleApplyFix}
-            onIgnoreCorrection={handleIgnoreCorrection}
-            onRefreshLinting={refreshLinting}
-            isLinting={isLinting}
-            activeLintIssueIndex={activeLintIssueIndex}
-            onOpenLintingSettings={handleOpenLintingSettings}
-            onApplyLintPreset={handleApplyLintPreset}
-            activeLintPresetId={activeLintPresetId}
-            switchToCorrectionsTrigger={switchToCorrectionsTrigger}
-          />
+          {activeEditorTab ? (
+            <Inspector
+              compactMode={compactMode}
+              charCount={charCount}
+              selectedCharCount={selectedCharCount}
+              paragraphCount={paragraphCount}
+              fileName={fileName}
+              isDirty={isDirty}
+              isSaving={isSaving}
+              lastSavedTime={lastSavedTime}
+              onSaveFile={saveFile}
+              onFileNameChange={updateFileName}
+              sentenceCount={sentenceCount}
+              charTypeAnalysis={charTypeAnalysis}
+              charUsageRates={charUsageRates}
+              readabilityAnalysis={readabilityAnalysis}
+              onOpenPosHighlightSettings={handleOpenPosHighlightSettings}
+              activeFileName={currentFile?.name}
+              currentContent={content}
+              onHistoryRestore={(restoredContent: string) => {
+                setContent(restoredContent);
+                incrementEditorKey();
+              }}
+              onCompareInEditor={setEditorDiff}
+              lintIssues={enrichedLintIssues}
+              onNavigateToIssue={handleNavigateToIssue}
+              onApplyFix={handleApplyFix}
+              onIgnoreCorrection={handleIgnoreCorrection}
+              onRefreshLinting={refreshLinting}
+              isLinting={isLinting}
+              activeLintIssueIndex={activeLintIssueIndex}
+              onOpenLintingSettings={handleOpenLintingSettings}
+              onApplyLintPreset={handleApplyLintPreset}
+              activeLintPresetId={activeLintPresetId}
+              switchToCorrectionsTrigger={switchToCorrectionsTrigger}
+            />
+          ) : (
+            // Non-editor tab (terminal / diff): inspector is unavailable
+            <div className="h-full flex items-center justify-center p-4">
+              <p className="text-foreground-secondary text-sm text-center">
+                インスペクタはエディタタブでのみ使用できます
+              </p>
+            </div>
+          )}
           </ErrorBoundary>
         </ResizablePanel>
       </div>
     </div>
       </EditorSettingsProvider>
+      </TerminalTabContext.Provider>
+      </DiffTabContext.Provider>
   );
 }

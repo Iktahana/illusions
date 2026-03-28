@@ -10,7 +10,7 @@ import {
 import clsx from "clsx";
 import type { EditorView } from "@milkdown/prose/view";
 import { useSpeech } from "@/lib/hooks/use-speech";
-import SearchDialog from "./SearchDialog";
+import SearchDialog, { type SearchMatch } from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
 import EditorToolbar from "./editor/EditorToolbar";
 import MilkdownEditor from "./editor/MilkdownEditor";
@@ -36,8 +36,7 @@ interface EditorProps {
   onEditorViewReady?: (view: EditorView) => void;
   /** Ref that external code sets to true before programmatic scrolling */
   programmaticScrollRef?: React.MutableRefObject<boolean>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onShowAllSearchResults?: (matches: any[], searchTerm: string) => void;
+  onShowAllSearchResults?: (matches: SearchMatch[], searchTerm: string) => void;
   // リンティング設定
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
@@ -81,7 +80,7 @@ export default function NovelEditor({
   const {
     fontScale, lineHeight, fontFamily,
     charsPerLine, autoCharsPerLine,
-    onCharsPerLineChange,
+    onAutoCharsPerLineCalc,
   } = useTypographySettings();
   const { speechVoiceURI, speechRate, speechPitch, speechVolume } = useSpeechSettings();
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
@@ -91,6 +90,8 @@ export default function NovelEditor({
   });
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  // コンテキストメニューの「検索」で渡された初期検索語
+  const [contextMenuSearchTerm, setContextMenuSearchTerm] = useState<string | undefined>(undefined);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const { state: speechState, speakSegments, pause, resume, stop } = useSpeech({
     voiceURI: speechVoiceURI,
@@ -110,6 +111,9 @@ export default function NovelEditor({
 
   // Ref to indicate a mode switch is in progress (for scroll restoration)
   const isModeSwitchingRef = useRef(false);
+
+  /** Cache for DOM character-width measurement (invalidated when font settings change) */
+  const charSizeCacheRef = useRef<{ fontFamily: string; fontScale: number; lineHeight: number; size: number } | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -137,6 +141,12 @@ export default function NovelEditor({
   };
 
   const handleSearchOpen = useCallback(() => {
+    setIsSearchOpen(true);
+  }, []);
+
+  /** コンテキストメニューの「検索」アクションを処理する。選択テキストを初期検索語として渡す。 */
+  const handleFind = useCallback((initialTerm?: string) => {
+    setContextMenuSearchTerm(initialTerm);
     setIsSearchOpen(true);
   }, []);
 
@@ -275,25 +285,49 @@ export default function NovelEditor({
     setIsVertical(!isVertical);
   }, [isVertical, scrollContainerRef]);
 
+  // Refs to avoid including charsPerLine / callback in useCallback deps (prevents recalc loop)
+  const charsPerLineRef = useRef(charsPerLine);
+  charsPerLineRef.current = charsPerLine;
+  const onAutoCharsPerLineCalcRef = useRef(onAutoCharsPerLineCalc);
+  onAutoCharsPerLineCalcRef.current = onAutoCharsPerLineCalc;
+
   // Calculate optimal chars per line based on editor width and font size
   const calculateOptimalCharsPerLine = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    // Measure character width
-    const measureEl = document.createElement('span');
-    measureEl.style.cssText = `
-      position: absolute;
-      visibility: hidden;
-      white-space: nowrap;
-      font-family: "${fontFamily}", serif;
-      font-size: ${fontScale}%;
-      line-height: ${lineHeight};
-    `;
-    measureEl.textContent = '国'; // Measure with full-width character
-    document.body.appendChild(measureEl);
-    const charSize = measureEl.offsetWidth;
-    document.body.removeChild(measureEl);
+    // Skip calculation when container is not visible (e.g., hidden dockview panel)
+    if (container.clientWidth <= 0 || container.clientHeight <= 0) return;
+
+    // Use cached charSize when font settings are unchanged (avoids DOM element creation on every resize)
+    let charSize: number;
+    const cache = charSizeCacheRef.current;
+    if (
+      cache &&
+      cache.fontFamily === fontFamily &&
+      cache.fontScale === fontScale &&
+      cache.lineHeight === lineHeight
+    ) {
+      charSize = cache.size;
+    } else {
+      // Measure character width via a temporary DOM element
+      const measureEl = document.createElement('span');
+      measureEl.style.cssText = `
+        position: absolute;
+        visibility: hidden;
+        white-space: nowrap;
+        font-family: "${fontFamily}", serif;
+        font-size: ${fontScale}%;
+        line-height: ${lineHeight};
+      `;
+      measureEl.textContent = '国'; // Measure with full-width character
+      document.body.appendChild(measureEl);
+      charSize = measureEl.offsetWidth;
+      document.body.removeChild(measureEl);
+
+      // Cache the result for subsequent resize events with the same font settings
+      charSizeCacheRef.current = { fontFamily, fontScale, lineHeight, size: charSize };
+    }
 
     if (charSize <= 0) return;
 
@@ -303,17 +337,16 @@ export default function NovelEditor({
 
     if (isVertical) {
       // For vertical writing: calculate based on available height
-      // Get visible height (subtract toolbar height)
-      const toolbarHeight = 48; // h-12 = 48px
+      // Only subtract topPadding (pt-12); toolbar is outside the scroll container
       const topPadding = 48; // pt-12 = 48px
-      const availableHeight = container.clientHeight - toolbarHeight - topPadding;
+      const availableHeight = container.clientHeight - topPadding;
 
       const optimalChars = Math.max(10, Math.floor(availableHeight / charSize));
       // Clamp: max 40 characters
       const clamped = Math.min(40, optimalChars);
 
-      if (clamped !== charsPerLine) {
-        onCharsPerLineChange?.(clamped);
+      if (clamped !== charsPerLineRef.current) {
+        onAutoCharsPerLineCalcRef.current?.(clamped);
       }
     } else {
       // For horizontal writing: calculate based on available width
@@ -321,11 +354,12 @@ export default function NovelEditor({
       // Clamp: max 40 characters
       const clamped = Math.min(40, optimalChars);
 
-      if (clamped !== charsPerLine) {
-        onCharsPerLineChange?.(clamped);
+      if (clamped !== charsPerLineRef.current) {
+        onAutoCharsPerLineCalcRef.current?.(clamped);
       }
     }
-  }, [fontFamily, fontScale, lineHeight, isVertical, charsPerLine, onCharsPerLineChange, scrollContainerRef]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- charsPerLine & callback read via refs to break recalc loop
+  }, [fontFamily, fontScale, lineHeight, isVertical, scrollContainerRef]);
 
   // Add window resize listener to auto-adjust chars per line
   useEffect(() => {
@@ -334,15 +368,18 @@ export default function NovelEditor({
     // Calculate on mount
     const timer = setTimeout(calculateOptimalCharsPerLine, 100);
 
-    // Calculate on window resize
+    // Debounce resize events to 300ms to avoid excessive recalculation during window drag
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     const handleResize = () => {
-      calculateOptimalCharsPerLine();
+      if (resizeTimer !== null) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(calculateOptimalCharsPerLine, 300);
     };
 
     window.addEventListener('resize', handleResize);
 
     return () => {
       clearTimeout(timer);
+      if (resizeTimer !== null) clearTimeout(resizeTimer);
       window.removeEventListener('resize', handleResize);
     };
   }, [calculateOptimalCharsPerLine, autoCharsPerLine]);
@@ -398,6 +435,8 @@ export default function NovelEditor({
               onIgnoreCorrection={onIgnoreCorrection}
               mdiExtensionsEnabled={mdiExtensionsEnabled}
               gfmEnabled={gfmEnabled}
+              onStartSpeech={startSpeechFromCursor}
+              onFind={handleFind}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -414,10 +453,11 @@ export default function NovelEditor({
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onShowAllResults={onShowAllSearchResults}
-        initialSearchTerm={searchInitialTerm}
+        initialSearchTerm={contextMenuSearchTerm ?? searchInitialTerm}
         programmaticScrollRef={programmaticScrollRef}
       />
     </div>
   );
 }
+
 

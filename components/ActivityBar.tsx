@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   FileText,
   Settings,
@@ -10,10 +10,14 @@ import {
   BarChart3,
   Users,
   BookOpen,
-  Folder
+  Folder,
+  Terminal,
 } from "lucide-react";
 import clsx from "clsx";
 import { localPreferences } from "@/lib/storage/local-preferences";
+import { useKeymap } from "@/contexts/KeymapContext";
+import { formatBinding } from "@/lib/keymap/keymap-utils";
+import type { CommandId } from "@/lib/keymap/command-ids";
 import {
   DndContext,
   PointerSensor,
@@ -40,6 +44,14 @@ interface ActivityBarItem {
   tooltip: string;
 }
 
+/** Maps ActivityBarView IDs to their keyboard shortcut CommandId */
+const VIEW_TO_COMMAND_ID: Partial<Record<ActivityBarView, CommandId>> = {
+  explorer: "panel.explorer",
+  search: "panel.search",
+  outline: "panel.outline",
+  settings: "nav.settings",
+};
+
 /** Top group: primary navigation (document/project structure) */
 const DEFAULT_TOP_ITEMS: ActivityBarItem[] = [
   {
@@ -52,19 +64,19 @@ const DEFAULT_TOP_ITEMS: ActivityBarItem[] = [
     id: "explorer",
     icon: Layers,
     label: "エクスプローラー",
-    tooltip: "エクスプローラー (Ctrl+Shift+E)"
+    tooltip: "エクスプローラー"
   },
   {
     id: "search",
     icon: Search,
     label: "検索",
-    tooltip: "検索 (Ctrl+Shift+F)"
+    tooltip: "検索"
   },
   {
     id: "outline",
     icon: Book,
     label: "アウトライン",
-    tooltip: "アウトライン (Ctrl+Shift+O)"
+    tooltip: "アウトライン"
   },
 ];
 
@@ -88,16 +100,18 @@ const DEFAULT_BOTTOM_ITEMS: ActivityBarItem[] = [
     label: "語彙統計",
     tooltip: "語彙統計"
   },
-  {
-    id: "settings",
-    icon: Settings,
-    label: "設定",
-    tooltip: "設定 (Ctrl+,)"
-  },
 ];
 
-/** Set of view IDs that belong to the bottom group */
-const BOTTOM_VIEW_IDS = new Set(DEFAULT_BOTTOM_ITEMS.map((item) => item.id));
+/** Settings item — rendered separately (non-sortable, always last) */
+const SETTINGS_ITEM: ActivityBarItem = {
+  id: "settings",
+  icon: Settings,
+  label: "設定",
+  tooltip: "設定"
+};
+
+/** Set of view IDs that belong to the bottom group (including settings) */
+const BOTTOM_VIEW_IDS = new Set([...DEFAULT_BOTTOM_ITEMS.map((item) => item.id), SETTINGS_ITEM.id]);
 
 /** Check whether a view belongs to the bottom group */
 export function isBottomView(view: ActivityBarView): boolean {
@@ -204,6 +218,8 @@ interface ActivityBarProps {
   onTopViewChange: (view: ActivityBarView) => void;
   onBottomViewChange: (view: ActivityBarView) => void;
   compactMode?: boolean;
+  /** Callback to create a new terminal tab (Electron only). */
+  onNewTerminal?: () => void;
 }
 
 export default function ActivityBar({
@@ -212,12 +228,39 @@ export default function ActivityBar({
   onTopViewChange,
   onBottomViewChange,
   compactMode = false,
+  onNewTerminal,
 }: ActivityBarProps) {
   const [topItems, setTopItems] = useState<ActivityBarItem[]>(() =>
     loadOrder(() => localPreferences.getSidebarTopOrder(), DEFAULT_TOP_ITEMS)
   );
   const [bottomItems, setBottomItems] = useState<ActivityBarItem[]>(() =>
     loadOrder(() => localPreferences.getSidebarBottomOrder(), DEFAULT_BOTTOM_ITEMS)
+  );
+
+  const { effectiveBindings } = useKeymap();
+
+  /** Adds the keyboard shortcut to the tooltip if this view has a CommandId */
+  const withTooltip = useCallback((item: ActivityBarItem): ActivityBarItem => {
+    const commandId = VIEW_TO_COMMAND_ID[item.id];
+    if (!commandId) return item;
+    const binding = effectiveBindings[commandId];
+    const shortcut = formatBinding(binding);
+    if (shortcut === "未設定") return item;
+    return { ...item, tooltip: `${item.label} (${shortcut})` };
+  }, [effectiveBindings]);
+
+  const topItemsWithTooltips = useMemo(
+    () => topItems.map(withTooltip),
+    [topItems, withTooltip]
+  );
+  const bottomItemsWithTooltips = useMemo(
+    () => bottomItems.map(withTooltip),
+    [bottomItems, withTooltip]
+  );
+
+  const settingsWithTooltip = useMemo(
+    () => withTooltip(SETTINGS_ITEM),
+    [withTooltip]
   );
 
   const sensors = useSensors(
@@ -269,7 +312,7 @@ export default function ActivityBar({
           items={topItems.map((item) => item.id)}
           strategy={verticalListSortingStrategy}
         >
-          {topItems.map((item) => (
+          {topItemsWithTooltips.map((item) => (
             <SortableButton
               key={item.id}
               item={item}
@@ -290,7 +333,7 @@ export default function ActivityBar({
           items={bottomItems.map((item) => item.id)}
           strategy={verticalListSortingStrategy}
         >
-          {bottomItems.map((item) => (
+          {bottomItemsWithTooltips.map((item) => (
             <SortableButton
               key={item.id}
               item={item}
@@ -302,6 +345,49 @@ export default function ActivityBar({
             />
           ))}
         </SortableContext>
+
+        {/* Terminal button (Electron only, non-sortable) */}
+        {onNewTerminal && (
+          <button
+            onClick={onNewTerminal}
+            className={clsx(
+              "flex items-center justify-center rounded-md transition-all relative group",
+              compactMode ? "w-8 h-8" : "w-10 h-10",
+              "text-foreground-tertiary hover:text-foreground hover:bg-hover",
+              "cursor-default active:cursor-pointer"
+            )}
+            title="新規ターミナル"
+          >
+            <Terminal className="w-5 h-5" />
+            <span className="absolute left-full ml-2 px-2 py-1 bg-background-elevated border border-border text-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+              新規ターミナル
+            </span>
+          </button>
+        )}
+
+        {/* Settings button (non-sortable, always last) */}
+        <button
+          onClick={() => {
+            onBottomViewChange(bottomView === "settings" ? "none" : "settings");
+          }}
+          className={clsx(
+            "flex items-center justify-center rounded-md transition-all relative group",
+            compactMode ? "w-8 h-8" : "w-10 h-10",
+            bottomView === "settings"
+              ? "bg-accent text-accent-foreground"
+              : "text-foreground-tertiary hover:text-foreground hover:bg-hover",
+            "cursor-default active:cursor-pointer"
+          )}
+          title={settingsWithTooltip.tooltip}
+        >
+          <Settings className="w-5 h-5" />
+          {bottomView === "settings" && (
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-accent-foreground rounded-r" />
+          )}
+          <span className="absolute left-full ml-2 px-2 py-1 bg-background-elevated border border-border text-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+            {settingsWithTooltip.tooltip}
+          </span>
+        </button>
       </div>
     </DndContext>
   );

@@ -4,13 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { RuleRunner } from "@/lib/linting/rule-runner";
 import type { LintIssue, Severity } from "@/lib/linting/types";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
-import type { ILlmClient } from "@/lib/llm-client/types";
-import { getLlmClient } from "@/lib/llm-client/llm-client";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import { notificationManager } from "@/lib/services/notification-manager";
 
-// Import all lint rules
+// ---------------------------------------------------------------------------
+// L1 rules — Original custom rules (per-paragraph, regex-based)
+// ---------------------------------------------------------------------------
 import { PunctuationRule } from "@/lib/linting/rules/punctuation-rules";
 import { NumberFormatRule } from "@/lib/linting/rules/number-format";
 import { JoyoKanjiRule } from "@/lib/linting/rules/joyo-kanji";
@@ -26,16 +26,11 @@ import { SentenceLengthRule } from "@/lib/linting/rules/sentence-length";
 import { DashFormatRule } from "@/lib/linting/rules/dash-format";
 import { DialoguePunctuationRule } from "@/lib/linting/rules/dialogue-punctuation";
 import { CommaFrequencyRule } from "@/lib/linting/rules/comma-frequency";
-import { DesuMasuConsistencyRule } from "@/lib/linting/rules/desu-masu-consistency";
-import { ConjunctionOveruseRule } from "@/lib/linting/rules/conjunction-overuse";
-import { WordRepetitionRule } from "@/lib/linting/rules/word-repetition";
-import { TaigenDomeOveruseRule } from "@/lib/linting/rules/taigen-dome-overuse";
-import { PassiveOveruseRule } from "@/lib/linting/rules/passive-overuse";
-import { CounterWordMismatchRule } from "@/lib/linting/rules/counter-word-mismatch";
-import { AdverbFormConsistencyRule } from "@/lib/linting/rules/adverb-form-consistency";
-import { HomophoneDetectionRule } from "@/lib/linting/rules/homophone-detection";
 
-// New rules from official Japanese language standards (#438)
+// ---------------------------------------------------------------------------
+// L1 rules — Standards-based rules from PR #438
+// Notation (JTF / JIS X 4051 / 外来語の表記 / 現代仮名遣い)
+// ---------------------------------------------------------------------------
 import { MixedWidthSpacingRule } from "@/lib/linting/rules/mixed-width-spacing-rule";
 import { BracketSpacingRule } from "@/lib/linting/rules/bracket-spacing-rule";
 import { KatakanaWidthRule } from "@/lib/linting/rules/katakana-width-rule";
@@ -55,6 +50,7 @@ import { GairaiKanaTableRule } from "@/lib/linting/rules/gairai-kana-table-rule"
 import { JiZuKanaRule } from "@/lib/linting/rules/ji-zu-kana-rule";
 import { HistoricalKanaDetection } from "@/lib/linting/rules/historical-kana-detection";
 import { LongVowelKanaRule } from "@/lib/linting/rules/long-vowel-kana-rule";
+// Kanji / grammar / style (送り仮名の付け方 / 漢字使用等 / 公用文作成の考え方)
 import { VerbOkuriganaStrictRule } from "@/lib/linting/rules/verb-okurigana-strict-rule";
 import { FixedOkuriganaNounRule } from "@/lib/linting/rules/fixed-okurigana-noun-rule";
 import { FormalNounOpeningRule } from "@/lib/linting/rules/formal-noun-opening-rule";
@@ -77,6 +73,26 @@ import { ExcessiveHonorificRule } from "@/lib/linting/rules/excessive-honorific-
 import { ModifierLengthOrderRule } from "@/lib/linting/rules/modifier-length-order-rule";
 import { KanjiVerbOneCharDo } from "@/lib/linting/rules/kanji-verb-one-char-do";
 
+// ---------------------------------------------------------------------------
+// L1 rules — JSON-driven factory rules (additive, different rule IDs)
+// These use data from Japanese-Style-Sheet JSON definitions and have their
+// own unique rule IDs (e.g. jtf-*, me2-*, gk-*, nh-*).
+// ---------------------------------------------------------------------------
+import { createManuscriptL1Rules } from "@/lib/linting/rules/json-l1/manuscript-l1-rules";
+import { createJtfL1Rules } from "@/lib/linting/rules/json-l1/jtf-l1-rules";
+import { createGendaiKanazukaiL1Rules, createNihongoHyoukiL1Rules } from "@/lib/linting/rules/json-l1";
+
+// ---------------------------------------------------------------------------
+// L2 rules — Morphological analysis (kuromoji-based, require NLP client)
+// ---------------------------------------------------------------------------
+import { DesuMasuConsistencyRule } from "@/lib/linting/rules/desu-masu-consistency";
+import { ConjunctionOveruseRule } from "@/lib/linting/rules/conjunction-overuse";
+import { WordRepetitionRule } from "@/lib/linting/rules/word-repetition";
+import { TaigenDomeOveruseRule } from "@/lib/linting/rules/taigen-dome-overuse";
+import { PassiveOveruseRule } from "@/lib/linting/rules/passive-overuse";
+import { CounterWordMismatchRule } from "@/lib/linting/rules/counter-word-mismatch";
+import { AdverbFormConsistencyRule } from "@/lib/linting/rules/adverb-form-consistency";
+
 export interface UseLintingResult {
   ruleRunner: RuleRunner;
   lintIssues: LintIssue[];
@@ -96,9 +112,7 @@ export function useLinting(
   lintingEnabled: boolean,
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
   editorViewInstance: EditorView | null,
-  llmEnabled: boolean = false,
   powerSaveMode: boolean = false,
-  llmModelId: string = "qwen3-1.7b-q8",
   correctionGuidelines?: GuidelineId[],
   correctionMode?: CorrectionModeId,
 ): UseLintingResult {
@@ -109,6 +123,8 @@ export function useLinting(
   // Lazily create and register all rules once
   if (!ruleRunnerRef.current) {
     const runner = new RuleRunner();
+
+    // -- L1: Original custom rules (15 rules) --------------------------------
     runner.registerRule(new PunctuationRule());
     runner.registerRule(new NumberFormatRule());
     runner.registerRule(new JoyoKanjiRule());
@@ -124,19 +140,9 @@ export function useLinting(
     runner.registerRule(new DashFormatRule());
     runner.registerRule(new DialoguePunctuationRule());
     runner.registerRule(new CommaFrequencyRule());
-    runner.registerRule(new DesuMasuConsistencyRule());
-    runner.registerRule(new ConjunctionOveruseRule());
-    runner.registerRule(new WordRepetitionRule());
-    runner.registerRule(new TaigenDomeOveruseRule());
-    runner.registerRule(new PassiveOveruseRule());
-    runner.registerRule(new CounterWordMismatchRule());
-    runner.registerRule(new AdverbFormConsistencyRule());
 
-    // L3 rules (LLM-based)
-    runner.registerRule(new HomophoneDetectionRule());
-
-    // New rules from official Japanese language standards (#438)
-    // Notation (約物・表記) — JTF / 公用文 / 外来語の表記 / 現代仮名遣い
+    // -- L1: Standards-based rules (#438) ------------------------------------
+    // Notation (JTF / JIS X 4051 / 外来語の表記 / 現代仮名遣い)
     runner.registerRule(new MixedWidthSpacingRule());
     runner.registerRule(new BracketSpacingRule());
     runner.registerRule(new KatakanaWidthRule());
@@ -156,7 +162,7 @@ export function useLinting(
     runner.registerRule(new JiZuKanaRule());
     runner.registerRule(new HistoricalKanaDetection());
     runner.registerRule(new LongVowelKanaRule());
-    // Kanji / grammar / style — 送り仮名の付け方 / 漢字使用等 / 公用文作成の考え方
+    // Kanji / grammar / style (送り仮名の付け方 / 漢字使用等 / 公用文作成の考え方)
     runner.registerRule(new VerbOkuriganaStrictRule());
     runner.registerRule(new FixedOkuriganaNounRule());
     runner.registerRule(new FormalNounOpeningRule());
@@ -178,6 +184,32 @@ export function useLinting(
     runner.registerRule(new ExcessiveHonorificRule());
     runner.registerRule(new ModifierLengthOrderRule());
     runner.registerRule(new KanjiVerbOneCharDo());
+
+    // -- L1: JSON-driven factory rules (additive, unique IDs) ----------------
+    // These rules are generated from Japanese-Style-Sheet JSON definitions.
+    // They use distinct rule IDs (jtf-*, me2-*, gk-*, nh-*) and do NOT
+    // replace the hand-written rules above.
+    for (const rule of createManuscriptL1Rules()) {
+      runner.registerRule(rule);
+    }
+    for (const rule of createJtfL1Rules()) {
+      runner.registerRule(rule);
+    }
+    for (const rule of createGendaiKanazukaiL1Rules()) {
+      runner.registerRule(rule);
+    }
+    for (const rule of createNihongoHyoukiL1Rules()) {
+      runner.registerRule(rule);
+    }
+
+    // -- L2: Morphological rules (require NLP/kuromoji) ----------------------
+    runner.registerRule(new DesuMasuConsistencyRule());
+    runner.registerRule(new ConjunctionOveruseRule());
+    runner.registerRule(new WordRepetitionRule());
+    runner.registerRule(new TaigenDomeOveruseRule());
+    runner.registerRule(new PassiveOveruseRule());
+    runner.registerRule(new CounterWordMismatchRule());
+    runner.registerRule(new AdverbFormConsistencyRule());
 
     // Initialize guideline map for guideline-based filtering
     runner.setGuidelineMap(RULE_GUIDELINE_MAP);
@@ -202,13 +234,10 @@ export function useLinting(
     }
   }, [ruleRunner, lintingRuleConfigs]);
 
-  const handleLintIssuesUpdated = useCallback((issues: LintIssue[], options?: { llmPending?: boolean }) => {
+  const handleLintIssuesUpdated = useCallback((issues: LintIssue[]) => {
     if (!lintingEnabled) return;
     setLintIssues(issues);
-    // Keep spinner active while LLM validation is still in progress
-    if (!options?.llmPending) {
-      setIsLinting(false);
-    }
+    setIsLinting(false);
   }, [lintingEnabled]);
 
   // Handle NLP tokenization errors — show a user-visible notification
@@ -241,42 +270,6 @@ export function useLinting(
     }
   }, [ruleRunner, correctionGuidelines, editorViewInstance, lintingEnabled]);
 
-  // Sync correctionMode to the decoration plugin for LLM validation context
-  useEffect(() => {
-    if (!editorViewInstance || !lintingEnabled || !correctionMode) return;
-
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
-      ({ updateLintingSettings }) => {
-        updateLintingSettings(
-          editorViewInstance,
-          { correctionMode },
-          "mode-change",
-        );
-      },
-    ).catch((err) => {
-      console.error("[useLinting] Failed to sync correction mode:", err);
-    });
-  }, [correctionMode, editorViewInstance, lintingEnabled]);
-
-  // Sync llmEnabled, llmClient, and llmModelId to the decoration plugin
-  useEffect(() => {
-    if (!editorViewInstance || !lintingEnabled) return;
-
-    const llmClient: ILlmClient | null = llmEnabled ? getLlmClient() : null;
-
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
-      ({ updateLintingSettings }) => {
-        updateLintingSettings(editorViewInstance, {
-          llmClient,
-          llmEnabled,
-          llmModelId,
-        });
-      },
-    ).catch((err) => {
-      console.error("[useLinting] Failed to sync LLM settings:", err);
-    });
-  }, [editorViewInstance, lintingEnabled, llmEnabled, llmModelId]);
-
   // Clear issues when linting is disabled
   useEffect(() => {
     if (!lintingEnabled) {
@@ -285,7 +278,6 @@ export function useLinting(
   }, [lintingEnabled]);
 
   // Force re-run linting on the full document (not just visible paragraphs)
-  // Always provides llmClient for L1/L2 validation regardless of power-save/llmEnabled state
   const refreshLinting = useCallback(() => {
     if (!editorViewInstance || !lintingEnabled) return;
 
@@ -296,19 +288,11 @@ export function useLinting(
           ? getNlpClient()
           : null;
 
-        const llmClient: ILlmClient | null =
-          llmEnabled && ruleRunnerRef.current?.hasLlmRules()
-            ? getLlmClient()
-            : null;
-
         updateLintingSettings(
           editorViewInstance,
           {
             ruleRunner: ruleRunnerRef.current,
             nlpClient,
-            llmClient,
-            llmEnabled,
-            llmModelId,
           },
           "manual-refresh",
         );
@@ -317,7 +301,7 @@ export function useLinting(
       console.error("[useLinting] Failed to refresh linting:", err);
       setIsLinting(false);
     });
-  }, [editorViewInstance, lintingEnabled, llmEnabled, llmModelId]);
+  }, [editorViewInstance, lintingEnabled]);
 
   return {
     ruleRunner,

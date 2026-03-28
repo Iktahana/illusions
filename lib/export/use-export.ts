@@ -11,6 +11,9 @@ interface UseExportParams {
   getContent: () => string;
   /** Returns the document title (file name or fallback) */
   getTitle: () => string;
+  /** Returns true when the active tab is an editor tab.
+   *  Export operations no-op when false (e.g. terminal or diff tab is active). */
+  getIsEditorTabActive: () => boolean;
 }
 
 /**
@@ -18,10 +21,9 @@ interface UseExportParams {
  */
 async function saveTxtFile(text: string, suggestedName: string): Promise<boolean> {
   // Try File System Access API first (Chromium browsers + Electron)
-  if ("showSaveFilePicker" in window) {
+  if (hasShowSaveFilePicker(window)) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const handle = await (window as any).showSaveFilePicker({
+      const handle = await window.showSaveFilePicker({
         suggestedName,
         types: [
           {
@@ -57,13 +59,16 @@ async function saveTxtFile(text: string, suggestedName: string): Promise<boolean
  * Hook that provides export functionality and registers Electron menu handlers.
  * Handles PDF, EPUB, DOCX, TXT export with progress notifications.
  */
-export function useExport({ getContent, getTitle }: UseExportParams): {
+export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExportParams): {
   exportAs: (format: ExportFormat) => Promise<void>;
 } {
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
   const exportAs = useCallback(
     async (format: ExportFormat) => {
+      // No-op when a non-editor tab (terminal, diff) is active
+      if (!getIsEditorTabActive()) return;
+
       const content = getContent();
       if (!content.trim()) {
         notificationManager.warning("エクスポートするコンテンツがありません");
@@ -173,7 +178,7 @@ export function useExport({ getContent, getTitle }: UseExportParams): {
         );
       }
     },
-    [getContent, getTitle, isElectron]
+    [getContent, getTitle, getIsEditorTabActive, isElectron]
   );
 
   // Register Electron menu event handlers
@@ -206,4 +211,15 @@ export function useExport({ getContent, getTitle }: UseExportParams): {
   }, [isElectron, exportAs]);
 
   return { exportAs };
+}
+
+/**
+ * Type guard: checks whether window has the File System Access API showSaveFilePicker method.
+ */
+function hasShowSaveFilePicker(
+  w: Window
+): w is Window & {
+  showSaveFilePicker: (options?: object) => Promise<FileSystemFileHandle>;
+} {
+  return "showSaveFilePicker" in w;
 }

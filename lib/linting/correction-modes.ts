@@ -13,7 +13,6 @@ export interface CorrectionMode {
   descriptionJa: string;
   defaultGuidelines: GuidelineId[];
   ruleOverrides: Record<string, Partial<LintRuleConfig>>;
-  llmPromptStyleJa: string;
 }
 
 export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
@@ -26,8 +25,6 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     ruleOverrides: {
       "desu-masu-consistency": { enabled: false },
     },
-    llmPromptStyleJa:
-      "小説の文体として自然な表現かどうかを判断してください。文学的な表現や倒置法は許容します。",
   },
   official: {
     id: "official",
@@ -44,8 +41,6 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     ruleOverrides: {
       "taigen-dome-overuse": { enabled: false },
     },
-    llmPromptStyleJa:
-      "公用文として適切な表現かどうかを判断してください。擬声語・個人的感情・倒置文は不適切とします。",
   },
   blog: {
     id: "blog",
@@ -56,8 +51,6 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     ruleOverrides: {
       "sentence-length": { enabled: true },
     },
-    llmPromptStyleJa:
-      "ウェブ記事として読みやすく親しみやすい表現かどうかを判断してください。過度な堅苦しさや難解な語彙は避けてください。",
   },
   academic: {
     id: "academic",
@@ -69,8 +62,6 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     ruleOverrides: {
       "taigen-dome-overuse": { enabled: true, severity: "warning" },
     },
-    llmPromptStyleJa:
-      "学術論文として適切な客観的表現かどうかを判断してください。「私は」などの主観表現や修辞的隠喩は不適切とします。",
   },
   sns: {
     id: "sns",
@@ -83,7 +74,6 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
       "taigen-dome-overuse": { enabled: false },
       "conjunction-overuse": { enabled: false },
     },
-    llmPromptStyleJa: "SNSの短文として自然かどうかを判断してください。",
   },
 };
 

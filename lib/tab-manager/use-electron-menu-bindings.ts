@@ -5,7 +5,8 @@ import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../services/file-watcher";
 import type { SupportedFileExtension } from "../project/project-types";
-import type { TabId, TabState } from "./tab-types";
+import type { TabId, TabState, EditorTabState } from "./tab-types";
+import { isEditorTab } from "./tab-types";
 import { sanitizeMdiContent } from "./types";
 import type { TabManagerCore } from "./types";
 
@@ -25,11 +26,15 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
   /** Load a system file into a tab. */
   loadSystemFile: (path: string, content: string) => void;
   /** Update a single tab by id. */
-  updateTab: (tabId: TabId, updates: Partial<TabState>) => void;
+  updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
   /** Register a handler for system file open events. */
   systemFileOpenHandlerRef: React.MutableRefObject<
     ((path: string, content: string) => void) | null
   >;
+  /** Immediately flush pending tab state to storage. */
+  flushTabState?: () => Promise<void>;
+  /** Immediately flush pending dockview layout to storage. */
+  flushLayoutState?: () => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,6 +64,8 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     loadSystemFile,
     updateTab,
     systemFileOpenHandlerRef,
+    flushTabState,
+    flushLayoutState,
   } = params;
 
   // Stable refs for callbacks that change frequently
@@ -70,19 +77,56 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
   // Dirty state → Electron title dot
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.setDirty) return;
-    const anyDirty = tabs.some((t) => t.isDirty);
+    const anyDirty = tabs.some((t) => isEditorTab(t) && t.isDirty);
     window.electronAPI.setDirty(anyDirty);
   }, [tabs, isElectron]);
+
+  // Stable refs for flush callbacks
+  const flushTabStateRef = useRef(flushTabState);
+  flushTabStateRef.current = flushTabState;
+  const flushLayoutStateRef = useRef(flushLayoutState);
+  flushLayoutStateRef.current = flushLayoutState;
 
   // Save all dirty tabs before Electron window close
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onSaveBeforeClose) return;
 
     const cleanup = window.electronAPI.onSaveBeforeClose(async () => {
+      // Flush debounced persistence state before saving files
+      await Promise.all([
+        flushTabStateRef.current?.(),
+        flushLayoutStateRef.current?.(),
+      ]);
+
+      let anyFailed = false;
+
       for (const tab of tabsRef.current) {
-        if (!tab.isDirty || !tab.file) continue;
+        if (!isEditorTab(tab)) continue;
+        if (!tab.isDirty) continue;
+
+        const sanitized = sanitizeMdiContent(tab.content);
+
+        if (!tab.file) {
+          // New unsaved document: show Save As dialog so the user can give it a path.
+          // If the user cancels or the save fails, abort the window close.
+          try {
+            const result = await saveMdiFile({
+              descriptor: null,
+              content: sanitized,
+              fileType: tab.fileType,
+            });
+            if (!result) {
+              // User cancelled the Save As dialog — abort close
+              anyFailed = true;
+            }
+          } catch (error) {
+            console.error("名前を付けて保存に失敗しました:", error);
+            anyFailed = true;
+          }
+          continue;
+        }
+
         try {
-          const sanitized = sanitizeMdiContent(tab.content);
           if (isProjectRef.current && tab.file.path) {
             const vfs = getVFS();
             suppressFileWatch(tab.file.path);
@@ -98,13 +142,34 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
             `保存に失敗しました (${tab.file.name}):`,
             error,
           );
+          anyFailed = true;
         }
       }
-      await window.electronAPI?.saveDoneAndClose?.();
+
+      // Only close if every save succeeded; otherwise leave the window open.
+      if (!anyFailed) {
+        await window.electronAPI?.saveDoneAndClose?.();
+      }
     });
 
     return cleanup;
   }, [isElectron, tabsRef, isProjectRef]);
+
+  // Flush tab/layout state before close (without saving dirty files)
+  // This handles: clean close, and "Don't Save" in dirty dialog
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI?.onFlushStateBeforeClose) return;
+
+    const cleanup = window.electronAPI.onFlushStateBeforeClose(async () => {
+      await Promise.all([
+        flushTabStateRef.current?.(),
+        flushLayoutStateRef.current?.(),
+      ]);
+      await window.electronAPI?.saveDoneAndClose?.();
+    });
+
+    return cleanup;
+  }, [isElectron]);
 
   // System file open (Electron: double-click .mdi etc.)
   useEffect(() => {
@@ -131,6 +196,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
       if (!vfs.isRootOpen()) return;
 
       for (const tab of tabsRef.current) {
+        if (!isEditorTab(tab)) continue;
         if (!tab.file?.path || tab.isSaving) continue;
         if (tab.isDirty) continue;
         try {
@@ -178,10 +244,11 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
       const activeId = activeTabIdRef.current;
       const active = current.find((t) => t.id === activeId);
 
-      // Single empty clean tab → close window
+      // Single empty clean editor tab → close window
       if (
         current.length === 1 &&
         active &&
+        isEditorTab(active) &&
         !active.file &&
         !active.isDirty
       ) {
@@ -207,7 +274,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
   useEffect(() => {
     if (isElectron) return;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      const anyDirty = tabsRef.current.some((t) => t.isDirty);
+      const anyDirty = tabsRef.current.some((t) => isEditorTab(t) && t.isDirty);
       if (anyDirty) {
         event.preventDefault();
         event.returnValue = "";
@@ -216,4 +283,19 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isElectron, tabsRef]);
+
+  // Web: flush tab/layout state when page becomes hidden (covers tab close, navigate away)
+  // visibilitychange fires before beforeunload and allows async work
+  useEffect(() => {
+    if (isElectron) return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        // Fire-and-forget: flush pending debounced state
+        void flushTabStateRef.current?.();
+        void flushLayoutStateRef.current?.();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isElectron]);
 }

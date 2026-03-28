@@ -1,14 +1,11 @@
 "use client";
 
 import { Type, AlignLeft, Search, BookAudio, Pause } from "lucide-react";
-import { useLlmStatus } from "@/lib/hooks/use-llm-status";
 import {
   useTypographySettings,
-  useLlmSettings,
 } from "@/contexts/EditorSettingsContext";
 import type { SpeechState } from "@/lib/hooks/use-speech";
 import ValuePicker from "./ValuePicker";
-import LlmStatusDot from "./LlmStatusDot";
 
 export default function EditorToolbar({
   isVertical,
@@ -27,15 +24,13 @@ export default function EditorToolbar({
     fontScale, lineHeight, paragraphSpacing,
     onFontScaleChange, onLineHeightChange, onParagraphSpacingChange,
   } = useTypographySettings();
-  const { llmEnabled, llmModelId } = useLlmSettings();
-  const llmStatus = useLlmStatus(llmEnabled, llmModelId);
   // Options matching the 書式 menu ranges/steps
   const fontScaleOptions = Array.from({ length: 13 }, (_, i) => 50 + i * 10); // 50–170
   const lineHeightOptions = Array.from({ length: 21 }, (_, i) => +(1.0 + i * 0.1).toFixed(1)); // 1.0–3.0
   const paragraphSpacingOptions = Array.from({ length: 31 }, (_, i) => +(i * 0.1).toFixed(1)); // 0–3.0
 
   return (
-    <div className="h-12 border-b border-border bg-background flex items-center justify-between px-4">
+    <div className="h-12 border-y border-border bg-background-secondary flex items-center justify-between px-4">
       <div className="flex items-center gap-4">
         {/* 縦書き/横書き */}
          <button
@@ -59,9 +54,6 @@ export default function EditorToolbar({
       </div>
 
       <div className="flex items-center gap-4">
-        {/* LLM status indicator */}
-        <LlmStatusDot status={llmStatus} />
-
         {/* 読み上げ */}
         {speechState.isSupported && (
           <button
