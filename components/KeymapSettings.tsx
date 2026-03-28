@@ -26,14 +26,14 @@ const CATEGORY_LABELS: Record<ShortcutCategory, string> = {
 const CATEGORY_ORDER: ShortcutCategory[] = ["file", "edit", "format", "view", "nav", "panel", "app"];
 
 export default function KeymapSettings() {
-  const { effectiveBindings, overrides, setOverride, resetOverride, resetAll } = useKeymap();
+  const { effectiveBindings, overrides, setOverrideBatch, resetOverride, resetAll } = useKeymap();
   const [recording, setRecording] = useState<CommandId | null>(null);
 
   /** Find all commands that bind to a given binding string (for conflict detection) */
   const bindingConflicts = useMemo(() => {
     const bindingKey = (b: KeyBinding | null): string => {
       if (!b) return "";
-      return `${b.modifiers.sort().join("+")}_${b.key.toLowerCase()}`;
+      return `${[...b.modifiers].sort().join("+")}_${b.key.toLowerCase()}`;
     };
 
     const keyToCommands = new Map<string, CommandId[]>();
@@ -69,7 +69,21 @@ export default function KeymapSettings() {
   }, []);
 
   const handleRecord = async (id: CommandId, binding: KeyBinding) => {
-    await setOverride(id, binding);
+    const bindingKey = (b: KeyBinding): string =>
+      `${[...b.modifiers].sort().join("+")}_${b.key.toLowerCase()}`;
+    const newKey = bindingKey(binding);
+
+    const updates: Partial<Record<CommandId, KeyBinding | null>> = {};
+    for (const otherId of ALL_COMMAND_IDS) {
+      if (otherId === id) continue;
+      const otherBinding = effectiveBindings[otherId];
+      if (otherBinding && bindingKey(otherBinding) === newKey) {
+        updates[otherId] = null;
+      }
+    }
+    updates[id] = binding;
+
+    await setOverrideBatch(updates);
     setRecording(null);
   };
 

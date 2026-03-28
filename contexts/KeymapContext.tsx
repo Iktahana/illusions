@@ -26,6 +26,8 @@ export interface KeymapContextValue {
   overrides: KeymapOverrides;
   /** Set or clear a binding override for a command */
   setOverride: (id: CommandId, binding: KeyBinding | null) => Promise<void>;
+  /** Set multiple overrides atomically (used for conflict resolution) */
+  setOverrideBatch: (updates: Partial<Record<CommandId, KeyBinding | null>>) => Promise<void>;
   /** Reset a single command back to its default */
   resetOverride: (id: CommandId) => Promise<void>;
   /** Reset all commands to their defaults */
@@ -88,6 +90,13 @@ export function KeymapProvider({ children }: KeymapProviderProps): React.JSX.Ele
     await syncElectronMenu(next);
   }, [overrides, syncElectronMenu]);
 
+  const setOverrideBatch = useCallback(async (updates: Partial<Record<CommandId, KeyBinding | null>>) => {
+    const next: KeymapOverrides = { ...overrides, ...updates };
+    setOverrides(next);
+    await saveKeymapOverrides(next);
+    await syncElectronMenu(next);
+  }, [overrides, syncElectronMenu]);
+
   const resetOverride = useCallback(async (id: CommandId) => {
     const next = { ...overrides };
     delete next[id];
@@ -103,8 +112,8 @@ export function KeymapProvider({ children }: KeymapProviderProps): React.JSX.Ele
   }, [syncElectronMenu]);
 
   const value = useMemo<KeymapContextValue>(
-    () => ({ effectiveBindings, overrides, setOverride, resetOverride, resetAll }),
-    [effectiveBindings, overrides, setOverride, resetOverride, resetAll],
+    () => ({ effectiveBindings, overrides, setOverride, setOverrideBatch, resetOverride, resetAll }),
+    [effectiveBindings, overrides, setOverride, setOverrideBatch, resetOverride, resetAll],
   );
 
   return (
