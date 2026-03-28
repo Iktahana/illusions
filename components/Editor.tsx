@@ -140,6 +140,15 @@ export default function NovelEditor({
     setIsSearchOpen(true);
   }, []);
 
+  const handleSearchClose = useCallback(() => {
+    setIsSearchOpen(false);
+    // Clear search decorations so highlights don't remain after dialog close
+    const view = editorViewRef.current;
+    if (view) {
+      view.dispatch(view.state.tr.setMeta("searchDecorations", []));
+    }
+  }, []);
+
   const clearHighlight = useCallback(() => {
     cancelSpeechScroll();
     const view = editorViewRef.current;
@@ -394,6 +403,7 @@ export default function NovelEditor({
               onOpenRubyDialog={onOpenRubyDialog}
               onToggleTcy={onToggleTcy}
               onOpenDictionary={onOpenDictionary}
+              onOpenSearch={handleSearchOpen}
               onShowLintHint={onShowLintHint}
               onIgnoreCorrection={onIgnoreCorrection}
               mdiExtensionsEnabled={mdiExtensionsEnabled}
@@ -412,7 +422,7 @@ export default function NovelEditor({
       <SearchDialog
         editorView={editorViewInstance}
         isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
+        onClose={handleSearchClose}
         onShowAllResults={onShowAllSearchResults}
         initialSearchTerm={searchInitialTerm}
         programmaticScrollRef={programmaticScrollRef}

@@ -74,7 +74,7 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
     }
   }, [isOpen]);
 
-  // 文書内の一致箇所を検索する
+  // 文書内の一致箇所を検索する（ノード境界を跨ぐテキストにも対応）
   useEffect(() => {
     if (!editorView || !searchTerm) {
       setMatches([]);
@@ -87,22 +87,33 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
     const foundMatches: SearchMatch[] = [];
     const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
 
-    // Search within each text node using correct ProseMirror positions
+    // Build a full-text string and a position map so we can find matches
+    // that span across node boundaries (e.g. ruby / bold / italic).
+    const fullTextParts: string[] = [];
+    const posMap: number[] = []; // posMap[charIndex] = ProseMirror position
+
     doc.descendants((node, pos) => {
       if (node.isText && node.text) {
-        const nodeText = caseSensitive ? node.text : node.text.toLowerCase();
-        let searchIndex = 0;
-        while (searchIndex < nodeText.length) {
-          const matchIndex = nodeText.indexOf(searchStr, searchIndex);
-          if (matchIndex === -1) break;
-          foundMatches.push({
-            from: pos + matchIndex,
-            to: pos + matchIndex + searchTerm.length,
-          });
-          searchIndex = matchIndex + 1;
+        for (let i = 0; i < node.text.length; i++) {
+          fullTextParts.push(node.text[i]);
+          posMap.push(pos + i);
         }
       }
     });
+
+    const fullText = fullTextParts.join("");
+    const haystack = caseSensitive ? fullText : fullText.toLowerCase();
+
+    let searchIndex = 0;
+    while (searchIndex < haystack.length) {
+      const matchIndex = haystack.indexOf(searchStr, searchIndex);
+      if (matchIndex === -1) break;
+      const from = posMap[matchIndex];
+      const to = posMap[matchIndex + searchTerm.length - 1] + 1;
+      foundMatches.push({ from, to });
+      searchIndex = matchIndex + 1;
+    }
+
     setMatches(foundMatches);
     setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1);
   }, [searchTerm, caseSensitive, editorView]);
