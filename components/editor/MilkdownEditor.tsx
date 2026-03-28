@@ -56,6 +56,8 @@ interface MilkdownEditorProps {
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
   onStartSpeech?: () => void;
+  /** Called when the user triggers "検索" from the context menu. Receives selected text as initial search term. */
+  onFind?: (initialTerm?: string) => void;
 }
 
 export default function MilkdownEditor({
@@ -80,6 +82,7 @@ export default function MilkdownEditor({
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
   onStartSpeech,
+  onFind,
 }: MilkdownEditorProps) {
   const {
     fontScale, lineHeight, paragraphSpacing, textIndent, fontFamily,
@@ -705,11 +708,14 @@ export default function MilkdownEditor({
           console.error("Failed to paste plain text:", err);
         });
         break;
-      case "find":
-        // Trigger search dialog (you'll need to expose this functionality)
-        // For now, we'll use the browser's default find
-        document.execCommand("find");
+      case "find": {
+        // Open the app's SearchDialog, passing any selected text as the initial term
+        const { state: fs } = editorViewInstance;
+        const { from: ff, to: ft } = fs.selection;
+        const findTerm = ff !== ft ? fs.doc.textBetween(ff, ft) : undefined;
+        onFind?.(findTerm);
         break;
+      }
       case "select-all": {
         const { state: st, dispatch: dp } = editorViewInstance;
         const allSelection = new AllSelection(st.doc);
@@ -759,7 +765,7 @@ export default function MilkdownEditor({
       default:
         break;
     }
-  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary, lintIssueAtCursor, onShowLintHint, onIgnoreCorrection, onStartSpeech]);
+  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary, lintIssueAtCursor, onShowLintHint, onIgnoreCorrection, onStartSpeech, onFind]);
 
   // Electron: native OS context menu via IPC
   const handleElectronContextMenu = useCallback(async (e: React.MouseEvent) => {
@@ -919,6 +925,8 @@ export default function MilkdownEditor({
           hasSelection={hasSelection}
           lintIssueAtCursor={lintIssueAtCursor}
           onContextMenuOpen={(e) => setLintIssueAtCursor(getLintIssueAtCoords(e.clientX, e.clientY))}
+          mdiExtensionsEnabled={mdiExtensionsEnabled}
+          onStartSpeech={onStartSpeech}
         >
           {editorContent}
         </EditorContextMenu>

@@ -28,7 +28,18 @@ export default function PopoutEditorWindow({
   fileName,
   fileType,
 }: PopoutEditorWindowProps) {
-  const [content, setContent] = useState("");
+  // On web, content is passed via sessionStorage (Electron uses IPC instead)
+  const [content, setContent] = useState(() => {
+    if (typeof window === "undefined" || window.electronAPI?.editor?.onBufferSync) {
+      return "";
+    }
+    const stored = sessionStorage.getItem(`popout-content-${bufferId}`);
+    if (stored !== null) {
+      sessionStorage.removeItem(`popout-content-${bufferId}`);
+      return stored;
+    }
+    return "";
+  });
   const [editorKey, setEditorKey] = useState(0);
   const contentRef = useRef("");
   const incrementEditorKey = useCallback(() => setEditorKey((k) => k + 1), []);

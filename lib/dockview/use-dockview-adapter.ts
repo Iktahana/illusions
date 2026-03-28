@@ -188,7 +188,7 @@ export function useDockviewAdapter({
   // effect to re-run (which would duplicate addPanel calls).
   const [layoutReadyTick, setLayoutReadyTick] = useState(0);
 
-  const { tabs, activeTabId, switchTab, closeTab, newTab } = tabManager;
+  const { tabs, activeTabId, switchTab, closeTab, cloneTab } = tabManager;
 
   // -- onReady callback -----------------------------------------------------
 
@@ -452,17 +452,17 @@ export function useDockviewAdapter({
       // Split is only supported for editor tabs
       if (!isEditorTab(activeTab)) return;
 
-      // Create a new empty tab with the same file type.
+      // Clone the active tab's content and file association into a new tab.
       // The new panel will be positioned in the split direction
       // by the sync effect above (via pendingSplitRef).
-      newTab(activeTab.fileType);
+      cloneTab(activeTab);
 
       pendingSplitRef.current = {
         direction,
         referencePanel: activePanel.id,
       };
     },
-    [tabs, activeTabId, newTab],
+    [tabs, activeTabId, cloneTab],
   );
 
   // -- Close group ----------------------------------------------------------
@@ -497,7 +497,8 @@ export function useDockviewAdapter({
       // Electron: pop out to a new BrowserWindow via IPC
       void electronAPI.editor.popoutPanel(activeTab.id, content, fileName, fileType);
     } else {
-      // Web fallback: open in a new browser window
+      // Web fallback: store content in sessionStorage so the popout can read it
+      sessionStorage.setItem(`popout-content-${activeTab.id}`, content);
       const params = new URLSearchParams({
         "popout-buffer": activeTab.id,
         fileName,

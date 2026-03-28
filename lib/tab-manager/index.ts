@@ -181,6 +181,7 @@ export function useTabManager(options?: {
     tabs: tabState.tabs,
     activeTabId: tabState.activeTabId,
     newTab: tabState.newTab,
+    cloneTab: tabState.cloneTab,
     closeTab: tabState.closeTab,
     switchTab: tabState.switchTab,
     nextTab: tabState.nextTab,

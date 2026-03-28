@@ -2,7 +2,7 @@
 // Application menu construction and management
 
 const { app, BrowserWindow, Menu, shell } = require('electron')
-const { APP_NAME } = require('./app-constants')
+const { APP_NAME, isDev } = require('./app-constants')
 const { getStorageManager } = require('./storage-ipc-handlers')
 
 // UI state synced from renderer for menu checked states
@@ -266,10 +266,14 @@ function buildApplicationMenu(recentProjects = []) {
   template.push({
     label: '表示',
     submenu: [
-      { role: 'reload', label: '再読み込み' },
-      { role: 'forceReload', label: '強制再読み込み' },
-      { role: 'toggleDevTools', label: '開発者ツールを切り替え' },
-      { type: 'separator' },
+      ...(isDev
+        ? [
+            { role: 'reload', label: '再読み込み' },
+            { role: 'forceReload', label: '強制再読み込み' },
+            { role: 'toggleDevTools', label: '開発者ツールを切り替え' },
+            { type: 'separator' },
+          ]
+        : []),
       { role: 'resetZoom', label: '実際のサイズ' },
       { role: 'zoomIn', label: '拡大' },
       { role: 'zoomOut', label: '縮小' },
