@@ -155,6 +155,22 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     return cleanup;
   }, [isElectron, tabsRef, isProjectRef]);
 
+  // Flush tab/layout state before close (without saving dirty files)
+  // This handles: clean close, and "Don't Save" in dirty dialog
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI?.onFlushStateBeforeClose) return;
+
+    const cleanup = window.electronAPI.onFlushStateBeforeClose(async () => {
+      await Promise.all([
+        flushTabStateRef.current?.(),
+        flushLayoutStateRef.current?.(),
+      ]);
+      await window.electronAPI?.saveDoneAndClose?.();
+    });
+
+    return cleanup;
+  }, [isElectron]);
+
   // System file open (Electron: double-click .mdi etc.)
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onOpenFileFromSystem) return;
@@ -267,4 +283,19 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isElectron, tabsRef]);
+
+  // Web: flush tab/layout state when page becomes hidden (covers tab close, navigate away)
+  // visibilitychange fires before beforeunload and allows async work
+  useEffect(() => {
+    if (isElectron) return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        // Fire-and-forget: flush pending debounced state
+        void flushTabStateRef.current?.();
+        void flushLayoutStateRef.current?.();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isElectron]);
 }

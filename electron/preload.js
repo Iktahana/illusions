@@ -48,6 +48,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('electron-request-save-before-close', handler)
     return () => ipcRenderer.removeListener('electron-request-save-before-close', handler)
   },
+  onFlushStateBeforeClose: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('electron-request-flush-state-before-close', handler)
+    return () => ipcRenderer.removeListener('electron-request-flush-state-before-close', handler)
+  },
   onOpenFileFromSystem: (callback) => {
     const handler = (_event, payload) => callback(payload)
     ipcRenderer.on('open-file-from-system', handler)
