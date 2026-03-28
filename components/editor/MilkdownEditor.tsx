@@ -23,13 +23,13 @@ import { $prose } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "../BubbleMenu";
 import { searchHighlightPlugin } from "@/lib/editor-page/search-highlight-plugin";
 import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin";
+import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
 import EditorContextMenu, { type ContextMenuAction } from "../EditorContextMenu";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
 import {
   useTypographySettings,
   useLintingSettings,
-  useLlmSettings,
   usePosHighlightSettings,
   useScrollSettings,
 } from "@/contexts/EditorSettingsContext";
@@ -46,7 +46,7 @@ interface MilkdownEditorProps {
   isModeSwitchingRef: MutableRefObject<boolean>;
   savedScrollProgressRef: RefObject<number>;
   lintingRuleRunner?: RuleRunner | null;
-  onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
+  onLintIssuesUpdated?: (issues: LintIssue[]) => void;
   onNlpError?: (error: Error) => void;
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
@@ -55,6 +55,9 @@ interface MilkdownEditorProps {
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
+  onStartSpeech?: () => void;
+  /** Called when the user triggers "検索" from the context menu. Receives selected text as initial search term. */
+  onFind?: (initialTerm?: string) => void;
 }
 
 export default function MilkdownEditor({
@@ -78,25 +81,24 @@ export default function MilkdownEditor({
   onIgnoreCorrection,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
+  onStartSpeech,
+  onFind,
 }: MilkdownEditorProps) {
   const {
     fontScale, lineHeight, paragraphSpacing, textIndent, fontFamily,
     charsPerLine, showParagraphNumbers,
   } = useTypographySettings();
   const { lintingEnabled } = useLintingSettings();
-  const { llmEnabled } = useLlmSettings();
-  const { posHighlightEnabled, posHighlightColors } = usePosHighlightSettings();
+  const { posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes } = usePosHighlightSettings();
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
-  const [hasSelection, setHasSelection] = useState(false);
   const [lintIssueAtCursor, setLintIssueAtCursor] = useState<LintIssue | null>(null);
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
   // 初期内容はマウント時に固定（ファイル切り替えでコンポーネントが再マウントされたときだけ変わる）
   const initialContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
   const onInsertTextRef = useRef(onInsertText);
-  const onSelectionChangeRef = useRef(onSelectionChange);
   const onLintIssuesUpdatedRef = useRef(onLintIssuesUpdated);
   const onNlpErrorRef = useRef(onNlpError);
 
@@ -109,10 +111,6 @@ export default function MilkdownEditor({
   useEffect(() => {
     onInsertTextRef.current = onInsertText;
   }, [onInsertText]);
-
-  useEffect(() => {
-    onSelectionChangeRef.current = onSelectionChange;
-  }, [onSelectionChange]);
 
   useEffect(() => {
     onLintIssuesUpdatedRef.current = onLintIssuesUpdated;
@@ -196,7 +194,7 @@ export default function MilkdownEditor({
       .use(linting({
         enabled: false, // 初期化時は無効、後で動的に更新
         debounceMs: 500,
-        onIssuesUpdated: (issues, options) => onLintIssuesUpdatedRef.current?.(issues, options),
+        onIssuesUpdated: (issues) => onLintIssuesUpdatedRef.current?.(issues),
         onNlpError: (error) => onNlpErrorRef.current?.(error),
       }));
 
@@ -244,11 +242,12 @@ export default function MilkdownEditor({
       updatePosHighlightSettings(editorViewInstance, {
         enabled: posHighlightEnabled,
         colors: posHighlightColors,
+        disabledTypes: posHighlightDisabledTypes,
       });
     }).catch(err => {
       console.error('[Editor] Failed to update POS highlight settings:', err);
     });
-  }, [editorViewInstance, posHighlightEnabled, posHighlightColors]);
+  }, [editorViewInstance, posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes]);
 
   // linting 設定を動的に更新（Editor を再作成せずに）
   useEffect(() => {
@@ -260,66 +259,19 @@ export default function MilkdownEditor({
         {
           enabled: lintingEnabled,
           ruleRunner: lintingRuleRunner,
-          llmEnabled,
         },
         "rule-config-change",
       );
     }).catch(err => {
       console.error('[Editor] Failed to update linting settings:', err);
     });
-  }, [editorViewInstance, lintingEnabled, lintingRuleRunner, llmEnabled]);
+  }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
 
-  // 選択範囲の変更を追跡する
-  useEffect(() => {
-    if (!editorViewInstance) return;
-
-    const updateSelectionCount = () => {
-      const { state } = editorViewInstance;
-      const { selection } = state;
-      const { from, to } = selection;
-
-      // 選択がない場合は 0
-      if (from === to) {
-        setHasSelection(false);
-        onSelectionChangeRef.current?.(0);
-        return;
-      }
-
-      // 選択文字列の文字数を数える（空白は除外）
-      const selectedText = state.doc.textBetween(from, to);
-      const count = selectedText.replace(/\s/g, "").length;
-      setHasSelection(count > 0);
-      onSelectionChangeRef.current?.(count);
-    };
-
-    // 選択変更を購読
-    const editorDom = editorViewInstance.dom;
-
-    const timers = new Set<ReturnType<typeof setTimeout>>();
-
-    const scheduleUpdate = () => {
-      const id = setTimeout(() => {
-        timers.delete(id);
-        updateSelectionCount();
-      }, 10);
-      timers.add(id);
-    };
-
-    editorDom.addEventListener("mouseup", scheduleUpdate);
-    editorDom.addEventListener("keyup", scheduleUpdate);
-    document.addEventListener("selectionchange", scheduleUpdate);
-
-    // 初期値
-    updateSelectionCount();
-
-    return () => {
-      editorDom.removeEventListener("mouseup", scheduleUpdate);
-      editorDom.removeEventListener("keyup", scheduleUpdate);
-      document.removeEventListener("selectionchange", scheduleUpdate);
-      timers.forEach(clearTimeout);
-      timers.clear();
-    };
-  }, [editorViewInstance]);
+  // 選択文字数の追跡
+  const { hasSelection } = useSelectionTracking({
+    editorViewInstance,
+    onSelectionChange: onSelectionChange,
+  });
 
   // 不要なアニメーションを避けるため、直前のスタイル値を保持する
   const prevStyleRef = useRef({ charsPerLine, isVertical, fontFamily, fontScale, lineHeight });
@@ -652,14 +604,25 @@ export default function MilkdownEditor({
     };
   }, [isVertical, scrollContainerRef, isModeSwitchingRef, savedScrollPosRef, userScrollingRef]);
 
+  // Union of all Milkdown command keys used in handleFormat.
+  // Each .key property is a branded CmdKey<T> string exported by @milkdown.
+  type MilkdownCommandKey =
+    | typeof toggleStrongCommand.key
+    | typeof toggleEmphasisCommand.key
+    | typeof toggleInlineCodeCommand.key
+    | typeof wrapInHeadingCommand.key
+    | typeof wrapInBlockquoteCommand.key
+    | typeof wrapInBulletListCommand.key
+    | typeof wrapInOrderedListCommand.key
+    | typeof toggleStrikethroughCommand.key;
+
   // BubbleMenu からの書式コマンドを処理する
   const handleFormat = (format: FormatType, level?: number) => {
     try {
       const editor = get();
       if (!editor) return;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const execute = (commandKey: any, payload?: unknown) => {
+      const execute = (commandKey: MilkdownCommandKey, payload?: unknown): void => {
         editor.action((ctx) => {
           const commands = ctx.get(commandsCtx);
           commands.call(commandKey, payload);
@@ -745,11 +708,14 @@ export default function MilkdownEditor({
           console.error("Failed to paste plain text:", err);
         });
         break;
-      case "find":
-        // Trigger search dialog (you'll need to expose this functionality)
-        // For now, we'll use the browser's default find
-        document.execCommand("find");
+      case "find": {
+        // Open the app's SearchDialog, passing any selected text as the initial term
+        const { state: fs } = editorViewInstance;
+        const { from: ff, to: ft } = fs.selection;
+        const findTerm = ff !== ft ? fs.doc.textBetween(ff, ft) : undefined;
+        onFind?.(findTerm);
         break;
+      }
       case "select-all": {
         const { state: st, dispatch: dp } = editorViewInstance;
         const allSelection = new AllSelection(st.doc);
@@ -793,10 +759,13 @@ export default function MilkdownEditor({
           onIgnoreCorrection?.(lintIssueAtCursor, true);
         }
         break;
+      case "start-speech":
+        onStartSpeech?.();
+        break;
       default:
         break;
     }
-  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary, lintIssueAtCursor, onShowLintHint, onIgnoreCorrection]);
+  }, [editorViewInstance, onOpenRubyDialog, onToggleTcy, onOpenDictionary, lintIssueAtCursor, onShowLintHint, onIgnoreCorrection, onStartSpeech, onFind]);
 
   // Electron: native OS context menu via IPC
   const handleElectronContextMenu = useCallback(async (e: React.MouseEvent) => {
@@ -827,6 +796,8 @@ export default function MilkdownEditor({
         { label: 'Googleで検索', action: 'google-search' },
         { label: '辞書で調べる', action: 'dictionary' },
       ] : []),
+      { label: '-', action: '_separator' },
+      { label: '開始朗読', action: 'start-speech' },
       { label: '-', action: '_separator' },
       { label: 'すべて選択', action: 'select-all', accelerator: 'CmdOrCtrl+A' },
     ];
@@ -954,6 +925,8 @@ export default function MilkdownEditor({
           hasSelection={hasSelection}
           lintIssueAtCursor={lintIssueAtCursor}
           onContextMenuOpen={(e) => setLintIssueAtCursor(getLintIssueAtCoords(e.clientX, e.clientY))}
+          mdiExtensionsEnabled={mdiExtensionsEnabled}
+          onStartSpeech={onStartSpeech}
         >
           {editorContent}
         </EditorContextMenu>

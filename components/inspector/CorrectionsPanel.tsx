@@ -2,12 +2,13 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, ChevronDown, ChevronRight, EyeOff, Info, Lightbulb, ListFilter, Loader2, RefreshCw, Settings, XCircle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, EyeOff, Info, ListFilter, RefreshCw, Settings, XCircle } from "lucide-react";
 import clsx from "clsx";
 
-import { LINT_PRESETS, LINT_RULES_META, LINT_RULE_CATEGORIES } from "@/lib/linting/lint-presets";
+import { LINT_PRESETS, LINT_RULE_CATEGORIES } from "@/lib/linting/lint-presets";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import InfoTooltip from "./InfoTooltip";
+import IssueCard from "./IssueCard";
 import { useLintingSettings, usePosHighlightSettings } from "@/contexts/EditorSettingsContext";
 
 import type { LintIssue, Severity } from "@/lib/linting";
@@ -30,35 +31,11 @@ interface CorrectionsPanelProps {
   activeLintPresetId?: string;
 }
 
-const SEVERITY_LABELS: Record<Severity, string> = {
-  error: "エラー",
-  warning: "警告",
-  info: "情報",
-};
-
 const SEVERITY_ORDER: Record<Severity, number> = {
   error: 0,
   warning: 1,
   info: 2,
 };
-
-/** Returns the display color class for a severity level */
-function severityColor(severity: Severity): string {
-  switch (severity) {
-    case "error":
-      return "bg-error";
-    case "warning":
-      return "bg-warning";
-    case "info":
-      return "bg-info";
-  }
-}
-
-/** Get rule display name from metadata */
-function getRuleName(ruleId: string): string {
-  const meta = LINT_RULES_META.find(r => r.id === ruleId);
-  return meta?.nameJa ?? ruleId;
-}
 
 /** Find which category a rule belongs to */
 function getCategoryForRule(ruleId: string): typeof LINT_RULE_CATEGORIES[number] | undefined {
@@ -87,145 +64,6 @@ const POS_LEGEND_ITEMS = [
   { key: "記号", label: "記号" },
 ];
 
-/** Renders a single issue card */
-function IssueCard({
-  issue,
-  isActive,
-  onNavigateToIssue,
-  onApplyFix,
-  onIgnoreCorrection,
-}: {
-  issue: LintIssue | EnrichedLintIssue;
-  isActive: boolean;
-  onNavigateToIssue?: (issue: LintIssue) => void;
-  onApplyFix?: (issue: LintIssue) => void;
-  onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
-}): React.JSX.Element {
-  const enriched = issue as EnrichedLintIssue;
-  const hasOriginal = !!enriched.originalText;
-  const hasFix = !!issue.fix;
-
-  return (
-    <div
-      className={clsx(
-        "relative rounded-lg border transition-colors",
-        isActive
-          ? "border-accent bg-accent/5"
-          : "border-border bg-background-secondary hover:border-border-secondary"
-      )}
-    >
-      {/* Actions: top-right corner, absolutely positioned to avoid overlapping button */}
-      <div className="absolute top-1.5 right-1.5 flex items-center gap-1 z-10">
-        <InfoTooltip
-          content={`${issue.messageJa}${issue.reference ? `\n${issue.reference.standard}${issue.reference.section ? ` ${issue.reference.section}` : ""}` : ""}\n[${getRuleName(issue.ruleId)}]`}
-          className="text-foreground-tertiary hover:text-foreground-secondary"
-        >
-          <Info className="w-3.5 h-3.5" />
-        </InfoTooltip>
-        {hasFix && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation();
-              onApplyFix?.(issue);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.stopPropagation();
-                onApplyFix?.(issue);
-              }
-            }}
-            className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-accent hover:text-accent-hover bg-accent/10 hover:bg-accent/20 rounded transition-colors cursor-pointer"
-          >
-            置換
-          </span>
-        )}
-        {onIgnoreCorrection && (
-          <InfoTooltip
-            content="この指摘を無視（右クリックで同じ指摘をすべて無視）"
-            className="text-foreground-tertiary hover:text-foreground-secondary"
-          >
-            <span
-              role="button"
-              tabIndex={0}
-              aria-label="この指摘を無視"
-              onClick={(e) => {
-                e.stopPropagation();
-                onIgnoreCorrection(issue, false);
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onIgnoreCorrection(issue, true);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.stopPropagation();
-                  onIgnoreCorrection(issue, false);
-                }
-              }}
-              className="inline-flex items-center p-0.5 rounded transition-colors cursor-pointer hover:bg-hover"
-            >
-              <EyeOff className="w-3.5 h-3.5" />
-            </span>
-          </InfoTooltip>
-        )}
-      </div>
-      {/* Main row: click to navigate */}
-      <button
-        type="button"
-        onClick={() => onNavigateToIssue?.(issue)}
-        className="w-full text-left px-3 py-2 pr-14"
-      >
-        <div className="flex items-start gap-2">
-          {/* Severity dot + validation spinner */}
-          <span className="relative shrink-0 mt-1.5 w-2 h-2">
-            <span
-              className={clsx(
-                "w-2 h-2 rounded-full block",
-                severityColor(issue.severity)
-              )}
-              title={SEVERITY_LABELS[issue.severity]}
-            />
-            {issue.llmValidated === undefined && (
-              <span className="absolute -top-0.5 -left-0.5" title="確認中">
-                <Loader2 className="w-3 h-3 animate-spin text-foreground-tertiary" />
-              </span>
-            )}
-          </span>
-          {/* Content: original → replacement or just message */}
-          <div className="flex-1 min-w-0">
-            {hasOriginal && hasFix ? (
-              <p className="text-sm text-foreground leading-snug">
-                <span className="text-foreground-tertiary line-through">{enriched.originalText}</span>
-                <span className="text-foreground-tertiary mx-1">→</span>
-                <span className="text-foreground font-medium">{issue.fix!.replacement}</span>
-              </p>
-            ) : hasOriginal ? (
-              <p className="text-sm text-foreground leading-snug">
-                {enriched.originalText}
-              </p>
-            ) : (
-              <p className="text-sm text-foreground leading-snug flex items-start gap-1">
-                <Lightbulb className="w-3.5 h-3.5 text-foreground-tertiary shrink-0 mt-0.5" />
-                {issue.messageJa}
-              </p>
-            )}
-            {/* Secondary line: show message when we have original text but no fix */}
-            {hasOriginal && !hasFix && (
-              <p className="text-xs text-foreground-tertiary mt-0.5 flex items-start gap-1">
-                <Lightbulb className="w-3 h-3 shrink-0 mt-0.5" />
-                {issue.messageJa}
-              </p>
-            )}
-          </div>
-        </div>
-      </button>
-    </div>
-  );
-}
-
 /** Panel for displaying lint corrections and POS highlighting controls */
 export default function CorrectionsPanel({
   onOpenPosHighlightSettings,
@@ -241,8 +79,8 @@ export default function CorrectionsPanel({
   activeLintPresetId = "",
 }: CorrectionsPanelProps): React.JSX.Element {
   const {
-    posHighlightEnabled, posHighlightColors,
-    onPosHighlightEnabledChange,
+    posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes,
+    onPosHighlightEnabledChange, onPosHighlightDisabledTypesChange,
   } = usePosHighlightSettings();
   const {
     lintingEnabled, lintingRuleConfigs,
@@ -254,11 +92,9 @@ export default function CorrectionsPanel({
   const issueListRef = useRef<HTMLDivElement>(null);
 
   const filteredIssues = useMemo(() => {
-    // Hide issues rejected by LLM validation
-    const validated = lintIssues.filter((issue) => issue.llmValidated !== false);
     return severityFilter === "all"
-      ? validated
-      : validated.filter((issue) => issue.severity === severityFilter);
+      ? lintIssues
+      : lintIssues.filter((issue) => issue.severity === severityFilter);
   }, [lintIssues, severityFilter]);
 
   /** Sort issues based on the current sort mode */
@@ -534,15 +370,35 @@ export default function CorrectionsPanel({
         {posHighlightEnabled && (
           <div className="mt-2 space-y-2">
             <div className="flex flex-wrap gap-x-3 gap-y-1">
-              {POS_LEGEND_ITEMS.map(({ key, label }) => (
-                <span key={key} className="inline-flex items-center gap-1 text-xs text-foreground-secondary">
-                  <span
-                    className="inline-block w-2.5 h-2.5 rounded-sm"
-                    style={{ backgroundColor: posHighlightColors[key] || DEFAULT_POS_COLORS[key] || "#000" }}
-                  />
-                  {label}
-                </span>
-              ))}
+              {POS_LEGEND_ITEMS.map(({ key, label }) => {
+                const isDisabled = posHighlightDisabledTypes.includes(key);
+                return (
+                  <button
+                    key={key}
+                    className={clsx(
+                      "inline-flex items-center gap-1 text-xs transition-opacity cursor-pointer",
+                      isDisabled ? "opacity-40 text-foreground-muted" : "text-foreground-secondary"
+                    )}
+                    title={isDisabled ? "クリックで表示" : "クリックで非表示"}
+                    onClick={() => {
+                      const next = isDisabled
+                        ? posHighlightDisabledTypes.filter(t => t !== key)
+                        : [...posHighlightDisabledTypes, key];
+                      onPosHighlightDisabledTypesChange(next);
+                    }}
+                  >
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-sm"
+                      style={{
+                        backgroundColor: isDisabled
+                          ? "#ccc"
+                          : (posHighlightColors[key] || DEFAULT_POS_COLORS[key] || "#000"),
+                      }}
+                    />
+                    {label}
+                  </button>
+                );
+              })}
             </div>
             {onOpenPosHighlightSettings && (
               <button

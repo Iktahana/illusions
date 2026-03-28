@@ -1,5 +1,7 @@
 export type {
   CorrectionEngine,
+  JsonRuleMeta,
+  RuleLevel,
   Severity,
   LintIssue,
   LintRule,
@@ -15,14 +17,13 @@ export {
   isMorphologicalDocumentLintRule,
 } from "./types";
 export {
+  AbstractL1Rule,
   AbstractLintRule,
   AbstractDocumentLintRule,
   AbstractMorphologicalLintRule,
   AbstractMorphologicalDocumentLintRule,
 } from "./base-rule";
 export { RuleRunner } from "./rule-runner";
-export type { LlmState, LlmControllerOptions } from "./llm-controller";
-export { LlmController } from "./llm-controller";
 
 export type {
   ConfigChangeReason,

@@ -1,15 +1,4 @@
-/**
- * Power saving hook — simplified to a no-op.
- *
- * The original implementation detected battery state via Electron's powerMonitor
- * and auto-disabled linting/AI features. That responsibility has been moved to
- * LlmController (lib/linting/llm-controller.ts), which automatically unloads the
- * model after a configurable cooldown period. This provides equivalent power
- * efficiency without requiring battery-state detection.
- *
- * The hook signature is preserved so existing callers in app/page.tsx do not
- * need to be changed.
- */
+import { useEffect } from "react";
 
 interface UsePowerSavingOptions {
   powerSaveMode: boolean;
@@ -18,13 +7,44 @@ interface UsePowerSavingOptions {
 }
 
 /**
- * No-op hook. Power-save behaviour is now handled by LlmController auto unload.
- * Kept for API compatibility — callers do not need to be updated.
+ * Listens for Electron power state changes and auto-switches power saving mode.
+ *
+ * - When on battery and `autoPowerSaveOnBattery` is enabled, power saving is turned on.
+ * - When AC power is restored, power saving is turned off.
+ * - Does nothing on web (no `window.electronAPI?.power`).
  */
-export function usePowerSaving(
-  _options: UsePowerSavingOptions,
-): void {
-  // Intentional no-op.
-  // LlmController (lib/linting/llm-controller.ts) handles power efficiency by
-  // automatically unloading the model after `cooldownMs` of inactivity.
+export function usePowerSaving({
+  autoPowerSaveOnBattery,
+  onPowerSaveModeChange,
+}: UsePowerSavingOptions): void {
+  useEffect(() => {
+    const powerAPI = window.electronAPI?.power;
+    if (!powerAPI) {
+      return;
+    }
+
+    // Apply the current state immediately on mount.
+    powerAPI.getPowerState().then((state) => {
+      if (state === "battery" && autoPowerSaveOnBattery) {
+        onPowerSaveModeChange(true);
+      } else if (state === "ac") {
+        onPowerSaveModeChange(false);
+      }
+    });
+
+    // Subscribe to future state changes.
+    const unsubscribe = powerAPI.onPowerStateChange((state) => {
+      if (state === "battery" && autoPowerSaveOnBattery) {
+        onPowerSaveModeChange(true);
+      } else if (state === "ac") {
+        onPowerSaveModeChange(false);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  // Re-run when the user toggles autoPowerSaveOnBattery in settings.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPowerSaveOnBattery]);
 }

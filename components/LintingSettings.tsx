@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, MessageSquareOff, MessageSquare } from "lucide-react";
 import clsx from "clsx";
 
@@ -18,18 +18,7 @@ import {
   CORRECTION_MODE_IDS,
   CORRECTION_MODES,
 } from "@/lib/linting/correction-modes";
-import { DEFAULT_MODEL_ID } from "@/lib/llm-client/model-registry";
 import GuidelineList from "@/components/GuidelineList";
-
-const LlmSettings = dynamic(
-  () => import("./LlmSettings").then((mod) => mod.LlmSettings),
-  { ssr: false },
-);
-
-/** Set of rule IDs that belong to the AI category */
-const AI_RULE_IDS = new Set(
-  LINT_RULE_CATEGORIES.find((c) => c.id === "ai")?.rules ?? [],
-);
 
 /** Map of rule ID -> supportsSkipDialogue from metadata */
 const SKIP_DIALOGUE_SUPPORT = new Map(
@@ -39,15 +28,9 @@ const SKIP_DIALOGUE_SUPPORT = new Map(
 interface LintingSettingsProps {
   lintingEnabled: boolean;
   onLintingEnabledChange: (value: boolean) => void;
-  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }>;
-  onLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }) => void;
-  onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }>) => void;
-  llmEnabled?: boolean;
-  onLlmEnabledChange?: (value: boolean) => void;
-  llmModelId?: string;
-  onLlmModelIdChange?: (modelId: string) => void;
-  llmIdlingStop?: boolean;
-  onLlmIdlingStopChange?: (value: boolean) => void;
+  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; }>;
+  onLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity; skipDialogue?: boolean; }) => void;
+  onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; }>) => void;
   characterExtractionBatchSize?: number;
   onCharacterExtractionBatchSizeChange?: (value: number) => void;
   characterExtractionConcurrency?: number;
@@ -60,8 +43,8 @@ interface LintingSettingsProps {
 /** Resolve the effective config for a rule, falling back to defaults */
 function getConfig(
   ruleId: string,
-  configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }>,
-): { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean } {
+  configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; }>,
+): { enabled: boolean; severity: Severity; skipDialogue?: boolean; } {
   return configs[ruleId] ?? LINT_DEFAULT_CONFIGS[ruleId] ?? { enabled: true, severity: "warning" };
 }
 
@@ -71,12 +54,6 @@ export default function LintingSettings({
   lintingRuleConfigs,
   onLintingRuleConfigChange,
   onLintingRuleConfigsBatchChange,
-  llmEnabled,
-  onLlmEnabledChange,
-  llmModelId,
-  onLlmModelIdChange,
-  llmIdlingStop,
-  onLlmIdlingStopChange,
   characterExtractionBatchSize,
   onCharacterExtractionBatchSizeChange,
   characterExtractionConcurrency,
@@ -86,7 +63,7 @@ export default function LintingSettings({
 }: LintingSettingsProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
-  const toggleGroup = (groupId: string) => {
+  const toggleGroup = useCallback((groupId: string) => {
     setCollapsedGroups(prev => {
       const next = new Set(prev);
       if (next.has(groupId)) {
@@ -96,17 +73,17 @@ export default function LintingSettings({
       }
       return next;
     });
-  };
+  }, []);
 
   /** Toggle all rules in a category */
-  const toggleCategoryEnabled = (ruleIds: string[], enabled: boolean) => {
+  const toggleCategoryEnabled = useCallback((ruleIds: string[], enabled: boolean) => {
     const next = { ...lintingRuleConfigs };
     for (const ruleId of ruleIds) {
       const current = getConfig(ruleId, next);
       next[ruleId] = { ...current, enabled };
     }
     onLintingRuleConfigsBatchChange(next);
-  };
+  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange]);
 
   /** Check if all rules in a category are enabled */
   const isCategoryAllEnabled = (ruleIds: string[]): boolean =>
@@ -116,36 +93,37 @@ export default function LintingSettings({
   const categoryEnabledCount = (ruleIds: string[]): number =>
     ruleIds.filter(id => getConfig(id, lintingRuleConfigs).enabled).length;
 
-  const handleApplyPreset = (presetId: string) => {
+  const handleApplyPreset = useCallback((presetId: string) => {
     const preset = LINT_PRESETS[presetId];
     if (preset) {
       onLintingRuleConfigsBatchChange({ ...preset.configs });
     }
-  };
+  }, [onLintingRuleConfigsBatchChange]);
 
-  const handleEnableAll = () => {
-    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }> = {};
+  const handleEnableAll = useCallback(() => {
+    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; }> = {};
     for (const rule of LINT_RULES_META) {
       const current = getConfig(rule.id, lintingRuleConfigs);
       next[rule.id] = { ...current, enabled: true };
     }
     onLintingRuleConfigsBatchChange(next);
-  };
+  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange]);
 
-  const handleDisableAll = () => {
-    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; skipLlmValidation?: boolean }> = {};
+  const handleDisableAll = useCallback(() => {
+    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; }> = {};
     for (const rule of LINT_RULES_META) {
       const current = getConfig(rule.id, lintingRuleConfigs);
       next[rule.id] = { ...current, enabled: false };
     }
     onLintingRuleConfigsBatchChange(next);
-  };
+  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange]);
 
-  const handleResetDefaults = () => {
+  const handleResetDefaults = useCallback(() => {
     onLintingRuleConfigsBatchChange({ ...LINT_DEFAULT_CONFIGS });
-  };
+  }, [onLintingRuleConfigsBatchChange]);
 
-  const ruleMetaMap = new Map(LINT_RULES_META.map(r => [r.id, r]));
+  // Memoized map to avoid recreation on every render (LINT_RULES_META is a module-level constant)
+  const ruleMetaMap = useMemo(() => new Map(LINT_RULES_META.map(r => [r.id, r])), []);
 
   /** Detect which preset matches the current config (if any) */
   const activePresetId = useMemo(() => {
@@ -166,7 +144,7 @@ export default function LintingSettings({
   }, [lintingRuleConfigs]);
 
   /** Handle correction mode change: update mode and reset guidelines to mode defaults */
-  const handleModeChange = (modeId: string) => {
+  const handleModeChange = useCallback((modeId: string) => {
     if (!onCorrectionConfigChange) return;
     const mode = CORRECTION_MODES[modeId as keyof typeof CORRECTION_MODES];
     if (!mode) return;
@@ -174,12 +152,12 @@ export default function LintingSettings({
       mode: mode.id,
       guidelines: [...mode.defaultGuidelines],
     });
-  };
+  }, [onCorrectionConfigChange]);
 
   /** Handle guideline priority list change */
-  const handleGuidelinesChange = (guidelines: CorrectionConfig["guidelines"]) => {
+  const handleGuidelinesChange = useCallback((guidelines: CorrectionConfig["guidelines"]) => {
     onCorrectionConfigChange?.({ guidelines });
-  };
+  }, [onCorrectionConfigChange]);
 
   const showCorrectionConfig = Boolean(correctionConfig && onCorrectionConfigChange);
 
@@ -210,20 +188,6 @@ export default function LintingSettings({
           />
         </button>
       </div>
-
-      {/* AI校正 (LLM) settings */}
-      <LlmSettings
-        llmEnabled={llmEnabled ?? false}
-        onLlmEnabledChange={onLlmEnabledChange}
-        llmModelId={llmModelId ?? DEFAULT_MODEL_ID}
-        onLlmModelIdChange={onLlmModelIdChange}
-        llmIdlingStop={llmIdlingStop}
-        onLlmIdlingStopChange={onLlmIdlingStopChange}
-        characterExtractionBatchSize={characterExtractionBatchSize}
-        onCharacterExtractionBatchSizeChange={onCharacterExtractionBatchSizeChange}
-        characterExtractionConcurrency={characterExtractionConcurrency}
-        onCharacterExtractionConcurrencyChange={onCharacterExtractionConcurrencyChange}
-      />
 
       {/* Correction mode selector + guideline priority */}
       {showCorrectionConfig && correctionConfig && (
@@ -375,8 +339,6 @@ export default function LintingSettings({
                     const meta = ruleMetaMap.get(ruleId);
                     if (!meta) return null;
                     const config = getConfig(ruleId, lintingRuleConfigs);
-                    const isAiRule = AI_RULE_IDS.has(ruleId);
-                    const aiDisabled = isAiRule && !llmEnabled;
                     const showDialogueToggle = SKIP_DIALOGUE_SUPPORT.get(ruleId) ?? false;
 
                     return (
@@ -384,9 +346,8 @@ export default function LintingSettings({
                         key={ruleId}
                         className={clsx(
                           "flex items-center gap-2 px-3 py-2",
-                          aiDisabled && "opacity-50",
                         )}
-                        title={aiDisabled ? "AI校正を有効にしてください" : undefined}
+                        title={undefined}
                       >
                         {/* Rule name */}
                         <div className="flex-1 min-w-0">
@@ -398,7 +359,7 @@ export default function LintingSettings({
                         {/* Skip dialogue toggle */}
                         {showDialogueToggle && (
                           <button
-                            disabled={aiDisabled}
+  
                             onClick={() =>
                               onLintingRuleConfigChange(ruleId, {
                                 ...config,
@@ -424,7 +385,7 @@ export default function LintingSettings({
                         {/* Severity dropdown */}
                         <select
                           value={config.severity}
-                          disabled={aiDisabled}
+
                           onChange={(e) =>
                             onLintingRuleConfigChange(ruleId, {
                               ...config,
@@ -440,7 +401,7 @@ export default function LintingSettings({
 
                         {/* Toggle */}
                         <button
-                          disabled={aiDisabled}
+
                           onClick={() =>
                             onLintingRuleConfigChange(ruleId, {
                               ...config,

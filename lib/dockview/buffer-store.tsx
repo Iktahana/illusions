@@ -20,7 +20,6 @@ import {
 import type { MdiFileDescriptor } from "@/lib/project/mdi-file";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 import type { BufferId, BufferState, BufferChangeEvent } from "./types";
-import { getRandomillusionstory } from "@/lib/project/illusion-stories";
 
 // ---------------------------------------------------------------------------
 // ID generation
@@ -100,7 +99,7 @@ export class BufferStore {
   }): BufferState {
     const fileType = opts?.fileType ?? ".mdi";
     const content =
-      opts?.content ?? (fileType === ".mdi" ? getRandomillusionstory() : "");
+      opts?.content ?? "";
     const buffer: BufferState = {
       id: opts?.id ?? generateBufferId(),
       file: opts?.file ?? null,

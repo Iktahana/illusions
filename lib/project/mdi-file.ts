@@ -179,8 +179,8 @@ export async function saveMdiFile(
     if (!handle && hasShowSaveFilePicker(window)) {
       const defaultName = descriptor?.name ?? getDefaultFileName(fileType);
       const suggestedName = ensureExtension(defaultName, fileType);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handle = await (window as any).showSaveFilePicker({
+      // window is narrowed by hasShowSaveFilePicker to include showSaveFilePicker
+      handle = await window.showSaveFilePicker({
         suggestedName,
         types: getSaveFilters(fileType),
       });
@@ -193,11 +193,15 @@ export async function saveMdiFile(
     // 永続化されたハンドルの場合、必要なら権限確認/要求を行う
     if (descriptor?.handle && "queryPermission" in handle) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const permission = await (handle as any).queryPermission({ mode: "readwrite" });
+        // queryPermission / requestPermission are File System Access API extensions
+        // not yet in standard TS lib types; cast through unknown to avoid any.
+        const permHandle = handle as unknown as {
+          queryPermission(d: { mode: string }): Promise<string>;
+          requestPermission(d: { mode: string }): Promise<string>;
+        };
+        const permission = await permHandle.queryPermission({ mode: "readwrite" });
         if (permission !== "granted") {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const requestResult = await (handle as any).requestPermission({ mode: "readwrite" });
+          const requestResult = await permHandle.requestPermission({ mode: "readwrite" });
           if (requestResult !== "granted") {
             console.warn("ファイルハンドルの書き込み権限が許可されませんでした");
             return null;
@@ -208,8 +212,11 @@ export async function saveMdiFile(
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const writable = await (handle as any).createWritable();
+    // createWritable is a File System Access API extension not yet in standard TS lib types
+    const writableHandle = handle as unknown as {
+      createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>;
+    };
+    const writable = await writableHandle.createWritable();
     await writable.write(content);
     await writable.close();
 

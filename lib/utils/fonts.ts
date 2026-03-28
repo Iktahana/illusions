@@ -13,7 +13,9 @@ export interface FontInfo {
   variants?: string[];
 }
 
-export type SystemFontPlatform = 'mac' | 'windows';
+import type { OSPlatform } from './runtime-env';
+
+export type SystemFontPlatform = OSPlatform;
 
 export interface SystemFontInfo extends FontInfo {
   platforms: SystemFontPlatform[];
@@ -111,6 +113,42 @@ export const LOCAL_SYSTEM_FONTS: SystemFontInfo[] = [
     localizedName: 'BIZ UDP明朝',
     category: 'serif',
     platforms: ['windows'],
+  },
+  {
+    family: 'Noto Serif CJK JP',
+    localizedName: 'Noto 明朝 CJK JP',
+    category: 'serif',
+    platforms: ['linux'],
+  },
+  {
+    family: 'Noto Sans CJK JP',
+    localizedName: 'Noto ゴシック CJK JP',
+    category: 'sans-serif',
+    platforms: ['linux'],
+  },
+  {
+    family: 'IPAexMincho',
+    localizedName: 'IPAex明朝',
+    category: 'serif',
+    platforms: ['linux'],
+  },
+  {
+    family: 'IPAexGothic',
+    localizedName: 'IPAexゴシック',
+    category: 'sans-serif',
+    platforms: ['linux'],
+  },
+  {
+    family: 'TakaoMincho',
+    localizedName: 'Takao明朝',
+    category: 'serif',
+    platforms: ['linux'],
+  },
+  {
+    family: 'TakaoGothic',
+    localizedName: 'Takaoゴシック',
+    category: 'sans-serif',
+    platforms: ['linux'],
   },
 ];
 
