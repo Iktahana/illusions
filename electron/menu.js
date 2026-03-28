@@ -341,6 +341,12 @@ function buildApplicationMenu(recentProjects = []) {
           shell.openExternal('https://www.illusions.app/')
         },
       },
+      {
+        label: 'AI回答の不適切報告',
+        click: () => {
+          shell.openExternal('https://github.com/Iktahana/illusions/issues/new')
+        },
+      },
     ],
   })
 

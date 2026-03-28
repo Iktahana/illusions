@@ -161,6 +161,11 @@ export function useWebMenuHandlers({
         // No-op in web
         break;
 
+      // Help menu
+      case 'report-ai-inappropriate':
+        window.open('https://github.com/Iktahana/illusions/issues/new', '_blank');
+        break;
+
       default:
         if (action.startsWith('open-recent-project:')) {
           const projectId = action.slice('open-recent-project:'.length);
