@@ -80,24 +80,31 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
 
     const cleanup = window.electronAPI.onSaveBeforeClose(async () => {
       for (const tab of tabsRef.current) {
-        if (!tab.isDirty || !tab.file) continue;
+        if (!tab.isDirty) continue;
         try {
           const sanitized = sanitizeMdiContent(tab.content);
-          if (isProjectRef.current && tab.file.path) {
+          if (isProjectRef.current && tab.file?.path) {
             const vfs = getVFS();
             suppressFileWatch(tab.file.path);
             await vfs.writeFile(tab.file.path, sanitized);
           } else {
-            await saveMdiFile({
+            const result = await saveMdiFile({
               descriptor: tab.file,
               content: sanitized,
+              fileType: tab.fileType,
             });
+            if (!result) {
+              // User cancelled the save dialog → abort close
+              return;
+            }
           }
         } catch (error) {
           console.error(
-            `保存に失敗しました (${tab.file.name}):`,
+            `保存に失敗しました (${tab.file?.name ?? "untitled"}):`,
             error,
           );
+          // Save failed → abort close
+          return;
         }
       }
       await window.electronAPI?.saveDoneAndClose?.();
