@@ -86,6 +86,8 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
     label: 'ヘルプ',
     items: [
       { label: `バージョン ${APP_VERSION}`, enabled: false },
+      { type: 'separator' },
+      { label: 'AI回答の不適切報告', action: 'report-ai-inappropriate' },
     ]
   }
 ];
