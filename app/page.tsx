@@ -1067,7 +1067,7 @@ export default function EditorPage() {
                setBottomView(view);
              }
            }}
-           onNewTerminal={handleNewTerminalTab}
+           onNewTerminal={isElectronRenderer() ? handleNewTerminalTab : undefined}
          />
 
            {/* Left side panel */}
@@ -1098,7 +1098,7 @@ export default function EditorPage() {
                   }
                 }}
                 onOpenFile={() => void openFile()}
-                onNewTerminal={handleNewTerminalTab}
+                onNewTerminal={isElectronRenderer() ? handleNewTerminalTab : undefined}
               />
             </div>
           )}

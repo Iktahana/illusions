@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react';
 
+import { isMacOS } from '@/lib/utils/runtime-env';
+
 /**
  * Global keyboard shortcuts that must fire regardless of focus.
  * Currently only blocks the browser's default Ctrl/Cmd+R reload behavior.
@@ -13,8 +15,7 @@ import { useEffect } from 'react';
 export function useGlobalShortcuts(): void {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = typeof navigator !== 'undefined' &&
-                    navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const isMac = isMacOS();
       const modifier = isMac ? e.metaKey : e.ctrlKey;
 
       // Ctrl/Cmd + R: Block browser reload (always, regardless of focus)
