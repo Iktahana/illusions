@@ -51,10 +51,17 @@ function registerPtyHandlers() {
     const rows = typeof options.rows === 'number' && options.rows > 0 ? options.rows : 24
 
     try {
+      // Filter sensitive environment variables before forwarding to PTY.
+      // Standard terminal env (PATH, HOME, SHELL, LANG, TERM, etc.) is kept.
+      const SENSITIVE_PATTERNS = /^(.*_KEY|.*_SECRET|.*_TOKEN|.*_PASSWORD|.*_CREDENTIAL|NPM_TOKEN|GH_TOKEN|GITHUB_TOKEN)$/i
+      const safeEnv = Object.fromEntries(
+        Object.entries(process.env).filter(([k]) => !SENSITIVE_PATTERNS.test(k))
+      )
+
       const ptyProcess = pty.spawn(shell, [], {
         name: 'xterm-256color',
         cwd,
-        env: { ...process.env },
+        env: safeEnv,
         cols,
         rows,
       })
@@ -120,7 +127,7 @@ function registerPtyHandlers() {
  * Dispose all active PTY sessions (call on app quit).
  */
 function disposeAllPtys() {
-  for (const [id, proc] of activePtys) {
+  for (const [id, proc] of Array.from(activePtys)) {
     try {
       proc.kill()
     } catch { /* ignore */ }

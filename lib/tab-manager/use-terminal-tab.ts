@@ -122,8 +122,8 @@ export function useTerminalTab(): UseTerminalTabReturn {
   const closeTerminal = useCallback((tabId: TabId) => {
     const tab = tabsRef.current.find((t) => t.id === tabId);
     if (tab?.ptyId) {
-      window.electronAPI?.terminal?.kill(tab.ptyId).catch(() => {
-        /* best-effort */
+      window.electronAPI?.terminal?.kill(tab.ptyId).catch((err) => {
+        console.warn("[terminal] Failed to kill PTY on tab close:", err);
       });
     }
     setTerminalTabs((prev) => prev.filter((t) => t.id !== tabId));
