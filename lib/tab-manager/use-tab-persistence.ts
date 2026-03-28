@@ -122,11 +122,16 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
       if (tabPersistTimerRef.current) {
         clearTimeout(tabPersistTimerRef.current);
         tabPersistTimerRef.current = null;
-        // Flush pending state immediately on cleanup (unmount or deps change)
-        void persistTabStateNow().catch(() => {});
       }
     };
   }, [tabs, activeTabId, persistTabStateNow]);
+
+  // Flush pending tab state on unmount only (not on every deps change).
+  useEffect(() => {
+    return () => {
+      void flushTabState().catch(() => {});
+    };
+  }, [flushTabState]);
 
   // --- Storage initialization & Web file restore --------------------------
   //
