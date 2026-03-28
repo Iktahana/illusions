@@ -115,11 +115,16 @@ export function useWebMenuHandlers({
         }
         break;
       case 'paste-plaintext':
-        // TODO: Implement paste as plaintext
         if (editorView) {
           editorView.focus();
-          // This will be implemented later with proper Milkdown integration
-          console.warn('[Web Menu] Paste as plaintext not yet implemented');
+          navigator.clipboard.readText().then((text) => {
+            const { state, dispatch } = editorView;
+            const { from, to } = state.selection;
+            const transaction = state.tr.insertText(text, from, to);
+            dispatch(transaction);
+          }).catch((err) => {
+            console.error('Failed to paste plain text:', err);
+          });
         }
         break;
       case 'select-all':
