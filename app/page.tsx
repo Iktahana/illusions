@@ -40,7 +40,6 @@ import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
-import { useGlobalShortcuts } from "@/lib/hooks/use-global-shortcuts";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import WebMenuBar from "@/components/WebMenuBar";
 import { useEditorMode } from "@/contexts/EditorModeContext";
@@ -356,12 +355,6 @@ export default function EditorPage() {
     onFontScaleChange: (scale: number) => fontScaleChangeRef.current(scale),
   });
 
-  // Global shortcuts for Web (only when not in Electron)
-  useGlobalShortcuts(
-    !isElectron ? handleMenuAction : () => {},
-    editorDomRef
-  );
-
   // Save toast: show when lastSavedTime updates (skip auto-save / initial load)
   useEffect(() => {
     if (lastSavedTime && prevLastSavedTimeRef.current !== lastSavedTime) {
@@ -587,6 +580,8 @@ export default function EditorPage() {
     activeTabId,
     splitEditorRight: useCallback(() => splitEditor("right"), [splitEditor]),
     splitEditorDown: useCallback(() => splitEditor("down"), [splitEditor]),
+    onMenuAction: !isElectron ? handleMenuAction : undefined,
+    editorContainerRef: editorDomRef,
   });
 
   // Detect feature availability after mount to avoid SSR hydration mismatch

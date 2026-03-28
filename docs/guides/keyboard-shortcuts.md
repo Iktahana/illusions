@@ -2,7 +2,7 @@
 
 ## Overview
 
-illusions supports keyboard shortcuts across both Electron (desktop) and Web environments. Shortcuts are defined in `lib/menu-definitions.ts` and handled by `lib/use-global-shortcuts.ts`. The menu system uses Japanese labels for all user-facing items.
+illusions supports keyboard shortcuts across both Electron (desktop) and Web environments. Shortcuts are defined in `lib/menu-definitions.ts` and handled by `lib/editor-page/use-keyboard-shortcuts.ts`. The menu system uses Japanese labels for all user-facing items.
 
 ---
 
@@ -118,7 +118,7 @@ In the web version, the menu is rendered as a UI component (`WEB_MENU_STRUCTURE`
 | Feature | Electron | Web |
 |---------|----------|-----|
 | Menu rendering | Native OS menu bar | `WEB_MENU_STRUCTURE` rendered in the UI |
-| Shortcut handling | OS-level accelerators via Electron | `useGlobalShortcuts` hook with `keydown` listener |
+| Shortcut handling | OS-level accelerators via Electron | `useKeyboardShortcuts` hook with `keydown` listener |
 | Editor key bindings | Electron passes through to Milkdown | Milkdown handles directly |
 | Tab switching (Cmd/Ctrl+1-9) | Supported | Not available |
 | Browser reload blocking | Not needed | Actively blocked (Cmd/Ctrl+R intercepted) |
@@ -128,67 +128,27 @@ In the web version, the menu is rendered as a UI component (`WEB_MENU_STRUCTURE`
 
 **Electron:** Menu definitions are converted to Electron's `Menu.buildFromTemplate()` format. Accelerators are registered at the OS level, so they work regardless of which UI element has focus.
 
-**Web:** The `useGlobalShortcuts` hook attaches a `keydown` event listener to the document. It must coordinate with the Milkdown editor to avoid conflicts -- shortcuts only fire when the editor does not have focus for the same key combination.
+**Web:** The `useKeyboardShortcuts` hook attaches a single `keydown` event listener to the window. Shortcuts are split into two scope categories:
+- **Always-active**: Fire regardless of focus (e.g. save, zoom, new-window, browser-reload block, settings).
+- **Context-dependent**: Suppressed when a non-editor text input (e.g. settings dialog) has focus (e.g. search, ruby, tcy, tab navigation).
 
 ---
 
-## useGlobalShortcuts Hook
+## useKeyboardShortcuts Hook
 
-**File:** `lib/use-global-shortcuts.ts`
+**File:** `lib/editor-page/use-keyboard-shortcuts.ts`
 
-The `useGlobalShortcuts` hook manages keyboard shortcut handling in the web environment.
+The `useKeyboardShortcuts` hook is the single, unified keyboard shortcut dispatcher for the web environment.
 
 ### Behavior
 
-1. **Focus-aware**: Only fires for shortcuts when the editor does not have focus for the relevant key combination. This prevents conflicts where both the hook and the editor would respond to the same keystroke.
+1. **Focus-scope aware**: Shortcuts are categorised into *always-active* and *context-dependent*. Always-active shortcuts (save, zoom, new-window, open, settings) fire regardless of which element has focus. Context-dependent shortcuts (search, ruby, tcy, tabs, split-editor) are suppressed when a non-editor `<input>`, `<textarea>`, or `contentEditable` element is focused, preventing misfires in settings dialogs.
 
 2. **Platform detection**: Automatically detects macOS vs. Windows/Linux and maps modifier keys accordingly:
    - macOS: `Cmd` (Meta key)
    - Windows/Linux: `Ctrl`
 
 3. **Browser reload blocking**: Intercepts `Cmd+R` / `Ctrl+R` to prevent accidental page reloads that would lose unsaved work.
-
-### formatAccelerator()
-
-Converts internal shortcut format to platform-appropriate display strings:
-
-```typescript
-import { formatAccelerator } from "@/lib/use-global-shortcuts";
-
-// On macOS:
-formatAccelerator("Ctrl+S");    // Returns: "⌘S"
-formatAccelerator("Ctrl+Shift+R"); // Returns: "⇧⌘R"
-
-// On Windows:
-formatAccelerator("Ctrl+S");    // Returns: "Ctrl+S"
-formatAccelerator("Ctrl+Shift+R"); // Returns: "Shift+Ctrl+R"
-```
-
-The internal format always uses `Ctrl` as the primary modifier. On macOS, this is displayed as the Command symbol. Modifier key display mapping:
-
-| Internal | macOS Display | Windows Display |
-|----------|--------------|-----------------|
-| `Ctrl` | `⌘` (Command) | `Ctrl` |
-| `Shift` | `⇧` | `Shift` |
-| `Alt` | `⌥` (Option) | `Alt` |
-
-### Usage Example
-
-```typescript
-import { useGlobalShortcuts } from "@/lib/use-global-shortcuts";
-
-function App() {
-  const handlers = {
-    "file:save": () => saveCurrentFile(),
-    "file:open": () => openFileDialog(),
-    "edit:find": () => toggleSearchPanel(),
-  };
-
-  useGlobalShortcuts(handlers);
-
-  return <Editor />;
-}
-```
 
 ---
 
@@ -202,25 +162,9 @@ To add a new keyboard shortcut:
 
 3. **For Electron**, the menu definition is automatically picked up by the native menu builder.
 
-4. **For Web**, ensure the action ID is handled in the `useGlobalShortcuts` callback map.
+4. **For Web**, add the shortcut handling in `useKeyboardShortcuts` (`lib/editor-page/use-keyboard-shortcuts.ts`). Choose the appropriate scope — always-active or context-dependent.
 
 5. **Update the menu structure** in `WEB_MENU_STRUCTURE` if the shortcut should appear in the web menu.
-
-Example:
-
-```typescript
-// In menu-definitions.ts
-{
-  label: "新しいアクション",
-  actionId: "edit:new-action",
-  accelerator: "Ctrl+Shift+A",
-}
-```
-
-```typescript
-// In useGlobalShortcuts handler map
-"edit:new-action": () => performNewAction(),
-```
 
 ---
 

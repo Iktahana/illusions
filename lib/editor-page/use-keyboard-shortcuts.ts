@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useEffect } from "react";
 
 import type { MdiFileDescriptor } from "@/lib/project/mdi-file";
@@ -31,13 +31,46 @@ interface UseKeyboardShortcutsParams {
   // Split editor operations
   splitEditorRight?: () => void;
   splitEditorDown?: () => void;
+  // Global / menu-level actions (formerly in useGlobalShortcuts)
+  onMenuAction?: (action: string) => void;
+  editorContainerRef?: RefObject<HTMLElement>;
 }
 
 /**
- * Keyboard shortcut handler for the editor page.
+ * Returns true when the currently focused element is a non-editor text input
+ * (e.g. settings dialog input, search box, textarea) where app-level
+ * shortcuts should be suppressed to avoid misfires.
+ */
+function isFocusInNonEditorInput(
+  editorContainerRef?: RefObject<HTMLElement>,
+): boolean {
+  const el = document.activeElement;
+  if (!el) return false;
+
+  // Focus inside the editor is fine — editor handles its own key bindings
+  if (editorContainerRef?.current?.contains(el)) return false;
+
+  const tag = el.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") return true;
+  if ((el as HTMLElement).isContentEditable) return true;
+
+  return false;
+}
+
+/**
+ * Unified keyboard shortcut handler for the editor page.
  *
- * Handles: save, search, settings, paste-as-plaintext, compact mode,
- * ruby dialog, tcy toggle, and tab navigation.
+ * Merges the former useGlobalShortcuts (browser-reload block, zoom, new-window,
+ * open, save-as) with editor-page shortcuts (save, search, settings, paste-as-
+ * plaintext, compact mode, ruby, tcy, tabs, split editor) into a single
+ * dispatch point with explicit focus-scope management.
+ *
+ * Scope rules:
+ *  • "always"  — fires regardless of focus (browser-reload block, zoom,
+ *                new-window, save, save-as, open, settings)
+ *  • "context" — suppressed when a non-editor input/textarea is focused
+ *                (search, paste-plaintext, compact-mode, ruby, tcy, tabs,
+ *                 split-editor)
  */
 export function useKeyboardShortcuts({
   isElectron,
@@ -58,6 +91,8 @@ export function useKeyboardShortcuts({
   activeTabId,
   splitEditorRight,
   splitEditorDown,
+  onMenuAction,
+  editorContainerRef,
 }: UseKeyboardShortcutsParams): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -65,115 +100,159 @@ export function useKeyboardShortcuts({
       const isMac = nav.userAgentData
         ? nav.userAgentData.platform === "macOS"
         : /mac/i.test(navigator.userAgent);
+      const modifier = isMac ? event.metaKey : event.ctrlKey;
 
-      // Cmd+, (macOS) / Ctrl+, (Windows/Linux): Settings
-      const isSettingsShortcut = isMac
-        ? event.metaKey && event.key === ","
-        : event.ctrlKey && event.key === ",";
+      // ── Always-active shortcuts (fire regardless of focus) ────────
 
-      // Cmd+S (macOS) / Ctrl+S (Windows/Linux): Save
-      const isSaveShortcut = isMac
-        ? event.metaKey && event.key === "s"
-        : event.ctrlKey && event.key === "s";
-
-      // Cmd+F (macOS) / Ctrl+F (Windows/Linux): Search
-      const isSearchShortcut = isMac
-        ? event.metaKey && event.key === "f"
-        : event.ctrlKey && event.key === "f";
-
-      // Shift+Cmd+V (macOS) / Shift+Ctrl+V (Windows/Linux): Paste as plaintext
-      const isPasteAsPlaintextShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "v"
-        : event.shiftKey && event.ctrlKey && event.key === "v";
-
-      // Shift+Cmd+M (macOS) / Shift+Ctrl+M (Windows/Linux): Compact mode toggle
-      const isCompactModeShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "m"
-        : event.shiftKey && event.ctrlKey && event.key === "m";
-
-      // Shift+Cmd+R (macOS) / Shift+Ctrl+R (Windows/Linux): Ruby dialog
-      const isRubyShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "r"
-        : event.shiftKey && event.ctrlKey && event.key === "r";
-
-      // Shift+Cmd+T (macOS) / Shift+Ctrl+T (Windows/Linux): Tcy
-      const isTcyShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "t"
-        : event.shiftKey && event.ctrlKey && event.key === "t";
-
-      // Tab shortcuts (Web only; Electron handles Cmd+W/T via menu)
-      const isNextTab = event.ctrlKey && !event.shiftKey && event.key === "Tab";
-      const isPrevTab = event.ctrlKey && event.shiftKey && event.key === "Tab";
-      const isNewTabShortcut = !isElectron && (isMac
-        ? event.metaKey && !event.shiftKey && event.key === "t"
-        : event.ctrlKey && !event.shiftKey && event.key === "t");
-      const isCloseTabShortcut = !isElectron && (isMac
-        ? event.metaKey && event.key === "w"
-        : event.ctrlKey && event.key === "w");
-      const isTabJump = (isMac ? event.metaKey : event.ctrlKey) &&
-        !event.shiftKey && event.key >= "1" && event.key <= "9";
-
-      // Cmd+\ (macOS) / Ctrl+\ (Windows/Linux): Split editor right
-      const isSplitRight = isMac
-        ? event.metaKey && !event.shiftKey && event.key === "\\"
-        : event.ctrlKey && !event.shiftKey && event.key === "\\";
-
-      // Shift+Cmd+\ (macOS) / Shift+Ctrl+\ (Windows/Linux): Split editor down
-      const isSplitDown = isMac
-        ? event.shiftKey && event.metaKey && event.key === "\\"
-        : event.shiftKey && event.ctrlKey && event.key === "\\";
-
-      if (isSplitRight && splitEditorRight) {
+      // Ctrl/Cmd + R: Block browser reload
+      if (modifier && !event.shiftKey && event.key === "r") {
         event.preventDefault();
-        splitEditorRight();
-      } else if (isSplitDown && splitEditorDown) {
-        event.preventDefault();
-        splitEditorDown();
-      } else if (isTcyShortcut) {
-        event.preventDefault();
-        handleToggleTcy();
-      } else if (isRubyShortcut) {
-        event.preventDefault();
-        handleOpenRubyDialog();
-      } else if (isCompactModeShortcut) {
-        event.preventDefault();
-        handleToggleCompactMode();
-      } else if (isSettingsShortcut) {
-        event.preventDefault();
-        setShowSettingsModal(true);
-      } else if (isSaveShortcut) {
+        return;
+      }
+
+      // Ctrl/Cmd + S: Save
+      if (modifier && event.key === "s" && !event.shiftKey) {
         event.preventDefault();
         void saveFile();
-      } else if (isSearchShortcut) {
+        return;
+      }
+
+      // Ctrl/Cmd + Shift + S: Save As (Web only)
+      if (!isElectron && modifier && event.shiftKey && (event.key === "S" || event.key === "s")) {
+        event.preventDefault();
+        onMenuAction?.("save-as");
+        return;
+      }
+
+      // Ctrl/Cmd + O: Open (Web only)
+      if (!isElectron && modifier && event.key === "o") {
+        event.preventDefault();
+        onMenuAction?.("open-file");
+        return;
+      }
+
+      // Ctrl/Cmd + N: New Window (Web only)
+      if (!isElectron && modifier && event.key === "n") {
+        event.preventDefault();
+        onMenuAction?.("new-window");
+        return;
+      }
+
+      // Ctrl/Cmd + 0: Reset Zoom (Web only)
+      if (!isElectron && modifier && event.key === "0") {
+        event.preventDefault();
+        onMenuAction?.("reset-zoom");
+        return;
+      }
+
+      // Ctrl/Cmd + = / +: Zoom In (Web only)
+      if (!isElectron && modifier && (event.key === "+" || event.key === "=")) {
+        event.preventDefault();
+        onMenuAction?.("zoom-in");
+        return;
+      }
+
+      // Ctrl/Cmd + -: Zoom Out (Web only)
+      if (!isElectron && modifier && event.key === "-") {
+        event.preventDefault();
+        onMenuAction?.("zoom-out");
+        return;
+      }
+
+      // Ctrl/Cmd + ,: Settings
+      if (modifier && event.key === ",") {
+        event.preventDefault();
+        setShowSettingsModal(true);
+        return;
+      }
+
+      // ── Context-dependent shortcuts (suppressed in non-editor inputs) ─
+
+      if (isFocusInNonEditorInput(editorContainerRef)) return;
+
+      // Cmd+F / Ctrl+F: Search
+      if (modifier && event.key === "f") {
         event.preventDefault();
         setSearchOpenTrigger(prev => prev + 1);
-      } else if (isPasteAsPlaintextShortcut) {
+        return;
+      }
+
+      // Shift+Cmd+V / Shift+Ctrl+V: Paste as plaintext
+      if (event.shiftKey && modifier && event.key === "v") {
         event.preventDefault();
         void handlePasteAsPlaintext();
-      } else if (isNextTab) {
+        return;
+      }
+
+      // Shift+Cmd+M / Shift+Ctrl+M: Compact mode toggle
+      if (event.shiftKey && modifier && event.key === "m") {
+        event.preventDefault();
+        handleToggleCompactMode();
+        return;
+      }
+
+      // Shift+Cmd+R / Shift+Ctrl+R: Ruby dialog
+      if (event.shiftKey && modifier && event.key === "r") {
+        event.preventDefault();
+        handleOpenRubyDialog();
+        return;
+      }
+
+      // Shift+Cmd+T / Shift+Ctrl+T: Tcy toggle
+      if (event.shiftKey && modifier && event.key === "t") {
+        event.preventDefault();
+        handleToggleTcy();
+        return;
+      }
+
+      // Tab shortcuts (Web only; Electron handles Cmd+W/T via menu)
+      if (event.ctrlKey && !event.shiftKey && event.key === "Tab") {
         event.preventDefault();
         nextTab();
         incrementEditorKey();
-      } else if (isPrevTab) {
+        return;
+      }
+      if (event.ctrlKey && event.shiftKey && event.key === "Tab") {
         event.preventDefault();
         prevTab();
         incrementEditorKey();
-      } else if (isNewTabShortcut) {
+        return;
+      }
+      if (!isElectron && modifier && !event.shiftKey && event.key === "t") {
         event.preventDefault();
         newTab();
         incrementEditorKey();
-      } else if (isCloseTabShortcut) {
+        return;
+      }
+      if (!isElectron && modifier && event.key === "w") {
         event.preventDefault();
         if (tabs.length === 1 && !tabs[0].file && !tabs[0].isDirty) {
           window.close();
           return;
         }
         closeTab(activeTabId);
-      } else if (isTabJump) {
+        return;
+      }
+      if (modifier && !event.shiftKey && event.key >= "1" && event.key <= "9") {
         event.preventDefault();
         const idx = parseInt(event.key, 10) - 1;
         switchToIndex(idx);
         incrementEditorKey();
+        return;
+      }
+
+      // Cmd+\ / Ctrl+\: Split editor right
+      if (modifier && !event.shiftKey && event.key === "\\" && splitEditorRight) {
+        event.preventDefault();
+        splitEditorRight();
+        return;
+      }
+
+      // Shift+Cmd+\ / Shift+Ctrl+\: Split editor down
+      if (event.shiftKey && modifier && event.key === "\\" && splitEditorDown) {
+        event.preventDefault();
+        splitEditorDown();
+        return;
       }
     };
 
@@ -181,5 +260,5 @@ export function useKeyboardShortcuts({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [saveFile, handlePasteAsPlaintext, handleToggleCompactMode, handleOpenRubyDialog, handleToggleTcy, isElectron, nextTab, prevTab, newTab, closeTab, tabs, activeTabId, switchToIndex, setShowSettingsModal, incrementEditorKey, setSearchOpenTrigger, splitEditorRight, splitEditorDown]);
+  }, [saveFile, handlePasteAsPlaintext, handleToggleCompactMode, handleOpenRubyDialog, handleToggleTcy, isElectron, nextTab, prevTab, newTab, closeTab, tabs, activeTabId, switchToIndex, setShowSettingsModal, incrementEditorKey, setSearchOpenTrigger, splitEditorRight, splitEditorDown, onMenuAction, editorContainerRef]);
 }
