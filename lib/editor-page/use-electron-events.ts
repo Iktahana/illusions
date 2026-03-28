@@ -199,19 +199,19 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
   useEffect(() => {
     if (!isElectron || typeof window === "undefined") return;
     const cleanup = window.electronAPI?.onMenuOpenProject?.(() => {
-      void handleOpenProject();
+      void confirmBeforeAction(() => handleOpenProject());
     });
     return () => { cleanup?.(); };
-  }, [isElectron, handleOpenProject]);
+  }, [isElectron, confirmBeforeAction, handleOpenProject]);
 
   // Open recent project from menu IPC listener
   useEffect(() => {
     if (!isElectron || typeof window === "undefined") return;
     const cleanup = window.electronAPI?.onMenuOpenRecentProject?.((projectId: string) => {
-      void handleOpenRecentProject(projectId);
+      void confirmBeforeAction(() => handleOpenRecentProject(projectId));
     });
     return () => { cleanup?.(); };
-  }, [isElectron, handleOpenRecentProject]);
+  }, [isElectron, confirmBeforeAction, handleOpenRecentProject]);
 
   // Open as project (system-triggered, e.g., double-clicked .mdi in project dir)
   useEffect(() => {

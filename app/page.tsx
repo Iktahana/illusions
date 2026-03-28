@@ -346,8 +346,8 @@ export default function EditorPage() {
     onOpen: openFile,
     onSave: saveFile,
     onSaveAs: saveAsFile,
-    onOpenProject: () => void handleOpenProject(),
-    onOpenRecentProject: (projectId: string) => openRecentProjectRef.current(projectId),
+    onOpenProject: () => void unsavedWarning.confirmBeforeAction(() => handleOpenProject()),
+    onOpenRecentProject: (projectId: string) => void unsavedWarning.confirmBeforeAction(() => openRecentProjectRef.current(projectId)),
     onCloseWindow: () => window.close(),
     onToggleCompactMode: () => toggleCompactModeRef.current(),
     onExport: (format) => void exportAs(format),
@@ -614,9 +614,9 @@ export default function EditorPage() {
 
         <WelcomeScreen
           onCreateProject={handleCreateProject}
-          onOpenProject={() => void handleOpenProject()}
-          onOpenStandaloneFile={() => void handleOpenStandaloneFile()}
-          onOpenRecentProject={(id) => void handleOpenRecentProject(id)}
+          onOpenProject={() => void unsavedWarning.confirmBeforeAction(() => handleOpenProject())}
+          onOpenStandaloneFile={() => void unsavedWarning.confirmBeforeAction(() => handleOpenStandaloneFile())}
+          onOpenRecentProject={(id) => void unsavedWarning.confirmBeforeAction(() => handleOpenRecentProject(id))}
           onDeleteRecentProject={(id) => void handleDeleteRecentProject(id)}
           recentProjects={recentProjects}
           isProjectModeSupported={features.projectMode}
