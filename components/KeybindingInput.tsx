@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { KeyBinding } from "@/lib/keymap/keymap-types";
-import { buildBindingFromEvent, formatBinding } from "@/lib/keymap/keymap-utils";
+import { buildBindingFromEvent, formatBinding, isReservedBinding } from "@/lib/keymap/keymap-utils";
 
 interface KeybindingInputProps {
   onRecord: (binding: KeyBinding) => void;
@@ -39,6 +39,12 @@ export default function KeybindingInput({ onRecord, onCancel }: KeybindingInputP
     // Require at least one modifier for non-Tab keys
     if (binding.key !== "Tab" && binding.modifiers.length === 0) {
       setPreview(`${formatBinding(binding)} (修飾キーが必要です)`);
+      return;
+    }
+
+    // Reject browser/OS reserved key combinations
+    if (isReservedBinding(binding)) {
+      setPreview(`${formatBinding(binding)} (予約済みキーです)`);
       return;
     }
 

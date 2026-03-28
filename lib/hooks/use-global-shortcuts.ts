@@ -2,7 +2,15 @@
 
 import { useEffect } from 'react';
 
-import { isMacOS } from '@/lib/utils/runtime-env';
+import type { KeyBinding } from '@/lib/keymap/keymap-types';
+import { matchesEvent } from '@/lib/keymap/keymap-utils';
+
+/**
+ * Binding used to block browser reload.
+ * Defined here as a constant so it participates in the keymap utilities
+ * rather than being a raw key/modifier check.
+ */
+const BLOCK_RELOAD_BINDING: KeyBinding = { modifiers: ["CmdOrCtrl"], key: "r" };
 
 /**
  * Global keyboard shortcuts that must fire regardless of focus.
@@ -15,11 +23,8 @@ import { isMacOS } from '@/lib/utils/runtime-env';
 export function useGlobalShortcuts(): void {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = isMacOS();
-      const modifier = isMac ? e.metaKey : e.ctrlKey;
-
-      // Ctrl/Cmd + R: Block browser reload (always, regardless of focus)
-      if (modifier && e.key === 'r') {
+      // Block browser reload (always, regardless of focus)
+      if (matchesEvent(BLOCK_RELOAD_BINDING, e)) {
         e.preventDefault();
         return;
       }

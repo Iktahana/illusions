@@ -141,6 +141,57 @@ export function toWebMenuAccelerator(binding: KeyBinding | null): string | undef
 }
 
 /**
+ * Normalizes a binding to a canonical string for comparison.
+ * Modifiers are sorted to ensure consistent comparison.
+ */
+function bindingToCanonical(mods: readonly string[], key: string): string {
+  return [...mods].sort().join("+") + "_" + key.toLowerCase();
+}
+
+/**
+ * Browser/OS reserved key combinations that should not be assigned as shortcuts.
+ * These are combinations that browsers intercept before the page can handle them,
+ * or that conflict with essential OS/browser navigation.
+ */
+const RESERVED_BINDINGS: ReadonlySet<string> = new Set(
+  (
+    [
+      // Browser tab/window management (not reliably interceptable)
+      { modifiers: ["CmdOrCtrl"], key: "l" },         // Address bar focus
+      { modifiers: ["CmdOrCtrl"], key: "d" },         // Bookmark
+      { modifiers: ["CmdOrCtrl"], key: "r" },         // Reload
+      { modifiers: ["CmdOrCtrl", "Shift"], key: "r" }, // Hard reload
+      { modifiers: ["CmdOrCtrl", "Shift"], key: "i" }, // DevTools
+      { modifiers: ["CmdOrCtrl", "Shift"], key: "j" }, // DevTools console
+      { modifiers: ["CmdOrCtrl"], key: "j" },         // Downloads (Chrome)
+      { modifiers: ["CmdOrCtrl"], key: "h" },         // History
+      { modifiers: ["CmdOrCtrl"], key: "g" },         // Find next (browser)
+      { modifiers: ["CmdOrCtrl", "Shift"], key: "g" }, // Find previous (browser)
+      { modifiers: ["CmdOrCtrl"], key: "u" },         // View source
+      { modifiers: ["CmdOrCtrl"], key: "p" },         // Print
+      { modifiers: ["CmdOrCtrl"], key: "q" },         // Quit browser (macOS)
+      // F-keys reserved by browsers
+      { modifiers: [], key: "F1" },                    // Help
+      { modifiers: [], key: "F3" },                    // Find
+      { modifiers: [], key: "F5" },                    // Reload
+      { modifiers: [], key: "F7" },                    // Caret browsing
+      { modifiers: [], key: "F11" },                   // Fullscreen
+      { modifiers: [], key: "F12" },                   // DevTools
+    ] satisfies Array<{ modifiers: string[]; key: string }>
+  ).map(b => bindingToCanonical(b.modifiers, b.key)),
+);
+
+/**
+ * Checks whether a binding conflicts with browser/OS reserved key combinations.
+ * Returns true if the binding should be rejected.
+ */
+export function isReservedBinding(binding: KeyBinding): boolean {
+  return RESERVED_BINDINGS.has(
+    bindingToCanonical(binding.modifiers, binding.key),
+  );
+}
+
+/**
  * Builds a KeyBinding from a keyboard event.
  * Used by the KeybindingInput recording component.
  */

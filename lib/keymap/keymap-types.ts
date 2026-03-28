@@ -22,6 +22,11 @@ export type ShortcutCategory =
   | "app";
 
 /**
+ * Platform scope that determines where a shortcut is active.
+ */
+export type ShortcutScope = "all" | "electron-only" | "web-only";
+
+/**
  * A single entry in the shortcut registry.
  */
 export interface ShortcutEntry {
@@ -31,7 +36,7 @@ export interface ShortcutEntry {
   category: ShortcutCategory;
   defaultBinding: KeyBinding | null;
   /** Platform scope for this shortcut */
-  scope: "all" | "electron-only" | "web-only";
+  scope: ShortcutScope;
 }
 
 /**
