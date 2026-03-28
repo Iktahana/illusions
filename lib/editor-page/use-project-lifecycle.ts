@@ -370,6 +370,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
           rootDirName: p.rootPath.split("/").pop(),
         }));
         setRecentProjects(entries);
+        void window.electronAPI?.rebuildMenu?.();
       } else {
         const projectManager = getProjectManager();
         await projectManager.removeProjectHandle(projectId);
