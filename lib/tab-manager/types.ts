@@ -4,6 +4,7 @@ import type { MutableRefObject, Dispatch, SetStateAction } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, TabState } from "./tab-types";
+import type { FileConflictState } from "./use-file-watch-integration";
 import { getRandomillusionstory } from "../project/illusion-stories";
 
 // ---------------------------------------------------------------------------
@@ -46,6 +47,10 @@ export interface UseTabManagerReturn {
   handleCloseTabSave: () => Promise<void>;
   handleCloseTabDiscard: () => void;
   handleCloseTabCancel: () => void;
+
+  // File watch integration (external change detection)
+  fileConflict: FileConflictState | null;
+  resolveFileConflict: (resolution: "local" | "remote") => void;
 }
 
 // ---------------------------------------------------------------------------

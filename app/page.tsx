@@ -15,6 +15,7 @@ import SidebarSplitter from "@/components/SidebarSplitter";
 import SearchResults from "@/components/SearchResults";
 import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import FileConflictDialog from "@/components/FileConflictDialog";
 import UpgradeToProjectBanner from "@/components/UpgradeToProjectBanner";
 import WordFrequency from "@/components/WordFrequency";
 import Characters from "@/components/Characters";
@@ -185,6 +186,7 @@ export default function EditorPage() {
     tabs, activeTabId, newTab, closeTab, switchTab, nextTab, prevTab, switchToIndex,
     openProjectFile, pinTab,
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
+    fileConflict, resolveFileConflict,
   } = tabManager;
 
   // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
@@ -755,6 +757,16 @@ export default function EditorPage() {
             }
           }}
           onCancel={() => setConfirmRemoveRecent(null)}
+        />
+
+        {/* 外部変更検出ダイアログ */}
+        <FileConflictDialog
+          isOpen={fileConflict !== null}
+          fileName={fileConflict?.fileName ?? ""}
+          lastModified={fileConflict?.diskTimestamp ?? 0}
+          onResolve={resolveFileConflict}
+          localContent={fileConflict?.localContent}
+          remoteContent={fileConflict?.remoteContent}
         />
 
         {/* UpgradeBanner for standalone mode */}

@@ -93,7 +93,7 @@ export default function FileConflictDialog({
             「{fileName}」が外部のプログラムにより変更されました。
           </p>
           <p className="mt-1 text-xs text-foreground-secondary">
-            最終変更: {formattedTimestamp}
+            ディスク最終更新: {formattedTimestamp}
           </p>
           {(diff.added > 0 || diff.removed > 0) && (
             <>
