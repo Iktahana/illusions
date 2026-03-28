@@ -16,6 +16,9 @@ import {
   useBufferStoreInstance,
   useBuffer,
 } from "./buffer-store";
+import { useContextMenu } from "@/lib/hooks/use-context-menu";
+import type { ContextMenuItem } from "@/lib/hooks/use-context-menu";
+import ContextMenu from "@/components/ContextMenu";
 
 // ---------------------------------------------------------------------------
 // EditorPanel — content component rendered inside each dockview panel
@@ -127,89 +130,111 @@ export function DockviewTabHeader({
     }
   }, [buffer?.isPreview]);
 
-  const handleContextMenu = useCallback(
-    async (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
+  const { menu, show: showContextMenu, close: closeContextMenu } = useContextMenu();
 
-      const electronAPI = window.electronAPI;
-      if (electronAPI?.showContextMenu) {
-        // Electron: use native context menu
-        const action = await electronAPI.showContextMenu([
-          { label: "新しいウィンドウで開く", action: "popout" },
-          { type: "separator" },
-          { label: "閉じる", action: "close" },
-        ]);
-        if (action === "popout" && buffer && electronAPI.editor?.popoutPanel) {
+  const handleContextAction = useCallback(
+    (action: string) => {
+      if (action === "popout" && buffer) {
+        const electronAPI = window.electronAPI;
+        if (electronAPI?.editor?.popoutPanel) {
           void electronAPI.editor.popoutPanel(
             params.bufferId,
             buffer.content,
             buffer.file?.name ?? `新規ファイル${buffer.fileType}`,
             buffer.fileType,
           );
-        } else if (action === "close") {
-          api.close();
+        } else {
+          const urlParams = new URLSearchParams({
+            "popout-buffer": params.bufferId,
+            fileName: buffer.file?.name ?? `新規ファイル${buffer.fileType}`,
+            fileType: buffer.fileType,
+          });
+          window.open(
+            `${window.location.origin}?${urlParams.toString()}`,
+            "_blank",
+            "width=900,height=700",
+          );
         }
-      } else if (buffer) {
-        // Web fallback: directly pop out (simple approach)
-        const urlParams = new URLSearchParams({
-          "popout-buffer": params.bufferId,
-          fileName: buffer.file?.name ?? `新規ファイル${buffer.fileType}`,
-          fileType: buffer.fileType,
-        });
-        window.open(
-          `${window.location.origin}?${urlParams.toString()}`,
-          "_blank",
-          "width=900,height=700",
-        );
+      } else if (action === "close") {
+        api.close();
       }
     },
     [api, buffer, params.bufferId],
   );
 
+  const handleContextMenu = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const items: ContextMenuItem[] = [];
+      if (buffer) {
+        items.push({ label: "新しいウィンドウで開く", action: "popout" });
+      }
+      items.push({ label: "閉じる", action: "close" });
+
+      const result = await showContextMenu(e, items);
+      if (result) {
+        handleContextAction(result);
+      }
+    },
+    [buffer, showContextMenu, handleContextAction],
+  );
+
   return (
-    <div
-      className={`
-        group relative flex items-center gap-1.5 px-3 h-full
-        text-xs whitespace-nowrap transition-colors duration-100
-        cursor-pointer select-none
-        ${
-          isActive
-            ? "text-foreground"
-            : "text-foreground-secondary hover:text-foreground"
-        }
-      `}
-      onMouseDown={handleMiddleClick}
-      onDoubleClick={handleDoubleClick}
-      onContextMenu={handleContextMenu}
-    >
-      {/* Dirty indicator */}
-      {buffer?.isDirty && (
-        <span className="w-1.5 h-1.5 rounded-full bg-warning shrink-0" />
-      )}
-
-      {/* Tab label */}
-      <span
-        className={`truncate${buffer?.isPreview ? " italic opacity-75" : ""}`}
-      >
-        {label}
-      </span>
-
-      {/* Close button */}
-      <span
-        role="button"
-        tabIndex={-1}
+    <>
+      <div
         className={`
-          shrink-0 w-4 h-4 flex items-center justify-center rounded-sm
-          hover:bg-hover-strong transition-colors
-          ${isActive ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100"}
+          group relative flex items-center gap-1.5 px-3 h-full
+          text-xs whitespace-nowrap transition-colors duration-100
+          cursor-pointer select-none
+          ${
+            isActive
+              ? "text-foreground"
+              : "text-foreground-secondary hover:text-foreground"
+          }
         `}
-        onClick={handleClose}
-        onMouseDown={(e) => e.stopPropagation()}
+        onMouseDown={handleMiddleClick}
+        onDoubleClick={handleDoubleClick}
+        onContextMenu={handleContextMenu}
       >
-        <X size={12} />
-      </span>
-    </div>
+        {/* Dirty indicator */}
+        {buffer?.isDirty && (
+          <span className="w-1.5 h-1.5 rounded-full bg-warning shrink-0" />
+        )}
+
+        {/* Tab label */}
+        <span
+          className={`truncate${buffer?.isPreview ? " italic opacity-75" : ""}`}
+        >
+          {label}
+        </span>
+
+        {/* Close button */}
+        <span
+          role="button"
+          tabIndex={-1}
+          className={`
+            shrink-0 w-4 h-4 flex items-center justify-center rounded-sm
+            hover:bg-hover-strong transition-colors
+            ${isActive ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100"}
+          `}
+          onClick={handleClose}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <X size={12} />
+        </span>
+      </div>
+
+      {/* Web context menu overlay */}
+      {menu && (
+        <ContextMenu
+          menu={menu}
+          onAction={handleContextAction}
+          onClose={closeContextMenu}
+        />
+      )}
+    </>
   );
 }
 
