@@ -104,7 +104,7 @@ export function useKeyboardShortcuts({
 
       // ── Always-active shortcuts (fire regardless of focus) ────────
 
-      // Ctrl/Cmd + R: Block browser reload
+      // Ctrl/Cmd + R: Block browser reload (excludes Shift to allow Shift+Cmd+R ruby dialog)
       if (modifier && !event.shiftKey && event.key === "r") {
         event.preventDefault();
         return;
@@ -118,7 +118,7 @@ export function useKeyboardShortcuts({
       }
 
       // Ctrl/Cmd + Shift + S: Save As (Web only)
-      if (!isElectron && modifier && event.shiftKey && (event.key === "S" || event.key === "s")) {
+      if (!isElectron && modifier && event.shiftKey && event.key === "S") {
         event.preventDefault();
         onMenuAction?.("save-as");
         return;
