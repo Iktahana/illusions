@@ -137,7 +137,7 @@ export function DockviewTabHeader({
         // Electron: use native context menu
         const action = await electronAPI.showContextMenu([
           { label: "新しいウィンドウで開く", action: "popout" },
-          { type: "separator" },
+          { label: "", action: "_separator" },
           { label: "閉じる", action: "close" },
         ]);
         if (action === "popout" && buffer && electronAPI.editor?.popoutPanel) {

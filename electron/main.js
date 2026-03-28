@@ -1204,7 +1204,9 @@ ipcMain.handle('show-context-menu', (_event, items) => {
   if (!Array.isArray(items) || items.length === 0 || items.length > 50) return null
   for (const item of items) {
     if (typeof item !== 'object' || item === null) return null
-    if (item.action !== '_separator') {
+    // Accept both { type: "separator" } and { action: "_separator" } as separators
+    const isSeparator = item.type === 'separator' || item.action === '_separator'
+    if (!isSeparator) {
       if (typeof item.label !== 'string' || typeof item.action !== 'string') return null
     }
   }
@@ -1214,7 +1216,7 @@ ipcMain.handle('show-context-menu', (_event, items) => {
 
   return new Promise((resolve) => {
     const template = items.map((item) =>
-      item.action === '_separator'
+      (item.type === 'separator' || item.action === '_separator')
         ? { type: 'separator' }
         : {
             label: item.label,
