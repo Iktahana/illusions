@@ -84,22 +84,39 @@ export function MenuItem({ item, onClick, onClose }: MenuItemProps) {
               項目なし
             </div>
           ) : (
-            item.submenu!.map((subItem, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={() => {
-                  if (subItem.action && subItem.enabled !== false) {
-                    onClick(subItem.action);
-                    onClose();
-                  }
-                }}
-                disabled={subItem.enabled === false}
-                className="w-full text-left px-3 py-1.5 text-sm flex items-center justify-between gap-4 hover:bg-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <span className="text-foreground truncate">{subItem.label}</span>
-              </button>
-            ))
+            item.submenu!.map((subItem, index) => {
+              if (subItem.type === 'separator') {
+                return <div key={index} className="h-px bg-border my-1" />;
+              }
+
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => {
+                    if (subItem.action && subItem.enabled !== false) {
+                      onClick(subItem.action);
+                      onClose();
+                    }
+                  }}
+                  disabled={subItem.enabled === false}
+                  className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {/* Checkbox/Radio indicator */}
+                  {(subItem.type === 'checkbox' || subItem.type === 'radio') ? (
+                    <span className="w-4 flex-shrink-0 text-center text-foreground">
+                      {subItem.checked ? (subItem.type === 'radio' ? '●' : '✓') : ''}
+                    </span>
+                  ) : null}
+                  <span className="text-foreground truncate flex-1">{subItem.label}</span>
+                  {subItem.accelerator ? (
+                    <span className="text-xs text-foreground-tertiary font-mono">
+                      {formatAccelerator(subItem.accelerator)}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })
           )}
         </div>
       )}

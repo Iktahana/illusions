@@ -12,7 +12,7 @@ const APP_VERSION = (() => {
 
 export interface MenuItem {
   label?: string;
-  type?: 'normal' | 'separator' | 'checkbox';
+  type?: 'normal' | 'separator' | 'checkbox' | 'radio';
   accelerator?: string;
   action?: string;
   enabled?: boolean;
@@ -67,6 +67,45 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
     ]
   },
   {
+    label: '書式',
+    items: [
+      {
+        label: '行間',
+        submenu: [
+          { label: '広くする', accelerator: 'Ctrl+]', action: 'format-line-height-increase' },
+          { label: '狭くする', accelerator: 'Ctrl+[', action: 'format-line-height-decrease' },
+        ],
+      },
+      {
+        label: '段落間隔',
+        submenu: [
+          { label: '広くする', action: 'format-paragraph-spacing-increase' },
+          { label: '狭くする', action: 'format-paragraph-spacing-decrease' },
+        ],
+      },
+      {
+        label: '字下げ',
+        submenu: [
+          { label: '深くする', action: 'format-text-indent-increase' },
+          { label: '浅くする', action: 'format-text-indent-decrease' },
+          { label: 'なし', action: 'format-text-indent-none' },
+        ],
+      },
+      { type: 'separator' },
+      {
+        label: '1行あたりの文字数',
+        submenu: [
+          { label: '自動', type: 'checkbox', action: 'format-chars-per-line-auto' },
+          { type: 'separator' },
+          { label: '増やす', action: 'format-chars-per-line-increase' },
+          { label: '減らす', action: 'format-chars-per-line-decrease' },
+        ],
+      },
+      { type: 'separator' },
+      { label: '段落番号を表示', type: 'checkbox', action: 'toggle-paragraph-numbers' },
+    ]
+  },
+  {
     label: '表示',
     items: [
       { label: '実際のサイズ', accelerator: 'Ctrl+0', action: 'reset-zoom' },
@@ -78,6 +117,14 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
     label: 'ウィンドウ',
     items: [
       { label: 'コンパクトモード', type: 'checkbox', action: 'toggle-compact-mode' },
+      {
+        label: 'ダークモード',
+        submenu: [
+          { label: '自動', type: 'radio', action: 'set-theme-auto' },
+          { label: 'オフ', type: 'radio', action: 'set-theme-light' },
+          { label: 'オン', type: 'radio', action: 'set-theme-dark' },
+        ],
+      },
     ]
   },
   {

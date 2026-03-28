@@ -6,6 +6,8 @@ import { MenuDropdown } from './WebMenuBar/MenuDropdown';
 
 import type { MenuSection, MenuItem } from '@/lib/menu/menu-definitions';
 
+import type { ThemeMode } from '@/lib/storage/local-preferences';
+
 interface RecentProjectInfo {
   projectId: string;
   name: string;
@@ -14,6 +16,9 @@ interface RecentProjectInfo {
 
 interface MenuCheckedState {
   compactMode?: boolean;
+  showParagraphNumbers?: boolean;
+  autoCharsPerLine?: boolean;
+  themeMode?: ThemeMode;
 }
 
 interface WebMenuBarProps {
@@ -32,11 +37,54 @@ export default function WebMenuBar({ onMenuAction, recentProjects, checkedState 
     if (checkedState?.compactMode != null) {
       map['toggle-compact-mode'] = checkedState.compactMode;
     }
+    if (checkedState?.showParagraphNumbers != null) {
+      map['toggle-paragraph-numbers'] = checkedState.showParagraphNumbers;
+    }
+    if (checkedState?.autoCharsPerLine != null) {
+      map['format-chars-per-line-auto'] = checkedState.autoCharsPerLine;
+    }
+    if (checkedState?.themeMode != null) {
+      map['set-theme-auto'] = checkedState.themeMode === 'auto';
+      map['set-theme-light'] = checkedState.themeMode === 'light';
+      map['set-theme-dark'] = checkedState.themeMode === 'dark';
+    }
     return map;
   }, [checkedState]);
 
-  // Inject recent projects and checked state into the menu structure
+  // Enabled state overrides: action → boolean (false = disabled)
+  const enabledMap = useMemo<Record<string, boolean>>(() => {
+    const map: Record<string, boolean> = {};
+    if (checkedState?.autoCharsPerLine) {
+      map['format-chars-per-line-increase'] = false;
+      map['format-chars-per-line-decrease'] = false;
+    }
+    return map;
+  }, [checkedState]);
+
+  // Inject dynamic state (recent projects, checked, enabled) into the menu structure
   const menuStructure = useMemo<MenuSection[]>(() => {
+    const applyState = (item: MenuItem): MenuItem => {
+      let result = item;
+
+      // Inject checked state for checkbox/radio items
+      if ((result.type === 'checkbox' || result.type === 'radio') && result.action && result.action in checkedMap) {
+        result = { ...result, checked: checkedMap[result.action] };
+      }
+
+      // Inject enabled state overrides
+      if (result.action && result.action in enabledMap) {
+        result = { ...result, enabled: enabledMap[result.action] };
+      }
+
+      // Recursively process submenu items
+      if (result.submenu) {
+        const updatedSubmenu = result.submenu.map(applyState);
+        result = { ...result, submenu: updatedSubmenu };
+      }
+
+      return result;
+    };
+
     return WEB_MENU_STRUCTURE.map((section) => {
       const items = section.items.map((item): MenuItem => {
         // Inject recent projects submenu
@@ -51,17 +99,12 @@ export default function WebMenuBar({ onMenuAction, recentProjects, checkedState 
           return { ...item, submenu: submenuItems };
         }
 
-        // Inject checked state for checkbox items
-        if (item.type === 'checkbox' && item.action && item.action in checkedMap) {
-          return { ...item, checked: checkedMap[item.action] };
-        }
-
-        return item;
+        return applyState(item);
       });
 
       return { ...section, items };
     });
-  }, [recentProjects, checkedMap]);
+  }, [recentProjects, checkedMap, enabledMap]);
 
   const handleMenuClick = (index: number) => {
     setOpenMenu(openMenu === index ? null : index);

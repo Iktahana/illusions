@@ -16,6 +16,8 @@ interface UseWebMenuHandlersProps {
   editorView?: EditorView | null;
   fontScale?: number;
   onFontScaleChange?: (scale: number) => void;
+  onFormatChange?: (setting: string, action: string) => void;
+  onSetThemeMode?: (mode: 'auto' | 'light' | 'dark') => void;
 }
 
 export function useWebMenuHandlers({
@@ -31,6 +33,8 @@ export function useWebMenuHandlers({
   editorView,
   fontScale = 100,
   onFontScaleChange,
+  onFormatChange,
+  onSetThemeMode,
 }: UseWebMenuHandlersProps) {
   
   const handleMenuAction = useCallback((action: string) => {
@@ -149,6 +153,52 @@ export function useWebMenuHandlers({
         onToggleCompactMode?.();
         break;
 
+      // Format menu
+      case 'format-line-height-increase':
+        onFormatChange?.('lineHeight', 'increase');
+        break;
+      case 'format-line-height-decrease':
+        onFormatChange?.('lineHeight', 'decrease');
+        break;
+      case 'format-paragraph-spacing-increase':
+        onFormatChange?.('paragraphSpacing', 'increase');
+        break;
+      case 'format-paragraph-spacing-decrease':
+        onFormatChange?.('paragraphSpacing', 'decrease');
+        break;
+      case 'format-text-indent-increase':
+        onFormatChange?.('textIndent', 'increase');
+        break;
+      case 'format-text-indent-decrease':
+        onFormatChange?.('textIndent', 'decrease');
+        break;
+      case 'format-text-indent-none':
+        onFormatChange?.('textIndent', 'none');
+        break;
+      case 'format-chars-per-line-auto':
+        onFormatChange?.('charsPerLine', 'auto');
+        break;
+      case 'format-chars-per-line-increase':
+        onFormatChange?.('charsPerLine', 'increase');
+        break;
+      case 'format-chars-per-line-decrease':
+        onFormatChange?.('charsPerLine', 'decrease');
+        break;
+      case 'toggle-paragraph-numbers':
+        onFormatChange?.('paragraphNumbers', 'toggle');
+        break;
+
+      // Theme
+      case 'set-theme-auto':
+        onSetThemeMode?.('auto');
+        break;
+      case 'set-theme-light':
+        onSetThemeMode?.('light');
+        break;
+      case 'set-theme-dark':
+        onSetThemeMode?.('dark');
+        break;
+
       case 'show-in-file-manager':
         // No-op in web
         break;
@@ -161,7 +211,7 @@ export function useWebMenuHandlers({
         }
         console.warn('[Web Menu] Unknown action:', action);
     }
-  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, onToggleCompactMode, onExport, editorView, fontScale, onFontScaleChange]);
+  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, onToggleCompactMode, onExport, editorView, fontScale, onFontScaleChange, onFormatChange, onSetThemeMode]);
   
   return { handleMenuAction };
 }

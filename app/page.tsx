@@ -339,6 +339,8 @@ export default function EditorPage() {
   const openRecentProjectRef = useRef<(projectId: string) => void>(() => {});
   const fontScaleChangeRef = useRef<(scale: number) => void>(() => {});
   const toggleCompactModeRef = useRef<() => void>(() => {});
+  const formatChangeRef = useRef<(setting: string, action: string) => void>(() => {});
+  const setThemeModeRef = useRef<(mode: 'auto' | 'light' | 'dark') => void>(() => {});
 
   // Web menu handlers
   const { handleMenuAction } = useWebMenuHandlers({
@@ -354,6 +356,8 @@ export default function EditorPage() {
     editorView: editorViewInstance,
     fontScale,
     onFontScaleChange: (scale: number) => fontScaleChangeRef.current(scale),
+    onFormatChange: (setting, action) => formatChangeRef.current(setting, action),
+    onSetThemeMode: (mode) => setThemeModeRef.current(mode),
   });
 
   // Global shortcuts for Web (only when not in Electron)
@@ -566,6 +570,32 @@ export default function EditorPage() {
   openRecentProjectRef.current = (projectId: string) => void handleOpenRecentProject(projectId);
   fontScaleChangeRef.current = handleFontScaleChange;
   toggleCompactModeRef.current = handleToggleCompactMode;
+  setThemeModeRef.current = setThemeMode;
+  formatChangeRef.current = (setting: string, action: string) => {
+    switch (setting) {
+      case 'lineHeight':
+        if (action === 'increase') handleLineHeightChange(Math.min(3.0, +(lineHeight + 0.1).toFixed(1)));
+        else if (action === 'decrease') handleLineHeightChange(Math.max(1.0, +(lineHeight - 0.1).toFixed(1)));
+        break;
+      case 'paragraphSpacing':
+        if (action === 'increase') handleParagraphSpacingChange(Math.min(3.0, +(paragraphSpacing + 0.1).toFixed(1)));
+        else if (action === 'decrease') handleParagraphSpacingChange(Math.max(0, +(paragraphSpacing - 0.1).toFixed(1)));
+        break;
+      case 'textIndent':
+        if (action === 'increase') handleTextIndentChange(Math.min(5, textIndent + 1));
+        else if (action === 'decrease') handleTextIndentChange(Math.max(0, textIndent - 1));
+        else if (action === 'none') handleTextIndentChange(0);
+        break;
+      case 'charsPerLine':
+        if (action === 'auto') handleAutoCharsPerLineChange();
+        else if (action === 'increase') handleCharsPerLineChange(charsPerLine + 5);
+        else if (action === 'decrease') handleCharsPerLineChange(Math.max(1, charsPerLine - 5));
+        break;
+      case 'paragraphNumbers':
+        if (action === 'toggle') handleShowParagraphNumbersChange(!showParagraphNumbers);
+        break;
+    }
+  };
 
   // --- Keyboard shortcuts hook ---
   useKeyboardShortcuts({
@@ -610,7 +640,7 @@ export default function EditorPage() {
     return (
       <div className="h-screen flex flex-col overflow-hidden relative">
         {/* Web menu bar (only for non-Electron environment) */}
-        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} checkedState={{ compactMode }} />}
+        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} checkedState={{ compactMode, showParagraphNumbers, autoCharsPerLine, themeMode }} />}
 
         <WelcomeScreen
           onCreateProject={handleCreateProject}
@@ -719,7 +749,7 @@ export default function EditorPage() {
         <TitleUpdater currentFile={currentFile} isDirty={isDirty} />
 
         {/* Web menu bar (only for non-Electron environment) */}
-        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} checkedState={{ compactMode }} />}
+        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} checkedState={{ compactMode, showParagraphNumbers, autoCharsPerLine, themeMode }} />}
 
          {/* Unsaved warning dialog (project mode transitions) */}
         <UnsavedWarningDialog
