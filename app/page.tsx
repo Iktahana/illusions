@@ -594,8 +594,9 @@ export default function EditorPage() {
   // Flush debounced tab/layout state on page refresh.
   // Electron: the normal quit flow uses IPC flush, but Cmd+R bypasses it.
   // Web: browser refresh would lose any debounced changes still in-flight.
-  // Fire-and-forget is acceptable — Electron IPC queues synchronously,
-  // and browsers allow brief async completion (IndexedDB) after beforeunload.
+  // ここでの beforeunload フックは「ベストエフォート」でのフラッシュ用セーフティネット。
+  // beforeunload 中の非同期処理（IndexedDB 等）の完了は仕様上保証されないため、
+  // 確実にフラッシュしたい処理は visibilitychange/pagehide 側を主経路として扱うこと。
   useEffect(() => {
     const handleBeforeUnload = () => {
       void flushTabState();
