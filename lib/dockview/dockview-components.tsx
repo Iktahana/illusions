@@ -16,6 +16,7 @@ import {
   useBufferStoreInstance,
   useBuffer,
 } from "./buffer-store";
+import { respondWithContentOnReady } from "./web-popout-channel";
 
 // ---------------------------------------------------------------------------
 // EditorPanel — content component rendered inside each dockview panel
@@ -162,6 +163,8 @@ export function DockviewTabHeader({
           "_blank",
           "width=900,height=700",
         );
+        // Send initial content via BroadcastChannel when popout signals readiness
+        respondWithContentOnReady(params.bufferId, buffer.content);
       }
     },
     [api, buffer, params.bufferId],

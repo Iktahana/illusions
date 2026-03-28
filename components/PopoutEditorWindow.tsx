@@ -5,7 +5,8 @@
  *
  * Rendered when the page detects ?popout-buffer=<id> in the URL.
  * Shows only the editor (no sidebar, no inspector, no menu bar).
- * Buffer content is synced with the parent window via Electron IPC.
+ * Buffer content is synced with the parent window via Electron IPC
+ * or BroadcastChannel (web fallback).
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -14,8 +15,13 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import NovelEditor from "@/components/Editor";
 import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
+import {
+  WEB_POPOUT_CHANNEL_NAME,
+  isBroadcastChannelAvailable,
+} from "@/lib/dockview/web-popout-channel";
 
 import type { SupportedFileExtension } from "@/lib/project/project-types";
+import type { WebPopoutMessage } from "@/lib/dockview/web-popout-channel";
 
 interface PopoutEditorWindowProps {
   bufferId: string;
@@ -31,6 +37,7 @@ export default function PopoutEditorWindow({
   const [content, setContent] = useState("");
   const [editorKey, setEditorKey] = useState(0);
   const contentRef = useRef("");
+  const webChannelRef = useRef<BroadcastChannel | null>(null);
   const incrementEditorKey = useCallback(() => setEditorKey((k) => k + 1), []);
 
   // Editor settings (reuse the same hook for consistent appearance)
@@ -62,6 +69,40 @@ export default function PopoutEditorWindow({
     };
   }, [bufferId]);
 
+  // Listen for buffer sync from parent window (Web BroadcastChannel fallback)
+  useEffect(() => {
+    // Skip if Electron IPC handles sync
+    if (window.electronAPI?.editor?.onBufferSync) return;
+    if (!isBroadcastChannelAvailable()) return;
+
+    const channel = new BroadcastChannel(WEB_POPOUT_CHANNEL_NAME);
+    webChannelRef.current = channel;
+
+    channel.onmessage = (event: MessageEvent<WebPopoutMessage>) => {
+      const msg = event.data;
+      if (
+        (msg.type === "buffer-content" || msg.type === "buffer-change") &&
+        msg.bufferId === bufferId &&
+        msg.content !== contentRef.current
+      ) {
+        contentRef.current = msg.content;
+        setContent(msg.content);
+        setEditorKey((k) => k + 1);
+      }
+    };
+
+    // Signal to the parent that we are ready to receive content
+    channel.postMessage({
+      type: "popout-ready",
+      bufferId,
+    } satisfies WebPopoutMessage);
+
+    return () => {
+      webChannelRef.current = null;
+      channel.close();
+    };
+  }, [bufferId]);
+
   // Broadcast content changes back to other windows
   const handleChange = useCallback(
     (newContent: string) => {
@@ -71,6 +112,12 @@ export default function PopoutEditorWindow({
       const electronAPI = window.electronAPI;
       if (electronAPI?.editor?.sendBufferSync) {
         electronAPI.editor.sendBufferSync(bufferId, newContent);
+      } else if (webChannelRef.current) {
+        webChannelRef.current.postMessage({
+          type: "buffer-change",
+          bufferId,
+          content: newContent,
+        } satisfies WebPopoutMessage);
       }
     },
     [bufferId],
@@ -82,6 +129,11 @@ export default function PopoutEditorWindow({
       const electronAPI = window.electronAPI;
       if (electronAPI?.editor?.sendBufferClose) {
         electronAPI.editor.sendBufferClose(bufferId);
+      } else if (webChannelRef.current) {
+        webChannelRef.current.postMessage({
+          type: "buffer-close",
+          bufferId,
+        } satisfies WebPopoutMessage);
       }
     };
   }, [bufferId]);

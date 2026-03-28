@@ -16,6 +16,12 @@ import type { DockviewApi } from "dockview-react";
 import type { TabId, TabState } from "@/lib/tab-manager/tab-types";
 import type { UseTabManagerReturn } from "@/lib/tab-manager/types";
 import type { EditorPanelParams } from "./types";
+import {
+  respondWithContentOnReady,
+  WEB_POPOUT_CHANNEL_NAME,
+  isBroadcastChannelAvailable,
+} from "./web-popout-channel";
+import type { WebPopoutMessage } from "./web-popout-channel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -275,6 +281,8 @@ export function useDockviewAdapter({
         fileType,
       });
       window.open(`${window.location.origin}?${params.toString()}`, "_blank", "width=900,height=700");
+      // Send initial content via BroadcastChannel when popout signals readiness
+      respondWithContentOnReady(activeTab.id, content);
     }
   }, [tabs, activeTabId, tabManager.content]);
 
@@ -314,6 +322,49 @@ export function useDockviewAdapter({
     // Debounce to avoid flooding IPC on every keystroke
     const timer = setTimeout(() => {
       electronAPI.editor!.sendBufferSync(activeTabId, content);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [activeTabId, tabContent]);
+
+  // -- Cross-window buffer sync (Web BroadcastChannel fallback) ------------
+
+  useEffect(() => {
+    // Skip if Electron IPC handles sync
+    if (window.electronAPI?.editor) return;
+    if (!isBroadcastChannelAvailable()) return;
+
+    const channel = new BroadcastChannel(WEB_POPOUT_CHANNEL_NAME);
+
+    channel.onmessage = (event: MessageEvent<WebPopoutMessage>) => {
+      const msg = event.data;
+      if (msg.type === "buffer-change" && msg.bufferId === activeTabId) {
+        tabSetContent(msg.content);
+      }
+    };
+
+    return () => {
+      channel.close();
+    };
+  }, [activeTabId, tabSetContent]);
+
+  // Broadcast content changes to web popout windows
+  useEffect(() => {
+    if (window.electronAPI?.editor?.sendBufferSync) return;
+    if (!isBroadcastChannelAvailable()) return;
+    if (!activeTabId) return;
+
+    const content = tabContent ?? "";
+
+    // Debounce to avoid flooding BroadcastChannel on every keystroke
+    const timer = setTimeout(() => {
+      const channel = new BroadcastChannel(WEB_POPOUT_CHANNEL_NAME);
+      channel.postMessage({
+        type: "buffer-change",
+        bufferId: activeTabId,
+        content,
+      } satisfies WebPopoutMessage);
+      channel.close();
     }, 300);
 
     return () => clearTimeout(timer);
