@@ -187,6 +187,7 @@ export default function EditorPage() {
     openProjectFile, pinTab, newTerminalTab, updateTerminalTab, openDiffTab,
     forceCloseTab, updateTab,
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
+    flushTabState,
   } = tabManager;
 
   // Ref that always holds the latest tabs array (avoids stale closures in PTY callbacks)
@@ -235,7 +236,17 @@ export default function EditorPage() {
         const cwd = isProjectMode(editorMode) ? editorMode.rootPath : undefined;
         const shell = settings.terminalDefaultShell || undefined;
         const result = await ptyApi.spawn({ cwd, shell });
-        if ("error" in result) return;
+        if ("error" in result) {
+          // PTY spawn failed — remove the stuck "connecting" tab
+          const stuckTab = tabsRef.current
+            .slice()
+            .reverse()
+            .find((t) => isTerminalTab(t) && (t as TerminalTabState).sessionId === "");
+          if (stuckTab) {
+            forceCloseTab(stuckTab.id);
+          }
+          return;
+        }
         const { sessionId } = result;
         // Update the most recently created terminal tab with an empty sessionId
         const targetTab = tabsRef.current
@@ -580,6 +591,20 @@ export default function EditorPage() {
     });
   }, [onSystemFileOpen, incrementEditorKey]);
 
+  // Flush debounced tab/layout state on page refresh.
+  // Electron: the normal quit flow uses IPC flush, but Cmd+R bypasses it.
+  // Web: browser refresh would lose any debounced changes still in-flight.
+  // Fire-and-forget is acceptable — Electron IPC queues synchronously,
+  // and browsers allow brief async completion (IndexedDB) after beforeunload.
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      void flushTabState();
+      void stableFlushLayoutState();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [flushTabState, stableFlushLayoutState]);
+
   // Clean up ?welcome and ?pending-file parameters from URL
   useEffect(() => {
     if (skipAutoRestore && typeof window !== "undefined") {
@@ -625,8 +650,8 @@ export default function EditorPage() {
     onOpen: openFile,
     onSave: saveFile,
     onSaveAs: saveAsFile,
-    onOpenProject: () => void handleOpenProject(),
-    onOpenRecentProject: (projectId: string) => openRecentProjectRef.current(projectId),
+    onOpenProject: () => void unsavedWarning.confirmBeforeAction(() => handleOpenProject()),
+    onOpenRecentProject: (projectId: string) => void unsavedWarning.confirmBeforeAction(() => openRecentProjectRef.current(projectId)),
     onCloseWindow: () => window.close(),
     onToggleCompactMode: () => toggleCompactModeRef.current(),
     onExport: (format) => void exportAs(format),
@@ -636,11 +661,8 @@ export default function EditorPage() {
     isEditorTabActive: !!activeEditorTab,
   });
 
-  // Global shortcuts for Web (only when not in Electron)
-  useGlobalShortcuts(
-    !isElectron ? handleMenuAction : () => {},
-    editorDomRef
-  );
+  // Block browser reload (Ctrl/Cmd+R) regardless of focus
+  useGlobalShortcuts();
 
   // --- Save toast hook ---
   const { showSaveToast, saveToastExiting } = useSaveToast({ lastSavedTime, lastSaveWasAuto });
@@ -843,6 +865,7 @@ export default function EditorPage() {
     toggleExplorer: useCallback(() => setTopView(topView === "explorer" ? "none" : "explorer"), [setTopView, topView]),
     toggleSearch: useCallback(() => setTopView(topView === "search" ? "none" : "search"), [setTopView, topView]),
     toggleOutline: useCallback(() => setTopView(topView === "outline" ? "none" : "outline"), [setTopView, topView]),
+    handleMenuAction: !isElectron ? handleMenuAction : undefined,
   });
 
   // Detect feature availability after mount to avoid SSR hydration mismatch

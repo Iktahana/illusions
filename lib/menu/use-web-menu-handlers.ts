@@ -117,11 +117,17 @@ export function useWebMenuHandlers({
         }
         break;
       case 'paste-plaintext':
-        // TODO: Implement paste as plaintext
         if (editorView && isEditorTabActive) {
-          editorView.focus();
-          // This will be implemented later with proper Milkdown integration
-          console.warn('[Web Menu] Paste as plaintext not yet implemented');
+          // Read plain text from clipboard and insert it, stripping any rich-text formatting
+          void navigator.clipboard.readText().then((text) => {
+            if (!text) return;
+            const { state, dispatch } = editorView;
+            const tr = state.tr.insertText(text, state.selection.from, state.selection.to);
+            dispatch(tr);
+            editorView.focus();
+          }).catch((err: unknown) => {
+            console.warn('[Web Menu] クリップボードの読み取りに失敗しました:', err);
+          });
         }
         break;
       case 'select-all':

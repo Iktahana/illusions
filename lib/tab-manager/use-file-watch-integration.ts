@@ -47,8 +47,8 @@ function buildOnChanged(
   setTabs: TabManagerCore["setTabs"],
   tabsRef: TabManagerCore["tabsRef"],
   openDiffTab: UseFileWatchIntegrationParams["openDiffTab"],
-): (diskContent: string) => void {
-  return (diskContent: string) => {
+): (diskContent: string, lastModified: number) => void {
+  return (diskContent: string, lastModified: number) => {
     const currentTabs = tabsRef.current;
     const tab = currentTabs.find((t) => t.id === tabId);
     if (!tab || !isEditorTab(tab)) return;
@@ -101,7 +101,7 @@ function buildOnChanged(
                   fileName,
                   localContent,
                   diskContent,
-                  Date.now(),
+                  lastModified,
                 );
                 // Do not clear conflict state; user must explicitly resolve
               },

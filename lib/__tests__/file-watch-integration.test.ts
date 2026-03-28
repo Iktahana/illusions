@@ -47,8 +47,8 @@ function buildOnChangedForTest(
   setTabs: SetTabsFn,
   tabsRef: MutableRefObject<TabState[]>,
   notifications: SimulatedNotification[],
-): (diskContent: string) => void {
-  return (diskContent: string) => {
+): (diskContent: string, lastModified: number) => void {
+  return (diskContent: string, _lastModified: number) => {
     const currentTabs = tabsRef.current;
     const tab = currentTabs.find((t) => t.id === tabId);
     if (!tab || !isEditorTab(tab)) return;
@@ -174,7 +174,7 @@ describe("file-watch: clean tab receives external change", () => {
     const tab = makeEditorTab({ fileSyncStatus: "clean", content: "old", lastSavedContent: "old" });
     const { onChanged, getTab } = buildContext(tab);
 
-    onChanged("new disk content");
+    onChanged("new disk content", Date.now());
 
     expect(getTab().content).toBe("new disk content");
   });
@@ -183,7 +183,7 @@ describe("file-watch: clean tab receives external change", () => {
     const tab = makeEditorTab({ fileSyncStatus: "clean" });
     const { onChanged, getTab } = buildContext(tab);
 
-    onChanged("new disk content");
+    onChanged("new disk content", Date.now());
 
     expect(getTab().fileSyncStatus).toBe("clean");
   });
@@ -192,7 +192,7 @@ describe("file-watch: clean tab receives external change", () => {
     const tab = makeEditorTab({ fileSyncStatus: "clean", isDirty: false });
     const { onChanged, getTab } = buildContext(tab);
 
-    onChanged("new disk content");
+    onChanged("new disk content", Date.now());
 
     expect(getTab().isDirty).toBe(false);
   });
@@ -201,7 +201,7 @@ describe("file-watch: clean tab receives external change", () => {
     const tab = makeEditorTab({ fileSyncStatus: "clean" });
     const { onChanged, notifications } = buildContext(tab);
 
-    onChanged("new disk content");
+    onChanged("new disk content", Date.now());
 
     expect(notifications).toHaveLength(1);
     expect(notifications[0].type).toBe("info");
@@ -217,7 +217,7 @@ describe("file-watch: dirty tab receives external change", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", content: "my edits", isDirty: true });
     const { onChanged, getTab } = buildContext(tab);
 
-    onChanged("disk changes");
+    onChanged("disk changes", Date.now());
 
     expect(getTab().fileSyncStatus).toBe("conflicted");
   });
@@ -226,7 +226,7 @@ describe("file-watch: dirty tab receives external change", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", content: "my edits", isDirty: true });
     const { onChanged, getTab } = buildContext(tab);
 
-    onChanged("disk changes");
+    onChanged("disk changes", Date.now());
 
     expect(getTab().content).toBe("my edits");
   });
@@ -235,7 +235,7 @@ describe("file-watch: dirty tab receives external change", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", content: "my edits", isDirty: true });
     const { onChanged, getTab } = buildContext(tab);
 
-    onChanged("disk changes");
+    onChanged("disk changes", Date.now());
 
     expect(getTab().conflictDiskContent).toBe("disk changes");
   });
@@ -244,7 +244,7 @@ describe("file-watch: dirty tab receives external change", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", isDirty: true });
     const { onChanged, notifications } = buildContext(tab);
 
-    onChanged("disk changes");
+    onChanged("disk changes", Date.now());
 
     expect(notifications).toHaveLength(1);
     expect(notifications[0].type).toBe("warning");
@@ -255,7 +255,7 @@ describe("file-watch: dirty tab receives external change", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", isDirty: true });
     const { onChanged, notifications } = buildContext(tab);
 
-    onChanged("disk changes");
+    onChanged("disk changes", Date.now());
 
     const labels = notifications[0].actions.map((a) => a.label);
     expect(labels).toContain("差分を表示");
@@ -273,7 +273,7 @@ describe("file-watch: 'エディタの内容を保持' action", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", content: "my edits", isDirty: true });
     const { onChanged, getTab, notifications } = buildContext(tab);
 
-    onChanged("disk changes");
+    onChanged("disk changes", Date.now());
     const keepAction = notifications[0].actions.find((a) => a.label === "エディタの内容を保持");
     keepAction?.onClick();
 
@@ -284,7 +284,7 @@ describe("file-watch: 'エディタの内容を保持' action", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", content: "my edits", isDirty: true });
     const { onChanged, getTab, notifications } = buildContext(tab);
 
-    onChanged("disk changes");
+    onChanged("disk changes", Date.now());
     const keepAction = notifications[0].actions.find((a) => a.label === "エディタの内容を保持");
     keepAction?.onClick();
 
@@ -295,7 +295,7 @@ describe("file-watch: 'エディタの内容を保持' action", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", content: "my edits", isDirty: true });
     const { onChanged, getTab, notifications } = buildContext(tab);
 
-    onChanged("disk changes");
+    onChanged("disk changes", Date.now());
     const keepAction = notifications[0].actions.find((a) => a.label === "エディタの内容を保持");
     keepAction?.onClick();
 
@@ -312,7 +312,7 @@ describe("file-watch: 'ディスクの内容を採用' action", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", content: "my edits", isDirty: true });
     const { onChanged, getTab, notifications } = buildContext(tab);
 
-    onChanged("disk changes");
+    onChanged("disk changes", Date.now());
     const adoptAction = notifications[0].actions.find((a) => a.label === "ディスクの内容を採用");
     adoptAction?.onClick();
 
@@ -324,7 +324,7 @@ describe("file-watch: 'ディスクの内容を採用' action", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", content: "my edits", isDirty: true });
     const { onChanged, getTab, notifications } = buildContext(tab);
 
-    onChanged("disk changes");
+    onChanged("disk changes", Date.now());
     const adoptAction = notifications[0].actions.find((a) => a.label === "ディスクの内容を採用");
     adoptAction?.onClick();
 
@@ -335,7 +335,7 @@ describe("file-watch: 'ディスクの内容を採用' action", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", content: "my edits", isDirty: true });
     const { onChanged, getTab, notifications } = buildContext(tab);
 
-    onChanged("disk changes");
+    onChanged("disk changes", Date.now());
     const adoptAction = notifications[0].actions.find((a) => a.label === "ディスクの内容を採用");
     adoptAction?.onClick();
 
@@ -346,7 +346,7 @@ describe("file-watch: 'ディスクの内容を採用' action", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", content: "my edits", isDirty: true });
     const { onChanged, getTab, notifications } = buildContext(tab);
 
-    onChanged("disk changes");
+    onChanged("disk changes", Date.now());
     const adoptAction = notifications[0].actions.find((a) => a.label === "ディスクの内容を採用");
     adoptAction?.onClick();
 
@@ -364,12 +364,12 @@ describe("file-watch: conflicted tab ignores further disk changes", () => {
     const { onChanged, getTab, notifications } = buildContext(tab);
 
     // First change → conflicted
-    onChanged("first disk change");
+    onChanged("first disk change", Date.now());
     const statusAfterFirst = getTab().fileSyncStatus;
     const notifCountAfterFirst = notifications.length;
 
     // Second change while still conflicted → should be ignored
-    onChanged("second disk change");
+    onChanged("second disk change", Date.now());
 
     expect(getTab().fileSyncStatus).toBe(statusAfterFirst);
     expect(notifications).toHaveLength(notifCountAfterFirst);

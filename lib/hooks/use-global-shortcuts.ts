@@ -1,23 +1,18 @@
 'use client';
 
-import type { RefObject } from "react";
 import { useEffect } from 'react';
 
-import { useKeymap } from '@/contexts/KeymapContext';
-import { matchesEvent } from '@/lib/keymap/keymap-utils';
 import { isMacOS } from '@/lib/utils/runtime-env';
 
 /**
- * Global keyboard shortcuts for the Web menu bar.
- * Only triggers when focus is outside the editor.
- * Uses the centralized keymap registry for binding lookups.
+ * Global keyboard shortcuts that must fire regardless of focus.
+ * Currently only blocks the browser's default Ctrl/Cmd+R reload behavior.
+ *
+ * Note: File and zoom shortcuts (file.open, file.saveAs, file.newWindow,
+ * view.zoomIn/Out/Reset) were moved to useKeyboardShortcuts so they work
+ * even when the editor is focused.
  */
-export function useGlobalShortcuts(
-  onAction: (action: string) => void,
-  editorContainerRef?: RefObject<HTMLElement>
-): void {
-  const { effectiveBindings } = useKeymap();
-
+export function useGlobalShortcuts(): void {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMac = isMacOS();
@@ -28,63 +23,9 @@ export function useGlobalShortcuts(
         e.preventDefault();
         return;
       }
-
-      // Check if focus is inside the editor
-      if (editorContainerRef?.current?.contains(document.activeElement)) {
-        return;
-      }
-
-      if (matchesEvent(effectiveBindings['file.save'], e)) {
-        e.preventDefault();
-        onAction('save-file');
-        return;
-      }
-
-      if (matchesEvent(effectiveBindings['file.saveAs'], e)) {
-        e.preventDefault();
-        onAction('save-as');
-        return;
-      }
-
-      if (matchesEvent(effectiveBindings['file.open'], e)) {
-        e.preventDefault();
-        onAction('open-file');
-        return;
-      }
-
-      if (matchesEvent(effectiveBindings['file.newWindow'], e)) {
-        e.preventDefault();
-        onAction('new-window');
-        return;
-      }
-
-      if (matchesEvent(effectiveBindings['view.resetZoom'], e)) {
-        e.preventDefault();
-        onAction('reset-zoom');
-        return;
-      }
-
-      if (matchesEvent(effectiveBindings['view.zoomIn'], e)) {
-        e.preventDefault();
-        onAction('zoom-in');
-        return;
-      }
-
-      // Also match Ctrl/Cmd + = as zoom-in (common alternative)
-      if (modifier && e.key === '=') {
-        e.preventDefault();
-        onAction('zoom-in');
-        return;
-      }
-
-      if (matchesEvent(effectiveBindings['view.zoomOut'], e)) {
-        e.preventDefault();
-        onAction('zoom-out');
-        return;
-      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onAction, editorContainerRef, effectiveBindings]);
+  }, []);
 }
