@@ -50,9 +50,17 @@ export function detectOSPlatform(): OSPlatform | null {
     if (p === "windows") return "windows";
     if (p === "linux") return "linux";
   }
+  // Prefer navigator.platform for reliable OS detection
+  const platform = (navigator.platform || "").toLowerCase();
+  if (platform.startsWith("mac")) return "mac";
+  if (platform.startsWith("win")) return "windows";
+  if (platform.includes("linux")) return "linux";
+
+  // Fallback: parse userAgent, excluding iOS devices from macOS detection
   const ua = navigator.userAgent.toLowerCase();
-  if (ua.includes("mac")) return "mac";
-  if (ua.includes("win")) return "windows";
+  const isIOS = /iphone|ipad|ipod/.test(ua);
+  if (!isIOS && ua.includes("macintosh")) return "mac";
+  if (ua.includes("windows")) return "windows";
   if (ua.includes("linux")) return "linux";
   return null;
 }

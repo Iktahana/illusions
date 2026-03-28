@@ -212,9 +212,9 @@
       "category": "Office",
       "desktop": {
         "Name": "illusions",
-        "Comment": "AI-powered Japanese novel editor",
-        "Keywords": "novel;writing;japanese;editor;ai;",
-        "MimeType": "application/x-mdi"
+        "Comment": "AI搭載日本語小説エディタ",
+        "Keywords": "小説;執筆;日本語;エディタ;AI;novel;writing;japanese;editor;",
+        "MimeType": "application/x-mdi;"
       },
       "target": [
         { "target": "AppImage", "arch": ["x64"] },
@@ -225,7 +225,7 @@
         {
           "ext": "mdi",
           "name": "illusions MDI Document",
-          "icon": "build/mdi-icon",
+          "icon": "build/mdi-icon.png",
           "mimeType": "application/x-mdi",
           "description": "illusions MDI Document"
         }
