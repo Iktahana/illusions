@@ -54,7 +54,7 @@ export function useDockviewAdapter({
   const prevTabsRef = useRef<TabState[]>([]);
   const prevActiveTabRef = useRef<TabId>("");
 
-  const { tabs, activeTabId, switchTab, closeTab, newTab } = tabManager;
+  const { tabs, activeTabId, switchTab, closeTab, newTab, duplicateTab } = tabManager;
 
   // -- onReady callback -----------------------------------------------------
 
@@ -223,17 +223,17 @@ export function useDockviewAdapter({
       const activeTab = tabs.find((t) => t.id === activeTabId);
       if (!activeTab) return;
 
-      // Create a new empty tab with the same file type.
-      // The new panel will be positioned in the split direction
-      // by the sync effect above (via pendingSplitRef).
-      newTab(activeTab.fileType);
+      // Duplicate the active tab so the split shows the same document
+      // content and file metadata. The new panel will be positioned in
+      // the split direction by the sync effect above (via pendingSplitRef).
+      duplicateTab(activeTab.id);
 
       pendingSplitRef.current = {
         direction,
         referencePanel: activePanel.id,
       };
     },
-    [tabs, activeTabId, newTab],
+    [tabs, activeTabId, duplicateTab],
   );
 
   // -- Close group ----------------------------------------------------------

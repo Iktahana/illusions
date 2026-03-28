@@ -32,6 +32,7 @@ export interface UseTabManagerReturn {
   tabs: TabState[];
   activeTabId: TabId;
   newTab: (fileType?: SupportedFileExtension) => void;
+  duplicateTab: (tabId: TabId) => void;
   closeTab: (tabId: TabId) => void;
   switchTab: (tabId: TabId) => void;
   nextTab: () => void;

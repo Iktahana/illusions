@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, TabState } from "./tab-types";
-import { createNewTab } from "./types";
+import { createNewTab, generateTabId } from "./types";
 import type { TabManagerCore } from "./types";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import { isElectronRenderer } from "../utils/runtime-env";
@@ -38,6 +38,8 @@ export interface UseTabStateReturn extends TabManagerCore {
   // Tab CRUD operations
   /** Create a new empty tab. */
   newTab: (fileType?: SupportedFileExtension) => void;
+  /** Duplicate an existing tab (clone content & file metadata). */
+  duplicateTab: (tabId: TabId) => void;
   /** Switch to an existing tab by id. */
   switchTab: (tabId: TabId) => void;
   /** Switch to the next tab. */
@@ -129,6 +131,25 @@ export function useTabState(): UseTabStateReturn {
     const tab = createNewTab(undefined, fileType);
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(tab.id);
+  }, []);
+
+  const duplicateTab = useCallback((tabId: TabId) => {
+    const source = tabsRef.current.find((t) => t.id === tabId);
+    if (!source) return;
+    const cloned: TabState = {
+      id: generateTabId(),
+      file: source.file ? { ...source.file } : null,
+      content: source.content,
+      lastSavedContent: source.lastSavedContent,
+      isDirty: source.isDirty,
+      lastSavedTime: source.lastSavedTime,
+      lastSaveWasAuto: false,
+      isSaving: false,
+      isPreview: false,
+      fileType: source.fileType,
+    };
+    setTabs((prev) => [...prev, cloned]);
+    setActiveTabId(cloned.id);
   }, []);
 
   const switchTab = useCallback((tabId: TabId) => {
@@ -278,6 +299,7 @@ export function useTabState(): UseTabStateReturn {
 
     // Tab CRUD
     newTab,
+    duplicateTab,
     switchTab,
     nextTab: nextTabFn,
     prevTab: prevTabFn,
