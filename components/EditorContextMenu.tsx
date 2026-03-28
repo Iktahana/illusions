@@ -30,6 +30,10 @@ interface EditorContextMenuProps {
   hasSelection?: boolean;
   lintIssueAtCursor?: LintIssue | null;
   onContextMenuOpen?: (e: MouseEvent) => void;
+  /** Whether MDI extensions (ruby / tcy) are enabled for this document */
+  mdiExtensionsEnabled?: boolean;
+  /** Pass the speech callback when speech feature is available; omit to hide the menu item */
+  onStartSpeech?: (() => void) | null;
 }
 
 interface MenuItemProps {
@@ -70,12 +74,17 @@ export default function EditorContextMenu({
   hasSelection = false,
   lintIssueAtCursor,
   onContextMenuOpen,
+  mdiExtensionsEnabled = true,
+  onStartSpeech,
 }: EditorContextMenuProps) {
   const { effectiveBindings } = useKeymap();
 
   // Detect platform for native shortcuts (cut/copy/paste are browser built-ins not in registry)
   const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
   const cmdKey = isMac ? "⌘" : "Ctrl+";
+
+  // "辞書で調べる" is only available in Electron via IPC
+  const isElectron = typeof window !== "undefined" && Boolean((window as Window & { electronAPI?: unknown }).electronAPI);
 
   return (
     <ContextMenu.Root>
@@ -139,23 +148,24 @@ export default function EditorContextMenu({
 
           <Separator />
 
-          {/* 書式 */}
-          <MenuItem
-            icon={<Languages className="w-4 h-4" />}
-            label="ルビ"
-            shortcut={formatBinding(effectiveBindings["format.ruby"])}
-            onClick={() => onAction("ruby")}
-            disabled={!hasSelection}
-          />
-          <MenuItem
-            icon={<ALargeSmall className="w-4 h-4" />}
-            label="縦中横"
-            shortcut={formatBinding(effectiveBindings["format.tcy"])}
-            onClick={() => onAction("tcy")}
-            disabled={!hasSelection}
-          />
-
-          <Separator />
+          {/* 書式: ruby / tcy are MDI-extension features; hide when disabled or nothing is selected */}
+          {mdiExtensionsEnabled && hasSelection && (
+            <>
+              <MenuItem
+                icon={<Languages className="w-4 h-4" />}
+                label="ルビ"
+                shortcut={formatBinding(effectiveBindings["format.ruby"])}
+                onClick={() => onAction("ruby")}
+              />
+              <MenuItem
+                icon={<ALargeSmall className="w-4 h-4" />}
+                label="縦中横"
+                shortcut={formatBinding(effectiveBindings["format.tcy"])}
+                onClick={() => onAction("tcy")}
+              />
+              <Separator />
+            </>
+          )}
 
           {/* 検索・調べる */}
           <MenuItem
@@ -171,23 +181,29 @@ export default function EditorContextMenu({
             onClick={() => onAction("google-search")}
             disabled={!hasSelection}
           />
-          <MenuItem
-            icon={<BookOpen className="w-4 h-4" />}
-            label="辞書で調べる"
-            shortcut=""
-            onClick={() => onAction("dictionary")}
-            disabled={!hasSelection}
-          />
+          {/* 辞書で調べる: Electron only — uses native IPC */}
+          {isElectron && (
+            <MenuItem
+              icon={<BookOpen className="w-4 h-4" />}
+              label="辞書で調べる"
+              shortcut=""
+              onClick={() => onAction("dictionary")}
+              disabled={!hasSelection}
+            />
+          )}
 
-          <Separator />
-
-          {/* 朗読 */}
-          <MenuItem
-            icon={<Play className="w-4 h-4" />}
-            label="開始朗読"
-            shortcut=""
-            onClick={() => onAction("start-speech")}
-          />
+          {/* 朗読: hide when speech feature is not available */}
+          {onStartSpeech != null && (
+            <>
+              <Separator />
+              <MenuItem
+                icon={<Play className="w-4 h-4" />}
+                label="開始朗読"
+                shortcut=""
+                onClick={() => onAction("start-speech")}
+              />
+            </>
+          )}
 
           <Separator />
 

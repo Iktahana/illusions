@@ -333,7 +333,6 @@ export default function HistoryPanel({
    * Handle manual snapshot creation.
    * 手動スナップショットの作成を処理する。
    * Note: This creates a snapshot of the current content via HistoryService.
-   *       The actual content is not accessible here; a placeholder is used.
    */
   const handleCreateSnapshot = useCallback(async () => {
     try {
@@ -342,7 +341,7 @@ export default function HistoryPanel({
       const historyService = getHistoryService();
       await historyService.createSnapshot({
         sourceFile: mainFileName,
-        content: "", // The caller should provide actual content via a different mechanism
+        content: currentContent,
         type: "manual",
       });
       await loadSnapshots();
@@ -352,7 +351,7 @@ export default function HistoryPanel({
     } finally {
       setCreatingSnapshot(false);
     }
-  }, [mainFileName, loadSnapshots]);
+  }, [mainFileName, loadSnapshots, currentContent]);
 
   /**
    * Handle comparing a snapshot with current content.

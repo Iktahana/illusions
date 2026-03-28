@@ -31,6 +31,8 @@ export interface UseTabManagerReturn {
   tabs: TabState[];
   activeTabId: TabId;
   newTab: (fileType?: SupportedFileExtension) => void;
+  /** Create a new editor tab pre-populated with content and file association from a source tab. */
+  cloneTab: (source: EditorTabState) => void;
   closeTab: (tabId: TabId) => void;
   switchTab: (tabId: TabId) => void;
   nextTab: () => void;

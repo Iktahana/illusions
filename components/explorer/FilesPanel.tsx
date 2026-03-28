@@ -586,14 +586,18 @@ export function FilesPanel({
   const onFolderContextMenu = useCallback(async (e: React.MouseEvent, fullPath: string) => {
     e.stopPropagation();
     contextTargetRef.current = { path: fullPath, kind: "directory" };
+    const isRoot = fullPath === "/";
     const items = [
-      { label: "名前の変更", action: "rename" },
+      // Rename and delete are not available for the root folder
+      ...(!isRoot ? [{ label: "名前の変更", action: "rename" }] : []),
       { label: "新規 MDI ファイル", action: "new-file-mdi" },
       { label: "新規 Markdown ファイル", action: "new-file-md" },
       { label: "新規テキストファイル", action: "new-file-txt" },
       { label: "新規フォルダ", action: "new-folder" },
-      { label: "", action: "_separator" },
-      { label: "削除", action: "delete" },
+      ...(!isRoot ? [
+        { label: "", action: "_separator" },
+        { label: "削除", action: "delete" },
+      ] : []),
       ...(isElectronRenderer() ? [
         { label: "", action: "_separator" },
         { label: `${getFileManagerName()} で開く`, action: "open-in-finder" },
