@@ -59,6 +59,8 @@ export function usePowerSaving(
       if (!autoPowerSaveRef.current) return;
       if (state === "battery" && !powerSaveModeRef.current) {
         onChangeRef.current(true);
+      } else if (state === "ac" && powerSaveModeRef.current) {
+        onChangeRef.current(false);
       }
     });
 
