@@ -13,6 +13,7 @@ const { registerNlpHandlers } = require('./nlp/nlp-ipc-handlers')
 const { registerLlmHandlers, disposeLlmEngine } = require('./llm/llm-ipc-handlers')
 const { registerStorageHandlers, getStorageManager } = require('./storage-ipc-handlers')
 const { registerVFSHandlers } = require('./vfs-ipc-handlers')
+const { registerPtyHandlers, disposeAllPtys } = require('./ipc/pty-ipc')
 
 // Configure module resolution paths for ASAR environment
 if (app.isPackaged) {
@@ -1400,6 +1401,7 @@ app.whenReady().then(async () => {
   registerLlmHandlers()
   registerStorageHandlers()
   registerVFSHandlers()
+  registerPtyHandlers()
 
   // Power state monitoring
   powerMonitor.on('on-ac', () => broadcastPowerState('ac'))
@@ -1423,6 +1425,7 @@ app.on('before-quit', (event) => {
   if (isQuitting) return
   isQuitting = true
   event.preventDefault()
+  disposeAllPtys()
   const forceQuitTimeout = setTimeout(() => app.exit(0), 5000)
   disposeLlmEngine()
     .catch((err) => console.error('[before-quit] LLM disposal error:', err))

@@ -231,4 +231,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeAllListeners('editor:buffer-close-broadcast')
     },
   },
+  terminal: {
+    spawn: (options) => ipcRenderer.invoke('pty:spawn', options),
+    write: (ptyId, data) => ipcRenderer.invoke('pty:write', ptyId, data),
+    resize: (ptyId, cols, rows) => ipcRenderer.invoke('pty:resize', ptyId, cols, rows),
+    kill: (ptyId) => ipcRenderer.invoke('pty:kill', ptyId),
+    onData: (callback) => {
+      const handler = (_event, payload) => callback(payload)
+      ipcRenderer.on('pty:data', handler)
+      return () => ipcRenderer.removeListener('pty:data', handler)
+    },
+    onExit: (callback) => {
+      const handler = (_event, payload) => callback(payload)
+      ipcRenderer.on('pty:exit', handler)
+      return () => ipcRenderer.removeListener('pty:exit', handler)
+    },
+    removeAllListeners: () => {
+      ipcRenderer.removeAllListeners('pty:data')
+      ipcRenderer.removeAllListeners('pty:exit')
+    },
+  },
 })

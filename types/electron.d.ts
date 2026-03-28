@@ -210,6 +210,39 @@ declare global {
       /** Remove all editor sync listeners */
       removeAllListeners: () => void;
     };
+    /** Terminal PTY IPC bridge */
+    terminal?: {
+      /** Spawn a new PTY process */
+      spawn: (options: {
+        shell?: string;
+        cwd?: string;
+        cols?: number;
+        rows?: number;
+      }) => Promise<
+        | { success: true; ptyId: string; pid: number }
+        | { success: false; error: string }
+      >;
+      /** Write data to a PTY */
+      write: (ptyId: string, data: string) => Promise<void>;
+      /** Resize a PTY */
+      resize: (ptyId: string, cols: number, rows: number) => Promise<void>;
+      /** Kill a PTY process */
+      kill: (ptyId: string) => Promise<void>;
+      /** Listen for PTY data output */
+      onData: (
+        callback: (payload: { ptyId: string; data: string }) => void,
+      ) => () => void;
+      /** Listen for PTY exit events */
+      onExit: (
+        callback: (payload: {
+          ptyId: string;
+          exitCode: number;
+          signal?: number;
+        }) => void,
+      ) => () => void;
+      /** Remove all terminal event listeners */
+      removeAllListeners: () => void;
+    };
   }
 
   interface Window {

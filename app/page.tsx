@@ -56,6 +56,7 @@ import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
+import { useTerminalTab } from "@/lib/tab-manager/use-terminal-tab";
 
 import type { ActivityBarView } from "@/components/ActivityBar";
 import type { EditorView } from "@milkdown/prose/view";
@@ -186,6 +187,29 @@ export default function EditorPage() {
     openProjectFile, pinTab,
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
   } = tabManager;
+
+  // --- Terminal tab hook (PTY lifecycle with error-state handling) ---
+  const {
+    terminalTabs,
+    createTerminal,
+    closeTerminal,
+    retryTerminal,
+    updateTerminalStatus,
+  } = useTerminalTab();
+
+  // Listen for PTY exit events and update terminal tab status
+  useEffect(() => {
+    const api = typeof window !== "undefined" ? window.electronAPI?.terminal : undefined;
+    if (!api) return;
+
+    const cleanupExit = api.onExit(({ ptyId, exitCode }) => {
+      updateTerminalStatus(ptyId, "exited", { exitCode });
+    });
+
+    return () => {
+      cleanupExit();
+    };
+  }, [updateTerminalStatus]);
 
   // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
   const {

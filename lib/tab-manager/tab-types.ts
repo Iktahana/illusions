@@ -32,3 +32,21 @@ export interface TabPersistenceState {
   tabs: SerializedTab[];
   activeIndex: number;
 }
+
+// ---------------------------------------------------------------------------
+// Terminal tab types
+// ---------------------------------------------------------------------------
+
+/** Lifecycle status of a terminal PTY session */
+export type TerminalTabStatus = "connecting" | "running" | "exited" | "error";
+
+/** Runtime state of a terminal tab */
+export interface TerminalTabState {
+  id: TabId;
+  title: string;
+  status: TerminalTabStatus;
+  ptyId: string | null;
+  pid: number | null;
+  exitCode?: number;
+  errorMessage?: string;
+}
