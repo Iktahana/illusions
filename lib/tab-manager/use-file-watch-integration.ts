@@ -135,9 +135,6 @@ export function useFileWatchIntegration(
       const path = tab.file?.path;
       if (!path || currentWatchers.has(path)) continue;
 
-      const tabId = tab.id;
-      const fileName = tab.file?.name ?? "不明";
-
       const watcher = createFileWatcher({
         path,
         onChanged: (content: string, lastModified: number) => {
@@ -158,7 +155,7 @@ export function useFileWatchIntegration(
           // using the actual disk timestamp from the filesystem
           setFileConflict({
             tabId: currentTab.id,
-            fileName: currentTab.file?.name ?? fileName,
+            fileName: currentTab.file?.name ?? "不明",
             diskTimestamp: lastModified,
             remoteContent: content,
             localContent: currentTab.content,
