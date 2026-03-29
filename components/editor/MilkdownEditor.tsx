@@ -58,6 +58,8 @@ interface MilkdownEditorProps {
   onStartSpeech?: () => void;
   /** Called when the user triggers "検索" from the context menu. Receives selected text as initial search term. */
   onFind?: (initialTerm?: string) => void;
+  /** Per-pane override for charsPerLine (used by auto mode to avoid global state conflicts in split editors) */
+  overrideCharsPerLine?: number;
 }
 
 export default function MilkdownEditor({
@@ -83,11 +85,13 @@ export default function MilkdownEditor({
   gfmEnabled = true,
   onStartSpeech,
   onFind,
+  overrideCharsPerLine,
 }: MilkdownEditorProps) {
   const {
     fontScale, lineHeight, paragraphSpacing, textIndent, fontFamily,
-    charsPerLine, showParagraphNumbers,
+    charsPerLine: contextCharsPerLine, showParagraphNumbers,
   } = useTypographySettings();
+  const charsPerLine = overrideCharsPerLine ?? contextCharsPerLine;
   const { lintingEnabled } = useLintingSettings();
   const { posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes } = usePosHighlightSettings();
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();

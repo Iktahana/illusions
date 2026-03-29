@@ -80,7 +80,6 @@ export default function NovelEditor({
   const {
     fontScale, lineHeight, fontFamily,
     charsPerLine, autoCharsPerLine,
-    onAutoCharsPerLineCalc,
   } = useTypographySettings();
   const { speechVoiceURI, speechRate, speechPitch, speechVolume } = useSpeechSettings();
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
@@ -285,11 +284,20 @@ export default function NovelEditor({
     setIsVertical(!isVertical);
   }, [isVertical, scrollContainerRef]);
 
+  // Per-pane local state for auto-calculated chars per line (avoids split panes overwriting each other)
+  const [localAutoCharsPerLine, setLocalAutoCharsPerLine] = useState<number | null>(null);
+  const effectiveCharsPerLine = autoCharsPerLine && localAutoCharsPerLine !== null
+    ? localAutoCharsPerLine
+    : charsPerLine;
+
+  // Reset local value when auto mode is toggled off
+  useEffect(() => {
+    if (!autoCharsPerLine) setLocalAutoCharsPerLine(null);
+  }, [autoCharsPerLine]);
+
   // Refs to avoid including charsPerLine / callback in useCallback deps (prevents recalc loop)
-  const charsPerLineRef = useRef(charsPerLine);
-  charsPerLineRef.current = charsPerLine;
-  const onAutoCharsPerLineCalcRef = useRef(onAutoCharsPerLineCalc);
-  onAutoCharsPerLineCalcRef.current = onAutoCharsPerLineCalc;
+  const charsPerLineRef = useRef(effectiveCharsPerLine);
+  charsPerLineRef.current = effectiveCharsPerLine;
 
   // Calculate optimal chars per line based on editor width and font size
   const calculateOptimalCharsPerLine = useCallback(() => {
@@ -346,7 +354,7 @@ export default function NovelEditor({
       const clamped = Math.min(40, optimalChars);
 
       if (clamped !== charsPerLineRef.current) {
-        onAutoCharsPerLineCalcRef.current?.(clamped);
+        setLocalAutoCharsPerLine(clamped);
       }
     } else {
       // For horizontal writing: calculate based on available width
@@ -355,7 +363,7 @@ export default function NovelEditor({
       const clamped = Math.min(40, optimalChars);
 
       if (clamped !== charsPerLineRef.current) {
-        onAutoCharsPerLineCalcRef.current?.(clamped);
+        setLocalAutoCharsPerLine(clamped);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- charsPerLine & callback read via refs to break recalc loop
@@ -418,6 +426,7 @@ export default function NovelEditor({
               onSelectionChange={onSelectionChange}
               isVertical={isVertical}
               scrollContainerRef={scrollContainerRef}
+              overrideCharsPerLine={effectiveCharsPerLine}
               onEditorViewReady={(view) => {
                 setEditorViewInstance(view);
                 onEditorViewReady?.(view);
