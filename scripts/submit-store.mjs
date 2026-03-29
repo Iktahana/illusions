@@ -17,16 +17,18 @@
  *   MSIX_DIR              - Directory containing .appx packages (default: "msix-packages")
  *
  * Optional:
- *   DRY_RUN=true          - Log API calls without mutating state
- *   POLL_TIMEOUT_MS       - Polling timeout in ms (default: 600000 = 10 min)
+ *   DRY_RUN=true              - Log API calls without mutating state (credentials not required)
+ *   FORCE_DELETE_PENDING=true - Delete any existing pending submission before creating a new one
+ *   POLL_TIMEOUT_MS           - Polling timeout in ms (default: 600000 = 10 min)
  */
 
-import { readFileSync, readdirSync, createReadStream } from 'node:fs';
-import { resolve, basename, dirname } from 'node:path';
+import { readFileSync, readdirSync, createReadStream, statSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -35,6 +37,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // ---------------------------------------------------------------------------
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
+const FORCE_DELETE_PENDING = process.env.FORCE_DELETE_PENDING === 'true';
 const TENANT_ID = process.env.MSSTORE_TENANT_ID;
 const CLIENT_ID = process.env.MSSTORE_CLIENT_ID;
 const CLIENT_SECRET = process.env.MSSTORE_CLIENT_SECRET;
@@ -81,6 +84,10 @@ async function getAccessToken() {
  * @returns {Promise<object>}
  */
 async function apiGet(token, path) {
+  if (DRY_RUN) {
+    console.log(`[dry-run] GET ${path}`);
+    return {};
+  }
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -233,26 +240,26 @@ function createPackageZip() {
  * @returns {Promise<void>}
  */
 async function uploadPackageToSas(sasUrl, zipPath) {
-  if (DRY_RUN) {
-    console.log(`  [dry-run] Upload ${zipPath} → SAS URL`);
-    return;
-  }
   if (!sasUrl) {
     console.warn('  No fileUploadUrl provided — skipping package upload');
     return;
   }
 
-  const data = readFileSync(zipPath);
-  console.log(`  Uploading ${(data.length / 1024 / 1024).toFixed(1)} MB to SAS URL...`);
+  const { size: fileSize } = statSync(zipPath);
+  console.log(`  Uploading ${(fileSize / 1024 / 1024).toFixed(1)} MB to SAS URL...`);
+
+  // Stream the file to avoid loading large packages into memory
+  const webStream = Readable.toWeb(createReadStream(zipPath));
 
   const res = await fetch(sasUrl, {
     method: 'PUT',
     headers: {
       'x-ms-blob-type': 'BlockBlob',
       'Content-Type': 'application/zip',
-      'Content-Length': String(data.length),
+      'Content-Length': String(fileSize),
     },
-    body: data,
+    body: webStream,
+    duplex: 'half',
   });
 
   if (!res.ok) {
@@ -293,16 +300,13 @@ async function pollSubmissionStatus(token, submissionId) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  // Validate environment
-  if (!TENANT_ID || !CLIENT_ID || !CLIENT_SECRET || !APP_ID) {
+  if (DRY_RUN) {
+    console.log('=== DRY RUN MODE — no mutations will be made ===\n');
+  } else if (!TENANT_ID || !CLIENT_ID || !CLIENT_SECRET || !APP_ID) {
     throw new Error(
       'Missing required environment variables: ' +
         'MSSTORE_TENANT_ID, MSSTORE_CLIENT_ID, MSSTORE_CLIENT_SECRET, STORE_PRODUCT_ID',
     );
-  }
-
-  if (DRY_RUN) {
-    console.log('=== DRY RUN MODE — no mutations will be made ===\n');
   }
 
   // --- Step 1: Read listing content ---
@@ -319,33 +323,46 @@ async function main() {
   console.log(`  releaseNotes:     ${releaseNotes.length} chars`);
 
   // --- Step 2: Authenticate ---
-  console.log('\nAuthenticating with Azure AD...');
-  const token = await getAccessToken();
-  console.log('  OK');
+  let token = 'dry-run-token';
+  if (!DRY_RUN) {
+    console.log('\nAuthenticating with Azure AD...');
+    token = await getAccessToken();
+    console.log('  OK');
+  }
 
-  // --- Step 3: Get app info ---
+  // --- Step 3: Get app info + resolve pending submission ---
+  let submissionId;
+  let fileUploadUrl;
+
   console.log(`\nFetching app info for ${APP_ID}...`);
   const app = await apiGet(token, `/applications/${APP_ID}`);
 
-  // Delete any existing pending submission to start fresh
   if (app.pendingApplicationSubmission?.id) {
     const pendingId = app.pendingApplicationSubmission.id;
-    console.log(`  Deleting existing pending submission: ${pendingId}`);
-    await apiDelete(token, `/applications/${APP_ID}/submissions/${pendingId}`);
+    if (FORCE_DELETE_PENDING) {
+      console.log(`  Deleting existing pending submission: ${pendingId}`);
+      await apiDelete(token, `/applications/${APP_ID}/submissions/${pendingId}`);
+    } else {
+      // Reuse the existing pending submission to avoid wiping manual Partner Center edits
+      console.log(`  Reusing existing pending submission: ${pendingId}`);
+      submissionId = pendingId;
+      const existingSub = await apiGet(token, `/applications/${APP_ID}/submissions/${pendingId}`);
+      fileUploadUrl = existingSub.fileUploadUrl;
+    }
   }
 
-  // --- Step 4: Create new submission ---
-  console.log('\nCreating new submission...');
-  const newSub = await apiPost(token, `/applications/${APP_ID}/submissions`, null);
-  const submissionId = newSub.id;
-  const fileUploadUrl = newSub.fileUploadUrl;
-  console.log(`  Submission ID: ${submissionId}`);
+  // --- Step 4: Create new submission (if no pending submission to reuse) ---
+  if (!submissionId) {
+    console.log('\nCreating new submission...');
+    const newSub = await apiPost(token, `/applications/${APP_ID}/submissions`, null);
+    submissionId = newSub.id;
+    fileUploadUrl = newSub.fileUploadUrl;
+    console.log(`  Submission ID: ${submissionId}`);
+  }
 
   // --- Step 5: Get full submission details ---
   console.log('\nGetting submission details...');
-  const submission = DRY_RUN
-    ? { listings: {}, applicationPackages: [] }
-    : await apiGet(token, `/applications/${APP_ID}/submissions/${submissionId}`);
+  const submission = await apiGet(token, `/applications/${APP_ID}/submissions/${submissionId}`);
 
   // --- Step 6: Update listing ---
   console.log('\nUpdating store listing (ja-JP)...');
@@ -376,10 +393,14 @@ async function main() {
   await apiPut(token, `/applications/${APP_ID}/submissions/${submissionId}`, submission);
 
   // --- Step 9: Upload packages ---
-  console.log('\nPreparing package ZIP...');
-  const zipPath = createPackageZip();
-  console.log('\nUploading packages to Azure Blob Storage...');
-  await uploadPackageToSas(fileUploadUrl, zipPath);
+  if (DRY_RUN) {
+    console.log('\n[dry-run] Skipping package ZIP creation and upload.');
+  } else {
+    console.log('\nPreparing package ZIP...');
+    const zipPath = createPackageZip();
+    console.log('\nUploading packages to Azure Blob Storage...');
+    await uploadPackageToSas(fileUploadUrl, zipPath);
+  }
 
   // --- Step 10: Commit ---
   console.log('\nCommitting submission...');
