@@ -13,6 +13,7 @@ import type { CommandId } from "@/lib/keymap/command-ids";
 import type { KeyBinding, KeymapOverrides } from "@/lib/keymap/keymap-types";
 import { loadKeymapOverrides, saveKeymapOverrides } from "@/lib/keymap/keymap-storage";
 import { SHORTCUT_REGISTRY } from "@/lib/keymap/shortcut-registry";
+import { bindingsMatch } from "@/lib/keymap/keymap-utils";
 
 /**
  * The effective binding for a command: either the user override or the default.
@@ -26,6 +27,8 @@ export interface KeymapContextValue {
   overrides: KeymapOverrides;
   /** Set or clear a binding override for a command */
   setOverride: (id: CommandId, binding: KeyBinding | null) => Promise<void>;
+  /** Set a binding, automatically unbinding any conflicting commands */
+  setOverrideWithConflictResolution: (id: CommandId, binding: KeyBinding | null) => Promise<void>;
   /** Reset a single command back to its default */
   resetOverride: (id: CommandId) => Promise<void>;
   /** Reset all commands to their defaults */
@@ -88,6 +91,24 @@ export function KeymapProvider({ children }: KeymapProviderProps): React.JSX.Ele
     await syncElectronMenu(next);
   }, [overrides, syncElectronMenu]);
 
+  const setOverrideWithConflictResolution = useCallback(async (id: CommandId, binding: KeyBinding | null) => {
+    const next: KeymapOverrides = { ...overrides };
+    // Unbind any commands that already use this binding
+    if (binding) {
+      const merged = mergeBindings(defaultBindings, overrides);
+      for (const [cmdId, existing] of Object.entries(merged) as Array<[CommandId, KeyBinding | null]>) {
+        if (cmdId === id || !existing) continue;
+        if (bindingsMatch(existing, binding)) {
+          next[cmdId] = null;
+        }
+      }
+    }
+    next[id] = binding;
+    setOverrides(next);
+    await saveKeymapOverrides(next);
+    await syncElectronMenu(next);
+  }, [overrides, defaultBindings, syncElectronMenu]);
+
   const resetOverride = useCallback(async (id: CommandId) => {
     const next = { ...overrides };
     delete next[id];
@@ -103,8 +124,8 @@ export function KeymapProvider({ children }: KeymapProviderProps): React.JSX.Ele
   }, [syncElectronMenu]);
 
   const value = useMemo<KeymapContextValue>(
-    () => ({ effectiveBindings, overrides, setOverride, resetOverride, resetAll }),
-    [effectiveBindings, overrides, setOverride, resetOverride, resetAll],
+    () => ({ effectiveBindings, overrides, setOverride, setOverrideWithConflictResolution, resetOverride, resetAll }),
+    [effectiveBindings, overrides, setOverride, setOverrideWithConflictResolution, resetOverride, resetAll],
   );
 
   return (
