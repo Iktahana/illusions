@@ -13,14 +13,14 @@ import clsx from "clsx";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import ContextMenu from "@/components/ContextMenu";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { isElectronRenderer, detectOSPlatform } from "@/lib/utils/runtime-env";
 import type { FileTreeEntry, EditingEntry } from "./types";
 
 /** Returns the OS-specific file manager name for context menu labels. */
 function getFileManagerName(): string {
-  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-  if (/Mac/.test(ua)) return "Finder";
-  if (/Win/.test(ua)) return "Explorer";
+  const platform = detectOSPlatform();
+  if (platform === "mac") return "Finder";
+  if (platform === "windows") return "Explorer";
   return "ファイルマネージャー";
 }
 

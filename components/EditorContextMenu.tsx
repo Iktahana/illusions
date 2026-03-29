@@ -6,6 +6,7 @@ import type { ReactNode, MouseEvent } from "react";
 
 import type { LintIssue } from "@/lib/linting";
 import { useKeymap } from "@/contexts/KeymapContext";
+import { isMacOS } from "@/lib/utils/runtime-env";
 import { formatBinding } from "@/lib/keymap/keymap-utils";
 
 export type ContextMenuAction =
@@ -80,7 +81,7 @@ export default function EditorContextMenu({
   const { effectiveBindings } = useKeymap();
 
   // Detect platform for native shortcuts (cut/copy/paste are browser built-ins not in registry)
-  const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
+  const isMac = isMacOS();
   const cmdKey = isMac ? "⌘" : "Ctrl+";
 
   // "辞書で調べる" is only available in Electron via IPC

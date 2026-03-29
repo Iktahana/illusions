@@ -187,6 +187,7 @@ export default function EditorPage() {
     openProjectFile, pinTab, newTerminalTab, updateTerminalTab, openDiffTab,
     forceCloseTab, updateTab,
     pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
+    flushTabState,
   } = tabManager;
 
   // Ref that always holds the latest tabs array (avoids stale closures in PTY callbacks)
@@ -589,6 +590,21 @@ export default function EditorPage() {
       incrementEditorKey();
     });
   }, [onSystemFileOpen, incrementEditorKey]);
+
+  // Flush debounced tab/layout state on page refresh.
+  // Electron: the normal quit flow uses IPC flush, but Cmd+R bypasses it.
+  // Web: browser refresh would lose any debounced changes still in-flight.
+  // ここでの beforeunload フックは「ベストエフォート」でのフラッシュ用セーフティネット。
+  // beforeunload 中の非同期処理（IndexedDB 等）の完了は仕様上保証されないため、
+  // 確実にフラッシュしたい処理は visibilitychange/pagehide 側を主経路として扱うこと。
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      void flushTabState();
+      void stableFlushLayoutState();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [flushTabState, stableFlushLayoutState]);
 
   // Clean up ?welcome and ?pending-file parameters from URL
   useEffect(() => {
@@ -1051,7 +1067,7 @@ export default function EditorPage() {
                setBottomView(view);
              }
            }}
-           onNewTerminal={isElectron ? handleNewTerminalTab : undefined}
+           onNewTerminal={isElectronRenderer() ? handleNewTerminalTab : undefined}
          />
 
            {/* Left side panel */}
@@ -1082,7 +1098,7 @@ export default function EditorPage() {
                   }
                 }}
                 onOpenFile={() => void openFile()}
-                onNewTerminal={isElectron ? handleNewTerminalTab : undefined}
+                onNewTerminal={isElectronRenderer() ? handleNewTerminalTab : undefined}
               />
             </div>
           )}

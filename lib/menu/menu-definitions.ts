@@ -3,6 +3,7 @@
  * Mirrors Electron native menu structure
  */
 import type { CommandId } from "@/lib/keymap/command-ids";
+import { isMacOS } from "@/lib/utils/runtime-env";
 
 const APP_VERSION = (() => {
   const v = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
@@ -85,6 +86,8 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
     label: 'ヘルプ',
     items: [
       { label: `バージョン ${APP_VERSION}`, enabled: false },
+      { type: 'separator' },
+      { label: 'AI回答の不適切報告', action: 'report-ai-inappropriate' },
     ]
   }
 ];
@@ -119,7 +122,7 @@ export function formatAccelerator(accelerator: string): string {
     return accelerator;
   }
   
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const isMac = isMacOS();
   
   if (isMac) {
     return accelerator

@@ -92,13 +92,15 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
     newWindow?.show()
   })
 
-  // 未保存の変更がある場合は終了前に確認ダイアログを表示する
+  // ウィンドウ終了前に状態をフラッシュする（未保存の場合はダイアログも表示）
   let isHandlingClose = false
   newWindow.on('close', (event) => {
-    if (newWindow.isDocumentEdited() && !isHandlingClose) {
-      event.preventDefault()
-      isHandlingClose = true
+    if (isHandlingClose) return
+    event.preventDefault()
+    isHandlingClose = true
 
+    if (newWindow.isDocumentEdited()) {
+      // 未保存の変更がある場合は確認ダイアログを表示
       dialog
         .showMessageBox(newWindow, {
           type: 'question',
@@ -110,18 +112,22 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
         })
         .then(({ response }) => {
           if (response === 0) {
-            // "Save": request renderer to save, then close
+            // "Save": flush state + save dirty files, then close
             newWindow.webContents.send('electron-request-save-before-close')
           } else if (response === 1) {
-            // "Don't Save": discard changes and close immediately
-            newWindow.destroy()
+            // "Don't Save": flush state only (preserve tab/layout), then close
+            newWindow.webContents.send('electron-request-flush-state-before-close')
+          } else {
+            // "Cancel": keep window open
+            isHandlingClose = false
           }
-          // response === 2 ("Cancel"): do nothing, keep window open
-          isHandlingClose = false
         })
         .catch(() => {
           isHandlingClose = false
         })
+    } else {
+      // 変更なし: タブ・レイアウト状態をフラッシュしてから閉じる
+      newWindow.webContents.send('electron-request-flush-state-before-close')
     }
   })
 
