@@ -211,10 +211,12 @@
       "icon": "build/icon.png",
       "category": "Office",
       "desktop": {
-        "Name": "illusions",
-        "Comment": "AI搭載日本語小説エディタ",
-        "Keywords": "小説;執筆;日本語;エディタ;AI;novel;writing;japanese;editor;",
-        "MimeType": "application/x-mdi;"
+        "entry": {
+          "Name": "illusions",
+          "Comment": "AI搭載日本語小説エディタ",
+          "Keywords": "小説;執筆;日本語;エディタ;AI;novel;writing;japanese;editor;",
+          "MimeType": "application/x-mdi;"
+        }
       },
       "target": [
         { "target": "AppImage", "arch": ["x64"] },
