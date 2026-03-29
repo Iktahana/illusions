@@ -187,6 +187,16 @@ export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExp
 
     const cleanups: Array<(() => void) | void> = [];
 
+    if (window.electronAPI.onMenuExportTxt) {
+      cleanups.push(
+        window.electronAPI.onMenuExportTxt(() => void exportAs("txt"))
+      );
+    }
+    if (window.electronAPI.onMenuExportTxtRuby) {
+      cleanups.push(
+        window.electronAPI.onMenuExportTxtRuby(() => void exportAs("txt-ruby"))
+      );
+    }
     if (window.electronAPI.onMenuExportPDF) {
       cleanups.push(
         window.electronAPI.onMenuExportPDF(() => void exportAs("pdf"))

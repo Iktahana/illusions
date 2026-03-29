@@ -19,6 +19,14 @@ interface UseWebMenuHandlersProps {
   /** Whether the currently active tab is an editor tab.
    *  Edit-menu operations (undo/redo/cut/copy/paste) and export are no-ops when false. */
   isEditorTabActive?: boolean;
+  /** Handler for Format menu actions (setting name, action type) */
+  onFormatChange?: (setting: string, action: string) => void;
+  /** Handler for theme mode changes */
+  onThemeChange?: (mode: string) => void;
+  /** Handler for creating a new tab */
+  onNewTab?: () => void;
+  /** Handler for closing the active tab */
+  onCloseTab?: () => void;
 }
 
 export function useWebMenuHandlers({
@@ -35,6 +43,10 @@ export function useWebMenuHandlers({
   fontScale = 100,
   onFontScaleChange,
   isEditorTabActive = true,
+  onFormatChange,
+  onThemeChange,
+  onNewTab,
+  onCloseTab,
 }: UseWebMenuHandlersProps) {
 
   const handleMenuAction = useCallback((action: string) => {
@@ -62,6 +74,12 @@ export function useWebMenuHandlers({
         break;
       case 'close-window':
         onCloseWindow?.();
+        break;
+      case 'new-tab':
+        onNewTab?.();
+        break;
+      case 'close-tab':
+        onCloseTab?.();
         break;
 
       // Export — disabled when non-editor tab is active
@@ -157,11 +175,60 @@ export function useWebMenuHandlers({
         onToggleCompactMode?.();
         break;
 
+      // Theme menu
+      case 'theme-auto':
+        onThemeChange?.('auto');
+        break;
+      case 'theme-light':
+        onThemeChange?.('light');
+        break;
+      case 'theme-dark':
+        onThemeChange?.('dark');
+        break;
+
+      // Format menu
+      case 'format-line-height-increase':
+        onFormatChange?.('lineHeight', 'increase');
+        break;
+      case 'format-line-height-decrease':
+        onFormatChange?.('lineHeight', 'decrease');
+        break;
+      case 'format-paragraph-spacing-increase':
+        onFormatChange?.('paragraphSpacing', 'increase');
+        break;
+      case 'format-paragraph-spacing-decrease':
+        onFormatChange?.('paragraphSpacing', 'decrease');
+        break;
+      case 'format-text-indent-increase':
+        onFormatChange?.('textIndent', 'increase');
+        break;
+      case 'format-text-indent-decrease':
+        onFormatChange?.('textIndent', 'decrease');
+        break;
+      case 'format-text-indent-none':
+        onFormatChange?.('textIndent', 'none');
+        break;
+      case 'format-chars-per-line-auto':
+        onFormatChange?.('charsPerLine', 'auto');
+        break;
+      case 'format-chars-per-line-increase':
+        onFormatChange?.('charsPerLine', 'increase');
+        break;
+      case 'format-chars-per-line-decrease':
+        onFormatChange?.('charsPerLine', 'decrease');
+        break;
+      case 'format-paragraph-numbers-toggle':
+        onFormatChange?.('paragraphNumbers', 'toggle');
+        break;
+
       case 'show-in-file-manager':
         // No-op in web
         break;
 
       // Help menu
+      case 'open-website':
+        window.open('https://www.illusions.app/', '_blank');
+        break;
       case 'report-ai-inappropriate':
         window.open('https://github.com/Iktahana/illusions/issues/new', '_blank');
         break;
@@ -174,7 +241,7 @@ export function useWebMenuHandlers({
         }
         console.warn('[Web Menu] Unknown action:', action);
     }
-  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, onToggleCompactMode, onExport, editorView, fontScale, onFontScaleChange, isEditorTabActive]);
+  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, onToggleCompactMode, onExport, editorView, fontScale, onFontScaleChange, isEditorTabActive, onFormatChange, onThemeChange, onNewTab, onCloseTab]);
   
   return { handleMenuAction };
 }

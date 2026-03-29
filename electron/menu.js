@@ -156,6 +156,15 @@ function buildApplicationMenu(recentProjects = []) {
         label: 'エクスポート',
         submenu: [
           {
+            label: 'テキスト（プレーン）としてエクスポート...',
+            click: () => sendToFocused('menu-export-txt'),
+          },
+          {
+            label: 'テキスト（ルビ付き）としてエクスポート...',
+            click: () => sendToFocused('menu-export-txt-ruby'),
+          },
+          { type: 'separator' },
+          {
             label: 'PDF としてエクスポート...',
             click: () => sendToFocused('menu-export-pdf'),
           },
