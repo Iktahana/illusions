@@ -26,7 +26,7 @@ const CATEGORY_LABELS: Record<ShortcutCategory, string> = {
 const CATEGORY_ORDER: ShortcutCategory[] = ["file", "edit", "format", "view", "nav", "panel", "app"];
 
 export default function KeymapSettings() {
-  const { effectiveBindings, overrides, setOverride, resetOverride, resetAll } = useKeymap();
+  const { effectiveBindings, overrides, setOverrideWithConflictResolution, resetOverride, resetAll } = useKeymap();
   const [recording, setRecording] = useState<CommandId | null>(null);
 
   /** Find all commands that bind to a given binding string (for conflict detection) */
@@ -69,7 +69,7 @@ export default function KeymapSettings() {
   }, []);
 
   const handleRecord = async (id: CommandId, binding: KeyBinding) => {
-    await setOverride(id, binding);
+    await setOverrideWithConflictResolution(id, binding);
     setRecording(null);
   };
 
