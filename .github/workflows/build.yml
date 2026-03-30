@@ -707,15 +707,24 @@ jobs:
     runs-on: windows-latest
     environment: MicrosoftStore
     env:
-      MSSTORE_CLI_VERSION: "v0.3.9"
       MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
       MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
       MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-      MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
       STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
       VERSION: v${{ needs.compute-version.outputs.full }}
+      MSIX_DIR: msix-packages
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Download MSIX packages from GitHub Release
         shell: pwsh
         env:
@@ -731,31 +740,8 @@ jobs:
           Write-Host "Downloaded $($appxFiles.Count) .appx package(s):"
           $appxFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
 
-      - name: Install msstore-cli
-        shell: pwsh
-        run: |
-          $url = "https://github.com/microsoft/msstore-cli/releases/download/$env:MSSTORE_CLI_VERSION/MSStoreCLI-win-x64.zip"
-          Invoke-WebRequest $url -OutFile msstore.zip
-          Expand-Archive msstore.zip -DestinationPath "$env:LOCALAPPDATA\msstore-cli" -Force
-          echo "$env:LOCALAPPDATA\msstore-cli" >> $env:GITHUB_PATH
-
-      - name: Configure msstore-cli credentials
-        shell: pwsh
-        run: |
-          msstore reconfigure `
-            --tenantId $env:MSSTORE_TENANT_ID `
-            --clientId $env:MSSTORE_CLIENT_ID `
-            --clientSecret $env:MSSTORE_CLIENT_SECRET `
-            --sellerId $env:MSSTORE_SELLER_ID
-
-      - name: Submit to Microsoft Store
-        shell: pwsh
-        run: |
-          $appxFiles = Get-ChildItem "msix-packages\*.appx"
-          $uploadFile = "msix-packages\illusions.msixupload"
-          Compress-Archive -Path $appxFiles.FullName -DestinationPath $uploadFile -Force
-          Write-Host "Created bundle: $uploadFile"
-          msstore publish "$uploadFile" -id $env:STORE_PRODUCT_ID -v
+      - name: Submit listing + packages to Microsoft Store
+        run: node scripts/submit-store.mjs
 
       - name: Create submission marker tag
         shell: bash
