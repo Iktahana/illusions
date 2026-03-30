@@ -170,7 +170,7 @@ function parseInlineFormatting(text: string): TextRun[] {
   const runs: TextRun[] = [];
 
   // Process all MDI inline syntax via shared parser (ruby → fullwidth parens)
-  let processed = replaceMdiWithRubyText(text);
+  const processed = replaceMdiWithRubyText(text);
 
   // Now parse bold/italic markdown
   // Split by bold-italic (***text***), bold (**text**), and italic (*text*) markers

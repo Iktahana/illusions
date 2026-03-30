@@ -432,7 +432,6 @@ async function main() {
       minimumSystemRam: "None",
     }));
 
-
     submission.applicationPackages = [...existingPackages, ...newPackages];
   } else {
     console.log("\nSkipping package configuration (listing-only mode).");
