@@ -3,6 +3,7 @@
 import type { StorageSession, AppState, RecentFile, EditorBuffer } from "@/lib/storage/storage-types";
 import type { Token, WordEntry, TokenizeProgress } from "@/lib/nlp-client/types";
 import type { VFSWatchEvent } from "@/lib/vfs/types";
+import type { KeymapOverrides } from "@/lib/keymap/keymap-types";
 
 export {}
 
@@ -22,6 +23,7 @@ declare global {
     openDictionaryPopup?: (url: string, title: string) => Promise<boolean>;
     showContextMenu?: (items: Array<{ type?: string; label?: string; action?: string; accelerator?: string }>) => Promise<string | null>;
     onSaveBeforeClose?: (callback: () => void) => (() => void) | void;
+    onFlushStateBeforeClose?: (callback: () => void) => (() => void) | void;
     onOpenFileFromSystem?: (
       callback: (payload: { path: string; content: string }) => void
     ) => (() => void) | void;
@@ -43,10 +45,12 @@ declare global {
     onMenuOpenRecentProject?: (callback: (projectId: string) => void) => (() => void) | void;
     rebuildMenu?: () => Promise<boolean>;
     syncMenuUiState?: (state: { compactMode?: boolean; showParagraphNumbers?: boolean; themeMode?: string; autoCharsPerLine?: boolean }) => Promise<boolean>;
+    updateKeymapOverrides?: (overrides: KeymapOverrides) => Promise<boolean>;
     showInFileManager?: (dirPath: string) => Promise<boolean>;
     revealInFileManager?: (filePath: string) => Promise<boolean>;
     openExternal?: (url: string) => Promise<boolean>;
     onMenuShowInFileManager?: (callback: () => void) => (() => void) | void;
+    onPasteAsPlaintext?: (callback: () => void) => (() => void) | void;
     onToggleCompactMode?: (callback: () => void) => (() => void) | void;
     onFormatChange?: (callback: (setting: string, action: string) => void) => (() => void) | void;
     onThemeChange?: (callback: (mode: "auto" | "light" | "dark") => void) => (() => void) | void;
@@ -63,6 +67,8 @@ declare global {
       content: string,
       options: { metadata: { title: string; author?: string; date?: string; language?: string } }
     ) => Promise<string | { success: false; error: string } | null>;
+    onMenuExportTxt?: (callback: () => void) => (() => void) | void;
+    onMenuExportTxtRuby?: (callback: () => void) => (() => void) | void;
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;
@@ -154,39 +160,6 @@ declare global {
       /** Check if OS-level encryption is available */
       isAvailable: () => Promise<boolean>;
     };
-    llm?: {
-      getModels: () => Promise<
-        Array<{
-          id: string;
-          status: "not-downloaded" | "downloading" | "ready" | "loading" | "loaded" | "error";
-          downloadProgress?: number;
-          filePath?: string;
-          error?: string;
-        }>
-      >;
-      downloadModel: (modelId: string) => Promise<void>;
-      deleteModel: (modelId: string) => Promise<void>;
-      loadModel: (modelId: string) => Promise<void>;
-      unloadModel: () => Promise<void>;
-      isModelLoaded: () => Promise<boolean>;
-      infer: (
-        prompt: string,
-        options?: { maxTokens?: number },
-      ) => Promise<{ text: string; tokenCount: number }>;
-      inferBatch: (
-        prompts: string[],
-        options?: { maxTokens?: number },
-      ) => Promise<Array<{ text: string; tokenCount: number }>>;
-      getStorageUsage: () => Promise<{
-        used: number;
-        models: Array<{ id: string; size: number }>;
-      }>;
-      onDownloadProgress: (
-        callback: (progress: { modelId: string; progress: number }) => void,
-      ) => () => void;
-      removeDownloadProgressListener: () => void;
-      setIdlingStop: (enabled: boolean) => Promise<void>;
-    };
     power?: {
       /** Listen for debounced power state changes from main process */
       onPowerStateChange: (callback: (state: 'ac' | 'battery') => void) => (() => void);
@@ -209,6 +182,71 @@ declare global {
       onBufferClose: (callback: (bufferId: string) => void) => (() => void);
       /** Remove all editor sync listeners */
       removeAllListeners: () => void;
+    };
+    /** PTY session management */
+    pty?: {
+      /**
+       * Spawn a new PTY session in the main process.
+       * @param options - Optional spawn configuration
+       * @returns sessionId on success, or error message
+       */
+      spawn: (options?: {
+        cwd?: string;
+        shell?: string;
+        cols?: number;
+        rows?: number;
+      }) => Promise<{ sessionId: string } | { error: string }>;
+      /**
+       * Re-attach to an existing session and retrieve its output ring buffer.
+       * @param sessionId - ID returned by spawn
+       */
+      attach: (sessionId: string) => Promise<
+        | { sessionId: string; status: 'active' | 'exited' | 'killed'; exitCode: number | null; outputBuffer: string }
+        | { error: string }
+      >;
+      /**
+       * Write keystroke data to a PTY session (max 64 KB).
+       * @param sessionId - Target session ID
+       * @param data - Raw input string
+       */
+      write: (sessionId: string, data: string) => Promise<{ ok: boolean }>;
+      /**
+       * Resize the terminal dimensions.
+       * @param sessionId - Target session ID
+       * @param cols - Column count (1–500)
+       * @param rows - Row count (1–500)
+       */
+      resize: (sessionId: string, cols: number, rows: number) => Promise<{ ok: boolean }>;
+      /**
+       * Kill a PTY session (idempotent).
+       * @param sessionId - Target session ID
+       */
+      kill: (sessionId: string) => Promise<{ ok: boolean }>;
+      /**
+       * Query the current state of a PTY session.
+       * @param sessionId - Target session ID
+       */
+      status: (sessionId: string) => Promise<
+        | {
+            sessionId: string;
+            status: 'active' | 'exited' | 'killed';
+            exitCode: number | null;
+            shell: string;
+            cwd: string;
+            createdAt: number;
+          }
+        | { error: string }
+      >;
+      /**
+       * Listen for PTY output data pushed from the main process.
+       * Returns a cleanup function that removes the listener.
+       */
+      onData: (callback: (payload: { sessionId: string; data: string }) => void) => () => void;
+      /**
+       * Listen for PTY process exit notifications.
+       * Returns a cleanup function that removes the listener.
+       */
+      onExit: (callback: (payload: { sessionId: string; exitCode: number }) => void) => () => void;
     };
   }
 

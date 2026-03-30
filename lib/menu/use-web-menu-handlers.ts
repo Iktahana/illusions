@@ -16,6 +16,17 @@ interface UseWebMenuHandlersProps {
   editorView?: EditorView | null;
   fontScale?: number;
   onFontScaleChange?: (scale: number) => void;
+  /** Whether the currently active tab is an editor tab.
+   *  Edit-menu operations (undo/redo/cut/copy/paste) and export are no-ops when false. */
+  isEditorTabActive?: boolean;
+  /** Handler for Format menu actions (setting name, action type) */
+  onFormatChange?: (setting: string, action: string) => void;
+  /** Handler for theme mode changes */
+  onThemeChange?: (mode: string) => void;
+  /** Handler for creating a new tab */
+  onNewTab?: () => void;
+  /** Handler for closing the active tab */
+  onCloseTab?: () => void;
 }
 
 export function useWebMenuHandlers({
@@ -31,10 +42,15 @@ export function useWebMenuHandlers({
   editorView,
   fontScale = 100,
   onFontScaleChange,
+  isEditorTabActive = true,
+  onFormatChange,
+  onThemeChange,
+  onNewTab,
+  onCloseTab,
 }: UseWebMenuHandlersProps) {
-  
+
   const handleMenuAction = useCallback((action: string) => {
-    
+
     switch (action) {
       // File menu
       case 'new-window':
@@ -59,71 +75,81 @@ export function useWebMenuHandlers({
       case 'close-window':
         onCloseWindow?.();
         break;
+      case 'new-tab':
+        onNewTab?.();
+        break;
+      case 'close-tab':
+        onCloseTab?.();
+        break;
 
-      // Export
+      // Export — disabled when non-editor tab is active
       case 'export-txt':
-        onExport?.('txt');
+        if (isEditorTabActive) onExport?.('txt');
         break;
       case 'export-txt-ruby':
-        onExport?.('txt-ruby');
+        if (isEditorTabActive) onExport?.('txt-ruby');
         break;
       case 'export-pdf':
-        onExport?.('pdf');
+        if (isEditorTabActive) onExport?.('pdf');
         break;
       case 'export-epub':
-        onExport?.('epub');
+        if (isEditorTabActive) onExport?.('epub');
         break;
       case 'export-docx':
-        onExport?.('docx');
+        if (isEditorTabActive) onExport?.('docx');
         break;
 
-      // Edit menu - Using ProseMirror commands
+      // Edit menu — guard with both editorView and isEditorTabActive
       case 'undo':
-        if (editorView) {
-          const { state, dispatch } = editorView;
-          // Use ProseMirror undo command
-          const undoCommand = state.tr;
+        if (editorView && isEditorTabActive) {
+          const { state } = editorView;
           if (state.doc) {
-            // Try to execute undo via history plugin
+            // Execute undo via history plugin
             editorView.focus();
             document.execCommand('undo');
           }
         }
         break;
       case 'redo':
-        if (editorView) {
+        if (editorView && isEditorTabActive) {
           editorView.focus();
           document.execCommand('redo');
         }
         break;
       case 'cut':
-        if (editorView) {
+        if (editorView && isEditorTabActive) {
           editorView.focus();
           document.execCommand('cut');
         }
         break;
       case 'copy':
-        if (editorView) {
+        if (editorView && isEditorTabActive) {
           editorView.focus();
           document.execCommand('copy');
         }
         break;
       case 'paste':
-        if (editorView) {
+        if (editorView && isEditorTabActive) {
           editorView.focus();
           document.execCommand('paste');
         }
         break;
       case 'paste-plaintext':
-        // TODO: Implement paste as plaintext
-        if (editorView) {
-          editorView.focus();
-          // This will be implemented later with proper Milkdown integration
-          console.warn('[Web Menu] Paste as plaintext not yet implemented');
+        if (editorView && isEditorTabActive) {
+          // Read plain text from clipboard and insert it, stripping any rich-text formatting
+          void navigator.clipboard.readText().then((text) => {
+            if (!text) return;
+            const { state, dispatch } = editorView;
+            const tr = state.tr.insertText(text, state.selection.from, state.selection.to);
+            dispatch(tr);
+            editorView.focus();
+          }).catch((err: unknown) => {
+            console.warn('[Web Menu] クリップボードの読み取りに失敗しました:', err);
+          });
         }
         break;
       case 'select-all':
-        if (editorView) {
+        if (editorView && isEditorTabActive) {
           editorView.focus();
           document.execCommand('selectAll');
         }
@@ -149,8 +175,62 @@ export function useWebMenuHandlers({
         onToggleCompactMode?.();
         break;
 
+      // Theme menu
+      case 'theme-auto':
+        onThemeChange?.('auto');
+        break;
+      case 'theme-light':
+        onThemeChange?.('light');
+        break;
+      case 'theme-dark':
+        onThemeChange?.('dark');
+        break;
+
+      // Format menu
+      case 'format-line-height-increase':
+        onFormatChange?.('lineHeight', 'increase');
+        break;
+      case 'format-line-height-decrease':
+        onFormatChange?.('lineHeight', 'decrease');
+        break;
+      case 'format-paragraph-spacing-increase':
+        onFormatChange?.('paragraphSpacing', 'increase');
+        break;
+      case 'format-paragraph-spacing-decrease':
+        onFormatChange?.('paragraphSpacing', 'decrease');
+        break;
+      case 'format-text-indent-increase':
+        onFormatChange?.('textIndent', 'increase');
+        break;
+      case 'format-text-indent-decrease':
+        onFormatChange?.('textIndent', 'decrease');
+        break;
+      case 'format-text-indent-none':
+        onFormatChange?.('textIndent', 'none');
+        break;
+      case 'format-chars-per-line-auto':
+        onFormatChange?.('charsPerLine', 'auto');
+        break;
+      case 'format-chars-per-line-increase':
+        onFormatChange?.('charsPerLine', 'increase');
+        break;
+      case 'format-chars-per-line-decrease':
+        onFormatChange?.('charsPerLine', 'decrease');
+        break;
+      case 'format-paragraph-numbers-toggle':
+        onFormatChange?.('paragraphNumbers', 'toggle');
+        break;
+
       case 'show-in-file-manager':
         // No-op in web
+        break;
+
+      // Help menu
+      case 'open-website':
+        window.open('https://www.illusions.app/', '_blank');
+        break;
+      case 'report-ai-inappropriate':
+        window.open('https://github.com/Iktahana/illusions/issues/new', '_blank');
         break;
 
       default:
@@ -161,7 +241,7 @@ export function useWebMenuHandlers({
         }
         console.warn('[Web Menu] Unknown action:', action);
     }
-  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, onToggleCompactMode, onExport, editorView, fontScale, onFontScaleChange]);
+  }, [onNew, onOpen, onSave, onSaveAs, onOpenProject, onOpenRecentProject, onCloseWindow, onToggleCompactMode, onExport, editorView, fontScale, onFontScaleChange, isEditorTabActive, onFormatChange, onThemeChange, onNewTab, onCloseTab]);
   
   return { handleMenuAction };
 }

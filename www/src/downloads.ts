@@ -509,25 +509,56 @@ if (bgImageUrl) {
   img.src = bgImageUrl
 }
 
-// Show loading state immediately
-renderPage(null, null)
+const CACHE_KEY = 'illusions_release_cache'
+const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
 
-// Fetch latest release
-const fetchOptions: RequestInit = {
-  headers: {
-    // クライアント側ではアクセストークンを送信しない
-    Accept: 'application/vnd.github.v3+json',
-  },
+interface ReleaseCache {
+  data: GitHubRelease
+  fetchedAt: number
 }
 
-fetch(API_URL, fetchOptions)
+function loadCache(): GitHubRelease | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    if (!raw) return null
+    const cache = JSON.parse(raw) as ReleaseCache
+    if (Date.now() - cache.fetchedAt > CACHE_TTL_MS) return null
+    return cache.data
+  } catch {
+    return null
+  }
+}
+
+function saveCache(data: GitHubRelease): void {
+  try {
+    const cache: ReleaseCache = { data, fetchedAt: Date.now() }
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache))
+  } catch {
+    // localStorage unavailable — ignore
+  }
+}
+
+// Stale-while-revalidate: render cached data immediately, then refresh in background
+const cached = loadCache()
+renderPage(cached, null)
+
+fetch(API_URL, { headers: { Accept: 'application/vnd.github.v3+json' } })
   .then(async (res) => {
+    if (res.status === 403 || res.status === 429) {
+      if (!cached) {
+        window.location.href = 'https://github.com/Iktahana/illusions/blob/main/README.md'
+      }
+      return
+    }
     if (!res.ok) {
       throw new Error(`GitHub API returned ${res.status}`)
     }
     const data = (await res.json()) as GitHubRelease
+    saveCache(data)
     renderPage(data, null)
   })
   .catch((err: Error) => {
-    renderPage(null, err.message)
+    if (!cached) {
+      renderPage(null, err.message)
+    }
   })

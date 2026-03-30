@@ -48,6 +48,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('electron-request-save-before-close', handler)
     return () => ipcRenderer.removeListener('electron-request-save-before-close', handler)
   },
+  onFlushStateBeforeClose: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('electron-request-flush-state-before-close', handler)
+    return () => ipcRenderer.removeListener('electron-request-flush-state-before-close', handler)
+  },
   onOpenFileFromSystem: (callback) => {
     const handler = (_event, payload) => callback(payload)
     ipcRenderer.on('open-file-from-system', handler)
@@ -79,6 +84,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   rebuildMenu: () => ipcRenderer.invoke('menu:rebuild'),
   syncMenuUiState: (state) => ipcRenderer.invoke('menu:sync-ui-state', state),
+  updateKeymapOverrides: (overrides) => ipcRenderer.invoke('menu:update-keymap-overrides', overrides),
   onMenuShowInFileManager: (callback) => {
     const handler = () => callback()
     ipcRenderer.on('menu-show-in-file-manager', handler)
@@ -103,6 +109,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportPDF: (content, options) => ipcRenderer.invoke('export-pdf', content, options),
   exportEPUB: (content, options) => ipcRenderer.invoke('export-epub', content, options),
   exportDOCX: (content, options) => ipcRenderer.invoke('export-docx', content, options),
+  onMenuExportTxt: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-export-txt', handler)
+    return () => ipcRenderer.removeListener('menu-export-txt', handler)
+  },
+  onMenuExportTxtRuby: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-export-txt-ruby', handler)
+    return () => ipcRenderer.removeListener('menu-export-txt-ruby', handler)
+  },
   onMenuExportPDF: (callback) => {
     const handler = () => callback()
     ipcRenderer.on('menu-export-pdf', handler)
@@ -138,29 +154,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return ipcRenderer.invoke('nlp:tokenize-document', { paragraphs });
     },
     analyzeWordFrequency: (text) => ipcRenderer.invoke('nlp:analyze-word-frequency', text),
-  },
-  llm: {
-    getModels: () => ipcRenderer.invoke('llm:get-models'),
-    downloadModel: (modelId) => ipcRenderer.invoke('llm:download-model', modelId),
-    deleteModel: (modelId) => ipcRenderer.invoke('llm:delete-model', modelId),
-    loadModel: (modelId) => ipcRenderer.invoke('llm:load-model', modelId),
-    unloadModel: () => ipcRenderer.invoke('llm:unload-model'),
-    isModelLoaded: () => ipcRenderer.invoke('llm:is-model-loaded'),
-    infer: (prompt, options) => ipcRenderer.invoke('llm:infer', { prompt, ...options }),
-    inferBatch: (prompts, options) => ipcRenderer.invoke('llm:infer-batch', { prompts, ...options }),
-    getStorageUsage: () => ipcRenderer.invoke('llm:get-storage-usage'),
-    setIdlingStop: (enabled) => ipcRenderer.invoke('llm:set-idling-stop', { enabled }),
-    onDownloadProgress: (callback) => {
-      // Remove any stale listeners before registering to prevent duplicates on remount
-      ipcRenderer.removeAllListeners('llm:download-progress');
-      const handler = (_event, progress) => callback(progress);
-      ipcRenderer.on('llm:download-progress', handler);
-      // Return cleanup function for proper lifecycle management
-      return () => ipcRenderer.removeListener('llm:download-progress', handler);
-    },
-    removeDownloadProgressListener: () => {
-      ipcRenderer.removeAllListeners('llm:download-progress');
-    },
   },
   storage: {
     saveSession: (session) => ipcRenderer.invoke('storage:save-session', session),
@@ -229,6 +222,42 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeAllListeners: () => {
       ipcRenderer.removeAllListeners('editor:buffer-sync-broadcast')
       ipcRenderer.removeAllListeners('editor:buffer-close-broadcast')
+    },
+  },
+  pty: {
+    /** Spawn a new PTY session. Returns { sessionId } or { error }. */
+    spawn: (options) => ipcRenderer.invoke('pty:spawn', options),
+    /** Re-attach to an existing session and retrieve buffered output. */
+    attach: (sessionId) => ipcRenderer.invoke('pty:attach', sessionId),
+    /** Write keystroke data to a PTY session. */
+    write: (sessionId, data) => ipcRenderer.invoke('pty:write', { sessionId, data }),
+    /** Resize the terminal dimensions. */
+    resize: (sessionId, cols, rows) => ipcRenderer.invoke('pty:resize', { sessionId, cols, rows }),
+    /** Kill a PTY session (idempotent). */
+    kill: (sessionId) => ipcRenderer.invoke('pty:kill', sessionId),
+    /** Query the state of a PTY session. */
+    status: (sessionId) => ipcRenderer.invoke('pty:status', sessionId),
+    /**
+     * Listen for PTY output data pushed from main process.
+     * Returns a cleanup function that removes the listener.
+     * @param {function({ sessionId: string, data: string }): void} callback
+     * @returns {() => void}
+     */
+    onData: (callback) => {
+      const handler = (_event, payload) => callback(payload)
+      ipcRenderer.on('pty:data', handler)
+      return () => ipcRenderer.removeListener('pty:data', handler)
+    },
+    /**
+     * Listen for PTY process exit notification.
+     * Returns a cleanup function that removes the listener.
+     * @param {function({ sessionId: string, exitCode: number }): void} callback
+     * @returns {() => void}
+     */
+    onExit: (callback) => {
+      const handler = (_event, payload) => callback(payload)
+      ipcRenderer.on('pty:exit', handler)
+      return () => ipcRenderer.removeListener('pty:exit', handler)
     },
   },
 })

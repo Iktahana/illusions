@@ -79,6 +79,7 @@ export function useTypographySettings() {
     onTextIndentChange: handlers.handleTextIndentChange,
     onFontFamilyChange: handlers.handleFontFamilyChange,
     onCharsPerLineChange: handlers.handleCharsPerLineChange,
+    onAutoCharsPerLineCalc: handlers.handleAutoCharsPerLineCalc,
     onAutoCharsPerLineChange: handlers.handleAutoCharsPerLineChange,
     onShowParagraphNumbersChange: handlers.handleShowParagraphNumbersChange,
   }), [settings, handlers]);
@@ -98,18 +99,12 @@ export function useLintingSettings() {
   }), [settings, handlers]);
 }
 
-/** LLM configuration */
-export function useLlmSettings() {
+/** Character extraction settings */
+export function useCharacterExtractionSettings() {
   const { settings, handlers } = useEditorSettingsContext();
   return useMemo(() => ({
-    llmEnabled: settings.llmEnabled,
-    llmModelId: settings.llmModelId,
-    llmIdlingStop: settings.llmIdlingStop,
     characterExtractionBatchSize: settings.characterExtractionBatchSize,
     characterExtractionConcurrency: settings.characterExtractionConcurrency,
-    onLlmEnabledChange: handlers.handleLlmEnabledChange,
-    onLlmModelIdChange: handlers.handleLlmModelIdChange,
-    onLlmIdlingStopChange: handlers.handleLlmIdlingStopChange,
     onCharacterExtractionBatchSizeChange: handlers.handleCharacterExtractionBatchSizeChange,
     onCharacterExtractionConcurrencyChange: handlers.handleCharacterExtractionConcurrencyChange,
   }), [settings, handlers]);
@@ -121,8 +116,10 @@ export function usePosHighlightSettings() {
   return useMemo(() => ({
     posHighlightEnabled: settings.posHighlightEnabled,
     posHighlightColors: settings.posHighlightColors,
+    posHighlightDisabledTypes: settings.posHighlightDisabledTypes,
     onPosHighlightEnabledChange: handlers.handlePosHighlightEnabledChange,
     onPosHighlightColorsChange: handlers.handlePosHighlightColorsChange,
+    onPosHighlightDisabledTypesChange: handlers.handlePosHighlightDisabledTypesChange,
   }), [settings, handlers]);
 }
 
@@ -173,5 +170,37 @@ export function useSpeechSettings() {
     onSpeechRateChange: handlers.handleSpeechRateChange,
     onSpeechPitchChange: handlers.handleSpeechPitchChange,
     onSpeechVolumeChange: handlers.handleSpeechVolumeChange,
+  }), [settings, handlers]);
+}
+
+/** Terminal configuration */
+export function useTerminalSettings() {
+  const { settings, handlers } = useEditorSettingsContext();
+  return useMemo(() => ({
+    terminalBackground: settings.terminalBackground,
+    terminalForeground: settings.terminalForeground,
+    terminalFontFamily: settings.terminalFontFamily,
+    terminalFontSize: settings.terminalFontSize,
+    terminalLineHeight: settings.terminalLineHeight,
+    terminalCursorStyle: settings.terminalCursorStyle,
+    terminalCursorBlink: settings.terminalCursorBlink,
+    terminalScrollback: settings.terminalScrollback,
+    terminalCopyOnSelect: settings.terminalCopyOnSelect,
+    terminalMacOptionIsMeta: settings.terminalMacOptionIsMeta,
+    terminalDefaultShell: settings.terminalDefaultShell,
+    terminalAnsiColors: settings.terminalAnsiColors,
+    onTerminalBackgroundChange: handlers.handleTerminalBackgroundChange,
+    onTerminalForegroundChange: handlers.handleTerminalForegroundChange,
+    onTerminalFontFamilyChange: handlers.handleTerminalFontFamilyChange,
+    onTerminalFontSizeChange: handlers.handleTerminalFontSizeChange,
+    onTerminalLineHeightChange: handlers.handleTerminalLineHeightChange,
+    onTerminalCursorStyleChange: handlers.handleTerminalCursorStyleChange,
+    onTerminalCursorBlinkChange: handlers.handleTerminalCursorBlinkChange,
+    onTerminalScrollbackChange: handlers.handleTerminalScrollbackChange,
+    onTerminalCopyOnSelectChange: handlers.handleTerminalCopyOnSelectChange,
+    onTerminalMacOptionIsMetaChange: handlers.handleTerminalMacOptionIsMetaChange,
+    onTerminalDefaultShellChange: handlers.handleTerminalDefaultShellChange,
+    onTerminalAnsiColorChange: handlers.handleTerminalAnsiColorChange,
+    onTerminalAnsiColorsReset: handlers.handleTerminalAnsiColorsReset,
   }), [settings, handlers]);
 }

@@ -17,15 +17,26 @@ import type { PosColorConfig } from './types';
 
 export const posHighlightKey = new PluginKey('posHighlight');
 
+/** Compare two Sets for equality */
+function setsEqual(a?: Set<string>, b?: Set<string>): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  if (a.size !== b.size) return false;
+  for (const v of a) if (!b.has(v)) return false;
+  return true;
+}
+
 interface PosHighlightState {
   decorations: DecorationSet;
   enabled: boolean;
   colors: PosColorConfig;
+  disabledTypes: Set<string>;
 }
 
 export interface PosHighlightPluginOptions {
   enabled: boolean;
   colors: PosColorConfig;
+  disabledTypes?: string[];
   debounceMs?: number;
 }
 
@@ -35,7 +46,7 @@ export interface PosHighlightPluginOptions {
 export function createPosHighlightPlugin(
   options: PosHighlightPluginOptions
 ): Plugin<PosHighlightState> {
-  const { enabled, colors, debounceMs = 300 } = options;
+  const { enabled, colors, disabledTypes = [], debounceMs = 300 } = options;
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let processingVersion = 0;
@@ -54,6 +65,7 @@ export function createPosHighlightPlugin(
           decorations: DecorationSet.empty,
           enabled,
           colors,
+          disabledTypes: new Set(disabledTypes),
         };
       },
 
@@ -70,6 +82,10 @@ export function createPosHighlightPlugin(
             tokenCache.clear();
           }
           const updated = { ...pluginState, ...meta };
+          // disabledTypes が配列で渡された場合は Set に変換
+          if (Array.isArray(meta.disabledTypes)) {
+            updated.disabledTypes = new Set(meta.disabledTypes);
+          }
           // enabled が false になった場合は decorations をクリア
           if (meta.enabled === false) {
             updated.decorations = DecorationSet.empty;
@@ -170,6 +186,9 @@ export function createPosHighlightPlugin(
             decoratedCount++;
 
             for (const token of tokens) {
+              // Skip disabled POS types
+              if (state.disabledTypes.has(token.pos)) continue;
+
               const color = getPosColor(
                 token.pos,
                 token.pos_detail_1,
@@ -216,9 +235,11 @@ export function createPosHighlightPlugin(
             return;
           }
 
-          // colors が変更された場合
-          if (state?.enabled && JSON.stringify(state.colors) !== JSON.stringify(prevPluginState?.colors)) {
-            tokenCache.clear();
+          // colors or disabledTypes が変更された場合
+          if (state?.enabled && (
+            JSON.stringify(state.colors) !== JSON.stringify(prevPluginState?.colors) ||
+            !setsEqual(state.disabledTypes, prevPluginState?.disabledTypes)
+          )) {
             scheduleViewportUpdate(view);
             return;
           }

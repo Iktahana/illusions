@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { RefreshCw, LoaderCircle } from "lucide-react";
 import clsx from "clsx";
 
@@ -55,7 +55,7 @@ function getCachePath(filePath: string): string {
   return `.illusions/word_count/${basename}.json`;
 }
 
-export default function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) {
+function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) {
   const [words, setWords] = useState<WordEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -314,3 +314,5 @@ export default function WordFrequency({ content, onWordSearch, filePath }: WordF
     </div>
   );
 }
+
+export default memo(WordFrequency);

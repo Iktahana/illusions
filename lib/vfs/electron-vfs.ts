@@ -15,6 +15,7 @@ import type {
   VFSWatcher,
   VirtualFileSystem,
 } from "./types";
+import { basename, dirname, isAbsolutePath, joinPath } from "./path-utils";
 
 // -----------------------------------------------------------------------
 // Type declarations for the Electron VFS IPC bridge
@@ -57,47 +58,6 @@ interface ElectronVFSBridge {
 // -----------------------------------------------------------------------
 
 /**
- * Join path segments using "/" separator, handling trailing/leading slashes.
- * Normalizes Windows backslashes to forward slashes for consistent IPC communication.
- */
-function joinPath(base: string, ...parts: string[]): string {
-  // First, normalize any backslashes in the base to forward slashes
-  const normalizedBase = base.replace(/\\/g, "/").replace(/\/+$/, "");
-  const normalizedParts = parts.map((p) =>
-    p.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "")
-  ).filter((p) => p.length > 0);
-  return [normalizedBase, ...normalizedParts].join("/");
-}
-
-/**
- * Extract the basename from a path string.
- */
-function basename(path: string): string {
-  const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
-  const parts = normalized.split("/");
-  return parts[parts.length - 1] || path;
-}
-
-/**
- * Extract the parent directory path from a file path.
- */
-function dirname(path: string): string {
-  const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
-  const lastSlash = normalized.lastIndexOf("/");
-  if (lastSlash <= 0) return "/";
-  return normalized.substring(0, lastSlash);
-}
-
-/**
- * Check if a path is absolute.
- * Handles both Unix ("/path") and Windows ("C:\path", "D:/path", "\\server\share") formats.
- */
-function isAbsolutePath(p: string): boolean {
-  // Unix absolute path, or Windows UNC path (\\server\share)
-  return p.startsWith("/") || p.startsWith("\\\\") || /^[a-zA-Z]:[/\\]/.test(p);
-}
-
-/**
  * Get the Electron VFS bridge from window.electronAPI.
  * @throws Error if the bridge is not available
  */
@@ -107,8 +67,9 @@ function getVFSBridge(): ElectronVFSBridge {
     throw new Error("Electron API is not available (window.electronAPI is undefined).");
   }
 
-  // Access the vfs sub-object on electronAPI
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // Access the vfs sub-object on electronAPI.
+  // electronAPI is typed by electron.d.ts but its vfs shape differs from
+  // ElectronVFSBridge, so we cast through unknown to get the stricter type.
   const vfsBridge = (api as unknown as { vfs?: ElectronVFSBridge }).vfs;
   if (!vfsBridge) {
     throw new Error(

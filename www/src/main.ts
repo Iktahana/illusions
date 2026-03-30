@@ -28,12 +28,20 @@ if (bgImageUrl) {
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <nav class="top-nav">
     <a href="https://my.illusions.app" class="nav-login-link">ログイン / 新規登録</a>
+    <button class="hamburger" id="hamburger-btn" aria-label="メニューを開く" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+    <div class="mobile-menu" id="mobile-menu">
+      <a href="https://my.illusions.app" class="mobile-menu-link">ログイン / 新規登録</a>
+    </div>
   </nav>
   <div class="hero">
     <div class="title-logo">${logoSvg}</div>
     <p class="tagline">
-      縦書き、ルビ、縦中横、しっかり対応。<br/>
-      文章分析から推敲支援まで、集中しやすい執筆環境。
+      日本語小説を書く人のための執筆エディタ。<br/>
+      縦書き、ルビ、文章校正、読み上げを1つにまとめました。
   </p>
 
     <div class="cta-buttons">
@@ -52,18 +60,18 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <div class="features">
       <div class="feature-card">
         <span class="feature-icon" aria-hidden="true">✦</span>
-        <h3>執筆に耽溺するための執筆環境</h3>
-        <p>「illusions」は組版ソフトではなく、純粋な「執筆環境」です。煩雑なメニューや過剰な設定が溢れるWordの喧騒から逃れ、作家がただ「書くこと」だけに没入できるよう、極限まで削ぎ落としたミニマリズムを追求しました。</p>
+        <h3>日本語小説らしく書ける編集環境</h3>
+        <p>縦書き、ルビ、縦中横に対応し、日本語小説らしい体裁で書けます。シンプルな画面構成で、書くことだけに向き合える環境を目指しました。</p>
       </div>
       <div class="feature-card">
         <span class="feature-icon" aria-hidden="true">◈</span>
-        <h3>文章分析は、研ぎ澄まされた「鏡」である</h3>
-        <p>illusionsにおける自然言語処理は、文体分析から物語の機微までを客観的に映し出し、作品を磨き上げるための「鏡」であり、最も頼れる「ツール」となります。</p>
+        <h3>書いた文章を見直す、校正と分析</h3>
+        <p>22項目の文章校正で、表記ゆれや文体の乱れに気づけます。読み上げで文章のリズムを確認したり、単語の頻度や読みやすさを確認したりできます。</p>
       </div>
       <div class="feature-card">
         <span class="feature-icon" aria-hidden="true">◇</span>
-        <h3>創作の聖域を守る — 絶対的なプライバシー</h3>
-        <p>あなたのアイデアや言葉は、何者にも侵されない「聖域」であるべきです。illusionsは、あなたが綴った大切な原稿を学習素材として利用することは決してありません。データはクラウドではなく、常にあなた自身のパソコン内にのみ保存されます。</p>
+        <h3>原稿はデバイス内に保存されます</h3>
+        <p>デスクトップ版では、すべての原稿データをお使いのパソコン内にのみ保存します。クラウドへの自動送信はなく、ソースコードはGitHubで公開しています。</p>
       </div>
     </div>
 
@@ -81,3 +89,28 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     </footer>
   </div>
 `
+
+// Hamburger menu toggle
+const hamburgerBtn = document.getElementById('hamburger-btn')
+const mobileMenu = document.getElementById('mobile-menu')
+
+if (hamburgerBtn && mobileMenu) {
+  hamburgerBtn.addEventListener('click', () => {
+    const isOpen = hamburgerBtn.classList.toggle('is-open')
+    hamburgerBtn.setAttribute('aria-expanded', String(isOpen))
+    mobileMenu.classList.toggle('is-open')
+  })
+
+  // Close menu when clicking outside
+  document.addEventListener('click', (e) => {
+    if (
+      mobileMenu.classList.contains('is-open') &&
+      !hamburgerBtn.contains(e.target as Node) &&
+      !mobileMenu.contains(e.target as Node)
+    ) {
+      hamburgerBtn.classList.remove('is-open')
+      hamburgerBtn.setAttribute('aria-expanded', 'false')
+      mobileMenu.classList.remove('is-open')
+    }
+  })
+}
