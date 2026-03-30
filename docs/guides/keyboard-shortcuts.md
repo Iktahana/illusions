@@ -10,55 +10,55 @@ illusions supports keyboard shortcuts across both Electron (desktop) and Web env
 
 ### File Operations
 
-| Shortcut (macOS) | Shortcut (Windows) | Action | Japanese Label | Context |
-|---|---|---|---|---|
-| Cmd+N | Ctrl+N | New window | 新規ウィンドウ | Global |
-| Cmd+O | Ctrl+O | Open file | 開く | Global |
-| Cmd+S | Ctrl+S | Save | 保存 | Global |
-| Shift+Cmd+S | Shift+Ctrl+S | Save as | 名前を付けて保存 | Global |
-| Cmd+W | Ctrl+W | Close tab | タブを閉じる | Global |
+| Shortcut (macOS) | Shortcut (Windows) | Action     | Japanese Label   | Context |
+| ---------------- | ------------------ | ---------- | ---------------- | ------- |
+| Cmd+N            | Ctrl+N             | New window | 新規ウィンドウ   | Global  |
+| Cmd+O            | Ctrl+O             | Open file  | 開く             | Global  |
+| Cmd+S            | Ctrl+S             | Save       | 保存             | Global  |
+| Shift+Cmd+S      | Shift+Ctrl+S       | Save as    | 名前を付けて保存 | Global  |
+| Cmd+W            | Ctrl+W             | Close tab  | タブを閉じる     | Global  |
 
 ### Tab Management (Electron Only)
 
-| Shortcut (macOS) | Shortcut (Windows) | Action | Japanese Label | Context |
-|---|---|---|---|---|
-| Cmd+T | Ctrl+T | New tab | 新しいタブ | Electron only |
-| Cmd+1 | Ctrl+1 | Switch to tab 1 | タブ1に切り替え | Electron only |
-| Cmd+2 | Ctrl+2 | Switch to tab 2 | タブ2に切り替え | Electron only |
-| Cmd+3 | Ctrl+3 | Switch to tab 3 | タブ3に切り替え | Electron only |
-| Cmd+4 | Ctrl+4 | Switch to tab 4 | タブ4に切り替え | Electron only |
-| Cmd+5 | Ctrl+5 | Switch to tab 5 | タブ5に切り替え | Electron only |
-| Cmd+6 | Ctrl+6 | Switch to tab 6 | タブ6に切り替え | Electron only |
-| Cmd+7 | Ctrl+7 | Switch to tab 7 | タブ7に切り替え | Electron only |
-| Cmd+8 | Ctrl+8 | Switch to tab 8 | タブ8に切り替え | Electron only |
-| Cmd+9 | Ctrl+9 | Switch to last tab | 最後のタブに切り替え | Electron only |
+| Shortcut (macOS) | Shortcut (Windows) | Action             | Japanese Label       | Context       |
+| ---------------- | ------------------ | ------------------ | -------------------- | ------------- |
+| Cmd+T            | Ctrl+T             | New tab            | 新しいタブ           | Electron only |
+| Cmd+1            | Ctrl+1             | Switch to tab 1    | タブ1に切り替え      | Electron only |
+| Cmd+2            | Ctrl+2             | Switch to tab 2    | タブ2に切り替え      | Electron only |
+| Cmd+3            | Ctrl+3             | Switch to tab 3    | タブ3に切り替え      | Electron only |
+| Cmd+4            | Ctrl+4             | Switch to tab 4    | タブ4に切り替え      | Electron only |
+| Cmd+5            | Ctrl+5             | Switch to tab 5    | タブ5に切り替え      | Electron only |
+| Cmd+6            | Ctrl+6             | Switch to tab 6    | タブ6に切り替え      | Electron only |
+| Cmd+7            | Ctrl+7             | Switch to tab 7    | タブ7に切り替え      | Electron only |
+| Cmd+8            | Ctrl+8             | Switch to tab 8    | タブ8に切り替え      | Electron only |
+| Cmd+9            | Ctrl+9             | Switch to last tab | 最後のタブに切り替え | Electron only |
 
 ### Editing
 
-| Shortcut (macOS) | Shortcut (Windows) | Action | Japanese Label | Context |
-|---|---|---|---|---|
-| Cmd+Z | Ctrl+Z | Undo | 元に戻す | Editor |
-| Cmd+Y / Shift+Cmd+Z | Ctrl+Y | Redo | やり直す | Editor |
-| Cmd+X | Ctrl+X | Cut | 切り取り | Editor |
-| Cmd+C | Ctrl+C | Copy | コピー | Editor |
-| Cmd+V | Ctrl+V | Paste | 貼り付け | Editor |
-| Shift+Cmd+V | Shift+Ctrl+V | Paste as plain text | プレーンテキストとして貼り付け | Editor |
-| Cmd+A | Ctrl+A | Select all | すべて選択 | Editor |
-| Cmd+F | Ctrl+F | Find | 検索 | Editor |
+| Shortcut (macOS)    | Shortcut (Windows) | Action              | Japanese Label                 | Context |
+| ------------------- | ------------------ | ------------------- | ------------------------------ | ------- |
+| Cmd+Z               | Ctrl+Z             | Undo                | 元に戻す                       | Editor  |
+| Cmd+Y / Shift+Cmd+Z | Ctrl+Y             | Redo                | やり直す                       | Editor  |
+| Cmd+X               | Ctrl+X             | Cut                 | 切り取り                       | Editor  |
+| Cmd+C               | Ctrl+C             | Copy                | コピー                         | Editor  |
+| Cmd+V               | Ctrl+V             | Paste               | 貼り付け                       | Editor  |
+| Shift+Cmd+V         | Shift+Ctrl+V       | Paste as plain text | プレーンテキストとして貼り付け | Editor  |
+| Cmd+A               | Ctrl+A             | Select all          | すべて選択                     | Editor  |
+| Cmd+F               | Ctrl+F             | Find                | 検索                           | Editor  |
 
 ### Formatting
 
-| Shortcut (macOS) | Shortcut (Windows) | Action | Japanese Label | Context |
-|---|---|---|---|---|
-| Shift+Cmd+R | Shift+Ctrl+R | Ruby annotation | ルビ | Editor (requires selection) |
+| Shortcut (macOS) | Shortcut (Windows) | Action          | Japanese Label | Context                     |
+| ---------------- | ------------------ | --------------- | -------------- | --------------------------- |
+| Shift+Cmd+R      | Shift+Ctrl+R       | Ruby annotation | ルビ           | Editor (requires selection) |
 
 ### View Controls
 
-| Shortcut (macOS) | Shortcut (Windows) | Action | Japanese Label | Context |
-|---|---|---|---|---|
-| Cmd+0 | Ctrl+0 | Reset zoom | ズームリセット | Global |
-| Cmd++ | Ctrl++ | Zoom in | 拡大 | Global |
-| Cmd+- | Ctrl+- | Zoom out | 縮小 | Global |
+| Shortcut (macOS) | Shortcut (Windows) | Action     | Japanese Label | Context |
+| ---------------- | ------------------ | ---------- | -------------- | ------- |
+| Cmd+0            | Ctrl+0             | Reset zoom | ズームリセット | Global  |
+| Cmd++            | Ctrl++             | Zoom in    | 拡大           | Global  |
+| Cmd+-            | Ctrl+-             | Zoom out   | 縮小           | Global  |
 
 ---
 
@@ -68,61 +68,61 @@ In the web version, the menu is rendered as a UI component (`WEB_MENU_STRUCTURE`
 
 ### ファイル (File)
 
-| Menu Item | Action ID | Shortcut |
-|-----------|-----------|----------|
-| 新規ウィンドウ | `file:new-window` | Cmd/Ctrl+N |
-| 開く | `file:open` | Cmd/Ctrl+O |
-| 保存 | `file:save` | Cmd/Ctrl+S |
-| 名前を付けて保存 | `file:save-as` | Shift+Cmd/Ctrl+S |
-| タブを閉じる | `file:close-tab` | Cmd/Ctrl+W |
+| Menu Item        | Action ID         | Shortcut         |
+| ---------------- | ----------------- | ---------------- |
+| 新規ウィンドウ   | `file:new-window` | Cmd/Ctrl+N       |
+| 開く             | `file:open`       | Cmd/Ctrl+O       |
+| 保存             | `file:save`       | Cmd/Ctrl+S       |
+| 名前を付けて保存 | `file:save-as`    | Shift+Cmd/Ctrl+S |
+| タブを閉じる     | `file:close-tab`  | Cmd/Ctrl+W       |
 
 ### 編集 (Edit)
 
-| Menu Item | Action ID | Shortcut |
-|-----------|-----------|----------|
-| 元に戻す | `edit:undo` | Cmd/Ctrl+Z |
-| やり直す | `edit:redo` | Cmd/Ctrl+Y |
-| 切り取り | `edit:cut` | Cmd/Ctrl+X |
-| コピー | `edit:copy` | Cmd/Ctrl+C |
-| 貼り付け | `edit:paste` | Cmd/Ctrl+V |
+| Menu Item                      | Action ID          | Shortcut         |
+| ------------------------------ | ------------------ | ---------------- |
+| 元に戻す                       | `edit:undo`        | Cmd/Ctrl+Z       |
+| やり直す                       | `edit:redo`        | Cmd/Ctrl+Y       |
+| 切り取り                       | `edit:cut`         | Cmd/Ctrl+X       |
+| コピー                         | `edit:copy`        | Cmd/Ctrl+C       |
+| 貼り付け                       | `edit:paste`       | Cmd/Ctrl+V       |
 | プレーンテキストとして貼り付け | `edit:paste-plain` | Shift+Cmd/Ctrl+V |
-| すべて選択 | `edit:select-all` | Cmd/Ctrl+A |
-| 検索 | `edit:find` | Cmd/Ctrl+F |
-| ルビ | `edit:ruby` | Shift+Cmd/Ctrl+R |
+| すべて選択                     | `edit:select-all`  | Cmd/Ctrl+A       |
+| 検索                           | `edit:find`        | Cmd/Ctrl+F       |
+| ルビ                           | `edit:ruby`        | Shift+Cmd/Ctrl+R |
 
 ### 表示 (View)
 
-| Menu Item | Action ID | Shortcut |
-|-----------|-----------|----------|
-| 拡大 | `view:zoom-in` | Cmd/Ctrl++ |
-| 縮小 | `view:zoom-out` | Cmd/Ctrl+- |
+| Menu Item      | Action ID         | Shortcut   |
+| -------------- | ----------------- | ---------- |
+| 拡大           | `view:zoom-in`    | Cmd/Ctrl++ |
+| 縮小           | `view:zoom-out`   | Cmd/Ctrl+- |
 | ズームリセット | `view:zoom-reset` | Cmd/Ctrl+0 |
 
 ### ウィンドウ (Window)
 
-| Menu Item | Action ID | Shortcut |
-|-----------|-----------|----------|
-| 最小化 | `window:minimize` | -- |
-| フルスクリーン | `window:fullscreen` | -- |
+| Menu Item      | Action ID           | Shortcut |
+| -------------- | ------------------- | -------- |
+| 最小化         | `window:minimize`   | --       |
+| フルスクリーン | `window:fullscreen` | --       |
 
 ### ヘルプ (Help)
 
-| Menu Item | Action ID | Shortcut |
-|-----------|-----------|----------|
-| バージョン情報 | `help:about` | -- |
+| Menu Item      | Action ID    | Shortcut |
+| -------------- | ------------ | -------- |
+| バージョン情報 | `help:about` | --       |
 
 ---
 
 ## Electron vs Web Comparison
 
-| Feature | Electron | Web |
-|---------|----------|-----|
-| Menu rendering | Native OS menu bar | `WEB_MENU_STRUCTURE` rendered in the UI |
-| Shortcut handling | OS-level accelerators via Electron | `useGlobalShortcuts` hook with `keydown` listener |
-| Editor key bindings | Electron passes through to Milkdown | Milkdown handles directly |
-| Tab switching (Cmd/Ctrl+1-9) | Supported | Not available |
-| Browser reload blocking | Not needed | Actively blocked (Cmd/Ctrl+R intercepted) |
-| Window management | Native window controls | Limited (minimize, fullscreen via API) |
+| Feature                      | Electron                            | Web                                               |
+| ---------------------------- | ----------------------------------- | ------------------------------------------------- |
+| Menu rendering               | Native OS menu bar                  | `WEB_MENU_STRUCTURE` rendered in the UI           |
+| Shortcut handling            | OS-level accelerators via Electron  | `useGlobalShortcuts` hook with `keydown` listener |
+| Editor key bindings          | Electron passes through to Milkdown | Milkdown handles directly                         |
+| Tab switching (Cmd/Ctrl+1-9) | Supported                           | Not available                                     |
+| Browser reload blocking      | Not needed                          | Actively blocked (Cmd/Ctrl+R intercepted)         |
+| Window management            | Native window controls              | Limited (minimize, fullscreen via API)            |
 
 ### Key Differences
 
@@ -156,21 +156,21 @@ Converts internal shortcut format to platform-appropriate display strings:
 import { formatAccelerator } from "@/lib/use-global-shortcuts";
 
 // On macOS:
-formatAccelerator("Ctrl+S");    // Returns: "⌘S"
+formatAccelerator("Ctrl+S"); // Returns: "⌘S"
 formatAccelerator("Ctrl+Shift+R"); // Returns: "⇧⌘R"
 
 // On Windows:
-formatAccelerator("Ctrl+S");    // Returns: "Ctrl+S"
+formatAccelerator("Ctrl+S"); // Returns: "Ctrl+S"
 formatAccelerator("Ctrl+Shift+R"); // Returns: "Shift+Ctrl+R"
 ```
 
 The internal format always uses `Ctrl` as the primary modifier. On macOS, this is displayed as the Command symbol. Modifier key display mapping:
 
 | Internal | macOS Display | Windows Display |
-|----------|--------------|-----------------|
-| `Ctrl` | `⌘` (Command) | `Ctrl` |
-| `Shift` | `⇧` | `Shift` |
-| `Alt` | `⌥` (Option) | `Alt` |
+| -------- | ------------- | --------------- |
+| `Ctrl`   | `⌘` (Command) | `Ctrl`          |
+| `Shift`  | `⇧`           | `Shift`         |
+| `Alt`    | `⌥` (Option)  | `Alt`           |
 
 ### Usage Example
 

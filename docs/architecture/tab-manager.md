@@ -9,6 +9,7 @@ Composable React hook system for multi-tab editing in the illusions editor.
 The Tab Manager provides multi-tab editing through a set of composable React hooks, coordinated by the top-level `useTabManager()` hook. Each concern (state management, file I/O, auto-save, persistence, close dialogs, menu bindings) is handled by a dedicated hook, keeping the codebase modular and testable.
 
 Key behaviors:
+
 - **Auto-save**: Dirty tabs are saved automatically every 5 seconds.
 - **Tab persistence**: Tab state is persisted with a 1-second debounce, and restored on app startup.
 - **Preview tabs**: Single-click opens a preview tab; editing or double-click promotes it to a full tab.
@@ -17,16 +18,16 @@ Key behaviors:
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `lib/tab-manager/types.ts` | Type definitions (`TabState`, `MdiFileDescriptor`, constants) |
-| `lib/tab-manager/index.ts` | `useTabManager()` -- top-level composing hook |
-| `lib/tab-manager/use-tab-state.ts` | Tab CRUD and active tab management |
-| `lib/tab-manager/use-file-io.ts` | Open, save, and load file operations |
-| `lib/tab-manager/use-auto-save.ts` | Automatic save on 5-second interval |
-| `lib/tab-manager/use-tab-persistence.ts` | Persist/restore tabs (1s debounce) |
-| `lib/tab-manager/use-close-dialog.ts` | Save/Discard/Cancel dialog on tab close |
-| `lib/tab-manager/use-electron-menu-bindings.ts` | Electron IPC menu integration |
+| File                                            | Purpose                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------- |
+| `lib/tab-manager/types.ts`                      | Type definitions (`TabState`, `MdiFileDescriptor`, constants) |
+| `lib/tab-manager/index.ts`                      | `useTabManager()` -- top-level composing hook                 |
+| `lib/tab-manager/use-tab-state.ts`              | Tab CRUD and active tab management                            |
+| `lib/tab-manager/use-file-io.ts`                | Open, save, and load file operations                          |
+| `lib/tab-manager/use-auto-save.ts`              | Automatic save on 5-second interval                           |
+| `lib/tab-manager/use-tab-persistence.ts`        | Persist/restore tabs (1s debounce)                            |
+| `lib/tab-manager/use-close-dialog.ts`           | Save/Discard/Cancel dialog on tab close                       |
+| `lib/tab-manager/use-electron-menu-bindings.ts` | Electron IPC menu integration                                 |
 
 ---
 
@@ -80,15 +81,15 @@ Represents the state of a single editor tab.
 
 ```typescript
 interface TabState {
-  id: string;                          // Unique tab identifier
-  file: MdiFileDescriptor | null;      // Associated file (null for new/untitled)
-  content: string;                     // Current editor content
-  lastSavedContent: string;            // Content at last save (for dirty detection)
-  isDirty: boolean;                    // Has unsaved changes
-  lastSavedTime: number | null;        // Timestamp of last save (ms)
-  isSaving: boolean;                   // Currently saving to disk
-  isPreview: boolean;                  // Preview tab (single-click, not yet promoted)
-  fileType: string;                    // File type (e.g., "mdi", "txt")
+  id: string; // Unique tab identifier
+  file: MdiFileDescriptor | null; // Associated file (null for new/untitled)
+  content: string; // Current editor content
+  lastSavedContent: string; // Content at last save (for dirty detection)
+  isDirty: boolean; // Has unsaved changes
+  lastSavedTime: number | null; // Timestamp of last save (ms)
+  isSaving: boolean; // Currently saving to disk
+  isPreview: boolean; // Preview tab (single-click, not yet promoted)
+  fileType: string; // File type (e.g., "mdi", "txt")
 }
 ```
 
@@ -98,17 +99,17 @@ Describes a file reference, platform-agnostic.
 
 ```typescript
 interface MdiFileDescriptor {
-  path: string | null;                          // Absolute path (Electron) or null (Web)
-  handle: FileSystemFileHandle | null;          // File System API handle (Web) or null
-  name: string;                                 // Display name (e.g., "document.mdi")
+  path: string | null; // Absolute path (Electron) or null (Web)
+  handle: FileSystemFileHandle | null; // File System API handle (Web) or null
+  name: string; // Display name (e.g., "document.mdi")
 }
 ```
 
 ### Constants
 
 ```typescript
-const AUTO_SAVE_INTERVAL = 5000;        // Auto-save every 5 seconds
-const TAB_PERSIST_DEBOUNCE = 1000;      // Debounce tab persistence by 1 second
+const AUTO_SAVE_INTERVAL = 5000; // Auto-save every 5 seconds
+const TAB_PERSIST_DEBOUNCE = 1000; // Debounce tab persistence by 1 second
 ```
 
 ---
@@ -262,14 +263,14 @@ Binds Electron application menu actions (File -> Save, File -> Close, etc.) to t
 
 ## Platform Comparison
 
-| Feature | Electron | Web |
-|---------|----------|-----|
-| Tab persistence | AppState via SQLite | IndexedDB (single-file mode) |
-| File I/O | VFS + system dialog (`dialog.showOpenDialog`) | File System Access API (`showOpenFilePicker`) |
-| File reference | `path` (absolute string) | `handle` (`FileSystemFileHandle`) |
-| Visibility reload | Yes (reloads on `visibilitychange`) | No |
-| Menu bindings | Native Electron menu via IPC | Not applicable (web UI controls only) |
-| Close confirmation | Native Electron dialog | Custom modal component |
+| Feature            | Electron                                      | Web                                           |
+| ------------------ | --------------------------------------------- | --------------------------------------------- |
+| Tab persistence    | AppState via SQLite                           | IndexedDB (single-file mode)                  |
+| File I/O           | VFS + system dialog (`dialog.showOpenDialog`) | File System Access API (`showOpenFilePicker`) |
+| File reference     | `path` (absolute string)                      | `handle` (`FileSystemFileHandle`)             |
+| Visibility reload  | Yes (reloads on `visibilitychange`)           | No                                            |
+| Menu bindings      | Native Electron menu via IPC                  | Not applicable (web UI controls only)         |
+| Close confirmation | Native Electron dialog                        | Custom modal component                        |
 
 ---
 

@@ -40,7 +40,9 @@ export default function PowerSettingsTab(): React.ReactElement {
             onChange={(e) => onAutoPowerSaveOnBatteryChange?.(e.target.checked)}
             className="w-4 h-4 rounded border-border accent-accent"
           />
-          <span className="text-sm font-medium text-foreground">バッテリー駆動時に自動で省電力モードを提案する</span>
+          <span className="text-sm font-medium text-foreground">
+            バッテリー駆動時に自動で省電力モードを提案する
+          </span>
         </label>
       </div>
       <div className="text-xs text-foreground-secondary space-y-1">

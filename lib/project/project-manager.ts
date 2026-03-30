@@ -73,7 +73,7 @@ export class ProjectManager {
   async saveProjectHandle(
     projectId: string,
     rootHandle: FileSystemDirectoryHandle,
-    name?: string
+    name?: string,
   ): Promise<void> {
     const db = getWebStorageDatabase();
 
@@ -144,13 +144,10 @@ export class ProjectManager {
 
       // Validate that the stored handle is a real FileSystemDirectoryHandle
       // IndexedDB Structured Clone may fail to preserve the prototype in some browsers
-      if (
-        !stored.rootHandle ||
-        typeof stored.rootHandle.getDirectoryHandle !== "function"
-      ) {
+      if (!stored.rootHandle || typeof stored.rootHandle.getDirectoryHandle !== "function") {
         console.warn(
           "Stored handle is missing or not a valid FileSystemDirectoryHandle / 保存されたハンドルが無効です:",
-          projectId
+          projectId,
         );
         try {
           await db.projectHandles.delete(projectId);
@@ -167,7 +164,7 @@ export class ProjectManager {
 
       // Verify the handle is still valid by checking permissions
       const permissionStatus = await this.permissionManager.checkDirectoryPermission(
-        stored.rootHandle
+        stored.rootHandle,
       );
 
       // Update the stored permission state and last accessed time
@@ -247,7 +244,7 @@ export class ProjectManager {
         ) {
           console.warn(
             "Skipping corrupt IndexedDB entry / 破損したIndexedDBエントリをスキップします:",
-            record.projectId ?? "(unknown)"
+            record.projectId ?? "(unknown)",
           );
           return false;
         }
@@ -298,10 +295,7 @@ export class ProjectManager {
     const db = getWebStorageDatabase();
 
     try {
-      const count = await db.projectHandles
-        .where("projectId")
-        .equals(projectId)
-        .count();
+      const count = await db.projectHandles.where("projectId").equals(projectId).count();
       return count > 0;
     } catch (error) {
       console.error("プロジェクトハンドルの存在確認に失敗しました:", error);

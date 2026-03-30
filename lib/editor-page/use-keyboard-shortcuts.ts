@@ -75,15 +75,42 @@ export function useKeyboardShortcuts({
 
   const handlers = useMemo<Partial<Record<CommandId, () => void>>>(() => {
     const tabHandlers: Partial<Record<CommandId, () => void>> = {
-      "nav.tab1": () => { switchToIndex(0); incrementEditorKey(); },
-      "nav.tab2": () => { switchToIndex(1); incrementEditorKey(); },
-      "nav.tab3": () => { switchToIndex(2); incrementEditorKey(); },
-      "nav.tab4": () => { switchToIndex(3); incrementEditorKey(); },
-      "nav.tab5": () => { switchToIndex(4); incrementEditorKey(); },
-      "nav.tab6": () => { switchToIndex(5); incrementEditorKey(); },
-      "nav.tab7": () => { switchToIndex(6); incrementEditorKey(); },
-      "nav.tab8": () => { switchToIndex(7); incrementEditorKey(); },
-      "nav.tab9": () => { switchToIndex(8); incrementEditorKey(); },
+      "nav.tab1": () => {
+        switchToIndex(0);
+        incrementEditorKey();
+      },
+      "nav.tab2": () => {
+        switchToIndex(1);
+        incrementEditorKey();
+      },
+      "nav.tab3": () => {
+        switchToIndex(2);
+        incrementEditorKey();
+      },
+      "nav.tab4": () => {
+        switchToIndex(3);
+        incrementEditorKey();
+      },
+      "nav.tab5": () => {
+        switchToIndex(4);
+        incrementEditorKey();
+      },
+      "nav.tab6": () => {
+        switchToIndex(5);
+        incrementEditorKey();
+      },
+      "nav.tab7": () => {
+        switchToIndex(6);
+        incrementEditorKey();
+      },
+      "nav.tab8": () => {
+        switchToIndex(7);
+        incrementEditorKey();
+      },
+      "nav.tab9": () => {
+        switchToIndex(8);
+        incrementEditorKey();
+      },
     };
 
     const closeTabHandler = isElectron
@@ -91,7 +118,13 @@ export function useKeyboardShortcuts({
       : () => {
           if (tabs.length === 0) return;
           const firstTab = tabs[0];
-          if (tabs.length === 1 && firstTab && isEditorTab(firstTab) && !firstTab.file && !firstTab.isDirty) {
+          if (
+            tabs.length === 1 &&
+            firstTab &&
+            isEditorTab(firstTab) &&
+            !firstTab.file &&
+            !firstTab.isDirty
+          ) {
             window.close();
             return;
           }
@@ -101,16 +134,17 @@ export function useKeyboardShortcuts({
     // Web-exclusive commands: these are not handled by Electron IPC, so they
     // must be registered here (which fires unconditionally) rather than in
     // useGlobalShortcuts (which skips when the editor is focused).
-    const webOnlyHandlers: Partial<Record<CommandId, () => void>> = !isElectron && handleMenuAction
-      ? {
-          "file.open":      () => handleMenuAction('open-file'),
-          "file.saveAs":    () => handleMenuAction('save-as'),
-          "file.newWindow": () => handleMenuAction('new-window'),
-          "view.zoomIn":    () => handleMenuAction('zoom-in'),
-          "view.zoomOut":   () => handleMenuAction('zoom-out'),
-          "view.resetZoom": () => handleMenuAction('reset-zoom'),
-        }
-      : {};
+    const webOnlyHandlers: Partial<Record<CommandId, () => void>> =
+      !isElectron && handleMenuAction
+        ? {
+            "file.open": () => handleMenuAction("open-file"),
+            "file.saveAs": () => handleMenuAction("save-as"),
+            "file.newWindow": () => handleMenuAction("new-window"),
+            "view.zoomIn": () => handleMenuAction("zoom-in"),
+            "view.zoomOut": () => handleMenuAction("zoom-out"),
+            "view.resetZoom": () => handleMenuAction("reset-zoom"),
+          }
+        : {};
 
     return {
       "file.save": () => void saveFile(),
@@ -120,10 +154,21 @@ export function useKeyboardShortcuts({
       "format.ruby": isEditorTabActive ? handleOpenRubyDialog : undefined,
       "format.tcy": isEditorTabActive ? handleToggleTcy : undefined,
       "nav.settings": () => setShowSettingsModal(true),
-      "nav.search": isEditorTabActive ? () => setSearchOpenTrigger(prev => prev + 1) : undefined,
-      "nav.nextTab": () => { nextTab(); incrementEditorKey(); },
-      "nav.prevTab": () => { prevTab(); incrementEditorKey(); },
-      "file.newTab": isElectron ? undefined : () => { newTab(); incrementEditorKey(); },
+      "nav.search": isEditorTabActive ? () => setSearchOpenTrigger((prev) => prev + 1) : undefined,
+      "nav.nextTab": () => {
+        nextTab();
+        incrementEditorKey();
+      },
+      "nav.prevTab": () => {
+        prevTab();
+        incrementEditorKey();
+      },
+      "file.newTab": isElectron
+        ? undefined
+        : () => {
+            newTab();
+            incrementEditorKey();
+          },
       "file.closeTab": closeTabHandler,
       "view.splitRight": splitEditorRight,
       "view.splitDown": splitEditorDown,

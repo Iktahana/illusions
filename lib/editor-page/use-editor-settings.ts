@@ -22,8 +22,13 @@ export type EditorSettingsHandlers = Omit<DisplaySettingsHandlers, "setShowSetti
   Omit<AiSettingsHandlers, "setLintingEnabled" | "setLintingRuleConfigs" | "setLlmEnabled"> & {
     setShowSettingsModal: (value: boolean) => void;
     handleLintingEnabledChange: (value: boolean) => void;
-    handleLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity }) => void;
-    handleLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity }>) => void;
+    handleLintingRuleConfigChange: (
+      ruleId: string,
+      config: { enabled: boolean; severity: Severity },
+    ) => void;
+    handleLintingRuleConfigsBatchChange: (
+      configs: Record<string, { enabled: boolean; severity: Severity }>,
+    ) => void;
     handleCorrectionConfigChange: (partial: Partial<CorrectionConfig>) => void;
   };
 
@@ -50,21 +55,11 @@ export interface UseEditorSettingsResult {
  *
  * @param incrementEditorKey - callback to increment the editor key, forcing a remount
  */
-export function useEditorSettings(
-  incrementEditorKey: () => void,
-): UseEditorSettingsResult {
-  const {
-    displaySettings,
-    displayHandlers,
-    displaySetters,
-    applyPersistedDisplaySettings,
-  } = useDisplaySettings(incrementEditorKey);
+export function useEditorSettings(incrementEditorKey: () => void): UseEditorSettingsResult {
+  const { displaySettings, displayHandlers, displaySetters, applyPersistedDisplaySettings } =
+    useDisplaySettings(incrementEditorKey);
 
-  const {
-    aiSettings,
-    aiHandlers,
-    applyPersistedAiSettings,
-  } = useAiSettings();
+  const { aiSettings, aiHandlers, applyPersistedAiSettings } = useAiSettings();
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -106,7 +101,8 @@ export function useEditorSettings(
     handleLlmModelIdChange: aiHandlers.handleLlmModelIdChange,
     handleLlmIdlingStopChange: aiHandlers.handleLlmIdlingStopChange,
     handleCharacterExtractionBatchSizeChange: aiHandlers.handleCharacterExtractionBatchSizeChange,
-    handleCharacterExtractionConcurrencyChange: aiHandlers.handleCharacterExtractionConcurrencyChange,
+    handleCharacterExtractionConcurrencyChange:
+      aiHandlers.handleCharacterExtractionConcurrencyChange,
     handlePowerSaveModeChange: aiHandlers.handlePowerSaveModeChange,
     handleAutoPowerSaveOnBatteryChange: aiHandlers.handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange: aiHandlers.handleCorrectionConfigChange,

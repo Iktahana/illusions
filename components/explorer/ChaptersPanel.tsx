@@ -38,7 +38,7 @@ export function ChaptersPanel({ content, onChapterClick, onInsertText }: Chapter
       {/* Chapter list */}
       <div className="space-y-1">
         {chapters.length > 0 ? (
-            chapters.map((chapter, index) => (
+          chapters.map((chapter, index) => (
             <ChapterItem
               key={index}
               chapter={chapter}
@@ -50,7 +50,6 @@ export function ChaptersPanel({ content, onChapterClick, onInsertText }: Chapter
               }}
             />
           ))
-
         ) : (
           <div className="text-xs text-foreground-tertiary px-2 py-2">
             コンテンツに見出しがありません

@@ -1,34 +1,34 @@
 /**
  * Web NLP Client
- * 
+ *
  * Communicates with Next.js API routes for NLP operations.
  * Makes HTTP requests to /api/nlp/* endpoints.
  */
 
-import type { 
-  INlpClient, 
-  Token, 
-  TokenizeProgress, 
+import type {
+  INlpClient,
+  Token,
+  TokenizeProgress,
   WordEntry,
   ParagraphTokenizeResponse,
   BatchTokenizeResponse,
-  FrequencyAnalysisResponse
-} from './types';
+  FrequencyAnalysisResponse,
+} from "./types";
 
 export class WebNlpClient implements INlpClient {
-  private readonly baseUrl = '/api/nlp';
+  private readonly baseUrl = "/api/nlp";
 
   /**
    * Tokenize a single paragraph using API
-   * 
+   *
    * @param text - Paragraph text
    * @returns Promise of token array
    * @throws Error if API request fails
    */
   async tokenizeParagraph(text: string): Promise<Token[]> {
     const response = await fetch(`${this.baseUrl}/tokenize`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
 
@@ -43,10 +43,10 @@ export class WebNlpClient implements INlpClient {
 
   /**
    * Tokenize multiple paragraphs in batch using API
-   * 
+   *
    * Note: Web mode does not support real-time progress updates
    * due to HTTP limitations. Progress callback is called once at completion.
-   * 
+   *
    * @param paragraphs - Array of {pos, text} objects
    * @param onProgress - Optional progress callback (called once at end)
    * @returns Promise of array with {pos, tokens} results
@@ -54,11 +54,11 @@ export class WebNlpClient implements INlpClient {
    */
   async tokenizeDocument(
     paragraphs: Array<{ pos: number; text: string }>,
-    onProgress?: (progress: TokenizeProgress) => void
+    onProgress?: (progress: TokenizeProgress) => void,
   ): Promise<Array<{ pos: number; tokens: Token[] }>> {
     const response = await fetch(`${this.baseUrl}/batch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ paragraphs }),
     });
 
@@ -68,30 +68,30 @@ export class WebNlpClient implements INlpClient {
     }
 
     const data: BatchTokenizeResponse = await response.json();
-    
+
     // Simulate progress (immediate completion in web mode)
     if (onProgress) {
-      onProgress({ 
-        completed: paragraphs.length, 
-        total: paragraphs.length, 
-        percentage: 100 
+      onProgress({
+        completed: paragraphs.length,
+        total: paragraphs.length,
+        percentage: 100,
       });
     }
-    
+
     return data.results;
   }
 
   /**
    * Analyze word frequency using API
-   * 
+   *
    * @param text - Full document text
    * @returns Promise of sorted word entries
    * @throws Error if API request fails
    */
   async analyzeWordFrequency(text: string): Promise<WordEntry[]> {
     const response = await fetch(`${this.baseUrl}/frequency`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
 

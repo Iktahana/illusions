@@ -15,25 +15,30 @@ git branch --show-current
 ```
 
 **Guard rails:**
+
 - If the branch is `dev`, `main`, or `master`, stop immediately:
   "PR は feature ブランチから作成してください。現在のブランチは `<branch>` です。"
 - If there are uncommitted changes relevant to this task, stage and commit them
   with a Conventional Commits message before continuing.
 
 Then detect the **base branch**:
+
 ```bash
 # Check project convention file first
 grep -i "base.*branch\|target.*branch\|PR.*target\|→.*main\|→.*dev" CLAUDE.md 2>/dev/null | head -3
 # Then verify the candidate branch actually exists on the remote
 git ls-remote --heads origin dev main master 2>/dev/null
 ```
+
 Use `dev` if it exists remotely. Otherwise use `main`, then `master`. If the
 project's CLAUDE.md clearly names a different base, use that instead.
 
 Check commits that will be in this PR:
+
 ```bash
 git log <base>..HEAD --oneline
 ```
+
 If there are zero commits, report: "このブランチには <base> との差分がありません。" and stop.
 
 ---
@@ -41,9 +46,11 @@ If there are zero commits, report: "このブランチには <base> との差分
 ## Step 2 — Check for existing PR
 
 Before creating, verify no PR is already open for this branch:
+
 ```bash
 gh pr list --head "$(git branch --show-current)" --state open --json number,url,title
 ```
+
 If one exists, print its URL and ask the user: "このブランチには既に PR #NNN が存在します。新しく作成しますか、それとも既存の PR を更新しますか？"
 Wait for the answer before proceeding.
 
@@ -60,9 +67,11 @@ Collect Issue numbers from three sources, then deduplicate:
    - Match `issue-NNN` or `issues-NNN`: `fix/issue-123` → `123`
 
 2. **Commit messages** since `<base>`:
+
    ```bash
    git log <base>..HEAD --pretty="%s %b"
    ```
+
    Extract numbers from these patterns (case-insensitive):
    `(#NNN)`, `close #NNN`, `closes #NNN`, `fix #NNN`, `fixes #NNN`, `resolve #NNN`, `refs #NNN`
 
@@ -70,9 +79,11 @@ Collect Issue numbers from three sources, then deduplicate:
    (e.g. `/open-pr 123 456`).
 
 For each candidate, verify it exists and is open:
+
 ```bash
 gh issue view <NNN> --json number,title,state 2>/dev/null
 ```
+
 Discard any that don't exist or are already closed. If nothing found, continue
 without `Closes` keywords — never invent Issue numbers.
 
@@ -85,10 +96,12 @@ git push -u origin HEAD
 ```
 
 If this fails with a "non-fast-forward" error, check the remote carefully:
+
 ```bash
 git log origin/<branch>..HEAD --oneline   # commits only in local
 git log HEAD..origin/<branch> --oneline   # commits only in remote
 ```
+
 Only use `--force-with-lease` if the remote has no commits that aren't already
 in the local branch (i.e., the remote has only the old version of your commits).
 
@@ -165,9 +178,11 @@ done
 ```
 
 ### MERGEABLE
+
 Report: "✓ 衝突なし — PR #NNN はそのままマージ可能です。" Skip to Step 8.
 
 ### CONFLICTING
+
 Announce: "衝突を検出しました。自動修復を開始します。"
 
 ```bash
@@ -180,7 +195,7 @@ For each conflicting file reported by git:
 1. **Read the whole file** — understand what both sides were trying to do, not
    just the lines immediately around the markers.
 2. **Resolve semantically:**
-   - If one side *added* something the other didn't touch → keep the addition.
+   - If one side _added_ something the other didn't touch → keep the addition.
    - If both sides changed the same region in compatible ways → merge both
      changes together.
    - If both sides changed the same region incompatibly → keep the version that
@@ -194,6 +209,7 @@ For each conflicting file reported by git:
 4. Stage: `git add <file>`
 
 After resolving all files:
+
 ```bash
 git commit -m "merge: resolve conflicts with <base-branch>
 
@@ -206,6 +222,7 @@ CONFLICTING after the second attempt, show the conflicting sections verbatim
 and ask the user to decide.
 
 ### UNKNOWN after all retries
+
 Report the raw JSON and move on — don't block on GitHub's cache.
 
 ---

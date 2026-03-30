@@ -58,7 +58,7 @@ export function useContextMenu(): UseContextMenuResult {
       setMenu({ x: e.clientX, y: e.clientY, items });
       return null;
     },
-    []
+    [],
   );
 
   return { menu, show, close };

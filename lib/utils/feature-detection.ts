@@ -53,9 +53,8 @@ export function isFileSystemHandleSupported(): boolean {
     const hasCreateWritable =
       hasFileHandle &&
       typeof (
-        (window as Window & { FileSystemFileHandle?: { prototype?: { createWritable?: unknown } } })
-          .FileSystemFileHandle?.prototype?.createWritable
-      ) !== "undefined";
+        window as Window & { FileSystemFileHandle?: { prototype?: { createWritable?: unknown } } }
+      ).FileSystemFileHandle?.prototype?.createWritable !== "undefined";
 
     return hasFileHandle && hasDirHandle && hasCreateWritable;
   } catch (error) {
@@ -81,7 +80,8 @@ export function isFSASupported(): boolean {
   const saveFilePickerSupported = isSaveFilePickerSupported();
   const handleSupported = isFileSystemHandleSupported();
 
-  const allSupported = dirPickerSupported && filePickerSupported && saveFilePickerSupported && handleSupported;
+  const allSupported =
+    dirPickerSupported && filePickerSupported && saveFilePickerSupported && handleSupported;
 
   return allSupported;
 }

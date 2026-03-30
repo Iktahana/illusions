@@ -29,10 +29,7 @@ export function useLintHandlers({
     const doc = editorViewInstance.state.doc;
     return lintIssues.map((issue: LintIssue) => {
       try {
-        const originalText = doc.textBetween(
-          issue.from,
-          Math.min(issue.to, doc.content.size),
-        );
+        const originalText = doc.textBetween(issue.from, Math.min(issue.to, doc.content.size));
         return { ...issue, originalText };
       } catch {
         return issue;
@@ -59,9 +56,7 @@ export function useLintHandlers({
     const dom = editorViewInstance.dom as HTMLElement;
     const handler = () => {
       const pos = editorViewInstance.state.selection.from;
-      const idx = enrichedLintIssues.findIndex(
-        (i: LintIssue) => pos >= i.from && pos <= i.to,
-      );
+      const idx = enrichedLintIssues.findIndex((i: LintIssue) => pos >= i.from && pos <= i.to);
       setActiveLintIssueIndex(idx >= 0 ? idx : null);
     };
     dom.addEventListener("mouseup", handler);
@@ -73,130 +68,145 @@ export function useLintHandlers({
   }, [editorViewInstance, enrichedLintIssues]);
 
   /** Navigate to a lint issue in the editor */
-  const handleNavigateToIssue = useCallback((issue: LintIssue) => {
-    if (!editorViewInstance) return;
-    void import("@milkdown/prose/state").then(({ TextSelection }) => {
-      const { state, dispatch } = editorViewInstance;
-      const clampedTo = Math.min(issue.to, state.doc.content.size);
-      const clampedFrom = Math.min(issue.from, clampedTo);
-      const selection = TextSelection.create(state.doc, clampedFrom, clampedTo);
+  const handleNavigateToIssue = useCallback(
+    (issue: LintIssue) => {
+      if (!editorViewInstance) return;
+      void import("@milkdown/prose/state").then(({ TextSelection }) => {
+        const { state, dispatch } = editorViewInstance;
+        const clampedTo = Math.min(issue.to, state.doc.content.size);
+        const clampedFrom = Math.min(issue.from, clampedTo);
+        const selection = TextSelection.create(state.doc, clampedFrom, clampedTo);
 
-      // Allow the scroll protection to accept our programmatic scroll
-      programmaticScrollRef.current = true;
+        // Allow the scroll protection to accept our programmatic scroll
+        programmaticScrollRef.current = true;
 
-      dispatch(state.tr.setSelection(selection).scrollIntoView());
+        dispatch(state.tr.setSelection(selection).scrollIntoView());
 
-      // DOM-level scroll for vertical writing mode
-      try {
-        const coords = editorViewInstance.coordsAtPos(clampedFrom);
-        const scrollContainer = editorViewInstance.dom.closest(
-          ".flex-1.bg-background-secondary"
-        ) as HTMLElement | null;
-        if (scrollContainer) {
-          const containerRect = scrollContainer.getBoundingClientRect();
-          const offsetY = coords.top - containerRect.top + scrollContainer.scrollTop;
-          const offsetX = coords.left - containerRect.left + scrollContainer.scrollLeft;
-          scrollContainer.scrollTo({
-            left: offsetX - containerRect.width / 2,
-            top: offsetY - containerRect.height / 2,
-            behavior: "smooth",
-          });
-        }
-      } catch {
-        // fallback
+        // DOM-level scroll for vertical writing mode
         try {
-          const domResult = editorViewInstance.domAtPos(clampedFrom);
-          const target = domResult.node instanceof HTMLElement
-            ? domResult.node
-            : domResult.node.parentElement;
-          target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+          const coords = editorViewInstance.coordsAtPos(clampedFrom);
+          const scrollContainer = editorViewInstance.dom.closest(
+            ".flex-1.bg-background-secondary",
+          ) as HTMLElement | null;
+          if (scrollContainer) {
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const offsetY = coords.top - containerRect.top + scrollContainer.scrollTop;
+            const offsetX = coords.left - containerRect.left + scrollContainer.scrollLeft;
+            scrollContainer.scrollTo({
+              left: offsetX - containerRect.width / 2,
+              top: offsetY - containerRect.height / 2,
+              behavior: "smooth",
+            });
+          }
         } catch {
-          // ignore
-        }
-      }
-
-      // Reset the flag after smooth scroll completes
-      navigateTimeoutRef.current = setTimeout(() => {
-        programmaticScrollRef.current = false;
-      }, 500);
-
-      editorViewInstance.focus();
-    });
-  }, [editorViewInstance, programmaticScrollRef]);
-
-  /** Navigate to a lint issue from context menu (also switches Inspector to corrections tab) */
-  const handleShowLintHint = useCallback((issue: LintIssue) => {
-    triggerSwitchToCorrections();
-    handleNavigateToIssue(issue);
-  }, [handleNavigateToIssue, triggerSwitchToCorrections]);
-
-  /** Handle ignoring a correction (single or all identical) */
-  const handleIgnoreCorrection = useCallback((issue: LintIssue, ignoreAll: boolean) => {
-    if (!editorViewInstance) return;
-    // Extract original text from the document
-    let issueText: string;
-    try {
-      issueText = editorViewInstance.state.doc.textBetween(
-        issue.from,
-        Math.min(issue.to, editorViewInstance.state.doc.content.size),
-      );
-    } catch {
-      return;
-    }
-    if (!issueText) return;
-
-    if (ignoreAll) {
-      // Ignore all occurrences: no context hash
-      ignoreCorrection(issue.ruleId, issueText);
-    } else {
-      // Ignore single occurrence: compute context hash from paragraph text
-      // Find the paragraph containing this issue
-      let paragraphText: string | undefined;
-      editorViewInstance.state.doc.descendants((node, pos) => {
-        if (paragraphText) return false;
-        if (node.type.name === "paragraph" && node.textContent) {
-          const paraEnd = pos + node.nodeSize;
-          if (issue.from >= pos && issue.to <= paraEnd) {
-            paragraphText = node.textContent;
-            return false;
+          // fallback
+          try {
+            const domResult = editorViewInstance.domAtPos(clampedFrom);
+            const target =
+              domResult.node instanceof HTMLElement ? domResult.node : domResult.node.parentElement;
+            target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+          } catch {
+            // ignore
           }
         }
-        return true;
+
+        // Reset the flag after smooth scroll completes
+        navigateTimeoutRef.current = setTimeout(() => {
+          programmaticScrollRef.current = false;
+        }, 500);
+
+        editorViewInstance.focus();
       });
-      ignoreCorrection(issue.ruleId, issueText, paragraphText);
-    }
-  }, [editorViewInstance, ignoreCorrection]);
+    },
+    [editorViewInstance, programmaticScrollRef],
+  );
+
+  /** Navigate to a lint issue from context menu (also switches Inspector to corrections tab) */
+  const handleShowLintHint = useCallback(
+    (issue: LintIssue) => {
+      triggerSwitchToCorrections();
+      handleNavigateToIssue(issue);
+    },
+    [handleNavigateToIssue, triggerSwitchToCorrections],
+  );
+
+  /** Handle ignoring a correction (single or all identical) */
+  const handleIgnoreCorrection = useCallback(
+    (issue: LintIssue, ignoreAll: boolean) => {
+      if (!editorViewInstance) return;
+      // Extract original text from the document
+      let issueText: string;
+      try {
+        issueText = editorViewInstance.state.doc.textBetween(
+          issue.from,
+          Math.min(issue.to, editorViewInstance.state.doc.content.size),
+        );
+      } catch {
+        return;
+      }
+      if (!issueText) return;
+
+      if (ignoreAll) {
+        // Ignore all occurrences: no context hash
+        ignoreCorrection(issue.ruleId, issueText);
+      } else {
+        // Ignore single occurrence: compute context hash from paragraph text
+        // Find the paragraph containing this issue
+        let paragraphText: string | undefined;
+        editorViewInstance.state.doc.descendants((node, pos) => {
+          if (paragraphText) return false;
+          if (node.type.name === "paragraph" && node.textContent) {
+            const paraEnd = pos + node.nodeSize;
+            if (issue.from >= pos && issue.to <= paraEnd) {
+              paragraphText = node.textContent;
+              return false;
+            }
+          }
+          return true;
+        });
+        ignoreCorrection(issue.ruleId, issueText, paragraphText);
+      }
+    },
+    [editorViewInstance, ignoreCorrection],
+  );
 
   /** Apply a lint fix by replacing the text range */
-  const handleApplyFix = useCallback((issue: LintIssue & { originalText?: string }) => {
-    if (!editorViewInstance || !issue.fix) return;
-    const { state, dispatch } = editorViewInstance;
-    if (issue.to > state.doc.content.size) {
-      notificationManager.warning("テキストが変更されたため修正を適用できません");
-      return;
-    }
-    const currentText = state.doc.textBetween(issue.from, issue.to, "");
-    if (issue.originalText && currentText !== issue.originalText) {
-      notificationManager.warning("テキストが変更されたため修正を適用できません");
-      return;
-    }
-    const tr = state.tr.insertText(issue.fix.replacement, issue.from, issue.to);
-    dispatch(tr);
-  }, [editorViewInstance]);
+  const handleApplyFix = useCallback(
+    (issue: LintIssue & { originalText?: string }) => {
+      if (!editorViewInstance || !issue.fix) return;
+      const { state, dispatch } = editorViewInstance;
+      if (issue.to > state.doc.content.size) {
+        notificationManager.warning("テキストが変更されたため修正を適用できません");
+        return;
+      }
+      const currentText = state.doc.textBetween(issue.from, issue.to, "");
+      if (issue.originalText && currentText !== issue.originalText) {
+        notificationManager.warning("テキストが変更されたため修正を適用できません");
+        return;
+      }
+      const tr = state.tr.insertText(issue.fix.replacement, issue.from, issue.to);
+      dispatch(tr);
+    },
+    [editorViewInstance],
+  );
 
   /** Apply a lint preset from the Inspector dropdown */
-  const handleApplyLintPreset = useCallback((presetId: string) => {
-    const preset = LINT_PRESETS[presetId];
-    if (preset) {
-      handleLintingRuleConfigsBatchChange({ ...preset.configs });
-    }
-  }, [handleLintingRuleConfigsBatchChange]);
+  const handleApplyLintPreset = useCallback(
+    (presetId: string) => {
+      const preset = LINT_PRESETS[presetId];
+      if (preset) {
+        handleLintingRuleConfigsBatchChange({ ...preset.configs });
+      }
+    },
+    [handleLintingRuleConfigsBatchChange],
+  );
 
   /** Detect which preset matches the current linting config */
   const activeLintPresetId = useMemo(() => {
     for (const [id, preset] of Object.entries(LINT_PRESETS)) {
       const allMatch = LINT_RULES_META.every((rule) => {
-        const current = lintingRuleConfigs[rule.id] ?? LINT_DEFAULT_CONFIGS[rule.id] ?? { enabled: true, severity: "warning" };
+        const current = lintingRuleConfigs[rule.id] ??
+          LINT_DEFAULT_CONFIGS[rule.id] ?? { enabled: true, severity: "warning" };
         const presetCfg = preset.configs[rule.id];
         if (!presetCfg) return false;
         return current.enabled === presetCfg.enabled && current.severity === presetCfg.severity;

@@ -93,10 +93,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
 
     const cleanup = window.electronAPI.onSaveBeforeClose(async () => {
       // Flush debounced persistence state before saving files
-      await Promise.all([
-        flushTabStateRef.current?.(),
-        flushLayoutStateRef.current?.(),
-      ]);
+      await Promise.all([flushTabStateRef.current?.(), flushLayoutStateRef.current?.()]);
 
       let anyFailed = false;
 
@@ -138,10 +135,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
             });
           }
         } catch (error) {
-          console.error(
-            `保存に失敗しました (${tab.file.name}):`,
-            error,
-          );
+          console.error(`保存に失敗しました (${tab.file.name}):`, error);
           anyFailed = true;
         }
       }
@@ -161,10 +155,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     if (!isElectron || !window.electronAPI?.onFlushStateBeforeClose) return;
 
     const cleanup = window.electronAPI.onFlushStateBeforeClose(async () => {
-      await Promise.all([
-        flushTabStateRef.current?.(),
-        flushLayoutStateRef.current?.(),
-      ]);
+      await Promise.all([flushTabStateRef.current?.(), flushLayoutStateRef.current?.()]);
       await window.electronAPI?.saveDoneAndClose?.();
     });
 
@@ -175,13 +166,11 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onOpenFileFromSystem) return;
 
-    const cleanup = window.electronAPI.onOpenFileFromSystem(
-      ({ path, content: fileContent }) => {
-        loadSystemFile(path, fileContent);
-        // Notify page.tsx for editor key update
-        systemFileOpenHandlerRef.current?.(path, fileContent);
-      },
-    );
+    const cleanup = window.electronAPI.onOpenFileFromSystem(({ path, content: fileContent }) => {
+      loadSystemFile(path, fileContent);
+      // Notify page.tsx for editor key update
+      systemFileOpenHandlerRef.current?.(path, fileContent);
+    });
 
     return cleanup;
   }, [isElectron, loadSystemFile, systemFileOpenHandlerRef]);

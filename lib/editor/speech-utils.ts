@@ -47,7 +47,11 @@ export function buildSpeechChunks(
 }
 
 /** Maps each char in flat text to its doc position. Block boundaries are skipped. */
-export function buildSpeechMap(doc: ProsemirrorNode, from: number, to: number): { text: string; positions: number[] } {
+export function buildSpeechMap(
+  doc: ProsemirrorNode,
+  from: number,
+  to: number,
+): { text: string; positions: number[] } {
   const chars: string[] = [];
   const positions: number[] = [];
   doc.nodesBetween(from, to, (node, pos) => {

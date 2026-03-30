@@ -89,16 +89,12 @@ export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExp
 
       // TXT exports are client-side (no Electron IPC needed)
       if (format === "txt" || format === "txt-ruby") {
-        const progressId = notificationManager.showProgress(
-          `${label}をエクスポート中...`,
-          { type: "info" },
-        );
+        const progressId = notificationManager.showProgress(`${label}をエクスポート中...`, {
+          type: "info",
+        });
 
         try {
-          const converted =
-            format === "txt"
-              ? mdiToPlainText(content)
-              : mdiToRubyText(content);
+          const converted = format === "txt" ? mdiToPlainText(content) : mdiToRubyText(content);
 
           const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
           const suffix = format === "txt-ruby" ? "_ruby" : "";
@@ -112,19 +108,15 @@ export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExp
           }
         } catch (error) {
           notificationManager.dismiss(progressId);
-          const message =
-            error instanceof Error ? error.message : "Unknown error";
-          notificationManager.error(
-            `${label}のエクスポートに失敗しました: ${message}`,
-          );
+          const message = error instanceof Error ? error.message : "Unknown error";
+          notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
         }
         return;
       }
 
-      const progressId = notificationManager.showProgress(
-        `${label}をエクスポート中...`,
-        { type: "info" }
-      );
+      const progressId = notificationManager.showProgress(`${label}をエクスポート中...`, {
+        type: "info",
+      });
 
       try {
         let result: string | { success: false; error: string } | null | undefined;
@@ -148,9 +140,7 @@ export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExp
         } else {
           // Web mode: not supported yet
           notificationManager.dismiss(progressId);
-          notificationManager.warning(
-            "エクスポート機能はデスクトップ版でのみ利用可能です"
-          );
+          notificationManager.warning("エクスポート機能はデスクトップ版でのみ利用可能です");
           return;
         }
 
@@ -162,23 +152,18 @@ export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExp
         }
 
         if (typeof result === "object" && "success" in result && !result.success) {
-          notificationManager.error(
-            `${label}のエクスポートに失敗しました: ${result.error}`
-          );
+          notificationManager.error(`${label}のエクスポートに失敗しました: ${result.error}`);
           return;
         }
 
         notificationManager.success(`${label}をエクスポートしました`);
       } catch (error) {
         notificationManager.dismiss(progressId);
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
-        notificationManager.error(
-          `${label}のエクスポートに失敗しました: ${message}`
-        );
+        const message = error instanceof Error ? error.message : "Unknown error";
+        notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
       }
     },
-    [getContent, getTitle, getIsEditorTabActive, isElectron]
+    [getContent, getTitle, getIsEditorTabActive, isElectron],
   );
 
   // Register Electron menu event handlers
@@ -188,29 +173,19 @@ export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExp
     const cleanups: Array<(() => void) | void> = [];
 
     if (window.electronAPI.onMenuExportTxt) {
-      cleanups.push(
-        window.electronAPI.onMenuExportTxt(() => void exportAs("txt"))
-      );
+      cleanups.push(window.electronAPI.onMenuExportTxt(() => void exportAs("txt")));
     }
     if (window.electronAPI.onMenuExportTxtRuby) {
-      cleanups.push(
-        window.electronAPI.onMenuExportTxtRuby(() => void exportAs("txt-ruby"))
-      );
+      cleanups.push(window.electronAPI.onMenuExportTxtRuby(() => void exportAs("txt-ruby")));
     }
     if (window.electronAPI.onMenuExportPDF) {
-      cleanups.push(
-        window.electronAPI.onMenuExportPDF(() => void exportAs("pdf"))
-      );
+      cleanups.push(window.electronAPI.onMenuExportPDF(() => void exportAs("pdf")));
     }
     if (window.electronAPI.onMenuExportEPUB) {
-      cleanups.push(
-        window.electronAPI.onMenuExportEPUB(() => void exportAs("epub"))
-      );
+      cleanups.push(window.electronAPI.onMenuExportEPUB(() => void exportAs("epub")));
     }
     if (window.electronAPI.onMenuExportDOCX) {
-      cleanups.push(
-        window.electronAPI.onMenuExportDOCX(() => void exportAs("docx"))
-      );
+      cleanups.push(window.electronAPI.onMenuExportDOCX(() => void exportAs("docx")));
     }
 
     return () => {
@@ -226,9 +201,7 @@ export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExp
 /**
  * Type guard: checks whether window has the File System Access API showSaveFilePicker method.
  */
-function hasShowSaveFilePicker(
-  w: Window
-): w is Window & {
+function hasShowSaveFilePicker(w: Window): w is Window & {
   showSaveFilePicker: (options?: object) => Promise<FileSystemFileHandle>;
 } {
   return "showSaveFilePicker" in w;

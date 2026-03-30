@@ -2,7 +2,17 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, ChevronDown, ChevronRight, EyeOff, Info, ListFilter, RefreshCw, Settings, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  EyeOff,
+  Info,
+  ListFilter,
+  RefreshCw,
+  Settings,
+  XCircle,
+} from "lucide-react";
 import clsx from "clsx";
 
 import { LINT_PRESETS, LINT_RULE_CATEGORIES } from "@/lib/linting/lint-presets";
@@ -38,8 +48,8 @@ const SEVERITY_ORDER: Record<Severity, number> = {
 };
 
 /** Find which category a rule belongs to */
-function getCategoryForRule(ruleId: string): typeof LINT_RULE_CATEGORIES[number] | undefined {
-  return LINT_RULE_CATEGORIES.find(cat => cat.rules.includes(ruleId));
+function getCategoryForRule(ruleId: string): (typeof LINT_RULE_CATEGORIES)[number] | undefined {
+  return LINT_RULE_CATEGORIES.find((cat) => cat.rules.includes(ruleId));
 }
 
 /** Grouped issues by category */
@@ -79,13 +89,14 @@ export default function CorrectionsPanel({
   activeLintPresetId = "",
 }: CorrectionsPanelProps): React.JSX.Element {
   const {
-    posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes,
-    onPosHighlightEnabledChange, onPosHighlightDisabledTypesChange,
+    posHighlightEnabled,
+    posHighlightColors,
+    posHighlightDisabledTypes,
+    onPosHighlightEnabledChange,
+    onPosHighlightDisabledTypesChange,
   } = usePosHighlightSettings();
-  const {
-    lintingEnabled, lintingRuleConfigs,
-    onLintingEnabledChange, onLintingRuleConfigChange,
-  } = useLintingSettings();
+  const { lintingEnabled, lintingRuleConfigs, onLintingEnabledChange, onLintingRuleConfigChange } =
+    useLintingSettings();
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("category");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -105,13 +116,15 @@ export default function CorrectionsPanel({
         sorted.sort((a, b) => a.from - b.from);
         break;
       case "severity":
-        sorted.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || a.from - b.from);
+        sorted.sort(
+          (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || a.from - b.from,
+        );
         break;
       case "category":
         // Sorted by category order, then by position within each category
         sorted.sort((a, b) => {
-          const catA = LINT_RULE_CATEGORIES.findIndex(c => c.rules.includes(a.ruleId));
-          const catB = LINT_RULE_CATEGORIES.findIndex(c => c.rules.includes(b.ruleId));
+          const catA = LINT_RULE_CATEGORIES.findIndex((c) => c.rules.includes(a.ruleId));
+          const catB = LINT_RULE_CATEGORIES.findIndex((c) => c.rules.includes(b.ruleId));
           if (catA !== catB) return catA - catB;
           return a.from - b.from;
         });
@@ -157,9 +170,7 @@ export default function CorrectionsPanel({
   // Build a global index map so we can find the active issue across groups
   const issueIndexMap = useMemo(() => {
     const map = new Map<LintIssue | EnrichedLintIssue, number>();
-    const list = sortMode === "category"
-      ? groupedIssues.flatMap(g => g.issues)
-      : sortedIssues;
+    const list = sortMode === "category" ? groupedIssues.flatMap((g) => g.issues) : sortedIssues;
     list.forEach((issue, i) => map.set(issue, i));
     return map;
   }, [sortMode, groupedIssues, sortedIssues]);
@@ -195,7 +206,7 @@ export default function CorrectionsPanel({
     const category = getCategoryForRule(activeIssue.ruleId);
     const catId = category?.id ?? "other";
     if (collapsedGroups.has(catId)) {
-      setCollapsedGroups(prev => {
+      setCollapsedGroups((prev) => {
         const next = new Set(prev);
         next.delete(catId);
         return next;
@@ -206,7 +217,7 @@ export default function CorrectionsPanel({
   }, [activeIssue, sortMode]);
 
   const toggleGroup = useCallback((categoryId: string) => {
-    setCollapsedGroups(prev => {
+    setCollapsedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(categoryId)) {
         next.delete(categoryId);
@@ -218,14 +229,17 @@ export default function CorrectionsPanel({
   }, []);
 
   /** Disable all rules in a category via settings */
-  const handleDisableGroup = useCallback((group: IssueGroup) => {
-    if (!onLintingRuleConfigChange) return;
-    for (const ruleId of group.ruleIds) {
-      const current = lintingRuleConfigs[ruleId];
-      const severity = current?.severity ?? "warning";
-      onLintingRuleConfigChange(ruleId, { enabled: false, severity });
-    }
-  }, [onLintingRuleConfigChange, lintingRuleConfigs]);
+  const handleDisableGroup = useCallback(
+    (group: IssueGroup) => {
+      if (!onLintingRuleConfigChange) return;
+      for (const ruleId of group.ruleIds) {
+        const current = lintingRuleConfigs[ruleId];
+        const severity = current?.severity ?? "warning";
+        onLintingRuleConfigChange(ruleId, { enabled: false, severity });
+      }
+    },
+    [onLintingRuleConfigChange, lintingRuleConfigs],
+  );
 
   const filterOptions: { value: SeverityFilter; label: string; icon: ReactNode }[] = [
     { value: "all", label: "全て", icon: <ListFilter className="w-3.5 h-3.5" /> },
@@ -240,7 +254,11 @@ export default function CorrectionsPanel({
       {sortedIssues.map((issue, index) => {
         const globalIndex = issueIndexMap.get(issue) ?? index;
         return (
-          <div key={`${issue.ruleId}-${issue.from}-${issue.to}-${index}`} data-issue-index={globalIndex} className="animate-fade-in">
+          <div
+            key={`${issue.ruleId}-${issue.from}-${issue.to}-${index}`}
+            data-issue-index={globalIndex}
+            className="animate-fade-in"
+          >
             <IssueCard
               issue={issue}
               isActive={activeDisplayIndex === globalIndex}
@@ -268,11 +286,14 @@ export default function CorrectionsPanel({
                 onClick={() => toggleGroup(group.categoryId)}
                 className="flex-1 flex items-center gap-1.5 px-3 py-2 text-left hover:bg-hover transition-colors"
               >
-                {isCollapsed
-                  ? <ChevronRight className="w-3.5 h-3.5 text-foreground-tertiary shrink-0" />
-                  : <ChevronDown className="w-3.5 h-3.5 text-foreground-tertiary shrink-0" />
-                }
-                <span className="text-xs font-medium text-foreground-secondary">{group.categoryName}</span>
+                {isCollapsed ? (
+                  <ChevronRight className="w-3.5 h-3.5 text-foreground-tertiary shrink-0" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 text-foreground-tertiary shrink-0" />
+                )}
+                <span className="text-xs font-medium text-foreground-secondary">
+                  {group.categoryName}
+                </span>
                 <span className="text-xs text-foreground-tertiary">{group.issues.length}件</span>
               </button>
               {/* Disable entire group */}
@@ -296,7 +317,11 @@ export default function CorrectionsPanel({
                 {group.issues.map((issue, index) => {
                   const globalIndex = issueIndexMap.get(issue) ?? index;
                   return (
-                    <div key={`${issue.ruleId}-${issue.from}-${issue.to}-${index}`} data-issue-index={globalIndex} className="animate-fade-in">
+                    <div
+                      key={`${issue.ruleId}-${issue.from}-${issue.to}-${index}`}
+                      data-issue-index={globalIndex}
+                      className="animate-fade-in"
+                    >
                       <IssueCard
                         issue={issue}
                         isActive={activeDisplayIndex === globalIndex}
@@ -322,21 +347,19 @@ export default function CorrectionsPanel({
         <div className="flex items-center justify-between">
           <div>
             <h4 className="text-sm font-medium text-foreground">校正機能</h4>
-            <p className="text-xs text-foreground-tertiary mt-0.5">
-              文章の問題を自動検出
-            </p>
+            <p className="text-xs text-foreground-tertiary mt-0.5">文章の問題を自動検出</p>
           </div>
           <button
             onClick={() => onLintingEnabledChange?.(!lintingEnabled)}
             className={clsx(
               "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
-              lintingEnabled ? "bg-accent" : "bg-foreground-muted"
+              lintingEnabled ? "bg-accent" : "bg-foreground-muted",
             )}
           >
             <span
               className={clsx(
                 "inline-block h-4 w-4 transform rounded-full transition-transform shadow-sm",
-                lintingEnabled ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"
+                lintingEnabled ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white",
               )}
             />
           </button>
@@ -348,21 +371,21 @@ export default function CorrectionsPanel({
         <div className="flex items-center justify-between">
           <div>
             <h4 className="text-sm font-medium text-foreground">品詞ハイライト</h4>
-            <p className="text-xs text-foreground-tertiary mt-0.5">
-              動詞・助詞などを色分け表示
-            </p>
+            <p className="text-xs text-foreground-tertiary mt-0.5">動詞・助詞などを色分け表示</p>
           </div>
           <button
             onClick={() => onPosHighlightEnabledChange?.(!posHighlightEnabled)}
             className={clsx(
               "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
-              posHighlightEnabled ? "bg-accent" : "bg-foreground-muted"
+              posHighlightEnabled ? "bg-accent" : "bg-foreground-muted",
             )}
           >
             <span
               className={clsx(
                 "inline-block h-4 w-4 transform rounded-full transition-transform shadow-sm",
-                posHighlightEnabled ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"
+                posHighlightEnabled
+                  ? "translate-x-6 bg-accent-foreground"
+                  : "translate-x-1 bg-white",
               )}
             />
           </button>
@@ -377,12 +400,12 @@ export default function CorrectionsPanel({
                     key={key}
                     className={clsx(
                       "inline-flex items-center gap-1 text-xs transition-opacity cursor-pointer",
-                      isDisabled ? "opacity-40 text-foreground-muted" : "text-foreground-secondary"
+                      isDisabled ? "opacity-40 text-foreground-muted" : "text-foreground-secondary",
                     )}
                     title={isDisabled ? "クリックで表示" : "クリックで非表示"}
                     onClick={() => {
                       const next = isDisabled
-                        ? posHighlightDisabledTypes.filter(t => t !== key)
+                        ? posHighlightDisabledTypes.filter((t) => t !== key)
                         : [...posHighlightDisabledTypes, key];
                       onPosHighlightDisabledTypesChange(next);
                     }}
@@ -392,7 +415,7 @@ export default function CorrectionsPanel({
                       style={{
                         backgroundColor: isDisabled
                           ? "#ccc"
-                          : (posHighlightColors[key] || DEFAULT_POS_COLORS[key] || "#000"),
+                          : posHighlightColors[key] || DEFAULT_POS_COLORS[key] || "#000",
                       }}
                     />
                     {label}
@@ -417,106 +440,106 @@ export default function CorrectionsPanel({
           <p className="text-sm text-foreground-tertiary">校正機能が無効です</p>
         </div>
       ) : (
-      <>
-      {/* Header: issue count + controls */}
-      <div className="space-y-1.5">
-        {/* Row 1: issue count */}
-        <div className="flex items-center gap-1">
-          <h3 className="text-sm font-medium text-foreground-secondary">検出結果</h3>
-          <span className="text-xs text-foreground-tertiary">
-            {lintIssues.length}件
-          </span>
-        </div>
-        {/* Row 2: sort + refresh + settings */}
-        <div className="flex items-center gap-1">
-          <select
-            value={sortMode}
-            onChange={(e) => setSortMode(e.target.value as SortMode)}
-            className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-            title="並び替え"
-          >
-            <option value="category">種類別</option>
-            <option value="position">出現順</option>
-            <option value="severity">重要度順</option>
-          </select>
-          {onRefreshLinting && (
-            <button
-              onClick={onRefreshLinting}
-              disabled={isLinting}
-              className={clsx(
-                "p-1 rounded transition-colors",
-                isLinting
-                  ? "text-accent cursor-wait"
-                  : "text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover"
+        <>
+          {/* Header: issue count + controls */}
+          <div className="space-y-1.5">
+            {/* Row 1: issue count */}
+            <div className="flex items-center gap-1">
+              <h3 className="text-sm font-medium text-foreground-secondary">検出結果</h3>
+              <span className="text-xs text-foreground-tertiary">{lintIssues.length}件</span>
+            </div>
+            {/* Row 2: sort + refresh + settings */}
+            <div className="flex items-center gap-1">
+              <select
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as SortMode)}
+                className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                title="並び替え"
+              >
+                <option value="category">種類別</option>
+                <option value="position">出現順</option>
+                <option value="severity">重要度順</option>
+              </select>
+              {onRefreshLinting && (
+                <button
+                  onClick={onRefreshLinting}
+                  disabled={isLinting}
+                  className={clsx(
+                    "p-1 rounded transition-colors",
+                    isLinting
+                      ? "text-accent cursor-wait"
+                      : "text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover",
+                  )}
+                  title="全文を再検査"
+                  aria-label="全文を再検査"
+                >
+                  <RefreshCw className={clsx("w-3.5 h-3.5", isLinting && "animate-spin")} />
+                </button>
               )}
-              title="全文を再検査"
-              aria-label="全文を再検査"
-            >
-              <RefreshCw className={clsx("w-3.5 h-3.5", isLinting && "animate-spin")} />
-            </button>
-          )}
-          {onOpenLintingSettings && (
-            <button
-              onClick={onOpenLintingSettings}
-              className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
-              title="校正設定を開く"
-            >
-              <Settings className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-        {/* Row 3: preset selector */}
-        {onApplyLintPreset && (
-          <select
-            value={activeLintPresetId}
-            onChange={(e) => {
-              if (e.target.value) {
-                onApplyLintPreset(e.target.value);
-              }
-            }}
-            className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent w-full"
-            title="プリセットを適用"
-          >
-            {!activeLintPresetId && <option value="">カスタム</option>}
-            {Object.entries(LINT_PRESETS).map(([id, preset]) => (
-              <option key={id} value={id}>{preset.nameJa}</option>
-            ))}
-          </select>
-        )}
-      </div>
-
-      {/* Severity filter buttons */}
-      <div className="flex gap-1">
-        {filterOptions.map((option) => (
-          <button
-            key={option.value}
-            onClick={() => setSeverityFilter(option.value)}
-            title={option.label}
-            aria-label={option.label}
-            aria-pressed={severityFilter === option.value}
-            className={clsx(
-              "flex-1 flex items-center justify-center px-2 py-1.5 rounded transition-colors",
-              severityFilter === option.value
-                ? "bg-accent text-accent-foreground"
-                : "bg-background-tertiary text-foreground-secondary hover:text-foreground border border-border-secondary"
+              {onOpenLintingSettings && (
+                <button
+                  onClick={onOpenLintingSettings}
+                  className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
+                  title="校正設定を開く"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            {/* Row 3: preset selector */}
+            {onApplyLintPreset && (
+              <select
+                value={activeLintPresetId}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onApplyLintPreset(e.target.value);
+                  }
+                }}
+                className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent w-full"
+                title="プリセットを適用"
+              >
+                {!activeLintPresetId && <option value="">カスタム</option>}
+                {Object.entries(LINT_PRESETS).map(([id, preset]) => (
+                  <option key={id} value={id}>
+                    {preset.nameJa}
+                  </option>
+                ))}
+              </select>
             )}
-          >
-            {option.icon}
-          </button>
-        ))}
-      </div>
+          </div>
 
-      {/* Issue list */}
-      {filteredIssues.length === 0 ? (
-        <div className="pt-4 text-center">
-          <p className="text-sm text-foreground-tertiary">問題は検出されませんでした</p>
-        </div>
-      ) : sortMode === "category" ? (
-        renderGroupedList()
-      ) : (
-        renderFlatList()
-      )}
-      </>
+          {/* Severity filter buttons */}
+          <div className="flex gap-1">
+            {filterOptions.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setSeverityFilter(option.value)}
+                title={option.label}
+                aria-label={option.label}
+                aria-pressed={severityFilter === option.value}
+                className={clsx(
+                  "flex-1 flex items-center justify-center px-2 py-1.5 rounded transition-colors",
+                  severityFilter === option.value
+                    ? "bg-accent text-accent-foreground"
+                    : "bg-background-tertiary text-foreground-secondary hover:text-foreground border border-border-secondary",
+                )}
+              >
+                {option.icon}
+              </button>
+            ))}
+          </div>
+
+          {/* Issue list */}
+          {filteredIssues.length === 0 ? (
+            <div className="pt-4 text-center">
+              <p className="text-sm text-foreground-tertiary">問題は検出されませんでした</p>
+            </div>
+          ) : sortMode === "category" ? (
+            renderGroupedList()
+          ) : (
+            renderFlatList()
+          )}
+        </>
       )}
     </div>
   );

@@ -14,13 +14,13 @@ The Virtual File System (VFS) provides a unified API for file operations across 
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `lib/vfs/types.ts` | Core interfaces and type definitions |
-| `lib/vfs/index.ts` | Factory function `getVFS()` and environment detection |
-| `lib/electron-vfs.ts` | Electron renderer-side VFS implementation (IPC client) |
-| `lib/vfs/web-vfs.ts` | Web VFS implementation (File System Access API) |
-| `electron-vfs-ipc-handlers.js` | Electron main process IPC handlers |
+| File                           | Purpose                                                |
+| ------------------------------ | ------------------------------------------------------ |
+| `lib/vfs/types.ts`             | Core interfaces and type definitions                   |
+| `lib/vfs/index.ts`             | Factory function `getVFS()` and environment detection  |
+| `lib/electron-vfs.ts`          | Electron renderer-side VFS implementation (IPC client) |
+| `lib/vfs/web-vfs.ts`           | Web VFS implementation (File System Access API)        |
+| `electron-vfs-ipc-handlers.js` | Electron main process IPC handlers                     |
 
 ---
 
@@ -113,8 +113,8 @@ interface VirtualFileSystem {
 interface VFSFileMetadata {
   name: string;
   size: number;
-  lastModified: number;    // Unix timestamp (ms)
-  type: string;            // MIME type or extension
+  lastModified: number; // Unix timestamp (ms)
+  type: string; // MIME type or extension
 }
 
 interface VFSEntry {
@@ -208,17 +208,17 @@ vfs.watchFile?.("/path/to/file.mdi", (event) => {
 
 All IPC channels use the `vfs:` prefix. The main process validates every request against the per-window security context.
 
-| Channel | Direction | Purpose |
-|---------|-----------|---------|
-| `vfs:open-directory` | Renderer -> Main | Show directory picker, register root |
-| `vfs:read-file` | Renderer -> Main | Read file contents (UTF-8) |
-| `vfs:write-file` | Renderer -> Main | Write file (open -> write -> sync -> close) |
-| `vfs:read-directory` | Renderer -> Main | List directory entries |
-| `vfs:stat` | Renderer -> Main | Get file metadata |
-| `vfs:mkdir` | Renderer -> Main | Create directory (recursive) |
-| `vfs:delete` | Renderer -> Main | Delete file or directory |
-| `vfs:rename` | Renderer -> Main | Rename / move file |
-| `vfs:set-root` | Renderer -> Main | Set allowed root for a window |
+| Channel              | Direction        | Purpose                                     |
+| -------------------- | ---------------- | ------------------------------------------- |
+| `vfs:open-directory` | Renderer -> Main | Show directory picker, register root        |
+| `vfs:read-file`      | Renderer -> Main | Read file contents (UTF-8)                  |
+| `vfs:write-file`     | Renderer -> Main | Write file (open -> write -> sync -> close) |
+| `vfs:read-directory` | Renderer -> Main | List directory entries                      |
+| `vfs:stat`           | Renderer -> Main | Get file metadata                           |
+| `vfs:mkdir`          | Renderer -> Main | Create directory (recursive)                |
+| `vfs:delete`         | Renderer -> Main | Delete file or directory                    |
+| `vfs:rename`         | Renderer -> Main | Rename / move file                          |
+| `vfs:set-root`       | Renderer -> Main | Set allowed root for a window               |
 
 ---
 
@@ -251,15 +251,15 @@ Paths selected through Electron's native file dialog are tracked in an LRU Map (
 
 ## Platform Comparison
 
-| Feature | Electron | Web |
-|---------|----------|-----|
-| Path format | Absolute (`/Users/.../file.mdi`) | Relative (from directory handle root) |
-| File watching | Native `fs.watch` + polling fallback | Polling only (5s interval) |
-| Rename | Native `fs.rename` (atomic) | Simulated via copy + delete |
-| Permissions | Per-window `allowedRoots` + denylist | Browser sandbox (user grants access) |
-| `getRootPath()` | Available (returns absolute path) | Not available |
-| Write safety | Explicit `open -> write -> sync -> close` | File System Access API handles it |
-| Network drives | Supported (explicit sync for compatibility) | Not supported |
+| Feature         | Electron                                    | Web                                   |
+| --------------- | ------------------------------------------- | ------------------------------------- |
+| Path format     | Absolute (`/Users/.../file.mdi`)            | Relative (from directory handle root) |
+| File watching   | Native `fs.watch` + polling fallback        | Polling only (5s interval)            |
+| Rename          | Native `fs.rename` (atomic)                 | Simulated via copy + delete           |
+| Permissions     | Per-window `allowedRoots` + denylist        | Browser sandbox (user grants access)  |
+| `getRootPath()` | Available (returns absolute path)           | Not available                         |
+| Write safety    | Explicit `open -> write -> sync -> close`   | File System Access API handles it     |
+| Network drives  | Supported (explicit sync for compatibility) | Not supported                         |
 
 ---
 

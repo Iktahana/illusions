@@ -3,7 +3,7 @@
 // Sessions survive React component mount/unmount and are identified by a
 // main-process-generated sessionId.
 
-'use strict'
+"use strict";
 
 /** @typedef {'active'|'exited'|'killed'} SessionStatus */
 
@@ -20,23 +20,23 @@
  * @property {string[]}      outputBuffer   - Ring buffer of last OUTPUT_BUFFER_LINES lines
  */
 
-const MAX_SESSIONS_PER_WINDOW = 10
-const MAX_SESSIONS_GLOBAL = 20
-const OUTPUT_BUFFER_LINES = 1000
+const MAX_SESSIONS_PER_WINDOW = 10;
+const MAX_SESSIONS_GLOBAL = 20;
+const OUTPUT_BUFFER_LINES = 1000;
 
 /** @type {Map<string, SessionEntry>} */
-const registry = new Map()
+const registry = new Map();
 
 /** Monotonically increasing counter for session IDs */
-let sessionCounter = 0
+let sessionCounter = 0;
 
 /**
  * Generate a unique session ID.
  * @returns {string}
  */
 function generateSessionId() {
-  sessionCounter += 1
-  return `term-${sessionCounter}-${Date.now()}`
+  sessionCounter += 1;
+  return `term-${sessionCounter}-${Date.now()}`;
 }
 
 /**
@@ -45,11 +45,11 @@ function generateSessionId() {
  * @returns {number}
  */
 function countSessionsForWindow(webContentsId) {
-  let count = 0
+  let count = 0;
   for (const entry of registry.values()) {
-    if (entry.webContentsId === webContentsId) count += 1
+    if (entry.webContentsId === webContentsId) count += 1;
   }
-  return count
+  return count;
 }
 
 /**
@@ -60,10 +60,10 @@ function countSessionsForWindow(webContentsId) {
  */
 function appendToOutputBuffer(entry, data) {
   // Split on newlines but preserve partial lines at the end
-  const lines = data.split('\n')
-  entry.outputBuffer.push(...lines)
+  const lines = data.split("\n");
+  entry.outputBuffer.push(...lines);
   if (entry.outputBuffer.length > OUTPUT_BUFFER_LINES) {
-    entry.outputBuffer.splice(0, entry.outputBuffer.length - OUTPUT_BUFFER_LINES)
+    entry.outputBuffer.splice(0, entry.outputBuffer.length - OUTPUT_BUFFER_LINES);
   }
 }
 
@@ -77,7 +77,7 @@ function appendToOutputBuffer(entry, data) {
  * @returns {SessionEntry}
  */
 function addSession({ ptyProcess, webContentsId, shell, cwd }) {
-  const sessionId = generateSessionId()
+  const sessionId = generateSessionId();
   /** @type {SessionEntry} */
   const entry = {
     sessionId,
@@ -85,13 +85,13 @@ function addSession({ ptyProcess, webContentsId, shell, cwd }) {
     webContentsId,
     shell,
     cwd,
-    status: 'active',
+    status: "active",
     exitCode: null,
     createdAt: Date.now(),
     outputBuffer: [],
-  }
-  registry.set(sessionId, entry)
-  return entry
+  };
+  registry.set(sessionId, entry);
+  return entry;
 }
 
 /**
@@ -100,7 +100,7 @@ function addSession({ ptyProcess, webContentsId, shell, cwd }) {
  * @returns {SessionEntry|null}
  */
 function getSession(sessionId) {
-  return registry.get(sessionId) ?? null
+  return registry.get(sessionId) ?? null;
 }
 
 /**
@@ -108,7 +108,7 @@ function getSession(sessionId) {
  * @param {string} sessionId
  */
 function removeSession(sessionId) {
-  registry.delete(sessionId)
+  registry.delete(sessionId);
 }
 
 /**
@@ -117,15 +117,15 @@ function removeSession(sessionId) {
  * @param {string} sessionId
  */
 function killSession(sessionId) {
-  const entry = registry.get(sessionId)
-  if (!entry) return
-  if (entry.status !== 'active') return
+  const entry = registry.get(sessionId);
+  if (!entry) return;
+  if (entry.status !== "active") return;
 
-  entry.status = 'killed'
+  entry.status = "killed";
   try {
-    entry.ptyProcess.kill()
+    entry.ptyProcess.kill();
   } catch (err) {
-    console.warn(`[PTY] Error killing session ${sessionId}:`, err)
+    console.warn(`[PTY] Error killing session ${sessionId}:`, err);
   }
 }
 
@@ -135,8 +135,8 @@ function killSession(sessionId) {
  */
 function killSessionsForWindow(webContentsId) {
   for (const entry of registry.values()) {
-    if (entry.webContentsId === webContentsId && entry.status === 'active') {
-      killSession(entry.sessionId)
+    if (entry.webContentsId === webContentsId && entry.status === "active") {
+      killSession(entry.sessionId);
     }
   }
 }
@@ -146,8 +146,8 @@ function killSessionsForWindow(webContentsId) {
  */
 function killAllSessions() {
   for (const entry of registry.values()) {
-    if (entry.status === 'active') {
-      killSession(entry.sessionId)
+    if (entry.status === "active") {
+      killSession(entry.sessionId);
     }
   }
 }
@@ -166,4 +166,4 @@ module.exports = {
   killSession,
   killSessionsForWindow,
   killAllSessions,
-}
+};

@@ -93,7 +93,7 @@ export function useEditorLifecycle({
         incrementEditorKey();
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
   }, []);
 
   useEffect(() => {
@@ -120,19 +120,22 @@ export function useEditorLifecycle({
     setRecoveryExiting,
   ]);
 
-  const insertTextAtSelectionOrAppend = useCallback((text: string) => {
-    if (editorViewInstance) {
-      const { state, dispatch } = editorViewInstance;
-      const { from, to } = state.selection;
-      const tr = state.tr.insertText(text, from, to);
-      dispatch(tr);
-    } else {
-      const currentContent = contentRef.current;
-      const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
-      setContent(newContent);
-      incrementEditorKey();
-    }
-  }, [editorViewInstance, contentRef, setContent, incrementEditorKey]);
+  const insertTextAtSelectionOrAppend = useCallback(
+    (text: string) => {
+      if (editorViewInstance) {
+        const { state, dispatch } = editorViewInstance;
+        const { from, to } = state.selection;
+        const tr = state.tr.insertText(text, from, to);
+        dispatch(tr);
+      } else {
+        const currentContent = contentRef.current;
+        const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
+        setContent(newContent);
+        incrementEditorKey();
+      }
+    },
+    [editorViewInstance, contentRef, setContent, incrementEditorKey],
+  );
 
   const handlePasteAsPlaintext = useCallback(async () => {
     try {
@@ -156,9 +159,12 @@ export function useEditorLifecycle({
     }
   }, [insertTextAtSelectionOrAppend, isElectron]);
 
-  const handleInsertText = useCallback((text: string) => {
-    insertTextAtSelectionOrAppend(text);
-  }, [insertTextAtSelectionOrAppend]);
+  const handleInsertText = useCallback(
+    (text: string) => {
+      insertTextAtSelectionOrAppend(text);
+    },
+    [insertTextAtSelectionOrAppend],
+  );
 
   const handleChapterClick = useCallback((anchorId: string) => {
     if (!anchorId) return;

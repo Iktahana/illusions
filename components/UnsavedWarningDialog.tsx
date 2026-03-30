@@ -19,9 +19,7 @@ export default function UnsavedWarningDialog({
 }: UnsavedWarningDialogProps) {
   return (
     <GlassDialog isOpen={isOpen} onBackdropClick={onCancel}>
-      <h2 className="text-lg font-semibold text-foreground">
-        未保存の変更があります
-      </h2>
+      <h2 className="text-lg font-semibold text-foreground">未保存の変更があります</h2>
       <p className="mt-2 text-sm text-foreground-secondary">
         「{fileName}」への変更を保存しますか？
       </p>

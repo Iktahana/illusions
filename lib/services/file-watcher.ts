@@ -70,7 +70,10 @@ function cleanupExpiredSuppressions(): void {
 }
 
 // Start periodic cleanup timer (unref so it does not keep the process alive)
-const suppressionCleanupTimer = setInterval(cleanupExpiredSuppressions, SUPPRESSION_CLEANUP_INTERVAL_MS);
+const suppressionCleanupTimer = setInterval(
+  cleanupExpiredSuppressions,
+  SUPPRESSION_CLEANUP_INTERVAL_MS,
+);
 if (typeof suppressionCleanupTimer === "object" && "unref" in suppressionCleanupTimer) {
   suppressionCleanupTimer.unref();
 }
@@ -87,7 +90,10 @@ if (typeof suppressionCleanupTimer === "object" && "unref" in suppressionCleanup
  * @param filePath - The file path to suppress notifications for
  * @param durationMs - How long to suppress (default 3000ms)
  */
-export function suppressFileWatch(filePath: string, durationMs: number = SAVE_SUPPRESSION_MS): void {
+export function suppressFileWatch(
+  filePath: string,
+  durationMs: number = SAVE_SUPPRESSION_MS,
+): void {
   saveSuppression.set(filePath, Date.now() + durationMs);
 }
 
@@ -250,7 +256,7 @@ class WebFileWatcher implements FileWatcher {
       if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
         console.warn(
           `File watcher stopped after ${MAX_CONSECUTIVE_FAILURES} consecutive failures: ${this.path} / ` +
-          `ファイル監視を ${MAX_CONSECUTIVE_FAILURES} 回連続失敗のため停止しました: ${this.path}`
+            `ファイル監視を ${MAX_CONSECUTIVE_FAILURES} 回連続失敗のため停止しました: ${this.path}`,
         );
         this.stop();
       }
@@ -393,16 +399,13 @@ class ElectronFileWatcher implements FileWatcher {
       ) {
         console.warn(
           `File watcher stopping due to permission revocation: ${this.path} / ` +
-          `権限が取り消されたためファイル監視を停止します: ${this.path}`
+            `権限が取り消されたためファイル監視を停止します: ${this.path}`,
         );
         this.stop();
         return;
       }
       // Other errors (file deleted, etc.) are non-fatal; just log
-      console.warn(
-        `File watcher failed to read file: ${this.path}`,
-        error
-      );
+      console.warn(`File watcher failed to read file: ${this.path}`, error);
     }
   }
 }

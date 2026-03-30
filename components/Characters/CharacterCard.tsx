@@ -34,9 +34,7 @@ export default function CharacterCard({
       >
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground truncate">
-              {character.name}
-            </h3>
+            <h3 className="font-semibold text-foreground truncate">{character.name}</h3>
             {character.aliases.length > 0 && (
               <p className="text-xs text-foreground-tertiary mt-0.5">
                 別名: {character.aliases.join("、")}
@@ -151,9 +149,7 @@ export default function CharacterCard({
 
               {character.appearance && (
                 <div>
-                  <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
-                    外見
-                  </h4>
+                  <h4 className="text-xs font-semibold text-foreground-secondary mb-1">外見</h4>
                   <p className="text-sm text-foreground whitespace-pre-wrap">
                     {character.appearance}
                   </p>
@@ -162,9 +158,7 @@ export default function CharacterCard({
 
               {character.personality && (
                 <div>
-                  <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
-                    性格
-                  </h4>
+                  <h4 className="text-xs font-semibold text-foreground-secondary mb-1">性格</h4>
                   <p className="text-sm text-foreground whitespace-pre-wrap">
                     {character.personality}
                   </p>
@@ -173,9 +167,7 @@ export default function CharacterCard({
 
               {character.relationships && (
                 <div>
-                  <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
-                    関係性
-                  </h4>
+                  <h4 className="text-xs font-semibold text-foreground-secondary mb-1">関係性</h4>
                   <p className="text-sm text-foreground whitespace-pre-wrap">
                     {character.relationships}
                   </p>

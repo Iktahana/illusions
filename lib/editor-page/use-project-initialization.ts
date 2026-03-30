@@ -40,64 +40,72 @@ export function useProjectInitialization({
   setProjectMode,
 }: UseProjectInitializationParams): UseProjectInitializationResult {
   /** Load a project's main file content into the editor */
-  const loadProjectContent = useCallback(async (project: ProjectMode) => {
-    try {
-      const projectService = getProjectService();
-      const mainContent = await projectService.readProjectContent(project);
-      const mainFileName = project.metadata.mainFile;
+  const loadProjectContent = useCallback(
+    async (project: ProjectMode) => {
+      try {
+        const projectService = getProjectService();
+        const mainContent = await projectService.readProjectContent(project);
+        const mainFileName = project.metadata.mainFile;
 
-      if (isElectron && project.rootPath) {
-        tabLoadSystemFile(`${project.rootPath}/${mainFileName}`, mainContent);
-      } else {
-        tabLoadSystemFile(mainFileName, mainContent);
+        if (isElectron && project.rootPath) {
+          tabLoadSystemFile(`${project.rootPath}/${mainFileName}`, mainContent);
+        } else {
+          tabLoadSystemFile(mainFileName, mainContent);
+        }
+
+        incrementEditorKey();
+      } catch (error) {
+        console.error("Failed to load project main file:", error);
+        notificationManager.error(
+          "プロジェクトのメインファイルを読み込めませんでした。ファイルが移動または削除された可能性があります。",
+        );
       }
-
-      incrementEditorKey();
-    } catch (error) {
-      console.error("Failed to load project main file:", error);
-      notificationManager.error(
-        "プロジェクトのメインファイルを読み込めませんでした。ファイルが移動または削除された可能性があります。"
-      );
-    }
-  }, [isElectron, tabLoadSystemFile, incrementEditorKey]);
+    },
+    [isElectron, tabLoadSystemFile, incrementEditorKey],
+  );
 
   /** Read project.json from a restored directory handle and enter project mode */
-  const openRestoredProject = useCallback(async (handle: FileSystemDirectoryHandle) => {
-    try {
-      const { metadata, illusionsDir } = await ensureProjectJson(handle);
-
-      let workspaceState: ProjectMode["workspaceState"];
+  const openRestoredProject = useCallback(
+    async (handle: FileSystemDirectoryHandle) => {
       try {
-        const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json");
-        const workspaceText = await readFileHandle(workspaceJsonHandle as Parameters<typeof readFileHandle>[0]);
-        workspaceState = JSON.parse(workspaceText) as ProjectMode["workspaceState"];
-      } catch {
-        workspaceState = getDefaultWorkspaceState();
+        const { metadata, illusionsDir } = await ensureProjectJson(handle);
+
+        let workspaceState: ProjectMode["workspaceState"];
+        try {
+          const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json");
+          const workspaceText = await readFileHandle(
+            workspaceJsonHandle as Parameters<typeof readFileHandle>[0],
+          );
+          workspaceState = JSON.parse(workspaceText) as ProjectMode["workspaceState"];
+        } catch {
+          workspaceState = getDefaultWorkspaceState();
+        }
+
+        const mainFileHandle = await handle.getFileHandle(metadata.mainFile);
+
+        const project: ProjectMode = {
+          type: "project",
+          projectId: metadata.projectId,
+          name: metadata.name,
+          rootHandle: handle,
+          mainFileHandle,
+          metadata,
+          workspaceState,
+        };
+
+        setProjectMode(project);
+        // Skip loading main file during auto-restore on Electron — tab persistence
+        // will restore the previously open tabs (or empty state).
+        // On Web, always load so the main file is available.
+        if (!isAutoRestoringRef.current || !isElectron) {
+          await loadProjectContent(project);
+        }
+      } catch (error) {
+        console.error("Failed to load restored project:", error);
       }
-
-      const mainFileHandle = await handle.getFileHandle(metadata.mainFile);
-
-      const project: ProjectMode = {
-        type: "project",
-        projectId: metadata.projectId,
-        name: metadata.name,
-        rootHandle: handle,
-        mainFileHandle,
-        metadata,
-        workspaceState,
-      };
-
-      setProjectMode(project);
-      // Skip loading main file during auto-restore on Electron — tab persistence
-      // will restore the previously open tabs (or empty state).
-      // On Web, always load so the main file is available.
-      if (!isAutoRestoringRef.current || !isElectron) {
-        await loadProjectContent(project);
-      }
-    } catch (error) {
-      console.error("Failed to load restored project:", error);
-    }
-  }, [setProjectMode, loadProjectContent, isElectron, isAutoRestoringRef]);
+    },
+    [setProjectMode, loadProjectContent, isElectron, isAutoRestoringRef],
+  );
 
   return { loadProjectContent, openRestoredProject };
 }

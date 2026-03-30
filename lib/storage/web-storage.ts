@@ -214,9 +214,7 @@ export class WebStorageProvider implements IStorageService {
       const allFiles = await this.db.recentFiles.toArray();
       if (allFiles.length > 10) {
         // 新しい順に並べ、古いものを削除
-        const sorted = allFiles.sort(
-          (a, b) => b.data.lastModified - a.data.lastModified
-        );
+        const sorted = allFiles.sort((a, b) => b.data.lastModified - a.data.lastModified);
         const toDelete = sorted.slice(10);
         await this.db.recentFiles.bulkDelete(toDelete.map((f) => f.id));
       }
@@ -305,12 +303,12 @@ export class WebStorageProvider implements IStorageService {
     try {
       const stored = await this.db.editorBuffer.get("editor_buffer");
       if (!stored?.data) return null;
-      
+
       // fileHandle があれば復元する
       if (stored.fileHandle) {
         stored.data.fileHandle = stored.fileHandle;
       }
-      
+
       return stored.data;
     } catch (error) {
       console.error("エディタバッファの読み込みに失敗しました:", error);

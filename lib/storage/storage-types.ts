@@ -25,11 +25,11 @@ export interface ProjectMetadata {
   id: string;
   name: string;
   type: "local";
-  
+
   // ローカルファイル情報
   localPath?: string;
   fileHandle?: FileSystemFileHandle; // Web only
-  
+
   // プロジェクト統計
   metadata: {
     wordCount: number;
@@ -78,7 +78,10 @@ export interface AppState {
 
   // リンティング設定
   lintingEnabled?: boolean;
-  lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>;
+  lintingRuleConfigs?: Record<
+    string,
+    { enabled: boolean; severity: Severity; skipDialogue?: boolean }
+  >;
 
   // LLM設定
   llmEnabled?: boolean;

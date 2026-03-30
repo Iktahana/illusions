@@ -28,9 +28,7 @@ import type {
 // In-memory table mock (simulates a Dexie Table)
 // -----------------------------------------------------------------------
 
-function createMockTable<T extends Record<string, any>>(
-  primaryKey: string
-) {
+function createMockTable<T extends Record<string, any>>(primaryKey: string) {
   const records = new Map<string, T>();
 
   return {
@@ -130,9 +128,7 @@ function makeRecentFile(overrides: Partial<RecentFile> = {}): RecentFile {
   };
 }
 
-function makeEditorBuffer(
-  overrides: Partial<EditorBuffer> = {}
-): EditorBuffer {
+function makeEditorBuffer(overrides: Partial<EditorBuffer> = {}): EditorBuffer {
   return {
     content: "Draft content",
     timestamp: Date.now(),
@@ -251,7 +247,7 @@ describe("WebStorageProvider", () => {
             name: `file${i}.mdi`,
             path: `/file${i}.mdi`,
             lastModified: i * 1000,
-          })
+          }),
         );
       }
 
@@ -274,9 +270,7 @@ describe("WebStorageProvider", () => {
 
     it("does not throw when removing a non-existent path", async () => {
       const provider = createProvider();
-      await expect(
-        provider.removeFromRecent("/nonexistent.mdi")
-      ).resolves.not.toThrow();
+      await expect(provider.removeFromRecent("/nonexistent.mdi")).resolves.not.toThrow();
     });
   });
 
@@ -285,9 +279,7 @@ describe("WebStorageProvider", () => {
       const provider = createProvider();
 
       await provider.addToRecent(makeRecentFile({ path: "/a.mdi" }));
-      await provider.addToRecent(
-        makeRecentFile({ path: "/b.mdi", name: "b.mdi" })
-      );
+      await provider.addToRecent(makeRecentFile({ path: "/b.mdi", name: "b.mdi" }));
       await provider.clearRecent();
 
       const files = await provider.getRecentFiles();

@@ -30,16 +30,18 @@ export interface PermissionStatus {
  * Chrome/Edge expose these methods on FileSystemHandle.
  */
 interface FileSystemHandleWithPermissions extends FileSystemHandle {
-  queryPermission(descriptor: { mode: "read" | "readwrite" }): Promise<"granted" | "denied" | "prompt">;
-  requestPermission(descriptor: { mode: "read" | "readwrite" }): Promise<"granted" | "denied" | "prompt">;
+  queryPermission(descriptor: {
+    mode: "read" | "readwrite";
+  }): Promise<"granted" | "denied" | "prompt">;
+  requestPermission(descriptor: {
+    mode: "read" | "readwrite";
+  }): Promise<"granted" | "denied" | "prompt">;
 }
 
 /**
  * Type guard to check if a handle supports the permission API.
  */
-function hasPermissionMethods(
-  handle: FileSystemHandle
-): handle is FileSystemHandleWithPermissions {
+function hasPermissionMethods(handle: FileSystemHandle): handle is FileSystemHandleWithPermissions {
   return (
     "queryPermission" in handle &&
     "requestPermission" in handle &&
@@ -77,9 +79,7 @@ export class PermissionManager {
    * ディレクトリハンドルの現在の権限状態を確認する。
    * 権限プロンプトはトリガーしないため、ユーザージェスチャーなしで呼び出せる。
    */
-  async checkDirectoryPermission(
-    handle: FileSystemDirectoryHandle
-  ): Promise<PermissionStatus> {
+  async checkDirectoryPermission(handle: FileSystemDirectoryHandle): Promise<PermissionStatus> {
     if (!hasPermissionMethods(handle)) {
       // If permission API is not available, assume granted
       // (fallback for environments that don't support queryPermission)
@@ -124,9 +124,7 @@ export class PermissionManager {
    *
    * @returns Updated permission status after the request
    */
-  async requestWritePermission(
-    handle: FileSystemDirectoryHandle
-  ): Promise<PermissionStatus> {
+  async requestWritePermission(handle: FileSystemDirectoryHandle): Promise<PermissionStatus> {
     if (!hasPermissionMethods(handle)) {
       return { status: "granted", canWrite: true, canRead: true };
     }
@@ -160,9 +158,7 @@ export class PermissionManager {
    *
    * @returns Updated permission status after the request
    */
-  async requestReadPermission(
-    handle: FileSystemDirectoryHandle
-  ): Promise<PermissionStatus> {
+  async requestReadPermission(handle: FileSystemDirectoryHandle): Promise<PermissionStatus> {
     if (!hasPermissionMethods(handle)) {
       return { status: "granted", canWrite: true, canRead: true };
     }
@@ -192,9 +188,7 @@ export class PermissionManager {
    *
    * ファイルハンドルの権限を確認する便利メソッド。
    */
-  async checkFilePermission(
-    handle: FileSystemFileHandle
-  ): Promise<PermissionStatus> {
+  async checkFilePermission(handle: FileSystemFileHandle): Promise<PermissionStatus> {
     if (!hasPermissionMethods(handle)) {
       return { status: "granted", canWrite: true, canRead: true };
     }

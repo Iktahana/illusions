@@ -4,7 +4,13 @@ import { useCallback, useEffect, useRef } from "react";
 
 import type { DiffTabContextValue } from "@/contexts/DiffTabContext";
 import type { EditorTabState } from "@/lib/tab-manager/tab-types";
-import { isDiffTab, isEditorTab, isTerminalTab, type DiffTabState, type TabState } from "@/lib/tab-manager/tab-types";
+import {
+  isDiffTab,
+  isEditorTab,
+  isTerminalTab,
+  type DiffTabState,
+  type TabState,
+} from "@/lib/tab-manager/tab-types";
 
 interface UseDiffTabsParams {
   tabs: TabState[];
@@ -124,10 +130,7 @@ export function useDiffTabs({
 
     if (removedTabIds.size > 0) {
       const orphanedDiffTabIds = tabs
-        .filter(
-          (tab): tab is DiffTabState =>
-            isDiffTab(tab) && removedTabIds.has(tab.sourceTabId),
-        )
+        .filter((tab): tab is DiffTabState => isDiffTab(tab) && removedTabIds.has(tab.sourceTabId))
         .map((tab) => tab.id);
 
       for (const diffTabId of orphanedDiffTabIds) {

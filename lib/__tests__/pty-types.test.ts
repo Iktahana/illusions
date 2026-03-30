@@ -119,9 +119,7 @@ describe("TerminalSource values", () => {
 describe("PTY IPC channel definitions on window.electronAPI", () => {
   it("window.electronAPI is undefined in a non-Electron (jsdom) environment", () => {
     // In a browser/test environment, electronAPI should not be present.
-    expect(
-      (window as typeof window & { electronAPI?: unknown }).electronAPI,
-    ).toBeUndefined();
+    expect((window as typeof window & { electronAPI?: unknown }).electronAPI).toBeUndefined();
   });
 
   it("a mock electronAPI.pty can be constructed with the expected shape", () => {
@@ -129,12 +127,9 @@ describe("PTY IPC channel definitions on window.electronAPI", () => {
     // If the TypeScript interface changes incompatibly, this mock will produce
     // a compile-time error.
     const mockPty = {
-      spawn: async (_opts?: {
-        cwd?: string;
-        shell?: string;
-        cols?: number;
-        rows?: number;
-      }) => ({ sessionId: "sess-001" }),
+      spawn: async (_opts?: { cwd?: string; shell?: string; cols?: number; rows?: number }) => ({
+        sessionId: "sess-001",
+      }),
       attach: async (_sessionId: string) => ({
         sessionId: "sess-001",
         status: "active" as const,
@@ -154,11 +149,8 @@ describe("PTY IPC channel definitions on window.electronAPI", () => {
         cwd: "/home/user",
         createdAt: Date.now(),
       }),
-      onData: (_cb: (payload: { sessionId: string; data: string }) => void) =>
-        () => {},
-      onExit: (
-        _cb: (payload: { sessionId: string; exitCode: number }) => void,
-      ) => () => {},
+      onData: (_cb: (payload: { sessionId: string; data: string }) => void) => () => {},
+      onExit: (_cb: (payload: { sessionId: string; exitCode: number }) => void) => () => {},
     };
 
     expect(typeof mockPty.spawn).toBe("function");

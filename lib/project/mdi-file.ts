@@ -26,14 +26,19 @@ export interface SaveMdiParams {
 /** Default file name for each file type */
 function getDefaultFileName(fileType: SupportedFileExtension): string {
   switch (fileType) {
-    case ".md": return "untitled.md";
-    case ".txt": return "untitled.txt";
-    default: return "untitled.mdi";
+    case ".md":
+      return "untitled.md";
+    case ".txt":
+      return "untitled.txt";
+    default:
+      return "untitled.mdi";
   }
 }
 
 /** Save dialog file type filters per file type */
-function getSaveFilters(fileType: SupportedFileExtension): Array<{ description: string; accept: Record<string, string[]> }> {
+function getSaveFilters(
+  fileType: SupportedFileExtension,
+): Array<{ description: string; accept: Record<string, string[]> }> {
   switch (fileType) {
     case ".md":
       return [
@@ -127,9 +132,7 @@ export async function openMdiFile(): Promise<OpenMdiResult | null> {
  * .illusions MDI Documentを保存する（可能なら既存ディスクリプタを再利用）
  * 新規の場合は「名前を付けて保存」相当のダイアログを出す
  */
-export async function saveMdiFile(
-  params: SaveMdiParams
-): Promise<OpenMdiResult | null> {
+export async function saveMdiFile(params: SaveMdiParams): Promise<OpenMdiResult | null> {
   const env = getRuntimeEnvironment();
   const { descriptor, content, fileType = ".mdi" } = params;
 
@@ -143,9 +146,7 @@ export async function saveMdiFile(
       }
       // Check for structured error response from main process
       if (typeof result === "object" && "success" in result && !result.success) {
-        throw new Error(
-          (result as { error?: string }).error ?? "ファイルの保存に失敗しました"
-        );
+        throw new Error((result as { error?: string }).error ?? "ファイルの保存に失敗しました");
       }
       const savedPath = result as string;
       const name = basename(savedPath);
@@ -254,17 +255,13 @@ function ensureExtension(name: string, fileType: SupportedFileExtension): string
   return `${withoutExt}${fileType}`;
 }
 
-function hasShowOpenFilePicker(
-  w: Window
-): w is Window & {
+function hasShowOpenFilePicker(w: Window): w is Window & {
   showOpenFilePicker: (o?: object) => Promise<FileSystemFileHandle[]>;
 } {
   return "showOpenFilePicker" in w;
 }
 
-function hasShowSaveFilePicker(
-  w: Window
-): w is Window & {
+function hasShowSaveFilePicker(w: Window): w is Window & {
   showSaveFilePicker: (o?: object) => Promise<FileSystemFileHandle>;
 } {
   return "showSaveFilePicker" in w;

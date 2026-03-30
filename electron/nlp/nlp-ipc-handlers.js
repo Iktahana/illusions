@@ -11,9 +11,9 @@
  * - nlp:analyze-word-frequency - Word frequency analysis
  */
 
-const { ipcMain } = require('electron');
-const path = require('path');
-const { nlpProcessor } = require('../../lib/nlp-backend/nlp-processor');
+const { ipcMain } = require("electron");
+const path = require("path");
+const { nlpProcessor } = require("../../lib/nlp-backend/nlp-processor");
 
 /**
  * Get default dictionary path for Electron environment.
@@ -24,14 +24,14 @@ const { nlpProcessor } = require('../../lib/nlp-backend/nlp-processor');
 function getDefaultDicPath() {
   try {
     // require.resolve('kuromoji') returns <kuromoji-root>/src/kuromoji.js
-    const kuromojiPath = require.resolve('kuromoji');
+    const kuromojiPath = require.resolve("kuromoji");
     const kuromojiSrcDir = path.dirname(kuromojiPath);
     const kuromojiRoot = path.dirname(kuromojiSrcDir);
-    const dicPath = path.join(kuromojiRoot, 'dict');
+    const dicPath = path.join(kuromojiRoot, "dict");
     return dicPath;
   } catch (error) {
-    console.error('[NLP IPC] Failed to resolve kuromoji path:', error);
-    return '/dict';
+    console.error("[NLP IPC] Failed to resolve kuromoji path:", error);
+    return "/dict";
   }
 }
 
@@ -48,18 +48,17 @@ async function ensureInitialized() {
  * Register all NLP-related IPC handlers
  */
 function registerNlpHandlers() {
-
   /**
    * Initialize NLP service
    * Handler: nlp:init
    */
-  ipcMain.handle('nlp:init', async () => {
+  ipcMain.handle("nlp:init", async () => {
     try {
       const resolvedPath = getDefaultDicPath();
       await nlpProcessor.init(resolvedPath);
       return { success: true };
     } catch (error) {
-      console.error('[NLP IPC] Init error:', error);
+      console.error("[NLP IPC] Init error:", error);
       return { success: false, error: error.message };
     }
   });
@@ -68,10 +67,10 @@ function registerNlpHandlers() {
    * Tokenize single paragraph
    * Handler: nlp:tokenize-paragraph
    */
-  ipcMain.handle('nlp:tokenize-paragraph', async (event, text) => {
+  ipcMain.handle("nlp:tokenize-paragraph", async (event, text) => {
     try {
-      if (typeof text !== 'string' || text.length === 0 || text.length > 1_000_000) {
-        throw new Error('Invalid text parameter');
+      if (typeof text !== "string" || text.length === 0 || text.length > 1_000_000) {
+        throw new Error("Invalid text parameter");
       }
       await ensureInitialized();
 
@@ -79,7 +78,7 @@ function registerNlpHandlers() {
 
       return tokens;
     } catch (error) {
-      console.error('[NLP IPC] Tokenize paragraph error:', error);
+      console.error("[NLP IPC] Tokenize paragraph error:", error);
       throw error;
     }
   });
@@ -88,16 +87,16 @@ function registerNlpHandlers() {
    * Tokenize document in batch
    * Handler: nlp:tokenize-document
    */
-  ipcMain.handle('nlp:tokenize-document', async (event, request) => {
+  ipcMain.handle("nlp:tokenize-document", async (event, request) => {
     try {
       const { paragraphs } = request;
 
       if (!Array.isArray(paragraphs) || paragraphs.length > 10_000) {
-        throw new Error('Invalid paragraphs parameter');
+        throw new Error("Invalid paragraphs parameter");
       }
       for (const p of paragraphs) {
-        if (typeof p?.text !== 'string' || typeof p?.pos !== 'number') {
-          throw new Error('Invalid paragraph structure');
+        if (typeof p?.text !== "string" || typeof p?.pos !== "number") {
+          throw new Error("Invalid paragraph structure");
         }
       }
 
@@ -114,17 +113,17 @@ function registerNlpHandlers() {
 
         // Send progress event every 10 paragraphs
         if ((i + 1) % 10 === 0 || i === total - 1) {
-          event.sender.send('nlp:tokenize-progress', {
+          event.sender.send("nlp:tokenize-progress", {
             completed: i + 1,
             total: total,
-            percentage: Math.round(((i + 1) / total) * 100)
+            percentage: Math.round(((i + 1) / total) * 100),
           });
         }
       }
 
       return results;
     } catch (error) {
-      console.error('[NLP IPC] Tokenize document error:', error);
+      console.error("[NLP IPC] Tokenize document error:", error);
       throw error;
     }
   });
@@ -133,20 +132,19 @@ function registerNlpHandlers() {
    * Analyze word frequency
    * Handler: nlp:analyze-word-frequency
    */
-  ipcMain.handle('nlp:analyze-word-frequency', async (event, text) => {
+  ipcMain.handle("nlp:analyze-word-frequency", async (event, text) => {
     try {
-      if (typeof text !== 'string' || text.length === 0 || text.length > 10_000_000) {
-        throw new Error('Invalid text parameter');
+      if (typeof text !== "string" || text.length === 0 || text.length > 10_000_000) {
+        throw new Error("Invalid text parameter");
       }
       await ensureInitialized();
       const result = await nlpProcessor.analyzeWordFrequency(text);
       return result.words;
     } catch (error) {
-      console.error('[NLP IPC] Analyze frequency error:', error);
+      console.error("[NLP IPC] Analyze frequency error:", error);
       throw error;
     }
   });
-
 }
 
 module.exports = { registerNlpHandlers };

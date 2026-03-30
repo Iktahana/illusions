@@ -39,9 +39,7 @@ export interface TerminalPanelProps {
 
 function resolveThemeColor(property: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
-  const raw = getComputedStyle(document.documentElement)
-    .getPropertyValue(property)
-    .trim();
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(property).trim();
   if (!raw) return fallback;
   // CSS values are in "R G B" space-separated format (used with rgb())
   return `rgb(${raw})`;
@@ -229,7 +227,7 @@ export default function TerminalPanel({
         // Ignore
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- settings are captured at init time; terminal is recreated on sessionId change
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- settings are captured at init time; terminal is recreated on sessionId change
   }, [sessionId, onExit]);
 
   useEffect(() => {

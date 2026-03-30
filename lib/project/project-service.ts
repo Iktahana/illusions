@@ -8,10 +8,7 @@
 import { getVFS } from "../vfs";
 import { getProjectManager } from "./project-manager";
 import { isElectronRenderer } from "../utils/runtime-env";
-import {
-  getDefaultEditorSettings,
-  getDefaultWorkspaceState,
-} from "./project-types";
+import { getDefaultEditorSettings, getDefaultWorkspaceState } from "./project-types";
 
 import type { VirtualFileSystem, VFSDirectoryHandle } from "../vfs/types";
 import type { ProjectManager } from "./project-manager";
@@ -63,9 +60,7 @@ interface WindowWithFilePicker {
 /**
  * Type guard for showOpenFilePicker support.
  */
-function hasShowOpenFilePicker(
-  w: Window
-): w is Window & WindowWithFilePicker {
+function hasShowOpenFilePicker(w: Window): w is Window & WindowWithFilePicker {
   return "showOpenFilePicker" in w;
 }
 
@@ -73,9 +68,7 @@ function hasShowOpenFilePicker(
  * Validate a project name for filesystem safety.
  * プロジェクト名がファイルシステムで安全かどうかを検証する。
  */
-export function validateProjectName(
-  name: string
-): { valid: boolean; error?: string } {
+export function validateProjectName(name: string): { valid: boolean; error?: string } {
   if (!name.trim()) {
     return { valid: false, error: "プロジェクト名を入力してください" };
   }
@@ -119,7 +112,7 @@ export class ProjectService {
    */
   async createProject(
     name: string,
-    fileExtension: SupportedFileExtension = ".mdi"
+    fileExtension: SupportedFileExtension = ".mdi",
   ): Promise<ProjectMode> {
     // Validate project name before proceeding
     const validation = validateProjectName(name);
@@ -155,10 +148,7 @@ export class ProjectService {
       lastModified: Date.now(),
       editorSettings: getDefaultEditorSettings(fileExtension),
     };
-    const projectJsonHandle = await illusionsDir.getFileHandle(
-      "project.json",
-      { create: true }
-    );
+    const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
     await projectJsonHandle.write(JSON.stringify(metadata, null, 2));
 
     // 6. Create main file with initial content in project directory
@@ -169,13 +159,10 @@ export class ProjectService {
 
     // 7. Create workspace.json
     const workspaceState = getDefaultWorkspaceState();
-    const workspaceJsonHandle = await illusionsDir.getFileHandle(
-      "workspace.json",
-      { create: true }
-    );
-    await workspaceJsonHandle.write(
-      JSON.stringify(workspaceState, null, 2)
-    );
+    const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json", {
+      create: true,
+    });
+    await workspaceJsonHandle.write(JSON.stringify(workspaceState, null, 2));
 
     // 8. Create history/ directory with empty index
     const historyDir = await illusionsDir.getDirectoryHandle("history", {
@@ -189,32 +176,24 @@ export class ProjectService {
     const historyIndexHandle = await historyDir.getFileHandle("index.json", {
       create: true,
     });
-    await historyIndexHandle.write(
-      JSON.stringify(historyIndex, null, 2)
-    );
+    await historyIndexHandle.write(JSON.stringify(historyIndex, null, 2));
 
     // 9. Extract native handles for IndexedDB persistence and ProjectMode.
     // VFS wrappers cannot be stored in IndexedDB (Structured Clone loses class methods).
     // VFS ラッパーは Structured Clone でメソッドが失われるため、ネイティブハンドルを使用する。
-    const nativeRootHandle = projectDirHandle.nativeDirectoryHandle
-      ?? (projectDirHandle as unknown as FileSystemDirectoryHandle);
-    const nativeMainFileHandle = mainFileHandle.nativeFileHandle
-      ?? (mainFileHandle as unknown as FileSystemFileHandle);
+    const nativeRootHandle =
+      projectDirHandle.nativeDirectoryHandle ??
+      (projectDirHandle as unknown as FileSystemDirectoryHandle);
+    const nativeMainFileHandle =
+      mainFileHandle.nativeFileHandle ?? (mainFileHandle as unknown as FileSystemFileHandle);
 
     // Save native handle to IndexedDB for persistence (Web only)
     if (!isElectronRenderer()) {
       try {
-        await this.projectManager.saveProjectHandle(
-          projectId,
-          nativeRootHandle,
-          name
-        );
+        await this.projectManager.saveProjectHandle(projectId, nativeRootHandle, name);
       } catch (error) {
         // IndexedDB may not be available in all contexts
-        console.warn(
-          "プロジェクトハンドルの永続化をスキップしました:",
-          error
-        );
+        console.warn("プロジェクトハンドルの永続化をスキップしました:", error);
       }
     }
 
@@ -227,9 +206,7 @@ export class ProjectService {
       if (parentPath) {
         projectRootPath = `${parentPath}/${name}`;
         if ("setRootPath" in this.vfs) {
-          (this.vfs as { setRootPath: (p: string) => void }).setRootPath(
-            projectRootPath
-          );
+          (this.vfs as { setRootPath: (p: string) => void }).setRootPath(projectRootPath);
         }
       }
     }
@@ -268,9 +245,7 @@ export class ProjectService {
     // Read workspace.json (create defaults if missing)
     let workspaceState: WorkspaceState;
     try {
-      const workspaceJsonHandle = await illusionsDir.getFileHandle(
-        "workspace.json"
-      );
+      const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json");
       const workspaceText = await workspaceJsonHandle.read();
       workspaceState = JSON.parse(workspaceText) as WorkspaceState;
     } catch {
@@ -279,15 +254,14 @@ export class ProjectService {
     }
 
     // Get main file handle
-    const mainFileHandle = await rootDirHandle.getFileHandle(
-      metadata.mainFile
-    );
+    const mainFileHandle = await rootDirHandle.getFileHandle(metadata.mainFile);
 
     // Extract native handles (see createProject comment for rationale)
-    const nativeRootHandle = rootDirHandle.nativeDirectoryHandle
-      ?? (rootDirHandle as unknown as FileSystemDirectoryHandle);
-    const nativeMainFileHandle = mainFileHandle.nativeFileHandle
-      ?? (mainFileHandle as unknown as FileSystemFileHandle);
+    const nativeRootHandle =
+      rootDirHandle.nativeDirectoryHandle ??
+      (rootDirHandle as unknown as FileSystemDirectoryHandle);
+    const nativeMainFileHandle =
+      mainFileHandle.nativeFileHandle ?? (mainFileHandle as unknown as FileSystemFileHandle);
 
     // Save native handle to IndexedDB (Web only)
     if (!isElectronRenderer()) {
@@ -295,13 +269,10 @@ export class ProjectService {
         await this.projectManager.saveProjectHandle(
           metadata.projectId,
           nativeRootHandle,
-          metadata.name
+          metadata.name,
         );
       } catch (error) {
-        console.warn(
-          "プロジェクトハンドルの永続化をスキップしました:",
-          error
-        );
+        console.warn("プロジェクトハンドルの永続化をスキップしました:", error);
       }
     }
 
@@ -313,7 +284,7 @@ export class ProjectService {
       mainFileHandle: nativeMainFileHandle,
       metadata,
       workspaceState,
-      rootPath: isElectronRenderer() ? this.vfs.getRootPath?.() ?? undefined : undefined,
+      rootPath: isElectronRenderer() ? (this.vfs.getRootPath?.() ?? undefined) : undefined,
     };
   }
 
@@ -328,9 +299,7 @@ export class ProjectService {
     const rootDirHandle = await this.getVFSDirectoryHandle(project);
 
     // Write main file
-    const mainFileHandle = await rootDirHandle.getFileHandle(
-      project.metadata.mainFile
-    );
+    const mainFileHandle = await rootDirHandle.getFileHandle(project.metadata.mainFile);
     await mainFileHandle.write(content);
 
     // Update project.json lastModified
@@ -340,17 +309,11 @@ export class ProjectService {
       ...project.metadata,
       lastModified: Date.now(),
     };
-    await projectJsonHandle.write(
-      JSON.stringify(updatedMetadata, null, 2)
-    );
+    await projectJsonHandle.write(JSON.stringify(updatedMetadata, null, 2));
 
     // Update workspace.json
-    const workspaceJsonHandle = await illusionsDir.getFileHandle(
-      "workspace.json"
-    );
-    await workspaceJsonHandle.write(
-      JSON.stringify(project.workspaceState, null, 2)
-    );
+    const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json");
+    await workspaceJsonHandle.write(JSON.stringify(project.workspaceState, null, 2));
   }
 
   /**
@@ -413,9 +376,7 @@ export class ProjectService {
       };
     }
 
-    throw new Error(
-      "ファイル選択ダイアログはこの環境でサポートされていません。"
-    );
+    throw new Error("ファイル選択ダイアログはこの環境でサポートされていません。");
   }
 
   /**
@@ -425,9 +386,7 @@ export class ProjectService {
    * @param rootDirHandle - Directory handle to validate
    * @returns Validation result with list of errors
    */
-  async validateProjectStructure(
-    rootDirHandle: VFSDirectoryHandle
-  ): Promise<ValidationResult> {
+  async validateProjectStructure(rootDirHandle: VFSDirectoryHandle): Promise<ValidationResult> {
     const errors: string[] = [];
 
     // Check .illusions directory
@@ -441,9 +400,7 @@ export class ProjectService {
 
     // Check project.json
     try {
-      const projectJsonHandle = await illusionsDir.getFileHandle(
-        "project.json"
-      );
+      const projectJsonHandle = await illusionsDir.getFileHandle("project.json");
       const content = await projectJsonHandle.read();
       const parsed = JSON.parse(content) as Record<string, unknown>;
 
@@ -476,9 +433,7 @@ export class ProjectService {
    */
   async readProjectContent(project: ProjectMode): Promise<string> {
     const rootDirHandle = await this.getVFSDirectoryHandle(project);
-    const mainFileHandle = await rootDirHandle.getFileHandle(
-      project.metadata.mainFile
-    );
+    const mainFileHandle = await rootDirHandle.getFileHandle(project.metadata.mainFile);
     return mainFileHandle.read();
   }
 
@@ -514,9 +469,7 @@ export class ProjectService {
    * プロジェクトのルートディレクトリの VFSDirectoryHandle を取得する。
    * ProjectMode のネイティブハンドルと VFS の間を橋渡しする。
    */
-  private async getVFSDirectoryHandle(
-    project: ProjectMode
-  ): Promise<VFSDirectoryHandle> {
+  private async getVFSDirectoryHandle(project: ProjectMode): Promise<VFSDirectoryHandle> {
     // If VFS already has root set, use it directly.
     if (this.vfs.isRootOpen()) {
       return await this.vfs.getDirectoryHandle("");
@@ -526,24 +479,20 @@ export class ProjectService {
     if (isElectronRenderer() && project.rootPath) {
       // Re-set the VFS root using the stored absolute path
       if ("setRootPath" in this.vfs) {
-        (this.vfs as { setRootPath: (p: string) => void }).setRootPath(
-          project.rootPath
-        );
+        (this.vfs as { setRootPath: (p: string) => void }).setRootPath(project.rootPath);
       }
       return await this.vfs.getDirectoryHandle("");
     }
 
     // Web: recover from project's rootHandle (restored from IndexedDB)
     if (project.rootHandle && "setRootHandle" in this.vfs) {
-      (
-        this.vfs as { setRootHandle: (h: FileSystemDirectoryHandle) => void }
-      ).setRootHandle(project.rootHandle);
+      (this.vfs as { setRootHandle: (h: FileSystemDirectoryHandle) => void }).setRootHandle(
+        project.rootHandle,
+      );
       return await this.vfs.getDirectoryHandle("");
     }
 
-    throw new Error(
-      "VFS のルートディレクトリが利用できません。プロジェクトを再度開いてください。"
-    );
+    throw new Error("VFS のルートディレクトリが利用できません。プロジェクトを再度開いてください。");
   }
 }
 

@@ -52,18 +52,64 @@ const JA_CHAR = "[\\u3041-\\u3096\\u30A1-\\u30F6\\u4E00-\\u9FFF\\u3400-\\u4DBF]"
 // ---------------------------------------------------------------------------
 
 const HALF_TO_FULL_KANA: ReadonlyMap<string, string> = new Map([
-  ["ｦ", "ヲ"], ["ｧ", "ァ"], ["ｨ", "ィ"], ["ｩ", "ゥ"], ["ｪ", "ェ"],
-  ["ｫ", "ォ"], ["ｬ", "ャ"], ["ｭ", "ュ"], ["ｮ", "ョ"], ["ｯ", "ッ"],
-  ["ｰ", "ー"], ["ｱ", "ア"], ["ｲ", "イ"], ["ｳ", "ウ"], ["ｴ", "エ"],
-  ["ｵ", "オ"], ["ｶ", "カ"], ["ｷ", "キ"], ["ｸ", "ク"], ["ｹ", "ケ"],
-  ["ｺ", "コ"], ["ｻ", "サ"], ["ｼ", "シ"], ["ｽ", "ス"], ["ｾ", "セ"],
-  ["ｿ", "ソ"], ["ﾀ", "タ"], ["ﾁ", "チ"], ["ﾂ", "ツ"], ["ﾃ", "テ"],
-  ["ﾄ", "ト"], ["ﾅ", "ナ"], ["ﾆ", "ニ"], ["ﾇ", "ヌ"], ["ﾈ", "ネ"],
-  ["ﾉ", "ノ"], ["ﾊ", "ハ"], ["ﾋ", "ヒ"], ["ﾌ", "フ"], ["ﾍ", "ヘ"],
-  ["ﾎ", "ホ"], ["ﾏ", "マ"], ["ﾐ", "ミ"], ["ﾑ", "ム"], ["ﾒ", "メ"],
-  ["ﾓ", "モ"], ["ﾔ", "ヤ"], ["ﾕ", "ユ"], ["ﾖ", "ヨ"], ["ﾗ", "ラ"],
-  ["ﾘ", "リ"], ["ﾙ", "ル"], ["ﾚ", "レ"], ["ﾛ", "ロ"], ["ﾜ", "ワ"],
-  ["ﾝ", "ン"], ["ﾞ", "゛"], ["ﾟ", "゜"],
+  ["ｦ", "ヲ"],
+  ["ｧ", "ァ"],
+  ["ｨ", "ィ"],
+  ["ｩ", "ゥ"],
+  ["ｪ", "ェ"],
+  ["ｫ", "ォ"],
+  ["ｬ", "ャ"],
+  ["ｭ", "ュ"],
+  ["ｮ", "ョ"],
+  ["ｯ", "ッ"],
+  ["ｰ", "ー"],
+  ["ｱ", "ア"],
+  ["ｲ", "イ"],
+  ["ｳ", "ウ"],
+  ["ｴ", "エ"],
+  ["ｵ", "オ"],
+  ["ｶ", "カ"],
+  ["ｷ", "キ"],
+  ["ｸ", "ク"],
+  ["ｹ", "ケ"],
+  ["ｺ", "コ"],
+  ["ｻ", "サ"],
+  ["ｼ", "シ"],
+  ["ｽ", "ス"],
+  ["ｾ", "セ"],
+  ["ｿ", "ソ"],
+  ["ﾀ", "タ"],
+  ["ﾁ", "チ"],
+  ["ﾂ", "ツ"],
+  ["ﾃ", "テ"],
+  ["ﾄ", "ト"],
+  ["ﾅ", "ナ"],
+  ["ﾆ", "ニ"],
+  ["ﾇ", "ヌ"],
+  ["ﾈ", "ネ"],
+  ["ﾉ", "ノ"],
+  ["ﾊ", "ハ"],
+  ["ﾋ", "ヒ"],
+  ["ﾌ", "フ"],
+  ["ﾍ", "ヘ"],
+  ["ﾎ", "ホ"],
+  ["ﾏ", "マ"],
+  ["ﾐ", "ミ"],
+  ["ﾑ", "ム"],
+  ["ﾒ", "メ"],
+  ["ﾓ", "モ"],
+  ["ﾔ", "ヤ"],
+  ["ﾕ", "ユ"],
+  ["ﾖ", "ヨ"],
+  ["ﾗ", "ラ"],
+  ["ﾘ", "リ"],
+  ["ﾙ", "ル"],
+  ["ﾚ", "レ"],
+  ["ﾛ", "ロ"],
+  ["ﾜ", "ワ"],
+  ["ﾝ", "ン"],
+  ["ﾞ", "゛"],
+  ["ﾟ", "゜"],
 ]);
 
 // ---------------------------------------------------------------------------
@@ -73,11 +119,11 @@ const HALF_TO_FULL_KANA: ReadonlyMap<string, string> = new Map([
 function fullwidthToHalfwidth(ch: string): string {
   const code = ch.charCodeAt(0);
   // ０-９ (0xFF10-0xFF19) → 0-9
-  if (code >= 0xFF10 && code <= 0xFF19) return String.fromCharCode(code - 0xFF10 + 0x30);
+  if (code >= 0xff10 && code <= 0xff19) return String.fromCharCode(code - 0xff10 + 0x30);
   // Ａ-Ｚ (0xFF21-0xFF3A) → A-Z
-  if (code >= 0xFF21 && code <= 0xFF3A) return String.fromCharCode(code - 0xFF21 + 0x41);
+  if (code >= 0xff21 && code <= 0xff3a) return String.fromCharCode(code - 0xff21 + 0x41);
   // ａ-ｚ (0xFF41-0xFF5A) → a-z
-  if (code >= 0xFF41 && code <= 0xFF5A) return String.fromCharCode(code - 0xFF41 + 0x61);
+  if (code >= 0xff41 && code <= 0xff5a) return String.fromCharCode(code - 0xff41 + 0x61);
   return ch;
 }
 
@@ -86,9 +132,12 @@ function fullwidthToHalfwidth(ch: string): string {
 // ---------------------------------------------------------------------------
 
 const HALF_TO_FULL_BRACKET: ReadonlyMap<string, string> = new Map([
-  ["(", "（"], [")", "）"],
-  ["[", "［"], ["]", "］"],
-  ["｢", "「"], ["｣", "」"],
+  ["(", "（"],
+  [")", "）"],
+  ["[", "［"],
+  ["]", "］"],
+  ["｢", "「"],
+  ["｣", "」"],
 ]);
 
 // ---------------------------------------------------------------------------
@@ -132,7 +181,8 @@ class JtfPunctuationStandardRule extends AbstractL1Rule {
         ruleId: this.id,
         severity: config.severity,
         message: "Use full-width touten (、) instead of full-width comma (，)",
-        messageJa: "JTFスタイルガイドに基づき、句読点には全角の読点（、）を使用してください。全角カンマ（，）は使用しません。",
+        messageJa:
+          "JTFスタイルガイドに基づき、句読点には全角の読点（、）を使用してください。全角カンマ（，）は使用しません。",
         from: m.index,
         to: m.index + 1,
         originalText: "，",
@@ -148,7 +198,8 @@ class JtfPunctuationStandardRule extends AbstractL1Rule {
         ruleId: this.id,
         severity: config.severity,
         message: "Use full-width kuten (。) instead of full-width period (．)",
-        messageJa: "JTFスタイルガイドに基づき、句読点には全角の句点（。）を使用してください。全角ピリオド（．）は使用しません。",
+        messageJa:
+          "JTFスタイルガイドに基づき、句読点には全角の句点（。）を使用してください。全角ピリオド（．）は使用しません。",
         from: m.index,
         to: m.index + 1,
         originalText: "．",
@@ -175,7 +226,8 @@ class JtfPunctuationReplacementRule extends AbstractL1Rule {
         ruleId: this.id,
         severity: config.severity,
         message: "Use full-width touten (、) instead of half-width comma (,) in Japanese text",
-        messageJa: "JTFスタイルガイドに基づき、和文中では半角カンマ（,）ではなく全角読点（、）を使用してください。",
+        messageJa:
+          "JTFスタイルガイドに基づき、和文中では半角カンマ（,）ではなく全角読点（、）を使用してください。",
         from: m.index,
         to: m.index + 1,
         originalText: ",",
@@ -186,13 +238,17 @@ class JtfPunctuationReplacementRule extends AbstractL1Rule {
 
     // Half-width period preceded by a non-ASCII char (Japanese context)
     // Exclude decimal points (digit.digit) and abbreviations
-    const periodPattern = new RegExp(`(?<=${JA_CHAR})\\.(?!\\d)|(?<![a-zA-Z0-9])\\.(?=${JA_CHAR})`, "g");
+    const periodPattern = new RegExp(
+      `(?<=${JA_CHAR})\\.(?!\\d)|(?<![a-zA-Z0-9])\\.(?=${JA_CHAR})`,
+      "g",
+    );
     while ((m = periodPattern.exec(text)) !== null) {
       issues.push({
         ruleId: this.id,
         severity: config.severity,
         message: "Use full-width kuten (。) instead of half-width period (.) in Japanese text",
-        messageJa: "JTFスタイルガイドに基づき、和文中では半角ピリオド（.）ではなく全角句点（。）を使用してください。",
+        messageJa:
+          "JTFスタイルガイドに基づき、和文中では半角ピリオド（.）ではなく全角句点（。）を使用してください。",
         from: m.index,
         to: m.index + 1,
         originalText: ".",
@@ -221,7 +277,8 @@ class JtfKutenRule extends AbstractL1Rule {
         ruleId: this.id,
         severity: config.severity,
         message: "Use full-width kuten (。) for sentence endings, not half-width period (.)",
-        messageJa: "JTFスタイルガイドに基づき、文末には全角句点（。）を使用してください。半角ピリオド（.）は文末の句点として使いません。",
+        messageJa:
+          "JTFスタイルガイドに基づき、文末には全角句点（。）を使用してください。半角ピリオド（.）は文末の句点として使いません。",
         from: m.index,
         to: m.index + 1,
         originalText: ".",
@@ -275,7 +332,8 @@ class JtfPeriodCommaRule extends AbstractL1Rule {
         ruleId: this.id,
         severity: config.severity,
         message: "Use full-width touten (、) in Japanese text, not half-width comma",
-        messageJa: "JTFスタイルガイドに基づき、日本語文中では半角カンマ（,）ではなく全角読点（、）を使用してください。",
+        messageJa:
+          "JTFスタイルガイドに基づき、日本語文中では半角カンマ（,）ではなく全角読点（、）を使用してください。",
         from: m.index,
         to: m.index + 1,
         originalText: ",",
@@ -291,7 +349,8 @@ class JtfPeriodCommaRule extends AbstractL1Rule {
         ruleId: this.id,
         severity: config.severity,
         message: "Use full-width kuten (。) in Japanese text, not half-width period",
-        messageJa: "JTFスタイルガイドに基づき、日本語文中では半角ピリオド（.）ではなく全角句点（。）を使用してください。",
+        messageJa:
+          "JTFスタイルガイドに基づき、日本語文中では半角ピリオド（.）ではなく全角句点（。）を使用してください。",
         from: m.index,
         to: m.index + 1,
         originalText: ".",
@@ -326,7 +385,11 @@ class JtfFullwidthKanaRule extends AbstractL1Rule {
         to: m.index + 1,
         originalText: halfChar,
         reference: { ...JTF_REFERENCE, section: "2.1.5" },
-        fix: { label: `Replace with ${fullChar}`, labelJa: `「${fullChar}」に置換`, replacement: fullChar },
+        fix: {
+          label: `Replace with ${fullChar}`,
+          labelJa: `「${fullChar}」に置換`,
+          replacement: fullChar,
+        },
       });
     }
 
@@ -354,7 +417,11 @@ class JtfNumericStandardRule extends AbstractL1Rule {
         to: m.index + 1,
         originalText: m[0],
         reference: { ...JTF_REFERENCE, section: "2.1.8" },
-        fix: { label: `Replace with ${halfChar}`, labelJa: `「${halfChar}」に置換`, replacement: halfChar },
+        fix: {
+          label: `Replace with ${halfChar}`,
+          labelJa: `「${halfChar}」に置換`,
+          replacement: halfChar,
+        },
       });
     }
 
@@ -381,7 +448,11 @@ class JtfHalfwidthAlnumRule extends AbstractL1Rule {
         to: m.index + 1,
         originalText: m[0],
         reference: { ...JTF_REFERENCE, section: "2.1.8" },
-        fix: { label: `Replace with ${halfChar}`, labelJa: `「${halfChar}」に置換`, replacement: halfChar },
+        fix: {
+          label: `Replace with ${halfChar}`,
+          labelJa: `「${halfChar}」に置換`,
+          replacement: halfChar,
+        },
       });
     }
 
@@ -404,7 +475,8 @@ class JtfDigitCommaRule extends AbstractL1Rule {
         ruleId: this.id,
         severity: config.severity,
         message: "Use half-width comma (,) for digit grouping, not full-width (，)",
-        messageJa: "JTFスタイルガイドに基づき、数字の桁区切りには半角カンマ（,）を使用してください。",
+        messageJa:
+          "JTFスタイルガイドに基づき、数字の桁区切りには半角カンマ（,）を使用してください。",
         from,
         to: from + 1,
         originalText: "，",
@@ -455,7 +527,11 @@ class JtfKanjiRule extends AbstractL1Rule {
           to: m.index + hiragana.length,
           originalText: hiragana,
           reference: { ...JTF_REFERENCE, section: "2.2.1" },
-          fix: { label: `Replace with ${kanji}`, labelJa: `「${kanji}」に置換`, replacement: kanji },
+          fix: {
+            label: `Replace with ${kanji}`,
+            labelJa: `「${kanji}」に置換`,
+            replacement: kanji,
+          },
         });
       }
     }
@@ -481,7 +557,8 @@ class JtfNoSpaceRule extends AbstractL1Rule {
         ruleId: this.id,
         severity: config.severity,
         message: "Remove space between half-width and full-width characters",
-        messageJa: "JTFスタイルガイドに基づき、半角文字と全角文字の間にスペースを入れないでください。",
+        messageJa:
+          "JTFスタイルガイドに基づき、半角文字と全角文字の間にスペースを入れないでください。",
         from: spaceIdx,
         to: spaceIdx + 1,
         originalText: " ",
@@ -497,7 +574,8 @@ class JtfNoSpaceRule extends AbstractL1Rule {
         ruleId: this.id,
         severity: config.severity,
         message: "Remove space between full-width and half-width characters",
-        messageJa: "JTFスタイルガイドに基づき、全角文字と半角文字の間にスペースを入れないでください。",
+        messageJa:
+          "JTFスタイルガイドに基づき、全角文字と半角文字の間にスペースを入れないでください。",
         from: spaceIdx,
         to: spaceIdx + 1,
         originalText: " ",
@@ -594,10 +672,7 @@ class JtfBracketsFullwidthRule extends AbstractL1Rule {
     const issues: LintIssue[] = [];
 
     // Half-width brackets adjacent to Japanese characters
-    const pattern = new RegExp(
-      `(?<=${JA_CHAR})[()\\[\\]｢｣]|[()\\[\\]｢｣](?=${JA_CHAR})`,
-      "g",
-    );
+    const pattern = new RegExp(`(?<=${JA_CHAR})[()\\[\\]｢｣]|[()\\[\\]｢｣](?=${JA_CHAR})`, "g");
     let m: RegExpExecArray | null;
     while ((m = pattern.exec(text)) !== null) {
       const halfBracket = m[0];
@@ -612,7 +687,11 @@ class JtfBracketsFullwidthRule extends AbstractL1Rule {
         to: m.index + 1,
         originalText: halfBracket,
         reference: { ...JTF_REFERENCE, section: "3.3" },
-        fix: { label: `Replace with ${fullBracket}`, labelJa: `「${fullBracket}」に置換`, replacement: fullBracket },
+        fix: {
+          label: `Replace with ${fullBracket}`,
+          labelJa: `「${fullBracket}」に置換`,
+          replacement: fullBracket,
+        },
       });
     }
 
@@ -643,7 +722,11 @@ function createUnitIssue(
     to: from + matched.length,
     originalText: matched,
     reference: { ...JTF_REFERENCE, section },
-    fix: { label: `Replace with ${correct}`, labelJa: `「${correct}」に置換`, replacement: correct },
+    fix: {
+      label: `Replace with ${correct}`,
+      labelJa: `「${correct}」に置換`,
+      replacement: correct,
+    },
   };
 }
 
@@ -660,7 +743,7 @@ class JtfLengthUnitRule extends AbstractL1Rule {
       [/(?<=\d\s*)Cm\b/g, "cm"],
       [/(?<=\d\s*)KM\b/g, "km"],
       [/(?<=\d\s*)Km\b/g, "km"],
-      [/(?<=\d\s*)M(?=[^a-zA-Z/²³]|$)/g, "m"],  // Capital M alone (not MHz, etc.)
+      [/(?<=\d\s*)M(?=[^a-zA-Z/²³]|$)/g, "m"], // Capital M alone (not MHz, etc.)
     ];
 
     for (const [pattern, correct] of wrongCases) {
@@ -686,7 +769,7 @@ class JtfMassUnitRule extends AbstractL1Rule {
       [/(?<=\d\s*)Kg\b/g, "kg"],
       [/(?<=\d\s*)MG\b/g, "mg"],
       [/(?<=\d\s*)Mg\b/g, "mg"],
-      [/(?<=\d\s*)G(?=[^a-zA-Z]|$)/g, "g"],  // Capital G alone
+      [/(?<=\d\s*)G(?=[^a-zA-Z]|$)/g, "g"], // Capital G alone
       [/(?<=\d\s*)Gr\b/gi, "g"],
     ];
 
@@ -787,7 +870,8 @@ class JtfTemperatureUnitRule extends AbstractL1Rule {
         ruleId: this.id,
         severity: config.severity,
         message: "Use ℃ (U+2103) instead of °C (degree sign + C)",
-        messageJa: "JTFスタイルガイドに基づき、温度の単位には「℃」（U+2103）を使用してください。「°C」（度記号＋C）は使いません。",
+        messageJa:
+          "JTFスタイルガイドに基づき、温度の単位には「℃」（U+2103）を使用してください。「°C」（度記号＋C）は使いません。",
         from: m.index,
         to: m.index + 2,
         originalText: "°C",
@@ -896,7 +980,13 @@ class JtfDataRateUnitRule extends AbstractL1Rule {
 // Rule ID → concrete class mapping
 // ============================================================================
 
-type RuleClassMap = Record<string, new (meta: JsonRuleMeta, config: ConstructorParameters<typeof AbstractL1Rule>[1]) => AbstractL1Rule>;
+type RuleClassMap = Record<
+  string,
+  new (
+    meta: JsonRuleMeta,
+    config: ConstructorParameters<typeof AbstractL1Rule>[1],
+  ) => AbstractL1Rule
+>;
 
 const IMPLEMENTED_RULES: RuleClassMap = {
   JTF_1_2_1: JtfPunctuationStandardRule,

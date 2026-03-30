@@ -7,11 +7,7 @@ import {
   calculateReadabilityScore,
 } from "@/lib/utils";
 
-import type {
-  CharacterTypeAnalysis,
-  CharacterUsageRates,
-  ReadabilityAnalysis,
-} from "@/lib/utils";
+import type { CharacterTypeAnalysis, CharacterUsageRates, ReadabilityAnalysis } from "@/lib/utils";
 
 import { chars } from "./types";
 
@@ -32,13 +28,16 @@ export function useTextStatistics(content: string): TextStatisticsResult {
   const charCount = useMemo(() => chars(content), [content]);
 
   const paragraphCount = useMemo(
-    () => content ? content.split(/\n\n+/).filter(p => p.trim().length > 0).length : 0,
+    () => (content ? content.split(/\n\n+/).filter((p) => p.trim().length > 0).length : 0),
     [content],
   );
 
   const sentenceCount = useMemo(() => countSentences(content), [content]);
   const charTypeAnalysis = useMemo(() => analyzeCharacterTypes(content), [content]);
-  const charUsageRates = useMemo(() => calculateCharacterUsageRates(charTypeAnalysis), [charTypeAnalysis]);
+  const charUsageRates = useMemo(
+    () => calculateCharacterUsageRates(charTypeAnalysis),
+    [charTypeAnalysis],
+  );
   const readabilityAnalysis = useMemo(() => calculateReadabilityScore(content), [content]);
 
   return {

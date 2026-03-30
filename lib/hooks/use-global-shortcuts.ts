@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
-import { isMacOS } from '@/lib/utils/runtime-env';
+import { isMacOS } from "@/lib/utils/runtime-env";
 
 /**
  * Global keyboard shortcuts that must fire regardless of focus.
@@ -19,13 +19,13 @@ export function useGlobalShortcuts(): void {
       const modifier = isMac ? e.metaKey : e.ctrlKey;
 
       // Ctrl/Cmd + R: Block browser reload (always, regardless of focus)
-      if (modifier && e.key === 'r') {
+      if (modifier && e.key === "r") {
         e.preventDefault();
         return;
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 }

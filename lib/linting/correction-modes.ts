@@ -28,14 +28,8 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     id: "official",
     nameJa: "公用文",
     toneJa: "厳粛・対等・標準化",
-    descriptionJa:
-      "官公庁・公的機関の文書向けモード。内閣告示の各種基準に準拠します。",
-    defaultGuidelines: [
-      "koyo-bun-2022",
-      "joyo-kanji-2010",
-      "okurigana-1973",
-      "gairai-1991",
-    ],
+    descriptionJa: "官公庁・公的機関の文書向けモード。内閣告示の各種基準に準拠します。",
+    defaultGuidelines: ["koyo-bun-2022", "joyo-kanji-2010", "okurigana-1973", "gairai-1991"],
     ruleOverrides: {},
   },
   blog: {
@@ -50,8 +44,7 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     id: "academic",
     nameJa: "学術",
     toneJa: "冷静・客観・構造化",
-    descriptionJa:
-      "論文・学術文書向けモード。客観性と構造的な記述を重視します。",
+    descriptionJa: "論文・学術文書向けモード。客観性と構造的な記述を重視します。",
     defaultGuidelines: ["joyo-kanji-2010", "okurigana-1973", "jis-x-4051"],
     ruleOverrides: {},
   },

@@ -44,7 +44,7 @@ export function usePowerSaving({
     return () => {
       unsubscribe();
     };
-  // Re-run when the user toggles autoPowerSaveOnBattery in settings.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Re-run when the user toggles autoPowerSaveOnBattery in settings.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPowerSaveOnBattery]);
 }

@@ -2,8 +2,8 @@ name: Weekly Release
 
 on:
   schedule:
-    - cron: '0 0 * * 1'   # Every Monday 00:00 UTC = 09:00 JST
-  workflow_dispatch:        # Manual trigger
+    - cron: "0 0 * * 1" # Every Monday 00:00 UTC = 09:00 JST
+  workflow_dispatch: # Manual trigger
 
 permissions:
   contents: write

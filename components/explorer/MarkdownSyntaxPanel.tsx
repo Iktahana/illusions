@@ -12,11 +12,36 @@ interface MarkdownSyntaxPanelProps {
 export function MarkdownSyntaxPanel({ onClose, onInsertText }: MarkdownSyntaxPanelProps) {
   const syntaxExamples = [
     { syntax: "# 見出し", description: "レベル1の見出し", example: "# 第一章", fontSize: "2em" },
-    { syntax: "## 見出し", description: "レベル2の見出し", example: "## 第一節", fontSize: "1.5em" },
-    { syntax: "### 見出し", description: "レベル3の見出し", example: "### シーン1", fontSize: "1.17em" },
-    { syntax: "#### 見出し", description: "レベル4の見出し", example: "#### セクション", fontSize: "1em" },
-    { syntax: "##### 見出し", description: "レベル5の見出し", example: "##### サブセクション", fontSize: "0.83em" },
-    { syntax: "###### 見出し", description: "レベル6の見出し", example: "###### 詳細", fontSize: "0.67em" },
+    {
+      syntax: "## 見出し",
+      description: "レベル2の見出し",
+      example: "## 第一節",
+      fontSize: "1.5em",
+    },
+    {
+      syntax: "### 見出し",
+      description: "レベル3の見出し",
+      example: "### シーン1",
+      fontSize: "1.17em",
+    },
+    {
+      syntax: "#### 見出し",
+      description: "レベル4の見出し",
+      example: "#### セクション",
+      fontSize: "1em",
+    },
+    {
+      syntax: "##### 見出し",
+      description: "レベル5の見出し",
+      example: "##### サブセクション",
+      fontSize: "0.83em",
+    },
+    {
+      syntax: "###### 見出し",
+      description: "レベル6の見出し",
+      example: "###### 詳細",
+      fontSize: "0.67em",
+    },
   ];
 
   return (
@@ -27,9 +52,7 @@ export function MarkdownSyntaxPanel({ onClose, onInsertText }: MarkdownSyntaxPan
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background-secondary/50 rounded-t-xl">
-        <h3 className="text-sm font-semibold text-foreground">
-          章の見出しを追加
-        </h3>
+        <h3 className="text-sm font-semibold text-foreground">章の見出しを追加</h3>
         <button
           onClick={onClose}
           className="p-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
@@ -54,12 +77,8 @@ export function MarkdownSyntaxPanel({ onClose, onInsertText }: MarkdownSyntaxPan
                 <span className="text-xs text-foreground-tertiary">{item.description}</span>
               </div>
               <div className="text-foreground-secondary mt-2 pl-2 border-l-2 border-border-secondary">
-                {item.example.split('\n').map((line, i) => (
-                  <div
-                    key={i}
-                    className="font-mono"
-                    style={{ fontSize: item.fontSize }}
-                  >
+                {item.example.split("\n").map((line, i) => (
+                  <div key={i} className="font-mono" style={{ fontSize: item.fontSize }}>
                     {line}
                   </div>
                 ))}

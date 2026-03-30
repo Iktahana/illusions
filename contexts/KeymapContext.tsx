@@ -1,13 +1,6 @@
 "use client";
 
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import type { CommandId } from "@/lib/keymap/command-ids";
 import type { KeyBinding, KeymapOverrides } from "@/lib/keymap/keymap-types";
@@ -79,43 +72,58 @@ export function KeymapProvider({ children }: KeymapProviderProps): React.JSX.Ele
   /** Notifies Electron main process to rebuild native menu with new accelerators */
   const syncElectronMenu = useCallback(async (next: KeymapOverrides) => {
     if (typeof window !== "undefined") {
-      const api = (window as Window & { electronAPI?: { updateKeymapOverrides?: (o: KeymapOverrides) => Promise<boolean> } }).electronAPI;
+      const api = (
+        window as Window & {
+          electronAPI?: { updateKeymapOverrides?: (o: KeymapOverrides) => Promise<boolean> };
+        }
+      ).electronAPI;
       await api?.updateKeymapOverrides?.(next);
     }
   }, []);
 
-  const setOverride = useCallback(async (id: CommandId, binding: KeyBinding | null) => {
-    const next: KeymapOverrides = { ...overrides, [id]: binding };
-    setOverrides(next);
-    await saveKeymapOverrides(next);
-    await syncElectronMenu(next);
-  }, [overrides, syncElectronMenu]);
+  const setOverride = useCallback(
+    async (id: CommandId, binding: KeyBinding | null) => {
+      const next: KeymapOverrides = { ...overrides, [id]: binding };
+      setOverrides(next);
+      await saveKeymapOverrides(next);
+      await syncElectronMenu(next);
+    },
+    [overrides, syncElectronMenu],
+  );
 
-  const setOverrideWithConflictResolution = useCallback(async (id: CommandId, binding: KeyBinding | null) => {
-    const next: KeymapOverrides = { ...overrides };
-    // Unbind any commands that already use this binding
-    if (binding) {
-      const merged = mergeBindings(defaultBindings, overrides);
-      for (const [cmdId, existing] of Object.entries(merged) as Array<[CommandId, KeyBinding | null]>) {
-        if (cmdId === id || !existing) continue;
-        if (bindingsMatch(existing, binding)) {
-          next[cmdId] = null;
+  const setOverrideWithConflictResolution = useCallback(
+    async (id: CommandId, binding: KeyBinding | null) => {
+      const next: KeymapOverrides = { ...overrides };
+      // Unbind any commands that already use this binding
+      if (binding) {
+        const merged = mergeBindings(defaultBindings, overrides);
+        for (const [cmdId, existing] of Object.entries(merged) as Array<
+          [CommandId, KeyBinding | null]
+        >) {
+          if (cmdId === id || !existing) continue;
+          if (bindingsMatch(existing, binding)) {
+            next[cmdId] = null;
+          }
         }
       }
-    }
-    next[id] = binding;
-    setOverrides(next);
-    await saveKeymapOverrides(next);
-    await syncElectronMenu(next);
-  }, [overrides, defaultBindings, syncElectronMenu]);
+      next[id] = binding;
+      setOverrides(next);
+      await saveKeymapOverrides(next);
+      await syncElectronMenu(next);
+    },
+    [overrides, defaultBindings, syncElectronMenu],
+  );
 
-  const resetOverride = useCallback(async (id: CommandId) => {
-    const next = { ...overrides };
-    delete next[id];
-    setOverrides(next);
-    await saveKeymapOverrides(next);
-    await syncElectronMenu(next);
-  }, [overrides, syncElectronMenu]);
+  const resetOverride = useCallback(
+    async (id: CommandId) => {
+      const next = { ...overrides };
+      delete next[id];
+      setOverrides(next);
+      await saveKeymapOverrides(next);
+      await syncElectronMenu(next);
+    },
+    [overrides, syncElectronMenu],
+  );
 
   const resetAll = useCallback(async () => {
     setOverrides({});
@@ -124,15 +132,25 @@ export function KeymapProvider({ children }: KeymapProviderProps): React.JSX.Ele
   }, [syncElectronMenu]);
 
   const value = useMemo<KeymapContextValue>(
-    () => ({ effectiveBindings, overrides, setOverride, setOverrideWithConflictResolution, resetOverride, resetAll }),
-    [effectiveBindings, overrides, setOverride, setOverrideWithConflictResolution, resetOverride, resetAll],
+    () => ({
+      effectiveBindings,
+      overrides,
+      setOverride,
+      setOverrideWithConflictResolution,
+      resetOverride,
+      resetAll,
+    }),
+    [
+      effectiveBindings,
+      overrides,
+      setOverride,
+      setOverrideWithConflictResolution,
+      resetOverride,
+      resetAll,
+    ],
   );
 
-  return (
-    <KeymapContext.Provider value={value}>
-      {children}
-    </KeymapContext.Provider>
-  );
+  return <KeymapContext.Provider value={value}>{children}</KeymapContext.Provider>;
 }
 
 /**

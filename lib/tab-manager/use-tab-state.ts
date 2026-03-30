@@ -44,7 +44,12 @@ export interface UseTabStateReturn extends TabManagerCore {
   /** Open a new terminal tab with placeholder values. */
   newTerminalTab: () => void;
   /** Update a terminal tab's mutable fields (status, exitCode, sessionId). */
-  updateTerminalTab: (tabId: TabId, updates: Partial<Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">>) => void;
+  updateTerminalTab: (
+    tabId: TabId,
+    updates: Partial<
+      Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">
+    >,
+  ) => void;
   /** Open a diff tab for the given source tab. */
   openDiffTab: (
     sourceTabId: TabId,
@@ -84,8 +89,7 @@ export interface UseTabStateReturn extends TabManagerCore {
 // ---------------------------------------------------------------------------
 
 export function useTabState(): UseTabStateReturn {
-  const isElectron =
-    typeof window !== "undefined" && isElectronRenderer();
+  const isElectron = typeof window !== "undefined" && isElectronRenderer();
   const { isProject } = useEditorMode();
 
   // --- Core state ---------------------------------------------------------
@@ -94,9 +98,7 @@ export function useTabState(): UseTabStateReturn {
   // preventing a brief flash of randomly-generated tab content on cold start.
   const [tabs, setTabs] = useState<TabState[]>([]);
   const [activeTabId, setActiveTabId] = useState<TabId>("");
-  const [pendingCloseTabId, setPendingCloseTabId] = useState<TabId | null>(
-    null,
-  );
+  const [pendingCloseTabId, setPendingCloseTabId] = useState<TabId | null>(null);
 
   // --- Refs ---------------------------------------------------------------
 
@@ -124,27 +126,19 @@ export function useTabState(): UseTabStateReturn {
 
   // --- Helpers ------------------------------------------------------------
 
-  const updateTab = useCallback(
-    (tabId: TabId, updates: Partial<EditorTabState>) => {
-      setTabs((prev) =>
-        prev.map((tab): TabState => {
-          if (tab.id !== tabId || !isEditorTab(tab)) return tab;
-          return { ...tab, ...updates };
-        }),
-      );
-    },
-    [],
-  );
+  const updateTab = useCallback((tabId: TabId, updates: Partial<EditorTabState>) => {
+    setTabs((prev) =>
+      prev.map((tab): TabState => {
+        if (tab.id !== tabId || !isEditorTab(tab)) return tab;
+        return { ...tab, ...updates };
+      }),
+    );
+  }, []);
 
-  const findTabByPath = useCallback(
-    (path: string): EditorTabState | undefined => {
-      const tab = tabsRef.current.find(
-        (t) => isEditorTab(t) && t.file?.path === path,
-      );
-      return tab && isEditorTab(tab) ? tab : undefined;
-    },
-    [],
-  );
+  const findTabByPath = useCallback((path: string): EditorTabState | undefined => {
+    const tab = tabsRef.current.find((t) => isEditorTab(t) && t.file?.path === path);
+    return tab && isEditorTab(tab) ? tab : undefined;
+  }, []);
 
   // --- Tab CRUD -----------------------------------------------------------
 
@@ -182,7 +176,9 @@ export function useTabState(): UseTabStateReturn {
   const updateTerminalTab = useCallback(
     (
       tabId: TabId,
-      updates: Partial<Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">>,
+      updates: Partial<
+        Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">
+      >,
     ) => {
       setTabs((prev) =>
         prev.map((t) => {
@@ -233,21 +229,16 @@ export function useTabState(): UseTabStateReturn {
   }, []);
 
   const nextTabFn = useCallback(() => {
-    const idx = tabsRef.current.findIndex(
-      (t) => t.id === activeTabIdRef.current,
-    );
+    const idx = tabsRef.current.findIndex((t) => t.id === activeTabIdRef.current);
     if (idx === -1) return;
     const next = (idx + 1) % tabsRef.current.length;
     setActiveTabId(tabsRef.current[next].id);
   }, []);
 
   const prevTabFn = useCallback(() => {
-    const idx = tabsRef.current.findIndex(
-      (t) => t.id === activeTabIdRef.current,
-    );
+    const idx = tabsRef.current.findIndex((t) => t.id === activeTabIdRef.current);
     if (idx === -1) return;
-    const prev =
-      (idx - 1 + tabsRef.current.length) % tabsRef.current.length;
+    const prev = (idx - 1 + tabsRef.current.length) % tabsRef.current.length;
     setActiveTabId(tabsRef.current[prev].id);
   }, []);
 
@@ -336,14 +327,11 @@ export function useTabState(): UseTabStateReturn {
 
   // --- Pending close-tab dialog -------------------------------------------
 
-  const pendingCloseTab = pendingCloseTabId
-    ? tabs.find((t) => t.id === pendingCloseTabId)
-    : null;
+  const pendingCloseTab = pendingCloseTabId ? tabs.find((t) => t.id === pendingCloseTabId) : null;
   const pendingCloseEditorTab =
     pendingCloseTab && isEditorTab(pendingCloseTab) ? pendingCloseTab : null;
   const pendingCloseFileName =
-    pendingCloseEditorTab?.file?.name ??
-    `新規ファイル${pendingCloseEditorTab?.fileType ?? ".mdi"}`;
+    pendingCloseEditorTab?.file?.name ?? `新規ファイル${pendingCloseEditorTab?.fileType ?? ".mdi"}`;
 
   const handleCloseTabCancel = useCallback(() => {
     setPendingCloseTabId(null);

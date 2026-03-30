@@ -41,24 +41,18 @@ export function getAllJsonRules(): JsonRuleEntry[] {
 }
 
 /** Filter rules by level (L1, L2, or L3). */
-export function getJsonRulesByLevel(
-  level: "L1" | "L2" | "L3",
-): JsonRuleEntry[] {
+export function getJsonRulesByLevel(level: "L1" | "L2" | "L3"): JsonRuleEntry[] {
   return getAllJsonRules().filter((rule) => rule.Level === level);
 }
 
 /** Return L1 rules whose Pattern/Logic does NOT start with "TODO". */
 export function getImplementableL1Rules(): JsonRuleEntry[] {
-  return getJsonRulesByLevel("L1").filter(
-    (rule) => !rule["Pattern/Logic"].startsWith("TODO"),
-  );
+  return getJsonRulesByLevel("L1").filter((rule) => !rule["Pattern/Logic"].startsWith("TODO"));
 }
 
 /** Return L1 rules whose Pattern/Logic starts with "TODO". */
 export function getTodoL1Rules(): JsonRuleEntry[] {
-  return getJsonRulesByLevel("L1").filter((rule) =>
-    rule["Pattern/Logic"].startsWith("TODO"),
-  );
+  return getJsonRulesByLevel("L1").filter((rule) => rule["Pattern/Logic"].startsWith("TODO"));
 }
 
 /** Filter rules by book title. */

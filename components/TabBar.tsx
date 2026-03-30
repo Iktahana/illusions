@@ -124,7 +124,9 @@ export default function TabBar({
               {icon}
 
               {/* Tab label */}
-              <span className={`truncate flex-1 text-left${isPreview ? " italic opacity-75" : ""}`}>{label}</span>
+              <span className={`truncate flex-1 text-left${isPreview ? " italic opacity-75" : ""}`}>
+                {label}
+              </span>
 
               {/* Close button (shared across all tab kinds) */}
               <span
@@ -147,7 +149,6 @@ export default function TabBar({
           );
         })}
       </div>
-
     </div>
   );
 }

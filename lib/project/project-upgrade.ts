@@ -34,18 +34,12 @@ export class ProjectUpgradeService {
    * @param content - The current file content to migrate
    * @returns ProjectMode representing the upgraded project
    */
-  async upgradeToProject(
-    standaloneMode: StandaloneMode,
-    content: string
-  ): Promise<ProjectMode> {
+  async upgradeToProject(standaloneMode: StandaloneMode, content: string): Promise<ProjectMode> {
     // Extract project name from filename (without extension)
     const name = standaloneMode.fileName.replace(/\.[^.]+$/, "");
 
     // Create project (this opens directory picker for user selection)
-    const project = await this.projectService.createProject(
-      name,
-      standaloneMode.fileExtension
-    );
+    const project = await this.projectService.createProject(name, standaloneMode.fileExtension);
 
     // Overwrite the main file with existing content
     // (createProject writes default content, so we need to replace it)

@@ -80,7 +80,7 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
         openDictionary(word, url, title);
       }
     },
-    [openDictionary]
+    [openDictionary],
   );
 
   const [contextWord, setContextWord] = useState("");
@@ -102,7 +102,7 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
         handleDictionaryAction(action, word);
       }
     },
-    [contextMenu, handleDictionaryAction]
+    [contextMenu, handleDictionaryAction],
   );
 
   // コンテンツを解析 (with VFS cache support)
@@ -199,17 +199,28 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
 
   const getPosColorHex = (pos: string): string | null => {
     switch (pos) {
-      case "名詞": return "#4A90E2";
-      case "動詞": return "#27AE60";
-      case "形容詞": return "#00A8FF";
-      case "副詞": return "#E84393";
-      case "助詞": return "#8E44AD";
-      case "助動詞": return "#E67E22";
-      case "接続詞": return "#D4A017";
-      case "連体詞": return "#6C5CE7";
-      case "感動詞": return "#FF7675";
-      case "記号": return "#7F8C8D";
-      default: return null;
+      case "名詞":
+        return "#4A90E2";
+      case "動詞":
+        return "#27AE60";
+      case "形容詞":
+        return "#00A8FF";
+      case "副詞":
+        return "#E84393";
+      case "助詞":
+        return "#8E44AD";
+      case "助動詞":
+        return "#E67E22";
+      case "接続詞":
+        return "#D4A017";
+      case "連体詞":
+        return "#6C5CE7";
+      case "感動詞":
+        return "#FF7675";
+      case "記号":
+        return "#7F8C8D";
+      default:
+        return null;
     }
   };
 
@@ -224,7 +235,7 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
             disabled={isLoading}
             className={clsx(
               "p-1 rounded hover:bg-hover transition-colors",
-              isLoading && "animate-spin"
+              isLoading && "animate-spin",
             )}
             title="再解析"
           >
@@ -234,17 +245,17 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
 
         {/* 統計サマリー */}
         <div className="flex gap-4 mt-2 text-xs text-foreground-tertiary">
-          <span>総語数: <span className="text-foreground">{stats.totalWords}</span></span>
-          <span>異なり語数: <span className="text-foreground">{stats.uniqueWords}</span></span>
+          <span>
+            総語数: <span className="text-foreground">{stats.totalWords}</span>
+          </span>
+          <span>
+            異なり語数: <span className="text-foreground">{stats.uniqueWords}</span>
+          </span>
         </div>
       </div>
 
       {/* エラー表示 */}
-      {error && (
-        <div className="px-3 py-2 text-xs text-red-500 bg-red-500/10">
-          {error}
-        </div>
-      )}
+      {error && <div className="px-3 py-2 text-xs text-red-500 bg-red-500/10">{error}</div>}
 
       {/* ローディング */}
       {isLoading && (
@@ -270,23 +281,20 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-sm text-foreground truncate">
-                      {entry.word}
-                    </span>
+                    <span className="text-sm text-foreground truncate">{entry.word}</span>
                     {entry.reading && (
-                      <span className="text-xs text-foreground-tertiary">
-                        ({entry.reading})
-                      </span>
+                      <span className="text-xs text-foreground-tertiary">({entry.reading})</span>
                     )}
                   </div>
-                  <span className="text-xs" style={{ color: getPosColorHex(entry.pos) ?? undefined }}>
+                  <span
+                    className="text-xs"
+                    style={{ color: getPosColorHex(entry.pos) ?? undefined }}
+                  >
                     {entry.pos}
                   </span>
                 </div>
                 <div className="flex-shrink-0 flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">
-                    {entry.count}
-                  </span>
+                  <span className="text-sm font-medium text-foreground">{entry.count}</span>
                   {/* 使用頻度バー */}
                   <div className="w-16 h-1.5 bg-border rounded-full overflow-hidden">
                     <div

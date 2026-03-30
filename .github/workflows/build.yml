@@ -10,16 +10,16 @@ on:
     tags:
       - "v*"
     paths-ignore:
-      - 'www/**'
-      - 'store/**'
-      - '.github/workflows/deploy-www.yml'
-      - '.github/workflows/sync-ms-store-listing.yml'
+      - "www/**"
+      - "store/**"
+      - ".github/workflows/deploy-www.yml"
+      - ".github/workflows/sync-ms-store-listing.yml"
   pull_request:
     paths-ignore:
-      - 'www/**'
-      - 'store/**'
-      - '.github/workflows/deploy-www.yml'
-      - '.github/workflows/sync-ms-store-listing.yml'
+      - "www/**"
+      - "store/**"
+      - ".github/workflows/deploy-www.yml"
+      - ".github/workflows/sync-ms-store-listing.yml"
 
 permissions:
   contents: write
@@ -668,7 +668,15 @@ jobs:
       github.event_name != 'pull_request' &&
       github.ref != 'refs/heads/dev' &&
       needs.detect-changes.outputs.desktop_changed == 'true'
-    needs: [detect-changes, compute-version, build-macos, package-windows-nsis, package-windows-msix, build-linux]
+    needs:
+      [
+        detect-changes,
+        compute-version,
+        build-macos,
+        package-windows-nsis,
+        package-windows-msix,
+        build-linux,
+      ]
     runs-on: ubuntu-latest
 
     steps:

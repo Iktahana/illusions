@@ -7,7 +7,10 @@ import type { VFSDirectoryHandle } from "@/lib/vfs/types";
 export type AnyDirectoryHandle = VFSDirectoryHandle | FileSystemDirectoryHandle;
 
 /** Read text from a file handle (VFS or Web) */
-export async function readFileHandle(handle: { read?: () => Promise<string>; getFile?: () => Promise<File> }): Promise<string> {
+export async function readFileHandle(handle: {
+  read?: () => Promise<string>;
+  getFile?: () => Promise<File>;
+}): Promise<string> {
   if (typeof handle.read === "function") {
     return handle.read();
   }
@@ -55,8 +58,13 @@ export async function ensureProjectJson(
   };
 
   // projectJsonHandle already exists (created empty above) — write defaults into it
-  if ("write" in projectJsonHandle && typeof (projectJsonHandle as { write: unknown }).write === "function") {
-    await (projectJsonHandle as { write: (s: string) => Promise<void> }).write(JSON.stringify(metadata, null, 2));
+  if (
+    "write" in projectJsonHandle &&
+    typeof (projectJsonHandle as { write: unknown }).write === "function"
+  ) {
+    await (projectJsonHandle as { write: (s: string) => Promise<void> }).write(
+      JSON.stringify(metadata, null, 2),
+    );
   } else {
     const writable = await (projectJsonHandle as FileSystemFileHandle).createWritable();
     await writable.write(JSON.stringify(metadata, null, 2));

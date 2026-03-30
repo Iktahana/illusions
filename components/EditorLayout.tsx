@@ -31,7 +31,12 @@ import {
 import type { EditorSettings, EditorSettingsHandlers } from "@/lib/editor-page/use-editor-settings";
 import type { PanelState } from "@/lib/editor-page/use-panel-state";
 import type { RecentProjectEntry } from "@/lib/editor-page/types";
-import { isProjectMode, isStandaloneMode, type EditorMode, type SupportedFileExtension } from "@/lib/project/project-types";
+import {
+  isProjectMode,
+  isStandaloneMode,
+  type EditorMode,
+  type SupportedFileExtension,
+} from "@/lib/project/project-types";
 import type { MdiFileDescriptor } from "@/lib/project/mdi-file";
 import { isEditorTab, type EditorTabState, type TabState } from "@/lib/tab-manager/tab-types";
 import type { ContextMenuState } from "@/lib/hooks/use-context-menu";
@@ -82,7 +87,9 @@ interface EditorLayoutProps {
     showSettingsModal: boolean;
     setShowSettingsModal: (value: boolean) => void;
     settingsInitialCategory: React.ComponentProps<typeof SettingsModal>["initialCategory"];
-    setSettingsInitialCategory: (category: React.ComponentProps<typeof SettingsModal>["initialCategory"]) => void;
+    setSettingsInitialCategory: (
+      category: React.ComponentProps<typeof SettingsModal>["initialCategory"],
+    ) => void;
     showRubyDialog: boolean;
     setShowRubyDialog: (show: boolean) => void;
     rubySelectedText: string;
@@ -131,9 +138,13 @@ interface EditorLayoutProps {
     setSelectedCharCount: Dispatch<SetStateAction<number>>;
     searchOpenTrigger: number;
     searchInitialTerm?: string;
-    setEditorViewInstance: NonNullable<React.ComponentProps<typeof NovelEditor>["onEditorViewReady"]>;
+    setEditorViewInstance: NonNullable<
+      React.ComponentProps<typeof NovelEditor>["onEditorViewReady"]
+    >;
     programmaticScrollRef: MutableRefObject<boolean>;
-    handleShowAllSearchResults: NonNullable<React.ComponentProps<typeof NovelEditor>["onShowAllSearchResults"]>;
+    handleShowAllSearchResults: NonNullable<
+      React.ComponentProps<typeof NovelEditor>["onShowAllSearchResults"]
+    >;
     ruleRunner: RuleRunner;
     handleLintIssuesUpdated: (issues: LintIssue[]) => void;
     handleNlpError: (error: Error) => void;
@@ -141,7 +152,9 @@ interface EditorLayoutProps {
     handleToggleTcy: () => void;
     handleOpenDictionary: (searchTerm?: string) => void;
     handleShowLintHint: NonNullable<React.ComponentProps<typeof NovelEditor>["onShowLintHint"]>;
-    handleIgnoreCorrection: NonNullable<React.ComponentProps<typeof NovelEditor>["onIgnoreCorrection"]>;
+    handleIgnoreCorrection: NonNullable<
+      React.ComponentProps<typeof NovelEditor>["onIgnoreCorrection"]
+    >;
     switchTab: (tabId: string) => void;
   };
   inspector: {
@@ -218,10 +231,10 @@ export default function EditorLayout({
               onCancel={() => dialogs.setConfirmRemoveRecent(null)}
             />
 
-            {upgrade.showUpgradeBanner
-              && !upgrade.upgradeBannerDismissed
-              && isStandaloneMode(upgrade.editorMode)
-              && upgrade.featuresProjectMode && (
+            {upgrade.showUpgradeBanner &&
+              !upgrade.upgradeBannerDismissed &&
+              isStandaloneMode(upgrade.editorMode) &&
+              upgrade.featuresProjectMode && (
                 <UpgradeToProjectBanner
                   onUpgrade={() => void upgrade.handleUpgrade()}
                   onDismiss={upgrade.handleUpgradeDismiss}
@@ -245,11 +258,15 @@ export default function EditorLayout({
             />
 
             {!chrome.isElectron && recovery.wasAutoRecovered && !recovery.dismissedRecovery && (
-              <div className={`fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between shadow-lg ${recovery.recoveryExiting ? "animate-slide-out-up" : "animate-slide-in-down"}`}>
+              <div
+                className={`fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between shadow-lg ${recovery.recoveryExiting ? "animate-slide-out-up" : "animate-slide-in-down"}`}
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
                   <p className="text-sm text-foreground">
-                    <span className="font-semibold text-foreground">✓ 前回編集したファイルを復元しました：</span>{" "}
+                    <span className="font-semibold text-foreground">
+                      ✓ 前回編集したファイルを復元しました：
+                    </span>{" "}
                     <span className="font-mono text-success">{recovery.currentFileName}</span>
                   </p>
                 </div>
@@ -295,12 +312,17 @@ export default function EditorLayout({
                   className=""
                 >
                   {(() => {
-                    const topPanel = activityBar.topView !== "none"
-                      ? <SidebarPanel view={activityBar.topView} {...mainArea.sidebarPanelProps} />
-                      : null;
-                    const bottomPanel = activityBar.bottomView !== "none"
-                      ? <SidebarPanel view={activityBar.bottomView} {...mainArea.sidebarPanelProps} />
-                      : null;
+                    const topPanel =
+                      activityBar.topView !== "none" ? (
+                        <SidebarPanel view={activityBar.topView} {...mainArea.sidebarPanelProps} />
+                      ) : null;
+                    const bottomPanel =
+                      activityBar.bottomView !== "none" ? (
+                        <SidebarPanel
+                          view={activityBar.bottomView}
+                          {...mainArea.sidebarPanelProps}
+                        />
+                      ) : null;
 
                     if (topPanel && bottomPanel) {
                       return <SidebarSplitter top={topPanel} bottom={bottomPanel} />;
@@ -347,7 +369,9 @@ export default function EditorLayout({
                         const panelMdiEnabled = panelFileType === ".mdi";
                         const panelGfmEnabled = panelFileType !== ".txt";
 
-                        const liveTab = mainArea.tabsRef.current.find((tab) => tab.id === panelBufferId);
+                        const liveTab = mainArea.tabsRef.current.find(
+                          (tab) => tab.id === panelBufferId,
+                        );
                         const liveEditorTab = liveTab && isEditorTab(liveTab) ? liveTab : undefined;
                         const panelContent = liveEditorTab?.content ?? "";
                         const panelLastSavedContent = liveEditorTab?.lastSavedContent ?? "";
@@ -366,7 +390,10 @@ export default function EditorLayout({
                         if (isActivePanel) {
                           return (
                             <ErrorBoundary sectionName="エディタ">
-                              <div ref={mainArea.editorDomRef as React.RefObject<HTMLDivElement>} className="h-full">
+                              <div
+                                ref={mainArea.editorDomRef as React.RefObject<HTMLDivElement>}
+                                className="h-full"
+                              >
                                 <NovelEditor
                                   key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}`}
                                   initialContent={panelContent}
@@ -432,7 +459,9 @@ export default function EditorLayout({
                 {inspector.showSaveToast && (
                   <div
                     className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-background-elevated border border-border rounded-lg shadow-lg flex items-center gap-2 z-50 ${
-                      inspector.saveToastExiting ? "animate-save-toast-out" : "animate-save-toast-in"
+                      inspector.saveToastExiting
+                        ? "animate-save-toast-out"
+                        : "animate-save-toast-in"
                     }`}
                   >
                     <span className="text-success text-sm font-medium">✓</span>

@@ -8,11 +8,11 @@ The illusions linting system provides Japanese text quality analysis with 22+ ru
 
 **Three rule levels:**
 
-| Level | Name | Dependencies | Latency | Examples |
-|-------|------|-------------|---------|---------|
-| L1 | Regex | None | Instant | punctuation-rules, number-format, dash-format |
-| L2 | Morphological | Kuromoji tokenizer | ~50ms | word-repetition, passive-overuse, desu-masu-consistency |
-| L3 | LLM | LLM inference API | ~2-8s | Homophone detection (同音異義語) |
+| Level | Name          | Dependencies       | Latency | Examples                                                |
+| ----- | ------------- | ------------------ | ------- | ------------------------------------------------------- |
+| L1    | Regex         | None               | Instant | punctuation-rules, number-format, dash-format           |
+| L2    | Morphological | Kuromoji tokenizer | ~50ms   | word-repetition, passive-overuse, desu-masu-consistency |
+| L3    | LLM           | LLM inference API  | ~2-8s   | Homophone detection (同音異義語)                        |
 
 ---
 
@@ -53,10 +53,7 @@ For rules that need cross-paragraph context (e.g., notation consistency across t
 ```typescript
 abstract class AbstractDocumentLintRule extends AbstractLintRule {
   // Receives all paragraphs at once
-  abstract lintDocument(
-    paragraphs: ParagraphInfo[],
-    config: LintRuleConfig
-  ): LintIssue[];
+  abstract lintDocument(paragraphs: ParagraphInfo[], config: LintRuleConfig): LintIssue[];
 }
 ```
 
@@ -75,7 +72,7 @@ abstract class AbstractMorphologicalLintRule {
   abstract lintWithTokens(
     text: string,
     tokens: KuromojiToken[],
-    config: LintRuleConfig
+    config: LintRuleConfig,
   ): LintIssue[];
 }
 ```
@@ -87,10 +84,7 @@ Combines morphological analysis with document-wide scope. Used for rules like `d
 ```typescript
 abstract class AbstractMorphologicalDocumentLintRule {
   // Receives all paragraphs with their tokens
-  abstract lintDocumentWithTokens(
-    paragraphs: ParagraphInfo[],
-    config: LintRuleConfig
-  ): LintIssue[];
+  abstract lintDocumentWithTokens(paragraphs: ParagraphInfo[], config: LintRuleConfig): LintIssue[];
 }
 ```
 
@@ -109,7 +103,7 @@ abstract class AbstractLlmLintRule {
     sentences: string[],
     config: LintRuleConfig,
     llmClient: ILlmClient,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<LintIssue[]>;
 }
 ```
@@ -126,17 +120,18 @@ Every rule returns an array of `LintIssue` objects:
 
 ```typescript
 interface LintIssue {
-  ruleId: string;          // Rule identifier (e.g., "punctuation-rules")
+  ruleId: string; // Rule identifier (e.g., "punctuation-rules")
   severity: "error" | "warning" | "info";
-  message: string;         // English message
-  messageJa: string;       // Japanese message (displayed to user)
-  from: number;            // Start offset in plain text
-  to: number;              // End offset in plain text
-  reference?: string;      // Standard reference (e.g., "JIS X 4051:2004")
-  originalText?: string;   // The problematic text
-  llmValidated?: boolean;  // True if confirmed by LLM
-  fix?: {                  // Optional auto-fix
-    text: string;          // Replacement text
+  message: string; // English message
+  messageJa: string; // Japanese message (displayed to user)
+  from: number; // Start offset in plain text
+  to: number; // End offset in plain text
+  reference?: string; // Standard reference (e.g., "JIS X 4051:2004")
+  originalText?: string; // The problematic text
+  llmValidated?: boolean; // True if confirmed by LLM
+  fix?: {
+    // Optional auto-fix
+    text: string; // Replacement text
   };
 }
 ```
@@ -147,7 +142,7 @@ interface LintIssue {
 interface LintRuleConfig {
   enabled: boolean;
   severity: "error" | "warning" | "info";
-  skipDialogue?: boolean;      // Skip text inside 「」『』
+  skipDialogue?: boolean; // Skip text inside 「」『』
   skipLlmValidation?: boolean; // Skip L3 validation step
   options?: Record<string, unknown>; // Rule-specific options
 }
@@ -158,10 +153,10 @@ interface LintRuleConfig {
 Use these to determine a rule's capabilities at runtime:
 
 ```typescript
-isDocumentLintRule(rule)              // Has lintDocument()
-isMorphologicalLintRule(rule)         // Has lintWithTokens()
-isMorphologicalDocumentLintRule(rule) // Has lintDocumentWithTokens()
-isLlmLintRule(rule)                   // Has lintWithLlm()
+isDocumentLintRule(rule); // Has lintDocument()
+isMorphologicalLintRule(rule); // Has lintWithTokens()
+isMorphologicalDocumentLintRule(rule); // Has lintDocumentWithTokens()
+isLlmLintRule(rule); // Has lintWithLlm()
 ```
 
 ---
@@ -174,18 +169,19 @@ The `RuleRunner` orchestrates rule execution, manages configuration, and respect
 
 ### Key Methods
 
-| Method | Description |
-|--------|-------------|
-| `registerRule(rule)` | Register a rule instance |
-| `setConfig(ruleId, config)` | Override config for a specific rule |
-| `runAll(text)` | Run all enabled L1 rules on text |
-| `run(ruleId, text)` | Run a specific L1 rule |
-| `runDocumentRules(paragraphs)` | Run all enabled document-level rules |
-| `runWithTokens(text, tokens)` | Run all enabled L2 per-paragraph rules |
-| `runDocumentWithTokens(paragraphs)` | Run all enabled L2 document-level rules |
-| `runWithLlm(sentences, llmClient, signal?)` | Run all enabled L3 rules |
+| Method                                      | Description                             |
+| ------------------------------------------- | --------------------------------------- |
+| `registerRule(rule)`                        | Register a rule instance                |
+| `setConfig(ruleId, config)`                 | Override config for a specific rule     |
+| `runAll(text)`                              | Run all enabled L1 rules on text        |
+| `run(ruleId, text)`                         | Run a specific L1 rule                  |
+| `runDocumentRules(paragraphs)`              | Run all enabled document-level rules    |
+| `runWithTokens(text, tokens)`               | Run all enabled L2 per-paragraph rules  |
+| `runDocumentWithTokens(paragraphs)`         | Run all enabled L2 document-level rules |
+| `runWithLlm(sentences, llmClient, signal?)` | Run all enabled L3 rules                |
 
 The runner handles:
+
 - Filtering by `enabled` state
 - Applying `skipDialogue` masking
 - Guideline-based filtering
@@ -199,13 +195,13 @@ The runner handles:
 
 Five built-in presets control which rules are active and at what severity:
 
-| Preset | Description | Use Case |
-|--------|-------------|----------|
-| `relaxed` | Minimal checks, info-level only | Casual writing, drafts |
-| `standard` | Balanced checks | General purpose |
-| `strict` | All rules at warning/error level | Professional editing |
-| `novel` | Optimized for fiction writing | Creative writing |
-| `official` | Follows government publication standards | Official documents |
+| Preset     | Description                              | Use Case               |
+| ---------- | ---------------------------------------- | ---------------------- |
+| `relaxed`  | Minimal checks, info-level only          | Casual writing, drafts |
+| `standard` | Balanced checks                          | General purpose        |
+| `strict`   | All rules at warning/error level         | Professional editing   |
+| `novel`    | Optimized for fiction writing            | Creative writing       |
+| `official` | Follows government publication standards | Official documents     |
 
 ### Using Presets
 
@@ -223,13 +219,13 @@ The `getPresetForMode()` function merges mode-specific overrides onto the `stand
 
 Rules are organized into five categories for the settings UI:
 
-| Category | Japanese Label | Examples |
-|----------|---------------|----------|
-| Punctuation & Notation | 約物・表記 | punctuation-rules, dash-format, number-format |
-| Kanji & Characters | 漢字・用字 | joyo-kanji, notation-consistency |
-| Grammar & Usage | 文法・語法 | particle-no-repetition, conjugation-errors, correlative-expression |
-| Style | 文体 | sentence-ending-repetition, sentence-length, desu-masu-consistency |
-| AI Proofreading | AI校正 | L3 rules (homophone detection, etc.) |
+| Category               | Japanese Label | Examples                                                           |
+| ---------------------- | -------------- | ------------------------------------------------------------------ |
+| Punctuation & Notation | 約物・表記     | punctuation-rules, dash-format, number-format                      |
+| Kanji & Characters     | 漢字・用字     | joyo-kanji, notation-consistency                                   |
+| Grammar & Usage        | 文法・語法     | particle-no-repetition, conjugation-errors, correlative-expression |
+| Style                  | 文体           | sentence-ending-repetition, sentence-length, desu-masu-consistency |
+| AI Proofreading        | AI校正         | L3 rules (homophone detection, etc.)                               |
 
 ---
 
@@ -237,13 +233,13 @@ Rules are organized into five categories for the settings UI:
 
 **Directory:** `lib/linting/data/`
 
-| File | Content | Count |
-|------|---------|-------|
-| `joyo-kanji.ts` | Joyo kanji set (常用漢字表 2010) | 2,136 characters |
-| `jinmeiyo-kanji.ts` | Jinmeiyo kanji set (人名用漢字) | 863 characters |
-| `notation-variants.ts` | Notation variant groups for consistency checking | 66 groups |
-| `adverb-variants.ts` | Adverb variant groups | 30 groups |
-| `counter-words.ts` | Counter word entries with valid noun pairings | 7 entries |
+| File                   | Content                                          | Count            |
+| ---------------------- | ------------------------------------------------ | ---------------- |
+| `joyo-kanji.ts`        | Joyo kanji set (常用漢字表 2010)                 | 2,136 characters |
+| `jinmeiyo-kanji.ts`    | Jinmeiyo kanji set (人名用漢字)                  | 863 characters   |
+| `notation-variants.ts` | Notation variant groups for consistency checking | 66 groups        |
+| `adverb-variants.ts`   | Adverb variant groups                            | 30 groups        |
+| `counter-words.ts`     | Counter word entries with valid noun pairings    | 7 entries        |
 
 ### Notation Variants Example
 
@@ -295,34 +291,34 @@ Many rules skip dialogue text because fictional speech intentionally uses inform
 
 ### L1 Rules (15 rules)
 
-| Rule ID | Scope | Description |
-|---------|-------|-------------|
-| `punctuation-rules` | per-paragraph | Validates punctuation usage per JIS X 4051:2004 |
-| `number-format` | per-paragraph | Checks numeral formatting per government guidelines |
-| `joyo-kanji` | per-paragraph | Flags non-joyo kanji (outside 2,136 standard set) |
-| `era-year-validator` | per-paragraph | Validates Japanese era year ranges (e.g., 令和) |
-| `particle-no-repetition` | per-paragraph | Detects repeated の particle chains |
-| `conjugation-errors` | per-paragraph | Catches common conjugation mistakes |
-| `redundant-expression` | per-paragraph | Flags redundant phrases (e.g., 頭痛が痛い) |
-| `verbose-expression` | per-paragraph | Suggests concise alternatives for wordy phrases |
-| `sentence-ending-repetition` | per-paragraph | Detects repeated sentence endings (e.g., ~た。~た。~た。) |
-| `correlative-expression` | per-paragraph | Checks correlative pairs (e.g., もし...ならば) |
-| `notation-consistency` | document-level | Detects inconsistent notation across the document |
-| `sentence-length` | per-paragraph | Warns on overly long sentences |
-| `dash-format` | per-paragraph | Validates dash character usage |
-| `dialogue-punctuation` | per-paragraph | Checks punctuation inside dialogue brackets |
-| `comma-frequency` | per-paragraph | Flags excessive comma usage in a single sentence |
+| Rule ID                      | Scope          | Description                                               |
+| ---------------------------- | -------------- | --------------------------------------------------------- |
+| `punctuation-rules`          | per-paragraph  | Validates punctuation usage per JIS X 4051:2004           |
+| `number-format`              | per-paragraph  | Checks numeral formatting per government guidelines       |
+| `joyo-kanji`                 | per-paragraph  | Flags non-joyo kanji (outside 2,136 standard set)         |
+| `era-year-validator`         | per-paragraph  | Validates Japanese era year ranges (e.g., 令和)           |
+| `particle-no-repetition`     | per-paragraph  | Detects repeated の particle chains                       |
+| `conjugation-errors`         | per-paragraph  | Catches common conjugation mistakes                       |
+| `redundant-expression`       | per-paragraph  | Flags redundant phrases (e.g., 頭痛が痛い)                |
+| `verbose-expression`         | per-paragraph  | Suggests concise alternatives for wordy phrases           |
+| `sentence-ending-repetition` | per-paragraph  | Detects repeated sentence endings (e.g., ~た。~た。~た。) |
+| `correlative-expression`     | per-paragraph  | Checks correlative pairs (e.g., もし...ならば)            |
+| `notation-consistency`       | document-level | Detects inconsistent notation across the document         |
+| `sentence-length`            | per-paragraph  | Warns on overly long sentences                            |
+| `dash-format`                | per-paragraph  | Validates dash character usage                            |
+| `dialogue-punctuation`       | per-paragraph  | Checks punctuation inside dialogue brackets               |
+| `comma-frequency`            | per-paragraph  | Flags excessive comma usage in a single sentence          |
 
 ### L2 Rules (7 rules)
 
-| Rule ID | Scope | Description |
-|---------|-------|-------------|
-| `desu-masu-consistency` | document-level | Detects mixed desu/masu and da/dearu styles |
-| `conjunction-overuse` | per-paragraph | Flags excessive conjunction usage |
-| `word-repetition` | per-paragraph | Detects repeated words in close proximity |
-| `taigen-dome-overuse` | per-paragraph | Flags excessive noun-ending sentences (体言止め) |
-| `passive-overuse` | per-paragraph | Detects excessive passive voice usage |
-| `counter-word-mismatch` | per-paragraph | Checks counter word + noun agreement |
+| Rule ID                   | Scope          | Description                                           |
+| ------------------------- | -------------- | ----------------------------------------------------- |
+| `desu-masu-consistency`   | document-level | Detects mixed desu/masu and da/dearu styles           |
+| `conjunction-overuse`     | per-paragraph  | Flags excessive conjunction usage                     |
+| `word-repetition`         | per-paragraph  | Detects repeated words in close proximity             |
+| `taigen-dome-overuse`     | per-paragraph  | Flags excessive noun-ending sentences (体言止め)      |
+| `passive-overuse`         | per-paragraph  | Detects excessive passive voice usage                 |
+| `counter-word-mismatch`   | per-paragraph  | Checks counter word + noun agreement                  |
 | `adverb-form-consistency` | document-level | Detects inconsistent adverb forms across the document |
 
 ---
@@ -377,8 +373,7 @@ export class ExampleRule extends AbstractLintRule {
         severity: config.severity,
         message: "Description of the issue in English",
         // MUST reference the relevant standard
-        messageJa:
-          "JIS X 4051:2004に基づき、問題の説明をここに記述します",
+        messageJa: "JIS X 4051:2004に基づき、問題の説明をここに記述します",
         from,
         to,
         reference: "JIS X 4051:2004",
@@ -452,26 +447,26 @@ All user-facing messages (`messageJa`) **must** reference the relevant official 
 
 ### Reference Standards
 
-| Standard | Scope | Example Usage |
-|----------|-------|---------------|
-| JIS X 4051:2004 | Punctuation (約物) | Punctuation placement, dash formatting |
-| 文化庁「公用文作成の考え方」(2022) | Numeral formatting, correlative expressions | Number format, paired expressions |
-| 文化庁 常用漢字表 (2010) | 2,136 standard kanji | Non-joyo kanji detection |
-| 文化庁「送り仮名の付け方」(1973) | Okurigana rules | Okurigana consistency |
-| 文化庁「外来語の表記」(1991) | Katakana long vowels | Foreign word notation |
-| 日本語スタイルガイド | Stylistic rules | Sentence length, repetition, overuse patterns |
+| Standard                           | Scope                                       | Example Usage                                 |
+| ---------------------------------- | ------------------------------------------- | --------------------------------------------- |
+| JIS X 4051:2004                    | Punctuation (約物)                          | Punctuation placement, dash formatting        |
+| 文化庁「公用文作成の考え方」(2022) | Numeral formatting, correlative expressions | Number format, paired expressions             |
+| 文化庁 常用漢字表 (2010)           | 2,136 standard kanji                        | Non-joyo kanji detection                      |
+| 文化庁「送り仮名の付け方」(1973)   | Okurigana rules                             | Okurigana consistency                         |
+| 文化庁「外来語の表記」(1991)       | Katakana long vowels                        | Foreign word notation                         |
+| 日本語スタイルガイド               | Stylistic rules                             | Sentence length, repetition, overuse patterns |
 
 ### Example Messages
 
 ```typescript
 // Good: References specific standard
-messageJa: "JIS X 4051:2004に基づき、全角ダッシュ（――）は偶数個で使用してください"
+messageJa: "JIS X 4051:2004に基づき、全角ダッシュ（――）は偶数個で使用してください";
 
 // Good: References government guideline
-messageJa: "文化庁「公用文作成の考え方」に基づき、大きな数は漢数字を使用してください"
+messageJa: "文化庁「公用文作成の考え方」に基づき、大きな数は漢数字を使用してください";
 
 // Bad: No standard reference
-messageJa: "ダッシュの使い方が間違っています"  // DO NOT do this
+messageJa: "ダッシュの使い方が間違っています"; // DO NOT do this
 ```
 
 ---

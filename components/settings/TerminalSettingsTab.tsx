@@ -24,7 +24,10 @@ const ANSI_COLOR_LABELS: { key: string; label: string }[] = [
 ];
 
 const FONT_OPTIONS = [
-  { value: "'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace", label: "JetBrains Mono" },
+  {
+    value: "'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
+    label: "JetBrains Mono",
+  },
   { value: "'Menlo', 'Monaco', 'Courier New', monospace", label: "Menlo" },
   { value: "'Monaco', 'Courier New', monospace", label: "Monaco" },
   { value: "'SF Mono', 'Menlo', 'Monaco', monospace", label: "SF Mono" },
@@ -80,9 +83,7 @@ export default function TerminalSettingsTab(): React.ReactElement {
 
         {/* Default shell */}
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            デフォルトShell
-          </label>
+          <label className="block text-sm font-medium text-foreground mb-2">デフォルトShell</label>
           <input
             type="text"
             value={terminalDefaultShell}
@@ -105,7 +106,9 @@ export default function TerminalSettingsTab(): React.ReactElement {
           />
           <div>
             <span className="text-sm font-medium text-foreground">選択時に自動コピー</span>
-            <p className="text-xs text-foreground-tertiary">テキストを選択すると自動的にクリップボードにコピーします。</p>
+            <p className="text-xs text-foreground-tertiary">
+              テキストを選択すると自動的にクリップボードにコピーします。
+            </p>
           </div>
         </label>
 
@@ -118,8 +121,12 @@ export default function TerminalSettingsTab(): React.ReactElement {
             className="w-4 h-4 rounded border-border accent-accent"
           />
           <div>
-            <span className="text-sm font-medium text-foreground">Option キーを Meta として使用</span>
-            <p className="text-xs text-foreground-tertiary">macOS で Option キーを Alt/Meta キーとして扱います（Emacs キーバインドなどに便利）。</p>
+            <span className="text-sm font-medium text-foreground">
+              Option キーを Meta として使用
+            </span>
+            <p className="text-xs text-foreground-tertiary">
+              macOS で Option キーを Alt/Meta キーとして扱います（Emacs キーバインドなどに便利）。
+            </p>
           </div>
         </label>
       </div>
@@ -151,7 +158,8 @@ export default function TerminalSettingsTab(): React.ReactElement {
         {/* Font size */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            フォントサイズ <span className="text-foreground-tertiary font-normal">({terminalFontSize}px)</span>
+            フォントサイズ{" "}
+            <span className="text-foreground-tertiary font-normal">({terminalFontSize}px)</span>
           </label>
           <input
             type="range"
@@ -171,7 +179,10 @@ export default function TerminalSettingsTab(): React.ReactElement {
         {/* Line height */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            行の高さ <span className="text-foreground-tertiary font-normal">({terminalLineHeight.toFixed(1)})</span>
+            行の高さ{" "}
+            <span className="text-foreground-tertiary font-normal">
+              ({terminalLineHeight.toFixed(1)})
+            </span>
           </label>
           <input
             type="range"
@@ -197,15 +208,13 @@ export default function TerminalSettingsTab(): React.ReactElement {
 
         {/* Cursor style */}
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            カーソルスタイル
-          </label>
+          <label className="block text-sm font-medium text-foreground mb-2">カーソルスタイル</label>
           <div className="flex gap-2">
-            {([
+            {[
               { value: "block" as const, label: "ブロック", preview: "█" },
               { value: "underline" as const, label: "アンダーライン", preview: "_" },
               { value: "bar" as const, label: "バー", preview: "│" },
-            ]).map(({ value, label, preview }) => (
+            ].map(({ value, label, preview }) => (
               <button
                 key={value}
                 onClick={() => onTerminalCursorStyleChange(value)}
@@ -242,7 +251,10 @@ export default function TerminalSettingsTab(): React.ReactElement {
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            最大行数 <span className="text-foreground-tertiary font-normal">({terminalScrollback.toLocaleString()} 行)</span>
+            最大行数{" "}
+            <span className="text-foreground-tertiary font-normal">
+              ({terminalScrollback.toLocaleString()} 行)
+            </span>
           </label>
           <input
             type="range"
@@ -271,9 +283,7 @@ export default function TerminalSettingsTab(): React.ReactElement {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              背景色
-            </label>
+            <label className="block text-sm font-medium text-foreground mb-2">背景色</label>
             <div className="flex items-center gap-3">
               <input
                 type="color"
@@ -365,17 +375,37 @@ export default function TerminalSettingsTab(): React.ReactElement {
         </div>
 
         {/* Preview */}
-        <div className="mt-4 p-4 rounded-lg border border-border overflow-hidden" style={{ backgroundColor: terminalBackground }}>
-          <p className="text-xs mb-2" style={{ color: terminalForeground, opacity: 0.5 }}>プレビュー</p>
-          <div className="font-mono text-sm leading-relaxed space-y-0.5" style={{ fontFamily: terminalFontFamily, fontSize: `${terminalFontSize}px`, color: terminalForeground }}>
+        <div
+          className="mt-4 p-4 rounded-lg border border-border overflow-hidden"
+          style={{ backgroundColor: terminalBackground }}
+        >
+          <p className="text-xs mb-2" style={{ color: terminalForeground, opacity: 0.5 }}>
+            プレビュー
+          </p>
+          <div
+            className="font-mono text-sm leading-relaxed space-y-0.5"
+            style={{
+              fontFamily: terminalFontFamily,
+              fontSize: `${terminalFontSize}px`,
+              color: terminalForeground,
+            }}
+          >
             {ANSI_COLOR_LABELS.slice(0, 8).map(({ key, label }) => (
-              <span key={key} className="inline-block mr-3" style={{ color: terminalAnsiColors[key] }}>
+              <span
+                key={key}
+                className="inline-block mr-3"
+                style={{ color: terminalAnsiColors[key] }}
+              >
                 {label}
               </span>
             ))}
             <br />
             {ANSI_COLOR_LABELS.slice(8).map(({ key, label }) => (
-              <span key={key} className="inline-block mr-3" style={{ color: terminalAnsiColors[key] }}>
+              <span
+                key={key}
+                className="inline-block mr-3"
+                style={{ color: terminalAnsiColors[key] }}
+              >
                 {label}
               </span>
             ))}

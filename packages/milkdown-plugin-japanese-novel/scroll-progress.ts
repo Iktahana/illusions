@@ -35,7 +35,7 @@ export function getScrollProgress({ container, isVertical }: ScrollProgressOptio
     const maxScroll = container.scrollWidth - container.clientWidth;
     if (maxScroll <= 0) return 0;
 
-    const progress = 1 - (container.scrollLeft / maxScroll);
+    const progress = 1 - container.scrollLeft / maxScroll;
     return progress;
   } else {
     // Horizontal writing mode: uses scrollTop (vertical scrollbar)
@@ -63,7 +63,7 @@ export function getScrollProgress({ container, isVertical }: ScrollProgressOptio
  */
 export function setScrollProgress(
   { container, isVertical }: ScrollProgressOptions,
-  progress: number
+  progress: number,
 ): boolean {
   // Clamp progress value to the 0-1 range
   const clampedProgress = Math.max(0, Math.min(1, progress));
@@ -167,7 +167,7 @@ export function scrollToEnd({ container, isVertical }: ScrollProgressOptions): b
  */
 export function scrollByPercent(
   { container, isVertical }: ScrollProgressOptions,
-  delta: number
+  delta: number,
 ): boolean {
   const currentProgress = getScrollProgress({ container, isVertical });
   const newProgress = currentProgress + delta;

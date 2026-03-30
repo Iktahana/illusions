@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useState, useRef, useMemo, useEffect } from 'react';
-import { WEB_MENU_STRUCTURE, ACTION_TO_COMMAND_ID } from '@/lib/menu/menu-definitions';
-import { SHORTCUT_REGISTRY } from '@/lib/keymap/shortcut-registry';
-import { loadKeymapOverrides } from '@/lib/keymap/keymap-storage';
-import { toWebMenuAccelerator } from '@/lib/keymap/keymap-utils';
-import { MenuDropdown } from './WebMenuBar/MenuDropdown';
+import { useState, useRef, useMemo, useEffect } from "react";
+import { WEB_MENU_STRUCTURE, ACTION_TO_COMMAND_ID } from "@/lib/menu/menu-definitions";
+import { SHORTCUT_REGISTRY } from "@/lib/keymap/shortcut-registry";
+import { loadKeymapOverrides } from "@/lib/keymap/keymap-storage";
+import { toWebMenuAccelerator } from "@/lib/keymap/keymap-utils";
+import { MenuDropdown } from "./WebMenuBar/MenuDropdown";
 
-import type { MenuSection, MenuItem } from '@/lib/menu/menu-definitions';
-import type { KeymapOverrides } from '@/lib/keymap/keymap-types';
+import type { MenuSection, MenuItem } from "@/lib/menu/menu-definitions";
+import type { KeymapOverrides } from "@/lib/keymap/keymap-types";
 
 interface RecentProjectInfo {
   projectId: string;
@@ -26,23 +26,29 @@ interface WebMenuBarProps {
   checkedState?: MenuCheckedState;
 }
 
-export default function WebMenuBar({ onMenuAction, recentProjects, checkedState }: WebMenuBarProps) {
+export default function WebMenuBar({
+  onMenuAction,
+  recentProjects,
+  checkedState,
+}: WebMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const menuRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // Load user keymap overrides so accelerator labels reflect customizations
   const [keymapOverrides, setKeymapOverrides] = useState<KeymapOverrides>({});
   useEffect(() => {
-    loadKeymapOverrides().then(setKeymapOverrides).catch(() => {
-      // Silently fall back to defaults if overrides cannot be loaded
-    });
+    loadKeymapOverrides()
+      .then(setKeymapOverrides)
+      .catch(() => {
+        // Silently fall back to defaults if overrides cannot be loaded
+      });
   }, []);
 
   // Checked state map: action → boolean
   const checkedMap = useMemo<Record<string, boolean>>(() => {
     const map: Record<string, boolean> = {};
     if (checkedState?.compactMode != null) {
-      map['toggle-compact-mode'] = checkedState.compactMode;
+      map["toggle-compact-mode"] = checkedState.compactMode;
     }
     return map;
   }, [checkedState]);
@@ -68,7 +74,7 @@ export default function WebMenuBar({ onMenuAction, recentProjects, checkedState 
     return WEB_MENU_STRUCTURE.map((section) => {
       const items = section.items.map((item): MenuItem => {
         // Inject recent projects submenu
-        if (item.action === 'open-recent-project' && section.label === 'ファイル') {
+        if (item.action === "open-recent-project" && section.label === "ファイル") {
           const submenuItems: MenuItem[] =
             recentProjects && recentProjects.length > 0
               ? recentProjects.map((p) => ({
@@ -80,8 +86,12 @@ export default function WebMenuBar({ onMenuAction, recentProjects, checkedState 
         }
 
         // Inject checked state for checkbox items
-        if (item.type === 'checkbox' && item.action && item.action in checkedMap) {
-          return { ...item, checked: checkedMap[item.action], accelerator: resolveAccelerator(item.action) };
+        if (item.type === "checkbox" && item.action && item.action in checkedMap) {
+          return {
+            ...item,
+            checked: checkedMap[item.action],
+            accelerator: resolveAccelerator(item.action),
+          };
         }
 
         // Replace hardcoded accelerator with the effective user binding
@@ -109,7 +119,9 @@ export default function WebMenuBar({ onMenuAction, recentProjects, checkedState 
       {menuStructure.map((section, index) => (
         <div key={index} className="relative">
           <button
-            ref={(el) => { menuRefs.current[index] = el; }}
+            ref={(el) => {
+              menuRefs.current[index] = el;
+            }}
             type="button"
             onClick={() => handleMenuClick(index)}
             className="px-3 py-1 text-sm text-foreground-secondary hover:bg-hover rounded transition-colors"

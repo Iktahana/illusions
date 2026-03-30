@@ -38,10 +38,7 @@ checker.init(
           name,
           version,
           license: (info.licenses as string) || "Unknown",
-          repository:
-            (info.repository as string) ||
-            (info.url as string) ||
-            "",
+          repository: (info.repository as string) || (info.url as string) || "",
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -52,5 +49,5 @@ checker.init(
     const outPath = resolve(outDir, "credits.json");
     writeFileSync(outPath, JSON.stringify(credits, null, 2) + "\n");
     console.log(`Generated ${credits.length} credits → ${outPath}`);
-  }
+  },
 );

@@ -4,7 +4,6 @@
 
 ![banner](/public/banner/github.png)
 
-
 ## ダウンロード / Downloads
 
 <div style="display: flex; gap: 8px; height: 48px;">
@@ -41,12 +40,14 @@
 ### システム要件 / System Requirements
 
 #### macOS
+
 - **OS**: macOS 10.15 (Catalina) or later
 - **Processor**: Intel または Apple Silicon
-- **Memory**:  4 GB RAM 以上
+- **Memory**: 4 GB RAM 以上
 - **Disk Space**: 1 GB 以上の空き容量
 
 #### Windows
+
 - **OS**: Windows 10 version 1909 以上 または Windows 11
 - **Processor**: Intel または AMD (x64)
 - **Memory**: 4 GB RAM 以上
@@ -54,6 +55,7 @@
 - **Note**: SmartScreen警告が表示される場合がありますが、これは署名なしアプリケーションの標準的な動作です
 
 #### Chrome版 / Web Version
+
 - **Browser**: Google Chrome 90+ (latest recommended)
 
 ---
@@ -71,11 +73,13 @@ Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try 
 ## 🚀 Quick Start
 
 ### macOS
+
 1. Download the `.dmg` file from [illusions.app/downloads](https://www.illusions.app/downloads)
 2. Open the DMG and drag illusions to your Applications folder
 3. Launch the app and start writing!
 
 ### Windows
+
 1. Download the `.exe` installer from [illusions.app/downloads](https://www.illusions.app/downloads)
 2. Run the installer
 3. **Important**: You may see a Windows SmartScreen warning saying "Unknown Publisher"
@@ -86,6 +90,7 @@ Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try 
 > **Tip**: To skip the SmartScreen warning, install from the **Microsoft Store** instead (search "illusions novel editor").
 
 **Why does Windows show this warning?**
+
 - illusions is currently distributed without a Windows code signing certificate
 - Code signing certificates cost $200-400/year for individual developers
 - The app is completely safe and open-source - you can review the code on GitHub
@@ -96,6 +101,7 @@ Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try 
 ## 🛠️ For Developers
 
 #### Prerequisites
+
 - Node.js 22+
 - npm or yarn
 
@@ -209,28 +215,34 @@ illusions/
 ## 🛠️ Tech Stack
 
 ### Core
+
 - **Next.js 16** - React framework with App Router
 - **React 18** - UI library
 - **TypeScript** - Type-safe development
 - **Tailwind CSS 3** - Utility-first styling
 
 ### Editor
+
 - **Milkdown 7** - WYSIWYG Markdown editor
 - **ProseMirror** - Editor foundation
 - **Kuromoji.js** - Japanese morphological analysis
 
 ### Storage
+
 - **Dexie.js** - IndexedDB wrapper (Web)
 - **better-sqlite3** - SQLite database (Electron)
 
 ### Layout & Terminal
+
 - **dockview-react** - Flexible panel layout system
 - **xterm.js + node-pty** - Integrated terminal panel
 
 ### Testing
+
 - **Vitest** - Unit testing framework
 
 ### Desktop
+
 - **Electron 32** - Cross-platform desktop app
 - **electron-builder** - Build and packaging
 - **electron-updater** - Auto-update support
