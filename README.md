@@ -68,6 +68,34 @@ Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try 
 
 ---
 
+## ✨ Key Features
+
+### エディタ / Editor
+- **縦書き・横書き対応 (Vertical & horizontal writing)** — Switch between writing modes optimized for Japanese novels
+- **Flexible panel layout** — Dockview-based multi-panel workspace; drag, split, and rearrange panels freely
+- **Pop-out editor windows** — Detach any editor tab into a separate window for multi-monitor workflows
+- **File diff view** — Side-by-side comparison of file versions directly in the editor
+- **Multi-tab editing** — Work on multiple files simultaneously with persistent tab state
+- **Empty editor placeholder** — Guided empty state when no file is open
+
+### ターミナル / Terminal
+- **Integrated terminal panel** — Full xterm.js terminal embedded in the editor (desktop only)
+- **Multiple terminal tabs** — Open and manage several terminal sessions in parallel
+
+### キーボード / Keyboard
+- **Customizable keybindings** — Remap any command via the Keymap settings tab; bindings persist across sessions
+- **Shortcut registry** — Centralized command-ID system for consistent shortcut management
+
+### 校正・設定 / Linting & Settings
+- **Japanese text linting** — Configurable rule-based linting with JSON-defined rule sets; preset support
+- **Settings tabs** — Including: Keymap, Linting, Typography, Vertical layout, Speech, Terminal, Position highlight, Power
+
+### デスクトップ / Desktop
+- **Desktop-only feature guards** — `DesktopOnlyDialog` gracefully blocks web-unsupported features
+- **Download button component** — In-app prompt to download the desktop build when a desktop-only feature is accessed
+
+---
+
 ## 🚀 Quick Start
 
 ### macOS
@@ -83,7 +111,7 @@ Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try 
    - Click **"More info"** → **"Run anyway"** to proceed with installation
 4. Launch the app and start writing!
 
-> **Tip**: To skip the SmartScreen warning, install from the **Microsoft Store** instead (search "illusions novel editor").
+> **Tip**: To skip the SmartScreen warning, install from the **Microsoft Store** instead (search "illusions novel editor"). The Store listing is automatically published with every stable release, so it is always up-to-date.
 
 **Why does Windows show this warning?**
 - illusions is currently distributed without a Windows code signing certificate
