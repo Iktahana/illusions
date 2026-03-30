@@ -101,36 +101,22 @@ jobs:
           MAJOR=$(echo "$PKG_VERSION" | cut -d. -f1)
           MINOR=$(echo "$PKG_VERSION" | cut -d. -f2)
 
+          # Find the highest patch number from existing tags matching vMAJOR.MINOR.*
+          LATEST_PATCH=$(git tag -l "v${MAJOR}.${MINOR}.*" | sed "s/^v${MAJOR}\.${MINOR}\.//" | grep -E '^[0-9]+$' | sort -n | tail -1)
+
+          if [ -z "$LATEST_PATCH" ]; then
+            NEXT_PATCH=1
+          else
+            NEXT_PATCH=$((LATEST_PATCH + 1))
+          fi
+
+          BASE_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}"
+
           # Determine effective branch name
           if [ "${{ github.ref_type }}" = "tag" ]; then
             BRANCH_NAME="main"
           else
             BRANCH_NAME="${GITHUB_REF_NAME}"
-          fi
-
-          # For tag pushes: use the tag version directly (strip leading "v")
-          # For branch pushes: auto-increment patch from latest matching tag
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            TAG_VERSION="${GITHUB_REF_NAME#v}"
-            TAG_MAJOR=$(echo "$TAG_VERSION" | cut -d. -f1)
-            TAG_MINOR=$(echo "$TAG_VERSION" | cut -d. -f2)
-
-            if [ "$TAG_MAJOR" != "$MAJOR" ] || [ "$TAG_MINOR" != "$MINOR" ]; then
-              echo "::error::Tag MAJOR.MINOR (${TAG_MAJOR}.${TAG_MINOR}) does not match package.json (${MAJOR}.${MINOR})"
-              exit 1
-            fi
-
-            BASE_VERSION="$TAG_VERSION"
-          else
-            LATEST_PATCH=$(git tag -l "v${MAJOR}.${MINOR}.*" | sed "s/^v${MAJOR}\.${MINOR}\.//" | grep -E '^[0-9]+$' | sort -n | tail -1)
-
-            if [ -z "$LATEST_PATCH" ]; then
-              NEXT_PATCH=1
-            else
-              NEXT_PATCH=$((LATEST_PATCH + 1))
-            fi
-
-            BASE_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}"
           fi
 
           # main: use computed version as-is
@@ -684,9 +670,6 @@ jobs:
       needs.detect-changes.outputs.desktop_changed == 'true'
     needs: [detect-changes, compute-version, build-macos, package-windows-nsis, package-windows-msix, build-linux]
     runs-on: ubuntu-latest
-    outputs:
-      release_tag: v${{ needs.compute-version.outputs.full }}
-      is_stable: ${{ needs.compute-version.outputs.branch == 'main' }}
 
     steps:
       - name: Download build artifacts
@@ -714,19 +697,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
-  # Automatically submit to Microsoft Store after a stable release.
-  # Triggered via workflow_call — runs only on main branch / version tags.
+  # Microsoft Store submission is handled by a separate workflow:
+  #   .github/workflows/sync-ms-store-listing.yml
+  # Use it manually via workflow_dispatch after a release.
   # ---------------------------------------------------------------------------
-
-  sync-ms-store:
-    name: Sync Microsoft Store (full-submission)
-    needs: [release]
-    if: |
-      github.event_name != 'pull_request' &&
-      needs.release.outputs.is_stable == 'true'
-    uses: ./.github/workflows/sync-ms-store-listing.yml
-    with:
-      mode: full-submission
-      release_tag: ${{ needs.release.outputs.release_tag }}
-      dry_run: false
-    secrets: inherit
