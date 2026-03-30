@@ -107,22 +107,10 @@ Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try 
 3. Launch the app and start writing!
 
 ### Windows
+1. Download the `.exe` installer from [illusions.app/downloads](https://www.illusions.app/downloads), or install from the **Microsoft Store** (search "illusions novel editor")
+2. Run the installer and launch the app
 
-1. Download the `.exe` installer from [illusions.app/downloads](https://www.illusions.app/downloads)
-2. Run the installer
-3. **Important**: You may see a Windows SmartScreen warning saying "Unknown Publisher"
-   - This is normal for unsigned applications
-   - Click **"More info"** → **"Run anyway"** to proceed with installation
-4. Launch the app and start writing!
-
-> **Tip**: To skip the SmartScreen warning, install from the **Microsoft Store** instead (search "illusions novel editor"). The Store listing is automatically published with every stable release, so it is always up-to-date.
-
-**Why does Windows show this warning?**
-
-- illusions is currently distributed without a Windows code signing certificate
-- Code signing certificates cost $200-400/year for individual developers
-- The app is completely safe and open-source - you can review the code on GitHub
-- We plan to add code signing in the future as the project grows
+> **Note**: The direct installer may trigger a Windows SmartScreen warning since the app is not code-signed. Click **"More info"** → **"Run anyway"** to proceed. The Microsoft Store version does not have this issue.
 
 ---
 
@@ -151,29 +139,7 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-Open http://localhost:3000 in your browser.
-
-#### GitHub OAuth Setup (Optional)
-
-To enable GitHub authentication and cloud sync:
-
-1. Create a GitHub OAuth App at https://github.com/settings/applications/new
-2. Configure the OAuth App:
-   - **Application name**: `illusions Novel Editor` (or your preferred name)
-   - **Homepage URL**: `http://localhost:3000`
-   - **Authorization callback URL**: `http://localhost:3000`
-3. Copy the **Client ID** from the OAuth App page
-4. Create a `.env.local` file in the project root:
-   ```bash
-   cp .env.local.example .env.local
-   ```
-5. Edit `.env.local` and replace `your_client_id_here` with your actual Client ID:
-   ```
-   GITHUB_CLIENT_ID=your_actual_client_id
-   ```
-6. Restart the development server
-
-The GitHub avatar will appear at the bottom of the left sidebar, allowing you to log in and sync your work.
+Open http://localhost:3010 in your browser.
 
 #### Electron Development
 
@@ -201,37 +167,11 @@ The generated file is used in the "About illusions" page in Settings.
 ```
 illusions/
 ├── app/                      # Next.js App Router pages
-│   ├── api/                  # API routes (NLP endpoints)
-│   ├── globals.css           # Global styles & theme variables
-│   └── page.tsx              # Main editor page
 ├── components/               # React components
-│   ├── Editor.tsx            # Milkdown editor
-│   ├── Explorer.tsx          # Left sidebar (file tree)
-│   ├── Inspector.tsx         # Right sidebar (stats & tools)
-│   ├── ActivityBar.tsx       # Left activity bar
-│   └── explorer/             # Explorer sub-components
 ├── contexts/                 # React context providers
-├── electron/                 # Electron main process
-│   ├── main.js               # Main process entry
-│   ├── preload.js            # Preload script (secure IPC)
-│   ├── nlp/                  # NLP backend (kuromoji)
-│   └── storage-ipc-handlers.js
-├── lib/                      # Core libraries
-│   ├── storage/              # Storage abstraction layer
-│   ├── services/             # App services (history, notifications, etc.)
-│   ├── linting/              # Japanese text linting framework
-│   ├── keymap/               # Keyboard shortcut customization
-│   ├── nlp-client/           # NLP client abstraction
-│   ├── nlp-backend/          # NLP backend logic
-│   ├── export/               # PDF/EPUB/DOCX export
-│   ├── dockview/             # Panel layout (dockview-react adapter)
-│   ├── hooks/                # React hooks
-│   ├── project/              # Project management
-│   ├── tab-manager/          # Multi-tab management
-│   ├── vfs/                  # Virtual file system
-│   └── utils/                # Utility functions
-├── packages/                 # Internal packages
-│   └── milkdown-plugin-japanese-novel/
+├── electron/                 # Electron main process & preload
+├── lib/                      # Core libraries (storage, linting, editor, VFS, etc.)
+├── packages/                 # Internal packages (milkdown-plugin-japanese-novel)
 ├── www/                      # Landing page (Vite)
 ├── types/                    # TypeScript type definitions
 ├── scripts/                  # Build and utility scripts
