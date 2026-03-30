@@ -24,6 +24,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         {/* External theme init script to avoid CSP unsafe-inline */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- intentionally synchronous to prevent theme FOUC */}
         <script src="./theme-init.js" />
       </head>
       <body className="antialiased">
