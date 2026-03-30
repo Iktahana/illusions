@@ -89,7 +89,10 @@ export default function WelcomeScreen({
     const isElectron =
       typeof window !== "undefined" &&
       "electronAPI" in window &&
-      Boolean((window as { electronAPI?: { isElectron?: boolean } }).electronAPI?.isElectron);
+      Boolean(
+        (window as { electronAPI?: { isElectron?: boolean } }).electronAPI
+          ?.isElectron,
+      );
 
     // Only show modal if browser is unsupported AND not in Electron
     if (!isProjectModeSupported && !isElectron) {
