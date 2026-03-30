@@ -21,6 +21,22 @@ on:
         type: boolean
         default: false
 
+  workflow_call:
+    inputs:
+      mode:
+        description: "Submission mode (listing-only | full-submission)"
+        required: true
+        type: string
+      release_tag:
+        description: "GitHub Release tag to download .appx from (required for full-submission)"
+        required: false
+        type: string
+      dry_run:
+        description: "Dry run — log actions without mutating"
+        required: false
+        type: boolean
+        default: false
+
 permissions:
   contents: read
   pull-requests: read
@@ -39,11 +55,11 @@ jobs:
       DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
 
     steps:
-      - name: Verify running from main branch
+      - name: Verify running from main branch or tag
         shell: bash
         run: |
-          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
-            echo "::error::This workflow may only be run from main. Current ref: ${{ github.ref }}"
+          if [ "${{ github.ref }}" != "refs/heads/main" ] && [ "${{ github.ref_type }}" != "tag" ]; then
+            echo "::error::This workflow may only be run from main or a version tag. Current ref: ${{ github.ref }}"
             exit 1
           fi
 
