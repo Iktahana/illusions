@@ -180,17 +180,15 @@ illusions/
 ├── electron/                 # Electron main process
 │   ├── main.js               # Main process entry
 │   ├── preload.js            # Preload script (secure IPC)
-│   ├── llm/                  # LLM inference backend
 │   ├── nlp/                  # NLP backend (kuromoji)
 │   └── storage-ipc-handlers.js
 ├── lib/                      # Core libraries
 │   ├── storage/              # Storage abstraction layer
 │   ├── services/             # App services (history, notifications, etc.)
 │   ├── linting/              # Japanese text linting framework
+│   ├── keymap/               # Keyboard shortcut customization
 │   ├── nlp-client/           # NLP client abstraction
 │   ├── nlp-backend/          # NLP backend logic
-│   ├── llm-client/           # LLM client abstraction + model registry
-│   ├── character-extraction/ # LLM-based character extraction
 │   ├── export/               # PDF/EPUB/DOCX export
 │   ├── hooks/                # React hooks
 │   ├── project/              # Project management
