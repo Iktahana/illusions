@@ -190,6 +190,7 @@ illusions/
 │   ├── nlp-client/           # NLP client abstraction
 │   ├── nlp-backend/          # NLP backend logic
 │   ├── export/               # PDF/EPUB/DOCX export
+│   ├── dockview/             # Panel layout (dockview-react adapter)
 │   ├── hooks/                # React hooks
 │   ├── project/              # Project management
 │   ├── tab-manager/          # Multi-tab management
@@ -218,11 +219,13 @@ illusions/
 - **ProseMirror** - Editor foundation
 - **Kuromoji.js** - Japanese morphological analysis
 
-### Storage & Sync
+### Storage
 - **Dexie.js** - IndexedDB wrapper (Web)
 - **better-sqlite3** - SQLite database (Electron)
-- **isomorphic-git** - Git implementation in JavaScript
-- **@octokit/rest** - GitHub API client
+
+### Layout & Terminal
+- **dockview-react** - Flexible panel layout system
+- **xterm.js + node-pty** - Integrated terminal panel
 
 ### Testing
 - **Vitest** - Unit testing framework
@@ -273,7 +276,6 @@ See also: [利用規約 / Terms of Service](TERMS.md) | [Online Policy Page](htt
 
 - **Milkdown** - Excellent Markdown editor framework
 - **Kuromoji.js** - Japanese text tokenization
-- **isomorphic-git** - Pure JavaScript Git implementation
 - **Electron** - Cross-platform desktop framework
 
 ---
