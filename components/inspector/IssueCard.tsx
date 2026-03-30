@@ -34,7 +34,7 @@ export function severityColor(severity: Severity): string {
 
 /** Get rule display name from metadata */
 export function getRuleName(ruleId: string): string {
-  const meta = LINT_RULES_META.find(r => r.id === ruleId);
+  const meta = LINT_RULES_META.find((r) => r.id === ruleId);
   return meta?.nameJa ?? ruleId;
 }
 
@@ -68,7 +68,7 @@ export default function IssueCard({
         "relative rounded-lg border transition-colors",
         isActive
           ? "border-accent bg-accent/5"
-          : "border-border bg-background-secondary hover:border-border-secondary"
+          : "border-border bg-background-secondary hover:border-border-secondary",
       )}
     >
       {/* Actions: top-right corner, absolutely positioned to avoid overlapping button */}
@@ -140,10 +140,7 @@ export default function IssueCard({
           {/* Severity dot + validation spinner */}
           <span className="relative shrink-0 mt-1.5 w-2 h-2">
             <span
-              className={clsx(
-                "w-2 h-2 rounded-full block",
-                severityColor(issue.severity)
-              )}
+              className={clsx("w-2 h-2 rounded-full block", severityColor(issue.severity))}
               title={SEVERITY_LABELS[issue.severity]}
             />
           </span>
@@ -151,14 +148,14 @@ export default function IssueCard({
           <div className="flex-1 min-w-0">
             {hasOriginal && hasFix ? (
               <p className="text-sm text-foreground leading-snug">
-                <span className="text-foreground-tertiary line-through">{enriched.originalText}</span>
+                <span className="text-foreground-tertiary line-through">
+                  {enriched.originalText}
+                </span>
                 <span className="text-foreground-tertiary mx-1">→</span>
                 <span className="text-foreground font-medium">{issue.fix!.replacement}</span>
               </p>
             ) : hasOriginal ? (
-              <p className="text-sm text-foreground leading-snug">
-                {enriched.originalText}
-              </p>
+              <p className="text-sm text-foreground leading-snug">{enriched.originalText}</p>
             ) : (
               <p className="text-sm text-foreground leading-snug flex items-start gap-1">
                 <Lightbulb className="w-3.5 h-3.5 text-foreground-tertiary shrink-0 mt-0.5" />

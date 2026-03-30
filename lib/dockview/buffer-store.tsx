@@ -98,8 +98,7 @@ export class BufferStore {
     id?: BufferId;
   }): BufferState {
     const fileType = opts?.fileType ?? ".mdi";
-    const content =
-      opts?.content ?? "";
+    const content = opts?.content ?? "";
     const buffer: BufferState = {
       id: opts?.id ?? generateBufferId(),
       file: opts?.file ?? null,
@@ -135,11 +134,7 @@ export class BufferStore {
    * Emits a BufferChangeEvent to subscribers with the sourcePanelId so that
    * the originating panel can ignore the echo.
    */
-  setBufferContent(
-    id: BufferId,
-    content: string,
-    sourcePanelId?: string,
-  ): void {
+  setBufferContent(id: BufferId, content: string, sourcePanelId?: string): void {
     const existing = this._buffers.get(id);
     if (!existing) return;
     // Skip if content unchanged
@@ -217,11 +212,7 @@ export function BufferStoreProvider({
   store: BufferStore;
   children: ReactNode;
 }) {
-  return (
-    <BufferStoreContext.Provider value={store}>
-      {children}
-    </BufferStoreContext.Provider>
-  );
+  return <BufferStoreContext.Provider value={store}>{children}</BufferStoreContext.Provider>;
 }
 
 export function useBufferStoreInstance(): BufferStore {
@@ -238,10 +229,7 @@ export function useBufferStoreInstance(): BufferStore {
  */
 export function useBuffers(): BufferState[] {
   const store = useBufferStoreInstance();
-  const subscribe = useCallback(
-    (cb: () => void) => store.subscribeStore(cb),
-    [store],
-  );
+  const subscribe = useCallback((cb: () => void) => store.subscribeStore(cb), [store]);
   const getSnapshot = useCallback(() => store.getBuffers(), [store]);
   const getServerSnapshot = useCallback(() => [] as BufferState[], []);
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
@@ -252,10 +240,7 @@ export function useBuffers(): BufferState[] {
  */
 export function useBuffer(bufferId: BufferId | null): BufferState | undefined {
   const store = useBufferStoreInstance();
-  const subscribe = useCallback(
-    (cb: () => void) => store.subscribeStore(cb),
-    [store],
-  );
+  const subscribe = useCallback((cb: () => void) => store.subscribeStore(cb), [store]);
   const getSnapshot = useCallback(
     () => (bufferId ? store.getBuffer(bufferId) : undefined),
     [store, bufferId],

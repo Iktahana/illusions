@@ -17,14 +17,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-} from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import type { VFSDirectoryHandle, VFSFileHandle } from "@/lib/vfs/types";
 
@@ -41,10 +34,7 @@ const fileStore = new Map<string, string>();
 /** Track removed entries for deletion verification */
 const removedEntries: string[] = [];
 
-function createMockFileHandle(
-  name: string,
-  dirPath: string
-): VFSFileHandle {
+function createMockFileHandle(name: string, dirPath: string): VFSFileHandle {
   const fullPath = dirPath ? `${dirPath}/${name}` : name;
   return {
     name,
@@ -63,33 +53,24 @@ function createMockFileHandle(
   } as unknown as VFSFileHandle;
 }
 
-function createMockDirectoryHandle(
-  name: string,
-  path: string
-): VFSDirectoryHandle {
+function createMockDirectoryHandle(name: string, path: string): VFSDirectoryHandle {
   return {
     name,
     path,
     getFileHandle: vi.fn(
-      async (
-        fileName: string,
-        options?: { create?: boolean }
-      ): Promise<VFSFileHandle> => {
+      async (fileName: string, options?: { create?: boolean }): Promise<VFSFileHandle> => {
         const fullPath = path ? `${path}/${fileName}` : fileName;
         if (!fileStore.has(fullPath) && !options?.create) {
           throw new Error(`File not found: ${fullPath}`);
         }
         return createMockFileHandle(fileName, path);
-      }
+      },
     ),
     getDirectoryHandle: vi.fn(
-      async (
-        dirName: string,
-        options?: { create?: boolean }
-      ): Promise<VFSDirectoryHandle> => {
+      async (dirName: string, options?: { create?: boolean }): Promise<VFSDirectoryHandle> => {
         const newPath = path ? `${path}/${dirName}` : dirName;
         return createMockDirectoryHandle(dirName, newPath);
-      }
+      },
     ),
     removeEntry: vi.fn(async (entryName: string): Promise<void> => {
       const fullPath = path ? `${path}/${entryName}` : entryName;
@@ -108,9 +89,7 @@ function createMockDirectoryHandle(
 
 vi.mock("@/lib/vfs", () => ({
   getVFS: () => ({
-    getDirectoryHandle: vi.fn(async () =>
-      createMockDirectoryHandle("", "")
-    ),
+    getDirectoryHandle: vi.fn(async () => createMockDirectoryHandle("", "")),
   }),
 }));
 
@@ -127,14 +106,9 @@ function mockCryptoSubtle(): void {
 
   // Simple hash: use built-in crypto if available, otherwise provide a
   // deterministic fallback that always returns a fixed-length hex string.
-  const mockDigest = async (
-    _algo: string,
-    data: BufferSource
-  ): Promise<ArrayBuffer> => {
+  const mockDigest = async (_algo: string, data: BufferSource): Promise<ArrayBuffer> => {
     // Use a simple FNV-like hash for deterministic test results
-    const bytes = new Uint8Array(
-      data instanceof ArrayBuffer ? data : (data as Uint8Array).buffer
-    );
+    const bytes = new Uint8Array(data instanceof ArrayBuffer ? data : (data as Uint8Array).buffer);
     const hash = new Uint8Array(32);
     for (let i = 0; i < bytes.length; i++) {
       hash[i % 32] ^= bytes[i];
@@ -149,8 +123,7 @@ function mockCryptoSubtle(): void {
       subtle: {
         digest: mockDigest,
       },
-      randomUUID: () =>
-        `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      randomUUID: () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
     },
     configurable: true,
   });
@@ -267,9 +240,7 @@ describe("HistoryService", () => {
       });
 
       // Read the index from the file store
-      const indexKey = Array.from(fileStore.keys()).find((k) =>
-        k.includes("index.json")
-      );
+      const indexKey = Array.from(fileStore.keys()).find((k) => k.includes("index.json"));
       expect(indexKey).toBeTruthy();
 
       const index = JSON.parse(fileStore.get(indexKey!)!) as HistoryIndex;
@@ -326,9 +297,7 @@ describe("HistoryService", () => {
 
       const snapshots = await service.getSnapshots();
       expect(snapshots.length).toBe(2);
-      expect(snapshots[0].timestamp).toBeGreaterThanOrEqual(
-        snapshots[1].timestamp
-      );
+      expect(snapshots[0].timestamp).toBeGreaterThanOrEqual(snapshots[1].timestamp);
     });
 
     it("should filter snapshots by source file", async () => {
@@ -347,9 +316,7 @@ describe("HistoryService", () => {
 
       const mainSnapshots = await service.getSnapshots("main.mdi");
       expect(mainSnapshots.length).toBe(2);
-      expect(mainSnapshots.every((s) => s.sourceFile === "main.mdi")).toBe(
-        true
-      );
+      expect(mainSnapshots.every((s) => s.sourceFile === "main.mdi")).toBe(true);
 
       const ch1Snapshots = await service.getSnapshots("chapter1.mdi");
       expect(ch1Snapshots.length).toBe(1);
@@ -401,9 +368,7 @@ describe("HistoryService", () => {
       });
 
       // Tamper with the stored file content
-      const snapshotKey = Array.from(fileStore.keys()).find((k) =>
-        k.includes(entry.filename)
-      );
+      const snapshotKey = Array.from(fileStore.keys()).find((k) => k.includes(entry.filename));
       if (snapshotKey) {
         fileStore.set(snapshotKey, "Tampered content!!!");
       }
@@ -454,9 +419,7 @@ describe("HistoryService", () => {
     });
 
     it("should throw for non-existent snapshot ID", async () => {
-      await expect(
-        service.deleteSnapshot("non-existent-id")
-      ).rejects.toThrow("Snapshot not found");
+      await expect(service.deleteSnapshot("non-existent-id")).rejects.toThrow("Snapshot not found");
     });
 
     it("should allow deleting milestone snapshots", async () => {
@@ -530,9 +493,7 @@ describe("HistoryService", () => {
       await service.pruneOldSnapshots();
 
       const snapshots = await service.getSnapshots();
-      const milestoneStillExists = snapshots.some(
-        (s) => s.id === milestone.id
-      );
+      const milestoneStillExists = snapshots.some((s) => s.id === milestone.id);
       expect(milestoneStillExists).toBe(true);
     });
 

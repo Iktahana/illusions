@@ -101,7 +101,10 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
   const [isRestoring, setIsRestoring] = useState(true);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const isAutoRestoringRef = useRef(false);
-  const [confirmRemoveRecent, setConfirmRemoveRecent] = useState<{ projectId: string; message: string } | null>(null);
+  const [confirmRemoveRecent, setConfirmRemoveRecent] = useState<{
+    projectId: string;
+    message: string;
+  } | null>(null);
 
   // VFS readiness signal: ensures onVfsReady is called exactly once
   const vfsReadyFiredRef = useRef(false);
@@ -186,21 +189,24 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     setShowCreateWizard(true);
   }, []);
 
-  const handleProjectCreated = useCallback(async (project: ProjectMode) => {
-    setProjectMode(project);
-    setShowCreateWizard(false);
-    await loadProjectContent(project);
+  const handleProjectCreated = useCallback(
+    async (project: ProjectMode) => {
+      setProjectMode(project);
+      setShowCreateWizard(false);
+      await loadProjectContent(project);
 
-    if (isElectron && project.rootPath) {
-      const storage = getStorageService();
-      await storage.addRecentProject({
-        id: project.projectId,
-        rootPath: project.rootPath,
-        name: project.name,
-      });
-      void window.electronAPI?.rebuildMenu?.();
-    }
-  }, [setProjectMode, isElectron, loadProjectContent]);
+      if (isElectron && project.rootPath) {
+        const storage = getStorageService();
+        await storage.addRecentProject({
+          id: project.projectId,
+          rootPath: project.rootPath,
+          name: project.name,
+        });
+        void window.electronAPI?.rebuildMenu?.();
+      }
+    },
+    [setProjectMode, isElectron, loadProjectContent],
+  );
 
   const handleUpgrade = useCallback(async () => {
     if (!isStandaloneMode(editorMode)) return;

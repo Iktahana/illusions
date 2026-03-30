@@ -12,11 +12,7 @@ interface ChapterItemProps {
 }
 
 /** Renders a single heading entry in the table of contents */
-export function ChapterItem({
-  chapter,
-  isActive = false,
-  onClick,
-}: ChapterItemProps) {
+export function ChapterItem({ chapter, isActive = false, onClick }: ChapterItemProps) {
   const indent = (chapter.level - 1) * 12; // Indent based on heading level
   const href = chapter.anchorId ? `#${chapter.anchorId}` : undefined;
 
@@ -30,9 +26,7 @@ export function ChapterItem({
       }}
       className={clsx(
         "flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors",
-        isActive
-          ? "bg-accent text-accent-foreground"
-          : "hover:bg-hover text-foreground"
+        isActive ? "bg-accent text-accent-foreground" : "hover:bg-hover text-foreground",
       )}
       style={{ paddingLeft: `${8 + indent}px` }}
     >

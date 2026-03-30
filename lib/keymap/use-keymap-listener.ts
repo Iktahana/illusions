@@ -18,7 +18,9 @@ export function useKeymapListener(
 ): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      for (const [commandId, handler] of Object.entries(handlers) as Array<[CommandId, (() => void) | undefined]>) {
+      for (const [commandId, handler] of Object.entries(handlers) as Array<
+        [CommandId, (() => void) | undefined]
+      >) {
         if (!handler) continue;
 
         const entry = SHORTCUT_REGISTRY[commandId];

@@ -117,12 +117,7 @@ export default function SidebarPanel({
         />
       );
     case "outline":
-      return (
-        <Outline
-          content={content}
-          onHeadingClick={onChapterClick}
-        />
-      );
+      return <Outline content={content} onHeadingClick={onChapterClick} />;
     case "characters":
       return <Characters content={content} />;
     case "dictionary":
@@ -136,11 +131,7 @@ export default function SidebarPanel({
       );
     case "wordfreq":
       return (
-        <WordFrequency
-          content={content}
-          filePath={currentFilePath}
-          onWordSearch={onWordSearch}
-        />
+        <WordFrequency content={content} filePath={currentFilePath} onWordSearch={onWordSearch} />
       );
     default:
       return null;

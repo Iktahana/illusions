@@ -108,11 +108,7 @@ export default function DiffIndicator({ diffStats, isFirstVersion }: DiffIndicat
   }, [showTooltip]);
 
   if (isFirstVersion) {
-    return (
-      <span className="text-[10px] tabular-nums text-foreground-tertiary">
-        初版
-      </span>
-    );
+    return <span className="text-[10px] tabular-nums text-foreground-tertiary">初版</span>;
   }
 
   if (!diffStats) return null;
@@ -120,11 +116,7 @@ export default function DiffIndicator({ diffStats, isFirstVersion }: DiffIndicat
   const { added, removed, addedText, removedText } = diffStats;
 
   if (added === 0 && removed === 0) {
-    return (
-      <span className="text-[10px] tabular-nums text-foreground-tertiary">
-        変更なし
-      </span>
-    );
+    return <span className="text-[10px] tabular-nums text-foreground-tertiary">変更なし</span>;
   }
 
   const total = added + removed;
@@ -161,9 +153,7 @@ export default function DiffIndicator({ diffStats, isFirstVersion }: DiffIndicat
           <span className="text-[11px] font-mono leading-tight text-success">
             {"+".repeat(plusCount)}
           </span>
-          <span className="text-[10px] tabular-nums text-success">
-            {added.toLocaleString()}
-          </span>
+          <span className="text-[10px] tabular-nums text-success">{added.toLocaleString()}</span>
         </div>
       )}
       {removed > 0 && (
@@ -171,46 +161,52 @@ export default function DiffIndicator({ diffStats, isFirstVersion }: DiffIndicat
           <span className="text-[11px] font-mono leading-tight text-error">
             {"\u2212".repeat(minusCount)}
           </span>
-          <span className="text-[10px] tabular-nums text-error">
-            {removed.toLocaleString()}
-          </span>
+          <span className="text-[10px] tabular-nums text-error">{removed.toLocaleString()}</span>
         </div>
       )}
 
       {/* Portal tooltip rendered at document root */}
-      {showTooltip && tooltipPos && createPortal(
-        <div
-          className="fixed min-w-[200px] max-w-[300px] max-h-[300px] overflow-y-auto p-1.5 rounded-lg bg-background-secondary border border-border shadow-lg text-[11px] leading-none"
-          style={{
-            zIndex: 9999,
-            top: tooltipPos.top,
-            left: tooltipPos.left,
-            transform: "translateY(-100%) translateY(-8px)",
-          }}
-          onMouseEnter={showTip}
-          onMouseLeave={hideTip}
-        >
-          {removed > 0 && (
-            <div className={added > 0 ? "mb-0.5" : ""}>
-              <div className="text-error whitespace-pre-wrap break-words line-through" style={{ lineHeight: 1.15 }}>
-                {removedText.length > MAX_PREVIEW_LEN
-                  ? removedText.slice(0, MAX_PREVIEW_LEN) + "…"
-                  : removedText}
+      {showTooltip &&
+        tooltipPos &&
+        createPortal(
+          <div
+            className="fixed min-w-[200px] max-w-[300px] max-h-[300px] overflow-y-auto p-1.5 rounded-lg bg-background-secondary border border-border shadow-lg text-[11px] leading-none"
+            style={{
+              zIndex: 9999,
+              top: tooltipPos.top,
+              left: tooltipPos.left,
+              transform: "translateY(-100%) translateY(-8px)",
+            }}
+            onMouseEnter={showTip}
+            onMouseLeave={hideTip}
+          >
+            {removed > 0 && (
+              <div className={added > 0 ? "mb-0.5" : ""}>
+                <div
+                  className="text-error whitespace-pre-wrap break-words line-through"
+                  style={{ lineHeight: 1.15 }}
+                >
+                  {removedText.length > MAX_PREVIEW_LEN
+                    ? removedText.slice(0, MAX_PREVIEW_LEN) + "…"
+                    : removedText}
+                </div>
               </div>
-            </div>
-          )}
-          {added > 0 && (
-            <div>
-              <div className="text-success whitespace-pre-wrap break-words" style={{ lineHeight: 1.15 }}>
-                {addedText.length > MAX_PREVIEW_LEN
-                  ? addedText.slice(0, MAX_PREVIEW_LEN) + "…"
-                  : addedText}
+            )}
+            {added > 0 && (
+              <div>
+                <div
+                  className="text-success whitespace-pre-wrap break-words"
+                  style={{ lineHeight: 1.15 }}
+                >
+                  {addedText.length > MAX_PREVIEW_LEN
+                    ? addedText.slice(0, MAX_PREVIEW_LEN) + "…"
+                    : addedText}
+                </div>
               </div>
-            </div>
-          )}
-        </div>,
-        document.body
-      )}
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

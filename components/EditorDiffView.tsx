@@ -24,10 +24,11 @@ export default function EditorDiffView({
   snapshotLabel,
   onClose,
 }: EditorDiffViewProps) {
-  const { fontScale, lineHeight, fontFamily, charsPerLine, textIndent, paragraphSpacing } = useTypographySettings();
+  const { fontScale, lineHeight, fontFamily, charsPerLine, textIndent, paragraphSpacing } =
+    useTypographySettings();
   const chunks = useMemo(
     () => computeDiff(snapshotContent, currentContent),
-    [snapshotContent, currentContent]
+    [snapshotContent, currentContent],
   );
 
   const stats = useMemo(() => getDiffStats(chunks), [chunks]);
@@ -40,19 +41,11 @@ export default function EditorDiffView({
       {/* Header bar (sticky) */}
       <div className="h-12 border-b border-border bg-background flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-4">
-          <h3 className="text-sm font-medium text-foreground whitespace-nowrap">
-            差分表示
-          </h3>
-          <span className="text-xs text-foreground-secondary truncate">
-            {snapshotLabel}
-          </span>
+          <h3 className="text-sm font-medium text-foreground whitespace-nowrap">差分表示</h3>
+          <span className="text-xs text-foreground-secondary truncate">{snapshotLabel}</span>
           <div className="flex items-center gap-3 text-xs">
-            <span className="text-success font-medium">
-              +{stats.addedChars}文字
-            </span>
-            <span className="text-error font-medium">
-              -{stats.removedChars}文字
-            </span>
+            <span className="text-success font-medium">+{stats.addedChars}文字</span>
+            <span className="text-error font-medium">-{stats.removedChars}文字</span>
           </div>
         </div>
 
@@ -132,7 +125,7 @@ function DiffContent({
           }}
         >
           {currentParagraph}
-        </p>
+        </p>,
       );
       currentParagraph = [];
       paraIndex++;
@@ -157,7 +150,7 @@ function DiffContent({
 
       if (text.length > 0) {
         currentParagraph.push(
-          <DiffChunkSpan key={`c${ci}-l${li}`} type={chunk.type} value={text} />
+          <DiffChunkSpan key={`c${ci}-l${li}`} type={chunk.type} value={text} />,
         );
       }
     }
@@ -172,11 +165,7 @@ function DiffContent({
 function DiffChunkSpan({ type, value }: { type: DiffChunk["type"]; value: string }) {
   switch (type) {
     case "added":
-      return (
-        <span className="bg-success/20 text-success border-b border-success/40">
-          {value}
-        </span>
-      );
+      return <span className="bg-success/20 text-success border-b border-success/40">{value}</span>;
     case "removed":
       return (
         <span className="bg-error/20 text-error line-through border-b border-error/40">

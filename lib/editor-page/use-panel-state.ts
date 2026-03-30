@@ -24,7 +24,9 @@ export interface PanelHandlers {
   setSettingsInitialCategory: (category: SettingsCategory | undefined) => void;
   setShowRubyDialog: (show: boolean) => void;
   setRubySelectedText: (text: string) => void;
-  setEditorDiff: (diff: { snapshotContent: string; currentContent: string; label: string } | null) => void;
+  setEditorDiff: (
+    diff: { snapshotContent: string; currentContent: string; label: string } | null,
+  ) => void;
   handleOpenDictionary: (searchTerm?: string) => void;
   handleShowAllSearchResults: (matches: { from: number; to: number }[], searchTerm: string) => void;
   handleCloseSearchResults: () => void;
@@ -46,26 +48,41 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
 } {
   const [topView, setTopView] = useState<ActivityBarView>("explorer");
   const [bottomView, setBottomView] = useState<ActivityBarView>("none");
-  const [searchResults, setSearchResults] = useState<{ matches: { from: number; to: number }[]; searchTerm: string } | null>(null);
+  const [searchResults, setSearchResults] = useState<{
+    matches: { from: number; to: number }[];
+    searchTerm: string;
+  } | null>(null);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
-  const [dictionarySearchTrigger, setDictionarySearchTrigger] = useState<{ term: string; id: number }>({ term: "", id: 0 });
-  const [settingsInitialCategory, setSettingsInitialCategory] = useState<SettingsCategory | undefined>(undefined);
+  const [dictionarySearchTrigger, setDictionarySearchTrigger] = useState<{
+    term: string;
+    id: number;
+  }>({ term: "", id: 0 });
+  const [settingsInitialCategory, setSettingsInitialCategory] = useState<
+    SettingsCategory | undefined
+  >(undefined);
   const [switchToCorrectionsTrigger, setSwitchToCorrectionsTrigger] = useState(0);
   const [showRubyDialog, setShowRubyDialog] = useState(false);
   const [rubySelectedText, setRubySelectedText] = useState("");
-  const [editorDiff, setEditorDiff] = useState<{ snapshotContent: string; currentContent: string; label: string } | null>(null);
+  const [editorDiff, setEditorDiff] = useState<{
+    snapshotContent: string;
+    currentContent: string;
+    label: string;
+  } | null>(null);
 
   const handleOpenDictionary = useCallback((searchTerm?: string) => {
     if (searchTerm) {
-      setDictionarySearchTrigger(prev => ({ term: searchTerm, id: prev.id + 1 }));
+      setDictionarySearchTrigger((prev) => ({ term: searchTerm, id: prev.id + 1 }));
     }
     setTopView("dictionary");
   }, []);
 
-  const handleShowAllSearchResults = useCallback((matches: { from: number; to: number }[], searchTerm: string) => {
-    setSearchResults({ matches, searchTerm });
-    setTopView("search");
-  }, []);
+  const handleShowAllSearchResults = useCallback(
+    (matches: { from: number; to: number }[], searchTerm: string) => {
+      setSearchResults({ matches, searchTerm });
+      setTopView("search");
+    },
+    [],
+  );
 
   const handleCloseSearchResults = useCallback(() => {
     setSearchResults(null);

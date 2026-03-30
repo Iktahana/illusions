@@ -41,7 +41,4 @@ export {
 } from "./use-dockview-adapter";
 
 // Persistence
-export {
-  useDockviewPersistence,
-  loadDockviewLayout,
-} from "./use-dockview-persistence";
+export { useDockviewPersistence, loadDockviewLayout } from "./use-dockview-persistence";

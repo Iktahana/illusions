@@ -29,7 +29,7 @@ export interface NovelMetadata {
   wordCount?: number;
   characterCount?: number;
   manuscriptPages?: number;
-  language?: 'ja' | 'en' | 'zh-TW';
+  language?: "ja" | "en" | "zh-TW";
 }
 
 export interface EditorSettings {
@@ -37,7 +37,7 @@ export interface EditorSettings {
   lineHeight: number;
   fontFamily: string;
   isVertical: boolean;
-  theme: 'light' | 'dark';
+  theme: "light" | "dark";
   textIndent: number; // Text indent in em units (e.g., 1 = 1em)
   charsPerLine: number; // Character limit per line/column (0 = no limit, 10-50)
 }
@@ -53,14 +53,14 @@ export interface UserPreferences {
 
 export interface AIMessage {
   id: string;
-  role: 'user' | 'assistant' | 'system';
+  role: "user" | "assistant" | "system";
   content: string;
   timestamp: Date;
 }
 
 export interface Correction {
   id: string;
-  type: 'warning' | 'info' | 'error';
+  type: "warning" | "info" | "error";
   message: string;
   context: string;
   line: number;
@@ -77,7 +77,7 @@ export interface WritingStatistics {
 }
 
 // Storage related types
-export type StorageProvider = 'mock' | 'local' | 'google-drive' | 'synology';
+export type StorageProvider = "mock" | "local" | "google-drive" | "synology";
 
 export interface StorageConfig {
   provider: StorageProvider;
@@ -85,8 +85,8 @@ export interface StorageConfig {
 }
 
 // UI State types
-export type SidebarTab = 'chapters' | 'settings' | 'style';
-export type InspectorTab = 'ai' | 'corrections' | 'stats' | 'history';
+export type SidebarTab = "chapters" | "settings" | "style";
+export type InspectorTab = "ai" | "corrections" | "stats" | "history";
 
 export interface UIState {
   sidebarTab: SidebarTab;

@@ -28,9 +28,7 @@ export default function ConfirmDialog({
   return (
     <GlassDialog isOpen={isOpen} onBackdropClick={onCancel} ariaLabel={title}>
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-      <div className="mt-2 text-sm text-foreground-secondary whitespace-pre-wrap">
-        {message}
-      </div>
+      <div className="mt-2 text-sm text-foreground-secondary whitespace-pre-wrap">{message}</div>
       <div className="mt-6 flex justify-end gap-3">
         <button
           type="button"

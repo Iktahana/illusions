@@ -15,10 +15,8 @@ export function calculateManuscriptPages(charCount: number): number {
  */
 export function countWords(text: string): number {
   // Markdown記法をざっくり除去
-  const plainText = text
-    .replace(/[#*_~`\[\]()]/g, '')
-    .trim();
-  
+  const plainText = text.replace(/[#*_~`\[\]()]/g, "").trim();
+
   // 空白で分割し、空要素を除外
   const words = plainText.split(/\s+/).filter(Boolean);
   return words.length;
@@ -28,19 +26,19 @@ export function countWords(text: string): number {
  * 空白を除いた文字数を数える
  */
 export function countCharacters(text: string): number {
-  return text.replace(/\s/g, '').length;
+  return text.replace(/\s/g, "").length;
 }
 
 /**
  * 表示用に日付を整形する（日本語ロケール）
  */
 export function formatDate(date: Date): string {
-  return date.toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  return date.toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -51,7 +49,7 @@ export function formatRelativeTime(date: Date): string {
   const now = new Date();
   const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diff < 60) return '今';
+  if (diff < 60) return "今";
   if (diff < 3600) return `${Math.floor(diff / 60)}分前`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}時間前`;
   return `${Math.floor(diff / 86400)}日前`;
@@ -62,7 +60,7 @@ export function formatRelativeTime(date: Date): string {
  */
 export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
-  wait: number
+  wait: number,
 ): (...args: Parameters<T>) => void {
   let timeout: NodeJS.Timeout | null = null;
 
@@ -98,10 +96,10 @@ export function hasJapanese(text: string): boolean {
  */
 export function validateTitle(title: string): { valid: boolean; error?: string } {
   if (!title || title.trim().length === 0) {
-    return { valid: false, error: 'タイトルを入力してください' };
+    return { valid: false, error: "タイトルを入力してください" };
   }
   if (title.length > 100) {
-    return { valid: false, error: 'タイトルは100文字以内にしてください' };
+    return { valid: false, error: "タイトルは100文字以内にしてください" };
   }
   return { valid: true };
 }
@@ -110,42 +108,44 @@ export function validateTitle(title: string): { valid: boolean; error?: string }
  * 文字数カウント用にMarkdownを整形する
  */
 export function cleanMarkdown(markdown: string): string {
-  return markdown
-    // コードブロックを除去
-    .replace(/```[\s\S]*?```/g, '')
-    // インラインコードを除去
-    .replace(/`[^`]+`/g, '')
-    // リンクはテキストだけ残す
-    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
-    // 画像を除去
-    .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '')
-    // 見出し記号を除去
-    .replace(/^#{1,6}\s+/gm, '')
-    // 強調記号を除去
-    .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, '$1')
-    // 引用記号を除去
-    .replace(/^>\s+/gm, '')
-    // 罫線を除去
-    .replace(/^[-*_]{3,}$/gm, '')
-    .trim();
+  return (
+    markdown
+      // コードブロックを除去
+      .replace(/```[\s\S]*?```/g, "")
+      // インラインコードを除去
+      .replace(/`[^`]+`/g, "")
+      // リンクはテキストだけ残す
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
+      // 画像を除去
+      .replace(/!\[([^\]]*)\]\([^\)]+\)/g, "")
+      // 見出し記号を除去
+      .replace(/^#{1,6}\s+/gm, "")
+      // 強調記号を除去
+      .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1")
+      // 引用記号を除去
+      .replace(/^>\s+/gm, "")
+      // 罫線を除去
+      .replace(/^[-*_]{3,}$/gm, "")
+      .trim()
+  );
 }
 
 /**
  * 文字種別の分析結果
  */
 export interface CharacterTypeAnalysis {
-  kanji: number;        // 漢字
-  hiragana: number;     // ひらがな
-  katakana: number;     // カタカナ
-  other: number;        // その他
-  total: number;        // 合計
+  kanji: number; // 漢字
+  hiragana: number; // ひらがな
+  katakana: number; // カタカナ
+  other: number; // その他
+  total: number; // 合計
 }
 
 /**
  * 文字種別の使用率
  */
 export interface CharacterUsageRates {
-  kanjiRate: number;    // 漢字使用率（%）
+  kanjiRate: number; // 漢字使用率（%）
   hiraganaRate: number; // ひらがな使用率（%）
   katakanaRate: number; // カタカナ使用率（%）
 }
@@ -154,9 +154,9 @@ export interface CharacterUsageRates {
  * 読みやすさ分析の結果
  */
 export interface ReadabilityAnalysis {
-  score: number;        // スコア（0-100）
-  level: string;        // レベル（easy/normal/difficult）
-  avgSentenceLength: number;     // 平均文長
+  score: number; // スコア（0-100）
+  level: string; // レベル（easy/normal/difficult）
+  avgSentenceLength: number; // 平均文長
   avgPunctuationSpacing: number; // 平均句読点間隔
 }
 
@@ -164,7 +164,7 @@ export interface ReadabilityAnalysis {
  * 日本語テキスト向けの詳細統計
  */
 export interface AdvancedStatistics {
-  sentenceCount: number;      // 文数
+  sentenceCount: number; // 文数
   characterTypeAnalysis: CharacterTypeAnalysis;
   usageRates: CharacterUsageRates;
   readability: ReadabilityAnalysis;
@@ -188,7 +188,7 @@ export function calculateStatistics(text: string): TextStatistics {
   const wordCount = countWords(cleanedText);
   const manuscriptPages = calculateManuscriptPages(charCount);
   const paragraphCount = text.split(/\n\n+/).filter(Boolean).length;
-  
+
   // 日本語テキスト向けの詳細統計
   const advanced: AdvancedStatistics = {
     sentenceCount: countSentences(cleanedText),
@@ -212,10 +212,8 @@ export function calculateStatistics(text: string): TextStatistics {
  */
 export function generateHeadingId(title: string): string {
   // Markdown記法を除去して整形
-  const cleanTitle = title
-    .replace(/[*_~`\[\]()]/g, '')
-    .trim();
-  
+  const cleanTitle = title.replace(/[*_~`\[\]()]/g, "").trim();
+
   // URLエンコード
   return encodeURIComponent(cleanTitle);
 }
@@ -232,7 +230,7 @@ export interface Chapter {
 }
 
 export function parseMarkdownChapters(markdown: string): Chapter[] {
-  const lines = markdown.split('\n');
+  const lines = markdown.split("\n");
   const chapters: Chapter[] = [];
   let charOffset = 0;
 
@@ -243,7 +241,7 @@ export function parseMarkdownChapters(markdown: string): Chapter[] {
       const level = match[1].length;
       const title = match[2].trim();
       const anchorId = generateHeadingId(title);
-      
+
       chapters.push({
         level,
         title,
@@ -266,21 +264,21 @@ export function countSentences(text: string): number {
   // 日本語の句点で文を分割：。！？のいずれか
   const sentences = text.split(/[。！？]/);
   // 空の要素を除外し、最後の空白を削除
-  return sentences.filter(s => s.trim().length > 0).length;
+  return sentences.filter((s) => s.trim().length > 0).length;
 }
 
 /**
  * 文字種別を分析する（日本語向け）
  */
 export function analyzeCharacterTypes(text: string): CharacterTypeAnalysis {
-  let kanji = 0;      // 漢字
-  let hiragana = 0;   // ひらがな
-  let katakana = 0;   // カタカナ
-  let other = 0;      // その他
+  let kanji = 0; // 漢字
+  let hiragana = 0; // ひらがな
+  let katakana = 0; // カタカナ
+  let other = 0; // その他
 
   for (const char of text) {
     const code = char.charCodeAt(0);
-    
+
     // 漢字 (U+4E00 - U+9FFF)
     if (code >= 0x4e00 && code <= 0x9fff) {
       kanji++;
@@ -329,7 +327,7 @@ export function calculateCharacterUsageRates(analysis: CharacterTypeAnalysis): C
  */
 export function calculateAveragePunctuationSpacing(text: string): number {
   const punctuationIndices: number[] = [];
-  
+
   // 日本語の句読点を検出：、。！？
   for (let i = 0; i < text.length; i++) {
     if (/[、。！？]/.test(text[i])) {
@@ -347,7 +345,7 @@ export function calculateAveragePunctuationSpacing(text: string): number {
     totalDistance += punctuationIndices[i] - punctuationIndices[i - 1];
   }
 
-  return Math.round(totalDistance / (punctuationIndices.length - 1) * 10) / 10;
+  return Math.round((totalDistance / (punctuationIndices.length - 1)) * 10) / 10;
 }
 
 /**
@@ -359,11 +357,10 @@ export function calculateReadabilityScore(text: string): ReadabilityAnalysis {
   const sentenceCount = countSentences(text);
   const charAnalysis = analyzeCharacterTypes(text);
   const totalChars = charAnalysis.total || 1;
-  
+
   // 平均文長を計算
-  const avgSentenceLength = sentenceCount > 0 
-    ? Math.round((totalChars / sentenceCount) * 10) / 10 
-    : 0;
+  const avgSentenceLength =
+    sentenceCount > 0 ? Math.round((totalChars / sentenceCount) * 10) / 10 : 0;
 
   // 平均句読点間隔を計算
   const avgPunctuationSpacing = calculateAveragePunctuationSpacing(text);
@@ -403,7 +400,7 @@ export function calculateReadabilityScore(text: string): ReadabilityAnalysis {
   // 4. ひらがなとカタカナのバランス
   const hiraganaRate = (charAnalysis.hiragana / totalChars) * 100;
   const katakanaRate = (charAnalysis.katakana / totalChars) * 100;
-  
+
   // ひらがなが多いほど読みやすい
   if (hiraganaRate < 30) {
     score -= 5;
@@ -417,11 +414,11 @@ export function calculateReadabilityScore(text: string): ReadabilityAnalysis {
   // レベルを決定
   let level: string;
   if (score >= 70) {
-    level = 'easy';      // 読みやすい
+    level = "easy"; // 読みやすい
   } else if (score >= 40) {
-    level = 'normal';    // 普通
+    level = "normal"; // 普通
   } else {
-    level = 'difficult'; // 読みにくい
+    level = "difficult"; // 読みにくい
   }
 
   return {
@@ -438,24 +435,24 @@ export function calculateReadabilityScore(text: string): ReadabilityAnalysis {
  */
 export function getChaptersFromDOM(): Chapter[] {
   const chapters: Chapter[] = [];
-  
+
   // ブラウザ環境のみ
-  if (typeof document === 'undefined') {
+  if (typeof document === "undefined") {
     return chapters;
   }
-  
-  const editorContent = document.querySelector('.milkdown');
-  
+
+  const editorContent = document.querySelector(".milkdown");
+
   if (!editorContent) return chapters;
-  
+
   // 見出し要素を列挙する
-  const headings = editorContent.querySelectorAll('h1, h2, h3, h4, h5, h6');
-  
+  const headings = editorContent.querySelectorAll("h1, h2, h3, h4, h5, h6");
+
   headings.forEach((heading, index) => {
     const level = parseInt(heading.tagName[1]);
     const anchorId = heading.id;
-    const title = heading.textContent || '';
-    
+    const title = heading.textContent || "";
+
     chapters.push({
       level,
       title,
@@ -464,6 +461,6 @@ export function getChaptersFromDOM(): Chapter[] {
       anchorId: anchorId || undefined,
     });
   });
-  
+
   return chapters;
 }

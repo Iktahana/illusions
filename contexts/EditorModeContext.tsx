@@ -43,14 +43,10 @@ export function EditorModeProvider({ children }: { children: React.ReactNode }) 
       isProject,
       isStandalone,
     }),
-    [editorMode, setProjectMode, setStandaloneMode, resetMode, isProject, isStandalone]
+    [editorMode, setProjectMode, setStandaloneMode, resetMode, isProject, isStandalone],
   );
 
-  return (
-    <EditorModeContext.Provider value={value}>
-      {children}
-    </EditorModeContext.Provider>
-  );
+  return <EditorModeContext.Provider value={value}>{children}</EditorModeContext.Provider>;
 }
 
 export function useEditorMode(): EditorModeContextType {

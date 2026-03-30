@@ -1,6 +1,5 @@
 import type { Token } from "@/lib/nlp-client/types";
 
-
 export type Severity = "error" | "warning" | "info";
 
 /** Detection level: L1=regex, L2=morphological, L3=LLM-assisted */
@@ -106,17 +105,11 @@ export function isDocumentLintRule(rule: LintRule): rule is DocumentLintRule {
  * Used for L2 rules that need POS tagging, conjugation info, etc.
  */
 export interface MorphologicalLintRule extends LintRule {
-  lintWithTokens(
-    text: string,
-    tokens: ReadonlyArray<Token>,
-    config: LintRuleConfig,
-  ): LintIssue[];
+  lintWithTokens(text: string, tokens: ReadonlyArray<Token>, config: LintRuleConfig): LintIssue[];
 }
 
 /** Type guard for MorphologicalLintRule */
-export function isMorphologicalLintRule(
-  rule: LintRule,
-): rule is MorphologicalLintRule {
+export function isMorphologicalLintRule(rule: LintRule): rule is MorphologicalLintRule {
   return "lintWithTokens" in rule;
 }
 

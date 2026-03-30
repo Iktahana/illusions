@@ -37,13 +37,13 @@ metadata:
 
 ### よくある失敗パターン
 
-| パターン | 原因 | 解決策 |
-|---------|------|--------|
-| `GH_TOKEN is not set` | electron-builder が自動で publish を試行 | `--publish never` フラグを確認 |
-| `Code signing failed` | Apple 証明書の期限切れ or secrets 未設定 | GitHub Secrets を確認 |
-| `tsc --noEmit` failed | TypeScript コンパイルエラー | エラーメッセージのファイル・行番号を確認 |
-| `npm ci` failed | lockfile と package.json の不一致 | `npm install` で lockfile を更新 |
-| `next build` failed | ページのビルドエラー | 静的生成の問題を確認 |
+| パターン              | 原因                                     | 解決策                                   |
+| --------------------- | ---------------------------------------- | ---------------------------------------- |
+| `GH_TOKEN is not set` | electron-builder が自動で publish を試行 | `--publish never` フラグを確認           |
+| `Code signing failed` | Apple 証明書の期限切れ or secrets 未設定 | GitHub Secrets を確認                    |
+| `tsc --noEmit` failed | TypeScript コンパイルエラー              | エラーメッセージのファイル・行番号を確認 |
+| `npm ci` failed       | lockfile と package.json の不一致        | `npm install` で lockfile を更新         |
+| `next build` failed   | ページのビルドエラー                     | 静的生成の問題を確認                     |
 
 ## 📝 出力フォーマット
 
@@ -55,16 +55,20 @@ metadata:
 **失敗ジョブ**: (ジョブ名)
 
 ### 根本原因
+
 （1〜2文で要約）
 
 ### エラーログ（関連部分）
+
 （エラーの核心部分のみ抽出）
 
 ### 解決策
+
 1. (具体的な修正手順)
 2. ...
 
 ### 関連ファイル
+
 - `path/to/file.ts` (変更が必要な箇所)
 ```
 

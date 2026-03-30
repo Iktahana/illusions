@@ -23,10 +23,7 @@ export interface EpubExportOptions {
  * @param options - EPUB export options
  * @returns EPUB data as a Buffer
  */
-export async function generateEpub(
-  content: string,
-  options: EpubExportOptions
-): Promise<Buffer> {
+export async function generateEpub(content: string, options: EpubExportOptions): Promise<Buffer> {
   const { metadata } = options;
   const title = metadata.title || "Untitled";
   const author = metadata.author || "";
@@ -73,7 +70,7 @@ export async function generateEpub(
       bookId,
       chapterCount: chapters.length,
     }),
-    { name: "OEBPS/content.opf" }
+    { name: "OEBPS/content.opf" },
   );
 
   // 4. OEBPS/toc.xhtml (navigation document)
@@ -90,12 +87,8 @@ export async function generateEpub(
   for (let i = 0; i < chapters.length; i++) {
     const chapter = chapters[i];
     archive.append(
-      generateChapterXhtml(
-        chapter.title || `Chapter ${i + 1}`,
-        chapter.htmlContent,
-        language
-      ),
-      { name: `OEBPS/chapter-${i + 1}.xhtml` }
+      generateChapterXhtml(chapter.title || `Chapter ${i + 1}`, chapter.htmlContent, language),
+      { name: `OEBPS/chapter-${i + 1}.xhtml` },
     );
   }
 
@@ -140,14 +133,12 @@ function generateContentOpf(params: {
 
   for (let i = 1; i <= chapterCount; i++) {
     manifestItems.push(
-      `    <item id="chapter-${i}" href="chapter-${i}.xhtml" media-type="application/xhtml+xml"/>`
+      `    <item id="chapter-${i}" href="chapter-${i}.xhtml" media-type="application/xhtml+xml"/>`,
     );
     spineItems.push(`    <itemref idref="chapter-${i}"/>`);
   }
 
-  const modifiedTimestamp = new Date()
-    .toISOString()
-    .replace(/\.\d{3}Z/, "Z");
+  const modifiedTimestamp = new Date().toISOString().replace(/\.\d{3}Z/, "Z");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
@@ -169,12 +160,12 @@ ${spineItems.join("\n")}
 
 function generateTocXhtml(
   title: string,
-  chapters: Array<{ title: string; level: number }>
+  chapters: Array<{ title: string; level: number }>,
 ): string {
   const tocItems = chapters
     .map(
       (ch, i) =>
-        `      <li><a href="chapter-${i + 1}.xhtml">${escapeXml(ch.title || `Chapter ${i + 1}`)}</a></li>`
+        `      <li><a href="chapter-${i + 1}.xhtml">${escapeXml(ch.title || `Chapter ${i + 1}`)}</a></li>`,
     )
     .join("\n");
 
@@ -197,11 +188,7 @@ ${tocItems}
 </html>`;
 }
 
-function generateChapterXhtml(
-  title: string,
-  htmlContent: string,
-  language: string
-): string {
+function generateChapterXhtml(title: string, htmlContent: string, language: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="${language}" lang="${language}">

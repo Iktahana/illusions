@@ -176,11 +176,16 @@ export default function Inspector({
       className={clsx(
         "h-full bg-background flex flex-col transition-opacity duration-150",
         !isTabReady && "opacity-0 pointer-events-none",
-        className
+        className,
       )}
     >
       {/* ファイル状態 */}
-      <div className={clsx("border-b border-border bg-background-secondary", compactMode ? "px-3 py-2" : "px-4 py-3")}>
+      <div
+        className={clsx(
+          "border-b border-border bg-background-secondary",
+          compactMode ? "px-3 py-2" : "px-4 py-3",
+        )}
+      >
         <div className="flex items-center justify-between mb-1">
           <p className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide">
             ファイル情報
@@ -192,29 +197,29 @@ export default function Inspector({
                 disabled={!isClient || isSaving || !isDirty}
                 className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
                   !isClient
-                    ? 'bg-background text-foreground-muted cursor-not-allowed opacity-50 border border-border'
+                    ? "bg-background text-foreground-muted cursor-not-allowed opacity-50 border border-border"
                     : isSaving
-                    ? 'bg-background text-foreground-tertiary cursor-wait border border-border'
-                    : isDirty
-                    ? 'bg-accent text-accent-foreground hover:bg-accent-hover'
-                    : 'bg-background text-foreground-muted cursor-not-allowed opacity-50 border border-border'
+                      ? "bg-background text-foreground-tertiary cursor-wait border border-border"
+                      : isDirty
+                        ? "bg-accent text-accent-foreground hover:bg-accent-hover"
+                        : "bg-background text-foreground-muted cursor-not-allowed opacity-50 border border-border"
                 }`}
                 title={
                   !isClient
-                    ? '変更なし'
+                    ? "変更なし"
                     : isSaving
-                    ? '保存中...'
-                    : isDirty
-                    ? 'ファイルを保存 (Cmd/Ctrl+S)'
-                    : '変更なし'
+                      ? "保存中..."
+                      : isDirty
+                        ? "ファイルを保存 (Cmd/Ctrl+S)"
+                        : "変更なし"
                 }
               >
-                {isClient && isSaving ? '保存中...' : '保存'}
+                {isClient && isSaving ? "保存中..." : "保存"}
               </button>
             )}
           </div>
         </div>
-        
+
         {/* ファイル名（編集可） */}
         {isEditingFileName ? (
           <div className="flex items-center gap-1">
@@ -227,7 +232,9 @@ export default function Inspector({
                 className="flex-1 min-w-0 text-sm font-semibold text-foreground px-2 py-1 border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background"
               />
               {extension && (
-                <span className="shrink-0 text-xs font-semibold text-foreground-tertiary whitespace-nowrap">{extension}</span>
+                <span className="shrink-0 text-xs font-semibold text-foreground-tertiary whitespace-nowrap">
+                  {extension}
+                </span>
               )}
             </div>
             <button
@@ -248,14 +255,15 @@ export default function Inspector({
             </button>
           </div>
         ) : (
-          <div 
-            className="flex items-center gap-2 group cursor-pointer"
-            onClick={handleStartEdit}
-          >
+          <div className="flex items-center gap-2 group cursor-pointer" onClick={handleStartEdit}>
             <div className="flex-1 min-w-0 flex items-center">
-              <p className="min-w-0 text-sm font-semibold text-foreground truncate">{displayBaseName}</p>
+              <p className="min-w-0 text-sm font-semibold text-foreground truncate">
+                {displayBaseName}
+              </p>
               {extension && (
-                <span className="shrink-0 text-xs font-semibold text-foreground-tertiary whitespace-nowrap">{extension}</span>
+                <span className="shrink-0 text-xs font-semibold text-foreground-tertiary whitespace-nowrap">
+                  {extension}
+                </span>
               )}
             </div>
             {onFileNameChange && (
@@ -263,29 +271,29 @@ export default function Inspector({
             )}
           </div>
         )}
-        
+
         <div className="mt-2 flex items-center justify-between text-xs">
           <span>
-              {isClient && isSaving && (
-               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-info/20 text-info animate-pulse">
-                 <span className="mr-1">⟳</span> 保存中
-               </span>
-             )}
-             {isClient && !isSaving && isDirty && (
-               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-warning text-white">
-                 <span className="mr-1">●</span> 編集中
-               </span>
-             )}
-             {!isClient || (!isSaving && !isDirty && lastSavedTime === null) ? (
-               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-foreground-muted text-white">
-                 <span className="mr-1">●</span> 新規
-               </span>
-             ) : null}
-             {isClient && !isSaving && !isDirty && lastSavedTime !== null && (
-               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-success text-white">
-                 <span className="mr-1">✓</span> 保存済み
-               </span>
-             )}
+            {isClient && isSaving && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-info/20 text-info animate-pulse">
+                <span className="mr-1">⟳</span> 保存中
+              </span>
+            )}
+            {isClient && !isSaving && isDirty && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-warning text-white">
+                <span className="mr-1">●</span> 編集中
+              </span>
+            )}
+            {!isClient || (!isSaving && !isDirty && lastSavedTime === null) ? (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-foreground-muted text-white">
+                <span className="mr-1">●</span> 新規
+              </span>
+            ) : null}
+            {isClient && !isSaving && !isDirty && lastSavedTime !== null && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-success text-white">
+                <span className="mr-1">✓</span> 保存済み
+              </span>
+            )}
           </span>
           {isClient && lastSavedTime && !isDirty && (
             <span className="text-foreground-tertiary">{formatTime(lastSavedTime)}</span>
@@ -294,7 +302,10 @@ export default function Inspector({
       </div>
 
       {/* タブ */}
-      <div ref={tabBarRef} className={clsx("border-b border-border flex items-center", compactMode ? "h-10" : "h-12")}>
+      <div
+        ref={tabBarRef}
+        className={clsx("border-b border-border flex items-center", compactMode ? "h-10" : "h-12")}
+      >
         <button
           onClick={() => setActiveTab("corrections")}
           className={clsx(
@@ -302,7 +313,7 @@ export default function Inspector({
             showLabels ? "gap-2" : "gap-0",
             activeTab === "corrections"
               ? "text-foreground border-b-2 border-accent"
-              : "text-foreground-tertiary hover:text-foreground-secondary"
+              : "text-foreground-tertiary hover:text-foreground-secondary",
           )}
           title="校正"
         >
@@ -316,7 +327,7 @@ export default function Inspector({
             showLabels ? "gap-2" : "gap-0",
             activeTab === "stats"
               ? "text-foreground border-b-2 border-accent"
-              : "text-foreground-tertiary hover:text-foreground-secondary"
+              : "text-foreground-tertiary hover:text-foreground-secondary",
           )}
           title="統計"
         >
@@ -331,7 +342,7 @@ export default function Inspector({
               showLabels ? "gap-2" : "gap-0",
               activeTab === "history"
                 ? "text-foreground border-b-2 border-accent"
-                : "text-foreground-tertiary hover:text-foreground-secondary"
+                : "text-foreground-tertiary hover:text-foreground-secondary",
             )}
             title="履歴"
           >
@@ -341,46 +352,45 @@ export default function Inspector({
         )}
       </div>
 
-       {/* 本文 */}
-       <div className={clsx("flex-1 overflow-y-auto", compactMode ? "p-3" : "p-4")}>
-         {activeTab === "corrections" && (
-           <CorrectionsPanel
-             onOpenPosHighlightSettings={onOpenPosHighlightSettings}
-             lintIssues={lintIssues ?? []}
-             onNavigateToIssue={onNavigateToIssue}
-             onApplyFix={onApplyFix}
-             onIgnoreCorrection={onIgnoreCorrection}
-             onRefreshLinting={onRefreshLinting}
-             isLinting={isLinting}
-             activeLintIssueIndex={activeLintIssueIndex}
-             onOpenLintingSettings={onOpenLintingSettings}
-             onApplyLintPreset={onApplyLintPreset}
-             activeLintPresetId={activeLintPresetId}
-           />
-         )}
-         {activeTab === "stats" && (
-           <StatsPanel
-             charCount={charCount}
-             selectedCharCount={selectedCharCount}
-             paragraphCount={paragraphCount}
-             manuscriptPages={manuscriptPages}
-             sentenceCount={sentenceCount}
-             charTypeAnalysis={charTypeAnalysis}
-             charUsageRates={charUsageRates}
-             readabilityAnalysis={readabilityAnalysis}
-           />
-         )}
-         {activeTab === "history" && projectMode && onHistoryRestore && (
-           <HistoryPanel
-             projectId={projectMode.projectId}
-             mainFileName={activeFileName || projectMode.metadata.mainFile}
-             onRestore={onHistoryRestore}
-             currentContent={currentContent}
-             onCompareInEditor={onCompareInEditor}
-           />
-         )}
-       </div>
-
-      </aside>
+      {/* 本文 */}
+      <div className={clsx("flex-1 overflow-y-auto", compactMode ? "p-3" : "p-4")}>
+        {activeTab === "corrections" && (
+          <CorrectionsPanel
+            onOpenPosHighlightSettings={onOpenPosHighlightSettings}
+            lintIssues={lintIssues ?? []}
+            onNavigateToIssue={onNavigateToIssue}
+            onApplyFix={onApplyFix}
+            onIgnoreCorrection={onIgnoreCorrection}
+            onRefreshLinting={onRefreshLinting}
+            isLinting={isLinting}
+            activeLintIssueIndex={activeLintIssueIndex}
+            onOpenLintingSettings={onOpenLintingSettings}
+            onApplyLintPreset={onApplyLintPreset}
+            activeLintPresetId={activeLintPresetId}
+          />
+        )}
+        {activeTab === "stats" && (
+          <StatsPanel
+            charCount={charCount}
+            selectedCharCount={selectedCharCount}
+            paragraphCount={paragraphCount}
+            manuscriptPages={manuscriptPages}
+            sentenceCount={sentenceCount}
+            charTypeAnalysis={charTypeAnalysis}
+            charUsageRates={charUsageRates}
+            readabilityAnalysis={readabilityAnalysis}
+          />
+        )}
+        {activeTab === "history" && projectMode && onHistoryRestore && (
+          <HistoryPanel
+            projectId={projectMode.projectId}
+            mainFileName={activeFileName || projectMode.metadata.mainFile}
+            onRestore={onHistoryRestore}
+            currentContent={currentContent}
+            onCompareInEditor={onCompareInEditor}
+          />
+        )}
+      </div>
+    </aside>
   );
 }

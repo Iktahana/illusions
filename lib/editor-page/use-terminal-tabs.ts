@@ -13,7 +13,9 @@ interface UseTerminalTabsParams {
   newTerminalTab: () => void;
   updateTerminalTab: (
     tabId: string,
-    updates: Partial<Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">>,
+    updates: Partial<
+      Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">
+    >,
   ) => void;
   forceCloseTab: (tabId: string) => void;
   editorMode: EditorMode;

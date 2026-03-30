@@ -10,10 +10,10 @@ The history service provides a local version history system for documents. It cr
 
 ### Key Files
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `lib/history-service.ts` | ~760 | Snapshot creation, restoration, pruning, and management |
-| `lib/diff-service.ts` | ~67 | Character-level diff computation and statistics |
+| File                     | Lines | Purpose                                                 |
+| ------------------------ | ----- | ------------------------------------------------------- |
+| `lib/history-service.ts` | ~760  | Snapshot creation, restoration, pruning, and management |
+| `lib/diff-service.ts`    | ~67   | Character-level diff computation and statistics         |
 
 ### Features
 
@@ -107,12 +107,12 @@ project-root/
 
 ### Pruning Strategy
 
-| Rule | Condition | Action |
-|------|-----------|--------|
-| Count limit | Total snapshots > 100 | Delete oldest non-milestone snapshots |
-| Age limit | Snapshot older than 90 days | Delete non-milestone snapshots |
-| Per-file limit | Auto-snapshots per file > 100 | Delete oldest auto-snapshots for that file |
-| Milestone protection | Snapshot type is "milestone" | **NEVER deleted** by pruning |
+| Rule                 | Condition                     | Action                                     |
+| -------------------- | ----------------------------- | ------------------------------------------ |
+| Count limit          | Total snapshots > 100         | Delete oldest non-milestone snapshots      |
+| Age limit            | Snapshot older than 90 days   | Delete non-milestone snapshots             |
+| Per-file limit       | Auto-snapshots per file > 100 | Delete oldest auto-snapshots for that file |
+| Milestone protection | Snapshot type is "milestone"  | **NEVER deleted** by pruning               |
 
 All pruning operations are atomic via `AsyncMutex`.
 
@@ -126,29 +126,29 @@ type SnapshotType = "auto" | "manual" | "milestone";
 
 /** A single snapshot entry in the history index */
 interface SnapshotEntry {
-  id: string;               // UUID v4
-  timestamp: number;        // Unix timestamp (ms)
-  filename: string;         // Snapshot file name on disk
-  sourceFile: string;       // Original source file name
+  id: string; // UUID v4
+  timestamp: number; // Unix timestamp (ms)
+  filename: string; // Snapshot file name on disk
+  sourceFile: string; // Original source file name
   type: SnapshotType;
-  label?: string;           // Optional user-provided label
-  characterCount: number;   // Character count at snapshot time
-  fileSize: number;         // File size in bytes
-  checksum: string;         // SHA-256 hash for integrity verification
+  label?: string; // Optional user-provided label
+  characterCount: number; // Character count at snapshot time
+  fileSize: number; // File size in bytes
+  checksum: string; // SHA-256 hash for integrity verification
 }
 
 /** The history index stored in index.json */
 interface HistoryIndex {
   snapshots: SnapshotEntry[];
-  maxSnapshots: number;     // Default: 100
-  retentionDays: number;    // Default: 90
+  maxSnapshots: number; // Default: 100
+  retentionDays: number; // Default: 90
 }
 
 /** Result of a snapshot restore operation */
 interface RestoreResult {
   success: boolean;
-  content?: string;         // Restored content (on success)
-  error?: string;           // Error message (on failure)
+  content?: string; // Restored content (on success)
+  error?: string; // Error message (on failure)
 }
 
 /** A single diff chunk */
@@ -167,12 +167,12 @@ interface DiffStats {
 
 ### Constants
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `DEFAULT_MAX_SNAPSHOTS` | `100` | Maximum total snapshots in history |
-| `DEFAULT_RETENTION_DAYS` | `90` | Days before non-milestone snapshots are pruned |
+| Constant                    | Value    | Description                                         |
+| --------------------------- | -------- | --------------------------------------------------- |
+| `DEFAULT_MAX_SNAPSHOTS`     | `100`    | Maximum total snapshots in history                  |
+| `DEFAULT_RETENTION_DAYS`    | `90`     | Days before non-milestone snapshots are pruned      |
 | `AUTO_SNAPSHOT_INTERVAL_MS` | `300000` | Minimum interval between auto-snapshots (5 minutes) |
-| `MAX_SNAPSHOTS_PER_FILE` | `100` | Maximum auto-snapshots per source file |
+| `MAX_SNAPSHOTS_PER_FILE`    | `100`    | Maximum auto-snapshots per source file              |
 
 ---
 

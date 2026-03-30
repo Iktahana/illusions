@@ -1,7 +1,20 @@
 "use client";
 
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { Scissors, Copy, ClipboardPaste, Search, CheckSquare, Languages, ALargeSmall, Globe, BookOpen, AlertCircle, EyeOff, Play } from "lucide-react";
+import {
+  Scissors,
+  Copy,
+  ClipboardPaste,
+  Search,
+  CheckSquare,
+  Languages,
+  ALargeSmall,
+  Globe,
+  BookOpen,
+  AlertCircle,
+  EyeOff,
+  Play,
+} from "lucide-react";
 import type { ReactNode, MouseEvent } from "react";
 
 import type { LintIssue } from "@/lib/linting";
@@ -85,15 +98,17 @@ export default function EditorContextMenu({
   const cmdKey = isMac ? "⌘" : "Ctrl+";
 
   // "辞書で調べる" is only available in Electron via IPC
-  const isElectron = typeof window !== "undefined" && Boolean((window as Window & { electronAPI?: unknown }).electronAPI);
+  const isElectron =
+    typeof window !== "undefined" &&
+    Boolean((window as Window & { electronAPI?: unknown }).electronAPI);
 
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger onContextMenu={onContextMenuOpen} asChild>{children}</ContextMenu.Trigger>
+      <ContextMenu.Trigger onContextMenu={onContextMenuOpen} asChild>
+        {children}
+      </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content
-          className="min-w-[220px] bg-background/95 backdrop-blur-xl border border-border rounded-lg shadow-2xl p-1.5 will-change-[opacity,transform] data-[side=top]:animate-slideDownAndFade data-[side=right]:animate-slideLeftAndFade data-[side=bottom]:animate-slideUpAndFade data-[side=left]:animate-slideRightAndFade"
-        >
+        <ContextMenu.Content className="min-w-[220px] bg-background/95 backdrop-blur-xl border border-border rounded-lg shadow-2xl p-1.5 will-change-[opacity,transform] data-[side=top]:animate-slideDownAndFade data-[side=right]:animate-slideLeftAndFade data-[side=bottom]:animate-slideUpAndFade data-[side=left]:animate-slideRightAndFade">
           {/* 校正提示 */}
           {lintIssueAtCursor && (
             <>

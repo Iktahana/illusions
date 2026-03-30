@@ -96,9 +96,7 @@ function makeRecentFile(overrides: Partial<RecentFile> = {}): RecentFile {
   };
 }
 
-function makeEditorBuffer(
-  overrides: Partial<EditorBuffer> = {}
-): EditorBuffer {
+function makeEditorBuffer(overrides: Partial<EditorBuffer> = {}): EditorBuffer {
   return {
     content: "Draft content",
     timestamp: Date.now(),
@@ -127,9 +125,7 @@ describe("ElectronStorageProvider", () => {
       removeElectronAPI();
       const provider = new ElectronStorageProvider();
 
-      await expect(provider.loadAppState()).rejects.toThrow(
-        /storage API/
-      );
+      await expect(provider.loadAppState()).rejects.toThrow(/storage API/);
     });
   });
 
@@ -225,9 +221,7 @@ describe("ElectronStorageProvider", () => {
       await provider.removeFromRecent("/to-remove.mdi");
 
       expect(mockStorage.removeFromRecent).toHaveBeenCalledOnce();
-      expect(mockStorage.removeFromRecent).toHaveBeenCalledWith(
-        "/to-remove.mdi"
-      );
+      expect(mockStorage.removeFromRecent).toHaveBeenCalledWith("/to-remove.mdi");
     });
   });
 
@@ -363,9 +357,7 @@ describe("ElectronStorageProvider", () => {
   describe("getRecentProjects", () => {
     it("returns projects from IPC bridge", async () => {
       const provider = new ElectronStorageProvider();
-      const projects = [
-        { id: "proj-1", rootPath: "/projects/novel", name: "My Novel" },
-      ];
+      const projects = [{ id: "proj-1", rootPath: "/projects/novel", name: "My Novel" }];
       mockStorage.getRecentProjects.mockResolvedValue(projects);
 
       const result = await provider.getRecentProjects();
@@ -381,9 +373,7 @@ describe("ElectronStorageProvider", () => {
       await provider.removeRecentProject("proj-1");
 
       expect(mockStorage.removeRecentProject).toHaveBeenCalledOnce();
-      expect(mockStorage.removeRecentProject).toHaveBeenCalledWith(
-        "proj-1"
-      );
+      expect(mockStorage.removeRecentProject).toHaveBeenCalledWith("proj-1");
     });
   });
 });

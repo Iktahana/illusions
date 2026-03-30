@@ -153,7 +153,9 @@
 }
 
 /* Ensure separator between split editor groups uses the theme border color */
-.dockview-theme-illusions .dv-split-view-container.dv-separator-border .dv-view:not(:first-child)::before {
+.dockview-theme-illusions
+  .dv-split-view-container.dv-separator-border
+  .dv-view:not(:first-child)::before {
   background-color: rgb(var(--border));
 }
 

@@ -49,7 +49,11 @@ import type { SupportedFileExtension } from "@/lib/project/project-types";
 let _skipAutoRestoreDetected: boolean | null = null;
 
 // Module-level popout detection (checked once per window context)
-let _popoutBufferInfo: { bufferId: string; fileName: string; fileType: SupportedFileExtension } | null = null;
+let _popoutBufferInfo: {
+  bufferId: string;
+  fileName: string;
+  fileType: SupportedFileExtension;
+} | null = null;
 let _popoutDetected = false;
 
 function detectPopoutMode(): typeof _popoutBufferInfo {
@@ -88,7 +92,7 @@ export default function EditorPage() {
 
   const [editorKey, setEditorKey] = useState(0);
   const incrementEditorKey = useCallback(() => {
-    setEditorKey(prev => prev + 1);
+    setEditorKey((prev) => prev + 1);
   }, []);
 
   // Ref for dockview layout flush — populated after useDockviewPersistence,
@@ -101,31 +105,61 @@ export default function EditorPage() {
   // Deferred promise gate: tab restoration waits until VFS root is set
   const [vfsGate] = useState(() => {
     let resolve!: () => void;
-    const promise = new Promise<void>((r) => { resolve = r; });
+    const promise = new Promise<void>((r) => {
+      resolve = r;
+    });
     return { promise, resolve };
   });
 
   // --- Editor settings hook ---
-  const { settings, handlers: settingsHandlers, setters: settingsSetters } = useEditorSettings(incrementEditorKey);
   const {
-    fontScale, lineHeight, paragraphSpacing, textIndent, fontFamily,
-    charsPerLine, autoCharsPerLine, showParagraphNumbers, autoSave,
-    posHighlightEnabled, posHighlightColors, verticalScrollBehavior,
-    scrollSensitivity, compactMode, showSettingsModal,
-    lintingEnabled, lintingRuleConfigs,
-    powerSaveMode, autoPowerSaveOnBattery,
+    settings,
+    handlers: settingsHandlers,
+    setters: settingsSetters,
+  } = useEditorSettings(incrementEditorKey);
+  const {
+    fontScale,
+    lineHeight,
+    paragraphSpacing,
+    textIndent,
+    fontFamily,
+    charsPerLine,
+    autoCharsPerLine,
+    showParagraphNumbers,
+    autoSave,
+    posHighlightEnabled,
+    posHighlightColors,
+    verticalScrollBehavior,
+    scrollSensitivity,
+    compactMode,
+    showSettingsModal,
+    lintingEnabled,
+    lintingRuleConfigs,
+    powerSaveMode,
+    autoPowerSaveOnBattery,
     correctionConfig,
   } = settings;
   const {
-    handleFontScaleChange, handleLineHeightChange, handleParagraphSpacingChange,
-    handleTextIndentChange, handleFontFamilyChange, handleCharsPerLineChange,
-    handleAutoCharsPerLineChange, handleShowParagraphNumbersChange,
-    handleAutoSaveChange, handlePosHighlightEnabledChange,
-    handlePosHighlightColorsChange, handleVerticalScrollBehaviorChange,
-    handleScrollSensitivityChange, handleToggleCompactMode, setShowSettingsModal,
-    handleLintingEnabledChange, handleLintingRuleConfigChange,
+    handleFontScaleChange,
+    handleLineHeightChange,
+    handleParagraphSpacingChange,
+    handleTextIndentChange,
+    handleFontFamilyChange,
+    handleCharsPerLineChange,
+    handleAutoCharsPerLineChange,
+    handleShowParagraphNumbersChange,
+    handleAutoSaveChange,
+    handlePosHighlightEnabledChange,
+    handlePosHighlightColorsChange,
+    handleVerticalScrollBehaviorChange,
+    handleScrollSensitivityChange,
+    handleToggleCompactMode,
+    setShowSettingsModal,
+    handleLintingEnabledChange,
+    handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
-    handlePowerSaveModeChange, handleAutoPowerSaveOnBatteryChange,
+    handlePowerSaveModeChange,
+    handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange,
   } = settingsHandlers;
 
@@ -141,27 +175,75 @@ export default function EditorPage() {
   // --- Panel state hook ---
   const { state: panelState, handlers: panelHandlers } = usePanelState({ setShowSettingsModal });
   const {
-    topView, bottomView, searchResults, isRightPanelCollapsed,
-    dictionarySearchTrigger, settingsInitialCategory, switchToCorrectionsTrigger,
-    showRubyDialog, rubySelectedText, editorDiff,
+    topView,
+    bottomView,
+    searchResults,
+    isRightPanelCollapsed,
+    dictionarySearchTrigger,
+    settingsInitialCategory,
+    switchToCorrectionsTrigger,
+    showRubyDialog,
+    rubySelectedText,
+    editorDiff,
   } = panelState;
   const {
-    setTopView, setBottomView, setIsRightPanelCollapsed,
-    setSettingsInitialCategory, setShowRubyDialog, setRubySelectedText, setEditorDiff,
-    handleOpenDictionary, handleShowAllSearchResults, handleCloseSearchResults,
-    handleOpenLintingSettings, handleOpenPosHighlightSettings, triggerSwitchToCorrections,
+    setTopView,
+    setBottomView,
+    setIsRightPanelCollapsed,
+    setSettingsInitialCategory,
+    setShowRubyDialog,
+    setRubySelectedText,
+    setEditorDiff,
+    handleOpenDictionary,
+    handleShowAllSearchResults,
+    handleCloseSearchResults,
+    handleOpenLintingSettings,
+    handleOpenPosHighlightSettings,
+    triggerSwitchToCorrections,
   } = panelHandlers;
 
-  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReadyPromise: vfsGate.promise, flushLayoutState: stableFlushLayoutState });
+  const tabManager = useTabManager({
+    skipAutoRestore,
+    autoSave,
+    vfsReadyPromise: vfsGate.promise,
+    flushLayoutState: stableFlushLayoutState,
+  });
   const {
-    content, setContent, currentFile, isDirty, isSaving, lastSavedTime, lastSaveWasAuto,
-    openFile: tabOpenFile, saveFile, saveAsFile,
-    newFile: tabNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen,
+    content,
+    setContent,
+    currentFile,
+    isDirty,
+    isSaving,
+    lastSavedTime,
+    lastSaveWasAuto,
+    openFile: tabOpenFile,
+    saveFile,
+    saveAsFile,
+    newFile: tabNewFile,
+    updateFileName,
+    wasAutoRecovered,
+    onSystemFileOpen,
     _loadSystemFile: tabLoadSystemFile,
-    tabs, activeTabId, newTab, closeTab, switchTab, nextTab, prevTab, switchToIndex,
-    openProjectFile, pinTab, newTerminalTab, updateTerminalTab, openDiffTab,
-    forceCloseTab, updateTab,
-    pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
+    tabs,
+    activeTabId,
+    newTab,
+    closeTab,
+    switchTab,
+    nextTab,
+    prevTab,
+    switchToIndex,
+    openProjectFile,
+    pinTab,
+    newTerminalTab,
+    updateTerminalTab,
+    openDiffTab,
+    forceCloseTab,
+    updateTab,
+    pendingCloseTabId,
+    pendingCloseFileName,
+    handleCloseTabSave,
+    handleCloseTabDiscard,
+    handleCloseTabCancel,
     flushTabState,
   } = tabManager;
 
@@ -169,10 +251,7 @@ export default function EditorPage() {
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
-  const {
-    diffTabContextValue,
-    handleCloseTabWithPtyCleanup,
-  } = useDiffTabs({
+  const { diffTabContextValue, handleCloseTabWithPtyCleanup } = useDiffTabs({
     tabs,
     updateTab,
     forceCloseTab,
@@ -199,12 +278,14 @@ export default function EditorPage() {
   const tabManagerWithPtyCleanup = { ...tabManager, closeTab: handleCloseTabWithPtyCleanup };
 
   // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
-  const {
-    handleDockviewReady,
+  const { handleDockviewReady, dockviewApi, splitEditor } = useDockviewAdapter({
+    tabManager: tabManagerWithPtyCleanup,
+    editorKey,
+  });
+  const { flushLayoutState } = useDockviewPersistence({
     dockviewApi,
-    splitEditor,
-  } = useDockviewAdapter({ tabManager: tabManagerWithPtyCleanup, editorKey });
-  const { flushLayoutState } = useDockviewPersistence({ dockviewApi, tabs: tabManagerWithPtyCleanup.tabs });
+    tabs: tabManagerWithPtyCleanup.tabs,
+  });
   flushLayoutStateRef.current = flushLayoutState;
 
   // Derive editor mode from active tab's fileType
@@ -277,26 +358,36 @@ export default function EditorPage() {
   });
   const {
     state: {
-      recentProjects, showCreateWizard, showPermissionPrompt, permissionPromptData,
-      isRestoring, restoreError, confirmRemoveRecent,
+      recentProjects,
+      showCreateWizard,
+      showPermissionPrompt,
+      permissionPromptData,
+      isRestoring,
+      restoreError,
+      confirmRemoveRecent,
     },
     handlers: {
-      handleCreateProject, handleOpenProject, handleOpenStandaloneFile,
-      handleOpenRecentProject, handleDeleteRecentProject, handleOpenAsProject,
-      handleProjectCreated, handlePermissionGranted, handlePermissionDenied,
-      handleUpgrade, handleUpgradeDismiss,
-      setShowCreateWizard, setRestoreError, setConfirmRemoveRecent,
+      handleCreateProject,
+      handleOpenProject,
+      handleOpenStandaloneFile,
+      handleOpenRecentProject,
+      handleDeleteRecentProject,
+      handleOpenAsProject,
+      handleProjectCreated,
+      handlePermissionGranted,
+      handlePermissionDenied,
+      handleUpgrade,
+      handleUpgradeDismiss,
+      setShowCreateWizard,
+      setRestoreError,
+      setConfirmRemoveRecent,
     },
     upgrade: { showUpgradeBanner, upgradeBannerDismissed },
   } = projectLifecycle;
 
   // Unsaved warning hook (project mode transitions only; tabs handle per-tab dirty checks)
   const anyDirty = tabs.some((t) => isEditorTab(t) && t.isDirty);
-  const unsavedWarning = useUnsavedWarning(
-    anyDirty,
-    saveFile,
-    currentFile?.name || null
-  );
+  const unsavedWarning = useUnsavedWarning(anyDirty, saveFile, currentFile?.name || null);
 
   // Auto-recovered editor remount
   useEffect(() => {
@@ -312,43 +403,53 @@ export default function EditorPage() {
     incrementEditorKey();
   }, [tabOpenFile, incrementEditorKey]);
 
-  const newFile = useCallback((fileType?: SupportedFileExtension) => {
-    tabNewFile(fileType);
-    incrementEditorKey();
-  }, [tabNewFile, incrementEditorKey]);
+  const newFile = useCallback(
+    (fileType?: SupportedFileExtension) => {
+      tabNewFile(fileType);
+      incrementEditorKey();
+    },
+    [tabNewFile, incrementEditorKey],
+  );
 
   // --- Tab bar empty area context menu ---
-  const handleTabBarContextMenu = useCallback((e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    // Only show on the void (empty) area of the tab bar
-    if (!target.closest(".dv-void-container") && !target.classList.contains("dv-void-container")) return;
+  const handleTabBarContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Only show on the void (empty) area of the tab bar
+      if (!target.closest(".dv-void-container") && !target.classList.contains("dv-void-container"))
+        return;
 
-    const items = [
-      { label: "新規ファイル", action: "new-file" },
-      { label: "ファイルを開く…", action: "open-file" },
-      ...(isElectron ? [{ label: "新規ターミナル", action: "new-terminal" }] : []),
-    ];
-    void showTabBarMenu(e, items);
-  }, [showTabBarMenu, isElectron]);
+      const items = [
+        { label: "新規ファイル", action: "new-file" },
+        { label: "ファイルを開く…", action: "open-file" },
+        ...(isElectron ? [{ label: "新規ターミナル", action: "new-terminal" }] : []),
+      ];
+      void showTabBarMenu(e, items);
+    },
+    [showTabBarMenu, isElectron],
+  );
 
-  const handleTabBarMenuAction = useCallback((action: string) => {
-    switch (action) {
-      case "new-file":
-        if (isProjectMode(editorMode)) {
-          setTopView("files");
-          setNewFileTrigger(prev => prev + 1);
-        } else {
-          newTab();
-        }
-        break;
-      case "open-file":
-        void openFile();
-        break;
-      case "new-terminal":
-        handleNewTerminalTab();
-        break;
-    }
-  }, [editorMode, newTab, openFile, handleNewTerminalTab, setTopView, setNewFileTrigger]);
+  const handleTabBarMenuAction = useCallback(
+    (action: string) => {
+      switch (action) {
+        case "new-file":
+          if (isProjectMode(editorMode)) {
+            setTopView("files");
+            setNewFileTrigger((prev) => prev + 1);
+          } else {
+            newTab();
+          }
+          break;
+        case "open-file":
+          void openFile();
+          break;
+        case "new-terminal":
+          handleNewTerminalTab();
+          break;
+      }
+    },
+    [editorMode, newTab, openFile, handleNewTerminalTab, setTopView, setNewFileTrigger],
+  );
 
   // Electron menu "New" and "Open" bindings (with safety checks)
   useElectronMenuHandlers(newFile, openFile);
@@ -403,11 +504,7 @@ export default function EditorPage() {
   // --- Save toast hook ---
   const { showSaveToast, saveToastExiting } = useSaveToast({ lastSavedTime, lastSaveWasAuto });
 
-  const {
-    handlePasteAsPlaintext,
-    handleInsertText,
-    handleChapterClick,
-  } = useEditorLifecycle({
+  const { handlePasteAsPlaintext, handleInsertText, handleChapterClick } = useEditorLifecycle({
     flushTabState,
     flushLayoutState: stableFlushLayoutState,
     skipAutoRestore,
@@ -457,12 +554,23 @@ export default function EditorPage() {
 
   // --- Text statistics hook ---
   const {
-    charCount, paragraphCount, sentenceCount,
-    charTypeAnalysis, charUsageRates, readabilityAnalysis,
+    charCount,
+    paragraphCount,
+    sentenceCount,
+    charTypeAnalysis,
+    charUsageRates,
+    readabilityAnalysis,
   } = useTextStatistics(content);
 
   // --- Linting hook ---
-  const { ruleRunner, lintIssues, isLinting, handleLintIssuesUpdated, handleNlpError, refreshLinting } = useLinting(
+  const {
+    ruleRunner,
+    lintIssues,
+    isLinting,
+    handleLintIssuesUpdated,
+    handleNlpError,
+    refreshLinting,
+  } = useLinting(
     lintingEnabled,
     lintingRuleConfigs,
     editorViewInstance,
@@ -472,26 +580,19 @@ export default function EditorPage() {
   );
 
   // --- Ignored corrections hook ---
-  const {
-    ignoredCorrections,
-    ignoreCorrection,
-  } = useIgnoredCorrections(editorMode);
+  const { ignoredCorrections, ignoreCorrection } = useIgnoredCorrections(editorMode);
 
   // Sync ignoredCorrections to ProseMirror plugin
   useEffect(() => {
     if (!editorViewInstance) return;
 
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
-      ({ updateLintingSettings }) => {
-        updateLintingSettings(
-          editorViewInstance,
-          { ignoredCorrections },
-          "ignored-correction",
-        );
-      },
-    ).catch((err) => {
-      console.error("[page] Failed to sync ignored corrections:", err);
-    });
+    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
+      .then(({ updateLintingSettings }) => {
+        updateLintingSettings(editorViewInstance, { ignoredCorrections }, "ignored-correction");
+      })
+      .catch((err) => {
+        console.error("[page] Failed to sync ignored corrections:", err);
+      });
   }, [editorViewInstance, ignoredCorrections]);
 
   // --- Lint handlers hook ---
@@ -542,9 +643,18 @@ export default function EditorPage() {
     isEditorTabActive: !!activeEditorTab,
     splitEditorRight: useCallback(() => splitEditor("right"), [splitEditor]),
     splitEditorDown: useCallback(() => splitEditor("down"), [splitEditor]),
-    toggleExplorer: useCallback(() => setTopView(topView === "explorer" ? "none" : "explorer"), [setTopView, topView]),
-    toggleSearch: useCallback(() => setTopView(topView === "search" ? "none" : "search"), [setTopView, topView]),
-    toggleOutline: useCallback(() => setTopView(topView === "outline" ? "none" : "outline"), [setTopView, topView]),
+    toggleExplorer: useCallback(
+      () => setTopView(topView === "explorer" ? "none" : "explorer"),
+      [setTopView, topView],
+    ),
+    toggleSearch: useCallback(
+      () => setTopView(topView === "search" ? "none" : "search"),
+      [setTopView, topView],
+    ),
+    toggleOutline: useCallback(
+      () => setTopView(topView === "outline" ? "none" : "outline"),
+      [setTopView, topView],
+    ),
   });
 
   // Detect feature availability after mount to avoid SSR hydration mismatch
@@ -568,7 +678,13 @@ export default function EditorPage() {
     return (
       <div className="h-screen flex flex-col overflow-hidden relative">
         {/* Web menu bar (only for non-Electron environment) */}
-        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} checkedState={{ compactMode }} />}
+        {!isElectron && (
+          <WebMenuBar
+            onMenuAction={handleMenuAction}
+            recentProjects={recentProjects}
+            checkedState={{ compactMode }}
+          />
+        )}
 
         <WelcomeScreen
           onCreateProject={handleCreateProject}
@@ -622,7 +738,7 @@ export default function EditorPage() {
     incrementEditorKey,
     onWordSearch: (word: string) => {
       setSearchInitialTerm(word);
-      setSearchOpenTrigger(prev => prev + 1);
+      setSearchOpenTrigger((prev) => prev + 1);
     },
   } as const;
 

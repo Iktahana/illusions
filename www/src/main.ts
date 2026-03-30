@@ -1,31 +1,31 @@
-import './style.css'
-import { getRandomBackgroundImage } from './bg-images'
-import logoSvg from '/logo.svg?raw'
-import iconApple from '~icons/mdi/apple?raw'
-import iconWindows from '~icons/mdi/microsoft-windows?raw'
-import iconChrome from '~icons/mdi/google-chrome?raw'
-import iconGithub from '~icons/mdi/github?raw'
-const iconX = `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`
+import "./style.css";
+import { getRandomBackgroundImage } from "./bg-images";
+import logoSvg from "/logo.svg?raw";
+import iconApple from "~icons/mdi/apple?raw";
+import iconWindows from "~icons/mdi/microsoft-windows?raw";
+import iconChrome from "~icons/mdi/google-chrome?raw";
+import iconGithub from "~icons/mdi/github?raw";
+const iconX = `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`;
 
 // ランダムな背景画像を取得
-const bgImageUrl = getRandomBackgroundImage()
+const bgImageUrl = getRandomBackgroundImage();
 
 if (bgImageUrl) {
   // 画像をプリロード
-  const img = new Image()
+  const img = new Image();
   img.onload = () => {
-    document.body.style.setProperty('--bg-image', `url('${bgImageUrl}')`)
-  }
+    document.body.style.setProperty("--bg-image", `url('${bgImageUrl}')`);
+  };
   img.onerror = () => {
-    console.warn('Failed to load background image:', bgImageUrl)
-  }
-  img.src = bgImageUrl
+    console.warn("Failed to load background image:", bgImageUrl);
+  };
+  img.src = bgImageUrl;
 } else {
   // 画像がない場合はグラデーション背景を維持
-  console.info('No background images available, using gradient fallback')
+  console.info("No background images available, using gradient fallback");
 }
 
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
+document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <nav class="top-nav">
     <a href="https://my.illusions.app" class="nav-login-link">ログイン / 新規登録</a>
     <button class="hamburger" id="hamburger-btn" aria-label="メニューを開く" aria-expanded="false">
@@ -88,29 +88,29 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <a href="https://github.com/Iktahana/illusions/blob/main/TERMS.md" target="_blank" rel="noopener noreferrer">プライバシー・利用規約</a>
     </footer>
   </div>
-`
+`;
 
 // Hamburger menu toggle
-const hamburgerBtn = document.getElementById('hamburger-btn')
-const mobileMenu = document.getElementById('mobile-menu')
+const hamburgerBtn = document.getElementById("hamburger-btn");
+const mobileMenu = document.getElementById("mobile-menu");
 
 if (hamburgerBtn && mobileMenu) {
-  hamburgerBtn.addEventListener('click', () => {
-    const isOpen = hamburgerBtn.classList.toggle('is-open')
-    hamburgerBtn.setAttribute('aria-expanded', String(isOpen))
-    mobileMenu.classList.toggle('is-open')
-  })
+  hamburgerBtn.addEventListener("click", () => {
+    const isOpen = hamburgerBtn.classList.toggle("is-open");
+    hamburgerBtn.setAttribute("aria-expanded", String(isOpen));
+    mobileMenu.classList.toggle("is-open");
+  });
 
   // Close menu when clicking outside
-  document.addEventListener('click', (e) => {
+  document.addEventListener("click", (e) => {
     if (
-      mobileMenu.classList.contains('is-open') &&
+      mobileMenu.classList.contains("is-open") &&
       !hamburgerBtn.contains(e.target as Node) &&
       !mobileMenu.contains(e.target as Node)
     ) {
-      hamburgerBtn.classList.remove('is-open')
-      hamburgerBtn.setAttribute('aria-expanded', 'false')
-      mobileMenu.classList.remove('is-open')
+      hamburgerBtn.classList.remove("is-open");
+      hamburgerBtn.setAttribute("aria-expanded", "false");
+      mobileMenu.classList.remove("is-open");
     }
-  })
+  });
 }

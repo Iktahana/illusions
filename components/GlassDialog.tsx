@@ -47,9 +47,7 @@ export default function GlassDialog({
       aria-label={ariaLabel}
       onClick={handleBackdropClick}
     >
-      <div className={`${GLASS_CLASSES} ${panelClassName ?? DEFAULT_PANEL}`}>
-        {children}
-      </div>
+      <div className={`${GLASS_CLASSES} ${panelClassName ?? DEFAULT_PANEL}`}>{children}</div>
     </div>
   );
 }

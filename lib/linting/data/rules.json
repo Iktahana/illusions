@@ -1,1303 +1,1303 @@
 [
-    {
-        "Book": {
-            "Title": "JTF 日本語標準スタイルガイド",
-            "Author": "JTF",
-            "Year": "2023",
-            "ISBN": "978-4-86696-651-7"
-        },
-        "Rules": [
-            {
-                "Rule_ID": "JTF_1_1_1",
-                "Level": "L3",
-                "Description": "本文について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 本文.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 1.1.1 本文",
-                "prompt": "これはL3の規則です。以下のテキストが「本文について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_1_1_1_style_consistency",
-                "Level": "L3",
-                "Description": "本文を、敬体（ですます調）あるいは常体（である調）のどちらかに統一する。",
-                "Pattern/Logic": "LLM Evaluation. The language model needs to read the whole text, determine the dominant writing style (Keigo/Desumasu or Joutai/Da-Dearu), and point out exceptions logically without breaking the reading flow.",
-                "Positive_Example": "本文の文型を、敬体または常体のいずれかに統一します。一般読者向けのマニュアルでは、通常、敬体が使われます。",
-                "Negative_Example": "本文の文型を、敬体または常体のいずれかに統一する。一般読者向けのマニュアルでは、通常、敬体が使われます。",
-                "Source_Reference": "JTF日本語標準スタイルガイド 1.1 文体 (Page 9)",
-                "prompt": "これはL3の規則です。以下のテキストが「本文を、敬体（ですます調）あるいは常体（である調）のどちらかに統一する。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_1_1_2",
-                "Level": "L3",
-                "Description": "見出しについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 見出し.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 1.1.2 見出し",
-                "prompt": "これはL3の規則です。以下のテキストが「見出しについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_1_1_3",
-                "Level": "L3",
-                "Description": "箇条書きについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 箇条書き.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 1.1.3 箇条書き",
-                "prompt": "これはL3の規則です。以下のテキストが「箇条書きについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_1_1_4",
-                "Level": "L3",
-                "Description": "図表内のテキストについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 図表内のテキスト.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 1.1.4 図表内のテキスト",
-                "prompt": "これはL3の規則です。以下のテキストが「図表内のテキストについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_1_1_5",
-                "Level": "L3",
-                "Description": "図表のキャプションについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 図表のキャプション.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 1.1.5 図表のキャプション",
-                "prompt": "これはL3の規則です。以下のテキストが「図表のキャプションについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_1_2_1",
-                "Level": "L1",
-                "Description": "句点（。）と読点（、）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "句読点には全角の句点（。）と読点（、）を使用する。半角ピリオド（.）・カンマ（,）を和文の句読点として使わない。具体的な実装は個別ルール JTF_1_2_1_punctuation を参照のこと。",
-                "Positive_Example": "これは、見本となる例です。",
-                "Negative_Example": "これは，見本となる例です．",
-                "Source_Reference": "JTF日本語標準スタイルガイド 1.2.1 句点（。）と読点（、）",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_1_2_1_punctuation",
-                "Level": "L1",
-                "Description": "句読点には全角の「、」と「。」を使います。和文の句読点としてピリオド（.）とカンマ（,）は使用しません。",
-                "Pattern/Logic": "Regex replacement. Replace `,` with `、` and `.` with `。` unless the character is enclosed in an English word or numerical statement (which might require a small heuristic, but basically L1 regex with lookarounds `(?<=[^a-zA-Z0-9]),` -> `、`).",
-                "Positive_Example": "これは、見本となる例です。",
-                "Negative_Example": "これは，見本となる例です．",
-                "Source_Reference": "JTF日本語標準スタイルガイド 1.2.1 句点（。）と読点（、） (Page 11)",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_1_2_2",
-                "Level": "L1",
-                "Description": "ピリオド（.）とカンマ（,）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for ピリオド（.）とカンマ（,）.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 1.2.2 ピリオド（.）とカンマ（,）",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_1_1",
-                "Level": "L2",
-                "Description": "ひらがなについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L2` logic appropriate for ひらがな.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.1 ひらがな",
-                "prompt": "これはL2の規則です。以下のテキストが「ひらがなについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_2_1_10",
-                "Level": "L1",
-                "Description": "算用数字の位取りの表記について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 算用数字の位取りの表記.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.10 算用数字の位取りの表記",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_1_10_digit_comma",
-                "Level": "L1",
-                "Description": "算用数字の位取りの表記について、桁区切りには「カンマ」、小数点には「ピリオド」を使います。",
-                "Pattern/Logic": "Regex replacement. Detect full-width commas/periods or incorrect localized marks inside numbers and replace with half-width `,` for thousands separation and `.` for decimals. (e.g., `12，345．67` -> `12,345.67`). Note: JTF rule 1.2.1 applies to Japanese text, but numbers have their own punctuation rules.",
-                "Positive_Example": "12,345.67",
-                "Negative_Example": "12，345．67",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.10 算用数字の位取りの表記 (Page 19)",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_1_2",
-                "Level": "L2",
-                "Description": "漢字について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "漢字は原則として常用漢字表（2136字、2010年改訂）に従って使用する。表外字は平仮名書きまたは常用漢字による書き換えを行う。ただし実務翻訳で慣用的に用いられる語は漢字を使う。個別実装は JTF_2_1_2_kanji を参照のこと（常用漢字表との辞書照合、表外字のフラグ付け）。Note: 常用漢字表との照合・辞書マッチの具体的な実装については JTF_2_1_2_kanji ルールを参照のこと。",
-                "Positive_Example": "情報を取得する（常用漢字のみ使用）/概念を理解する",
-                "Negative_Example": "情報を蒐集する（「蒐」は常用漢字外）/概念を諒解する（「諒」は常用漢字外）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.2 漢字",
-                "prompt": "これはL2の規則です。以下のテキストが「漢字について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_2_1_2_kanji",
-                "Level": "L2",
-                "Description": "漢字は常用漢字表に原則として準じます。ただし、実務翻訳で慣用的に用いられる語（聡明、改竄、罫線など）は漢字を使います。",
-                "Pattern/Logic": "Heuristic dictionary match. Look up kanji in the Joyo Kanji list. Flag non-Joyo kanji unless they appear in a whitelist of accepted translations (e.g., 聡明, 拿捕).",
-                "Positive_Example": "右揃え",
-                "Negative_Example": "右そろえ",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.2 漢字 (Page 12)",
-                "prompt": "これはL2の規則です。以下のテキストが「漢字は常用漢字表に原則として準じます。ただし、実務翻訳で慣用的に用いられる語（聡明、改竄、罫線など）は漢字を使います。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_2_1_3",
-                "Level": "L2",
-                "Description": "漢字の送りがなについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L2` logic appropriate for 漢字の送りがな.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.3 漢字の送りがな",
-                "prompt": "これはL2の規則です。以下のテキストが「漢字の送りがなについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_2_1_3_verb_okurigana",
-                "Level": "L2",
-                "Description": "動詞の送りがなは内閣告示「送り仮名の付け方」の本則と例外に従い、「許容」として挙げられている送りがなは使用しません。",
-                "Pattern/Logic": "Regex matching specific okurigana patterns that are marked as \"acceptable\" (許容) but violating the JTF rule, replacing them with the standard rule. (e.g., `行なう` -> `行う`, `表わす` -> `表す`, `現われる` -> `現れる`).",
-                "Positive_Example": "行う",
-                "Negative_Example": "行なう",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.3 漢字の送りがな (Page 12)",
-                "prompt": "これはL2の規則です。以下のテキストが「動詞の送りがなは内閣告示「送り仮名の付け方」の本則と例外に従い、「許容」として挙げられている送りがなは使用しません。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_2_1_4",
-                "Level": "L2",
-                "Description": "複合語の送りがなについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "複合語の送り仮名は内閣告示「送り仮名の付け方」通則6・通則7に従う。通則6（本則）：各構成語の送り仮名を保持する（例：書き取り、申し込み、打ち合わせ）。通則6（例外）：慣用として定着しているものは省略できる（例：書取、申込、打合せ）。JTFでは読み間違えのおそれがない場合に限り省略を認める。通則7：複合語の名詞で先頭が体言の場合は送り仮名を付けない（例：受付、乗換、振込）。形態素解析を使って複合語を分解し、各構成要素の送り仮名基準を適用する。",
-                "Positive_Example": "申し込み用紙を記入します。/取り組みを開始します。/受付時間は9時からです。",
-                "Negative_Example": "申込み用紙を記入します（通則6本則から外れた表記）。/取組みを開始します（部分省略の誤用）。",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.4 複合語の送りがな",
-                "prompt": "これはL2の規則です。以下のテキストが「複合語の送りがなについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_2_1_5",
-                "Level": "L2",
-                "Description": "カタカナについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L2` logic appropriate for カタカナ. NOTE: Level changed from L1 to L2. While half-width→full-width substitution is L1 (see JTF_2_1_5_fullwidth_kana), the broader rule of 'when to use katakana for loanwords' requires dictionary lookup.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.5 カタカナ",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_1_5_fullwidth_kana",
-                "Level": "L1",
-                "Description": "漢字、ひらがな、カタカナは全角で表記します。半角カタカナは使用しません。",
-                "Pattern/Logic": "Regex matching half-width katakana (`[ｦ-ﾟ]`) and replacing with the corresponding full-width katakana (`[ヲ-ン]`).",
-                "Positive_Example": "メールアドレス",
-                "Negative_Example": "ﾒｰﾙｱﾄﾞﾚｽ",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.5 カタカナ (Page 16)",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_1_6",
-                "Level": "L2",
-                "Description": "カタカナ語の長音について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L2` logic appropriate for カタカナ語の長音.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.6 カタカナ語の長音",
-                "prompt": "これはL2の規則です。以下のテキストが「カタカナ語の長音について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_2_1_6_katakana_long_vowel",
-                "Level": "L2",
-                "Description": "カタカナ語の語尾の長音は省略しない。",
-                "Pattern/Logic": "Regex matching specific katakana words combined with lookup dictionary for exceptions/allowlists. E.g., match `コンピュータ` not followed by `ー` and replace it with `コンピューター`. Requires contextual knowledge or whitelist to prevent over-correction.",
-                "Positive_Example": "コンピューター",
-                "Negative_Example": "コンピュータ",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.6 カタカナ語の長音 (Page 16)",
-                "prompt": "これはL2の規則です。以下のテキストが「カタカナ語の語尾の長音は省略しない。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_2_1_7",
-                "Level": "L2",
-                "Description": "カタカナ複合語について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L2` logic appropriate for カタカナ複合語.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.7 カタカナ複合語",
-                "prompt": "これはL2の規則です。以下のテキストが「カタカナ複合語について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_2_1_8",
-                "Level": "L1",
-                "Description": "算用数字について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "算用数字（アラビア数字）は横組み文書で使用する。全角数字は使用せず、半角数字で統一する。個別実装は JTF_2_1_8_halfwidth_alnum を参照のこと（全角数字 `[０-９]` → 半角数字 `[0-9]` の正規表現置換）。漢字表記の数字（一、二、三…）は、慣用語・固有名詞を除き算用数字に統一する。Note: 算用数字の半角化の具体的な実装については JTF_2_1_8_halfwidth_alnum ルールを参照のこと。",
-                "Positive_Example": "ファイルサイズは256MBです。/3つの手順があります。/バージョン2.0をインストールします。",
-                "Negative_Example": "ファイルサイズは２５６ＭＢです。/３つの手順があります。/バージョン２．０をインストールします。",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.8 算用数字",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_1_8_halfwidth_alnum",
-                "Level": "L1",
-                "Description": "算用数字とアルファベットは半角で表記します（横組みの場合）。全角の英数字は使用しません。",
-                "Pattern/Logic": "Regex matching full-width alphanumeric characters (`[０-９Ａ-Ｚａ-ｚ]`) and replacing with half-width (`[0-9A-Za-z]`).",
-                "Positive_Example": "12345、abc DEF",
-                "Negative_Example": "１２３４５、ａｂｃ ＤＥＦ",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.8 算用数字、2.1.9 アルファベット (Page 19)",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_1_9",
-                "Level": "L1",
-                "Description": "アルファベットについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for アルファベット.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.1.9 アルファベット",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_2_1",
-                "Level": "L2",
-                "Description": "ひらがなと漢字の使い分けについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "ひらがなと漢字の使い分けは JTF スタイルガイド 2.2.1 の規定に従う。特定の接続詞・副詞・補助動詞はひらがなで、特定の副詞的用法の語は漢字で表記する。ひらがな化すべき語については JTF_2_2_1_hiragana、漢字化すべき語については JTF_2_2_1_kanji を参照のこと。",
-                "Positive_Example": "あらかじめ提出してください。/必ず一切の責任を負う。",
-                "Negative_Example": "予め提出して下さい。/かならずいっさいの責任を負う。",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.2.1 ひらがなと漢字の使い分け",
-                "prompt": "これはL2の規則です。以下のテキストが「ひらがなと漢字の使い分けについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_2_2_1_hiragana",
-                "Level": "L2",
-                "Description": "特定の接続詞や副詞、補助動詞などは、漢字ではなく「ひらがな」で表記します。",
-                "Pattern/Logic": "Regex word boundary substitution using a target list. Replace specific kanji with hiragana counterparts. Targets: 予め->あらかじめ、何れ->いずれ、凡そ->およそ、却って->かえって、且つ->かつ、下さい->ください、等。NOTE: Level changed from L1 to L2. Words like「下さい」require context-dependent judgment (本動詞 vs 補助動詞) and cannot be handled by simple regex alone.",
-                "Positive_Example": "あらかじめ提出してください。",
-                "Negative_Example": "予め提出して下さい。",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.2.1 ひらがなと漢字の使い分け (Page 20)",
-                "prompt": "これはL2の規則です。以下のテキストで、接続詞・副詞・補助動詞が漢字のまま使われていないか確認してください（例：「予め」→「あらかじめ」、「下さい」（補助動詞用法）→「ください」）。文脈を考慮し、本動詞の「下さい」（例：「水を下さい」）は漢字のままにしてください。"
-            },
-            {
-                "Rule_ID": "JTF_2_2_1_kanji",
-                "Level": "L1",
-                "Description": "特定の副詞などは、ひらがなではなく「漢字」で表記します。",
-                "Pattern/Logic": "Regex word boundary substitution using a target list. Replace specific hiragana words with kanji counterparts. Targets: いっさい->一切、かならず->必ず、おおいに->大いに、しいて->強いて、等。",
-                "Positive_Example": "必ず一切の責任を負う。",
-                "Negative_Example": "かならずいっさいの責任を負う。",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.2.1 ひらがなと漢字の使い分け (Page 21)",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_2_2",
-                "Level": "L3",
-                "Description": "算用数字と漢数字の使い分けについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 算用数字と漢数字の使い分け.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.2.2 算用数字と漢数字の使い分け",
-                "prompt": "これはL3の規則です。以下のテキストが「算用数字と漢数字の使い分けについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_2_2_3",
-                "Level": "L2",
-                "Description": "一部の助数詞に関する表記について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L2` logic appropriate for 一部の助数詞に関する表記. NOTE: Level changed from L1 to L2. 助数詞の表記（「ヶ」vs「カ」vs「か」vs「箇」など）は辞書照合が必要であり、単純な正規表現では対応不可。",
-                "Positive_Example": "3か月、1カ所（JTF推奨）",
-                "Negative_Example": "3ヶ月（公用文では不推奨）、1ヶ所",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.2.3 一部の助数詞に関する表記",
-                "prompt": "これはL2の規則です。以下のテキストで助数詞「ヶ」「箇」の使用を確認してください。JTFスタイルガイドでは「か」または「カ」を推奨しています（例：「3か月」「1カ所」）。"
-            },
-            {
-                "Rule_ID": "JTF_2_3_1_1",
-                "Level": "L1",
-                "Description": "全角文字と半角文字の間について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 全角文字と半角文字の間.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.3.1.1 全角文字と半角文字の間",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_3_1_2",
-                "Level": "L1",
-                "Description": "全角文字どうしについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 全角文字どうし.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.3.1.2 全角文字どうし",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_3_1_3",
-                "Level": "L1",
-                "Description": "半角文字どうしについて、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 半角文字どうし.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.3.1.3 半角文字どうし",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_3_2",
-                "Level": "L1",
-                "Description": "かっこ類と隣接する文字の間のスペースの有無について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for かっこ類と隣接する文字の間のスペースの有無.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.3.2 かっこ類と隣接する文字の間のスペースの有無",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_2_3_no_space",
-                "Level": "L1",
-                "Description": "半角文字と全角文字の間に半角スペースを入れない。",
-                "Pattern/Logic": "Regex finding spaces between half-width characters (e.g., `[a-zA-Z0-9]`) and full-width characters (e.g., `[ぁ-んァ-ヶ一-龠]`) and removing them. Example pattern: `(?<=[a-zA-Z0-9]) (?=[ぁ-んァ-ヶ一-龠])` or vice versa.",
-                "Positive_Example": "JTF標準",
-                "Negative_Example": "JTF 標準",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.3 文字間のスペース (Page 25)",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_1_1",
-                "Level": "L1",
-                "Description": "句点（。）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "文末には全角句点（。）を打つ。半角ピリオド（.）は文末の句点として使わない。見出し（タイトル・章・節の見出し）には句点を打たない。箇条書きの各項目が文の形（述語で終わる）の場合は句点を打つ。体言止め・名詞句の場合は句点を打たない。かぎかっこ（「」）の内側の文末には句点を打たない（詳細は JTF_3_1_1_kuten_brackets を参照）。Note: かぎかっこ内の句点省略については JTF_3_1_1_kuten_brackets ルールを参照のこと。",
-                "Positive_Example": "この機能を使用して、ファイルを保存します。/A氏は「5月に新製品を発売します」と述べました。",
-                "Negative_Example": "この機能を使用して、ファイルを保存します/A氏は「5月に新製品を発売します。」と述べました。",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.1.1 句点（。）",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_1_1_kuten_brackets",
-                "Level": "L1",
-                "Description": "文中にかぎかっこや丸かっこが入る場合は、閉じかっこの前に句点（。）を打ちません。",
-                "Pattern/Logic": "Regex matching period characters inside closing brackets. Replace `。」` with `」` and `。）」` or `。）` with `）` depending on the context.",
-                "Positive_Example": "A氏は「5月に新製品を発売します」と述べました。",
-                "Negative_Example": "A氏は「5月に新製品を発売します。」と述べました。",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.1.1 句点（。） (Page 26)",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_1_2",
-                "Level": "L2",
-                "Description": "読点（、）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L2` logic appropriate for 読点（、）.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.1.2 読点（、）",
-                "prompt": "これはL2の規則です。以下のテキストが「読点（、）について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_3_1_3",
-                "Level": "L1",
-                "Description": "ピリオド（.）、カンマ（,）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "日本語文中の句読点には全角句点（。）と読点（、）を使い、半角ピリオド（.）・半角カンマ（,）は和文の句読点として使わない。英文・欧文の引用・英語略語（e.g., etc., i.e.）中では半角ピリオド（.）・カンマ（,）をそのまま使う。数値の小数点には半角ピリオド（.）を使う（例：3.14、1.5倍）。正規表現で日本語文脈中の `.`→`。`、`,`→`、` を置換する際は、英数字前後のピリオド・カンマは対象外とする（lookaround `(?<=[^\\x00-\\x7E]),` → `、` など）。",
-                "Positive_Example": "データを処理します。次の画面に進みます。/英語の略語：e.g., etc., i.e.",
-                "Negative_Example": "データを処理します.次の画面に進みます./英語の略語：ｅ．ｇ．，ｅｔｃ．",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.1.3 ピリオド（.）、カンマ（,）",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_2_1",
-                "Level": "L2",
-                "Description": "感嘆符（！）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "感嘆符は全角（！）を使用する。文末に感嘆符を使用し、後に別の文が続く場合は直後に全角スペースを挿入する。具体的な実装・例外処理については JTF_3_2_1_exclamation を参照のこと。",
-                "Positive_Example": "驚きの速さ！ これが新製品のキャッチコピーでした。",
-                "Negative_Example": "驚きの速さ！これが新製品のキャッチコピーでした。",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.2.1 感嘆符（！）",
-                "prompt": "これはL2の規則です。以下のテキストが「感嘆符（！）について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_3_2_1_exclamation",
-                "Level": "L2",
-                "Description": "感嘆符（！）は全角で表記します。文末に感嘆符を使用し、後に別の文が続く場合は、直後に全角スペースを挿入します。",
-                "Pattern/Logic": "Regex mapping `!` to `！` and replacing cases where `！` is immediately followed by another character with `！　` (adding a full-width space).",
-                "Positive_Example": "驚きの速さ！ これが新製品のキャッチコピーでした。",
-                "Negative_Example": "驚きの速さ！これが新製品のキャッチコピーでした。",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.2.1 感嘆符（！） (Page 27)",
-                "prompt": "これはL2の規則です。以下のテキストが「感嘆符（！）は全角で表記します。文末に感嘆符を使用し、後に別の文が続く場合は、直後に全角スペースを挿入します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_3_2_2",
-                "Level": "L2",
-                "Description": "疑問符（？）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L2` logic appropriate for 疑問符（？）.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.2.2 疑問符（？）",
-                "prompt": "これはL2の規則です。以下のテキストが「疑問符（？）について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_3_2_2_question_mark",
-                "Level": "L2",
-                "Description": "疑問符（？）は全角で表記します。文末に疑問符を使用し、後に別の文が続く場合は、直後に全角スペースを挿入します。",
-                "Pattern/Logic": "Regex mapping `?` to `？` and replacing cases where `？` is immediately followed by another character with `？　` (adding a full-width space).",
-                "Positive_Example": "A社の成功の秘密とは？ この本ではそれをご紹介します。",
-                "Negative_Example": "A社の成功の秘密とは？この本ではそれをご紹介します。",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.2.2 疑問符（？） (Page 28)",
-                "prompt": "これはL2の規則です。以下のテキストが「疑問符（？）は全角で表記します。文末に疑問符を使用し、後に別の文が続く場合は、直後に全角スペースを挿入します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_3_2_3",
-                "Level": "L1",
-                "Description": "和文中のスラッシュは全角（／）を使用します。",
-                "Pattern/Logic": "TODO: Implement `L1` regex to replace half-width slash `/` with full-width slash `／` in Japanese text context. NOTE: Level changed from L2 to L1. The core rule (全角化) is a simple regex substitution. Half-width slashes in URLs, file paths, or English text should be excluded.",
-                "Positive_Example": "入力／出力",
-                "Negative_Example": "入力/出力（和文中の半角スラッシュ）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.2.3 スラッシュ（/）（／）",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_2_4",
-                "Level": "L2",
-                "Description": "中黒（・）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L2` logic appropriate for 中黒（・）.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.2.4 中黒（・）",
-                "prompt": "これはL2の規則です。以下のテキストが「中黒（・）について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_3_2_5",
-                "Level": "L1",
-                "Description": "波線（〜）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 波線（〜）.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.2.5 波線（〜）",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_2_6",
-                "Level": "L1",
-                "Description": "ハイフン（-）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for ハイフン（-）.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.2.6 ハイフン（-）",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_2_7",
-                "Level": "L1",
-                "Description": "コロン（：）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for コロン（：）.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.2.7 コロン（：）",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_2_8",
-                "Level": "L1",
-                "Description": "セミコロン（；）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for セミコロン（；）.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.2.8 セミコロン（；）",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_2_9",
-                "Level": "L2",
-                "Description": "ダッシュ（―）について、JTFスタイルガイドの基準に従って表記を統一します。ダッシュは二つ重ねて使用します（――）。",
-                "Pattern/Logic": "TODO: Implement `L2` logic for ダッシュ. NOTE: Level changed from L1 to L2. The rule requires: (1) ensuring ダッシュ is the correct character (― U+2015, not ー U+30FC or — U+2014); (2) checking that ダッシュ is used in pairs (――). Context-dependent judgment required.",
-                "Positive_Example": "東京――大阪間の距離",
-                "Negative_Example": "東京―大阪間の距離（一本のみ）、東京ー大阪間（長音符号の誤用）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.2.9 ダッシュ（―）",
-                "prompt": "これはL2の規則です。以下のテキストでダッシュ（―）の使用を確認してください。JTFでは二倍ダッシュ（――）を使用し、一本ダッシュや長音符号（ー）との混用を避けます。"
-            },
-            {
-                "Rule_ID": "JTF_3_3_1",
-                "Level": "L1",
-                "Description": "丸かっこ（）について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 丸かっこ（）.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.3.1 丸かっこ（）",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_3_1_parentheses_space",
-                "Level": "L1",
-                "Description": "かっこの外側、内側ともにスペースを入れません。",
-                "Pattern/Logic": "Regex identifying any spaces (half or full-width) immediately inside or outside Japanese brackets like `「 `, ` 」`, `（ `, ` ）` and removing the spaces.",
-                "Positive_Example": "クォータ（割り当て）",
-                "Negative_Example": "クォータ （割り当て）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 2.3.2 かっこ類と隣接する文字の間のスペースの有無 (Page 26)",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_3_2",
-                "Level": "L1",
-                "Description": "大かっこ［］について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 大かっこ［］.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.3.2 大かっこ［］",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_3_3",
-                "Level": "L1",
-                "Description": "かぎかっこ「」について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for かぎかっこ「」.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.3.3 かぎかっこ「」",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_3_4",
-                "Level": "L1",
-                "Description": "二重かぎかっこ『』について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 二重かぎかっこ『』.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.3.4 二重かぎかっこ『』",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_3_5",
-                "Level": "L1",
-                "Description": "二重引用符\" \"について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 二重引用符\" \".",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.3.5 二重引用符\" \"",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_3_6",
-                "Level": "L1",
-                "Description": "中かっこ{ }について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 中かっこ{ }.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.3.6 中かっこ{ }",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_3_7",
-                "Level": "L1",
-                "Description": "山かっこ〈 〉について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 山かっこ〈 〉.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.3.7 山かっこ〈 〉",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_3_8",
-                "Level": "L1",
-                "Description": "一重引用符' 'について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 一重引用符' '.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.3.8 一重引用符' '",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_3_3_brackets_fullwidth",
-                "Level": "L1",
-                "Description": "丸かっこ（）、大かっこ［］、かぎかっこ「」、二重かぎかっこ『』などは原則として全角で表記します。",
-                "Pattern/Logic": "Regex substitution that converts half-width brackets like `()`, `[]`, `｢｣` to their full-width equivalents `（）`, `［］`, `「」`.",
-                "Positive_Example": "［ファイル］メニュー",
-                "Negative_Example": "[ファイル]メニュー",
-                "Source_Reference": "JTF日本語標準スタイルガイド 3.3 かっこ (Page 30)",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_4_1",
-                "Level": "L3",
-                "Description": "単位系について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 単位系.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.1 単位系",
-                "prompt": "これはL3の規則です。以下のテキストが「単位系について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_4_2",
-                "Level": "L2",
-                "Description": "単位記号の表記について、JTFスタイルガイドの基準に従って表記を統一します。SI単位系の記号を正しく使用します。",
-                "Pattern/Logic": "TODO: Implement `L2` logic for 単位記号. NOTE: Level changed from L3 to L2. Unit symbol correctness (kg not Kg, ℃ not °C, MHz not mhz) can be checked via dictionary/regex, not requiring full LLM judgment.",
-                "Positive_Example": "10 kg、25 ℃、100 MHz",
-                "Negative_Example": "10 Kg（大文字誤り）、25 °C（記号不統一）、100 mhz（小文字誤り）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.2 単位記号の表記",
-                "prompt": "これはL2の規則です。以下のテキストで単位記号の表記を確認してください。SI単位系の記号（kg、m、℃、MHzなど）の大文字・小文字・記号形式が正しいか確認し、誤りがあれば指摘してください。"
-            },
-            {
-                "Rule_ID": "JTF_4_3_1",
-                "Level": "L2",
-                "Description": "時間、時刻について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L2` logic appropriate for 時間、時刻.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.1 時間、時刻",
-                "prompt": "これはL2の規則です。以下のテキストが「時間、時刻について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "JTF_4_3_10",
-                "Level": "L1",
-                "Description": "割合について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 割合.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.10 割合",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_4_3_11",
-                "Level": "L1",
-                "Description": "角度について、JTFスタイルガイドの基準に従って表記を統一します。",
-                "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 角度.",
-                "Positive_Example": "（正しい表記の例）",
-                "Negative_Example": "（誤った表記の例）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.11 角度",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_4_3_12",
-                "Level": "L2",
-                "Description": "記憶容量について、単位（B、KB、MB、GB、TB）を正しく表記します。",
-                "Pattern/Logic": "TODO: Implement `L2` dictionary-based check for 記憶容量 unit symbols. NOTE: Level changed L1→L2. Valid: B, KB, MB, GB, TB（大文字）。JTFでは2進法接頭辞（KiB等）は原則使用しない。",
-                "Positive_Example": "容量 512 GB、メモリ 16 MB",
-                "Negative_Example": "容量 512 gb（小文字誤り）、メモリ 16 mb",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.12 記憶容量",
-                "prompt": "これはL2の規則です。以下のテキストで記憶容量の単位記号（B、KB、MB、GB、TB）の表記を確認し、小文字の誤りを指摘してください。"
-            },
-            {
-                "Rule_ID": "JTF_4_3_13",
-                "Level": "L2",
-                "Description": "通貨について、通貨記号（¥、$、€）や通貨コード（JPY、USD）を正しく表記します。",
-                "Pattern/Logic": "TODO: Implement `L2` context-aware check for 通貨 notation. NOTE: Level changed L1→L2. Currency symbols and codes require context judgment (whether to use symbol vs full name vs ISO code). Rule: ¥ prefix for yen, no space between symbol and numeral.",
-                "Positive_Example": "¥1,000、$100、€50",
-                "Negative_Example": "¥ 1,000（記号と数字の間にスペース）、円1,000（記号の位置誤り）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.13 通貨",
-                "prompt": "これはL2の規則です。以下のテキストで通貨記号（¥、$、€）の位置と数字との間のスペースを確認してください。"
-            },
-            {
-                "Rule_ID": "JTF_4_3_2",
-                "Level": "L1",
-                "Description": "長さについて、SI単位（m、cm、mm、km）を正しく表記します。",
-                "Pattern/Logic": "Regex matching of unit symbol strings. Valid units: mm, cm, m, km（すべて小文字）。誤表記例：MM, Cm, KM などを正規表現でフラグ付け。",
-                "Positive_Example": "全長 1.5 m、厚さ 3 mm",
-                "Negative_Example": "全長 1.5 M（大文字誤り）、厚さ 3 MM",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.2 長さ",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_4_3_3",
-                "Level": "L1",
-                "Description": "質量について、SI単位（g、kg、t）を正しく表記します。",
-                "Pattern/Logic": "Regex matching of unit symbol strings. Valid units: mg, g, kg, t。誤表記例：Kg, KG, Gr などを正規表現でフラグ付け。",
-                "Positive_Example": "体重 60 kg、荷物 500 g",
-                "Negative_Example": "体重 60 Kg（大文字誤り）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.3 質量",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_4_3_4",
-                "Level": "L1",
-                "Description": "面積、体積について、SI単位（m²、m³、L）を正しく表記します。",
-                "Pattern/Logic": "Regex matching of unit symbol strings. Valid units: cm², m², km², cm³, m³, mL, L。「m2」「m3」など上付き文字なしの誤表記を正規表現でフラグ付け。",
-                "Positive_Example": "床面積 75 m²、容量 500 mL",
-                "Negative_Example": "床面積 75 m2（上付き文字なし）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.4 面積、体積",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_4_3_5",
-                "Level": "L1",
-                "Description": "電気について、SI単位（V、A、W、Ω、Hz）を正しく表記します。",
-                "Pattern/Logic": "Regex matching of unit symbol strings. Valid units: V, mV, A, mA, W, kW, MW, Ω, kΩ。大文字小文字の区別が重要（v, w などの小文字誤りを検出）。",
-                "Positive_Example": "電圧 100 V、消費電力 60 W",
-                "Negative_Example": "電圧 100 v（小文字誤り）、消費電力 60 w",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.5 電気",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_4_3_6",
-                "Level": "L1",
-                "Description": "温度について、摂氏（℃）を正しく表記します。",
-                "Pattern/Logic": "Regex matching of temperature unit symbols. ℃ (U+2103) を使用する。`°C`（度記号＋Cの2文字の組み合わせ）との混用を検出して修正する。",
-                "Positive_Example": "室温 25℃",
-                "Negative_Example": "室温 25°C（別字符の組み合わせ）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.6 温度",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_4_3_7",
-                "Level": "L1",
-                "Description": "周波数について、SI単位（Hz、kHz、MHz、GHz）を正しく表記します。",
-                "Pattern/Logic": "Regex matching of frequency unit symbol strings. Valid: Hz, kHz, MHz, GHz, THz。k は小文字、M・G・T は大文字。誤表記（hz, khz, mhz, ghz）を正規表現でフラグ付け。",
-                "Positive_Example": "50 Hz、2.4 GHz",
-                "Negative_Example": "50 hz（小文字誤り）、2.4 ghz",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.7 周波数",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_4_3_8",
-                "Level": "L1",
-                "Description": "速度について、SI単位（m/s、km/h）を正しく表記します。",
-                "Pattern/Logic": "Regex matching of speed unit symbol strings. Use m/s または km/h（小文字）。誤表記（km/H, M/S など大文字誤り）を正規表現でフラグ付け。",
-                "Positive_Example": "時速 60 km/h、秒速 9.8 m/s",
-                "Negative_Example": "時速 60 km/H（大文字誤り）",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.8 速度",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "JTF_4_3_9",
-                "Level": "L1",
-                "Description": "伝送速度について、単位（bps、kbps、Mbps、Gbps）を正しく表記します。",
-                "Pattern/Logic": "Regex matching of data rate unit symbol strings. Valid: bps, kbps, Mbps, Gbps, Tbps。k は小文字、M・G・T は大文字、b は小文字。誤表記（MBPS, mbps, MBps など）を正規表現でフラグ付け。",
-                "Positive_Example": "通信速度 100 Mbps",
-                "Negative_Example": "通信速度 100 MBPS（すべて大文字）、100 mbps",
-                "Source_Reference": "JTF日本語標準スタイルガイド 4.3.9 伝送速度",
-                "prompt": "none"
-            }
-        ]
+  {
+    "Book": {
+      "Title": "JTF 日本語標準スタイルガイド",
+      "Author": "JTF",
+      "Year": "2023",
+      "ISBN": "978-4-86696-651-7"
     },
-    {
-        "Book": {
-            "Title": "原稿編集 第2版",
-            "Author": "日本エディタースクール",
-            "Year": "2021",
-            "ISBN": "978-4-88888-404-2"
-        },
-        "Rules": [
-            {
-                "Rule_ID": "rule_ME2_10_romaji",
-                "Level": "L2",
-                "Description": "原則として「ローマ字のつづり方」の第1表（訓令式）に従うが、国際関係などの慣例がある場合は第2表（ヘボン式）も許容する。",
-                "Pattern/Logic": "訓令式（si, ti, tu, hu）を基本とするが、プロジェクトの方針でヘボン式（shi, chi, tsu, fu）に統一することもある。",
-                "Positive_Example": "huzi (訓令式), fuji (ヘボン式)",
-                "Negative_Example": "fuzi (混在)",
-                "Source_Reference": "p. 29, 73",
-                "prompt": "これはL2の規則です。以下のテキストが「原則として「ローマ字のつづり方」の第1表（訓令式）に従うが、国際関係などの慣例がある場合は第2表（ヘボン式）も許容する。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_ME2_11_vertical_numbers",
-                "Level": "L1",
-                "Description": "縦組では原則として漢数字を使用する。",
-                "Pattern/Logic": "数値を漢数字（一、二、三、十、百、万など）で表記。2桁の数字には「十」を入れる方針もある。",
-                "Positive_Example": "二〇一二年、昭和六三年、五二歳、十四人、二十歳",
-                "Negative_Example": "2012年、14人",
-                "Source_Reference": "p. 29, 73",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "rule_ME2_12_horizontal_numbers",
-                "Level": "L1",
-                "Description": "横組では原則としてアラビア数字（算用数字）を使用する。",
-                "Pattern/Logic": "数値をアラビア数字（1, 2, 3）で表記。3桁ごとにカンマを入れるか、4桁ごとに万、億を入れる方針を決める。",
-                "Positive_Example": "1998年、5,000円、11億9988万2255",
-                "Negative_Example": "一九九八年、五千円",
-                "Source_Reference": "p. 31, 73",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "rule_ME2_13_unit_symbols",
-                "Level": "L1",
-                "Description": "縦組では原則として片仮名（メートル、グラム）、横組では欧字（m, g）の記号を使用する。",
-                "Pattern/Logic": "縦組/横組に応じて単位表記（片仮名/欧字）を使い分ける。欧字記号の場合は、数値との間に四分アキ（半角スペース相当）を入れる。",
-                "Positive_Example": "50 km (横組)、50キロメートル (縦組)",
-                "Negative_Example": "50km (横組でスペースなし)、50 m (縦組で欧字)",
-                "Source_Reference": "p. 34, 73",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "rule_ME2_14_pre_post_symbols",
-                "Level": "L1",
-                "Description": "円(¥)、ドル($)、パーセント(%)などの記號は、數字との間にスペースを入れずベタで組む。",
-                "Pattern/Logic": "前置（¥, $）は數字の前に、後置（%, ‰）は數字の後に配置し、密着させる。",
-                "Positive_Example": "¥300, 25%",
-                "Negative_Example": "¥ 300, 25 %",
-                "Source_Reference": "p. 37",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "rule_ME2_15_punctuation",
-                "Level": "L1",
-                "Description": "句読点は、縦組では〔、。〕を、横組では目的や内容に合わせて〔,.〕〔、。〕〔,。〕のいずれかに統一する。",
-                "Pattern/Logic": "プロジェクト全体で一貫した句読点セット（例：横組なら「、。」）を使用しているか確認する。",
-                "Positive_Example": "本書は、原稿編集についてまとめたものです。",
-                "Negative_Example": "本書は，原稿編集についてまとめたものです．（混在）",
-                "Source_Reference": "p. 37, 74",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "rule_ME2_16_brackets",
-                "Level": "L2",
-                "Description": "括弧類（「」、（）、『』など）の使い分けを統一し、文末の句点との位置関係を整理する。",
-                "Pattern/Logic": "一重かぎ、二重かぎ、パーレンの入れ子構造や、文末の句点が括弧の内か外かを確認する。",
-                "Positive_Example": "「原稿編集（原稿整理）の方法をまとめたものです。」",
-                "Negative_Example": "「原稿編集（原稿整理）の方法をまとめたものです」。",
-                "Source_Reference": "p. 37, 74",
-                "prompt": "これはL2の規則です。以下のテキストが「括弧類（「」、（）、『』など）の使い分けを統一し、文末の句点との位置関係を整理する。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_ME2_17_repetition_symbols",
-                "Level": "L1",
-                "Description": "くり返し符号（々、ゝ、ゞ）を適切に使用する。",
-                "Pattern/Logic": "同じ漢字が続く場合に「々」を使用し、平仮名・片仮名のくり返し（ゝ、ゞ、ヽ、ヾ）は児童書などを除き原則として使用しない。",
-                "Positive_Example": "人々、国々、ときどき",
-                "Negative_Example": "人びと、国ぐに（一般書では「々」が一般的）",
-                "Source_Reference": "p. 39",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "rule_ME2_18_trademarks",
-                "Level": "L3",
-                "Description": "特定の商品名は避け、なるべく普通名詞に言い換える。",
-                "Pattern/Logic": "商標（宅急便、セロテープ、ゼロックス）を検出し、一般名称（宅配便、セロハンテープ、コピー）に置換を検討。",
-                "Positive_Example": "宅配便で送る。、セロハンテープで貼る。",
-                "Negative_Example": "宅急便で送る。、セロテープで貼る。",
-                "Source_Reference": "p. 39",
-                "prompt": "これはL3の規則です。以下のテキストが「特定の商品名は避け、なるべく普通名詞に言い換える。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_ME2_19_ruby",
-                "Level": "L3",
-                "Description": "難読文字や専門用語にはルビ（振り仮名）を振る。",
-                "Pattern/Logic": "常用漢字外の漢字や、誤読しやすい語にルビが付いているか確認する。熟語全体に振る（熟語ルビ）か、一字ずつ振る（モノルビ）かの方針を統一。",
-                "Positive_Example": "摯（しん）実（じつ）、真（しん）摯（し）",
-                "Negative_Example": "摯（し）実",
-                "Source_Reference": "p. 39, 74",
-                "prompt": "これはL3の規則です。以下のテキストが「難読文字や専門用語にはルビ（振り仮名）を振る。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_ME2_1_style_consistency",
-                "Level": "L3",
-                "Description": "文体（です・ます調とだ・である調）の不統一を避け、本の内容や読者層に合わせていずれかに統一する。",
-                "Pattern/Logic": "文末表現をスキャンし、「です・ます」と「だ・である」が混在していないか確認する。",
-                "Positive_Example": "本書は、原稿編集の方法についてまとめたものです。（敬体で統一）",
-                "Negative_Example": "本書は、原稿編集の方法についてまとめたものである。です。",
-                "Source_Reference": "p. 18, 72",
-                "prompt": "これはL3の規則です。以下のテキストが「文体（です・ます調とだ・である調）の不統一を避け、本の内容や読者層に合わせていずれかに統一する。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_ME2_20_emphasis_points",
-                "Level": "L2",
-                "Description": "強調したい語句には圏点（傍点）を付ける。",
-                "Pattern/Logic": "縦組では読点（ヽ）、横組では中黒（・）を文字の上に配置し、強調を表現する。",
-                "Positive_Example": "・・・",
-                "Negative_Example": "圏点が不統一（一部だけ違う記号など）",
-                "Source_Reference": "p. 40",
-                "prompt": "これはL2の規則です。以下のテキストが「強調したい語句には圏点（傍点）を付ける。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_ME2_2_kanji_usage",
-                "Level": "L2",
-                "Description": "常用漢字を基準とし、表外漢字（常用漢字以外の漢字）はなるべく平仮名にするか、適切な別の言葉に言い換える。",
-                "Pattern/Logic": "常用漢字表に含まれない漢字を検出し、ルビを振るか、平仮名に変更するかを検討する。",
-                "Positive_Example": "修正を加える。（「修正」は常用漢字）",
-                "Negative_Example": "修正を施す。（「施」は常用漢字だが、文脈により言い換え検討）",
-                "Source_Reference": "p. 19, 72",
-                "prompt": "これはL2の規則です。以下のテキストが「常用漢字を基準とし、表外漢字（常用漢字以外の漢字）はなるべく平仮名にするか、適切な別の言葉に言い換える。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_ME2_3_kana_words",
-                "Level": "L2",
-                "Description": "代名詞、副詞、接続詞、助詞、助動詞などは、原則として平仮名（ひらく）で書き表す。",
-                "Pattern/Logic": "指定されたリスト（余り、至って、及び、並びに、又は、等）に基づいて漢字を平仮名に変換。",
-                "Positive_Example": "更に検討する。 -> さらに検討する。",
-                "Negative_Example": "余り、恐らく、或いは、及び、並びに、等",
-                "Source_Reference": "p. 20",
-                "prompt": "これはL2の規則です。以下のテキストが「代名詞、副詞、接続詞、助詞、助動詞などは、原則として平仮名（ひらく）で書き表す。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_ME2_4_kanji_font",
-                "Level": "L1",
-                "Description": "常用漢字の字体は、常用漢字表に示されている字体（通用字体）を使用する。いわゆる康煕字典体（旧字体）は避ける。",
-                "Pattern/Logic": "旧字体（例：榮、衞、曉）を検出し、新字体（栄、衛、暁）に置換する。",
-                "Positive_Example": "栄、衛、暁、島、杯、富",
-                "Negative_Example": "榮、衞、曉、嶋、盃、冨",
-                "Source_Reference": "p. 22, 72",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "rule_ME2_5_homophones",
-                "Level": "L3",
-                "Description": "同音・同訓異義語の誤変換や使い分けに注意する。",
-                "Pattern/Logic": "誤りやすいペア（対照/対象、異議/意義、回答/解答）の文脈判断。",
-                "Positive_Example": "対象とする読者層を考える。",
-                "Negative_Example": "対照とする読者層を考える。",
-                "Source_Reference": "p. 25",
-                "prompt": "これはL3の規則です。以下のテキストが「同音・同訓異義語の誤変換や使い分けに注意する。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_ME2_6_kana_usage",
-                "Level": "L2",
-                "Description": "原則として「現代仮名遣い」に従う。",
-                "Pattern/Logic": "「じ・ず」を原則とし、「ぢ・づ」は二語の連合などで必要な場合のみ使用する。オ列の長音などは「う」で表すが、例外（お、おおきい、とおる、とお（十））に注意。",
-                "Positive_Example": "世界中（せかいじゅう）、縮む（ちぢむ）、続く（つづく）、鼻血（はなぢ）",
-                "Negative_Example": "せかいぢゆう、ちじむ、つずく、はなじ",
-                "Source_Reference": "p. 26, 73",
-                "prompt": "これはL2の規則です。以下のテキストが「原則として「現代仮名遣い」に従う。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_ME2_7_okurigana",
-                "Level": "L2",
-                "Description": "内閣告示の「送り仮名の付け方」の本則を基本とする。",
-                "Pattern/Logic": "通則1（活用のある語）、通則2（活用のない語）などに従い、不統一にならないように整理する。",
-                "Positive_Example": "終わる、答え、願う、行なう（「行う」も本則だが、統一する）",
-                "Negative_Example": "終る、答、願、行う（混在させない）",
-                "Source_Reference": "p. 27, 73",
-                "prompt": "これはL2の規則です。以下のテキストが「内閣告示の「送り仮名の付け方」の本則を基本とする。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_ME2_8_katakana",
-                "Level": "L1",
-                "Description": "外国の人名・地名、外来語、擬声語・擬音語、動植物名などは片仮名で表記する。",
-                "Pattern/Logic": "特定のカテゴリー（外来語、動植物名）を検出し、片仮名で表記されているか確認する。",
-                "Positive_Example": "スキャナー、ネコ、ワンワン",
-                "Negative_Example": "すきゃなー、猫（一般書では「ねこ」または「ネコ」）、わんわん",
-                "Source_Reference": "p. 27, 73",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "rule_ME2_9_foreign_words",
-                "Level": "L1",
-                "Description": "外来語の末尾の長音符号「ー」は、原則としてア列の長音とし、長音符号を用いる。",
-                "Pattern/Logic": "3音以上の言葉（英語の-er, -or, -arなど）で、長音符号を省略しない。",
-                "Positive_Example": "スキャナー、コンピューター、フォルダー",
-                "Negative_Example": "スキャナ、コンピュータ、フォルダ",
-                "Source_Reference": "p. 28, 73",
-                "prompt": "none"
-            }
-        ]
+    "Rules": [
+      {
+        "Rule_ID": "JTF_1_1_1",
+        "Level": "L3",
+        "Description": "本文について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 本文.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 1.1.1 本文",
+        "prompt": "これはL3の規則です。以下のテキストが「本文について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_1_1_1_style_consistency",
+        "Level": "L3",
+        "Description": "本文を、敬体（ですます調）あるいは常体（である調）のどちらかに統一する。",
+        "Pattern/Logic": "LLM Evaluation. The language model needs to read the whole text, determine the dominant writing style (Keigo/Desumasu or Joutai/Da-Dearu), and point out exceptions logically without breaking the reading flow.",
+        "Positive_Example": "本文の文型を、敬体または常体のいずれかに統一します。一般読者向けのマニュアルでは、通常、敬体が使われます。",
+        "Negative_Example": "本文の文型を、敬体または常体のいずれかに統一する。一般読者向けのマニュアルでは、通常、敬体が使われます。",
+        "Source_Reference": "JTF日本語標準スタイルガイド 1.1 文体 (Page 9)",
+        "prompt": "これはL3の規則です。以下のテキストが「本文を、敬体（ですます調）あるいは常体（である調）のどちらかに統一する。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_1_1_2",
+        "Level": "L3",
+        "Description": "見出しについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 見出し.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 1.1.2 見出し",
+        "prompt": "これはL3の規則です。以下のテキストが「見出しについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_1_1_3",
+        "Level": "L3",
+        "Description": "箇条書きについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 箇条書き.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 1.1.3 箇条書き",
+        "prompt": "これはL3の規則です。以下のテキストが「箇条書きについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_1_1_4",
+        "Level": "L3",
+        "Description": "図表内のテキストについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 図表内のテキスト.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 1.1.4 図表内のテキスト",
+        "prompt": "これはL3の規則です。以下のテキストが「図表内のテキストについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_1_1_5",
+        "Level": "L3",
+        "Description": "図表のキャプションについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 図表のキャプション.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 1.1.5 図表のキャプション",
+        "prompt": "これはL3の規則です。以下のテキストが「図表のキャプションについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_1_2_1",
+        "Level": "L1",
+        "Description": "句点（。）と読点（、）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "句読点には全角の句点（。）と読点（、）を使用する。半角ピリオド（.）・カンマ（,）を和文の句読点として使わない。具体的な実装は個別ルール JTF_1_2_1_punctuation を参照のこと。",
+        "Positive_Example": "これは、見本となる例です。",
+        "Negative_Example": "これは，見本となる例です．",
+        "Source_Reference": "JTF日本語標準スタイルガイド 1.2.1 句点（。）と読点（、）",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_1_2_1_punctuation",
+        "Level": "L1",
+        "Description": "句読点には全角の「、」と「。」を使います。和文の句読点としてピリオド（.）とカンマ（,）は使用しません。",
+        "Pattern/Logic": "Regex replacement. Replace `,` with `、` and `.` with `。` unless the character is enclosed in an English word or numerical statement (which might require a small heuristic, but basically L1 regex with lookarounds `(?<=[^a-zA-Z0-9]),` -> `、`).",
+        "Positive_Example": "これは、見本となる例です。",
+        "Negative_Example": "これは，見本となる例です．",
+        "Source_Reference": "JTF日本語標準スタイルガイド 1.2.1 句点（。）と読点（、） (Page 11)",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_1_2_2",
+        "Level": "L1",
+        "Description": "ピリオド（.）とカンマ（,）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for ピリオド（.）とカンマ（,）.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 1.2.2 ピリオド（.）とカンマ（,）",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_1_1",
+        "Level": "L2",
+        "Description": "ひらがなについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L2` logic appropriate for ひらがな.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.1 ひらがな",
+        "prompt": "これはL2の規則です。以下のテキストが「ひらがなについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_2_1_10",
+        "Level": "L1",
+        "Description": "算用数字の位取りの表記について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 算用数字の位取りの表記.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.10 算用数字の位取りの表記",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_1_10_digit_comma",
+        "Level": "L1",
+        "Description": "算用数字の位取りの表記について、桁区切りには「カンマ」、小数点には「ピリオド」を使います。",
+        "Pattern/Logic": "Regex replacement. Detect full-width commas/periods or incorrect localized marks inside numbers and replace with half-width `,` for thousands separation and `.` for decimals. (e.g., `12，345．67` -> `12,345.67`). Note: JTF rule 1.2.1 applies to Japanese text, but numbers have their own punctuation rules.",
+        "Positive_Example": "12,345.67",
+        "Negative_Example": "12，345．67",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.10 算用数字の位取りの表記 (Page 19)",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_1_2",
+        "Level": "L2",
+        "Description": "漢字について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "漢字は原則として常用漢字表（2136字、2010年改訂）に従って使用する。表外字は平仮名書きまたは常用漢字による書き換えを行う。ただし実務翻訳で慣用的に用いられる語は漢字を使う。個別実装は JTF_2_1_2_kanji を参照のこと（常用漢字表との辞書照合、表外字のフラグ付け）。Note: 常用漢字表との照合・辞書マッチの具体的な実装については JTF_2_1_2_kanji ルールを参照のこと。",
+        "Positive_Example": "情報を取得する（常用漢字のみ使用）/概念を理解する",
+        "Negative_Example": "情報を蒐集する（「蒐」は常用漢字外）/概念を諒解する（「諒」は常用漢字外）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.2 漢字",
+        "prompt": "これはL2の規則です。以下のテキストが「漢字について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_2_1_2_kanji",
+        "Level": "L2",
+        "Description": "漢字は常用漢字表に原則として準じます。ただし、実務翻訳で慣用的に用いられる語（聡明、改竄、罫線など）は漢字を使います。",
+        "Pattern/Logic": "Heuristic dictionary match. Look up kanji in the Joyo Kanji list. Flag non-Joyo kanji unless they appear in a whitelist of accepted translations (e.g., 聡明, 拿捕).",
+        "Positive_Example": "右揃え",
+        "Negative_Example": "右そろえ",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.2 漢字 (Page 12)",
+        "prompt": "これはL2の規則です。以下のテキストが「漢字は常用漢字表に原則として準じます。ただし、実務翻訳で慣用的に用いられる語（聡明、改竄、罫線など）は漢字を使います。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_2_1_3",
+        "Level": "L2",
+        "Description": "漢字の送りがなについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L2` logic appropriate for 漢字の送りがな.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.3 漢字の送りがな",
+        "prompt": "これはL2の規則です。以下のテキストが「漢字の送りがなについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_2_1_3_verb_okurigana",
+        "Level": "L2",
+        "Description": "動詞の送りがなは内閣告示「送り仮名の付け方」の本則と例外に従い、「許容」として挙げられている送りがなは使用しません。",
+        "Pattern/Logic": "Regex matching specific okurigana patterns that are marked as \"acceptable\" (許容) but violating the JTF rule, replacing them with the standard rule. (e.g., `行なう` -> `行う`, `表わす` -> `表す`, `現われる` -> `現れる`).",
+        "Positive_Example": "行う",
+        "Negative_Example": "行なう",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.3 漢字の送りがな (Page 12)",
+        "prompt": "これはL2の規則です。以下のテキストが「動詞の送りがなは内閣告示「送り仮名の付け方」の本則と例外に従い、「許容」として挙げられている送りがなは使用しません。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_2_1_4",
+        "Level": "L2",
+        "Description": "複合語の送りがなについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "複合語の送り仮名は内閣告示「送り仮名の付け方」通則6・通則7に従う。通則6（本則）：各構成語の送り仮名を保持する（例：書き取り、申し込み、打ち合わせ）。通則6（例外）：慣用として定着しているものは省略できる（例：書取、申込、打合せ）。JTFでは読み間違えのおそれがない場合に限り省略を認める。通則7：複合語の名詞で先頭が体言の場合は送り仮名を付けない（例：受付、乗換、振込）。形態素解析を使って複合語を分解し、各構成要素の送り仮名基準を適用する。",
+        "Positive_Example": "申し込み用紙を記入します。/取り組みを開始します。/受付時間は9時からです。",
+        "Negative_Example": "申込み用紙を記入します（通則6本則から外れた表記）。/取組みを開始します（部分省略の誤用）。",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.4 複合語の送りがな",
+        "prompt": "これはL2の規則です。以下のテキストが「複合語の送りがなについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_2_1_5",
+        "Level": "L2",
+        "Description": "カタカナについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L2` logic appropriate for カタカナ. NOTE: Level changed from L1 to L2. While half-width→full-width substitution is L1 (see JTF_2_1_5_fullwidth_kana), the broader rule of 'when to use katakana for loanwords' requires dictionary lookup.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.5 カタカナ",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_1_5_fullwidth_kana",
+        "Level": "L1",
+        "Description": "漢字、ひらがな、カタカナは全角で表記します。半角カタカナは使用しません。",
+        "Pattern/Logic": "Regex matching half-width katakana (`[ｦ-ﾟ]`) and replacing with the corresponding full-width katakana (`[ヲ-ン]`).",
+        "Positive_Example": "メールアドレス",
+        "Negative_Example": "ﾒｰﾙｱﾄﾞﾚｽ",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.5 カタカナ (Page 16)",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_1_6",
+        "Level": "L2",
+        "Description": "カタカナ語の長音について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L2` logic appropriate for カタカナ語の長音.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.6 カタカナ語の長音",
+        "prompt": "これはL2の規則です。以下のテキストが「カタカナ語の長音について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_2_1_6_katakana_long_vowel",
+        "Level": "L2",
+        "Description": "カタカナ語の語尾の長音は省略しない。",
+        "Pattern/Logic": "Regex matching specific katakana words combined with lookup dictionary for exceptions/allowlists. E.g., match `コンピュータ` not followed by `ー` and replace it with `コンピューター`. Requires contextual knowledge or whitelist to prevent over-correction.",
+        "Positive_Example": "コンピューター",
+        "Negative_Example": "コンピュータ",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.6 カタカナ語の長音 (Page 16)",
+        "prompt": "これはL2の規則です。以下のテキストが「カタカナ語の語尾の長音は省略しない。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_2_1_7",
+        "Level": "L2",
+        "Description": "カタカナ複合語について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L2` logic appropriate for カタカナ複合語.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.7 カタカナ複合語",
+        "prompt": "これはL2の規則です。以下のテキストが「カタカナ複合語について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_2_1_8",
+        "Level": "L1",
+        "Description": "算用数字について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "算用数字（アラビア数字）は横組み文書で使用する。全角数字は使用せず、半角数字で統一する。個別実装は JTF_2_1_8_halfwidth_alnum を参照のこと（全角数字 `[０-９]` → 半角数字 `[0-9]` の正規表現置換）。漢字表記の数字（一、二、三…）は、慣用語・固有名詞を除き算用数字に統一する。Note: 算用数字の半角化の具体的な実装については JTF_2_1_8_halfwidth_alnum ルールを参照のこと。",
+        "Positive_Example": "ファイルサイズは256MBです。/3つの手順があります。/バージョン2.0をインストールします。",
+        "Negative_Example": "ファイルサイズは２５６ＭＢです。/３つの手順があります。/バージョン２．０をインストールします。",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.8 算用数字",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_1_8_halfwidth_alnum",
+        "Level": "L1",
+        "Description": "算用数字とアルファベットは半角で表記します（横組みの場合）。全角の英数字は使用しません。",
+        "Pattern/Logic": "Regex matching full-width alphanumeric characters (`[０-９Ａ-Ｚａ-ｚ]`) and replacing with half-width (`[0-9A-Za-z]`).",
+        "Positive_Example": "12345、abc DEF",
+        "Negative_Example": "１２３４５、ａｂｃ ＤＥＦ",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.8 算用数字、2.1.9 アルファベット (Page 19)",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_1_9",
+        "Level": "L1",
+        "Description": "アルファベットについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for アルファベット.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.1.9 アルファベット",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_2_1",
+        "Level": "L2",
+        "Description": "ひらがなと漢字の使い分けについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "ひらがなと漢字の使い分けは JTF スタイルガイド 2.2.1 の規定に従う。特定の接続詞・副詞・補助動詞はひらがなで、特定の副詞的用法の語は漢字で表記する。ひらがな化すべき語については JTF_2_2_1_hiragana、漢字化すべき語については JTF_2_2_1_kanji を参照のこと。",
+        "Positive_Example": "あらかじめ提出してください。/必ず一切の責任を負う。",
+        "Negative_Example": "予め提出して下さい。/かならずいっさいの責任を負う。",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.2.1 ひらがなと漢字の使い分け",
+        "prompt": "これはL2の規則です。以下のテキストが「ひらがなと漢字の使い分けについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_2_2_1_hiragana",
+        "Level": "L2",
+        "Description": "特定の接続詞や副詞、補助動詞などは、漢字ではなく「ひらがな」で表記します。",
+        "Pattern/Logic": "Regex word boundary substitution using a target list. Replace specific kanji with hiragana counterparts. Targets: 予め->あらかじめ、何れ->いずれ、凡そ->およそ、却って->かえって、且つ->かつ、下さい->ください、等。NOTE: Level changed from L1 to L2. Words like「下さい」require context-dependent judgment (本動詞 vs 補助動詞) and cannot be handled by simple regex alone.",
+        "Positive_Example": "あらかじめ提出してください。",
+        "Negative_Example": "予め提出して下さい。",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.2.1 ひらがなと漢字の使い分け (Page 20)",
+        "prompt": "これはL2の規則です。以下のテキストで、接続詞・副詞・補助動詞が漢字のまま使われていないか確認してください（例：「予め」→「あらかじめ」、「下さい」（補助動詞用法）→「ください」）。文脈を考慮し、本動詞の「下さい」（例：「水を下さい」）は漢字のままにしてください。"
+      },
+      {
+        "Rule_ID": "JTF_2_2_1_kanji",
+        "Level": "L1",
+        "Description": "特定の副詞などは、ひらがなではなく「漢字」で表記します。",
+        "Pattern/Logic": "Regex word boundary substitution using a target list. Replace specific hiragana words with kanji counterparts. Targets: いっさい->一切、かならず->必ず、おおいに->大いに、しいて->強いて、等。",
+        "Positive_Example": "必ず一切の責任を負う。",
+        "Negative_Example": "かならずいっさいの責任を負う。",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.2.1 ひらがなと漢字の使い分け (Page 21)",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_2_2",
+        "Level": "L3",
+        "Description": "算用数字と漢数字の使い分けについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 算用数字と漢数字の使い分け.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.2.2 算用数字と漢数字の使い分け",
+        "prompt": "これはL3の規則です。以下のテキストが「算用数字と漢数字の使い分けについて、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_2_2_3",
+        "Level": "L2",
+        "Description": "一部の助数詞に関する表記について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L2` logic appropriate for 一部の助数詞に関する表記. NOTE: Level changed from L1 to L2. 助数詞の表記（「ヶ」vs「カ」vs「か」vs「箇」など）は辞書照合が必要であり、単純な正規表現では対応不可。",
+        "Positive_Example": "3か月、1カ所（JTF推奨）",
+        "Negative_Example": "3ヶ月（公用文では不推奨）、1ヶ所",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.2.3 一部の助数詞に関する表記",
+        "prompt": "これはL2の規則です。以下のテキストで助数詞「ヶ」「箇」の使用を確認してください。JTFスタイルガイドでは「か」または「カ」を推奨しています（例：「3か月」「1カ所」）。"
+      },
+      {
+        "Rule_ID": "JTF_2_3_1_1",
+        "Level": "L1",
+        "Description": "全角文字と半角文字の間について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 全角文字と半角文字の間.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.3.1.1 全角文字と半角文字の間",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_3_1_2",
+        "Level": "L1",
+        "Description": "全角文字どうしについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 全角文字どうし.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.3.1.2 全角文字どうし",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_3_1_3",
+        "Level": "L1",
+        "Description": "半角文字どうしについて、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 半角文字どうし.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.3.1.3 半角文字どうし",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_3_2",
+        "Level": "L1",
+        "Description": "かっこ類と隣接する文字の間のスペースの有無について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for かっこ類と隣接する文字の間のスペースの有無.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.3.2 かっこ類と隣接する文字の間のスペースの有無",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_2_3_no_space",
+        "Level": "L1",
+        "Description": "半角文字と全角文字の間に半角スペースを入れない。",
+        "Pattern/Logic": "Regex finding spaces between half-width characters (e.g., `[a-zA-Z0-9]`) and full-width characters (e.g., `[ぁ-んァ-ヶ一-龠]`) and removing them. Example pattern: `(?<=[a-zA-Z0-9]) (?=[ぁ-んァ-ヶ一-龠])` or vice versa.",
+        "Positive_Example": "JTF標準",
+        "Negative_Example": "JTF 標準",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.3 文字間のスペース (Page 25)",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_1_1",
+        "Level": "L1",
+        "Description": "句点（。）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "文末には全角句点（。）を打つ。半角ピリオド（.）は文末の句点として使わない。見出し（タイトル・章・節の見出し）には句点を打たない。箇条書きの各項目が文の形（述語で終わる）の場合は句点を打つ。体言止め・名詞句の場合は句点を打たない。かぎかっこ（「」）の内側の文末には句点を打たない（詳細は JTF_3_1_1_kuten_brackets を参照）。Note: かぎかっこ内の句点省略については JTF_3_1_1_kuten_brackets ルールを参照のこと。",
+        "Positive_Example": "この機能を使用して、ファイルを保存します。/A氏は「5月に新製品を発売します」と述べました。",
+        "Negative_Example": "この機能を使用して、ファイルを保存します/A氏は「5月に新製品を発売します。」と述べました。",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.1.1 句点（。）",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_1_1_kuten_brackets",
+        "Level": "L1",
+        "Description": "文中にかぎかっこや丸かっこが入る場合は、閉じかっこの前に句点（。）を打ちません。",
+        "Pattern/Logic": "Regex matching period characters inside closing brackets. Replace `。」` with `」` and `。）」` or `。）` with `）` depending on the context.",
+        "Positive_Example": "A氏は「5月に新製品を発売します」と述べました。",
+        "Negative_Example": "A氏は「5月に新製品を発売します。」と述べました。",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.1.1 句点（。） (Page 26)",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_1_2",
+        "Level": "L2",
+        "Description": "読点（、）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L2` logic appropriate for 読点（、）.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.1.2 読点（、）",
+        "prompt": "これはL2の規則です。以下のテキストが「読点（、）について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_3_1_3",
+        "Level": "L1",
+        "Description": "ピリオド（.）、カンマ（,）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "日本語文中の句読点には全角句点（。）と読点（、）を使い、半角ピリオド（.）・半角カンマ（,）は和文の句読点として使わない。英文・欧文の引用・英語略語（e.g., etc., i.e.）中では半角ピリオド（.）・カンマ（,）をそのまま使う。数値の小数点には半角ピリオド（.）を使う（例：3.14、1.5倍）。正規表現で日本語文脈中の `.`→`。`、`,`→`、` を置換する際は、英数字前後のピリオド・カンマは対象外とする（lookaround `(?<=[^\\x00-\\x7E]),` → `、` など）。",
+        "Positive_Example": "データを処理します。次の画面に進みます。/英語の略語：e.g., etc., i.e.",
+        "Negative_Example": "データを処理します.次の画面に進みます./英語の略語：ｅ．ｇ．，ｅｔｃ．",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.1.3 ピリオド（.）、カンマ（,）",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_2_1",
+        "Level": "L2",
+        "Description": "感嘆符（！）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "感嘆符は全角（！）を使用する。文末に感嘆符を使用し、後に別の文が続く場合は直後に全角スペースを挿入する。具体的な実装・例外処理については JTF_3_2_1_exclamation を参照のこと。",
+        "Positive_Example": "驚きの速さ！ これが新製品のキャッチコピーでした。",
+        "Negative_Example": "驚きの速さ！これが新製品のキャッチコピーでした。",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.2.1 感嘆符（！）",
+        "prompt": "これはL2の規則です。以下のテキストが「感嘆符（！）について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_3_2_1_exclamation",
+        "Level": "L2",
+        "Description": "感嘆符（！）は全角で表記します。文末に感嘆符を使用し、後に別の文が続く場合は、直後に全角スペースを挿入します。",
+        "Pattern/Logic": "Regex mapping `!` to `！` and replacing cases where `！` is immediately followed by another character with `！　` (adding a full-width space).",
+        "Positive_Example": "驚きの速さ！ これが新製品のキャッチコピーでした。",
+        "Negative_Example": "驚きの速さ！これが新製品のキャッチコピーでした。",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.2.1 感嘆符（！） (Page 27)",
+        "prompt": "これはL2の規則です。以下のテキストが「感嘆符（！）は全角で表記します。文末に感嘆符を使用し、後に別の文が続く場合は、直後に全角スペースを挿入します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_3_2_2",
+        "Level": "L2",
+        "Description": "疑問符（？）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L2` logic appropriate for 疑問符（？）.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.2.2 疑問符（？）",
+        "prompt": "これはL2の規則です。以下のテキストが「疑問符（？）について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_3_2_2_question_mark",
+        "Level": "L2",
+        "Description": "疑問符（？）は全角で表記します。文末に疑問符を使用し、後に別の文が続く場合は、直後に全角スペースを挿入します。",
+        "Pattern/Logic": "Regex mapping `?` to `？` and replacing cases where `？` is immediately followed by another character with `？　` (adding a full-width space).",
+        "Positive_Example": "A社の成功の秘密とは？ この本ではそれをご紹介します。",
+        "Negative_Example": "A社の成功の秘密とは？この本ではそれをご紹介します。",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.2.2 疑問符（？） (Page 28)",
+        "prompt": "これはL2の規則です。以下のテキストが「疑問符（？）は全角で表記します。文末に疑問符を使用し、後に別の文が続く場合は、直後に全角スペースを挿入します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_3_2_3",
+        "Level": "L1",
+        "Description": "和文中のスラッシュは全角（／）を使用します。",
+        "Pattern/Logic": "TODO: Implement `L1` regex to replace half-width slash `/` with full-width slash `／` in Japanese text context. NOTE: Level changed from L2 to L1. The core rule (全角化) is a simple regex substitution. Half-width slashes in URLs, file paths, or English text should be excluded.",
+        "Positive_Example": "入力／出力",
+        "Negative_Example": "入力/出力（和文中の半角スラッシュ）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.2.3 スラッシュ（/）（／）",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_2_4",
+        "Level": "L2",
+        "Description": "中黒（・）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L2` logic appropriate for 中黒（・）.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.2.4 中黒（・）",
+        "prompt": "これはL2の規則です。以下のテキストが「中黒（・）について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_3_2_5",
+        "Level": "L1",
+        "Description": "波線（〜）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 波線（〜）.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.2.5 波線（〜）",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_2_6",
+        "Level": "L1",
+        "Description": "ハイフン（-）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for ハイフン（-）.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.2.6 ハイフン（-）",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_2_7",
+        "Level": "L1",
+        "Description": "コロン（：）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for コロン（：）.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.2.7 コロン（：）",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_2_8",
+        "Level": "L1",
+        "Description": "セミコロン（；）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for セミコロン（；）.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.2.8 セミコロン（；）",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_2_9",
+        "Level": "L2",
+        "Description": "ダッシュ（―）について、JTFスタイルガイドの基準に従って表記を統一します。ダッシュは二つ重ねて使用します（――）。",
+        "Pattern/Logic": "TODO: Implement `L2` logic for ダッシュ. NOTE: Level changed from L1 to L2. The rule requires: (1) ensuring ダッシュ is the correct character (― U+2015, not ー U+30FC or — U+2014); (2) checking that ダッシュ is used in pairs (――). Context-dependent judgment required.",
+        "Positive_Example": "東京――大阪間の距離",
+        "Negative_Example": "東京―大阪間の距離（一本のみ）、東京ー大阪間（長音符号の誤用）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.2.9 ダッシュ（―）",
+        "prompt": "これはL2の規則です。以下のテキストでダッシュ（―）の使用を確認してください。JTFでは二倍ダッシュ（――）を使用し、一本ダッシュや長音符号（ー）との混用を避けます。"
+      },
+      {
+        "Rule_ID": "JTF_3_3_1",
+        "Level": "L1",
+        "Description": "丸かっこ（）について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 丸かっこ（）.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.3.1 丸かっこ（）",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_3_1_parentheses_space",
+        "Level": "L1",
+        "Description": "かっこの外側、内側ともにスペースを入れません。",
+        "Pattern/Logic": "Regex identifying any spaces (half or full-width) immediately inside or outside Japanese brackets like `「 `, ` 」`, `（ `, ` ）` and removing the spaces.",
+        "Positive_Example": "クォータ（割り当て）",
+        "Negative_Example": "クォータ （割り当て）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 2.3.2 かっこ類と隣接する文字の間のスペースの有無 (Page 26)",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_3_2",
+        "Level": "L1",
+        "Description": "大かっこ［］について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 大かっこ［］.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.3.2 大かっこ［］",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_3_3",
+        "Level": "L1",
+        "Description": "かぎかっこ「」について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for かぎかっこ「」.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.3.3 かぎかっこ「」",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_3_4",
+        "Level": "L1",
+        "Description": "二重かぎかっこ『』について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 二重かぎかっこ『』.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.3.4 二重かぎかっこ『』",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_3_5",
+        "Level": "L1",
+        "Description": "二重引用符\" \"について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 二重引用符\" \".",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.3.5 二重引用符\" \"",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_3_6",
+        "Level": "L1",
+        "Description": "中かっこ{ }について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 中かっこ{ }.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.3.6 中かっこ{ }",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_3_7",
+        "Level": "L1",
+        "Description": "山かっこ〈 〉について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 山かっこ〈 〉.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.3.7 山かっこ〈 〉",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_3_8",
+        "Level": "L1",
+        "Description": "一重引用符' 'について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 一重引用符' '.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.3.8 一重引用符' '",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_3_3_brackets_fullwidth",
+        "Level": "L1",
+        "Description": "丸かっこ（）、大かっこ［］、かぎかっこ「」、二重かぎかっこ『』などは原則として全角で表記します。",
+        "Pattern/Logic": "Regex substitution that converts half-width brackets like `()`, `[]`, `｢｣` to their full-width equivalents `（）`, `［］`, `「」`.",
+        "Positive_Example": "［ファイル］メニュー",
+        "Negative_Example": "[ファイル]メニュー",
+        "Source_Reference": "JTF日本語標準スタイルガイド 3.3 かっこ (Page 30)",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_4_1",
+        "Level": "L3",
+        "Description": "単位系について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L3` logic appropriate for 単位系.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.1 単位系",
+        "prompt": "これはL3の規則です。以下のテキストが「単位系について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_4_2",
+        "Level": "L2",
+        "Description": "単位記号の表記について、JTFスタイルガイドの基準に従って表記を統一します。SI単位系の記号を正しく使用します。",
+        "Pattern/Logic": "TODO: Implement `L2` logic for 単位記号. NOTE: Level changed from L3 to L2. Unit symbol correctness (kg not Kg, ℃ not °C, MHz not mhz) can be checked via dictionary/regex, not requiring full LLM judgment.",
+        "Positive_Example": "10 kg、25 ℃、100 MHz",
+        "Negative_Example": "10 Kg（大文字誤り）、25 °C（記号不統一）、100 mhz（小文字誤り）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.2 単位記号の表記",
+        "prompt": "これはL2の規則です。以下のテキストで単位記号の表記を確認してください。SI単位系の記号（kg、m、℃、MHzなど）の大文字・小文字・記号形式が正しいか確認し、誤りがあれば指摘してください。"
+      },
+      {
+        "Rule_ID": "JTF_4_3_1",
+        "Level": "L2",
+        "Description": "時間、時刻について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L2` logic appropriate for 時間、時刻.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.1 時間、時刻",
+        "prompt": "これはL2の規則です。以下のテキストが「時間、時刻について、JTFスタイルガイドの基準に従って表記を統一します。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "JTF_4_3_10",
+        "Level": "L1",
+        "Description": "割合について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 割合.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.10 割合",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_4_3_11",
+        "Level": "L1",
+        "Description": "角度について、JTFスタイルガイドの基準に従って表記を統一します。",
+        "Pattern/Logic": "TODO: Implement `L1` logic appropriate for 角度.",
+        "Positive_Example": "（正しい表記の例）",
+        "Negative_Example": "（誤った表記の例）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.11 角度",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_4_3_12",
+        "Level": "L2",
+        "Description": "記憶容量について、単位（B、KB、MB、GB、TB）を正しく表記します。",
+        "Pattern/Logic": "TODO: Implement `L2` dictionary-based check for 記憶容量 unit symbols. NOTE: Level changed L1→L2. Valid: B, KB, MB, GB, TB（大文字）。JTFでは2進法接頭辞（KiB等）は原則使用しない。",
+        "Positive_Example": "容量 512 GB、メモリ 16 MB",
+        "Negative_Example": "容量 512 gb（小文字誤り）、メモリ 16 mb",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.12 記憶容量",
+        "prompt": "これはL2の規則です。以下のテキストで記憶容量の単位記号（B、KB、MB、GB、TB）の表記を確認し、小文字の誤りを指摘してください。"
+      },
+      {
+        "Rule_ID": "JTF_4_3_13",
+        "Level": "L2",
+        "Description": "通貨について、通貨記号（¥、$、€）や通貨コード（JPY、USD）を正しく表記します。",
+        "Pattern/Logic": "TODO: Implement `L2` context-aware check for 通貨 notation. NOTE: Level changed L1→L2. Currency symbols and codes require context judgment (whether to use symbol vs full name vs ISO code). Rule: ¥ prefix for yen, no space between symbol and numeral.",
+        "Positive_Example": "¥1,000、$100、€50",
+        "Negative_Example": "¥ 1,000（記号と数字の間にスペース）、円1,000（記号の位置誤り）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.13 通貨",
+        "prompt": "これはL2の規則です。以下のテキストで通貨記号（¥、$、€）の位置と数字との間のスペースを確認してください。"
+      },
+      {
+        "Rule_ID": "JTF_4_3_2",
+        "Level": "L1",
+        "Description": "長さについて、SI単位（m、cm、mm、km）を正しく表記します。",
+        "Pattern/Logic": "Regex matching of unit symbol strings. Valid units: mm, cm, m, km（すべて小文字）。誤表記例：MM, Cm, KM などを正規表現でフラグ付け。",
+        "Positive_Example": "全長 1.5 m、厚さ 3 mm",
+        "Negative_Example": "全長 1.5 M（大文字誤り）、厚さ 3 MM",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.2 長さ",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_4_3_3",
+        "Level": "L1",
+        "Description": "質量について、SI単位（g、kg、t）を正しく表記します。",
+        "Pattern/Logic": "Regex matching of unit symbol strings. Valid units: mg, g, kg, t。誤表記例：Kg, KG, Gr などを正規表現でフラグ付け。",
+        "Positive_Example": "体重 60 kg、荷物 500 g",
+        "Negative_Example": "体重 60 Kg（大文字誤り）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.3 質量",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_4_3_4",
+        "Level": "L1",
+        "Description": "面積、体積について、SI単位（m²、m³、L）を正しく表記します。",
+        "Pattern/Logic": "Regex matching of unit symbol strings. Valid units: cm², m², km², cm³, m³, mL, L。「m2」「m3」など上付き文字なしの誤表記を正規表現でフラグ付け。",
+        "Positive_Example": "床面積 75 m²、容量 500 mL",
+        "Negative_Example": "床面積 75 m2（上付き文字なし）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.4 面積、体積",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_4_3_5",
+        "Level": "L1",
+        "Description": "電気について、SI単位（V、A、W、Ω、Hz）を正しく表記します。",
+        "Pattern/Logic": "Regex matching of unit symbol strings. Valid units: V, mV, A, mA, W, kW, MW, Ω, kΩ。大文字小文字の区別が重要（v, w などの小文字誤りを検出）。",
+        "Positive_Example": "電圧 100 V、消費電力 60 W",
+        "Negative_Example": "電圧 100 v（小文字誤り）、消費電力 60 w",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.5 電気",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_4_3_6",
+        "Level": "L1",
+        "Description": "温度について、摂氏（℃）を正しく表記します。",
+        "Pattern/Logic": "Regex matching of temperature unit symbols. ℃ (U+2103) を使用する。`°C`（度記号＋Cの2文字の組み合わせ）との混用を検出して修正する。",
+        "Positive_Example": "室温 25℃",
+        "Negative_Example": "室温 25°C（別字符の組み合わせ）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.6 温度",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_4_3_7",
+        "Level": "L1",
+        "Description": "周波数について、SI単位（Hz、kHz、MHz、GHz）を正しく表記します。",
+        "Pattern/Logic": "Regex matching of frequency unit symbol strings. Valid: Hz, kHz, MHz, GHz, THz。k は小文字、M・G・T は大文字。誤表記（hz, khz, mhz, ghz）を正規表現でフラグ付け。",
+        "Positive_Example": "50 Hz、2.4 GHz",
+        "Negative_Example": "50 hz（小文字誤り）、2.4 ghz",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.7 周波数",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_4_3_8",
+        "Level": "L1",
+        "Description": "速度について、SI単位（m/s、km/h）を正しく表記します。",
+        "Pattern/Logic": "Regex matching of speed unit symbol strings. Use m/s または km/h（小文字）。誤表記（km/H, M/S など大文字誤り）を正規表現でフラグ付け。",
+        "Positive_Example": "時速 60 km/h、秒速 9.8 m/s",
+        "Negative_Example": "時速 60 km/H（大文字誤り）",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.8 速度",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "JTF_4_3_9",
+        "Level": "L1",
+        "Description": "伝送速度について、単位（bps、kbps、Mbps、Gbps）を正しく表記します。",
+        "Pattern/Logic": "Regex matching of data rate unit symbol strings. Valid: bps, kbps, Mbps, Gbps, Tbps。k は小文字、M・G・T は大文字、b は小文字。誤表記（MBPS, mbps, MBps など）を正規表現でフラグ付け。",
+        "Positive_Example": "通信速度 100 Mbps",
+        "Negative_Example": "通信速度 100 MBPS（すべて大文字）、100 mbps",
+        "Source_Reference": "JTF日本語標準スタイルガイド 4.3.9 伝送速度",
+        "prompt": "none"
+      }
+    ]
+  },
+  {
+    "Book": {
+      "Title": "原稿編集 第2版",
+      "Author": "日本エディタースクール",
+      "Year": "2021",
+      "ISBN": "978-4-88888-404-2"
     },
-    {
-        "Book": {
-            "Title": "日本語表記",
-            "Author": "日本エディタースクール",
-            "Year": "2011",
-            "ISBN": "978-4-88888-397-9"
-        },
-        "Rules": [
-            {
-                "Rule_ID": "nihongo_hyouki_10",
-                "Level": "L1",
-                "Description": "単位の表し方",
-                "Pattern/Logic": "単位記号は半角英字で表記する（例：kg、m、s、Hz、MB、°C）。全角の単位記号（ｋｇ、Ｍなど）は使わない。正規表現 `[Ａ-Ｚａ-ｚ]` にマッチした全角英字を半角に変換する。数値と単位記号の間にはスペースを入れない（例：5kg、100MHz）。SI接頭辞の大文字・小文字を正確に区別する（k=キロ, M=メガ, G=ギガ）。旧来の非SI単位（尺・寸・匁・坪など）の使用は避け、SI単位を優先する。",
-                "Positive_Example": "容量は500GBです。/温度は25°Cに設定します。/重さは3.5kgです。",
-                "Negative_Example": "容量は５００ＧＢです。/温度は25℃に設定します（単位記号の全角使用）。/重さは3.5Kgです（接頭辞の大文字誤り）。",
-                "Source_Reference": "p.48",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_11",
-                "Level": "L1",
-                "Description": "記述記号の注意点",
-                "Pattern/Logic": "かぎかっこ（「」）は引用・強調・語句の提示に使う。二重かぎかっこ（『』）は書名・誌名・作品名に使う。欧文スタイルのダブルクォート（\"\"）は日本語文中では使わない。省略記号には全角三点リーダ（…）を2つ連続（……）して使う。半角ピリオド3つ（...）は使わない。ダッシュは全角ダッシュ（—）を2つ連続（——）して使う（倍角ダッシュ）。括弧（（））は補足説明・読み仮名・英訳などに使い、始め括弧の前・終わり括弧の後にはスペースを入れない。",
-                "Positive_Example": "彼は「今すぐ出発しよう」と言った。/『坊っちゃん』は夏目漱石の代表作です。/言葉を選ぶ……それが大切なことです。",
-                "Negative_Example": "彼は\"今すぐ出発しよう\"と言った。/「坊っちゃん」（書名にかぎかっこを使用）/言葉を選ぶ...それが大切なことです。",
-                "Source_Reference": "p.54",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_12",
-                "Level": "L2",
-                "Description": "その他の表記の注意点",
-                "Pattern/Logic": "TODO",
-                "Positive_Example": "TODO",
-                "Negative_Example": "TODO",
-                "Source_Reference": "p.59",
-                "prompt": "これはL2の規則です。以下のテキストが「その他の表記の注意点」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_1",
-                "Level": "L3",
-                "Description": "原稿作成と表記の扱い",
-                "Pattern/Logic": "TODO",
-                "Positive_Example": "TODO",
-                "Negative_Example": "TODO",
-                "Source_Reference": "p.3",
-                "prompt": "これはL3の規則です。以下のテキストが「原稿作成と表記の扱い」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_2",
-                "Level": "L3",
-                "Description": "文体について",
-                "Pattern/Logic": "TODO",
-                "Positive_Example": "TODO",
-                "Negative_Example": "TODO",
-                "Source_Reference": "p.6",
-                "prompt": "これはL3の規則です。以下のテキストが「文体について」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_3_auxiliary_verbs",
-                "Level": "L2",
-                "Description": "補助動詞（他の動詞の後に付いて補助的な意味を添える動詞）は、原則として仮名で表記する。",
-                "Pattern/Logic": "形態素解析により、テ形・連用形に接続する補助動詞用法のみを対象にする。本動詞用法の「行く」「来る」「見る」などは除外する。\n1. 「〜てあげる、〜ていく、〜ていただく、〜ておく、〜てください、〜てくる、〜てしまう、〜てみる、〜てよい」等の「て」に続く動詞をチェック。\n2. 「〜かもしれない、〜にすぎない」も含む。",
-                "Positive_Example": "教えてあげる、見てみる、読んでおく、寒くなってくる、間違いかもしれない",
-                "Negative_Example": "教えて上げる、見て見る、読んで置く、寒くなって来る、間違いかも知れない",
-                "Source_Reference": "p.12",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_3_formal_nouns",
-                "Level": "L2",
-                "Description": "形式名詞（実質的な意味が薄れている名詞）は、原則として仮名で表記する。",
-                "Pattern/Logic": "形式名詞用法のみを対象とし、実質名詞用法は除外する。形態素解析または構文パターン判定を前提とする。\n1. 「うち、おり、こと、たび、ため、とおり、とき、ところ、はず、ほど、まま、もの、ゆえ、よう、よし、わけ」をチェック。\n2. 文脈が実質名詞（例：事柄、場所）ではなく形式名詞（例：〜すること、〜なところ）の場合は仮名にする。",
-                "Positive_Example": "すること、行くとき、そのはずだ、わけではない",
-                "Negative_Example": "する事、行く時、その筈だ、訳ではない",
-                "Source_Reference": "p.12",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_3_ijidoukun_au",
-                "Level": "L2",
-                "Description": "「あう」の使い分けを文脈に応じて正しく行う。",
-                "Pattern/Logic": "1. 会う：人と人が顔を合わせる。",
-                "Positive_Example": "友人に会う、意見が合う、災難に遭う",
-                "Negative_Example": "友人に合う、災難に会う、災難に合う",
-                "Source_Reference": "p.11",
-                "prompt": "これはL2の規則です。以下のテキストが「「あう」の使い分けを文脈に応じて正しく行う。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_3_ijidoukun_sawaru",
-                "Level": "L2",
-                "Description": "「さわる」の使い分けを文脈に応じて正しく行う。",
-                "Pattern/Logic": "1. 触る：手で触れる、関わり合う（展示品に触る、問題に触る等）。",
-                "Positive_Example": "展示品に触る、激務が体に障る、気に障る言い方",
-                "Negative_Example": "展示品に障る、体に触る（「体に触れる」の意味でない場合）",
-                "Source_Reference": "p.11",
-                "prompt": "これはL2の規則です。以下のテキストが「「さわる」の使い分けを文脈に応じて正しく行う。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_3",
-                "Level": "L2",
-                "Description": "漢字の用い方",
-                "Pattern/Logic": "TODO",
-                "Positive_Example": "TODO",
-                "Negative_Example": "TODO",
-                "Source_Reference": "p.9",
-                "prompt": "これはL2の規則です。以下のテキストが「漢字の用い方」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_4",
-                "Level": "L2",
-                "Description": "漢字の字体",
-                "Pattern/Logic": "TODO",
-                "Positive_Example": "TODO",
-                "Negative_Example": "TODO",
-                "Source_Reference": "p.15",
-                "prompt": "これはL2の規則です。以下のテキストが「漢字の字体」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_5",
-                "Level": "L2",
-                "Description": "人名用漢字の使用",
-                "Pattern/Logic": "TODO",
-                "Positive_Example": "TODO",
-                "Negative_Example": "TODO",
-                "Source_Reference": "p.22",
-                "prompt": "これはL2の規則です。以下のテキストが「人名用漢字の使用」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_6_ji_zu_di_du_exceptions",
-                "Level": "L1",
-                "Description": "現代仮名遣いにおける「じ・ず」と「ぢ・づ」の例外的な語彙をチェック。",
-                "Pattern/Logic": "1. 原則「じ・ず」だが、「ぢ・づ」が正しい語：ちぢむ、つづく、はなぢ、こづかい、みかづき等。",
-                "Positive_Example": "ちぢむ、はなぢ、いちじく、地面",
-                "Negative_Example": "ちじむ、はなじ、いちぢく、ぢめん",
-                "Source_Reference": "p.27",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_6",
-                "Level": "L1",
-                "Description": "現代仮名遣いの注意点",
-                "Pattern/Logic": "TODO",
-                "Positive_Example": "TODO",
-                "Negative_Example": "TODO",
-                "Source_Reference": "p.26",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_7_compound_nouns_no_okurigana",
-                "Level": "L1",
-                "Description": "慣用が固定しているため送り仮名を付けない複合名詞のリスト。",
-                "Pattern/Logic": "1. 役職・身分：関取、頭取、取締役、事務取扱。",
-                "Positive_Example": "取締役、物語、日付、受付、献立",
-                "Negative_Example": "取り締まり役、物書き（文脈による）、日付け、受け付け、献じ立て",
-                "Source_Reference": "p.33-34",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_7",
-                "Level": "L2",
-                "Description": "送り仮名の付け方",
-                "Pattern/Logic": "活用のある語（動詞・形容詞・形容動詞）は活用語尾から送り仮名を付ける（本則）。例：書く、読む、起きる、美しい、暖かだ。動詞・形容詞の名詞形（転成名詞）は語幹に送り仮名を付ける（例：読み、走り）。送り仮名の例外（慣用として固定しているもの）については nihongo_hyouki_7_verbs_adjectives_exceptions を参照。慣用として送り仮名を省略する複合名詞については nihongo_hyouki_7_compound_nouns_no_okurigana を参照。形態素解析により活用形を判定し、送り仮名の誤りを検出する。",
-                "Positive_Example": "書く（動詞本則）、明るい（形容詞本則）、贈る（動詞本則）、動き（名詞転成）",
-                "Negative_Example": "書（送り仮名省略）、明い（語尾省略）、贈（語尾省略）",
-                "Source_Reference": "p.29",
-                "prompt": "これはL2の規則です。以下のテキストが「送り仮名の付け方」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_7_verbs_adjectives_exceptions",
-                "Level": "L2",
-                "Description": "送り仮名の例外（活用のある語）。本則（活用語尾を送る）に合わないが、慣用として固定しているものをチェック。",
-                "Pattern/Logic": "1. 語幹が「し」で終わる形容詞：著しい、惜しい、悔しい、珍しい（「著い」などはNG）。",
-                "Positive_Example": "明るい、小さい、著しい、暖かだ、教わる",
-                "Negative_Example": "明い、小い、著い、暖だ、教る",
-                "Source_Reference": "p.30-31",
-                "prompt": "これはL2の規則です。以下のテキストが「送り仮名の例外（活用のある語）。本則（活用語尾を送る）に合わないが、慣用として固定しているものをチェック。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_8",
-                "Level": "L2",
-                "Description": "外来語の表記",
-                "Pattern/Logic": "外来語は原語の発音に近いカタカナで表記する。半角カタカナ（ｱｲｳ…）は使わない。語末の \"-er\"、\"-or\"、\"-ar\"、\"-re\" 等に由来する音には長音符（ー）を付ける（例：コンピューター、プリンター、プロセッサー）。ただし慣用として長音符なしが定着している語は例外（バス、クラス、ウイルス）。人名・地名などの固有名詞は広く通用している日本語表記を優先する（例：ニューヨーク、ロンドン）。辞書参照または定着語リストと照合して表記の統一を促す。",
-                "Positive_Example": "コンピューター、プリンター、ファイル、インストール、ニューヨーク",
-                "Negative_Example": "コンピュータ（長音符省略）、プリンタ（長音符省略）、ﾌｧｲﾙ（半角カタカナ）",
-                "Source_Reference": "p.36",
-                "prompt": "これはL2の規則です。以下のテキストが「外来語の表記」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "nihongo_hyouki_9",
-                "Level": "L1",
-                "Description": "数字の表記",
-                "Pattern/Logic": "横組みの文書では算用数字（半角アラビア数字）を使用する。全角数字は使用しない。正規表現 `[０-９]` にマッチした全角数字を対応する半角数字に変換する。縦組みの文書では漢数字を用いる。ただし、コンピュータ関係・理科・数学などの数値は算用数字のままでよい。「一つ」「二つ」「一人」「二人」など和語で数を数える場合は漢字を使う。3桁ごとのコンマ区切りには半角コンマ（,）を使う（例：1,000,000）。",
-                "Positive_Example": "3,000円の製品が256台入荷しました。/解像度は1,920×1,080ピクセルです。",
-                "Negative_Example": "３，０００円の製品が２５６台入荷しました。/解像度は１，９２０×１，０８０ピクセルです。",
-                "Source_Reference": "p.42",
-                "prompt": "none"
-            }
-        ]
+    "Rules": [
+      {
+        "Rule_ID": "rule_ME2_10_romaji",
+        "Level": "L2",
+        "Description": "原則として「ローマ字のつづり方」の第1表（訓令式）に従うが、国際関係などの慣例がある場合は第2表（ヘボン式）も許容する。",
+        "Pattern/Logic": "訓令式（si, ti, tu, hu）を基本とするが、プロジェクトの方針でヘボン式（shi, chi, tsu, fu）に統一することもある。",
+        "Positive_Example": "huzi (訓令式), fuji (ヘボン式)",
+        "Negative_Example": "fuzi (混在)",
+        "Source_Reference": "p. 29, 73",
+        "prompt": "これはL2の規則です。以下のテキストが「原則として「ローマ字のつづり方」の第1表（訓令式）に従うが、国際関係などの慣例がある場合は第2表（ヘボン式）も許容する。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_ME2_11_vertical_numbers",
+        "Level": "L1",
+        "Description": "縦組では原則として漢数字を使用する。",
+        "Pattern/Logic": "数値を漢数字（一、二、三、十、百、万など）で表記。2桁の数字には「十」を入れる方針もある。",
+        "Positive_Example": "二〇一二年、昭和六三年、五二歳、十四人、二十歳",
+        "Negative_Example": "2012年、14人",
+        "Source_Reference": "p. 29, 73",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "rule_ME2_12_horizontal_numbers",
+        "Level": "L1",
+        "Description": "横組では原則としてアラビア数字（算用数字）を使用する。",
+        "Pattern/Logic": "数値をアラビア数字（1, 2, 3）で表記。3桁ごとにカンマを入れるか、4桁ごとに万、億を入れる方針を決める。",
+        "Positive_Example": "1998年、5,000円、11億9988万2255",
+        "Negative_Example": "一九九八年、五千円",
+        "Source_Reference": "p. 31, 73",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "rule_ME2_13_unit_symbols",
+        "Level": "L1",
+        "Description": "縦組では原則として片仮名（メートル、グラム）、横組では欧字（m, g）の記号を使用する。",
+        "Pattern/Logic": "縦組/横組に応じて単位表記（片仮名/欧字）を使い分ける。欧字記号の場合は、数値との間に四分アキ（半角スペース相当）を入れる。",
+        "Positive_Example": "50 km (横組)、50キロメートル (縦組)",
+        "Negative_Example": "50km (横組でスペースなし)、50 m (縦組で欧字)",
+        "Source_Reference": "p. 34, 73",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "rule_ME2_14_pre_post_symbols",
+        "Level": "L1",
+        "Description": "円(¥)、ドル($)、パーセント(%)などの記號は、數字との間にスペースを入れずベタで組む。",
+        "Pattern/Logic": "前置（¥, $）は數字の前に、後置（%, ‰）は數字の後に配置し、密着させる。",
+        "Positive_Example": "¥300, 25%",
+        "Negative_Example": "¥ 300, 25 %",
+        "Source_Reference": "p. 37",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "rule_ME2_15_punctuation",
+        "Level": "L1",
+        "Description": "句読点は、縦組では〔、。〕を、横組では目的や内容に合わせて〔,.〕〔、。〕〔,。〕のいずれかに統一する。",
+        "Pattern/Logic": "プロジェクト全体で一貫した句読点セット（例：横組なら「、。」）を使用しているか確認する。",
+        "Positive_Example": "本書は、原稿編集についてまとめたものです。",
+        "Negative_Example": "本書は，原稿編集についてまとめたものです．（混在）",
+        "Source_Reference": "p. 37, 74",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "rule_ME2_16_brackets",
+        "Level": "L2",
+        "Description": "括弧類（「」、（）、『』など）の使い分けを統一し、文末の句点との位置関係を整理する。",
+        "Pattern/Logic": "一重かぎ、二重かぎ、パーレンの入れ子構造や、文末の句点が括弧の内か外かを確認する。",
+        "Positive_Example": "「原稿編集（原稿整理）の方法をまとめたものです。」",
+        "Negative_Example": "「原稿編集（原稿整理）の方法をまとめたものです」。",
+        "Source_Reference": "p. 37, 74",
+        "prompt": "これはL2の規則です。以下のテキストが「括弧類（「」、（）、『』など）の使い分けを統一し、文末の句点との位置関係を整理する。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_ME2_17_repetition_symbols",
+        "Level": "L1",
+        "Description": "くり返し符号（々、ゝ、ゞ）を適切に使用する。",
+        "Pattern/Logic": "同じ漢字が続く場合に「々」を使用し、平仮名・片仮名のくり返し（ゝ、ゞ、ヽ、ヾ）は児童書などを除き原則として使用しない。",
+        "Positive_Example": "人々、国々、ときどき",
+        "Negative_Example": "人びと、国ぐに（一般書では「々」が一般的）",
+        "Source_Reference": "p. 39",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "rule_ME2_18_trademarks",
+        "Level": "L3",
+        "Description": "特定の商品名は避け、なるべく普通名詞に言い換える。",
+        "Pattern/Logic": "商標（宅急便、セロテープ、ゼロックス）を検出し、一般名称（宅配便、セロハンテープ、コピー）に置換を検討。",
+        "Positive_Example": "宅配便で送る。、セロハンテープで貼る。",
+        "Negative_Example": "宅急便で送る。、セロテープで貼る。",
+        "Source_Reference": "p. 39",
+        "prompt": "これはL3の規則です。以下のテキストが「特定の商品名は避け、なるべく普通名詞に言い換える。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_ME2_19_ruby",
+        "Level": "L3",
+        "Description": "難読文字や専門用語にはルビ（振り仮名）を振る。",
+        "Pattern/Logic": "常用漢字外の漢字や、誤読しやすい語にルビが付いているか確認する。熟語全体に振る（熟語ルビ）か、一字ずつ振る（モノルビ）かの方針を統一。",
+        "Positive_Example": "摯（しん）実（じつ）、真（しん）摯（し）",
+        "Negative_Example": "摯（し）実",
+        "Source_Reference": "p. 39, 74",
+        "prompt": "これはL3の規則です。以下のテキストが「難読文字や専門用語にはルビ（振り仮名）を振る。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_ME2_1_style_consistency",
+        "Level": "L3",
+        "Description": "文体（です・ます調とだ・である調）の不統一を避け、本の内容や読者層に合わせていずれかに統一する。",
+        "Pattern/Logic": "文末表現をスキャンし、「です・ます」と「だ・である」が混在していないか確認する。",
+        "Positive_Example": "本書は、原稿編集の方法についてまとめたものです。（敬体で統一）",
+        "Negative_Example": "本書は、原稿編集の方法についてまとめたものである。です。",
+        "Source_Reference": "p. 18, 72",
+        "prompt": "これはL3の規則です。以下のテキストが「文体（です・ます調とだ・である調）の不統一を避け、本の内容や読者層に合わせていずれかに統一する。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_ME2_20_emphasis_points",
+        "Level": "L2",
+        "Description": "強調したい語句には圏点（傍点）を付ける。",
+        "Pattern/Logic": "縦組では読点（ヽ）、横組では中黒（・）を文字の上に配置し、強調を表現する。",
+        "Positive_Example": "・・・",
+        "Negative_Example": "圏点が不統一（一部だけ違う記号など）",
+        "Source_Reference": "p. 40",
+        "prompt": "これはL2の規則です。以下のテキストが「強調したい語句には圏点（傍点）を付ける。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_ME2_2_kanji_usage",
+        "Level": "L2",
+        "Description": "常用漢字を基準とし、表外漢字（常用漢字以外の漢字）はなるべく平仮名にするか、適切な別の言葉に言い換える。",
+        "Pattern/Logic": "常用漢字表に含まれない漢字を検出し、ルビを振るか、平仮名に変更するかを検討する。",
+        "Positive_Example": "修正を加える。（「修正」は常用漢字）",
+        "Negative_Example": "修正を施す。（「施」は常用漢字だが、文脈により言い換え検討）",
+        "Source_Reference": "p. 19, 72",
+        "prompt": "これはL2の規則です。以下のテキストが「常用漢字を基準とし、表外漢字（常用漢字以外の漢字）はなるべく平仮名にするか、適切な別の言葉に言い換える。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_ME2_3_kana_words",
+        "Level": "L2",
+        "Description": "代名詞、副詞、接続詞、助詞、助動詞などは、原則として平仮名（ひらく）で書き表す。",
+        "Pattern/Logic": "指定されたリスト（余り、至って、及び、並びに、又は、等）に基づいて漢字を平仮名に変換。",
+        "Positive_Example": "更に検討する。 -> さらに検討する。",
+        "Negative_Example": "余り、恐らく、或いは、及び、並びに、等",
+        "Source_Reference": "p. 20",
+        "prompt": "これはL2の規則です。以下のテキストが「代名詞、副詞、接続詞、助詞、助動詞などは、原則として平仮名（ひらく）で書き表す。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_ME2_4_kanji_font",
+        "Level": "L1",
+        "Description": "常用漢字の字体は、常用漢字表に示されている字体（通用字体）を使用する。いわゆる康煕字典体（旧字体）は避ける。",
+        "Pattern/Logic": "旧字体（例：榮、衞、曉）を検出し、新字体（栄、衛、暁）に置換する。",
+        "Positive_Example": "栄、衛、暁、島、杯、富",
+        "Negative_Example": "榮、衞、曉、嶋、盃、冨",
+        "Source_Reference": "p. 22, 72",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "rule_ME2_5_homophones",
+        "Level": "L3",
+        "Description": "同音・同訓異義語の誤変換や使い分けに注意する。",
+        "Pattern/Logic": "誤りやすいペア（対照/対象、異議/意義、回答/解答）の文脈判断。",
+        "Positive_Example": "対象とする読者層を考える。",
+        "Negative_Example": "対照とする読者層を考える。",
+        "Source_Reference": "p. 25",
+        "prompt": "これはL3の規則です。以下のテキストが「同音・同訓異義語の誤変換や使い分けに注意する。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_ME2_6_kana_usage",
+        "Level": "L2",
+        "Description": "原則として「現代仮名遣い」に従う。",
+        "Pattern/Logic": "「じ・ず」を原則とし、「ぢ・づ」は二語の連合などで必要な場合のみ使用する。オ列の長音などは「う」で表すが、例外（お、おおきい、とおる、とお（十））に注意。",
+        "Positive_Example": "世界中（せかいじゅう）、縮む（ちぢむ）、続く（つづく）、鼻血（はなぢ）",
+        "Negative_Example": "せかいぢゆう、ちじむ、つずく、はなじ",
+        "Source_Reference": "p. 26, 73",
+        "prompt": "これはL2の規則です。以下のテキストが「原則として「現代仮名遣い」に従う。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_ME2_7_okurigana",
+        "Level": "L2",
+        "Description": "内閣告示の「送り仮名の付け方」の本則を基本とする。",
+        "Pattern/Logic": "通則1（活用のある語）、通則2（活用のない語）などに従い、不統一にならないように整理する。",
+        "Positive_Example": "終わる、答え、願う、行なう（「行う」も本則だが、統一する）",
+        "Negative_Example": "終る、答、願、行う（混在させない）",
+        "Source_Reference": "p. 27, 73",
+        "prompt": "これはL2の規則です。以下のテキストが「内閣告示の「送り仮名の付け方」の本則を基本とする。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_ME2_8_katakana",
+        "Level": "L1",
+        "Description": "外国の人名・地名、外来語、擬声語・擬音語、動植物名などは片仮名で表記する。",
+        "Pattern/Logic": "特定のカテゴリー（外来語、動植物名）を検出し、片仮名で表記されているか確認する。",
+        "Positive_Example": "スキャナー、ネコ、ワンワン",
+        "Negative_Example": "すきゃなー、猫（一般書では「ねこ」または「ネコ」）、わんわん",
+        "Source_Reference": "p. 27, 73",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "rule_ME2_9_foreign_words",
+        "Level": "L1",
+        "Description": "外来語の末尾の長音符号「ー」は、原則としてア列の長音とし、長音符号を用いる。",
+        "Pattern/Logic": "3音以上の言葉（英語の-er, -or, -arなど）で、長音符号を省略しない。",
+        "Positive_Example": "スキャナー、コンピューター、フォルダー",
+        "Negative_Example": "スキャナ、コンピュータ、フォルダ",
+        "Source_Reference": "p. 28, 73",
+        "prompt": "none"
+      }
+    ]
+  },
+  {
+    "Book": {
+      "Title": "日本語表記",
+      "Author": "日本エディタースクール",
+      "Year": "2011",
+      "ISBN": "978-4-88888-397-9"
     },
-    {
-        "Book": {
-            "Title": "現代仮名遣い",
-            "Author": "文部科学省",
-            "Year": "1986",
-            "ISBN": "none"
-        },
-        "Rules": [
-            {
-                "Rule_ID": "rule_GK_2_1_particle_o",
-                "Level": "L1",
-                "Description": "助詞の「を」は，「を」と書く。",
-                "Pattern/Logic": "助詞として用いられる場合は「を」を使用する。「お」は使用しない。",
-                "Positive_Example": "本を読む",
-                "Negative_Example": "本をお読む",
-                "Source_Reference": "現代仮名遣い 第2 1",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "rule_GK_2_2_particle_ha",
-                "Level": "L1",
-                "Description": "助詞の「は」は，「は」と書く。",
-                "Pattern/Logic": "助詞として用いられる場合は「は」を使用する。「わ」は使用しない。",
-                "Positive_Example": "今日は日曜です",
-                "Negative_Example": "今日わ日曜です",
-                "Source_Reference": "現代仮名遣い 第2 2",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "rule_GK_2_3_particle_he",
-                "Level": "L1",
-                "Description": "助詞の「へ」は，「へ」と書く。",
-                "Pattern/Logic": "助詞として用いられる場合は「へ」を使用する。「え」は使用しない。",
-                "Positive_Example": "故郷へ帰る",
-                "Negative_Example": "故郷え帰る",
-                "Source_Reference": "現代仮名遣い 第2 3",
-                "prompt": "none"
-            },
-            {
-                "Rule_ID": "rule_GK_2_4_verb_iu",
-                "Level": "L2",
-                "Description": "動詞の「いう（言）」は，「いう」と書く。",
-                "Pattern/Logic": "動詞「いう」を「ゆう」と書かない。",
-                "Positive_Example": "ものをいう（言）",
-                "Negative_Example": "ものをゆう",
-                "Source_Reference": "現代仮名遣い 第2 4",
-                "prompt": "これはL2の規則です。以下のテキストが「動詞の「いう（言）」は，「いう」と書く。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_GK_2_5_di_du",
-                "Level": "L2",
-                "Description": "次のような語は，「ぢ」「づ」を用いて書く。同音の連呼、二語の連合。",
-                "Pattern/Logic": "同音の連呼（ちぢむ、つづく）や二語の連合（鼻血、三日月）による「ぢ」「づ」は、それぞれ「ぢ」「づ」と書く。それ以外は原則として「じ」「ず」と書く。",
-                "Positive_Example": "はなぢ（鼻血）、みかづき（三日月）",
-                "Negative_Example": "はなじ、みかずき",
-                "Source_Reference": "現代仮名遣い 第2 5",
-                "prompt": "これはL2の規則です。以下のテキストが「次のような語は，「ぢ」「づ」を用いて書く。同音の連呼、二語の連合。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_GK_2_6_long_vowel_o",
-                "Level": "L2",
-                "Description": "オ列の長音はオ列の仮名に「う」を添える。ただし特定の語（おおかみ、大きい等）は「お」を添える。",
-                "Pattern/Logic": "原則としてオ列の長音は「う」を添えるが、歴史的仮名遣いで「ほ」又は「を」が続く語などは「お」を添える。",
-                "Positive_Example": "とうだい（灯台）、おおかみ（狼）",
-                "Negative_Example": "とおだい、おうかみ",
-                "Source_Reference": "現代仮名遣い 第1 5(5), 第2 6",
-                "prompt": "これはL2の規則です。以下のテキストが「オ列の長音はオ列の仮名に「う」を添える。ただし特定の語（おおかみ、大きい等）は「お」を添える。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            }
-        ]
+    "Rules": [
+      {
+        "Rule_ID": "nihongo_hyouki_10",
+        "Level": "L1",
+        "Description": "単位の表し方",
+        "Pattern/Logic": "単位記号は半角英字で表記する（例：kg、m、s、Hz、MB、°C）。全角の単位記号（ｋｇ、Ｍなど）は使わない。正規表現 `[Ａ-Ｚａ-ｚ]` にマッチした全角英字を半角に変換する。数値と単位記号の間にはスペースを入れない（例：5kg、100MHz）。SI接頭辞の大文字・小文字を正確に区別する（k=キロ, M=メガ, G=ギガ）。旧来の非SI単位（尺・寸・匁・坪など）の使用は避け、SI単位を優先する。",
+        "Positive_Example": "容量は500GBです。/温度は25°Cに設定します。/重さは3.5kgです。",
+        "Negative_Example": "容量は５００ＧＢです。/温度は25℃に設定します（単位記号の全角使用）。/重さは3.5Kgです（接頭辞の大文字誤り）。",
+        "Source_Reference": "p.48",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_11",
+        "Level": "L1",
+        "Description": "記述記号の注意点",
+        "Pattern/Logic": "かぎかっこ（「」）は引用・強調・語句の提示に使う。二重かぎかっこ（『』）は書名・誌名・作品名に使う。欧文スタイルのダブルクォート（\"\"）は日本語文中では使わない。省略記号には全角三点リーダ（…）を2つ連続（……）して使う。半角ピリオド3つ（...）は使わない。ダッシュは全角ダッシュ（—）を2つ連続（——）して使う（倍角ダッシュ）。括弧（（））は補足説明・読み仮名・英訳などに使い、始め括弧の前・終わり括弧の後にはスペースを入れない。",
+        "Positive_Example": "彼は「今すぐ出発しよう」と言った。/『坊っちゃん』は夏目漱石の代表作です。/言葉を選ぶ……それが大切なことです。",
+        "Negative_Example": "彼は\"今すぐ出発しよう\"と言った。/「坊っちゃん」（書名にかぎかっこを使用）/言葉を選ぶ...それが大切なことです。",
+        "Source_Reference": "p.54",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_12",
+        "Level": "L2",
+        "Description": "その他の表記の注意点",
+        "Pattern/Logic": "TODO",
+        "Positive_Example": "TODO",
+        "Negative_Example": "TODO",
+        "Source_Reference": "p.59",
+        "prompt": "これはL2の規則です。以下のテキストが「その他の表記の注意点」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_1",
+        "Level": "L3",
+        "Description": "原稿作成と表記の扱い",
+        "Pattern/Logic": "TODO",
+        "Positive_Example": "TODO",
+        "Negative_Example": "TODO",
+        "Source_Reference": "p.3",
+        "prompt": "これはL3の規則です。以下のテキストが「原稿作成と表記の扱い」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_2",
+        "Level": "L3",
+        "Description": "文体について",
+        "Pattern/Logic": "TODO",
+        "Positive_Example": "TODO",
+        "Negative_Example": "TODO",
+        "Source_Reference": "p.6",
+        "prompt": "これはL3の規則です。以下のテキストが「文体について」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_3_auxiliary_verbs",
+        "Level": "L2",
+        "Description": "補助動詞（他の動詞の後に付いて補助的な意味を添える動詞）は、原則として仮名で表記する。",
+        "Pattern/Logic": "形態素解析により、テ形・連用形に接続する補助動詞用法のみを対象にする。本動詞用法の「行く」「来る」「見る」などは除外する。\n1. 「〜てあげる、〜ていく、〜ていただく、〜ておく、〜てください、〜てくる、〜てしまう、〜てみる、〜てよい」等の「て」に続く動詞をチェック。\n2. 「〜かもしれない、〜にすぎない」も含む。",
+        "Positive_Example": "教えてあげる、見てみる、読んでおく、寒くなってくる、間違いかもしれない",
+        "Negative_Example": "教えて上げる、見て見る、読んで置く、寒くなって来る、間違いかも知れない",
+        "Source_Reference": "p.12",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_3_formal_nouns",
+        "Level": "L2",
+        "Description": "形式名詞（実質的な意味が薄れている名詞）は、原則として仮名で表記する。",
+        "Pattern/Logic": "形式名詞用法のみを対象とし、実質名詞用法は除外する。形態素解析または構文パターン判定を前提とする。\n1. 「うち、おり、こと、たび、ため、とおり、とき、ところ、はず、ほど、まま、もの、ゆえ、よう、よし、わけ」をチェック。\n2. 文脈が実質名詞（例：事柄、場所）ではなく形式名詞（例：〜すること、〜なところ）の場合は仮名にする。",
+        "Positive_Example": "すること、行くとき、そのはずだ、わけではない",
+        "Negative_Example": "する事、行く時、その筈だ、訳ではない",
+        "Source_Reference": "p.12",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_3_ijidoukun_au",
+        "Level": "L2",
+        "Description": "「あう」の使い分けを文脈に応じて正しく行う。",
+        "Pattern/Logic": "1. 会う：人と人が顔を合わせる。",
+        "Positive_Example": "友人に会う、意見が合う、災難に遭う",
+        "Negative_Example": "友人に合う、災難に会う、災難に合う",
+        "Source_Reference": "p.11",
+        "prompt": "これはL2の規則です。以下のテキストが「「あう」の使い分けを文脈に応じて正しく行う。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_3_ijidoukun_sawaru",
+        "Level": "L2",
+        "Description": "「さわる」の使い分けを文脈に応じて正しく行う。",
+        "Pattern/Logic": "1. 触る：手で触れる、関わり合う（展示品に触る、問題に触る等）。",
+        "Positive_Example": "展示品に触る、激務が体に障る、気に障る言い方",
+        "Negative_Example": "展示品に障る、体に触る（「体に触れる」の意味でない場合）",
+        "Source_Reference": "p.11",
+        "prompt": "これはL2の規則です。以下のテキストが「「さわる」の使い分けを文脈に応じて正しく行う。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_3",
+        "Level": "L2",
+        "Description": "漢字の用い方",
+        "Pattern/Logic": "TODO",
+        "Positive_Example": "TODO",
+        "Negative_Example": "TODO",
+        "Source_Reference": "p.9",
+        "prompt": "これはL2の規則です。以下のテキストが「漢字の用い方」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_4",
+        "Level": "L2",
+        "Description": "漢字の字体",
+        "Pattern/Logic": "TODO",
+        "Positive_Example": "TODO",
+        "Negative_Example": "TODO",
+        "Source_Reference": "p.15",
+        "prompt": "これはL2の規則です。以下のテキストが「漢字の字体」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_5",
+        "Level": "L2",
+        "Description": "人名用漢字の使用",
+        "Pattern/Logic": "TODO",
+        "Positive_Example": "TODO",
+        "Negative_Example": "TODO",
+        "Source_Reference": "p.22",
+        "prompt": "これはL2の規則です。以下のテキストが「人名用漢字の使用」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_6_ji_zu_di_du_exceptions",
+        "Level": "L1",
+        "Description": "現代仮名遣いにおける「じ・ず」と「ぢ・づ」の例外的な語彙をチェック。",
+        "Pattern/Logic": "1. 原則「じ・ず」だが、「ぢ・づ」が正しい語：ちぢむ、つづく、はなぢ、こづかい、みかづき等。",
+        "Positive_Example": "ちぢむ、はなぢ、いちじく、地面",
+        "Negative_Example": "ちじむ、はなじ、いちぢく、ぢめん",
+        "Source_Reference": "p.27",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_6",
+        "Level": "L1",
+        "Description": "現代仮名遣いの注意点",
+        "Pattern/Logic": "TODO",
+        "Positive_Example": "TODO",
+        "Negative_Example": "TODO",
+        "Source_Reference": "p.26",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_7_compound_nouns_no_okurigana",
+        "Level": "L1",
+        "Description": "慣用が固定しているため送り仮名を付けない複合名詞のリスト。",
+        "Pattern/Logic": "1. 役職・身分：関取、頭取、取締役、事務取扱。",
+        "Positive_Example": "取締役、物語、日付、受付、献立",
+        "Negative_Example": "取り締まり役、物書き（文脈による）、日付け、受け付け、献じ立て",
+        "Source_Reference": "p.33-34",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_7",
+        "Level": "L2",
+        "Description": "送り仮名の付け方",
+        "Pattern/Logic": "活用のある語（動詞・形容詞・形容動詞）は活用語尾から送り仮名を付ける（本則）。例：書く、読む、起きる、美しい、暖かだ。動詞・形容詞の名詞形（転成名詞）は語幹に送り仮名を付ける（例：読み、走り）。送り仮名の例外（慣用として固定しているもの）については nihongo_hyouki_7_verbs_adjectives_exceptions を参照。慣用として送り仮名を省略する複合名詞については nihongo_hyouki_7_compound_nouns_no_okurigana を参照。形態素解析により活用形を判定し、送り仮名の誤りを検出する。",
+        "Positive_Example": "書く（動詞本則）、明るい（形容詞本則）、贈る（動詞本則）、動き（名詞転成）",
+        "Negative_Example": "書（送り仮名省略）、明い（語尾省略）、贈（語尾省略）",
+        "Source_Reference": "p.29",
+        "prompt": "これはL2の規則です。以下のテキストが「送り仮名の付け方」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_7_verbs_adjectives_exceptions",
+        "Level": "L2",
+        "Description": "送り仮名の例外（活用のある語）。本則（活用語尾を送る）に合わないが、慣用として固定しているものをチェック。",
+        "Pattern/Logic": "1. 語幹が「し」で終わる形容詞：著しい、惜しい、悔しい、珍しい（「著い」などはNG）。",
+        "Positive_Example": "明るい、小さい、著しい、暖かだ、教わる",
+        "Negative_Example": "明い、小い、著い、暖だ、教る",
+        "Source_Reference": "p.30-31",
+        "prompt": "これはL2の規則です。以下のテキストが「送り仮名の例外（活用のある語）。本則（活用語尾を送る）に合わないが、慣用として固定しているものをチェック。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_8",
+        "Level": "L2",
+        "Description": "外来語の表記",
+        "Pattern/Logic": "外来語は原語の発音に近いカタカナで表記する。半角カタカナ（ｱｲｳ…）は使わない。語末の \"-er\"、\"-or\"、\"-ar\"、\"-re\" 等に由来する音には長音符（ー）を付ける（例：コンピューター、プリンター、プロセッサー）。ただし慣用として長音符なしが定着している語は例外（バス、クラス、ウイルス）。人名・地名などの固有名詞は広く通用している日本語表記を優先する（例：ニューヨーク、ロンドン）。辞書参照または定着語リストと照合して表記の統一を促す。",
+        "Positive_Example": "コンピューター、プリンター、ファイル、インストール、ニューヨーク",
+        "Negative_Example": "コンピュータ（長音符省略）、プリンタ（長音符省略）、ﾌｧｲﾙ（半角カタカナ）",
+        "Source_Reference": "p.36",
+        "prompt": "これはL2の規則です。以下のテキストが「外来語の表記」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "nihongo_hyouki_9",
+        "Level": "L1",
+        "Description": "数字の表記",
+        "Pattern/Logic": "横組みの文書では算用数字（半角アラビア数字）を使用する。全角数字は使用しない。正規表現 `[０-９]` にマッチした全角数字を対応する半角数字に変換する。縦組みの文書では漢数字を用いる。ただし、コンピュータ関係・理科・数学などの数値は算用数字のままでよい。「一つ」「二つ」「一人」「二人」など和語で数を数える場合は漢字を使う。3桁ごとのコンマ区切りには半角コンマ（,）を使う（例：1,000,000）。",
+        "Positive_Example": "3,000円の製品が256台入荷しました。/解像度は1,920×1,080ピクセルです。",
+        "Negative_Example": "３，０００円の製品が２５６台入荷しました。/解像度は１，９２０×１，０８０ピクセルです。",
+        "Source_Reference": "p.42",
+        "prompt": "none"
+      }
+    ]
+  },
+  {
+    "Book": {
+      "Title": "現代仮名遣い",
+      "Author": "文部科学省",
+      "Year": "1986",
+      "ISBN": "none"
     },
-    {
-        "Book": {
-            "Title": "常用漢字表",
-            "Author": "文化庁",
-            "Year": "2010",
-            "ISBN": "none"
-        },
-        "Rules": [
-            {
-                "Rule_ID": "rule_JK_reading",
-                "Level": "L2",
-                "Description": "常用漢字表（2136字）で認められている音訓の範囲。",
-                "Pattern/Logic": "公用文や法令では、常用漢字表に記載された音（カタカナ）と訓（ひらがな）のみを用いる。表外音訓は原則として使用しない。",
-                "Positive_Example": "亜（ア）、哀（アイ、あわれ、あわれむ）、愛（アイ）、悪（アク、わるい）、握（アク、にぎる）、圧（アツ）、扱（あつかう）、安（アン、やすい）、案（アン）、暗（アン、くらい）",
-                "Negative_Example": "宛（あて - 表外訓）、弄（もてあそぶ - 表外訓、音は「ロウ」のみ表内）",
-                "Source_Reference": "常用漢字表",
-                "prompt": "これはL2の規則です。以下のテキストが「常用漢字表（2136字）で認められている音訓の範囲。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_JK_scope",
-                "Level": "L2",
-                "Description": "法令，公用文書等において，漢字使用は原則として常用漢字表の範囲内とする。",
-                "Pattern/Logic": "常用漢字表（2136字）に含まれない漢字は原則として用いない。用いる場合は平仮名書きにするか，振り仮名を振る。",
-                "Positive_Example": "挨拶（常用漢字）、整理（常用漢字）",
-                "Negative_Example": "躊躇（「躊」「躇」は常用漢字外）、齟齬（「齟」「齬」は常用漢字外）、逡巡（「逡」「巡」のうち「逡」は常用漢字外）",
-                "Note": "「蔓」「毀」は2010年改訂で常用漢字表に追加済み。従来の反例として挙げられていた「蔓延」「毀損」は現在は表内語。",
-                "Source_Reference": "常用漢字表 前書き 1",
-                "prompt": "これはL2の規則です。以下のテキストが「法令，公用文書等において，漢字使用は原則として常用漢字表の範囲内とする。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            }
-        ]
+    "Rules": [
+      {
+        "Rule_ID": "rule_GK_2_1_particle_o",
+        "Level": "L1",
+        "Description": "助詞の「を」は，「を」と書く。",
+        "Pattern/Logic": "助詞として用いられる場合は「を」を使用する。「お」は使用しない。",
+        "Positive_Example": "本を読む",
+        "Negative_Example": "本をお読む",
+        "Source_Reference": "現代仮名遣い 第2 1",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "rule_GK_2_2_particle_ha",
+        "Level": "L1",
+        "Description": "助詞の「は」は，「は」と書く。",
+        "Pattern/Logic": "助詞として用いられる場合は「は」を使用する。「わ」は使用しない。",
+        "Positive_Example": "今日は日曜です",
+        "Negative_Example": "今日わ日曜です",
+        "Source_Reference": "現代仮名遣い 第2 2",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "rule_GK_2_3_particle_he",
+        "Level": "L1",
+        "Description": "助詞の「へ」は，「へ」と書く。",
+        "Pattern/Logic": "助詞として用いられる場合は「へ」を使用する。「え」は使用しない。",
+        "Positive_Example": "故郷へ帰る",
+        "Negative_Example": "故郷え帰る",
+        "Source_Reference": "現代仮名遣い 第2 3",
+        "prompt": "none"
+      },
+      {
+        "Rule_ID": "rule_GK_2_4_verb_iu",
+        "Level": "L2",
+        "Description": "動詞の「いう（言）」は，「いう」と書く。",
+        "Pattern/Logic": "動詞「いう」を「ゆう」と書かない。",
+        "Positive_Example": "ものをいう（言）",
+        "Negative_Example": "ものをゆう",
+        "Source_Reference": "現代仮名遣い 第2 4",
+        "prompt": "これはL2の規則です。以下のテキストが「動詞の「いう（言）」は，「いう」と書く。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_GK_2_5_di_du",
+        "Level": "L2",
+        "Description": "次のような語は，「ぢ」「づ」を用いて書く。同音の連呼、二語の連合。",
+        "Pattern/Logic": "同音の連呼（ちぢむ、つづく）や二語の連合（鼻血、三日月）による「ぢ」「づ」は、それぞれ「ぢ」「づ」と書く。それ以外は原則として「じ」「ず」と書く。",
+        "Positive_Example": "はなぢ（鼻血）、みかづき（三日月）",
+        "Negative_Example": "はなじ、みかずき",
+        "Source_Reference": "現代仮名遣い 第2 5",
+        "prompt": "これはL2の規則です。以下のテキストが「次のような語は，「ぢ」「づ」を用いて書く。同音の連呼、二語の連合。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_GK_2_6_long_vowel_o",
+        "Level": "L2",
+        "Description": "オ列の長音はオ列の仮名に「う」を添える。ただし特定の語（おおかみ、大きい等）は「お」を添える。",
+        "Pattern/Logic": "原則としてオ列の長音は「う」を添えるが、歴史的仮名遣いで「ほ」又は「を」が続く語などは「お」を添える。",
+        "Positive_Example": "とうだい（灯台）、おおかみ（狼）",
+        "Negative_Example": "とおだい、おうかみ",
+        "Source_Reference": "現代仮名遣い 第1 5(5), 第2 6",
+        "prompt": "これはL2の規則です。以下のテキストが「オ列の長音はオ列の仮名に「う」を添える。ただし特定の語（おおかみ、大きい等）は「お」を添える。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      }
+    ]
+  },
+  {
+    "Book": {
+      "Title": "常用漢字表",
+      "Author": "文化庁",
+      "Year": "2010",
+      "ISBN": "none"
     },
-    {
-        "Book": {
-            "Title": "公用文 送り仮名用例集",
-            "Author": "文部科学省",
-            "Year": "2011",
-            "ISBN": "none"
-        },
-        "Rules": [
-            {
-                "Rule_ID": "rule_OY_6_omission",
-                "Level": "L2",
-                "Description": "複合の語のうち，特定の語については，送り仮名を省く（公用文の慣習）。",
-                "Pattern/Logic": "慣用的に送り仮名を省く語（預り金、言渡し、受取等）は、送り仮名を省いて表記する。これらは用例集で＊印が付されている。",
-                "Positive_Example": "預り金、言渡し、受取、請負、売上げ",
-                "Negative_Example": "預かり金、言い渡し、受け取り、請け負い、売り上げ",
-                "Source_Reference": "文部科学省 公用文 送り仮名用例集 前書き 3(2)",
-                "prompt": "これはL2の規則です。以下のテキストが「複合の語のうち，特定の語については，送り仮名を省く（公用文の慣習）。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            },
-            {
-                "Rule_ID": "rule_OY_word_list",
-                "Level": "L2",
-                "Description": "文部科学省「公用文 送り仮名用例集」に基づく標準的な送り仮名の付け方。",
-                "Pattern/Logic": "五十音順に配列された全5700語以上の用例を標準とする。表記に迷う場合はこのリストを参照する。",
-                "Positive_Example": "あだ討ち、ある、いくさ、いそ伝い、うつ伏せ、うろ覚え、うわさ話、う飼い、えかき、えさ、えり好み、えり抜き、おくり名、おとぎ話、お下がり、お互いに、お仕着せ、お供え、お化け、お守り、お巡りさん、お忍び、お悔やみ、お払い箱、お湿り、お目見え、かき乱す、かき回す、かぎ裂き、かじ取り、かす漬け",
-                "Negative_Example": "あだ打ち（誤）、有る（標準送り仮名から外れる）、戦（誤）",
-                "Source_Reference": "文部科学省 公用文 送り仮名用例集",
-                "prompt": "これはL2の規則です。以下のテキストが「文部科学省「公用文 送り仮名用例集」に基づく標準的な送り仮名の付け方。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
-            }
-        ]
-    }
+    "Rules": [
+      {
+        "Rule_ID": "rule_JK_reading",
+        "Level": "L2",
+        "Description": "常用漢字表（2136字）で認められている音訓の範囲。",
+        "Pattern/Logic": "公用文や法令では、常用漢字表に記載された音（カタカナ）と訓（ひらがな）のみを用いる。表外音訓は原則として使用しない。",
+        "Positive_Example": "亜（ア）、哀（アイ、あわれ、あわれむ）、愛（アイ）、悪（アク、わるい）、握（アク、にぎる）、圧（アツ）、扱（あつかう）、安（アン、やすい）、案（アン）、暗（アン、くらい）",
+        "Negative_Example": "宛（あて - 表外訓）、弄（もてあそぶ - 表外訓、音は「ロウ」のみ表内）",
+        "Source_Reference": "常用漢字表",
+        "prompt": "これはL2の規則です。以下のテキストが「常用漢字表（2136字）で認められている音訓の範囲。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_JK_scope",
+        "Level": "L2",
+        "Description": "法令，公用文書等において，漢字使用は原則として常用漢字表の範囲内とする。",
+        "Pattern/Logic": "常用漢字表（2136字）に含まれない漢字は原則として用いない。用いる場合は平仮名書きにするか，振り仮名を振る。",
+        "Positive_Example": "挨拶（常用漢字）、整理（常用漢字）",
+        "Negative_Example": "躊躇（「躊」「躇」は常用漢字外）、齟齬（「齟」「齬」は常用漢字外）、逡巡（「逡」「巡」のうち「逡」は常用漢字外）",
+        "Note": "「蔓」「毀」は2010年改訂で常用漢字表に追加済み。従来の反例として挙げられていた「蔓延」「毀損」は現在は表内語。",
+        "Source_Reference": "常用漢字表 前書き 1",
+        "prompt": "これはL2の規則です。以下のテキストが「法令，公用文書等において，漢字使用は原則として常用漢字表の範囲内とする。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      }
+    ]
+  },
+  {
+    "Book": {
+      "Title": "公用文 送り仮名用例集",
+      "Author": "文部科学省",
+      "Year": "2011",
+      "ISBN": "none"
+    },
+    "Rules": [
+      {
+        "Rule_ID": "rule_OY_6_omission",
+        "Level": "L2",
+        "Description": "複合の語のうち，特定の語については，送り仮名を省く（公用文の慣習）。",
+        "Pattern/Logic": "慣用的に送り仮名を省く語（預り金、言渡し、受取等）は、送り仮名を省いて表記する。これらは用例集で＊印が付されている。",
+        "Positive_Example": "預り金、言渡し、受取、請負、売上げ",
+        "Negative_Example": "預かり金、言い渡し、受け取り、請け負い、売り上げ",
+        "Source_Reference": "文部科学省 公用文 送り仮名用例集 前書き 3(2)",
+        "prompt": "これはL2の規則です。以下のテキストが「複合の語のうち，特定の語については，送り仮名を省く（公用文の慣習）。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      },
+      {
+        "Rule_ID": "rule_OY_word_list",
+        "Level": "L2",
+        "Description": "文部科学省「公用文 送り仮名用例集」に基づく標準的な送り仮名の付け方。",
+        "Pattern/Logic": "五十音順に配列された全5700語以上の用例を標準とする。表記に迷う場合はこのリストを参照する。",
+        "Positive_Example": "あだ討ち、ある、いくさ、いそ伝い、うつ伏せ、うろ覚え、うわさ話、う飼い、えかき、えさ、えり好み、えり抜き、おくり名、おとぎ話、お下がり、お互いに、お仕着せ、お供え、お化け、お守り、お巡りさん、お忍び、お悔やみ、お払い箱、お湿り、お目見え、かき乱す、かき回す、かぎ裂き、かじ取り、かす漬け",
+        "Negative_Example": "あだ打ち（誤）、有る（標準送り仮名から外れる）、戦（誤）",
+        "Source_Reference": "文部科学省 公用文 送り仮名用例集",
+        "prompt": "これはL2の規則です。以下のテキストが「文部科学省「公用文 送り仮名用例集」に基づく標準的な送り仮名の付け方。」に準拠しているか確認してください。この規則に違反している場合は、その箇所を指摘し、修正案を提示してください。"
+      }
+    ]
+  }
 ]
