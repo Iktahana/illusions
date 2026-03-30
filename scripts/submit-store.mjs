@@ -422,7 +422,7 @@ async function main() {
     // the payload; omitting them causes a 400 "missing packages" error.
     const existingPackages = (submission.applicationPackages ?? []).map((pkg) => ({
       ...pkg,
-      fileStatus: 'PendingDelete',
+      fileStatus: "PendingDelete",
     }));
 
     const newPackages = appxFiles.map((fileName) => ({
