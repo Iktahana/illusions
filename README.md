@@ -71,7 +71,7 @@ Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try 
 ## ✨ Key Features
 
 ### エディタ / Editor
-- **縦書き・横書き対応** — 日本語小説に最適なレイアウトを切り替え可能
+- **縦書き・横書き対応 (Vertical & horizontal writing)** — Switch between writing modes optimized for Japanese novels
 - **Flexible panel layout** — Dockview-based multi-panel workspace; drag, split, and rearrange panels freely
 - **Pop-out editor windows** — Detach any editor tab into a separate window for multi-monitor workflows
 - **File diff view** — Side-by-side comparison of file versions directly in the editor
@@ -88,7 +88,7 @@ Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try 
 
 ### 校正・設定 / Linting & Settings
 - **Japanese text linting** — Configurable rule-based linting with JSON-defined rule sets; preset support
-- **Settings tabs**: Keymap, Linting, Typography, Vertical layout, Speech, Terminal, Position highlight, Power
+- **Settings tabs** — Including: Keymap, Linting, Typography, Vertical layout, Speech, Terminal, Position highlight, Power
 
 ### デスクトップ / Desktop
 - **Desktop-only feature guards** — `DesktopOnlyDialog` gracefully blocks web-unsupported features
