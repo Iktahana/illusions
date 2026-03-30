@@ -150,6 +150,9 @@ export function useDockviewPersistence({
       disposable.dispose();
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+        // Flush pending layout state immediately on cleanup
+        void persistLayoutNow().catch(() => {});
       }
     };
   }, [dockviewApi, enabled, persistLayoutNow]);

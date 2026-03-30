@@ -5,18 +5,9 @@ import { RuleRunner } from "@/lib/linting/rule-runner";
 import type { LintIssue, Severity } from "@/lib/linting/types";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
+import { getAllRules, createJsonDrivenRules } from "@/lib/linting/rule-registry";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import { notificationManager } from "@/lib/services/notification-manager";
-
-// ---------------------------------------------------------------------------
-// L1 rules — JSON-driven factory rules from Japanese-Style-Sheet
-// ---------------------------------------------------------------------------
-import {
-  createJtfL1Rules,
-  createManuscriptL1Rules,
-  createGendaiKanazukaiL1Rules,
-  createNihongoHyoukiL1Rules,
-} from "@/lib/linting/rules/json-l1";
 
 export interface UseLintingResult {
   ruleRunner: RuleRunner;
@@ -48,14 +39,9 @@ export function useLinting(
   // Lazily create and register all rules once
   if (!ruleRunnerRef.current) {
     const runner = new RuleRunner();
+    for (const rule of getAllRules()) runner.registerRule(rule);
+    for (const rule of createJsonDrivenRules()) runner.registerRule(rule);
 
-    // -- L1: JSON-driven factory rules from Japanese-Style-Sheet --------------
-    for (const rule of createJtfL1Rules()) runner.registerRule(rule);
-    for (const rule of createManuscriptL1Rules()) runner.registerRule(rule);
-    for (const rule of createGendaiKanazukaiL1Rules()) runner.registerRule(rule);
-    for (const rule of createNihongoHyoukiL1Rules()) runner.registerRule(rule);
-
-    // Initialize guideline map for guideline-based filtering
     runner.setGuidelineMap(RULE_GUIDELINE_MAP);
 
     ruleRunnerRef.current = runner;

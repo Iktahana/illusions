@@ -23,6 +23,7 @@ declare global {
     openDictionaryPopup?: (url: string, title: string) => Promise<boolean>;
     showContextMenu?: (items: Array<{ type?: string; label?: string; action?: string; accelerator?: string }>) => Promise<string | null>;
     onSaveBeforeClose?: (callback: () => void) => (() => void) | void;
+    onFlushStateBeforeClose?: (callback: () => void) => (() => void) | void;
     onOpenFileFromSystem?: (
       callback: (payload: { path: string; content: string }) => void
     ) => (() => void) | void;
@@ -66,6 +67,8 @@ declare global {
       content: string,
       options: { metadata: { title: string; author?: string; date?: string; language?: string } }
     ) => Promise<string | { success: false; error: string } | null>;
+    onMenuExportTxt?: (callback: () => void) => (() => void) | void;
+    onMenuExportTxtRuby?: (callback: () => void) => (() => void) | void;
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;

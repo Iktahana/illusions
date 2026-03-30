@@ -3,36 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useTheme } from "@/contexts/ThemeContext";
-import ErrorBoundary from "@/components/ErrorBoundary";
-import Inspector from "@/components/Inspector";
-import NovelEditor from "@/components/Editor";
-import EditorDiffView from "@/components/EditorDiffView";
-import ResizablePanel from "@/components/ResizablePanel";
-import TitleUpdater from "@/components/TitleUpdater";
-import ActivityBar from "@/components/ActivityBar";
-import SidebarSplitter from "@/components/SidebarSplitter";
-import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
-import ConfirmDialog from "@/components/ConfirmDialog";
-import UpgradeToProjectBanner from "@/components/UpgradeToProjectBanner";
+import EditorLayout from "@/components/EditorLayout";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import PopoutEditorWindow from "@/components/PopoutEditorWindow";
-import SidebarPanel from "@/components/SidebarPanel";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
-import SettingsModal from "@/components/SettingsModal";
-import RubyDialog from "@/components/RubyDialog";
-import DesktopOnlyDialog from "@/components/DesktopOnlyDialog";
-import { EmptyEditorState } from "@/components/EmptyEditorState";
 import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
 import { useTabManager } from "@/lib/hooks/use-tab-manager";
 import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
-import { DockviewReact } from "dockview-react";
-import {
-  dockviewTabComponents,
-  TerminalPanel,
-  DiffPanel,
-} from "@/lib/dockview/dockview-components";
 import { useDockviewAdapter } from "@/lib/dockview/use-dockview-adapter";
 import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence";
 import "@/lib/dockview/dockview-theme.css";
@@ -43,17 +22,12 @@ import { useGlobalShortcuts } from "@/lib/hooks/use-global-shortcuts";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import WebMenuBar from "@/components/WebMenuBar";
 import { useEditorMode } from "@/contexts/EditorModeContext";
-import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
-import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
-import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
-import type { TerminalTabState, DiffTabState } from "@/lib/tab-manager/tab-types";
-import { TerminalTabContext } from "@/contexts/TerminalTabContext";
-import type { TerminalTabContextValue } from "@/contexts/TerminalTabContext";
-import { DiffTabContext } from "@/contexts/DiffTabContext";
-import type { DiffTabContextValue } from "@/contexts/DiffTabContext";
+import { isProjectMode } from "@/lib/project/project-types";
+import { isEditorTab } from "@/lib/tab-manager/tab-types";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
+import { useEditorLifecycle } from "@/lib/editor-page/use-editor-lifecycle";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
 import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
@@ -62,8 +36,9 @@ import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
 import { useSaveToast } from "@/lib/editor-page/use-save-toast";
+import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
+import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
-import ContextMenu from "@/components/ContextMenu";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
@@ -190,26 +165,34 @@ export default function EditorPage() {
     flushTabState,
   } = tabManager;
 
-  // Ref that always holds the latest tabs array (avoids stale closures in PTY callbacks)
+  // Keep a live tabs ref for dockview panel renderers captured by stale closures.
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
-  // Ref that always holds the latest updateTerminalTab (avoids re-subscribing)
-  const updateTerminalTabRef = useRef(updateTerminalTab);
-  updateTerminalTabRef.current = updateTerminalTab;
+  const {
+    diffTabContextValue,
+    handleCloseTabWithPtyCleanup,
+  } = useDiffTabs({
+    tabs,
+    updateTab,
+    forceCloseTab,
+    closeTab,
+  });
 
-  // --- Tab close wrapper: kill PTY session when a terminal tab closes ---
-  const handleCloseTabWithPtyCleanup = useCallback(
-    (tabId: string) => {
-      // Look up the tab before closing it
-      const tab = tabsRef.current.find((t) => t.id === tabId);
-      if (tab && isTerminalTab(tab) && tab.sessionId) {
-        void window.electronAPI?.pty?.kill(tab.sessionId);
-      }
-      closeTab(tabId);
-    },
-    [closeTab],
-  );
+  const {
+    handleNewTerminalTab,
+    terminalTabContextValue,
+    showDesktopOnlyDialog,
+    setShowDesktopOnlyDialog,
+  } = useTerminalTabs({
+    tabs,
+    newTerminalTab,
+    updateTerminalTab,
+    forceCloseTab,
+    editorMode,
+    settings,
+    isElectron,
+  });
 
   // Patched tabManager passed to the dockview adapter so that panel close
   // triggers PTY kill before removing the tab from state.
@@ -223,168 +206,6 @@ export default function EditorPage() {
   } = useDockviewAdapter({ tabManager: tabManagerWithPtyCleanup, editorKey });
   const { flushLayoutState } = useDockviewPersistence({ dockviewApi, tabs: tabManagerWithPtyCleanup.tabs });
   flushLayoutStateRef.current = flushLayoutState;
-
-  // --- New terminal tab callback ---
-  const handleNewTerminalTab = useCallback(() => {
-    if (isElectronRenderer()) {
-      const ptyApi = window.electronAPI?.pty;
-      if (!ptyApi) return;
-      // Create the tab first (shows "connecting" state immediately)
-      newTerminalTab();
-      // Spawn the PTY session; update the tab's sessionId once we have it
-      void (async () => {
-        const cwd = isProjectMode(editorMode) ? editorMode.rootPath : undefined;
-        const shell = settings.terminalDefaultShell || undefined;
-        const result = await ptyApi.spawn({ cwd, shell });
-        if ("error" in result) return;
-        const { sessionId } = result;
-        // Update the most recently created terminal tab with an empty sessionId
-        const targetTab = tabsRef.current
-          .slice()
-          .reverse()
-          .find((t) => isTerminalTab(t) && (t as TerminalTabState).sessionId === "");
-        if (targetTab) {
-          updateTerminalTabRef.current(targetTab.id, { sessionId, status: "running" });
-        }
-      })();
-    } else {
-      // Web: show desktop-only dialog since terminal requires native PTY
-      setShowDesktopOnlyDialog(true);
-    }
-  }, [newTerminalTab, editorMode, settings.terminalDefaultShell]);
-
-  // --- PTY exit event listener: update tab status when process exits ---
-  useEffect(() => {
-    if (!isElectronRenderer()) return;
-    const ptyApi = window.electronAPI?.pty;
-    if (!ptyApi) return;
-
-    const unsubExit = ptyApi.onExit(({ sessionId, exitCode }) => {
-      // Find the terminal tab with this sessionId and mark it as exited
-      const tab = tabsRef.current.find(
-        (t) => isTerminalTab(t) && (t as TerminalTabState).sessionId === sessionId,
-      );
-      if (tab) {
-        updateTerminalTabRef.current(tab.id, { status: "exited", exitCode });
-      }
-    });
-
-    return unsubExit;
-  // Subscribe once on mount; use refs to avoid stale closures
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // --- TerminalTabContext value: exposes terminal tab state to dockview panel components ---
-  const getTerminalTabBySessionId = useCallback(
-    (sessionId: string) =>
-      tabsRef.current.find(
-        (t): t is TerminalTabState => isTerminalTab(t) && t.sessionId === sessionId,
-      ),
-    [],
-  );
-  const setTerminalTabExited = useCallback((sessionId: string, exitCode: number) => {
-    const tab = tabsRef.current.find(
-      (t): t is TerminalTabState => isTerminalTab(t) && t.sessionId === sessionId,
-    );
-    if (tab) {
-      updateTerminalTabRef.current(tab.id, { status: "exited", exitCode });
-    }
-  }, []);
-  const killTerminalSession = useCallback((sessionId: string) => {
-    void window.electronAPI?.pty?.kill(sessionId);
-  }, []);
-  const terminalTabContextValue: TerminalTabContextValue = {
-    getTerminalTabBySessionId,
-    setTerminalTabExited,
-    killTerminalSession,
-  };
-
-  // --- DiffTabContext value: exposes diff tab state and conflict resolution to panel components ---
-
-  const getDiffTabById = useCallback(
-    (tabId: string) =>
-      tabsRef.current.find((t): t is DiffTabState => isDiffTab(t) && t.id === tabId),
-    [],
-  );
-
-  const getDiffTabBySourceTabId = useCallback(
-    (sourceTabId: string) =>
-      tabsRef.current.find(
-        (t): t is DiffTabState => isDiffTab(t) && t.sourceTabId === sourceTabId,
-      ),
-    [],
-  );
-
-  /**
-   * Accept disk content: update the source editor tab with the remote content,
-   * clear its conflict state, then force-close the diff tab.
-   */
-  const acceptDiskContent = useCallback(
-    (diffTabId: string) => {
-      const diffTab = tabsRef.current.find(
-        (t): t is DiffTabState => isDiffTab(t) && t.id === diffTabId,
-      );
-      if (!diffTab) return;
-
-      const sourceTab = tabsRef.current.find(
-        (t) => isEditorTab(t) && t.id === diffTab.sourceTabId,
-      );
-      if (sourceTab && isEditorTab(sourceTab)) {
-        updateTab(sourceTab.id, {
-          content: diffTab.remoteContent,
-          lastSavedContent: diffTab.remoteContent,
-          isDirty: false,
-          fileSyncStatus: "clean",
-          conflictDiskContent: null,
-        });
-      }
-      forceCloseTab(diffTabId);
-    },
-    [updateTab, forceCloseTab],
-  );
-
-  /**
-   * Keep editor content: clear the conflict state on the source tab,
-   * then force-close the diff tab.
-   */
-  const keepEditorContent = useCallback(
-    (diffTabId: string) => {
-      const diffTab = tabsRef.current.find(
-        (t): t is DiffTabState => isDiffTab(t) && t.id === diffTabId,
-      );
-      if (!diffTab) return;
-
-      const sourceTab = tabsRef.current.find(
-        (t) => isEditorTab(t) && t.id === diffTab.sourceTabId,
-      );
-      if (sourceTab && isEditorTab(sourceTab)) {
-        updateTab(sourceTab.id, {
-          fileSyncStatus: "clean",
-          conflictDiskContent: null,
-        });
-      }
-      forceCloseTab(diffTabId);
-    },
-    [updateTab, forceCloseTab],
-  );
-
-  /**
-   * Close only the diff tab; source tab conflict state is preserved.
-   */
-  const closeDiffTab = useCallback(
-    (diffTabId: string) => {
-      forceCloseTab(diffTabId);
-    },
-    [forceCloseTab],
-  );
-
-  const diffTabContextValue: DiffTabContextValue = {
-    getDiffTabById,
-    getDiffTabBySourceTabId,
-    acceptDiskContent,
-    keepEditorContent,
-    closeDiffTab,
-  };
 
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -423,7 +244,6 @@ export default function EditorPage() {
 
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
-  const [showDesktopOnlyDialog, setShowDesktopOnlyDialog] = useState(false);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [recoveryExiting, setRecoveryExiting] = useState(false);
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
@@ -485,32 +305,6 @@ export default function EditorPage() {
       incrementEditorKey();
     }
   }, [wasAutoRecovered, incrementEditorKey]);
-
-  // --- Auto-close diff tabs when their source editor tab is closed ---
-  // Tracks the previous tab id set to detect removals.
-  const prevTabIdsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const currentTabIds = new Set(tabs.map((t) => t.id));
-    const removedTabIds = new Set(
-      [...prevTabIdsRef.current].filter((id) => !currentTabIds.has(id)),
-    );
-
-    if (removedTabIds.size > 0) {
-      // For each removed tab, find any diff tab that references it as sourceTabId
-      const orphanedDiffTabIds = tabs
-        .filter(
-          (t): t is DiffTabState =>
-            isDiffTab(t) && removedTabIds.has(t.sourceTabId),
-        )
-        .map((t) => t.id);
-
-      for (const diffTabId of orphanedDiffTabIds) {
-        forceCloseTab(diffTabId);
-      }
-    }
-
-    prevTabIdsRef.current = currentTabIds;
-  }, [tabs, forceCloseTab]);
 
   // With tabs, open/new don't need unsaved warnings (they create new tabs)
   const openFile = useCallback(async () => {
@@ -581,54 +375,6 @@ export default function EditorPage() {
     });
   }, [onSystemFileOpen, incrementEditorKey]);
 
-  // Flush debounced tab/layout state on page refresh.
-  // Electron: the normal quit flow uses IPC flush, but Cmd+R bypasses it.
-  // Web: browser refresh would lose any debounced changes still in-flight.
-  // Fire-and-forget is acceptable — Electron IPC queues synchronously,
-  // and browsers allow brief async completion (IndexedDB) after beforeunload.
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      void flushTabState();
-      void stableFlushLayoutState();
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [flushTabState, stableFlushLayoutState]);
-
-  // Clean up ?welcome and ?pending-file parameters from URL
-  useEffect(() => {
-    if (skipAutoRestore && typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      let changed = false;
-      if (params.has("welcome")) { params.delete("welcome"); changed = true; }
-      if (params.has("pending-file")) { params.delete("pending-file"); changed = true; }
-      if (changed) {
-        const cleanUrl = window.location.pathname + (params.toString() ? `?${params}` : "");
-        window.history.replaceState({}, "", cleanUrl);
-      }
-    }
-  }, [skipAutoRestore]);
-
-  // Pull pending file from main process (cold-start file association)
-  // This uses a pull model to avoid the race condition where the main process
-  // sends IPC before React hooks are mounted.
-  useEffect(() => {
-    if (!isElectron) return;
-    const api = window.electronAPI;
-    if (!api?.getPendingFile) return;
-
-    void api.getPendingFile().then((result) => {
-      if (!result) return;
-      if (result.type === "project") {
-        void handleOpenAsProject(result.projectPath, result.initialFile);
-      } else {
-        tabLoadSystemFile(result.path, result.content);
-        incrementEditorKey();
-      }
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
-  }, []);
-
   // Ref-forwarding for useWebMenuHandlers
   const openRecentProjectRef = useRef<(projectId: string) => void>(() => {});
   const fontScaleChangeRef = useRef<(scale: number) => void>(() => {});
@@ -652,66 +398,32 @@ export default function EditorPage() {
   });
 
   // Global shortcuts for Web (only when not in Electron)
-  useGlobalShortcuts(
-    !isElectron ? handleMenuAction : () => {},
-    editorDomRef
-  );
+  useGlobalShortcuts();
 
   // --- Save toast hook ---
   const { showSaveToast, saveToastExiting } = useSaveToast({ lastSavedTime, lastSaveWasAuto });
 
-  // Recovery notification: fade-out after 5s, then dismiss
-  useEffect(() => {
-    if (wasAutoRecovered && !dismissedRecovery && !recoveryExiting) {
-      const fadeoutTimer = setTimeout(() => {
-        setRecoveryExiting(true);
-      }, 5000);
-
-      return () => clearTimeout(fadeoutTimer);
-    }
-
-    if (recoveryExiting) {
-      const dismissTimer = setTimeout(() => {
-        setDismissedRecovery(true);
-      }, 300);
-
-      return () => clearTimeout(dismissTimer);
-    }
-  }, [wasAutoRecovered, dismissedRecovery, recoveryExiting]);
-
-  // Paste as plaintext
-  const handlePasteAsPlaintext = useCallback(async () => {
-    try {
-      let text: string | null = null;
-
-      if (isElectron && typeof window !== "undefined" && window.electronAPI) {
-        if (navigator.clipboard && navigator.clipboard.readText) {
-          text = await navigator.clipboard.readText();
-        }
-      } else {
-        if (navigator.clipboard && navigator.clipboard.readText) {
-          text = await navigator.clipboard.readText();
-        }
-      }
-
-      if (text) {
-        if (editorViewInstance) {
-          const { state, dispatch } = editorViewInstance;
-          const { from, to } = state.selection;
-          const tr = state.tr.insertText(text, from, to);
-          dispatch(tr);
-        } else {
-          // Fallback: append at end if editor view not available
-          const currentContent = contentRef.current;
-          const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
-          setContent(newContent);
-          incrementEditorKey();
-        }
-      }
-    } catch (error) {
-      console.error("Failed to paste as plaintext:", error);
-    }
-  }, [isElectron, setContent, editorViewInstance, incrementEditorKey]);
+  const {
+    handlePasteAsPlaintext,
+    handleInsertText,
+    handleChapterClick,
+  } = useEditorLifecycle({
+    flushTabState,
+    flushLayoutState: stableFlushLayoutState,
+    skipAutoRestore,
+    isElectron,
+    handleOpenAsProject,
+    tabLoadSystemFile,
+    incrementEditorKey,
+    wasAutoRecovered,
+    dismissedRecovery,
+    recoveryExiting,
+    setDismissedRecovery,
+    setRecoveryExiting,
+    editorViewInstance,
+    contentRef,
+    setContent,
+  });
 
   // --- Electron IPC events hook ---
   useElectronEvents({
@@ -741,31 +453,6 @@ export default function EditorPage() {
   const handleChange = (markdown: string) => {
     contentRef.current = markdown;
     setContent(markdown);
-  };
-
-  const handleInsertText = useCallback((text: string) => {
-    if (editorViewInstance) {
-      const { state, dispatch } = editorViewInstance;
-      const { from, to } = state.selection;
-      const tr = state.tr.insertText(text, from, to);
-      dispatch(tr);
-    } else {
-      // Fallback: append at end if editor view not available
-      const currentContent = contentRef.current;
-      const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
-      setContent(newContent);
-      incrementEditorKey();
-    }
-  }, [editorViewInstance, setContent, incrementEditorKey]);
-
-  const handleChapterClick = (anchorId: string) => {
-    if (!anchorId) return;
-
-    const target = document.getElementById(anchorId) as HTMLElement | null;
-    if (!target) return;
-
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    target.focus();
   };
 
   // --- Text statistics hook ---
@@ -939,339 +626,143 @@ export default function EditorPage() {
     },
   } as const;
 
-    return (
-      <DiffTabContext.Provider value={diffTabContextValue}>
-      <TerminalTabContext.Provider value={terminalTabContextValue}>
-      <EditorSettingsProvider settings={settings} handlers={settingsHandlers}>
-      <div className="h-screen flex flex-col overflow-hidden relative">
-         {/* Dynamic title update */}
-        <TitleUpdater currentFile={currentFile} isDirty={isDirty} />
+  const inspectorProps = {
+    compactMode,
+    charCount,
+    selectedCharCount,
+    paragraphCount,
+    fileName,
+    isDirty,
+    isSaving,
+    lastSavedTime,
+    onSaveFile: saveFile,
+    onFileNameChange: updateFileName,
+    sentenceCount,
+    charTypeAnalysis,
+    charUsageRates,
+    readabilityAnalysis,
+    onOpenPosHighlightSettings: handleOpenPosHighlightSettings,
+    activeFileName: currentFile?.name,
+    currentContent: content,
+    onHistoryRestore: (restoredContent: string) => {
+      setContent(restoredContent);
+      incrementEditorKey();
+    },
+    onCompareInEditor: setEditorDiff,
+    lintIssues: enrichedLintIssues,
+    onNavigateToIssue: handleNavigateToIssue,
+    onApplyFix: handleApplyFix,
+    onIgnoreCorrection: handleIgnoreCorrection,
+    onRefreshLinting: refreshLinting,
+    isLinting,
+    activeLintIssueIndex,
+    onOpenLintingSettings: handleOpenLintingSettings,
+    onApplyLintPreset: handleApplyLintPreset,
+    activeLintPresetId,
+    switchToCorrectionsTrigger,
+  } as const;
 
-        {/* Web menu bar (only for non-Electron environment) */}
-        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} checkedState={{ compactMode }} />}
-
-         {/* Unsaved warning dialog (project mode transitions) */}
-        <UnsavedWarningDialog
-          isOpen={unsavedWarning.showWarning}
-          fileName={currentFile?.name || "新規ファイル"}
-          onSave={unsavedWarning.handleSave}
-          onDiscard={unsavedWarning.handleDiscard}
-          onCancel={unsavedWarning.handleCancel}
-        />
-
-        {/* Unsaved warning dialog (tab close) */}
-        <UnsavedWarningDialog
-          isOpen={pendingCloseTabId !== null}
-          fileName={pendingCloseFileName}
-          onSave={handleCloseTabSave}
-          onDiscard={handleCloseTabDiscard}
-          onCancel={handleCloseTabCancel}
-        />
-
-        {/* Desktop-only feature dialog (shown to web users for terminal) */}
-        <DesktopOnlyDialog
-          isOpen={showDesktopOnlyDialog}
-          onClose={() => setShowDesktopOnlyDialog(false)}
-          featureName="ターミナル"
-        />
-
-        {/* 最近のプロジェクト削除確認ダイアログ */}
-        <ConfirmDialog
-          isOpen={confirmRemoveRecent !== null}
-          title="プロジェクトが見つかりません"
-          message={confirmRemoveRecent?.message ?? ""}
-          confirmLabel="削除する"
-          cancelLabel="キャンセル"
-          dangerous={true}
-          onConfirm={() => {
-            if (confirmRemoveRecent) {
-              const { projectId: pid } = confirmRemoveRecent;
-              setConfirmRemoveRecent(null);
-              void handleDeleteRecentProject(pid);
-            }
-          }}
-          onCancel={() => setConfirmRemoveRecent(null)}
-        />
-
-        {/* UpgradeBanner for standalone mode */}
-        {showUpgradeBanner && !upgradeBannerDismissed && isStandaloneMode(editorMode) && features.projectMode && (
-          <UpgradeToProjectBanner
-            onUpgrade={() => void handleUpgrade()}
-            onDismiss={handleUpgradeDismiss}
-          />
-        )}
-
-        <SettingsModal
-          isOpen={showSettingsModal}
-          onClose={() => {
-            setShowSettingsModal(false);
-            setSettingsInitialCategory(undefined);
-          }}
-          initialCategory={settingsInitialCategory}
-        />
-
-        {/* Ruby dialog */}
-        <RubyDialog
-          isOpen={showRubyDialog}
-          onClose={() => setShowRubyDialog(false)}
-          selectedText={rubySelectedText}
-          onApply={handleApplyRuby}
-        />
-
-         {/* Auto-recovery notification (Web only, fixed position) */}
-         {!isElectron && wasAutoRecovered && !dismissedRecovery && (
-          <div className={`fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between shadow-lg ${recoveryExiting ? 'animate-slide-out-up' : 'animate-slide-in-down'}`}>
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
-              <p className="text-sm text-foreground">
-                <span className="font-semibold text-foreground">✓ 前回編集したファイルを復元しました：</span> <span className="font-mono text-success">{currentFile?.name}</span>
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                setRecoveryExiting(true);
-              }}
-              className="text-foreground-secondary hover:text-foreground hover:bg-hover text-lg font-medium flex-shrink-0 ml-4 w-8 h-8 rounded flex items-center justify-center transition-all duration-200 hover:scale-110"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-       <div className="flex-1 flex overflow-hidden">
-         {/* Activity Bar */}
-         <ActivityBar
-           topView={topView}
-           bottomView={bottomView}
-           compactMode={compactMode}
-           onTopViewChange={(view) => {
-             if (view === "settings") {
-               setShowSettingsModal(true);
-             } else {
-               setTopView(view);
-             }
-           }}
-           onBottomViewChange={(view) => {
-             if (view === "settings") {
-               setShowSettingsModal(true);
-             } else {
-               setBottomView(view);
-             }
-           }}
-           onNewTerminal={handleNewTerminalTab}
-         />
-
-           {/* Left side panel */}
-          {(topView !== "none" || bottomView !== "none") && (
-            <ResizablePanel side="left" defaultWidth={compactMode ? 200 : 256} minWidth={compactMode ? 160 : 200} maxWidth={compactMode ? 320 : 400} className="">
-              {(() => {
-                const topPanel = topView !== "none" ? <SidebarPanel view={topView} {...sidebarPanelProps} /> : null;
-                const bottomPanel = bottomView !== "none" ? <SidebarPanel view={bottomView} {...sidebarPanelProps} /> : null;
-
-                if (topPanel && bottomPanel) {
-                  return <SidebarSplitter top={topPanel} bottom={bottomPanel} />;
-                }
-                return topPanel || bottomPanel;
-              })()}
-          </ResizablePanel>
-        )}
-
-        <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
-          {tabs.length === 0 && (
-            <div className="absolute inset-0 z-10">
-              <EmptyEditorState
-                onNewFile={() => {
-                  if (isProjectMode(editorMode)) {
-                    setTopView("files");
-                    setNewFileTrigger(prev => prev + 1);
-                  } else {
-                    newTab();
-                  }
-                }}
-                onOpenFile={() => void openFile()}
-                onNewTerminal={handleNewTerminalTab}
-              />
-            </div>
-          )}
-          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-          <div className="flex-1 flex flex-col overflow-hidden" onContextMenu={handleTabBarContextMenu}>
-          <DockviewReact
-            className="flex-1 dockview-theme-illusions"
-            components={{
-              editor: ({ api: panelApi, params: panelParams }) => {
-                // Identity/layout values come from panelParams (updated via updateParameters)
-                // because dockview-react captures the component function once per panel.
-                // Content is read from tabsRef (a stable ref object whose .current is
-                // always fresh, even inside a stale closure) to avoid triggering
-                // dockview re-renders on every keystroke.
-                const panelBufferId = panelParams?.bufferId ?? "";
-                const panelFilePath = panelParams?.filePath ?? "";
-                const panelFileType = (panelParams?.fileType ?? ".mdi") as string;
-                const panelEditorKey = panelParams?.editorKey ?? 0;
-                const panelActiveTabId = panelParams?.activeTabId ?? "";
-                const isActivePanel = panelBufferId === panelActiveTabId;
-                const panelMdiEnabled = panelFileType === ".mdi";
-                const panelGfmEnabled = panelFileType !== ".txt";
-
-                // Look up content from the live tabs ref (not params)
-                const liveTab = tabsRef.current.find((t) => t.id === panelBufferId);
-                const liveEditorTab = liveTab && isEditorTab(liveTab) ? liveTab : undefined;
-                const panelContent = liveEditorTab?.content ?? "";
-                const panelLastSavedContent = liveEditorTab?.lastSavedContent ?? "";
-
-                if (editorDiff && isActivePanel) {
-                  return (
-                    <EditorDiffView
-                      snapshotContent={editorDiff.snapshotContent}
-                      currentContent={editorDiff.currentContent}
-                      snapshotLabel={editorDiff.label}
-                      onClose={() => setEditorDiff(null)}
-                    />
-                  );
-                }
-
-                if (isActivePanel) {
-                  return (
-                    <ErrorBoundary sectionName="エディタ">
-                      <div ref={editorDomRef} className="h-full">
-                        <NovelEditor
-                          key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}`}
-                          initialContent={panelContent}
-                          onChange={handleChange}
-                          onInsertText={handleInsertText}
-                          onSelectionChange={setSelectedCharCount}
-                          searchOpenTrigger={searchOpenTrigger}
-                          searchInitialTerm={searchInitialTerm}
-                          onEditorViewReady={setEditorViewInstance}
-                          programmaticScrollRef={programmaticScrollRef}
-                          onShowAllSearchResults={handleShowAllSearchResults}
-                          lintingRuleRunner={ruleRunner}
-                          onLintIssuesUpdated={handleLintIssuesUpdated}
-                          onNlpError={handleNlpError}
-                          onOpenRubyDialog={handleOpenRubyDialog}
-                          onToggleTcy={handleToggleTcy}
-                          onOpenDictionary={handleOpenDictionary}
-                          onShowLintHint={handleShowLintHint}
-                          onIgnoreCorrection={handleIgnoreCorrection}
-                          mdiExtensionsEnabled={panelMdiEnabled}
-                          gfmEnabled={panelGfmEnabled}
-                        />
-                      </div>
-                    </ErrorBoundary>
-                  );
-                }
-
-                // Non-active panel: render a lightweight read-only editor
-                // that activates the tab when clicked
-                return (
-                  <div
-                    className="h-full cursor-pointer"
-                    onClick={() => {
-                      switchTab(panelBufferId);
-                      panelApi.setActive();
-                    }}
-                  >
-                    <ErrorBoundary sectionName="エディタ">
-                      <NovelEditor
-                        key={`tab-${panelBufferId}-${panelFilePath}-inactive`}
-                        initialContent={panelLastSavedContent}
-                        mdiExtensionsEnabled={panelMdiEnabled}
-                        gfmEnabled={panelGfmEnabled}
-                      />
-                    </ErrorBoundary>
-                  </div>
-                );
-              },
-              // Placeholder components for Phase 2/4 implementation
-              terminal: TerminalPanel,
-              diff: DiffPanel,
-            }}
-            tabComponents={dockviewTabComponents}
-            onReady={handleDockviewReady}
-          />
-          {tabBarMenu && (
-            <ContextMenu
-              menu={tabBarMenu}
-              onAction={handleTabBarMenuAction}
-              onClose={closeTabBarMenu}
-            />
-          )}
-          </div>
-
-           {/* Save complete toast */}
-          {showSaveToast && (
-            <div
-              className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-background-elevated border border-border rounded-lg shadow-lg flex items-center gap-2 z-50 ${
-                saveToastExiting ? 'animate-save-toast-out' : 'animate-save-toast-in'
-              }`}
-            >
-              <span className="text-success text-sm font-medium">✓</span>
-              <span className="text-foreground-secondary text-sm">保存完了</span>
-            </div>
-           )}
-         </main>
-
-          {/* Right side panel: statistics (auto-collapse when no tabs open) */}
-          <ResizablePanel
-            side="right"
-            defaultWidth={compactMode ? 200 : 256}
-            minWidth={compactMode ? 160 : 200}
-            maxWidth={compactMode ? 320 : 400}
-            collapsible={true}
-            isCollapsed={isRightPanelCollapsed || tabs.length === 0}
-            onToggleCollapse={handleToggleRightPanel}
-          >
-          <ErrorBoundary sectionName="インスペクタ">
-          {activeEditorTab ? (
-            <Inspector
-              compactMode={compactMode}
-              charCount={charCount}
-              selectedCharCount={selectedCharCount}
-              paragraphCount={paragraphCount}
-              fileName={fileName}
-              isDirty={isDirty}
-              isSaving={isSaving}
-              lastSavedTime={lastSavedTime}
-              onSaveFile={saveFile}
-              onFileNameChange={updateFileName}
-              sentenceCount={sentenceCount}
-              charTypeAnalysis={charTypeAnalysis}
-              charUsageRates={charUsageRates}
-              readabilityAnalysis={readabilityAnalysis}
-              onOpenPosHighlightSettings={handleOpenPosHighlightSettings}
-              activeFileName={currentFile?.name}
-              currentContent={content}
-              onHistoryRestore={(restoredContent: string) => {
-                setContent(restoredContent);
-                incrementEditorKey();
-              }}
-              onCompareInEditor={setEditorDiff}
-              lintIssues={enrichedLintIssues}
-              onNavigateToIssue={handleNavigateToIssue}
-              onApplyFix={handleApplyFix}
-              onIgnoreCorrection={handleIgnoreCorrection}
-              onRefreshLinting={refreshLinting}
-              isLinting={isLinting}
-              activeLintIssueIndex={activeLintIssueIndex}
-              onOpenLintingSettings={handleOpenLintingSettings}
-              onApplyLintPreset={handleApplyLintPreset}
-              activeLintPresetId={activeLintPresetId}
-              switchToCorrectionsTrigger={switchToCorrectionsTrigger}
-            />
-          ) : (
-            // Non-editor tab (terminal / diff): inspector is unavailable
-            <div className="h-full flex items-center justify-center p-4">
-              <p className="text-foreground-secondary text-sm text-center">
-                インスペクタはエディタタブでのみ使用できます
-              </p>
-            </div>
-          )}
-          </ErrorBoundary>
-        </ResizablePanel>
-      </div>
-    </div>
-      </EditorSettingsProvider>
-      </TerminalTabContext.Provider>
-      </DiffTabContext.Provider>
+  return (
+    <EditorLayout
+      providers={{
+        diffTabContextValue,
+        terminalTabContextValue,
+        settings,
+        settingsHandlers,
+      }}
+      chrome={{
+        currentFile,
+        isDirty,
+        isElectron,
+        handleMenuAction,
+        recentProjects,
+        compactMode,
+      }}
+      dialogs={{
+        unsavedWarning,
+        pendingCloseTabId,
+        pendingCloseFileName,
+        handleCloseTabSave,
+        handleCloseTabDiscard,
+        handleCloseTabCancel,
+        showDesktopOnlyDialog,
+        setShowDesktopOnlyDialog,
+        confirmRemoveRecent,
+        setConfirmRemoveRecent,
+        handleDeleteRecentProject,
+        showSettingsModal,
+        setShowSettingsModal,
+        settingsInitialCategory,
+        setSettingsInitialCategory,
+        showRubyDialog,
+        setShowRubyDialog,
+        rubySelectedText,
+        handleApplyRuby,
+      }}
+      recovery={{
+        wasAutoRecovered,
+        dismissedRecovery,
+        recoveryExiting,
+        setRecoveryExiting,
+        currentFileName: currentFile?.name,
+      }}
+      upgrade={{
+        showUpgradeBanner,
+        upgradeBannerDismissed,
+        editorMode,
+        featuresProjectMode: features.projectMode,
+        handleUpgrade,
+        handleUpgradeDismiss,
+      }}
+      activityBar={{
+        topView,
+        bottomView,
+        setTopView,
+        setBottomView,
+        handleNewTerminalTab,
+      }}
+      mainArea={{
+        tabs,
+        editorMode,
+        newTab,
+        openFile,
+        setNewFileTrigger,
+        handleTabBarContextMenu,
+        tabBarMenu,
+        handleTabBarMenuAction,
+        closeTabBarMenu,
+        handleDockviewReady,
+        sidebarPanelProps,
+        tabsRef,
+        editorDiff,
+        setEditorDiff,
+        editorDomRef,
+        handleChange,
+        handleInsertText,
+        setSelectedCharCount,
+        searchOpenTrigger,
+        searchInitialTerm,
+        setEditorViewInstance,
+        programmaticScrollRef,
+        handleShowAllSearchResults,
+        ruleRunner,
+        handleLintIssuesUpdated,
+        handleNlpError,
+        handleOpenRubyDialog,
+        handleToggleTcy,
+        handleOpenDictionary,
+        handleShowLintHint,
+        handleIgnoreCorrection,
+        switchTab,
+      }}
+      inspector={{
+        isRightPanelCollapsed,
+        handleToggleRightPanel,
+        activeEditorTab,
+        props: inspectorProps,
+        showSaveToast,
+        saveToastExiting,
+      }}
+    />
   );
 }
