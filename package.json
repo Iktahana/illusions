@@ -14,6 +14,9 @@
     "build": "npm run type-check && npm run generate:credits && next build",
     "start": "next start",
     "lint": "next lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
+    "prepare": "husky",
     "download:fonts": "node scripts/download-local-fonts.mjs",
     "bundle:electron": "node scripts/bundle-electron.mjs",
     "electron:dev": "npm run bundle:electron && concurrently \"next dev -p 3020\" \"wait-on http://localhost:3020 && cross-env ELECTRON_DEV=1 electron .\"",
@@ -94,8 +97,10 @@
     "eslint-config-next": "^16.1.6",
     "jsdom": "^28.1.0",
     "license-checker": "^25.0.1",
+    "lint-staged": "^15.5.2",
     "lucide-react": "^0.469.0",
     "postcss": "^8.4.49",
+    "prettier": "^3.8.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "serwist": "^9.5.5",
@@ -103,7 +108,20 @@
     "typescript": "^5.7.2",
     "unist-util-visit": "^5.0.0",
     "vitest": "^4.0.18",
-    "wait-on": "^9.0.3"
+    "wait-on": "^9.0.3",
+    "husky": "^9.1.7"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix --max-warnings=0"
+    ],
+    "*.{js,mjs}": [
+      "prettier --write"
+    ],
+    "*.{json,css,md}": [
+      "prettier --write"
+    ]
   },
   "build": {
     "appId": "com.iktahana.illusions",
