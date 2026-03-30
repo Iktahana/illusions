@@ -23,7 +23,7 @@
  *   POLL_TIMEOUT_MS           - Polling timeout in ms (default: 600000 = 10 min)
  */
 
-import { readFileSync, readdirSync, createReadStream, statSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, createReadStream, statSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -185,10 +185,12 @@ function stripHtmlComments(text) {
 /**
  * Reads a Markdown file, strips HTML comments, and returns trimmed content.
  * @param {string} name  Filename within STORE_METADATA_DIR
+ * @param {{ required?: boolean }} [options]
  * @returns {string}
  */
-function readListingFile(name) {
+function readListingFile(name, { required = true } = {}) {
   const filePath = join(STORE_METADATA_DIR, name);
+  if (!required && !existsSync(filePath)) return '';
   const raw = readFileSync(filePath, 'utf-8');
   return stripHtmlComments(raw).trim();
 }
@@ -329,7 +331,7 @@ async function main() {
   const description = readListingFile('description.md');
   const shortDescription = readListingFile('short-description.md');
   const featuresMarkdown = readListingFile('features.md');
-  const releaseNotes = readListingFile('release-notes.md');
+  const releaseNotes = readListingFile('release-notes.md', { required: false });
   const features = parseBulletList(featuresMarkdown);
 
   console.log(`  description:      ${description.length} chars`);
