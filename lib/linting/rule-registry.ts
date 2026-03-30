@@ -5,7 +5,10 @@ import type { LintRule } from "@/lib/linting/types";
 // ---------------------------------------------------------------------------
 import { createJtfL1Rules } from "@/lib/linting/rules/json-l1/jtf-l1-rules";
 import { createManuscriptL1Rules } from "@/lib/linting/rules/json-l1/manuscript-l1-rules";
-import { createGendaiKanazukaiL1Rules, createNihongoHyoukiL1Rules } from "@/lib/linting/rules/json-l1";
+import {
+  createGendaiKanazukaiL1Rules,
+  createNihongoHyoukiL1Rules,
+} from "@/lib/linting/rules/json-l1";
 
 /** Return all hand-written rules (currently none — all moved to JSON-driven). */
 export function getAllRules(): LintRule[] {

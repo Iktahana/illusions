@@ -58,12 +58,10 @@ export default function SnapshotItem({
           <span
             className={clsx(
               "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0",
-              getSnapshotTypeBadgeClass(snapshot.type)
+              getSnapshotTypeBadgeClass(snapshot.type),
             )}
           >
-            {snapshot.type === "milestone" && (
-              <Pin className="w-2.5 h-2.5" />
-            )}
+            {snapshot.type === "milestone" && <Pin className="w-2.5 h-2.5" />}
             {getSnapshotTypeLabel(snapshot.type)}
           </span>
         </div>
@@ -74,9 +72,7 @@ export default function SnapshotItem({
 
       {/* Milestone label */}
       {snapshot.label && (
-        <p className="text-xs font-medium text-foreground-secondary mb-1">
-          {snapshot.label}
-        </p>
+        <p className="text-xs font-medium text-foreground-secondary mb-1">{snapshot.label}</p>
       )}
 
       {/* Row 2: Diff indicator + actions */}
@@ -91,7 +87,7 @@ export default function SnapshotItem({
               "p-1 rounded transition-colors",
               isBookmarked
                 ? "text-accent"
-                : "text-foreground-tertiary hover:text-accent hover:bg-hover"
+                : "text-foreground-tertiary hover:text-accent hover:bg-hover",
             )}
             title={isBookmarked ? "ブックマークを解除" : "ブックマークに追加"}
           >
@@ -111,7 +107,10 @@ export default function SnapshotItem({
             {menuOpen && (
               <div className="absolute right-0 bottom-full mb-1 z-10 min-w-[120px] rounded-lg border border-border bg-background-secondary shadow-lg py-1">
                 <button
-                  onClick={() => { setMenuOpen(false); onRestore(snapshot); }}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onRestore(snapshot);
+                  }}
                   disabled={isRestoring}
                   className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] font-medium text-foreground-secondary hover:bg-hover transition-colors disabled:opacity-50"
                 >
@@ -123,7 +122,10 @@ export default function SnapshotItem({
                   復元
                 </button>
                 <button
-                  onClick={() => { setMenuOpen(false); onCompare(snapshot); }}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onCompare(snapshot);
+                  }}
                   disabled={isLoadingDiff}
                   className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] font-medium text-foreground-secondary hover:bg-hover transition-colors disabled:opacity-50"
                 >

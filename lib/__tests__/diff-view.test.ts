@@ -184,13 +184,8 @@ describe("DiffTab lifecycle", () => {
    * closes. In the real app this is handled by the closeTab handler in
    * useTabState. We test the pure data-layer logic here.
    */
-  function closeDiffTabsForSource(
-    tabs: TabState[],
-    sourceTabId: string,
-  ): TabState[] {
-    return tabs.filter(
-      (t) => !(isDiffTab(t) && t.sourceTabId === sourceTabId),
-    );
+  function closeDiffTabsForSource(tabs: TabState[], sourceTabId: string): TabState[] {
+    return tabs.filter((t) => !(isDiffTab(t) && t.sourceTabId === sourceTabId));
   }
 
   it("removes the diff tab when the source editor tab is closed", () => {

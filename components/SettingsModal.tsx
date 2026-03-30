@@ -1,7 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium, AudioLines, Keyboard, Terminal } from "lucide-react";
+import {
+  X,
+  Settings,
+  Columns2,
+  Highlighter,
+  SpellCheck,
+  BatteryMedium,
+  AudioLines,
+  Keyboard,
+  Terminal,
+} from "lucide-react";
 import clsx from "clsx";
 
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
@@ -22,14 +32,21 @@ interface SettingsModalProps {
   initialCategory?: SettingsCategory;
 }
 
-export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "speech" | "keymap" | "terminal" | "power" | "about";
+export type SettingsCategory =
+  | "editor"
+  | "vertical"
+  | "pos-highlight"
+  | "linting"
+  | "speech"
+  | "keymap"
+  | "terminal"
+  | "power"
+  | "about";
 
-export default function SettingsModal({
-  isOpen,
-  onClose,
-  initialCategory,
-}: SettingsModalProps) {
-  const [activeCategory, setActiveCategory] = useState<SettingsCategory>(initialCategory ?? "editor");
+export default function SettingsModal({ isOpen, onClose, initialCategory }: SettingsModalProps) {
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>(
+    initialCategory ?? "editor",
+  );
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Sync initialCategory when modal opens
@@ -77,7 +94,7 @@ export default function SettingsModal({
         ref={modalRef}
         className={clsx(
           "relative w-full h-[80vh] mx-4 rounded-xl bg-background-elevated shadow-xl border border-border flex flex-col transition-[max-width] duration-200",
-          activeCategory === "pos-highlight" ? "max-w-6xl" : "max-w-4xl"
+          activeCategory === "pos-highlight" ? "max-w-6xl" : "max-w-4xl",
         )}
       >
         {/* Header */}
@@ -103,7 +120,7 @@ export default function SettingsModal({
                   "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
                   activeCategory === "editor"
                     ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
                 )}
               >
                 <Settings className="w-4 h-4" />
@@ -115,7 +132,7 @@ export default function SettingsModal({
                   "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
                   activeCategory === "vertical"
                     ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
                 )}
               >
                 <Columns2 className="w-4 h-4" />
@@ -127,7 +144,7 @@ export default function SettingsModal({
                   "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
                   activeCategory === "pos-highlight"
                     ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
                 )}
               >
                 <Highlighter className="w-4 h-4" />
@@ -139,7 +156,7 @@ export default function SettingsModal({
                   "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
                   activeCategory === "linting"
                     ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
                 )}
               >
                 <SpellCheck className="w-4 h-4" />
@@ -151,7 +168,7 @@ export default function SettingsModal({
                   "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
                   activeCategory === "speech"
                     ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
                 )}
               >
                 <AudioLines className="w-4 h-4" />
@@ -163,7 +180,7 @@ export default function SettingsModal({
                   "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
                   activeCategory === "keymap"
                     ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
                 )}
               >
                 <Keyboard className="w-4 h-4" />
@@ -176,7 +193,7 @@ export default function SettingsModal({
                     "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
                     activeCategory === "terminal"
                       ? "bg-accent text-accent-foreground"
-                      : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                      : "text-foreground-secondary hover:bg-hover hover:text-foreground",
                   )}
                 >
                   <Terminal className="w-4 h-4" />
@@ -190,7 +207,7 @@ export default function SettingsModal({
                     "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
                     activeCategory === "power"
                       ? "bg-accent text-accent-foreground"
-                      : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                      : "text-foreground-secondary hover:bg-hover hover:text-foreground",
                   )}
                 >
                   <BatteryMedium className="w-4 h-4" />
@@ -204,7 +221,7 @@ export default function SettingsModal({
                   "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                   activeCategory === "about"
                     ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
                 )}
               >
                 illusionsについて
@@ -213,10 +230,12 @@ export default function SettingsModal({
           </div>
 
           {/* Right content */}
-          <div className={clsx(
-            "flex-1 p-6",
-            activeCategory === "pos-highlight" ? "overflow-hidden" : "overflow-y-auto"
-          )}>
+          <div
+            className={clsx(
+              "flex-1 p-6",
+              activeCategory === "pos-highlight" ? "overflow-hidden" : "overflow-y-auto",
+            )}
+          >
             {activeCategory === "editor" && <TypographySettingsTab />}
             {activeCategory === "vertical" && <VerticalSettingsTab />}
             {activeCategory === "pos-highlight" && <PosHighlightSettingsTab />}

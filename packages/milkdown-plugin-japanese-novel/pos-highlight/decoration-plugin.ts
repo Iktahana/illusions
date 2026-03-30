@@ -5,17 +5,22 @@
  * ビューポート内の段落のみを非同期で処理し、トークンキャッシュで効率化
  */
 
-import { Plugin, PluginKey } from '@milkdown/prose/state';
-import { Decoration, DecorationSet } from '@milkdown/prose/view';
-import type { EditorView } from '@milkdown/prose/view';
-import { getNlpClient } from '@/lib/nlp-client/nlp-client';
-import type { Token as NlpToken } from '@/lib/nlp-client/types';
-import { LRUCache } from '@/lib/utils/lru-cache';
-import { getAtomOffset, collectParagraphs, findScrollContainer, getVisibleParagraphs } from '../shared/paragraph-helpers';
-import { getPosColor, DEFAULT_POS_COLORS } from './pos-colors';
-import type { PosColorConfig } from './types';
+import { Plugin, PluginKey } from "@milkdown/prose/state";
+import { Decoration, DecorationSet } from "@milkdown/prose/view";
+import type { EditorView } from "@milkdown/prose/view";
+import { getNlpClient } from "@/lib/nlp-client/nlp-client";
+import type { Token as NlpToken } from "@/lib/nlp-client/types";
+import { LRUCache } from "@/lib/utils/lru-cache";
+import {
+  getAtomOffset,
+  collectParagraphs,
+  findScrollContainer,
+  getVisibleParagraphs,
+} from "../shared/paragraph-helpers";
+import { getPosColor, DEFAULT_POS_COLORS } from "./pos-colors";
+import type { PosColorConfig } from "./types";
 
-export const posHighlightKey = new PluginKey('posHighlight');
+export const posHighlightKey = new PluginKey("posHighlight");
 
 /** Compare two Sets for equality */
 function setsEqual(a?: Set<string>, b?: Set<string>): boolean {
@@ -44,7 +49,7 @@ export interface PosHighlightPluginOptions {
  * 構文ハイライトプラグインを作成
  */
 export function createPosHighlightPlugin(
-  options: PosHighlightPluginOptions
+  options: PosHighlightPluginOptions,
 ): Plugin<PosHighlightState> {
   const { enabled, colors, disabledTypes = [], debounceMs = 300 } = options;
 
@@ -125,7 +130,7 @@ export function createPosHighlightPlugin(
       };
 
       // スクロールコンテナにリスナーを追加
-      scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+      scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
 
       // 初期化時に実行
       if (enabled) {
@@ -150,25 +155,24 @@ export function createPosHighlightPlugin(
           const visibleParagraphs = getVisibleParagraphs(view, allParagraphs, 2);
 
           // キャッシュにない段落のみをNLPで処理
-          const uncachedParagraphs = visibleParagraphs.filter(p => !tokenCache.has(p.text));
+          const uncachedParagraphs = visibleParagraphs.filter((p) => !tokenCache.has(p.text));
 
           if (uncachedParagraphs.length > 0) {
-
             try {
-              const paragraphData = uncachedParagraphs.map(p => ({ pos: p.pos, text: p.text }));
+              const paragraphData = uncachedParagraphs.map((p) => ({ pos: p.pos, text: p.text }));
               const results = await nlpClient.tokenizeDocument(paragraphData);
 
               if (version !== processingVersion) return;
 
               // 結果をキャッシュに保存
               for (const result of results) {
-                const paragraph = uncachedParagraphs.find(p => p.pos === result.pos);
+                const paragraph = uncachedParagraphs.find((p) => p.pos === result.pos);
                 if (paragraph) {
                   tokenCache.set(paragraph.text, result.tokens);
                 }
               }
             } catch (err) {
-              console.error('[PosHighlight] Tokenization failed:', err);
+              console.error("[PosHighlight] Tokenization failed:", err);
               return;
             }
           }
@@ -189,11 +193,10 @@ export function createPosHighlightPlugin(
               // Skip disabled POS types
               if (state.disabledTypes.has(token.pos)) continue;
 
-              const color = getPosColor(
-                token.pos,
-                token.pos_detail_1,
-                { ...DEFAULT_POS_COLORS, ...state.colors }
-              );
+              const color = getPosColor(token.pos, token.pos_detail_1, {
+                ...DEFAULT_POS_COLORS,
+                ...state.colors,
+              });
 
               if (color) {
                 const extraFrom = getAtomOffset(paragraph.atomAdjustments, token.start);
@@ -205,19 +208,19 @@ export function createPosHighlightPlugin(
                   Decoration.inline(from, to, {
                     style: `color: ${color}`,
                     class: `pos-${token.pos}`,
-                  })
+                  }),
                 );
               }
             }
           }
 
           // デコレーションを適用
-          const decorations = allDecorations.length > 0
-            ? DecorationSet.create(view.state.doc, allDecorations)
-            : DecorationSet.empty;
+          const decorations =
+            allDecorations.length > 0
+              ? DecorationSet.create(view.state.doc, allDecorations)
+              : DecorationSet.empty;
           const tr = view.state.tr.setMeta(posHighlightKey, { decorations });
           view.dispatch(tr);
-
         }, debounceMs);
       }
 
@@ -236,10 +239,11 @@ export function createPosHighlightPlugin(
           }
 
           // colors or disabledTypes が変更された場合
-          if (state?.enabled && (
-            JSON.stringify(state.colors) !== JSON.stringify(prevPluginState?.colors) ||
-            !setsEqual(state.disabledTypes, prevPluginState?.disabledTypes)
-          )) {
+          if (
+            state?.enabled &&
+            (JSON.stringify(state.colors) !== JSON.stringify(prevPluginState?.colors) ||
+              !setsEqual(state.disabledTypes, prevPluginState?.disabledTypes))
+          ) {
             scheduleViewportUpdate(view);
             return;
           }
@@ -254,7 +258,7 @@ export function createPosHighlightPlugin(
         destroy() {
           if (debounceTimer) clearTimeout(debounceTimer);
           if (scrollTimer) clearTimeout(scrollTimer);
-          scrollContainer.removeEventListener('scroll', handleScroll);
+          scrollContainer.removeEventListener("scroll", handleScroll);
           tokenCache.clear();
         },
       };

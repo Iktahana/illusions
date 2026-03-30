@@ -4,15 +4,15 @@ illusions で使用されている全てのオーバーレイ UI コンポーネ
 
 ## Summary
 
-| Category | Count | Components |
-|----------|-------|------------|
-| Modal / Dialog | 8 | GlassDialog, ConfirmDialog, FileConflictDialog, RubyDialog, SearchDialog, UnsavedWarningDialog, SettingsModal, CreateProjectWizard, PermissionPrompt |
-| Toast / Notification | 2 | Notification, NotificationContainer |
-| Dropdown / Popover | 4 | ColorPicker, FontSelector, MenuDropdown, NewTabMenu |
-| Context Menu | 2 | ContextMenu, EditorContextMenu |
-| Floating Toolbar | 1 | BubbleMenu |
-| Banner | 1 | UpgradeToProjectBanner |
-| Tooltip | 2 | InfoTooltip (Inspector), Timestamp Tooltip (HistoryPanel) |
+| Category             | Count | Components                                                                                                                                           |
+| -------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Modal / Dialog       | 8     | GlassDialog, ConfirmDialog, FileConflictDialog, RubyDialog, SearchDialog, UnsavedWarningDialog, SettingsModal, CreateProjectWizard, PermissionPrompt |
+| Toast / Notification | 2     | Notification, NotificationContainer                                                                                                                  |
+| Dropdown / Popover   | 4     | ColorPicker, FontSelector, MenuDropdown, NewTabMenu                                                                                                  |
+| Context Menu         | 2     | ContextMenu, EditorContextMenu                                                                                                                       |
+| Floating Toolbar     | 1     | BubbleMenu                                                                                                                                           |
+| Banner               | 1     | UpgradeToProjectBanner                                                                                                                               |
+| Tooltip              | 2     | InfoTooltip (Inspector), Timestamp Tooltip (HistoryPanel)                                                                                            |
 
 ---
 
@@ -144,27 +144,27 @@ All modal dialogs share a common base: `GlassDialog` — frosted-glass overlay w
 ### API
 
 ```typescript
-import { notificationManager } from '@/lib/notification-manager';
+import { notificationManager } from "@/lib/notification-manager";
 
 // Simple messages
-notificationManager.info('処理が完了しました');
-notificationManager.warning('注意が必要です');
-notificationManager.error('保存に失敗しました');
-notificationManager.success('ファイルを保存しました');
+notificationManager.info("処理が完了しました");
+notificationManager.warning("注意が必要です");
+notificationManager.error("保存に失敗しました");
+notificationManager.success("ファイルを保存しました");
 
 // With action buttons
-notificationManager.showMessage('保存に失敗しました', {
-  type: 'error',
+notificationManager.showMessage("保存に失敗しました", {
+  type: "error",
   duration: 0, // persistent
   actions: [
-    { label: '再試行', onClick: () => saveFile() },
-    { label: '設定を開く', onClick: () => openSettings() },
+    { label: "再試行", onClick: () => saveFile() },
+    { label: "設定を開く", onClick: () => openSettings() },
   ],
 });
 
 // Progress
-const id = notificationManager.showProgress('アップロード中...', { progress: 0 });
-notificationManager.updateProgress(id, 50, 'アップロード中... 50%');
+const id = notificationManager.showProgress("アップロード中...", { progress: 0 });
+notificationManager.updateProgress(id, 50, "アップロード中... 50%");
 notificationManager.updateProgress(id, 100); // auto-closes after 3s
 ```
 

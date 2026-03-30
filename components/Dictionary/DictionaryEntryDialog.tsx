@@ -80,9 +80,7 @@ export default function DictionaryEntryDialog({
 
           {/* POS - Dropdown */}
           <div>
-            <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-              品詞
-            </label>
+            <label className="text-xs font-medium text-foreground-secondary mb-1 block">品詞</label>
             <select
               value={formData.partOfSpeech || ""}
               onChange={(e) => onFormChange({ ...formData, partOfSpeech: e.target.value })}
@@ -99,9 +97,7 @@ export default function DictionaryEntryDialog({
 
           {/* Definition (optional) */}
           <div>
-            <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-              意味
-            </label>
+            <label className="text-xs font-medium text-foreground-secondary mb-1 block">意味</label>
             <textarea
               placeholder="この言葉の意味を入力してください"
               value={formData.definition || ""}
@@ -113,9 +109,7 @@ export default function DictionaryEntryDialog({
 
           {/* Examples */}
           <div>
-            <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-              用例
-            </label>
+            <label className="text-xs font-medium text-foreground-secondary mb-1 block">用例</label>
             <textarea
               placeholder="使用例を入力してください"
               value={formData.examples || ""}
@@ -127,9 +121,7 @@ export default function DictionaryEntryDialog({
 
           {/* Notes */}
           <div>
-            <label className="text-xs font-medium text-foreground-secondary mb-1 block">
-              メモ
-            </label>
+            <label className="text-xs font-medium text-foreground-secondary mb-1 block">メモ</label>
             <textarea
               placeholder="メモや補足情報を入力してください"
               value={formData.notes || ""}

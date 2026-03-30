@@ -84,9 +84,7 @@ export function useTabManager(options?: {
 
   // --- Electron IPC bindings & browser event listeners --------------------
 
-  const systemFileOpenHandlerRef = useRef<
-    ((path: string, content: string) => void) | null
-  >(null);
+  const systemFileOpenHandlerRef = useRef<((path: string, content: string) => void) | null>(null);
 
   // flushTabState is provided by useTabPersistence below; use a ref so the
   // menu bindings can call it in the async onSaveBeforeClose handler.
@@ -148,12 +146,9 @@ export function useTabManager(options?: {
   const newFile = tabState.newTab;
 
   // Register system file open callback
-  const onSystemFileOpen = useCallback(
-    (handler: (path: string, content: string) => void) => {
-      systemFileOpenHandlerRef.current = handler;
-    },
-    [],
-  );
+  const onSystemFileOpen = useCallback((handler: (path: string, content: string) => void) => {
+    systemFileOpenHandlerRef.current = handler;
+  }, []);
 
   // -----------------------------------------------------------------------
   // Return the exact same interface as the original hook

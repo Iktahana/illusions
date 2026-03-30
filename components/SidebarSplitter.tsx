@@ -12,11 +12,7 @@ interface SidebarSplitterProps {
 const MIN_RATIO = 20;
 const MAX_RATIO = 80;
 
-export default function SidebarSplitter({
-  top,
-  bottom,
-  defaultRatio = 50,
-}: SidebarSplitterProps) {
+export default function SidebarSplitter({ top, bottom, defaultRatio = 50 }: SidebarSplitterProps) {
   const [ratio, setRatio] = useState(defaultRatio);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -45,7 +41,7 @@ export default function SidebarSplitter({
       document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", onMouseUp);
     },
-    [ratio]
+    [ratio],
   );
 
   return (

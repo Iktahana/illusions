@@ -34,7 +34,7 @@ export function renderFormattedTitle(title: string): ReactNode {
           nodes.push(
             <strong key={nextKey()} className="font-semibold text-foreground">
               {parseSegment(segment.slice(idx + 2, end))}
-            </strong>
+            </strong>,
           );
           idx = end + 2;
           continue;
@@ -47,7 +47,7 @@ export function renderFormattedTitle(title: string): ReactNode {
           nodes.push(
             <strong key={nextKey()} className="font-semibold text-foreground">
               {parseSegment(segment.slice(idx + 2, end))}
-            </strong>
+            </strong>,
           );
           idx = end + 2;
           continue;
@@ -60,7 +60,7 @@ export function renderFormattedTitle(title: string): ReactNode {
           nodes.push(
             <span key={nextKey()} className="text-foreground-tertiary line-through">
               {parseSegment(segment.slice(idx + 2, end))}
-            </span>
+            </span>,
           );
           idx = end + 2;
           continue;
@@ -73,7 +73,7 @@ export function renderFormattedTitle(title: string): ReactNode {
           nodes.push(
             <em key={nextKey()} className="italic text-foreground-secondary">
               {parseSegment(segment.slice(idx + 1, end))}
-            </em>
+            </em>,
           );
           idx = end + 1;
           continue;
@@ -86,7 +86,7 @@ export function renderFormattedTitle(title: string): ReactNode {
           nodes.push(
             <em key={nextKey()} className="italic text-foreground-secondary">
               {parseSegment(segment.slice(idx + 1, end))}
-            </em>
+            </em>,
           );
           idx = end + 1;
           continue;
@@ -97,9 +97,12 @@ export function renderFormattedTitle(title: string): ReactNode {
         const end = segment.indexOf("`", idx + 1);
         if (end > idx) {
           nodes.push(
-            <code key={nextKey()} className="font-mono text-xs text-foreground-secondary bg-background-tertiary px-1 rounded-sm">
+            <code
+              key={nextKey()}
+              className="font-mono text-xs text-foreground-secondary bg-background-tertiary px-1 rounded-sm"
+            >
               {segment.slice(idx + 1, end)}
-            </code>
+            </code>,
           );
           idx = end + 1;
           continue;
@@ -116,7 +119,7 @@ export function renderFormattedTitle(title: string): ReactNode {
           nodes.push(
             <strong key={nextKey()} className="font-semibold text-foreground">
               {parseSegment(label)}
-            </strong>
+            </strong>,
           );
           idx = closeParen + 1;
           continue;
@@ -126,9 +129,7 @@ export function renderFormattedTitle(title: string): ReactNode {
       const nextSpecial = findNextSpecial(segment, idx);
       const plainText = segment.slice(idx, nextSpecial);
       if (plainText) {
-        nodes.push(
-          <span key={nextKey()}>{plainText}</span>
-        );
+        nodes.push(<span key={nextKey()}>{plainText}</span>);
       }
       idx = nextSpecial;
     }

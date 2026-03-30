@@ -30,12 +30,8 @@ function splitPath(path: string): string[] {
 /**
  * Type guard for checking if showDirectoryPicker is available.
  */
-function hasShowDirectoryPicker(
-  w: Window
-): w is Window & {
-  showDirectoryPicker: (
-    options?: { mode?: string }
-  ) => Promise<FileSystemDirectoryHandle>;
+function hasShowDirectoryPicker(w: Window): w is Window & {
+  showDirectoryPicker: (options?: { mode?: string }) => Promise<FileSystemDirectoryHandle>;
 } {
   return "showDirectoryPicker" in w;
 }
@@ -52,7 +48,7 @@ function hasShowDirectoryPicker(
 async function resolveDirectoryHandle(
   root: FileSystemDirectoryHandle,
   segments: string[],
-  create = false
+  create = false,
 ): Promise<FileSystemDirectoryHandle> {
   let current = root;
   for (const segment of segments) {
@@ -73,7 +69,7 @@ async function resolveDirectoryHandle(
 async function resolveFileHandle(
   root: FileSystemDirectoryHandle,
   path: string,
-  create = false
+  create = false,
 ): Promise<FileSystemFileHandle> {
   const segments = splitPath(path);
   if (segments.length === 0) {
@@ -118,7 +114,13 @@ class WebVFSFileHandle implements VFSFileHandle {
     // FileSystemFileHandle.createWritable() is not in the base TS types,
     // but is available in browsers that support File System Access API.
 
-    const writable = await (this.handle as unknown as { createWritable(): Promise<WritableStream & { write(data: string): Promise<void>; close(): Promise<void> }> }).createWritable();
+    const writable = await (
+      this.handle as unknown as {
+        createWritable(): Promise<
+          WritableStream & { write(data: string): Promise<void>; close(): Promise<void> }
+        >;
+      }
+    ).createWritable();
     await writable.write(content);
     await writable.close();
   }
@@ -145,10 +147,7 @@ class WebVFSDirectoryHandle implements VFSDirectoryHandle {
     this.path = path;
   }
 
-  async getFileHandle(
-    name: string,
-    options?: { create?: boolean }
-  ): Promise<VFSFileHandle> {
+  async getFileHandle(name: string, options?: { create?: boolean }): Promise<VFSFileHandle> {
     const nativeHandle = await this.handle.getFileHandle(name, {
       create: options?.create ?? false,
     });
@@ -158,7 +157,7 @@ class WebVFSDirectoryHandle implements VFSDirectoryHandle {
 
   async getDirectoryHandle(
     name: string,
-    options?: { create?: boolean }
+    options?: { create?: boolean },
   ): Promise<VFSDirectoryHandle> {
     const nativeHandle = await this.handle.getDirectoryHandle(name, {
       create: options?.create ?? false,
@@ -167,13 +166,14 @@ class WebVFSDirectoryHandle implements VFSDirectoryHandle {
     return new WebVFSDirectoryHandle(nativeHandle, dirPath);
   }
 
-  async removeEntry(
-    name: string,
-    options?: { recursive?: boolean }
-  ): Promise<void> {
+  async removeEntry(name: string, options?: { recursive?: boolean }): Promise<void> {
     // FileSystemDirectoryHandle.removeEntry is part of the File System Access API
 
-    await (this.handle as unknown as { removeEntry(name: string, options?: { recursive?: boolean }): Promise<void> }).removeEntry(name, {
+    await (
+      this.handle as unknown as {
+        removeEntry(name: string, options?: { recursive?: boolean }): Promise<void>;
+      }
+    ).removeEntry(name, {
       recursive: options?.recursive ?? false,
     });
   }
@@ -181,7 +181,9 @@ class WebVFSDirectoryHandle implements VFSDirectoryHandle {
   async *entries(): AsyncIterable<[string, VFSEntry]> {
     // FileSystemDirectoryHandle is an AsyncIterable in supporting browsers
 
-    const iterable = this.handle as unknown as AsyncIterable<[string, FileSystemHandle & { kind: "file" | "directory" }]>;
+    const iterable = this.handle as unknown as AsyncIterable<
+      [string, FileSystemHandle & { kind: "file" | "directory" }]
+    >;
     for await (const [entryName, entryHandle] of iterable) {
       const entryPath = joinPath(this.path, entryName);
       const entry: VFSEntry = {
@@ -218,7 +220,7 @@ export class WebVFS implements VirtualFileSystem {
     if (!hasShowDirectoryPicker(window)) {
       throw new Error(
         "File System Access API is not supported in this browser. " +
-          "Please use Chrome 86+ or a Chromium-based browser."
+          "Please use Chrome 86+ or a Chromium-based browser.",
       );
     }
 
@@ -231,7 +233,7 @@ export class WebVFS implements VirtualFileSystem {
         throw new Error("Directory picker was cancelled by the user.");
       }
       throw new Error(
-        `Failed to open directory: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to open directory: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -254,7 +256,7 @@ export class WebVFS implements VirtualFileSystem {
       return new WebVFSDirectoryHandle(handle, path);
     } catch (error) {
       throw new Error(
-        `Failed to get directory "${path}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to get directory "${path}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -271,7 +273,7 @@ export class WebVFS implements VirtualFileSystem {
       return file.text();
     } catch (error) {
       throw new Error(
-        `Failed to read file "${path}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to read file "${path}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -285,13 +287,19 @@ export class WebVFS implements VirtualFileSystem {
     const root = this.ensureRoot();
     try {
       const fileHandle = await resolveFileHandle(root, path, true);
-  
-      const writable = await (fileHandle as unknown as { createWritable(): Promise<WritableStream & { write(data: string): Promise<void>; close(): Promise<void> }> }).createWritable();
+
+      const writable = await (
+        fileHandle as unknown as {
+          createWritable(): Promise<
+            WritableStream & { write(data: string): Promise<void>; close(): Promise<void> }
+          >;
+        }
+      ).createWritable();
       await writable.write(content);
       await writable.close();
     } catch (error) {
       throw new Error(
-        `Failed to write file "${path}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to write file "${path}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -311,11 +319,13 @@ export class WebVFS implements VirtualFileSystem {
 
     try {
       const parentHandle = await resolveDirectoryHandle(root, segments);
-  
-      await (parentHandle as unknown as { removeEntry(name: string): Promise<void> }).removeEntry(fileName);
+
+      await (parentHandle as unknown as { removeEntry(name: string): Promise<void> }).removeEntry(
+        fileName,
+      );
     } catch (error) {
       throw new Error(
-        `Failed to delete file "${path}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to delete file "${path}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -341,7 +351,7 @@ export class WebVFS implements VirtualFileSystem {
       }
     } catch (error) {
       throw new Error(
-        `Failed to rename "${oldPath}" to "${newPath}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to rename "${oldPath}" to "${newPath}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -349,10 +359,7 @@ export class WebVFS implements VirtualFileSystem {
   /**
    * Check whether a path refers to a directory.
    */
-  private async isDirectory(
-    root: FileSystemDirectoryHandle,
-    path: string
-  ): Promise<boolean> {
+  private async isDirectory(root: FileSystemDirectoryHandle, path: string): Promise<boolean> {
     const segments = splitPath(path);
     if (segments.length === 0) return true;
     try {
@@ -366,10 +373,7 @@ export class WebVFS implements VirtualFileSystem {
   /**
    * Recursively copy a directory and all its contents to a new path.
    */
-  private async copyDirectoryRecursive(
-    srcPath: string,
-    destPath: string
-  ): Promise<void> {
+  private async copyDirectoryRecursive(srcPath: string, destPath: string): Promise<void> {
     const entries = await this.listDirectory(srcPath);
     for (const entry of entries) {
       const srcEntryPath = joinPath(srcPath, entry.name);
@@ -395,7 +399,11 @@ export class WebVFS implements VirtualFileSystem {
     const dirName = segments.pop()!;
     const parentHandle = await resolveDirectoryHandle(root, segments);
 
-    await (parentHandle as unknown as { removeEntry(name: string, options?: { recursive?: boolean }): Promise<void> }).removeEntry(dirName, { recursive: true });
+    await (
+      parentHandle as unknown as {
+        removeEntry(name: string, options?: { recursive?: boolean }): Promise<void>;
+      }
+    ).removeEntry(dirName, { recursive: true });
   }
 
   /**
@@ -415,7 +423,7 @@ export class WebVFS implements VirtualFileSystem {
       };
     } catch (error) {
       throw new Error(
-        `Failed to get metadata for "${path}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to get metadata for "${path}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -429,14 +437,13 @@ export class WebVFS implements VirtualFileSystem {
     const segments = splitPath(path);
 
     try {
-      const dirHandle =
-        segments.length === 0
-          ? root
-          : await resolveDirectoryHandle(root, segments);
+      const dirHandle = segments.length === 0 ? root : await resolveDirectoryHandle(root, segments);
 
       const entries: VFSEntry[] = [];
-  
-      const iterable = dirHandle as unknown as AsyncIterable<[string, FileSystemHandle & { kind: "file" | "directory" }]>;
+
+      const iterable = dirHandle as unknown as AsyncIterable<
+        [string, FileSystemHandle & { kind: "file" | "directory" }]
+      >;
       for await (const [entryName, entryHandle] of iterable) {
         entries.push({
           name: entryName,
@@ -447,7 +454,7 @@ export class WebVFS implements VirtualFileSystem {
       return entries;
     } catch (error) {
       throw new Error(
-        `Failed to list directory "${path}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to list directory "${path}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -479,9 +486,7 @@ export class WebVFS implements VirtualFileSystem {
    */
   private ensureRoot(): FileSystemDirectoryHandle {
     if (!this.rootHandle) {
-      throw new Error(
-        "No root directory has been opened. Call openDirectory() first."
-      );
+      throw new Error("No root directory has been opened. Call openDirectory() first.");
     }
     return this.rootHandle;
   }

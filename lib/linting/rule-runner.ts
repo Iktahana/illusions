@@ -1,11 +1,6 @@
 import type { Token } from "@/lib/nlp-client/types";
 
-import type {
-  CorrectionEngine,
-  LintRule,
-  LintRuleConfig,
-  LintIssue,
-} from "./types";
+import type { CorrectionEngine, LintRule, LintRuleConfig, LintIssue } from "./types";
 import {
   isDocumentLintRule,
   isMorphologicalLintRule,
@@ -209,13 +204,15 @@ export class RuleRunner {
    * Engine field acts as implementation metadata, not architectural boundary.
    */
   getRulesByEngine(engine: CorrectionEngine): LintRule[] {
-    return Array.from(this.rules.values()).filter(r => r.engine === engine);
+    return Array.from(this.rules.values()).filter((r) => r.engine === engine);
   }
 
   /**
    * Checks whether any enabled rules use the given engine.
    */
   hasRulesForEngine(engine: CorrectionEngine): boolean {
-    return Array.from(this.rules.values()).some(r => this.configs.get(r.id)?.enabled !== false && r.engine === engine);
+    return Array.from(this.rules.values()).some(
+      (r) => this.configs.get(r.id)?.enabled !== false && r.engine === engine,
+    );
   }
 }

@@ -6,28 +6,36 @@
  * Supports both per-paragraph rules and document-level rules.
  */
 
-import { Plugin, PluginKey } from '@milkdown/prose/state';
-import { Decoration, DecorationSet } from '@milkdown/prose/view';
-import type { EditorView } from '@milkdown/prose/view';
-import type { RuleRunner, LintIssue, Severity } from '@/lib/linting';
-import type { INlpClient } from '@/lib/nlp-client/types';
-import type { Token } from '@/lib/nlp-client/types';
-import type { IgnoredCorrection } from '@/lib/project/project-types';
-import { LRUCache } from '@/lib/utils/lru-cache';
-import { hashString } from '@/lib/utils/hash-string';
-import { getAtomOffset, collectParagraphs, findScrollContainer, getVisibleParagraphs } from '../shared/paragraph-helpers';
-import type { LintingPluginState, LintingPluginOptions, LintingSettingsUpdate } from './types';
+import { Plugin, PluginKey } from "@milkdown/prose/state";
+import { Decoration, DecorationSet } from "@milkdown/prose/view";
+import type { EditorView } from "@milkdown/prose/view";
+import type { RuleRunner, LintIssue, Severity } from "@/lib/linting";
+import type { INlpClient } from "@/lib/nlp-client/types";
+import type { Token } from "@/lib/nlp-client/types";
+import type { IgnoredCorrection } from "@/lib/project/project-types";
+import { LRUCache } from "@/lib/utils/lru-cache";
+import { hashString } from "@/lib/utils/hash-string";
+import {
+  getAtomOffset,
+  collectParagraphs,
+  findScrollContainer,
+  getVisibleParagraphs,
+} from "../shared/paragraph-helpers";
+import type { LintingPluginState, LintingPluginOptions, LintingSettingsUpdate } from "./types";
 
-export const lintingKey = new PluginKey<LintingPluginState>('linting');
+export const lintingKey = new PluginKey<LintingPluginState>("linting");
 
 /**
  * Map severity to CSS class name for decoration styling.
  */
 function severityToClass(severity: Severity): string {
   switch (severity) {
-    case 'error': return 'lint-error';
-    case 'warning': return 'lint-warning';
-    case 'info': return 'lint-info';
+    case "error":
+      return "lint-error";
+    case "warning":
+      return "lint-warning";
+    case "info":
+      return "lint-info";
   }
 }
 
@@ -50,9 +58,7 @@ function isIssueIgnored(
   });
 }
 
-export function createLintingPlugin(
-  options: LintingPluginOptions
-): Plugin<LintingPluginState> {
+export function createLintingPlugin(options: LintingPluginOptions): Plugin<LintingPluginState> {
   const { enabled, ruleRunner, nlpClient, onIssuesUpdated, onNlpError, debounceMs = 500 } = options;
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -104,14 +110,16 @@ export function createLintingPlugin(
 
       apply(tr, pluginState): LintingPluginState {
         // Update settings via meta
-        const meta = tr.getMeta(lintingKey) as (LintingSettingsUpdate & Partial<LintingPluginState>) | undefined;
+        const meta = tr.getMeta(lintingKey) as
+          | (LintingSettingsUpdate & Partial<LintingPluginState>)
+          | undefined;
         if (meta) {
           // If decorations are included, apply directly
           if (meta.decorations !== undefined) {
             return { ...pluginState, ...meta };
           }
           // Update ruleRunner reference if provided
-          if ('ruleRunner' in meta) {
+          if ("ruleRunner" in meta) {
             currentRuleRunner = meta.ruleRunner ?? null;
             // Clear cache when runner changes (rules may have changed)
             issueCache.clear();
@@ -119,7 +127,7 @@ export function createLintingPlugin(
             documentIssueCache = null;
           }
           // Update nlpClient reference if provided
-          if ('nlpClient' in meta) {
+          if ("nlpClient" in meta) {
             currentNlpClient = meta.nlpClient ?? null;
             // Reset NLP error state when client changes (enables retry)
             nlpErrorFired = false;
@@ -165,7 +173,7 @@ export function createLintingPlugin(
             pendingFullScan = true;
           }
           // Update ignoredCorrections list if provided
-          if ('ignoredCorrections' in meta) {
+          if ("ignoredCorrections" in meta) {
             currentIgnoredCorrections = meta.ignoredCorrections ?? [];
           }
           // enabled/disabled change
@@ -217,7 +225,7 @@ export function createLintingPlugin(
       };
 
       // Add scroll listener
-      scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+      scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
 
       // Run on initialization if enabled
       if (enabled && currentRuleRunner) {
@@ -254,7 +262,7 @@ export function createLintingPlugin(
           const nlp = currentNlpClient;
 
           // Process uncached paragraphs (per-paragraph rules)
-          const uncachedParagraphs = targetParagraphs.filter(p => !issueCache.has(p.text));
+          const uncachedParagraphs = targetParagraphs.filter((p) => !issueCache.has(p.text));
 
           if (uncachedParagraphs.length > 0) {
             for (const paragraph of uncachedParagraphs) {
@@ -270,7 +278,7 @@ export function createLintingPlugin(
                     tokenCache.set(paragraph.text, tokens);
                   } catch (err) {
                     const error = err instanceof Error ? err : new Error(String(err));
-                    console.error('[Linting] NLP tokenization failed — L2 rules disabled:', error);
+                    console.error("[Linting] NLP tokenization failed — L2 rules disabled:", error);
                     // Fire the error callback once per failure episode
                     if (!nlpErrorFired) {
                       nlpErrorFired = true;
@@ -310,7 +318,10 @@ export function createLintingPlugin(
                     tokenCache.set(p.text, tokens);
                   } catch (err) {
                     const error = err instanceof Error ? err : new Error(String(err));
-                    console.error('[Linting] NLP tokenization failed during document rules — L2 rules disabled:', error);
+                    console.error(
+                      "[Linting] NLP tokenization failed during document rules — L2 rules disabled:",
+                      error,
+                    );
                     if (!nlpErrorFired) {
                       nlpErrorFired = true;
                       onNlpError?.(error);
@@ -326,12 +337,12 @@ export function createLintingPlugin(
               } else {
                 // Fall back to L1-only document rules
                 documentIssueCache = currentRuleRunner.runDocument(
-                  allParagraphs.map(p => ({ text: p.text, index: p.index }))
+                  allParagraphs.map((p) => ({ text: p.text, index: p.index })),
                 );
               }
             } else {
               documentIssueCache = currentRuleRunner.runDocument(
-                allParagraphs.map(p => ({ text: p.text, index: p.index }))
+                allParagraphs.map((p) => ({ text: p.text, index: p.index })),
               );
             }
           }
@@ -362,8 +373,10 @@ export function createLintingPlugin(
             for (const issue of combinedIssues) {
               // Filter out ignored corrections
               const issueText = paragraph.text.slice(issue.from, issue.to);
-              if (currentIgnoredCorrections.length > 0 &&
-                  isIssueIgnored(issue, issueText, paragraph.text, currentIgnoredCorrections)) {
+              if (
+                currentIgnoredCorrections.length > 0 &&
+                isIssueIgnored(issue, issueText, paragraph.text, currentIgnoredCorrections)
+              ) {
                 continue;
               }
 
@@ -375,8 +388,13 @@ export function createLintingPlugin(
               allDecorations.push(
                 Decoration.inline(from, to, {
                   class: severityToClass(issue.severity),
-                  'data-lint-issue': JSON.stringify({ ...issue, from, to, originalText: issueText }),
-                })
+                  "data-lint-issue": JSON.stringify({
+                    ...issue,
+                    from,
+                    to,
+                    originalText: issueText,
+                  }),
+                }),
               );
 
               allIssues.push({
@@ -389,15 +407,15 @@ export function createLintingPlugin(
           }
 
           // Apply decorations
-          const decorations = allDecorations.length > 0
-            ? DecorationSet.create(view.state.doc, allDecorations)
-            : DecorationSet.empty;
+          const decorations =
+            allDecorations.length > 0
+              ? DecorationSet.create(view.state.doc, allDecorations)
+              : DecorationSet.empty;
           const tr = view.state.tr.setMeta(lintingKey, { decorations });
           view.dispatch(tr);
 
           // Notify parent of all issues
           onIssuesUpdated?.(allIssues);
-
         }, delay);
       }
 
@@ -433,7 +451,7 @@ export function createLintingPlugin(
         destroy() {
           if (debounceTimer) clearTimeout(debounceTimer);
           if (scrollTimer) clearTimeout(scrollTimer);
-          scrollContainer.removeEventListener('scroll', handleScroll);
+          scrollContainer.removeEventListener("scroll", handleScroll);
           issueCache.clear();
           tokenCache.clear();
           documentIssueCache = null;

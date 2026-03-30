@@ -25,11 +25,13 @@ claude /install-github-app
 ```
 
 This command will:
+
 - Guide you through installing the GitHub App
 - Automatically configure necessary permissions
 - Set up the integration with your repository
 
 **Prerequisites**:
+
 - You must be a repository admin
 - Claude CLI must be installed on your machine
 
@@ -65,11 +67,13 @@ This command will:
 ### Step 3: Verify Configuration
 
 1. Create a test branch:
+
    ```bash
    git checkout -b test-claude-review
    ```
 
 2. Make a small change (e.g., add a comment to a file):
+
    ```bash
    echo "// Test comment" >> README.md
    git add README.md
@@ -103,21 +107,27 @@ Claude will post a comment with the following sections:
 
 ```markdown
 ## 🔒 Security Issues
+
 [Critical security findings]
 
 ## ⚡ Performance Issues
+
 [Performance concerns]
 
 ## 🌐 Language Violations (CRITICAL)
+
 [Prohibited language usage]
 
 ## 💡 Japanese Quality Suggestions (Advisory)
+
 [Japanese phrasing improvements]
 
 ## 📝 Code Style Issues
+
 [Style and convention issues]
 
 ## ✅ Summary
+
 - Status: Approved / Needs Changes / Blocked
 - Critical Issues: X
 - High Priority: X
@@ -136,6 +146,7 @@ claude_args: "--max-turns 5 --model MODEL_NAME"
 ```
 
 Available models:
+
 - `claude-3-5-haiku-20241022` (Current - Fast & Cost-effective)
 - `claude-3-5-sonnet-20241022` (More thorough analysis)
 - `claude-opus-4-5-20251101` (Most powerful)
@@ -143,6 +154,7 @@ Available models:
 ### Adjusting Max Turns
 
 Increase for deeper analysis (uses more tokens):
+
 ```yaml
 claude_args: "--max-turns 10 --model claude-3-5-haiku-20241022"
 ```
@@ -200,9 +212,11 @@ With Haiku model (`claude-3-5-haiku-20241022`):
 - **Estimated cost per review**: $0.01 - $0.05
 
 With Max Plan (current):
+
 - Unlimited reviews within plan limits
 
 After switching to $100 plan:
+
 - Approximately 300M tokens per month
 - Can handle 5,000-30,000 PR reviews per month
 

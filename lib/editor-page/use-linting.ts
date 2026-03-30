@@ -26,7 +26,10 @@ export interface UseLintingResult {
  */
 export function useLinting(
   lintingEnabled: boolean,
-  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
+  lintingRuleConfigs: Record<
+    string,
+    { enabled: boolean; severity: Severity; skipDialogue?: boolean }
+  >,
   editorViewInstance: EditorView | null,
   powerSaveMode: boolean = false,
   correctionGuidelines?: GuidelineId[],
@@ -64,11 +67,14 @@ export function useLinting(
     }
   }, [ruleRunner, lintingRuleConfigs]);
 
-  const handleLintIssuesUpdated = useCallback((issues: LintIssue[]) => {
-    if (!lintingEnabled) return;
-    setLintIssues(issues);
-    setIsLinting(false);
-  }, [lintingEnabled]);
+  const handleLintIssuesUpdated = useCallback(
+    (issues: LintIssue[]) => {
+      if (!lintingEnabled) return;
+      setLintIssues(issues);
+      setIsLinting(false);
+    },
+    [lintingEnabled],
+  );
 
   // Handle NLP tokenization errors — show a user-visible notification
   const handleNlpError = useCallback((error: Error) => {
@@ -86,17 +92,17 @@ export function useLinting(
 
     // Trigger re-lint when guidelines change
     if (editorViewInstance && lintingEnabled) {
-      import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
-        ({ updateLintingSettings }) => {
+      import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
+        .then(({ updateLintingSettings }) => {
           updateLintingSettings(
             editorViewInstance,
             { ruleRunner: ruleRunnerRef.current },
             "guideline-change",
           );
-        },
-      ).catch((err) => {
-        console.error("[useLinting] Failed to sync guidelines:", err);
-      });
+        })
+        .catch((err) => {
+          console.error("[useLinting] Failed to sync guidelines:", err);
+        });
     }
   }, [ruleRunner, correctionGuidelines, editorViewInstance, lintingEnabled]);
 
@@ -112,11 +118,9 @@ export function useLinting(
     if (!editorViewInstance || !lintingEnabled) return;
 
     setIsLinting(true);
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
-      ({ updateLintingSettings }) => {
-        const nlpClient = ruleRunnerRef.current?.hasMorphologicalRules()
-          ? getNlpClient()
-          : null;
+    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
+      .then(({ updateLintingSettings }) => {
+        const nlpClient = ruleRunnerRef.current?.hasMorphologicalRules() ? getNlpClient() : null;
 
         updateLintingSettings(
           editorViewInstance,
@@ -126,11 +130,11 @@ export function useLinting(
           },
           "manual-refresh",
         );
-      },
-    ).catch((err) => {
-      console.error("[useLinting] Failed to refresh linting:", err);
-      setIsLinting(false);
-    });
+      })
+      .catch((err) => {
+        console.error("[useLinting] Failed to refresh linting:", err);
+        setIsLinting(false);
+      });
   }, [editorViewInstance, lintingEnabled]);
 
   return {

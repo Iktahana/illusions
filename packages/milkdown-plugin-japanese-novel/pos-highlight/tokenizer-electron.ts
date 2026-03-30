@@ -3,8 +3,8 @@
  * Electron では Node.js の zlib を使えるので、ローカルの辞書ファイルを使用可能
  */
 
-import type { Token, InitProgressCallback } from './types';
-import type kuromoji from 'kuromoji';
+import type { Token, InitProgressCallback } from "./types";
+import type kuromoji from "kuromoji";
 
 class ElectronTokenizer {
   private tokenizer: kuromoji.Tokenizer<kuromoji.IpadicFeatures> | null = null;
@@ -16,7 +16,7 @@ class ElectronTokenizer {
    * トークナイザーを初期化する
    * Electron では dicPath をローカルパスに設定可能
    */
-  async init(dicPath: string = '/dict', callback?: InitProgressCallback): Promise<void> {
+  async init(dicPath: string = "/dict", callback?: InitProgressCallback): Promise<void> {
     // 重複初期化を防ぐ
     if (this.initPromise) {
       // 既に初期化中または完了している場合
@@ -25,33 +25,33 @@ class ElectronTokenizer {
       }
       return this.initPromise;
     }
-    
+
     this.initPromise = (async () => {
       try {
         // ステップ 1: kuromoji モジュールを読み込む（20%）
-        callback?.onProgress?.(20, 'kuromoji モジュールを読み込み中...');
-        
+        callback?.onProgress?.(20, "kuromoji モジュールを読み込み中...");
+
         if (!this.kuromojiModule) {
-          this.kuromojiModule = (await import('kuromoji')).default;
+          this.kuromojiModule = (await import("kuromoji")).default;
         }
-        
+
         // ステップ 2: 辞書を読み込む（50%）
-        callback?.onProgress?.(50, 'ローカル辞書を読み込み中...');
-        
+        callback?.onProgress?.(50, "ローカル辞書を読み込み中...");
+
         return new Promise<void>((resolve, reject) => {
           this.kuromojiModule!.builder({ dicPath }).build((err, tokenizer) => {
             if (err) {
-              console.error('[ElectronTokenizer] Initialization error:', err);
+              console.error("[ElectronTokenizer] Initialization error:", err);
               callback?.onError?.(err);
               reject(err);
             } else {
               this.tokenizer = tokenizer;
               this.isReady = true;
-              
+
               // ステップ 3: 完了（100%）
-              callback?.onProgress?.(100, '初期化完了！');
+              callback?.onProgress?.(100, "初期化完了！");
               callback?.onComplete?.();
-              
+
               resolve();
             }
           });
@@ -63,7 +63,7 @@ class ElectronTokenizer {
         throw error;
       }
     })();
-    
+
     return this.initPromise;
   }
 
@@ -81,20 +81,20 @@ class ElectronTokenizer {
         await this.init();
       }
     }
-    
+
     if (!this.tokenizer) {
-      throw new Error('Tokenizer initialization failed.');
+      throw new Error("Tokenizer initialization failed.");
     }
-    
+
     const rawTokens = this.tokenizer.tokenize(text);
-    
+
     // 必要なフィールドだけを抽出
     // kuromoji の word_position はバイト位置なので、文字位置を手動で計算する
     let charPosition = 0;
-    const tokens: Token[] = rawTokens.map(t => {
+    const tokens: Token[] = rawTokens.map((t) => {
       const token: Token = {
         surface: t.surface_form,
-        pos: t.pos as Token['pos'],
+        pos: t.pos as Token["pos"],
         pos_detail_1: t.pos_detail_1,
         pos_detail_2: t.pos_detail_2,
         pos_detail_3: t.pos_detail_3,

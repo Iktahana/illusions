@@ -37,7 +37,9 @@ export default function AboutSection(): React.ReactElement {
   useEffect(() => {
     import("@/generated/credits.json")
       .then((mod) => setCreditsData(mod.default as CreditEntry[]))
-      .catch(() => { /* credits.json may not exist in dev */ });
+      .catch(() => {
+        /* credits.json may not exist in dev */
+      });
   }, []);
 
   // Group credits by license type
@@ -74,9 +76,7 @@ export default function AboutSection(): React.ReactElement {
       {/* App info header */}
       <div className="text-center space-y-2">
         <h3 className="text-2xl font-bold text-foreground">illusions</h3>
-        <p className="text-sm text-foreground-secondary">
-          バージョン {APP_VERSION}
-        </p>
+        <p className="text-sm text-foreground-secondary">バージョン {APP_VERSION}</p>
         <p className="text-sm text-foreground-tertiary">
           © {new Date().getFullYear()} 幾田花 (Iktahana). All rights reserved.
         </p>
@@ -114,7 +114,7 @@ export default function AboutSection(): React.ReactElement {
             "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
             activeTab === "terms"
               ? "border-accent text-accent"
-              : "border-transparent text-foreground-secondary hover:text-foreground"
+              : "border-transparent text-foreground-secondary hover:text-foreground",
           )}
         >
           利用規約
@@ -125,7 +125,7 @@ export default function AboutSection(): React.ReactElement {
             "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
             activeTab === "license"
               ? "border-accent text-accent"
-              : "border-transparent text-foreground-secondary hover:text-foreground"
+              : "border-transparent text-foreground-secondary hover:text-foreground",
           )}
         >
           LICENSE
@@ -136,7 +136,7 @@ export default function AboutSection(): React.ReactElement {
             "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
             activeTab === "credits"
               ? "border-accent text-accent"
-              : "border-transparent text-foreground-secondary hover:text-foreground"
+              : "border-transparent text-foreground-secondary hover:text-foreground",
           )}
         >
           CREDITS ({creditsData.length})
@@ -165,7 +165,11 @@ export default function AboutSection(): React.ReactElement {
         <div className="space-y-2 max-h-[40vh] overflow-y-auto">
           {creditsData.length === 0 ? (
             <p className="text-sm text-foreground-tertiary text-center py-4">
-              クレジットデータがありません。<code className="text-xs bg-background px-1 py-0.5 rounded">npm run generate:credits</code> を実行してください。
+              クレジットデータがありません。
+              <code className="text-xs bg-background px-1 py-0.5 rounded">
+                npm run generate:credits
+              </code>{" "}
+              を実行してください。
             </p>
           ) : (
             Object.entries(creditsByLicense)
@@ -240,7 +244,10 @@ function renderMarkdown(md: string): string {
 
     // Horizontal rule
     if (/^---+$/.test(line.trim())) {
-      if (inList) { html.push("</ul>"); inList = false; }
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
       html.push('<hr class="my-4 border-border" />');
       continue;
     }
@@ -248,25 +255,41 @@ function renderMarkdown(md: string): string {
     // Headings
     const headingMatch = line.match(/^(#{1,4})\s+(.*)/);
     if (headingMatch) {
-      if (inList) { html.push("</ul>"); inList = false; }
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
       const level = headingMatch[1].length;
       const text = inlineFormat(escape(headingMatch[2]));
-      const sizes: Record<number, string> = { 1: "text-lg font-bold", 2: "text-base font-bold", 3: "text-sm font-semibold", 4: "text-sm font-medium" };
-      html.push(`<h${level} class="${sizes[level] || "text-sm font-medium"} text-foreground mt-4 mb-2">${text}</h${level}>`);
+      const sizes: Record<number, string> = {
+        1: "text-lg font-bold",
+        2: "text-base font-bold",
+        3: "text-sm font-semibold",
+        4: "text-sm font-medium",
+      };
+      html.push(
+        `<h${level} class="${sizes[level] || "text-sm font-medium"} text-foreground mt-4 mb-2">${text}</h${level}>`,
+      );
       continue;
     }
 
     // List items (*, -)
     const listMatch = line.match(/^(\s*)[*\-]\s+(.*)/);
     if (listMatch) {
-      if (!inList) { html.push('<ul class="list-disc pl-5 space-y-1">'); inList = true; }
+      if (!inList) {
+        html.push('<ul class="list-disc pl-5 space-y-1">');
+        inList = true;
+      }
       const indent = listMatch[1].length >= 4 ? ' class="ml-4"' : "";
       html.push(`<li${indent}>${inlineFormat(escape(listMatch[2]))}</li>`);
       continue;
     }
 
     // Close list if we hit a non-list line
-    if (inList) { html.push("</ul>"); inList = false; }
+    if (inList) {
+      html.push("</ul>");
+      inList = false;
+    }
 
     // Empty line
     if (line.trim() === "") {
@@ -307,22 +330,28 @@ function sanitizeHref(url: string): string {
 /** Render inline markdown: bold, links, code */
 function inlineFormat(text: string): string {
   // Bold **text**
-  text = text.replace(/\*\*(.+?)\*\*/g, '<strong class="text-foreground font-semibold">$1</strong>');
-  // Links [text](url) — sanitize href to prevent XSS via javascript: or data: URLs
   text = text.replace(
-    /\[(.+?)\]\((.+?)\)/g,
-    (_match: string, linkText: string, url: string) => {
-      const safeUrl = sanitizeHref(url);
-      if (safeUrl) {
-        const escapedUrl = safeUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
-        return `<a href="${escapedUrl}" target="_blank" rel="noopener noreferrer" class="text-accent hover:text-accent-hover underline">${linkText}</a>`;
-      }
-      // Unsafe URL — render as plain text without a link
-      return linkText;
-    }
+    /\*\*(.+?)\*\*/g,
+    '<strong class="text-foreground font-semibold">$1</strong>',
   );
+  // Links [text](url) — sanitize href to prevent XSS via javascript: or data: URLs
+  text = text.replace(/\[(.+?)\]\((.+?)\)/g, (_match: string, linkText: string, url: string) => {
+    const safeUrl = sanitizeHref(url);
+    if (safeUrl) {
+      const escapedUrl = safeUrl
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#x27;");
+      return `<a href="${escapedUrl}" target="_blank" rel="noopener noreferrer" class="text-accent hover:text-accent-hover underline">${linkText}</a>`;
+    }
+    // Unsafe URL — render as plain text without a link
+    return linkText;
+  });
   // Inline code `text`
-  text = text.replace(/`(.+?)`/g, '<code class="text-xs bg-background px-1 py-0.5 rounded">$1</code>');
+  text = text.replace(
+    /`(.+?)`/g,
+    '<code class="text-xs bg-background px-1 py-0.5 rounded">$1</code>',
+  );
   // Line break (two trailing spaces)
   text = text.replace(/ {2}$/, "<br />");
   return text;

@@ -10,25 +10,25 @@ The export system converts MDI (Markdown for Illusions) content into multiple ou
 
 ### Supported Formats
 
-| Format | Engine | Environment | Description |
-|--------|--------|-------------|-------------|
-| PDF | Electron `printToPDF` | Electron only | Hidden BrowserWindow rendering |
-| EPUB 3 | `archiver` | Electron only | Standards-compliant EPUB 3.0 |
-| DOCX | `docx` library | Electron only | Microsoft Word format |
-| TXT | Built-in | Client + Electron | Plain text, all MDI syntax stripped |
-| TXT+Ruby | Built-in | Client + Electron | Plain text with ruby in parentheses |
+| Format   | Engine                | Environment       | Description                         |
+| -------- | --------------------- | ----------------- | ----------------------------------- |
+| PDF      | Electron `printToPDF` | Electron only     | Hidden BrowserWindow rendering      |
+| EPUB 3   | `archiver`            | Electron only     | Standards-compliant EPUB 3.0        |
+| DOCX     | `docx` library        | Electron only     | Microsoft Word format               |
+| TXT      | Built-in              | Client + Electron | Plain text, all MDI syntax stripped |
+| TXT+Ruby | Built-in              | Client + Electron | Plain text with ruby in parentheses |
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `lib/export/types.ts` | Type definitions for the export system |
-| `lib/export/use-export.ts` | React hook providing the `exportAs` API |
-| `lib/export/mdi-to-html.ts` | MDI-to-HTML conversion pipeline |
-| `lib/export/pdf-exporter.ts` | PDF export via hidden BrowserWindow |
-| `lib/export/epub-exporter.ts` | EPUB 3.0 archive generation |
-| `lib/export/docx-exporter.ts` | DOCX document generation |
-| `lib/export/txt-exporter.ts` | TXT and TXT+Ruby export |
+| File                          | Purpose                                 |
+| ----------------------------- | --------------------------------------- |
+| `lib/export/types.ts`         | Type definitions for the export system  |
+| `lib/export/use-export.ts`    | React hook providing the `exportAs` API |
+| `lib/export/mdi-to-html.ts`   | MDI-to-HTML conversion pipeline         |
+| `lib/export/pdf-exporter.ts`  | PDF export via hidden BrowserWindow     |
+| `lib/export/epub-exporter.ts` | EPUB 3.0 archive generation             |
+| `lib/export/docx-exporter.ts` | DOCX document generation                |
+| `lib/export/txt-exporter.ts`  | TXT and TXT+Ruby export                 |
 
 ---
 
@@ -83,12 +83,12 @@ The conversion pipeline ensures security by never passing raw MDI syntax through
 
 #### Supported MDI Syntax
 
-| Syntax | Description | HTML Output |
-|--------|-------------|-------------|
-| `{base\|ruby}` | Ruby annotation | `<ruby>base<rp>(</rp><rt>ruby</rt><rp>)</rp></ruby>` |
-| `^tcy^` | Tate-chu-yoko (horizontal-in-vertical) | `<span class="tcy">tcy</span>` |
-| `[[no-break:text]]` | Non-breaking text | `<span class="no-break">text</span>` |
-| `[[kern:amount:text]]` | Manual kerning | `<span style="letter-spacing:amount">text</span>` |
+| Syntax                 | Description                            | HTML Output                                          |
+| ---------------------- | -------------------------------------- | ---------------------------------------------------- |
+| `{base\|ruby}`         | Ruby annotation                        | `<ruby>base<rp>(</rp><rt>ruby</rt><rp>)</rp></ruby>` |
+| `^tcy^`                | Tate-chu-yoko (horizontal-in-vertical) | `<span class="tcy">tcy</span>`                       |
+| `[[no-break:text]]`    | Non-breaking text                      | `<span class="no-break">text</span>`                 |
+| `[[kern:amount:text]]` | Manual kerning                         | `<span style="letter-spacing:amount">text</span>`    |
 
 #### Security Model
 
@@ -121,8 +121,8 @@ interface Chapter {
 
 /** Hook input configuration */
 interface UseExportOptions {
-  getContent: () => string;   // Returns current MDI content
-  getTitle: () => string;     // Returns document title
+  getContent: () => string; // Returns current MDI content
+  getTitle: () => string; // Returns document title
 }
 
 /** Hook return value */
@@ -224,11 +224,11 @@ Content is split into chapters at `#` heading boundaries.
 ```typescript
 // DOCX configuration
 const docxConfig = {
-  font: "Yu Mincho",       // 游明朝
-  fontSize: 12,            // 12pt
+  font: "Yu Mincho", // 游明朝
+  fontSize: 12, // 12pt
   pageSize: "A5",
   margins: {
-    top: 20,               // 20mm all sides
+    top: 20, // 20mm all sides
     bottom: 20,
     left: 20,
     right: 20,
@@ -254,9 +254,9 @@ const docxConfig = {
 
 ### IPC Channels
 
-| Channel | Direction | Description |
-|---------|-----------|-------------|
-| `export-pdf` | Renderer → Main | Trigger PDF export with content and metadata |
+| Channel       | Direction       | Description                                   |
+| ------------- | --------------- | --------------------------------------------- |
+| `export-pdf`  | Renderer → Main | Trigger PDF export with content and metadata  |
 | `export-epub` | Renderer → Main | Trigger EPUB export with content and metadata |
 | `export-docx` | Renderer → Main | Trigger DOCX export with content and metadata |
 

@@ -4,9 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Decoration } from "@milkdown/prose/view";
 import { MilkdownProvider } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
-import {
-  getScrollProgress,
-} from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
+import { getScrollProgress } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import clsx from "clsx";
 import type { EditorView } from "@milkdown/prose/view";
 import { useSpeech } from "@/lib/hooks/use-speech";
@@ -77,10 +75,8 @@ export default function NovelEditor({
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
 }: EditorProps) {
-  const {
-    fontScale, lineHeight, fontFamily,
-    charsPerLine, autoCharsPerLine,
-  } = useTypographySettings();
+  const { fontScale, lineHeight, fontFamily, charsPerLine, autoCharsPerLine } =
+    useTypographySettings();
   const { speechVoiceURI, speechRate, speechPitch, speechVolume } = useSpeechSettings();
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
   const [isVertical, setIsVertical] = useState(() => {
@@ -92,7 +88,13 @@ export default function NovelEditor({
   // コンテキストメニューの「検索」で渡された初期検索語
   const [contextMenuSearchTerm, setContextMenuSearchTerm] = useState<string | undefined>(undefined);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
-  const { state: speechState, speakSegments, pause, resume, stop } = useSpeech({
+  const {
+    state: speechState,
+    speakSegments,
+    pause,
+    resume,
+    stop,
+  } = useSpeech({
     voiceURI: speechVoiceURI,
     rate: speechRate,
     pitch: speechPitch,
@@ -112,7 +114,12 @@ export default function NovelEditor({
   const isModeSwitchingRef = useRef(false);
 
   /** Cache for DOM character-width measurement (invalidated when font settings change) */
-  const charSizeCacheRef = useRef<{ fontFamily: string; fontScale: number; lineHeight: number; size: number } | null>(null);
+  const charSizeCacheRef = useRef<{
+    fontFamily: string;
+    fontScale: number;
+    lineHeight: number;
+    size: number;
+  } | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -125,18 +132,18 @@ export default function NovelEditor({
   // 変更時に縦書き状態を localStorage に保存する
   useEffect(() => {
     if (!isMounted) return;
-    localPreferences.setWritingMode(isVertical ? 'vertical' : 'horizontal');
+    localPreferences.setWritingMode(isVertical ? "vertical" : "horizontal");
   }, [isVertical, isMounted]);
 
-   // 注意：このエフェクトはもう不要。理由：
-   // 1. 新規ファイル打開時、親コンポーネント は key 属性経由で NovelEditor 全体を再マウント
-   // 2. 編集内容時、initialContent は変わるが、スクロール位置をリセットするべきではない
-   // 3. モード切替時、handleToggleVertical がスクロール位置の保存と復元を担当
-   //
-   // 将来、再マウント無しでファイル切替が必要なら、明確な fileId prop を追加して追跡可能
+  // 注意：このエフェクトはもう不要。理由：
+  // 1. 新規ファイル打開時、親コンポーネント は key 属性経由で NovelEditor 全体を再マウント
+  // 2. 編集内容時、initialContent は変わるが、スクロール位置をリセットするべきではない
+  // 3. モード切替時、handleToggleVertical がスクロール位置の保存と復元を担当
+  //
+  // 将来、再マウント無しでファイル切替が必要なら、明確な fileId prop を追加して追跡可能
 
   const handleSearchToggle = () => {
-    setIsSearchOpen(prev => !prev);
+    setIsSearchOpen((prev) => !prev);
   };
 
   const handleSearchOpen = useCallback(() => {
@@ -156,65 +163,75 @@ export default function NovelEditor({
     view.dispatch(view.state.tr.setMeta("speechDecorations", []));
   }, []);
 
-  const startSpeechFromPos = useCallback((startPos: number) => {
-    stop();
-    clearHighlight();
-    const view = editorViewRef.current;
-    if (!view) return;
-    const docSize = view.state.doc.content.size;
-    // Limit the range to avoid allocating huge arrays and thousands of utterances
-    // on long documents. Continuation is handled lazily in onEnd.
-    const endPos = Math.min(startPos + MAX_SPEECH_CHUNK_RANGE, docSize);
-    const map = buildSpeechMap(view.state.doc, startPos, endPos);
-    const segments = buildSegments(map.text);
-    const chunks = buildSpeechChunks(map.text, segments);
-    if (chunks.length === 0) return;
-    speechMapRef.current = map;
-    speechContinuationPosRef.current = endPos < docSize ? endPos : null;
+  const startSpeechFromPos = useCallback(
+    (startPos: number) => {
+      stop();
+      clearHighlight();
+      const view = editorViewRef.current;
+      if (!view) return;
+      const docSize = view.state.doc.content.size;
+      // Limit the range to avoid allocating huge arrays and thousands of utterances
+      // on long documents. Continuation is handled lazily in onEnd.
+      const endPos = Math.min(startPos + MAX_SPEECH_CHUNK_RANGE, docSize);
+      const map = buildSpeechMap(view.state.doc, startPos, endPos);
+      const segments = buildSegments(map.text);
+      const chunks = buildSpeechChunks(map.text, segments);
+      if (chunks.length === 0) return;
+      speechMapRef.current = map;
+      speechContinuationPosRef.current = endPos < docSize ? endPos : null;
 
-    speakSegments(
-      chunks.map((c) => c.speech),
-      {
-        onSegmentStart(index) {
-          const v = editorViewRef.current;
-          const m = speechMapRef.current;
-          if (!v || !m) return;
-          const chunk = chunks[index];
-          const from = m.positions[chunk.highlightStart];
-          const to = (m.positions[chunk.highlightEnd - 1] ?? from) + 1;
-          if (from == null) return;
-          const deco = Decoration.inline(from, to, { class: "speech-reading" });
-          // Set programmatic scroll flag BEFORE dispatch so the scroll guard
-          // does not revert any browser scroll triggered by the DOM update.
-          if (programmaticScrollRef) {
-            programmaticScrollRef.current = true;
-          }
-          v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
-          requestAnimationFrame(() => {
-            const target = v.dom.querySelector(".speech-reading") as HTMLElement | null;
-            const container = scrollContainerRef.current;
-            if (target && container) {
-              scrollToSpeechTarget({ container, target, isVertical, programmaticScrollRef });
-            } else if (programmaticScrollRef) {
-              // No scroll needed — clear flag
-              programmaticScrollRef.current = false;
+      speakSegments(
+        chunks.map((c) => c.speech),
+        {
+          onSegmentStart(index) {
+            const v = editorViewRef.current;
+            const m = speechMapRef.current;
+            if (!v || !m) return;
+            const chunk = chunks[index];
+            const from = m.positions[chunk.highlightStart];
+            const to = (m.positions[chunk.highlightEnd - 1] ?? from) + 1;
+            if (from == null) return;
+            const deco = Decoration.inline(from, to, { class: "speech-reading" });
+            // Set programmatic scroll flag BEFORE dispatch so the scroll guard
+            // does not revert any browser scroll triggered by the DOM update.
+            if (programmaticScrollRef) {
+              programmaticScrollRef.current = true;
             }
-          });
+            v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
+            requestAnimationFrame(() => {
+              const target = v.dom.querySelector(".speech-reading") as HTMLElement | null;
+              const container = scrollContainerRef.current;
+              if (target && container) {
+                scrollToSpeechTarget({ container, target, isVertical, programmaticScrollRef });
+              } else if (programmaticScrollRef) {
+                // No scroll needed — clear flag
+                programmaticScrollRef.current = false;
+              }
+            });
+          },
+          onEnd() {
+            clearHighlight();
+            speechMapRef.current = null;
+            // Lazily load the next chunk so the full document is read without
+            // pre-allocating all utterances upfront.
+            const nextPos = speechContinuationPosRef.current;
+            speechContinuationPosRef.current = null;
+            if (nextPos !== null) {
+              startSpeechFromPosRef.current?.(nextPos);
+            }
+          },
         },
-        onEnd() {
-          clearHighlight();
-          speechMapRef.current = null;
-          // Lazily load the next chunk so the full document is read without
-          // pre-allocating all utterances upfront.
-          const nextPos = speechContinuationPosRef.current;
-          speechContinuationPosRef.current = null;
-          if (nextPos !== null) {
-            startSpeechFromPosRef.current?.(nextPos);
-          }
-        },
-      },
-    );
-  }, [speakSegments, stop, clearHighlight, isVertical, programmaticScrollRef, MAX_SPEECH_CHUNK_RANGE]);
+      );
+    },
+    [
+      speakSegments,
+      stop,
+      clearHighlight,
+      isVertical,
+      programmaticScrollRef,
+      MAX_SPEECH_CHUNK_RANGE,
+    ],
+  );
 
   // Keep the ref in sync so onEnd can call startSpeechFromPos without a circular dep
   startSpeechFromPosRef.current = startSpeechFromPos;
@@ -286,9 +303,8 @@ export default function NovelEditor({
 
   // Per-pane local state for auto-calculated chars per line (avoids split panes overwriting each other)
   const [localAutoCharsPerLine, setLocalAutoCharsPerLine] = useState<number | null>(null);
-  const effectiveCharsPerLine = autoCharsPerLine && localAutoCharsPerLine !== null
-    ? localAutoCharsPerLine
-    : charsPerLine;
+  const effectiveCharsPerLine =
+    autoCharsPerLine && localAutoCharsPerLine !== null ? localAutoCharsPerLine : charsPerLine;
 
   // Reset local value when auto mode is toggled off
   useEffect(() => {
@@ -319,7 +335,7 @@ export default function NovelEditor({
       charSize = cache.size;
     } else {
       // Measure character width via a temporary DOM element
-      const measureEl = document.createElement('span');
+      const measureEl = document.createElement("span");
       measureEl.style.cssText = `
         position: absolute;
         visibility: hidden;
@@ -328,7 +344,7 @@ export default function NovelEditor({
         font-size: ${fontScale}%;
         line-height: ${lineHeight};
       `;
-      measureEl.textContent = '国'; // Measure with full-width character
+      measureEl.textContent = "国"; // Measure with full-width character
       document.body.appendChild(measureEl);
       charSize = measureEl.offsetWidth;
       document.body.removeChild(measureEl);
@@ -366,7 +382,7 @@ export default function NovelEditor({
         setLocalAutoCharsPerLine(clamped);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- charsPerLine & callback read via refs to break recalc loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- charsPerLine & callback read via refs to break recalc loop
   }, [fontFamily, fontScale, lineHeight, isVertical, scrollContainerRef]);
 
   // Add window resize listener to auto-adjust chars per line
@@ -383,12 +399,12 @@ export default function NovelEditor({
       resizeTimer = setTimeout(calculateOptimalCharsPerLine, 300);
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
 
     return () => {
       clearTimeout(timer);
       if (resizeTimer !== null) clearTimeout(resizeTimer);
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener("resize", handleResize);
     };
   }, [calculateOptimalCharsPerLine, autoCharsPerLine]);
 
@@ -408,10 +424,10 @@ export default function NovelEditor({
         ref={scrollContainerRef}
         className="flex-1 bg-background-secondary relative min-h-0 pt-12"
         style={{
-          overflowX: 'auto',
-          overflowY: 'auto',
+          overflowX: "auto",
+          overflowY: "auto",
           // Disable browser scroll anchoring to prevent auto-scroll adjustment during DOM updates in vertical mode
-          overflowAnchor: 'none',
+          overflowAnchor: "none",
           // In vertical-rl, padding on child elements causes Chromium to miscalculate scrollWidth.
           // Move horizontal padding to the scroll container itself, where the browser handles it correctly.
           ...(isVertical ? { paddingLeft: 64, paddingRight: 64 } : {}),
@@ -468,5 +484,3 @@ export default function NovelEditor({
     </div>
   );
 }
-
-

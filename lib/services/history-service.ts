@@ -203,12 +203,7 @@ export class HistoryService {
    * @returns The created SnapshotEntry
    */
   async createSnapshot(options: CreateSnapshotOptions): Promise<SnapshotEntry> {
-    const {
-      sourceFile,
-      content,
-      type = "auto",
-      label,
-    } = options;
+    const { sourceFile, content, type = "auto", label } = options;
 
     try {
       const timestamp = Date.now();
@@ -259,10 +254,7 @@ export class HistoryService {
 
       return entry;
     } catch (error) {
-      console.error(
-        "Failed to create snapshot / スナップショットの作成に失敗しました:",
-        error
-      );
+      console.error("Failed to create snapshot / スナップショットの作成に失敗しました:", error);
       throw error;
     }
   }
@@ -300,7 +292,8 @@ export class HistoryService {
       if (actualChecksum !== entry.checksum) {
         return {
           success: false,
-          error: `Checksum mismatch for snapshot "${entry.filename}". ` +
+          error:
+            `Checksum mismatch for snapshot "${entry.filename}". ` +
             `Expected: ${entry.checksum}, got: ${actualChecksum}. ` +
             "The snapshot file may be corrupted.",
         };
@@ -391,9 +384,7 @@ export class HistoryService {
           await historyDir.removeEntry(snapshot.filename);
         } catch {
           // File may already be deleted; ignore
-          console.warn(
-            `Failed to delete snapshot file: ${snapshot.filename}`
-          );
+          console.warn(`Failed to delete snapshot file: ${snapshot.filename}`);
         }
       }
 
@@ -439,9 +430,7 @@ export class HistoryService {
       const index = await this.readHistoryIndex();
 
       // Get all snapshots for this file
-      const fileSnapshots = index.snapshots.filter(
-        (s) => s.sourceFile === sourceFile
-      );
+      const fileSnapshots = index.snapshots.filter((s) => s.sourceFile === sourceFile);
 
       const autoCount = fileSnapshots.filter((s) => s.type === "auto").length;
       if (autoCount <= MAX_SNAPSHOTS_PER_FILE) {
@@ -478,9 +467,7 @@ export class HistoryService {
           await historyDir.removeEntry(snapshot.filename);
         } catch {
           // File may already be deleted; ignore
-          console.warn(
-            `Failed to delete snapshot file: ${snapshot.filename}`
-          );
+          console.warn(`Failed to delete snapshot file: ${snapshot.filename}`);
         }
       }
 
@@ -491,7 +478,7 @@ export class HistoryService {
       // Non-critical: log warning and continue
       console.warn(
         "Failed to prune per-file snapshots / ファイルごとのスナップショット削減に失敗しました:",
-        error
+        error,
       );
     }
   }
@@ -526,9 +513,7 @@ export class HistoryService {
       const index = await this.readHistoryIndex();
 
       // Find the most recent snapshot for this source file
-      const lastSnapshot = index.snapshots.find(
-        (s) => s.sourceFile === sourceFile
-      );
+      const lastSnapshot = index.snapshots.find((s) => s.sourceFile === sourceFile);
 
       if (!lastSnapshot) {
         return true;
@@ -574,10 +559,7 @@ export class HistoryService {
       // Ensure sorted by timestamp descending
       return snapshots.sort((a, b) => b.timestamp - a.timestamp);
     } catch (error) {
-      console.error(
-        "Failed to get snapshots / スナップショットの取得に失敗しました:",
-        error
-      );
+      console.error("Failed to get snapshots / スナップショットの取得に失敗しました:", error);
       // Return empty array on failure so the UI can still render
       return [];
     }
@@ -680,9 +662,7 @@ export class HistoryService {
   private async readHistoryIndex(): Promise<HistoryIndex> {
     try {
       const historyDir = await this.getHistoryDirectory();
-      const indexHandle = await historyDir.getFileHandle(
-        HISTORY_INDEX_FILENAME
-      );
+      const indexHandle = await historyDir.getFileHandle(HISTORY_INDEX_FILENAME);
       const content = await indexHandle.read();
       return JSON.parse(content) as HistoryIndex;
     } catch {
@@ -697,10 +677,7 @@ export class HistoryService {
    */
   private async writeHistoryIndex(index: HistoryIndex): Promise<void> {
     const historyDir = await this.ensureHistoryDirectory();
-    const indexHandle = await historyDir.getFileHandle(
-      HISTORY_INDEX_FILENAME,
-      { create: true }
-    );
+    const indexHandle = await historyDir.getFileHandle(HISTORY_INDEX_FILENAME, { create: true });
     await indexHandle.write(JSON.stringify(index, null, 2));
   }
 

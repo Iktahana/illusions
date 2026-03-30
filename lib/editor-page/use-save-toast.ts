@@ -20,7 +20,10 @@ interface UseSaveToastResult {
  * The toast is shown only after a manual save (not auto-saves and not the
  * initial load). It auto-dismisses after 1200 ms with a 150 ms fade-out.
  */
-export function useSaveToast({ lastSavedTime, lastSaveWasAuto }: UseSaveToastOptions): UseSaveToastResult {
+export function useSaveToast({
+  lastSavedTime,
+  lastSaveWasAuto,
+}: UseSaveToastOptions): UseSaveToastResult {
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [saveToastExiting, setSaveToastExiting] = useState(false);
   const prevLastSavedTimeRef = useRef<number | null>(null);

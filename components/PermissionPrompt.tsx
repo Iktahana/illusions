@@ -43,9 +43,7 @@ export default function PermissionPrompt({
       }
     } catch (err) {
       const message =
-        err instanceof Error
-          ? err.message
-          : "権限の取得中に不明なエラーが発生しました。";
+        err instanceof Error ? err.message : "権限の取得中に不明なエラーが発生しました。";
       setError(message);
     } finally {
       setIsRequesting(false);
@@ -53,13 +51,8 @@ export default function PermissionPrompt({
   }
 
   return (
-    <GlassDialog
-      isOpen={isOpen}
-      onBackdropClick={isRequesting ? undefined : onDenied}
-    >
-      <h2 className="text-lg font-semibold text-foreground">
-        アクセス許可が必要です
-      </h2>
+    <GlassDialog isOpen={isOpen} onBackdropClick={isRequesting ? undefined : onDenied}>
+      <h2 className="text-lg font-semibold text-foreground">アクセス許可が必要です</h2>
       <p className="mt-2 text-sm text-foreground-secondary">
         「{projectName}」のファイルにアクセスするには、ブラウザの許可が必要です。
       </p>

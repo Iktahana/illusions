@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { notificationManager } from '@/lib/services/notification-manager';
-import { Notification } from './Notification';
-import type { NotificationItem } from '@/types/notification';
+import { useEffect, useState } from "react";
+import { notificationManager } from "@/lib/services/notification-manager";
+import { Notification } from "./Notification";
+import type { NotificationItem } from "@/types/notification";
 
 const MAX_VISIBLE = 5;
 

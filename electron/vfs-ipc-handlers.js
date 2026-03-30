@@ -4,10 +4,10 @@
  * Provides file system operations for the renderer process
  */
 
-const { ipcMain, dialog, app } = require('electron');
-const fs = require('fs/promises');
-const path = require('path');
-const os = require('os');
+const { ipcMain, dialog, app } = require("electron");
+const fs = require("fs/promises");
+const path = require("path");
+const os = require("os");
 
 function registerVFSHandlers() {
   // Track the opened root directory per window for path validation
@@ -42,7 +42,7 @@ function registerVFSHandlers() {
    */
   function normalizePath(p) {
     // Replace all backslashes with forward slashes and remove trailing slashes
-    return p.replace(/\\/g, '/').replace(/\/+$/, '');
+    return p.replace(/\\/g, "/").replace(/\/+$/, "");
   }
 
   /**
@@ -54,27 +54,30 @@ function registerVFSHandlers() {
   function validateVFSPath(event, requestedPath) {
     const allowedRoot = allowedRoots.get(event.sender.id);
     if (!allowedRoot) {
-      throw new Error('ディレクトリが開かれていません');
+      throw new Error("ディレクトリが開かれていません");
     }
     // Normalize the incoming path to use forward slashes to avoid issues with
     // mixed path separators on Windows (which can cause path.resolve to misbehave)
-    const normalizedInput = requestedPath.replace(/\\/g, '/');
+    const normalizedInput = requestedPath.replace(/\\/g, "/");
     const resolved = path.resolve(normalizedInput);
 
     // Normalize paths for consistent comparison across platforms
     const normalizedResolved = normalizePath(resolved);
     const normalizedRoot = normalizePath(allowedRoot);
 
-    if (normalizedResolved !== normalizedRoot && !normalizedResolved.startsWith(normalizedRoot + '/')) {
-      throw new Error('プロジェクトディレクトリの外部へのアクセスは許可されていません');
+    if (
+      normalizedResolved !== normalizedRoot &&
+      !normalizedResolved.startsWith(normalizedRoot + "/")
+    ) {
+      throw new Error("プロジェクトディレクトリの外部へのアクセスは許可されていません");
     }
     return resolved;
   }
 
   // Open directory picker
-  ipcMain.handle('vfs:open-directory', async (event) => {
+  ipcMain.handle("vfs:open-directory", async (event) => {
     const result = await dialog.showOpenDialog({
-      properties: ['openDirectory', 'createDirectory'],
+      properties: ["openDirectory", "createDirectory"],
     });
 
     if (result.canceled || !result.filePaths[0]) {
@@ -95,35 +98,35 @@ function registerVFSHandlers() {
   });
 
   // Read file content
-  ipcMain.handle('vfs:read-file', async (event, filePath) => {
+  ipcMain.handle("vfs:read-file", async (event, filePath) => {
     try {
       const resolved = validateVFSPath(event, filePath);
-      return await fs.readFile(resolved, 'utf-8');
+      return await fs.readFile(resolved, "utf-8");
     } catch (error) {
       // ENOENT is expected for optional config files — skip noisy logging
-      if (error.code !== 'ENOENT') {
-        console.error('[VFS IPC] readFile failed:', error);
+      if (error.code !== "ENOENT") {
+        console.error("[VFS IPC] readFile failed:", error);
       }
       throw error;
     }
   });
 
   // Write file content
-  ipcMain.handle('vfs:write-file', async (event, filePath, content) => {
+  ipcMain.handle("vfs:write-file", async (event, filePath, content) => {
     try {
       const resolved = validateVFSPath(event, filePath);
       // Use open -> write -> sync -> close pattern for better compatibility with virtual file systems (e.g., Google Drive on Windows)
-      const fileHandle = await fs.open(resolved, 'w');
+      const fileHandle = await fs.open(resolved, "w");
       try {
-        await fileHandle.writeFile(content, 'utf-8');
+        await fileHandle.writeFile(content, "utf-8");
         // Explicitly sync to ensure data is flushed to disk (critical for Windows network drives)
         await fileHandle.sync();
       } finally {
         await fileHandle.close();
       }
     } catch (error) {
-      console.error('[VFS IPC] writeFile failed:', error);
-      console.error('[VFS IPC] Error details:', {
+      console.error("[VFS IPC] writeFile failed:", error);
+      console.error("[VFS IPC] Error details:", {
         message: error.message,
         code: error.code,
         syscall: error.syscall,
@@ -134,52 +137,52 @@ function registerVFSHandlers() {
   });
 
   // Read directory entries
-  ipcMain.handle('vfs:read-directory', async (event, dirPath) => {
+  ipcMain.handle("vfs:read-directory", async (event, dirPath) => {
     try {
       const resolved = validateVFSPath(event, dirPath);
       const entries = await fs.readdir(resolved, { withFileTypes: true });
       return entries.map((entry) => ({
         name: entry.name,
-        kind: entry.isDirectory() ? 'directory' : 'file',
+        kind: entry.isDirectory() ? "directory" : "file",
       }));
     } catch (error) {
-      console.error('[VFS IPC] readDirectory failed:', error);
+      console.error("[VFS IPC] readDirectory failed:", error);
       throw error;
     }
   });
 
   // Get file stats
-  ipcMain.handle('vfs:stat', async (event, filePath) => {
+  ipcMain.handle("vfs:stat", async (event, filePath) => {
     try {
       const resolved = validateVFSPath(event, filePath);
       const stats = await fs.stat(resolved);
       return {
         size: stats.size,
         lastModified: stats.mtimeMs,
-        type: stats.isDirectory() ? 'directory' : 'text/plain',
+        type: stats.isDirectory() ? "directory" : "text/plain",
       };
     } catch (error) {
       // ENOENT is expected when callers use stat to check existence before creating
-      if (error?.code !== 'ENOENT') {
-        console.error('[VFS IPC] stat failed:', error);
+      if (error?.code !== "ENOENT") {
+        console.error("[VFS IPC] stat failed:", error);
       }
       throw error;
     }
   });
 
   // Create directory (with parents)
-  ipcMain.handle('vfs:mkdir', async (event, dirPath) => {
+  ipcMain.handle("vfs:mkdir", async (event, dirPath) => {
     try {
       const resolved = validateVFSPath(event, dirPath);
       await fs.mkdir(resolved, { recursive: true });
     } catch (error) {
-      console.error('[VFS IPC] mkdir failed:', error);
+      console.error("[VFS IPC] mkdir failed:", error);
       throw error;
     }
   });
 
   // Delete file or directory
-  ipcMain.handle('vfs:delete', async (event, targetPath, options = {}) => {
+  ipcMain.handle("vfs:delete", async (event, targetPath, options = {}) => {
     try {
       const resolved = validateVFSPath(event, targetPath);
       const stats = await fs.stat(resolved);
@@ -189,19 +192,19 @@ function registerVFSHandlers() {
         await fs.unlink(resolved);
       }
     } catch (error) {
-      console.error('[VFS IPC] delete failed:', error);
+      console.error("[VFS IPC] delete failed:", error);
       throw error;
     }
   });
 
   // Rename file or directory
-  ipcMain.handle('vfs:rename', async (event, oldPath, newPath) => {
+  ipcMain.handle("vfs:rename", async (event, oldPath, newPath) => {
     try {
       const resolvedOld = validateVFSPath(event, oldPath);
       const resolvedNew = validateVFSPath(event, newPath);
       await fs.rename(resolvedOld, resolvedNew);
     } catch (error) {
-      console.error('[VFS IPC] rename failed:', error);
+      console.error("[VFS IPC] rename failed:", error);
       throw error;
     }
   });
@@ -219,56 +222,72 @@ function registerVFSHandlers() {
     // System root directories (Unix + macOS + Windows)
     // Treated as prefixes — block the directory itself AND any nested path
     const denyPrefixes = [
-      '/', '/etc', '/usr', '/bin', '/sbin', '/var', '/tmp', '/System',
-      '/private', '/private/etc', '/private/var',
+      "/",
+      "/etc",
+      "/usr",
+      "/bin",
+      "/sbin",
+      "/var",
+      "/tmp",
+      "/System",
+      "/private",
+      "/private/etc",
+      "/private/var",
     ];
 
     // Add Windows drive roots and system directories
     const driveLetterMatch = normalizedPath.match(/^([a-zA-Z]):?\/?$/);
     if (driveLetterMatch) return true; // Bare drive root (C:/ or C:)
 
-    const windowsDenyPrefixes = [
-      'C:/Windows', 'C:/Program Files', 'C:/Program Files (x86)',
-    ];
+    const windowsDenyPrefixes = ["C:/Windows", "C:/Program Files", "C:/Program Files (x86)"];
 
     // Sensitive directories within home
     const homeSensitiveSuffixes = [
-      '/.ssh', '/.gnupg', '/.aws', '/.kube', '/.docker',
-      '/.config/gcloud', '/Library/Keychains',
+      "/.ssh",
+      "/.gnupg",
+      "/.aws",
+      "/.kube",
+      "/.docker",
+      "/.config/gcloud",
+      "/Library/Keychains",
     ];
 
     // Treat denied roots as prefixes — block any nested path under them
-    if (denyPrefixes.some(dir => normalizedPath === dir || normalizedPath.startsWith(`${dir}/`))) return true;
+    if (denyPrefixes.some((dir) => normalizedPath === dir || normalizedPath.startsWith(`${dir}/`)))
+      return true;
     if (normalizedPath === homedir) return true;
     const normalizedLower = normalizedPath.toLowerCase();
-    if (windowsDenyPrefixes.some(p => {
-      const pLower = p.toLowerCase();
-      return normalizedLower === pLower || normalizedLower.startsWith(`${pLower}/`);
-    })) return true;
-    if (homeSensitiveSuffixes.some(s => normalizedPath.startsWith(homedir + s))) return true;
+    if (
+      windowsDenyPrefixes.some((p) => {
+        const pLower = p.toLowerCase();
+        return normalizedLower === pLower || normalizedLower.startsWith(`${pLower}/`);
+      })
+    )
+      return true;
+    if (homeSensitiveSuffixes.some((s) => normalizedPath.startsWith(homedir + s))) return true;
 
     return false;
   }
 
   // Set root directory programmatically (for restoring a recent project without dialog)
-  ipcMain.handle('vfs:set-root', async (event, rootPath) => {
+  ipcMain.handle("vfs:set-root", async (event, rootPath) => {
     const resolved = path.resolve(rootPath);
     const normalizedResolved = normalizePath(resolved);
 
     // 1. Deny system-sensitive paths
     if (isDeniedPath(normalizedResolved)) {
-      throw new Error('セキュリティ上の理由により、このディレクトリへのアクセスは制限されています');
+      throw new Error("セキュリティ上の理由により、このディレクトリへのアクセスは制限されています");
     }
 
     // 2. Verify the path actually exists and is a directory
     try {
       const stats = await fs.stat(resolved);
       if (!stats.isDirectory()) {
-        throw new Error('指定されたパスはディレクトリではありません');
+        throw new Error("指定されたパスはディレクトリではありません");
       }
     } catch (error) {
-      if (error.code === 'ENOENT') {
-        throw new Error('指定されたディレクトリが見つかりません');
+      if (error.code === "ENOENT") {
+        throw new Error("指定されたディレクトリが見つかりません");
       }
       throw error;
     }
@@ -282,12 +301,11 @@ function registerVFSHandlers() {
   });
 
   // Clean up allowedRoots when a window is destroyed to prevent memory leaks
-  app.on('web-contents-created', (_, contents) => {
-    contents.on('destroyed', () => {
+  app.on("web-contents-created", (_, contents) => {
+    contents.on("destroyed", () => {
       allowedRoots.delete(contents.id);
     });
   });
-
 }
 
 module.exports = { registerVFSHandlers };

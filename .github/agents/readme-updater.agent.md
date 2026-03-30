@@ -23,23 +23,28 @@ When triggered, analyse the recent commits on the current branch and determine w
 Scan recent changes and update the corresponding README sections:
 
 ### 1. Features (`✨ Key Features`)
+
 - New user-facing feature added → add a bullet point under the appropriate sub-section.
 - Feature removed → remove the corresponding bullet point.
 - Feature significantly changed → update description.
 
 ### 2. Tech Stack (`🛠️ Tech Stack`)
+
 - Major dependency added/removed/upgraded (e.g., React 18→19, new library) → update the list.
 - Minor patch updates → ignore.
 
 ### 3. Project Structure (`📂 Project Structure`)
+
 - New top-level directory or major structural change → update the tree.
 - Internal file moves → ignore.
 
 ### 4. Quick Start (`🚀 Quick Start`)
+
 - New required setup steps (new env var, new prerequisite) → add instructions.
 - Removed steps → clean up.
 
 ### 5. Roadmap (`🎯 Features Roadmap`)
+
 - Planned feature now implemented → move from "Planned" to "Current Release" with ✅.
 - New planned feature announced in an issue → add to "Planned".
 

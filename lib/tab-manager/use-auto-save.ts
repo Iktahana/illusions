@@ -29,20 +29,18 @@ export interface UseAutoSaveParams extends TabManagerCore {
  * that have associated file descriptors.
  */
 export function useAutoSave(params: UseAutoSaveParams): void {
-  const {
-    setTabs,
-    tabsRef,
-    activeTabIdRef,
-    isProjectRef,
-    autoSaveEnabled,
-    saveFileRef,
-  } = params;
+  const { setTabs, tabsRef, activeTabIdRef, isProjectRef, autoSaveEnabled, saveFileRef } = params;
 
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const savingTabIdsRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
 
-  useEffect(() => () => { mountedRef.current = false; }, []);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!autoSaveEnabled) {
@@ -72,11 +70,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
 
         // Non-active dirty tabs: save directly
         // Set isSaving before starting async operation to prevent concurrent saves
-        setTabs((prev) =>
-          prev.map((t) =>
-            t.id === tab.id ? { ...t, isSaving: true } : t,
-          ),
-        );
+        setTabs((prev) => prev.map((t) => (t.id === tab.id ? { ...t, isSaving: true } : t)));
         void (async () => {
           try {
             const sanitized = sanitizeMdiContent(tab.content);
@@ -123,21 +117,14 @@ export function useAutoSave(params: UseAutoSaveParams): void {
               }
             }
           } catch (error) {
-            console.error(
-              `自動保存に失敗しました (${tab.file?.name}):`,
-              error,
-            );
+            console.error(`自動保存に失敗しました (${tab.file?.name}):`, error);
             notificationManager.warning(
-              `自動保存に失敗しました: ${tab.file?.name ?? "不明なファイル"}`
+              `自動保存に失敗しました: ${tab.file?.name ?? "不明なファイル"}`,
             );
           } finally {
             savingTabIdsRef.current.delete(tab.id);
             if (!mountedRef.current) return;
-            setTabs((prev) =>
-              prev.map((t) =>
-                t.id === tab.id ? { ...t, isSaving: false } : t,
-              ),
-            );
+            setTabs((prev) => prev.map((t) => (t.id === tab.id ? { ...t, isSaving: false } : t)));
           }
         })();
       }

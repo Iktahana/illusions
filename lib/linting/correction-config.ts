@@ -11,12 +11,12 @@ import type { IgnoredCorrection } from "@/lib/project/project-types";
  * in the decoration plugin.
  */
 export type ConfigChangeReason =
-  | "text-edit"            // re-run affected paragraphs only
-  | "rule-config-change"   // clear issue cache, full re-run
-  | "mode-change"          // clear all caches, full re-run
-  | "guideline-change"     // clear issue + validation cache
-  | "ignored-correction"   // rebuild decorations only (no re-run)
-  | "manual-refresh";      // clear all caches, force re-run
+  | "text-edit" // re-run affected paragraphs only
+  | "rule-config-change" // clear issue cache, full re-run
+  | "mode-change" // clear all caches, full re-run
+  | "guideline-change" // clear issue + validation cache
+  | "ignored-correction" // rebuild decorations only (no re-run)
+  | "manual-refresh"; // clear all caches, force re-run
 
 /** Correction mode identifiers */
 export type CorrectionModeId = "novel" | "official" | "blog" | "academic" | "sns";

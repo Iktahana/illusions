@@ -164,9 +164,7 @@ describe("RuleRunner", () => {
       const runner = new RuleRunner();
       runner.registerRule(new TestRule()); // Not a document rule
 
-      const paragraphs = [
-        { text: "ERROR text", index: 0 },
-      ];
+      const paragraphs = [{ text: "ERROR text", index: 0 }];
 
       const results = runner.runDocument(paragraphs);
       let totalIssues = 0;

@@ -1,31 +1,25 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import type { NotificationItem } from '@/types/notification';
-import { notificationManager } from '@/lib/services/notification-manager';
-import {
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle,
-  Info,
-  X,
-} from 'lucide-react';
+import { useState } from "react";
+import type { NotificationItem } from "@/types/notification";
+import { notificationManager } from "@/lib/services/notification-manager";
+import { AlertCircle, AlertTriangle, CheckCircle, Info, X } from "lucide-react";
 
 interface NotificationProps {
   notification: NotificationItem;
 }
 
 const iconConfig = {
-  info: { icon: Info, colorClass: 'text-info' },
-  warning: { icon: AlertTriangle, colorClass: 'text-warning' },
-  error: { icon: AlertCircle, colorClass: 'text-error' },
-  success: { icon: CheckCircle, colorClass: 'text-success' },
+  info: { icon: Info, colorClass: "text-info" },
+  warning: { icon: AlertTriangle, colorClass: "text-warning" },
+  error: { icon: AlertCircle, colorClass: "text-error" },
+  success: { icon: CheckCircle, colorClass: "text-success" },
 } as const;
 
 export function Notification({ notification }: NotificationProps) {
   const [isClosing, setIsClosing] = useState(false);
-  const hasProgress = 'progress' in notification;
-  const progress = hasProgress ? notification.progress ?? 0 : undefined;
+  const hasProgress = "progress" in notification;
+  const progress = hasProgress ? (notification.progress ?? 0) : undefined;
   const actions = notification.actions?.slice(0, 3);
 
   const handleClose = (): void => {
@@ -47,7 +41,7 @@ export function Notification({ notification }: NotificationProps) {
       className={`
         relative flex flex-col rounded-md border
         bg-background-elevated border-border shadow-lg
-        ${isClosing ? 'animate-notification-out' : 'animate-notification-in'}
+        ${isClosing ? "animate-notification-out" : "animate-notification-in"}
       `}
       style={{ width: 340 }}
     >
@@ -86,11 +80,11 @@ export function Notification({ notification }: NotificationProps) {
       )}
 
       {/* Progress bar */}
-      {hasProgress && typeof progress === 'number' && (
+      {hasProgress && typeof progress === "number" && (
         <div className="px-3 pb-2.5">
           <div className="w-full h-1 bg-border rounded-full overflow-hidden">
             <div
-              className={`h-full ${colorClass.replace('text-', 'bg-')} transition-all duration-300 ease-out`}
+              className={`h-full ${colorClass.replace("text-", "bg-")} transition-all duration-300 ease-out`}
               style={{ width: `${progress}%` }}
             />
           </div>

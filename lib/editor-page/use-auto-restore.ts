@@ -43,7 +43,9 @@ export function useAutoRestore({
       timerId = setTimeout(() => {
         setIsRestoring((prev) => {
           if (prev && isElectron) {
-            setRestoreError("前回のプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。");
+            setRestoreError(
+              "前回のプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。",
+            );
           }
           return false;
         });
@@ -53,5 +55,13 @@ export function useAutoRestore({
     return () => {
       if (timerId !== undefined) clearTimeout(timerId);
     };
-  }, [autoRestoreProjectId, handleOpenRecentProject, isElectron, isAutoRestoringRef, signalVfsReady, setIsRestoring, setRestoreError]);
+  }, [
+    autoRestoreProjectId,
+    handleOpenRecentProject,
+    isElectron,
+    isAutoRestoringRef,
+    signalVfsReady,
+    setIsRestoring,
+    setRestoreError,
+  ]);
 }

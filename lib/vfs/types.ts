@@ -86,28 +86,19 @@ export interface VFSDirectoryHandle {
    * @param name - File name to look up
    * @param options - Pass { create: true } to create the file if it does not exist
    */
-  getFileHandle(
-    name: string,
-    options?: { create?: boolean }
-  ): Promise<VFSFileHandle>;
+  getFileHandle(name: string, options?: { create?: boolean }): Promise<VFSFileHandle>;
   /**
    * Get a subdirectory handle by name within this directory.
    * @param name - Directory name to look up
    * @param options - Pass { create: true } to create the directory if it does not exist
    */
-  getDirectoryHandle(
-    name: string,
-    options?: { create?: boolean }
-  ): Promise<VFSDirectoryHandle>;
+  getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<VFSDirectoryHandle>;
   /**
    * Remove an entry (file or directory) from this directory.
    * @param name - Entry name to remove
    * @param options - Pass { recursive: true } to remove directories with contents
    */
-  removeEntry(
-    name: string,
-    options?: { recursive?: boolean }
-  ): Promise<void>;
+  removeEntry(name: string, options?: { recursive?: boolean }): Promise<void>;
   /**
    * Iterate over all entries in this directory.
    * Yields [name, VFSEntry] pairs.
@@ -178,10 +169,7 @@ export interface VirtualFileSystem {
    * @param callback - Called when the file changes
    * @returns A watcher that can be stopped
    */
-  watchFile?(
-    path: string,
-    callback: (event: VFSWatchEvent) => void
-  ): VFSWatcher;
+  watchFile?(path: string, callback: (event: VFSWatchEvent) => void): VFSWatcher;
 
   /** Get the root directory path as a string (Electron only). */
   getRootPath?(): string | null;

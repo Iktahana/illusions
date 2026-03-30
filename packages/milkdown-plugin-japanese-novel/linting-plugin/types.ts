@@ -3,12 +3,12 @@
  * リンティングプラグインの型定義
  */
 
-import type { DecorationSet } from '@milkdown/prose/view';
-import type { LintIssue } from '@/lib/linting';
-import type { RuleRunner } from '@/lib/linting';
-import type { INlpClient } from '@/lib/nlp-client/types';
-import type { IgnoredCorrection } from '@/lib/project/project-types';
-import type { ConfigChangeReason } from '@/lib/linting/correction-config';
+import type { DecorationSet } from "@milkdown/prose/view";
+import type { LintIssue } from "@/lib/linting";
+import type { RuleRunner } from "@/lib/linting";
+import type { INlpClient } from "@/lib/nlp-client/types";
+import type { IgnoredCorrection } from "@/lib/project/project-types";
+import type { ConfigChangeReason } from "@/lib/linting/correction-config";
 
 export type { ConfigChangeReason };
 

@@ -19,30 +19,34 @@ npm install milkdown-plugin-japanese-novel
 ## Usage
 
 ```ts
-import { Editor, rootCtx } from '@milkdown/core'
-import { commonmark } from '@milkdown/preset-commonmark'
-import { japaneseNovel } from 'milkdown-plugin-japanese-novel'
-import 'milkdown-plugin-japanese-novel/style.css'
+import { Editor, rootCtx } from "@milkdown/core";
+import { commonmark } from "@milkdown/preset-commonmark";
+import { japaneseNovel } from "milkdown-plugin-japanese-novel";
+import "milkdown-plugin-japanese-novel/style.css";
 
 Editor.make()
-  .config((ctx) => { ctx.set(rootCtx, root) })
+  .config((ctx) => {
+    ctx.set(rootCtx, root);
+  })
   .use(commonmark)
-  .use(japaneseNovel({
-    isVertical: true,
-    showManuscriptLine: false,
-    enableRuby: true,
-    enableTcy: true,
-  }))
+  .use(
+    japaneseNovel({
+      isVertical: true,
+      showManuscriptLine: false,
+      enableRuby: true,
+      enableTcy: true,
+    }),
+  );
 ```
 
 ## Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `isVertical` | `boolean` | `false` | Enable vertical writing mode. |
-| `showManuscriptLine` | `boolean` | `false` | Show manuscript-style grid. |
-| `enableRuby` | `boolean` | `true` | Enable `{base\|ruby}` syntax. |
-| `enableTcy` | `boolean` | `true` | Enable tate-chu-yoko for digits/punctuation. |
+| Option               | Type      | Default | Description                                  |
+| -------------------- | --------- | ------- | -------------------------------------------- |
+| `isVertical`         | `boolean` | `false` | Enable vertical writing mode.                |
+| `showManuscriptLine` | `boolean` | `false` | Show manuscript-style grid.                  |
+| `enableRuby`         | `boolean` | `true`  | Enable `{base\|ruby}` syntax.                |
+| `enableTcy`          | `boolean` | `true`  | Enable tate-chu-yoko for digits/punctuation. |
 
 ## Syntax
 

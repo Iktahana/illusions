@@ -12,15 +12,18 @@ Single source of truth for all AI assistants (Cursor, Claude, etc.)
 ### 1. Language Standards
 
 **❌ STRICTLY FORBIDDEN in Code/Documentation:**
+
 - **Chinese (中文/中国語)** - ABSOLUTELY PROHIBITED
 - **Korean (한국어/韓国語)** - ABSOLUTELY PROHIBITED
 - **Any other languages** except English and Japanese
 
 **✅ ALLOWED Languages:**
+
 - **English**: Preferred for code logic (variables, functions, types, comments)
 - **Japanese (日本語)**: Required for UI strings, allowed for comments and user-facing documentation
 
 **Where this applies:**
+
 - Code logic: Variable names, function names, class names
 - Code comments: All inline and block comments
 - Documentation files: README, API docs, technical specs
@@ -28,11 +31,13 @@ Single source of truth for all AI assistants (Cursor, Claude, etc.)
 - JSDoc, configuration files, JSON data, YAML files
 
 **✅ ALLOWED in AI Conversations & Planning:**
+
 - AI assistant responses, project planning, internal notes, design documents
 
 ### UI/UX Language Requirements
 
 **ALL user-facing text MUST be in Japanese**, including:
+
 - Menu items, dialog boxes, notifications
 - Buttons, labels, placeholders, tooltips
 - Error messages, update notifications
@@ -62,6 +67,7 @@ hotfix/<name>   →  main  (emergency only, then cherry-pick to dev)
 - **DO** clean up (remove) the worktree and delete the branch after merging
 
 **Workflow:**
+
 ```bash
 # 1. Create worktree with a new feature branch
 git worktree add ../illusions-work-<short-name> -b feature/<branch-name>
@@ -76,6 +82,7 @@ git branch -d feature/<branch-name>
 ```
 
 **Rules:**
+
 - One worktree per task — do NOT reuse worktrees across unrelated tasks
 - Naming convention: `illusions-work-<short-name>`
 - Always verify removal after merge (`git worktree list`)
@@ -91,12 +98,14 @@ git branch -d feature/<branch-name>
 ### 4. TypeScript & Code Style Standards
 
 **TypeScript Requirements:**
+
 - **Strict Mode**: All files must work with TypeScript strict mode enabled
 - **Type Safety**: Avoid `any`; prefer `unknown` or specific types
 - **Type Imports**: Use `import type` for type-only imports
 - **Explicit Return Types**: Public functions should have explicit return types
 
 **Naming Conventions:**
+
 - Components/Classes: PascalCase (`EditorComponent`, `StorageManager`)
 - Functions/Variables: camelCase (`handleClick`, `isLoading`)
 - Constants: UPPER_SNAKE_CASE (`MAX_FILE_SIZE`, `DEFAULT_FONT_SIZE`)
@@ -104,12 +113,14 @@ git branch -d feature/<branch-name>
 - Files: kebab-case for utilities (`use-mdi-file.ts`), PascalCase for components (`Editor.tsx`)
 
 **Import Order:**
+
 1. External libraries (React, Next.js, etc.)
 2. Internal packages (`@/`)
 3. Relative imports (`./`)
 4. Types (`import type`)
 
 **Code Organization:**
+
 - Use JSDoc for public functions and complex logic
 - Component structure: Props interface → Component → Helper functions → Exports
 - Use early returns to reduce nesting
@@ -143,11 +154,16 @@ git branch -d feature/<branch-name>
 import { getStorageService } from "@/lib/storage/storage-service";
 
 const storage = getStorageService();
-await storage.saveSession({ appState: { lastOpenedMdiPath: "/path/to/file.mdi" }, recentFiles: [], editorBuffer: { content: "...", timestamp: Date.now() } });
+await storage.saveSession({
+  appState: { lastOpenedMdiPath: "/path/to/file.mdi" },
+  recentFiles: [],
+  editorBuffer: { content: "...", timestamp: Date.now() },
+});
 const session = await storage.loadSession();
 ```
 
 **12 Core Methods:**
+
 - **Session**: `saveSession()`, `loadSession()`
 - **App State**: `saveAppState()`, `loadAppState()`
 - **Recent Files**: `addToRecent()`, `getRecentFiles()`, `removeFromRecent()`, `clearRecent()`
@@ -155,15 +171,18 @@ const session = await storage.loadSession();
 - **Utility**: `clearAll()`
 
 **Storage Locations:**
+
 - Electron: SQLite at `~/Library/Application Support/illusions/illusions-storage.db`
 - Web: Browser IndexedDB via Dexie
 
 **❌ Never:**
+
 - Implement custom storage logic per component
 - Use `localStorage` directly in Electron
 - Manually interact with IndexedDB or SQLite
 
 **✅ Always:**
+
 - Use `getStorageService()`
 - Auto-save editor buffer every 30 seconds
 
@@ -226,12 +245,14 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ## 📋 REVIEW CHECKLIST
 
 ### Before Starting Work
+
 - [ ] `git worktree list` — check for stale worktrees
 - [ ] `git branch` — check for old feature branches
 - [ ] For each stale worktree: check `git log main..<branch>` and `git status` — ask user before cleanup
 - [ ] `git worktree add ../illusions-work-<name> -b feature/<name>`
 
 ### Before Committing
+
 - [ ] On feature branch (not main)
 - [ ] Atomic commits (unrelated changes split)
 - [ ] Conventional Commits format
@@ -244,6 +265,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 - [ ] React hooks dependency arrays correct
 
 ### After Completing Work
+
 - [ ] `git worktree remove ../illusions-work-<name>`
 - [ ] `git branch -d feature/<name>`
 - [ ] `git worktree list` — only main worktree remains
@@ -261,16 +283,17 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 ### Component Responsibility Map
 
-| Component / Hook | Responsible For |
-|---|---|
-| `app/page.tsx` | Top-level coordinator — wires all hooks to EditorLayout |
-| `components/EditorLayout.tsx` | Layout structure only; no business logic |
-| `components/Editor.tsx` | Milkdown editor instance and ProseMirror bridge |
-| `lib/editor-page/use-linting.ts` | RuleRunner lifecycle and lint state management |
-| `lib/editor-page/use-file-opening.ts` | Open/save file dialogs and IPC calls |
-| `lib/storage/storage-service.ts` | Storage singleton with environment detection |
-| `lib/vfs/` | Filesystem abstraction (browser File API vs Node.js fs) |
-| `electron/preload.js` | **IPC security boundary** — sole point exposing APIs to renderer |
+| Component / Hook                      | Responsible For                                                  |
+| ------------------------------------- | ---------------------------------------------------------------- |
+| `app/page.tsx`                        | Top-level coordinator — wires all hooks to EditorLayout          |
+| `components/EditorLayout.tsx`         | Layout structure only; no business logic                         |
+| `components/Editor.tsx`               | Milkdown editor instance and ProseMirror bridge                  |
+| `lib/editor-page/use-linting.ts`      | RuleRunner lifecycle and lint state management                   |
+| `lib/editor-page/use-file-opening.ts` | Open/save file dialogs and IPC calls                             |
+| `lib/storage/storage-service.ts`      | Storage singleton with environment detection                     |
+| `lib/vfs/`                            | Filesystem abstraction (browser File API vs Node.js fs)          |
+| `electron/preload.js`                 | **IPC security boundary** — sole point exposing APIs to renderer |
+
 - Storage docs: `docs/architecture/storage-system.md`
 - MDI syntax: `MDI.md`
 - Electron types: `types/electron.d.ts`

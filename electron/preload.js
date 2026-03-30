@@ -1,242 +1,244 @@
 // Electron の preload スクリプト
 // レンダラへ最小限かつ安全なAPIだけを公開する
 
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld('electronAPI', {
+contextBridge.exposeInMainWorld("electronAPI", {
   isElectron: true,
-  openFile: () => ipcRenderer.invoke('open-file'),
-  saveFile: (filePath, content, fileType) => ipcRenderer.invoke('save-file', filePath, content, fileType),
-  getChromeVersion: () => ipcRenderer.invoke('get-chrome-version'),
-  setDirty: (dirty) => ipcRenderer.invoke('set-dirty', dirty),
-  saveDoneAndClose: () => ipcRenderer.invoke('save-before-close-done'),
-  newWindow: () => ipcRenderer.invoke('new-window'),
-  openDictionaryPopup: (url, title) => ipcRenderer.invoke('open-dictionary-popup', url, title),
-  showContextMenu: (items) => ipcRenderer.invoke('show-context-menu', items),
+  openFile: () => ipcRenderer.invoke("open-file"),
+  saveFile: (filePath, content, fileType) =>
+    ipcRenderer.invoke("save-file", filePath, content, fileType),
+  getChromeVersion: () => ipcRenderer.invoke("get-chrome-version"),
+  setDirty: (dirty) => ipcRenderer.invoke("set-dirty", dirty),
+  saveDoneAndClose: () => ipcRenderer.invoke("save-before-close-done"),
+  newWindow: () => ipcRenderer.invoke("new-window"),
+  openDictionaryPopup: (url, title) => ipcRenderer.invoke("open-dictionary-popup", url, title),
+  showContextMenu: (items) => ipcRenderer.invoke("show-context-menu", items),
   onMenuNew: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-new-triggered', handler)
-    return () => ipcRenderer.removeListener('menu-new-triggered', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-new-triggered", handler);
+    return () => ipcRenderer.removeListener("menu-new-triggered", handler);
   },
   onMenuOpen: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-open-triggered', handler)
-    return () => ipcRenderer.removeListener('menu-open-triggered', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-open-triggered", handler);
+    return () => ipcRenderer.removeListener("menu-open-triggered", handler);
   },
   onMenuSave: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-save-triggered', handler)
-    return () => ipcRenderer.removeListener('menu-save-triggered', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-save-triggered", handler);
+    return () => ipcRenderer.removeListener("menu-save-triggered", handler);
   },
   onMenuSaveAs: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-save-as-triggered', handler)
-    return () => ipcRenderer.removeListener('menu-save-as-triggered', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-save-as-triggered", handler);
+    return () => ipcRenderer.removeListener("menu-save-as-triggered", handler);
   },
   onMenuCloseTab: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-close-tab', handler)
-    return () => ipcRenderer.removeListener('menu-close-tab', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-close-tab", handler);
+    return () => ipcRenderer.removeListener("menu-close-tab", handler);
   },
   onMenuNewTab: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-new-tab', handler)
-    return () => ipcRenderer.removeListener('menu-new-tab', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-new-tab", handler);
+    return () => ipcRenderer.removeListener("menu-new-tab", handler);
   },
   onSaveBeforeClose: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('electron-request-save-before-close', handler)
-    return () => ipcRenderer.removeListener('electron-request-save-before-close', handler)
+    const handler = () => callback();
+    ipcRenderer.on("electron-request-save-before-close", handler);
+    return () => ipcRenderer.removeListener("electron-request-save-before-close", handler);
   },
   onFlushStateBeforeClose: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('electron-request-flush-state-before-close', handler)
-    return () => ipcRenderer.removeListener('electron-request-flush-state-before-close', handler)
+    const handler = () => callback();
+    ipcRenderer.on("electron-request-flush-state-before-close", handler);
+    return () => ipcRenderer.removeListener("electron-request-flush-state-before-close", handler);
   },
   onOpenFileFromSystem: (callback) => {
-    const handler = (_event, payload) => callback(payload)
-    ipcRenderer.on('open-file-from-system', handler)
-    return () => ipcRenderer.removeListener('open-file-from-system', handler)
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("open-file-from-system", handler);
+    return () => ipcRenderer.removeListener("open-file-from-system", handler);
   },
   onOpenAsProject: (callback) => {
-    const handler = (_event, payload) => callback(payload)
-    ipcRenderer.on('open-as-project', handler)
-    return () => ipcRenderer.removeListener('open-as-project', handler)
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("open-as-project", handler);
+    return () => ipcRenderer.removeListener("open-as-project", handler);
   },
-  getPendingFile: () => ipcRenderer.invoke('get-pending-file'),
+  getPendingFile: () => ipcRenderer.invoke("get-pending-file"),
   onPasteAsPlaintext: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-paste-as-plaintext', handler)
-    return () => ipcRenderer.removeListener('menu-paste-as-plaintext', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-paste-as-plaintext", handler);
+    return () => ipcRenderer.removeListener("menu-paste-as-plaintext", handler);
   },
-  showInFileManager: (dirPath) => ipcRenderer.invoke('show-in-file-manager', dirPath),
-  revealInFileManager: (filePath) => ipcRenderer.invoke('reveal-in-file-manager', filePath),
-  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  showInFileManager: (dirPath) => ipcRenderer.invoke("show-in-file-manager", dirPath),
+  revealInFileManager: (filePath) => ipcRenderer.invoke("reveal-in-file-manager", filePath),
+  openExternal: (url) => ipcRenderer.invoke("open-external", url),
   onMenuOpenProject: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-open-project', handler)
-    return () => ipcRenderer.removeListener('menu-open-project', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-open-project", handler);
+    return () => ipcRenderer.removeListener("menu-open-project", handler);
   },
   onMenuOpenRecentProject: (callback) => {
-    const handler = (_event, projectId) => callback(projectId)
-    ipcRenderer.on('menu-open-recent-project', handler)
-    return () => ipcRenderer.removeListener('menu-open-recent-project', handler)
+    const handler = (_event, projectId) => callback(projectId);
+    ipcRenderer.on("menu-open-recent-project", handler);
+    return () => ipcRenderer.removeListener("menu-open-recent-project", handler);
   },
-  rebuildMenu: () => ipcRenderer.invoke('menu:rebuild'),
-  syncMenuUiState: (state) => ipcRenderer.invoke('menu:sync-ui-state', state),
-  updateKeymapOverrides: (overrides) => ipcRenderer.invoke('menu:update-keymap-overrides', overrides),
+  rebuildMenu: () => ipcRenderer.invoke("menu:rebuild"),
+  syncMenuUiState: (state) => ipcRenderer.invoke("menu:sync-ui-state", state),
+  updateKeymapOverrides: (overrides) =>
+    ipcRenderer.invoke("menu:update-keymap-overrides", overrides),
   onMenuShowInFileManager: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-show-in-file-manager', handler)
-    return () => ipcRenderer.removeListener('menu-show-in-file-manager', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-show-in-file-manager", handler);
+    return () => ipcRenderer.removeListener("menu-show-in-file-manager", handler);
   },
   onToggleCompactMode: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-toggle-compact-mode', handler)
-    return () => ipcRenderer.removeListener('menu-toggle-compact-mode', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-toggle-compact-mode", handler);
+    return () => ipcRenderer.removeListener("menu-toggle-compact-mode", handler);
   },
   onFormatChange: (callback) => {
-    const handler = (_event, setting, action) => callback(setting, action)
-    ipcRenderer.on('menu-format', handler)
-    return () => ipcRenderer.removeListener('menu-format', handler)
+    const handler = (_event, setting, action) => callback(setting, action);
+    ipcRenderer.on("menu-format", handler);
+    return () => ipcRenderer.removeListener("menu-format", handler);
   },
   onThemeChange: (callback) => {
-    const handler = (_event, mode) => callback(mode)
-    ipcRenderer.on('menu-theme', handler)
-    return () => ipcRenderer.removeListener('menu-theme', handler)
+    const handler = (_event, mode) => callback(mode);
+    ipcRenderer.on("menu-theme", handler);
+    return () => ipcRenderer.removeListener("menu-theme", handler);
   },
   // Export
-  exportPDF: (content, options) => ipcRenderer.invoke('export-pdf', content, options),
-  exportEPUB: (content, options) => ipcRenderer.invoke('export-epub', content, options),
-  exportDOCX: (content, options) => ipcRenderer.invoke('export-docx', content, options),
+  exportPDF: (content, options) => ipcRenderer.invoke("export-pdf", content, options),
+  exportEPUB: (content, options) => ipcRenderer.invoke("export-epub", content, options),
+  exportDOCX: (content, options) => ipcRenderer.invoke("export-docx", content, options),
   onMenuExportTxt: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-export-txt', handler)
-    return () => ipcRenderer.removeListener('menu-export-txt', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-export-txt", handler);
+    return () => ipcRenderer.removeListener("menu-export-txt", handler);
   },
   onMenuExportTxtRuby: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-export-txt-ruby', handler)
-    return () => ipcRenderer.removeListener('menu-export-txt-ruby', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-export-txt-ruby", handler);
+    return () => ipcRenderer.removeListener("menu-export-txt-ruby", handler);
   },
   onMenuExportPDF: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-export-pdf', handler)
-    return () => ipcRenderer.removeListener('menu-export-pdf', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-export-pdf", handler);
+    return () => ipcRenderer.removeListener("menu-export-pdf", handler);
   },
   onMenuExportEPUB: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-export-epub', handler)
-    return () => ipcRenderer.removeListener('menu-export-epub', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-export-epub", handler);
+    return () => ipcRenderer.removeListener("menu-export-epub", handler);
   },
   onMenuExportDOCX: (callback) => {
-    const handler = () => callback()
-    ipcRenderer.on('menu-export-docx', handler)
-    return () => ipcRenderer.removeListener('menu-export-docx', handler)
+    const handler = () => callback();
+    ipcRenderer.on("menu-export-docx", handler);
+    return () => ipcRenderer.removeListener("menu-export-docx", handler);
   },
   nlp: {
-    init: (dicPath) => ipcRenderer.invoke('nlp:init', dicPath),
-    tokenizeParagraph: (text) => ipcRenderer.invoke('nlp:tokenize-paragraph', text),
+    init: (dicPath) => ipcRenderer.invoke("nlp:init", dicPath),
+    tokenizeParagraph: (text) => ipcRenderer.invoke("nlp:tokenize-paragraph", text),
     tokenizeDocument: (paragraphs, onProgress) => {
       // Register progress listener if callback provided
       if (onProgress) {
         // Remove any stale listeners from previous calls before registering
-        ipcRenderer.removeAllListeners('nlp:tokenize-progress');
+        ipcRenderer.removeAllListeners("nlp:tokenize-progress");
         const handler = (_event, progress) => onProgress(progress);
-        ipcRenderer.on('nlp:tokenize-progress', handler);
+        ipcRenderer.on("nlp:tokenize-progress", handler);
 
         // Clean up on promise settlement instead of a fixed timeout
-        return ipcRenderer.invoke('nlp:tokenize-document', { paragraphs }).finally(() => {
-          ipcRenderer.removeListener('nlp:tokenize-progress', handler);
+        return ipcRenderer.invoke("nlp:tokenize-document", { paragraphs }).finally(() => {
+          ipcRenderer.removeListener("nlp:tokenize-progress", handler);
         });
       }
 
-      return ipcRenderer.invoke('nlp:tokenize-document', { paragraphs });
+      return ipcRenderer.invoke("nlp:tokenize-document", { paragraphs });
     },
-    analyzeWordFrequency: (text) => ipcRenderer.invoke('nlp:analyze-word-frequency', text),
+    analyzeWordFrequency: (text) => ipcRenderer.invoke("nlp:analyze-word-frequency", text),
   },
   storage: {
-    saveSession: (session) => ipcRenderer.invoke('storage:save-session', session),
-    loadSession: () => ipcRenderer.invoke('storage:load-session'),
-    saveAppState: (appState) => ipcRenderer.invoke('storage:save-app-state', appState),
-    loadAppState: () => ipcRenderer.invoke('storage:load-app-state'),
-    addToRecent: (file) => ipcRenderer.invoke('storage:add-to-recent', file),
-    getRecentFiles: () => ipcRenderer.invoke('storage:get-recent-files'),
-    removeFromRecent: (path) => ipcRenderer.invoke('storage:remove-from-recent', path),
-    clearRecent: () => ipcRenderer.invoke('storage:clear-recent'),
-    saveEditorBuffer: (buffer) => ipcRenderer.invoke('storage:save-editor-buffer', buffer),
-    loadEditorBuffer: () => ipcRenderer.invoke('storage:load-editor-buffer'),
-    clearEditorBuffer: () => ipcRenderer.invoke('storage:clear-editor-buffer'),
-    clearAll: () => ipcRenderer.invoke('storage:clear-all'),
-    addRecentProject: (project) => ipcRenderer.invoke('storage:add-recent-project', project),
-    getRecentProjects: () => ipcRenderer.invoke('storage:get-recent-projects'),
-    removeRecentProject: (projectId) => ipcRenderer.invoke('storage:remove-recent-project', projectId),
-    setItem: (key, value) => ipcRenderer.invoke('storage:set-item', key, value),
-    getItem: (key) => ipcRenderer.invoke('storage:get-item', key),
-    removeItem: (key) => ipcRenderer.invoke('storage:remove-item', key),
+    saveSession: (session) => ipcRenderer.invoke("storage:save-session", session),
+    loadSession: () => ipcRenderer.invoke("storage:load-session"),
+    saveAppState: (appState) => ipcRenderer.invoke("storage:save-app-state", appState),
+    loadAppState: () => ipcRenderer.invoke("storage:load-app-state"),
+    addToRecent: (file) => ipcRenderer.invoke("storage:add-to-recent", file),
+    getRecentFiles: () => ipcRenderer.invoke("storage:get-recent-files"),
+    removeFromRecent: (path) => ipcRenderer.invoke("storage:remove-from-recent", path),
+    clearRecent: () => ipcRenderer.invoke("storage:clear-recent"),
+    saveEditorBuffer: (buffer) => ipcRenderer.invoke("storage:save-editor-buffer", buffer),
+    loadEditorBuffer: () => ipcRenderer.invoke("storage:load-editor-buffer"),
+    clearEditorBuffer: () => ipcRenderer.invoke("storage:clear-editor-buffer"),
+    clearAll: () => ipcRenderer.invoke("storage:clear-all"),
+    addRecentProject: (project) => ipcRenderer.invoke("storage:add-recent-project", project),
+    getRecentProjects: () => ipcRenderer.invoke("storage:get-recent-projects"),
+    removeRecentProject: (projectId) =>
+      ipcRenderer.invoke("storage:remove-recent-project", projectId),
+    setItem: (key, value) => ipcRenderer.invoke("storage:set-item", key, value),
+    getItem: (key) => ipcRenderer.invoke("storage:get-item", key),
+    removeItem: (key) => ipcRenderer.invoke("storage:remove-item", key),
   },
   vfs: {
-    openDirectory: () => ipcRenderer.invoke('vfs:open-directory'),
-    setRoot: (rootPath) => ipcRenderer.invoke('vfs:set-root', rootPath),
-    readFile: (filePath) => ipcRenderer.invoke('vfs:read-file', filePath),
-    writeFile: (filePath, content) => ipcRenderer.invoke('vfs:write-file', filePath, content),
-    readDirectory: (dirPath) => ipcRenderer.invoke('vfs:read-directory', dirPath),
-    stat: (filePath) => ipcRenderer.invoke('vfs:stat', filePath),
-    mkdir: (dirPath) => ipcRenderer.invoke('vfs:mkdir', dirPath),
-    delete: (targetPath, options) => ipcRenderer.invoke('vfs:delete', targetPath, options),
-    rename: (oldPath, newPath) => ipcRenderer.invoke('vfs:rename', oldPath, newPath),
+    openDirectory: () => ipcRenderer.invoke("vfs:open-directory"),
+    setRoot: (rootPath) => ipcRenderer.invoke("vfs:set-root", rootPath),
+    readFile: (filePath) => ipcRenderer.invoke("vfs:read-file", filePath),
+    writeFile: (filePath, content) => ipcRenderer.invoke("vfs:write-file", filePath, content),
+    readDirectory: (dirPath) => ipcRenderer.invoke("vfs:read-directory", dirPath),
+    stat: (filePath) => ipcRenderer.invoke("vfs:stat", filePath),
+    mkdir: (dirPath) => ipcRenderer.invoke("vfs:mkdir", dirPath),
+    delete: (targetPath, options) => ipcRenderer.invoke("vfs:delete", targetPath, options),
+    rename: (oldPath, newPath) => ipcRenderer.invoke("vfs:rename", oldPath, newPath),
   },
   safeStorage: {
-    encrypt: (plaintext) => ipcRenderer.invoke('safe-storage:encrypt', plaintext),
-    decrypt: (base64Cipher) => ipcRenderer.invoke('safe-storage:decrypt', base64Cipher),
-    isAvailable: () => ipcRenderer.invoke('safe-storage:is-available'),
+    encrypt: (plaintext) => ipcRenderer.invoke("safe-storage:encrypt", plaintext),
+    decrypt: (base64Cipher) => ipcRenderer.invoke("safe-storage:decrypt", base64Cipher),
+    isAvailable: () => ipcRenderer.invoke("safe-storage:is-available"),
   },
   power: {
     onPowerStateChange: (callback) => {
-      const handler = (_event, state) => callback(state)
-      ipcRenderer.on('power:state-changed', handler)
-      return () => ipcRenderer.removeListener('power:state-changed', handler)
+      const handler = (_event, state) => callback(state);
+      ipcRenderer.on("power:state-changed", handler);
+      return () => ipcRenderer.removeListener("power:state-changed", handler);
     },
-    getPowerState: () => ipcRenderer.invoke('power:get-state'),
+    getPowerState: () => ipcRenderer.invoke("power:get-state"),
     removeOnPowerStateChange: () => {
-      ipcRenderer.removeAllListeners('power:state-changed')
+      ipcRenderer.removeAllListeners("power:state-changed");
     },
   },
   editor: {
     popoutPanel: (bufferId, content, fileName, fileType) =>
-      ipcRenderer.invoke('editor:popout-panel', { bufferId, content, fileName, fileType }),
+      ipcRenderer.invoke("editor:popout-panel", { bufferId, content, fileName, fileType }),
     sendBufferSync: (bufferId, content) =>
-      ipcRenderer.send('editor:buffer-sync', { bufferId, content }),
+      ipcRenderer.send("editor:buffer-sync", { bufferId, content }),
     onBufferSync: (callback) => {
-      const handler = (_event, data) => callback(data)
-      ipcRenderer.on('editor:buffer-sync-broadcast', handler)
-      return () => ipcRenderer.removeListener('editor:buffer-sync-broadcast', handler)
+      const handler = (_event, data) => callback(data);
+      ipcRenderer.on("editor:buffer-sync-broadcast", handler);
+      return () => ipcRenderer.removeListener("editor:buffer-sync-broadcast", handler);
     },
-    sendBufferClose: (bufferId) =>
-      ipcRenderer.send('editor:buffer-close', bufferId),
+    sendBufferClose: (bufferId) => ipcRenderer.send("editor:buffer-close", bufferId),
     onBufferClose: (callback) => {
-      const handler = (_event, bufferId) => callback(bufferId)
-      ipcRenderer.on('editor:buffer-close-broadcast', handler)
-      return () => ipcRenderer.removeListener('editor:buffer-close-broadcast', handler)
+      const handler = (_event, bufferId) => callback(bufferId);
+      ipcRenderer.on("editor:buffer-close-broadcast", handler);
+      return () => ipcRenderer.removeListener("editor:buffer-close-broadcast", handler);
     },
     removeAllListeners: () => {
-      ipcRenderer.removeAllListeners('editor:buffer-sync-broadcast')
-      ipcRenderer.removeAllListeners('editor:buffer-close-broadcast')
+      ipcRenderer.removeAllListeners("editor:buffer-sync-broadcast");
+      ipcRenderer.removeAllListeners("editor:buffer-close-broadcast");
     },
   },
   pty: {
     /** Spawn a new PTY session. Returns { sessionId } or { error }. */
-    spawn: (options) => ipcRenderer.invoke('pty:spawn', options),
+    spawn: (options) => ipcRenderer.invoke("pty:spawn", options),
     /** Re-attach to an existing session and retrieve buffered output. */
-    attach: (sessionId) => ipcRenderer.invoke('pty:attach', sessionId),
+    attach: (sessionId) => ipcRenderer.invoke("pty:attach", sessionId),
     /** Write keystroke data to a PTY session. */
-    write: (sessionId, data) => ipcRenderer.invoke('pty:write', { sessionId, data }),
+    write: (sessionId, data) => ipcRenderer.invoke("pty:write", { sessionId, data }),
     /** Resize the terminal dimensions. */
-    resize: (sessionId, cols, rows) => ipcRenderer.invoke('pty:resize', { sessionId, cols, rows }),
+    resize: (sessionId, cols, rows) => ipcRenderer.invoke("pty:resize", { sessionId, cols, rows }),
     /** Kill a PTY session (idempotent). */
-    kill: (sessionId) => ipcRenderer.invoke('pty:kill', sessionId),
+    kill: (sessionId) => ipcRenderer.invoke("pty:kill", sessionId),
     /** Query the state of a PTY session. */
-    status: (sessionId) => ipcRenderer.invoke('pty:status', sessionId),
+    status: (sessionId) => ipcRenderer.invoke("pty:status", sessionId),
     /**
      * Listen for PTY output data pushed from main process.
      * Returns a cleanup function that removes the listener.
@@ -244,9 +246,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * @returns {() => void}
      */
     onData: (callback) => {
-      const handler = (_event, payload) => callback(payload)
-      ipcRenderer.on('pty:data', handler)
-      return () => ipcRenderer.removeListener('pty:data', handler)
+      const handler = (_event, payload) => callback(payload);
+      ipcRenderer.on("pty:data", handler);
+      return () => ipcRenderer.removeListener("pty:data", handler);
     },
     /**
      * Listen for PTY process exit notification.
@@ -255,9 +257,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * @returns {() => void}
      */
     onExit: (callback) => {
-      const handler = (_event, payload) => callback(payload)
-      ipcRenderer.on('pty:exit', handler)
-      return () => ipcRenderer.removeListener('pty:exit', handler)
+      const handler = (_event, payload) => callback(payload);
+      ipcRenderer.on("pty:exit", handler);
+      return () => ipcRenderer.removeListener("pty:exit", handler);
     },
   },
-})
+});

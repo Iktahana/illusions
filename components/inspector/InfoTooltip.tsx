@@ -11,19 +11,27 @@ interface InfoTooltipProps {
 }
 
 /** Tooltip component for information icons */
-export default function InfoTooltip({ content, className, children }: InfoTooltipProps): React.JSX.Element {
+export default function InfoTooltip({
+  content,
+  className,
+  children,
+}: InfoTooltipProps): React.JSX.Element {
   const [isVisible, setIsVisible] = useState(false);
-  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0, placement: 'top' as 'top' | 'bottom' });
+  const [tooltipPos, setTooltipPos] = useState({
+    top: 0,
+    left: 0,
+    placement: "top" as "top" | "bottom",
+  });
   const ref = useRef<HTMLSpanElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  
+
   const handleMouseEnter = () => {
     if (ref.current) {
       const rect = ref.current.getBoundingClientRect();
       setTooltipPos({
         top: rect.top - 8,
         left: rect.left + rect.width / 2,
-        placement: 'top',
+        placement: "top",
       });
     }
     setIsVisible(true);
@@ -46,17 +54,17 @@ export default function InfoTooltip({ content, className, children }: InfoToolti
     if (left > maxLeft) left = maxLeft;
 
     let top = iconRect.top - 8;
-    let placement: 'top' | 'bottom' = 'top';
+    let placement: "top" | "bottom" = "top";
     if (top - tooltipRect.height < margin) {
       top = iconRect.bottom + 8;
-      placement = 'bottom';
+      placement = "bottom";
     }
 
     setTooltipPos({ top, left, placement });
   }, [isVisible]);
-  
+
   return (
-    <span 
+    <span
       ref={ref}
       className={clsx("info-tooltip-wrapper cursor-help", className)}
       onMouseEnter={handleMouseEnter}
@@ -64,16 +72,17 @@ export default function InfoTooltip({ content, className, children }: InfoToolti
     >
       {children}
       {isVisible && (
-        <span 
+        <span
           ref={tooltipRef}
           className="info-tooltip-content"
           style={{
-            position: 'fixed',
+            position: "fixed",
             top: `${tooltipPos.top}px`,
             left: `${tooltipPos.left}px`,
-            transform: tooltipPos.placement === 'top'
-              ? 'translateX(-50%) translateY(-100%)'
-              : 'translateX(-50%) translateY(0)'
+            transform:
+              tooltipPos.placement === "top"
+                ? "translateX(-50%) translateY(-100%)"
+                : "translateX(-50%) translateY(0)",
           }}
         >
           {content}

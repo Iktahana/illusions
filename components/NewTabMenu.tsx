@@ -32,7 +32,11 @@ const FILE_TYPE_OPTIONS: {
   },
 ];
 
-export default function NewTabMenu({ onNewTab, onNewTerminalTab, compactMode = false }: NewTabMenuProps) {
+export default function NewTabMenu({
+  onNewTab,
+  onNewTerminalTab,
+  compactMode = false,
+}: NewTabMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -86,9 +90,7 @@ export default function NewTabMenu({ onNewTab, onNewTerminalTab, compactMode = f
               onClick={() => handleSelect(option.fileType)}
             >
               <span className="text-foreground">{option.label}</span>
-              <span className="text-xs text-foreground-tertiary">
-                {option.description}
-              </span>
+              <span className="text-xs text-foreground-tertiary">{option.description}</span>
             </button>
           ))}
 
@@ -105,9 +107,7 @@ export default function NewTabMenu({ onNewTab, onNewTerminalTab, compactMode = f
           >
             <Terminal size={13} className="shrink-0 text-foreground-secondary" />
             <span className="text-foreground flex-1">ターミナル</span>
-            <span className="text-xs text-foreground-tertiary">
-              コマンドラインツール
-            </span>
+            <span className="text-xs text-foreground-tertiary">コマンドラインツール</span>
           </button>
         </div>
       )}

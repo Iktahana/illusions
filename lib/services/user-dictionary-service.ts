@@ -93,9 +93,7 @@ class UserDictionaryService {
     updates: Partial<UserDictionaryEntry>,
   ): Promise<UserDictionaryEntry[]> {
     const entries = await this.loadEntries();
-    const updated = entries.map((e) =>
-      e.id === id ? { ...e, ...updates } : e,
-    );
+    const updated = entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
     await this.saveEntries(updated);
     return updated;
   }
@@ -132,10 +130,7 @@ class UserDictionaryService {
   /**
    * Save user dictionary entries to StorageService for a specific file.
    */
-  async saveEntriesStandalone(
-    fileName: string,
-    entries: UserDictionaryEntry[],
-  ): Promise<void> {
+  async saveEntriesStandalone(fileName: string, entries: UserDictionaryEntry[]): Promise<void> {
     const key = STANDALONE_STORAGE_PREFIX + fileName;
     const data: UserDictionaryFile = {
       version: "1.0.0",
@@ -170,9 +165,7 @@ class UserDictionaryService {
     updates: Partial<UserDictionaryEntry>,
   ): Promise<UserDictionaryEntry[]> {
     const entries = await this.loadEntriesStandalone(fileName);
-    const updated = entries.map((e) =>
-      e.id === id ? { ...e, ...updates } : e,
-    );
+    const updated = entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
     await this.saveEntriesStandalone(fileName, updated);
     return updated;
   }
@@ -180,10 +173,7 @@ class UserDictionaryService {
   /**
    * Remove an entry in standalone mode.
    */
-  async removeEntryStandalone(
-    fileName: string,
-    id: string,
-  ): Promise<UserDictionaryEntry[]> {
+  async removeEntryStandalone(fileName: string, id: string): Promise<UserDictionaryEntry[]> {
     const entries = await this.loadEntriesStandalone(fileName);
     const filtered = entries.filter((e) => e.id !== id);
     await this.saveEntriesStandalone(fileName, filtered);

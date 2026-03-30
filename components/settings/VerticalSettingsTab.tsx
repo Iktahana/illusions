@@ -38,9 +38,7 @@ export default function VerticalSettingsTab(): React.ReactElement {
     <div className="space-y-6">
       {/* Scroll behavior */}
       <div>
-        <h3 className="text-sm font-medium text-foreground mb-3">
-          スクロール動作
-        </h3>
+        <h3 className="text-sm font-medium text-foreground mb-3">スクロール動作</h3>
         <div className="space-y-2">
           {SCROLL_BEHAVIORS.map((behavior) => (
             <button
@@ -50,7 +48,7 @@ export default function VerticalSettingsTab(): React.ReactElement {
                 "w-full text-left px-3 py-2 rounded-lg border transition-colors",
                 verticalScrollBehavior === behavior.value
                   ? "border-accent bg-accent/10"
-                  : "border-border hover:border-accent/50 hover:bg-hover"
+                  : "border-border hover:border-accent/50 hover:bg-hover",
               )}
             >
               <div className="flex items-center gap-2">
@@ -59,7 +57,7 @@ export default function VerticalSettingsTab(): React.ReactElement {
                     "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0",
                     verticalScrollBehavior === behavior.value
                       ? "border-accent"
-                      : "border-border-secondary"
+                      : "border-border-secondary",
                   )}
                 >
                   {verticalScrollBehavior === behavior.value && (
@@ -67,12 +65,8 @@ export default function VerticalSettingsTab(): React.ReactElement {
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-foreground">
-                    {behavior.label}
-                  </div>
-                  <div className="text-xs text-foreground-tertiary">
-                    {behavior.description}
-                  </div>
+                  <div className="text-sm font-medium text-foreground">{behavior.label}</div>
+                  <div className="text-xs text-foreground-tertiary">{behavior.description}</div>
                 </div>
               </div>
             </button>

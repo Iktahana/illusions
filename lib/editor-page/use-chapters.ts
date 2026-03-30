@@ -19,10 +19,7 @@ export function useChapters(content: string): UseChaptersResult {
 
   // Auto-refresh every 10 seconds
   useEffect(() => {
-    const timer = setInterval(
-      () => setRefreshToken((v) => v + 1),
-      AUTO_REFRESH_INTERVAL_MS,
-    );
+    const timer = setInterval(() => setRefreshToken((v) => v + 1), AUTO_REFRESH_INTERVAL_MS);
     return () => clearInterval(timer);
   }, []);
 

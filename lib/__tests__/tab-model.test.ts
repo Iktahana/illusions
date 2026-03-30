@@ -9,11 +9,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import {
-  isEditorTab,
-  isTerminalTab,
-  isDiffTab,
-} from "@/lib/tab-manager/tab-types";
+import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
 import type {
   TabState,
   EditorTabState,
@@ -219,7 +215,9 @@ describe("TabState discriminated union", () => {
   it("exactly one type guard returns true for each tab kind", () => {
     const tabs: TabState[] = [makeEditorTab(), makeTerminalTab(), makeDiffTab()];
     for (const tab of tabs) {
-      const matchCount = [isEditorTab(tab), isTerminalTab(tab), isDiffTab(tab)].filter(Boolean).length;
+      const matchCount = [isEditorTab(tab), isTerminalTab(tab), isDiffTab(tab)].filter(
+        Boolean,
+      ).length;
       expect(matchCount).toBe(1);
     }
   });

@@ -163,9 +163,7 @@ export function isStandaloneMode(mode: EditorMode): mode is StandaloneMode {
  * Returns default editor settings based on file extension.
  * MDI files have MDI extensions enabled by default.
  */
-export function getDefaultEditorSettings(
-  extension: SupportedFileExtension
-): EditorSettings {
+export function getDefaultEditorSettings(extension: SupportedFileExtension): EditorSettings {
   return {
     fontScale: 1.0,
     lineHeight: 1.8,

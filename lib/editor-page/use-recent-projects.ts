@@ -79,38 +79,41 @@ export function useRecentProjects(
     };
   }, [isElectron, skipAutoRestore, onNoRestore]);
 
-  const handleDeleteRecentProject = useCallback(async (projectId: string) => {
-    try {
-      if (isElectron) {
-        const storage = getStorageService();
-        await storage.removeRecentProject(projectId);
+  const handleDeleteRecentProject = useCallback(
+    async (projectId: string) => {
+      try {
+        if (isElectron) {
+          const storage = getStorageService();
+          await storage.removeRecentProject(projectId);
 
-        const updatedProjects = await storage.getRecentProjects();
-        const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
-          projectId: p.id,
-          name: p.name,
-          lastAccessedAt: Date.now(),
-          rootDirName: p.rootPath.split(/[/\\]/).filter(Boolean).pop(),
-        }));
-        setRecentProjects(entries);
-        void window.electronAPI?.rebuildMenu?.();
-      } else {
-        const projectManager = getProjectManager();
-        await projectManager.removeProjectHandle(projectId);
+          const updatedProjects = await storage.getRecentProjects();
+          const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
+            projectId: p.id,
+            name: p.name,
+            lastAccessedAt: Date.now(),
+            rootDirName: p.rootPath.split(/[/\\]/).filter(Boolean).pop(),
+          }));
+          setRecentProjects(entries);
+          void window.electronAPI?.rebuildMenu?.();
+        } else {
+          const projectManager = getProjectManager();
+          await projectManager.removeProjectHandle(projectId);
 
-        const handles = await projectManager.listProjectHandles();
-        const entries: RecentProjectEntry[] = handles.map((h) => ({
-          projectId: h.projectId,
-          name: h.name ?? h.rootDirName ?? h.projectId,
-          lastAccessedAt: h.lastAccessedAt,
-          rootDirName: h.rootDirName,
-        }));
-        setRecentProjects(entries);
+          const handles = await projectManager.listProjectHandles();
+          const entries: RecentProjectEntry[] = handles.map((h) => ({
+            projectId: h.projectId,
+            name: h.name ?? h.rootDirName ?? h.projectId,
+            lastAccessedAt: h.lastAccessedAt,
+            rootDirName: h.rootDirName,
+          }));
+          setRecentProjects(entries);
+        }
+      } catch (error) {
+        console.error("Failed to delete recent project:", error);
       }
-    } catch (error) {
-      console.error("Failed to delete recent project:", error);
-    }
-  }, [isElectron]);
+    },
+    [isElectron],
+  );
 
   return { recentProjects, autoRestoreProjectId, handleDeleteRecentProject };
 }

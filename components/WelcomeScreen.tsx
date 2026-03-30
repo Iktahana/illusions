@@ -85,7 +85,8 @@ export default function WelcomeScreen({
 
   useEffect(() => {
     // Check if running in Electron
-    const isElectron = typeof window !== "undefined" &&
+    const isElectron =
+      typeof window !== "undefined" &&
       "electronAPI" in window &&
       Boolean((window as { electronAPI?: { isElectron?: boolean } }).electronAPI?.isElectron);
 
@@ -132,9 +133,7 @@ export default function WelcomeScreen({
               className="h-16 w-auto dark:invert drop-shadow-sm"
             />
           </div>
-          <p className="mt-2 text-sm text-foreground-secondary">
-            日本語小説を書くためのエディタ
-          </p>
+          <p className="mt-2 text-sm text-foreground-secondary">日本語小説を書くためのエディタ</p>
         </div>
 
         {/* Action buttons */}
@@ -147,13 +146,11 @@ export default function WelcomeScreen({
               "flex flex-col items-center gap-2 rounded-xl border border-border p-5 transition-all duration-200",
               isProjectModeSupported
                 ? "hover:bg-hover hover:border-border-secondary hover:shadow-md hover:scale-[1.02] active:scale-[0.99] cursor-pointer"
-                : "cursor-not-allowed opacity-50"
+                : "cursor-not-allowed opacity-50",
             )}
           >
             <FolderPlus className="h-6 w-6 text-accent" />
-            <span className="text-sm font-medium text-foreground">
-              新規プロジェクト
-            </span>
+            <span className="text-sm font-medium text-foreground">新規プロジェクト</span>
           </button>
 
           <button
@@ -164,13 +161,11 @@ export default function WelcomeScreen({
               "flex flex-col items-center gap-2 rounded-xl border border-border p-5 transition-all duration-200",
               isProjectModeSupported
                 ? "hover:bg-hover hover:border-border-secondary hover:shadow-md hover:scale-[1.02] active:scale-[0.99] cursor-pointer"
-                : "cursor-not-allowed opacity-50"
+                : "cursor-not-allowed opacity-50",
             )}
           >
             <FolderOpen className="h-6 w-6 text-accent" />
-            <span className="text-sm font-medium text-foreground">
-              プロジェクトを開く
-            </span>
+            <span className="text-sm font-medium text-foreground">プロジェクトを開く</span>
           </button>
 
           <button
@@ -179,14 +174,15 @@ export default function WelcomeScreen({
             className="flex flex-col items-center gap-2 rounded-xl border border-border p-5 transition-all duration-200 hover:bg-hover hover:border-border-secondary hover:shadow-md hover:scale-[1.02] active:scale-[0.99] cursor-pointer"
           >
             <FileText className="h-6 w-6 text-accent" />
-            <span className="text-sm font-medium text-foreground">
-              ファイルを開く
-            </span>
+            <span className="text-sm font-medium text-foreground">ファイルを開く</span>
           </button>
         </div>
 
         {/* Non-dismissible modal for unsupported browsers (not shown in Electron) */}
-        <GlassDialog isOpen={showUnsupportedModal} panelClassName="mx-4 w-full max-w-md p-8 text-center">
+        <GlassDialog
+          isOpen={showUnsupportedModal}
+          panelClassName="mx-4 w-full max-w-md p-8 text-center"
+        >
           <h2 className="text-xl font-bold text-foreground">
             現在お使いのブラウザでは、illusions のWeb版はご利用いただけません。
           </h2>
@@ -212,7 +208,10 @@ export default function WelcomeScreen({
             </h2>
             <ul className="flex flex-col gap-1">
               {recentProjects.map((project) => (
-                <li key={project.projectId} className="group flex items-center rounded-lg hover:bg-hover">
+                <li
+                  key={project.projectId}
+                  className="group flex items-center rounded-lg hover:bg-hover"
+                >
                   <button
                     type="button"
                     onClick={() => onOpenRecentProject(project.projectId)}
@@ -220,9 +219,7 @@ export default function WelcomeScreen({
                   >
                     <FileText className="h-4 w-4 shrink-0 text-foreground-tertiary" />
                     <div className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-foreground">
-                        {project.name}
-                      </span>
+                      <span className="block truncate text-sm text-foreground">{project.name}</span>
                       {project.rootDirName && (
                         <span className="block truncate text-xs text-foreground-muted">
                           ~/{project.rootDirName}

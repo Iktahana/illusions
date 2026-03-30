@@ -44,7 +44,9 @@ export interface UseTabManagerReturn {
   /** Update mutable fields on a terminal tab (e.g. status, exitCode after PTY exits). */
   updateTerminalTab: (
     tabId: TabId,
-    updates: Partial<Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">>,
+    updates: Partial<
+      Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">
+    >,
   ) => void;
   openDiffTab: (
     sourceTabId: TabId,
@@ -227,10 +229,7 @@ const VOID_HTML_TAGS = [
 ] as const;
 
 /** Regex matching void HTML elements (opening or self-closing form). */
-const VOID_TAG_PATTERN = new RegExp(
-  `<(${VOID_HTML_TAGS.join("|")})(\\s[^>]*)?\\/?>`,
-  "gi",
-);
+const VOID_TAG_PATTERN = new RegExp(`<(${VOID_HTML_TAGS.join("|")})(\\s[^>]*)?\\/?>`, "gi");
 
 /**
  * Sanitize MDI content before saving.
@@ -274,15 +273,17 @@ export function getErrorMessage(error: unknown): string {
   } else if (errorCode === "ENOENT") {
     message = "保存先のフォルダが見つかりません。";
   } else if (errorCode === "EINVAL") {
-    message =
-      "ファイル名またはパスが無効です。使用できない文字が含まれている可能性があります。";
+    message = "ファイル名またはパスが無効です。使用できない文字が含まれている可能性があります。";
   } else if (errorCode === "ENAMETOOLONG") {
     message = "ファイル名またはパスが長すぎます。";
   }
   return message;
 }
 
-export function createNewTab(content?: string, fileType: SupportedFileExtension = ".mdi"): EditorTabState {
+export function createNewTab(
+  content?: string,
+  fileType: SupportedFileExtension = ".mdi",
+): EditorTabState {
   const c = content ?? "";
   return {
     tabKind: "editor",
@@ -300,4 +301,3 @@ export function createNewTab(content?: string, fileType: SupportedFileExtension 
     conflictDiskContent: null,
   };
 }
-

@@ -16,7 +16,12 @@ import type { DockviewApi, IDockviewPanel } from "dockview-react";
 import type { TabId, TabState } from "@/lib/tab-manager/tab-types";
 import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
 import type { UseTabManagerReturn } from "@/lib/tab-manager/types";
-import type { EditorPanelParams, TerminalPanelParams, DiffPanelParams, SimplifiedGroupLayout } from "./types";
+import type {
+  EditorPanelParams,
+  TerminalPanelParams,
+  DiffPanelParams,
+  SimplifiedGroupLayout,
+} from "./types";
 import { loadDockviewLayout } from "./use-dockview-persistence";
 
 // ---------------------------------------------------------------------------
@@ -51,11 +56,7 @@ export interface UseDockviewAdapterReturn {
  * - If another terminal already exists, move into its group ("center").
  * - Otherwise, split below an existing editor panel ("bottom").
  */
-function positionTerminalPanel(
-  api: DockviewApi,
-  newPanel: IDockviewPanel,
-  tabs: TabState[],
-): void {
+function positionTerminalPanel(api: DockviewApi, newPanel: IDockviewPanel, tabs: TabState[]): void {
   // Look for an existing terminal panel to group with
   for (const panel of api.panels) {
     if (panel.id === newPanel.id) continue;
@@ -134,9 +135,8 @@ function applySimplifiedLayout(
         // First panel in this group: split to create a new group
         try {
           // Find a reference panel that's still in the default group
-          const refPanel = api.panels.find(
-            (p) => p.id !== panelId && p.group !== panel.group,
-          ) ?? api.panels[0];
+          const refPanel =
+            api.panels.find((p) => p.id !== panelId && p.group !== panel.group) ?? api.panels[0];
           if (refPanel && refPanel.id !== panelId) {
             panel.api.moveTo({
               group: refPanel.group,
@@ -271,7 +271,9 @@ export function useDockviewAdapter({
         setLayoutReadyTick((t) => t + 1);
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // -- Pending split tracking -----------------------------------------------
@@ -414,7 +416,7 @@ export function useDockviewAdapter({
     prevTabsRef.current = tabs;
     prevActiveTabRef.current = activeTabId;
     isSyncingRef.current = false;
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- dockviewApi triggers re-sync after onReady
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dockviewApi triggers re-sync after onReady
   }, [tabs, activeTabId, editorKey, dockviewApi]);
 
   // -- Restore saved layout (separate effect to avoid sync effect interference) --
@@ -426,7 +428,8 @@ export function useDockviewAdapter({
   const hasTabsForLayout = tabs.length > 0;
 
   useEffect(() => {
-    if (!dockviewApi || !savedLayoutRef.current || layoutAppliedRef.current || !hasTabsForLayout) return;
+    if (!dockviewApi || !savedLayoutRef.current || layoutAppliedRef.current || !hasTabsForLayout)
+      return;
 
     layoutAppliedRef.current = true;
     try {
@@ -504,7 +507,11 @@ export function useDockviewAdapter({
         fileName,
         fileType,
       });
-      window.open(`${window.location.origin}?${params.toString()}`, "_blank", "width=900,height=700");
+      window.open(
+        `${window.location.origin}?${params.toString()}`,
+        "_blank",
+        "width=900,height=700",
+      );
     }
   }, [tabs, activeTabId, tabManager.content]);
 

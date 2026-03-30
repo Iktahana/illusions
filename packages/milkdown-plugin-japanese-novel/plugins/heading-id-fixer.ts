@@ -1,25 +1,23 @@
-import { Plugin, PluginKey } from '@milkdown/prose/state'
-import type { Node } from '@milkdown/prose/model'
+import { Plugin, PluginKey } from "@milkdown/prose/state";
+import type { Node } from "@milkdown/prose/model";
 
 /**
  * 見出しの内容からアンカーIDを生成する（URLエンコード）
  */
 function generateHeadingIdFromContent(node: Node): string {
   // 見出しノードから本文テキストを抽出
-  let textContent = ''
+  let textContent = "";
   node.descendants((child) => {
     if (child.isText) {
-      textContent += child.text
+      textContent += child.text;
     }
-  })
-  
+  });
+
   // Markdown記法を除去して整形
-  const cleanTitle = textContent
-    .replace(/[*_~`\[\]()]/g, '')
-    .trim()
-  
+  const cleanTitle = textContent.replace(/[*_~`\[\]()]/g, "").trim();
+
   // URLエンコード
-  return encodeURIComponent(cleanTitle)
+  return encodeURIComponent(cleanTitle);
 }
 
 /**
@@ -33,42 +31,42 @@ function generateHeadingIdFromContent(node: Node): string {
  */
 export function createHeadingIdFixerPlugin() {
   return new Plugin({
-    key: new PluginKey('headingIdFixer'),
+    key: new PluginKey("headingIdFixer"),
     appendTransaction(transactions, _oldState, newState) {
       // 文書が変更されたときだけ処理する
-      const docChanged = transactions.some(transaction => transaction.docChanged)
-      if (!docChanged) return null
+      const docChanged = transactions.some((transaction) => transaction.docChanged);
+      if (!docChanged) return null;
 
       // ID がない/内容変更で不一致になった見出しを探す
-      const headingsToFix: Array<{ pos: number; node: Node; attrs: Record<string, unknown> }> = []
-      
+      const headingsToFix: Array<{ pos: number; node: Node; attrs: Record<string, unknown> }> = [];
+
       newState.doc.descendants((node: Node, pos: number) => {
-        if (node.type.name === 'heading') {
-          const currentId = node.attrs.id as string
-          const expectedId = generateHeadingIdFromContent(node)
-          
+        if (node.type.name === "heading") {
+          const currentId = node.attrs.id as string;
+          const expectedId = generateHeadingIdFromContent(node);
+
           // ID がない、または内容変更で不一致になったものを修正対象にする
           if (!currentId || currentId !== expectedId) {
             headingsToFix.push({
               pos,
               node,
               attrs: { ...node.attrs },
-            })
+            });
           }
         }
-      })
+      });
 
-      if (headingsToFix.length === 0) return null
+      if (headingsToFix.length === 0) return null;
 
       // 位置ずれを避けるため、後ろから順に適用する
-      const tr = newState.tr
+      const tr = newState.tr;
       for (let i = headingsToFix.length - 1; i >= 0; i--) {
-        const { pos, node, attrs } = headingsToFix[i]
-        const newId = generateHeadingIdFromContent(node)
-        tr.setNodeMarkup(pos, undefined, { ...attrs, id: newId })
+        const { pos, node, attrs } = headingsToFix[i];
+        const newId = generateHeadingIdFromContent(node);
+        tr.setNodeMarkup(pos, undefined, { ...attrs, id: newId });
       }
 
-      return tr
+      return tr;
     },
-  })
+  });
 }

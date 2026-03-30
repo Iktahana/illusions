@@ -6,21 +6,45 @@ import clsx from "clsx";
 // プリセットカラーパレット
 const PRESET_COLORS = [
   // 赤系
-  '#ef4444', '#dc2626', '#b91c1c', '#f87171',
+  "#ef4444",
+  "#dc2626",
+  "#b91c1c",
+  "#f87171",
   // オレンジ系
-  '#f97316', '#ea580c', '#c2410c', '#fb923c',
+  "#f97316",
+  "#ea580c",
+  "#c2410c",
+  "#fb923c",
   // 緑系
-  '#22c55e', '#16a34a', '#15803d', '#4ade80',
+  "#22c55e",
+  "#16a34a",
+  "#15803d",
+  "#4ade80",
   // 青系
-  '#3b82f6', '#2563eb', '#1d4ed8', '#60a5fa',
+  "#3b82f6",
+  "#2563eb",
+  "#1d4ed8",
+  "#60a5fa",
   // 紫系
-  '#a855f7', '#9333ea', '#7c3aed', '#c084fc',
+  "#a855f7",
+  "#9333ea",
+  "#7c3aed",
+  "#c084fc",
   // ピンク系
-  '#ec4899', '#db2777', '#be185d', '#f472b6',
+  "#ec4899",
+  "#db2777",
+  "#be185d",
+  "#f472b6",
   // ティール系
-  '#14b8a6', '#0d9488', '#0f766e', '#2dd4bf',
+  "#14b8a6",
+  "#0d9488",
+  "#0f766e",
+  "#2dd4bf",
   // グレー系
-  '#6b7280', '#4b5563', '#374151', '#9ca3af',
+  "#6b7280",
+  "#4b5563",
+  "#374151",
+  "#9ca3af",
 ];
 
 interface ColorPickerProps {
@@ -41,8 +65,8 @@ export default function ColorPicker({ value, onChange, label }: ColorPickerProps
         setIsOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleSelectColor = (color: string) => {
@@ -54,11 +78,9 @@ export default function ColorPicker({ value, onChange, label }: ColorPickerProps
   return (
     <div className="relative" ref={dropdownRef}>
       {label && (
-        <label className="block text-xs font-medium text-foreground-tertiary mb-1">
-          {label}
-        </label>
+        <label className="block text-xs font-medium text-foreground-tertiary mb-1">{label}</label>
       )}
-      
+
       {/* 色プレビューボタン */}
       <button
         type="button"
@@ -69,9 +91,7 @@ export default function ColorPicker({ value, onChange, label }: ColorPickerProps
           className="w-5 h-5 rounded border border-border-secondary"
           style={{ backgroundColor: value }}
         />
-        <span className="text-xs font-mono text-foreground-secondary">
-          {value}
-        </span>
+        <span className="text-xs font-mono text-foreground-secondary">{value}</span>
       </button>
 
       {/* ドロップダウンカラーパネル */}
@@ -86,7 +106,7 @@ export default function ColorPicker({ value, onChange, label }: ColorPickerProps
                 onClick={() => handleSelectColor(color)}
                 className={clsx(
                   "w-4 h-4 rounded transition-transform hover:scale-110",
-                  value === color && "ring-2 ring-accent ring-offset-1"
+                  value === color && "ring-2 ring-accent ring-offset-1",
                 )}
                 style={{ backgroundColor: color }}
                 title={color}
