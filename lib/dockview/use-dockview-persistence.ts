@@ -63,7 +63,7 @@ function extractSimplifiedLayout(
     const activePanel = group.activePanel;
     const activeTabPath = activePanel ? (pathByPanelId.get(activePanel.id) ?? null) : null;
     simplifiedGroups.push({ tabPaths, activeTabPath });
-    sizes.push(group.api.height > 0 ? group.api.width : group.api.width);
+    sizes.push(orientation === "HORIZONTAL" ? group.api.width : group.api.height);
   }
 
   // Normalize sizes to proportional values
