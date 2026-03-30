@@ -1,16 +1,5 @@
 import type { KeyBinding } from "./keymap-types";
-
-/**
- * Detects if the current platform is macOS.
- */
-function isMacPlatform(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
-  if (nav.userAgentData?.platform) {
-    return nav.userAgentData.platform === "macOS";
-  }
-  return /mac/i.test(navigator.userAgent);
-}
+import { isMacOS, isElectronRenderer } from "@/lib/utils/runtime-env";
 
 /**
  * Returns the platform-specific display string for a key binding.
@@ -19,7 +8,7 @@ function isMacPlatform(): boolean {
 export function formatBinding(binding: KeyBinding | null): string {
   if (!binding) return "未設定";
 
-  const isMac = isMacPlatform();
+  const isMac = isMacOS();
   const parts: string[] = [];
 
   for (const mod of binding.modifiers) {
@@ -67,7 +56,7 @@ function formatKey(key: string, isMac: boolean): string {
 export function matchesEvent(binding: KeyBinding | null, event: KeyboardEvent): boolean {
   if (!binding) return false;
 
-  const isMac = isMacPlatform();
+  const isMac = isMacOS();
 
   for (const mod of binding.modifiers) {
     if (mod === "CmdOrCtrl") {
@@ -152,6 +141,56 @@ export function toWebMenuAccelerator(binding: KeyBinding | null): string | undef
 }
 
 /**
+ * Compares two KeyBindings for equality (normalized modifiers + lowercase key).
+ */
+export function bindingsMatch(a: KeyBinding | null, b: KeyBinding | null): boolean {
+  if (!a || !b) return false;
+  if (a.key.toLowerCase() !== b.key.toLowerCase()) return false;
+  const aMods = [...a.modifiers].sort();
+  const bMods = [...b.modifiers].sort();
+  if (aMods.length !== bMods.length) return false;
+  return aMods.every((m, i) => m === bMods[i]);
+}
+
+/**
+ * Browser/OS reserved key combinations that should not be overridden.
+ */
+const RESERVED_BINDINGS: Array<{ modifiers: KeyBinding["modifiers"]; key: string }> = [
+  { modifiers: ["CmdOrCtrl"], key: "r" },
+  { modifiers: ["CmdOrCtrl", "Shift"], key: "r" },
+  { modifiers: ["CmdOrCtrl"], key: "l" },
+  { modifiers: ["CmdOrCtrl"], key: "d" },
+  { modifiers: ["CmdOrCtrl"], key: "q" },
+  { modifiers: ["CmdOrCtrl", "Shift"], key: "i" },
+  { modifiers: ["CmdOrCtrl", "Shift"], key: "j" },
+  { modifiers: [], key: "F5" },
+  { modifiers: [], key: "F11" },
+  { modifiers: [], key: "F12" },
+  { modifiers: ["CmdOrCtrl"], key: "g" },
+  { modifiers: ["CmdOrCtrl"], key: "f" },
+];
+
+/**
+ * Returns true if the binding conflicts with a browser/OS reserved shortcut.
+ */
+export function isReservedBinding(binding: KeyBinding): boolean {
+  return RESERVED_BINDINGS.some((reserved) =>
+    bindingsMatch(binding, { modifiers: reserved.modifiers, key: reserved.key }),
+  );
+}
+
+/**
+ * Returns true if the given scope is active in the current environment.
+ */
+export function isScopeActive(scope: "all" | "electron-only" | "web-only" | undefined): boolean {
+  if (!scope || scope === "all") return true;
+  const isElectron = isElectronRenderer();
+  if (scope === "electron-only") return isElectron;
+  if (scope === "web-only") return !isElectron;
+  return true;
+}
+
+/**
  * Builds a KeyBinding from a keyboard event.
  * Used by the KeybindingInput recording component.
  */
@@ -159,7 +198,7 @@ export function buildBindingFromEvent(event: KeyboardEvent): KeyBinding | null {
   const modifierKeys = new Set(["Control", "Meta", "Shift", "Alt"]);
   if (modifierKeys.has(event.key)) return null;
 
-  const isMac = isMacPlatform();
+  const isMac = isMacOS();
   const modifiers: KeyBinding["modifiers"] = [];
 
   if (isMac ? event.metaKey : event.ctrlKey) modifiers.push("CmdOrCtrl");

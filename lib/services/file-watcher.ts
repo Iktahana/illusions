@@ -106,8 +106,11 @@ function isFileSuppressed(filePath: string): boolean {
 /**
  * Callback invoked when a watched file changes.
  * 監視対象ファイルが変更されたときに呼ばれるコールバック。
+ *
+ * @param content - New file content
+ * @param lastModified - File's actual mtime (ms since epoch) at the time of the change
  */
-export type FileChangeCallback = (content: string) => void;
+export type FileChangeCallback = (content: string, lastModified: number) => void;
 
 /**
  * Options for creating a file watcher.
@@ -238,7 +241,7 @@ class WebFileWatcher implements FileWatcher {
         // Skip callback if suppressed (app's own save), but still update baseline
         if (!suppressed) {
           const content = await this.vfs.readFile(this.path);
-          this.onChanged(content);
+          this.onChanged(content, metadata.lastModified);
         }
       }
     } catch {
@@ -377,8 +380,11 @@ class ElectronFileWatcher implements FileWatcher {
     }
 
     try {
-      const content = await this.vfs.readFile(this.path);
-      this.onChanged(content);
+      const [content, metadata] = await Promise.all([
+        this.vfs.readFile(this.path),
+        this.vfs.getFileMetadata(this.path),
+      ]);
+      this.onChanged(content, metadata.lastModified);
     } catch (error) {
       // Check for permission-related errors (DOMException with NotAllowedError)
       if (

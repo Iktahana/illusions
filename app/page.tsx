@@ -188,6 +188,7 @@ export default function EditorPage() {
     tabs,
     newTerminalTab,
     updateTerminalTab,
+    forceCloseTab,
     editorMode,
     settings,
     isElectron,
@@ -397,10 +398,7 @@ export default function EditorPage() {
   });
 
   // Global shortcuts for Web (only when not in Electron)
-  useGlobalShortcuts(
-    !isElectron ? handleMenuAction : () => {},
-    editorDomRef
-  );
+  useGlobalShortcuts();
 
   // --- Save toast hook ---
   const { showSaveToast, saveToastExiting } = useSaveToast({ lastSavedTime, lastSaveWasAuto });

@@ -11,11 +11,15 @@ on:
       - "v*"
     paths-ignore:
       - 'www/**'
+      - 'store/**'
       - '.github/workflows/deploy-www.yml'
+      - '.github/workflows/sync-ms-store-listing.yml'
   pull_request:
     paths-ignore:
       - 'www/**'
+      - 'store/**'
       - '.github/workflows/deploy-www.yml'
+      - '.github/workflows/sync-ms-store-listing.yml'
 
 permissions:
   contents: write
@@ -48,11 +52,13 @@ jobs:
             desktop_changed:
               - '**'
               - '!www/**' # Exclude www/ from desktop change detection
+              - '!store/**' # Store listing changes should not trigger desktop builds
               - '!docs/**'
               - '!README.md'
               - '!TERMS.md'
               - '!MDI.md'
               - '!.github/workflows/deploy-www.yml' # Web CD changes should not gate desktop builds
+              - '!.github/workflows/sync-ms-store-listing.yml'
               # Keep build.yml included so workflow edits validate desktop builds
 
   # NOTE: All desktop jobs run only when desktop_changed=true.
@@ -70,6 +76,7 @@ jobs:
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ubuntu-latest
     outputs:
+      base: ${{ steps.version.outputs.base }}
       full: ${{ steps.version.outputs.full }}
       msix: ${{ steps.version.outputs.msix }}
       branch: ${{ steps.version.outputs.branch }}
@@ -88,21 +95,82 @@ jobs:
       - name: Compute version strings
         id: version
         run: |
-          BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          BRANCH_NAME="${GITHUB_REF_NAME}"
-          if [ "$BRANCH_NAME" = "main" ]; then
-            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          # Read full semver from package.json (e.g. 0.1.3)
+          BASE_VERSION=$(node -p "require('./package.json').version")
+
+          # Determine effective branch name
+          # For tag pushes (github.ref_type == 'tag'), treat as main release
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            EXPECTED_TAG="v${BASE_VERSION}"
+            ACTUAL_TAG="${GITHUB_REF_NAME}"
+            if [ "$ACTUAL_TAG" != "$EXPECTED_TAG" ]; then
+              echo "::error::Tag '${ACTUAL_TAG}' does not match package.json version '${BASE_VERSION}' (expected '${EXPECTED_TAG}')"
+              exit 1
+            fi
+            BRANCH_NAME="main"
           else
-            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}"
+            BRANCH_NAME="${GITHUB_REF_NAME}"
           fi
-          # MSIX requires exactly four numeric parts (x.y.z.w); strip any prerelease suffix
-          # by always using revision 0 as the fourth component
-          MSIX_REVISION=0
-          MSIX_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}.${MSIX_REVISION}"
+
+          # main: use package.json version as-is
+          # alpha|beta|dev: append branch name as prerelease suffix
+          case "$BRANCH_NAME" in
+            main)
+              FULL_VERSION="${BASE_VERSION}"
+              ;;
+            alpha|beta|dev)
+              FULL_VERSION="${BASE_VERSION}-${BRANCH_NAME}"
+              ;;
+            *)
+              echo "::error::Unexpected branch '${BRANCH_NAME}' — only main/alpha/beta/dev are allowed"
+              exit 1
+              ;;
+          esac
+
+          # MSIX requires exactly four numeric parts (X.Y.Z.0); no prerelease suffix
+          MSIX_VERSION="${BASE_VERSION}.0"
+
+          echo "base=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
           echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
           echo "msix=${MSIX_VERSION}" >> "$GITHUB_OUTPUT"
           echo "branch=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
-          echo "Version: ${FULL_VERSION} | MSIX: ${MSIX_VERSION} | Branch: ${BRANCH_NAME}"
+          echo "Version: base=${BASE_VERSION} | full=${FULL_VERSION} | MSIX: ${MSIX_VERSION} | Branch: ${BRANCH_NAME}"
+
+      - name: Validate version format
+        run: |
+          BASE="${{ steps.version.outputs.base }}"
+          MSIX="${{ steps.version.outputs.msix }}"
+          FULL="${{ steps.version.outputs.full }}"
+          BRANCH="${{ steps.version.outputs.branch }}"
+
+          # base must be strict semver X.Y.Z
+          if ! echo "$BASE" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Invalid base version: '${BASE}' (expected X.Y.Z)"
+            exit 1
+          fi
+
+          # msix must be four-part pure numeric X.Y.Z.0 (fourth part fixed to 0)
+          if ! echo "$MSIX" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.0$'; then
+            echo "::error::Invalid MSIX version: '${MSIX}' (expected X.Y.Z.0)"
+            exit 1
+          fi
+
+          # full version: strict format per branch
+          if [ "$BRANCH" = "main" ]; then
+            # stable release: must be exactly X.Y.Z
+            if ! echo "$FULL" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Stable full version '${FULL}' is not strict semver (expected X.Y.Z)"
+              exit 1
+            fi
+          else
+            # prerelease: must be X.Y.Z-(alpha|beta|dev)
+            if ! echo "$FULL" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|dev)$'; then
+              echo "::error::Prerelease full version '${FULL}' has invalid format (expected X.Y.Z-(alpha|beta|dev))"
+              exit 1
+            fi
+          fi
+
+          echo "Version validation passed: base=${BASE}, full=${FULL}, msix=${MSIX}, branch=${BRANCH}"
 
   # ---------------------------------------------------------------------------
   # Pre-flight checks — verify signing credentials before any build starts
@@ -186,14 +254,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Type check
-        run: npx tsc --noEmit
-
-      # --- Full build steps (push to main/alpha/beta/dev only) ---
-
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
         uses: actions/cache@v4
@@ -204,6 +264,26 @@ jobs:
           key: electron-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             electron-${{ runner.os }}-${{ matrix.arch }}-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            npm install && break
+            if [ $i -lt 3 ]; then
+              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::npm install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+      - name: Type check
+        if: github.event_name == 'pull_request'
+        run: npx tsc --noEmit
+
+      # --- Full build steps (push to main/alpha/beta/dev only) ---
 
       - name: Restore Next.js cache
         if: github.event_name != 'pull_request'
@@ -266,14 +346,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Type check
-        run: npx tsc --noEmit
-
-      # --- Full build steps (push to main/alpha/beta/dev only) ---
-
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
         uses: actions/cache@v4
@@ -284,6 +356,26 @@ jobs:
           key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             electron-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            npm install && break
+            if [ $i -lt 3 ]; then
+              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::npm install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+      - name: Type check
+        if: github.event_name == 'pull_request'
+        run: npx tsc --noEmit
+
+      # --- Full build steps (push to main/alpha/beta/dev only) ---
 
       - name: Restore Next.js cache
         if: github.event_name != 'pull_request'
@@ -347,11 +439,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm install
-
-      # --- Full packaging steps (push to main/alpha/beta/dev only) ---
-
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
         uses: actions/cache@v4
@@ -362,6 +449,22 @@ jobs:
           key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             electron-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            npm install && break
+            if [ $i -lt 3 ]; then
+              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::npm install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+      # --- Full packaging steps (push to main/alpha/beta/dev only) ---
 
       - name: Update package.json version
         if: github.event_name != 'pull_request'
@@ -416,11 +519,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm install
-
-      # --- Full packaging steps (push to main/alpha/beta/dev only) ---
-
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
         uses: actions/cache@v4
@@ -431,6 +529,22 @@ jobs:
           key: electron-${{ runner.os }}-msix-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             electron-${{ runner.os }}-msix-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            npm install && break
+            if [ $i -lt 3 ]; then
+              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::npm install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+      # --- Full packaging steps (push to main/alpha/beta/dev only) ---
 
       - name: Update package.json version (4-part for MSIX)
         if: github.event_name != 'pull_request'
@@ -456,6 +570,98 @@ jobs:
             dist-electron/*.appx.blockmap
 
   # ---------------------------------------------------------------------------
+  # Linux
+  # ---------------------------------------------------------------------------
+
+  build-linux:
+    name: Build (Linux)
+    needs: [detect-changes, compute-version]
+    if: |
+      always() &&
+      (github.event_name == 'pull_request' || needs.compute-version.result == 'success') &&
+      needs.detect-changes.outputs.desktop_changed == 'true'
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Restore Electron caches
+        if: github.event_name != 'pull_request'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ELECTRON_CACHE }}
+            ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: electron-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-x64-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            npm install && break
+            if [ $i -lt 3 ]; then
+              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::npm install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+      - name: Type check
+        if: github.event_name == 'pull_request'
+        run: npx tsc --noEmit
+
+      # --- Full build steps (push to main/alpha/beta/dev only) ---
+
+      - name: Install rpm build tools
+        if: github.event_name != 'pull_request'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Restore Next.js cache
+        if: github.event_name != 'pull_request'
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            next-${{ runner.os }}-x64-
+
+      - name: Update package.json version
+        if: github.event_name != 'pull_request'
+        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version
+
+      - name: Download local fonts
+        if: github.event_name != 'pull_request'
+        run: npm run download:fonts
+
+      - name: Build Electron application
+        if: github.event_name != 'pull_request'
+        run: npm run electron:build -- --linux --x64 --publish never
+        env:
+          DEBUG: electron-builder
+
+      - name: Upload build artifacts
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: illusions-linux-x64-${{ needs.compute-version.outputs.full }}
+          path: dist-electron/**
+
+  # ---------------------------------------------------------------------------
   # Publish & Release
   # ---------------------------------------------------------------------------
 
@@ -465,7 +671,7 @@ jobs:
       github.event_name != 'pull_request' &&
       github.ref != 'refs/heads/dev' &&
       needs.detect-changes.outputs.desktop_changed == 'true'
-    needs: [detect-changes, compute-version, build-macos, package-windows-nsis, package-windows-msix]
+    needs: [detect-changes, compute-version, build-macos, package-windows-nsis, package-windows-msix, build-linux]
     runs-on: ubuntu-latest
 
     steps:
@@ -478,7 +684,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-assets
-          find dist-electron -type f \( -name "*.yml" -o -name "*.exe" -o -name "*.exe.blockmap" -o -name "*.dmg" -o -name "*.dmg.blockmap" -o -name "*-mac.zip" -o -name "*-mac.zip.blockmap" -o -name "*.appx" -o -name "*.appx.blockmap" \) -exec cp {} release-assets/ \;
+          find dist-electron -type f \( -name "*.yml" -o -name "*.exe" -o -name "*.exe.blockmap" -o -name "*.dmg" -o -name "*.dmg.blockmap" -o -name "*-mac.zip" -o -name "*-mac.zip.blockmap" -o -name "*.appx" -o -name "*.appx.blockmap" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) -exec cp {} release-assets/ \;
           ls -lh release-assets/
 
       - name: Create GitHub Release and upload assets
@@ -494,87 +700,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
-  # Microsoft Store submission — runs immediately after release (main only)
+  # Microsoft Store submission is handled by a separate workflow:
+  #   .github/workflows/sync-ms-store-listing.yml
+  # Use it manually via workflow_dispatch after a release.
   # ---------------------------------------------------------------------------
-
-  submit-to-ms-store:
-    name: Submit to Microsoft Store
-    needs: [detect-changes, compute-version, release]
-    if: |
-      github.event_name != 'pull_request' &&
-      github.ref == 'refs/heads/main' &&
-      needs.detect-changes.outputs.desktop_changed == 'true'
-    runs-on: windows-latest
-    environment: MicrosoftStore
-    env:
-      MSSTORE_CLI_VERSION: "v0.3.9"
-      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-      MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
-      STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
-      VERSION: v${{ needs.compute-version.outputs.full }}
-
-    steps:
-      - name: Download MSIX packages from GitHub Release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          New-Item -ItemType Directory -Path msix-packages -Force | Out-Null
-          gh release download $env:VERSION --pattern "*.appx" --dir msix-packages --repo $env:GITHUB_REPOSITORY
-
-          $appxFiles = Get-ChildItem "msix-packages\*.appx"
-          if ($appxFiles.Count -eq 0) {
-            throw "No .appx packages found in release $env:VERSION. Cannot submit to Microsoft Store."
-          }
-          Write-Host "Downloaded $($appxFiles.Count) .appx package(s):"
-          $appxFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
-
-      - name: Install msstore-cli
-        shell: pwsh
-        run: |
-          $url = "https://github.com/microsoft/msstore-cli/releases/download/$env:MSSTORE_CLI_VERSION/MSStoreCLI-win-x64.zip"
-          Invoke-WebRequest $url -OutFile msstore.zip
-          Expand-Archive msstore.zip -DestinationPath "$env:LOCALAPPDATA\msstore-cli" -Force
-          echo "$env:LOCALAPPDATA\msstore-cli" >> $env:GITHUB_PATH
-
-      - name: Configure msstore-cli credentials
-        shell: pwsh
-        run: |
-          msstore reconfigure `
-            --tenantId $env:MSSTORE_TENANT_ID `
-            --clientId $env:MSSTORE_CLIENT_ID `
-            --clientSecret $env:MSSTORE_CLIENT_SECRET `
-            --sellerId $env:MSSTORE_SELLER_ID
-
-      - name: Submit to Microsoft Store
-        shell: pwsh
-        run: |
-          $appxFiles = Get-ChildItem "msix-packages\*.appx"
-          $uploadFile = "msix-packages\illusions.msixupload"
-          Compress-Archive -Path $appxFiles.FullName -DestinationPath $uploadFile -Force
-          Write-Host "Created bundle: $uploadFile"
-          msstore publish "$uploadFile" -id $env:STORE_PRODUCT_ID -v
-
-      - name: Create submission marker tag
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          REF_DATA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION")
-          OBJECT_TYPE=$(echo "$REF_DATA" | jq -r '.object.type')
-          OBJECT_SHA=$(echo "$REF_DATA" | jq -r '.object.sha')
-
-          if [ "$OBJECT_TYPE" = "tag" ]; then
-            SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$OBJECT_SHA" --jq '.object.sha')
-          else
-            SHA="$OBJECT_SHA"
-          fi
-
-          MARKER="ms-store-$VERSION"
-          gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
-            -f "ref=refs/tags/$MARKER" \
-            -f "sha=$SHA"
-          echo "Created submission marker tag: $MARKER"
-

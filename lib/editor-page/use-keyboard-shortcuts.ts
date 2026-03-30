@@ -36,6 +36,10 @@ interface UseKeyboardShortcutsParams {
   toggleExplorer?: () => void;
   toggleSearch?: () => void;
   toggleOutline?: () => void;
+  /** Web-only: dispatches menu actions for commands not handled by Electron IPC.
+   *  Required when isElectron is false so that file.open, file.saveAs,
+   *  file.newWindow, and zoom commands work even when the editor has focus. */
+  handleMenuAction?: (action: string) => void;
 }
 
 /**
@@ -65,6 +69,7 @@ export function useKeyboardShortcuts({
   toggleExplorer,
   toggleSearch,
   toggleOutline,
+  handleMenuAction,
 }: UseKeyboardShortcutsParams): void {
   const { effectiveBindings } = useKeymap();
 
@@ -93,6 +98,20 @@ export function useKeyboardShortcuts({
           closeTab(activeTabId);
         };
 
+    // Web-exclusive commands: these are not handled by Electron IPC, so they
+    // must be registered here (which fires unconditionally) rather than in
+    // useGlobalShortcuts (which skips when the editor is focused).
+    const webOnlyHandlers: Partial<Record<CommandId, () => void>> = !isElectron && handleMenuAction
+      ? {
+          "file.open":      () => handleMenuAction('open-file'),
+          "file.saveAs":    () => handleMenuAction('save-as'),
+          "file.newWindow": () => handleMenuAction('new-window'),
+          "view.zoomIn":    () => handleMenuAction('zoom-in'),
+          "view.zoomOut":   () => handleMenuAction('zoom-out'),
+          "view.resetZoom": () => handleMenuAction('reset-zoom'),
+        }
+      : {};
+
     return {
       "file.save": () => void saveFile(),
       // Editor-only commands: no-op when a terminal or diff tab is active
@@ -112,6 +131,7 @@ export function useKeyboardShortcuts({
       "panel.search": toggleSearch,
       "panel.outline": toggleOutline,
       ...tabHandlers,
+      ...webOnlyHandlers,
     };
   }, [
     isElectron,
@@ -136,6 +156,7 @@ export function useKeyboardShortcuts({
     toggleExplorer,
     toggleSearch,
     toggleOutline,
+    handleMenuAction,
   ]);
 
   useKeymapListener(handlers, effectiveBindings);

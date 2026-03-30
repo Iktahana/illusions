@@ -128,6 +128,24 @@ const session = await storage.loadSession();
 - **XSS prevention**: No `dangerouslySetInnerHTML` without sanitization
 - **Code injection**: No `eval()`, `Function()`, dynamic script execution
 
+## Branch Strategy (CRITICAL)
+
+**All PRs MUST target `dev`, NOT `main`.**
+
+```
+feature/<name>  →  dev  →  (weekly PR, every Monday)  →  main
+hotfix/<name>   →  main  (emergency only, then cherry-pick to dev)
+```
+
+- **`main`**: Production branch — receives merges only via weekly release PR
+- **`dev`**: Integration branch — all feature/fix PRs target `dev`
+- **Hotfix**: Branch from `main`, merge directly to `main`, then cherry-pick into `dev`
+
+When creating a PR:
+- Base branch: `dev` (default)
+- Only use `main` as base for emergency hotfixes
+- Include `Closes #<issue>` in PR body for auto-closing
+
 ## Build & Development
 
 ### Common Commands

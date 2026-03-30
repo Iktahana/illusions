@@ -15,6 +15,7 @@ interface UseTerminalTabsParams {
     tabId: string,
     updates: Partial<Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">>,
   ) => void;
+  forceCloseTab: (tabId: string) => void;
   editorMode: EditorMode;
   settings: EditorSettings;
   isElectron: boolean;
@@ -31,6 +32,7 @@ export function useTerminalTabs({
   tabs,
   newTerminalTab,
   updateTerminalTab,
+  forceCloseTab,
   editorMode,
   settings,
   isElectron,
@@ -54,7 +56,17 @@ export function useTerminalTabs({
         const cwd = isProjectMode(editorMode) ? editorMode.rootPath : undefined;
         const shell = settings.terminalDefaultShell || undefined;
         const result = await ptyApi.spawn({ cwd, shell });
-        if ("error" in result) return;
+        if ("error" in result) {
+          // PTY spawn failed — remove the stuck "connecting" tab
+          const stuckTab = tabsRef.current
+            .slice()
+            .reverse()
+            .find((tab) => isTerminalTab(tab) && tab.sessionId === "");
+          if (stuckTab) {
+            forceCloseTab(stuckTab.id);
+          }
+          return;
+        }
 
         const { sessionId } = result;
         const targetTab = tabsRef.current

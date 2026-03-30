@@ -80,7 +80,6 @@ export default function NovelEditor({
   const {
     fontScale, lineHeight, fontFamily,
     charsPerLine, autoCharsPerLine,
-    onAutoCharsPerLineCalc,
   } = useTypographySettings();
   const { speechVoiceURI, speechRate, speechPitch, speechVolume } = useSpeechSettings();
   // localStorage から同期的に初期値を読み込む（初回レンダリング前に反映、横→縦のフラッシュ防止）
@@ -90,6 +89,8 @@ export default function NovelEditor({
   });
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  // コンテキストメニューの「検索」で渡された初期検索語
+  const [contextMenuSearchTerm, setContextMenuSearchTerm] = useState<string | undefined>(undefined);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const { state: speechState, speakSegments, pause, resume, stop } = useSpeech({
     voiceURI: speechVoiceURI,
@@ -139,6 +140,12 @@ export default function NovelEditor({
   };
 
   const handleSearchOpen = useCallback(() => {
+    setIsSearchOpen(true);
+  }, []);
+
+  /** コンテキストメニューの「検索」アクションを処理する。選択テキストを初期検索語として渡す。 */
+  const handleFind = useCallback((initialTerm?: string) => {
+    setContextMenuSearchTerm(initialTerm);
     setIsSearchOpen(true);
   }, []);
 
@@ -277,11 +284,20 @@ export default function NovelEditor({
     setIsVertical(!isVertical);
   }, [isVertical, scrollContainerRef]);
 
+  // Per-pane local state for auto-calculated chars per line (avoids split panes overwriting each other)
+  const [localAutoCharsPerLine, setLocalAutoCharsPerLine] = useState<number | null>(null);
+  const effectiveCharsPerLine = autoCharsPerLine && localAutoCharsPerLine !== null
+    ? localAutoCharsPerLine
+    : charsPerLine;
+
+  // Reset local value when auto mode is toggled off
+  useEffect(() => {
+    if (!autoCharsPerLine) setLocalAutoCharsPerLine(null);
+  }, [autoCharsPerLine]);
+
   // Refs to avoid including charsPerLine / callback in useCallback deps (prevents recalc loop)
-  const charsPerLineRef = useRef(charsPerLine);
-  charsPerLineRef.current = charsPerLine;
-  const onAutoCharsPerLineCalcRef = useRef(onAutoCharsPerLineCalc);
-  onAutoCharsPerLineCalcRef.current = onAutoCharsPerLineCalc;
+  const charsPerLineRef = useRef(effectiveCharsPerLine);
+  charsPerLineRef.current = effectiveCharsPerLine;
 
   // Calculate optimal chars per line based on editor width and font size
   const calculateOptimalCharsPerLine = useCallback(() => {
@@ -338,7 +354,7 @@ export default function NovelEditor({
       const clamped = Math.min(40, optimalChars);
 
       if (clamped !== charsPerLineRef.current) {
-        onAutoCharsPerLineCalcRef.current?.(clamped);
+        setLocalAutoCharsPerLine(clamped);
       }
     } else {
       // For horizontal writing: calculate based on available width
@@ -347,7 +363,7 @@ export default function NovelEditor({
       const clamped = Math.min(40, optimalChars);
 
       if (clamped !== charsPerLineRef.current) {
-        onAutoCharsPerLineCalcRef.current?.(clamped);
+        setLocalAutoCharsPerLine(clamped);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- charsPerLine & callback read via refs to break recalc loop
@@ -410,6 +426,7 @@ export default function NovelEditor({
               onSelectionChange={onSelectionChange}
               isVertical={isVertical}
               scrollContainerRef={scrollContainerRef}
+              overrideCharsPerLine={effectiveCharsPerLine}
               onEditorViewReady={(view) => {
                 setEditorViewInstance(view);
                 onEditorViewReady?.(view);
@@ -428,6 +445,7 @@ export default function NovelEditor({
               mdiExtensionsEnabled={mdiExtensionsEnabled}
               gfmEnabled={gfmEnabled}
               onStartSpeech={startSpeechFromCursor}
+              onFind={handleFind}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
@@ -444,7 +462,7 @@ export default function NovelEditor({
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onShowAllResults={onShowAllSearchResults}
-        initialSearchTerm={searchInitialTerm}
+        initialSearchTerm={contextMenuSearchTerm ?? searchInitialTerm}
         programmaticScrollRef={programmaticScrollRef}
       />
     </div>

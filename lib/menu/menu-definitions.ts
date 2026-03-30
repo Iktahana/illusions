@@ -3,6 +3,7 @@
  * Mirrors Electron native menu structure
  */
 import type { CommandId } from "@/lib/keymap/command-ids";
+import { isMacOS } from "@/lib/utils/runtime-env";
 
 const APP_VERSION = (() => {
   const v = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
@@ -50,7 +51,9 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
         ],
       },
       { type: 'separator' },
-      { label: '閉じる', accelerator: 'Ctrl+W', action: 'close-window' },
+      { type: 'separator' },
+      { label: '新しいタブ', accelerator: 'Ctrl+T', action: 'new-tab' },
+      { label: 'タブを閉じる', accelerator: 'Ctrl+W', action: 'close-tab' },
     ]
   },
   {
@@ -68,6 +71,45 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
     ]
   },
   {
+    label: '書式',
+    items: [
+      {
+        label: '行間',
+        submenu: [
+          { label: '広くする', accelerator: 'Ctrl+]', action: 'format-line-height-increase' },
+          { label: '狭くする', accelerator: 'Ctrl+[', action: 'format-line-height-decrease' },
+        ],
+      },
+      {
+        label: '段落間隔',
+        submenu: [
+          { label: '広くする', action: 'format-paragraph-spacing-increase' },
+          { label: '狭くする', action: 'format-paragraph-spacing-decrease' },
+        ],
+      },
+      {
+        label: '字下げ',
+        submenu: [
+          { label: '深くする', action: 'format-text-indent-increase' },
+          { label: '浅くする', action: 'format-text-indent-decrease' },
+          { label: 'なし', action: 'format-text-indent-none' },
+        ],
+      },
+      { type: 'separator' },
+      {
+        label: '1行あたりの文字数',
+        submenu: [
+          { label: '自動', type: 'checkbox', action: 'format-chars-per-line-auto' },
+          { type: 'separator' },
+          { label: '増やす', action: 'format-chars-per-line-increase' },
+          { label: '減らす', action: 'format-chars-per-line-decrease' },
+        ],
+      },
+      { type: 'separator' },
+      { label: '段落番号を表示', type: 'checkbox', action: 'format-paragraph-numbers-toggle' },
+    ],
+  },
+  {
     label: '表示',
     items: [
       { label: '実際のサイズ', accelerator: 'Ctrl+0', action: 'reset-zoom' },
@@ -79,12 +121,23 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
     label: 'ウィンドウ',
     items: [
       { label: 'コンパクトモード', type: 'checkbox', action: 'toggle-compact-mode' },
+      {
+        label: 'ダークモード',
+        submenu: [
+          { label: '自動', type: 'checkbox', action: 'theme-auto' },
+          { label: 'オフ', type: 'checkbox', action: 'theme-light' },
+          { label: 'オン', type: 'checkbox', action: 'theme-dark' },
+        ],
+      },
     ]
   },
   {
     label: 'ヘルプ',
     items: [
       { label: `バージョン ${APP_VERSION}`, enabled: false },
+      { type: 'separator' },
+      { label: '公式サイトへ', action: 'open-website' },
+      { label: 'AI回答の不適切報告', action: 'report-ai-inappropriate' },
     ]
   }
 ];
@@ -98,7 +151,8 @@ export const ACTION_TO_COMMAND_ID: Partial<Record<string, CommandId>> = {
   "open-file": "file.open",
   "save-file": "file.save",
   "save-as": "file.saveAs",
-  "close-window": "file.closeTab",
+  "new-tab": "file.newTab",
+  "close-tab": "file.closeTab",
   "undo": "edit.undo",
   "redo": "edit.redo",
   "paste-plaintext": "edit.pasteAsPlaintext",
@@ -119,7 +173,7 @@ export function formatAccelerator(accelerator: string): string {
     return accelerator;
   }
   
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const isMac = isMacOS();
   
   if (isMac) {
     return accelerator
