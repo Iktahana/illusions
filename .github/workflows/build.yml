@@ -684,6 +684,9 @@ jobs:
       needs.detect-changes.outputs.desktop_changed == 'true'
     needs: [detect-changes, compute-version, build-macos, package-windows-nsis, package-windows-msix, build-linux]
     runs-on: ubuntu-latest
+    outputs:
+      release_tag: v${{ needs.compute-version.outputs.full }}
+      is_stable: ${{ needs.compute-version.outputs.branch == 'main' }}
 
     steps:
       - name: Download build artifacts
@@ -717,13 +720,13 @@ jobs:
 
   sync-ms-store:
     name: Sync Microsoft Store (full-submission)
-    needs: [release, compute-version]
+    needs: [release]
     if: |
       github.event_name != 'pull_request' &&
-      needs.compute-version.outputs.branch == 'main'
+      needs.release.outputs.is_stable == 'true'
     uses: ./.github/workflows/sync-ms-store-listing.yml
     with:
       mode: full-submission
-      release_tag: v${{ needs.compute-version.outputs.full }}
+      release_tag: ${{ needs.release.outputs.release_tag }}
       dry_run: false
     secrets: inherit
