@@ -73,6 +73,7 @@ Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try 
 ## ✨ Key Features
 
 ### エディタ / Editor
+
 - **縦書き・横書き対応 (Vertical & horizontal writing)** — Switch between writing modes optimized for Japanese novels
 - **Flexible panel layout** — Dockview-based multi-panel workspace; drag, split, and rearrange panels freely
 - **Pop-out editor windows** — Detach any editor tab into a separate window for multi-monitor workflows
@@ -81,18 +82,22 @@ Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try 
 - **Empty editor placeholder** — Guided empty state when no file is open
 
 ### ターミナル / Terminal
+
 - **Integrated terminal panel** — Full xterm.js terminal embedded in the editor (desktop only)
 - **Multiple terminal tabs** — Open and manage several terminal sessions in parallel
 
 ### キーボード / Keyboard
+
 - **Customizable keybindings** — Remap any command via the Keymap settings tab; bindings persist across sessions
 - **Shortcut registry** — Centralized command-ID system for consistent shortcut management
 
 ### 校正・設定 / Linting & Settings
+
 - **Japanese text linting** — Configurable rule-based linting with JSON-defined rule sets; preset support
 - **Settings tabs** — Including: Keymap, Linting, Typography, Vertical layout, Speech, Terminal, Position highlight, Power
 
 ### デスクトップ / Desktop
+
 - **Desktop-only feature guards** — `DesktopOnlyDialog` gracefully blocks web-unsupported features
 - **Download button component** — In-app prompt to download the desktop build when a desktop-only feature is accessed
 
@@ -107,6 +112,7 @@ Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try 
 3. Launch the app and start writing!
 
 ### Windows
+
 1. Download the `.exe` installer from [illusions.app/downloads](https://www.illusions.app/downloads), or install from the **Microsoft Store** (search "illusions novel editor")
 2. Run the installer and launch the app
 
