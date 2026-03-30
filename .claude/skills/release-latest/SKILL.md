@@ -66,6 +66,7 @@ git merge --no-commit --no-ff origin/dev 2>&1
 ```
 
 **コンフリクトなし**（exit 0 かつ "Automatic merge went well" と表示された場合）:
+
 ```bash
 GIT_EDITOR=true git merge --continue
 ```
@@ -75,19 +76,22 @@ GIT_EDITOR=true git merge --continue
 #### このプロジェクトのコンフリクト解決ルール
 
 まず main にしか存在しない hotfix コミットを確認する:
+
 ```bash
 git log origin/dev..origin/main --oneline
 ```
+
 これに含まれる変更は dev 側に存在しないため、コンフリクト解決時に消さないよう注意する。
 
-| ファイル | 解決方針 |
-|---------|---------|
-| `CLAUDE.md` | dev 側を採用（prettier 整形済み）|
-| `scripts/submit-store.mjs` | dev 側を採用（ダブルクォート、prettier 準拠）|
-| `package.json` | dev 側を採用。`version` フィールドは `"0.1.0"` のまま保持（タグでバージョン管理するため）|
-| その他 | dev 側を優先。ただし上記 hotfix コミットに含まれるファイルは main 側の変更も保持する |
+| ファイル                   | 解決方針                                                                                  |
+| -------------------------- | ----------------------------------------------------------------------------------------- |
+| `CLAUDE.md`                | dev 側を採用（prettier 整形済み）                                                         |
+| `scripts/submit-store.mjs` | dev 側を採用（ダブルクォート、prettier 準拠）                                             |
+| `package.json`             | dev 側を採用。`version` フィールドは `"0.1.0"` のまま保持（タグでバージョン管理するため） |
+| その他                     | dev 側を優先。ただし上記 hotfix コミットに含まれるファイルは main 側の変更も保持する      |
 
 コンフリクト解決後:
+
 ```bash
 git add <conflicted-files>
 GIT_EDITOR=true git merge --continue
@@ -138,10 +142,10 @@ gh pr view <PR_NUMBER> --json statusCheckRollup
 
 チェック結果の判断:
 
-| 状態 | 対応 |
-|------|------|
-| 全て SUCCESS | そのまま通常マージ |
-| **Code Quality** のみ FAILURE | ユーザーに内容を報告し、`--admin` bypass の許可を求める |
+| 状態                                   | 対応                                                       |
+| -------------------------------------- | ---------------------------------------------------------- |
+| 全て SUCCESS                           | そのまま通常マージ                                         |
+| **Code Quality** のみ FAILURE          | ユーザーに内容を報告し、`--admin` bypass の許可を求める    |
 | Desktop Build / 他の重要 CI が FAILURE | 原因を調査してから進む。自己解決できなければユーザーに相談 |
 
 CI がまだ走り中（IN_PROGRESS）の場合は完了を待ってから判断する。
@@ -149,16 +153,19 @@ CI がまだ走り中（IN_PROGRESS）の場合は完了を待ってから判断
 ### 3b. マージ
 
 **通常マージ（CI 全 pass）:**
+
 ```bash
 gh pr merge <PR_NUMBER> --merge --subject "release: weekly release v<NEXT_VERSION>"
 ```
 
 **Admin bypass マージ（ユーザーが許可した場合）:**
+
 ```bash
 gh pr merge <PR_NUMBER> --merge --admin --subject "release: weekly release v<NEXT_VERSION>"
 ```
 
 マージ確認:
+
 ```bash
 gh pr view <PR_NUMBER> --json state,mergedAt
 ```
@@ -178,6 +185,7 @@ git push origin v<NEXT_VERSION>
 ```
 
 ビルドの起動確認（タグ名で絞り込む）:
+
 ```bash
 gh run list --event push --limit 10 --json status,conclusion,workflowName,headBranch | \
   python3 -c "
