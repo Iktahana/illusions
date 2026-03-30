@@ -293,7 +293,6 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 | `lib/storage/storage-service.ts`      | Storage singleton with environment detection                     |
 | `lib/vfs/`                            | Filesystem abstraction (browser File API vs Node.js fs)          |
 | `electron/preload.js`                 | **IPC security boundary** — sole point exposing APIs to renderer |
-
 - Storage docs: `docs/architecture/storage-system.md`
 - MDI syntax: `MDI.md`
 - Electron types: `types/electron.d.ts`
