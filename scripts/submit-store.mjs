@@ -17,6 +17,7 @@
  *   MSIX_DIR              - Directory containing .appx packages (default: "msix-packages")
  *
  * Optional:
+ *   SUBMISSION_MODE            - "listing-only" or "full-submission" (default: "full-submission")
  *   DRY_RUN=true              - Log API calls without mutating state (credentials not required)
  *   FORCE_DELETE_PENDING=true - Delete any existing pending submission before creating a new one
  *   POLL_TIMEOUT_MS           - Polling timeout in ms (default: 600000 = 10 min)
@@ -37,6 +38,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // ---------------------------------------------------------------------------
 
 const DRY_RUN = process.env.DRY_RUN === 'true';
+const SUBMISSION_MODE = process.env.SUBMISSION_MODE ?? 'full-submission';
+const LISTING_ONLY = SUBMISSION_MODE === 'listing-only';
 const FORCE_DELETE_PENDING = process.env.FORCE_DELETE_PENDING === 'true';
 const TENANT_ID = process.env.MSSTORE_TENANT_ID;
 const CLIENT_ID = process.env.MSSTORE_CLIENT_ID;
@@ -171,24 +174,35 @@ async function apiDelete(token, path) {
 // ---------------------------------------------------------------------------
 
 /**
- * Reads a Markdown file and returns its trimmed content as plain text.
+ * Strips HTML comments from text.
+ * @param {string} text
+ * @returns {string}
+ */
+function stripHtmlComments(text) {
+  return text.replace(/<!--[\s\S]*?-->/g, '');
+}
+
+/**
+ * Reads a Markdown file, strips HTML comments, and returns trimmed content.
  * @param {string} name  Filename within STORE_METADATA_DIR
  * @returns {string}
  */
 function readListingFile(name) {
   const filePath = join(STORE_METADATA_DIR, name);
-  return readFileSync(filePath, 'utf-8').trim();
+  const raw = readFileSync(filePath, 'utf-8');
+  return stripHtmlComments(raw).trim();
 }
 
 /**
  * Parses a Markdown bullet list into an array of strings.
- * Supports `-`, `*`, `+` list markers.
+ * Only lines starting with `-`, `*`, or `+` are included; everything else is ignored.
  * @param {string} markdown
  * @returns {string[]}
  */
 function parseBulletList(markdown) {
   return markdown
     .split('\n')
+    .filter((line) => /^[-*+]\s+/.test(line))
     .map((line) => line.replace(/^[-*+]\s+/, '').trim())
     .filter((line) => line.length > 0);
 }
@@ -241,8 +255,7 @@ function createPackageZip() {
  */
 async function uploadPackageToSas(sasUrl, zipPath) {
   if (!sasUrl) {
-    console.warn('  No fileUploadUrl provided — skipping package upload');
-    return;
+    throw new Error('fileUploadUrl is empty — cannot upload packages. The Store API did not provide an upload URL.');
   }
 
   const { size: fileSize } = statSync(zipPath);
@@ -300,6 +313,8 @@ async function pollSubmissionStatus(token, submissionId) {
 // ---------------------------------------------------------------------------
 
 async function main() {
+  console.log(`Mode: ${SUBMISSION_MODE}${LISTING_ONLY ? ' (listing metadata only, no package upload)' : ''}`);
+
   if (DRY_RUN) {
     console.log('=== DRY RUN MODE — no mutations will be made ===\n');
   } else if (!TENANT_ID || !CLIENT_ID || !CLIENT_SECRET || !APP_ID) {
@@ -339,6 +354,20 @@ async function main() {
 
   if (app.pendingApplicationSubmission?.id) {
     const pendingId = app.pendingApplicationSubmission.id;
+
+    if (LISTING_ONLY) {
+      // In listing-only mode, refuse to touch an existing pending submission.
+      // It may contain package uploads or manual Partner Center edits that
+      // would be inadvertently committed along with the listing update.
+      throw new Error(
+        `A pending submission already exists (${pendingId}). ` +
+          'listing-only mode refuses to reuse it to avoid accidentally committing ' +
+          'unrelated package or draft changes. ' +
+          'Please complete or delete the pending submission in Partner Center first, ' +
+          'then re-run this workflow.',
+      );
+    }
+
     if (FORCE_DELETE_PENDING) {
       console.log(`  Deleting existing pending submission: ${pendingId}`);
       await apiDelete(token, `/applications/${APP_ID}/submissions/${pendingId}`);
@@ -377,29 +406,35 @@ async function main() {
   listing.features = features;
   listing.releaseNotes = releaseNotes;
 
-  // --- Step 7: Set application packages ---
-  const appxFiles = DRY_RUN ? ['example.appx'] : findAppxFiles();
-  console.log(`\nPackages to submit: ${appxFiles.join(', ')}`);
+  // --- Step 7: Set application packages (full-submission only) ---
+  if (!LISTING_ONLY) {
+    const appxFiles = DRY_RUN ? ['example.appx'] : findAppxFiles();
+    console.log(`\nPackages to submit: ${appxFiles.join(', ')}`);
 
-  submission.applicationPackages = appxFiles.map((fileName) => ({
-    fileName,
-    fileStatus: 'PendingUpload',
-    minimumDirectXVersion: 'None',
-    minimumSystemRam: 'None',
-  }));
+    submission.applicationPackages = appxFiles.map((fileName) => ({
+      fileName,
+      fileStatus: 'PendingUpload',
+      minimumDirectXVersion: 'None',
+      minimumSystemRam: 'None',
+    }));
+  } else {
+    console.log('\nSkipping package configuration (listing-only mode).');
+  }
 
   // --- Step 8: PUT updated submission ---
   console.log('\nSaving submission changes...');
   await apiPut(token, `/applications/${APP_ID}/submissions/${submissionId}`, submission);
 
-  // --- Step 9: Upload packages ---
-  if (DRY_RUN) {
-    console.log('\n[dry-run] Skipping package ZIP creation and upload.');
-  } else {
-    console.log('\nPreparing package ZIP...');
-    const zipPath = createPackageZip();
-    console.log('\nUploading packages to Azure Blob Storage...');
-    await uploadPackageToSas(fileUploadUrl, zipPath);
+  // --- Step 9: Upload packages (full-submission only) ---
+  if (!LISTING_ONLY) {
+    if (DRY_RUN) {
+      console.log('\n[dry-run] Skipping package ZIP creation and upload.');
+    } else {
+      console.log('\nPreparing package ZIP...');
+      const zipPath = createPackageZip();
+      console.log('\nUploading packages to Azure Blob Storage...');
+      await uploadPackageToSas(fileUploadUrl, zipPath);
+    }
   }
 
   // --- Step 10: Commit ---

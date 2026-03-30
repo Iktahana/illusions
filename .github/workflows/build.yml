@@ -11,11 +11,15 @@ on:
       - "v*"
     paths-ignore:
       - 'www/**'
+      - 'store/**'
       - '.github/workflows/deploy-www.yml'
+      - '.github/workflows/sync-ms-store-listing.yml'
   pull_request:
     paths-ignore:
       - 'www/**'
+      - 'store/**'
       - '.github/workflows/deploy-www.yml'
+      - '.github/workflows/sync-ms-store-listing.yml'
 
 permissions:
   contents: write
@@ -48,11 +52,13 @@ jobs:
             desktop_changed:
               - '**'
               - '!www/**' # Exclude www/ from desktop change detection
+              - '!store/**' # Store listing changes should not trigger desktop builds
               - '!docs/**'
               - '!README.md'
               - '!TERMS.md'
               - '!MDI.md'
               - '!.github/workflows/deploy-www.yml' # Web CD changes should not gate desktop builds
+              - '!.github/workflows/sync-ms-store-listing.yml'
               # Keep build.yml included so workflow edits validate desktop builds
 
   # NOTE: All desktop jobs run only when desktop_changed=true.
@@ -694,73 +700,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
-  # Microsoft Store submission — runs immediately after release (main only)
+  # Microsoft Store submission is handled by a separate workflow:
+  #   .github/workflows/sync-ms-store-listing.yml
+  # Use it manually via workflow_dispatch after a release.
   # ---------------------------------------------------------------------------
-
-  submit-to-ms-store:
-    name: Submit to Microsoft Store
-    needs: [detect-changes, compute-version, release]
-    if: |
-      github.event_name != 'pull_request' &&
-      github.ref == 'refs/heads/main' &&
-      needs.detect-changes.outputs.desktop_changed == 'true'
-    runs-on: windows-latest
-    environment: MicrosoftStore
-    env:
-      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-      STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
-      VERSION: v${{ needs.compute-version.outputs.full }}
-      MSIX_DIR: msix-packages
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Download MSIX packages from GitHub Release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          New-Item -ItemType Directory -Path msix-packages -Force | Out-Null
-          gh release download $env:VERSION --pattern "*.appx" --dir msix-packages --repo $env:GITHUB_REPOSITORY
-
-          $appxFiles = Get-ChildItem "msix-packages\*.appx"
-          if ($appxFiles.Count -eq 0) {
-            throw "No .appx packages found in release $env:VERSION. Cannot submit to Microsoft Store."
-          }
-          Write-Host "Downloaded $($appxFiles.Count) .appx package(s):"
-          $appxFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
-
-      - name: Submit listing + packages to Microsoft Store
-        run: node scripts/submit-store.mjs
-
-      - name: Create submission marker tag
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          REF_DATA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION")
-          OBJECT_TYPE=$(echo "$REF_DATA" | jq -r '.object.type')
-          OBJECT_SHA=$(echo "$REF_DATA" | jq -r '.object.sha')
-
-          if [ "$OBJECT_TYPE" = "tag" ]; then
-            SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$OBJECT_SHA" --jq '.object.sha')
-          else
-            SHA="$OBJECT_SHA"
-          fi
-
-          MARKER="ms-store-$VERSION"
-          gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
-            -f "ref=refs/tags/$MARKER" \
-            -f "sha=$SHA"
-          echo "Created submission marker tag: $MARKER"
-
