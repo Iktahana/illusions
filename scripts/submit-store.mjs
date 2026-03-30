@@ -413,12 +413,22 @@ async function main() {
     const appxFiles = DRY_RUN ? ['example.appx'] : findAppxFiles();
     console.log(`\nPackages to submit: ${appxFiles.join(', ')}`);
 
-    submission.applicationPackages = appxFiles.map((fileName) => ({
+    // Mark all existing packages as PendingDelete.
+    // The Store API requires every previously-uploaded package to be present in
+    // the payload; omitting them causes a 400 "missing packages" error.
+    const existingPackages = (submission.applicationPackages ?? []).map((pkg) => ({
+      ...pkg,
+      fileStatus: 'PendingDelete',
+    }));
+
+    const newPackages = appxFiles.map((fileName) => ({
       fileName,
       fileStatus: 'PendingUpload',
       minimumDirectXVersion: 'None',
       minimumSystemRam: 'None',
     }));
+
+    submission.applicationPackages = [...existingPackages, ...newPackages];
   } else {
     console.log('\nSkipping package configuration (listing-only mode).');
   }
