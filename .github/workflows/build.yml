@@ -546,9 +546,9 @@ jobs:
 
       # --- Full packaging steps (push to main/alpha/beta/dev only) ---
 
-      - name: Update package.json version (4-part for MSIX)
+      - name: Update package.json version for MSIX build
         if: github.event_name != 'pull_request'
-        run: node -e "const p=require('./package.json');p.version='${{ needs.compute-version.outputs.msix }}';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+        run: node -e "const p=require('./package.json');p.version='${{ needs.compute-version.outputs.base }}';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 
       - name: Download build output
         if: github.event_name != 'pull_request'
