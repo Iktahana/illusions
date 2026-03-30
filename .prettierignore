@@ -1,0 +1,7 @@
+node_modules/
+dist-electron/
+dist-main/
+out/
+.next/
+public/
+coverage/

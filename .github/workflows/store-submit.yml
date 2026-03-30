@@ -1,0 +1,49 @@
+name: Microsoft Store Auto Submit
+
+on:
+  workflow_run:
+    workflows: ["Desktop Build and Release"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  submit:
+    name: Submit to Microsoft Store
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get latest stable release tag
+        id: get-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_TAG=$(gh api repos/${{ github.repository }}/releases \
+            --jq '[.[] | select(.draft == false and .prerelease == false)] | sort_by(.created_at) | last | .tag_name')
+          if [ -z "$RELEASE_TAG" ] || [ "$RELEASE_TAG" = "null" ]; then
+            echo "::error::No stable release found"
+            exit 1
+          fi
+          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Found release tag: ${RELEASE_TAG}"
+
+      - name: Dispatch store submission
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'sync-ms-store-listing.yml',
+              ref: 'main',
+              inputs: {
+                mode: 'full-submission',
+                release_tag: '${{ steps.get-tag.outputs.tag }}',
+                dry_run: 'false',
+              },
+            });
+            core.info(`Dispatched store submission for ${{ steps.get-tag.outputs.tag }}`);

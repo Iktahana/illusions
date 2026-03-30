@@ -258,6 +258,19 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 > Note: Users may communicate with agents in any language. Do NOT instruct users to use English or Japanese.
 
 **Key file references:**
+
+### Component Responsibility Map
+
+| Component / Hook | Responsible For |
+|---|---|
+| `app/page.tsx` | Top-level coordinator — wires all hooks to EditorLayout |
+| `components/EditorLayout.tsx` | Layout structure only; no business logic |
+| `components/Editor.tsx` | Milkdown editor instance and ProseMirror bridge |
+| `lib/editor-page/use-linting.ts` | RuleRunner lifecycle and lint state management |
+| `lib/editor-page/use-file-opening.ts` | Open/save file dialogs and IPC calls |
+| `lib/storage/storage-service.ts` | Storage singleton with environment detection |
+| `lib/vfs/` | Filesystem abstraction (browser File API vs Node.js fs) |
+| `electron/preload.js` | **IPC security boundary** — sole point exposing APIs to renderer |
 - Storage docs: `docs/architecture/storage-system.md`
 - MDI syntax: `MDI.md`
 - Electron types: `types/electron.d.ts`
