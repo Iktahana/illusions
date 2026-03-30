@@ -13,7 +13,7 @@
     "dev": "npm run type-check && next dev -p 3010",
     "build": "npm run type-check && npm run generate:credits && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "next lint --dir app --dir components --dir lib --dir electron",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
     "prepare": "husky",
