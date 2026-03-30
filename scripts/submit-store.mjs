@@ -23,13 +23,13 @@
  *   POLL_TIMEOUT_MS           - Polling timeout in ms (default: 600000 = 10 min)
  */
 
-import { readFileSync, existsSync, readdirSync, createReadStream, statSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { Readable } from 'node:stream';
+import { readFileSync, existsSync, readdirSync, createReadStream, statSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { execSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Readable } from "node:stream";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -37,19 +37,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Configuration
 // ---------------------------------------------------------------------------
 
-const DRY_RUN = process.env.DRY_RUN === 'true';
-const SUBMISSION_MODE = process.env.SUBMISSION_MODE ?? 'full-submission';
-const LISTING_ONLY = SUBMISSION_MODE === 'listing-only';
-const FORCE_DELETE_PENDING = process.env.FORCE_DELETE_PENDING === 'true';
+const DRY_RUN = process.env.DRY_RUN === "true";
+const SUBMISSION_MODE = process.env.SUBMISSION_MODE ?? "full-submission";
+const LISTING_ONLY = SUBMISSION_MODE === "listing-only";
+const FORCE_DELETE_PENDING = process.env.FORCE_DELETE_PENDING === "true";
 const TENANT_ID = process.env.MSSTORE_TENANT_ID;
 const CLIENT_ID = process.env.MSSTORE_CLIENT_ID;
 const CLIENT_SECRET = process.env.MSSTORE_CLIENT_SECRET;
 const APP_ID = process.env.STORE_PRODUCT_ID;
-const MSIX_DIR = resolve(process.env.MSIX_DIR ?? 'msix-packages');
+const MSIX_DIR = resolve(process.env.MSIX_DIR ?? "msix-packages");
 const POLL_TIMEOUT_MS = Number(process.env.POLL_TIMEOUT_MS ?? 600_000);
 
-const API_BASE = 'https://manage.devcenter.microsoft.com/v1.0/my';
-const STORE_METADATA_DIR = resolve(__dirname, '..', 'store', 'microsoft', 'ja-JP');
+const API_BASE = "https://manage.devcenter.microsoft.com/v1.0/my";
+const STORE_METADATA_DIR = resolve(__dirname, "..", "store", "microsoft", "ja-JP");
 
 // ---------------------------------------------------------------------------
 // Authentication
@@ -62,13 +62,13 @@ const STORE_METADATA_DIR = resolve(__dirname, '..', 'store', 'microsoft', 'ja-JP
 async function getAccessToken() {
   const url = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
   const body = new URLSearchParams({
-    grant_type: 'client_credentials',
+    grant_type: "client_credentials",
     client_id: CLIENT_ID,
     client_secret: CLIENT_SECRET,
-    scope: 'https://manage.devcenter.microsoft.com/.default',
+    scope: "https://manage.devcenter.microsoft.com/.default",
   });
 
-  const res = await fetch(url, { method: 'POST', body });
+  const res = await fetch(url, { method: "POST", body });
   const data = await res.json();
 
   if (!data.access_token) {
@@ -109,13 +109,13 @@ async function apiGet(token, path) {
 async function apiPost(token, path, body) {
   if (DRY_RUN) {
     console.log(`[dry-run] POST ${path}`);
-    return { id: 'dry-run-submission-id', fileUploadUrl: '' };
+    return { id: "dry-run-submission-id", fileUploadUrl: "" };
   }
   const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
+    method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: body != null ? JSON.stringify(body) : undefined,
   });
@@ -137,10 +137,10 @@ async function apiPut(token, path, body) {
     return body;
   }
   const res = await fetch(`${API_BASE}${path}`, {
-    method: 'PUT',
+    method: "PUT",
     headers: {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
   });
@@ -161,7 +161,7 @@ async function apiDelete(token, path) {
     return;
   }
   const res = await fetch(`${API_BASE}${path}`, {
-    method: 'DELETE',
+    method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -179,7 +179,7 @@ async function apiDelete(token, path) {
  * @returns {string}
  */
 function stripHtmlComments(text) {
-  return text.replace(/<!--[\s\S]*?-->/g, '');
+  return text.replace(/<!--[\s\S]*?-->/g, "");
 }
 
 /**
@@ -190,8 +190,8 @@ function stripHtmlComments(text) {
  */
 function readListingFile(name, { required = true } = {}) {
   const filePath = join(STORE_METADATA_DIR, name);
-  if (!required && !existsSync(filePath)) return '';
-  const raw = readFileSync(filePath, 'utf-8');
+  if (!required && !existsSync(filePath)) return "";
+  const raw = readFileSync(filePath, "utf-8");
   return stripHtmlComments(raw).trim();
 }
 
@@ -203,9 +203,9 @@ function readListingFile(name, { required = true } = {}) {
  */
 function parseBulletList(markdown) {
   return markdown
-    .split('\n')
+    .split("\n")
     .filter((line) => /^[-*+]\s+/.test(line))
-    .map((line) => line.replace(/^[-*+]\s+/, '').trim())
+    .map((line) => line.replace(/^[-*+]\s+/, "").trim())
     .filter((line) => line.length > 0);
 }
 
@@ -219,7 +219,7 @@ function parseBulletList(markdown) {
  */
 function findAppxFiles() {
   const entries = readdirSync(MSIX_DIR);
-  const appxFiles = entries.filter((f) => f.endsWith('.appx'));
+  const appxFiles = entries.filter((f) => f.endsWith(".appx"));
   if (appxFiles.length === 0) {
     throw new Error(`No .appx files found in ${MSIX_DIR}`);
   }
@@ -232,7 +232,7 @@ function findAppxFiles() {
  * @returns {string} Absolute path to the created ZIP file
  */
 function createPackageZip() {
-  const zipPath = join(tmpdir(), 'store-package-upload.zip');
+  const zipPath = join(tmpdir(), "store-package-upload.zip");
   const appxFiles = findAppxFiles();
   const appxPaths = appxFiles.map((f) => join(MSIX_DIR, f)).join("','");
 
@@ -241,7 +241,7 @@ function createPackageZip() {
   console.log(`  Creating package ZIP: ${zipPath}`);
 
   if (!DRY_RUN) {
-    execSync(cmd, { stdio: 'inherit' });
+    execSync(cmd, { stdio: "inherit" });
   } else {
     console.log(`  [dry-run] ${cmd}`);
   }
@@ -257,7 +257,9 @@ function createPackageZip() {
  */
 async function uploadPackageToSas(sasUrl, zipPath) {
   if (!sasUrl) {
-    throw new Error('fileUploadUrl is empty — cannot upload packages. The Store API did not provide an upload URL.');
+    throw new Error(
+      "fileUploadUrl is empty — cannot upload packages. The Store API did not provide an upload URL.",
+    );
   }
 
   const { size: fileSize } = statSync(zipPath);
@@ -267,14 +269,14 @@ async function uploadPackageToSas(sasUrl, zipPath) {
   const webStream = Readable.toWeb(createReadStream(zipPath));
 
   const res = await fetch(sasUrl, {
-    method: 'PUT',
+    method: "PUT",
     headers: {
-      'x-ms-blob-type': 'BlockBlob',
-      'Content-Type': 'application/zip',
-      'Content-Length': String(fileSize),
+      "x-ms-blob-type": "BlockBlob",
+      "Content-Type": "application/zip",
+      "Content-Length": String(fileSize),
     },
     body: webStream,
-    duplex: 'half',
+    duplex: "half",
   });
 
   if (!res.ok) {
@@ -300,7 +302,7 @@ async function pollSubmissionStatus(token, submissionId) {
     const sub = await apiGet(token, `/applications/${APP_ID}/submissions/${submissionId}`);
     console.log(`  commitStatus: ${sub.commitStatus}`);
 
-    if (sub.commitStatus !== 'CommitStarted') {
+    if (sub.commitStatus !== "CommitStarted") {
       return sub;
     }
 
@@ -315,23 +317,25 @@ async function pollSubmissionStatus(token, submissionId) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log(`Mode: ${SUBMISSION_MODE}${LISTING_ONLY ? ' (listing metadata only, no package upload)' : ''}`);
+  console.log(
+    `Mode: ${SUBMISSION_MODE}${LISTING_ONLY ? " (listing metadata only, no package upload)" : ""}`,
+  );
 
   if (DRY_RUN) {
-    console.log('=== DRY RUN MODE — no mutations will be made ===\n');
+    console.log("=== DRY RUN MODE — no mutations will be made ===\n");
   } else if (!TENANT_ID || !CLIENT_ID || !CLIENT_SECRET || !APP_ID) {
     throw new Error(
-      'Missing required environment variables: ' +
-        'MSSTORE_TENANT_ID, MSSTORE_CLIENT_ID, MSSTORE_CLIENT_SECRET, STORE_PRODUCT_ID',
+      "Missing required environment variables: " +
+        "MSSTORE_TENANT_ID, MSSTORE_CLIENT_ID, MSSTORE_CLIENT_SECRET, STORE_PRODUCT_ID",
     );
   }
 
   // --- Step 1: Read listing content ---
-  console.log('Reading store listing content...');
-  const description = readListingFile('description.md');
-  const shortDescription = readListingFile('short-description.md');
-  const featuresMarkdown = readListingFile('features.md');
-  const releaseNotes = readListingFile('release-notes.md', { required: false });
+  console.log("Reading store listing content...");
+  const description = readListingFile("description.md");
+  const shortDescription = readListingFile("short-description.md");
+  const featuresMarkdown = readListingFile("features.md");
+  const releaseNotes = readListingFile("release-notes.md", { required: false });
   const features = parseBulletList(featuresMarkdown);
 
   console.log(`  description:      ${description.length} chars`);
@@ -340,11 +344,11 @@ async function main() {
   console.log(`  releaseNotes:     ${releaseNotes.length} chars`);
 
   // --- Step 2: Authenticate ---
-  let token = 'dry-run-token';
+  let token = "dry-run-token";
   if (!DRY_RUN) {
-    console.log('\nAuthenticating with Azure AD...');
+    console.log("\nAuthenticating with Azure AD...");
     token = await getAccessToken();
-    console.log('  OK');
+    console.log("  OK");
   }
 
   // --- Step 3: Get app info + resolve pending submission ---
@@ -363,10 +367,10 @@ async function main() {
       // would be inadvertently committed along with the listing update.
       throw new Error(
         `A pending submission already exists (${pendingId}). ` +
-          'listing-only mode refuses to reuse it to avoid accidentally committing ' +
-          'unrelated package or draft changes. ' +
-          'Please complete or delete the pending submission in Partner Center first, ' +
-          'then re-run this workflow.',
+          "listing-only mode refuses to reuse it to avoid accidentally committing " +
+          "unrelated package or draft changes. " +
+          "Please complete or delete the pending submission in Partner Center first, " +
+          "then re-run this workflow.",
       );
     }
 
@@ -384,7 +388,7 @@ async function main() {
 
   // --- Step 4: Create new submission (if no pending submission to reuse) ---
   if (!submissionId) {
-    console.log('\nCreating new submission...');
+    console.log("\nCreating new submission...");
     const newSub = await apiPost(token, `/applications/${APP_ID}/submissions`, null);
     submissionId = newSub.id;
     fileUploadUrl = newSub.fileUploadUrl;
@@ -392,17 +396,17 @@ async function main() {
   }
 
   // --- Step 5: Get full submission details ---
-  console.log('\nGetting submission details...');
+  console.log("\nGetting submission details...");
   const submission = await apiGet(token, `/applications/${APP_ID}/submissions/${submissionId}`);
 
   // --- Step 6: Update listing ---
-  console.log('\nUpdating store listing (ja-JP)...');
+  console.log("\nUpdating store listing (ja-JP)...");
   if (!submission.listings) submission.listings = {};
-  if (!submission.listings['ja-jp']) {
-    submission.listings['ja-jp'] = { baseListing: {} };
+  if (!submission.listings["ja-jp"]) {
+    submission.listings["ja-jp"] = { baseListing: {} };
   }
 
-  const listing = submission.listings['ja-jp'].baseListing;
+  const listing = submission.listings["ja-jp"].baseListing;
   listing.description = description;
   listing.shortDescription = shortDescription;
   listing.features = features;
@@ -410,65 +414,66 @@ async function main() {
 
   // --- Step 7: Set application packages (full-submission only) ---
   if (!LISTING_ONLY) {
-    const appxFiles = DRY_RUN ? ['example.appx'] : findAppxFiles();
-    console.log(`\nPackages to submit: ${appxFiles.join(', ')}`);
+    const appxFiles = DRY_RUN ? ["example.appx"] : findAppxFiles();
+    console.log(`\nPackages to submit: ${appxFiles.join(", ")}`);
 
     // Mark all existing packages as PendingDelete.
     // The Store API requires every previously-uploaded package to be present in
     // the payload; omitting them causes a 400 "missing packages" error.
     const existingPackages = (submission.applicationPackages ?? []).map((pkg) => ({
       ...pkg,
-      fileStatus: 'PendingDelete',
+      fileStatus: "PendingDelete",
     }));
 
     const newPackages = appxFiles.map((fileName) => ({
       fileName,
-      fileStatus: 'PendingUpload',
-      minimumDirectXVersion: 'None',
-      minimumSystemRam: 'None',
+      fileStatus: "PendingUpload",
+      minimumDirectXVersion: "None",
+      minimumSystemRam: "None",
     }));
+
 
     submission.applicationPackages = [...existingPackages, ...newPackages];
   } else {
-    console.log('\nSkipping package configuration (listing-only mode).');
+    console.log("\nSkipping package configuration (listing-only mode).");
   }
 
   // --- Step 8: PUT updated submission ---
-  console.log('\nSaving submission changes...');
+  console.log("\nSaving submission changes...");
   await apiPut(token, `/applications/${APP_ID}/submissions/${submissionId}`, submission);
 
   // --- Step 9: Upload packages (full-submission only) ---
   if (!LISTING_ONLY) {
     if (DRY_RUN) {
-      console.log('\n[dry-run] Skipping package ZIP creation and upload.');
+      console.log("\n[dry-run] Skipping package ZIP creation and upload.");
     } else {
-      console.log('\nPreparing package ZIP...');
+      console.log("\nPreparing package ZIP...");
       const zipPath = createPackageZip();
-      console.log('\nUploading packages to Azure Blob Storage...');
+      console.log("\nUploading packages to Azure Blob Storage...");
       await uploadPackageToSas(fileUploadUrl, zipPath);
     }
   }
 
   // --- Step 10: Commit ---
-  console.log('\nCommitting submission...');
+  console.log("\nCommitting submission...");
   await apiPost(token, `/applications/${APP_ID}/submissions/${submissionId}/commit`, null);
 
   // --- Step 11: Poll ---
-  console.log('\nPolling submission status...');
+  console.log("\nPolling submission status...");
   const finalSubmission = DRY_RUN
-    ? { commitStatus: 'CommitStarted (dry-run)' }
+    ? { commitStatus: "CommitStarted (dry-run)" }
     : await pollSubmissionStatus(token, submissionId);
 
   console.log(`\nFinal status: ${finalSubmission.commitStatus}`);
 
-  if (finalSubmission.commitStatus === 'CommitFailed') {
+  if (finalSubmission.commitStatus === "CommitFailed") {
     throw new Error(`Submission commit failed: ${JSON.stringify(finalSubmission.statusDetails)}`);
   }
 
-  console.log('\nStore submission completed successfully.');
+  console.log("\nStore submission completed successfully.");
 }
 
 main().catch((err) => {
-  console.error('\nFATAL:', err.message);
+  console.error("\nFATAL:", err.message);
   process.exit(1);
 });

@@ -59,9 +59,7 @@ export default function SpeechSettingsTab(): React.ReactElement {
 
         {/* Voice selection */}
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            音声
-          </label>
+          <label className="block text-sm font-medium text-foreground mb-2">音声</label>
           <select
             value={speechVoiceURI}
             onChange={(e) => onSpeechVoiceURIChange(e.target.value)}
@@ -84,7 +82,8 @@ export default function SpeechSettingsTab(): React.ReactElement {
         {/* Rate slider */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            速度 <span className="text-foreground-tertiary font-normal">({speechRate.toFixed(1)}x)</span>
+            速度{" "}
+            <span className="text-foreground-tertiary font-normal">({speechRate.toFixed(1)}x)</span>
           </label>
           <input
             type="range"
@@ -104,7 +103,8 @@ export default function SpeechSettingsTab(): React.ReactElement {
         {/* Pitch slider */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            ピッチ <span className="text-foreground-tertiary font-normal">({speechPitch.toFixed(1)})</span>
+            ピッチ{" "}
+            <span className="text-foreground-tertiary font-normal">({speechPitch.toFixed(1)})</span>
           </label>
           <input
             type="range"
@@ -124,7 +124,10 @@ export default function SpeechSettingsTab(): React.ReactElement {
         {/* Volume slider */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            音量 <span className="text-foreground-tertiary font-normal">({Math.round(speechVolume * 100)}%)</span>
+            音量{" "}
+            <span className="text-foreground-tertiary font-normal">
+              ({Math.round(speechVolume * 100)}%)
+            </span>
           </label>
           <input
             type="range"

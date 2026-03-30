@@ -79,13 +79,10 @@ export function replaceMdiWithRubyText(text: string): string {
   let result = text;
 
   // Ruby: base（ruby）  — strip dots from split ruby
-  result = result.replace(
-    MDI_RUBY_RE,
-    (_match, base: string, ruby: string) => {
-      const cleanRuby = ruby.replace(/\./g, "");
-      return `${base}\uFF08${cleanRuby}\uFF09`;
-    },
-  );
+  result = result.replace(MDI_RUBY_RE, (_match, base: string, ruby: string) => {
+    const cleanRuby = ruby.replace(/\./g, "");
+    return `${base}\uFF08${cleanRuby}\uFF09`;
+  });
 
   // Tate-chu-yoko: keep text
   result = result.replace(MDI_TCY_RE, "$1");

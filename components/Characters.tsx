@@ -15,10 +15,8 @@ interface CharactersProps {
 }
 
 function Characters({ content }: CharactersProps) {
-  const {
-    characterExtractionBatchSize,
-    characterExtractionConcurrency,
-  } = useCharacterExtractionSettings();
+  const { characterExtractionBatchSize, characterExtractionConcurrency } =
+    useCharacterExtractionSettings();
 
   const [characters, setCharacters] = useState<Character[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -99,9 +97,7 @@ function Characters({ content }: CharactersProps) {
   }, []);
 
   const handleUpdateCharacter = useCallback((id: string, updates: Partial<Character>) => {
-    setCharacters((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
-    );
+    setCharacters((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
   }, []);
 
   const handleCancelAdd = useCallback(() => {
@@ -132,7 +128,7 @@ function Characters({ content }: CharactersProps) {
       for (const token of tokens) {
         if (token.pos === "名詞" && token.pos_detail_1 === "固有名詞") {
           const alreadyExists = characters.some(
-            (c) => c.name.toLowerCase() === token.surface.toLowerCase()
+            (c) => c.name.toLowerCase() === token.surface.toLowerCase(),
           );
 
           if (!alreadyExists) {
@@ -214,9 +210,7 @@ function Characters({ content }: CharactersProps) {
         {/* Extraction error banner */}
         {extractionError && (
           <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
-            <p className="text-xs text-red-600 dark:text-red-400">
-              {extractionError}
-            </p>
+            <p className="text-xs text-red-600 dark:text-red-400">{extractionError}</p>
             <button
               onClick={() => setExtractionError(null)}
               className="p-0.5 hover:bg-red-100 dark:hover:bg-red-900/40 rounded text-red-500"

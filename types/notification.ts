@@ -1,4 +1,4 @@
-export type NotificationType = 'info' | 'warning' | 'error' | 'success';
+export type NotificationType = "info" | "warning" | "error" | "success";
 
 export interface NotificationAction {
   label: string;
@@ -14,7 +14,7 @@ export interface NotificationMessage {
 }
 
 export interface NotificationProgress extends NotificationMessage {
-  type: 'info' | 'warning' | 'error' | 'success';
+  type: "info" | "warning" | "error" | "success";
   progress?: number; // 0-100
 }
 

@@ -25,10 +25,7 @@ export interface PdfExportOptions {
  * @param options - PDF export options
  * @returns PDF data as a Buffer
  */
-export async function generatePdf(
-  content: string,
-  options: PdfExportOptions
-): Promise<Buffer> {
+export async function generatePdf(content: string, options: PdfExportOptions): Promise<Buffer> {
   // Dynamic import for Electron (only available in main process at runtime)
   const { BrowserWindow } = await import("electron");
   const { mdiToHtml } = await import("./mdi-to-html");
@@ -53,18 +50,16 @@ export async function generatePdf(
   // Set a strict CSP header to block all script execution and data: URLs.
   // This is a defense-in-depth measure alongside html:false in markdown-it
   // and the CSP meta tag in the HTML document.
-  hiddenWin.webContents.session.webRequest.onHeadersReceived(
-    (details, callback) => {
-      callback({
-        responseHeaders: {
-          ...details.responseHeaders,
-          "Content-Security-Policy": [
-            "default-src 'none'; style-src 'unsafe-inline'; img-src 'self';",
-          ],
-        },
-      });
-    }
-  );
+  hiddenWin.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        "Content-Security-Policy": [
+          "default-src 'none'; style-src 'unsafe-inline'; img-src 'self';",
+        ],
+      },
+    });
+  });
 
   try {
     // Register did-finish-load listener BEFORE loadURL to avoid race condition
@@ -76,9 +71,7 @@ export async function generatePdf(
     // Load HTML content into the hidden window.
     // Uses data: URL which is necessary for inline HTML rendering.
     // The CSP meta tag in the HTML itself blocks script execution.
-    await hiddenWin.loadURL(
-      `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
-    );
+    await hiddenWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 
     // Wait for did-finish-load to fire (guaranteed since listener was registered first)
     await loadPromise;

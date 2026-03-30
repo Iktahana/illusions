@@ -7,7 +7,12 @@ import { getHistoryService } from "@/lib/services/history-service";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SnapshotItem from "./HistoryPanel/SnapshotItem";
 import { computeDiffStats } from "./HistoryPanel/DiffIndicator";
-import { getDateKey, formatDateGroupLabel, formatTimeJa, getSnapshotTypeLabel } from "./HistoryPanel/snapshot-utils";
+import {
+  getDateKey,
+  formatDateGroupLabel,
+  formatTimeJa,
+  getSnapshotTypeLabel,
+} from "./HistoryPanel/snapshot-utils";
 
 import type { SnapshotEntry } from "@/lib/services/history-service";
 import type { DiffStats } from "./HistoryPanel/DiffIndicator";
@@ -36,7 +41,11 @@ interface HistoryPanelProps {
   /** Current editor content for diff comparison */
   currentContent?: string;
   /** Callback to display diff in the editor area */
-  onCompareInEditor?: (data: { snapshotContent: string; currentContent: string; label: string }) => void;
+  onCompareInEditor?: (data: {
+    snapshotContent: string;
+    currentContent: string;
+    label: string;
+  }) => void;
 }
 
 // -----------------------------------------------------------------------
@@ -140,7 +149,7 @@ export default function HistoryPanel({
       if (nextSnapshot) idsToLoad.push(nextSnapshot.id);
 
       const contents = await Promise.all(
-        idsToLoad.map((id) => historyService.getSnapshotContent(id))
+        idsToLoad.map((id) => historyService.getSnapshotContent(id)),
       );
       if (cancelled) return;
 
@@ -156,7 +165,9 @@ export default function HistoryPanel({
     };
 
     void compute();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [snapshots, displayCount]);
 
   /** Set of bookmarked snapshot IDs */
@@ -171,7 +182,9 @@ export default function HistoryPanel({
       if (!cancelled) setBookmarkSet(set);
     };
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [snapshots]);
 
   /** Toggle a bookmark and update local state */
@@ -195,7 +208,7 @@ export default function HistoryPanel({
    */
   const groupedSnapshots = useMemo(
     () => groupSnapshotsByDate(snapshots.slice(0, displayCount)),
-    [snapshots, displayCount]
+    [snapshots, displayCount],
   );
 
   /** Collapsed state for each date group. Key = date label */
@@ -266,7 +279,9 @@ export default function HistoryPanel({
     };
 
     void compute();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [groupedSnapshots]);
 
   const toggleGroup = useCallback((label: string) => {
@@ -296,12 +311,9 @@ export default function HistoryPanel({
    * Show confirmation dialog for snapshot restoration.
    * スナップショット復元の確認ダイアログを表示する。
    */
-  const handleRestore = useCallback(
-    (snapshot: SnapshotEntry) => {
-      setRestoreConfirm(snapshot);
-    },
-    []
-  );
+  const handleRestore = useCallback((snapshot: SnapshotEntry) => {
+    setRestoreConfirm(snapshot);
+  }, []);
 
   /**
    * Execute the snapshot restoration after user confirmation.
@@ -326,7 +338,7 @@ export default function HistoryPanel({
         setRestoringId(null);
       }
     },
-    [onRestore]
+    [onRestore],
   );
 
   /**
@@ -382,7 +394,7 @@ export default function HistoryPanel({
         setLoadingDiffId(null);
       }
     },
-    [currentContent, onCompareInEditor]
+    [currentContent, onCompareInEditor],
   );
 
   // -----------------------------------------------------------------------
@@ -413,7 +425,7 @@ export default function HistoryPanel({
             "flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors",
             creatingSnapshot
               ? "bg-background text-foreground-muted cursor-wait border border-border"
-              : "bg-accent text-accent-foreground hover:bg-accent-hover"
+              : "bg-accent text-accent-foreground hover:bg-accent-hover",
           )}
         >
           {creatingSnapshot ? (
@@ -442,9 +454,7 @@ export default function HistoryPanel({
       {snapshots.length === 0 && !error && (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <History className="w-8 h-8 text-foreground-muted mb-3" />
-          <p className="text-sm font-medium text-foreground-secondary mb-1">
-            履歴がありません
-          </p>
+          <p className="text-sm font-medium text-foreground-secondary mb-1">履歴がありません</p>
           <p className="text-xs text-foreground-tertiary leading-relaxed">
             プロジェクトを保存すると、自動的に履歴が作成されます。
           </p>
@@ -489,20 +499,21 @@ export default function HistoryPanel({
                 </button>
 
                 {/* Snapshots within this date group */}
-                {!isCollapsed && group.snapshots.map((snapshot) => (
-                  <SnapshotItem
-                    key={snapshot.id}
-                    snapshot={snapshot}
-                    isRestoring={restoringId === snapshot.id}
-                    onRestore={handleRestore}
-                    onCompare={handleCompare}
-                    isLoadingDiff={loadingDiffId === snapshot.id}
-                    diffStats={diffStatsMap.get(snapshot.id)}
-                    isFirstVersion={snapshot.id === firstVersionId}
-                    isBookmarked={bookmarkSet.has(snapshot.id)}
-                    onToggleBookmark={handleToggleBookmark}
-                  />
-                ))}
+                {!isCollapsed &&
+                  group.snapshots.map((snapshot) => (
+                    <SnapshotItem
+                      key={snapshot.id}
+                      snapshot={snapshot}
+                      isRestoring={restoringId === snapshot.id}
+                      onRestore={handleRestore}
+                      onCompare={handleCompare}
+                      isLoadingDiff={loadingDiffId === snapshot.id}
+                      diffStats={diffStatsMap.get(snapshot.id)}
+                      isFirstVersion={snapshot.id === firstVersionId}
+                      isBookmarked={bookmarkSet.has(snapshot.id)}
+                      onToggleBookmark={handleToggleBookmark}
+                    />
+                  ))}
               </div>
             );
           })}
@@ -537,4 +548,3 @@ export default function HistoryPanel({
     </div>
   );
 }
-

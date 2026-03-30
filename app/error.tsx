@@ -34,9 +34,7 @@ export default function Error({
         backgroundColor: "#fafafa",
       }}
     >
-      <h2 style={{ fontSize: "1.5rem", margin: 0 }}>
-        エラーが発生しました
-      </h2>
+      <h2 style={{ fontSize: "1.5rem", margin: 0 }}>エラーが発生しました</h2>
       <p style={{ color: "#666", margin: 0, maxWidth: "400px", textAlign: "center" }}>
         予期しないエラーが発生しました。下のボタンで復旧を試みてください。
       </p>

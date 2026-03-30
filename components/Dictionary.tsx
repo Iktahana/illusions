@@ -1,7 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, memo, useState } from "react";
-import { Plus, Trash2, Edit2, BookOpen, ChevronDown, ChevronRight, Search, Globe, ExternalLink } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Edit2,
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Search,
+  Globe,
+  ExternalLink,
+} from "lucide-react";
 import type { UserDictionaryEntry } from "@/lib/project/project-types";
 import type { EditorMode } from "@/lib/project/project-types";
 import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
@@ -29,9 +39,11 @@ const WEB_DICTIONARIES: WebDictionarySource[] = [
 ];
 
 const isElectron = (): boolean => {
-  return typeof window !== "undefined" &&
+  return (
+    typeof window !== "undefined" &&
     typeof window.process !== "undefined" &&
-    window.process?.type === "renderer";
+    window.process?.type === "renderer"
+  );
 };
 
 const EMPTY_FORM: Partial<UserDictionaryEntry> = {
@@ -81,17 +93,20 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
     }
   }, [editorMode, dictService]);
 
-  const persistEntries = useCallback(async (entries: UserDictionaryEntry[]) => {
-    try {
-      if (editorMode && isProjectMode(editorMode)) {
-        await dictService.saveEntries(entries);
-      } else if (editorMode && isStandaloneMode(editorMode)) {
-        await dictService.saveEntriesStandalone(editorMode.fileName, entries);
+  const persistEntries = useCallback(
+    async (entries: UserDictionaryEntry[]) => {
+      try {
+        if (editorMode && isProjectMode(editorMode)) {
+          await dictService.saveEntries(entries);
+        } else if (editorMode && isStandaloneMode(editorMode)) {
+          await dictService.saveEntriesStandalone(editorMode.fileName, entries);
+        }
+      } catch {
+        // Silently fail
       }
-    } catch {
-      // Silently fail
-    }
-  }, [editorMode, dictService]);
+    },
+    [editorMode, dictService],
+  );
 
   // Load entries on mount / mode change
   useEffect(() => {
@@ -172,12 +187,15 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
     handleCloseDialog();
   };
 
-  const handleDeleteEntry = useCallback(async (id: string) => {
-    const updated = userEntries.filter((e) => e.id !== id);
-    setUserEntries(updated);
-    if (expandedId === id) setExpandedId(null);
-    await persistEntries(updated);
-  }, [userEntries, expandedId, persistEntries]);
+  const handleDeleteEntry = useCallback(
+    async (id: string) => {
+      const updated = userEntries.filter((e) => e.id !== id);
+      setUserEntries(updated);
+      if (expandedId === id) setExpandedId(null);
+      await persistEntries(updated);
+    },
+    [userEntries, expandedId, persistEntries],
+  );
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -307,9 +325,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                           )}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-2">
-                              <h3 className="font-semibold text-foreground">
-                                {entry.word}
-                              </h3>
+                              <h3 className="font-semibold text-foreground">{entry.word}</h3>
                               {entry.reading && (
                                 <span className="text-sm text-foreground-tertiary">
                                   {entry.reading}
@@ -390,9 +406,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                         )}
 
                         {!entry.definition && !entry.examples && !entry.notes && (
-                          <p className="text-sm text-foreground-tertiary">
-                            詳細情報はありません
-                          </p>
+                          <p className="text-sm text-foreground-tertiary">詳細情報はありません</p>
                         )}
                       </div>
                     )}
@@ -407,9 +421,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                 <div className="text-xs text-foreground-secondary">
                   合計: {userEntries.length} 項目
                   {activeSearchQuery && filteredEntries.length !== userEntries.length && (
-                    <span className="ml-2">
-                      ({filteredEntries.length} 件表示中)
-                    </span>
+                    <span className="ml-2">({filteredEntries.length} 件表示中)</span>
                   )}
                 </div>
               </div>
@@ -424,16 +436,22 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                   <Globe className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p>検索語を入力してWeb辞書を検索</p>
                   <p className="mt-1 text-xs">
-                    {WEB_DICTIONARIES.map(d => d.name).join("、")}で検索します
+                    {WEB_DICTIONARIES.map((d) => d.name).join("、")}で検索します
                   </p>
                 </div>
               ) : (
                 WEB_DICTIONARIES.map((dict) => {
-                  const searchUrl = dict.urlTemplate.replace("{query}", encodeURIComponent(activeSearchQuery));
+                  const searchUrl = dict.urlTemplate.replace(
+                    "{query}",
+                    encodeURIComponent(activeSearchQuery),
+                  );
 
                   const handleOpenDictionary = () => {
                     if (isElectron() && window.electronAPI?.openDictionaryPopup) {
-                      window.electronAPI.openDictionaryPopup(searchUrl, `${dict.name} - ${activeSearchQuery}`);
+                      window.electronAPI.openDictionaryPopup(
+                        searchUrl,
+                        `${dict.name} - ${activeSearchQuery}`,
+                      );
                     } else {
                       window.open(searchUrl, "_blank", "noopener,noreferrer");
                     }

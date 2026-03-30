@@ -23,21 +23,19 @@ The `milkdown-plugin-japanese-novel` package provides Japanese-specific editing 
 import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
 
 // Use with Milkdown Editor
-Editor.make()
-  .use(japaneseNovel(options))
-  .create();
+Editor.make().use(japaneseNovel(options)).create();
 ```
 
 ### JapaneseNovelOptions
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `isVertical` | `boolean` | `false` | Enable vertical writing mode |
-| `showManuscriptLine` | `boolean` | `false` | Show manuscript grid lines |
-| `enableTcy` | `boolean` | `true` | Enable tate-chu-yoko nodes |
-| `enableRuby` | `boolean` | `true` | Enable ruby annotation nodes |
-| `enableNoBreak` | `boolean` | `true` | Enable no-break span nodes |
-| `enableKern` | `boolean` | `true` | Enable kerning span nodes |
+| Option               | Type      | Default | Description                  |
+| -------------------- | --------- | ------- | ---------------------------- |
+| `isVertical`         | `boolean` | `false` | Enable vertical writing mode |
+| `showManuscriptLine` | `boolean` | `false` | Show manuscript grid lines   |
+| `enableTcy`          | `boolean` | `true`  | Enable tate-chu-yoko nodes   |
+| `enableRuby`         | `boolean` | `true`  | Enable ruby annotation nodes |
+| `enableNoBreak`      | `boolean` | `true`  | Enable no-break span nodes   |
+| `enableKern`         | `boolean` | `true`  | Enable kerning span nodes    |
 
 The function returns `MilkdownPlugin[]`, which can be spread into the editor's plugin chain.
 
@@ -54,6 +52,7 @@ The package defines four custom ProseMirror node types. Each follows the `$nodeS
 **Markdown syntax:** `{base|ruby}`
 
 **HTML output:**
+
 ```html
 <ruby><rb>base</rb><rt>ruby</rt></ruby>
 ```
@@ -72,6 +71,7 @@ This renders each character with its own `<rt>` annotation, producing per-charac
 - 京 -> きょう
 
 **Example usage in MDI:**
+
 ```markdown
 {漢字|かんじ}の読みを付ける
 {薔薇|ばら}は美しい
@@ -85,6 +85,7 @@ This renders each character with its own `<rt>` annotation, producing per-charac
 **Markdown syntax:** `^text^`
 
 **HTML output:**
+
 ```html
 <span class="tcy">text</span>
 ```
@@ -92,6 +93,7 @@ This renders each character with its own `<rt>` annotation, producing per-charac
 Tate-chu-yoko (TCY) renders horizontal text within vertical writing mode. This is commonly used for two-digit numbers, abbreviations, and short Latin strings in Japanese vertical text.
 
 **Example usage in MDI:**
+
 ```markdown
 ^12^月^31^日
 ^OK^をクリックする
@@ -104,6 +106,7 @@ Tate-chu-yoko (TCY) renders horizontal text within vertical writing mode. This i
 **Markdown syntax:** `[[no-break:text]]`
 
 **HTML output:**
+
 ```html
 <span class="mdi-nobr">text</span>
 ```
@@ -111,6 +114,7 @@ Tate-chu-yoko (TCY) renders horizontal text within vertical writing mode. This i
 Prevents line breaking within the wrapped text. Useful for keeping compound terms or proper nouns on a single line.
 
 **Example usage in MDI:**
+
 ```markdown
 [[no-break:令和六年]]の出来事
 [[no-break:東京スカイツリー]]を訪れた
@@ -123,6 +127,7 @@ Prevents line breaking within the wrapped text. Useful for keeping compound term
 **Markdown syntax:** `[[kern:value:text]]`
 
 **HTML output:**
+
 ```html
 <span class="mdi-kern" style="--mdi-kern:0.2em;">text</span>
 ```
@@ -130,6 +135,7 @@ Prevents line breaking within the wrapped text. Useful for keeping compound term
 Provides fine-grained character spacing control. The `value` is a CSS length unit applied as letter-spacing via a CSS custom property.
 
 **Example usage in MDI:**
+
 ```markdown
 [[kern:0.2em:タイトル]]
 [[kern:-0.05em:（注）]]
@@ -143,13 +149,13 @@ Provides fine-grained character spacing control. The `value` is a CSS length uni
 
 Five remark plugins parse inline notation from Markdown/MDI source into the custom nodes above. Each plugin supports an `enable` toggle to selectively activate or deactivate parsing.
 
-| Plugin | Syntax | Purpose |
-|--------|--------|---------|
-| `remarkRubyPlugin` | `{base\|ruby}` | Ruby annotation parsing |
-| `remarkTcyPlugin` | `^text^` | Tate-chu-yoko parsing |
-| `remarkNoBreakPlugin` | `[[no-break:text]]` | No-break span parsing |
-| `remarkKernPlugin` | `[[kern:value:text]]` | Kerning span parsing |
-| `remarkHeadingAnchorPlugin` | N/A | Auto-generates heading anchors |
+| Plugin                      | Syntax                | Purpose                        |
+| --------------------------- | --------------------- | ------------------------------ |
+| `remarkRubyPlugin`          | `{base\|ruby}`        | Ruby annotation parsing        |
+| `remarkTcyPlugin`           | `^text^`              | Tate-chu-yoko parsing          |
+| `remarkNoBreakPlugin`       | `[[no-break:text]]`   | No-break span parsing          |
+| `remarkKernPlugin`          | `[[kern:value:text]]` | Kerning span parsing           |
+| `remarkHeadingAnchorPlugin` | N/A                   | Auto-generates heading anchors |
 
 These plugins operate at the remark (Markdown AST) level, transforming raw text into typed MDAST nodes that Milkdown then converts into ProseMirror nodes.
 
@@ -164,6 +170,7 @@ These plugins operate at the remark (Markdown AST) level, transforming raw text 
 Automatically generates deterministic IDs for heading nodes based on their text content. Uses `encodeURIComponent()` to produce URL-safe IDs.
 
 **Behavior:**
+
 - Runs on every document change (transaction)
 - Includes infinite loop prevention to avoid recursive dispatch
 - Ensures all headings have stable, content-derived IDs for anchor linking
@@ -175,6 +182,7 @@ Automatically generates deterministic IDs for heading nodes based on their text 
 Assigns sequential IDs to all textblock nodes in the document.
 
 **Behavior:**
+
 - Runs only on Markdown load (not on every change)
 - Applies IDs in reverse document order to avoid position shifts caused by earlier mutations
 - Provides stable paragraph identifiers for linting and cross-referencing
@@ -193,9 +201,7 @@ The POS (Part-of-Speech) highlighting system colorizes tokens in the editor base
 import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
 
 // Initialize
-Editor.make()
-  .use(posHighlight(options))
-  .create();
+Editor.make().use(posHighlight(options)).create();
 
 // Update settings at runtime
 import { updatePosHighlightSettings } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
@@ -213,20 +219,20 @@ updatePosHighlightSettings(view, newSettings);
 
 The system recognizes 12 part-of-speech categories, each with a configurable highlight color:
 
-| POS | Japanese Label | Description |
-|-----|---------------|-------------|
-| Noun | 名詞 | Nouns and noun phrases |
-| Verb | 動詞 | Verbs |
-| Adjective | 形容詞 | I-adjectives |
-| Adverb | 副詞 | Adverbs |
-| Particle | 助詞 | Particles (は, が, を, etc.) |
-| Auxiliary Verb | 助動詞 | Auxiliary verbs (です, ます, etc.) |
-| Conjunction | 接続詞 | Conjunctions |
-| Interjection | 感動詞 | Interjections |
-| Symbol | 記号 | Symbols and punctuation |
-| Adnominal | 連体詞 | Pre-noun adjectivals |
-| Filler | フィラー | Fillers (えーと, あのー, etc.) |
-| Other | その他 | Unclassified tokens |
+| POS            | Japanese Label | Description                        |
+| -------------- | -------------- | ---------------------------------- |
+| Noun           | 名詞           | Nouns and noun phrases             |
+| Verb           | 動詞           | Verbs                              |
+| Adjective      | 形容詞         | I-adjectives                       |
+| Adverb         | 副詞           | Adverbs                            |
+| Particle       | 助詞           | Particles (は, が, を, etc.)       |
+| Auxiliary Verb | 助動詞         | Auxiliary verbs (です, ます, etc.) |
+| Conjunction    | 接続詞         | Conjunctions                       |
+| Interjection   | 感動詞         | Interjections                      |
+| Symbol         | 記号           | Symbols and punctuation            |
+| Adnominal      | 連体詞         | Pre-noun adjectivals               |
+| Filler         | フィラー       | Fillers (えーと, あのー, etc.)     |
+| Other          | その他         | Unclassified tokens                |
 
 ---
 
@@ -242,9 +248,7 @@ The linting plugin provides real-time Japanese text quality checks with inline d
 import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 
 // Initialize
-Editor.make()
-  .use(linting(options))
-  .create();
+Editor.make().use(linting(options)).create();
 
 // Update settings at runtime
 import { updateLintingSettings } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
@@ -280,22 +284,22 @@ L3 rules submit candidate issues to an LLM for validation. This avoids false pos
 
 ```typescript
 interface ParagraphInfo {
-  node: ProseMirrorNode;  // The ProseMirror node
-  pos: number;            // Absolute position in the document
-  text: string;           // Plain text content
-  atomAdjustments: number[];  // Offset adjustments for atom nodes
-  index: number;          // Paragraph index in the document
+  node: ProseMirrorNode; // The ProseMirror node
+  pos: number; // Absolute position in the document
+  text: string; // Plain text content
+  atomAdjustments: number[]; // Offset adjustments for atom nodes
+  index: number; // Paragraph index in the document
 }
 ```
 
 ### Functions
 
-| Function | Description |
-|----------|-------------|
-| `collectParagraphs()` | Gathers all paragraph-level nodes with their positions and text |
-| `getAtomOffset()` | Calculates position offset caused by atom nodes (ruby, tcy, kern, nobreak) |
-| `getVisibleParagraphs()` | Filters paragraphs to only those visible in the current viewport |
-| `findScrollContainer()` | Locates the nearest scrollable ancestor element |
+| Function                 | Description                                                                |
+| ------------------------ | -------------------------------------------------------------------------- |
+| `collectParagraphs()`    | Gathers all paragraph-level nodes with their positions and text            |
+| `getAtomOffset()`        | Calculates position offset caused by atom nodes (ruby, tcy, kern, nobreak) |
+| `getVisibleParagraphs()` | Filters paragraphs to only those visible in the current viewport           |
+| `findScrollContainer()`  | Locates the nearest scrollable ancestor element                            |
 
 ### Why Atom Adjustments Matter
 

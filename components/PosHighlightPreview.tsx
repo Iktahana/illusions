@@ -11,7 +11,10 @@ import { Plugin, PluginKey } from "@milkdown/prose/state";
 import { Loader2 } from "lucide-react";
 
 import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
-import { posHighlight, updatePosHighlightSettings } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
+import {
+  posHighlight,
+  updatePosHighlightSettings,
+} from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
 
 import type { EditorView } from "@milkdown/prose/view";
 
@@ -33,35 +36,49 @@ function PreviewEditor({
   const [editorView, setEditorView] = useState<EditorView | null>(null);
   const contentRef = useRef(content);
 
-  const readOnlyPlugin = useMemo(() => $prose(() => new Plugin({
-    key: new PluginKey("previewReadOnly"),
-    props: {
-      editable: () => false,
-    },
-  })), []);
+  const readOnlyPlugin = useMemo(
+    () =>
+      $prose(
+        () =>
+          new Plugin({
+            key: new PluginKey("previewReadOnly"),
+            props: {
+              editable: () => false,
+            },
+          }),
+      ),
+    [],
+  );
 
-  const { get } = useEditor((root) => {
-    return Editor.make()
-      .config(nord)
-      .config((ctx) => {
-        ctx.set(rootCtx, root);
-        ctx.set(defaultValueCtx, contentRef.current);
-      })
-      .use(commonmark)
-      .use(japaneseNovel({
-        isVertical: false,
-        showManuscriptLine: false,
-        enableRuby: true,
-        enableTcy: true,
-      }))
-      .use(readOnlyPlugin)
-      .use(posHighlight({
-        enabled: false,
-        colors: {},
-        dicPath: "/dict",
-        debounceMs: 300,
-      }));
-  }, [readOnlyPlugin]);
+  const { get } = useEditor(
+    (root) => {
+      return Editor.make()
+        .config(nord)
+        .config((ctx) => {
+          ctx.set(rootCtx, root);
+          ctx.set(defaultValueCtx, contentRef.current);
+        })
+        .use(commonmark)
+        .use(
+          japaneseNovel({
+            isVertical: false,
+            showManuscriptLine: false,
+            enableRuby: true,
+            enableTcy: true,
+          }),
+        )
+        .use(readOnlyPlugin)
+        .use(
+          posHighlight({
+            enabled: false,
+            colors: {},
+            dicPath: "/dict",
+            debounceMs: 300,
+          }),
+        );
+    },
+    [readOnlyPlugin],
+  );
 
   // Get EditorView instance after mount
   useEffect(() => {

@@ -2,7 +2,7 @@
  * トークン結合のプリセット設定
  */
 
-import type { TokenMergeOptions, TokenizePreset } from './types';
+import type { TokenMergeOptions, TokenizePreset } from "./types";
 
 /**
  * 細粒度プリセット（kuromoji原始）
@@ -48,13 +48,13 @@ export const COARSE_PRESET: TokenMergeOptions = {
  */
 export function getPresetOptions(preset: TokenizePreset): TokenMergeOptions {
   switch (preset) {
-    case 'fine':
+    case "fine":
       return FINE_PRESET;
-    case 'medium':
+    case "medium":
       return MEDIUM_PRESET;
-    case 'coarse':
+    case "coarse":
       return COARSE_PRESET;
-    case 'custom':
+    case "custom":
       // カスタムの場合は medium をベースにする
       return { ...MEDIUM_PRESET };
     default:
@@ -66,18 +66,18 @@ export function getPresetOptions(preset: TokenizePreset): TokenMergeOptions {
  * プリセットの表示名
  */
 export const PRESET_LABELS: Record<TokenizePreset, string> = {
-  fine: '細粒度（語言学）',
-  medium: '標準（推奨）',
-  coarse: '粗粒度（閲読）',
-  custom: 'カスタム',
+  fine: "細粒度（語言学）",
+  medium: "標準（推奨）",
+  coarse: "粗粒度（閲読）",
+  custom: "カスタム",
 };
 
 /**
  * プリセットの説明
  */
 export const PRESET_DESCRIPTIONS: Record<TokenizePreset, string> = {
-  fine: 'kuromoji原始の細かい分詞。例：なっ｜た',
-  medium: 'バランスの取れた分詞。例：なった',
-  coarse: '最大限結合した粗い分詞。例：突如として｜相続人となった',
-  custom: '自分で詳細設定をカスタマイズ',
+  fine: "kuromoji原始の細かい分詞。例：なっ｜た",
+  medium: "バランスの取れた分詞。例：なった",
+  coarse: "最大限結合した粗い分詞。例：突如として｜相続人となった",
+  custom: "自分で詳細設定をカスタマイズ",
 };

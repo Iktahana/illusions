@@ -87,61 +87,52 @@ function buildOnChanged(
       );
 
       // Show persistent notification with conflict resolution actions
-      notificationManager.showMessage(
-        `「${fileName}」が外部で変更されました`,
-        {
-          type: "warning",
-          duration: 0, // Persistent until dismissed or action taken
-          actions: [
-            {
-              label: "差分を表示",
-              onClick: () => {
-                openDiffTab(
-                  tabId,
-                  fileName,
-                  localContent,
-                  diskContent,
-                  lastModified,
-                );
-                // Do not clear conflict state; user must explicitly resolve
-              },
+      notificationManager.showMessage(`「${fileName}」が外部で変更されました`, {
+        type: "warning",
+        duration: 0, // Persistent until dismissed or action taken
+        actions: [
+          {
+            label: "差分を表示",
+            onClick: () => {
+              openDiffTab(tabId, fileName, localContent, diskContent, lastModified);
+              // Do not clear conflict state; user must explicitly resolve
             },
-            {
-              label: "ディスクの内容を採用",
-              onClick: () => {
-                setTabs((prev) =>
-                  prev.map((t) => {
-                    if (t.id !== tabId || !isEditorTab(t)) return t;
-                    return {
-                      ...t,
-                      content: diskContent,
-                      lastSavedContent: diskContent,
-                      isDirty: false,
-                      fileSyncStatus: "clean",
-                      conflictDiskContent: null,
-                    } satisfies EditorTabState;
-                  }),
-                );
-              },
+          },
+          {
+            label: "ディスクの内容を採用",
+            onClick: () => {
+              setTabs((prev) =>
+                prev.map((t) => {
+                  if (t.id !== tabId || !isEditorTab(t)) return t;
+                  return {
+                    ...t,
+                    content: diskContent,
+                    lastSavedContent: diskContent,
+                    isDirty: false,
+                    fileSyncStatus: "clean",
+                    conflictDiskContent: null,
+                  } satisfies EditorTabState;
+                }),
+              );
             },
-            {
-              label: "エディタの内容を保持",
-              onClick: () => {
-                setTabs((prev) =>
-                  prev.map((t) => {
-                    if (t.id !== tabId || !isEditorTab(t)) return t;
-                    return {
-                      ...t,
-                      fileSyncStatus: "dirty",
-                      conflictDiskContent: null,
-                    } satisfies EditorTabState;
-                  }),
-                );
-              },
+          },
+          {
+            label: "エディタの内容を保持",
+            onClick: () => {
+              setTabs((prev) =>
+                prev.map((t) => {
+                  if (t.id !== tabId || !isEditorTab(t)) return t;
+                  return {
+                    ...t,
+                    fileSyncStatus: "dirty",
+                    conflictDiskContent: null,
+                  } satisfies EditorTabState;
+                }),
+              );
             },
-          ],
-        },
-      );
+          },
+        ],
+      });
     }
     // If already "conflicted", ignore further disk changes (user must resolve first)
   };
@@ -168,17 +159,8 @@ function buildOnChanged(
  * アクティブタブのウォッチャーは継続稼働し、バックグラウンドタブは
  * CPU 節約のため一時停止する。タブを閉じるとウォッチャーも停止する。
  */
-export function useFileWatchIntegration(
-  params: UseFileWatchIntegrationParams,
-): void {
-  const {
-    tabs,
-    setTabs,
-    activeTabId,
-    tabsRef,
-    isElectron,
-    openDiffTab,
-  } = params;
+export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): void {
+  const { tabs, setTabs, activeTabId, tabsRef, isElectron, openDiffTab } = params;
 
   /**
    * Map from tabId to its FileWatcher instance.

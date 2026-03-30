@@ -35,14 +35,16 @@ export default function Explorer({
   return (
     <aside className={clsx("h-full bg-background border-r border-border flex flex-col", className)}>
       {/* Tabs */}
-      <div className={clsx("border-b border-border flex items-center", compactMode ? "h-10" : "h-12")}>
+      <div
+        className={clsx("border-b border-border flex items-center", compactMode ? "h-10" : "h-12")}
+      >
         <button
           onClick={() => setActiveTab("chapters")}
           className={clsx(
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
             activeTab === "chapters"
               ? "text-foreground border-b-2 border-accent"
-              : "text-foreground hover:text-foreground"
+              : "text-foreground hover:text-foreground",
           )}
           title="章"
         >
@@ -55,7 +57,7 @@ export default function Explorer({
             "flex-1 h-full flex items-center justify-center gap-2 text-sm transition-colors",
             activeTab === "style"
               ? "text-foreground border-b-2 border-accent"
-              : "text-foreground hover:text-foreground"
+              : "text-foreground hover:text-foreground",
           )}
           title="行間"
         >
@@ -66,7 +68,15 @@ export default function Explorer({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === "chapters" && <div className={compactMode ? "p-3" : "p-4"}><ChaptersPanel content={content} onChapterClick={onChapterClick} onInsertText={onInsertText} /></div>}
+        {activeTab === "chapters" && (
+          <div className={compactMode ? "p-3" : "p-4"}>
+            <ChaptersPanel
+              content={content}
+              onChapterClick={onChapterClick}
+              onInsertText={onInsertText}
+            />
+          </div>
+        )}
         {activeTab === "style" && (
           <div className={compactMode ? "p-3" : "p-4"}>
             <StylePanel />

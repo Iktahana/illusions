@@ -100,17 +100,21 @@ The storage service automatically detects the runtime environment:
 ### Core Methods
 
 #### `initialize(): Promise<void>`
+
 Initialize the storage service. Called automatically on first use.
 
 #### `saveSession(session: StorageSession): Promise<void>`
+
 Save the complete session (app state, recent files, editor buffer).
 
 #### `loadSession(): Promise<StorageSession | null>`
+
 Load the complete session.
 
 ### App State
 
 #### `saveAppState(appState: AppState): Promise<void>`
+
 Save application state.
 
 ```typescript
@@ -120,11 +124,13 @@ await storage.saveAppState({
 ```
 
 #### `loadAppState(): Promise<AppState | null>`
+
 Load application state.
 
 ### Recent Files
 
 #### `addToRecent(file: RecentFile): Promise<void>`
+
 Add file to recent files list (max 10 files).
 
 ```typescript
@@ -137,17 +143,21 @@ await storage.addToRecent({
 ```
 
 #### `getRecentFiles(): Promise<RecentFile[]>`
+
 Get list of recent files (sorted by last modified).
 
 #### `removeFromRecent(path: string): Promise<void>`
+
 Remove file from recent files list.
 
 #### `clearRecent(): Promise<void>`
+
 Clear all recent files.
 
 ### Editor Buffer
 
 #### `saveEditorBuffer(buffer: EditorBuffer): Promise<void>`
+
 Save editor content for crash recovery.
 
 ```typescript
@@ -158,14 +168,17 @@ await storage.saveEditorBuffer({
 ```
 
 #### `loadEditorBuffer(): Promise<EditorBuffer | null>`
+
 Load saved editor buffer.
 
 #### `clearEditorBuffer(): Promise<void>`
+
 Clear editor buffer (e.g., after successful save).
 
 ### Maintenance
 
 #### `clearAll(): Promise<void>`
+
 Clear all stored data. ⚠️ **Cannot be undone!**
 
 ---
@@ -174,10 +187,10 @@ Clear all stored data. ⚠️ **Cannot be undone!**
 
 ```typescript
 interface RecentFile {
-  name: string;           // File name
-  path: string;          // File path
-  lastModified: number;  // Timestamp (ms)
-  snippet?: string;      // Content preview
+  name: string; // File name
+  path: string; // File path
+  lastModified: number; // Timestamp (ms)
+  snippet?: string; // Content preview
 }
 
 interface AppState {
@@ -186,8 +199,8 @@ interface AppState {
 }
 
 interface EditorBuffer {
-  content: string;      // Editor content
-  timestamp: number;    // Timestamp
+  content: string; // Editor content
+  timestamp: number; // Timestamp
 }
 
 interface StorageSession {
@@ -198,22 +211,22 @@ interface StorageSession {
 
 interface IStorageService {
   initialize(): Promise<void>;
-  
+
   saveSession(session: StorageSession): Promise<void>;
   loadSession(): Promise<StorageSession | null>;
-  
+
   saveAppState(appState: AppState): Promise<void>;
   loadAppState(): Promise<AppState | null>;
-  
+
   addToRecent(file: RecentFile): Promise<void>;
   getRecentFiles(): Promise<RecentFile[]>;
   removeFromRecent(path: string): Promise<void>;
   clearRecent(): Promise<void>;
-  
+
   saveEditorBuffer(buffer: EditorBuffer): Promise<void>;
   loadEditorBuffer(): Promise<EditorBuffer | null>;
   clearEditorBuffer(): Promise<void>;
-  
+
   clearAll(): Promise<void>;
 }
 ```
@@ -291,6 +304,7 @@ async function saveFile(path: string, content: string) {
 - ❌ **Requires IPC**: Must communicate with main process
 
 **Storage Location:**
+
 - macOS: `~/Library/Application Support/illusions/illusions-storage.db`
 - Windows: `%APPDATA%\illusions\illusions-storage.db`
 - Linux: `~/.config/illusions/illusions-storage.db`
@@ -344,11 +358,11 @@ SELECT * FROM editor_buffer;
 
 ```typescript
 // Before (v1)
-import { MockStorageAdapter } from '@/lib/storage-adapter';
+import { MockStorageAdapter } from "@/lib/storage-adapter";
 const adapter = new MockStorageAdapter();
 
 // After (v2)
-import { getStorageService } from '@/lib/storage-service';
+import { getStorageService } from "@/lib/storage-service";
 const storage = getStorageService();
 ```
 
@@ -384,6 +398,7 @@ A: No, this is a client-side service. Use it only in `"use client"` components.
 **Q: What if IndexedDB quota is exceeded?**
 
 A: The service will throw a `QuotaExceededError`. Handle it by:
+
 - Clearing old data
 - Asking user to free up space
 - Implementing data compression

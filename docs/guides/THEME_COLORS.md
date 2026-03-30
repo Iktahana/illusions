@@ -8,53 +8,53 @@
 
 ### 背景色 (Background)
 
-| Tailwind Class | CSS Variable | 用途 | ライト | ダーク |
-|----------------|--------------|------|--------|--------|
-| `bg-background` | `--background` | メイン背景 | `#ffffff` | `#171717` |
-| `bg-background-secondary` | `--background-secondary` | サブ背景 | `#f8fafc` | `#262626` |
-| `bg-background-tertiary` | `--background-tertiary` | 第3背景 | `#f1f5f9` | `#404040` |
-| `bg-background-elevated` | `--background-elevated` | モーダル/カード | `#ffffff` | `#262626` |
+| Tailwind Class            | CSS Variable             | 用途            | ライト    | ダーク    |
+| ------------------------- | ------------------------ | --------------- | --------- | --------- |
+| `bg-background`           | `--background`           | メイン背景      | `#ffffff` | `#171717` |
+| `bg-background-secondary` | `--background-secondary` | サブ背景        | `#f8fafc` | `#262626` |
+| `bg-background-tertiary`  | `--background-tertiary`  | 第3背景         | `#f1f5f9` | `#404040` |
+| `bg-background-elevated`  | `--background-elevated`  | モーダル/カード | `#ffffff` | `#262626` |
 
 ### 文字色 (Foreground)
 
-| Tailwind Class | CSS Variable | 用途 | ライト | ダーク |
-|----------------|--------------|------|--------|--------|
-| `text-foreground` | `--foreground` | 主要テキスト | `#0f172a` | `#f5f5f5` |
+| Tailwind Class              | CSS Variable             | 用途         | ライト    | ダーク    |
+| --------------------------- | ------------------------ | ------------ | --------- | --------- |
+| `text-foreground`           | `--foreground`           | 主要テキスト | `#0f172a` | `#f5f5f5` |
 | `text-foreground-secondary` | `--foreground-secondary` | サブテキスト | `#475569` | `#d4d4d4` |
-| `text-foreground-tertiary` | `--foreground-tertiary` | 補助テキスト | `#64748b` | `#a3a3a3` |
-| `text-foreground-muted` | `--foreground-muted` | 淡いテキスト | `#94a3b8` | `#737373` |
+| `text-foreground-tertiary`  | `--foreground-tertiary`  | 補助テキスト | `#64748b` | `#a3a3a3` |
+| `text-foreground-muted`     | `--foreground-muted`     | 淡いテキスト | `#94a3b8` | `#737373` |
 
 ### 枠線色 (Border)
 
-| Tailwind Class | CSS Variable | 用途 | ライト | ダーク |
-|----------------|--------------|------|--------|--------|
-| `border-border` | `--border` | 主要ボーダー | `#e2e8f0` | `#404040` |
+| Tailwind Class            | CSS Variable         | 用途         | ライト    | ダーク    |
+| ------------------------- | -------------------- | ------------ | --------- | --------- |
+| `border-border`           | `--border`           | 主要ボーダー | `#e2e8f0` | `#404040` |
 | `border-border-secondary` | `--border-secondary` | サブボーダー | `#cbd5e1` | `#525252` |
 
 ### アクセント (Accent)
 
-| Tailwind Class | CSS Variable | 用途 | ライト | ダーク |
-|----------------|--------------|------|--------|--------|
-| `bg-accent` | `--accent` | アクセント背景 | `#6366f1` | `#6366f1` |
+| Tailwind Class           | CSS Variable          | 用途           | ライト    | ダーク    |
+| ------------------------ | --------------------- | -------------- | --------- | --------- |
+| `bg-accent`              | `--accent`            | アクセント背景 | `#6366f1` | `#6366f1` |
 | `text-accent-foreground` | `--accent-foreground` | アクセント文字 | `#ffffff` | `#ffffff` |
-| `bg-accent-light` | `--accent-light` | 薄いアクセント | `#eef2ff` | `#312e81` |
-| `bg-accent-hover` | `--accent-hover` | ホバー状態 | `#4f46e5` | `#4f46e5` |
+| `bg-accent-light`        | `--accent-light`      | 薄いアクセント | `#eef2ff` | `#312e81` |
+| `bg-accent-hover`        | `--accent-hover`      | ホバー状態     | `#4f46e5` | `#4f46e5` |
 
 ### インタラクション (Interactive)
 
-| Tailwind Class | CSS Variable | 用途 | ライト | ダーク |
-|----------------|--------------|------|--------|--------|
-| `hover:bg-hover` | `--hover` | ホバー背景 | `#f1f5f9` | `#262626` |
-| `bg-active` | `--active` | アクティブ状態 | `#e0e7ff` | `#312e81` |
+| Tailwind Class   | CSS Variable | 用途           | ライト    | ダーク    |
+| ---------------- | ------------ | -------------- | --------- | --------- |
+| `hover:bg-hover` | `--hover`    | ホバー背景     | `#f1f5f9` | `#262626` |
+| `bg-active`      | `--active`   | アクティブ状態 | `#e0e7ff` | `#312e81` |
 
 ### ステータス色 (Status)
 
-| Tailwind Class | CSS Variable | 用途 | 色 |
-|----------------|--------------|------|----|
-| `text-success` / `bg-success` | `--success` | 成功 | `#10b981` |
-| `text-warning` / `bg-warning` | `--warning` | 警告 | `#f59e0b` |
-| `text-error` / `bg-error` | `--error` | エラー | `#ef4444` |
-| `text-info` / `bg-info` | `--info` | 情報 | `#3b82f6` |
+| Tailwind Class                | CSS Variable | 用途   | 色        |
+| ----------------------------- | ------------ | ------ | --------- |
+| `text-success` / `bg-success` | `--success`  | 成功   | `#10b981` |
+| `text-warning` / `bg-warning` | `--warning`  | 警告   | `#f59e0b` |
+| `text-error` / `bg-error`     | `--error`    | エラー | `#ef4444` |
+| `text-info` / `bg-info`       | `--info`     | 情報   | `#3b82f6` |
 
 ## 使用例
 

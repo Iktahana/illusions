@@ -21,11 +21,7 @@ export default function NewCharacterForm({
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-foreground">新しい人物</h3>
         <div className="flex gap-1">
-          <button
-            onClick={onAdd}
-            className="p-1 hover:bg-hover rounded text-success"
-            title="追加"
-          >
+          <button onClick={onAdd} className="p-1 hover:bg-hover rounded text-success" title="追加">
             <Check className="w-4 h-4" />
           </button>
           <button

@@ -45,12 +45,7 @@ export interface DiffViewProps {
  * Renders a toolbar with filename, timestamp, stats, and action buttons.
  * For very large diffs (> 50 KB combined), shows a simplified fallback.
  */
-export default function DiffView({
-  tab,
-  onAcceptDisk,
-  onKeepEditor,
-  onClose,
-}: DiffViewProps) {
+export default function DiffView({ tab, onAcceptDisk, onKeepEditor, onClose }: DiffViewProps) {
   const { sourceFileName, localContent, remoteContent, remoteTimestamp } = tab;
 
   // Format timestamp for display
@@ -74,9 +69,7 @@ export default function DiffView({
         {/* File info */}
         <div className="flex items-center gap-2 min-w-0 shrink">
           <FileText size={14} className="text-foreground-tertiary shrink-0" />
-          <span className="text-sm font-medium text-foreground truncate">
-            {sourceFileName}
-          </span>
+          <span className="text-sm font-medium text-foreground truncate">{sourceFileName}</span>
           <span className="text-xs text-foreground-tertiary whitespace-nowrap">
             （ディスク最終更新: {formattedTimestamp}）
           </span>
@@ -86,14 +79,10 @@ export default function DiffView({
         {stats && (stats.addedChars > 0 || stats.removedChars > 0) && (
           <div className="flex items-center gap-2 text-xs ml-2">
             {stats.addedChars > 0 && (
-              <span className="text-success">
-                +{stats.addedChars.toLocaleString()} 文字追加
-              </span>
+              <span className="text-success">+{stats.addedChars.toLocaleString()} 文字追加</span>
             )}
             {stats.removedChars > 0 && (
-              <span className="text-error">
-                −{stats.removedChars.toLocaleString()} 文字削除
-              </span>
+              <span className="text-error">−{stats.removedChars.toLocaleString()} 文字削除</span>
             )}
           </div>
         )}
@@ -136,10 +125,7 @@ export default function DiffView({
       <div className="flex-1 overflow-auto p-4">
         {isTooLarge ? (
           // Fallback for large files
-          <LargeDiffFallback
-            onAcceptDisk={onAcceptDisk}
-            onKeepEditor={onKeepEditor}
-          />
+          <LargeDiffFallback onAcceptDisk={onAcceptDisk} onKeepEditor={onKeepEditor} />
         ) : chunks.length === 0 ? (
           // No changes
           <div className="flex items-center justify-center h-full text-foreground-muted text-sm">
@@ -179,20 +165,14 @@ function InlineDiff({ chunks }: InlineDiffProps) {
       {chunks.map((chunk, index) => {
         if (chunk.type === "added") {
           return (
-            <span
-              key={index}
-              className="bg-success/20 text-success rounded-sm"
-            >
+            <span key={index} className="bg-success/20 text-success rounded-sm">
               {chunk.value}
             </span>
           );
         }
         if (chunk.type === "removed") {
           return (
-            <span
-              key={index}
-              className="bg-error/20 text-error line-through rounded-sm"
-            >
+            <span key={index} className="bg-error/20 text-error line-through rounded-sm">
               {chunk.value}
             </span>
           );

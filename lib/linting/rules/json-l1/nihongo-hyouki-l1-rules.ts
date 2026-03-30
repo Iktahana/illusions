@@ -166,7 +166,9 @@ class UnitsRule extends AbstractL1Rule {
       );
     }
 
-    for (const match of text.matchAll(/\d\s+(kg|g|mg|m|cm|mm|km|s|ms|Hz|kHz|MHz|GHz|MB|GB|TB|°C)\b/g)) {
+    for (const match of text.matchAll(
+      /\d\s+(kg|g|mg|m|cm|mm|km|s|ms|Hz|kHz|MHz|GHz|MB|GB|TB|°C)\b/g,
+    )) {
       if (match.index === undefined) {
         continue;
       }

@@ -6,15 +6,9 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { X, Terminal, GitCompare } from "lucide-react";
-import type {
-  IDockviewPanelProps,
-  IDockviewPanelHeaderProps,
-} from "dockview-react";
+import type { IDockviewPanelProps, IDockviewPanelHeaderProps } from "dockview-react";
 import type { EditorPanelParams, TerminalPanelParams, DiffPanelParams, BufferId } from "./types";
-import {
-  useBufferStoreInstance,
-  useBuffer,
-} from "./buffer-store";
+import { useBufferStoreInstance, useBuffer } from "./buffer-store";
 import { useTerminalTabContext } from "@/contexts/TerminalTabContext";
 import { useDiffTabContext } from "@/contexts/DiffTabContext";
 import RealTerminalPanel from "@/components/TerminalPanel";
@@ -40,11 +34,7 @@ export interface EditorPanelInjectedProps {
   }) => React.ReactNode;
 }
 
-export function EditorPanel({
-  api,
-  params,
-  containerApi,
-}: IDockviewPanelProps<EditorPanelParams>) {
+export function EditorPanel({ api, params, containerApi }: IDockviewPanelProps<EditorPanelParams>) {
   const store = useBufferStoreInstance();
   const buffer = useBuffer(params.bufferId);
   const panelId = api.id;
@@ -194,27 +184,17 @@ export function DockviewTabHeader({
         group relative flex items-center gap-1.5 px-3 h-full
         text-xs whitespace-nowrap transition-colors duration-100
         cursor-pointer select-none
-        ${
-          isActive
-            ? "text-foreground"
-            : "text-foreground-secondary hover:text-foreground"
-        }
+        ${isActive ? "text-foreground" : "text-foreground-secondary hover:text-foreground"}
       `}
       onMouseDown={handleMiddleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
     >
       {/* Dirty indicator */}
-      {buffer?.isDirty && (
-        <span className="w-1.5 h-1.5 rounded-full bg-warning shrink-0" />
-      )}
+      {buffer?.isDirty && <span className="w-1.5 h-1.5 rounded-full bg-warning shrink-0" />}
 
       {/* Tab label */}
-      <span
-        className={`truncate${buffer?.isPreview ? " italic opacity-75" : ""}`}
-      >
-        {label}
-      </span>
+      <span className={`truncate${buffer?.isPreview ? " italic opacity-75" : ""}`}>{label}</span>
 
       {/* Close button */}
       <span
@@ -247,10 +227,7 @@ export function DockviewTabHeader({
 // TerminalPanel — xterm.js content component for terminal tabs
 // ---------------------------------------------------------------------------
 
-export function TerminalPanel({
-  api,
-  params,
-}: IDockviewPanelProps<TerminalPanelParams>) {
+export function TerminalPanel({ api, params }: IDockviewPanelProps<TerminalPanelParams>) {
   const { getTerminalTabBySessionId, setTerminalTabExited } = useTerminalTabContext();
   const tab = getTerminalTabBySessionId(params.sessionId);
 
@@ -277,10 +254,7 @@ export function TerminalPanel({
 // TerminalTabHeader — tab header for terminal tabs
 // ---------------------------------------------------------------------------
 
-export function TerminalTabHeader({
-  api,
-  params,
-}: IDockviewPanelHeaderProps<TerminalPanelParams>) {
+export function TerminalTabHeader({ api, params }: IDockviewPanelHeaderProps<TerminalPanelParams>) {
   const isActive = api.isActive;
   const label = api.title;
 
@@ -310,9 +284,7 @@ export function TerminalTabHeader({
       const electronAPI = window.electronAPI;
       if (electronAPI?.showContextMenu) {
         // Electron: use native context menu
-        const action = await electronAPI.showContextMenu([
-          { label: "閉じる", action: "close" },
-        ]);
+        const action = await electronAPI.showContextMenu([{ label: "閉じる", action: "close" }]);
         if (action === "close") {
           api.close();
         }
@@ -363,10 +335,7 @@ export function TerminalTabHeader({
 // DiffPanel — real diff content component using DiffView
 // ---------------------------------------------------------------------------
 
-export function DiffPanel({
-  api,
-  params,
-}: IDockviewPanelProps<DiffPanelParams>) {
+export function DiffPanel({ api, params }: IDockviewPanelProps<DiffPanelParams>) {
   const { getDiffTabBySourceTabId, acceptDiskContent, keepEditorContent, closeDiffTab } =
     useDiffTabContext();
 
@@ -406,10 +375,7 @@ export function DiffPanel({
 // DiffTabHeader — tab header for diff tabs
 // ---------------------------------------------------------------------------
 
-export function DiffTabHeader({
-  api,
-  params,
-}: IDockviewPanelHeaderProps<DiffPanelParams>) {
+export function DiffTabHeader({ api, params }: IDockviewPanelHeaderProps<DiffPanelParams>) {
   const isActive = api.isActive;
   const label = api.title;
 
@@ -439,9 +405,7 @@ export function DiffTabHeader({
       const electronAPI = window.electronAPI;
       if (electronAPI?.showContextMenu) {
         // Electron: use native context menu
-        const action = await electronAPI.showContextMenu([
-          { label: "閉じる", action: "close" },
-        ]);
+        const action = await electronAPI.showContextMenu([{ label: "閉じる", action: "close" }]);
         if (action === "close") {
           api.close();
         }

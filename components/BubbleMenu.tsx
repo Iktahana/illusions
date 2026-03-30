@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bold, Italic, Strikethrough, Quote, List, ListOrdered, Heading1, Heading2, Heading3, Code } from "lucide-react";
+import {
+  Bold,
+  Italic,
+  Strikethrough,
+  Quote,
+  List,
+  ListOrdered,
+  Heading1,
+  Heading2,
+  Heading3,
+  Code,
+} from "lucide-react";
 import clsx from "clsx";
 import { EditorView } from "@milkdown/prose/view";
 
@@ -120,7 +131,7 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
       ref={menuRef}
       className={clsx(
         "fixed z-50 bg-background-elevated rounded-lg shadow-lg border border-border flex gap-1 p-1",
-        isVertical ? "flex-col items-center" : "items-center"
+        isVertical ? "flex-col items-center" : "items-center",
       )}
       style={{
         top: `${position.top}px`,
@@ -134,7 +145,7 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
           onClick={() => setShowHeadingDropdown(!showHeadingDropdown)}
           className={clsx(
             "p-2 rounded hover:bg-hover transition-colors",
-            showHeadingDropdown && "bg-hover"
+            showHeadingDropdown && "bg-hover",
           )}
           title="見出し"
         >
@@ -145,7 +156,7 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
           <div
             className={clsx(
               "absolute bg-background-elevated rounded-lg shadow-lg border border-border py-1 min-w-[120px]",
-              isVertical ? "left-full top-0 ml-1" : "top-full left-0 mt-1"
+              isVertical ? "left-full top-0 ml-1" : "top-full left-0 mt-1",
             )}
           >
             {[1, 2, 3].map((level) => {

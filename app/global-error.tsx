@@ -31,9 +31,7 @@ export default function GlobalError({
             backgroundColor: "#fafafa",
           }}
         >
-          <h2 style={{ fontSize: "1.5rem", margin: 0 }}>
-            重大なエラーが発生しました
-          </h2>
+          <h2 style={{ fontSize: "1.5rem", margin: 0 }}>重大なエラーが発生しました</h2>
           <p style={{ color: "#666", margin: 0, maxWidth: "400px", textAlign: "center" }}>
             アプリケーションで重大なエラーが発生しました。再試行してください。
           </p>

@@ -18,13 +18,7 @@ import { localPreferences } from "@/lib/storage/local-preferences";
 import { useKeymap } from "@/contexts/KeymapContext";
 import { formatBinding } from "@/lib/keymap/keymap-utils";
 import type { CommandId } from "@/lib/keymap/command-ids";
-import {
-  DndContext,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { restrictToVerticalAxis, restrictToParentElement } from "@dnd-kit/modifiers";
 import {
@@ -35,7 +29,16 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-export type ActivityBarView = "files" | "explorer" | "settings" | "search" | "outline" | "wordfreq" | "characters" | "dictionary" | "none";
+export type ActivityBarView =
+  | "files"
+  | "explorer"
+  | "settings"
+  | "search"
+  | "outline"
+  | "wordfreq"
+  | "characters"
+  | "dictionary"
+  | "none";
 
 interface ActivityBarItem {
   id: ActivityBarView;
@@ -58,25 +61,25 @@ const DEFAULT_TOP_ITEMS: ActivityBarItem[] = [
     id: "files",
     icon: Folder,
     label: "ファイル",
-    tooltip: "ファイル"
+    tooltip: "ファイル",
   },
   {
     id: "explorer",
     icon: Layers,
     label: "エクスプローラー",
-    tooltip: "エクスプローラー"
+    tooltip: "エクスプローラー",
   },
   {
     id: "search",
     icon: Search,
     label: "検索",
-    tooltip: "検索"
+    tooltip: "検索",
   },
   {
     id: "outline",
     icon: Book,
     label: "アウトライン",
-    tooltip: "アウトライン"
+    tooltip: "アウトライン",
   },
 ];
 
@@ -86,19 +89,19 @@ const DEFAULT_BOTTOM_ITEMS: ActivityBarItem[] = [
     id: "characters",
     icon: Users,
     label: "登場人物",
-    tooltip: "登場人物"
+    tooltip: "登場人物",
   },
   {
     id: "dictionary",
     icon: BookOpen,
     label: "辞書",
-    tooltip: "辞書"
+    tooltip: "辞書",
   },
   {
     id: "wordfreq",
     icon: BarChart3,
     label: "語彙統計",
-    tooltip: "語彙統計"
+    tooltip: "語彙統計",
   },
 ];
 
@@ -107,7 +110,7 @@ const SETTINGS_ITEM: ActivityBarItem = {
   id: "settings",
   icon: Settings,
   label: "設定",
-  tooltip: "設定"
+  tooltip: "設定",
 };
 
 /** Set of view IDs that belong to the bottom group (including settings) */
@@ -122,7 +125,7 @@ export function isBottomView(view: ActivityBarView): boolean {
 
 function loadOrder(
   getter: () => string[] | null,
-  defaultItems: ActivityBarItem[]
+  defaultItems: ActivityBarItem[],
 ): ActivityBarItem[] {
   if (typeof window === "undefined") return defaultItems;
   try {
@@ -158,14 +161,9 @@ interface SortableButtonProps {
 }
 
 function SortableButton({ item, isActive, onClick, compactMode = false }: SortableButtonProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+  });
 
   const Icon = item.icon;
 
@@ -187,7 +185,7 @@ function SortableButton({ item, isActive, onClick, compactMode = false }: Sortab
           : "text-foreground-tertiary hover:text-foreground hover:bg-hover",
         isDragging
           ? "opacity-50 scale-105 cursor-grabbing z-50"
-          : "cursor-default active:cursor-pointer"
+          : "cursor-default active:cursor-pointer",
       )}
       title={item.tooltip}
       {...attributes}
@@ -231,41 +229,38 @@ export default function ActivityBar({
   onNewTerminal,
 }: ActivityBarProps) {
   const [topItems, setTopItems] = useState<ActivityBarItem[]>(() =>
-    loadOrder(() => localPreferences.getSidebarTopOrder(), DEFAULT_TOP_ITEMS)
+    loadOrder(() => localPreferences.getSidebarTopOrder(), DEFAULT_TOP_ITEMS),
   );
   const [bottomItems, setBottomItems] = useState<ActivityBarItem[]>(() =>
-    loadOrder(() => localPreferences.getSidebarBottomOrder(), DEFAULT_BOTTOM_ITEMS)
+    loadOrder(() => localPreferences.getSidebarBottomOrder(), DEFAULT_BOTTOM_ITEMS),
   );
 
   const { effectiveBindings } = useKeymap();
 
   /** Adds the keyboard shortcut to the tooltip if this view has a CommandId */
-  const withTooltip = useCallback((item: ActivityBarItem): ActivityBarItem => {
-    const commandId = VIEW_TO_COMMAND_ID[item.id];
-    if (!commandId) return item;
-    const binding = effectiveBindings[commandId];
-    const shortcut = formatBinding(binding);
-    if (shortcut === "未設定") return item;
-    return { ...item, tooltip: `${item.label} (${shortcut})` };
-  }, [effectiveBindings]);
-
-  const topItemsWithTooltips = useMemo(
-    () => topItems.map(withTooltip),
-    [topItems, withTooltip]
+  const withTooltip = useCallback(
+    (item: ActivityBarItem): ActivityBarItem => {
+      const commandId = VIEW_TO_COMMAND_ID[item.id];
+      if (!commandId) return item;
+      const binding = effectiveBindings[commandId];
+      const shortcut = formatBinding(binding);
+      if (shortcut === "未設定") return item;
+      return { ...item, tooltip: `${item.label} (${shortcut})` };
+    },
+    [effectiveBindings],
   );
+
+  const topItemsWithTooltips = useMemo(() => topItems.map(withTooltip), [topItems, withTooltip]);
   const bottomItemsWithTooltips = useMemo(
     () => bottomItems.map(withTooltip),
-    [bottomItems, withTooltip]
+    [bottomItems, withTooltip],
   );
 
-  const settingsWithTooltip = useMemo(
-    () => withTooltip(SETTINGS_ITEM),
-    [withTooltip]
-  );
+  const settingsWithTooltip = useMemo(() => withTooltip(SETTINGS_ITEM), [withTooltip]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor)
+    useSensor(KeyboardSensor),
   );
 
   const handleDragEnd = useCallback(
@@ -298,15 +293,21 @@ export default function ActivityBar({
         }
       }
     },
-    [topItems, bottomItems]
+    [topItems, bottomItems],
   );
 
   return (
-    <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis, restrictToParentElement]} onDragEnd={handleDragEnd}>
-      <div className={clsx(
-        "bg-background-tertiary border-r border-border flex flex-col items-center py-2 gap-1",
-        compactMode ? "w-10" : "w-12"
-      )}>
+    <DndContext
+      sensors={sensors}
+      modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+      onDragEnd={handleDragEnd}
+    >
+      <div
+        className={clsx(
+          "bg-background-tertiary border-r border-border flex flex-col items-center py-2 gap-1",
+          compactMode ? "w-10" : "w-12",
+        )}
+      >
         {/* Top group */}
         <SortableContext
           items={topItems.map((item) => item.id)}
@@ -354,7 +355,7 @@ export default function ActivityBar({
               "flex items-center justify-center rounded-md transition-all relative group",
               compactMode ? "w-8 h-8" : "w-10 h-10",
               "text-foreground-tertiary hover:text-foreground hover:bg-hover",
-              "cursor-default active:cursor-pointer"
+              "cursor-default active:cursor-pointer",
             )}
             title="新規ターミナル"
           >
@@ -376,7 +377,7 @@ export default function ActivityBar({
             bottomView === "settings"
               ? "bg-accent text-accent-foreground"
               : "text-foreground-tertiary hover:text-foreground hover:bg-hover",
-            "cursor-default active:cursor-pointer"
+            "cursor-default active:cursor-pointer",
           )}
           title={settingsWithTooltip.tooltip}
         >

@@ -5,15 +5,15 @@
  * code duplication (~160 lines of identical logic).
  */
 
-import type { Node as ProseMirrorNode } from '@milkdown/prose/model';
-import type { EditorView } from '@milkdown/prose/view';
+import type { Node as ProseMirrorNode } from "@milkdown/prose/model";
+import type { EditorView } from "@milkdown/prose/view";
 
 /**
  * Atom node (e.g. ruby) position adjustment information.
  * Atom nodes occupy positions in ProseMirror but are not in textContent.
  */
 export interface AtomAdjustment {
-  textPos: number;       // Position in textContent (just before the atom)
+  textPos: number; // Position in textContent (just before the atom)
   cumulativeOffset: number; // Cumulative additional offset
 }
 
@@ -22,7 +22,7 @@ export interface AtomAdjustment {
  */
 export interface ParagraphInfo {
   node: ProseMirrorNode;
-  pos: number;  // Paragraph start position
+  pos: number; // Paragraph start position
   text: string; // Text content of the paragraph
   atomAdjustments: AtomAdjustment[]; // Atom node position adjustments
   index: number; // Paragraph index (0-based)
@@ -52,7 +52,7 @@ export function collectParagraphs(doc: ProseMirrorNode): ParagraphInfo[] {
   let index = 0;
 
   doc.descendants((node, pos) => {
-    if (node.type.name === 'paragraph' && node.textContent) {
+    if (node.type.name === "paragraph" && node.textContent) {
       const atomAdjustments: AtomAdjustment[] = [];
       let textPos = 0;
       let cumulativeOffset = 0;
@@ -91,8 +91,12 @@ export function findScrollContainer(el: HTMLElement): HTMLElement {
   let parent = el.parentElement;
   while (parent) {
     const style = getComputedStyle(parent);
-    if (style.overflowX === 'auto' || style.overflowX === 'scroll' ||
-        style.overflowY === 'auto' || style.overflowY === 'scroll') {
+    if (
+      style.overflowX === "auto" ||
+      style.overflowX === "scroll" ||
+      style.overflowY === "auto" ||
+      style.overflowY === "scroll"
+    ) {
       return parent;
     }
     parent = parent.parentElement;
@@ -107,7 +111,7 @@ export function findScrollContainer(el: HTMLElement): HTMLElement {
 export function getVisibleParagraphs(
   view: EditorView,
   allParagraphs: ParagraphInfo[],
-  buffer: number = 2
+  buffer: number = 2,
 ): ParagraphInfo[] {
   if (allParagraphs.length === 0) return [];
 
@@ -122,8 +126,12 @@ export function getVisibleParagraphs(
       if (coords) {
         // coordsAtPos returns viewport coordinates
         // Check intersection with the container's visible area
-        if (coords.top < containerRect.bottom && coords.bottom > containerRect.top &&
-            coords.left < containerRect.right && coords.right > containerRect.left) {
+        if (
+          coords.top < containerRect.bottom &&
+          coords.bottom > containerRect.top &&
+          coords.left < containerRect.right &&
+          coords.right > containerRect.left
+        ) {
           visibleIndices.add(paragraph.index);
         }
       }
@@ -151,10 +159,14 @@ export function getVisibleParagraphs(
   // Expand with buffer
   const expandedIndices = new Set<number>();
   for (const index of visibleIndices) {
-    for (let i = Math.max(0, index - buffer); i <= Math.min(allParagraphs.length - 1, index + buffer); i++) {
+    for (
+      let i = Math.max(0, index - buffer);
+      i <= Math.min(allParagraphs.length - 1, index + buffer);
+      i++
+    ) {
       expandedIndices.add(i);
     }
   }
 
-  return allParagraphs.filter(p => expandedIndices.has(p.index));
+  return allParagraphs.filter((p) => expandedIndices.has(p.index));
 }

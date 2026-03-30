@@ -65,7 +65,11 @@ export interface InspectorProps {
   onHistoryRestore?: (content: string) => void;
   activeFileName?: string;
   currentContent?: string;
-  onCompareInEditor?: (data: { snapshotContent: string; currentContent: string; label: string }) => void;
+  onCompareInEditor?: (data: {
+    snapshotContent: string;
+    currentContent: string;
+    label: string;
+  }) => void;
   lintIssues?: LintIssue[];
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;

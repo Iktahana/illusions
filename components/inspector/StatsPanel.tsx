@@ -45,45 +45,46 @@ export default function StatsPanel({
   // Approximate punctuation estimation
   const estimatedPunctuation = Math.floor(activeCharCount * 0.12);
   const pureTextCount = activeCharCount - estimatedPunctuation;
-  const punctuationRatio = activeCharCount > 0 ? (estimatedPunctuation / activeCharCount * 100).toFixed(1) : '0.0';
+  const punctuationRatio =
+    activeCharCount > 0 ? ((estimatedPunctuation / activeCharCount) * 100).toFixed(1) : "0.0";
 
   // Style classification
-  let styleHint = '';
+  let styleHint = "";
   const ratio = parseFloat(punctuationRatio);
   if (ratio > 15) {
-    styleHint = '会話文が中心';
+    styleHint = "会話文が中心";
   } else if (ratio < 8) {
-    styleHint = '地の文が中心';
+    styleHint = "地の文が中心";
   } else {
-    styleHint = 'バランス型';
+    styleHint = "バランス型";
   }
 
   // Paragraph analysis
   const avgParagraphLength = paragraphCount > 0 ? Math.floor(activeCharCount / paragraphCount) : 0;
 
-  let paragraphWarning = '';
+  let paragraphWarning = "";
   if (avgParagraphLength >= 300) {
     paragraphWarning =
-      '一段落に含まれる情報量がやや多いようです。内容のまとまりごとに区切ると、読みやすさが向上するかもしれません。';
+      "一段落に含まれる情報量がやや多いようです。内容のまとまりごとに区切ると、読みやすさが向上するかもしれません。";
   } else if (avgParagraphLength >= 200) {
     paragraphWarning =
-      '読み応えのある段落構成です。公的文書や解説文としては安定していますが、スマホでは少し長く感じられる場合があります。';
+      "読み応えのある段落構成です。公的文書や解説文としては安定していますが、スマホでは少し長く感じられる場合があります。";
   } else if (avgParagraphLength >= 120) {
     paragraphWarning =
-      '段落の長さは標準的で、エッセイや一般的な文章に適した構成です。落ち着いて読み進められます。';
+      "段落の長さは標準的で、エッセイや一般的な文章に適した構成です。落ち着いて読み進められます。";
   } else if (avgParagraphLength >= 80) {
     paragraphWarning =
-      '小説向きの自然な段落長です。文章のリズムと情報量のバランスが保たれています。';
+      "小説向きの自然な段落長です。文章のリズムと情報量のバランスが保たれています。";
   } else if (avgParagraphLength > 0) {
     paragraphWarning =
-      '段落がコンパクトで、テンポよく読めます。会話やスマホでの読書に向いた構成です。';
+      "段落がコンパクトで、テンポよく読めます。会話やスマホでの読書に向いた構成です。";
   }
 
   // Reading time calculation
   const calculateReadTime = (charsPerMinute: number): string => {
-    if (activeCharCount === 0) return '0秒';
+    if (activeCharCount === 0) return "0秒";
     const minutes = Math.floor(activeCharCount / charsPerMinute);
-    const seconds = Math.round((activeCharCount % charsPerMinute) / charsPerMinute * 60);
+    const seconds = Math.round(((activeCharCount % charsPerMinute) / charsPerMinute) * 60);
 
     if (minutes === 0) {
       return `${seconds}秒`;
@@ -100,14 +101,14 @@ export default function StatsPanel({
 
   const getReadabilityLevelLabel = (level?: string): string => {
     switch (level) {
-      case 'easy':
-        return 'やさしい';
-      case 'normal':
-        return '標準';
-      case 'difficult':
-        return '難しい';
+      case "easy":
+        return "やさしい";
+      case "normal":
+        return "標準";
+      case "difficult":
+        return "難しい";
       default:
-        return '未分析';
+        return "未分析";
     }
   };
 
@@ -118,9 +119,7 @@ export default function StatsPanel({
         <div className="bg-background-secondary rounded-lg p-3 border border-border flex items-center justify-between">
           <div>
             <p className="text-xs text-foreground-tertiary font-medium mb-1 flex items-center">
-              <InfoTooltip content="400字詰め原稿用紙に換算した枚数">
-                原稿用紙
-              </InfoTooltip>
+              <InfoTooltip content="400字詰め原稿用紙に換算した枚数">原稿用紙</InfoTooltip>
             </p>
             <p className="text-xs text-foreground-tertiary">400字詰原稿用紙</p>
           </div>
@@ -130,9 +129,7 @@ export default function StatsPanel({
 
       {/* 見出し: 分析対象を動的に表示 */}
       <div className="flex items-center justify-between">
-        <h3 className="stats-header">
-          {isSelection ? '選択範囲の分析' : '全体の統計'}
-        </h3>
+        <h3 className="stats-header">{isSelection ? "選択範囲の分析" : "全体の統計"}</h3>
         {isSelection && (
           <span className="text-xs px-2 py-1 rounded-full bg-accent/20 text-accent font-medium">
             選択中
@@ -144,7 +141,7 @@ export default function StatsPanel({
       {readabilityAnalysis && !isSelection && (
         <div className="bg-background-secondary rounded-lg p-4 border border-border">
           <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-             読みやすさ
+            読みやすさ
           </h4>
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
@@ -157,19 +154,21 @@ export default function StatsPanel({
                 </InfoTooltip>
               </div>
               <div className="flex items-baseline gap-1 flex-shrink-0">
-                <span className="text-xl font-bold text-foreground">{readabilityAnalysis.score}</span>
+                <span className="text-xl font-bold text-foreground">
+                  {readabilityAnalysis.score}
+                </span>
                 <span className="text-xs text-foreground-tertiary">/100</span>
               </div>
             </div>
-             <div className="w-full h-2 bg-background rounded-full overflow-hidden border border-border-secondary">
-               <div
-                 className="h-full transition-all"
-                 style={{
-                   width: `${readabilityAnalysis.score}%`,
-                   backgroundColor: `var(--progress-readability)`,
-                 }}
-               />
-             </div>
+            <div className="w-full h-2 bg-background rounded-full overflow-hidden border border-border-secondary">
+              <div
+                className="h-full transition-all"
+                style={{
+                  width: `${readabilityAnalysis.score}%`,
+                  backgroundColor: `var(--progress-readability)`,
+                }}
+              />
+            </div>
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex items-center gap-1 min-w-0">
                 <InfoTooltip
@@ -193,7 +192,9 @@ export default function StatsPanel({
                     一文平均
                   </InfoTooltip>
                 </div>
-                <span className="text-foreground flex-shrink-0 text-sm">{readabilityAnalysis.avgSentenceLength}字/文</span>
+                <span className="text-foreground flex-shrink-0 text-sm">
+                  {readabilityAnalysis.avgSentenceLength}字/文
+                </span>
               </div>
               <div className="flex justify-between items-baseline text-xs gap-2">
                 <div className="flex items-center gap-1 min-w-0">
@@ -204,7 +205,9 @@ export default function StatsPanel({
                     句読点間隔
                   </InfoTooltip>
                 </div>
-                <span className="text-foreground flex-shrink-0 text-sm">{readabilityAnalysis.avgPunctuationSpacing}字</span>
+                <span className="text-foreground flex-shrink-0 text-sm">
+                  {readabilityAnalysis.avgPunctuationSpacing}字
+                </span>
               </div>
             </div>
           </div>
@@ -214,7 +217,7 @@ export default function StatsPanel({
       {/* 文字数内訳 */}
       <div className="bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-           文字数
+          文字数
         </h4>
         <div className="space-y-1.5">
           <div className="flex justify-between items-baseline gap-2">
@@ -226,7 +229,9 @@ export default function StatsPanel({
                 総字数
               </InfoTooltip>
             </div>
-            <span className="text-base font-semibold text-foreground flex-shrink-0">{activeCharCount.toLocaleString()}</span>
+            <span className="text-base font-semibold text-foreground flex-shrink-0">
+              {activeCharCount.toLocaleString()}
+            </span>
           </div>
           <div className="flex justify-between items-baseline gap-2">
             <div className="flex items-center gap-1 min-w-0">
@@ -237,7 +242,9 @@ export default function StatsPanel({
                 文数
               </InfoTooltip>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">{sentenceCount}文</span>
+            <span className="text-sm font-medium text-foreground flex-shrink-0">
+              {sentenceCount}文
+            </span>
           </div>
           {sentenceCount > 0 && (
             <div className="flex justify-between items-baseline gap-2">
@@ -250,7 +257,7 @@ export default function StatsPanel({
                 </InfoTooltip>
               </div>
               <span className="text-sm font-medium text-foreground flex-shrink-0">
-                {readabilityAnalysis ? `${readabilityAnalysis.avgSentenceLength}字/文` : '-'}
+                {readabilityAnalysis ? `${readabilityAnalysis.avgSentenceLength}字/文` : "-"}
               </span>
             </div>
           )}
@@ -263,7 +270,9 @@ export default function StatsPanel({
                 本文字数
               </InfoTooltip>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">{pureTextCount.toLocaleString()}</span>
+            <span className="text-sm font-medium text-foreground flex-shrink-0">
+              {pureTextCount.toLocaleString()}
+            </span>
           </div>
           <div className="flex justify-between items-baseline gap-2">
             <div className="min-w-0">
@@ -288,7 +297,7 @@ export default function StatsPanel({
       {charTypeAnalysis && !isSelection && (
         <div className="bg-background-secondary rounded-lg p-4 border border-border">
           <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-             文字種別
+            文字種別
           </h4>
           <div className="space-y-1.5">
             <div className="flex justify-between items-baseline gap-2">
@@ -301,7 +310,8 @@ export default function StatsPanel({
                 </InfoTooltip>
               </div>
               <span className="text-sm font-medium text-foreground flex-shrink-0">
-                {charTypeAnalysis.kanji} 字 {charUsageRates ? `(${charUsageRates.kanjiRate.toFixed(1)}%)` : ''}
+                {charTypeAnalysis.kanji} 字{" "}
+                {charUsageRates ? `(${charUsageRates.kanjiRate.toFixed(1)}%)` : ""}
               </span>
             </div>
             <div className="flex justify-between items-baseline gap-2">
@@ -314,7 +324,8 @@ export default function StatsPanel({
                 </InfoTooltip>
               </div>
               <span className="text-sm font-medium text-foreground flex-shrink-0">
-                {charTypeAnalysis.hiragana} 字 {charUsageRates ? `(${charUsageRates.hiraganaRate.toFixed(1)}%)` : ''}
+                {charTypeAnalysis.hiragana} 字{" "}
+                {charUsageRates ? `(${charUsageRates.hiraganaRate.toFixed(1)}%)` : ""}
               </span>
             </div>
             <div className="flex justify-between items-baseline gap-2">
@@ -327,13 +338,16 @@ export default function StatsPanel({
                 </InfoTooltip>
               </div>
               <span className="text-sm font-medium text-foreground flex-shrink-0">
-                {charTypeAnalysis.katakana} 字 {charUsageRates ? `(${charUsageRates.katakanaRate.toFixed(1)}%)` : ''}
+                {charTypeAnalysis.katakana} 字{" "}
+                {charUsageRates ? `(${charUsageRates.katakanaRate.toFixed(1)}%)` : ""}
               </span>
             </div>
             {charTypeAnalysis.other > 0 && (
               <div className="flex justify-between items-baseline">
                 <span className="text-sm text-foreground-secondary">その他</span>
-                <span className="text-sm font-medium text-foreground">{charTypeAnalysis.other}字</span>
+                <span className="text-sm font-medium text-foreground">
+                  {charTypeAnalysis.other}字
+                </span>
               </div>
             )}
             {/* 文字種の分布バー */}
@@ -342,41 +356,41 @@ export default function StatsPanel({
                 {charTypeAnalysis.total > 0 && (
                   <>
                     {charTypeAnalysis.kanji > 0 && (
-                      <div 
+                      <div
                         className="flex items-center justify-center text-white text-xs font-semibold"
-                        style={{ 
+                        style={{
                           width: `${(charTypeAnalysis.kanji / charTypeAnalysis.total) * 100}%`,
-                          backgroundColor: `var(--progress-kanji)`
+                          backgroundColor: `var(--progress-kanji)`,
                         }}
                         title={`漢字: ${charTypeAnalysis.kanji}`}
                       />
                     )}
                     {charTypeAnalysis.hiragana > 0 && (
-                      <div 
+                      <div
                         className="flex items-center justify-center text-white text-xs font-semibold"
-                        style={{ 
+                        style={{
                           width: `${(charTypeAnalysis.hiragana / charTypeAnalysis.total) * 100}%`,
-                          backgroundColor: `var(--progress-hiragana)`
+                          backgroundColor: `var(--progress-hiragana)`,
                         }}
                         title={`ひらがな: ${charTypeAnalysis.hiragana}`}
                       />
                     )}
                     {charTypeAnalysis.katakana > 0 && (
-                      <div 
+                      <div
                         className="flex items-center justify-center text-white text-xs font-semibold"
-                        style={{ 
+                        style={{
                           width: `${(charTypeAnalysis.katakana / charTypeAnalysis.total) * 100}%`,
-                          backgroundColor: `var(--progress-katakana)`
+                          backgroundColor: `var(--progress-katakana)`,
                         }}
                         title={`カタカナ: ${charTypeAnalysis.katakana}`}
                       />
                     )}
                     {charTypeAnalysis.other > 0 && (
-                      <div 
+                      <div
                         className="flex items-center justify-center text-white text-xs font-semibold"
-                        style={{ 
+                        style={{
                           width: `${(charTypeAnalysis.other / charTypeAnalysis.total) * 100}%`,
-                          backgroundColor: `var(--progress-other)`
+                          backgroundColor: `var(--progress-other)`,
                         }}
                         title={`その他: ${charTypeAnalysis.other}`}
                       />
@@ -386,31 +400,43 @@ export default function StatsPanel({
               </div>
               <div className="grid grid-cols-4 gap-2 text-xs">
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: `var(--progress-kanji)` }} />
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: `var(--progress-kanji)` }}
+                  />
                   <span className="text-foreground-tertiary">漢字</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: `var(--progress-hiragana)` }} />
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: `var(--progress-hiragana)` }}
+                  />
                   <span className="text-foreground-tertiary">ひらがな</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: `var(--progress-katakana)` }} />
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: `var(--progress-katakana)` }}
+                  />
                   <span className="text-foreground-tertiary">カタカナ</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: `var(--progress-other)` }} />
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: `var(--progress-other)` }}
+                  />
                   <span className="text-foreground-tertiary">その他</span>
                 </div>
               </div>
-           </div>
-         </div>
-       </div>
-     )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 段落構成 */}
       <div className="bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-           段落
+          段落
         </h4>
         <div className="space-y-1.5">
           <div className="flex justify-between items-baseline gap-2">
@@ -422,7 +448,9 @@ export default function StatsPanel({
                 段落数
               </InfoTooltip>
             </div>
-            <span className="text-base font-semibold text-foreground flex-shrink-0">{paragraphCount}</span>
+            <span className="text-base font-semibold text-foreground flex-shrink-0">
+              {paragraphCount}
+            </span>
           </div>
           <div className="flex justify-between items-baseline gap-2">
             <div className="flex items-center gap-1 min-w-0">
@@ -433,23 +461,25 @@ export default function StatsPanel({
                 一段落平均
               </InfoTooltip>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">{avgParagraphLength}字/段</span>
+            <span className="text-sm font-medium text-foreground flex-shrink-0">
+              {avgParagraphLength}字/段
+            </span>
           </div>
-         {paragraphWarning && (
-           <div className="mt-2">
-             <div className="h-px bg-border" />
+          {paragraphWarning && (
+            <div className="mt-2">
+              <div className="h-px bg-border" />
               <small className="mt-2 block text-[10px] text-foreground/50">
                 補足: {paragraphWarning}
               </small>
-           </div>
-         )}
-       </div>
-     </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* 読了時間（目安） */}
       <div className="bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
-           読了時間
+          読了時間
         </h4>
         <div className="space-y-1.5">
           <div className="flex justify-between items-baseline gap-2">
@@ -461,7 +491,9 @@ export default function StatsPanel({
                 速読時
               </InfoTooltip>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">{fastReadTime}</span>
+            <span className="text-sm font-medium text-foreground flex-shrink-0">
+              {fastReadTime}
+            </span>
           </div>
           <div className="flex justify-between items-baseline gap-2">
             <div className="flex items-center gap-1 min-w-0">
@@ -472,7 +504,9 @@ export default function StatsPanel({
                 通常時
               </InfoTooltip>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">{normalReadTime}</span>
+            <span className="text-sm font-medium text-foreground flex-shrink-0">
+              {normalReadTime}
+            </span>
           </div>
           <div className="flex justify-between items-baseline gap-2">
             <div className="flex items-center gap-1 min-w-0">
@@ -483,13 +517,12 @@ export default function StatsPanel({
                 精読時
               </InfoTooltip>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">{deepReadTime}</span>
+            <span className="text-sm font-medium text-foreground flex-shrink-0">
+              {deepReadTime}
+            </span>
           </div>
         </div>
       </div>
-
-
-
-   </div>
- );
+    </div>
+  );
 }

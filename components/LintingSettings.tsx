@@ -14,10 +14,7 @@ import {
   LINT_PRESETS,
   LINT_DEFAULT_CONFIGS,
 } from "@/lib/linting/lint-presets";
-import {
-  CORRECTION_MODE_IDS,
-  CORRECTION_MODES,
-} from "@/lib/linting/correction-modes";
+import { CORRECTION_MODE_IDS, CORRECTION_MODES } from "@/lib/linting/correction-modes";
 import GuidelineList from "@/components/GuidelineList";
 
 /** Map of rule ID -> supportsSkipDialogue from metadata */
@@ -28,9 +25,17 @@ const SKIP_DIALOGUE_SUPPORT = new Map(
 interface LintingSettingsProps {
   lintingEnabled: boolean;
   onLintingEnabledChange: (value: boolean) => void;
-  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; }>;
-  onLintingRuleConfigChange: (ruleId: string, config: { enabled: boolean; severity: Severity; skipDialogue?: boolean; }) => void;
-  onLintingRuleConfigsBatchChange: (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; }>) => void;
+  lintingRuleConfigs: Record<
+    string,
+    { enabled: boolean; severity: Severity; skipDialogue?: boolean }
+  >;
+  onLintingRuleConfigChange: (
+    ruleId: string,
+    config: { enabled: boolean; severity: Severity; skipDialogue?: boolean },
+  ) => void;
+  onLintingRuleConfigsBatchChange: (
+    configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
+  ) => void;
   characterExtractionBatchSize?: number;
   onCharacterExtractionBatchSizeChange?: (value: number) => void;
   characterExtractionConcurrency?: number;
@@ -43,8 +48,8 @@ interface LintingSettingsProps {
 /** Resolve the effective config for a rule, falling back to defaults */
 function getConfig(
   ruleId: string,
-  configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; }>,
-): { enabled: boolean; severity: Severity; skipDialogue?: boolean; } {
+  configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
+): { enabled: boolean; severity: Severity; skipDialogue?: boolean } {
   return configs[ruleId] ?? LINT_DEFAULT_CONFIGS[ruleId] ?? { enabled: true, severity: "warning" };
 }
 
@@ -64,7 +69,7 @@ export default function LintingSettings({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const toggleGroup = useCallback((groupId: string) => {
-    setCollapsedGroups(prev => {
+    setCollapsedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(groupId)) {
         next.delete(groupId);
@@ -76,32 +81,39 @@ export default function LintingSettings({
   }, []);
 
   /** Toggle all rules in a category */
-  const toggleCategoryEnabled = useCallback((ruleIds: string[], enabled: boolean) => {
-    const next = { ...lintingRuleConfigs };
-    for (const ruleId of ruleIds) {
-      const current = getConfig(ruleId, next);
-      next[ruleId] = { ...current, enabled };
-    }
-    onLintingRuleConfigsBatchChange(next);
-  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange]);
+  const toggleCategoryEnabled = useCallback(
+    (ruleIds: string[], enabled: boolean) => {
+      const next = { ...lintingRuleConfigs };
+      for (const ruleId of ruleIds) {
+        const current = getConfig(ruleId, next);
+        next[ruleId] = { ...current, enabled };
+      }
+      onLintingRuleConfigsBatchChange(next);
+    },
+    [lintingRuleConfigs, onLintingRuleConfigsBatchChange],
+  );
 
   /** Check if all rules in a category are enabled */
   const isCategoryAllEnabled = (ruleIds: string[]): boolean =>
-    ruleIds.every(id => getConfig(id, lintingRuleConfigs).enabled);
+    ruleIds.every((id) => getConfig(id, lintingRuleConfigs).enabled);
 
   /** Count enabled rules in a category */
   const categoryEnabledCount = (ruleIds: string[]): number =>
-    ruleIds.filter(id => getConfig(id, lintingRuleConfigs).enabled).length;
+    ruleIds.filter((id) => getConfig(id, lintingRuleConfigs).enabled).length;
 
-  const handleApplyPreset = useCallback((presetId: string) => {
-    const preset = LINT_PRESETS[presetId];
-    if (preset) {
-      onLintingRuleConfigsBatchChange({ ...preset.configs });
-    }
-  }, [onLintingRuleConfigsBatchChange]);
+  const handleApplyPreset = useCallback(
+    (presetId: string) => {
+      const preset = LINT_PRESETS[presetId];
+      if (preset) {
+        onLintingRuleConfigsBatchChange({ ...preset.configs });
+      }
+    },
+    [onLintingRuleConfigsBatchChange],
+  );
 
   const handleEnableAll = useCallback(() => {
-    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; }> = {};
+    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> =
+      {};
     for (const rule of LINT_RULES_META) {
       const current = getConfig(rule.id, lintingRuleConfigs);
       next[rule.id] = { ...current, enabled: true };
@@ -110,7 +122,8 @@ export default function LintingSettings({
   }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange]);
 
   const handleDisableAll = useCallback(() => {
-    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean; }> = {};
+    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> =
+      {};
     for (const rule of LINT_RULES_META) {
       const current = getConfig(rule.id, lintingRuleConfigs);
       next[rule.id] = { ...current, enabled: false };
@@ -123,7 +136,7 @@ export default function LintingSettings({
   }, [onLintingRuleConfigsBatchChange]);
 
   // Memoized map to avoid recreation on every render (LINT_RULES_META is a module-level constant)
-  const ruleMetaMap = useMemo(() => new Map(LINT_RULES_META.map(r => [r.id, r])), []);
+  const ruleMetaMap = useMemo(() => new Map(LINT_RULES_META.map((r) => [r.id, r])), []);
 
   /** Detect which preset matches the current config (if any) */
   const activePresetId = useMemo(() => {
@@ -144,20 +157,26 @@ export default function LintingSettings({
   }, [lintingRuleConfigs]);
 
   /** Handle correction mode change: update mode and reset guidelines to mode defaults */
-  const handleModeChange = useCallback((modeId: string) => {
-    if (!onCorrectionConfigChange) return;
-    const mode = CORRECTION_MODES[modeId as keyof typeof CORRECTION_MODES];
-    if (!mode) return;
-    onCorrectionConfigChange({
-      mode: mode.id,
-      guidelines: [...mode.defaultGuidelines],
-    });
-  }, [onCorrectionConfigChange]);
+  const handleModeChange = useCallback(
+    (modeId: string) => {
+      if (!onCorrectionConfigChange) return;
+      const mode = CORRECTION_MODES[modeId as keyof typeof CORRECTION_MODES];
+      if (!mode) return;
+      onCorrectionConfigChange({
+        mode: mode.id,
+        guidelines: [...mode.defaultGuidelines],
+      });
+    },
+    [onCorrectionConfigChange],
+  );
 
   /** Handle guideline priority list change */
-  const handleGuidelinesChange = useCallback((guidelines: CorrectionConfig["guidelines"]) => {
-    onCorrectionConfigChange?.({ guidelines });
-  }, [onCorrectionConfigChange]);
+  const handleGuidelinesChange = useCallback(
+    (guidelines: CorrectionConfig["guidelines"]) => {
+      onCorrectionConfigChange?.({ guidelines });
+    },
+    [onCorrectionConfigChange],
+  );
 
   const showCorrectionConfig = Boolean(correctionConfig && onCorrectionConfigChange);
 
@@ -166,24 +185,20 @@ export default function LintingSettings({
       {/* Master toggle */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-medium text-foreground">
-            校正機能を有効にする
-          </h3>
-          <p className="text-xs text-foreground-tertiary mt-0.5">
-            文章の校正ルールを適用します
-          </p>
+          <h3 className="text-sm font-medium text-foreground">校正機能を有効にする</h3>
+          <p className="text-xs text-foreground-tertiary mt-0.5">文章の校正ルールを適用します</p>
         </div>
         <button
           onClick={() => onLintingEnabledChange(!lintingEnabled)}
           className={clsx(
             "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
-            lintingEnabled ? "bg-accent" : "bg-foreground-muted"
+            lintingEnabled ? "bg-accent" : "bg-foreground-muted",
           )}
         >
           <span
             className={clsx(
               "inline-block h-4 w-4 transform rounded-full transition-transform shadow-sm",
-              lintingEnabled ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"
+              lintingEnabled ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white",
             )}
           />
         </button>
@@ -246,7 +261,7 @@ export default function LintingSettings({
       <div
         className={clsx(
           "space-y-4 pt-4 border-t border-border transition-opacity",
-          !lintingEnabled && "opacity-50 pointer-events-none"
+          !lintingEnabled && "opacity-50 pointer-events-none",
         )}
       >
         <h3 className="text-sm font-medium text-foreground">校正ルール</h3>
@@ -264,7 +279,9 @@ export default function LintingSettings({
           >
             {!activePresetId && <option value="">カスタム</option>}
             {Object.entries(LINT_PRESETS).map(([id, preset]) => (
-              <option key={id} value={id}>{preset.nameJa}</option>
+              <option key={id} value={id}>
+                {preset.nameJa}
+              </option>
             ))}
           </select>
           <div className="flex-1" />
@@ -309,9 +326,7 @@ export default function LintingSettings({
                   ) : (
                     <ChevronDown className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
                   )}
-                  <span className="text-sm font-medium text-foreground">
-                    {category.nameJa}
-                  </span>
+                  <span className="text-sm font-medium text-foreground">{category.nameJa}</span>
                   <span className="text-xs text-foreground-tertiary ml-1">
                     {enabledCount}/{category.rules.length}
                   </span>
@@ -320,13 +335,15 @@ export default function LintingSettings({
                   onClick={() => toggleCategoryEnabled(category.rules, !allEnabled)}
                   className={clsx(
                     "relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0",
-                    allEnabled ? "bg-accent" : "bg-foreground-muted"
+                    allEnabled ? "bg-accent" : "bg-foreground-muted",
                   )}
                 >
                   <span
                     className={clsx(
                       "inline-block h-3.5 w-3.5 transform rounded-full transition-transform shadow-sm",
-                      allEnabled ? "translate-x-5 bg-accent-foreground" : "translate-x-0.5 bg-white"
+                      allEnabled
+                        ? "translate-x-5 bg-accent-foreground"
+                        : "translate-x-0.5 bg-white",
                     )}
                   />
                 </button>
@@ -344,9 +361,7 @@ export default function LintingSettings({
                     return (
                       <div
                         key={ruleId}
-                        className={clsx(
-                          "flex items-center gap-2 px-3 py-2",
-                        )}
+                        className={clsx("flex items-center gap-2 px-3 py-2")}
                         title={undefined}
                       >
                         {/* Rule name */}
@@ -359,7 +374,6 @@ export default function LintingSettings({
                         {/* Skip dialogue toggle */}
                         {showDialogueToggle && (
                           <button
-  
                             onClick={() =>
                               onLintingRuleConfigChange(ruleId, {
                                 ...config,
@@ -385,7 +399,6 @@ export default function LintingSettings({
                         {/* Severity dropdown */}
                         <select
                           value={config.severity}
-
                           onChange={(e) =>
                             onLintingRuleConfigChange(ruleId, {
                               ...config,
@@ -401,7 +414,6 @@ export default function LintingSettings({
 
                         {/* Toggle */}
                         <button
-
                           onClick={() =>
                             onLintingRuleConfigChange(ruleId, {
                               ...config,
@@ -410,13 +422,15 @@ export default function LintingSettings({
                           }
                           className={clsx(
                             "relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0",
-                            config.enabled ? "bg-accent" : "bg-foreground-muted"
+                            config.enabled ? "bg-accent" : "bg-foreground-muted",
                           )}
                         >
                           <span
                             className={clsx(
                               "inline-block h-3.5 w-3.5 transform rounded-full transition-transform shadow-sm",
-                              config.enabled ? "translate-x-5 bg-accent-foreground" : "translate-x-0.5 bg-white"
+                              config.enabled
+                                ? "translate-x-5 bg-accent-foreground"
+                                : "translate-x-0.5 bg-white",
                             )}
                           />
                         </button>
@@ -429,7 +443,6 @@ export default function LintingSettings({
           );
         })}
       </div>
-
     </div>
   );
 }

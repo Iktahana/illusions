@@ -29,6 +29,6 @@ export default function ContextMenu({ menu, onAction, onClose }: ContextMenuProp
         </button>
       ))}
     </div>,
-    document.body
+    document.body,
   );
 }

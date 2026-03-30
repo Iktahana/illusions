@@ -12,14 +12,7 @@ export interface KeyBinding {
 /**
  * Category for grouping shortcuts in the settings UI.
  */
-export type ShortcutCategory =
-  | "file"
-  | "edit"
-  | "format"
-  | "view"
-  | "nav"
-  | "panel"
-  | "app";
+export type ShortcutCategory = "file" | "edit" | "format" | "view" | "nav" | "panel" | "app";
 
 /**
  * A single entry in the shortcut registry.

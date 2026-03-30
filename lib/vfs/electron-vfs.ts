@@ -33,13 +33,9 @@ interface ElectronVFSBridge {
   /** Write UTF-8 text content to a file */
   writeFile: (filePath: string, content: string) => Promise<void>;
   /** Read directory entries */
-  readDirectory: (
-    dirPath: string
-  ) => Promise<Array<{ name: string; kind: "file" | "directory" }>>;
+  readDirectory: (dirPath: string) => Promise<Array<{ name: string; kind: "file" | "directory" }>>;
   /** Get file stats */
-  stat: (
-    filePath: string
-  ) => Promise<{ size: number; lastModified: number; type: string }>;
+  stat: (filePath: string) => Promise<{ size: number; lastModified: number; type: string }>;
   /** Create a directory (with parents) */
   mkdir: (dirPath: string) => Promise<void>;
   /** Delete a file or directory */
@@ -47,10 +43,7 @@ interface ElectronVFSBridge {
   /** Rename (move) a file or directory */
   rename: (oldPath: string, newPath: string) => Promise<void>;
   /** Watch a file for changes (optional) */
-  watch?: (
-    filePath: string,
-    callback: (event: VFSWatchEvent) => void
-  ) => { stop: () => void };
+  watch?: (filePath: string, callback: (event: VFSWatchEvent) => void) => { stop: () => void };
 }
 
 // -----------------------------------------------------------------------
@@ -74,7 +67,7 @@ function getVFSBridge(): ElectronVFSBridge {
   if (!vfsBridge) {
     throw new Error(
       "Electron VFS API is not available (window.electronAPI.vfs is undefined). " +
-        "Ensure the preload script exposes VFS IPC methods."
+        "Ensure the preload script exposes VFS IPC methods.",
     );
   }
   return vfsBridge;
@@ -139,10 +132,7 @@ class ElectronVFSDirectoryHandle implements VFSDirectoryHandle {
     this.name = basename(absolutePath);
   }
 
-  async getFileHandle(
-    name: string,
-    options?: { create?: boolean }
-  ): Promise<VFSFileHandle> {
+  async getFileHandle(name: string, options?: { create?: boolean }): Promise<VFSFileHandle> {
     const filePath = joinPath(this.absolutePath, name);
     const relPath = this.path ? joinPath(this.path, name) : name;
 
@@ -162,7 +152,7 @@ class ElectronVFSDirectoryHandle implements VFSDirectoryHandle {
 
   async getDirectoryHandle(
     name: string,
-    options?: { create?: boolean }
+    options?: { create?: boolean },
   ): Promise<VFSDirectoryHandle> {
     const dirPath = joinPath(this.absolutePath, name);
     const relPath = this.path ? joinPath(this.path, name) : name;
@@ -175,10 +165,7 @@ class ElectronVFSDirectoryHandle implements VFSDirectoryHandle {
     return new ElectronVFSDirectoryHandle(dirPath, relPath);
   }
 
-  async removeEntry(
-    name: string,
-    options?: { recursive?: boolean }
-  ): Promise<void> {
+  async removeEntry(name: string, options?: { recursive?: boolean }): Promise<void> {
     const bridge = getVFSBridge();
     const targetPath = joinPath(this.absolutePath, name);
     await bridge.delete(targetPath, { recursive: options?.recursive ?? false });
@@ -189,9 +176,7 @@ class ElectronVFSDirectoryHandle implements VFSDirectoryHandle {
     const dirEntries = await bridge.readDirectory(this.absolutePath);
 
     for (const entry of dirEntries) {
-      const entryPath = this.path
-        ? joinPath(this.path, entry.name)
-        : entry.name;
+      const entryPath = this.path ? joinPath(this.path, entry.name) : entry.name;
 
       const vfsEntry: VFSEntry = {
         name: entry.name,
@@ -258,7 +243,7 @@ export class ElectronVFS implements VirtualFileSystem {
       return await bridge.readFile(absolutePath);
     } catch (error) {
       throw new Error(
-        `Failed to read file "${path}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to read file "${path}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -279,7 +264,7 @@ export class ElectronVFS implements VirtualFileSystem {
       await bridge.writeFile(absolutePath, content);
     } catch (error) {
       throw new Error(
-        `Failed to write file "${path}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to write file "${path}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -296,7 +281,7 @@ export class ElectronVFS implements VirtualFileSystem {
       await bridge.delete(absolutePath);
     } catch (error) {
       throw new Error(
-        `Failed to delete file "${path}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to delete file "${path}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -315,7 +300,7 @@ export class ElectronVFS implements VirtualFileSystem {
       await bridge.rename(absoluteOld, absoluteNew);
     } catch (error) {
       throw new Error(
-        `Failed to rename "${oldPath}" to "${newPath}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to rename "${oldPath}" to "${newPath}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -338,7 +323,7 @@ export class ElectronVFS implements VirtualFileSystem {
       };
     } catch (error) {
       throw new Error(
-        `Failed to get metadata for "${path}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to get metadata for "${path}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -360,7 +345,7 @@ export class ElectronVFS implements VirtualFileSystem {
       }));
     } catch (error) {
       throw new Error(
-        `Failed to list directory "${path}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to list directory "${path}": ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -371,10 +356,7 @@ export class ElectronVFS implements VirtualFileSystem {
    * @param path - File path to watch
    * @param callback - Called when the file changes
    */
-  watchFile(
-    path: string,
-    callback: (event: VFSWatchEvent) => void
-  ): VFSWatcher {
+  watchFile(path: string, callback: (event: VFSWatchEvent) => void): VFSWatcher {
     const bridge = getVFSBridge();
     if (!bridge.watch) {
       throw new Error("File watching is not supported by this Electron build.");
@@ -397,9 +379,7 @@ export class ElectronVFS implements VirtualFileSystem {
     try {
       const bridge = getVFSBridge();
       if ("setRoot" in bridge) {
-        await (bridge as { setRoot: (p: string) => Promise<unknown> }).setRoot(
-          rootPath
-        );
+        await (bridge as { setRoot: (p: string) => Promise<unknown> }).setRoot(rootPath);
       }
     } catch (error: unknown) {
       // Bridge may not be available during early initialization — that's expected.
@@ -434,7 +414,7 @@ export class ElectronVFS implements VirtualFileSystem {
     if (!this.rootPath) {
       throw new Error(
         "Cannot resolve relative path: no root directory has been opened. " +
-          "Call openDirectory() first or use an absolute path."
+          "Call openDirectory() first or use an absolute path.",
       );
     }
     return joinPath(this.rootPath, path);

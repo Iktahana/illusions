@@ -23,10 +23,24 @@ const CATEGORY_LABELS: Record<ShortcutCategory, string> = {
   app: "アプリ",
 };
 
-const CATEGORY_ORDER: ShortcutCategory[] = ["file", "edit", "format", "view", "nav", "panel", "app"];
+const CATEGORY_ORDER: ShortcutCategory[] = [
+  "file",
+  "edit",
+  "format",
+  "view",
+  "nav",
+  "panel",
+  "app",
+];
 
 export default function KeymapSettings() {
-  const { effectiveBindings, overrides, setOverrideWithConflictResolution, resetOverride, resetAll } = useKeymap();
+  const {
+    effectiveBindings,
+    overrides,
+    setOverrideWithConflictResolution,
+    resetOverride,
+    resetAll,
+  } = useKeymap();
   const [recording, setRecording] = useState<CommandId | null>(null);
 
   /** Find all commands that bind to a given binding string (for conflict detection) */
@@ -49,7 +63,10 @@ export default function KeymapSettings() {
     for (const [, ids] of keyToCommands) {
       if (ids.length > 1) {
         for (const id of ids) {
-          conflicts.set(id, ids.filter(x => x !== id));
+          conflicts.set(
+            id,
+            ids.filter((x) => x !== id),
+          );
         }
       }
     }
@@ -124,7 +141,7 @@ export default function KeymapSettings() {
                     className={clsx(
                       "flex items-center gap-3 px-4 py-2.5 text-sm",
                       idx > 0 && "border-t border-border",
-                      "bg-background hover:bg-hover transition-colors"
+                      "bg-background hover:bg-hover transition-colors",
                     )}
                   >
                     {/* Label */}
@@ -146,12 +163,14 @@ export default function KeymapSettings() {
                         onCancel={() => setRecording(null)}
                       />
                     ) : (
-                      <span className={clsx(
-                        "font-mono text-xs px-2 py-1 rounded border min-w-[120px] text-center",
-                        modified
-                          ? "border-accent text-accent bg-accent/10"
-                          : "border-border text-foreground-secondary bg-background-elevated"
-                      )}>
+                      <span
+                        className={clsx(
+                          "font-mono text-xs px-2 py-1 rounded border min-w-[120px] text-center",
+                          modified
+                            ? "border-accent text-accent bg-accent/10"
+                            : "border-border text-foreground-secondary bg-background-elevated",
+                        )}
+                      >
                         {formatBinding(binding)}
                       </span>
                     )}

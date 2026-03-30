@@ -19,7 +19,14 @@ export interface SearchMatch {
   to: number;
 }
 
-export default function SearchDialog({ editorView, isOpen, onClose, onShowAllResults, initialSearchTerm, programmaticScrollRef }: SearchDialogProps) {
+export default function SearchDialog({
+  editorView,
+  isOpen,
+  onClose,
+  onShowAllResults,
+  initialSearchTerm,
+  programmaticScrollRef,
+}: SearchDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [matches, setMatches] = useState<SearchMatch[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
@@ -30,7 +37,12 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
   // Drag state (session-only, resets on refresh)
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
   const isDragging = useRef(false);
-  const dragStart = useRef<{ mouseX: number; mouseY: number; elX: number; elY: number }>({ mouseX: 0, mouseY: 0, elX: 0, elY: 0 });
+  const dragStart = useRef<{ mouseX: number; mouseY: number; elX: number; elY: number }>({
+    mouseX: 0,
+    mouseY: 0,
+    elX: 0,
+    elY: 0,
+  });
 
   const handleDragMouseDown = useCallback((e: React.MouseEvent) => {
     // Don't initiate drag from interactive elements
@@ -107,29 +119,29 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
     setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1);
   }, [searchTerm, caseSensitive, editorView]);
 
-     // 検索ハイライト装飾
-     useEffect(() => {
+  // 検索ハイライト装飾
+  useEffect(() => {
     if (!editorView) return;
 
     const { state, dispatch } = editorView;
     const decorations: Decoration[] = [];
 
-     // すべてのマッチ項目に背景ハイライトを追加
-     matches.forEach((match, index) => {
+    // すべてのマッチ項目に背景ハイライトを追加
+    matches.forEach((match, index) => {
       const isCurrentMatch = index === currentMatchIndex;
       decorations.push(
         Decoration.inline(match.from, match.to, {
           class: isCurrentMatch ? "search-result-current" : "search-result",
-        })
+        }),
       );
     });
 
-     // meta を使用して装飾情報を渡す
-     const tr = state.tr.setMeta("searchDecorations", decorations);
+    // meta を使用して装飾情報を渡す
+    const tr = state.tr.setMeta("searchDecorations", decorations);
     dispatch(tr);
 
-     // 現在のマッチ項目までスクロール
-     if (currentMatchIndex !== -1 && matches[currentMatchIndex]) {
+    // 現在のマッチ項目までスクロール
+    if (currentMatchIndex !== -1 && matches[currentMatchIndex]) {
       const match = matches[currentMatchIndex];
 
       // Allow the scroll guard to accept our programmatic scroll
@@ -145,7 +157,9 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
       // DOM-level scroll for both horizontal and vertical writing modes
       try {
         const coords = editorView.coordsAtPos(match.from);
-        const scrollContainer = editorView.dom.closest(".flex-1.bg-background-secondary") as HTMLElement | null;
+        const scrollContainer = editorView.dom.closest(
+          ".flex-1.bg-background-secondary",
+        ) as HTMLElement | null;
         if (scrollContainer) {
           const containerRect = scrollContainer.getBoundingClientRect();
           const offsetY = coords.top - containerRect.top + scrollContainer.scrollTop;
@@ -159,9 +173,8 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
       } catch {
         try {
           const domResult = editorView.domAtPos(match.from);
-          const target = domResult.node instanceof HTMLElement
-            ? domResult.node
-            : domResult.node.parentElement;
+          const target =
+            domResult.node instanceof HTMLElement ? domResult.node : domResult.node.parentElement;
           target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
         } catch {
           // ignore
@@ -186,8 +199,6 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
     if (matches.length === 0) return;
     setCurrentMatchIndex((prev) => (prev - 1 + matches.length) % matches.length);
   };
-
-
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
@@ -221,17 +232,12 @@ export default function SearchDialog({ editorView, isOpen, onClose, onShowAllRes
       onKeyDown={handleKeyDown}
       onMouseDown={handleDragMouseDown}
     >
-      <div
-        className="flex items-center justify-between mb-3 select-none"
-      >
+      <div className="flex items-center justify-between mb-3 select-none">
         <div className="flex items-center gap-2">
           <Search className="w-4 h-4 text-foreground-secondary" />
           <h3 className="text-sm font-medium text-foreground">検索</h3>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 rounded hover:bg-hover transition-colors"
-        >
+        <button onClick={onClose} className="p-1 rounded hover:bg-hover transition-colors">
           <X className="w-4 h-4 text-foreground-secondary" />
         </button>
       </div>

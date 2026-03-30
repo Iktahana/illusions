@@ -45,11 +45,7 @@ function buildRubyHtml(base: string, ruby: string): string {
     // Split ruby: each dot-separated segment corresponds to one character
     const baseChars = [...base];
     return (
-      "<ruby>" +
-      baseChars
-        .map((char, i) => `${char}<rt>${rubyParts[i]}</rt>`)
-        .join("") +
-      "</ruby>"
+      "<ruby>" + baseChars.map((char, i) => `${char}<rt>${rubyParts[i]}</rt>`).join("") + "</ruby>"
     );
   }
 
@@ -95,49 +91,33 @@ function preProcessMdiSyntax(markdown: string): MdiPreProcessResult {
 
   // 1. Handle escaped MDI syntax (backslash before special chars)
   // Escape sequences: \{, \^, \[
-  result = result.replace(MDI_ESC_BRACE_RE, (_match, char) =>
-    addPlaceholder(char as string)
-  );
-  result = result.replace(MDI_ESC_CARET_RE, (_match, char) =>
-    addPlaceholder(char as string)
-  );
-  result = result.replace(MDI_ESC_BRACKET_RE, (_match, char) =>
-    addPlaceholder(char as string)
-  );
+  result = result.replace(MDI_ESC_BRACE_RE, (_match, char) => addPlaceholder(char as string));
+  result = result.replace(MDI_ESC_CARET_RE, (_match, char) => addPlaceholder(char as string));
+  result = result.replace(MDI_ESC_BRACKET_RE, (_match, char) => addPlaceholder(char as string));
 
   // 2. Ruby: {base|ruby}
-  result = result.replace(
-    MDI_RUBY_RE,
-    (_match, base: string, ruby: string) => addPlaceholder(buildRubyHtml(base, ruby))
+  result = result.replace(MDI_RUBY_RE, (_match, base: string, ruby: string) =>
+    addPlaceholder(buildRubyHtml(base, ruby)),
   );
 
   // 3. Tate-chu-yoko: ^text^
-  result = result.replace(
-    MDI_TCY_RE,
-    (_match, text: string) =>
-      addPlaceholder(`<span class="mdi-tcy">${text}</span>`)
+  result = result.replace(MDI_TCY_RE, (_match, text: string) =>
+    addPlaceholder(`<span class="mdi-tcy">${text}</span>`),
   );
 
   // 4. No-break: [[no-break:text]]
-  result = result.replace(
-    MDI_NOBR_RE,
-    (_match, text: string) =>
-      addPlaceholder(`<span class="mdi-nobr">${text}</span>`)
+  result = result.replace(MDI_NOBR_RE, (_match, text: string) =>
+    addPlaceholder(`<span class="mdi-nobr">${text}</span>`),
   );
 
   // 5. Kerning: [[kern:amount:text]]
-  result = result.replace(
-    MDI_KERN_RE,
-    (_match, amount: string, text: string) => {
-      if (!isValidKernAmount(amount)) {
-        // Invalid kern amount: return the original text unmodified
-        return _match;
-      }
-      return addPlaceholder(
-        `<span class="mdi-kern" style="--mdi-kern:${amount};">${text}</span>`
-      );
+  result = result.replace(MDI_KERN_RE, (_match, amount: string, text: string) => {
+    if (!isValidKernAmount(amount)) {
+      // Invalid kern amount: return the original text unmodified
+      return _match;
     }
-  );
+    return addPlaceholder(`<span class="mdi-kern" style="--mdi-kern:${amount};">${text}</span>`);
+  });
 
   return { text: result, placeholders };
 }
@@ -150,10 +130,7 @@ function preProcessMdiSyntax(markdown: string): MdiPreProcessResult {
  * Because markdown-it may HTML-escape the null-byte placeholder characters,
  * we also check for the escaped form.
  */
-function restorePlaceholders(
-  html: string,
-  placeholders: Map<string, string>
-): string {
+function restorePlaceholders(html: string, placeholders: Map<string, string>): string {
   let result = html;
   for (const [key, value] of placeholders) {
     result = result.split(key).join(value);
@@ -181,9 +158,7 @@ function createMarkdownIt(): MarkdownIt {
  * @param options.verticalWriting - Include vertical writing mode styles
  * @returns CSS stylesheet string
  */
-export function getMdiStylesheet(options?: {
-  verticalWriting?: boolean;
-}): string {
+export function getMdiStylesheet(options?: { verticalWriting?: boolean }): string {
   const rules: string[] = [
     ".mdi-tcy { text-combine-upright: all; }",
     ".mdi-nobr { white-space: nowrap; word-break: keep-all; }",
@@ -192,9 +167,7 @@ export function getMdiStylesheet(options?: {
   ];
 
   if (options?.verticalWriting) {
-    rules.push(
-      "body { writing-mode: vertical-rl; text-orientation: mixed; }"
-    );
+    rules.push("body { writing-mode: vertical-rl; text-orientation: mixed; }");
   }
 
   return rules.join("\n");
@@ -215,7 +188,7 @@ export function mdiToHtml(
     metadata?: ExportMetadata;
     verticalWriting?: boolean;
     bodyOnly?: boolean;
-  }
+  },
 ): string {
   const md = createMarkdownIt();
 
@@ -330,10 +303,7 @@ export function splitIntoChapters(markdown: string): Chapter[] {
  * Escape a string for use in HTML text content
  */
 function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**

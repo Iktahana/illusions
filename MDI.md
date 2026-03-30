@@ -1,14 +1,14 @@
 # MDI (Illusion Markdown) Syntax Specification (MDI 1.0 Draft)
 
 MDI files are Markdown documents with illusions-specific extensions for Japanese typography.
-This specification defines *inline* syntaxes that are difficult to express in standard Markdown (ruby, tate-chu-yoko, no-break, kerning).
+This specification defines _inline_ syntaxes that are difficult to express in standard Markdown (ruby, tate-chu-yoko, no-break, kerning).
 
 ## 1. Purpose & Assumptions
 
 MDI (Markdown for Document typesetting extensions) aims to provide concise, low-conflict markup for Japanese writing.
 
 - Target output: HTML (styling is controlled by CSS).
-- MDI focuses on *semantic annotation*; appearance is delegated to CSS.
+- MDI focuses on _semantic annotation_; appearance is delegated to CSS.
 - MDI is designed to avoid collisions with common Markdown constructs (`*`, `**`, links, etc.).
 
 ## 2. Parsing Rules (Recommended)
@@ -49,9 +49,9 @@ To write MDI delimiter characters literally, a backslash escape is recommended.
 
 ### 3.3 Semantics
 
-- If the number of base characters equals the number of dot-separated ruby segments, treat as *split ruby*.
+- If the number of base characters equals the number of dot-separated ruby segments, treat as _split ruby_.
 - If they do not match, implementations may:
-  - Preferably treat as *group ruby* (single `rt` for the whole base), or
+  - Preferably treat as _group ruby_ (single `rt` for the whole base), or
   - Fallback to plain text.
 - Okurigana (送り仮名) and punctuation may be included on the base side as-is.
 

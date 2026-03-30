@@ -53,24 +53,20 @@ export default function PosHighlightSettingsTab(): React.ReactElement {
         {/* Toggle */}
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium text-foreground">
-              品詞ハイライトを有効化
-            </h3>
-            <p className="text-xs text-foreground-tertiary mt-0.5">
-              動詞・助詞などを色分け表示
-            </p>
+            <h3 className="text-sm font-medium text-foreground">品詞ハイライトを有効化</h3>
+            <p className="text-xs text-foreground-tertiary mt-0.5">動詞・助詞などを色分け表示</p>
           </div>
           <button
             onClick={() => onPosHighlightEnabledChange(!posHighlightEnabled)}
             className={clsx(
               "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
-              posHighlightEnabled ? "bg-accent" : "bg-border-secondary"
+              posHighlightEnabled ? "bg-accent" : "bg-border-secondary",
             )}
           >
             <span
               className={clsx(
                 "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
-                posHighlightEnabled ? "translate-x-6" : "translate-x-1"
+                posHighlightEnabled ? "translate-x-6" : "translate-x-1",
               )}
             />
           </button>

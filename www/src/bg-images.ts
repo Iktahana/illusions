@@ -5,32 +5,32 @@
 
 // Import all jpg, jpeg, png, webp images from the bg directory
 // import.meta.glob resolves from project root, so we need /public/ prefix
-const imageModules = import.meta.glob<string>('/public/image/bg/*.{jpg,jpeg,png,webp}', {
+const imageModules = import.meta.glob<string>("/public/image/bg/*.{jpg,jpeg,png,webp}", {
   eager: true,
-  query: '?url',
-  import: 'default',
-})
+  query: "?url",
+  import: "default",
+});
 
 /**
  * Get all background image URLs
  */
 export function getBackgroundImages(): string[] {
-  const urls = Object.values(imageModules).filter((url): url is string => typeof url === 'string')
-  console.log('Found background images:', urls)
-  return urls
+  const urls = Object.values(imageModules).filter((url): url is string => typeof url === "string");
+  console.log("Found background images:", urls);
+  return urls;
 }
 
 /**
  * Get a random background image URL
  */
 export function getRandomBackgroundImage(): string | null {
-  const images = getBackgroundImages()
+  const images = getBackgroundImages();
 
   if (images.length === 0) {
-    console.info('No background images found in /public/image/bg/')
-    return null
+    console.info("No background images found in /public/image/bg/");
+    return null;
   }
 
-  const randomIndex = Math.floor(Math.random() * images.length)
-  return images[randomIndex]
+  const randomIndex = Math.floor(Math.random() * images.length);
+  return images[randomIndex];
 }

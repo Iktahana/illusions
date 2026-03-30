@@ -34,7 +34,10 @@ export abstract class AbstractLintRule implements LintRule {
  * Abstract base class for document-level lint rules.
  * These rules analyze all paragraphs together for cross-paragraph checks.
  */
-export abstract class AbstractDocumentLintRule extends AbstractLintRule implements DocumentLintRule {
+export abstract class AbstractDocumentLintRule
+  extends AbstractLintRule
+  implements DocumentLintRule
+{
   abstract lintDocument(
     paragraphs: ReadonlyArray<{ text: string; index: number }>,
     config: LintRuleConfig,

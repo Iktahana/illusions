@@ -6,12 +6,7 @@ import { fetchAppState, persistAppState } from "../storage/app-state-manager";
 import type { TabState, SerializedTab, TabPersistenceState, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import type { TabManagerCore } from "./types";
-import {
-  TAB_PERSIST_DEBOUNCE,
-  createNewTab,
-  generateTabId,
-  inferFileType,
-} from "./types";
+import { TAB_PERSIST_DEBOUNCE, createNewTab, generateTabId, inferFileType } from "./types";
 import { getVFS } from "../vfs";
 
 // ---------------------------------------------------------------------------
@@ -232,10 +227,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
       try {
         // Wait for VFS root to be set before reading files (prevents race condition)
         if (vfsReadyPromise) {
-          await Promise.race([
-            vfsReadyPromise,
-            new Promise<void>((r) => setTimeout(r, 5000)),
-          ]);
+          await Promise.race([vfsReadyPromise, new Promise<void>((r) => setTimeout(r, 5000))]);
         }
 
         const appState = await fetchAppState();
@@ -272,20 +264,14 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
                 conflictDiskContent: null,
               });
             } catch (error) {
-              console.warn(
-                `タブの復元に失敗しました (${serialized.filePath}):`,
-                error,
-              );
+              console.warn(`タブの復元に失敗しました (${serialized.filePath}):`, error);
             }
           }
         }
 
         if (restoredTabs.length > 0) {
           setTabs(restoredTabs);
-          const activeIdx = Math.min(
-            openTabs.activeIndex,
-            restoredTabs.length - 1,
-          );
+          const activeIdx = Math.min(openTabs.activeIndex, restoredTabs.length - 1);
           setActiveTabId(restoredTabs[activeIdx].id);
         } else {
           // Saved tabs were all untitled (no file path) — create a default tab.

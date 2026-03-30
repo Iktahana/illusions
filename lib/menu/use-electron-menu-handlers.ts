@@ -5,13 +5,10 @@ import { isElectronRenderer } from "../utils/runtime-env";
 
 /**
  * Electron メニューイベントのハンドラを登録する Hook
- * 
+ *
  * page.tsx で安全チェック付きの関数をバインドするために使用
  */
-export function useElectronMenuHandlers(
-  onMenuNew: () => void,
-  onMenuOpen: () => Promise<void>
-) {
+export function useElectronMenuHandlers(onMenuNew: () => void, onMenuOpen: () => Promise<void>) {
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
   // メニューの「新規作成」

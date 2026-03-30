@@ -19,7 +19,9 @@ export function usePermissions(
   openRestoredProject: (handle: FileSystemDirectoryHandle) => Promise<void>,
 ): UsePermissionsResult {
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
-  const [permissionPromptData, setPermissionPromptData] = useState<PermissionPromptState | null>(null);
+  const [permissionPromptData, setPermissionPromptData] = useState<PermissionPromptState | null>(
+    null,
+  );
 
   const handlePermissionGranted = useCallback(() => {
     if (permissionPromptData) {

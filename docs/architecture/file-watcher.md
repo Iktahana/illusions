@@ -10,9 +10,9 @@ The file watcher monitors external changes to files currently open in the editor
 
 ### Key File
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `lib/file-watcher.ts` | ~423 | Complete file watcher implementation |
+| File                  | Lines | Purpose                              |
+| --------------------- | ----- | ------------------------------------ |
+| `lib/file-watcher.ts` | ~423  | Complete file watcher implementation |
 
 ### Features
 
@@ -108,26 +108,26 @@ type FileChangeCallback = (content: string) => void;
 
 /** Configuration for creating a file watcher */
 interface FileWatcherOptions {
-  path: string;                // Absolute path to the file to watch
+  path: string; // Absolute path to the file to watch
   onChanged: FileChangeCallback; // Called when external change detected
-  pollIntervalMs?: number;     // Poll interval in ms (default: 5000)
+  pollIntervalMs?: number; // Poll interval in ms (default: 5000)
 }
 
 /** File watcher instance */
 interface FileWatcher {
-  start(): void;               // Begin watching the file
-  stop(): void;                // Stop watching and clean up
-  isActive: boolean;           // Whether the watcher is currently running
+  start(): void; // Begin watching the file
+  stop(): void; // Stop watching and clean up
+  isActive: boolean; // Whether the watcher is currently running
 }
 ```
 
 ### Constants
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `DEFAULT_POLL_INTERVAL_MS` | `5000` | Default polling interval (5 seconds) |
-| `MAX_CONSECUTIVE_FAILURES` | `5` | Auto-stop threshold for consecutive poll failures |
-| `SAVE_SUPPRESSION_MS` | `3000` | Duration to suppress change notifications after a save |
+| Constant                          | Value    | Description                                                      |
+| --------------------------------- | -------- | ---------------------------------------------------------------- |
+| `DEFAULT_POLL_INTERVAL_MS`        | `5000`   | Default polling interval (5 seconds)                             |
+| `MAX_CONSECUTIVE_FAILURES`        | `5`      | Auto-stop threshold for consecutive poll failures                |
+| `SAVE_SUPPRESSION_MS`             | `3000`   | Duration to suppress change notifications after a save           |
 | `SUPPRESSION_CLEANUP_INTERVAL_MS` | `300000` | Interval for cleaning up expired suppression entries (5 minutes) |
 
 ---

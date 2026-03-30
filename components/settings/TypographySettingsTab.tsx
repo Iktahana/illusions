@@ -3,10 +3,7 @@
 import type React from "react";
 import clsx from "clsx";
 import { FEATURED_JAPANESE_FONTS } from "@/lib/utils/fonts";
-import {
-  useTypographySettings,
-  useUISettings,
-} from "@/contexts/EditorSettingsContext";
+import { useTypographySettings, useUISettings } from "@/contexts/EditorSettingsContext";
 
 /**
  * Settings tab for typography (editor) and UI settings.
@@ -38,9 +35,7 @@ export default function TypographySettingsTab(): React.ReactElement {
     <div className="space-y-6">
       {/* Font family */}
       <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          フォント
-        </label>
+        <label className="block text-sm font-medium text-foreground mb-2">フォント</label>
         <select
           value={fontFamily}
           onChange={(e) => onFontFamilyChange(e.target.value)}
@@ -104,9 +99,7 @@ export default function TypographySettingsTab(): React.ReactElement {
 
       {/* Text indent */}
       <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          字下げ
-        </label>
+        <label className="block text-sm font-medium text-foreground mb-2">字下げ</label>
         <div className="flex items-center gap-2">
           <input
             type="number"
@@ -135,7 +128,7 @@ export default function TypographySettingsTab(): React.ReactElement {
             onChange={(e) => onCharsPerLineChange(Number(e.target.value))}
             className={clsx(
               "w-24 px-3 py-2 border border-border-secondary rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent",
-              autoCharsPerLine && "opacity-50 cursor-not-allowed"
+              autoCharsPerLine && "opacity-50 cursor-not-allowed",
             )}
           />
           <span className="text-sm text-foreground-secondary">字</span>
@@ -144,13 +137,13 @@ export default function TypographySettingsTab(): React.ReactElement {
             onClick={() => onAutoCharsPerLineChange(!autoCharsPerLine)}
             className={clsx(
               "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out",
-              autoCharsPerLine ? "bg-accent" : "bg-border-secondary"
+              autoCharsPerLine ? "bg-accent" : "bg-border-secondary",
             )}
           >
             <span
               className={clsx(
                 "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition duration-200 ease-in-out",
-                autoCharsPerLine ? "translate-x-5" : "translate-x-0"
+                autoCharsPerLine ? "translate-x-5" : "translate-x-0",
               )}
             />
           </button>
@@ -166,21 +159,19 @@ export default function TypographySettingsTab(): React.ReactElement {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-medium text-foreground">段落番号を表示</h3>
-          <p className="text-xs text-foreground-tertiary mt-0.5">
-            各段落に番号を表示します
-          </p>
+          <p className="text-xs text-foreground-tertiary mt-0.5">各段落に番号を表示します</p>
         </div>
         <button
           onClick={() => onShowParagraphNumbersChange(!showParagraphNumbers)}
           className={clsx(
             "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
-            showParagraphNumbers ? "bg-accent" : "bg-border-secondary"
+            showParagraphNumbers ? "bg-accent" : "bg-border-secondary",
           )}
         >
           <span
             className={clsx(
               "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
-              showParagraphNumbers ? "translate-x-6" : "translate-x-1"
+              showParagraphNumbers ? "translate-x-6" : "translate-x-1",
             )}
           />
         </button>
@@ -190,21 +181,19 @@ export default function TypographySettingsTab(): React.ReactElement {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-medium text-foreground">自動保存</h3>
-          <p className="text-xs text-foreground-tertiary mt-0.5">
-            変更を5秒ごとに自動保存します
-          </p>
+          <p className="text-xs text-foreground-tertiary mt-0.5">変更を5秒ごとに自動保存します</p>
         </div>
         <button
           onClick={() => onAutoSaveChange(!autoSave)}
           className={clsx(
             "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
-            autoSave ? "bg-accent" : "bg-border-secondary"
+            autoSave ? "bg-accent" : "bg-border-secondary",
           )}
         >
           <span
             className={clsx(
               "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
-              autoSave ? "translate-x-6" : "translate-x-1"
+              autoSave ? "translate-x-6" : "translate-x-1",
             )}
           />
         </button>
