@@ -55,11 +55,11 @@ jobs:
       DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
 
     steps:
-      - name: Verify running from main branch or tag
+      - name: Verify running from main branch or version tag
         shell: bash
         run: |
-          if [ "${{ github.ref }}" != "refs/heads/main" ] && [ "${{ github.ref_type }}" != "tag" ]; then
-            echo "::error::This workflow may only be run from main or a version tag. Current ref: ${{ github.ref }}"
+          if [ "${{ github.ref }}" != "refs/heads/main" ] && [[ "${{ github.ref }}" != refs/tags/v* ]]; then
+            echo "::error::This workflow may only be run from main or a version tag (refs/tags/v*). Current ref: ${{ github.ref }}"
             exit 1
           fi
 
@@ -77,6 +77,10 @@ jobs:
       - name: Validate inputs
         shell: bash
         run: |
+          if [ "${{ inputs.mode }}" != "listing-only" ] && [ "${{ inputs.mode }}" != "full-submission" ]; then
+            echo "::error::mode must be 'listing-only' or 'full-submission', got: ${{ inputs.mode }}"
+            exit 1
+          fi
           if [ "${{ inputs.mode }}" = "full-submission" ] && [ -z "${{ inputs.release_tag }}" ]; then
             echo "::error::release_tag is required for full-submission mode"
             exit 1
