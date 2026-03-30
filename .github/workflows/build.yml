@@ -70,6 +70,7 @@ jobs:
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ubuntu-latest
     outputs:
+      base: ${{ steps.version.outputs.base }}
       full: ${{ steps.version.outputs.full }}
       msix: ${{ steps.version.outputs.msix }}
       branch: ${{ steps.version.outputs.branch }}
@@ -88,21 +89,82 @@ jobs:
       - name: Compute version strings
         id: version
         run: |
-          BASE_VERSION=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          BRANCH_NAME="${GITHUB_REF_NAME}"
-          if [ "$BRANCH_NAME" = "main" ]; then
-            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          # Read full semver from package.json (e.g. 0.1.3)
+          BASE_VERSION=$(node -p "require('./package.json').version")
+
+          # Determine effective branch name
+          # For tag pushes (github.ref_type == 'tag'), treat as main release
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            EXPECTED_TAG="v${BASE_VERSION}"
+            ACTUAL_TAG="${GITHUB_REF_NAME}"
+            if [ "$ACTUAL_TAG" != "$EXPECTED_TAG" ]; then
+              echo "::error::Tag '${ACTUAL_TAG}' does not match package.json version '${BASE_VERSION}' (expected '${EXPECTED_TAG}')"
+              exit 1
+            fi
+            BRANCH_NAME="main"
           else
-            FULL_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}"
+            BRANCH_NAME="${GITHUB_REF_NAME}"
           fi
-          # MSIX requires exactly four numeric parts (x.y.z.w); strip any prerelease suffix
-          # by always using revision 0 as the fourth component
-          MSIX_REVISION=0
-          MSIX_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}.${MSIX_REVISION}"
+
+          # main: use package.json version as-is
+          # alpha|beta|dev: append branch name as prerelease suffix
+          case "$BRANCH_NAME" in
+            main)
+              FULL_VERSION="${BASE_VERSION}"
+              ;;
+            alpha|beta|dev)
+              FULL_VERSION="${BASE_VERSION}-${BRANCH_NAME}"
+              ;;
+            *)
+              echo "::error::Unexpected branch '${BRANCH_NAME}' — only main/alpha/beta/dev are allowed"
+              exit 1
+              ;;
+          esac
+
+          # MSIX requires exactly four numeric parts (X.Y.Z.0); no prerelease suffix
+          MSIX_VERSION="${BASE_VERSION}.0"
+
+          echo "base=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
           echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
           echo "msix=${MSIX_VERSION}" >> "$GITHUB_OUTPUT"
           echo "branch=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
-          echo "Version: ${FULL_VERSION} | MSIX: ${MSIX_VERSION} | Branch: ${BRANCH_NAME}"
+          echo "Version: base=${BASE_VERSION} | full=${FULL_VERSION} | MSIX: ${MSIX_VERSION} | Branch: ${BRANCH_NAME}"
+
+      - name: Validate version format
+        run: |
+          BASE="${{ steps.version.outputs.base }}"
+          MSIX="${{ steps.version.outputs.msix }}"
+          FULL="${{ steps.version.outputs.full }}"
+          BRANCH="${{ steps.version.outputs.branch }}"
+
+          # base must be strict semver X.Y.Z
+          if ! echo "$BASE" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Invalid base version: '${BASE}' (expected X.Y.Z)"
+            exit 1
+          fi
+
+          # msix must be four-part pure numeric X.Y.Z.0 (fourth part fixed to 0)
+          if ! echo "$MSIX" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.0$'; then
+            echo "::error::Invalid MSIX version: '${MSIX}' (expected X.Y.Z.0)"
+            exit 1
+          fi
+
+          # full version: strict format per branch
+          if [ "$BRANCH" = "main" ]; then
+            # stable release: must be exactly X.Y.Z
+            if ! echo "$FULL" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Stable full version '${FULL}' is not strict semver (expected X.Y.Z)"
+              exit 1
+            fi
+          else
+            # prerelease: must be X.Y.Z-(alpha|beta|dev)
+            if ! echo "$FULL" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|dev)$'; then
+              echo "::error::Prerelease full version '${FULL}' has invalid format (expected X.Y.Z-(alpha|beta|dev))"
+              exit 1
+            fi
+          fi
+
+          echo "Version validation passed: base=${BASE}, full=${FULL}, msix=${MSIX}, branch=${BRANCH}"
 
   # ---------------------------------------------------------------------------
   # Pre-flight checks — verify signing credentials before any build starts
@@ -186,15 +248,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Type check
-        if: github.event_name == 'pull_request'
-        run: npx tsc --noEmit
-
-      # --- Full build steps (push to main/alpha/beta/dev only) ---
-
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
         uses: actions/cache@v4
@@ -205,6 +258,26 @@ jobs:
           key: electron-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             electron-${{ runner.os }}-${{ matrix.arch }}-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            npm install && break
+            if [ $i -lt 3 ]; then
+              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::npm install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+      - name: Type check
+        if: github.event_name == 'pull_request'
+        run: npx tsc --noEmit
+
+      # --- Full build steps (push to main/alpha/beta/dev only) ---
 
       - name: Restore Next.js cache
         if: github.event_name != 'pull_request'
@@ -267,15 +340,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Type check
-        if: github.event_name == 'pull_request'
-        run: npx tsc --noEmit
-
-      # --- Full build steps (push to main/alpha/beta/dev only) ---
-
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
         uses: actions/cache@v4
@@ -286,6 +350,26 @@ jobs:
           key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             electron-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            npm install && break
+            if [ $i -lt 3 ]; then
+              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::npm install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+      - name: Type check
+        if: github.event_name == 'pull_request'
+        run: npx tsc --noEmit
+
+      # --- Full build steps (push to main/alpha/beta/dev only) ---
 
       - name: Restore Next.js cache
         if: github.event_name != 'pull_request'
@@ -349,11 +433,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm install
-
-      # --- Full packaging steps (push to main/alpha/beta/dev only) ---
-
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
         uses: actions/cache@v4
@@ -364,6 +443,22 @@ jobs:
           key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             electron-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            npm install && break
+            if [ $i -lt 3 ]; then
+              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::npm install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+      # --- Full packaging steps (push to main/alpha/beta/dev only) ---
 
       - name: Update package.json version
         if: github.event_name != 'pull_request'
@@ -418,11 +513,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm install
-
-      # --- Full packaging steps (push to main/alpha/beta/dev only) ---
-
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
         uses: actions/cache@v4
@@ -433,6 +523,22 @@ jobs:
           key: electron-${{ runner.os }}-msix-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             electron-${{ runner.os }}-msix-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            npm install && break
+            if [ $i -lt 3 ]; then
+              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::npm install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+      # --- Full packaging steps (push to main/alpha/beta/dev only) ---
 
       - name: Update package.json version (4-part for MSIX)
         if: github.event_name != 'pull_request'
@@ -484,19 +590,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Type check
-        if: github.event_name == 'pull_request'
-        run: npx tsc --noEmit
-
-      # --- Full build steps (push to main/alpha/beta/dev only) ---
-
-      - name: Install rpm build tools
-        if: github.event_name != 'pull_request'
-        run: sudo apt-get update && sudo apt-get install -y rpm
-
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
         uses: actions/cache@v4
@@ -507,6 +600,30 @@ jobs:
           key: electron-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             electron-${{ runner.os }}-x64-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            npm install && break
+            if [ $i -lt 3 ]; then
+              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::npm install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+      - name: Type check
+        if: github.event_name == 'pull_request'
+        run: npx tsc --noEmit
+
+      # --- Full build steps (push to main/alpha/beta/dev only) ---
+
+      - name: Install rpm build tools
+        if: github.event_name != 'pull_request'
+        run: sudo apt-get update && sudo apt-get install -y rpm
 
       - name: Restore Next.js cache
         if: github.event_name != 'pull_request'
