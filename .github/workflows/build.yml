@@ -296,7 +296,7 @@ jobs:
 
       - name: Update package.json version
         if: github.event_name != 'pull_request'
-        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version
+        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version --allow-same-version
 
       - name: Download local fonts
         if: github.event_name != 'pull_request'
@@ -388,7 +388,7 @@ jobs:
 
       - name: Update package.json version
         if: github.event_name != 'pull_request'
-        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version
+        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version --allow-same-version
 
       - name: Download local fonts
         if: github.event_name != 'pull_request'
@@ -468,7 +468,7 @@ jobs:
 
       - name: Update package.json version
         if: github.event_name != 'pull_request'
-        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version
+        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version --allow-same-version
 
       - name: Download build output
         if: github.event_name != 'pull_request'
@@ -642,7 +642,7 @@ jobs:
 
       - name: Update package.json version
         if: github.event_name != 'pull_request'
-        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version
+        run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version --allow-same-version
 
       - name: Download local fonts
         if: github.event_name != 'pull_request'
