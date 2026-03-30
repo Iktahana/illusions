@@ -22,9 +22,7 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     toneJa: "感性・具象・張力",
     descriptionJa: "小説・フィクション向けの校正モード。文体の個性を尊重します。",
     defaultGuidelines: ["novel-manuscript", "joyo-kanji-2010", "jis-x-4051"],
-    ruleOverrides: {
-      "desu-masu-consistency": { enabled: false },
-    },
+    ruleOverrides: {},
   },
   official: {
     id: "official",
@@ -38,9 +36,7 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
       "okurigana-1973",
       "gairai-1991",
     ],
-    ruleOverrides: {
-      "taigen-dome-overuse": { enabled: false },
-    },
+    ruleOverrides: {},
   },
   blog: {
     id: "blog",
@@ -48,9 +44,7 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     toneJa: "親切・共有感・半正式",
     descriptionJa: "ウェブ記事・ブログ向けモード。読みやすさを重視します。",
     defaultGuidelines: ["jtf-style-3", "joyo-kanji-2010"],
-    ruleOverrides: {
-      "sentence-length": { enabled: true },
-    },
+    ruleOverrides: {},
   },
   academic: {
     id: "academic",
@@ -59,9 +53,7 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     descriptionJa:
       "論文・学術文書向けモード。客観性と構造的な記述を重視します。",
     defaultGuidelines: ["joyo-kanji-2010", "okurigana-1973", "jis-x-4051"],
-    ruleOverrides: {
-      "taigen-dome-overuse": { enabled: true, severity: "warning" },
-    },
+    ruleOverrides: {},
   },
   sns: {
     id: "sns",
@@ -69,11 +61,7 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     toneJa: "簡潔・インパクト",
     descriptionJa: "SNS・短文投稿向けモード。最も寛容な設定です。",
     defaultGuidelines: ["joyo-kanji-2010"],
-    ruleOverrides: {
-      "sentence-length": { enabled: false },
-      "taigen-dome-overuse": { enabled: false },
-      "conjunction-overuse": { enabled: false },
-    },
+    ruleOverrides: {},
   },
 };
 

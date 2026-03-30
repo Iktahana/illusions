@@ -18,7 +18,7 @@ import type { JsonRuleMeta, LintIssue, LintReference, LintRuleConfig } from "../
 // ---------------------------------------------------------------------------
 
 const JTF_REFERENCE: LintReference = {
-  standard: "JTF日本語標準スタイルガイド (2023)",
+  standard: "JTF日本語標準スタイルガイド",
   url: "",
 };
 
@@ -893,16 +893,6 @@ class JtfDataRateUnitRule extends AbstractL1Rule {
 }
 
 // ============================================================================
-// TODO stub class: disabled rule that returns no issues
-// ============================================================================
-
-class JtfTodoStubRule extends AbstractL1Rule {
-  lint(_text: string, _config: LintRuleConfig): LintIssue[] {
-    return [];
-  }
-}
-
-// ============================================================================
 // Rule ID → concrete class mapping
 // ============================================================================
 
@@ -937,45 +927,38 @@ const IMPLEMENTED_RULES: RuleClassMap = {
 // ============================================================================
 
 /**
- * Create all JTF L1 rules.
- * Returns 43 rules: 21 implemented + 22 TODO stubs.
+ * Convert a JSON rule ID to the exported lint rule ID.
+ */
+function toRuleId(ruleId: string): string {
+  return `jtf-${ruleId.replace(/^JTF_/, "").replace(/_/g, "-").toLowerCase()}`;
+}
+
+/**
+ * Create all implementable JTF L1 rules.
  */
 export function createJtfL1Rules(): AbstractL1Rule[] {
   const jtfRules = getJsonRulesByBook("JTF 日本語標準スタイルガイド");
-  const l1Rules = jtfRules.filter((r) => r.Level === "L1");
+  const l1Rules = jtfRules.filter(
+    (rule) => rule.Level === "L1" && !rule["Pattern/Logic"].startsWith("TODO"),
+  );
 
   const result: AbstractL1Rule[] = [];
 
   for (const entry of l1Rules) {
     const meta = toMeta(entry);
-    const isTodo = entry["Pattern/Logic"].startsWith("TODO");
     const RuleClass = IMPLEMENTED_RULES[entry.Rule_ID];
 
-    if (RuleClass && !isTodo) {
-      // Implemented rule
-      result.push(
-        new RuleClass(meta, {
-          id: entry.Rule_ID,
-          name: entry.Source_Reference,
-          nameJa: entry.Source_Reference,
-          description: entry.Description,
-          descriptionJa: entry.Description,
-          defaultConfig: { enabled: true, severity: "warning" },
-        }),
-      );
-    } else {
-      // TODO stub (disabled)
-      result.push(
-        new JtfTodoStubRule(meta, {
-          id: entry.Rule_ID,
-          name: entry.Source_Reference,
-          nameJa: entry.Source_Reference,
-          description: entry.Description,
-          descriptionJa: entry.Description,
-          defaultConfig: { enabled: false, severity: "info" },
-        }),
-      );
-    }
+    if (!RuleClass) continue; // skip rules without implementation
+    result.push(
+      new RuleClass(meta, {
+        id: toRuleId(entry.Rule_ID),
+        name: entry.Description,
+        nameJa: entry.Description,
+        description: entry.Description,
+        descriptionJa: entry.Description,
+        defaultConfig: { enabled: true, severity: "warning" },
+      }),
+    );
   }
 
   return result;
