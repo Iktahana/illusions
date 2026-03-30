@@ -711,7 +711,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
-  # Microsoft Store submission is handled by a separate workflow:
-  #   .github/workflows/sync-ms-store-listing.yml
-  # Use it manually via workflow_dispatch after a release.
+  # Automatically submit to Microsoft Store after a stable release.
+  # Triggered via workflow_call — runs only on main branch / version tags.
   # ---------------------------------------------------------------------------
+
+  sync-ms-store:
+    name: Sync Microsoft Store (full-submission)
+    needs: [release, compute-version]
+    if: |
+      github.event_name != 'pull_request' &&
+      needs.compute-version.outputs.branch == 'main'
+    uses: ./.github/workflows/sync-ms-store-listing.yml
+    with:
+      mode: full-submission
+      release_tag: v${{ needs.compute-version.outputs.full }}
+      dry_run: false
+    secrets: inherit
