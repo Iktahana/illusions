@@ -1,5 +1,5 @@
 import type { KeyBinding } from "./keymap-types";
-import { isMacOS } from "@/lib/utils/runtime-env";
+import { isMacOS, isElectronRenderer } from "@/lib/utils/runtime-env";
 
 /**
  * Returns the platform-specific display string for a key binding.
@@ -138,6 +138,56 @@ export function toWebMenuAccelerator(binding: KeyBinding | null): string | undef
   const mods = binding.modifiers.map(m => m === "CmdOrCtrl" ? "Ctrl" : m);
   const key = binding.key === "+" ? "+" : binding.key.toUpperCase();
   return [...mods, key].join("+");
+}
+
+/**
+ * Compares two KeyBindings for equality (normalized modifiers + lowercase key).
+ */
+export function bindingsMatch(a: KeyBinding | null, b: KeyBinding | null): boolean {
+  if (!a || !b) return false;
+  if (a.key.toLowerCase() !== b.key.toLowerCase()) return false;
+  const aMods = [...a.modifiers].sort();
+  const bMods = [...b.modifiers].sort();
+  if (aMods.length !== bMods.length) return false;
+  return aMods.every((m, i) => m === bMods[i]);
+}
+
+/**
+ * Browser/OS reserved key combinations that should not be overridden.
+ */
+const RESERVED_BINDINGS: Array<{ modifiers: KeyBinding["modifiers"]; key: string }> = [
+  { modifiers: ["CmdOrCtrl"], key: "r" },
+  { modifiers: ["CmdOrCtrl", "Shift"], key: "r" },
+  { modifiers: ["CmdOrCtrl"], key: "l" },
+  { modifiers: ["CmdOrCtrl"], key: "d" },
+  { modifiers: ["CmdOrCtrl"], key: "q" },
+  { modifiers: ["CmdOrCtrl", "Shift"], key: "i" },
+  { modifiers: ["CmdOrCtrl", "Shift"], key: "j" },
+  { modifiers: [], key: "F5" },
+  { modifiers: [], key: "F11" },
+  { modifiers: [], key: "F12" },
+  { modifiers: ["CmdOrCtrl"], key: "g" },
+  { modifiers: ["CmdOrCtrl"], key: "f" },
+];
+
+/**
+ * Returns true if the binding conflicts with a browser/OS reserved shortcut.
+ */
+export function isReservedBinding(binding: KeyBinding): boolean {
+  return RESERVED_BINDINGS.some((reserved) =>
+    bindingsMatch(binding, { modifiers: reserved.modifiers, key: reserved.key }),
+  );
+}
+
+/**
+ * Returns true if the given scope is active in the current environment.
+ */
+export function isScopeActive(scope: "all" | "electron-only" | "web-only" | undefined): boolean {
+  if (!scope || scope === "all") return true;
+  const isElectron = isElectronRenderer();
+  if (scope === "electron-only") return isElectron;
+  if (scope === "web-only") return !isElectron;
+  return true;
 }
 
 /**

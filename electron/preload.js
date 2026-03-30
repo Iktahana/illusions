@@ -109,6 +109,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportPDF: (content, options) => ipcRenderer.invoke('export-pdf', content, options),
   exportEPUB: (content, options) => ipcRenderer.invoke('export-epub', content, options),
   exportDOCX: (content, options) => ipcRenderer.invoke('export-docx', content, options),
+  onMenuExportTxt: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-export-txt', handler)
+    return () => ipcRenderer.removeListener('menu-export-txt', handler)
+  },
+  onMenuExportTxtRuby: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu-export-txt-ruby', handler)
+    return () => ipcRenderer.removeListener('menu-export-txt-ruby', handler)
+  },
   onMenuExportPDF: (callback) => {
     const handler = () => callback()
     ipcRenderer.on('menu-export-pdf', handler)

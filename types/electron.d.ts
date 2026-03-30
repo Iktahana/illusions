@@ -67,6 +67,8 @@ declare global {
       content: string,
       options: { metadata: { title: string; author?: string; date?: string; language?: string } }
     ) => Promise<string | { success: false; error: string } | null>;
+    onMenuExportTxt?: (callback: () => void) => (() => void) | void;
+    onMenuExportTxtRuby?: (callback: () => void) => (() => void) | void;
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;
