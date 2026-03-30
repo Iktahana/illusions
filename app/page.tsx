@@ -46,12 +46,9 @@ import { useEditorMode } from "@/contexts/EditorModeContext";
 import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
-import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
-import type { TerminalTabState, DiffTabState } from "@/lib/tab-manager/tab-types";
+import { isEditorTab } from "@/lib/tab-manager/tab-types";
 import { TerminalTabContext } from "@/contexts/TerminalTabContext";
-import type { TerminalTabContextValue } from "@/contexts/TerminalTabContext";
 import { DiffTabContext } from "@/contexts/DiffTabContext";
-import type { DiffTabContextValue } from "@/contexts/DiffTabContext";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
@@ -62,6 +59,8 @@ import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
 import { useSaveToast } from "@/lib/editor-page/use-save-toast";
+import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
+import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import ContextMenu from "@/components/ContextMenu";
 
@@ -190,26 +189,33 @@ export default function EditorPage() {
     flushTabState,
   } = tabManager;
 
-  // Ref that always holds the latest tabs array (avoids stale closures in PTY callbacks)
+  // Keep a live tabs ref for dockview panel renderers captured by stale closures.
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
-  // Ref that always holds the latest updateTerminalTab (avoids re-subscribing)
-  const updateTerminalTabRef = useRef(updateTerminalTab);
-  updateTerminalTabRef.current = updateTerminalTab;
+  const {
+    diffTabContextValue,
+    handleCloseTabWithPtyCleanup,
+  } = useDiffTabs({
+    tabs,
+    updateTab,
+    forceCloseTab,
+    closeTab,
+  });
 
-  // --- Tab close wrapper: kill PTY session when a terminal tab closes ---
-  const handleCloseTabWithPtyCleanup = useCallback(
-    (tabId: string) => {
-      // Look up the tab before closing it
-      const tab = tabsRef.current.find((t) => t.id === tabId);
-      if (tab && isTerminalTab(tab) && tab.sessionId) {
-        void window.electronAPI?.pty?.kill(tab.sessionId);
-      }
-      closeTab(tabId);
-    },
-    [closeTab],
-  );
+  const {
+    handleNewTerminalTab,
+    terminalTabContextValue,
+    showDesktopOnlyDialog,
+    setShowDesktopOnlyDialog,
+  } = useTerminalTabs({
+    tabs,
+    newTerminalTab,
+    updateTerminalTab,
+    editorMode,
+    settings,
+    isElectron,
+  });
 
   // Patched tabManager passed to the dockview adapter so that panel close
   // triggers PTY kill before removing the tab from state.
@@ -223,168 +229,6 @@ export default function EditorPage() {
   } = useDockviewAdapter({ tabManager: tabManagerWithPtyCleanup, editorKey });
   const { flushLayoutState } = useDockviewPersistence({ dockviewApi, tabs: tabManagerWithPtyCleanup.tabs });
   flushLayoutStateRef.current = flushLayoutState;
-
-  // --- New terminal tab callback ---
-  const handleNewTerminalTab = useCallback(() => {
-    if (isElectronRenderer()) {
-      const ptyApi = window.electronAPI?.pty;
-      if (!ptyApi) return;
-      // Create the tab first (shows "connecting" state immediately)
-      newTerminalTab();
-      // Spawn the PTY session; update the tab's sessionId once we have it
-      void (async () => {
-        const cwd = isProjectMode(editorMode) ? editorMode.rootPath : undefined;
-        const shell = settings.terminalDefaultShell || undefined;
-        const result = await ptyApi.spawn({ cwd, shell });
-        if ("error" in result) return;
-        const { sessionId } = result;
-        // Update the most recently created terminal tab with an empty sessionId
-        const targetTab = tabsRef.current
-          .slice()
-          .reverse()
-          .find((t) => isTerminalTab(t) && (t as TerminalTabState).sessionId === "");
-        if (targetTab) {
-          updateTerminalTabRef.current(targetTab.id, { sessionId, status: "running" });
-        }
-      })();
-    } else {
-      // Web: show desktop-only dialog since terminal requires native PTY
-      setShowDesktopOnlyDialog(true);
-    }
-  }, [newTerminalTab, editorMode, settings.terminalDefaultShell]);
-
-  // --- PTY exit event listener: update tab status when process exits ---
-  useEffect(() => {
-    if (!isElectronRenderer()) return;
-    const ptyApi = window.electronAPI?.pty;
-    if (!ptyApi) return;
-
-    const unsubExit = ptyApi.onExit(({ sessionId, exitCode }) => {
-      // Find the terminal tab with this sessionId and mark it as exited
-      const tab = tabsRef.current.find(
-        (t) => isTerminalTab(t) && (t as TerminalTabState).sessionId === sessionId,
-      );
-      if (tab) {
-        updateTerminalTabRef.current(tab.id, { status: "exited", exitCode });
-      }
-    });
-
-    return unsubExit;
-  // Subscribe once on mount; use refs to avoid stale closures
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // --- TerminalTabContext value: exposes terminal tab state to dockview panel components ---
-  const getTerminalTabBySessionId = useCallback(
-    (sessionId: string) =>
-      tabsRef.current.find(
-        (t): t is TerminalTabState => isTerminalTab(t) && t.sessionId === sessionId,
-      ),
-    [],
-  );
-  const setTerminalTabExited = useCallback((sessionId: string, exitCode: number) => {
-    const tab = tabsRef.current.find(
-      (t): t is TerminalTabState => isTerminalTab(t) && t.sessionId === sessionId,
-    );
-    if (tab) {
-      updateTerminalTabRef.current(tab.id, { status: "exited", exitCode });
-    }
-  }, []);
-  const killTerminalSession = useCallback((sessionId: string) => {
-    void window.electronAPI?.pty?.kill(sessionId);
-  }, []);
-  const terminalTabContextValue: TerminalTabContextValue = {
-    getTerminalTabBySessionId,
-    setTerminalTabExited,
-    killTerminalSession,
-  };
-
-  // --- DiffTabContext value: exposes diff tab state and conflict resolution to panel components ---
-
-  const getDiffTabById = useCallback(
-    (tabId: string) =>
-      tabsRef.current.find((t): t is DiffTabState => isDiffTab(t) && t.id === tabId),
-    [],
-  );
-
-  const getDiffTabBySourceTabId = useCallback(
-    (sourceTabId: string) =>
-      tabsRef.current.find(
-        (t): t is DiffTabState => isDiffTab(t) && t.sourceTabId === sourceTabId,
-      ),
-    [],
-  );
-
-  /**
-   * Accept disk content: update the source editor tab with the remote content,
-   * clear its conflict state, then force-close the diff tab.
-   */
-  const acceptDiskContent = useCallback(
-    (diffTabId: string) => {
-      const diffTab = tabsRef.current.find(
-        (t): t is DiffTabState => isDiffTab(t) && t.id === diffTabId,
-      );
-      if (!diffTab) return;
-
-      const sourceTab = tabsRef.current.find(
-        (t) => isEditorTab(t) && t.id === diffTab.sourceTabId,
-      );
-      if (sourceTab && isEditorTab(sourceTab)) {
-        updateTab(sourceTab.id, {
-          content: diffTab.remoteContent,
-          lastSavedContent: diffTab.remoteContent,
-          isDirty: false,
-          fileSyncStatus: "clean",
-          conflictDiskContent: null,
-        });
-      }
-      forceCloseTab(diffTabId);
-    },
-    [updateTab, forceCloseTab],
-  );
-
-  /**
-   * Keep editor content: clear the conflict state on the source tab,
-   * then force-close the diff tab.
-   */
-  const keepEditorContent = useCallback(
-    (diffTabId: string) => {
-      const diffTab = tabsRef.current.find(
-        (t): t is DiffTabState => isDiffTab(t) && t.id === diffTabId,
-      );
-      if (!diffTab) return;
-
-      const sourceTab = tabsRef.current.find(
-        (t) => isEditorTab(t) && t.id === diffTab.sourceTabId,
-      );
-      if (sourceTab && isEditorTab(sourceTab)) {
-        updateTab(sourceTab.id, {
-          fileSyncStatus: "clean",
-          conflictDiskContent: null,
-        });
-      }
-      forceCloseTab(diffTabId);
-    },
-    [updateTab, forceCloseTab],
-  );
-
-  /**
-   * Close only the diff tab; source tab conflict state is preserved.
-   */
-  const closeDiffTab = useCallback(
-    (diffTabId: string) => {
-      forceCloseTab(diffTabId);
-    },
-    [forceCloseTab],
-  );
-
-  const diffTabContextValue: DiffTabContextValue = {
-    getDiffTabById,
-    getDiffTabBySourceTabId,
-    acceptDiskContent,
-    keepEditorContent,
-    closeDiffTab,
-  };
 
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -423,7 +267,6 @@ export default function EditorPage() {
 
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
-  const [showDesktopOnlyDialog, setShowDesktopOnlyDialog] = useState(false);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [recoveryExiting, setRecoveryExiting] = useState(false);
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
@@ -485,32 +328,6 @@ export default function EditorPage() {
       incrementEditorKey();
     }
   }, [wasAutoRecovered, incrementEditorKey]);
-
-  // --- Auto-close diff tabs when their source editor tab is closed ---
-  // Tracks the previous tab id set to detect removals.
-  const prevTabIdsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const currentTabIds = new Set(tabs.map((t) => t.id));
-    const removedTabIds = new Set(
-      [...prevTabIdsRef.current].filter((id) => !currentTabIds.has(id)),
-    );
-
-    if (removedTabIds.size > 0) {
-      // For each removed tab, find any diff tab that references it as sourceTabId
-      const orphanedDiffTabIds = tabs
-        .filter(
-          (t): t is DiffTabState =>
-            isDiffTab(t) && removedTabIds.has(t.sourceTabId),
-        )
-        .map((t) => t.id);
-
-      for (const diffTabId of orphanedDiffTabIds) {
-        forceCloseTab(diffTabId);
-      }
-    }
-
-    prevTabIdsRef.current = currentTabIds;
-  }, [tabs, forceCloseTab]);
 
   // With tabs, open/new don't need unsaved warnings (they create new tabs)
   const openFile = useCallback(async () => {
