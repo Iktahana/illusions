@@ -68,6 +68,7 @@ const mockAppStateTable = createMockTable<any>("id");
 const mockRecentFilesTable = createMockTable<any>("id");
 const mockEditorBufferTable = createMockTable<any>("id");
 const mockProjectHandlesTable = createMockTable<any>("projectId");
+const mockKvStoreTable = createMockTable<any>("key");
 
 const mockDb = {
   open: vi.fn(async () => {}),
@@ -75,6 +76,7 @@ const mockDb = {
   recentFiles: mockRecentFilesTable,
   editorBuffer: mockEditorBufferTable,
   projectHandles: mockProjectHandlesTable,
+  kvStore: mockKvStoreTable,
 };
 
 // -----------------------------------------------------------------------
@@ -93,6 +95,7 @@ vi.mock("dexie", () => {
         recentFiles: mockDb.recentFiles,
         editorBuffer: mockDb.editorBuffer,
         projectHandles: mockDb.projectHandles,
+        kvStore: mockDb.kvStore,
       });
     }
     version() {
@@ -155,6 +158,7 @@ describe("WebStorageProvider", () => {
     mockRecentFilesTable._records.clear();
     mockEditorBufferTable._records.clear();
     mockProjectHandlesTable._records.clear();
+    mockKvStoreTable._records.clear();
 
     // Reset call counts
     vi.clearAllMocks();
