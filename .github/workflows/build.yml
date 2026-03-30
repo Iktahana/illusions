@@ -548,7 +548,7 @@ jobs:
 
       - name: Update package.json version (4-part for MSIX)
         if: github.event_name != 'pull_request'
-        run: npm version ${{ needs.compute-version.outputs.msix }} --no-git-tag-version
+        run: node -e "const p=require('./package.json');p.version='${{ needs.compute-version.outputs.msix }}';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 
       - name: Download build output
         if: github.event_name != 'pull_request'
