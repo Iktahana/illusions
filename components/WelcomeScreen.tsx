@@ -1,8 +1,9 @@
 "use client";
 
-import { FolderPlus, FolderOpen, FileText, Clock, Download, X } from "lucide-react";
+import { FolderPlus, FolderOpen, FileText, Clock, X } from "lucide-react";
 import clsx from "clsx";
 import { useEffect, useState } from "react";
+import DesktopAppDownloadButton from "@/components/DesktopAppDownloadButton";
 import GlassDialog from "@/components/GlassDialog";
 
 interface RecentProject {
@@ -193,15 +194,7 @@ export default function WelcomeScreen({
           <p className="mt-3 text-sm text-foreground-secondary">
             すべての機能を利用するには、デスクトップ版をお試しください。
           </p>
-          <a
-            href="https://www.illusions.app/downloads/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
-          >
-            <Download className="h-5 w-5" />
-            デスクトップ版をダウンロード
-          </a>
+          <DesktopAppDownloadButton className="mt-6 px-6 py-3 text-base" />
         </GlassDialog>
 
         {/* Recent projects */}
