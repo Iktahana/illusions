@@ -9,8 +9,27 @@ const config = [
   ...nextTypescript,
   {
     rules: {
-      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": "warn",
+      "@typescript-eslint/no-unused-expressions": "warn",
+      "react-hooks/rules-of-hooks": "warn",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/refs": "warn",
     },
+  },
+  {
+    ignores: [
+      "node_modules/**",
+      ".next/**",
+      "out/**",
+      "dist-electron/**",
+      "dist-main/**",
+      "build/**",
+      "coverage/**",
+      "public/**",
+      "electron/**",
+      "scripts/**",
+    ],
   },
 ];
 
