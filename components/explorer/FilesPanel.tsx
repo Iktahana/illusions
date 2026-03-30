@@ -618,7 +618,7 @@ export function FilesPanel({
       { label: "新規フォルダ", action: "new-folder" },
       ...(isElectronRenderer() ? [
         { label: "", action: "_separator" },
-        { label: "Finder で開く", action: "open-in-finder" },
+        { label: `${getFileManagerName()} で開く`, action: "open-in-finder" },
       ] : []),
     ];
     const result = await showContextMenu(e, items);
