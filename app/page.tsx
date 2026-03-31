@@ -696,6 +696,10 @@ export default function EditorPage() {
           isProjectModeSupported={features.projectMode}
           restoreError={restoreError}
           onDismissRestoreError={() => setRestoreError(null)}
+          onOpenAccountSettings={() => {
+            setSettingsInitialCategory("account");
+            setShowSettingsModal(true);
+          }}
         />
 
         {/* CreateProjectWizard dialog */}
