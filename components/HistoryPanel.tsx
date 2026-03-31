@@ -36,7 +36,8 @@ const SNAPSHOTS_PER_PAGE = 20;
 
 interface HistoryPanelProps {
   projectId: string;
-  mainFileName: string;
+  sourcePath: string;
+  displayName: string;
   onRestore: (content: string) => void;
   /** Current editor content for diff comparison */
   currentContent?: string;
@@ -85,7 +86,8 @@ function groupSnapshotsByDate(items: SnapshotEntry[]): DateGroup[] {
 
 export default function HistoryPanel({
   projectId: _projectId,
-  mainFileName,
+  sourcePath,
+  displayName,
   onRestore,
   currentContent = "",
   onCompareInEditor,
@@ -108,7 +110,7 @@ export default function HistoryPanel({
       setIsLoading(true);
       setError(null);
       const historyService = getHistoryService();
-      const loaded = await historyService.getSnapshots(mainFileName);
+      const loaded = await historyService.getSnapshots(sourcePath);
       setSnapshots(loaded);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -116,9 +118,9 @@ export default function HistoryPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [mainFileName]);
+  }, [sourcePath]);
 
-  // Load snapshots on mount and when mainFileName changes
+  // Load snapshots on mount and when sourcePath changes
   useEffect(() => {
     void loadSnapshots();
     // Reset pagination when file changes
@@ -352,7 +354,8 @@ export default function HistoryPanel({
       setError(null);
       const historyService = getHistoryService();
       await historyService.createSnapshot({
-        sourceFile: mainFileName,
+        sourcePath,
+        displayName,
         content: currentContent,
         type: "manual",
       });
@@ -363,7 +366,7 @@ export default function HistoryPanel({
     } finally {
       setCreatingSnapshot(false);
     }
-  }, [mainFileName, loadSnapshots, currentContent]);
+  }, [sourcePath, displayName, loadSnapshots, currentContent]);
 
   /**
    * Handle comparing a snapshot with current content.

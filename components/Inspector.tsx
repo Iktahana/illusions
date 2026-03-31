@@ -48,6 +48,7 @@ export default function Inspector({
   onOpenPosHighlightSettings,
   onHistoryRestore,
   activeFileName,
+  activeFilePath,
   currentContent = "",
   onCompareInEditor,
   lintIssues,
@@ -386,7 +387,8 @@ export default function Inspector({
         {activeTab === "history" && projectMode && onHistoryRestore && (
           <HistoryPanel
             projectId={projectMode.projectId}
-            mainFileName={activeFileName || projectMode.metadata.mainFile}
+            sourcePath={activeFilePath || projectMode.metadata.mainFile}
+            displayName={activeFileName || (activeFilePath || projectMode.metadata.mainFile).split("/").pop() || projectMode.metadata.mainFile}
             onRestore={onHistoryRestore}
             currentContent={currentContent}
             onCompareInEditor={onCompareInEditor}

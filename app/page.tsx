@@ -771,6 +771,7 @@ export default function EditorPage() {
     readabilityAnalysis,
     onOpenPosHighlightSettings: handleOpenPosHighlightSettings,
     activeFileName: currentFile?.name,
+    activeFilePath: currentFile?.path ?? undefined,
     currentContent: content,
     onHistoryRestore: (restoredContent: string) => {
       setContent(restoredContent);
