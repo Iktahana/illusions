@@ -878,6 +878,7 @@ export default function EditorPage() {
         handleShowLintHint,
         handleIgnoreCorrection,
         switchTab,
+        updateTab,
       }}
       inspector={{
         isRightPanelCollapsed,

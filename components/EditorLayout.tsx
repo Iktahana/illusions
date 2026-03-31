@@ -156,6 +156,7 @@ interface EditorLayoutProps {
       React.ComponentProps<typeof NovelEditor>["onIgnoreCorrection"]
     >;
     switchTab: (tabId: string) => void;
+    updateTab: (tabId: string, updates: Partial<EditorTabState>) => void;
   };
   inspector: {
     isRightPanelCollapsed: boolean;
@@ -383,6 +384,8 @@ export default function EditorLayout({
                         const liveEditorTab = liveTab && isEditorTab(liveTab) ? liveTab : undefined;
                         const panelContent = liveEditorTab?.content ?? "";
                         const panelLastSavedContent = liveEditorTab?.lastSavedContent ?? "";
+                        const panelPendingExternalContent =
+                          liveEditorTab?.pendingExternalContent ?? null;
 
                         if (mainArea.editorDiff && isActivePanel) {
                           return (
@@ -423,6 +426,12 @@ export default function EditorLayout({
                                   onIgnoreCorrection={mainArea.handleIgnoreCorrection}
                                   mdiExtensionsEnabled={panelMdiEnabled}
                                   gfmEnabled={panelGfmEnabled}
+                                  externalContent={panelPendingExternalContent}
+                                  onExternalContentApplied={() => {
+                                    mainArea.updateTab(panelBufferId, {
+                                      pendingExternalContent: null,
+                                    });
+                                  }}
                                 />
                               </div>
                             </ErrorBoundary>
