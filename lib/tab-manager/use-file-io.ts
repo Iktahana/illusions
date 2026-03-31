@@ -1,5 +1,6 @@
 "use client";
 
+/** Warning message shown when file handle persistence fails. */
 const PERSIST_FAILURE_WARNING = "ファイル参照の保存に失敗しました";
 
 import { useCallback, useRef } from "react";
