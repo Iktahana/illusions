@@ -113,11 +113,23 @@ class UserDictionaryService {
   // -------------------------------------------------------------------
 
   /**
-   * Load user dictionary entries from StorageService for a specific file.
+   * Build a storage key from the full file path to avoid basename collisions.
+   * Normalizes path separators so keys are consistent across platforms.
    */
-  async loadEntriesStandalone(fileName: string): Promise<UserDictionaryEntry[]> {
+  private buildStandaloneKey(filePath: string): string {
+    // Normalize backslashes to forward slashes and strip leading slash
+    // so keys are deterministic regardless of platform separator.
+    const normalized = filePath.replace(/\\/g, "/").replace(/^\//, "");
+    return STANDALONE_STORAGE_PREFIX + normalized;
+  }
+
+  /**
+   * Load user dictionary entries from StorageService for a specific file.
+   * @param filePath - Full path to the file (used as storage key to avoid basename collisions).
+   */
+  async loadEntriesStandalone(filePath: string): Promise<UserDictionaryEntry[]> {
     try {
-      const key = STANDALONE_STORAGE_PREFIX + fileName;
+      const key = this.buildStandaloneKey(filePath);
       const raw = await this.storage.getItem(key);
       if (!raw) return [];
       const data: UserDictionaryFile = JSON.parse(raw);
@@ -129,9 +141,10 @@ class UserDictionaryService {
 
   /**
    * Save user dictionary entries to StorageService for a specific file.
+   * @param filePath - Full path to the file (used as storage key to avoid basename collisions).
    */
-  async saveEntriesStandalone(fileName: string, entries: UserDictionaryEntry[]): Promise<void> {
-    const key = STANDALONE_STORAGE_PREFIX + fileName;
+  async saveEntriesStandalone(filePath: string, entries: UserDictionaryEntry[]): Promise<void> {
+    const key = this.buildStandaloneKey(filePath);
     const data: UserDictionaryFile = {
       version: "1.0.0",
       entries,
