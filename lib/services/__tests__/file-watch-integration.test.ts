@@ -66,6 +66,7 @@ function buildOnChangedForTest(
             isDirty: false,
             fileSyncStatus: "clean",
             conflictDiskContent: null,
+            pendingExternalContent: diskContent,
           } as EditorTabState;
         }),
       );
@@ -195,6 +196,15 @@ describe("file-watch: clean tab receives external change", () => {
     onChanged("new disk content", Date.now());
 
     expect(getTab().isDirty).toBe(false);
+  });
+
+  it("sets pendingExternalContent for the editor to apply", () => {
+    const tab = makeEditorTab({ fileSyncStatus: "clean", content: "old", lastSavedContent: "old" });
+    const { onChanged, getTab } = buildContext(tab);
+
+    onChanged("new disk content", Date.now());
+
+    expect(getTab().pendingExternalContent).toBe("new disk content");
   });
 
   it("emits an info notification", () => {

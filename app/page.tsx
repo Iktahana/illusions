@@ -280,10 +280,16 @@ export default function EditorPage() {
   // triggers PTY kill before removing the tab from state.
   const tabManagerWithPtyCleanup = { ...tabManager, closeTab: handleCloseTabWithPtyCleanup };
 
+  // Search state — declared before useDockviewAdapter so it can be passed as options
+  const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
+  const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
+
   // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
   const { handleDockviewReady, dockviewApi, splitEditor } = useDockviewAdapter({
     tabManager: tabManagerWithPtyCleanup,
     editorKey,
+    searchOpenTrigger,
+    searchInitialTerm,
   });
   const { flushLayoutState } = useDockviewPersistence({
     dockviewApi,
@@ -330,9 +336,7 @@ export default function EditorPage() {
   const editorDomRef = useRef<HTMLDivElement>(null);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [recoveryExiting, setRecoveryExiting] = useState(false);
-  const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
   const [newFileTrigger, setNewFileTrigger] = useState(0);
-  const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
   const [selectedCharCount, setSelectedCharCount] = useState(0);
   const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
@@ -939,6 +943,7 @@ export default function EditorPage() {
         handleShowLintHint,
         handleIgnoreCorrection,
         switchTab,
+        updateTab,
       }}
       inspector={{
         isRightPanelCollapsed,

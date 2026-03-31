@@ -2,7 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import { createFileWatcher } from "../services/file-watcher";
+import { getHistoryService } from "../services/history-service";
 import { notificationManager } from "../services/notification-manager";
+import { getVFS } from "../vfs";
 import { isEditorTab } from "./tab-types";
 import type { FileWatcher } from "../services/file-watcher";
 import type { TabId, TabState, EditorTabState, DiffTabState } from "./tab-types";
@@ -36,6 +38,29 @@ export interface UseFileWatchIntegrationParams extends TabManagerCore {
 // ---------------------------------------------------------------------------
 
 /**
+ * Snapshot the current editor content before an external change overwrites it.
+ * Bypasses the normal 5-minute interval check since external changes are
+ * infrequent and the snapshot preserves user work that might otherwise be lost.
+ *
+ * 外部変更でエディタの内容が上書きされる前にスナップショットを作成する。
+ * 外部変更は頻繁には発生しないため、通常の5分間隔チェックをバイパスする。
+ */
+function snapshotBeforeExternalChange(fileName: string, editorContent: string): void {
+  if (!getVFS().isRootOpen()) return;
+  const historyService = getHistoryService();
+  historyService
+    .createSnapshot({
+      sourceFile: fileName,
+      content: editorContent,
+      type: "auto",
+      label: "外部変更前の自動保存",
+    })
+    .catch((error) => {
+      console.warn("外部変更前のスナップショット作成に失敗しました:", error);
+    });
+}
+
+/**
  * Build the onChanged callback for an editor tab.
  * Implements the state-transition logic described in issue #825.
  *
@@ -56,7 +81,13 @@ function buildOnChanged(
     const fileName = tab.file?.name ?? "ファイル";
 
     if (tab.fileSyncStatus === "clean") {
-      // Clean tab: auto-reload with disk content
+      // Snapshot current content before overwriting with disk content
+      snapshotBeforeExternalChange(fileName, tab.content);
+
+      // Clean tab: update content state AND set pendingExternalContent.
+      // content is updated for state consistency (isDirty, auto-save, etc.).
+      // pendingExternalContent triggers the editor to apply the new content
+      // via ProseMirror transaction (preserves scroll position).
       setTabs((prev) =>
         prev.map((t) => {
           if (t.id !== tabId || !isEditorTab(t)) return t;
@@ -67,11 +98,15 @@ function buildOnChanged(
             isDirty: false,
             fileSyncStatus: "clean",
             conflictDiskContent: null,
+            pendingExternalContent: diskContent,
           } satisfies EditorTabState;
         }),
       );
       notificationManager.info(`「${fileName}」が更新されました`, 3000);
     } else if (tab.fileSyncStatus === "dirty") {
+      // Snapshot current content before entering conflicted state
+      snapshotBeforeExternalChange(fileName, tab.content);
+
       // Dirty tab: do NOT touch buffer; enter conflicted state
       const localContent = tab.content;
 

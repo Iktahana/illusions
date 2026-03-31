@@ -51,6 +51,10 @@ interface EditorProps {
   // Editor mode controls
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
+  /** External content to apply to the editor (from file watcher). Preserves scroll position. */
+  externalContent?: string | null;
+  /** Called after externalContent has been applied to ProseMirror. */
+  onExternalContentApplied?: () => void;
 }
 
 export default function NovelEditor({
@@ -74,6 +78,8 @@ export default function NovelEditor({
   onIgnoreCorrection,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
+  externalContent,
+  onExternalContentApplied,
 }: EditorProps) {
   const { fontScale, lineHeight, fontFamily, charsPerLine, autoCharsPerLine } =
     useTypographySettings();
@@ -462,6 +468,8 @@ export default function NovelEditor({
               gfmEnabled={gfmEnabled}
               onStartSpeech={startSpeechFromCursor}
               onFind={handleFind}
+              externalContent={externalContent}
+              onExternalContentApplied={onExternalContentApplied}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>

@@ -161,6 +161,7 @@ interface EditorLayoutProps {
       React.ComponentProps<typeof NovelEditor>["onIgnoreCorrection"]
     >;
     switchTab: (tabId: string) => void;
+    updateTab: (tabId: string, updates: Partial<EditorTabState>) => void;
   };
   inspector: {
     isRightPanelCollapsed: boolean;
@@ -187,7 +188,7 @@ export default function EditorLayout({
       <TerminalTabContext.Provider value={providers.terminalTabContextValue}>
         <EditorSettingsProvider settings={providers.settings} handlers={providers.settingsHandlers}>
           <div className="h-screen flex flex-col overflow-hidden relative">
-            <TitleUpdater currentFile={chrome.currentFile} isDirty={chrome.isDirty} />
+            <TitleUpdater editorMode={upgrade.editorMode} isDirty={chrome.isDirty} />
 
             {!chrome.isElectron && (
               <WebMenuBar
@@ -380,6 +381,10 @@ export default function EditorLayout({
                         const panelFileType = (panelParams?.fileType ?? ".mdi") as string;
                         const panelEditorKey = panelParams?.editorKey ?? 0;
                         const panelActiveTabId = panelParams?.activeTabId ?? "";
+                        const panelSearchOpenTrigger = panelParams?.searchOpenTrigger ?? 0;
+                        const panelSearchInitialTerm = panelParams?.searchInitialTerm as
+                          | string
+                          | undefined;
                         const isActivePanel = panelBufferId === panelActiveTabId;
                         const panelMdiEnabled = panelFileType === ".mdi";
                         const panelGfmEnabled = panelFileType !== ".txt";
@@ -390,6 +395,8 @@ export default function EditorLayout({
                         const liveEditorTab = liveTab && isEditorTab(liveTab) ? liveTab : undefined;
                         const panelContent = liveEditorTab?.content ?? "";
                         const panelLastSavedContent = liveEditorTab?.lastSavedContent ?? "";
+                        const panelPendingExternalContent =
+                          liveEditorTab?.pendingExternalContent ?? null;
 
                         if (mainArea.editorDiff && isActivePanel) {
                           return (
@@ -415,8 +422,8 @@ export default function EditorLayout({
                                   onChange={mainArea.handleChange}
                                   onInsertText={mainArea.handleInsertText}
                                   onSelectionChange={mainArea.setSelectedCharCount}
-                                  searchOpenTrigger={mainArea.searchOpenTrigger}
-                                  searchInitialTerm={mainArea.searchInitialTerm}
+                                  searchOpenTrigger={panelSearchOpenTrigger}
+                                  searchInitialTerm={panelSearchInitialTerm}
                                   onEditorViewReady={mainArea.setEditorViewInstance}
                                   programmaticScrollRef={mainArea.programmaticScrollRef}
                                   onShowAllSearchResults={mainArea.handleShowAllSearchResults}
@@ -430,6 +437,12 @@ export default function EditorLayout({
                                   onIgnoreCorrection={mainArea.handleIgnoreCorrection}
                                   mdiExtensionsEnabled={panelMdiEnabled}
                                   gfmEnabled={panelGfmEnabled}
+                                  externalContent={panelPendingExternalContent}
+                                  onExternalContentApplied={() => {
+                                    mainArea.updateTab(panelBufferId, {
+                                      pendingExternalContent: null,
+                                    });
+                                  }}
                                 />
                               </div>
                             </ErrorBoundary>
