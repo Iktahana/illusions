@@ -147,6 +147,14 @@
         "repo": "illusions"
       }
     ],
+    "protocols": [
+      {
+        "name": "illusions",
+        "schemes": [
+          "illusions"
+        ]
+      }
+    ],
     "afterSign": "scripts/notarize.js",
     "mac": {
       "category": "public.app-category.productivity",

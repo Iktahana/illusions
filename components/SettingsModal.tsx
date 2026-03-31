@@ -11,6 +11,7 @@ import {
   AudioLines,
   Keyboard,
   Terminal,
+  UserCircle,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -24,6 +25,7 @@ import SpeechSettingsTab from "./settings/SpeechSettingsTab";
 import KeymapSettingsTab from "./settings/KeymapSettingsTab";
 import PowerSettingsTab from "./settings/PowerSettingsTab";
 import TerminalSettingsTab from "./settings/TerminalSettingsTab";
+import AccountSettingsTab from "./settings/AccountSettingsTab";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -33,6 +35,7 @@ interface SettingsModalProps {
 }
 
 export type SettingsCategory =
+  | "account"
   | "editor"
   | "vertical"
   | "pos-highlight"
@@ -114,6 +117,23 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
           {/* Left navigation */}
           <div className="w-48 flex-shrink-0 border-r border-border bg-background-secondary p-2">
             <nav className="space-y-1">
+              {isElectronRenderer() && (
+                <>
+                  <button
+                    onClick={() => setActiveCategory("account")}
+                    className={clsx(
+                      "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
+                      activeCategory === "account"
+                        ? "bg-accent text-accent-foreground"
+                        : "text-foreground-secondary hover:bg-hover hover:text-foreground",
+                    )}
+                  >
+                    <UserCircle className="w-4 h-4" />
+                    アカウント
+                  </button>
+                  <div className="my-2 border-t border-border" />
+                </>
+              )}
               <button
                 onClick={() => setActiveCategory("editor")}
                 className={clsx(
@@ -236,6 +256,7 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
               activeCategory === "pos-highlight" ? "overflow-hidden" : "overflow-y-auto",
             )}
           >
+            {activeCategory === "account" && <AccountSettingsTab />}
             {activeCategory === "editor" && <TypographySettingsTab />}
             {activeCategory === "vertical" && <VerticalSettingsTab />}
             {activeCategory === "pos-highlight" && <PosHighlightSettingsTab />}

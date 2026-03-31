@@ -40,6 +40,7 @@ const { registerShellHandlers } = require("./ipc/shell-ipc");
 const { registerSystemHandlers } = require("./ipc/system-ipc");
 const { registerPtyHandlers } = require("./ipc/pty-ipc");
 const { killAllSessions, killSessionsForWindow } = require("./ipc/terminal-session-registry");
+const { registerAuthHandlers, handleAuthCallback } = require("./ipc/auth-ipc");
 
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
@@ -53,6 +54,12 @@ process.on("unhandledRejection", (reason) => {
 // duplicate windows when a user double-clicks a .mdi file while the app is already open.
 // In dev mode, skip the lock so dev and production can run side-by-side.
 const { isDev } = require("./app-constants");
+
+// Register custom protocol for OAuth callbacks
+if (!isDev) {
+  app.setAsDefaultProtocolClient("illusions");
+}
+
 const gotTheLock = isDev || app.requestSingleInstanceLock();
 console.log("[DEBUG] Single instance lock:", gotTheLock, isDev ? "(skipped in dev)" : "");
 if (!gotTheLock) {
@@ -66,6 +73,12 @@ if (!gotTheLock) {
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
+    }
+    // Check for auth callback URL (Windows/Linux)
+    const authUrl = commandLine.find((a) => a.startsWith("illusions://auth/"));
+    if (authUrl) {
+      handleAuthCallback(authUrl);
+      return;
     }
     // Extract .mdi path from argv (Windows/Linux pass file path as CLI argument)
     const mdiArg = commandLine.find((a) => a.endsWith(".mdi") && !a.startsWith("-"));
@@ -88,6 +101,14 @@ app.on("open-file", async (event, filePath) => {
   }
 });
 
+// Handle OAuth callback via custom URL scheme (macOS)
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  if (url.startsWith("illusions://auth/")) {
+    handleAuthCallback(url);
+  }
+});
+
 console.log("[DEBUG] Waiting for app ready...");
 app.whenReady().then(async () => {
   console.log("[DEBUG] App is ready, creating window...");
@@ -107,9 +128,9 @@ app.whenReady().then(async () => {
             "default-src 'self'",
             `script-src 'self' 'unsafe-inline'${isDev && !app.isPackaged ? " 'unsafe-eval'" : ""}`,
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-            "img-src 'self' data: blob:",
+            "img-src 'self' data: blob: https:",
             "font-src 'self' data: https://fonts.gstatic.com",
-            "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com ws://localhost:*",
+            "connect-src 'self' https://my.illusions.app https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com ws://localhost:*",
             "worker-src 'self' blob:",
             "frame-src 'none'",
           ].join("; "),
@@ -138,6 +159,7 @@ app.whenReady().then(async () => {
   registerShellHandlers();
   registerSystemHandlers();
   registerPtyHandlers();
+  registerAuthHandlers();
 
   // Power state monitoring
   powerMonitor.on("on-ac", () => broadcastPowerState("ac"));
