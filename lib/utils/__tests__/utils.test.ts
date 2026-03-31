@@ -20,9 +20,9 @@ import {
   calculateAveragePunctuationSpacing,
   calculateReadabilityScore,
   getChaptersFromDOM,
-} from "../utils";
+} from "@/lib/utils";
 
-import type { CharacterTypeAnalysis } from "../utils";
+import type { CharacterTypeAnalysis } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // calculateManuscriptPages

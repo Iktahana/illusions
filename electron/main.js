@@ -24,9 +24,9 @@ if (app.isPackaged) {
   require("module").Module._initPaths();
 }
 
-const { registerNlpHandlers } = require("./nlp/nlp-ipc-handlers");
-const { registerStorageHandlers } = require("./storage-ipc-handlers");
-const { registerVFSHandlers } = require("./vfs-ipc-handlers");
+const { registerNlpHandlers } = require("./ipc/nlp-ipc");
+const { registerStorageHandlers } = require("./ipc/storage-ipc");
+const { registerVFSHandlers } = require("./ipc/vfs-ipc");
 const { setupAutoUpdater, checkForUpdates } = require("./auto-updater");
 const { createMainWindow, broadcastPowerState } = require("./window-manager");
 const { installQuickLookPluginIfNeeded } = require("./quick-look");

@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import KeymapSettings from "../KeymapSettings";
+import KeymapSettings from "./KeymapSettings";
 
 /**
  * Settings tab for keyboard shortcut (keymap) configuration.

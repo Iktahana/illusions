@@ -3,7 +3,7 @@
 
 const { app, BrowserWindow, Menu, shell } = require("electron");
 const { APP_NAME, isDev } = require("./app-constants");
-const { getStorageManager } = require("./storage-ipc-handlers");
+const { getStorageManager } = require("./ipc/storage-ipc");
 
 // UI state synced from renderer for menu checked states
 let menuUiState = {
