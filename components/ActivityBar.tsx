@@ -5,7 +5,7 @@ import {
   FileText,
   Settings,
   Search,
-  Book,
+  // Book, // TODO: Outline feature — planned for v1.3.0
   Layers,
   BarChart3,
   // Users, // TODO: Characters feature — planned for v1.3.0
@@ -79,12 +79,13 @@ const DEFAULT_TOP_ITEMS: ActivityBarItem[] = [
     label: "検索",
     tooltip: "検索",
   },
-  {
-    id: "outline",
-    icon: Book,
-    label: "アウトライン",
-    tooltip: "アウトライン",
-  },
+  // TODO: Outline feature — planned for v1.3.0
+  // {
+  //   id: "outline",
+  //   icon: Book,
+  //   label: "アウトライン",
+  //   tooltip: "アウトライン",
+  // },
 ];
 
 /** Bottom group: utilities and reference tools */
