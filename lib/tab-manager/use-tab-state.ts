@@ -310,11 +310,7 @@ export function useTabState(): UseTabStateReturn {
           // Track fileSyncStatus based on dirty state.
           // Never downgrade from "conflicted" — user must resolve conflicts explicitly.
           fileSyncStatus:
-            tab.fileSyncStatus === "conflicted"
-              ? "conflicted"
-              : dirty
-                ? "dirty"
-                : "clean",
+            tab.fileSyncStatus === "conflicted" ? "conflicted" : dirty ? "dirty" : "clean",
         };
       }),
     );
