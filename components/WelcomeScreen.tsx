@@ -1,6 +1,16 @@
 "use client";
 
-import { FolderPlus, FolderOpen, FileText, Clock, X, UserCircle, User, Settings, LogOut } from "lucide-react";
+import {
+  FolderPlus,
+  FolderOpen,
+  FileText,
+  Clock,
+  X,
+  UserCircle,
+  User,
+  Settings,
+  LogOut,
+} from "lucide-react";
 import clsx from "clsx";
 import { useEffect, useState, useRef } from "react";
 import DesktopAppDownloadButton from "@/components/DesktopAppDownloadButton";
@@ -128,11 +138,7 @@ export default function WelcomeScreen({
           title={isAuthenticated && user ? user.name : "アカウント"}
         >
           {isAuthenticated && user?.image ? (
-            <img
-              src={user.image}
-              alt={user.name}
-              className="h-8 w-8 rounded-full object-cover"
-            />
+            <img src={user.image} alt={user.name} className="h-8 w-8 rounded-full object-cover" />
           ) : isAuthenticated && user ? (
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground">
               {user.name.charAt(0).toUpperCase()}

@@ -427,10 +427,7 @@ export default function ActivityBar({
               <img
                 src={user.image}
                 alt={user.name}
-                className={clsx(
-                  "rounded-full object-cover",
-                  compactMode ? "h-6 w-6" : "h-7 w-7",
-                )}
+                className={clsx("rounded-full object-cover", compactMode ? "h-6 w-6" : "h-7 w-7")}
               />
             ) : isAuthenticated && user ? (
               <span
