@@ -1,8 +1,8 @@
 "use client";
 
-import { FolderPlus, FolderOpen, FileText, Clock, X } from "lucide-react";
+import { FolderPlus, FolderOpen, FileText, Clock, X, UserCircle, User, Settings, LogOut } from "lucide-react";
 import clsx from "clsx";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import DesktopAppDownloadButton from "@/components/DesktopAppDownloadButton";
 import GlassDialog from "@/components/GlassDialog";
 import { useAuth } from "@/contexts/AuthContext";
@@ -83,10 +83,24 @@ export default function WelcomeScreen({
   onDismissRestoreError,
   onOpenAccountSettings,
 }: WelcomeScreenProps): React.JSX.Element {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, login, logout } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   // Client-side only check to avoid hydration mismatch
   // Start with null (don't show modal), then check on mount
   const [showUnsupportedModal, setShowUnsupportedModal] = useState(false);
+
+  // Close user menu on outside click
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showUserMenu]);
 
   useEffect(() => {
     // Check if running in Electron
@@ -105,33 +119,92 @@ export default function WelcomeScreen({
 
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-background p-4">
-      {/* Account indicator */}
-      {onOpenAccountSettings && (
+      {/* User avatar (bottom-left) */}
+      <div ref={userMenuRef} className="absolute bottom-4 left-4 z-10">
         <button
           type="button"
-          onClick={onOpenAccountSettings}
-          className="absolute top-4 right-4 z-10 flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-hover hover:text-foreground"
+          onClick={() => setShowUserMenu((prev) => !prev)}
+          className="flex items-center justify-center rounded-full transition-colors hover:ring-2 hover:ring-border"
+          title={isAuthenticated && user ? user.name : "アカウント"}
         >
-          {isAuthenticated && user ? (
-            <>
-              {user.image ? (
-                <img
-                  src={user.image}
-                  alt={user.name}
-                  className="h-6 w-6 rounded-full object-cover"
-                />
-              ) : (
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
-                  {user.name.charAt(0).toUpperCase()}
-                </span>
-              )}
-              <span className="max-w-[120px] truncate">{user.name}</span>
-            </>
+          {isAuthenticated && user?.image ? (
+            <img
+              src={user.image}
+              alt={user.name}
+              className="h-8 w-8 rounded-full object-cover"
+            />
+          ) : isAuthenticated && user ? (
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground">
+              {user.name.charAt(0).toUpperCase()}
+            </span>
           ) : (
-            <span>ログイン</span>
+            <UserCircle className="h-8 w-8 text-foreground-tertiary hover:text-foreground transition-colors" />
           )}
         </button>
-      )}
+
+        {showUserMenu && (
+          <div className="absolute bottom-full left-0 mb-2 z-50 w-48 rounded-lg border border-border bg-background-elevated shadow-lg py-1">
+            {isAuthenticated && user ? (
+              <>
+                <div className="px-3 py-2 border-b border-border">
+                  <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
+                  <p className="text-xs text-foreground-tertiary truncate">{user.email}</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    window.open("https://my.illusions.app", "_blank");
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-hover transition-colors"
+                >
+                  <User className="w-4 h-4" />
+                  マイページ
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    onOpenAccountSettings?.();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-hover transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                  設定
+                </button>
+
+                <div className="border-t border-border my-1" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    logout();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-hover transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  ログアウト
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUserMenu(false);
+                  login();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-hover transition-colors"
+              >
+                <UserCircle className="w-4 h-4" />
+                ログイン
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Ambient gradient glow — decorative, non-interactive */}
       <div

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   FileText,
   Settings,
@@ -12,10 +12,14 @@ import {
   BookOpen,
   Folder,
   Terminal,
+  UserCircle,
+  LogOut,
+  User,
 } from "lucide-react";
 import clsx from "clsx";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import { useKeymap } from "@/contexts/KeymapContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { formatBinding } from "@/lib/keymap/keymap-utils";
 import type { CommandId } from "@/lib/keymap/command-ids";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -218,6 +222,8 @@ interface ActivityBarProps {
   compactMode?: boolean;
   /** Callback to create a new terminal tab (Electron only). */
   onNewTerminal?: () => void;
+  /** Callback to open account settings (settings modal with account tab). */
+  onOpenAccountSettings?: () => void;
 }
 
 export default function ActivityBar({
@@ -227,6 +233,7 @@ export default function ActivityBar({
   onBottomViewChange,
   compactMode = false,
   onNewTerminal,
+  onOpenAccountSettings,
 }: ActivityBarProps) {
   const [topItems, setTopItems] = useState<ActivityBarItem[]>(() =>
     loadOrder(() => localPreferences.getSidebarTopOrder(), DEFAULT_TOP_ITEMS),
@@ -234,8 +241,23 @@ export default function ActivityBar({
   const [bottomItems, setBottomItems] = useState<ActivityBarItem[]>(() =>
     loadOrder(() => localPreferences.getSidebarBottomOrder(), DEFAULT_BOTTOM_ITEMS),
   );
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
+  const { isAuthenticated, user, login, logout } = useAuth();
   const { effectiveBindings } = useKeymap();
+
+  // Close user menu on outside click
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showUserMenu]);
 
   /** Adds the keyboard shortcut to the tooltip if this view has a CommandId */
   const withTooltip = useCallback(
@@ -389,6 +411,111 @@ export default function ActivityBar({
             {settingsWithTooltip.tooltip}
           </span>
         </button>
+
+        {/* User avatar button */}
+        <div ref={userMenuRef} className="relative mt-1">
+          <button
+            onClick={() => setShowUserMenu((prev) => !prev)}
+            className={clsx(
+              "flex items-center justify-center rounded-full transition-all",
+              compactMode ? "w-8 h-8" : "w-10 h-10",
+              "cursor-default active:cursor-pointer",
+            )}
+            title={isAuthenticated && user ? user.name : "アカウント"}
+          >
+            {isAuthenticated && user?.image ? (
+              <img
+                src={user.image}
+                alt={user.name}
+                className={clsx(
+                  "rounded-full object-cover",
+                  compactMode ? "h-6 w-6" : "h-7 w-7",
+                )}
+              />
+            ) : isAuthenticated && user ? (
+              <span
+                className={clsx(
+                  "flex items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground",
+                  compactMode ? "h-6 w-6" : "h-7 w-7",
+                )}
+              >
+                {user.name.charAt(0).toUpperCase()}
+              </span>
+            ) : (
+              <UserCircle
+                className={clsx(
+                  "text-foreground-tertiary hover:text-foreground transition-colors",
+                  compactMode ? "h-5 w-5" : "h-6 w-6",
+                )}
+              />
+            )}
+          </button>
+
+          {/* User popover menu */}
+          {showUserMenu && (
+            <div className="absolute bottom-0 left-full ml-2 z-50 w-48 rounded-lg border border-border bg-background-elevated shadow-lg py-1">
+              {isAuthenticated && user ? (
+                <>
+                  {/* User info header */}
+                  <div className="px-3 py-2 border-b border-border">
+                    <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
+                    <p className="text-xs text-foreground-tertiary truncate">{user.email}</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      window.open("https://my.illusions.app", "_blank");
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-hover transition-colors"
+                  >
+                    <User className="w-4 h-4" />
+                    マイページ
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      onOpenAccountSettings?.();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-hover transition-colors"
+                  >
+                    <Settings className="w-4 h-4" />
+                    設定
+                  </button>
+
+                  <div className="border-t border-border my-1" />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      logout();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-hover transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    ログアウト
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    login();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-hover transition-colors"
+                >
+                  <UserCircle className="w-4 h-4" />
+                  ログイン
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </DndContext>
   );
