@@ -1,6 +1,14 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
 export interface AuthUser {
@@ -103,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Refresh 5 minutes before expiry
-    const refreshIn = Math.max((expiresAt - Date.now()) - 5 * 60 * 1000, 0);
+    const refreshIn = Math.max(expiresAt - Date.now() - 5 * 60 * 1000, 0);
     refreshTimerRef.current = setTimeout(async () => {
       const api = window.electronAPI;
       if (!api?.auth) return;
@@ -320,12 +328,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       logout,
     }),
-    [user, isLoading, login, logout]
+    [user, isLoading, login, logout],
   );
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

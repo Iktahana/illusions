@@ -190,15 +190,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
     rename: (oldPath, newPath) => ipcRenderer.invoke("vfs:rename", oldPath, newPath),
   },
   auth: {
-    startLogin: () => ipcRenderer.invoke('auth:start-login'),
-    exchangeCode: (params) => ipcRenderer.invoke('auth:exchange-code', params),
-    refreshToken: (refreshToken) => ipcRenderer.invoke('auth:refresh-token', refreshToken),
-    getUserInfo: (accessToken) => ipcRenderer.invoke('auth:get-userinfo', accessToken),
-    logout: () => ipcRenderer.invoke('auth:logout'),
+    startLogin: () => ipcRenderer.invoke("auth:start-login"),
+    exchangeCode: (params) => ipcRenderer.invoke("auth:exchange-code", params),
+    refreshToken: (refreshToken) => ipcRenderer.invoke("auth:refresh-token", refreshToken),
+    getUserInfo: (accessToken) => ipcRenderer.invoke("auth:get-userinfo", accessToken),
+    logout: () => ipcRenderer.invoke("auth:logout"),
     onCallback: (callback) => {
-      const handler = (_event, data) => callback(data)
-      ipcRenderer.on('auth:callback', handler)
-      return () => ipcRenderer.removeListener('auth:callback', handler)
+      const handler = (_event, data) => callback(data);
+      ipcRenderer.on("auth:callback", handler);
+      return () => ipcRenderer.removeListener("auth:callback", handler);
     },
   },
   safeStorage: {

@@ -47,9 +47,7 @@ export default function AccountSettingsTab() {
     return (
       <div className="space-y-6">
         <div>
-          <h3 className="text-base font-medium text-foreground">
-            illusionsアカウント
-          </h3>
+          <h3 className="text-base font-medium text-foreground">illusionsアカウント</h3>
           <p className="mt-2 text-sm text-foreground-secondary">
             アカウントにログインすると、クラウド同期やAI機能などの追加機能をご利用いただけます。
           </p>
@@ -68,28 +66,18 @@ export default function AccountSettingsTab() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-base font-medium text-foreground">
-          illusionsアカウント
-        </h3>
+        <h3 className="text-base font-medium text-foreground">illusionsアカウント</h3>
       </div>
 
       <div className="flex items-center gap-4">
         {user.image ? (
-          <img
-            src={user.image}
-            alt={user.name}
-            className="h-16 w-16 rounded-full object-cover"
-          />
+          <img src={user.image} alt={user.name} className="h-16 w-16 rounded-full object-cover" />
         ) : (
           <UserInitials name={user.name} />
         )}
         <div className="min-w-0">
-          <p className="text-base font-medium text-foreground truncate">
-            {user.name}
-          </p>
-          <p className="text-sm text-foreground-secondary truncate">
-            {user.email}
-          </p>
+          <p className="text-base font-medium text-foreground truncate">{user.name}</p>
+          <p className="text-sm text-foreground-secondary truncate">{user.email}</p>
           <div className="mt-1">
             <PlanBadge plan={user.plan} />
           </div>

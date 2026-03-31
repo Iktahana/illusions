@@ -89,11 +89,7 @@ export default function Navbar({
             aria-label="アカウント"
           >
             {isAuthenticated && user?.image ? (
-              <img
-                src={user.image}
-                alt={user.name}
-                className="h-7 w-7 rounded-full object-cover"
-              />
+              <img src={user.image} alt={user.name} className="h-7 w-7 rounded-full object-cover" />
             ) : isAuthenticated && user ? (
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
                 {user.name.charAt(0).toUpperCase()}

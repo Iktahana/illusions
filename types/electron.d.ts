@@ -188,11 +188,13 @@ declare global {
         subscription_status: string;
       }>;
       logout: () => Promise<{ success: boolean }>;
-      onCallback: (callback: (data: {
-        code?: string | null;
-        state?: string | null;
-        error?: string | null;
-      }) => void) => () => void;
+      onCallback: (
+        callback: (data: {
+          code?: string | null;
+          state?: string | null;
+          error?: string | null;
+        }) => void,
+      ) => () => void;
     };
     safeStorage?: {
       /** Encrypt a string using OS-level encryption (macOS Keychain / Windows DPAPI) */
