@@ -35,6 +35,10 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
+// ---------------------------------------------------------------------------
+// Electron-only token persistence (safeStorage / IPC)
+// ---------------------------------------------------------------------------
+
 interface StoredTokens {
   accessToken: string;
   refreshToken: string;
@@ -99,121 +103,124 @@ async function clearTokens(): Promise<void> {
   await api.storage.removeItem("auth:tokens");
 }
 
+// ---------------------------------------------------------------------------
+// Web-only helpers (httpOnly cookie flow via API routes)
+// ---------------------------------------------------------------------------
+
+interface MeResponse {
+  authenticated: boolean;
+  user?: AuthUser;
+  expiresAt?: number;
+}
+
+async function fetchMe(): Promise<MeResponse> {
+  try {
+    const res = await fetch("/api/auth/me/", { credentials: "same-origin" });
+    if (!res.ok) return { authenticated: false };
+    return (await res.json()) as MeResponse;
+  } catch {
+    return { authenticated: false };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Provider
+// ---------------------------------------------------------------------------
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isElectron = useRef(false);
 
-  const scheduleRefresh = useCallback((expiresAt: number, refreshToken: string) => {
+  const clearRefreshTimer = useCallback(() => {
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
     }
-
-    // Refresh 5 minutes before expiry
-    const refreshIn = Math.max(expiresAt - Date.now() - 5 * 60 * 1000, 0);
-    refreshTimerRef.current = setTimeout(async () => {
-      const api = window.electronAPI;
-      if (!api?.auth) return;
-
-      try {
-        const tokenResponse = await api.auth.refreshToken(refreshToken);
-        const newExpiresAt = Date.now() + tokenResponse.expires_in * 1000;
-        await saveTokens({
-          accessToken: tokenResponse.access_token,
-          refreshToken: tokenResponse.refresh_token,
-          expiresAt: newExpiresAt,
-        });
-
-        // Fetch updated user info
-        const userInfo = await api.auth.getUserInfo(tokenResponse.access_token);
-        setUser({
-          id: userInfo.sub,
-          email: userInfo.email,
-          name: userInfo.name,
-          image: userInfo.picture,
-          plan: userInfo.plan,
-        });
-
-        // Schedule next refresh
-        scheduleRefresh(newExpiresAt, tokenResponse.refresh_token);
-      } catch {
-        // Refresh failed, clear auth state
-        setUser(null);
-        await clearTokens();
-      }
-    }, refreshIn);
   }, []);
 
-  // Initialize auth state on mount
-  useEffect(() => {
-    if (!isElectronRenderer()) {
-      isElectron.current = false;
-      setIsLoading(false);
-      return;
-    }
+  // --- Electron refresh scheduler (unchanged from original) ---
+  const scheduleElectronRefresh = useCallback(
+    (expiresAt: number, refreshToken: string) => {
+      clearRefreshTimer();
 
-    isElectron.current = true;
-    const api = window.electronAPI;
+      const refreshIn = Math.max(expiresAt - Date.now() - 5 * 60 * 1000, 0);
+      refreshTimerRef.current = setTimeout(async () => {
+        const api = window.electronAPI;
+        if (!api?.auth) return;
 
-    async function restoreSession() {
-      try {
-        const tokens = await loadTokens();
-        if (!tokens) {
-          setIsLoading(false);
-          return;
+        try {
+          const tokenResponse = await api.auth.refreshToken(refreshToken);
+          const newExpiresAt = Date.now() + tokenResponse.expires_in * 1000;
+          await saveTokens({
+            accessToken: tokenResponse.access_token,
+            refreshToken: tokenResponse.refresh_token,
+            expiresAt: newExpiresAt,
+          });
+
+          const userInfo = await api.auth.getUserInfo(tokenResponse.access_token);
+          setUser({
+            id: userInfo.sub,
+            email: userInfo.email,
+            name: userInfo.name,
+            image: userInfo.picture,
+            plan: userInfo.plan,
+          });
+
+          scheduleElectronRefresh(newExpiresAt, tokenResponse.refresh_token);
+        } catch {
+          setUser(null);
+          await clearTokens();
         }
+      }, refreshIn);
+    },
+    [clearRefreshTimer],
+  );
 
-        const { accessToken, refreshToken, expiresAt } = tokens;
+  // --- Web refresh scheduler ---
+  const scheduleWebRefresh = useCallback(
+    (expiresAt: number) => {
+      clearRefreshTimer();
 
-        // If access token is expired, try to refresh
-        if (Date.now() >= expiresAt) {
-          if (!api?.auth) {
-            setIsLoading(false);
-            return;
-          }
-
-          try {
-            const tokenResponse = await api.auth.refreshToken(refreshToken);
-            const newExpiresAt = Date.now() + tokenResponse.expires_in * 1000;
-            await saveTokens({
-              accessToken: tokenResponse.access_token,
-              refreshToken: tokenResponse.refresh_token,
-              expiresAt: newExpiresAt,
-            });
-
-            const userInfo = await api.auth.getUserInfo(tokenResponse.access_token);
-            setUser({
-              id: userInfo.sub,
-              email: userInfo.email,
-              name: userInfo.name,
-              image: userInfo.picture,
-              plan: userInfo.plan,
-            });
-            scheduleRefresh(newExpiresAt, tokenResponse.refresh_token);
-          } catch {
-            // Refresh failed, clear tokens
-            await clearTokens();
-          }
+      const refreshIn = Math.max(expiresAt - Date.now() - 5 * 60 * 1000, 0);
+      refreshTimerRef.current = setTimeout(async () => {
+        const me = await fetchMe();
+        if (me.authenticated && me.user) {
+          setUser(me.user);
+          if (me.expiresAt) scheduleWebRefresh(me.expiresAt);
         } else {
-          // Access token still valid, fetch user info
-          if (!api?.auth) {
+          setUser(null);
+        }
+      }, refreshIn);
+    },
+    [clearRefreshTimer],
+  );
+
+  // --- Initialize auth state on mount ---
+  useEffect(() => {
+    if (isElectronRenderer()) {
+      isElectron.current = true;
+
+      // Electron: restore session from safeStorage
+      const api = window.electronAPI;
+
+      async function restoreElectronSession() {
+        try {
+          const tokens = await loadTokens();
+          if (!tokens) {
             setIsLoading(false);
             return;
           }
 
-          try {
-            const userInfo = await api.auth.getUserInfo(accessToken);
-            setUser({
-              id: userInfo.sub,
-              email: userInfo.email,
-              name: userInfo.name,
-              image: userInfo.picture,
-              plan: userInfo.plan,
-            });
-            scheduleRefresh(expiresAt, refreshToken);
-          } catch {
-            // Token might be revoked, try refreshing
+          const { accessToken, refreshToken, expiresAt } = tokens;
+
+          if (Date.now() >= expiresAt) {
+            if (!api?.auth) {
+              setIsLoading(false);
+              return;
+            }
+
             try {
               const tokenResponse = await api.auth.refreshToken(refreshToken);
               const newExpiresAt = Date.now() + tokenResponse.expires_in * 1000;
@@ -231,29 +238,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 image: userInfo.picture,
                 plan: userInfo.plan,
               });
-              scheduleRefresh(newExpiresAt, tokenResponse.refresh_token);
+              scheduleElectronRefresh(newExpiresAt, tokenResponse.refresh_token);
             } catch {
               await clearTokens();
             }
+          } else {
+            if (!api?.auth) {
+              setIsLoading(false);
+              return;
+            }
+
+            try {
+              const userInfo = await api.auth.getUserInfo(accessToken);
+              setUser({
+                id: userInfo.sub,
+                email: userInfo.email,
+                name: userInfo.name,
+                image: userInfo.picture,
+                plan: userInfo.plan,
+              });
+              scheduleElectronRefresh(expiresAt, refreshToken);
+            } catch {
+              try {
+                const tokenResponse = await api.auth.refreshToken(refreshToken);
+                const newExpiresAt = Date.now() + tokenResponse.expires_in * 1000;
+                await saveTokens({
+                  accessToken: tokenResponse.access_token,
+                  refreshToken: tokenResponse.refresh_token,
+                  expiresAt: newExpiresAt,
+                });
+
+                const userInfo = await api.auth.getUserInfo(tokenResponse.access_token);
+                setUser({
+                  id: userInfo.sub,
+                  email: userInfo.email,
+                  name: userInfo.name,
+                  image: userInfo.picture,
+                  plan: userInfo.plan,
+                });
+                scheduleElectronRefresh(newExpiresAt, tokenResponse.refresh_token);
+              } catch {
+                await clearTokens();
+              }
+            }
           }
+        } catch {
+          // Silently fail
+        } finally {
+          setIsLoading(false);
         }
-      } catch {
-        // Silently fail
-      } finally {
-        setIsLoading(false);
       }
+
+      void restoreElectronSession();
+    } else {
+      isElectron.current = false;
+
+      // Web: check session via httpOnly cookies
+      async function restoreWebSession() {
+        try {
+          const me = await fetchMe();
+          if (me.authenticated && me.user) {
+            setUser(me.user);
+            if (me.expiresAt) scheduleWebRefresh(me.expiresAt);
+          }
+        } catch {
+          // No session
+        } finally {
+          setIsLoading(false);
+        }
+      }
+
+      void restoreWebSession();
     }
 
-    void restoreSession();
+    return clearRefreshTimer;
+  }, [scheduleElectronRefresh, scheduleWebRefresh, clearRefreshTimer]);
 
-    return () => {
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current);
-      }
-    };
-  }, [scheduleRefresh]);
-
-  // Listen for OAuth callback
+  // --- Listen for Electron OAuth callback (Electron only) ---
   useEffect(() => {
     if (!isElectron.current) return;
 
@@ -291,34 +352,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           plan: userInfo.plan,
         });
 
-        scheduleRefresh(expiresAt, tokenResponse.refresh_token);
+        scheduleElectronRefresh(expiresAt, tokenResponse.refresh_token);
       } catch (err) {
         console.error("[auth] Token exchange failed:", err);
       }
     });
 
     return unsubscribe;
-  }, [scheduleRefresh]);
+  }, [scheduleElectronRefresh]);
 
+  // --- Login ---
   const login = useCallback(async () => {
-    const api = window.electronAPI;
-    if (!api?.auth) return;
-    await api.auth.startLogin();
+    if (isElectron.current) {
+      const api = window.electronAPI;
+      if (!api?.auth) return;
+      await api.auth.startLogin();
+    } else {
+      // Dynamic import to avoid bundling web-auth in Electron builds
+      const { startWebLogin } = await import("@/lib/auth/web-auth");
+      await startWebLogin();
+    }
   }, []);
 
+  // --- Logout ---
   const logout = useCallback(async () => {
-    const api = window.electronAPI;
-    if (!api?.auth) return;
+    clearRefreshTimer();
 
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
-      refreshTimerRef.current = null;
+    if (isElectron.current) {
+      const api = window.electronAPI;
+      if (!api?.auth) return;
+      await api.auth.logout();
+      await clearTokens();
+    } else {
+      await fetch("/api/auth/logout/", { method: "POST", credentials: "same-origin" });
     }
 
-    await api.auth.logout();
-    await clearTokens();
     setUser(null);
-  }, []);
+  }, [clearRefreshTimer]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
