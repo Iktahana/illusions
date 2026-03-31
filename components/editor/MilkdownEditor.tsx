@@ -34,7 +34,7 @@ import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugi
 import clsx from "clsx";
 import { EditorView } from "@milkdown/prose/view";
 import { AllSelection, Plugin, PluginKey } from "@milkdown/prose/state";
-import { $prose } from "@milkdown/utils";
+import { $prose, replaceAll } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "../BubbleMenu";
 import { searchHighlightPlugin } from "@/lib/editor-page/search-highlight-plugin";
 import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin";
@@ -75,6 +75,10 @@ interface MilkdownEditorProps {
   onFind?: (initialTerm?: string) => void;
   /** Per-pane override for charsPerLine (used by auto mode to avoid global state conflicts in split editors) */
   overrideCharsPerLine?: number;
+  /** External content to apply to the editor (from file watcher). Preserves scroll position. */
+  externalContent?: string | null;
+  /** Called after externalContent has been applied to ProseMirror. */
+  onExternalContentApplied?: () => void;
 }
 
 export default function MilkdownEditor({
@@ -101,6 +105,8 @@ export default function MilkdownEditor({
   onStartSpeech,
   onFind,
   overrideCharsPerLine,
+  externalContent,
+  onExternalContentApplied,
 }: MilkdownEditorProps) {
   const {
     fontScale,
@@ -273,6 +279,22 @@ export default function MilkdownEditor({
 
     return () => clearTimeout(timer);
   }, [get, onEditorViewReady]);
+
+  // 外部ファイル変更時にスクロール位置を保持したまま内容を更新する
+  const onExternalContentAppliedRef = useRef(onExternalContentApplied);
+  onExternalContentAppliedRef.current = onExternalContentApplied;
+
+  useEffect(() => {
+    if (externalContent == null) return;
+    const editor = get();
+    if (!editor) return;
+    try {
+      editor.action(replaceAll(externalContent));
+      onExternalContentAppliedRef.current?.();
+    } catch (error) {
+      console.warn("外部コンテンツの適用に失敗しました:", error);
+    }
+  }, [externalContent, get]);
 
   // posHighlight 設定を動的に更新（Editor を再作成せずに）
   useEffect(() => {
