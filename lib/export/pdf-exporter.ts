@@ -150,7 +150,7 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Derive physical dimensions in microns from PAGE_DIMENSIONS (mm)
-    const dims = PAGE_DIMENSIONS[options.pageSize ?? "A5"];
+    const dims = PAGE_DIMENSIONS[options.pageSize ?? "A5"] ?? PAGE_DIMENSIONS["A5"];
     const size = { width: dims.width * 1000, height: dims.height * 1000 };
 
     // When explicit margins are provided via @page CSS, set printToPDF margins to zero

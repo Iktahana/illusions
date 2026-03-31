@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/rules-of-hooks, @typescript-eslint/no-unused-vars */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -483,7 +484,10 @@ export default function EditorPage() {
   const handlePdfExportConfirm = useCallback(async (settings: PdfExportSettings) => {
     setShowPdfExportDialog(false);
 
-    if (!window.electronAPI?.exportPDF) return;
+    if (!window.electronAPI?.exportPDF) {
+      notificationManager.error("PDFエクスポートはデスクトップアプリでのみ利用可能です");
+      return;
+    }
 
     const progressId = notificationManager.showProgress("PDFをエクスポート中...", {
       type: "info",

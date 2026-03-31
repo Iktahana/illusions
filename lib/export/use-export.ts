@@ -126,7 +126,7 @@ export function useExport({
       }
 
       // PDF export: delegate to settings dialog when callback is provided
-      if (format === "pdf" && onPdfExportRequest) {
+      if (format === "pdf" && onPdfExportRequest && isElectronRenderer()) {
         onPdfExportRequest(content, metadata);
         return;
       }
