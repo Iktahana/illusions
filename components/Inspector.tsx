@@ -388,7 +388,11 @@ export default function Inspector({
           <HistoryPanel
             projectId={projectMode.projectId}
             sourcePath={activeFilePath || projectMode.metadata.mainFile}
-            displayName={activeFileName || (activeFilePath || projectMode.metadata.mainFile).split("/").pop() || projectMode.metadata.mainFile}
+            displayName={
+              activeFileName ||
+              (activeFilePath || projectMode.metadata.mainFile).split("/").pop() ||
+              projectMode.metadata.mainFile
+            }
             onRestore={onHistoryRestore}
             currentContent={currentContent}
             onCompareInEditor={onCompareInEditor}

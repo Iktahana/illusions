@@ -485,7 +485,7 @@ describe("HistoryService", () => {
 
       // Create some auto snapshots
       for (let i = 0; i < 3; i++) {
-          await service.createSnapshot({
+        await service.createSnapshot({
           sourcePath: "main.mdi",
           content: `Auto ${i}`,
         });

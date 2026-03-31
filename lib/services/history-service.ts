@@ -167,7 +167,9 @@ function isAutoSnapshotFilename(filename: string): boolean {
   return filename.includes(".__auto__.");
 }
 
-function getSnapshotSourceKey(snapshot: Partial<Pick<SnapshotEntry, "sourcePath" | "sourceFile">>): string {
+function getSnapshotSourceKey(
+  snapshot: Partial<Pick<SnapshotEntry, "sourcePath" | "sourceFile">>,
+): string {
   return snapshot.sourcePath || snapshot.sourceFile || "";
 }
 
