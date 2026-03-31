@@ -200,6 +200,14 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       // Only editor tabs can be saved
       if (!isEditorTab(tab)) return;
 
+      // Block save if tab has unresolved external conflict
+      if (tab.fileSyncStatus === "conflicted") {
+        notificationManager.warning(
+          "ファイルが外部で変更されています。保存する前にコンフリクトを解決してください。",
+        );
+        return;
+      }
+
       isSavingRef.current = true;
       updateTab(tabId, { isSaving: true });
 
@@ -221,6 +229,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
                     lastSavedTime: Date.now(),
                     lastSaveWasAuto: isAutoSave,
                     isSaving: false,
+                    fileSyncStatus: "clean",
+                    conflictDiskContent: null,
                   }
                 : t,
             ),
@@ -247,6 +257,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
                     lastSavedTime: Date.now(),
                     lastSaveWasAuto: isAutoSave,
                     isSaving: false,
+                    fileSyncStatus: "clean",
+                    conflictDiskContent: null,
                   }
                 : t,
             ),
