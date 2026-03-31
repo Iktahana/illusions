@@ -59,6 +59,7 @@ export function useTerminalTabs({
         const shell = settings.terminalDefaultShell || undefined;
         const result = await ptyApi.spawn({ cwd, shell });
         if ("error" in result) {
+          console.error("[Terminal] PTY spawn failed:", result.error);
           // PTY spawn failed — remove the stuck "connecting" tab
           const stuckTab = tabsRef.current
             .slice()

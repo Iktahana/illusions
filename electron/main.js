@@ -51,8 +51,10 @@ process.on("unhandledRejection", (reason) => {
 // --- Single-instance lock ---
 // Ensure only one instance of the app is running. On Windows/Linux this prevents
 // duplicate windows when a user double-clicks a .mdi file while the app is already open.
-const gotTheLock = app.requestSingleInstanceLock();
-console.log("[DEBUG] Single instance lock:", gotTheLock);
+// In dev mode, skip the lock so dev and production can run side-by-side.
+const { isDev } = require("./app-constants");
+const gotTheLock = isDev || app.requestSingleInstanceLock();
+console.log("[DEBUG] Single instance lock:", gotTheLock, isDev ? "(skipped in dev)" : "");
 if (!gotTheLock) {
   console.log("[DEBUG] Another instance is running, quitting.");
   app.quit();
