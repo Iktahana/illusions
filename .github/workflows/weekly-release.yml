@@ -14,7 +14,7 @@ jobs:
   weekly-release-pr:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -34,7 +34,7 @@ jobs:
       - name: Check latest dev CI status
         id: check-ci
         if: steps.check-diff.outputs.ahead != '0'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const runs = await github.rest.actions.listWorkflowRunsForRepo({
@@ -55,7 +55,7 @@ jobs:
 
       - name: Close old weekly release PRs
         if: steps.check-diff.outputs.ahead != '0' && steps.check-ci.outputs.green == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const { data: prs } = await github.rest.pulls.list({
@@ -79,7 +79,7 @@ jobs:
 
       - name: Create weekly release PR
         if: steps.check-diff.outputs.ahead != '0' && steps.check-ci.outputs.green == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const today = new Date().toISOString().slice(0, 10);
@@ -134,7 +134,7 @@ jobs:
 
       - name: Create issue on CI failure
         if: steps.check-diff.outputs.ahead != '0' && steps.check-ci.outputs.green != 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const today = new Date().toISOString().slice(0, 10);
