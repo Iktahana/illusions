@@ -1,6 +1,7 @@
 "use client";
 
 import InfoTooltip from "./InfoTooltip";
+import { calculateManuscriptPages } from "@/lib/utils";
 
 import type { PreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
 
@@ -56,7 +57,7 @@ export default function StatsPanel({
   // Previous day comparison
   const prevDayCharDiff = previousDayStats ? charCount - previousDayStats.charCount : null;
   const prevDayPageDiff = previousDayStats
-    ? manuscriptPages - Math.ceil(previousDayStats.charCount / 400)
+    ? manuscriptPages - calculateManuscriptPages(previousDayStats.charCount)
     : null;
 
   // Approximate punctuation estimation
