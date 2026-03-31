@@ -96,10 +96,10 @@ Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try 
 - **Japanese text linting** — Configurable rule-based linting with JSON-defined rule sets; preset support
 - **Settings tabs** — Including: Keymap, Linting, Typography, Vertical layout, Speech, Terminal, Position highlight, Power
 
-### デスクトップ / Desktop
+### アカウント / Account
 
-- **Desktop-only feature guards** — `DesktopOnlyDialog` gracefully blocks web-unsupported features
-- **Download button component** — In-app prompt to download the desktop build when a desktop-only feature is accessed
+- **Web OAuth login** — ウェブブラウザ経由でOAuthログインに対応；トークンはOS標準の暗号化で安全に保管
+- **ユーザーアバターメニュー** — サイドバーおよびウェルカム画面からプロフィールや利用状況を確認可能
 
 ---
 
@@ -156,15 +156,6 @@ npm run electron:dev
 # Build Electron app for production
 npm run electron:build
 ```
-
-#### Generate Dependency Credits
-
-```bash
-# Generate credits.json (list of production dependency licenses)
-npm run generate:credits
-```
-
-The generated file is used in the "About illusions" page in Settings.
 
 ---
 
@@ -255,14 +246,6 @@ Please follow the code review standards in [CLAUDE.md](CLAUDE.md).
 GNU Affero General Public License v3.0 - See [LICENSE](LICENSE) file for details.
 
 See also: [利用規約 / Terms of Service](TERMS.md) | [Online Policy Page](https://www.illusions.app/policy)
-
----
-
-## 🙏 Acknowledgments
-
-- **Milkdown** - Excellent Markdown editor framework
-- **Kuromoji.js** - Japanese text tokenization
-- **Electron** - Cross-platform desktop framework
 
 ---
 
