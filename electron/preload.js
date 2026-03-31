@@ -140,20 +140,26 @@ contextBridge.exposeInMainWorld("electronAPI", {
     init: (dicPath) => ipcRenderer.invoke("nlp:init", dicPath),
     tokenizeParagraph: (text) => ipcRenderer.invoke("nlp:tokenize-paragraph", text),
     tokenizeDocument: (paragraphs, onProgress) => {
-      // Register progress listener if callback provided
+      // Generate a unique requestId so parallel calls don't interfere with each other
+      const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
       if (onProgress) {
-        // Remove any stale listeners from previous calls before registering
-        ipcRenderer.removeAllListeners("nlp:tokenize-progress");
-        const handler = (_event, progress) => onProgress(progress);
+        // Only forward progress events that belong to this specific request
+        const handler = (_event, progress) => {
+          if (progress.requestId === requestId) {
+            onProgress(progress);
+          }
+        };
         ipcRenderer.on("nlp:tokenize-progress", handler);
 
-        // Clean up on promise settlement instead of a fixed timeout
-        return ipcRenderer.invoke("nlp:tokenize-document", { paragraphs }).finally(() => {
-          ipcRenderer.removeListener("nlp:tokenize-progress", handler);
-        });
+        return ipcRenderer
+          .invoke("nlp:tokenize-document", { paragraphs, requestId })
+          .finally(() => {
+            ipcRenderer.removeListener("nlp:tokenize-progress", handler);
+          });
       }
 
-      return ipcRenderer.invoke("nlp:tokenize-document", { paragraphs });
+      return ipcRenderer.invoke("nlp:tokenize-document", { paragraphs, requestId });
     },
     analyzeWordFrequency: (text) => ipcRenderer.invoke("nlp:analyze-word-frequency", text),
   },
