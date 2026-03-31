@@ -48,6 +48,8 @@ const POLL_TIMEOUT_MS = Number(process.env.POLL_TIMEOUT_MS ?? 600_000);
 
 const API_BASE = "https://manage.devcenter.microsoft.com/v1.0/my";
 const STORE_METADATA_DIR = resolve(__dirname, "..", "store", "microsoft", "ja-JP");
+const TERMS_PATH = resolve(__dirname, "..", "TERMS.md");
+const TERMS_CANONICAL_URL = "https://github.com/Iktahana/illusions/blob/main/TERMS.md";
 
 // ---------------------------------------------------------------------------
 // Authentication
@@ -207,6 +209,27 @@ function parseBulletList(markdown) {
     .filter((line) => line.length > 0);
 }
 
+/**
+ * Reads TERMS.md from the repo root, strips Markdown formatting to plain text,
+ * and appends the canonical URL line.
+ * @returns {string}
+ */
+function readLicenseTerms() {
+  if (!existsSync(TERMS_PATH)) return "";
+  const raw = readFileSync(TERMS_PATH, "utf-8");
+  const plain = raw
+    .replace(/^#{1,6}\s+/gm, "") // strip heading markers
+    .replace(/\*\*(.+?)\*\*/g, "$1") // strip bold
+    .replace(/\*(.+?)\*/g, "$1") // strip italic
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // [text](url) → text
+    .replace(/^\s*[-*+]\s+/gm, "") // strip list markers (including indented)
+    .replace(/^---$/gm, "") // strip horizontal rules
+    .replace(/`([^`]+)`/g, "$1") // strip inline code
+    .replace(/\n{3,}/g, "\n\n") // collapse excessive blank lines
+    .trim();
+  return plain + `\n\n最新バーション（正本）：${TERMS_CANONICAL_URL}`;
+}
+
 // ---------------------------------------------------------------------------
 // Package handling
 // ---------------------------------------------------------------------------
@@ -334,12 +357,14 @@ async function main() {
   const shortDescription = readListingFile("short-description.md");
   const featuresMarkdown = readListingFile("features.md");
   const releaseNotes = readListingFile("release-notes.md", { required: false });
+  const licenseTerms = readLicenseTerms();
   const features = parseBulletList(featuresMarkdown);
 
   console.log(`  description:      ${description.length} chars`);
   console.log(`  shortDescription: ${shortDescription.length} chars`);
   console.log(`  features:         ${features.length} items`);
   console.log(`  releaseNotes:     ${releaseNotes.length} chars`);
+  console.log(`  licenseTerms:     ${licenseTerms.length} chars`);
 
   // --- Step 2: Authenticate ---
   let token = "dry-run-token";
@@ -404,6 +429,7 @@ async function main() {
   listing.shortDescription = shortDescription;
   listing.features = features;
   listing.releaseNotes = releaseNotes;
+  if (licenseTerms) listing.licenseTerms = licenseTerms;
 
   // --- Step 7: Set application packages (full-submission only) ---
   if (!LISTING_ONLY) {
