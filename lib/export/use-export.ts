@@ -41,10 +41,7 @@ async function saveTxtFile(text: string, suggestedName: string): Promise<boolean
       // "Must be handling a user gesture" — the browser requires a direct
       // user interaction (click / key-press) in the active document to open
       // the file picker.  Re-throw with a friendlier Japanese message.
-      if (
-        error instanceof DOMException &&
-        error.message.includes("user gesture")
-      ) {
+      if (error instanceof DOMException && error.message.includes("user gesture")) {
         throw new Error(
           "エクスポートするには、エディタ上をクリックしてフォーカスを合わせてから再度お試しください。",
         );
