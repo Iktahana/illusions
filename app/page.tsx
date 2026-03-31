@@ -39,6 +39,7 @@ import { useSaveToast } from "@/lib/editor-page/use-save-toast";
 import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
 import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
+import { usePreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
@@ -562,6 +563,9 @@ export default function EditorPage() {
     readabilityAnalysis,
   } = useTextStatistics(content);
 
+  // --- Previous day comparison ---
+  const previousDayStats = usePreviousDayStats(currentFile?.name, isProjectMode(editorMode));
+
   // --- Linting hook ---
   const {
     ruleRunner,
@@ -780,6 +784,7 @@ export default function EditorPage() {
     onApplyLintPreset: handleApplyLintPreset,
     activeLintPresetId,
     switchToCorrectionsTrigger,
+    previousDayStats,
   } as const;
 
   return (

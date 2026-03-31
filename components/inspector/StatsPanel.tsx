@@ -2,6 +2,8 @@
 
 import InfoTooltip from "./InfoTooltip";
 
+import type { PreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
+
 interface StatsPanelProps {
   charCount: number;
   selectedCharCount: number;
@@ -26,6 +28,14 @@ interface StatsPanelProps {
     avgSentenceLength: number;
     avgPunctuationSpacing: number;
   };
+  previousDayStats?: PreviousDayStats | null;
+}
+
+/** Format a diff value with sign prefix */
+function formatDiff(diff: number, unit: string): string {
+  if (diff > 0) return `+${diff.toLocaleString()}${unit}`;
+  if (diff < 0) return `${diff.toLocaleString()}${unit}`;
+  return `±0${unit}`;
 }
 
 /** Statistics panel displaying character counts, readability, and reading time */
@@ -38,9 +48,16 @@ export default function StatsPanel({
   charTypeAnalysis,
   charUsageRates,
   readabilityAnalysis,
+  previousDayStats,
 }: StatsPanelProps) {
   const isSelection = selectedCharCount > 0;
   const activeCharCount = isSelection ? selectedCharCount : charCount;
+
+  // Previous day comparison
+  const prevDayCharDiff = previousDayStats ? charCount - previousDayStats.charCount : null;
+  const prevDayPageDiff = previousDayStats
+    ? manuscriptPages - Math.ceil(previousDayStats.charCount / 400)
+    : null;
 
   // Approximate punctuation estimation
   const estimatedPunctuation = Math.floor(activeCharCount * 0.12);
@@ -123,7 +140,16 @@ export default function StatsPanel({
             </p>
             <p className="text-xs text-foreground-tertiary">400字詰原稿用紙</p>
           </div>
-          <span className="text-sm font-bold text-foreground">{manuscriptPages}枚</span>
+          <div className="text-right">
+            <span className="text-sm font-bold text-foreground">{manuscriptPages}枚</span>
+            {prevDayPageDiff !== null && (
+              <p
+                className={`text-xs font-medium ${prevDayPageDiff > 0 ? "text-success" : prevDayPageDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
+              >
+                {formatDiff(prevDayPageDiff, "枚")}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -220,7 +246,7 @@ export default function StatsPanel({
           文字数
         </h4>
         <div className="space-y-1.5">
-          <div className="flex justify-between items-baseline gap-2">
+          <div className="flex justify-between items-center gap-2">
             <div className="flex items-center gap-1 min-w-0">
               <InfoTooltip
                 content="空白・改行を含むすべての文字数（原稿用紙換算の基準）"
@@ -229,9 +255,18 @@ export default function StatsPanel({
                 総字数
               </InfoTooltip>
             </div>
-            <span className="text-base font-semibold text-foreground flex-shrink-0">
-              {activeCharCount.toLocaleString()}
-            </span>
+            <div className="flex-shrink-0 text-right">
+              <span className="text-base font-semibold text-foreground">
+                {activeCharCount.toLocaleString()}
+              </span>
+              {!isSelection && prevDayCharDiff !== null && (
+                <p
+                  className={`text-xs font-medium ${prevDayCharDiff > 0 ? "text-success" : prevDayCharDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
+                >
+                  {formatDiff(prevDayCharDiff, "字")}
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex justify-between items-baseline gap-2">
             <div className="flex items-center gap-1 min-w-0">
