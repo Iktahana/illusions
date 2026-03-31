@@ -33,9 +33,6 @@ permissions:
   pull-requests: write
   issues: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   # ---------------------------------------------------------------------------
   # PR Reviewer — posts a review prompt comment on new PRs
@@ -193,7 +190,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 10
 

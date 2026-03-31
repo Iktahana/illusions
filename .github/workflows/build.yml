@@ -24,9 +24,6 @@ on:
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   # ---------------------------------------------------------------------------
   # Detect which areas changed — used to avoid bumping desktop version when
@@ -40,13 +37,13 @@ jobs:
       desktop_changed: ${{ steps.filter.outputs.desktop_changed }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Filter paths
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             desktop_changed:
@@ -82,16 +79,16 @@ jobs:
       branch: ${{ steps.version.outputs.branch }}
     steps:
       - name: Checkout (with tags for version computation)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           sparse-checkout: package.json
           sparse-checkout-cone-mode: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Compute version strings
         id: version
@@ -242,10 +239,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
@@ -253,7 +250,7 @@ jobs:
 
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ${{ env.ELECTRON_CACHE }}
@@ -284,7 +281,7 @@ jobs:
 
       - name: Restore Next.js cache
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .next/cache
           key: next-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
@@ -311,7 +308,7 @@ jobs:
 
       - name: Upload build artifacts
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: illusions-macos-${{ matrix.arch }}-${{ needs.compute-version.outputs.full }}
           path: dist-electron/**
@@ -334,10 +331,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
@@ -345,7 +342,7 @@ jobs:
 
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ${{ env.ELECTRON_CACHE }}
@@ -376,7 +373,7 @@ jobs:
 
       - name: Restore Next.js cache
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .next/cache
           key: next-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
@@ -397,7 +394,7 @@ jobs:
 
       - name: Upload build output
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-build-output
           path: |
@@ -427,10 +424,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
@@ -438,7 +435,7 @@ jobs:
 
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ${{ env.ELECTRON_CACHE }}
@@ -469,7 +466,7 @@ jobs:
 
       - name: Download build output
         if: github.event_name != 'pull_request'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-build-output
 
@@ -479,7 +476,7 @@ jobs:
 
       - name: Upload NSIS artifacts
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: illusions-windows-${{ needs.compute-version.outputs.full }}
           path: dist-electron/**
@@ -507,10 +504,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
@@ -518,7 +515,7 @@ jobs:
 
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ${{ env.ELECTRON_CACHE }}
@@ -549,7 +546,7 @@ jobs:
 
       - name: Download build output
         if: github.event_name != 'pull_request'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-build-output
 
@@ -559,7 +556,7 @@ jobs:
 
       - name: Upload MSIX artifacts
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: illusions-windows-msix-${{ needs.compute-version.outputs.full }}
           path: |
@@ -584,10 +581,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
@@ -595,7 +592,7 @@ jobs:
 
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ${{ env.ELECTRON_CACHE }}
@@ -630,7 +627,7 @@ jobs:
 
       - name: Restore Next.js cache
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .next/cache
           key: next-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
@@ -653,7 +650,7 @@ jobs:
 
       - name: Upload build artifacts
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: illusions-linux-x64-${{ needs.compute-version.outputs.full }}
           path: dist-electron/**
@@ -681,7 +678,7 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist-electron
 
