@@ -190,9 +190,29 @@ class WebFileWatcher implements FileWatcher {
 
     this._isActive = true;
 
+    // Save the previous baseline so we can detect changes that occurred while paused
+    const previousModified = this.lastModified;
+
     // Initialize lastModified before starting to poll
     void this.initializeLastModified().then(() => {
       if (!this._isActive) return;
+
+      // Catch-up check: detect changes that occurred while the watcher was paused
+      if (previousModified > 0 && this.lastModified > previousModified) {
+        if (!isFileSuppressed(this.path)) {
+          void this.vfs
+            .readFile(this.path)
+            .then((content) => {
+              if (this._isActive) {
+                this.onChanged(content, this.lastModified);
+              }
+            })
+            .catch(() => {
+              // File may have been deleted; normal poll cycle will handle it
+            });
+        }
+      }
+
       this.timerId = setInterval(() => {
         void this.checkForChanges();
       }, this.pollIntervalMs);
