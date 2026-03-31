@@ -115,7 +115,10 @@ interface MeResponse {
 
 async function fetchMe(): Promise<MeResponse> {
   try {
-    const res = await fetch("/api/auth/me/", { credentials: "same-origin" });
+    const res = await fetch("/api/auth/me/", {
+      method: "POST",
+      credentials: "same-origin",
+    });
     if (!res.ok) return { authenticated: false };
     return (await res.json()) as MeResponse;
   } catch {

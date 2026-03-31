@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { consumePendingAuth } from "@/lib/auth/web-auth";
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const exchanged = useRef(false);
@@ -84,5 +84,22 @@ export default function AuthCallbackPage() {
         <span className="text-sm">ログイン中...</span>
       </div>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center bg-background">
+          <div className="flex items-center gap-3 text-foreground-secondary">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-foreground-tertiary border-t-accent" />
+            <span className="text-sm">ログイン中...</span>
+          </div>
+        </div>
+      }
+    >
+      <AuthCallbackContent />
+    </Suspense>
   );
 }
