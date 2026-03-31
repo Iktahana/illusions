@@ -17,10 +17,9 @@
  *   MSIX_DIR              - Directory containing .appx packages (default: "msix-packages")
  *
  * Optional:
- *   SUBMISSION_MODE            - "listing-only" or "full-submission" (default: "full-submission")
- *   DRY_RUN=true              - Log API calls without mutating state (credentials not required)
- *   FORCE_DELETE_PENDING=true - Delete any existing pending submission before creating a new one
- *   POLL_TIMEOUT_MS           - Polling timeout in ms (default: 600000 = 10 min)
+ *   SUBMISSION_MODE   - "listing-only" or "full-submission" (default: "full-submission")
+ *   DRY_RUN=true     - Log API calls without mutating state (credentials not required)
+ *   POLL_TIMEOUT_MS  - Polling timeout in ms (default: 600000 = 10 min)
  */
 
 import { readFileSync, existsSync, readdirSync, createReadStream, statSync } from "node:fs";
@@ -40,7 +39,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DRY_RUN = process.env.DRY_RUN === "true";
 const SUBMISSION_MODE = process.env.SUBMISSION_MODE ?? "full-submission";
 const LISTING_ONLY = SUBMISSION_MODE === "listing-only";
-const FORCE_DELETE_PENDING = process.env.FORCE_DELETE_PENDING === "true";
 const TENANT_ID = process.env.MSSTORE_TENANT_ID;
 const CLIENT_ID = process.env.MSSTORE_CLIENT_ID;
 const CLIENT_SECRET = process.env.MSSTORE_CLIENT_SECRET;
@@ -374,16 +372,11 @@ async function main() {
       );
     }
 
-    if (FORCE_DELETE_PENDING) {
-      console.log(`  Deleting existing pending submission: ${pendingId}`);
-      await apiDelete(token, `/applications/${APP_ID}/submissions/${pendingId}`);
-    } else {
-      // Reuse the existing pending submission to avoid wiping manual Partner Center edits
-      console.log(`  Reusing existing pending submission: ${pendingId}`);
-      submissionId = pendingId;
-      const existingSub = await apiGet(token, `/applications/${APP_ID}/submissions/${pendingId}`);
-      fileUploadUrl = existingSub.fileUploadUrl;
-    }
+    // In full-submission mode, always delete the pending submission and create
+    // a fresh one. A pending submission in PreProcessing or validation state
+    // cannot be updated (409 InvalidState), so reusing it would fail.
+    console.log(`  Deleting existing pending submission: ${pendingId}`);
+    await apiDelete(token, `/applications/${APP_ID}/submissions/${pendingId}`);
   }
 
   // --- Step 4: Create new submission (if no pending submission to reuse) ---
