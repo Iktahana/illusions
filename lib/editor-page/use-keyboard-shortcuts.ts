@@ -174,7 +174,8 @@ export function useKeyboardShortcuts({
       "view.splitDown": splitEditorDown,
       "panel.explorer": toggleExplorer,
       "panel.search": toggleSearch,
-      "panel.outline": toggleOutline,
+      // TODO: Outline feature — planned for v1.3.0
+      // "panel.outline": toggleOutline,
       ...tabHandlers,
       ...webOnlyHandlers,
     };
