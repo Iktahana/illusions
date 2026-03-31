@@ -4,7 +4,7 @@ import { useCallback, useEffect } from "react";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { mdiToPlainText, mdiToRubyText } from "./txt-exporter";
-import type { ExportFormat } from "./types";
+import type { ExportFormat, ExportMetadata } from "./types";
 
 interface UseExportParams {
   /** Returns the current editor content as markdown */
@@ -14,6 +14,12 @@ interface UseExportParams {
   /** Returns true when the active tab is an editor tab.
    *  Export operations no-op when false (e.g. terminal or diff tab is active). */
   getIsEditorTabActive: () => boolean;
+  /**
+   * When provided, PDF export opens a settings dialog instead of exporting directly.
+   * The callback receives the content and metadata so the parent can show the dialog
+   * and later call the IPC with user-configured options.
+   */
+  onPdfExportRequest?: (content: string, metadata: ExportMetadata) => void;
 }
 
 /**
@@ -67,7 +73,12 @@ async function saveTxtFile(text: string, suggestedName: string): Promise<boolean
  * Hook that provides export functionality and registers Electron menu handlers.
  * Handles PDF, EPUB, DOCX, TXT export with progress notifications.
  */
-export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExportParams): {
+export function useExport({
+  getContent,
+  getTitle,
+  getIsEditorTabActive,
+  onPdfExportRequest,
+}: UseExportParams): {
   exportAs: (format: ExportFormat) => Promise<void>;
 } {
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
@@ -122,6 +133,12 @@ export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExp
         return;
       }
 
+      // PDF export: delegate to settings dialog when callback is provided
+      if (format === "pdf" && onPdfExportRequest && isElectronRenderer()) {
+        onPdfExportRequest(content, metadata);
+        return;
+      }
+
       const progressId = notificationManager.showProgress(`${label}をエクスポート中...`, {
         type: "info",
       });
@@ -171,7 +188,7 @@ export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExp
         notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
       }
     },
-    [getContent, getTitle, getIsEditorTabActive, isElectron],
+    [getContent, getTitle, getIsEditorTabActive, isElectron, onPdfExportRequest],
   );
 
   // Register Electron menu event handlers

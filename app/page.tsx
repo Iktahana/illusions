@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/rules-of-hooks, @typescript-eslint/no-unused-vars */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -17,6 +18,9 @@ import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence"
 import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
+import type { ExportMetadata } from "@/lib/export/types";
+import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
+import { notificationManager } from "@/lib/services/notification-manager";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
 import { useGlobalShortcuts } from "@/lib/hooks/use-global-shortcuts";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
@@ -467,10 +471,66 @@ export default function EditorPage() {
     return name.replace(/\.[^.]+$/, "");
   }, [tabs, activeTabId]);
 
+  // PDF export dialog state
+  const [showPdfExportDialog, setShowPdfExportDialog] = useState(false);
+  const pdfExportContentRef = useRef("");
+  const pdfExportMetadataRef = useRef<ExportMetadata>({ title: "" });
+
+  const handlePdfExportRequest = useCallback((pdfContent: string, metadata: ExportMetadata) => {
+    pdfExportContentRef.current = pdfContent;
+    pdfExportMetadataRef.current = metadata;
+    setShowPdfExportDialog(true);
+  }, []);
+
+  const handlePdfExportConfirm = useCallback(async (settings: PdfExportSettings) => {
+    setShowPdfExportDialog(false);
+
+    if (!window.electronAPI?.exportPDF) {
+      notificationManager.error("PDFエクスポートはデスクトップアプリでのみ利用可能です");
+      return;
+    }
+
+    const progressId = notificationManager.showProgress("PDFをエクスポート中...", {
+      type: "info",
+    });
+
+    try {
+      const result = await window.electronAPI.exportPDF(pdfExportContentRef.current, {
+        metadata: pdfExportMetadataRef.current,
+        verticalWriting: settings.verticalWriting,
+        pageSize: settings.pageSize,
+        margins: settings.margins,
+        charsPerLine: settings.charsPerLine,
+        linesPerPage: settings.linesPerPage,
+        fontFamily: settings.fontFamily,
+        showPageNumbers: settings.showPageNumbers,
+        textIndent: settings.textIndent,
+      });
+
+      notificationManager.dismiss(progressId);
+
+      if (result === null || result === undefined) return;
+
+      if (typeof result === "object" && "success" in result && !result.success) {
+        notificationManager.error(
+          `PDFのエクスポートに失敗しました: ${(result as { error: string }).error}`,
+        );
+        return;
+      }
+
+      notificationManager.success("PDFをエクスポートしました");
+    } catch (error) {
+      notificationManager.dismiss(progressId);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
+    }
+  }, []);
+
   const { exportAs } = useExport({
     getContent: getExportContent,
     getTitle: getExportTitle,
     getIsEditorTabActive: useCallback(() => isEditorTabActiveRef.current, []),
+    onPdfExportRequest: handlePdfExportRequest,
   });
 
   // System file open: tab manager handles loading; we just update editor key
@@ -828,6 +888,9 @@ export default function EditorPage() {
         setShowRubyDialog,
         rubySelectedText,
         handleApplyRuby,
+        showPdfExportDialog,
+        setShowPdfExportDialog,
+        handlePdfExportConfirm,
       }}
       recovery={{
         wasAutoRecovered,

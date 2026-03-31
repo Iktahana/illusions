@@ -73,6 +73,13 @@ declare global {
         metadata: { title: string; author?: string; date?: string; language?: string };
         verticalWriting?: boolean;
         pageSize?: "A4" | "A5" | "B5" | "B6";
+        landscape?: boolean;
+        margins?: { top: number; bottom: number; left: number; right: number };
+        charsPerLine?: number;
+        linesPerPage?: number;
+        fontFamily?: string;
+        showPageNumbers?: boolean;
+        textIndent?: number;
       },
     ) => Promise<string | { success: false; error: string } | null>;
     exportEPUB?: (
