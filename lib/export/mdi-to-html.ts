@@ -37,20 +37,26 @@ function isValidKernAmount(amount: string): boolean {
  * Build ruby HTML from base text and ruby text.
  * If ruby contains dots, split into per-character ruby pairs.
  * Otherwise, wrap the entire base with a single ruby annotation.
+ *
+ * base and ruby are HTML-escaped to prevent injection from user content.
  */
 function buildRubyHtml(base: string, ruby: string): string {
   const rubyParts = ruby.split(".");
+  const baseChars = [...base];
 
-  if (rubyParts.length > 1 && rubyParts.length === [...base].length) {
+  if (rubyParts.length > 1 && rubyParts.length === baseChars.length) {
     // Split ruby: each dot-separated segment corresponds to one character
-    const baseChars = [...base];
     return (
-      "<ruby>" + baseChars.map((char, i) => `${char}<rt>${rubyParts[i]}</rt>`).join("") + "</ruby>"
+      "<ruby>" +
+      baseChars
+        .map((char, i) => `${escapeHtml(char)}<rt>${escapeHtml(rubyParts[i])}</rt>`)
+        .join("") +
+      "</ruby>"
     );
   }
 
   // Group ruby: wrap entire base text
-  return `<ruby>${base}<rt>${ruby}</rt></ruby>`;
+  return `<ruby>${escapeHtml(base)}<rt>${escapeHtml(ruby)}</rt></ruby>`;
 }
 
 /** Result of MDI syntax pre-processing before markdown-it rendering */
@@ -102,21 +108,24 @@ function preProcessMdiSyntax(markdown: string): MdiPreProcessResult {
 
   // 3. Tate-chu-yoko: ^text^
   result = result.replace(MDI_TCY_RE, (_match, text: string) =>
-    addPlaceholder(`<span class="mdi-tcy">${text}</span>`),
+    addPlaceholder(`<span class="mdi-tcy">${escapeHtml(text)}</span>`),
   );
 
   // 4. No-break: [[no-break:text]]
   result = result.replace(MDI_NOBR_RE, (_match, text: string) =>
-    addPlaceholder(`<span class="mdi-nobr">${text}</span>`),
+    addPlaceholder(`<span class="mdi-nobr">${escapeHtml(text)}</span>`),
   );
 
   // 5. Kerning: [[kern:amount:text]]
+  // amount is validated against MDI_KERN_AMOUNT_RE (digits, dots, +/-, em only) before use.
   result = result.replace(MDI_KERN_RE, (_match, amount: string, text: string) => {
     if (!isValidKernAmount(amount)) {
       // Invalid kern amount: return the original text unmodified
       return _match;
     }
-    return addPlaceholder(`<span class="mdi-kern" style="--mdi-kern:${amount};">${text}</span>`);
+    return addPlaceholder(
+      `<span class="mdi-kern" style="--mdi-kern:${amount};">${escapeHtml(text)}</span>`,
+    );
   });
 
   return { text: result, placeholders };
