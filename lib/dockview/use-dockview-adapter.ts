@@ -218,6 +218,8 @@ export function useDockviewAdapter({
               fileType: tab.fileType,
               editorKey,
               activeTabId,
+              searchOpenTrigger,
+              searchInitialTerm,
             },
           });
         } else if (isTerminalTab(tab)) {
@@ -323,6 +325,8 @@ export function useDockviewAdapter({
               fileType: tab.fileType,
               editorKey,
               activeTabId,
+              searchOpenTrigger,
+              searchInitialTerm,
             },
           });
         } else if (isTerminalTab(tab)) {
