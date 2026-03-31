@@ -40,7 +40,7 @@ async function fetchUserInfo(accessToken: string): Promise<UserInfoResponse | nu
   return res.json() as Promise<UserInfoResponse>;
 }
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   const cookies = getAuthCookies(request);
   if (!cookies) {
     return NextResponse.json({ authenticated: false });
