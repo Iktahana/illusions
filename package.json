@@ -138,8 +138,7 @@
       "!www/**/*"
     ],
     "asarUnpack": [
-      "dist-main/node_modules/**",
-      "node_modules/node-pty/**"
+      "dist-main/node_modules/**"
     ],
     "publish": [
       {

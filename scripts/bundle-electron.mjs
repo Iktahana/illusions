@@ -113,7 +113,7 @@ function collectDepsRecursive(pkgName, collected) {
 
 // Root external modules that cannot be bundled by esbuild
 // kuromoji: dictionary loading at runtime; better-sqlite3: native addon
-const externalRoots = ["kuromoji", "better-sqlite3"];
+const externalRoots = ["kuromoji", "better-sqlite3", "node-pty"];
 
 // Collect all transitive production dependencies
 const allDeps = new Set();
