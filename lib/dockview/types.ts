@@ -48,6 +48,10 @@ export interface EditorPanelParams {
   editorKey: number;
   /** Currently active tab ID for isActivePanel check */
   activeTabId: string;
+  /** Monotonic counter to trigger search dialog open */
+  searchOpenTrigger: number;
+  /** Initial search term to pre-fill when search dialog opens */
+  searchInitialTerm?: string;
 }
 
 /** Params for a terminal panel */

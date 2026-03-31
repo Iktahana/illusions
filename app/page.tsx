@@ -281,6 +281,8 @@ export default function EditorPage() {
   const { handleDockviewReady, dockviewApi, splitEditor } = useDockviewAdapter({
     tabManager: tabManagerWithPtyCleanup,
     editorKey,
+    searchOpenTrigger,
+    searchInitialTerm,
   });
   const { flushLayoutState } = useDockviewPersistence({
     dockviewApi,
