@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getHistoryService } from "@/lib/services/history-service";
+import { chars } from "@/lib/editor-page/types";
 
 import type { SnapshotEntry } from "@/lib/services/history-service";
 
@@ -25,20 +26,21 @@ function getDateKey(timestamp: number): string {
 }
 
 /**
- * Find the last snapshot from the most recent day before today.
- * Returns the latest snapshot entry from that day, or null if none exists.
+ * Find the last snapshot from yesterday.
+ * Returns the latest snapshot entry from yesterday, or null if none exists.
  *
- * 今日より前の最新日のスナップショットを探す。
- * その日の最後のスナップショットを返す。存在しない場合はnull。
+ * 昨日のスナップショットを探す。
+ * 昨日の最後のスナップショットを返す。存在しない場合はnull。
  */
 function findPreviousDaySnapshot(snapshots: SnapshotEntry[]): SnapshotEntry | null {
-  const todayKey = getDateKey(Date.now());
+  const now = new Date();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const yesterdayKey = getDateKey(yesterday.getTime());
 
   // Snapshots are sorted newest-first
   for (const snapshot of snapshots) {
     const key = getDateKey(snapshot.timestamp);
-    if (key !== todayKey) {
-      // This is the latest snapshot from a previous day — use it
+    if (key === yesterdayKey) {
       return snapshot;
     }
   }
@@ -79,10 +81,19 @@ export function usePreviousDayStats(
 
         const prevSnapshot = findPreviousDaySnapshot(snapshots);
         if (prevSnapshot) {
-          setStats({
-            charCount: prevSnapshot.characterCount,
-            timestamp: prevSnapshot.timestamp,
-          });
+          // Load snapshot content and count with chars() (whitespace-stripped)
+          // to match StatsPanel's charCount calculation
+          const content = await historyService.getSnapshotContent(prevSnapshot.id);
+          if (cancelled) return;
+
+          if (content !== null) {
+            setStats({
+              charCount: chars(content),
+              timestamp: prevSnapshot.timestamp,
+            });
+          } else {
+            setStats(null);
+          }
         } else {
           setStats(null);
         }
