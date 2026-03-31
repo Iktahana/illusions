@@ -61,6 +61,7 @@ export default function Inspector({
   onApplyLintPreset,
   activeLintPresetId,
   switchToCorrectionsTrigger = 0,
+  previousDayStats,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
   const projectMode = isProject ? (editorMode as ProjectMode) : null;
@@ -379,6 +380,7 @@ export default function Inspector({
             charTypeAnalysis={charTypeAnalysis}
             charUsageRates={charUsageRates}
             readabilityAnalysis={readabilityAnalysis}
+            previousDayStats={previousDayStats}
           />
         )}
         {activeTab === "history" && projectMode && onHistoryRestore && (

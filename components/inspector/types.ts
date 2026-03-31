@@ -1,4 +1,5 @@
 import type { LintIssue, Severity } from "@/lib/linting";
+import type { PreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
 
 export type Tab = "corrections" | "stats" | "history";
 
@@ -82,4 +83,6 @@ export interface InspectorProps {
   activeLintPresetId?: string;
   /** Monotonically increasing trigger to switch to the corrections tab from outside */
   switchToCorrectionsTrigger?: number;
+  /** Previous day's stats for comparison display */
+  previousDayStats?: PreviousDayStats | null;
 }
