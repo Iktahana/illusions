@@ -10,7 +10,7 @@ import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
-import { useTabManager } from "@/lib/hooks/use-tab-manager";
+import { useTabManager } from "@/lib/tab-manager";
 import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
 import { useDockviewAdapter } from "@/lib/dockview/use-dockview-adapter";
 import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence";

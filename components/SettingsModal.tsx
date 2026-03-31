@@ -15,7 +15,7 @@ import {
 import clsx from "clsx";
 
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
-import AboutSection from "./SettingsModal/AboutSection";
+import AboutSection from "./settings/AboutSection";
 import TypographySettingsTab from "./settings/TypographySettingsTab";
 import VerticalSettingsTab from "./settings/VerticalSettingsTab";
 import PosHighlightSettingsTab from "./settings/PosHighlightSettingsTab";
