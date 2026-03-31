@@ -8,7 +8,7 @@ import {
   Book,
   Layers,
   BarChart3,
-  Users,
+  // Users, // TODO: Characters feature — planned for v1.3.0
   BookOpen,
   Folder,
   Terminal,
@@ -89,12 +89,13 @@ const DEFAULT_TOP_ITEMS: ActivityBarItem[] = [
 
 /** Bottom group: utilities and reference tools */
 const DEFAULT_BOTTOM_ITEMS: ActivityBarItem[] = [
-  {
-    id: "characters",
-    icon: Users,
-    label: "登場人物",
-    tooltip: "登場人物",
-  },
+  // TODO: Characters feature — planned for v1.3.0
+  // {
+  //   id: "characters",
+  //   icon: Users,
+  //   label: "登場人物",
+  //   tooltip: "登場人物",
+  // },
   {
     id: "dictionary",
     icon: BookOpen,
