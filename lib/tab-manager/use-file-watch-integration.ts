@@ -45,12 +45,17 @@ export interface UseFileWatchIntegrationParams extends TabManagerCore {
  * 外部変更でエディタの内容が上書きされる前にスナップショットを作成する。
  * 外部変更は頻繁には発生しないため、通常の5分間隔チェックをバイパスする。
  */
-function snapshotBeforeExternalChange(fileName: string, editorContent: string): void {
+function snapshotBeforeExternalChange(
+  sourcePath: string,
+  displayName: string,
+  editorContent: string,
+): void {
   if (!getVFS().isRootOpen()) return;
   const historyService = getHistoryService();
   historyService
     .createSnapshot({
-      sourceFile: fileName,
+      sourcePath,
+      displayName,
       content: editorContent,
       type: "auto",
       label: "外部変更前の自動保存",
@@ -79,10 +84,13 @@ function buildOnChanged(
     if (!tab || !isEditorTab(tab)) return;
 
     const fileName = tab.file?.name ?? "ファイル";
+    const filePath = tab.file?.path;
 
     if (tab.fileSyncStatus === "clean") {
       // Snapshot current content before overwriting with disk content
-      snapshotBeforeExternalChange(fileName, tab.content);
+      if (filePath) {
+        snapshotBeforeExternalChange(filePath, fileName, tab.content);
+      }
 
       // Clean tab: update content state AND set pendingExternalContent.
       // content is updated for state consistency (isDirty, auto-save, etc.).
@@ -105,7 +113,9 @@ function buildOnChanged(
       notificationManager.info(`「${fileName}」が更新されました`, 3000);
     } else if (tab.fileSyncStatus === "dirty") {
       // Snapshot current content before entering conflicted state
-      snapshotBeforeExternalChange(fileName, tab.content);
+      if (filePath) {
+        snapshotBeforeExternalChange(filePath, fileName, tab.content);
+      }
 
       // Dirty tab: do NOT touch buffer; enter conflicted state
       const localContent = tab.content;
