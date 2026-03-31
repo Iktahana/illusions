@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, ExternalLink, ChevronDown, ChevronRight, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium, AudioLines } from "lucide-react";
+import { X, ExternalLink, ChevronDown, ChevronRight, Settings, Columns2, Highlighter, SpellCheck, BatteryMedium, AudioLines, UserCircle } from "lucide-react";
 import dynamic from "next/dynamic";
 
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
@@ -19,6 +19,7 @@ import {
 } from "@/contexts/EditorSettingsContext";
 import ColorPicker from "./ColorPicker";
 import LintingSettings from "./LintingSettings";
+import AccountSettingsTab from "./settings/AccountSettingsTab";
 
 const PosHighlightPreview = dynamic(() => import("./PosHighlightPreview"), {
   ssr: false,
@@ -53,7 +54,7 @@ interface SettingsModalProps {
   initialCategory?: SettingsCategory;
 }
 
-export type SettingsCategory = "editor" | "vertical" | "pos-highlight" | "linting" | "speech" | "power" | "about";
+export type SettingsCategory = "account" | "editor" | "vertical" | "pos-highlight" | "linting" | "speech" | "power" | "about";
 
 const SCROLL_BEHAVIORS = [
   {
@@ -221,6 +222,23 @@ export default function SettingsModal({
           {/* Left navigation */}
           <div className="w-48 flex-shrink-0 border-r border-border bg-background-secondary p-2">
             <nav className="space-y-1">
+              {isElectronRenderer() && (
+                <>
+                  <button
+                    onClick={() => setActiveCategory("account")}
+                    className={clsx(
+                      "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
+                      activeCategory === "account"
+                        ? "bg-accent text-accent-foreground"
+                        : "text-foreground-secondary hover:bg-hover hover:text-foreground"
+                    )}
+                  >
+                    <UserCircle className="w-4 h-4" />
+                    アカウント
+                  </button>
+                  <div className="my-2 border-t border-border" />
+                </>
+              )}
               <button
                 onClick={() => setActiveCategory("editor")}
                 className={clsx(
@@ -315,6 +333,11 @@ export default function SettingsModal({
             "flex-1 p-6",
             activeCategory === "pos-highlight" ? "overflow-hidden" : "overflow-y-auto"
           )}>
+            {/* Account section */}
+            {activeCategory === "account" && (
+              <AccountSettingsTab />
+            )}
+
             {/* Editor section */}
             {activeCategory === "editor" && (
               <div className="space-y-6">

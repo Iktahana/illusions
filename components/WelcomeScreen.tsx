@@ -4,6 +4,8 @@ import { FolderPlus, FolderOpen, FileText, Clock, Download, X } from "lucide-rea
 import clsx from "clsx";
 import { useEffect, useState } from "react";
 import GlassDialog from "@/components/GlassDialog";
+import { useAuth } from "@/contexts/AuthContext";
+import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
 interface RecentProject {
   projectId: string;
@@ -24,6 +26,7 @@ interface WelcomeScreenProps {
   restoreError?: string | null;
   /** Dismiss the restore error banner */
   onDismissRestoreError?: () => void;
+  onOpenAccountSettings?: () => void;
 }
 
 /**
@@ -78,7 +81,9 @@ export default function WelcomeScreen({
   isProjectModeSupported,
   restoreError,
   onDismissRestoreError,
+  onOpenAccountSettings,
 }: WelcomeScreenProps): React.JSX.Element {
+  const { isAuthenticated, user } = useAuth();
   // Client-side only check to avoid hydration mismatch
   // Start with null (don't show modal), then check on mount
   const [showUnsupportedModal, setShowUnsupportedModal] = useState(false);
@@ -99,6 +104,34 @@ export default function WelcomeScreen({
 
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-background p-4">
+      {/* Account indicator (Electron only) */}
+      {isElectronRenderer() && onOpenAccountSettings && (
+        <button
+          type="button"
+          onClick={onOpenAccountSettings}
+          className="absolute top-4 right-4 z-10 flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-hover hover:text-foreground"
+        >
+          {isAuthenticated && user ? (
+            <>
+              {user.image ? (
+                <img
+                  src={user.image}
+                  alt={user.name}
+                  className="h-6 w-6 rounded-full object-cover"
+                />
+              ) : (
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
+                  {user.name.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="max-w-[120px] truncate">{user.name}</span>
+            </>
+          ) : (
+            <span>ログイン</span>
+          )}
+        </button>
+      )}
+
       {/* Ambient gradient glow — decorative, non-interactive */}
       <div
         aria-hidden="true"

@@ -193,6 +193,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     delete: (targetPath, options) => ipcRenderer.invoke('vfs:delete', targetPath, options),
     rename: (oldPath, newPath) => ipcRenderer.invoke('vfs:rename', oldPath, newPath),
   },
+  auth: {
+    startLogin: () => ipcRenderer.invoke('auth:start-login'),
+    exchangeCode: (params) => ipcRenderer.invoke('auth:exchange-code', params),
+    refreshToken: (refreshToken) => ipcRenderer.invoke('auth:refresh-token', refreshToken),
+    getUserInfo: (accessToken) => ipcRenderer.invoke('auth:get-userinfo', accessToken),
+    logout: () => ipcRenderer.invoke('auth:logout'),
+    onCallback: (callback) => {
+      const handler = (_event, data) => callback(data)
+      ipcRenderer.on('auth:callback', handler)
+      return () => ipcRenderer.removeListener('auth:callback', handler)
+    },
+  },
   safeStorage: {
     encrypt: (plaintext) => ipcRenderer.invoke('safe-storage:encrypt', plaintext),
     decrypt: (base64Cipher) => ipcRenderer.invoke('safe-storage:decrypt', base64Cipher),

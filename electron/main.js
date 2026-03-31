@@ -13,6 +13,7 @@ const { registerNlpHandlers } = require('./nlp/nlp-ipc-handlers')
 const { registerLlmHandlers, disposeLlmEngine } = require('./llm/llm-ipc-handlers')
 const { registerStorageHandlers, getStorageManager } = require('./storage-ipc-handlers')
 const { registerVFSHandlers } = require('./vfs-ipc-handlers')
+const { registerAuthHandlers, handleAuthCallback } = require('./ipc/auth-ipc')
 
 // Configure module resolution paths for ASAR environment
 if (app.isPackaged) {
@@ -37,6 +38,11 @@ const isDev =
 
 const APP_NAME = 'illusions'
 
+// Register custom protocol for OAuth callbacks
+if (!isDev) {
+  app.setAsDefaultProtocolClient('illusions')
+}
+
 // --- Single-instance lock ---
 // Ensure only one instance of the app is running. On Windows/Linux this prevents
 // duplicate windows when a user double-clicks a .mdi file while the app is already open.
@@ -49,6 +55,12 @@ if (!gotTheLock) {
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
+    }
+    // Check for auth callback URL (Windows/Linux)
+    const authUrl = commandLine.find(a => a.startsWith('illusions://auth/'))
+    if (authUrl) {
+      handleAuthCallback(authUrl)
+      return
     }
     // Extract .mdi path from argv (Windows/Linux pass file path as CLI argument)
     const mdiArg = commandLine.find(a => a.endsWith('.mdi') && !a.startsWith('-'))
@@ -1358,6 +1370,14 @@ app.on('open-file', async (event, filePath) => {
   }
 })
 
+// Handle OAuth callback via custom URL scheme (macOS)
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  if (url.startsWith('illusions://auth/')) {
+    handleAuthCallback(url)
+  }
+})
+
 app.whenReady().then(async () => {
   // Content Security Policy
   const { session } = require('electron')
@@ -1374,9 +1394,9 @@ app.whenReady().then(async () => {
             "default-src 'self'",
             `script-src 'self' 'unsafe-inline'${isDev && !app.isPackaged ? " 'unsafe-eval'" : ''}`,
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-            "img-src 'self' data: blob:",
+            "img-src 'self' data: blob: https:",
             "font-src 'self' data: https://fonts.gstatic.com",
-            "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com ws://localhost:*",
+            "connect-src 'self' https://my.illusions.app https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com ws://localhost:*",
             "worker-src 'self' blob:",
             "frame-src 'none'",
           ].join('; ')
@@ -1400,6 +1420,7 @@ app.whenReady().then(async () => {
   registerLlmHandlers()
   registerStorageHandlers()
   registerVFSHandlers()
+  registerAuthHandlers()
 
   // Power state monitoring
   powerMonitor.on('on-ac', () => broadcastPowerState('ac'))

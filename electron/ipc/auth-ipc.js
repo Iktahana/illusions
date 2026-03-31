@@ -1,0 +1,123 @@
+const { ipcMain, shell, BrowserWindow } = require('electron')
+const crypto = require('crypto')
+
+const PROVIDER_URL = 'https://my.illusions.app'
+const OAUTH_CLIENT_ID = 'illusions'
+const REDIRECT_URI = 'illusions://auth/callback'
+
+let pendingAuth = null // { state, codeVerifier }
+
+function generateCodeVerifier() {
+  return crypto.randomBytes(32).toString('base64url')
+}
+
+function generateCodeChallenge(verifier) {
+  return crypto.createHash('sha256').update(verifier).digest('base64url')
+}
+
+function registerAuthHandlers() {
+  ipcMain.handle('auth:start-login', async () => {
+    const state = crypto.randomBytes(16).toString('hex')
+    const codeVerifier = generateCodeVerifier()
+    const codeChallenge = generateCodeChallenge(codeVerifier)
+
+    pendingAuth = { state, codeVerifier }
+
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: OAUTH_CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      scope: 'openid profile email',
+      state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+    })
+
+    const authUrl = `${PROVIDER_URL}/api/oauth/authorize?${params}`
+    await shell.openExternal(authUrl)
+    return { state }
+  })
+
+  ipcMain.handle('auth:exchange-code', async (_event, { code, state }) => {
+    if (!pendingAuth || pendingAuth.state !== state) {
+      throw new Error('Invalid state parameter')
+    }
+    const { codeVerifier } = pendingAuth
+    pendingAuth = null
+
+    const response = await fetch(`${PROVIDER_URL}/api/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: REDIRECT_URI,
+        client_id: OAUTH_CLIENT_ID,
+        code_verifier: codeVerifier,
+      }),
+    })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.error_description || 'Token exchange failed')
+    }
+    return response.json()
+  })
+
+  ipcMain.handle('auth:refresh-token', async (_event, refreshToken) => {
+    const response = await fetch(`${PROVIDER_URL}/api/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: OAUTH_CLIENT_ID,
+      }),
+    })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.error_description || 'Token refresh failed')
+    }
+    return response.json()
+  })
+
+  ipcMain.handle('auth:get-userinfo', async (_event, accessToken) => {
+    const response = await fetch(`${PROVIDER_URL}/api/oauth/userinfo`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+
+    if (!response.ok) throw new Error('Failed to fetch user info')
+    return response.json()
+  })
+
+  ipcMain.handle('auth:logout', async () => {
+    pendingAuth = null
+    return { success: true }
+  })
+}
+
+function handleAuthCallback(url) {
+  try {
+    const parsed = new URL(url)
+    // illusions://auth/callback?code=xxx&state=yyy
+    if (parsed.host !== 'auth' || parsed.pathname !== '/callback') return
+
+    const code = parsed.searchParams.get('code')
+    const state = parsed.searchParams.get('state')
+    const error = parsed.searchParams.get('error')
+
+    // Find the main window (first non-destroyed window)
+    const windows = BrowserWindow.getAllWindows()
+    const targetWindow = windows.find(w => !w.isDestroyed())
+    if (targetWindow) {
+      if (targetWindow.isMinimized()) targetWindow.restore()
+      targetWindow.focus()
+      targetWindow.webContents.send('auth:callback', { code, state, error })
+    }
+  } catch (err) {
+    console.error('[auth] Failed to handle callback URL:', err)
+  }
+}
+
+module.exports = { registerAuthHandlers, handleAuthCallback }

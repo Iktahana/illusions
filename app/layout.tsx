@@ -1,6 +1,7 @@
 import "./globals.css";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { EditorModeProvider } from "../contexts/EditorModeContext";
+import { AuthProvider } from "../contexts/AuthContext";
 import { NotificationContainer } from "@/components/NotificationContainer";
 import AnalyticsLoader from "@/components/AnalyticsLoader";
 
@@ -30,7 +31,9 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         <ThemeProvider>
-          <EditorModeProvider>{children}</EditorModeProvider>
+          <AuthProvider>
+            <EditorModeProvider>{children}</EditorModeProvider>
+          </AuthProvider>
         </ThemeProvider>
         <NotificationContainer />
         {/* Only load analytics in web environment (client-side check) */}

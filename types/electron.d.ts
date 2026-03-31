@@ -146,6 +146,37 @@ declare global {
        */
       analyzeWordFrequency: (text: string) => Promise<WordEntry[]>;
     };
+    auth?: {
+      startLogin: () => Promise<{ state: string }>;
+      exchangeCode: (params: { code: string; state: string }) => Promise<{
+        access_token: string;
+        refresh_token: string;
+        expires_in: number;
+        token_type: string;
+        scope: string;
+      }>;
+      refreshToken: (refreshToken: string) => Promise<{
+        access_token: string;
+        refresh_token: string;
+        expires_in: number;
+        token_type: string;
+        scope: string;
+      }>;
+      getUserInfo: (accessToken: string) => Promise<{
+        sub: string;
+        email: string;
+        name: string;
+        picture: string | null;
+        plan: string;
+        subscription_status: string;
+      }>;
+      logout: () => Promise<{ success: boolean }>;
+      onCallback: (callback: (data: {
+        code?: string | null;
+        state?: string | null;
+        error?: string | null;
+      }) => void) => () => void;
+    };
     safeStorage?: {
       /** Encrypt a string using OS-level encryption (macOS Keychain / Windows DPAPI) */
       encrypt: (plaintext: string) => Promise<string | null>;
