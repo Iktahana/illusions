@@ -104,15 +104,16 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   // --- Auto-snapshot (project mode) ---------------------------------------
 
   const tryAutoSnapshot = useCallback(
-    async (sourceFileName: string, savedContent: string) => {
+    async (sourcePath: string, displayName: string, savedContent: string) => {
       if (!isProjectRef.current) return;
       if (!getVFS().isRootOpen()) return;
       try {
         const historyService = getHistoryService();
-        const shouldCreate = await historyService.shouldCreateSnapshot(sourceFileName);
+        const shouldCreate = await historyService.shouldCreateSnapshot(sourcePath);
         if (shouldCreate) {
           await historyService.createSnapshot({
-            sourceFile: sourceFileName,
+            sourcePath,
+            displayName,
             content: savedContent,
             type: "auto",
           });
@@ -235,7 +236,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
                 : t,
             ),
           );
-          await tryAutoSnapshot(tab.file.name, sanitized);
+          await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized);
           return;
         }
 
@@ -266,7 +267,9 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           if (!(await persistFileReference(result.descriptor, sanitized))) {
             notificationManager.warning(PERSIST_FAILURE_WARNING);
           }
-          await tryAutoSnapshot(result.descriptor.name, sanitized);
+          if (result.descriptor.path) {
+            await tryAutoSnapshot(result.descriptor.path, result.descriptor.name, sanitized);
+          }
         } else {
           updateTab(tabId, { isSaving: false });
         }
@@ -322,7 +325,9 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         if (!(await persistFileReference(result.descriptor, sanitized))) {
           notificationManager.warning(PERSIST_FAILURE_WARNING);
         }
-        await tryAutoSnapshot(result.descriptor.name, sanitized);
+        if (result.descriptor.path) {
+          await tryAutoSnapshot(result.descriptor.path, result.descriptor.name, sanitized);
+        }
       } else {
         updateTab(tabId, { isSaving: false });
       }

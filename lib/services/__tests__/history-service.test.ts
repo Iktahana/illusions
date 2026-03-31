@@ -3,7 +3,7 @@
  *
  * Tests cover:
  * - Snapshot creation (auto, manual, milestone)
- * - Snapshot retrieval and filtering by source file
+ * - Snapshot retrieval and filtering by source path
  * - Snapshot restoration with checksum verification
  * - Snapshot deletion
  * - Pruning by max count, retention period, and per-file limit
@@ -175,11 +175,12 @@ describe("HistoryService", () => {
   describe("createSnapshot", () => {
     it("should create an auto snapshot with correct metadata", async () => {
       const entry = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Hello, world!",
       });
 
-      expect(entry.sourceFile).toBe("main.mdi");
+      expect(entry.sourcePath).toBe("main.mdi");
+      expect(entry.displayName).toBe("main.mdi");
       expect(entry.type).toBe("auto");
       expect(entry.characterCount).toBe(13);
       expect(entry.fileSize).toBeGreaterThan(0);
@@ -193,7 +194,7 @@ describe("HistoryService", () => {
 
     it("should create a manual snapshot without __auto__ marker", async () => {
       const entry = await service.createSnapshot({
-        sourceFile: "chapter1.mdi",
+        sourcePath: "chapter1.mdi",
         content: "Manual save",
         type: "manual",
       });
@@ -205,7 +206,7 @@ describe("HistoryService", () => {
 
     it("should create a milestone snapshot with label", async () => {
       const entry = await service.createSnapshot({
-        sourceFile: "novel.mdi",
+        sourcePath: "novel.mdi",
         content: "Milestone content",
         type: "milestone",
         label: "Draft v1.0",
@@ -219,7 +220,7 @@ describe("HistoryService", () => {
     it("should store the snapshot content in VFS", async () => {
       const content = "Stored content for verification";
       await service.createSnapshot({
-        sourceFile: "test.mdi",
+        sourcePath: "test.mdi",
         content,
       });
 
@@ -231,11 +232,11 @@ describe("HistoryService", () => {
 
     it("should update the history index", async () => {
       await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "First snapshot",
       });
       await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Second snapshot",
       });
 
@@ -251,7 +252,7 @@ describe("HistoryService", () => {
 
     it("should handle empty content", async () => {
       const entry = await service.createSnapshot({
-        sourceFile: "empty.mdi",
+        sourcePath: "empty.mdi",
         content: "",
       });
 
@@ -263,7 +264,7 @@ describe("HistoryService", () => {
     it("should handle Japanese content correctly", async () => {
       const japaneseContent = "私は{雪女|ゆき.おんな}を見た。";
       const entry = await service.createSnapshot({
-        sourceFile: "japanese.mdi",
+        sourcePath: "japanese.mdi",
         content: japaneseContent,
       });
 
@@ -285,13 +286,13 @@ describe("HistoryService", () => {
 
     it("should return all snapshots sorted by timestamp descending", async () => {
       await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "First",
       });
       // Small delay to ensure different timestamps
       await new Promise((r) => setTimeout(r, 10));
       await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Second",
       });
 
@@ -300,32 +301,32 @@ describe("HistoryService", () => {
       expect(snapshots[0].timestamp).toBeGreaterThanOrEqual(snapshots[1].timestamp);
     });
 
-    it("should filter snapshots by source file", async () => {
+    it("should filter snapshots by source path", async () => {
       await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Main content",
       });
       await service.createSnapshot({
-        sourceFile: "chapter1.mdi",
+        sourcePath: "chapter1.mdi",
         content: "Chapter 1 content",
       });
       await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Main content v2",
       });
 
       const mainSnapshots = await service.getSnapshots("main.mdi");
       expect(mainSnapshots.length).toBe(2);
-      expect(mainSnapshots.every((s) => s.sourceFile === "main.mdi")).toBe(true);
+      expect(mainSnapshots.every((s) => s.sourcePath === "main.mdi")).toBe(true);
 
       const ch1Snapshots = await service.getSnapshots("chapter1.mdi");
       expect(ch1Snapshots.length).toBe(1);
-      expect(ch1Snapshots[0].sourceFile).toBe("chapter1.mdi");
+      expect(ch1Snapshots[0].sourcePath).toBe("chapter1.mdi");
     });
 
-    it("should return empty array for a non-existent source file", async () => {
+    it("should return empty array for a non-existent source path", async () => {
       await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "content",
       });
 
@@ -342,7 +343,7 @@ describe("HistoryService", () => {
     it("should restore snapshot content successfully", async () => {
       const content = "Content to restore";
       const entry = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content,
       });
 
@@ -363,7 +364,7 @@ describe("HistoryService", () => {
 
     it("should detect corrupted snapshots via checksum mismatch", async () => {
       const entry = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Original content",
       });
 
@@ -387,7 +388,7 @@ describe("HistoryService", () => {
   describe("getSnapshotContent", () => {
     it("should return content for valid snapshot", async () => {
       const entry = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Read-only peek",
       });
 
@@ -408,7 +409,7 @@ describe("HistoryService", () => {
   describe("deleteSnapshot", () => {
     it("should delete a snapshot by ID", async () => {
       const entry = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "To be deleted",
       });
 
@@ -424,7 +425,7 @@ describe("HistoryService", () => {
 
     it("should allow deleting milestone snapshots", async () => {
       const entry = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Milestone to delete",
         type: "milestone",
         label: "Test Milestone",
@@ -449,7 +450,7 @@ describe("HistoryService", () => {
 
     it("should return false when a recent snapshot exists (within 5 min)", async () => {
       await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Recent snapshot",
       });
 
@@ -459,7 +460,7 @@ describe("HistoryService", () => {
 
     it("should return true for a different source file", async () => {
       await service.createSnapshot({
-        sourceFile: "chapter1.mdi",
+        sourcePath: "chapter1.mdi",
         content: "Chapter 1",
       });
 
@@ -476,7 +477,7 @@ describe("HistoryService", () => {
     it("should not prune milestones", async () => {
       // Create a milestone
       const milestone = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Milestone",
         type: "milestone",
         label: "Keep me",
@@ -485,7 +486,7 @@ describe("HistoryService", () => {
       // Create some auto snapshots
       for (let i = 0; i < 3; i++) {
         await service.createSnapshot({
-          sourceFile: "main.mdi",
+          sourcePath: "main.mdi",
           content: `Auto ${i}`,
         });
       }
@@ -501,7 +502,7 @@ describe("HistoryService", () => {
       // Create fewer snapshots than the default max (100)
       for (let i = 0; i < 5; i++) {
         await service.createSnapshot({
-          sourceFile: "main.mdi",
+          sourcePath: "main.mdi",
           content: `Snapshot ${i}`,
         });
       }
@@ -525,7 +526,7 @@ describe("HistoryService", () => {
 
     it("should toggle bookmark on", async () => {
       const entry = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Bookmarked snapshot",
       });
 
@@ -538,7 +539,7 @@ describe("HistoryService", () => {
 
     it("should toggle bookmark off", async () => {
       const entry = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Toggle test",
       });
 
@@ -580,32 +581,32 @@ describe("HistoryService", () => {
   // -----------------------------------------------------------------------
 
   describe("edge cases", () => {
-    it("should handle creating snapshots for multiple source files", async () => {
+    it("should handle creating snapshots for multiple source paths", async () => {
       await service.createSnapshot({
-        sourceFile: "file-a.mdi",
+        sourcePath: "file-a.mdi",
         content: "Content A",
       });
       await service.createSnapshot({
-        sourceFile: "file-b.mdi",
+        sourcePath: "file-b.mdi",
         content: "Content B",
       });
       await service.createSnapshot({
-        sourceFile: "file-c.mdi",
+        sourcePath: "file-c.mdi",
         content: "Content C",
       });
 
       const allSnapshots = await service.getSnapshots();
       expect(allSnapshots.length).toBe(3);
 
-      const sourceFiles = new Set(allSnapshots.map((s) => s.sourceFile));
-      expect(sourceFiles.size).toBe(3);
+      const sourcePaths = new Set(allSnapshots.map((s) => s.sourcePath));
+      expect(sourcePaths.size).toBe(3);
     });
 
     it("should generate unique IDs for each snapshot", async () => {
       const entries: SnapshotEntry[] = [];
       for (let i = 0; i < 5; i++) {
         const entry = await service.createSnapshot({
-          sourceFile: "main.mdi",
+          sourcePath: "main.mdi",
           content: `Snapshot ${i}`,
         });
         entries.push(entry);
@@ -617,11 +618,11 @@ describe("HistoryService", () => {
 
     it("should produce different checksums for different content", async () => {
       const entry1 = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Content version 1",
       });
       const entry2 = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Content version 2",
       });
 
@@ -631,11 +632,11 @@ describe("HistoryService", () => {
     it("should produce the same checksum for identical content", async () => {
       const content = "Identical content for both snapshots";
       const entry1 = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content,
       });
       const entry2 = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content,
       });
 
@@ -645,7 +646,7 @@ describe("HistoryService", () => {
     it("should set correct timestamp on snapshot entries", async () => {
       const before = Date.now();
       const entry = await service.createSnapshot({
-        sourceFile: "main.mdi",
+        sourcePath: "main.mdi",
         content: "Timestamp test",
       });
       const after = Date.now();
@@ -658,13 +659,64 @@ describe("HistoryService", () => {
       // Each CJK character is 3 bytes in UTF-8
       const cjkContent = "漢字";
       const entry = await service.createSnapshot({
-        sourceFile: "cjk.mdi",
+        sourcePath: "cjk.mdi",
         content: cjkContent,
       });
 
       expect(entry.characterCount).toBe(2);
       // 2 CJK chars * 3 bytes each = 6 bytes
       expect(entry.fileSize).toBe(6);
+    });
+
+    it("keeps histories separate for duplicate basenames in different paths", async () => {
+      await service.createSnapshot({
+        sourcePath: "chapters/intro.mdi",
+        displayName: "intro.mdi",
+        content: "Chapter intro",
+      });
+      await service.createSnapshot({
+        sourcePath: "notes/intro.mdi",
+        displayName: "intro.mdi",
+        content: "Notes intro",
+      });
+
+      const chapterSnapshots = await service.getSnapshots("chapters/intro.mdi");
+      const noteSnapshots = await service.getSnapshots("notes/intro.mdi");
+
+      expect(chapterSnapshots).toHaveLength(1);
+      expect(noteSnapshots).toHaveLength(1);
+      expect(chapterSnapshots[0].sourcePath).toBe("chapters/intro.mdi");
+      expect(noteSnapshots[0].sourcePath).toBe("notes/intro.mdi");
+      expect(chapterSnapshots[0].displayName).toBe("intro.mdi");
+      expect(noteSnapshots[0].displayName).toBe("intro.mdi");
+    });
+
+    it("reads legacy entries that only stored sourceFile", async () => {
+      const legacyIndex: HistoryIndex = {
+        snapshots: [
+          {
+            id: "legacy-1",
+            timestamp: Date.now(),
+            filename: "main.mdi.[202604010101].__auto__.history",
+            sourcePath: "",
+            displayName: "",
+            sourceFile: "main.mdi",
+            type: "auto",
+            characterCount: 4,
+            fileSize: 4,
+            checksum: "abcd",
+          } as SnapshotEntry,
+        ],
+        maxSnapshots: 100,
+        retentionDays: 90,
+      };
+      fileStore.set(".illusions/history/index.json", JSON.stringify(legacyIndex));
+
+      const snapshots = await service.getSnapshots("main.mdi");
+
+      expect(snapshots).toHaveLength(1);
+      expect(snapshots[0].sourcePath).toBe("main.mdi");
+      expect(snapshots[0].displayName).toBe("main.mdi");
     });
   });
 });

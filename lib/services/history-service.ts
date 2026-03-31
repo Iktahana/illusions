@@ -59,8 +59,12 @@ export interface SnapshotEntry {
   timestamp: number;
   /** History file name (e.g. "main.mdi.[202602061430].history") */
   filename: string;
-  /** Source file that was snapshotted (e.g. "main.mdi") */
-  sourceFile: string;
+  /** Stable document identity within the project (prefer project-relative path). */
+  sourcePath: string;
+  /** Human-readable file name for UI display. */
+  displayName: string;
+  /** Legacy basename-only identity retained for backward compatibility reads. */
+  sourceFile?: string;
   /** Type of snapshot */
   type: SnapshotType;
   /** User-defined label (primarily for milestones) */
@@ -91,8 +95,10 @@ export interface HistoryIndex {
  * スナップショット作成時のオプション。
  */
 export interface CreateSnapshotOptions {
-  /** Source file name (e.g. "main.mdi") */
-  sourceFile: string;
+  /** Stable document identity within the project (prefer project-relative path). */
+  sourcePath: string;
+  /** Human-readable file name for UI display. */
+  displayName?: string;
   /** Content to snapshot */
   content: string;
   /** Snapshot type (defaults to "auto") */
@@ -161,6 +167,28 @@ function isAutoSnapshotFilename(filename: string): boolean {
   return filename.includes(".__auto__.");
 }
 
+function getSnapshotSourceKey(
+  snapshot: Partial<Pick<SnapshotEntry, "sourcePath" | "sourceFile">>,
+): string {
+  return snapshot.sourcePath || snapshot.sourceFile || "";
+}
+
+function getSnapshotDisplayName(
+  snapshot: Partial<Pick<SnapshotEntry, "displayName" | "sourcePath" | "sourceFile">>,
+): string {
+  if (snapshot.displayName) return snapshot.displayName;
+  const source = getSnapshotSourceKey(snapshot);
+  const normalized = source.replace(/\\/g, "/");
+  const lastSegment = normalized.split("/").pop();
+  return lastSegment || source;
+}
+
+function makeSnapshotStorageLabel(sourcePath: string, displayName: string): string {
+  const normalizedPath = sourcePath.replace(/\\/g, "/");
+  const pathLabel = normalizedPath.replace(/[\\/]/g, "__");
+  return pathLabel || displayName;
+}
+
 /**
  * Create a default (empty) history index.
  * デフォルトの空の履歴インデックスを作成する。
@@ -203,13 +231,15 @@ export class HistoryService {
    * @returns The created SnapshotEntry
    */
   async createSnapshot(options: CreateSnapshotOptions): Promise<SnapshotEntry> {
-    const { sourceFile, content, type = "auto", label } = options;
+    const { sourcePath, displayName: displayNameOption, content, type = "auto", label } = options;
 
     try {
       const timestamp = Date.now();
       const formattedTime = formatTimestamp(timestamp);
       const autoMarker = type === "auto" ? ".__auto__" : "";
-      const filename = `${sourceFile}.[${formattedTime}]${autoMarker}.history`;
+      const displayName = displayNameOption ?? getSnapshotDisplayName({ sourcePath });
+      const storageLabel = makeSnapshotStorageLabel(sourcePath, displayName);
+      const filename = `${storageLabel}.[${formattedTime}]${autoMarker}.history`;
       const checksum = await calculateChecksum(content);
       const fileSize = calculateByteSize(content);
       const characterCount = content.length;
@@ -218,7 +248,8 @@ export class HistoryService {
         id: crypto.randomUUID(),
         timestamp,
         filename,
-        sourceFile,
+        sourcePath,
+        displayName,
         type,
         characterCount,
         fileSize,
@@ -247,7 +278,7 @@ export class HistoryService {
 
         // Auto-prune old snapshots (global and per-file, within same lock)
         await this.pruneOldSnapshotsUnsafe();
-        await this.pruneSnapshotsPerFileUnsafe(sourceFile);
+        await this.pruneSnapshotsPerFileUnsafe(sourcePath);
       } finally {
         releaseLock();
       }
@@ -405,12 +436,12 @@ export class HistoryService {
    * 特定ソースファイルのスナップショットがファイルあたりの上限を超えた場合に削除する。
    * 削除対象は自動スナップショットのみ。マイルストーンと手動スナップショットは保持する。
    *
-   * @param sourceFile - The source file name to prune snapshots for
+   * @param sourcePath - The source file path to prune snapshots for
    */
-  async pruneSnapshotsPerFile(sourceFile: string): Promise<void> {
+  async pruneSnapshotsPerFile(sourcePath: string): Promise<void> {
     const releaseLock = await this.indexMutex.acquire();
     try {
-      await this.pruneSnapshotsPerFileUnsafe(sourceFile);
+      await this.pruneSnapshotsPerFileUnsafe(sourcePath);
     } finally {
       releaseLock();
     }
@@ -423,14 +454,14 @@ export class HistoryService {
    * ロックを取得しないファイルごとの内部削減ロジック。
    * 呼び出し元は事前に indexMutex を保持していなければならない。
    *
-   * @param sourceFile - The source file name to prune snapshots for
+   * @param sourcePath - The source file path to prune snapshots for
    */
-  private async pruneSnapshotsPerFileUnsafe(sourceFile: string): Promise<void> {
+  private async pruneSnapshotsPerFileUnsafe(sourcePath: string): Promise<void> {
     try {
       const index = await this.readHistoryIndex();
 
       // Get all snapshots for this file
-      const fileSnapshots = index.snapshots.filter((s) => s.sourceFile === sourceFile);
+      const fileSnapshots = index.snapshots.filter((s) => getSnapshotSourceKey(s) === sourcePath);
 
       const autoCount = fileSnapshots.filter((s) => s.type === "auto").length;
       if (autoCount <= MAX_SNAPSHOTS_PER_FILE) {
@@ -505,15 +536,15 @@ export class HistoryService {
    * 新しい自動スナップショットを作成すべきか判定する。
    * 最後のスナップショットが最小間隔内に作成されていた場合は false を返す。
    *
-   * @param sourceFile - The source file name to check against
+   * @param sourcePath - The source file path to check against
    * @returns true if a new snapshot should be created
    */
-  async shouldCreateSnapshot(sourceFile: string): Promise<boolean> {
+  async shouldCreateSnapshot(sourcePath: string): Promise<boolean> {
     try {
       const index = await this.readHistoryIndex();
 
       // Find the most recent snapshot for this source file
-      const lastSnapshot = index.snapshots.find((s) => s.sourceFile === sourceFile);
+      const lastSnapshot = index.snapshots.find((s) => getSnapshotSourceKey(s) === sourcePath);
 
       if (!lastSnapshot) {
         return true;
@@ -536,23 +567,29 @@ export class HistoryService {
    * タイムスタンプ降順（新しい順）でソートされる。
    * メタデータが不足している場合、ファイル名から型を検出する。
    *
-   * @param sourceFile - Optional source file filter
+   * @param sourcePath - Optional source file filter
    * @returns Array of snapshot entries
    */
-  async getSnapshots(sourceFile?: string): Promise<SnapshotEntry[]> {
+  async getSnapshots(sourcePath?: string): Promise<SnapshotEntry[]> {
     try {
       const index = await this.readHistoryIndex();
 
       let { snapshots } = index;
 
-      if (sourceFile !== undefined) {
-        snapshots = snapshots.filter((s) => s.sourceFile === sourceFile);
+      if (sourcePath !== undefined) {
+        snapshots = snapshots.filter((s) => getSnapshotSourceKey(s) === sourcePath);
       }
 
-      // Add type fallback for entries missing type metadata
+      // Add fallbacks for older entries missing newer metadata.
       for (const entry of snapshots) {
         if (!entry.type) {
           entry.type = isAutoSnapshotFilename(entry.filename) ? "auto" : "manual";
+        }
+        if (!entry.sourcePath) {
+          entry.sourcePath = entry.sourceFile ?? "";
+        }
+        if (!entry.displayName) {
+          entry.displayName = getSnapshotDisplayName(entry);
         }
       }
 

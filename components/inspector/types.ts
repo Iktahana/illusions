@@ -65,6 +65,7 @@ export interface InspectorProps {
   onOpenPosHighlightSettings?: () => void;
   onHistoryRestore?: (content: string) => void;
   activeFileName?: string;
+  activeFilePath?: string;
   currentContent?: string;
   onCompareInEditor?: (data: {
     snapshotContent: string;
