@@ -474,58 +474,52 @@ export default function EditorPage() {
   const pdfExportContentRef = useRef("");
   const pdfExportMetadataRef = useRef<ExportMetadata>({ title: "" });
 
-  const handlePdfExportRequest = useCallback(
-    (pdfContent: string, metadata: ExportMetadata) => {
-      pdfExportContentRef.current = pdfContent;
-      pdfExportMetadataRef.current = metadata;
-      setShowPdfExportDialog(true);
-    },
-    [],
-  );
+  const handlePdfExportRequest = useCallback((pdfContent: string, metadata: ExportMetadata) => {
+    pdfExportContentRef.current = pdfContent;
+    pdfExportMetadataRef.current = metadata;
+    setShowPdfExportDialog(true);
+  }, []);
 
-  const handlePdfExportConfirm = useCallback(
-    async (settings: PdfExportSettings) => {
-      setShowPdfExportDialog(false);
+  const handlePdfExportConfirm = useCallback(async (settings: PdfExportSettings) => {
+    setShowPdfExportDialog(false);
 
-      if (!window.electronAPI?.exportPDF) return;
+    if (!window.electronAPI?.exportPDF) return;
 
-      const progressId = notificationManager.showProgress("PDFをエクスポート中...", {
-        type: "info",
+    const progressId = notificationManager.showProgress("PDFをエクスポート中...", {
+      type: "info",
+    });
+
+    try {
+      const result = await window.electronAPI.exportPDF(pdfExportContentRef.current, {
+        metadata: pdfExportMetadataRef.current,
+        verticalWriting: settings.verticalWriting,
+        pageSize: settings.pageSize,
+        margins: settings.margins,
+        charsPerLine: settings.charsPerLine,
+        linesPerPage: settings.linesPerPage,
+        fontFamily: settings.fontFamily,
+        showPageNumbers: settings.showPageNumbers,
+        textIndent: settings.textIndent,
       });
 
-      try {
-        const result = await window.electronAPI.exportPDF(pdfExportContentRef.current, {
-          metadata: pdfExportMetadataRef.current,
-          verticalWriting: settings.verticalWriting,
-          pageSize: settings.pageSize,
-          margins: settings.margins,
-          charsPerLine: settings.charsPerLine,
-          linesPerPage: settings.linesPerPage,
-          fontFamily: settings.fontFamily,
-          showPageNumbers: settings.showPageNumbers,
-          textIndent: settings.textIndent,
-        });
+      notificationManager.dismiss(progressId);
 
-        notificationManager.dismiss(progressId);
+      if (result === null || result === undefined) return;
 
-        if (result === null || result === undefined) return;
-
-        if (typeof result === "object" && "success" in result && !result.success) {
-          notificationManager.error(
-            `PDFのエクスポートに失敗しました: ${(result as { error: string }).error}`,
-          );
-          return;
-        }
-
-        notificationManager.success("PDFをエクスポートしました");
-      } catch (error) {
-        notificationManager.dismiss(progressId);
-        const message = error instanceof Error ? error.message : "Unknown error";
-        notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
+      if (typeof result === "object" && "success" in result && !result.success) {
+        notificationManager.error(
+          `PDFのエクスポートに失敗しました: ${(result as { error: string }).error}`,
+        );
+        return;
       }
-    },
-    [],
-  );
+
+      notificationManager.success("PDFをエクスポートしました");
+    } catch (error) {
+      notificationManager.dismiss(progressId);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
+    }
+  }, []);
 
   const { exportAs } = useExport({
     getContent: getExportContent,
