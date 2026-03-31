@@ -35,7 +35,7 @@ vi.mock("@/lib/utils/runtime-env", () => ({
 }));
 
 import { createFileWatcher, suppressFileWatch } from "@/lib/services/file-watcher";
-import type { FileWatcher } from "@/lib/services/file-watcher";
+import type { FileChangeCallback, FileWatcher } from "@/lib/services/file-watcher";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,14 +51,14 @@ function sleep(ms: number): Promise<void> {
 
 describe("WebFileWatcher: catch-up on resume (#1010)", () => {
   let watcher: FileWatcher;
-  let onChanged: ReturnType<typeof vi.fn>;
+  let onChanged: ReturnType<typeof vi.fn<FileChangeCallback>>;
 
   beforeEach(() => {
     mockLastModified = 1000;
     mockFileContent = "initial content";
     mockGetFileMetadata.mockClear();
     mockReadFile.mockClear();
-    onChanged = vi.fn();
+    onChanged = vi.fn<FileChangeCallback>();
   });
 
   afterEach(() => {
