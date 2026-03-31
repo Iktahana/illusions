@@ -322,6 +322,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           isDirty: false,
           lastSavedTime: Date.now(),
           isSaving: false,
+          fileSyncStatus: "clean",
+          conflictDiskContent: null,
         });
         if (!(await persistFileReference(result.descriptor, sanitized))) {
           notificationManager.warning(PERSIST_FAILURE_WARNING);

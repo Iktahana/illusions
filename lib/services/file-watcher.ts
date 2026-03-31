@@ -190,13 +190,34 @@ class WebFileWatcher implements FileWatcher {
 
     this._isActive = true;
 
+    // Save the previous baseline so we can detect changes that occurred while paused
+    const previousModified = this.lastModified;
+
     // Initialize lastModified before starting to poll
-    void this.initializeLastModified().then(() => {
-      if (!this._isActive) return;
-      this.timerId = setInterval(() => {
-        void this.checkForChanges();
-      }, this.pollIntervalMs);
-    });
+    void this.initializeLastModified()
+      .then(async () => {
+        if (!this._isActive) return;
+
+        // Catch-up check: detect changes that occurred while the watcher was paused
+        if (previousModified > 0 && this.lastModified > previousModified) {
+          if (!isFileSuppressed(this.path)) {
+            try {
+              const content = await this.vfs.readFile(this.path);
+              if (this._isActive) {
+                this.onChanged(content, this.lastModified);
+              }
+            } catch {
+              // File may have been deleted; normal poll cycle will handle it
+            }
+          }
+        }
+      })
+      .then(() => {
+        if (!this._isActive) return;
+        this.timerId = setInterval(() => {
+          void this.checkForChanges();
+        }, this.pollIntervalMs);
+      });
   }
 
   /**
@@ -285,6 +306,8 @@ class ElectronFileWatcher implements FileWatcher {
   private nativeWatcher: { stop: () => void } | null = null;
   private fallbackWatcher: WebFileWatcher | null = null;
   private _isActive = false;
+  /** Last known mtime — preserved across stop/start for catch-up detection */
+  private lastKnownModified: number = 0;
 
   constructor(options: FileWatcherOptions) {
     this.vfs = getVFS();
@@ -310,6 +333,47 @@ class ElectronFileWatcher implements FileWatcher {
     }
 
     this._isActive = true;
+
+    const previousModified = this.lastKnownModified;
+
+    // Catch-up check for changes that occurred while the watcher was paused,
+    // then start the actual watcher (native or fallback).
+    void this.catchUpAndStartWatcher(previousModified);
+  }
+
+  /**
+   * Check for missed changes during pause, then start native or fallback watcher.
+   * 一時停止中に見逃した変更を確認し、ネイティブまたはフォールバックウォッチャーを開始する。
+   */
+  private async catchUpAndStartWatcher(previousModified: number): Promise<void> {
+    // Always read current metadata to establish/update the baseline.
+    // When previousModified > 0, also detect changes that occurred while paused.
+    try {
+      const metadata = await this.vfs.getFileMetadata(this.path);
+      if (previousModified > 0) {
+        if (
+          this._isActive &&
+          metadata.lastModified > previousModified &&
+          !isFileSuppressed(this.path)
+        ) {
+          const content = await this.vfs.readFile(this.path);
+          if (this._isActive) {
+            this.lastKnownModified = metadata.lastModified;
+            this.onChanged(content, metadata.lastModified);
+          }
+        } else {
+          // Update baseline even when no change detected
+          this.lastKnownModified = metadata.lastModified;
+        }
+      } else {
+        // First start: initialize baseline for future catch-up checks
+        this.lastKnownModified = metadata.lastModified;
+      }
+    } catch {
+      // File may not exist; proceed to start watcher normally
+    }
+
+    if (!this._isActive) return;
 
     // Try native watching first
     if (this.tryStartNativeWatch()) {
@@ -390,6 +454,7 @@ class ElectronFileWatcher implements FileWatcher {
         this.vfs.readFile(this.path),
         this.vfs.getFileMetadata(this.path),
       ]);
+      this.lastKnownModified = metadata.lastModified;
       this.onChanged(content, metadata.lastModified);
     } catch (error) {
       // Check for permission-related errors (DOMException with NotAllowedError)
