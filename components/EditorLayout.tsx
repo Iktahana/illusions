@@ -369,6 +369,10 @@ export default function EditorLayout({
                         const panelFileType = (panelParams?.fileType ?? ".mdi") as string;
                         const panelEditorKey = panelParams?.editorKey ?? 0;
                         const panelActiveTabId = panelParams?.activeTabId ?? "";
+                        const panelSearchOpenTrigger = panelParams?.searchOpenTrigger ?? 0;
+                        const panelSearchInitialTerm = panelParams?.searchInitialTerm as
+                          | string
+                          | undefined;
                         const isActivePanel = panelBufferId === panelActiveTabId;
                         const panelMdiEnabled = panelFileType === ".mdi";
                         const panelGfmEnabled = panelFileType !== ".txt";
@@ -404,8 +408,8 @@ export default function EditorLayout({
                                   onChange={mainArea.handleChange}
                                   onInsertText={mainArea.handleInsertText}
                                   onSelectionChange={mainArea.setSelectedCharCount}
-                                  searchOpenTrigger={mainArea.searchOpenTrigger}
-                                  searchInitialTerm={mainArea.searchInitialTerm}
+                                  searchOpenTrigger={panelSearchOpenTrigger}
+                                  searchInitialTerm={panelSearchInitialTerm}
                                   onEditorViewReady={mainArea.setEditorViewInstance}
                                   programmaticScrollRef={mainArea.programmaticScrollRef}
                                   onShowAllSearchResults={mainArea.handleShowAllSearchResults}

@@ -32,6 +32,10 @@ export interface UseDockviewAdapterOptions {
   tabManager: UseTabManagerReturn;
   /** Monotonic counter to force editor remount (e.g. after settings change) */
   editorKey: number;
+  /** Monotonic counter to trigger search dialog open in the active editor panel */
+  searchOpenTrigger: number;
+  /** Initial search term to pre-fill when search dialog opens */
+  searchInitialTerm?: string;
 }
 
 export interface UseDockviewAdapterReturn {
@@ -170,6 +174,8 @@ function applySimplifiedLayout(
 export function useDockviewAdapter({
   tabManager,
   editorKey,
+  searchOpenTrigger,
+  searchInitialTerm,
 }: UseDockviewAdapterOptions): UseDockviewAdapterReturn {
   const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
   const apiRef = useRef<DockviewApi | null>(null);
@@ -212,6 +218,8 @@ export function useDockviewAdapter({
               fileType: tab.fileType,
               editorKey,
               activeTabId,
+              searchOpenTrigger,
+              searchInitialTerm,
             },
           });
         } else if (isTerminalTab(tab)) {
@@ -317,6 +325,8 @@ export function useDockviewAdapter({
               fileType: tab.fileType,
               editorKey,
               activeTabId,
+              searchOpenTrigger,
+              searchInitialTerm,
             },
           });
         } else if (isTerminalTab(tab)) {
@@ -372,6 +382,8 @@ export function useDockviewAdapter({
           fileType: tab.fileType,
           editorKey,
           activeTabId,
+          searchOpenTrigger,
+          searchInitialTerm,
         });
       } else if (isTerminalTab(tab)) {
         if (panel.title !== tab.label) {
@@ -417,7 +429,7 @@ export function useDockviewAdapter({
     prevActiveTabRef.current = activeTabId;
     isSyncingRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dockviewApi triggers re-sync after onReady
-  }, [tabs, activeTabId, editorKey, dockviewApi]);
+  }, [tabs, activeTabId, editorKey, searchOpenTrigger, searchInitialTerm, dockviewApi]);
 
   // -- Restore saved layout (separate effect to avoid sync effect interference) --
   // Using a dedicated effect prevents savedLayout changes from re-triggering
