@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { isProjectMode, type EditorMode } from "@/lib/project/project-types";
+import { isProjectMode, isStandaloneMode, type EditorMode } from "@/lib/project/project-types";
 
 interface TitleUpdaterProps {
   editorMode: EditorMode;
@@ -10,11 +10,14 @@ interface TitleUpdaterProps {
 
 export default function TitleUpdater({ editorMode, isDirty }: TitleUpdaterProps) {
   useEffect(() => {
-    const name = isProjectMode(editorMode)
-      ? editorMode.name
-      : isDirty
-        ? "新規ファイル *"
-        : "新規ファイル";
+    let name: string;
+    if (isProjectMode(editorMode)) {
+      name = editorMode.name;
+    } else if (isStandaloneMode(editorMode) && editorMode.fileHandle) {
+      name = isDirty ? `${editorMode.fileName} *` : editorMode.fileName;
+    } else {
+      name = isDirty ? "新規ファイル *" : "新規ファイル";
+    }
     document.title = `${name} - illusions`;
   }, [editorMode, isDirty]);
 
