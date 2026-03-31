@@ -7,7 +7,7 @@ import { getVFS } from "@/lib/vfs";
 import { notificationManager } from "@/lib/services/notification-manager";
 
 import type { ProjectMode, StandaloneMode } from "@/lib/project/project-types";
-import { ensureProjectJson, readFileHandle } from "./project-file-utils";
+import { ensureProjectJson, readProjectJson, readFileHandle } from "./project-file-utils";
 
 interface UseFileOpeningParams {
   isElectron: boolean;
@@ -111,7 +111,23 @@ export function useFileOpening({
             }
             signalVfsReady();
             const rootDirHandle = await vfs.getDirectoryHandle("");
-            const { metadata, illusionsDir } = await ensureProjectJson(rootDirHandle);
+            const projectJsonResult = await readProjectJson(rootDirHandle);
+            if (!projectJsonResult) {
+              signalVfsReady();
+              console.error(
+                "Failed to load recent project: .illusions/project.json not found at",
+                project.rootPath,
+              );
+              if (!isAutoRestoringRef.current) {
+                setConfirmRemoveRecent({
+                  projectId,
+                  message: `プロジェクトのメタデータが見つかりませんでした。\n\nパス: ${project.rootPath}\n\n最近のプロジェクト一覧から削除しますか?`,
+                });
+              }
+              return;
+            }
+
+            const { metadata, illusionsDir } = projectJsonResult;
 
             let workspaceState: ProjectMode["workspaceState"];
             try {

@@ -5,7 +5,7 @@ import { getDefaultWorkspaceState } from "@/lib/project/project-types";
 import { notificationManager } from "@/lib/services/notification-manager";
 
 import type { ProjectMode } from "@/lib/project/project-types";
-import { ensureProjectJson, readFileHandle } from "./project-file-utils";
+import { readProjectJson, readFileHandle } from "./project-file-utils";
 
 interface UseProjectInitializationParams {
   isElectron: boolean;
@@ -68,7 +68,16 @@ export function useProjectInitialization({
   const openRestoredProject = useCallback(
     async (handle: FileSystemDirectoryHandle) => {
       try {
-        const { metadata, illusionsDir } = await ensureProjectJson(handle);
+        const result = await readProjectJson(handle);
+        if (!result) {
+          console.error("Failed to load restored project: .illusions/project.json not found");
+          notificationManager.error(
+            "プロジェクトのメタデータが見つかりませんでした。プロジェクトを再度開き直してください。",
+          );
+          return;
+        }
+
+        const { metadata, illusionsDir } = result;
 
         let workspaceState: ProjectMode["workspaceState"];
         try {
