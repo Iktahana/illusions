@@ -138,14 +138,21 @@
       "!www/**/*"
     ],
     "asarUnpack": [
-      "dist-main/node_modules/**",
-      "node_modules/node-pty/**"
+      "dist-main/node_modules/**"
     ],
     "publish": [
       {
         "provider": "github",
         "owner": "Iktahana",
         "repo": "illusions"
+      }
+    ],
+    "protocols": [
+      {
+        "name": "illusions",
+        "schemes": [
+          "illusions"
+        ]
       }
     ],
     "afterSign": "scripts/notarize.js",

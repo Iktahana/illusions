@@ -141,7 +141,7 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
       { label: `バージョン ${APP_VERSION}`, enabled: false },
       { type: "separator" },
       { label: "公式サイトへ", action: "open-website" },
-      { label: "AI回答の不適切報告", action: "report-ai-inappropriate" },
+      { label: "AI回答の不適切を報告", action: "report-ai-inappropriate" },
     ],
   },
 ];

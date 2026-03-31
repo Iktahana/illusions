@@ -5,7 +5,7 @@ import {
   useLintingSettings,
   useCharacterExtractionSettings,
 } from "@/contexts/EditorSettingsContext";
-import LintingSettings from "@/components/LintingSettings";
+import LintingSettings from "./LintingSettings";
 
 /**
  * Settings tab for linting/proofreading.
