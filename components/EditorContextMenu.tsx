@@ -1,10 +1,26 @@
 "use client";
 
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { Scissors, Copy, ClipboardPaste, Search, CheckSquare, Languages, ALargeSmall, Globe, BookOpen, AlertCircle, EyeOff } from "lucide-react";
+import {
+  Scissors,
+  Copy,
+  ClipboardPaste,
+  Search,
+  CheckSquare,
+  Languages,
+  ALargeSmall,
+  Globe,
+  BookOpen,
+  AlertCircle,
+  EyeOff,
+  Play,
+} from "lucide-react";
 import type { ReactNode, MouseEvent } from "react";
 
 import type { LintIssue } from "@/lib/linting";
+import { useKeymap } from "@/contexts/KeymapContext";
+import { isMacOS } from "@/lib/utils/runtime-env";
+import { formatBinding } from "@/lib/keymap/keymap-utils";
 
 export type ContextMenuAction =
   | "cut"
@@ -19,7 +35,8 @@ export type ContextMenuAction =
   | "dictionary"
   | "show-lint-hint"
   | "ignore-correction"
-  | "ignore-correction-all";
+  | "ignore-correction-all"
+  | "start-speech";
 
 interface EditorContextMenuProps {
   children: ReactNode;
@@ -27,6 +44,10 @@ interface EditorContextMenuProps {
   hasSelection?: boolean;
   lintIssueAtCursor?: LintIssue | null;
   onContextMenuOpen?: (e: MouseEvent) => void;
+  /** Whether MDI extensions (ruby / tcy) are enabled for this document */
+  mdiExtensionsEnabled?: boolean;
+  /** Pass the speech callback when speech feature is available; omit to hide the menu item */
+  onStartSpeech?: (() => void) | null;
 }
 
 interface MenuItemProps {
@@ -67,18 +88,27 @@ export default function EditorContextMenu({
   hasSelection = false,
   lintIssueAtCursor,
   onContextMenuOpen,
+  mdiExtensionsEnabled = true,
+  onStartSpeech,
 }: EditorContextMenuProps) {
-  // Detect platform for keyboard shortcuts
-  const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
+  const { effectiveBindings } = useKeymap();
+
+  // Detect platform for native shortcuts (cut/copy/paste are browser built-ins not in registry)
+  const isMac = isMacOS();
   const cmdKey = isMac ? "⌘" : "Ctrl+";
+
+  // "辞書で調べる" is only available in Electron via IPC
+  const isElectron =
+    typeof window !== "undefined" &&
+    Boolean((window as Window & { electronAPI?: unknown }).electronAPI);
 
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger onContextMenu={onContextMenuOpen} asChild>{children}</ContextMenu.Trigger>
+      <ContextMenu.Trigger onContextMenu={onContextMenuOpen} asChild>
+        {children}
+      </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content
-          className="min-w-[220px] bg-background/95 backdrop-blur-xl border border-border rounded-lg shadow-2xl p-1.5 will-change-[opacity,transform] data-[side=top]:animate-slideDownAndFade data-[side=right]:animate-slideLeftAndFade data-[side=bottom]:animate-slideUpAndFade data-[side=left]:animate-slideRightAndFade"
-        >
+        <ContextMenu.Content className="min-w-[220px] bg-background/95 backdrop-blur-xl border border-border rounded-lg shadow-2xl p-1.5 will-change-[opacity,transform] data-[side=top]:animate-slideDownAndFade data-[side=right]:animate-slideLeftAndFade data-[side=bottom]:animate-slideUpAndFade data-[side=left]:animate-slideRightAndFade">
           {/* 校正提示 */}
           {lintIssueAtCursor && (
             <>
@@ -128,35 +158,36 @@ export default function EditorContextMenu({
           <MenuItem
             icon={<ClipboardPaste className="w-4 h-4" />}
             label="プレーンテキストとして貼り付け"
-            shortcut={`Shift+${cmdKey}V`}
+            shortcut={formatBinding(effectiveBindings["edit.pasteAsPlaintext"])}
             onClick={() => onAction("paste-plaintext")}
           />
 
           <Separator />
 
-          {/* 書式 */}
-          <MenuItem
-            icon={<Languages className="w-4 h-4" />}
-            label="ルビ"
-            shortcut={`Shift+${cmdKey}R`}
-            onClick={() => onAction("ruby")}
-            disabled={!hasSelection}
-          />
-          <MenuItem
-            icon={<ALargeSmall className="w-4 h-4" />}
-            label="縦中横"
-            shortcut={`Shift+${cmdKey}T`}
-            onClick={() => onAction("tcy")}
-            disabled={!hasSelection}
-          />
-
-          <Separator />
+          {/* 書式: ruby / tcy are MDI-extension features; hide when disabled or nothing is selected */}
+          {mdiExtensionsEnabled && hasSelection && (
+            <>
+              <MenuItem
+                icon={<Languages className="w-4 h-4" />}
+                label="ルビ"
+                shortcut={formatBinding(effectiveBindings["format.ruby"])}
+                onClick={() => onAction("ruby")}
+              />
+              <MenuItem
+                icon={<ALargeSmall className="w-4 h-4" />}
+                label="縦中横"
+                shortcut={formatBinding(effectiveBindings["format.tcy"])}
+                onClick={() => onAction("tcy")}
+              />
+              <Separator />
+            </>
+          )}
 
           {/* 検索・調べる */}
           <MenuItem
             icon={<Search className="w-4 h-4" />}
             label="検索"
-            shortcut={`${cmdKey}F`}
+            shortcut={formatBinding(effectiveBindings["nav.search"])}
             onClick={() => onAction("find")}
           />
           <MenuItem
@@ -166,13 +197,29 @@ export default function EditorContextMenu({
             onClick={() => onAction("google-search")}
             disabled={!hasSelection}
           />
-          <MenuItem
-            icon={<BookOpen className="w-4 h-4" />}
-            label="辞書で調べる"
-            shortcut=""
-            onClick={() => onAction("dictionary")}
-            disabled={!hasSelection}
-          />
+          {/* 辞書で調べる: Electron only — uses native IPC */}
+          {isElectron && (
+            <MenuItem
+              icon={<BookOpen className="w-4 h-4" />}
+              label="辞書で調べる"
+              shortcut=""
+              onClick={() => onAction("dictionary")}
+              disabled={!hasSelection}
+            />
+          )}
+
+          {/* 朗読: hide when speech feature is not available */}
+          {onStartSpeech != null && (
+            <>
+              <Separator />
+              <MenuItem
+                icon={<Play className="w-4 h-4" />}
+                label="開始朗読"
+                shortcut=""
+                onClick={() => onAction("start-speech")}
+              />
+            </>
+          )}
 
           <Separator />
 

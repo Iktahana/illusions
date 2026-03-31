@@ -16,7 +16,7 @@ export const searchHighlightPlugin = new Plugin<SearchHighlightState>({
     apply(tr, value) {
       // 檢查是否有搜索裝飾的 meta
       const searchDecorations = tr.getMeta("searchDecorations");
-      
+
       if (searchDecorations !== undefined) {
         // 更新裝飾
         if (searchDecorations.length === 0) {
@@ -24,7 +24,7 @@ export const searchHighlightPlugin = new Plugin<SearchHighlightState>({
         }
         return { decorations: DecorationSet.create(tr.doc, searchDecorations) };
       }
-      
+
       // 映射現有裝飾到新文檔
       return { decorations: value.decorations.map(tr.mapping, tr.doc) };
     },

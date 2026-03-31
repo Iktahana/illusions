@@ -19,14 +19,14 @@ on:
   workflow_dispatch:
     inputs:
       agent:
-        description: 'Which agent to run manually'
+        description: "Which agent to run manually"
         type: choice
         options:
           - ci-failure-handler
       run_id:
-        description: 'Workflow Run ID for ci-failure-handler (blank = latest failure)'
+        description: "Workflow Run ID for ci-failure-handler (blank = latest failure)"
         required: false
-        default: ''
+        default: ""
 
 permissions:
   contents: read

@@ -27,9 +27,7 @@ const KANJI_REGEX = /[\u4e00-\u9faf\u3400-\u4dbf]/;
 
 /** Convert katakana to hiragana */
 function katakanaToHiragana(str: string): string {
-  return str.replace(/[\u30a1-\u30f6]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0x60)
-  );
+  return str.replace(/[\u30a1-\u30f6]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
 }
 
 /** Group consecutive tokens into Ruby segments */
@@ -38,9 +36,7 @@ function tokensToSegments(tokens: Token[]): RubySegment[] {
 
   for (const token of tokens) {
     const hasKanji = KANJI_REGEX.test(token.surface);
-    const reading = token.reading
-      ? katakanaToHiragana(token.reading)
-      : token.surface;
+    const reading = token.reading ? katakanaToHiragana(token.reading) : token.surface;
 
     segments.push({
       surface: token.surface,
@@ -64,12 +60,7 @@ function buildRubyMarkup(segments: RubySegment[]): string {
     .join("");
 }
 
-export default function RubyDialog({
-  isOpen,
-  onClose,
-  selectedText,
-  onApply,
-}: RubyDialogProps) {
+export default function RubyDialog({ isOpen, onClose, selectedText, onApply }: RubyDialogProps) {
   const [segments, setSegments] = useState<RubySegment[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,9 +84,7 @@ export default function RubyDialog({
         setSegments(tokensToSegments(tokens));
       } catch (err) {
         if (cancelled) return;
-        setError(
-          `形態素解析に失敗しました: ${err instanceof Error ? err.message : String(err)}`
-        );
+        setError(`形態素解析に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         if (!cancelled) setIsAnalyzing(false);
       }
@@ -108,16 +97,11 @@ export default function RubyDialog({
     };
   }, [isOpen, selectedText]);
 
-  const handleReadingChange = useCallback(
-    (index: number, newReading: string) => {
-      setSegments((prev) =>
-        prev.map((seg, i) =>
-          i === index ? { ...seg, reading: newReading } : seg
-        )
-      );
-    },
-    []
-  );
+  const handleReadingChange = useCallback((index: number, newReading: string) => {
+    setSegments((prev) =>
+      prev.map((seg, i) => (i === index ? { ...seg, reading: newReading } : seg)),
+    );
+  }, []);
 
   const handleApply = useCallback(() => {
     const markup = buildRubyMarkup(segments);
@@ -134,17 +118,13 @@ export default function RubyDialog({
       ariaLabel="ルビ設定"
       panelClassName="mx-4 w-full max-w-lg p-6"
     >
-      <h2 className="text-lg font-semibold text-foreground mb-4">
-        ルビ設定
-      </h2>
+      <h2 className="text-lg font-semibold text-foreground mb-4">ルビ設定</h2>
 
       {/* Loading state */}
       {isAnalyzing && (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="w-6 h-6 animate-spin text-accent mr-2" />
-          <span className="text-sm text-foreground-secondary">
-            解析中...
-          </span>
+          <span className="text-sm text-foreground-secondary">解析中...</span>
         </div>
       )}
 
@@ -198,12 +178,10 @@ export default function RubyDialog({
                   </ruby>
                 ) : (
                   <span key={i}>{seg.surface}</span>
-                )
+                ),
               )}
             </p>
-            <p className="text-xs text-foreground-tertiary mt-2 font-mono break-all">
-              {preview}
-            </p>
+            <p className="text-xs text-foreground-tertiary mt-2 font-mono break-all">{preview}</p>
           </div>
 
           {/* Actions */}

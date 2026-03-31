@@ -1,14 +1,12 @@
 import type { Dispatch, SetStateAction } from "react";
-import { useEffect } from "react";
+import { useMemo } from "react";
 
-import type { MdiFileDescriptor } from "@/lib/project/mdi-file";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
-
-interface TabInfo {
-  id: string;
-  file: MdiFileDescriptor | null;
-  isDirty: boolean;
-}
+import type { CommandId } from "@/lib/keymap/command-ids";
+import { useKeymapListener } from "@/lib/keymap/use-keymap-listener";
+import { useKeymap } from "@/contexts/KeymapContext";
+import type { TabState } from "@/lib/tab-manager/tab-types";
+import { isEditorTab } from "@/lib/tab-manager/tab-types";
 
 interface UseKeyboardShortcutsParams {
   isElectron: boolean;
@@ -26,18 +24,27 @@ interface UseKeyboardShortcutsParams {
   newTab: (fileType?: SupportedFileExtension) => void;
   closeTab: (tabId: string) => void;
   switchToIndex: (index: number) => void;
-  tabs: TabInfo[];
+  tabs: TabState[];
   activeTabId: string;
+  /** Whether the currently active tab is an editor tab.
+   *  Editor-only commands (Ruby, TCY, search, paste-as-plaintext) no-op when false. */
+  isEditorTabActive: boolean;
   // Split editor operations
   splitEditorRight?: () => void;
   splitEditorDown?: () => void;
+  // Panel toggle operations
+  toggleExplorer?: () => void;
+  toggleSearch?: () => void;
+  toggleOutline?: () => void;
+  /** Web-only: dispatches menu actions for commands not handled by Electron IPC.
+   *  Required when isElectron is false so that file.open, file.saveAs,
+   *  file.newWindow, and zoom commands work even when the editor has focus. */
+  handleMenuAction?: (action: string) => void;
 }
 
 /**
  * Keyboard shortcut handler for the editor page.
- *
- * Handles: save, search, settings, paste-as-plaintext, compact mode,
- * ruby dialog, tcy toggle, and tab navigation.
+ * Delegates to useKeymapListener using the centralized keymap registry.
  */
 export function useKeyboardShortcuts({
   isElectron,
@@ -56,130 +63,146 @@ export function useKeyboardShortcuts({
   switchToIndex,
   tabs,
   activeTabId,
+  isEditorTabActive,
   splitEditorRight,
   splitEditorDown,
+  toggleExplorer,
+  toggleSearch,
+  toggleOutline,
+  handleMenuAction,
 }: UseKeyboardShortcutsParams): void {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
-      const isMac = nav.userAgentData
-        ? nav.userAgentData.platform === "macOS"
-        : /mac/i.test(navigator.userAgent);
+  const { effectiveBindings } = useKeymap();
 
-      // Cmd+, (macOS) / Ctrl+, (Windows/Linux): Settings
-      const isSettingsShortcut = isMac
-        ? event.metaKey && event.key === ","
-        : event.ctrlKey && event.key === ",";
+  const handlers = useMemo<Partial<Record<CommandId, () => void>>>(() => {
+    const tabHandlers: Partial<Record<CommandId, () => void>> = {
+      "nav.tab1": () => {
+        switchToIndex(0);
+        incrementEditorKey();
+      },
+      "nav.tab2": () => {
+        switchToIndex(1);
+        incrementEditorKey();
+      },
+      "nav.tab3": () => {
+        switchToIndex(2);
+        incrementEditorKey();
+      },
+      "nav.tab4": () => {
+        switchToIndex(3);
+        incrementEditorKey();
+      },
+      "nav.tab5": () => {
+        switchToIndex(4);
+        incrementEditorKey();
+      },
+      "nav.tab6": () => {
+        switchToIndex(5);
+        incrementEditorKey();
+      },
+      "nav.tab7": () => {
+        switchToIndex(6);
+        incrementEditorKey();
+      },
+      "nav.tab8": () => {
+        switchToIndex(7);
+        incrementEditorKey();
+      },
+      "nav.tab9": () => {
+        switchToIndex(8);
+        incrementEditorKey();
+      },
+    };
 
-      // Cmd+S (macOS) / Ctrl+S (Windows/Linux): Save
-      const isSaveShortcut = isMac
-        ? event.metaKey && event.key === "s"
-        : event.ctrlKey && event.key === "s";
+    const closeTabHandler = isElectron
+      ? undefined
+      : () => {
+          if (tabs.length === 0) return;
+          const firstTab = tabs[0];
+          if (
+            tabs.length === 1 &&
+            firstTab &&
+            isEditorTab(firstTab) &&
+            !firstTab.file &&
+            !firstTab.isDirty
+          ) {
+            window.close();
+            return;
+          }
+          closeTab(activeTabId);
+        };
 
-      // Cmd+F (macOS) / Ctrl+F (Windows/Linux): Search
-      const isSearchShortcut = isMac
-        ? event.metaKey && event.key === "f"
-        : event.ctrlKey && event.key === "f";
+    // Web-exclusive commands: these are not handled by Electron IPC, so they
+    // must be registered here (which fires unconditionally) rather than in
+    // useGlobalShortcuts (which skips when the editor is focused).
+    const webOnlyHandlers: Partial<Record<CommandId, () => void>> =
+      !isElectron && handleMenuAction
+        ? {
+            "file.open": () => handleMenuAction("open-file"),
+            "file.saveAs": () => handleMenuAction("save-as"),
+            "file.newWindow": () => handleMenuAction("new-window"),
+            "view.zoomIn": () => handleMenuAction("zoom-in"),
+            "view.zoomOut": () => handleMenuAction("zoom-out"),
+            "view.resetZoom": () => handleMenuAction("reset-zoom"),
+          }
+        : {};
 
-      // Shift+Cmd+V (macOS) / Shift+Ctrl+V (Windows/Linux): Paste as plaintext
-      const isPasteAsPlaintextShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "v"
-        : event.shiftKey && event.ctrlKey && event.key === "v";
-
-      // Shift+Cmd+M (macOS) / Shift+Ctrl+M (Windows/Linux): Compact mode toggle
-      const isCompactModeShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "m"
-        : event.shiftKey && event.ctrlKey && event.key === "m";
-
-      // Shift+Cmd+R (macOS) / Shift+Ctrl+R (Windows/Linux): Ruby dialog
-      const isRubyShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "r"
-        : event.shiftKey && event.ctrlKey && event.key === "r";
-
-      // Shift+Cmd+T (macOS) / Shift+Ctrl+T (Windows/Linux): Tcy
-      const isTcyShortcut = isMac
-        ? event.shiftKey && event.metaKey && event.key === "t"
-        : event.shiftKey && event.ctrlKey && event.key === "t";
-
-      // Tab shortcuts (Web only; Electron handles Cmd+W/T via menu)
-      const isNextTab = event.ctrlKey && !event.shiftKey && event.key === "Tab";
-      const isPrevTab = event.ctrlKey && event.shiftKey && event.key === "Tab";
-      const isNewTabShortcut = !isElectron && (isMac
-        ? event.metaKey && !event.shiftKey && event.key === "t"
-        : event.ctrlKey && !event.shiftKey && event.key === "t");
-      const isCloseTabShortcut = !isElectron && (isMac
-        ? event.metaKey && event.key === "w"
-        : event.ctrlKey && event.key === "w");
-      const isTabJump = (isMac ? event.metaKey : event.ctrlKey) &&
-        !event.shiftKey && event.key >= "1" && event.key <= "9";
-
-      // Cmd+\ (macOS) / Ctrl+\ (Windows/Linux): Split editor right
-      const isSplitRight = isMac
-        ? event.metaKey && !event.shiftKey && event.key === "\\"
-        : event.ctrlKey && !event.shiftKey && event.key === "\\";
-
-      // Shift+Cmd+\ (macOS) / Shift+Ctrl+\ (Windows/Linux): Split editor down
-      const isSplitDown = isMac
-        ? event.shiftKey && event.metaKey && event.key === "\\"
-        : event.shiftKey && event.ctrlKey && event.key === "\\";
-
-      if (isSplitRight && splitEditorRight) {
-        event.preventDefault();
-        splitEditorRight();
-      } else if (isSplitDown && splitEditorDown) {
-        event.preventDefault();
-        splitEditorDown();
-      } else if (isTcyShortcut) {
-        event.preventDefault();
-        handleToggleTcy();
-      } else if (isRubyShortcut) {
-        event.preventDefault();
-        handleOpenRubyDialog();
-      } else if (isCompactModeShortcut) {
-        event.preventDefault();
-        handleToggleCompactMode();
-      } else if (isSettingsShortcut) {
-        event.preventDefault();
-        setShowSettingsModal(true);
-      } else if (isSaveShortcut) {
-        event.preventDefault();
-        void saveFile();
-      } else if (isSearchShortcut) {
-        event.preventDefault();
-        setSearchOpenTrigger(prev => prev + 1);
-      } else if (isPasteAsPlaintextShortcut) {
-        event.preventDefault();
-        void handlePasteAsPlaintext();
-      } else if (isNextTab) {
-        event.preventDefault();
+    return {
+      "file.save": () => void saveFile(),
+      // Editor-only commands: no-op when a terminal or diff tab is active
+      "edit.pasteAsPlaintext": isEditorTabActive ? () => void handlePasteAsPlaintext() : undefined,
+      "view.compactMode": handleToggleCompactMode,
+      "format.ruby": isEditorTabActive ? handleOpenRubyDialog : undefined,
+      "format.tcy": isEditorTabActive ? handleToggleTcy : undefined,
+      "nav.settings": () => setShowSettingsModal(true),
+      "nav.search": isEditorTabActive ? () => setSearchOpenTrigger((prev) => prev + 1) : undefined,
+      "nav.nextTab": () => {
         nextTab();
         incrementEditorKey();
-      } else if (isPrevTab) {
-        event.preventDefault();
+      },
+      "nav.prevTab": () => {
         prevTab();
         incrementEditorKey();
-      } else if (isNewTabShortcut) {
-        event.preventDefault();
-        newTab();
-        incrementEditorKey();
-      } else if (isCloseTabShortcut) {
-        event.preventDefault();
-        if (tabs.length === 1 && !tabs[0].file && !tabs[0].isDirty) {
-          window.close();
-          return;
-        }
-        closeTab(activeTabId);
-      } else if (isTabJump) {
-        event.preventDefault();
-        const idx = parseInt(event.key, 10) - 1;
-        switchToIndex(idx);
-        incrementEditorKey();
-      }
+      },
+      "file.newTab": isElectron
+        ? undefined
+        : () => {
+            newTab();
+            incrementEditorKey();
+          },
+      "file.closeTab": closeTabHandler,
+      "view.splitRight": splitEditorRight,
+      "view.splitDown": splitEditorDown,
+      "panel.explorer": toggleExplorer,
+      "panel.search": toggleSearch,
+      "panel.outline": toggleOutline,
+      ...tabHandlers,
+      ...webOnlyHandlers,
     };
+  }, [
+    isElectron,
+    saveFile,
+    handlePasteAsPlaintext,
+    handleToggleCompactMode,
+    handleOpenRubyDialog,
+    handleToggleTcy,
+    setShowSettingsModal,
+    setSearchOpenTrigger,
+    incrementEditorKey,
+    nextTab,
+    prevTab,
+    newTab,
+    closeTab,
+    switchToIndex,
+    tabs,
+    activeTabId,
+    isEditorTabActive,
+    splitEditorRight,
+    splitEditorDown,
+    toggleExplorer,
+    toggleSearch,
+    toggleOutline,
+    handleMenuAction,
+  ]);
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [saveFile, handlePasteAsPlaintext, handleToggleCompactMode, handleOpenRubyDialog, handleToggleTcy, isElectron, nextTab, prevTab, newTab, closeTab, tabs, activeTabId, switchToIndex, setShowSettingsModal, incrementEditorKey, setSearchOpenTrigger, splitEditorRight, splitEditorDown]);
+  useKeymapListener(handlers, effectiveBindings);
 }

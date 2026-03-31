@@ -58,16 +58,11 @@ export default function Outline({
       setActiveHeadingId(anchorId);
       onHeadingClick?.(anchorId);
     },
-    [onHeadingClick]
+    [onHeadingClick],
   );
 
   return (
-    <aside
-      className={clsx(
-        "h-full bg-background border-r border-border flex flex-col",
-        className
-      )}
-    >
+    <aside className={clsx("h-full bg-background border-r border-border flex flex-col", className)}>
       {/* ヘッダー */}
       <div className="h-12 border-b border-border flex items-center px-4">
         <h2 className="text-sm font-medium text-foreground flex-1">アウトライン</h2>
@@ -91,10 +86,7 @@ export default function Outline({
                 key={index}
                 heading={heading}
                 isActive={heading.anchorId === activeHeadingId}
-                onClick={() =>
-                  heading.anchorId &&
-                  handleHeadingClick(heading.anchorId)
-                }
+                onClick={() => heading.anchorId && handleHeadingClick(heading.anchorId)}
               />
             ))}
           </div>
@@ -123,14 +115,15 @@ function OutlineItem({
   // 見出しレベルに応じたフォントサイズ
   // CSS既定: h1=2em, h2=1.5em, h3=1.17em, h4=1em, h5=0.83em, h6=0.67em
   // アウトラインではテキストサイズの調整は控えめに、インデントで階層を表現
-  const fontSizeClass = {
-    1: "font-semibold text-base",
-    2: "font-semibold text-sm",
-    3: "font-medium text-sm",
-    4: "text-sm",
-    5: "text-xs",
-    6: "text-xs",
-  }[heading.level] || "text-sm";
+  const fontSizeClass =
+    {
+      1: "font-semibold text-base",
+      2: "font-semibold text-sm",
+      3: "font-medium text-sm",
+      4: "text-sm",
+      5: "text-xs",
+      6: "text-xs",
+    }[heading.level] || "text-sm";
 
   return (
     <button
@@ -141,16 +134,12 @@ function OutlineItem({
       }}
       className={clsx(
         "w-full flex items-center gap-2 px-2 py-1.5 rounded text-left cursor-pointer transition-colors",
-        isActive
-          ? "bg-accent text-accent-foreground"
-          : "hover:bg-hover text-foreground"
+        isActive ? "bg-accent text-accent-foreground" : "hover:bg-hover text-foreground",
       )}
       style={{ paddingLeft: `${8 + indent}px` }}
       title={heading.title}
     >
-      <span className={clsx("flex-1 truncate", fontSizeClass)}>
-        {heading.title}
-      </span>
+      <span className={clsx("flex-1 truncate", fontSizeClass)}>{heading.title}</span>
     </button>
   );
 }

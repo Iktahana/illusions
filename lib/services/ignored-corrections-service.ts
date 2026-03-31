@@ -63,7 +63,9 @@ class IgnoredCorrectionsService {
   async saveIgnoredCorrections(corrections: IgnoredCorrection[]): Promise<void> {
     const rootDir = await this.vfs.getDirectoryHandle("");
     const illusionsDir = await rootDir.getDirectoryHandle(".illusions", { create: true });
-    const fileHandle = await illusionsDir.getFileHandle(IGNORED_CORRECTIONS_FILENAME, { create: true });
+    const fileHandle = await illusionsDir.getFileHandle(IGNORED_CORRECTIONS_FILENAME, {
+      create: true,
+    });
     const data: IgnoredCorrectionsFile = {
       version: "1.0.0",
       ignoredCorrections: corrections,

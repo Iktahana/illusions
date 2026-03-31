@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useRef } from 'react';
-import { MenuItem as MenuItemType, formatAccelerator } from '@/lib/menu/menu-definitions';
+import { useState, useRef } from "react";
+import { MenuItem as MenuItemType, formatAccelerator } from "@/lib/menu/menu-definitions";
 
 interface MenuItemProps {
   item: MenuItemType;
@@ -14,7 +14,7 @@ export function MenuItem({ item, onClick, onClose }: MenuItemProps) {
   const itemRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  if (item.type === 'separator') {
+  if (item.type === "separator") {
     return <div className="h-px bg-border my-1" />;
   }
 
@@ -56,8 +56,20 @@ export function MenuItem({ item, onClick, onClose }: MenuItemProps) {
       >
         <span className="text-foreground flex-1">{item.label}</span>
         {hasSubmenu ? (
-          <svg width="12" height="12" viewBox="0 0 12 12" className="text-foreground-tertiary flex-shrink-0">
-            <path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            className="text-foreground-tertiary flex-shrink-0"
+          >
+            <path
+              d="M4.5 2.5L8 6L4.5 9.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
           </svg>
         ) : item.accelerator ? (
           <span className="text-xs text-foreground-tertiary font-mono">
@@ -65,9 +77,9 @@ export function MenuItem({ item, onClick, onClose }: MenuItemProps) {
           </span>
         ) : null}
         {/* Checkbox checkmark area — always rightmost */}
-        {item.type === 'checkbox' ? (
+        {item.type === "checkbox" ? (
           <span className="w-4 flex-shrink-0 text-center text-foreground">
-            {item.checked ? '✓' : ''}
+            {item.checked ? "✓" : ""}
           </span>
         ) : null}
       </button>
@@ -77,12 +89,10 @@ export function MenuItem({ item, onClick, onClose }: MenuItemProps) {
         <div
           className="absolute top-0 left-full ml-0.5 min-w-[200px] bg-background-elevated border border-border rounded-md shadow-lg py-1 z-50"
           role="menu"
-          style={{ animation: 'fadeIn 100ms ease-out' }}
+          style={{ animation: "fadeIn 100ms ease-out" }}
         >
           {item.submenu!.length === 0 ? (
-            <div className="px-3 py-1.5 text-sm text-foreground-tertiary">
-              項目なし
-            </div>
+            <div className="px-3 py-1.5 text-sm text-foreground-tertiary">項目なし</div>
           ) : (
             item.submenu!.map((subItem, index) => (
               <button

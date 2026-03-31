@@ -1,15 +1,15 @@
-import type { ILlmClient } from "@/lib/llm-client/types";
 import type { Token } from "@/lib/nlp-client/types";
 
 import type {
   CorrectionEngine,
+  JsonRuleMeta,
   LintRule,
   LintRuleConfig,
   LintIssue,
   DocumentLintRule,
   MorphologicalLintRule,
   MorphologicalDocumentLintRule,
-  LlmLintRule,
+  RuleLevel,
 } from "./types";
 
 /**
@@ -22,7 +22,7 @@ export abstract class AbstractLintRule implements LintRule {
   abstract readonly nameJa: string;
   abstract readonly description: string;
   abstract readonly descriptionJa: string;
-  abstract readonly level: "L1" | "L2" | "L3";
+  abstract readonly level: RuleLevel;
   abstract readonly defaultConfig: LintRuleConfig;
   /** Default engine for simple regex-based rules */
   engine: CorrectionEngine = "regex";
@@ -34,7 +34,10 @@ export abstract class AbstractLintRule implements LintRule {
  * Abstract base class for document-level lint rules.
  * These rules analyze all paragraphs together for cross-paragraph checks.
  */
-export abstract class AbstractDocumentLintRule extends AbstractLintRule implements DocumentLintRule {
+export abstract class AbstractDocumentLintRule
+  extends AbstractLintRule
+  implements DocumentLintRule
+{
   abstract lintDocument(
     paragraphs: ReadonlyArray<{ text: string; index: number }>,
     config: LintRuleConfig,
@@ -104,25 +107,37 @@ export abstract class AbstractMorphologicalDocumentLintRule
 }
 
 /**
- * Abstract base class for LLM-based lint rules (L3).
- * Subclasses implement lintWithLlm(). The sync lint() is a no-op.
+ * Abstract base class for data-driven L1 (regex) lint rules.
+ * These rules are configured via JsonRuleMeta loaded from rules.json.
  */
-export abstract class AbstractLlmLintRule
-  extends AbstractLintRule
-  implements LlmLintRule
-{
-  readonly level = "L3" as const;
-  /** LLM rules use language model inference */
-  override engine: CorrectionEngine = "llm";
+export abstract class AbstractL1Rule extends AbstractLintRule {
+  readonly meta: JsonRuleMeta;
+  readonly id: string;
+  readonly name: string;
+  readonly nameJa: string;
+  readonly description: string;
+  readonly descriptionJa: string;
+  readonly level: RuleLevel = "L1";
+  readonly defaultConfig: LintRuleConfig;
 
-  lint(_text: string, _config: LintRuleConfig): LintIssue[] {
-    return []; // L3 rules only run via lintWithLlm()
+  constructor(
+    meta: JsonRuleMeta,
+    config: {
+      id: string;
+      name: string;
+      nameJa: string;
+      description: string;
+      descriptionJa: string;
+      defaultConfig: LintRuleConfig;
+    },
+  ) {
+    super();
+    this.meta = meta;
+    this.id = config.id;
+    this.name = config.name;
+    this.nameJa = config.nameJa;
+    this.description = config.description;
+    this.descriptionJa = config.descriptionJa;
+    this.defaultConfig = config.defaultConfig;
   }
-
-  abstract lintWithLlm(
-    sentences: ReadonlyArray<{ text: string; from: number; to: number }>,
-    config: LintRuleConfig,
-    llmClient: ILlmClient,
-    signal?: AbortSignal,
-  ): Promise<LintIssue[]>;
 }

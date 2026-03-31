@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Search, X, Replace, ReplaceAll, ChevronRight, ChevronDown } from "lucide-react";
 import { EditorView, Decoration } from "@milkdown/prose/view";
 import { TextSelection } from "@milkdown/prose/state";
@@ -19,10 +19,10 @@ interface SearchResultsProps {
   programmaticScrollRef?: React.MutableRefObject<boolean>;
 }
 
-export default function SearchResults({ 
-  editorView, 
-  matches: initialMatches, 
-  searchTerm: initialSearchTerm, 
+export default function SearchResults({
+  editorView,
+  matches: initialMatches,
+  searchTerm: initialSearchTerm,
   onClose,
   programmaticScrollRef,
 }: SearchResultsProps) {
@@ -54,7 +54,7 @@ export default function SearchResults({
     // Full document text search
     const fullText = doc.textContent;
     const searchText = caseSensitive ? fullText : fullText.toLowerCase();
-    
+
     let searchIndex = 0;
     while (searchIndex < searchText.length) {
       const matchIndex = searchText.indexOf(searchStr, searchIndex);
@@ -63,10 +63,10 @@ export default function SearchResults({
       // Convert text position to document position
       let pos = 0;
       let textOffset = 0;
-      
+
       doc.descendants((node, nodePos) => {
         if (pos !== 0) return false; // Found, stop traversal
-        
+
         if (node.isText && node.text) {
           const nodeEnd = textOffset + node.text.length;
           if (matchIndex >= textOffset && matchIndex < nodeEnd) {
@@ -90,126 +90,135 @@ export default function SearchResults({
     const decorations: Decoration[] = foundMatches.map((m) =>
       Decoration.inline(m.from, m.to, {
         class: "search-result",
-      })
+      }),
     );
     const tr = state.tr.setMeta("searchDecorations", decorations);
     dispatch(tr);
   }, [searchTerm, caseSensitive, editorView]);
   // Get context text for match
-  const getMatchContext = (match: SearchMatch): { before: string; text: string; after: string } => {
-    if (!editorView) {
-      return { before: "", text: "", after: "" };
-    }
+  const getMatchContext = useCallback(
+    (match: SearchMatch): { before: string; text: string; after: string } => {
+      if (!editorView) {
+        return { before: "", text: "", after: "" };
+      }
 
-    const { state } = editorView;
-    const { doc } = state;
-    
-    // Get match text
-    const matchText = doc.textBetween(match.from, match.to);
-    
-    // Get surrounding text (30 characters before and after)
-    const contextLength = 30;
-    const beforeStart = Math.max(0, match.from - contextLength);
-    const afterEnd = Math.min(doc.content.size, match.to + contextLength);
-    
-    const beforeText = doc.textBetween(beforeStart, match.from);
-    const afterText = doc.textBetween(match.to, afterEnd);
-    
-    return {
-      before: beforeText.length > contextLength ? "..." + beforeText.slice(-contextLength) : beforeText,
-      text: matchText,
-      after: afterText.length > contextLength ? afterText.slice(0, contextLength) + "..." : afterText,
-    };
-  };
+      const { state } = editorView;
+      const { doc } = state;
+
+      // Get match text
+      const matchText = doc.textBetween(match.from, match.to);
+
+      // Get surrounding text (30 characters before and after)
+      const contextLength = 30;
+      const beforeStart = Math.max(0, match.from - contextLength);
+      const afterEnd = Math.min(doc.content.size, match.to + contextLength);
+
+      const beforeText = doc.textBetween(beforeStart, match.from);
+      const afterText = doc.textBetween(match.to, afterEnd);
+
+      return {
+        before:
+          beforeText.length > contextLength ? "..." + beforeText.slice(-contextLength) : beforeText,
+        text: matchText,
+        after:
+          afterText.length > contextLength ? afterText.slice(0, contextLength) + "..." : afterText,
+      };
+    },
+    [editorView],
+  );
 
   // Jump to specified match and highlight
-  const goToMatch = (match: SearchMatch, index: number) => {
-    if (!editorView) return;
+  const goToMatch = useCallback(
+    (match: SearchMatch, index: number) => {
+      if (!editorView) return;
 
-    const { state, dispatch } = editorView;
-    
-    // Create decoration to mark this match as current
-    const decorations: Decoration[] = [];
-    matches.forEach((m, i) => {
-      const isCurrentMatch = i === index;
-      decorations.push(
-        Decoration.inline(m.from, m.to, {
-          class: isCurrentMatch ? "search-result-current" : "search-result",
-        })
-      );
-    });
+      const { state, dispatch } = editorView;
 
-    // Allow the scroll guard to accept our programmatic scroll
-    if (programmaticScrollRef) {
-      programmaticScrollRef.current = true;
-    }
+      // Create decoration to mark this match as current
+      const decorations: Decoration[] = [];
+      matches.forEach((m, i) => {
+        const isCurrentMatch = i === index;
+        decorations.push(
+          Decoration.inline(m.from, m.to, {
+            class: isCurrentMatch ? "search-result-current" : "search-result",
+          }),
+        );
+      });
 
-    // Pass decoration info via meta
-    const tr = state.tr.setMeta("searchDecorations", decorations);
-    
-    // Scroll to match (don't select text, just move cursor)
-    const scrollTr = tr.setSelection(TextSelection.create(tr.doc, match.from, match.from))
-      .scrollIntoView();
-    
-    dispatch(scrollTr);
-
-    // DOM-level scroll for both horizontal and vertical writing modes
-    try {
-      const coords = editorView.coordsAtPos(match.from);
-      const scrollContainer = editorView.dom.closest(".flex-1.bg-background-secondary") as HTMLElement | null;
-      if (scrollContainer) {
-        const containerRect = scrollContainer.getBoundingClientRect();
-        const offsetY = coords.top - containerRect.top + scrollContainer.scrollTop;
-        const offsetX = coords.left - containerRect.left + scrollContainer.scrollLeft;
-        scrollContainer.scrollTo({
-          left: offsetX - containerRect.width / 2,
-          top: offsetY - containerRect.height / 2,
-          behavior: "smooth",
-        });
-      }
-    } catch {
-      try {
-        const domResult = editorView.domAtPos(match.from);
-        const target = domResult.node instanceof HTMLElement
-          ? domResult.node
-          : domResult.node.parentElement;
-        target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-      } catch {
-        // ignore
-      }
-    }
-
-    // Reset the flag after smooth scroll completes
-    setTimeout(() => {
+      // Allow the scroll guard to accept our programmatic scroll
       if (programmaticScrollRef) {
-        programmaticScrollRef.current = false;
+        programmaticScrollRef.current = true;
       }
-    }, 500);
 
-    editorView.focus();
-  };
+      // Pass decoration info via meta
+      const tr = state.tr.setMeta("searchDecorations", decorations);
+
+      // Scroll to match (don't select text, just move cursor)
+      const scrollTr = tr
+        .setSelection(TextSelection.create(tr.doc, match.from, match.from))
+        .scrollIntoView();
+
+      dispatch(scrollTr);
+
+      // DOM-level scroll for both horizontal and vertical writing modes
+      try {
+        const coords = editorView.coordsAtPos(match.from);
+        const scrollContainer = editorView.dom.closest(
+          ".flex-1.bg-background-secondary",
+        ) as HTMLElement | null;
+        if (scrollContainer) {
+          const containerRect = scrollContainer.getBoundingClientRect();
+          const offsetY = coords.top - containerRect.top + scrollContainer.scrollTop;
+          const offsetX = coords.left - containerRect.left + scrollContainer.scrollLeft;
+          scrollContainer.scrollTo({
+            left: offsetX - containerRect.width / 2,
+            top: offsetY - containerRect.height / 2,
+            behavior: "smooth",
+          });
+        }
+      } catch {
+        try {
+          const domResult = editorView.domAtPos(match.from);
+          const target =
+            domResult.node instanceof HTMLElement ? domResult.node : domResult.node.parentElement;
+          target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+        } catch {
+          // ignore
+        }
+      }
+
+      // Reset the flag after smooth scroll completes
+      setTimeout(() => {
+        if (programmaticScrollRef) {
+          programmaticScrollRef.current = false;
+        }
+      }, 500);
+
+      editorView.focus();
+    },
+    [editorView, matches, programmaticScrollRef],
+  );
 
   // Replace single match
-  const replaceMatch = (match: SearchMatch) => {
-    if (!editorView) return;
+  const replaceMatch = useCallback(
+    (match: SearchMatch) => {
+      if (!editorView) return;
 
-    const { state, dispatch } = editorView;
-    const tr = state.tr.replaceWith(
-      match.from,
-      match.to,
-      state.schema.text(replaceTerm)
-    );
-    dispatch(tr);
+      const { state, dispatch } = editorView;
+      const tr = state.tr.replaceWith(match.from, match.to, state.schema.text(replaceTerm));
+      dispatch(tr);
 
-    // Re-search
-    setTimeout(() => {
-      setSearchTerm(searchTerm + " ");
-      setTimeout(() => setSearchTerm(searchTerm.trim()), 0);
-    }, 100);
-  };
+      // Re-search
+      setTimeout(() => {
+        setSearchTerm(searchTerm + " ");
+        setTimeout(() => setSearchTerm(searchTerm.trim()), 0);
+      }, 100);
+    },
+    [editorView, replaceTerm, searchTerm],
+  );
 
   // Replace all matches
-  const replaceAllMatches = () => {
+  const replaceAllMatches = useCallback(() => {
     if (!editorView || matches.length === 0) return;
 
     const { state, dispatch } = editorView;
@@ -218,11 +227,7 @@ export default function SearchResults({
     // Replace from end to start to avoid position shift
     for (let i = matches.length - 1; i >= 0; i--) {
       const match = matches[i];
-      tr = tr.replaceWith(
-        match.from,
-        match.to,
-        state.schema.text(replaceTerm)
-      );
+      tr = tr.replaceWith(match.from, match.to, state.schema.text(replaceTerm));
     }
 
     dispatch(tr);
@@ -231,7 +236,7 @@ export default function SearchResults({
     setMatches([]);
     setSearchTerm("");
     setReplaceTerm("");
-  };
+  }, [editorView, matches, replaceTerm]);
 
   return (
     <div className="h-full bg-background-secondary border-r border-border flex flex-col">
@@ -288,7 +293,11 @@ export default function SearchResults({
           className="w-full flex items-center justify-between px-3 py-2 text-sm text-foreground-secondary hover:bg-hover rounded transition-colors"
         >
           <div className="flex items-center gap-2">
-            {showReplace ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            {showReplace ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
             <span>置換</span>
           </div>
         </button>
@@ -311,7 +320,7 @@ export default function SearchResults({
                   "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors",
                   matches.length === 0 || !replaceTerm
                     ? "bg-background-tertiary text-foreground-muted cursor-not-allowed"
-                    : "bg-accent text-accent-foreground hover:bg-accent-hover"
+                    : "bg-accent text-accent-foreground hover:bg-accent-hover",
                 )}
               >
                 <ReplaceAll className="w-4 h-4" />
@@ -325,13 +334,9 @@ export default function SearchResults({
       {/* Results list */}
       <div className="flex-1 overflow-y-auto">
         {searchTerm && matches.length === 0 ? (
-          <div className="p-4 text-center text-foreground-secondary">
-            検索結果がありません
-          </div>
+          <div className="p-4 text-center text-foreground-secondary">検索結果がありません</div>
         ) : !searchTerm ? (
-          <div className="p-4 text-center text-foreground-secondary">
-            検索語を入力してください
-          </div>
+          <div className="p-4 text-center text-foreground-secondary">検索語を入力してください</div>
         ) : (
           <div className="divide-y divide-border">
             {matches.map((match, index) => {
@@ -346,10 +351,7 @@ export default function SearchResults({
                       {index + 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <button
-                        onClick={() => goToMatch(match, index)}
-                        className="w-full text-left"
-                      >
+                      <button onClick={() => goToMatch(match, index)} className="w-full text-left">
                         <p className="text-sm text-foreground break-words">
                           <span className="text-foreground-secondary">{context.before}</span>
                           <span className="bg-accent-light text-accent font-semibold px-1 rounded">

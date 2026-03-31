@@ -25,11 +25,11 @@ export interface ProjectMetadata {
   id: string;
   name: string;
   type: "local";
-  
+
   // ローカルファイル情報
   localPath?: string;
   fileHandle?: FileSystemFileHandle; // Web only
-  
+
   // プロジェクト統計
   metadata: {
     wordCount: number;
@@ -44,7 +44,6 @@ export interface ProjectMetadata {
  */
 export interface AppState {
   lastOpenedMdiPath?: string;
-  hasSeenDemo?: boolean;
   sidebarTab?: "chapters" | "settings" | "style";
   inspectorTab?: "ai" | "corrections" | "stats" | "versions" | "history";
 
@@ -61,6 +60,7 @@ export interface AppState {
   // 品詞着色設定
   posHighlightEnabled?: boolean;
   posHighlightColors?: Record<string, string>;
+  posHighlightDisabledTypes?: string[];
 
   // プロジェクト管理
   currentProjectId?: string;
@@ -78,7 +78,10 @@ export interface AppState {
 
   // リンティング設定
   lintingEnabled?: boolean;
-  lintingRuleConfigs?: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>;
+  lintingRuleConfigs?: Record<
+    string,
+    { enabled: boolean; severity: Severity; skipDialogue?: boolean }
+  >;
 
   // LLM設定
   llmEnabled?: boolean;
@@ -110,7 +113,7 @@ export interface AppState {
   prePowerSaveState?: {
     lintingEnabled: boolean;
     lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
-    llmEnabled: boolean;
+    llmEnabled?: boolean;
   } | null;
 
   // 朗読（TTS）設定
@@ -119,11 +122,43 @@ export interface AppState {
   speechPitch?: number;
   speechVolume?: number;
 
+  // ターミナル設定
+  terminalBackground?: string;
+  terminalForeground?: string;
+  terminalFontFamily?: string;
+  terminalFontSize?: number;
+  terminalLineHeight?: number;
+  terminalCursorStyle?: "block" | "underline" | "bar";
+  terminalCursorBlink?: boolean;
+  terminalScrollback?: number;
+  terminalCopyOnSelect?: boolean;
+  terminalMacOptionIsMeta?: boolean;
+  terminalDefaultShell?: string;
+  terminalColorBlack?: string;
+  terminalColorRed?: string;
+  terminalColorGreen?: string;
+  terminalColorYellow?: string;
+  terminalColorBlue?: string;
+  terminalColorMagenta?: string;
+  terminalColorCyan?: string;
+  terminalColorWhite?: string;
+  terminalColorBrightBlack?: string;
+  terminalColorBrightRed?: string;
+  terminalColorBrightGreen?: string;
+  terminalColorBrightYellow?: string;
+  terminalColorBrightBlue?: string;
+  terminalColorBrightMagenta?: string;
+  terminalColorBrightCyan?: string;
+  terminalColorBrightWhite?: string;
+
   // タブの永続化
   openTabs?: TabPersistenceState;
 
   // Dockview レイアウトの永続化
   dockviewLayout?: DockviewLayoutState;
+
+  // キーマップオーバーライド
+  keymapOverrides?: Record<string, { modifiers: string[]; key: string } | null>;
 }
 
 /**

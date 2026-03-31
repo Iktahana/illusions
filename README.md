@@ -1,8 +1,64 @@
 # illusions - 日本語小説エディタ
 
-縦書き、ルビ。Windows, macOS, Chromeで動作する執筆環境。文章分析から校正まで、小説家のための機能を凝縮。
+<div align="center" style="display: flex; flex-direction: column; gap: 12px; align-items: center; margin: 20px 0;">
 
-A professional-grade Japanese novel editor with vertical writing, ruby notation, and Japanese NLP proofreading support.
+![banner](/public/banner/github.png)
+
+## ダウンロード / Downloads
+
+<div style="display: flex; gap: 8px; height: 48px;">
+  <a href="https://github.com/Iktahana/illusions/releases/latest" style="text-decoration: none; display: flex; align-items: center; border-radius: 4px; overflow: hidden;">
+    <div style="background-color: #666; padding: 0 16px; height: 100%; display: flex; align-items: center; color: white; font-weight: bold; font-size: 14px; gap: 8px;">
+      <img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/apple.svg" width="20" height="20" alt="Apple" style="filter: brightness(0) invert(1);">
+      Download For MacOS
+    </div>
+     </a>
+</div>
+<br>
+<div style="display: flex; gap: 8px; height: 48px;">
+  <a href="https://apps.microsoft.com/detail/9mtc0ct16xg1" style="text-decoration: none; display: flex; align-items: center; border-radius: 4px; overflow: hidden;">
+    <div style="background-color: #666; padding: 0 16px; height: 100%; display: flex; align-items: center; color: white; font-weight: bold; font-size: 14px; gap: 8px;">
+      <img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/windows.svg" width="20" height="20" alt="Windows" style="filter: brightness(0) invert(1);">
+      Download For Windows
+    </div>
+  </a>
+</div>
+<br>
+<div style="display: flex; gap: 8px; height: 48px; ">
+  <a href="https://illusions.app" target="_blank" style="text-decoration: none; display: flex; align-items: center; border-radius: 4px; overflow: hidden;">
+    <div style="background-color: #666; padding: 0 16px; height: 100%; display: flex; align-items: center; color: white; font-weight: bold; font-size: 14px; gap: 8px;">
+      <img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/googlechrome.svg" width="20" height="20" alt="Chrome" style="filter: brightness(0) invert(1);">
+      illusions on Chrome
+    </div>
+  </a>
+</div>
+
+</div>
+
+---
+
+### システム要件 / System Requirements
+
+#### macOS
+
+- **OS**: macOS 10.15 (Catalina) or later
+- **Processor**: Intel または Apple Silicon
+- **Memory**: 4 GB RAM 以上
+- **Disk Space**: 1 GB 以上の空き容量
+
+#### Windows
+
+- **OS**: Windows 10 version 1909 以上 または Windows 11
+- **Processor**: Intel または AMD (x64)
+- **Memory**: 4 GB RAM 以上
+- **Disk Space**: 1 GB 以上の空き容量
+- **Note**: SmartScreen警告が表示される場合がありますが、これは署名なしアプリケーションの標準的な動作です
+
+#### Chrome版 / Web Version
+
+- **Browser**: Google Chrome 90+ (latest recommended)
+
+---
 
 ## 🌐 公式サイト / Official Website
 
@@ -10,95 +66,64 @@ A professional-grade Japanese novel editor with vertical writing, ruby notation,
 📥 **Downloads**: https://www.illusions.app/downloads
 
 Available for **macOS** (Intel & Apple Silicon) and **Windows** (installer or Microsoft Store).
-Also runs in the browser — visit [illusions.app](https://www.illusions.app) to try it online (Chrome / Edge / Safari).
+Also runs in Chrome — visit [illusions.app](https://www.illusions.app) to try it online.
 
 ---
 
 ## ✨ Key Features
 
-### 📝 Editor
-- **Milkdown-based Markdown editor** with real-time preview
-- **Vertical writing mode** (縦書き) for traditional Japanese novels
-- **Ruby notation support** (ルビ) - furigana for kanji
-- **Tate-chu-yoko** (縦中横) - horizontal text in vertical writing
-- **Auto-save** every 2 seconds
-- **Read-aloud (音読)**: Web Speech API text-to-speech with word highlight, auto-scroll, and configurable Japanese voice, rate, and pitch
-- **Japanese NLP** integration for text analysis
-- **POS (Part-of-Speech) highlighting** for Japanese grammar review with live demo preview
-- **Word frequency analysis** for vocabulary insights
-- **Japanese text linting** — 22 rules covering punctuation, number format, joyo kanji, and more (JIS X 4051 / 文化庁標準準拠)
-- **Correction ignore** — dismiss individual lint warnings; per-rule dialogue skip toggle
+### エディタ / Editor
 
-### 🎨 Interface
-- **Three-column layout**: Explorer | Editor | Inspector
-- **Activity Bar**: Quick access to Projects, GitHub, Settings
-- **Snow-country monochrome theme**: Minimalist light/dark mode with warm stone palette
-- **Glassmorphism UI**: Frosted glass effects, micro-interactions, and ambient glow
-- **Design system dialogs**: Custom GlassDialog-based alerts and confirmations (no native browser dialogs)
-- **Responsive design**: Optimized for various screen sizes
+- **縦書き・横書き対応 (Vertical & horizontal writing)** — Switch between writing modes optimized for Japanese novels
+- **Flexible panel layout** — Dockview-based multi-panel workspace; drag, split, and rearrange panels freely
+- **Pop-out editor windows** — Detach any editor tab into a separate window for multi-monitor workflows
+- **File diff view** — Side-by-side comparison of file versions directly in the editor
+- **Multi-tab editing** — Work on multiple files simultaneously with persistent tab state
+- **Empty editor placeholder** — Guided empty state when no file is open
 
-### 💾 Storage & Sync
-- **Dual-mode storage**:
-  - **Electron**: SQLite (fast, unlimited)
-  - **Web**: IndexedDB (browser-native)
-- **GitHub integration**: Cloud sync with full version history
-- **Recent files**: Quick access to last 10 documents
-- **Crash recovery**: Auto-restore unsaved content
+### ターミナル / Terminal
 
-### 📊 Productivity
-- **Statistics panel**: Character count, paragraph count, manuscript pages (原稿用紙)
-- **Export to PDF/EPUB/DOCX**: Export your work to standard publishing formats
-- **Composition settings**: Font, size, line height, spacing
-- **Version history**: Browse and restore previous versions
-- **Diff viewer**: Compare changes between versions
+- **Integrated terminal panel** — Full xterm.js terminal embedded in the editor (desktop only)
+- **Multiple terminal tabs** — Open and manage several terminal sessions in parallel
 
-### 🔧 Advanced Features
-- **GitHub OAuth**: Device flow authentication
-- **Auto-commit & push**: Automatic version control
-- **Branch & tag management**: Organize your writing milestones
-- **Cross-platform**: Electron app works on macOS, Windows, Linux
-- **Web Speech API read-aloud** (読み上げ) — browser-native text-to-speech with voice selection and playback controls
-- **AI status report**: View AI model status, storage usage, and diagnostics in the Settings panel
-- **LLM-based character extraction** (キャラクター抽出) — automatically extracts characters (name, aliases, description) from novel text using batched LLM inference
-- **Multiple LLM model options** — Qwen3 (0.6B / 1.7B / 4B) and Gemma-2-Llama-Swallow 9B (日本語特化, 東京科学大学), selectable in Settings
+### キーボード / Keyboard
+
+- **Customizable keybindings** — Remap any command via the Keymap settings tab; bindings persist across sessions
+- **Shortcut registry** — Centralized command-ID system for consistent shortcut management
+
+### 校正・設定 / Linting & Settings
+
+- **Japanese text linting** — Configurable rule-based linting with JSON-defined rule sets; preset support
+- **Settings tabs** — Including: Keymap, Linting, Typography, Vertical layout, Speech, Terminal, Position highlight, Power
+
+### デスクトップ / Desktop
+
+- **Desktop-only feature guards** — `DesktopOnlyDialog` gracefully blocks web-unsupported features
+- **Download button component** — In-app prompt to download the desktop build when a desktop-only feature is accessed
 
 ---
 
 ## 🚀 Quick Start
 
-### For Users
+### macOS
 
-#### Chrome版 / Web Version
-Simply visit https://www.illusions.app in your browser.
-
-#### Desktop Version
-
-##### macOS
 1. Download the `.dmg` file from [illusions.app/downloads](https://www.illusions.app/downloads)
 2. Open the DMG and drag illusions to your Applications folder
 3. Launch the app and start writing!
 
-##### Windows
-1. Download the `.exe` installer from [illusions.app/downloads](https://www.illusions.app/downloads)
-2. Run the installer
-3. **Important**: You may see a Windows SmartScreen warning saying "Unknown Publisher"
-   - This is normal for unsigned applications
-   - Click **"More info"** → **"Run anyway"** to proceed with installation
-4. Launch the app and start writing!
+### Windows
 
-> **Tip**: To skip the SmartScreen warning, install from the **Microsoft Store** instead (search "illusions novel editor").
+1. Download the `.exe` installer from [illusions.app/downloads](https://www.illusions.app/downloads), or install from the **Microsoft Store** (search "illusions novel editor")
+2. Run the installer and launch the app
 
-**Why does Windows show this warning?**
-- illusions is currently distributed without a Windows code signing certificate
-- Code signing certificates cost $200-400/year for individual developers
-- The app is completely safe and open-source - you can review the code on GitHub
-- We plan to add code signing in the future as the project grows
+> **Note**: The direct installer may trigger a Windows SmartScreen warning since the app is not code-signed. Click **"More info"** → **"Run anyway"** to proceed. The Microsoft Store version does not have this issue.
 
 ---
 
 ## 🛠️ For Developers
 
 #### Prerequisites
+
 - Node.js 22+
 - npm or yarn
 
@@ -120,29 +145,7 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-Open http://localhost:3000 in your browser.
-
-#### GitHub OAuth Setup (Optional)
-
-To enable GitHub authentication and cloud sync:
-
-1. Create a GitHub OAuth App at https://github.com/settings/applications/new
-2. Configure the OAuth App:
-   - **Application name**: `illusions Novel Editor` (or your preferred name)
-   - **Homepage URL**: `http://localhost:3000`
-   - **Authorization callback URL**: `http://localhost:3000`
-3. Copy the **Client ID** from the OAuth App page
-4. Create a `.env.local` file in the project root:
-   ```bash
-   cp .env.local.example .env.local
-   ```
-5. Edit `.env.local` and replace `your_client_id_here` with your actual Client ID:
-   ```
-   GITHUB_CLIENT_ID=your_actual_client_id
-   ```
-6. Restart the development server
-
-The GitHub avatar will appear at the bottom of the left sidebar, allowing you to log in and sync your work.
+Open http://localhost:3010 in your browser.
 
 #### Electron Development
 
@@ -170,38 +173,11 @@ The generated file is used in the "About illusions" page in Settings.
 ```
 illusions/
 ├── app/                      # Next.js App Router pages
-│   ├── api/                  # API routes (NLP endpoints)
-│   ├── globals.css           # Global styles & theme variables
-│   └── page.tsx              # Main editor page
 ├── components/               # React components
-│   ├── Editor.tsx            # Milkdown editor
-│   ├── Explorer.tsx          # Left sidebar (file tree)
-│   ├── Inspector.tsx         # Right sidebar (stats & tools)
-│   ├── ActivityBar.tsx       # Left activity bar
-│   └── explorer/             # Explorer sub-components
 ├── contexts/                 # React context providers
-├── electron/                 # Electron main process
-│   ├── main.js               # Main process entry
-│   ├── preload.js            # Preload script (secure IPC)
-│   ├── llm/                  # LLM inference backend
-│   ├── nlp/                  # NLP backend (kuromoji)
-│   └── storage-ipc-handlers.js
-├── lib/                      # Core libraries
-│   ├── storage/              # Storage abstraction layer
-│   ├── services/             # App services (history, notifications, etc.)
-│   ├── linting/              # Japanese text linting framework
-│   ├── nlp-client/           # NLP client abstraction
-│   ├── nlp-backend/          # NLP backend logic
-│   ├── llm-client/           # LLM client abstraction + model registry
-│   ├── character-extraction/ # LLM-based character extraction
-│   ├── export/               # PDF/EPUB/DOCX export
-│   ├── hooks/                # React hooks
-│   ├── project/              # Project management
-│   ├── tab-manager/          # Multi-tab management
-│   ├── vfs/                  # Virtual file system
-│   └── utils/                # Utility functions
-├── packages/                 # Internal packages
-│   └── milkdown-plugin-japanese-novel/
+├── electron/                 # Electron main process & preload
+├── lib/                      # Core libraries (storage, linting, editor, VFS, etc.)
+├── packages/                 # Internal packages (milkdown-plugin-japanese-novel)
 ├── www/                      # Landing page (Vite)
 ├── types/                    # TypeScript type definitions
 ├── scripts/                  # Build and utility scripts
@@ -213,104 +189,37 @@ illusions/
 ## 🛠️ Tech Stack
 
 ### Core
+
 - **Next.js 16** - React framework with App Router
 - **React 18** - UI library
 - **TypeScript** - Type-safe development
 - **Tailwind CSS 3** - Utility-first styling
 
 ### Editor
+
 - **Milkdown 7** - WYSIWYG Markdown editor
 - **ProseMirror** - Editor foundation
 - **Kuromoji.js** - Japanese morphological analysis
 
-### Storage & Sync
+### Storage
+
 - **Dexie.js** - IndexedDB wrapper (Web)
 - **better-sqlite3** - SQLite database (Electron)
-- **isomorphic-git** - Git implementation in JavaScript
-- **@octokit/rest** - GitHub API client
+
+### Layout & Terminal
+
+- **dockview-react** - Flexible panel layout system
+- **xterm.js + node-pty** - Integrated terminal panel
 
 ### Testing
+
 - **Vitest** - Unit testing framework
 
 ### Desktop
+
 - **Electron 32** - Cross-platform desktop app
 - **electron-builder** - Build and packaging
 - **electron-updater** - Auto-update support
-
----
-
-## 📖 Documentation
-
-- **[Storage Architecture](docs/architecture/storage-system.md)** - Storage system design and API
-- **[NLP Backend Architecture](docs/architecture/nlp-backend-architecture.md)** - Japanese text processing
-- **[Notification System](docs/architecture/notification-system.md)** - Toast notification API
-- **[Export System](docs/architecture/export-system.md)** - PDF/EPUB/DOCX export
-- **[Tab Manager](docs/architecture/tab-manager.md)** - Multi-tab architecture
-- **[VFS Architecture](docs/architecture/vfs.md)** - Virtual file system
-- **[LLM Engine](docs/architecture/llm-engine.md)** - Local LLM inference
-- **[Theme Colors Guide](docs/guides/THEME_COLORS.md)** - Theming system
-- **[Linting Rules](docs/guides/linting-rules.md)** - Japanese text linting rules
-- **[Keyboard Shortcuts](docs/guides/keyboard-shortcuts.md)** - Key bindings
-
-### 📐 校正基準 / Proofreading Standards
-
-illusions の校正（リンティング）機能は、以下の公的標準・業界規範に準拠しています。
-検出された問題は、必ず準拠する標準名を明示してユーザーに提示します。
-
-The proofreading (linting) features in illusions comply with the following official standards. All detected issues cite their source standard when presented to users.
-
-| Standard | Scope | Reference |
-|----------|-------|-----------|
-| **JIS X 4051:2004** | 日本語文書の組版方法（禁則処理・約物・ルビ） | [Full text](https://kikakurui.com/x4/X4051-2004-02.html) |
-| **文化庁「公用文作成の考え方」(2022)** | 公用文の句読点・用字用語 | [PDF](https://www.bunka.go.jp/seisaku/bunkashingikai/kokugo/hokoku/pdf/93098001_01.pdf) |
-| **W3C JLREQ** | 日本語組版処理の要件（Web/デジタル組版） | [W3C](https://w3c.github.io/jlreq/) |
-| **文化庁 常用漢字表 (2010)** | 常用漢字 2,136字 | [文化庁](https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/naikaku/kanji/) |
-
----
-
-## 🎯 Features Roadmap
-
-### Current Release (v0.1.2)
-- ✅ Milkdown editor with vertical writing
-- ✅ Ruby notation (ルビ) support
-- ✅ Tate-chu-yoko (縦中横) support
-- ✅ Auto-save and crash recovery
-- ✅ Storage abstraction (Electron + Web)
-- ✅ GitHub integration with OAuth
-- ✅ Version history and diff viewer
-- ✅ Japanese NLP backend
-- ✅ POS highlighting
-- ✅ Word frequency analysis
-- ✅ Landing page with SEO optimization
-
-### Recently Added
-- ✅ Read-aloud (音読) — Web Speech API text-to-speech with word highlight and auto-scroll; configurable Japanese voice, rate, and pitch (音読・ハイライト・自動スクロール)
-- ✅ Snow-country monochrome theme — minimalist warm stone palette for app and landing page
-- ✅ Weekly release PR workflow — automated Monday `dev → main` release cycle with auto-cleanup
-- ✅ LLM-based character extraction — automatically extract characters from novel text with batched LLM inference (キャラクター抽出)
-- ✅ Gemma-2-Llama-Swallow 9B model — Japanese-optimised reasoning LLM by 東京科学大学, available in LLM settings (日本語特化モデル)
-- ✅ Error notifications for file operation failures — toast alerts on save/load errors
-- ✅ AI report in settings panel — view AI model status, storage usage, and system diagnostics (AIレポート)
-- ✅ Microsoft Store packaging — Windows `.appx` build target and tile assets for Store distribution
-- ✅ LLM idling stop — auto-unload AI model after 30s idle to reduce memory usage (AIアイドリングストップ)
-- ✅ Export to PDF/EPUB/DOCX — export novels to standard publishing formats
-- ✅ Correction ignore feature — dismiss individual lint warnings
-- ✅ Dialogue-aware linting — skip dialogue content with per-rule toggle
-- ✅ Live demo preview for POS highlight settings
-- ✅ 22 lint rules (15 L1 regex + 7 L2 morphological) with 5 presets
-- ✅ In-app notification for power saving (replaces native dialog)
-- ✅ Unit test coverage for core library modules (Vitest)
-- ✅ Japanese text linting framework (JIS X 4051 / 文化庁標準準拠)
-- ✅ Electron security hardening (CSP, navigation guards, safeStorage, IPC input validation, save-file path validation)
-- ✅ Design system dialogs replacing native browser alerts/confirms (GlassDialog)
-- ✅ Accurate Japanese text statistics (文字数 character count, misleading word count removed)
-
-### Planned
-- [ ] Real-time collaboration
-- [ ] Advanced AI grammar and style checking (local LLM integration in progress)
-- [ ] Custom themes and fonts
-- [ ] Plugin system
-- [ ] Mobile app (iOS/Android)
 
 ---
 
@@ -353,7 +262,6 @@ See also: [利用規約 / Terms of Service](TERMS.md) | [Online Policy Page](htt
 
 - **Milkdown** - Excellent Markdown editor framework
 - **Kuromoji.js** - Japanese text tokenization
-- **isomorphic-git** - Pure JavaScript Git implementation
 - **Electron** - Cross-platform desktop framework
 
 ---
@@ -362,62 +270,6 @@ See also: [利用規約 / Terms of Service](TERMS.md) | [Online Policy Page](htt
 
 - **GitHub Issues**: https://github.com/Iktahana/illusions/issues
 - **Website**: https://www.illusions.app
-- **Chrome版**: https://illusions.app
-
----
-
-## ❓ FAQ / よくある質問
-
-### Windows: "不明な発行元" / "Unknown Publisher" 警告について
-
-**Q: Windows でインストール時に「不明な発行元」と表示されます。安全ですか？**
-
-**A:** はい、安全です。この警告は、アプリケーションが Microsoft の認証を受けた署名がないために表示されます。
-
-**原因**:
-- コード署名証明書は年間 $200-400 の費用がかかります
-- 個人開発プロジェクトのため、現時点では署名を購入していません
-- すべてのソースコードは GitHub で公開されており、誰でも確認できます
-
-**インストール方法**:
-1. インストーラーをダブルクリック
-2. 「Windows によって PC が保護されました」と表示される
-3. 「詳細情報」をクリック
-4. 「実行」ボタンをクリック
-5. インストールが開始されます
-
-**セキュリティについて**:
-- ✅ オープンソース（コードは GitHub で公開）
-- ✅ GitHub Actions で自動ビルド
-- ✅ マルウェアスキャン済み
-- ✅ コミュニティによるコードレビュー
-
-将来的には、プロジェクトの成長に伴いコード署名証明書を取得する予定です。
-
----
-
-**Q: Windows shows "Unknown Publisher" warning during installation. Is it safe?**
-
-**A:** Yes, it's completely safe. This warning appears because the app doesn't have a Microsoft-verified signature.
-
-**Why this happens**:
-- Code signing certificates cost $200-400/year
-- As an individual developer project, we haven't purchased signing yet
-- All source code is public on GitHub and can be reviewed by anyone
-
-**How to install**:
-1. Double-click the installer
-2. When you see "Windows protected your PC", click **"More info"**
-3. Click **"Run anyway"**
-4. Installation will proceed normally
-
-**Security**:
-- ✅ Open source (code publicly available on GitHub)
-- ✅ Built automatically with GitHub Actions
-- ✅ Malware scanned
-- ✅ Community code reviewed
-
-We plan to obtain a code signing certificate as the project grows.
 
 ---
 

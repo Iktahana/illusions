@@ -10,6 +10,7 @@ export type {
   BufferState,
   EditorPanelParams,
   DockviewLayoutState,
+  SimplifiedGroupLayout,
   SerializedBuffer,
   BufferChangeEvent,
 } from "./types";
@@ -40,7 +41,4 @@ export {
 } from "./use-dockview-adapter";
 
 // Persistence
-export {
-  useDockviewPersistence,
-  loadDockviewLayout,
-} from "./use-dockview-persistence";
+export { useDockviewPersistence, loadDockviewLayout } from "./use-dockview-persistence";

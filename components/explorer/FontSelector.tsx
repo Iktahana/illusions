@@ -12,6 +12,7 @@ import {
   loadGoogleFont,
 } from "@/lib/utils/fonts";
 import type { FontInfo, SystemFontInfo } from "@/lib/utils/fonts";
+import { detectOSPlatform } from "@/lib/utils/runtime-env";
 
 interface FontSelectorProps {
   value: string;
@@ -21,22 +22,10 @@ interface FontSelectorProps {
 /** Font picker dropdown with system fonts, featured fonts, and search */
 export function FontSelector({ value, onChange }: FontSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const isElectron = useMemo(() => isElectronRuntime(), []);
-  const platform = useMemo(() => {
-    if (typeof navigator === 'undefined') {
-      return null;
-    }
-    const ua = navigator.userAgent.toLowerCase();
-    if (ua.includes('mac')) {
-      return 'mac';
-    }
-    if (ua.includes('win')) {
-      return 'windows';
-    }
-    return null;
-  }, []);
+  const platform = useMemo(() => detectOSPlatform(), []);
 
   const systemFonts = useMemo(() => {
     if (!isElectron) {
@@ -45,21 +34,19 @@ export function FontSelector({ value, onChange }: FontSelectorProps) {
     if (!platform) {
       return LOCAL_SYSTEM_FONTS;
     }
-    return LOCAL_SYSTEM_FONTS.filter((font: SystemFontInfo) =>
-      font.platforms.includes(platform)
-    );
+    return LOCAL_SYSTEM_FONTS.filter((font: SystemFontInfo) => font.platforms.includes(platform));
   }, [isElectron, platform]);
 
   const systemFontFamilies = useMemo(
     () => new Set(systemFonts.map((font) => font.family)),
-    [systemFonts]
+    [systemFonts],
   );
 
   const selectedFont = useMemo(
     () =>
       systemFonts.find((font) => font.family === value) ||
       ALL_JAPANESE_FONTS.find((font) => font.family === value),
-    [systemFonts, value]
+    [systemFonts, value],
   );
 
   // Close dropdown on outside click
@@ -69,8 +56,8 @@ export function FontSelector({ value, onChange }: FontSelectorProps) {
         setIsOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Preload featured fonts
@@ -88,31 +75,34 @@ export function FontSelector({ value, onChange }: FontSelectorProps) {
       loadGoogleFont(font);
     }
     setIsOpen(false);
-    setSearchTerm('');
+    setSearchTerm("");
   };
 
   // Filter fonts by search term (matching both family and localizedName)
   const filteredFonts = searchTerm
-    ? ALL_JAPANESE_FONTS.filter((font: FontInfo) =>
-        font.family.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (font.localizedName && font.localizedName.includes(searchTerm))
+    ? ALL_JAPANESE_FONTS.filter(
+        (font: FontInfo) =>
+          font.family.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (font.localizedName && font.localizedName.includes(searchTerm)),
       )
     : ALL_JAPANESE_FONTS;
 
-  const featuredFiltered = FEATURED_JAPANESE_FONTS.filter((font: FontInfo) =>
-    !searchTerm ||
-    font.family.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (font.localizedName && font.localizedName.includes(searchTerm))
+  const featuredFiltered = FEATURED_JAPANESE_FONTS.filter(
+    (font: FontInfo) =>
+      !searchTerm ||
+      font.family.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (font.localizedName && font.localizedName.includes(searchTerm)),
   );
 
-  const systemFiltered = systemFonts.filter((font: SystemFontInfo) =>
-    !searchTerm ||
-    font.family.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (font.localizedName && font.localizedName.includes(searchTerm))
+  const systemFiltered = systemFonts.filter(
+    (font: SystemFontInfo) =>
+      !searchTerm ||
+      font.family.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (font.localizedName && font.localizedName.includes(searchTerm)),
   );
 
   const otherFonts = filteredFonts.filter(
-    (font: FontInfo) => !FEATURED_JAPANESE_FONTS.find((f: FontInfo) => f.family === font.family)
+    (font: FontInfo) => !FEATURED_JAPANESE_FONTS.find((f: FontInfo) => f.family === font.family),
   );
 
   return (
@@ -124,14 +114,9 @@ export function FontSelector({ value, onChange }: FontSelectorProps) {
         className="w-full px-3 py-2 text-sm border border-border-secondary rounded focus:outline-none focus:ring-2 focus:ring-accent bg-background text-foreground text-left flex items-center justify-between"
         style={{ fontFamily: `"${value}", serif` }}
       >
-        <span>
-          {selectedFont?.localizedName || value}
-        </span>
+        <span>{selectedFont?.localizedName || value}</span>
         <ChevronRight
-          className={clsx(
-            "w-4 h-4 transition-transform",
-            isOpen ? "rotate-90" : "rotate-0"
-          )}
+          className={clsx("w-4 h-4 transition-transform", isOpen ? "rotate-90" : "rotate-0")}
         />
       </button>
 
@@ -160,21 +145,19 @@ export function FontSelector({ value, onChange }: FontSelectorProps) {
                     ローカル
                   </div>
                 )}
-                {systemFiltered.map(font => (
+                {systemFiltered.map((font) => (
                   <button
                     key={font.family}
                     type="button"
                     onClick={() => handleSelect(font.family)}
                     className={clsx(
                       "w-full px-3 py-2 text-sm text-left hover:bg-active flex items-center justify-between transition-colors text-foreground",
-                      value === font.family && "bg-accent-light"
+                      value === font.family && "bg-accent-light",
                     )}
                     style={{ fontFamily: `"${font.family}", serif` }}
                   >
                     <span>{font.localizedName || font.family}</span>
-                    {value === font.family && (
-                      <Check className="w-4 h-4 text-accent" />
-                    )}
+                    {value === font.family && <Check className="w-4 h-4 text-accent" />}
                   </button>
                 ))}
               </>
@@ -183,24 +166,22 @@ export function FontSelector({ value, onChange }: FontSelectorProps) {
             {/* Featured */}
             {featuredFiltered.length > 0 && (
               <>
-                  <div className="px-3 py-1 text-xs font-semibold text-foreground-tertiary bg-background-secondary sticky top-0">
+                <div className="px-3 py-1 text-xs font-semibold text-foreground-tertiary bg-background-secondary sticky top-0">
                   おすすめ
                 </div>
-                {featuredFiltered.map(font => (
+                {featuredFiltered.map((font) => (
                   <button
                     key={font.family}
                     type="button"
                     onClick={() => handleSelect(font.family)}
                     className={clsx(
                       "w-full px-3 py-2 text-sm text-left hover:bg-active flex items-center justify-between transition-colors text-foreground",
-                      value === font.family && "bg-accent-light"
+                      value === font.family && "bg-accent-light",
                     )}
                     style={{ fontFamily: `"${font.family}", serif` }}
                   >
                     <span>{font.localizedName || font.family}</span>
-                    {value === font.family && (
-                      <Check className="w-4 h-4 text-accent" />
-                    )}
+                    {value === font.family && <Check className="w-4 h-4 text-accent" />}
                   </button>
                 ))}
               </>
@@ -210,36 +191,36 @@ export function FontSelector({ value, onChange }: FontSelectorProps) {
             {otherFonts.length > 0 && (
               <>
                 {!searchTerm && (
-                <div className="px-3 py-1 text-xs font-semibold text-foreground-tertiary bg-background-secondary sticky top-0">
+                  <div className="px-3 py-1 text-xs font-semibold text-foreground-tertiary bg-background-secondary sticky top-0">
                     すべてのフォント
                   </div>
                 )}
-                {otherFonts.map(font => (
+                {otherFonts.map((font) => (
                   <button
                     key={font.family}
                     type="button"
                     onClick={() => handleSelect(font.family)}
                     className={clsx(
                       "w-full px-3 py-2 text-sm text-left hover:bg-active flex items-center justify-between transition-colors text-foreground",
-                      value === font.family && "bg-accent-light"
+                      value === font.family && "bg-accent-light",
                     )}
                     style={{ fontFamily: `"${font.family}", serif` }}
                   >
                     <span>{font.localizedName || font.family}</span>
-                    {value === font.family && (
-                      <Check className="w-4 h-4 text-accent" />
-                    )}
+                    {value === font.family && <Check className="w-4 h-4 text-accent" />}
                   </button>
                 ))}
               </>
             )}
 
             {/* No results */}
-            {systemFiltered.length === 0 && featuredFiltered.length === 0 && otherFonts.length === 0 && (
-              <div className="px-3 py-4 text-sm text-foreground-tertiary text-center">
-                フォントが見つかりません
-              </div>
-            )}
+            {systemFiltered.length === 0 &&
+              featuredFiltered.length === 0 &&
+              otherFonts.length === 0 && (
+                <div className="px-3 py-4 text-sm text-foreground-tertiary text-center">
+                  フォントが見つかりません
+                </div>
+              )}
           </div>
         </div>
       )}

@@ -86,15 +86,11 @@ export default function FileConflictDialog({
       <div className="flex items-start gap-3">
         <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" />
         <div>
-          <h2 className="text-lg font-semibold text-foreground">
-            ファイルが外部で変更されました
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground">ファイルが外部で変更されました</h2>
           <p className="mt-2 text-sm text-foreground-secondary">
             「{fileName}」が外部のプログラムにより変更されました。
           </p>
-          <p className="mt-1 text-xs text-foreground-secondary">
-            最終変更: {formattedTimestamp}
-          </p>
+          <p className="mt-1 text-xs text-foreground-secondary">最終変更: {formattedTimestamp}</p>
           {(diff.added > 0 || diff.removed > 0) && (
             <>
               <div className="mt-3 flex items-center gap-3 text-xs">

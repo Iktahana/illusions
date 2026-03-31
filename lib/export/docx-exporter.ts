@@ -5,16 +5,9 @@
  * Handles headings, paragraphs, bold, italic, and ruby (as parenthesized fallback).
  */
 
-import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  HeadingLevel,
-  AlignmentType,
-} from 'docx';
-import type { ExportMetadata } from './types';
-import { replaceMdiWithRubyText } from './mdi-parser';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
+import type { ExportMetadata } from "./types";
+import { replaceMdiWithRubyText } from "./mdi-parser";
 
 export interface DocxExportOptions {
   metadata: ExportMetadata;
@@ -27,22 +20,19 @@ export interface DocxExportOptions {
  * @param options - DOCX export options
  * @returns DOCX data as a Buffer
  */
-export async function generateDocx(
-  content: string,
-  options: DocxExportOptions
-): Promise<Buffer> {
+export async function generateDocx(content: string, options: DocxExportOptions): Promise<Buffer> {
   const { metadata } = options;
   const paragraphs = parseMarkdownToDocxParagraphs(content);
 
   const doc = new Document({
-    creator: metadata.author || '',
-    title: metadata.title || '',
-    description: '',
+    creator: metadata.author || "",
+    title: metadata.title || "",
+    description: "",
     styles: {
       default: {
         document: {
           run: {
-            font: 'Yu Mincho',
+            font: "Yu Mincho",
             size: 24, // 12pt in half-points
           },
           paragraph: {
@@ -82,13 +72,13 @@ export async function generateDocx(
  * Parse MDI markdown content into docx Paragraph objects
  */
 function parseMarkdownToDocxParagraphs(content: string): Paragraph[] {
-  const lines = content.split('\n');
+  const lines = content.split("\n");
   const paragraphs: Paragraph[] = [];
   let currentParagraphLines: string[] = [];
 
   const flushParagraph = (): void => {
     if (currentParagraphLines.length === 0) return;
-    const text = currentParagraphLines.join('\n').trim();
+    const text = currentParagraphLines.join("\n").trim();
     if (text) {
       paragraphs.push(createParagraph(text));
     }
@@ -99,7 +89,7 @@ function parseMarkdownToDocxParagraphs(content: string): Paragraph[] {
     const trimmed = line.trim();
 
     // Empty line = paragraph break
-    if (trimmed === '') {
+    if (trimmed === "") {
       flushParagraph();
       continue;
     }
@@ -123,12 +113,12 @@ function parseMarkdownToDocxParagraphs(content: string): Paragraph[] {
           spacing: { before: 200, after: 200 },
           children: [
             new TextRun({
-              text: '\uFF0A\u3000\uFF0A\u3000\uFF0A',
-              font: 'Yu Mincho',
+              text: "\uFF0A\u3000\uFF0A\u3000\uFF0A",
+              font: "Yu Mincho",
             }),
           ],
           alignment: AlignmentType.CENTER,
-        })
+        }),
       );
       continue;
     }
@@ -144,10 +134,7 @@ function parseMarkdownToDocxParagraphs(content: string): Paragraph[] {
  * Create a heading paragraph
  */
 function createHeading(text: string, level: number): Paragraph {
-  const headingLevels: Record<
-    number,
-    (typeof HeadingLevel)[keyof typeof HeadingLevel]
-  > = {
+  const headingLevels: Record<number, (typeof HeadingLevel)[keyof typeof HeadingLevel]> = {
     1: HeadingLevel.HEADING_1,
     2: HeadingLevel.HEADING_2,
     3: HeadingLevel.HEADING_3,
@@ -183,7 +170,7 @@ function parseInlineFormatting(text: string): TextRun[] {
   const runs: TextRun[] = [];
 
   // Process all MDI inline syntax via shared parser (ruby → fullwidth parens)
-  let processed = replaceMdiWithRubyText(text);
+  const processed = replaceMdiWithRubyText(text);
 
   // Now parse bold/italic markdown
   // Split by bold-italic (***text***), bold (**text**), and italic (*text*) markers

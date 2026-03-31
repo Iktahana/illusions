@@ -10,11 +10,11 @@ The project lifecycle system manages two distinct editor modes: **Project Mode**
 
 ### Key Files
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `lib/project-types.ts` | ~201 | Type definitions for project and standalone modes |
-| `lib/project-service.ts` | ~564 | Project creation, opening, saving, validation |
-| `lib/project-manager.ts` | ~326 | Web-only: FileSystemDirectoryHandle persistence in IndexedDB |
+| File                     | Lines | Purpose                                                      |
+| ------------------------ | ----- | ------------------------------------------------------------ |
+| `lib/project-types.ts`   | ~201  | Type definitions for project and standalone modes            |
+| `lib/project-service.ts` | ~564  | Project creation, opening, saving, validation                |
+| `lib/project-manager.ts` | ~326  | Web-only: FileSystemDirectoryHandle persistence in IndexedDB |
 
 ### Features
 
@@ -119,14 +119,14 @@ User clicks "New Project"
 
 ### Mode Comparison
 
-| Feature | Project Mode | Standalone Mode |
-|---------|-------------|-----------------|
-| `.illusions/` directory | Yes | No |
-| Version history | Yes | No |
-| Workspace state persistence | Yes | No |
-| Project metadata | Yes | No |
-| File extension | `.mdi`, `.md`, `.txt` | `.mdi`, `.md`, `.txt` |
-| Multiple files (future) | Planned | No |
+| Feature                     | Project Mode          | Standalone Mode       |
+| --------------------------- | --------------------- | --------------------- |
+| `.illusions/` directory     | Yes                   | No                    |
+| Version history             | Yes                   | No                    |
+| Workspace state persistence | Yes                   | No                    |
+| Project metadata            | Yes                   | No                    |
+| File extension              | `.mdi`, `.md`, `.txt` | `.mdi`, `.md`, `.txt` |
+| Multiple files (future)     | Planned               | No                    |
 
 ---
 
@@ -142,13 +142,13 @@ type EditorMode = ProjectMode | StandaloneMode | null;
 /** Project mode: full project context */
 interface ProjectMode {
   type: "project";
-  projectId: string;              // UUID v4
-  name: string;                   // Project display name
+  projectId: string; // UUID v4
+  name: string; // Project display name
   rootHandle: FileSystemDirectoryHandle; // Project root directory
-  mainFileHandle: FileSystemFileHandle;  // Main document file
+  mainFileHandle: FileSystemFileHandle; // Main document file
   metadata: ProjectConfig;
   workspaceState: WorkspaceState;
-  rootPath?: string;              // Absolute path (Electron only)
+  rootPath?: string; // Absolute path (Electron only)
 }
 
 /** Standalone mode: single file without project context */
@@ -163,12 +163,12 @@ interface StandaloneMode {
 /** Project configuration stored in project.json */
 interface ProjectConfig {
   version: "1.0.0";
-  projectId: string;              // UUID v4
+  projectId: string; // UUID v4
   name: string;
-  mainFile: string;               // e.g., "main.mdi"
+  mainFile: string; // e.g., "main.mdi"
   mainFileExtension: SupportedFileExtension;
-  createdAt: string;              // ISO 8601
-  lastModified: string;           // ISO 8601
+  createdAt: string; // ISO 8601
+  lastModified: string; // ISO 8601
   author?: string;
   description?: string;
   tags?: string[];
@@ -182,7 +182,7 @@ interface WorkspaceState {
     scrollTop: number;
     selection: SelectionRange | null;
   };
-  lastOpenedAt: string;           // ISO 8601
+  lastOpenedAt: string; // ISO 8601
   viewState: {
     activeView: string;
     inspectorTab: string;
@@ -328,15 +328,15 @@ function renderStatusBar(mode: EditorMode) {
 
 ```typescript
 // Valid names
-projectService.validateProjectName("My Novel");         // null (valid)
-projectService.validateProjectName("Novel 2026");        // null (valid)
+projectService.validateProjectName("My Novel"); // null (valid)
+projectService.validateProjectName("Novel 2026"); // null (valid)
 
 // Invalid names
-projectService.validateProjectName("");                  // "Name cannot be empty"
-projectService.validateProjectName("a".repeat(201));     // "Name too long (max 200)"
-projectService.validateProjectName("my<novel>");         // "Invalid characters"
-projectService.validateProjectName("CON");               // "Reserved name"
-projectService.validateProjectName("LPT1");              // "Reserved name"
+projectService.validateProjectName(""); // "Name cannot be empty"
+projectService.validateProjectName("a".repeat(201)); // "Name too long (max 200)"
+projectService.validateProjectName("my<novel>"); // "Invalid characters"
+projectService.validateProjectName("CON"); // "Reserved name"
+projectService.validateProjectName("LPT1"); // "Reserved name"
 ```
 
 ---
@@ -357,7 +357,7 @@ projectService.validateProjectName("LPT1");              // "Reserved name"
   "author": "Author Name",
   "description": "A novel project",
   "tags": ["fiction", "draft"],
-  "editorSettings": { }
+  "editorSettings": {}
 }
 ```
 
@@ -398,13 +398,14 @@ projectService.validateProjectName("LPT1");              // "Reserved name"
 
 The `ProjectManager` class handles persistence of `FileSystemDirectoryHandle` objects in IndexedDB, which is necessary because the File System Access API handles cannot survive page reloads without explicit storage.
 
-| Method | Description |
-|--------|-------------|
+| Method                     | Description                                              |
+| -------------------------- | -------------------------------------------------------- |
 | `restoreProjectHandle(id)` | Retrieve and validate a stored handle, check permissions |
-| `listProjects()` | List all stored projects sorted by most recently opened |
-| `removeProject(id)` | Remove a stored handle from IndexedDB |
+| `listProjects()`           | List all stored projects sorted by most recently opened  |
+| `removeProject(id)`        | Remove a stored handle from IndexedDB                    |
 
 The `restoreProjectHandle` method:
+
 1. Retrieves the `FileSystemDirectoryHandle` from IndexedDB
 2. Calls `handle.queryPermission()` to check current permissions
 3. If not granted, calls `handle.requestPermission()` to prompt the user

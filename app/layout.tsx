@@ -2,6 +2,7 @@ import "./globals.css";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { EditorModeProvider } from "../contexts/EditorModeContext";
 import { AuthProvider } from "../contexts/AuthContext";
+import { KeymapProvider } from "../contexts/KeymapContext";
 import { NotificationContainer } from "@/components/NotificationContainer";
 import AnalyticsLoader from "@/components/AnalyticsLoader";
 
@@ -13,10 +14,7 @@ export default function RootLayout({
   return (
     <html lang="ja" suppressHydrationWarning>
       <head>
-        <meta
-          name="description"
-          content="縦書きに対応した、日本語小説のための執筆エディタです。"
-        />
+        <meta name="description" content="縦書きに対応した、日本語小説のための執筆エディタです。" />
         <link rel="icon" type="image/x-icon" href="./favicon.ico" />
         <link rel="icon" href="./favicon.png" sizes="any" />
         <link rel="icon" href="./icon/illusions-32.png" sizes="32x32" type="image/png" />
@@ -27,12 +25,15 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         {/* External theme init script to avoid CSP unsafe-inline */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- intentionally synchronous to prevent theme FOUC */}
         <script src="./theme-init.js" />
       </head>
       <body className="antialiased">
         <ThemeProvider>
           <AuthProvider>
-            <EditorModeProvider>{children}</EditorModeProvider>
+            <EditorModeProvider>
+              <KeymapProvider>{children}</KeymapProvider>
+            </EditorModeProvider>
           </AuthProvider>
         </ThemeProvider>
         <NotificationContainer />

@@ -5,19 +5,19 @@
 /**
  * 品詞タイプ（kuromoji の品詞分類）
  */
-export type PosType = 
-  | '名詞' 
-  | '動詞' 
-  | '形容詞' 
-  | '副詞' 
-  | '助詞' 
-  | '助動詞' 
-  | '接続詞' 
-  | '感動詞' 
-  | '記号'
-  | '連体詞'
-  | 'フィラー'
-  | 'その他';
+export type PosType =
+  | "名詞"
+  | "動詞"
+  | "形容詞"
+  | "副詞"
+  | "助詞"
+  | "助動詞"
+  | "接続詞"
+  | "感動詞"
+  | "記号"
+  | "連体詞"
+  | "フィラー"
+  | "その他";
 
 /**
  * トークン（形態素解析結果）
@@ -53,7 +53,7 @@ export interface Token {
  * 品詞ごとの色設定
  */
 export interface PosColorConfig {
-  [key: string]: string;  // 品詞 -> 色（hex または CSS 変数）
+  [key: string]: string; // 品詞 -> 色（hex または CSS 変数）
 }
 
 /**
@@ -64,6 +64,8 @@ export interface PosHighlightSettings {
   enabled: boolean;
   /** 品詞ごとの色設定 */
   colors: PosColorConfig;
+  /** 非表示にする品詞タイプ */
+  disabledTypes?: string[];
 }
 
 /**
@@ -89,14 +91,14 @@ export interface TokenMergeOptions {
 /**
  * トークン化プリセット
  */
-export type TokenizePreset = 'fine' | 'medium' | 'coarse' | 'custom';
+export type TokenizePreset = "fine" | "medium" | "coarse" | "custom";
 
 /**
  * Worker へ送るメッセージ
  */
 export interface WorkerMessage {
   /** メッセージタイプ */
-  type: 'init' | 'tokenize';
+  type: "init" | "tokenize";
   /** メッセージID（レスポンスの照合用） */
   id: number;
   /** ペイロード */
@@ -115,7 +117,7 @@ export interface WorkerResponse {
   /** メッセージID */
   id: number;
   /** 結果（トークン配列 or 'ready'） */
-  result?: Token[] | 'ready';
+  result?: Token[] | "ready";
   /** エラーメッセージ */
   error?: string;
 }

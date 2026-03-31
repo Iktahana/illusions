@@ -6,22 +6,31 @@
  * with correct character positions, and word frequency analysis.
  */
 
-import kuromoji from 'kuromoji';
-import type { Token, WordEntry } from '../nlp-client/types';
-import { NlpCache } from './nlp-cache';
-import type { UserDictionaryEntry } from '../project/project-types';
+import kuromoji from "kuromoji";
+import type { Token, WordEntry } from "../nlp-client/types";
+import { NlpCache } from "./nlp-cache";
+import type { UserDictionaryEntry } from "../project/project-types";
 
 // Noise characters to strip before tokenization
-const NOISE_CHARS = new Set(['\n', '\r']);
+const NOISE_CHARS = new Set(["\n", "\r"]);
 
 // Excluded POS tags for frequency analysis
-const EXCLUDED_POS = new Set(['助詞', '助動詞', '記号', 'フィラー', 'その他']);
+const EXCLUDED_POS = new Set(["助詞", "助動詞", "記号", "フィラー", "その他"]);
 const EXCLUDED_POS_DETAILS = new Set([
-  '非自立', '接尾', '数', '代名詞', '句点', '読点', '空白', '括弧開', '括弧閉'
+  "非自立",
+  "接尾",
+  "数",
+  "代名詞",
+  "句点",
+  "読点",
+  "空白",
+  "括弧開",
+  "括弧閉",
 ]);
 // Note: ー (katakana prolonged sound mark) is intentionally NOT excluded
 // because it appears in actual words like コンピューター
-const EXCLUDED_CHARS_PATTERN = /^[\p{P}\p{S}\p{Z}\p{Cf}\s。、！？!?「」『』（）()【】［］\[\]・…―－〜～：；:;，,．.　""''〈〉《》〔〕｛｝＃＄＆＊＋＝＠＼＾｜]+$/u;
+const EXCLUDED_CHARS_PATTERN =
+  /^[\p{P}\p{S}\p{Z}\p{Cf}\s。、！？!?「」『』（）()【】［］\[\]・…―－〜～：；:;，,．.　""''〈〉《》〔〕｛｝＃＄＆＊＋＝＠＼＾｜]+$/u;
 
 interface CleanResult {
   cleanedText: string;
@@ -41,9 +50,7 @@ class NlpProcessor {
    * Clears cache since tokenization results may change.
    */
   setUserDictionary(entries: UserDictionaryEntry[]): void {
-    this.userDictionary = [...entries].sort(
-      (a, b) => b.word.length - a.word.length,
-    );
+    this.userDictionary = [...entries].sort((a, b) => b.word.length - a.word.length);
     this.cache.clear();
   }
 
@@ -64,7 +71,7 @@ class NlpProcessor {
       for (const dictEntry of this.userDictionary) {
         const word = dictEntry.word;
         // Try to match starting from token i
-        let combined = '';
+        let combined = "";
         let j = i;
         while (j < tokens.length && combined.length < word.length) {
           combined += tokens[j].surface;
@@ -110,7 +117,7 @@ class NlpProcessor {
     this.initPromise = new Promise((resolve, reject) => {
       kuromoji.builder({ dicPath }).build((err, tokenizer) => {
         if (err) {
-          console.error('[NlpProcessor] Init error:', err);
+          console.error("[NlpProcessor] Init error:", err);
           this.initPromise = null;
           reject(err);
         } else {
@@ -146,7 +153,7 @@ class NlpProcessor {
     positionMap.push(text.length);
 
     return {
-      cleanedText: cleanedChars.join(''),
+      cleanedText: cleanedChars.join(""),
       positionMap,
     };
   }
@@ -171,12 +178,12 @@ class NlpProcessor {
       if (this.initPromise) {
         await this.initPromise;
       } else {
-        throw new Error('NlpProcessor not initialized. Call init() first.');
+        throw new Error("NlpProcessor not initialized. Call init() first.");
       }
     }
 
     if (!this.tokenizer) {
-      throw new Error('Tokenizer initialization failed');
+      throw new Error("Tokenizer initialization failed");
     }
 
     // Step 1: Clean text
@@ -187,7 +194,7 @@ class NlpProcessor {
 
     // Step 3: Build tokens with correct character positions
     let charPosition = 0;
-    const tokens: Token[] = rawTokens.map(t => {
+    const tokens: Token[] = rawTokens.map((t) => {
       const token: Token = {
         surface: t.surface_form,
         pos: t.pos,
@@ -208,7 +215,7 @@ class NlpProcessor {
     });
 
     // Step 4: Remap positions back to original text coordinates
-    const remappedTokens = tokens.map(t => ({
+    const remappedTokens = tokens.map((t) => ({
       ...t,
       start: positionMap[t.start] ?? t.start,
       end: positionMap[t.end] ?? t.end,
@@ -227,7 +234,7 @@ class NlpProcessor {
    * Batch tokenize multiple paragraphs
    */
   async tokenizeBatch(
-    paragraphs: Array<{ pos: number; text: string }>
+    paragraphs: Array<{ pos: number; text: string }>,
   ): Promise<Array<{ pos: number; tokens: Token[] }>> {
     const results: Array<{ pos: number; tokens: Token[] }> = [];
 
@@ -253,12 +260,12 @@ class NlpProcessor {
       if (this.initPromise) {
         await this.initPromise;
       } else {
-        throw new Error('NlpProcessor not initialized. Call init() first.');
+        throw new Error("NlpProcessor not initialized. Call init() first.");
       }
     }
 
     if (!this.tokenizer) {
-      throw new Error('Tokenizer initialization failed');
+      throw new Error("Tokenizer initialization failed");
     }
 
     // For frequency analysis, positions don't matter — tokenize raw text
@@ -266,7 +273,7 @@ class NlpProcessor {
 
     // Build Token[] for user dictionary merging
     let charPos = 0;
-    const tokensForMerge: Token[] = rawTokens.map(t => {
+    const tokensForMerge: Token[] = rawTokens.map((t) => {
       const token: Token = {
         surface: t.surface_form,
         pos: t.pos,
@@ -293,9 +300,7 @@ class NlpProcessor {
       if (!t.surface.trim()) continue;
       if (EXCLUDED_CHARS_PATTERN.test(t.surface)) continue;
 
-      const key = t.basic_form && t.basic_form !== '*'
-        ? t.basic_form
-        : t.surface;
+      const key = t.basic_form && t.basic_form !== "*" ? t.basic_form : t.surface;
 
       const existing = wordMap.get(key);
       if (existing) {
@@ -303,7 +308,7 @@ class NlpProcessor {
       } else {
         wordMap.set(key, {
           word: key,
-          reading: t.reading !== '*' ? t.reading : undefined,
+          reading: t.reading !== "*" ? t.reading : undefined,
           pos: t.pos,
           count: 1,
         });

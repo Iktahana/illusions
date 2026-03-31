@@ -3,37 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useTheme } from "@/contexts/ThemeContext";
-import Explorer, { FilesPanel } from "@/components/Explorer";
-import ErrorBoundary from "@/components/ErrorBoundary";
-import Inspector from "@/components/Inspector";
-import NovelEditor from "@/components/Editor";
-import EditorDiffView from "@/components/EditorDiffView";
-import ResizablePanel from "@/components/ResizablePanel";
-import TitleUpdater from "@/components/TitleUpdater";
-import ActivityBar from "@/components/ActivityBar";
-import SidebarSplitter from "@/components/SidebarSplitter";
-import SearchResults from "@/components/SearchResults";
-import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
-import ConfirmDialog from "@/components/ConfirmDialog";
-import UpgradeToProjectBanner from "@/components/UpgradeToProjectBanner";
-import WordFrequency from "@/components/WordFrequency";
-import Characters from "@/components/Characters";
-import Dictionary from "@/components/Dictionary";
-import Outline from "@/components/Outline";
+import EditorLayout from "@/components/EditorLayout";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import PopoutEditorWindow from "@/components/PopoutEditorWindow";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
-import SettingsModal from "@/components/SettingsModal";
-import RubyDialog from "@/components/RubyDialog";
 import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
 import { useTabManager } from "@/lib/hooks/use-tab-manager";
 import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
-import { DockviewReact } from "dockview-react";
-import {
-  dockviewTabComponents,
-} from "@/lib/dockview/dockview-components";
 import { useDockviewAdapter } from "@/lib/dockview/use-dockview-adapter";
 import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence";
 import "@/lib/dockview/dockview-theme.css";
@@ -44,11 +22,12 @@ import { useGlobalShortcuts } from "@/lib/hooks/use-global-shortcuts";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import WebMenuBar from "@/components/WebMenuBar";
 import { useEditorMode } from "@/contexts/EditorModeContext";
-import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
-import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
+import { isProjectMode } from "@/lib/project/project-types";
+import { isEditorTab } from "@/lib/tab-manager/tab-types";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
+import { useEditorLifecycle } from "@/lib/editor-page/use-editor-lifecycle";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
 import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
@@ -56,8 +35,11 @@ import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
+import { useSaveToast } from "@/lib/editor-page/use-save-toast";
+import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
+import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
+import { useContextMenu } from "@/lib/hooks/use-context-menu";
 
-import type { ActivityBarView } from "@/components/ActivityBar";
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 
@@ -67,7 +49,11 @@ import type { SupportedFileExtension } from "@/lib/project/project-types";
 let _skipAutoRestoreDetected: boolean | null = null;
 
 // Module-level popout detection (checked once per window context)
-let _popoutBufferInfo: { bufferId: string; fileName: string; fileType: SupportedFileExtension } | null = null;
+let _popoutBufferInfo: {
+  bufferId: string;
+  fileName: string;
+  fileType: SupportedFileExtension;
+} | null = null;
 let _popoutDetected = false;
 
 function detectPopoutMode(): typeof _popoutBufferInfo {
@@ -106,39 +92,74 @@ export default function EditorPage() {
 
   const [editorKey, setEditorKey] = useState(0);
   const incrementEditorKey = useCallback(() => {
-    setEditorKey(prev => prev + 1);
+    setEditorKey((prev) => prev + 1);
+  }, []);
+
+  // Ref for dockview layout flush — populated after useDockviewPersistence,
+  // consumed by useTabManager's close handler via stable callback.
+  const flushLayoutStateRef = useRef<(() => Promise<void>) | undefined>(undefined);
+  const stableFlushLayoutState = useCallback(async () => {
+    await flushLayoutStateRef.current?.();
   }, []);
 
   // Deferred promise gate: tab restoration waits until VFS root is set
   const [vfsGate] = useState(() => {
     let resolve!: () => void;
-    const promise = new Promise<void>((r) => { resolve = r; });
+    const promise = new Promise<void>((r) => {
+      resolve = r;
+    });
     return { promise, resolve };
   });
 
   // --- Editor settings hook ---
-  const { settings, handlers: settingsHandlers, setters: settingsSetters } = useEditorSettings(incrementEditorKey);
   const {
-    fontScale, lineHeight, paragraphSpacing, textIndent, fontFamily,
-    charsPerLine, autoCharsPerLine, showParagraphNumbers, autoSave,
-    posHighlightEnabled, posHighlightColors, verticalScrollBehavior,
-    scrollSensitivity, compactMode, showSettingsModal,
-    lintingEnabled, lintingRuleConfigs,
-    llmEnabled, llmModelId, llmIdlingStop,
-    powerSaveMode, autoPowerSaveOnBattery,
+    settings,
+    handlers: settingsHandlers,
+    setters: settingsSetters,
+  } = useEditorSettings(incrementEditorKey);
+  const {
+    fontScale,
+    lineHeight,
+    paragraphSpacing,
+    textIndent,
+    fontFamily,
+    charsPerLine,
+    autoCharsPerLine,
+    showParagraphNumbers,
+    autoSave,
+    posHighlightEnabled,
+    posHighlightColors,
+    verticalScrollBehavior,
+    scrollSensitivity,
+    compactMode,
+    showSettingsModal,
+    lintingEnabled,
+    lintingRuleConfigs,
+    powerSaveMode,
+    autoPowerSaveOnBattery,
     correctionConfig,
   } = settings;
   const {
-    handleFontScaleChange, handleLineHeightChange, handleParagraphSpacingChange,
-    handleTextIndentChange, handleFontFamilyChange, handleCharsPerLineChange,
-    handleAutoCharsPerLineChange, handleShowParagraphNumbersChange,
-    handleAutoSaveChange, handlePosHighlightEnabledChange,
-    handlePosHighlightColorsChange, handleVerticalScrollBehaviorChange,
-    handleScrollSensitivityChange, handleToggleCompactMode, setShowSettingsModal,
-    handleLintingEnabledChange, handleLintingRuleConfigChange,
+    handleFontScaleChange,
+    handleLineHeightChange,
+    handleParagraphSpacingChange,
+    handleTextIndentChange,
+    handleFontFamilyChange,
+    handleCharsPerLineChange,
+    handleAutoCharsPerLineChange,
+    handleShowParagraphNumbersChange,
+    handleAutoSaveChange,
+    handlePosHighlightEnabledChange,
+    handlePosHighlightColorsChange,
+    handleVerticalScrollBehaviorChange,
+    handleScrollSensitivityChange,
+    handleToggleCompactMode,
+    setShowSettingsModal,
+    handleLintingEnabledChange,
+    handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
-    handleLlmEnabledChange, handleLlmModelIdChange, handleLlmIdlingStopChange,
-    handlePowerSaveModeChange, handleAutoPowerSaveOnBatteryChange,
+    handlePowerSaveModeChange,
+    handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange,
   } = settingsHandlers;
 
@@ -151,66 +172,166 @@ export default function EditorPage() {
     onPowerSaveModeChange: handlePowerSaveModeChange,
   });
 
-  // --- Sync llmIdlingStop setting to LLM engine ---
-  useEffect(() => {
-    import("@/lib/llm-client/llm-client").then(({ getLlmClient }) => {
-      const client = getLlmClient();
-      if (!client.isAvailable()) return;
-      void client.setIdlingStop(llmIdlingStop).catch((err) => {
-        console.error("[page] Failed to sync llmIdlingStop:", err);
-      });
-    });
-  }, [llmIdlingStop]);
-
   // --- Panel state hook ---
   const { state: panelState, handlers: panelHandlers } = usePanelState({ setShowSettingsModal });
   const {
-    topView, bottomView, searchResults, isRightPanelCollapsed,
-    dictionarySearchTrigger, settingsInitialCategory, switchToCorrectionsTrigger,
-    showRubyDialog, rubySelectedText, editorDiff,
+    topView,
+    bottomView,
+    searchResults,
+    isRightPanelCollapsed,
+    dictionarySearchTrigger,
+    settingsInitialCategory,
+    switchToCorrectionsTrigger,
+    showRubyDialog,
+    rubySelectedText,
+    editorDiff,
   } = panelState;
   const {
-    setTopView, setBottomView, setIsRightPanelCollapsed,
-    setSettingsInitialCategory, setShowRubyDialog, setRubySelectedText, setEditorDiff,
-    handleOpenDictionary, handleShowAllSearchResults, handleCloseSearchResults,
-    handleOpenLintingSettings, handleOpenPosHighlightSettings, triggerSwitchToCorrections,
+    setTopView,
+    setBottomView,
+    setIsRightPanelCollapsed,
+    setSettingsInitialCategory,
+    setShowRubyDialog,
+    setRubySelectedText,
+    setEditorDiff,
+    handleOpenDictionary,
+    handleShowAllSearchResults,
+    handleCloseSearchResults,
+    handleOpenLintingSettings,
+    handleOpenPosHighlightSettings,
+    triggerSwitchToCorrections,
   } = panelHandlers;
 
-  const tabManager = useTabManager({ skipAutoRestore, autoSave, vfsReadyPromise: vfsGate.promise });
+  const tabManager = useTabManager({
+    skipAutoRestore,
+    autoSave,
+    vfsReadyPromise: vfsGate.promise,
+    flushLayoutState: stableFlushLayoutState,
+  });
   const {
-    content, setContent, currentFile, isDirty, isSaving, lastSavedTime, lastSaveWasAuto,
-    openFile: tabOpenFile, saveFile, saveAsFile,
-    newFile: tabNewFile, updateFileName, wasAutoRecovered, onSystemFileOpen,
+    content,
+    setContent,
+    currentFile,
+    isDirty,
+    isSaving,
+    lastSavedTime,
+    lastSaveWasAuto,
+    openFile: tabOpenFile,
+    saveFile,
+    saveAsFile,
+    newFile: tabNewFile,
+    updateFileName,
+    wasAutoRecovered,
+    onSystemFileOpen,
     _loadSystemFile: tabLoadSystemFile,
-    tabs, activeTabId, newTab, closeTab, switchTab, nextTab, prevTab, switchToIndex,
-    openProjectFile, pinTab,
-    pendingCloseTabId, pendingCloseFileName, handleCloseTabSave, handleCloseTabDiscard, handleCloseTabCancel,
+    tabs,
+    activeTabId,
+    newTab,
+    closeTab,
+    switchTab,
+    nextTab,
+    prevTab,
+    switchToIndex,
+    openProjectFile,
+    pinTab,
+    newTerminalTab,
+    updateTerminalTab,
+    openDiffTab,
+    forceCloseTab,
+    updateTab,
+    pendingCloseTabId,
+    pendingCloseFileName,
+    handleCloseTabSave,
+    handleCloseTabDiscard,
+    handleCloseTabCancel,
+    flushTabState,
   } = tabManager;
 
-  // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
+  // Keep a live tabs ref for dockview panel renderers captured by stale closures.
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
+  const { diffTabContextValue, handleCloseTabWithPtyCleanup } = useDiffTabs({
+    tabs,
+    updateTab,
+    forceCloseTab,
+    closeTab,
+  });
+
   const {
-    handleDockviewReady,
+    handleNewTerminalTab,
+    terminalTabContextValue,
+    showDesktopOnlyDialog,
+    setShowDesktopOnlyDialog,
+  } = useTerminalTabs({
+    tabs,
+    newTerminalTab,
+    updateTerminalTab,
+    forceCloseTab,
+    editorMode,
+    settings,
+    isElectron,
+  });
+
+  // Patched tabManager passed to the dockview adapter so that panel close
+  // triggers PTY kill before removing the tab from state.
+  const tabManagerWithPtyCleanup = { ...tabManager, closeTab: handleCloseTabWithPtyCleanup };
+
+  // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
+  const { handleDockviewReady, dockviewApi, splitEditor } = useDockviewAdapter({
+    tabManager: tabManagerWithPtyCleanup,
+    editorKey,
+  });
+  const { flushLayoutState } = useDockviewPersistence({
     dockviewApi,
-    splitEditor,
-  } = useDockviewAdapter({ tabManager });
-  useDockviewPersistence({ dockviewApi });
+    tabs: tabManagerWithPtyCleanup.tabs,
+  });
+  flushLayoutStateRef.current = flushLayoutState;
 
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
-  const activeFileType = activeTab?.fileType ?? ".mdi";
+  const activeEditorTab = activeTab && isEditorTab(activeTab) ? activeTab : undefined;
+  const activeFileType = activeEditorTab?.fileType ?? ".mdi";
   const mdiExtensionsEnabled = activeFileType === ".mdi";
   const gfmEnabled = activeFileType !== ".txt";
+
+  // Stable ref so export / shortcut callbacks can read the current value without re-creating
+  const isEditorTabActiveRef = useRef<boolean>(!!activeEditorTab);
+  isEditorTabActiveRef.current = !!activeEditorTab;
+
+  // Auto-collapse right panel when all tabs are closed, restore when a tab opens
+  const rightPanelUserPrefRef = useRef(isRightPanelCollapsed);
+  const hasTabs = tabs.length > 0;
+  useEffect(() => {
+    if (!hasTabs) {
+      // Save user preference before auto-collapsing
+      rightPanelUserPrefRef.current = isRightPanelCollapsed;
+      setIsRightPanelCollapsed(true);
+    } else {
+      // Restore to user's last explicit preference
+      setIsRightPanelCollapsed(rightPanelUserPrefRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasTabs]);
+
+  // Track user's explicit toggle (not auto-collapse)
+  const handleToggleRightPanel = useCallback(() => {
+    const next = !isRightPanelCollapsed;
+    setIsRightPanelCollapsed(next);
+    if (hasTabs) {
+      rightPanelUserPrefRef.current = next;
+    }
+  }, [isRightPanelCollapsed, setIsRightPanelCollapsed, hasTabs]);
 
   const contentRef = useRef<string>(content);
   const editorDomRef = useRef<HTMLDivElement>(null);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [recoveryExiting, setRecoveryExiting] = useState(false);
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
+  const [newFileTrigger, setNewFileTrigger] = useState(0);
   const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
-  const [showSaveToast, setShowSaveToast] = useState(false);
-  const [saveToastExiting, setSaveToastExiting] = useState(false);
   const [selectedCharCount, setSelectedCharCount] = useState(0);
-  const prevLastSavedTimeRef = useRef<number | null>(null);
+  const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const programmaticScrollRef = useRef(false);
@@ -237,26 +358,36 @@ export default function EditorPage() {
   });
   const {
     state: {
-      recentProjects, showCreateWizard, showPermissionPrompt, permissionPromptData,
-      isRestoring, restoreError, confirmRemoveRecent,
+      recentProjects,
+      showCreateWizard,
+      showPermissionPrompt,
+      permissionPromptData,
+      isRestoring,
+      restoreError,
+      confirmRemoveRecent,
     },
     handlers: {
-      handleCreateProject, handleOpenProject, handleOpenStandaloneFile,
-      handleOpenRecentProject, handleDeleteRecentProject, handleOpenAsProject,
-      handleProjectCreated, handlePermissionGranted, handlePermissionDenied,
-      handleUpgrade, handleUpgradeDismiss,
-      setShowCreateWizard, setRestoreError, setConfirmRemoveRecent,
+      handleCreateProject,
+      handleOpenProject,
+      handleOpenStandaloneFile,
+      handleOpenRecentProject,
+      handleDeleteRecentProject,
+      handleOpenAsProject,
+      handleProjectCreated,
+      handlePermissionGranted,
+      handlePermissionDenied,
+      handleUpgrade,
+      handleUpgradeDismiss,
+      setShowCreateWizard,
+      setRestoreError,
+      setConfirmRemoveRecent,
     },
     upgrade: { showUpgradeBanner, upgradeBannerDismissed },
   } = projectLifecycle;
 
   // Unsaved warning hook (project mode transitions only; tabs handle per-tab dirty checks)
-  const anyDirty = tabs.some((t) => t.isDirty);
-  const unsavedWarning = useUnsavedWarning(
-    anyDirty,
-    saveFile,
-    currentFile?.name || null
-  );
+  const anyDirty = tabs.some((t) => isEditorTab(t) && t.isDirty);
+  const unsavedWarning = useUnsavedWarning(anyDirty, saveFile, currentFile?.name || null);
 
   // Auto-recovered editor remount
   useEffect(() => {
@@ -272,10 +403,53 @@ export default function EditorPage() {
     incrementEditorKey();
   }, [tabOpenFile, incrementEditorKey]);
 
-  const newFile = useCallback((fileType?: SupportedFileExtension) => {
-    tabNewFile(fileType);
-    incrementEditorKey();
-  }, [tabNewFile, incrementEditorKey]);
+  const newFile = useCallback(
+    (fileType?: SupportedFileExtension) => {
+      tabNewFile(fileType);
+      incrementEditorKey();
+    },
+    [tabNewFile, incrementEditorKey],
+  );
+
+  // --- Tab bar empty area context menu ---
+  const handleTabBarContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Only show on the void (empty) area of the tab bar
+      if (!target.closest(".dv-void-container") && !target.classList.contains("dv-void-container"))
+        return;
+
+      const items = [
+        { label: "新規ファイル", action: "new-file" },
+        { label: "ファイルを開く…", action: "open-file" },
+        ...(isElectron ? [{ label: "新規ターミナル", action: "new-terminal" }] : []),
+      ];
+      void showTabBarMenu(e, items);
+    },
+    [showTabBarMenu, isElectron],
+  );
+
+  const handleTabBarMenuAction = useCallback(
+    (action: string) => {
+      switch (action) {
+        case "new-file":
+          if (isProjectMode(editorMode)) {
+            setTopView("files");
+            setNewFileTrigger((prev) => prev + 1);
+          } else {
+            newTab();
+          }
+          break;
+        case "open-file":
+          void openFile();
+          break;
+        case "new-terminal":
+          handleNewTerminalTab();
+          break;
+      }
+    },
+    [editorMode, newTab, openFile, handleNewTerminalTab, setTopView, setNewFileTrigger],
+  );
 
   // Electron menu "New" and "Open" bindings (with safety checks)
   useElectronMenuHandlers(newFile, openFile);
@@ -284,13 +458,14 @@ export default function EditorPage() {
   const getExportContent = useCallback(() => content, [content]);
   const getExportTitle = useCallback(() => {
     const tab = tabs.find((t) => t.id === activeTabId);
-    const name = tab?.file?.name ?? "untitled";
+    const name = (tab && isEditorTab(tab) ? tab.file?.name : undefined) ?? "untitled";
     return name.replace(/\.[^.]+$/, "");
   }, [tabs, activeTabId]);
 
   const { exportAs } = useExport({
     getContent: getExportContent,
     getTitle: getExportTitle,
+    getIsEditorTabActive: useCallback(() => isEditorTabActiveRef.current, []),
   });
 
   // System file open: tab manager handles loading; we just update editor key
@@ -300,40 +475,6 @@ export default function EditorPage() {
       incrementEditorKey();
     });
   }, [onSystemFileOpen, incrementEditorKey]);
-
-  // Clean up ?welcome and ?pending-file parameters from URL
-  useEffect(() => {
-    if (skipAutoRestore && typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      let changed = false;
-      if (params.has("welcome")) { params.delete("welcome"); changed = true; }
-      if (params.has("pending-file")) { params.delete("pending-file"); changed = true; }
-      if (changed) {
-        const cleanUrl = window.location.pathname + (params.toString() ? `?${params}` : "");
-        window.history.replaceState({}, "", cleanUrl);
-      }
-    }
-  }, [skipAutoRestore]);
-
-  // Pull pending file from main process (cold-start file association)
-  // This uses a pull model to avoid the race condition where the main process
-  // sends IPC before React hooks are mounted.
-  useEffect(() => {
-    if (!isElectron) return;
-    const api = window.electronAPI;
-    if (!api?.getPendingFile) return;
-
-    void api.getPendingFile().then((result) => {
-      if (!result) return;
-      if (result.type === "project") {
-        void handleOpenAsProject(result.projectPath, result.initialFile);
-      } else {
-        tabLoadSystemFile(result.path, result.content);
-        incrementEditorKey();
-      }
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
-  }, []);
 
   // Ref-forwarding for useWebMenuHandlers
   const openRecentProjectRef = useRef<(projectId: string) => void>(() => {});
@@ -354,95 +495,32 @@ export default function EditorPage() {
     editorView: editorViewInstance,
     fontScale,
     onFontScaleChange: (scale: number) => fontScaleChangeRef.current(scale),
+    isEditorTabActive: !!activeEditorTab,
   });
 
   // Global shortcuts for Web (only when not in Electron)
-  useGlobalShortcuts(
-    !isElectron ? handleMenuAction : () => {},
-    editorDomRef
-  );
+  useGlobalShortcuts();
 
-  // Save toast: show when lastSavedTime updates (skip auto-save / initial load)
-  useEffect(() => {
-    if (lastSavedTime && prevLastSavedTimeRef.current !== lastSavedTime) {
-      if (prevLastSavedTimeRef.current !== null) {
-        // Only show toast for manual saves
-        if (!lastSaveWasAuto) {
-          setShowSaveToast(true);
-          setSaveToastExiting(false);
+  // --- Save toast hook ---
+  const { showSaveToast, saveToastExiting } = useSaveToast({ lastSavedTime, lastSaveWasAuto });
 
-          let exitTimer: ReturnType<typeof setTimeout> | null = null;
-          const hideTimer = setTimeout(() => {
-            setSaveToastExiting(true);
-            exitTimer = setTimeout(() => {
-              setShowSaveToast(false);
-              setSaveToastExiting(false);
-            }, 150);
-          }, 1200);
-
-          prevLastSavedTimeRef.current = lastSavedTime;
-          return () => {
-            clearTimeout(hideTimer);
-            if (exitTimer) clearTimeout(exitTimer);
-          };
-        }
-      }
-      prevLastSavedTimeRef.current = lastSavedTime;
-    }
-  }, [lastSavedTime, lastSaveWasAuto]);
-
-  // Recovery notification: fade-out after 5s, then dismiss
-  useEffect(() => {
-    if (wasAutoRecovered && !dismissedRecovery && !recoveryExiting) {
-      const fadeoutTimer = setTimeout(() => {
-        setRecoveryExiting(true);
-      }, 5000);
-
-      return () => clearTimeout(fadeoutTimer);
-    }
-
-    if (recoveryExiting) {
-      const dismissTimer = setTimeout(() => {
-        setDismissedRecovery(true);
-      }, 300);
-
-      return () => clearTimeout(dismissTimer);
-    }
-  }, [wasAutoRecovered, dismissedRecovery, recoveryExiting]);
-
-  // Paste as plaintext
-  const handlePasteAsPlaintext = useCallback(async () => {
-    try {
-      let text: string | null = null;
-
-      if (isElectron && typeof window !== "undefined" && window.electronAPI) {
-        if (navigator.clipboard && navigator.clipboard.readText) {
-          text = await navigator.clipboard.readText();
-        }
-      } else {
-        if (navigator.clipboard && navigator.clipboard.readText) {
-          text = await navigator.clipboard.readText();
-        }
-      }
-
-      if (text) {
-        if (editorViewInstance) {
-          const { state, dispatch } = editorViewInstance;
-          const { from, to } = state.selection;
-          const tr = state.tr.insertText(text, from, to);
-          dispatch(tr);
-        } else {
-          // Fallback: append at end if editor view not available
-          const currentContent = contentRef.current;
-          const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
-          setContent(newContent);
-          incrementEditorKey();
-        }
-      }
-    } catch (error) {
-      console.error("Failed to paste as plaintext:", error);
-    }
-  }, [isElectron, setContent, editorViewInstance, incrementEditorKey]);
+  const { handlePasteAsPlaintext, handleInsertText, handleChapterClick } = useEditorLifecycle({
+    flushTabState,
+    flushLayoutState: stableFlushLayoutState,
+    skipAutoRestore,
+    isElectron,
+    handleOpenAsProject,
+    tabLoadSystemFile,
+    incrementEditorKey,
+    wasAutoRecovered,
+    dismissedRecovery,
+    recoveryExiting,
+    setDismissedRecovery,
+    setRecoveryExiting,
+    editorViewInstance,
+    contentRef,
+    setContent,
+  });
 
   // --- Electron IPC events hook ---
   useElectronEvents({
@@ -474,70 +552,47 @@ export default function EditorPage() {
     setContent(markdown);
   };
 
-  const handleInsertText = useCallback((text: string) => {
-    if (editorViewInstance) {
-      const { state, dispatch } = editorViewInstance;
-      const { from, to } = state.selection;
-      const tr = state.tr.insertText(text, from, to);
-      dispatch(tr);
-    } else {
-      // Fallback: append at end if editor view not available
-      const currentContent = contentRef.current;
-      const newContent = currentContent ? `${currentContent}\n\n${text}` : text;
-      setContent(newContent);
-      incrementEditorKey();
-    }
-  }, [editorViewInstance, setContent, incrementEditorKey]);
-
-  const handleChapterClick = (anchorId: string) => {
-    if (!anchorId) return;
-
-    const target = document.getElementById(anchorId) as HTMLElement | null;
-    if (!target) return;
-
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    target.focus();
-  };
-
   // --- Text statistics hook ---
   const {
-    charCount, paragraphCount, sentenceCount,
-    charTypeAnalysis, charUsageRates, readabilityAnalysis,
+    charCount,
+    paragraphCount,
+    sentenceCount,
+    charTypeAnalysis,
+    charUsageRates,
+    readabilityAnalysis,
   } = useTextStatistics(content);
 
   // --- Linting hook ---
-  const { ruleRunner, lintIssues, isLinting, handleLintIssuesUpdated, handleNlpError, refreshLinting } = useLinting(
+  const {
+    ruleRunner,
+    lintIssues,
+    isLinting,
+    handleLintIssuesUpdated,
+    handleNlpError,
+    refreshLinting,
+  } = useLinting(
     lintingEnabled,
     lintingRuleConfigs,
     editorViewInstance,
-    llmEnabled,
     powerSaveMode,
-    llmModelId,
     correctionConfig.guidelines,
     correctionConfig.mode,
   );
 
   // --- Ignored corrections hook ---
-  const {
-    ignoredCorrections,
-    ignoreCorrection,
-  } = useIgnoredCorrections(editorMode);
+  const { ignoredCorrections, ignoreCorrection } = useIgnoredCorrections(editorMode);
 
   // Sync ignoredCorrections to ProseMirror plugin
   useEffect(() => {
     if (!editorViewInstance) return;
 
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin").then(
-      ({ updateLintingSettings }) => {
-        updateLintingSettings(
-          editorViewInstance,
-          { ignoredCorrections },
-          "ignored-correction",
-        );
-      },
-    ).catch((err) => {
-      console.error("[page] Failed to sync ignored corrections:", err);
-    });
+    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
+      .then(({ updateLintingSettings }) => {
+        updateLintingSettings(editorViewInstance, { ignoredCorrections }, "ignored-correction");
+      })
+      .catch((err) => {
+        console.error("[page] Failed to sync ignored corrections:", err);
+      });
   }, [editorViewInstance, ignoredCorrections]);
 
   // --- Lint handlers hook ---
@@ -585,8 +640,21 @@ export default function EditorPage() {
     switchToIndex,
     tabs,
     activeTabId,
+    isEditorTabActive: !!activeEditorTab,
     splitEditorRight: useCallback(() => splitEditor("right"), [splitEditor]),
     splitEditorDown: useCallback(() => splitEditor("down"), [splitEditor]),
+    toggleExplorer: useCallback(
+      () => setTopView(topView === "explorer" ? "none" : "explorer"),
+      [setTopView, topView],
+    ),
+    toggleSearch: useCallback(
+      () => setTopView(topView === "search" ? "none" : "search"),
+      [setTopView, topView],
+    ),
+    toggleOutline: useCallback(
+      () => setTopView(topView === "outline" ? "none" : "outline"),
+      [setTopView, topView],
+    ),
   });
 
   // Detect feature availability after mount to avoid SSR hydration mismatch
@@ -610,7 +678,13 @@ export default function EditorPage() {
     return (
       <div className="h-screen flex flex-col overflow-hidden relative">
         {/* Web menu bar (only for non-Electron environment) */}
-        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} checkedState={{ compactMode }} />}
+        {!isElectron && (
+          <WebMenuBar
+            onMenuAction={handleMenuAction}
+            recentProjects={recentProjects}
+            checkedState={{ compactMode }}
+          />
+        )}
 
         <WelcomeScreen
           onCreateProject={handleCreateProject}
@@ -646,343 +720,165 @@ export default function EditorPage() {
   }
 
   // --- Editor view (project or standalone mode) ---
-  const renderPanel = (view: ActivityBarView) => {
-    switch (view) {
-      case "files":
-        return (
-          <aside className="h-full bg-background border-r border-border flex flex-col">
-            <div className="p-4 flex-1 overflow-y-auto">
-              <FilesPanel
-                projectName={isProjectMode(editorMode) ? editorMode.name : undefined}
-                onFileClick={(vfsPath) => {
-                  void openProjectFile(vfsPath, { preview: true });
-                  incrementEditorKey();
-                }}
-                onFileDoubleClick={(vfsPath) => {
-                  void openProjectFile(vfsPath, { preview: false });
-                  incrementEditorKey();
-                }}
-                onFileMiddleClick={(vfsPath) => {
-                  void openProjectFile(vfsPath, { preview: false });
-                  incrementEditorKey();
-                }}
-              />
-            </div>
-          </aside>
-        );
-      case "explorer":
-        return (
-          <ErrorBoundary sectionName="エクスプローラ">
-          <Explorer
-            compactMode={compactMode}
-            content={content}
-            onChapterClick={handleChapterClick}
-            onInsertText={handleInsertText}
-          />
-          </ErrorBoundary>
-        );
-      case "search":
-        return (
-          <SearchResults
-            editorView={editorViewInstance}
-            matches={searchResults?.matches}
-            searchTerm={searchResults?.searchTerm}
-            onClose={handleCloseSearchResults}
-            programmaticScrollRef={programmaticScrollRef}
-          />
-        );
-      case "outline":
-        return (
-          <Outline
-            content={content}
-            onHeadingClick={handleChapterClick}
-          />
-        );
-      case "characters":
-        return <Characters content={content} />;
-      case "dictionary":
-        return <Dictionary content={content} initialSearchTerm={dictionarySearchTrigger.term} searchTriggerId={dictionarySearchTrigger.id} editorMode={editorMode} />;
-      case "wordfreq":
-        return <WordFrequency content={content} filePath={currentFile?.path ?? undefined} onWordSearch={(word) => {
-          setSearchInitialTerm(word);
-          setSearchOpenTrigger(prev => prev + 1);
-        }} />;
-      default:
-        return null;
-    }
-  };
+  // Shared props forwarded to every SidebarPanel instance
+  const sidebarPanelProps = {
+    content,
+    editorMode,
+    compactMode,
+    onChapterClick: handleChapterClick,
+    onInsertText: handleInsertText,
+    searchResults,
+    onCloseSearchResults: handleCloseSearchResults,
+    programmaticScrollRef,
+    editorViewInstance,
+    dictionarySearchTrigger,
+    currentFilePath: currentFile?.path ?? undefined,
+    newFileTrigger,
+    openProjectFile,
+    incrementEditorKey,
+    onWordSearch: (word: string) => {
+      setSearchInitialTerm(word);
+      setSearchOpenTrigger((prev) => prev + 1);
+    },
+  } as const;
 
-    return (
-      <EditorSettingsProvider settings={settings} handlers={settingsHandlers}>
-      <div className="h-screen flex flex-col overflow-hidden relative">
-         {/* Dynamic title update */}
-        <TitleUpdater currentFile={currentFile} isDirty={isDirty} />
+  const inspectorProps = {
+    compactMode,
+    charCount,
+    selectedCharCount,
+    paragraphCount,
+    fileName,
+    isDirty,
+    isSaving,
+    lastSavedTime,
+    onSaveFile: saveFile,
+    onFileNameChange: updateFileName,
+    sentenceCount,
+    charTypeAnalysis,
+    charUsageRates,
+    readabilityAnalysis,
+    onOpenPosHighlightSettings: handleOpenPosHighlightSettings,
+    activeFileName: currentFile?.name,
+    currentContent: content,
+    onHistoryRestore: (restoredContent: string) => {
+      setContent(restoredContent);
+      incrementEditorKey();
+    },
+    onCompareInEditor: setEditorDiff,
+    lintIssues: enrichedLintIssues,
+    onNavigateToIssue: handleNavigateToIssue,
+    onApplyFix: handleApplyFix,
+    onIgnoreCorrection: handleIgnoreCorrection,
+    onRefreshLinting: refreshLinting,
+    isLinting,
+    activeLintIssueIndex,
+    onOpenLintingSettings: handleOpenLintingSettings,
+    onApplyLintPreset: handleApplyLintPreset,
+    activeLintPresetId,
+    switchToCorrectionsTrigger,
+  } as const;
 
-        {/* Web menu bar (only for non-Electron environment) */}
-        {!isElectron && <WebMenuBar onMenuAction={handleMenuAction} recentProjects={recentProjects} checkedState={{ compactMode }} />}
-
-         {/* Unsaved warning dialog (project mode transitions) */}
-        <UnsavedWarningDialog
-          isOpen={unsavedWarning.showWarning}
-          fileName={currentFile?.name || "新規ファイル"}
-          onSave={unsavedWarning.handleSave}
-          onDiscard={unsavedWarning.handleDiscard}
-          onCancel={unsavedWarning.handleCancel}
-        />
-
-        {/* Unsaved warning dialog (tab close) */}
-        <UnsavedWarningDialog
-          isOpen={pendingCloseTabId !== null}
-          fileName={pendingCloseFileName}
-          onSave={handleCloseTabSave}
-          onDiscard={handleCloseTabDiscard}
-          onCancel={handleCloseTabCancel}
-        />
-
-        {/* 最近のプロジェクト削除確認ダイアログ */}
-        <ConfirmDialog
-          isOpen={confirmRemoveRecent !== null}
-          title="プロジェクトが見つかりません"
-          message={confirmRemoveRecent?.message ?? ""}
-          confirmLabel="削除する"
-          cancelLabel="キャンセル"
-          dangerous={true}
-          onConfirm={() => {
-            if (confirmRemoveRecent) {
-              const { projectId: pid } = confirmRemoveRecent;
-              setConfirmRemoveRecent(null);
-              void handleDeleteRecentProject(pid);
-            }
-          }}
-          onCancel={() => setConfirmRemoveRecent(null)}
-        />
-
-        {/* UpgradeBanner for standalone mode */}
-        {showUpgradeBanner && !upgradeBannerDismissed && isStandaloneMode(editorMode) && features.projectMode && (
-          <UpgradeToProjectBanner
-            onUpgrade={() => void handleUpgrade()}
-            onDismiss={handleUpgradeDismiss}
-          />
-        )}
-
-        <SettingsModal
-          isOpen={showSettingsModal}
-          onClose={() => {
-            setShowSettingsModal(false);
-            setSettingsInitialCategory(undefined);
-          }}
-          initialCategory={settingsInitialCategory}
-        />
-
-        {/* Ruby dialog */}
-        <RubyDialog
-          isOpen={showRubyDialog}
-          onClose={() => setShowRubyDialog(false)}
-          selectedText={rubySelectedText}
-          onApply={handleApplyRuby}
-        />
-
-         {/* Auto-recovery notification (Web only, fixed position) */}
-         {!isElectron && wasAutoRecovered && !dismissedRecovery && (
-          <div className={`fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between shadow-lg ${recoveryExiting ? 'animate-slide-out-up' : 'animate-slide-in-down'}`}>
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
-              <p className="text-sm text-foreground">
-                <span className="font-semibold text-foreground">✓ 前回編集したファイルを復元しました：</span> <span className="font-mono text-success">{currentFile?.name}</span>
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                setRecoveryExiting(true);
-              }}
-              className="text-foreground-secondary hover:text-foreground hover:bg-hover text-lg font-medium flex-shrink-0 ml-4 w-8 h-8 rounded flex items-center justify-center transition-all duration-200 hover:scale-110"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-       <div className="flex-1 flex overflow-hidden">
-         {/* Activity Bar */}
-         <ActivityBar
-           topView={topView}
-           bottomView={bottomView}
-           compactMode={compactMode}
-           onTopViewChange={(view) => {
-             if (view === "settings") {
-               setShowSettingsModal(true);
-             } else {
-               setTopView(view);
-             }
-           }}
-           onBottomViewChange={(view) => {
-             if (view === "settings") {
-               setShowSettingsModal(true);
-             } else {
-               setBottomView(view);
-             }
-           }}
-         />
-
-           {/* Left side panel */}
-          {(topView !== "none" || bottomView !== "none") && (
-            <ResizablePanel side="left" defaultWidth={compactMode ? 200 : 256} minWidth={compactMode ? 160 : 200} maxWidth={compactMode ? 320 : 400}>
-              {(() => {
-                const topPanel = topView !== "none" ? renderPanel(topView) : null;
-                const bottomPanel = bottomView !== "none" ? renderPanel(bottomView) : null;
-
-                if (topPanel && bottomPanel) {
-                  return <SidebarSplitter top={topPanel} bottom={bottomPanel} />;
-                }
-                return topPanel || bottomPanel;
-              })()}
-          </ResizablePanel>
-        )}
-
-        <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
-          <DockviewReact
-            className="flex-1 dockview-theme-illusions"
-            components={{
-              editor: ({ api: panelApi, params: panelParams }) => {
-                // Each dockview panel receives its own params.
-                // Only the panel matching the active tab renders the full interactive editor;
-                // other panels show a read-only content snapshot.
-                const panelBufferId = panelParams?.bufferId ?? activeTabId;
-                const isActivePanel = panelBufferId === activeTabId;
-
-                if (editorDiff && isActivePanel) {
-                  return (
-                    <EditorDiffView
-                      snapshotContent={editorDiff.snapshotContent}
-                      currentContent={editorDiff.currentContent}
-                      snapshotLabel={editorDiff.label}
-                      onClose={() => setEditorDiff(null)}
-                    />
-                  );
-                }
-
-                if (isActivePanel) {
-                  return (
-                    <ErrorBoundary sectionName="エディタ">
-                      <div ref={editorDomRef} className="h-full">
-                        <NovelEditor
-                          key={`tab-${panelBufferId}-${editorKey}`}
-                          initialContent={content}
-                          onChange={handleChange}
-                          onInsertText={handleInsertText}
-                          onSelectionChange={setSelectedCharCount}
-                          searchOpenTrigger={searchOpenTrigger}
-                          searchInitialTerm={searchInitialTerm}
-                          onEditorViewReady={setEditorViewInstance}
-                          programmaticScrollRef={programmaticScrollRef}
-                          onShowAllSearchResults={handleShowAllSearchResults}
-                          lintingRuleRunner={ruleRunner}
-                          onLintIssuesUpdated={handleLintIssuesUpdated}
-                          onNlpError={handleNlpError}
-                          onOpenRubyDialog={handleOpenRubyDialog}
-                          onToggleTcy={handleToggleTcy}
-                          onOpenDictionary={handleOpenDictionary}
-                          onShowLintHint={handleShowLintHint}
-                          onIgnoreCorrection={handleIgnoreCorrection}
-                          mdiExtensionsEnabled={mdiExtensionsEnabled}
-                          gfmEnabled={gfmEnabled}
-                        />
-                      </div>
-                    </ErrorBoundary>
-                  );
-                }
-
-                // Non-active panel: render a lightweight read-only editor
-                // that activates the tab when clicked
-                const panelTab = tabs.find((t) => t.id === panelBufferId);
-                const panelFileType = panelTab?.fileType ?? ".mdi";
-                return (
-                  <div
-                    className="h-full cursor-pointer"
-                    onClick={() => {
-                      switchTab(panelBufferId);
-                      panelApi.setActive();
-                    }}
-                  >
-                    <ErrorBoundary sectionName="エディタ">
-                      <NovelEditor
-                        key={`tab-${panelBufferId}-inactive`}
-                        initialContent={panelTab?.lastSavedContent ?? ""}
-                        mdiExtensionsEnabled={panelFileType === ".mdi"}
-                        gfmEnabled={panelFileType !== ".txt"}
-                      />
-                    </ErrorBoundary>
-                  </div>
-                );
-              },
-            }}
-            tabComponents={dockviewTabComponents}
-            onReady={handleDockviewReady}
-          />
-
-           {/* Save complete toast */}
-          {showSaveToast && (
-            <div
-              className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-background-elevated border border-border rounded-lg shadow-lg flex items-center gap-2 z-50 ${
-                saveToastExiting ? 'animate-save-toast-out' : 'animate-save-toast-in'
-              }`}
-            >
-              <span className="text-success text-sm font-medium">✓</span>
-              <span className="text-foreground-secondary text-sm">保存完了</span>
-            </div>
-           )}
-         </main>
-
-          {/* Right side panel: statistics (always visible) */}
-          <ResizablePanel
-            side="right"
-            defaultWidth={compactMode ? 200 : 256}
-            minWidth={compactMode ? 160 : 200}
-            maxWidth={compactMode ? 320 : 400}
-            collapsible={true}
-            isCollapsed={isRightPanelCollapsed}
-            onToggleCollapse={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
-          >
-          <ErrorBoundary sectionName="インスペクタ">
-          <Inspector
-            compactMode={compactMode}
-            charCount={charCount}
-            selectedCharCount={selectedCharCount}
-            paragraphCount={paragraphCount}
-            fileName={fileName}
-            isDirty={isDirty}
-            isSaving={isSaving}
-            lastSavedTime={lastSavedTime}
-            onSaveFile={saveFile}
-            onFileNameChange={updateFileName}
-            sentenceCount={sentenceCount}
-            charTypeAnalysis={charTypeAnalysis}
-            charUsageRates={charUsageRates}
-            readabilityAnalysis={readabilityAnalysis}
-            onOpenPosHighlightSettings={handleOpenPosHighlightSettings}
-            activeFileName={currentFile?.name}
-            currentContent={content}
-            onHistoryRestore={(restoredContent: string) => {
-              setContent(restoredContent);
-              incrementEditorKey();
-            }}
-            onCompareInEditor={setEditorDiff}
-            lintIssues={enrichedLintIssues}
-            onNavigateToIssue={handleNavigateToIssue}
-            onApplyFix={handleApplyFix}
-            onIgnoreCorrection={handleIgnoreCorrection}
-            onRefreshLinting={refreshLinting}
-            isLinting={isLinting}
-            activeLintIssueIndex={activeLintIssueIndex}
-            onOpenLintingSettings={handleOpenLintingSettings}
-            onApplyLintPreset={handleApplyLintPreset}
-            activeLintPresetId={activeLintPresetId}
-            switchToCorrectionsTrigger={switchToCorrectionsTrigger}
-          />
-          </ErrorBoundary>
-        </ResizablePanel>
-      </div>
-    </div>
-      </EditorSettingsProvider>
+  return (
+    <EditorLayout
+      providers={{
+        diffTabContextValue,
+        terminalTabContextValue,
+        settings,
+        settingsHandlers,
+      }}
+      chrome={{
+        currentFile,
+        isDirty,
+        isElectron,
+        handleMenuAction,
+        recentProjects,
+        compactMode,
+      }}
+      dialogs={{
+        unsavedWarning,
+        pendingCloseTabId,
+        pendingCloseFileName,
+        handleCloseTabSave,
+        handleCloseTabDiscard,
+        handleCloseTabCancel,
+        showDesktopOnlyDialog,
+        setShowDesktopOnlyDialog,
+        confirmRemoveRecent,
+        setConfirmRemoveRecent,
+        handleDeleteRecentProject,
+        showSettingsModal,
+        setShowSettingsModal,
+        settingsInitialCategory,
+        setSettingsInitialCategory,
+        showRubyDialog,
+        setShowRubyDialog,
+        rubySelectedText,
+        handleApplyRuby,
+      }}
+      recovery={{
+        wasAutoRecovered,
+        dismissedRecovery,
+        recoveryExiting,
+        setRecoveryExiting,
+        currentFileName: currentFile?.name,
+      }}
+      upgrade={{
+        showUpgradeBanner,
+        upgradeBannerDismissed,
+        editorMode,
+        featuresProjectMode: features.projectMode,
+        handleUpgrade,
+        handleUpgradeDismiss,
+      }}
+      activityBar={{
+        topView,
+        bottomView,
+        setTopView,
+        setBottomView,
+        handleNewTerminalTab,
+      }}
+      mainArea={{
+        tabs,
+        editorMode,
+        newTab,
+        openFile,
+        setNewFileTrigger,
+        handleTabBarContextMenu,
+        tabBarMenu,
+        handleTabBarMenuAction,
+        closeTabBarMenu,
+        handleDockviewReady,
+        sidebarPanelProps,
+        tabsRef,
+        editorDiff,
+        setEditorDiff,
+        editorDomRef,
+        handleChange,
+        handleInsertText,
+        setSelectedCharCount,
+        searchOpenTrigger,
+        searchInitialTerm,
+        setEditorViewInstance,
+        programmaticScrollRef,
+        handleShowAllSearchResults,
+        ruleRunner,
+        handleLintIssuesUpdated,
+        handleNlpError,
+        handleOpenRubyDialog,
+        handleToggleTcy,
+        handleOpenDictionary,
+        handleShowLintHint,
+        handleIgnoreCorrection,
+        switchTab,
+      }}
+      inspector={{
+        isRightPanelCollapsed,
+        handleToggleRightPanel,
+        activeEditorTab,
+        props: inspectorProps,
+        showSaveToast,
+        saveToastExiting,
+      }}
+    />
   );
 }

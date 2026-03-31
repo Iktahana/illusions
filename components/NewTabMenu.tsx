@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Terminal } from "lucide-react";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 
 interface NewTabMenuProps {
   onNewTab: (fileType: SupportedFileExtension) => void;
+  onNewTerminalTab: () => void;
   compactMode?: boolean;
 }
 
@@ -31,7 +32,11 @@ const FILE_TYPE_OPTIONS: {
   },
 ];
 
-export default function NewTabMenu({ onNewTab, compactMode = false }: NewTabMenuProps) {
+export default function NewTabMenu({
+  onNewTab,
+  onNewTerminalTab,
+  compactMode = false,
+}: NewTabMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -85,11 +90,25 @@ export default function NewTabMenu({ onNewTab, compactMode = false }: NewTabMenu
               onClick={() => handleSelect(option.fileType)}
             >
               <span className="text-foreground">{option.label}</span>
-              <span className="text-xs text-foreground-tertiary">
-                {option.description}
-              </span>
+              <span className="text-xs text-foreground-tertiary">{option.description}</span>
             </button>
           ))}
+
+          {/* Separator before non-document options */}
+          <div className="border-t border-border my-1" />
+
+          {/* Terminal option */}
+          <button
+            className="w-full px-3 py-2 text-left text-sm hover:bg-hover transition-colors flex items-center gap-2"
+            onClick={() => {
+              onNewTerminalTab();
+              setIsOpen(false);
+            }}
+          >
+            <Terminal size={13} className="shrink-0 text-foreground-secondary" />
+            <span className="text-foreground flex-1">ターミナル</span>
+            <span className="text-xs text-foreground-tertiary">コマンドラインツール</span>
+          </button>
         </div>
       )}
     </div>

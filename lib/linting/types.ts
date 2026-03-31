@@ -1,11 +1,27 @@
-import type { ILlmClient } from "@/lib/llm-client/types";
 import type { Token } from "@/lib/nlp-client/types";
-
 
 export type Severity = "error" | "warning" | "info";
 
+/** Detection level: L1=regex, L2=morphological, L3=LLM-assisted */
+export type RuleLevel = "L1" | "L2" | "L3";
+
 /** The underlying implementation engine for a correction rule */
-export type CorrectionEngine = "regex" | "morphological" | "llm";
+export type CorrectionEngine = "regex" | "morphological";
+
+/**
+ * Metadata for a JSON-driven lint rule.
+ * Used by data-driven L1 rules loaded from rules.json.
+ */
+export interface JsonRuleMeta {
+  ruleId: string;
+  level: RuleLevel;
+  description: string;
+  patternLogic: string;
+  positiveExample: string;
+  negativeExample: string;
+  sourceReference: string;
+  bookTitle: string;
+}
 
 export interface LintReference {
   /** Standard name, e.g. "JIS X 4051:2004" */
@@ -30,8 +46,6 @@ export interface LintIssue {
   reference?: LintReference;
   /** Original text at [from, to] when the issue was detected, used to verify before applying a fix */
   originalText?: string;
-  /** LLM validation state: undefined = pending, true = confirmed, false = rejected */
-  llmValidated?: boolean;
   /** Optional fix suggestion */
   fix?: {
     label: string;
@@ -45,8 +59,6 @@ export interface LintRuleConfig {
   severity: Severity;
   /** Whether to skip dialogue text (「」『』) when running this rule */
   skipDialogue?: boolean;
-  /** Skip LLM validation for this rule (for rules with very low false-positive rate) */
-  skipLlmValidation?: boolean;
   /** Rule-specific options */
   options?: Record<string, unknown>;
 }
@@ -57,8 +69,8 @@ export interface LintRule {
   nameJa: string;
   description: string;
   descriptionJa: string;
-  /** Detection level: L1=regex, L2=morphological, L3=advanced */
-  level: "L1" | "L2" | "L3";
+  /** Detection level: L1=regex, L2=morphological, L3=LLM-assisted */
+  level: RuleLevel;
   /** The underlying implementation engine for this rule */
   engine?: CorrectionEngine;
   defaultConfig: LintRuleConfig;
@@ -93,17 +105,11 @@ export function isDocumentLintRule(rule: LintRule): rule is DocumentLintRule {
  * Used for L2 rules that need POS tagging, conjugation info, etc.
  */
 export interface MorphologicalLintRule extends LintRule {
-  lintWithTokens(
-    text: string,
-    tokens: ReadonlyArray<Token>,
-    config: LintRuleConfig,
-  ): LintIssue[];
+  lintWithTokens(text: string, tokens: ReadonlyArray<Token>, config: LintRuleConfig): LintIssue[];
 }
 
 /** Type guard for MorphologicalLintRule */
-export function isMorphologicalLintRule(
-  rule: LintRule,
-): rule is MorphologicalLintRule {
+export function isMorphologicalLintRule(rule: LintRule): rule is MorphologicalLintRule {
   return "lintWithTokens" in rule;
 }
 
@@ -127,32 +133,4 @@ export function isMorphologicalDocumentLintRule(
   rule: LintRule,
 ): rule is MorphologicalDocumentLintRule {
   return "lintDocumentWithTokens" in rule;
-}
-
-/**
- * LLM-based lint rule (L3).
- * Uses a language model for contextual analysis.
- * All LLM rules are async and accept an ILlmClient + AbortSignal.
- */
-export interface LlmLintRule extends LintRule {
-  /**
-   * Lint sentences using an LLM for contextual analysis.
-   * @param sentences - Array of sentence objects with text and position info
-   * @param config - Rule configuration
-   * @param llmClient - LLM client for inference
-   * @param signal - AbortSignal for cancellation
-   */
-  lintWithLlm(
-    sentences: ReadonlyArray<{ text: string; from: number; to: number }>,
-    config: LintRuleConfig,
-    llmClient: ILlmClient,
-    signal?: AbortSignal,
-  ): Promise<LintIssue[]>;
-}
-
-/**
- * Type guard for LLM-based lint rules
- */
-export function isLlmLintRule(rule: LintRule): rule is LlmLintRule {
-  return "lintWithLlm" in rule;
 }

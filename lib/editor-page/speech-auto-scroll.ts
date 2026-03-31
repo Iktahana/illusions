@@ -82,7 +82,13 @@ export function scrollToSpeechTarget({
     const desiredX = viewportWidth * 0.7;
     const scrollDelta = targetCenterX - desiredX;
 
-    animateScroll(container, "scrollLeft", container.scrollLeft + scrollDelta, duration, programmaticScrollRef);
+    animateScroll(
+      container,
+      "scrollLeft",
+      container.scrollLeft + scrollDelta,
+      duration,
+      programmaticScrollRef,
+    );
   } else {
     // Horizontal writing mode: text flows top-to-bottom.
     const viewportHeight = containerRect.height;
@@ -100,7 +106,13 @@ export function scrollToSpeechTarget({
     const desiredY = viewportHeight * 0.3;
     const scrollDelta = targetCenterY - desiredY;
 
-    animateScroll(container, "scrollTop", container.scrollTop + scrollDelta, duration, programmaticScrollRef);
+    animateScroll(
+      container,
+      "scrollTop",
+      container.scrollTop + scrollDelta,
+      duration,
+      programmaticScrollRef,
+    );
   }
 }
 

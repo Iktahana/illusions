@@ -10,7 +10,7 @@
   overflow-wrap: break-word;
   word-break: normal;
   /* Unified typography settings matching vertical mode */
-  font-family: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
   font-weight: 400;
   font-size: 1em;
   letter-spacing: 0.05em;

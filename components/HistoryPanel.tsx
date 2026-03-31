@@ -1,13 +1,21 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { createPortal } from "react-dom";
-import { Pin, Plus, RotateCcw, Loader2, History, Bookmark, GitCompare, MoreVertical, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Loader2, History, ChevronDown, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 import { getHistoryService } from "@/lib/services/history-service";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import SnapshotItem from "./HistoryPanel/SnapshotItem";
+import { computeDiffStats } from "./HistoryPanel/DiffIndicator";
+import {
+  getDateKey,
+  formatDateGroupLabel,
+  formatTimeJa,
+  getSnapshotTypeLabel,
+} from "./HistoryPanel/snapshot-utils";
 
-import type { SnapshotEntry, SnapshotType } from "@/lib/services/history-service";
+import type { SnapshotEntry } from "@/lib/services/history-service";
+import type { DiffStats } from "./HistoryPanel/DiffIndicator";
 
 // -----------------------------------------------------------------------
 // Constants
@@ -33,58 +41,16 @@ interface HistoryPanelProps {
   /** Current editor content for diff comparison */
   currentContent?: string;
   /** Callback to display diff in the editor area */
-  onCompareInEditor?: (data: { snapshotContent: string; currentContent: string; label: string }) => void;
+  onCompareInEditor?: (data: {
+    snapshotContent: string;
+    currentContent: string;
+    label: string;
+  }) => void;
 }
 
 // -----------------------------------------------------------------------
-// Utility Functions
+// Types
 // -----------------------------------------------------------------------
-
-/** Day-of-week names in Japanese (日〜土) */
-const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"] as const;
-
-/**
- * Extract a YYYY-MM-DD date key from a timestamp for grouping.
- * タイムスタンプからグルーピング用の日付キー (YYYY-MM-DD) を抽出する。
- */
-function getDateKey(timestamp: number): string {
-  const d = new Date(timestamp);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/**
- * Format a date key into a Japanese group label.
- * 日付キーを日本語のグループラベルにフォーマットする。
- * - 今日 / 昨日 for recent dates
- * - M月D日（曜日） for current year
- * - YYYY年M月D日（曜日） for older years
- */
-function formatDateGroupLabel(dateKey: string): string {
-  const today = new Date();
-  const todayKey = getDateKey(today.getTime());
-
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayKey = getDateKey(yesterday.getTime());
-
-  if (dateKey === todayKey) return "今日";
-  if (dateKey === yesterdayKey) return "昨日";
-
-  const [yearStr, monthStr, dayStr] = dateKey.split("-");
-  const year = Number(yearStr);
-  const month = Number(monthStr);
-  const day = Number(dayStr);
-  const d = new Date(year, month - 1, day);
-  const dow = DAY_NAMES[d.getDay()];
-
-  if (year === today.getFullYear()) {
-    return `${month}月${day}日（${dow}）`;
-  }
-  return `${year}年${month}月${day}日（${dow}）`;
-}
 
 interface DateGroup {
   label: string;
@@ -111,100 +77,6 @@ function groupSnapshotsByDate(items: SnapshotEntry[]): DateGroup[] {
   }
 
   return groups;
-}
-
-/**
- * Format a timestamp as time only, respecting the user's locale and
- * 12/24-hour preference from the browser.
- */
-function formatTimeJa(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-/**
- * Get the Japanese label for a snapshot type.
- * スナップショットタイプの日本語ラベルを取得する。
- */
-function getSnapshotTypeLabel(type: SnapshotType): string {
-  switch (type) {
-    case "auto":
-      return "自動保存";
-    case "manual":
-      return "手動保存";
-    case "milestone":
-      return "マイルストーン";
-  }
-}
-
-/**
- * Get the CSS classes for a snapshot type badge.
- * スナップショットタイプのバッジ用CSSクラスを取得する。
- */
-function getSnapshotTypeBadgeClass(type: SnapshotType): string {
-  switch (type) {
-    case "auto":
-      return "bg-foreground-muted/20 text-foreground-secondary";
-    case "manual":
-      return "bg-info/20 text-info";
-    case "milestone":
-      return "bg-accent/20 text-accent";
-  }
-}
-
-// -----------------------------------------------------------------------
-// Diff Stats
-// -----------------------------------------------------------------------
-
-interface DiffStats {
-  added: number;
-  removed: number;
-  addedText: string;
-  removedText: string;
-}
-
-/**
- * Compute approximate character-level additions and removals
- * by matching common prefix and suffix between two strings.
- * O(n) time, no external library required.
- *
- * 共通の接頭辞と接尾辞を照合して文字レベルの追加・削除数を近似計算する。
- */
-function computeDiffStats(oldText: string, newText: string): DiffStats {
-  const oldLen = oldText.length;
-  const newLen = newText.length;
-  const minLen = Math.min(oldLen, newLen);
-
-  let prefixLen = 0;
-  while (prefixLen < minLen && oldText[prefixLen] === newText[prefixLen]) {
-    prefixLen++;
-  }
-
-  let suffixLen = 0;
-  const maxSuffix = minLen - prefixLen;
-  while (
-    suffixLen < maxSuffix &&
-    oldText[oldLen - 1 - suffixLen] === newText[newLen - 1 - suffixLen]
-  ) {
-    suffixLen++;
-  }
-
-  const removedStart = prefixLen;
-  const removedEnd = oldLen - suffixLen;
-  const addedStart = prefixLen;
-  const addedEnd = newLen - suffixLen;
-
-  const removedText = oldText.slice(removedStart, removedEnd);
-  const addedText = newText.slice(addedStart, addedEnd);
-
-  return {
-    added: addedText.length,
-    removed: removedText.length,
-    addedText,
-    removedText,
-  };
 }
 
 // -----------------------------------------------------------------------
@@ -277,7 +149,7 @@ export default function HistoryPanel({
       if (nextSnapshot) idsToLoad.push(nextSnapshot.id);
 
       const contents = await Promise.all(
-        idsToLoad.map((id) => historyService.getSnapshotContent(id))
+        idsToLoad.map((id) => historyService.getSnapshotContent(id)),
       );
       if (cancelled) return;
 
@@ -293,7 +165,9 @@ export default function HistoryPanel({
     };
 
     void compute();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [snapshots, displayCount]);
 
   /** Set of bookmarked snapshot IDs */
@@ -308,7 +182,9 @@ export default function HistoryPanel({
       if (!cancelled) setBookmarkSet(set);
     };
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [snapshots]);
 
   /** Toggle a bookmark and update local state */
@@ -332,7 +208,7 @@ export default function HistoryPanel({
    */
   const groupedSnapshots = useMemo(
     () => groupSnapshotsByDate(snapshots.slice(0, displayCount)),
-    [snapshots, displayCount]
+    [snapshots, displayCount],
   );
 
   /** Collapsed state for each date group. Key = date label */
@@ -403,7 +279,9 @@ export default function HistoryPanel({
     };
 
     void compute();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [groupedSnapshots]);
 
   const toggleGroup = useCallback((label: string) => {
@@ -433,12 +311,9 @@ export default function HistoryPanel({
    * Show confirmation dialog for snapshot restoration.
    * スナップショット復元の確認ダイアログを表示する。
    */
-  const handleRestore = useCallback(
-    (snapshot: SnapshotEntry) => {
-      setRestoreConfirm(snapshot);
-    },
-    []
-  );
+  const handleRestore = useCallback((snapshot: SnapshotEntry) => {
+    setRestoreConfirm(snapshot);
+  }, []);
 
   /**
    * Execute the snapshot restoration after user confirmation.
@@ -463,14 +338,13 @@ export default function HistoryPanel({
         setRestoringId(null);
       }
     },
-    [onRestore]
+    [onRestore],
   );
 
   /**
    * Handle manual snapshot creation.
    * 手動スナップショットの作成を処理する。
    * Note: This creates a snapshot of the current content via HistoryService.
-   *       The actual content is not accessible here; a placeholder is used.
    */
   const handleCreateSnapshot = useCallback(async () => {
     try {
@@ -479,7 +353,7 @@ export default function HistoryPanel({
       const historyService = getHistoryService();
       await historyService.createSnapshot({
         sourceFile: mainFileName,
-        content: "", // The caller should provide actual content via a different mechanism
+        content: currentContent,
         type: "manual",
       });
       await loadSnapshots();
@@ -489,7 +363,7 @@ export default function HistoryPanel({
     } finally {
       setCreatingSnapshot(false);
     }
-  }, [mainFileName, loadSnapshots]);
+  }, [mainFileName, loadSnapshots, currentContent]);
 
   /**
    * Handle comparing a snapshot with current content.
@@ -520,7 +394,7 @@ export default function HistoryPanel({
         setLoadingDiffId(null);
       }
     },
-    [currentContent, onCompareInEditor]
+    [currentContent, onCompareInEditor],
   );
 
   // -----------------------------------------------------------------------
@@ -551,7 +425,7 @@ export default function HistoryPanel({
             "flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors",
             creatingSnapshot
               ? "bg-background text-foreground-muted cursor-wait border border-border"
-              : "bg-accent text-accent-foreground hover:bg-accent-hover"
+              : "bg-accent text-accent-foreground hover:bg-accent-hover",
           )}
         >
           {creatingSnapshot ? (
@@ -580,9 +454,7 @@ export default function HistoryPanel({
       {snapshots.length === 0 && !error && (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <History className="w-8 h-8 text-foreground-muted mb-3" />
-          <p className="text-sm font-medium text-foreground-secondary mb-1">
-            履歴がありません
-          </p>
+          <p className="text-sm font-medium text-foreground-secondary mb-1">履歴がありません</p>
           <p className="text-xs text-foreground-tertiary leading-relaxed">
             プロジェクトを保存すると、自動的に履歴が作成されます。
           </p>
@@ -627,20 +499,21 @@ export default function HistoryPanel({
                 </button>
 
                 {/* Snapshots within this date group */}
-                {!isCollapsed && group.snapshots.map((snapshot) => (
-                  <SnapshotItem
-                    key={snapshot.id}
-                    snapshot={snapshot}
-                    isRestoring={restoringId === snapshot.id}
-                    onRestore={handleRestore}
-                    onCompare={handleCompare}
-                    isLoadingDiff={loadingDiffId === snapshot.id}
-                    diffStats={diffStatsMap.get(snapshot.id)}
-                    isFirstVersion={snapshot.id === firstVersionId}
-                    isBookmarked={bookmarkSet.has(snapshot.id)}
-                    onToggleBookmark={handleToggleBookmark}
-                  />
-                ))}
+                {!isCollapsed &&
+                  group.snapshots.map((snapshot) => (
+                    <SnapshotItem
+                      key={snapshot.id}
+                      snapshot={snapshot}
+                      isRestoring={restoringId === snapshot.id}
+                      onRestore={handleRestore}
+                      onCompare={handleCompare}
+                      isLoadingDiff={loadingDiffId === snapshot.id}
+                      diffStats={diffStatsMap.get(snapshot.id)}
+                      isFirstVersion={snapshot.id === firstVersionId}
+                      isBookmarked={bookmarkSet.has(snapshot.id)}
+                      onToggleBookmark={handleToggleBookmark}
+                    />
+                  ))}
               </div>
             );
           })}
@@ -672,289 +545,6 @@ export default function HistoryPanel({
         }}
         onCancel={() => setRestoreConfirm(null)}
       />
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------
-// SnapshotItem sub-component
-// -----------------------------------------------------------------------
-
-interface SnapshotItemProps {
-  snapshot: SnapshotEntry;
-  isRestoring: boolean;
-  onRestore: (snapshot: SnapshotEntry) => void;
-  onCompare: (snapshot: SnapshotEntry) => void;
-  isLoadingDiff: boolean;
-  diffStats?: DiffStats;
-  isFirstVersion: boolean;
-  isBookmarked: boolean;
-  onToggleBookmark: (snapshotId: string) => void;
-}
-
-function SnapshotItem({ snapshot, isRestoring, onRestore, onCompare, isLoadingDiff, diffStats, isFirstVersion, isBookmarked, onToggleBookmark }: SnapshotItemProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [menuOpen]);
-
-  return (
-    <div className="bg-background-secondary rounded-lg p-3 border border-border">
-      {/* Row 1: Time + type badge + char count */}
-      <div className="flex items-center justify-between gap-2 mb-1.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-semibold tabular-nums text-foreground">
-            {formatTimeJa(snapshot.timestamp)}
-          </span>
-          <span
-            className={clsx(
-              "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0",
-              getSnapshotTypeBadgeClass(snapshot.type)
-            )}
-          >
-            {snapshot.type === "milestone" && (
-              <Pin className="w-2.5 h-2.5" />
-            )}
-            {getSnapshotTypeLabel(snapshot.type)}
-          </span>
-        </div>
-        <span className="text-[10px] text-foreground-tertiary tabular-nums flex-shrink-0">
-          {snapshot.characterCount.toLocaleString()}文字
-        </span>
-      </div>
-
-      {/* Milestone label */}
-      {snapshot.label && (
-        <p className="text-xs font-medium text-foreground-secondary mb-1">
-          {snapshot.label}
-        </p>
-      )}
-
-      {/* Row 2: Diff indicator + actions */}
-      <div className="flex items-end justify-between">
-        <DiffIndicator diffStats={diffStats} isFirstVersion={isFirstVersion} />
-
-        <div className="flex items-center gap-0.5 flex-shrink-0">
-          {/* Bookmark button */}
-          <button
-            onClick={() => onToggleBookmark(snapshot.id)}
-            className={clsx(
-              "p-1 rounded transition-colors",
-              isBookmarked
-                ? "text-accent"
-                : "text-foreground-tertiary hover:text-accent hover:bg-hover"
-            )}
-            title={isBookmarked ? "ブックマークを解除" : "ブックマークに追加"}
-          >
-            <Bookmark className="w-3.5 h-3.5" fill={isBookmarked ? "currentColor" : "none"} />
-          </button>
-
-          {/* Three-dot menu */}
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              className="p-1 rounded transition-colors text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover"
-              title="メニュー"
-            >
-              <MoreVertical className="w-3.5 h-3.5" />
-            </button>
-
-            {menuOpen && (
-              <div className="absolute right-0 bottom-full mb-1 z-10 min-w-[120px] rounded-lg border border-border bg-background-secondary shadow-lg py-1">
-                <button
-                  onClick={() => { setMenuOpen(false); onRestore(snapshot); }}
-                  disabled={isRestoring}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] font-medium text-foreground-secondary hover:bg-hover transition-colors disabled:opacity-50"
-                >
-                  {isRestoring ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <RotateCcw className="w-3.5 h-3.5" />
-                  )}
-                  復元
-                </button>
-                <button
-                  onClick={() => { setMenuOpen(false); onCompare(snapshot); }}
-                  disabled={isLoadingDiff}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] font-medium text-foreground-secondary hover:bg-hover transition-colors disabled:opacity-50"
-                >
-                  {isLoadingDiff ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <GitCompare className="w-3.5 h-3.5" />
-                  )}
-                  比較
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------
-// DiffIndicator sub-component
-// -----------------------------------------------------------------------
-
-/** Total number of signs (+/−) in the git-style bar */
-const TOTAL_SIGNS = 5;
-
-interface DiffIndicatorProps {
-  diffStats?: DiffStats;
-  isFirstVersion: boolean;
-}
-
-/**
- * Git-style proportional diff bar with separate addition/removal lines.
- * 前のバージョンとの差分を git 風の +/− バーで比率表示する。
- *
- * Example output:
- *   +++++ +68
- *   −−    −10
- */
-function DiffIndicator({ diffStats, isFirstVersion }: DiffIndicatorProps) {
-  const [showTooltip, setShowTooltip] = useState(false);
-  const triggerRef = useRef<HTMLDivElement>(null);
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null);
-
-  const showTip = useCallback(() => {
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-    setShowTooltip(true);
-  }, []);
-
-  const hideTip = useCallback(() => {
-    hideTimerRef.current = setTimeout(() => setShowTooltip(false), 100);
-  }, []);
-
-  useEffect(() => {
-    if (showTooltip && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setTooltipPos({ top: rect.top, left: rect.left });
-    } else {
-      setTooltipPos(null);
-    }
-  }, [showTooltip]);
-
-  if (isFirstVersion) {
-    return (
-      <span className="text-[10px] tabular-nums text-foreground-tertiary">
-        初版
-      </span>
-    );
-  }
-
-  if (!diffStats) return null;
-
-  const { added, removed, addedText, removedText } = diffStats;
-
-  if (added === 0 && removed === 0) {
-    return (
-      <span className="text-[10px] tabular-nums text-foreground-tertiary">
-        変更なし
-      </span>
-    );
-  }
-
-  const total = added + removed;
-  let plusCount: number;
-  let minusCount: number;
-
-  if (added > 0 && removed > 0) {
-    // Split proportionally, ensure at least 1 each
-    plusCount = Math.max(1, Math.round((added / total) * TOTAL_SIGNS));
-    minusCount = TOTAL_SIGNS - plusCount;
-    if (minusCount < 1) {
-      minusCount = 1;
-      plusCount = TOTAL_SIGNS - 1;
-    }
-  } else if (added > 0) {
-    plusCount = TOTAL_SIGNS;
-    minusCount = 0;
-  } else {
-    plusCount = 0;
-    minusCount = TOTAL_SIGNS;
-  }
-
-  const MAX_PREVIEW_LEN = 80;
-
-  return (
-    <div
-      ref={triggerRef}
-      className="flex flex-col gap-0 cursor-help"
-      onMouseEnter={showTip}
-      onMouseLeave={hideTip}
-    >
-      {added > 0 && (
-        <div className="flex items-center gap-1">
-          <span className="text-[11px] font-mono leading-tight text-success">
-            {"+".repeat(plusCount)}
-          </span>
-          <span className="text-[10px] tabular-nums text-success">
-            {added.toLocaleString()}
-          </span>
-        </div>
-      )}
-      {removed > 0 && (
-        <div className="flex items-center gap-1">
-          <span className="text-[11px] font-mono leading-tight text-error">
-            {"\u2212".repeat(minusCount)}
-          </span>
-          <span className="text-[10px] tabular-nums text-error">
-            {removed.toLocaleString()}
-          </span>
-        </div>
-      )}
-
-      {/* Portal tooltip rendered at document root */}
-      {showTooltip && tooltipPos && createPortal(
-        <div
-          className="fixed min-w-[200px] max-w-[300px] max-h-[300px] overflow-y-auto p-1.5 rounded-lg bg-background-secondary border border-border shadow-lg text-[11px] leading-none"
-          style={{
-            zIndex: 9999,
-            top: tooltipPos.top,
-            left: tooltipPos.left,
-            transform: "translateY(-100%) translateY(-8px)",
-          }}
-          onMouseEnter={showTip}
-          onMouseLeave={hideTip}
-        >
-          {removed > 0 && (
-            <div className={added > 0 ? "mb-0.5" : ""}>
-              <div className="text-error whitespace-pre-wrap break-words line-through" style={{ lineHeight: 1.15 }}>
-                {removedText.length > MAX_PREVIEW_LEN
-                  ? removedText.slice(0, MAX_PREVIEW_LEN) + "…"
-                  : removedText}
-              </div>
-            </div>
-          )}
-          {added > 0 && (
-            <div>
-              <div className="text-success whitespace-pre-wrap break-words" style={{ lineHeight: 1.15 }}>
-                {addedText.length > MAX_PREVIEW_LEN
-                  ? addedText.slice(0, MAX_PREVIEW_LEN) + "…"
-                  : addedText}
-              </div>
-            </div>
-          )}
-        </div>,
-        document.body
-      )}
     </div>
   );
 }

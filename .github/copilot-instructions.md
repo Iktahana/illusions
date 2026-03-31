@@ -17,6 +17,7 @@
 ## Technology Stack
 
 ### Frontend
+
 - **Framework**: Next.js 16 (App Router), React 18
 - **Language**: TypeScript (strict mode enabled)
 - **Editor**: Milkdown 7 (ProseMirror-based) with custom Japanese plugin
@@ -24,15 +25,18 @@
 - **State**: React Context API, custom hooks
 
 ### Desktop
+
 - **Runtime**: Electron 32
 - **Storage**: SQLite (better-sqlite3) via StorageService abstraction
 - **IPC**: Typed channels with contextIsolation enabled
 
 ### Web
+
 - **Storage**: IndexedDB via Dexie (same StorageService API)
 - **PWA**: Serwist service worker for offline support
 
 ### NLP & Analysis
+
 - **Tokenizer**: Kuromoji (Japanese morphological analyzer)
 - **Backend**: Node.js workers for heavy processing
 - **Cache**: In-memory LRU cache for tokenization results
@@ -42,15 +46,18 @@
 ### Language Policy (CRITICAL)
 
 **STRICTLY FORBIDDEN in code/documentation:**
+
 - ❌ Chinese (中文/中国語)
 - ❌ Korean (한국어/韓国語)
 - ❌ Any other languages except English and Japanese
 
 **ALLOWED:**
+
 - ✅ English: Code logic (variables, functions, types, comments)
 - ✅ Japanese (日本語): UI strings, user-facing text, internal comments
 
 **User-facing text MUST be in Japanese:**
+
 - Menu items, dialog boxes, buttons, labels, tooltips
 - Error messages, notifications, status text
 - Documentation for end users
@@ -94,7 +101,7 @@ const storage = getStorageService();
 await storage.saveSession({
   appState: { lastOpenedMdiPath: "/path/to/file.mdi" },
   recentFiles: [],
-  editorBuffer: { content: "...", timestamp: Date.now() }
+  editorBuffer: { content: "...", timestamp: Date.now() },
 });
 
 // Load session
@@ -102,6 +109,7 @@ const session = await storage.loadSession();
 ```
 
 **12 Core Methods:**
+
 - Session: `saveSession()`, `loadSession()`
 - App State: `saveAppState()`, `loadAppState()`
 - Recent Files: `addToRecent()`, `getRecentFiles()`, `removeFromRecent()`, `clearRecent()`
@@ -109,10 +117,12 @@ const session = await storage.loadSession();
 - Utility: `clearAll()`
 
 **Storage Locations:**
+
 - Electron: SQLite at `~/Library/Application Support/illusions/illusions-storage.db`
 - Web: Browser IndexedDB via Dexie
 
 **What NOT to do:**
+
 - ❌ Use localStorage directly
 - ❌ Use IndexedDB directly
 - ❌ Implement custom storage logic in components
@@ -127,6 +137,25 @@ const session = await storage.loadSession();
   - Validate all IPC message handlers
 - **XSS prevention**: No `dangerouslySetInnerHTML` without sanitization
 - **Code injection**: No `eval()`, `Function()`, dynamic script execution
+
+## Branch Strategy (CRITICAL)
+
+**All PRs MUST target `dev`, NOT `main`.**
+
+```
+feature/<name>  →  dev  →  (weekly PR, every Monday)  →  main
+hotfix/<name>   →  main  (emergency only, then cherry-pick to dev)
+```
+
+- **`main`**: Production branch — receives merges only via weekly release PR
+- **`dev`**: Integration branch — all feature/fix PRs target `dev`
+- **Hotfix**: Branch from `main`, merge directly to `main`, then cherry-pick into `dev`
+
+When creating a PR:
+
+- Base branch: `dev` (default)
+- Only use `main` as base for emergency hotfixes
+- Include `Closes #<issue>` in PR body for auto-closing
 
 ## Build & Development
 
@@ -240,6 +269,7 @@ Use `@agent-name` in GitHub Copilot Chat:
 ## Questions?
 
 For project-specific questions:
+
 1. Check `CLAUDE.md` for code review standards
 2. Check `docs/` folder for technical documentation
 3. Ask `@maintainer` agent for guidance

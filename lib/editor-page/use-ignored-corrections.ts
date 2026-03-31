@@ -30,9 +30,7 @@ export interface UseIgnoredCorrectionsResult {
  *
  * @param editorMode Current editor mode (project / standalone / null)
  */
-export function useIgnoredCorrections(
-  editorMode: EditorMode,
-): UseIgnoredCorrectionsResult {
+export function useIgnoredCorrections(editorMode: EditorMode): UseIgnoredCorrectionsResult {
   const [ignoredCorrections, setIgnoredCorrections] = useState<IgnoredCorrection[]>([]);
   const loadedModeRef = useRef<string | null>(null);
 
@@ -106,9 +104,7 @@ export function useIgnoredCorrections(
         service
           .addIgnoredCorrection(ruleId, text, context)
           .then(setIgnoredCorrections)
-          .catch((err) =>
-            console.error("[useIgnoredCorrections] Failed to add:", err),
-          );
+          .catch((err) => console.error("[useIgnoredCorrections] Failed to add:", err));
       } else if (editorMode && isStandaloneMode(editorMode)) {
         // Optimistic update for standalone mode too
         setIgnoredCorrections((prev) => {
@@ -119,16 +115,9 @@ export function useIgnoredCorrections(
           return [...prev, { ruleId, text, context, addedAt: Date.now() }];
         });
         service
-          .addIgnoredCorrectionStandalone(
-            editorMode.fileName,
-            ruleId,
-            text,
-            context,
-          )
+          .addIgnoredCorrectionStandalone(editorMode.fileName, ruleId, text, context)
           .then(setIgnoredCorrections)
-          .catch((err) =>
-            console.error("[useIgnoredCorrections] Failed to add standalone:", err),
-          );
+          .catch((err) => console.error("[useIgnoredCorrections] Failed to add standalone:", err));
       }
     },
     [editorMode],
@@ -142,17 +131,10 @@ export function useIgnoredCorrections(
         service
           .removeIgnoredCorrection(ruleId, text, context)
           .then(setIgnoredCorrections)
-          .catch((err) =>
-            console.error("[useIgnoredCorrections] Failed to remove:", err),
-          );
+          .catch((err) => console.error("[useIgnoredCorrections] Failed to remove:", err));
       } else if (editorMode && isStandaloneMode(editorMode)) {
         service
-          .removeIgnoredCorrectionStandalone(
-            editorMode.fileName,
-            ruleId,
-            text,
-            context,
-          )
+          .removeIgnoredCorrectionStandalone(editorMode.fileName, ruleId, text, context)
           .then(setIgnoredCorrections)
           .catch((err) =>
             console.error("[useIgnoredCorrections] Failed to remove standalone:", err),

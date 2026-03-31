@@ -4,6 +4,9 @@
  *
  * Note: illusions uses Tailwind RGB channel format (e.g. "252 252 252"),
  * so we use rgb() wrappers here.
+ *
+ * Selector uses `.dv-dockview.dockview-theme-illusions` for higher
+ * specificity than the built-in themes (`.dockview-theme-dark` etc.).
  */
 
 /* Import dockview base styles */
@@ -13,27 +16,27 @@
 /* illusions custom theme — light mode (default)                       */
 /* ------------------------------------------------------------------ */
 
-.dockview-theme-illusions {
+.dv-dockview.dockview-theme-illusions {
   /* Editor content area background */
   --dv-group-view-background-color: rgb(var(--background));
 
-  /* Tab bar background */
-  --dv-tabs-and-actions-container-background-color: rgb(var(--background-secondary));
+  /* Tab bar background — pure white for clean appearance */
+  --dv-tabs-and-actions-container-background-color: #ffffff;
 
   /* Active group, visible (selected) tab */
   --dv-activegroup-visiblepanel-tab-background-color: rgb(var(--background));
   --dv-activegroup-visiblepanel-tab-color: rgb(var(--foreground));
 
   /* Active group, hidden (unselected) tabs */
-  --dv-activegroup-hiddenpanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-activegroup-hiddenpanel-tab-background-color: rgb(var(--background-tertiary));
   --dv-activegroup-hiddenpanel-tab-color: rgb(var(--foreground-tertiary));
 
   /* Inactive group, visible tab */
-  --dv-inactivegroup-visiblepanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-inactivegroup-visiblepanel-tab-background-color: rgb(var(--background-tertiary));
   --dv-inactivegroup-visiblepanel-tab-color: rgb(var(--foreground-secondary));
 
   /* Inactive group, hidden tabs */
-  --dv-inactivegroup-hiddenpanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-inactivegroup-hiddenpanel-tab-background-color: rgb(var(--background-tertiary));
   --dv-inactivegroup-hiddenpanel-tab-color: rgb(var(--foreground-muted));
 
   /* Tab divider */
@@ -47,7 +50,7 @@
   --dv-active-sash-color: rgb(var(--accent));
 
   /* Drag overlay */
-  --dv-drag-over-background-color: rgba(var(--accent), 0.08);
+  --dv-drag-over-background-color: rgb(var(--accent) / 0.08);
   --dv-drag-over-border-color: rgb(var(--accent));
 
   /* Scrollbar */
@@ -66,25 +69,25 @@
 /* illusions custom theme — dark mode                                  */
 /* ------------------------------------------------------------------ */
 
-.dark .dockview-theme-illusions {
+.dark .dv-dockview.dockview-theme-illusions {
   --dv-group-view-background-color: rgb(var(--background));
   --dv-tabs-and-actions-container-background-color: rgb(var(--background-secondary));
 
   --dv-activegroup-visiblepanel-tab-background-color: rgb(var(--background));
   --dv-activegroup-visiblepanel-tab-color: rgb(var(--foreground));
-  --dv-activegroup-hiddenpanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-activegroup-hiddenpanel-tab-background-color: rgb(var(--background-tertiary));
   --dv-activegroup-hiddenpanel-tab-color: rgb(var(--foreground-tertiary));
 
-  --dv-inactivegroup-visiblepanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-inactivegroup-visiblepanel-tab-background-color: rgb(var(--background-tertiary));
   --dv-inactivegroup-visiblepanel-tab-color: rgb(var(--foreground-secondary));
-  --dv-inactivegroup-hiddenpanel-tab-background-color: rgb(var(--background-secondary));
+  --dv-inactivegroup-hiddenpanel-tab-background-color: rgb(var(--background-tertiary));
   --dv-inactivegroup-hiddenpanel-tab-color: rgb(var(--foreground-muted));
 
   --dv-tab-divider-color: rgb(var(--border));
   --dv-separator-border: rgb(var(--border));
   --dv-sash-color: transparent;
   --dv-active-sash-color: rgb(var(--accent));
-  --dv-drag-over-background-color: rgba(var(--accent), 0.08);
+  --dv-drag-over-background-color: rgb(var(--accent) / 0.08);
   --dv-drag-over-border-color: rgb(var(--accent));
   --dv-tabs-container-scrollbar-color: rgb(var(--foreground-muted));
   --dv-icon-hover-background-color: rgb(var(--hover));
@@ -96,6 +99,36 @@
 /* ------------------------------------------------------------------ */
 /* Layout refinements                                                 */
 /* ------------------------------------------------------------------ */
+
+/* Force tab bar background to match illusions theme.
+   CSS variables on .dockview-theme-illusions are not inherited by dockview
+   internals in some builds, so we override the computed styles directly. */
+.dockview-theme-illusions .dv-tabs-and-actions-container {
+  background-color: #ffffff;
+}
+
+.dark .dockview-theme-illusions .dv-tabs-and-actions-container {
+  background-color: rgb(var(--background-secondary));
+}
+
+.dockview-theme-illusions .dv-groupview {
+  background-color: rgb(var(--background));
+}
+
+.dockview-theme-illusions .dv-default-tab.dv-active-tab {
+  background-color: rgb(var(--background));
+  color: rgb(var(--foreground));
+}
+
+.dockview-theme-illusions .dv-default-tab.dv-inactive-tab {
+  background-color: rgb(var(--background-tertiary));
+  color: rgb(var(--foreground-tertiary));
+}
+
+.dark .dockview-theme-illusions .dv-default-tab.dv-inactive-tab {
+  background-color: rgb(var(--background-tertiary));
+  color: rgb(var(--foreground-tertiary));
+}
 
 /* Hide the default dockview watermark (empty state) */
 .dv-dockview .dv-watermark {
@@ -112,4 +145,46 @@
 /* Reduce padding on tab items */
 .dv-dockview .dv-default-tab {
   padding: 0 8px;
+}
+
+/* Override grab cursor on empty tab bar area */
+.dockview-theme-illusions .dv-void-container.dv-draggable {
+  cursor: default;
+}
+
+/* Ensure separator between split editor groups uses the theme border color */
+.dockview-theme-illusions
+  .dv-split-view-container.dv-separator-border
+  .dv-view:not(:first-child)::before {
+  background-color: rgb(var(--border));
+}
+
+/* Remove any unexpected borders/outlines on group views and resize containers */
+.dockview-theme-illusions .dv-resize-container {
+  border: none;
+  outline: none;
+}
+
+.dockview-theme-illusions .dv-groupview {
+  outline: none;
+}
+
+/* Terminal panel: force black background on the group view and tab bar
+   so the white app theme doesn't bleed through around the terminal. */
+.dv-groupview:has(.terminal-panel-container) {
+  background-color: #000000;
+}
+
+.dv-groupview:has(.terminal-panel-container) .dv-tabs-and-actions-container {
+  background-color: #1a1a1a;
+}
+
+.dv-groupview:has(.terminal-panel-container) .dv-default-tab.dv-active-tab {
+  background-color: #000000;
+  color: #f2f2f2;
+}
+
+.dv-groupview:has(.terminal-panel-container) .dv-default-tab.dv-inactive-tab {
+  background-color: #1a1a1a;
+  color: #a0a0a0;
 }

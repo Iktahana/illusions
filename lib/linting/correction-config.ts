@@ -11,13 +11,12 @@ import type { IgnoredCorrection } from "@/lib/project/project-types";
  * in the decoration plugin.
  */
 export type ConfigChangeReason =
-  | "text-edit"            // re-run affected paragraphs only
-  | "rule-config-change"   // clear issue cache, full re-run
-  | "mode-change"          // clear all caches, full re-run
-  | "guideline-change"     // clear issue + validation cache
-  | "model-change"         // clear validation cache only
-  | "ignored-correction"   // rebuild decorations only (no re-run)
-  | "manual-refresh";      // clear all caches, force re-run
+  | "text-edit" // re-run affected paragraphs only
+  | "rule-config-change" // clear issue cache, full re-run
+  | "mode-change" // clear all caches, full re-run
+  | "guideline-change" // clear issue + validation cache
+  | "ignored-correction" // rebuild decorations only (no re-run)
+  | "manual-refresh"; // clear all caches, force re-run
 
 /** Correction mode identifiers */
 export type CorrectionModeId = "novel" | "official" | "blog" | "academic" | "sns";
@@ -42,12 +41,12 @@ export interface CorrectionConfig {
   mode: CorrectionModeId;
   guidelines: GuidelineId[];
   ruleOverrides: Record<string, Partial<LintRuleConfig>>;
-  llm: {
-    modelId: string;
-    cooldownMs: number;
-    validationEnabled: boolean;
-  };
   ignoredCorrections: IgnoredCorrection[];
+  /** LLM-based validation settings */
+  llm?: {
+    validationEnabled: boolean;
+    modelId: string;
+  };
 }
 
 /** Default CorrectionConfig values */
@@ -56,10 +55,5 @@ export const DEFAULT_CORRECTION_CONFIG: CorrectionConfig = {
   mode: "novel",
   guidelines: ["joyo-kanji-2010", "novel-manuscript"],
   ruleOverrides: {},
-  llm: {
-    modelId: "",
-    cooldownMs: 60_000,
-    validationEnabled: true,
-  },
   ignoredCorrections: [],
 };

@@ -32,10 +32,32 @@ export interface BufferState {
 // Dockview panel params
 // ---------------------------------------------------------------------------
 
-/** Params stored in each dockview panel, linking it to a buffer */
+/** Params stored in each dockview panel, linking it to a buffer.
+ *  Identity/layout fields are passed via updateParameters() to bypass stale closures
+ *  (dockview-react captures the component function once per panel).
+ *  Content is NOT included here — it is read from a stable tabsRef to avoid
+ *  triggering dockview re-renders on every keystroke. */
 export interface EditorPanelParams {
   bufferId: BufferId;
   isPreview: boolean;
+  /** File path for React key derivation */
+  filePath: string;
+  /** File extension (".mdi" | ".md" | ".txt") */
+  fileType: string;
+  /** Monotonic counter to force editor remount */
+  editorKey: number;
+  /** Currently active tab ID for isActivePanel check */
+  activeTabId: string;
+}
+
+/** Params for a terminal panel */
+export interface TerminalPanelParams {
+  sessionId: string;
+}
+
+/** Params for a diff panel */
+export interface DiffPanelParams {
+  sourceTabId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,12 +73,30 @@ export interface SerializedBuffer {
   isPreview: boolean;
 }
 
+/**
+ * Simplified, ID-independent layout descriptor.
+ * Uses file paths as stable keys so layout survives tab ID regeneration on restart.
+ */
+export interface SimplifiedGroupLayout {
+  /** Each group and its tab file paths in order */
+  groups: Array<{
+    tabPaths: (string | null)[];
+    activeTabPath: string | null;
+  }>;
+  /** Root grid orientation */
+  orientation: "HORIZONTAL" | "VERTICAL";
+  /** Relative sizes of each group (proportional) */
+  sizes: number[];
+}
+
 /** Full layout state persisted to AppState */
 export interface DockviewLayoutState {
   /** Dockview's own serialized layout (groups, panels, orientations) */
   dockviewJson: SerializedDockview;
   /** Buffer metadata for each open document */
   buffers: SerializedBuffer[];
+  /** Simplified layout for ID-independent restoration */
+  simplifiedLayout?: SimplifiedGroupLayout;
 }
 
 // ---------------------------------------------------------------------------

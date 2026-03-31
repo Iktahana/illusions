@@ -8,7 +8,23 @@ export default defineConfig({
     include: ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.tsx"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "lcov"],
+      reporter: ["text", "lcov", "html"],
+      thresholds: {
+        lines: 15,
+        functions: 10,
+        branches: 10,
+        statements: 15,
+      },
+      include: ["lib/**/*.ts"],
+      exclude: [
+        "**/__tests__/**",
+        "**/node_modules/**",
+        "lib/hooks/**",
+        "lib/menu/**",
+        "lib/nlp-backend/**",
+        "lib/editor-page/**",
+        "lib/dockview/**",
+      ],
     },
   },
   resolve: {

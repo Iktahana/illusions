@@ -1,10 +1,16 @@
 // Electron preload API の型定義
 
-import type { StorageSession, AppState, RecentFile, EditorBuffer } from "@/lib/storage/storage-types";
+import type {
+  StorageSession,
+  AppState,
+  RecentFile,
+  EditorBuffer,
+} from "@/lib/storage/storage-types";
 import type { Token, WordEntry, TokenizeProgress } from "@/lib/nlp-client/types";
 import type { VFSWatchEvent } from "@/lib/vfs/types";
+import type { KeymapOverrides } from "@/lib/keymap/keymap-types";
 
-export {}
+export {};
 
 declare global {
   interface ElectronAPI {
@@ -13,24 +19,27 @@ declare global {
     saveFile: (
       filePath: string | null,
       content: string,
-      fileType?: string
+      fileType?: string,
     ) => Promise<string | { success: false; error: string } | null>;
     getChromeVersion: () => Promise<number>;
     setDirty: (dirty: boolean) => Promise<void>;
     saveDoneAndClose?: () => Promise<void>;
     newWindow?: () => Promise<void>;
     openDictionaryPopup?: (url: string, title: string) => Promise<boolean>;
-    showContextMenu?: (items: Array<{ type?: string; label?: string; action?: string; accelerator?: string }>) => Promise<string | null>;
+    showContextMenu?: (
+      items: Array<{ type?: string; label?: string; action?: string; accelerator?: string }>,
+    ) => Promise<string | null>;
     onSaveBeforeClose?: (callback: () => void) => (() => void) | void;
+    onFlushStateBeforeClose?: (callback: () => void) => (() => void) | void;
     onOpenFileFromSystem?: (
-      callback: (payload: { path: string; content: string }) => void
+      callback: (payload: { path: string; content: string }) => void,
     ) => (() => void) | void;
     onOpenAsProject?: (
-      callback: (payload: { projectPath: string; initialFile: string }) => void
+      callback: (payload: { projectPath: string; initialFile: string }) => void,
     ) => (() => void) | void;
     getPendingFile?: () => Promise<
-      | { type: 'project'; projectPath: string; initialFile: string }
-      | { type: 'standalone'; path: string; content: string }
+      | { type: "project"; projectPath: string; initialFile: string }
+      | { type: "standalone"; path: string; content: string }
       | null
     >;
     onMenuNew?: (callback: () => void) => (() => void) | void;
@@ -42,27 +51,40 @@ declare global {
     onMenuOpenProject?: (callback: () => void) => (() => void) | void;
     onMenuOpenRecentProject?: (callback: (projectId: string) => void) => (() => void) | void;
     rebuildMenu?: () => Promise<boolean>;
-    syncMenuUiState?: (state: { compactMode?: boolean; showParagraphNumbers?: boolean; themeMode?: string; autoCharsPerLine?: boolean }) => Promise<boolean>;
+    syncMenuUiState?: (state: {
+      compactMode?: boolean;
+      showParagraphNumbers?: boolean;
+      themeMode?: string;
+      autoCharsPerLine?: boolean;
+    }) => Promise<boolean>;
+    updateKeymapOverrides?: (overrides: KeymapOverrides) => Promise<boolean>;
     showInFileManager?: (dirPath: string) => Promise<boolean>;
     revealInFileManager?: (filePath: string) => Promise<boolean>;
     openExternal?: (url: string) => Promise<boolean>;
     onMenuShowInFileManager?: (callback: () => void) => (() => void) | void;
+    onPasteAsPlaintext?: (callback: () => void) => (() => void) | void;
     onToggleCompactMode?: (callback: () => void) => (() => void) | void;
     onFormatChange?: (callback: (setting: string, action: string) => void) => (() => void) | void;
     onThemeChange?: (callback: (mode: "auto" | "light" | "dark") => void) => (() => void) | void;
     // Export
     exportPDF?: (
       content: string,
-      options: { metadata: { title: string; author?: string; date?: string; language?: string }; verticalWriting?: boolean; pageSize?: 'A4' | 'A5' | 'B5' | 'B6' }
+      options: {
+        metadata: { title: string; author?: string; date?: string; language?: string };
+        verticalWriting?: boolean;
+        pageSize?: "A4" | "A5" | "B5" | "B6";
+      },
     ) => Promise<string | { success: false; error: string } | null>;
     exportEPUB?: (
       content: string,
-      options: { metadata: { title: string; author?: string; date?: string; language?: string } }
+      options: { metadata: { title: string; author?: string; date?: string; language?: string } },
     ) => Promise<string | { success: false; error: string } | null>;
     exportDOCX?: (
       content: string,
-      options: { metadata: { title: string; author?: string; date?: string; language?: string } }
+      options: { metadata: { title: string; author?: string; date?: string; language?: string } },
     ) => Promise<string | { success: false; error: string } | null>;
+    onMenuExportTxt?: (callback: () => void) => (() => void) | void;
+    onMenuExportTxtRuby?: (callback: () => void) => (() => void) | void;
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;
@@ -78,21 +100,16 @@ declare global {
       writeFile: (filePath: string, content: string) => Promise<void>;
       /** Read directory entries */
       readDirectory: (
-        dirPath: string
+        dirPath: string,
       ) => Promise<Array<{ name: string; kind: "file" | "directory" }>>;
       /** Get file stats */
-      stat: (
-        filePath: string
-      ) => Promise<{ size: number; lastModified: number; type: string }>;
+      stat: (filePath: string) => Promise<{ size: number; lastModified: number; type: string }>;
       /** Create a directory (recursive) */
       mkdir: (dirPath: string) => Promise<void>;
       /** Delete a file or directory */
       delete: (targetPath: string, options?: { recursive?: boolean }) => Promise<void>;
       /** Watch a file for changes (optional) */
-      watch?: (
-        filePath: string,
-        callback: (event: VFSWatchEvent) => void
-      ) => { stop: () => void };
+      watch?: (filePath: string, callback: (event: VFSWatchEvent) => void) => { stop: () => void };
     };
     storage?: {
       saveSession: (session: StorageSession) => Promise<void>;
@@ -120,14 +137,14 @@ declare global {
        * @param dicPath - Dictionary path (e.g., '/dict')
        */
       init: (dicPath: string) => Promise<{ success: boolean }>;
-      
+
       /**
        * Tokenize a single paragraph
        * @param text - Paragraph text
        * @returns Token array
        */
       tokenizeParagraph: (text: string) => Promise<Token[]>;
-      
+
       /**
        * Tokenize multiple paragraphs in batch
        * @param paragraphs - Array of {pos, text} objects
@@ -136,9 +153,9 @@ declare global {
        */
       tokenizeDocument: (
         paragraphs: Array<{ pos: number; text: string }>,
-        onProgress?: (progress: TokenizeProgress) => void
+        onProgress?: (progress: TokenizeProgress) => void,
       ) => Promise<Array<{ pos: number; tokens: Token[] }>>;
-      
+
       /**
        * Analyze word frequency in text
        * @param text - Full document text
@@ -185,61 +202,103 @@ declare global {
       /** Check if OS-level encryption is available */
       isAvailable: () => Promise<boolean>;
     };
-    llm?: {
-      getModels: () => Promise<
-        Array<{
-          id: string;
-          status: "not-downloaded" | "downloading" | "ready" | "loading" | "loaded" | "error";
-          downloadProgress?: number;
-          filePath?: string;
-          error?: string;
-        }>
-      >;
-      downloadModel: (modelId: string) => Promise<void>;
-      deleteModel: (modelId: string) => Promise<void>;
-      loadModel: (modelId: string) => Promise<void>;
-      unloadModel: () => Promise<void>;
-      isModelLoaded: () => Promise<boolean>;
-      infer: (
-        prompt: string,
-        options?: { maxTokens?: number },
-      ) => Promise<{ text: string; tokenCount: number }>;
-      inferBatch: (
-        prompts: string[],
-        options?: { maxTokens?: number },
-      ) => Promise<Array<{ text: string; tokenCount: number }>>;
-      getStorageUsage: () => Promise<{
-        used: number;
-        models: Array<{ id: string; size: number }>;
-      }>;
-      onDownloadProgress: (
-        callback: (progress: { modelId: string; progress: number }) => void,
-      ) => () => void;
-      removeDownloadProgressListener: () => void;
-      setIdlingStop: (enabled: boolean) => Promise<void>;
-    };
     power?: {
       /** Listen for debounced power state changes from main process */
-      onPowerStateChange: (callback: (state: 'ac' | 'battery') => void) => (() => void);
+      onPowerStateChange: (callback: (state: "ac" | "battery") => void) => () => void;
       /** Get current power state */
-      getPowerState: () => Promise<'ac' | 'battery'>;
+      getPowerState: () => Promise<"ac" | "battery">;
       /** Remove all power state change listeners */
       removeOnPowerStateChange: () => void;
     };
     /** Split editor popout window IPC */
     editor?: {
       /** Pop out a buffer to a new Electron window */
-      popoutPanel: (bufferId: string, content: string, fileName: string, fileType: string) => Promise<boolean>;
+      popoutPanel: (
+        bufferId: string,
+        content: string,
+        fileName: string,
+        fileType: string,
+      ) => Promise<boolean>;
       /** Send buffer content change to other windows */
       sendBufferSync: (bufferId: string, content: string) => void;
       /** Listen for buffer content changes from other windows */
-      onBufferSync: (callback: (data: { bufferId: string; content: string }) => void) => (() => void);
+      onBufferSync: (callback: (data: { bufferId: string; content: string }) => void) => () => void;
       /** Notify that a buffer was closed in this window */
       sendBufferClose: (bufferId: string) => void;
       /** Listen for buffer close events from other windows */
-      onBufferClose: (callback: (bufferId: string) => void) => (() => void);
+      onBufferClose: (callback: (bufferId: string) => void) => () => void;
       /** Remove all editor sync listeners */
       removeAllListeners: () => void;
+    };
+    /** PTY session management */
+    pty?: {
+      /**
+       * Spawn a new PTY session in the main process.
+       * @param options - Optional spawn configuration
+       * @returns sessionId on success, or error message
+       */
+      spawn: (options?: {
+        cwd?: string;
+        shell?: string;
+        cols?: number;
+        rows?: number;
+      }) => Promise<{ sessionId: string } | { error: string }>;
+      /**
+       * Re-attach to an existing session and retrieve its output ring buffer.
+       * @param sessionId - ID returned by spawn
+       */
+      attach: (sessionId: string) => Promise<
+        | {
+            sessionId: string;
+            status: "active" | "exited" | "killed";
+            exitCode: number | null;
+            outputBuffer: string;
+          }
+        | { error: string }
+      >;
+      /**
+       * Write keystroke data to a PTY session (max 64 KB).
+       * @param sessionId - Target session ID
+       * @param data - Raw input string
+       */
+      write: (sessionId: string, data: string) => Promise<{ ok: boolean }>;
+      /**
+       * Resize the terminal dimensions.
+       * @param sessionId - Target session ID
+       * @param cols - Column count (1–500)
+       * @param rows - Row count (1–500)
+       */
+      resize: (sessionId: string, cols: number, rows: number) => Promise<{ ok: boolean }>;
+      /**
+       * Kill a PTY session (idempotent).
+       * @param sessionId - Target session ID
+       */
+      kill: (sessionId: string) => Promise<{ ok: boolean }>;
+      /**
+       * Query the current state of a PTY session.
+       * @param sessionId - Target session ID
+       */
+      status: (sessionId: string) => Promise<
+        | {
+            sessionId: string;
+            status: "active" | "exited" | "killed";
+            exitCode: number | null;
+            shell: string;
+            cwd: string;
+            createdAt: number;
+          }
+        | { error: string }
+      >;
+      /**
+       * Listen for PTY output data pushed from the main process.
+       * Returns a cleanup function that removes the listener.
+       */
+      onData: (callback: (payload: { sessionId: string; data: string }) => void) => () => void;
+      /**
+       * Listen for PTY process exit notifications.
+       * Returns a cleanup function that removes the listener.
+       */
+      onExit: (callback: (payload: { sessionId: string; exitCode: number }) => void) => () => void;
     };
   }
 

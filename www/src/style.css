@@ -6,19 +6,19 @@
   color-scheme: dark; /* www landing page is always dark-themed */
 
   /* Snow-country monochrome palette — pure black/white, no blue-gray tints */
-  --color-bg:                 #060606;
-  --color-surface:            rgba(255, 255, 255, 0.04);
-  --color-surface-hover:      rgba(255, 255, 255, 0.08);
-  --color-border:             rgba(255, 255, 255, 0.12);
-  --color-border-hover:       rgba(255, 255, 255, 0.30);
-  --color-text:               #f0f0f0;
-  --color-text-muted:         rgba(240, 240, 240, 0.50);
-  --color-accent:             #ffffff;
-  --color-accent-dim:         rgba(255, 255, 255, 0.10);
-  --color-accent-hover:       #f0f0f0;
-  --color-accent-foreground:  #060606;
-  --color-border-strong:      rgba(255, 255, 255, 0.50);
-  --shadow-accent:            0 4px 24px rgba(255, 255, 255, 0.18);
+  --color-bg: #060606;
+  --color-surface: rgba(255, 255, 255, 0.04);
+  --color-surface-hover: rgba(255, 255, 255, 0.08);
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-border-hover: rgba(255, 255, 255, 0.3);
+  --color-text: #f0f0f0;
+  --color-text-muted: rgba(240, 240, 240, 0.5);
+  --color-accent: #ffffff;
+  --color-accent-dim: rgba(255, 255, 255, 0.1);
+  --color-accent-hover: #f0f0f0;
+  --color-accent-foreground: #060606;
+  --color-border-strong: rgba(255, 255, 255, 0.5);
+  --shadow-accent: 0 4px 24px rgba(255, 255, 255, 0.18);
   color: var(--color-text);
   --bg-image: none;
 
@@ -48,7 +48,7 @@ body {
 }
 
 body::before {
-  content: '';
+  content: "";
   position: fixed;
   inset: 0;
   /* Lighter overlay — let the snow-country landscape breathe through */
@@ -56,7 +56,7 @@ body::before {
     to bottom,
     rgba(4, 4, 5, 0.62) 0%,
     rgba(4, 4, 5, 0.78) 60%,
-    rgba(4, 4, 5, 0.90) 100%
+    rgba(4, 4, 5, 0.9) 100%
   );
   z-index: -1;
 }
@@ -84,7 +84,10 @@ body::before {
   padding: 0.5rem 1.1rem;
   background: var(--color-accent);
   border-radius: 6px;
-  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .nav-login-link:hover {
@@ -93,12 +96,90 @@ body::before {
   box-shadow: var(--shadow-accent);
 }
 
+/* Hamburger button — hidden on desktop */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.hamburger span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: var(--color-text);
+  border-radius: 2px;
+  transition:
+    transform 0.25s ease,
+    opacity 0.25s ease;
+  transform-origin: center;
+}
+
+/* X animation when open */
+.hamburger.is-open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.hamburger.is-open span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+.hamburger.is-open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Mobile dropdown menu */
+.mobile-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 180px;
+  background: rgba(12, 12, 12, 0.92);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+  pointer-events: none;
+}
+
+.mobile-menu.is-open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.mobile-menu-link {
+  display: block;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text);
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.mobile-menu-link:hover {
+  background: var(--color-surface-hover);
+}
+
 .hero {
   text-align: center;
   color: white;
   padding: 4rem 2rem;
 }
-
 
 h1 {
   font-size: 4rem;
@@ -119,7 +200,7 @@ h1 {
   height: auto;
   /* Crisp snow-light glow — pure white diffusion */
   filter: drop-shadow(0 1px 8px rgba(255, 255, 255, 0.15))
-          drop-shadow(0 0 48px rgba(255, 255, 255, 0.06));
+    drop-shadow(0 0 48px rgba(255, 255, 255, 0.06));
 }
 
 .title-logo svg path {
@@ -279,7 +360,9 @@ h1 {
   border-radius: 10px;
   padding: 1.75rem;
   color: var(--color-text);
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
@@ -519,7 +602,7 @@ h1 {
 
 .release-version {
   background: var(--color-accent-dim);
-  border: 1px solid rgba(255, 255, 255, 0.20);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 0.25rem 0.75rem;
   border-radius: 20px;
   font-weight: 600;
@@ -556,7 +639,9 @@ h1 {
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 1.5rem;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
@@ -719,7 +804,9 @@ h1 {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error-card {
@@ -761,7 +848,21 @@ h1 {
   }
 
   .hero {
-    padding: 2rem 1rem;
+    /* Extra top padding to clear the fixed nav and add breathing room below it */
+    padding: 5rem 1rem 2rem;
+  }
+
+  /* Switch to hamburger on mobile */
+  .nav-login-link {
+    display: none;
+  }
+
+  .hamburger {
+    display: flex;
+  }
+
+  .mobile-menu {
+    display: block;
   }
 
   h1 {
@@ -845,7 +946,7 @@ h1 {
 /* Small mobile breakpoint */
 @media (max-width: 480px) {
   .hero {
-    padding: 1.5rem 0.5rem;
+    padding: 4.5rem 0.5rem 1.5rem;
   }
 
   h1 {

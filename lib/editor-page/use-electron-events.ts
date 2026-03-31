@@ -73,8 +73,7 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
   useEffect(() => {
     if (!isElectron || typeof window === "undefined") return;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsubscribe = (window as any).electronAPI?.onPasteAsPlaintext?.(() => {
+    const unsubscribe = window.electronAPI?.onPasteAsPlaintext?.(() => {
       void handlePasteAsPlaintext();
     });
 
@@ -89,7 +88,9 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
     const cleanup = window.electronAPI?.onToggleCompactMode?.(() => {
       handleToggleCompactMode();
     });
-    return () => { cleanup?.(); };
+    return () => {
+      cleanup?.();
+    };
   }, [isElectron, handleToggleCompactMode]);
 
   // Format change IPC listener (line height, paragraph spacing, text indent, chars per line, paragraph numbers)
@@ -98,10 +99,11 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
     const cleanup = window.electronAPI?.onFormatChange?.((setting: string, action: string) => {
       switch (setting) {
         case "lineHeight": {
-          setLineHeight(prev => {
-            const next = action === "increase"
-              ? Math.min(3.0, +(prev + 0.1).toFixed(1))
-              : Math.max(1.0, +(prev - 0.1).toFixed(1));
+          setLineHeight((prev) => {
+            const next =
+              action === "increase"
+                ? Math.min(3.0, +(prev + 0.1).toFixed(1))
+                : Math.max(1.0, +(prev - 0.1).toFixed(1));
             incrementEditorKey();
             void persistAppState({ lineHeight: next });
             return next;
@@ -109,10 +111,11 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
           break;
         }
         case "paragraphSpacing": {
-          setParagraphSpacing(prev => {
-            const next = action === "increase"
-              ? Math.min(3.0, +(prev + 0.1).toFixed(1))
-              : Math.max(0, +(prev - 0.1).toFixed(1));
+          setParagraphSpacing((prev) => {
+            const next =
+              action === "increase"
+                ? Math.min(3.0, +(prev + 0.1).toFixed(1))
+                : Math.max(0, +(prev - 0.1).toFixed(1));
             incrementEditorKey();
             void persistAppState({ paragraphSpacing: next });
             return next;
@@ -120,10 +123,13 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
           break;
         }
         case "textIndent": {
-          setTextIndent(prev => {
-            const next = action === "none" ? 0
-              : action === "increase" ? Math.min(5, prev + 1)
-              : Math.max(0, prev - 1);
+          setTextIndent((prev) => {
+            const next =
+              action === "none"
+                ? 0
+                : action === "increase"
+                  ? Math.min(5, prev + 1)
+                  : Math.max(0, prev - 1);
             incrementEditorKey();
             void persistAppState({ textIndent: next });
             return next;
@@ -136,9 +142,8 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
             break;
           }
           // Manual adjustments only when auto is off
-          setCharsPerLine(prev => {
-            const next = action === "increase" ? prev + 5
-              : Math.max(1, prev - 5);
+          setCharsPerLine((prev) => {
+            const next = action === "increase" ? prev + 5 : Math.max(1, prev - 5);
             incrementEditorKey();
             void persistAppState({ charsPerLine: next });
             return next;
@@ -146,7 +151,7 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
           break;
         }
         case "paragraphNumbers": {
-          setShowParagraphNumbers(prev => {
+          setShowParagraphNumbers((prev) => {
             const next = !prev;
             void persistAppState({ showParagraphNumbers: next });
             return next;
@@ -155,8 +160,19 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
         }
       }
     });
-    return () => { cleanup?.(); };
-  }, [isElectron, setLineHeight, setParagraphSpacing, setTextIndent, setCharsPerLine, setShowParagraphNumbers, handleAutoCharsPerLineChange, incrementEditorKey]);
+    return () => {
+      cleanup?.();
+    };
+  }, [
+    isElectron,
+    setLineHeight,
+    setParagraphSpacing,
+    setTextIndent,
+    setCharsPerLine,
+    setShowParagraphNumbers,
+    handleAutoCharsPerLineChange,
+    incrementEditorKey,
+  ]);
 
   // Theme change IPC listener
   useEffect(() => {
@@ -164,7 +180,9 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
     const cleanup = window.electronAPI?.onThemeChange?.((mode) => {
       setThemeMode(mode);
     });
-    return () => { cleanup?.(); };
+    return () => {
+      cleanup?.();
+    };
   }, [isElectron, setThemeMode]);
 
   // Sync menu checked state to Electron main process
@@ -199,19 +217,23 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
   useEffect(() => {
     if (!isElectron || typeof window === "undefined") return;
     const cleanup = window.electronAPI?.onMenuOpenProject?.(() => {
-      void handleOpenProject();
+      void confirmBeforeAction(() => handleOpenProject());
     });
-    return () => { cleanup?.(); };
-  }, [isElectron, handleOpenProject]);
+    return () => {
+      cleanup?.();
+    };
+  }, [isElectron, confirmBeforeAction, handleOpenProject]);
 
   // Open recent project from menu IPC listener
   useEffect(() => {
     if (!isElectron || typeof window === "undefined") return;
     const cleanup = window.electronAPI?.onMenuOpenRecentProject?.((projectId: string) => {
-      void handleOpenRecentProject(projectId);
+      void confirmBeforeAction(() => handleOpenRecentProject(projectId));
     });
-    return () => { cleanup?.(); };
-  }, [isElectron, handleOpenRecentProject]);
+    return () => {
+      cleanup?.();
+    };
+  }, [isElectron, confirmBeforeAction, handleOpenRecentProject]);
 
   // Open as project (system-triggered, e.g., double-clicked .mdi in project dir)
   useEffect(() => {
@@ -219,6 +241,8 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
     const cleanup = window.electronAPI?.onOpenAsProject?.(({ projectPath, initialFile }) => {
       void confirmBeforeAction(() => handleOpenAsProject(projectPath, initialFile));
     });
-    return () => { cleanup?.(); };
+    return () => {
+      cleanup?.();
+    };
   }, [isElectron, confirmBeforeAction, handleOpenAsProject]);
 }

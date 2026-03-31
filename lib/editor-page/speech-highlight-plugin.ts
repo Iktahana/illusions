@@ -13,10 +13,7 @@ export const speechHighlightPlugin = new Plugin({
       const d = tr.getMeta("speechDecorations");
       if (d !== undefined) {
         return {
-          decorations:
-            d.length === 0
-              ? DecorationSet.empty
-              : DecorationSet.create(tr.doc, d),
+          decorations: d.length === 0 ? DecorationSet.empty : DecorationSet.create(tr.doc, d),
         };
       }
       return { decorations: value.decorations.map(tr.mapping, tr.doc) };

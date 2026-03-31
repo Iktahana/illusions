@@ -16,9 +16,7 @@ export default function OfflinePage() {
         textAlign: "center",
       }}
     >
-      <div style={{ fontSize: "4rem", marginBottom: "1.5rem" }}>
-        ✈
-      </div>
+      <div style={{ fontSize: "4rem", marginBottom: "1.5rem" }}>✈</div>
       <h1
         style={{
           fontSize: "1.5rem",

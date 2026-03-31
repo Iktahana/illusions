@@ -14,8 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // Mock the storage-types module for isElectronEnvironment
 let mockIsElectronValue = false;
 vi.mock("@/lib/storage/storage-types", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@/lib/storage/storage-types")>();
+  const actual = await importOriginal<typeof import("@/lib/storage/storage-types")>();
   return {
     ...actual,
     isElectronEnvironment: () => mockIsElectronValue,
@@ -70,18 +69,14 @@ describe("StorageService factory", () => {
       mockIsElectronValue = false;
 
       const service = createStorageService();
-      expect(
-        (service as unknown as { _provider: string })._provider
-      ).toBe("web");
+      expect((service as unknown as { _provider: string })._provider).toBe("web");
     });
 
     it("returns ElectronStorageProvider when in Electron environment", () => {
       mockIsElectronValue = true;
 
       const service = createStorageService();
-      expect(
-        (service as unknown as { _provider: string })._provider
-      ).toBe("electron");
+      expect((service as unknown as { _provider: string })._provider).toBe("electron");
     });
   });
 
@@ -124,12 +119,8 @@ describe("StorageService factory", () => {
       mockIsElectronValue = true;
       const second = getStorageService();
 
-      expect(
-        (first as unknown as { _provider: string })._provider
-      ).toBe("web");
-      expect(
-        (second as unknown as { _provider: string })._provider
-      ).toBe("electron");
+      expect((first as unknown as { _provider: string })._provider).toBe("web");
+      expect((second as unknown as { _provider: string })._provider).toBe("electron");
     });
   });
 });

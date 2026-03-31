@@ -1,38 +1,38 @@
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { createHash } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(__dirname, "..");
 
 const fonts = [
-  { family: 'Noto Serif JP', weights: [400, 700] },
-  { family: 'Noto Sans JP', weights: [400, 700] },
-  { family: 'Shippori Mincho', weights: [400, 700] },
-  { family: 'Zen Kaku Gothic New', weights: [400, 700] },
-  { family: 'M PLUS Rounded 1c', weights: [400, 700] },
-  { family: 'Fira Code', weights: [400, 700] },
+  { family: "Noto Serif JP", weights: [400, 700] },
+  { family: "Noto Sans JP", weights: [400, 700] },
+  { family: "Shippori Mincho", weights: [400, 700] },
+  { family: "Zen Kaku Gothic New", weights: [400, 700] },
+  { family: "M PLUS Rounded 1c", weights: [400, 700] },
+  { family: "Fira Code", weights: [400, 700] },
 ];
 
 const userAgent =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:121.0) Gecko/20100101 Firefox/121.0';
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:121.0) Gecko/20100101 Firefox/121.0";
 
 function slugifyFontFamily(family) {
   return family
     .toLowerCase()
-    .replace(/['"]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function familyToGoogleParam(family) {
-  return family.trim().replace(/\s+/g, '+');
+  return family.trim().replace(/\s+/g, "+");
 }
 
 function hashUrl(url) {
-  return createHash('sha1').update(url).digest('hex').slice(0, 12);
+  return createHash("sha1").update(url).digest("hex").slice(0, 12);
 }
 
 async function fileExists(filePath) {
@@ -46,12 +46,12 @@ async function fileExists(filePath) {
 
 async function fetchGoogleCss({ family, weights }) {
   const familyParam = familyToGoogleParam(family);
-  const weightParam = weights.join(';');
+  const weightParam = weights.join(";");
   const url = `https://fonts.googleapis.com/css2?family=${familyParam}:wght@${weightParam}&display=swap`;
 
   const res = await fetch(url, {
     headers: {
-      'User-Agent': userAgent,
+      "User-Agent": userAgent,
     },
   });
 
@@ -64,8 +64,7 @@ async function fetchGoogleCss({ family, weights }) {
 
 function extractWoff2Urls(cssText) {
   const urls = new Set();
-  const re =
-    /url\((['"]?)(https:\/\/fonts\.gstatic\.com\/[^)'"]+)\1\)\s*format\(['"]woff2['"]\)/g;
+  const re = /url\((['"]?)(https:\/\/fonts\.gstatic\.com\/[^)'"]+)\1\)\s*format\(['"]woff2['"]\)/g;
   let match;
   while ((match = re.exec(cssText)) !== null) {
     urls.add(match[2]);
@@ -74,7 +73,7 @@ function extractWoff2Urls(cssText) {
 }
 
 async function downloadToFile(url, filePath) {
-  const res = await fetch(url, { headers: { 'User-Agent': userAgent } });
+  const res = await fetch(url, { headers: { "User-Agent": userAgent } });
   if (!res.ok) {
     throw new Error(`Failed to download ${url} (${res.status} ${res.statusText})`);
   }
@@ -83,12 +82,12 @@ async function downloadToFile(url, filePath) {
 }
 
 async function main() {
-  const publicFontsDir = path.join(repoRoot, 'public', 'fonts');
-  const appCssPath = path.join(repoRoot, 'app', 'local-fonts.css');
+  const publicFontsDir = path.join(repoRoot, "public", "fonts");
+  const appCssPath = path.join(repoRoot, "app", "local-fonts.css");
 
   await mkdir(publicFontsDir, { recursive: true });
 
-  let combinedCss = '';
+  let combinedCss = "";
 
   for (const font of fonts) {
     const slug = slugifyFontFamily(font.family);
@@ -126,18 +125,16 @@ async function main() {
 
 `;
 
-  await writeFile(appCssPath, header + combinedCss.trimEnd() + '\n');
+  await writeFile(appCssPath, header + combinedCss.trimEnd() + "\n");
 
-  const written = await readFile(appCssPath, 'utf8');
-  if (!written.includes('@font-face')) {
-    throw new Error(
-      `Generated ${path.relative(repoRoot, appCssPath)} does not include @font-face`
-    );
+  const written = await readFile(appCssPath, "utf8");
+  if (!written.includes("@font-face")) {
+    throw new Error(`Generated ${path.relative(repoRoot, appCssPath)} does not include @font-face`);
   }
 
   // eslint-disable-next-line no-console
   console.log(
-    `Wrote ${path.relative(repoRoot, appCssPath)} and downloaded fonts into public/fonts/`
+    `Wrote ${path.relative(repoRoot, appCssPath)} and downloaded fonts into public/fonts/`,
   );
 }
 

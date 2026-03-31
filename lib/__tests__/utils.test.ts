@@ -381,9 +381,7 @@ describe("cleanMarkdown", () => {
   });
 
   it("should extract text from links", () => {
-    expect(cleanMarkdown("[click here](https://example.com)")).toBe(
-      "click here"
-    );
+    expect(cleanMarkdown("[click here](https://example.com)")).toBe("click here");
   });
 
   it("should handle image syntax (link regex matches first, leaving '!')", () => {
@@ -698,24 +696,18 @@ describe("calculateAveragePunctuationSpacing", () => {
 // ---------------------------------------------------------------------------
 describe("calculateReadabilityScore", () => {
   it("should return a score between 0 and 100", () => {
-    const result = calculateReadabilityScore(
-      "吾輩は猫である。名前はまだない。"
-    );
+    const result = calculateReadabilityScore("吾輩は猫である。名前はまだない。");
     expect(result.score).toBeGreaterThanOrEqual(0);
     expect(result.score).toBeLessThanOrEqual(100);
   });
 
   it("should return a level of 'easy', 'normal', or 'difficult'", () => {
-    const result = calculateReadabilityScore(
-      "吾輩は猫である。名前はまだない。"
-    );
+    const result = calculateReadabilityScore("吾輩は猫である。名前はまだない。");
     expect(["easy", "normal", "difficult"]).toContain(result.level);
   });
 
   it("should include avgSentenceLength and avgPunctuationSpacing", () => {
-    const result = calculateReadabilityScore(
-      "短い文。もう一つ。"
-    );
+    const result = calculateReadabilityScore("短い文。もう一つ。");
     expect(typeof result.avgSentenceLength).toBe("number");
     expect(typeof result.avgPunctuationSpacing).toBe("number");
   });

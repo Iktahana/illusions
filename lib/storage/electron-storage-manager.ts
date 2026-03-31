@@ -6,12 +6,7 @@
 
 import * as path from "path";
 import { app } from "electron";
-import type {
-  StorageSession,
-  AppState,
-  RecentFile,
-  EditorBuffer,
-} from "./storage-types";
+import type { StorageSession, AppState, RecentFile, EditorBuffer } from "./storage-types";
 
 // better-sqlite3 用の型定義
 interface StatementResult {
@@ -59,13 +54,12 @@ export class ElectronStorageManager {
       throw new Error("better-sqlite3 モジュールが利用できません");
     }
 
-    this.db = new DatabaseModule(this.dbPath);
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    this.db!.pragma("journal_mode = WAL");
+    const db = new DatabaseModule(this.dbPath);
+    this.db = db;
+    db.pragma("journal_mode = WAL");
 
     // 必要ならテーブルを作成
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    this.db!.exec(`
+    db.exec(`
       CREATE TABLE IF NOT EXISTS app_state (
         id TEXT PRIMARY KEY,
         data TEXT NOT NULL,
@@ -100,8 +94,7 @@ export class ElectronStorageManager {
       );
     `);
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return this.db!;
+    return db;
   }
 
   /**
@@ -130,12 +123,7 @@ export class ElectronStorageManager {
         VALUES (?, ?, ?, ?)
       `);
       for (const file of session.recentFiles) {
-        insertRecent.run(
-          `recent_${file.path}`,
-          file.path,
-          JSON.stringify(file),
-          now
-        );
+        insertRecent.run(`recent_${file.path}`, file.path, JSON.stringify(file), now);
       }
 
       // editorBuffer
@@ -144,11 +132,7 @@ export class ElectronStorageManager {
           INSERT OR REPLACE INTO editor_buffer (id, data, updated_at)
           VALUES (?, ?, ?)
         `);
-        insertBuffer.run(
-          "editor_buffer",
-          JSON.stringify(session.editorBuffer),
-          now
-        );
+        insertBuffer.run("editor_buffer", JSON.stringify(session.editorBuffer), now);
       } else {
         const deleteBuffer = db.prepare("DELETE FROM editor_buffer");
         deleteBuffer.run();
@@ -227,12 +211,7 @@ export class ElectronStorageManager {
         INSERT INTO recent_files (id, path, data, updated_at)
         VALUES (?, ?, ?, ?)
       `);
-      insertStmt.run(
-        `recent_${file.path}`,
-        file.path,
-        JSON.stringify(file),
-        Date.now()
-      );
+      insertStmt.run(`recent_${file.path}`, file.path, JSON.stringify(file), Date.now());
 
       // 10件に丸める
       const countStmt = db.prepare("SELECT COUNT(*) as count FROM recent_files");
@@ -261,9 +240,7 @@ export class ElectronStorageManager {
    */
   getRecentFiles(): RecentFile[] {
     const db = this.ensureInitialized();
-    const stmt = db.prepare(
-      "SELECT data FROM recent_files ORDER BY updated_at DESC LIMIT 10"
-    );
+    const stmt = db.prepare("SELECT data FROM recent_files ORDER BY updated_at DESC LIMIT 10");
     const rows = stmt.all() as { data: string }[];
     return rows.map((row) => JSON.parse(row.data));
   }
@@ -320,20 +297,14 @@ export class ElectronStorageManager {
   /**
    * 最近使ったプロジェクトへ追加する（最大10件）
    */
-  addRecentProject(project: {
-    id: string;
-    rootPath: string;
-    name: string;
-  }): void {
+  addRecentProject(project: { id: string; rootPath: string; name: string }): void {
     const db = this.ensureInitialized();
 
     try {
       db.exec("BEGIN TRANSACTION");
 
       // Remove existing entry for this root path
-      const deleteStmt = db.prepare(
-        "DELETE FROM recent_projects WHERE root_path = ?"
-      );
+      const deleteStmt = db.prepare("DELETE FROM recent_projects WHERE root_path = ?");
       deleteStmt.run(project.rootPath);
 
       // Insert new entry
@@ -346,13 +317,11 @@ export class ElectronStorageManager {
         project.rootPath,
         project.name,
         JSON.stringify(project),
-        Date.now()
+        Date.now(),
       );
 
       // Trim to 10 entries
-      const countStmt = db.prepare(
-        "SELECT COUNT(*) as count FROM recent_projects"
-      );
+      const countStmt = db.prepare("SELECT COUNT(*) as count FROM recent_projects");
       const countResult = countStmt.get() as { count: number };
 
       if (countResult.count > 10) {
@@ -382,9 +351,7 @@ export class ElectronStorageManager {
     name: string;
   }> {
     const db = this.ensureInitialized();
-    const stmt = db.prepare(
-      "SELECT data FROM recent_projects ORDER BY updated_at DESC LIMIT 10"
-    );
+    const stmt = db.prepare("SELECT data FROM recent_projects ORDER BY updated_at DESC LIMIT 10");
     const rows = stmt.all() as { data: string }[];
     return rows.map((row) => JSON.parse(row.data));
   }

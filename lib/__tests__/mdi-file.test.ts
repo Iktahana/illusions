@@ -32,21 +32,14 @@ vi.mock("@/lib/utils/runtime-env", () => ({
 
 import { openMdiFile, saveMdiFile } from "@/lib/project/mdi-file";
 
-import type {
-  MdiFileDescriptor,
-  OpenMdiResult,
-  SaveMdiParams,
-} from "@/lib/project/mdi-file";
+import type { MdiFileDescriptor, OpenMdiResult, SaveMdiParams } from "@/lib/project/mdi-file";
 
 // -----------------------------------------------------------------------
 // Mock helpers
 // -----------------------------------------------------------------------
 
 /** Create a minimal mock FileSystemFileHandle for browser tests. */
-function createMockFileHandle(
-  name: string,
-  content: string
-): FileSystemFileHandle {
+function createMockFileHandle(name: string, content: string): FileSystemFileHandle {
   const mockFile = new File([content], name, { type: "text/plain" });
 
   let writtenContent = content;
@@ -62,9 +55,7 @@ function createMockFileHandle(
   return {
     kind: "file" as const,
     name,
-    getFile: vi.fn(async () =>
-      new File([writtenContent], name, { type: "text/plain" })
-    ),
+    getFile: vi.fn(async () => new File([writtenContent], name, { type: "text/plain" })),
     createWritable: vi.fn(async () => mockWritable),
     isSameEntry: vi.fn(async () => false),
     queryPermission: vi.fn(async () => "granted" as PermissionState),
@@ -177,9 +168,7 @@ describe("openMdiFile", () => {
       mockIsBrowser.mockReturnValue(true);
 
       const fileHandle = createMockFileHandle("novel.mdi", "MDI content here");
-      (window as any).showOpenFilePicker = vi
-        .fn()
-        .mockResolvedValue([fileHandle]);
+      (window as any).showOpenFilePicker = vi.fn().mockResolvedValue([fileHandle]);
 
       const result = await openMdiFile();
 
@@ -195,9 +184,7 @@ describe("openMdiFile", () => {
       mockIsBrowser.mockReturnValue(true);
 
       const abortError = new DOMException("User cancelled", "AbortError");
-      (window as any).showOpenFilePicker = vi
-        .fn()
-        .mockRejectedValue(abortError);
+      (window as any).showOpenFilePicker = vi.fn().mockRejectedValue(abortError);
 
       const result = await openMdiFile();
       expect(result).toBeNull();
@@ -242,9 +229,7 @@ describe("saveMdiFile", () => {
     it("should save to an existing path and return result", async () => {
       mockGetRuntimeEnvironment.mockReturnValue("electron-renderer");
       (window as any).electronAPI = {
-        saveFile: vi
-          .fn()
-          .mockResolvedValue("/Users/test/novel/chapter1.mdi"),
+        saveFile: vi.fn().mockResolvedValue("/Users/test/novel/chapter1.mdi"),
       };
 
       const descriptor: MdiFileDescriptor = {
@@ -265,16 +250,14 @@ describe("saveMdiFile", () => {
       expect((window as any).electronAPI.saveFile).toHaveBeenCalledWith(
         "/Users/test/novel/chapter1.mdi",
         "Updated content",
-        ".mdi"
+        ".mdi",
       );
     });
 
     it("should save new file (no existing descriptor) with Save As dialog", async () => {
       mockGetRuntimeEnvironment.mockReturnValue("electron-renderer");
       (window as any).electronAPI = {
-        saveFile: vi
-          .fn()
-          .mockResolvedValue("/Users/test/novel/new-file.mdi"),
+        saveFile: vi.fn().mockResolvedValue("/Users/test/novel/new-file.mdi"),
       };
 
       const result = await saveMdiFile({
@@ -288,7 +271,7 @@ describe("saveMdiFile", () => {
       expect((window as any).electronAPI.saveFile).toHaveBeenCalledWith(
         null,
         "New file content",
-        ".mdi"
+        ".mdi",
       );
     });
 
@@ -317,9 +300,9 @@ describe("saveMdiFile", () => {
 
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      await expect(
-        saveMdiFile({ descriptor: null, content: "content" })
-      ).rejects.toThrow("Disk full");
+      await expect(saveMdiFile({ descriptor: null, content: "content" })).rejects.toThrow(
+        "Disk full",
+      );
 
       consoleSpy.mockRestore();
     });
@@ -332,9 +315,9 @@ describe("saveMdiFile", () => {
 
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      await expect(
-        saveMdiFile({ descriptor: null, content: "content" })
-      ).rejects.toThrow("IPC failure");
+      await expect(saveMdiFile({ descriptor: null, content: "content" })).rejects.toThrow(
+        "IPC failure",
+      );
 
       consoleSpy.mockRestore();
     });
@@ -342,9 +325,7 @@ describe("saveMdiFile", () => {
     it("should use the correct file extension for .md files", async () => {
       mockGetRuntimeEnvironment.mockReturnValue("electron-renderer");
       (window as any).electronAPI = {
-        saveFile: vi
-          .fn()
-          .mockResolvedValue("/Users/test/doc.md"),
+        saveFile: vi.fn().mockResolvedValue("/Users/test/doc.md"),
       };
 
       const result = await saveMdiFile({
@@ -355,11 +336,7 @@ describe("saveMdiFile", () => {
 
       expect(result).not.toBeNull();
       expect(result!.descriptor.name).toBe("doc.md");
-      expect((window as any).electronAPI.saveFile).toHaveBeenCalledWith(
-        null,
-        "# Heading",
-        ".md"
-      );
+      expect((window as any).electronAPI.saveFile).toHaveBeenCalledWith(null, "# Heading", ".md");
     });
   });
 
@@ -406,9 +383,7 @@ describe("saveMdiFile", () => {
       mockIsBrowser.mockReturnValue(true);
 
       const savedHandle = createMockFileHandle("saved.mdi", "");
-      (window as any).showSaveFilePicker = vi
-        .fn()
-        .mockResolvedValue(savedHandle);
+      (window as any).showSaveFilePicker = vi.fn().mockResolvedValue(savedHandle);
 
       const result = await saveMdiFile({
         descriptor: null,
@@ -441,9 +416,7 @@ describe("saveMdiFile", () => {
       mockIsBrowser.mockReturnValue(true);
 
       const abortError = new DOMException("User cancelled", "AbortError");
-      (window as any).showSaveFilePicker = vi
-        .fn()
-        .mockRejectedValue(abortError);
+      (window as any).showSaveFilePicker = vi.fn().mockRejectedValue(abortError);
 
       const result = await saveMdiFile({
         descriptor: null,

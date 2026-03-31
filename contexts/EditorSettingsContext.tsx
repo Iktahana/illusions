@@ -31,16 +31,9 @@ export function EditorSettingsProvider({
   settings,
   handlers,
 }: EditorSettingsProviderProps): React.JSX.Element {
-  const value = useMemo(
-    () => ({ settings, handlers }),
-    [settings, handlers],
-  );
+  const value = useMemo(() => ({ settings, handlers }), [settings, handlers]);
 
-  return (
-    <EditorSettingsContext.Provider value={value}>
-      {children}
-    </EditorSettingsContext.Provider>
-  );
+  return <EditorSettingsContext.Provider value={value}>{children}</EditorSettingsContext.Provider>;
 }
 
 /**
@@ -50,9 +43,7 @@ export function EditorSettingsProvider({
 export function useEditorSettingsContext(): EditorSettingsContextValue {
   const ctx = useContext(EditorSettingsContext);
   if (!ctx) {
-    throw new Error(
-      "useEditorSettingsContext must be used within an EditorSettingsProvider",
-    );
+    throw new Error("useEditorSettingsContext must be used within an EditorSettingsProvider");
   }
   return ctx;
 }
@@ -64,114 +55,170 @@ export function useEditorSettingsContext(): EditorSettingsContextValue {
 /** Typography and display settings */
 export function useTypographySettings() {
   const { settings, handlers } = useEditorSettingsContext();
-  return useMemo(() => ({
-    fontScale: settings.fontScale,
-    lineHeight: settings.lineHeight,
-    paragraphSpacing: settings.paragraphSpacing,
-    textIndent: settings.textIndent,
-    fontFamily: settings.fontFamily,
-    charsPerLine: settings.charsPerLine,
-    autoCharsPerLine: settings.autoCharsPerLine,
-    showParagraphNumbers: settings.showParagraphNumbers,
-    onFontScaleChange: handlers.handleFontScaleChange,
-    onLineHeightChange: handlers.handleLineHeightChange,
-    onParagraphSpacingChange: handlers.handleParagraphSpacingChange,
-    onTextIndentChange: handlers.handleTextIndentChange,
-    onFontFamilyChange: handlers.handleFontFamilyChange,
-    onCharsPerLineChange: handlers.handleCharsPerLineChange,
-    onAutoCharsPerLineChange: handlers.handleAutoCharsPerLineChange,
-    onShowParagraphNumbersChange: handlers.handleShowParagraphNumbersChange,
-  }), [settings, handlers]);
+  return useMemo(
+    () => ({
+      fontScale: settings.fontScale,
+      lineHeight: settings.lineHeight,
+      paragraphSpacing: settings.paragraphSpacing,
+      textIndent: settings.textIndent,
+      fontFamily: settings.fontFamily,
+      charsPerLine: settings.charsPerLine,
+      autoCharsPerLine: settings.autoCharsPerLine,
+      showParagraphNumbers: settings.showParagraphNumbers,
+      onFontScaleChange: handlers.handleFontScaleChange,
+      onLineHeightChange: handlers.handleLineHeightChange,
+      onParagraphSpacingChange: handlers.handleParagraphSpacingChange,
+      onTextIndentChange: handlers.handleTextIndentChange,
+      onFontFamilyChange: handlers.handleFontFamilyChange,
+      onCharsPerLineChange: handlers.handleCharsPerLineChange,
+      onAutoCharsPerLineCalc: handlers.handleAutoCharsPerLineCalc,
+      onAutoCharsPerLineChange: handlers.handleAutoCharsPerLineChange,
+      onShowParagraphNumbersChange: handlers.handleShowParagraphNumbersChange,
+    }),
+    [settings, handlers],
+  );
 }
 
 /** Linting configuration */
 export function useLintingSettings() {
   const { settings, handlers } = useEditorSettingsContext();
-  return useMemo(() => ({
-    lintingEnabled: settings.lintingEnabled,
-    lintingRuleConfigs: settings.lintingRuleConfigs,
-    correctionConfig: settings.correctionConfig,
-    onLintingEnabledChange: handlers.handleLintingEnabledChange,
-    onLintingRuleConfigChange: handlers.handleLintingRuleConfigChange,
-    onLintingRuleConfigsBatchChange: handlers.handleLintingRuleConfigsBatchChange,
-    onCorrectionConfigChange: handlers.handleCorrectionConfigChange,
-  }), [settings, handlers]);
+  return useMemo(
+    () => ({
+      lintingEnabled: settings.lintingEnabled,
+      lintingRuleConfigs: settings.lintingRuleConfigs,
+      correctionConfig: settings.correctionConfig,
+      onLintingEnabledChange: handlers.handleLintingEnabledChange,
+      onLintingRuleConfigChange: handlers.handleLintingRuleConfigChange,
+      onLintingRuleConfigsBatchChange: handlers.handleLintingRuleConfigsBatchChange,
+      onCorrectionConfigChange: handlers.handleCorrectionConfigChange,
+    }),
+    [settings, handlers],
+  );
 }
 
-/** LLM configuration */
-export function useLlmSettings() {
+/** Character extraction settings */
+export function useCharacterExtractionSettings() {
   const { settings, handlers } = useEditorSettingsContext();
-  return useMemo(() => ({
-    llmEnabled: settings.llmEnabled,
-    llmModelId: settings.llmModelId,
-    llmIdlingStop: settings.llmIdlingStop,
-    characterExtractionBatchSize: settings.characterExtractionBatchSize,
-    characterExtractionConcurrency: settings.characterExtractionConcurrency,
-    onLlmEnabledChange: handlers.handleLlmEnabledChange,
-    onLlmModelIdChange: handlers.handleLlmModelIdChange,
-    onLlmIdlingStopChange: handlers.handleLlmIdlingStopChange,
-    onCharacterExtractionBatchSizeChange: handlers.handleCharacterExtractionBatchSizeChange,
-    onCharacterExtractionConcurrencyChange: handlers.handleCharacterExtractionConcurrencyChange,
-  }), [settings, handlers]);
+  return useMemo(
+    () => ({
+      characterExtractionBatchSize: settings.characterExtractionBatchSize,
+      characterExtractionConcurrency: settings.characterExtractionConcurrency,
+      onCharacterExtractionBatchSizeChange: handlers.handleCharacterExtractionBatchSizeChange,
+      onCharacterExtractionConcurrencyChange: handlers.handleCharacterExtractionConcurrencyChange,
+    }),
+    [settings, handlers],
+  );
 }
 
 /** POS highlight configuration */
 export function usePosHighlightSettings() {
   const { settings, handlers } = useEditorSettingsContext();
-  return useMemo(() => ({
-    posHighlightEnabled: settings.posHighlightEnabled,
-    posHighlightColors: settings.posHighlightColors,
-    onPosHighlightEnabledChange: handlers.handlePosHighlightEnabledChange,
-    onPosHighlightColorsChange: handlers.handlePosHighlightColorsChange,
-  }), [settings, handlers]);
+  return useMemo(
+    () => ({
+      posHighlightEnabled: settings.posHighlightEnabled,
+      posHighlightColors: settings.posHighlightColors,
+      posHighlightDisabledTypes: settings.posHighlightDisabledTypes,
+      onPosHighlightEnabledChange: handlers.handlePosHighlightEnabledChange,
+      onPosHighlightColorsChange: handlers.handlePosHighlightColorsChange,
+      onPosHighlightDisabledTypesChange: handlers.handlePosHighlightDisabledTypesChange,
+    }),
+    [settings, handlers],
+  );
 }
 
 /** Scroll behavior configuration */
 export function useScrollSettings() {
   const { settings, handlers } = useEditorSettingsContext();
-  return useMemo(() => ({
-    verticalScrollBehavior: settings.verticalScrollBehavior,
-    scrollSensitivity: settings.scrollSensitivity,
-    onVerticalScrollBehaviorChange: handlers.handleVerticalScrollBehaviorChange,
-    onScrollSensitivityChange: handlers.handleScrollSensitivityChange,
-  }), [settings, handlers]);
+  return useMemo(
+    () => ({
+      verticalScrollBehavior: settings.verticalScrollBehavior,
+      scrollSensitivity: settings.scrollSensitivity,
+      onVerticalScrollBehaviorChange: handlers.handleVerticalScrollBehaviorChange,
+      onScrollSensitivityChange: handlers.handleScrollSensitivityChange,
+    }),
+    [settings, handlers],
+  );
 }
 
 /** Power saving configuration */
 export function usePowerSettings() {
   const { settings, handlers } = useEditorSettingsContext();
-  return useMemo(() => ({
-    powerSaveMode: settings.powerSaveMode,
-    autoPowerSaveOnBattery: settings.autoPowerSaveOnBattery,
-    onPowerSaveModeChange: handlers.handlePowerSaveModeChange,
-    onAutoPowerSaveOnBatteryChange: handlers.handleAutoPowerSaveOnBatteryChange,
-  }), [settings, handlers]);
+  return useMemo(
+    () => ({
+      powerSaveMode: settings.powerSaveMode,
+      autoPowerSaveOnBattery: settings.autoPowerSaveOnBattery,
+      onPowerSaveModeChange: handlers.handlePowerSaveModeChange,
+      onAutoPowerSaveOnBatteryChange: handlers.handleAutoPowerSaveOnBatteryChange,
+    }),
+    [settings, handlers],
+  );
 }
 
 /** UI settings (compact mode, auto-save, settings modal) */
 export function useUISettings() {
   const { settings, handlers } = useEditorSettingsContext();
-  return useMemo(() => ({
-    compactMode: settings.compactMode,
-    autoSave: settings.autoSave,
-    showSettingsModal: settings.showSettingsModal,
-    onToggleCompactMode: handlers.handleToggleCompactMode,
-    onAutoSaveChange: handlers.handleAutoSaveChange,
-    setShowSettingsModal: handlers.setShowSettingsModal,
-  }), [settings, handlers]);
+  return useMemo(
+    () => ({
+      compactMode: settings.compactMode,
+      autoSave: settings.autoSave,
+      showSettingsModal: settings.showSettingsModal,
+      onToggleCompactMode: handlers.handleToggleCompactMode,
+      onAutoSaveChange: handlers.handleAutoSaveChange,
+      setShowSettingsModal: handlers.setShowSettingsModal,
+    }),
+    [settings, handlers],
+  );
 }
 
 /** Speech / TTS configuration */
 export function useSpeechSettings() {
   const { settings, handlers } = useEditorSettingsContext();
-  return useMemo(() => ({
-    speechVoiceURI: settings.speechVoiceURI,
-    speechRate: settings.speechRate,
-    speechPitch: settings.speechPitch,
-    speechVolume: settings.speechVolume,
-    onSpeechVoiceURIChange: handlers.handleSpeechVoiceURIChange,
-    onSpeechRateChange: handlers.handleSpeechRateChange,
-    onSpeechPitchChange: handlers.handleSpeechPitchChange,
-    onSpeechVolumeChange: handlers.handleSpeechVolumeChange,
-  }), [settings, handlers]);
+  return useMemo(
+    () => ({
+      speechVoiceURI: settings.speechVoiceURI,
+      speechRate: settings.speechRate,
+      speechPitch: settings.speechPitch,
+      speechVolume: settings.speechVolume,
+      onSpeechVoiceURIChange: handlers.handleSpeechVoiceURIChange,
+      onSpeechRateChange: handlers.handleSpeechRateChange,
+      onSpeechPitchChange: handlers.handleSpeechPitchChange,
+      onSpeechVolumeChange: handlers.handleSpeechVolumeChange,
+    }),
+    [settings, handlers],
+  );
+}
+
+/** Terminal configuration */
+export function useTerminalSettings() {
+  const { settings, handlers } = useEditorSettingsContext();
+  return useMemo(
+    () => ({
+      terminalBackground: settings.terminalBackground,
+      terminalForeground: settings.terminalForeground,
+      terminalFontFamily: settings.terminalFontFamily,
+      terminalFontSize: settings.terminalFontSize,
+      terminalLineHeight: settings.terminalLineHeight,
+      terminalCursorStyle: settings.terminalCursorStyle,
+      terminalCursorBlink: settings.terminalCursorBlink,
+      terminalScrollback: settings.terminalScrollback,
+      terminalCopyOnSelect: settings.terminalCopyOnSelect,
+      terminalMacOptionIsMeta: settings.terminalMacOptionIsMeta,
+      terminalDefaultShell: settings.terminalDefaultShell,
+      terminalAnsiColors: settings.terminalAnsiColors,
+      onTerminalBackgroundChange: handlers.handleTerminalBackgroundChange,
+      onTerminalForegroundChange: handlers.handleTerminalForegroundChange,
+      onTerminalFontFamilyChange: handlers.handleTerminalFontFamilyChange,
+      onTerminalFontSizeChange: handlers.handleTerminalFontSizeChange,
+      onTerminalLineHeightChange: handlers.handleTerminalLineHeightChange,
+      onTerminalCursorStyleChange: handlers.handleTerminalCursorStyleChange,
+      onTerminalCursorBlinkChange: handlers.handleTerminalCursorBlinkChange,
+      onTerminalScrollbackChange: handlers.handleTerminalScrollbackChange,
+      onTerminalCopyOnSelectChange: handlers.handleTerminalCopyOnSelectChange,
+      onTerminalMacOptionIsMetaChange: handlers.handleTerminalMacOptionIsMetaChange,
+      onTerminalDefaultShellChange: handlers.handleTerminalDefaultShellChange,
+      onTerminalAnsiColorChange: handlers.handleTerminalAnsiColorChange,
+      onTerminalAnsiColorsReset: handlers.handleTerminalAnsiColorsReset,
+    }),
+    [settings, handlers],
+  );
 }

@@ -1,0 +1,127 @@
+name: Sync Microsoft Store Listing
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Submission mode"
+        required: true
+        type: choice
+        options:
+          - listing-only
+          - full-submission
+        default: listing-only
+      release_tag:
+        description: "GitHub Release tag to download .appx from (required for full-submission, e.g. v0.2.0)"
+        required: false
+        type: string
+      dry_run:
+        description: "Dry run — log actions without mutating"
+        required: false
+        type: boolean
+        default: false
+
+  workflow_call:
+    inputs:
+      mode:
+        description: "Submission mode (listing-only | full-submission)"
+        required: true
+        type: string
+      release_tag:
+        description: "GitHub Release tag to download .appx from (required for full-submission)"
+        required: false
+        type: string
+      dry_run:
+        description: "Dry run — log actions without mutating"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  submit:
+    name: Submit to Microsoft Store (${{ inputs.mode }})
+    runs-on: windows-latest
+    environment: MicrosoftStore
+    env:
+      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+      STORE_PRODUCT_ID: ${{ vars.STORE_PRODUCT_ID }}
+      SUBMISSION_MODE: ${{ inputs.mode }}
+      DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+
+    steps:
+      - name: Verify running from main branch or version tag
+        shell: bash
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ] && [[ "${{ github.ref }}" != refs/tags/v* ]]; then
+            echo "::error::This workflow may only be run from main or a version tag (refs/tags/v*). Current ref: ${{ github.ref }}"
+            exit 1
+          fi
+
+      - name: Checkout repository (main)
+        uses: actions/checkout@v4
+        with:
+          ref: refs/heads/main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate inputs
+        shell: bash
+        run: |
+          if [ "${{ inputs.mode }}" != "listing-only" ] && [ "${{ inputs.mode }}" != "full-submission" ]; then
+            echo "::error::mode must be 'listing-only' or 'full-submission', got: ${{ inputs.mode }}"
+            exit 1
+          fi
+          if [ "${{ inputs.mode }}" = "full-submission" ] && [ -z "${{ inputs.release_tag }}" ]; then
+            echo "::error::release_tag is required for full-submission mode"
+            exit 1
+          fi
+
+      - name: Generate release notes (full-submission)
+        if: inputs.mode == 'full-submission'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NOTES_MODEL: ${{ vars.RELEASE_NOTES_MODEL || 'gpt-4o-mini' }}
+        run: |
+          node scripts/generate-release-notes.mjs \
+            --to "${{ inputs.release_tag }}" \
+            --out store/microsoft/ja-JP/release-notes.md
+          echo "--- Generated release notes ---"
+          cat store/microsoft/ja-JP/release-notes.md
+
+      - name: Write empty release notes stub (listing-only)
+        if: inputs.mode == 'listing-only'
+        shell: bash
+        run: echo "" > store/microsoft/ja-JP/release-notes.md
+
+      - name: Download MSIX packages from GitHub Release
+        if: inputs.mode == 'full-submission'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          New-Item -ItemType Directory -Path msix-packages -Force | Out-Null
+          gh release download $env:RELEASE_TAG --pattern "*.appx" --dir msix-packages --repo $env:GITHUB_REPOSITORY
+
+          $appxFiles = Get-ChildItem "msix-packages\*.appx"
+          if ($appxFiles.Count -eq 0) {
+            throw "No .appx packages found in release $env:RELEASE_TAG"
+          }
+          Write-Host "Downloaded $($appxFiles.Count) .appx package(s):"
+          $appxFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
+
+      - name: Submit to Microsoft Store
+        env:
+          MSIX_DIR: msix-packages
+        run: node scripts/submit-store.mjs

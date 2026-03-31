@@ -8,6 +8,7 @@ import { useAutoSave } from "./use-auto-save";
 import { useElectronMenuBindings } from "./use-electron-menu-bindings";
 import { useTabPersistence } from "./use-tab-persistence";
 import { useCloseDialog } from "./use-close-dialog";
+import { useFileWatchIntegration } from "./use-file-watch-integration";
 
 // Re-export the return type so consumers can import from this module
 export type { UseTabManagerReturn } from "./types";
@@ -24,6 +25,8 @@ export function useTabManager(options?: {
   skipAutoRestore?: boolean;
   autoSave?: boolean;
   vfsReadyPromise?: Promise<void>;
+  /** External flush callback for dockview layout persistence. */
+  flushLayoutState?: () => Promise<void>;
 }): UseTabManagerReturn {
   const skipAutoRestore = options?.skipAutoRestore ?? false;
   const autoSaveEnabled = options?.autoSave ?? true;
@@ -81,9 +84,11 @@ export function useTabManager(options?: {
 
   // --- Electron IPC bindings & browser event listeners --------------------
 
-  const systemFileOpenHandlerRef = useRef<
-    ((path: string, content: string) => void) | null
-  >(null);
+  const systemFileOpenHandlerRef = useRef<((path: string, content: string) => void) | null>(null);
+
+  // flushTabState is provided by useTabPersistence below; use a ref so the
+  // menu bindings can call it in the async onSaveBeforeClose handler.
+  const flushTabStateRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   useElectronMenuBindings({
     tabs: tabState.tabs,
@@ -101,11 +106,27 @@ export function useTabManager(options?: {
     loadSystemFile: fileIO.loadSystemFile,
     updateTab: tabState.updateTab,
     systemFileOpenHandlerRef,
+    flushTabState: flushTabStateRef.current,
+    flushLayoutState: options?.flushLayoutState,
+  });
+
+  // --- File watch integration (external change detection) -----------------
+
+  useFileWatchIntegration({
+    tabs: tabState.tabs,
+    setTabs: tabState.setTabs,
+    activeTabId: tabState.activeTabId,
+    setActiveTabId: tabState.setActiveTabId,
+    tabsRef: tabState.tabsRef,
+    activeTabIdRef: tabState.activeTabIdRef,
+    isProjectRef: tabState.isProjectRef,
+    isElectron: tabState.isElectron,
+    openDiffTab: tabState.openDiffTab,
   });
 
   // --- Tab persistence (save/restore to AppState) -------------------------
 
-  const { wasAutoRecovered } = useTabPersistence({
+  const { wasAutoRecovered, flushTabState: _flushTabState } = useTabPersistence({
     tabs: tabState.tabs,
     setTabs: tabState.setTabs,
     activeTabId: tabState.activeTabId,
@@ -118,16 +139,16 @@ export function useTabManager(options?: {
     vfsReadyPromise: options?.vfsReadyPromise,
   });
 
+  // Update the ref so useElectronMenuBindings can access flushTabState
+  flushTabStateRef.current = _flushTabState;
+
   // --- Backward compat alias: newFile === newTab --------------------------
   const newFile = tabState.newTab;
 
   // Register system file open callback
-  const onSystemFileOpen = useCallback(
-    (handler: (path: string, content: string) => void) => {
-      systemFileOpenHandlerRef.current = handler;
-    },
-    [],
-  );
+  const onSystemFileOpen = useCallback((handler: (path: string, content: string) => void) => {
+    systemFileOpenHandlerRef.current = handler;
+  }, []);
 
   // -----------------------------------------------------------------------
   // Return the exact same interface as the original hook
@@ -155,6 +176,7 @@ export function useTabManager(options?: {
     tabs: tabState.tabs,
     activeTabId: tabState.activeTabId,
     newTab: tabState.newTab,
+    cloneTab: tabState.cloneTab,
     closeTab: tabState.closeTab,
     switchTab: tabState.switchTab,
     nextTab: tabState.nextTab,
@@ -162,6 +184,11 @@ export function useTabManager(options?: {
     switchToIndex: tabState.switchToIndex,
     openProjectFile: fileIO.openProjectFile,
     pinTab: tabState.pinTab,
+    newTerminalTab: tabState.newTerminalTab,
+    updateTerminalTab: tabState.updateTerminalTab,
+    openDiffTab: tabState.openDiffTab,
+    forceCloseTab: tabState.forceCloseTab,
+    updateTab: tabState.updateTab,
 
     // Close-tab dialog
     pendingCloseTabId: tabState.pendingCloseTabId,
@@ -169,5 +196,8 @@ export function useTabManager(options?: {
     handleCloseTabSave: closeDialog.handleCloseTabSave,
     handleCloseTabDiscard: closeDialog.handleCloseTabDiscard,
     handleCloseTabCancel: tabState.handleCloseTabCancel,
+
+    // Persistence flush
+    flushTabState: _flushTabState,
   };
 }

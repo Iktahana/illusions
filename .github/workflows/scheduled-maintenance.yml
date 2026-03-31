@@ -2,11 +2,11 @@ name: Scheduled Maintenance
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Daily at 00:00 UTC
+    - cron: "0 0 * * *" # Daily at 00:00 UTC
   workflow_dispatch:
     inputs:
       task:
-        description: 'Run a specific maintenance task (or all)'
+        description: "Run a specific maintenance task (or all)"
         type: choice
         options:
           - all

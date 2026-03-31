@@ -5,11 +5,11 @@
  * Delegates to shared NlpProcessor backend.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { nlpProcessor } from '@/lib/nlp-backend/nlp-processor';
-import type { FrequencyAnalysisRequest, FrequencyAnalysisResponse } from '@/lib/nlp-client/types';
+import { NextRequest, NextResponse } from "next/server";
+import { nlpProcessor } from "@/lib/nlp-backend/nlp-processor";
+import type { FrequencyAnalysisRequest, FrequencyAnalysisResponse } from "@/lib/nlp-client/types";
 
-const WEB_DIC_PATH = process.cwd() + '/public/dict';
+const WEB_DIC_PATH = process.cwd() + "/public/dict";
 
 /** Maximum text length for frequency analysis (matches Electron IPC limit) */
 const MAX_TEXT_LENGTH = 10_000_000;
@@ -19,17 +19,14 @@ export async function POST(request: NextRequest) {
     const body: FrequencyAnalysisRequest = await request.json();
     const { text } = body;
 
-    if (!text || typeof text !== 'string') {
-      return NextResponse.json(
-        { error: 'Invalid text parameter' },
-        { status: 400 }
-      );
+    if (!text || typeof text !== "string") {
+      return NextResponse.json({ error: "Invalid text parameter" }, { status: 400 });
     }
 
     if (text.length > MAX_TEXT_LENGTH) {
       return NextResponse.json(
         { error: `Text exceeds maximum length of ${MAX_TEXT_LENGTH} characters` },
-        { status: 413 }
+        { status: 413 },
       );
     }
 
@@ -40,15 +37,14 @@ export async function POST(request: NextRequest) {
     const result = await nlpProcessor.analyzeWordFrequency(text);
     const response: FrequencyAnalysisResponse = result;
     return NextResponse.json(response);
-
   } catch (error) {
-    console.error('[API /nlp/frequency] Error:', error);
+    console.error("[API /nlp/frequency] Error:", error);
     return NextResponse.json(
       {
-        error: 'Frequency analysis failed',
-        details: error instanceof Error ? error.message : String(error)
+        error: "Frequency analysis failed",
+        details: error instanceof Error ? error.message : String(error),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

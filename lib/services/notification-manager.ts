@@ -1,9 +1,9 @@
-import type { 
-  NotificationItem, 
-  NotificationOptions, 
+import type {
+  NotificationItem,
+  NotificationOptions,
   ProgressNotificationOptions,
-  NotificationType 
-} from '@/types/notification';
+  NotificationType,
+} from "@/types/notification";
 
 type NotificationListener = (notifications: NotificationItem[]) => void;
 
@@ -36,18 +36,15 @@ class NotificationManager {
    * すべてのリスナーに通知
    */
   private notify(): void {
-    this.listeners.forEach(listener => listener([...this.notifications]));
+    this.listeners.forEach((listener) => listener([...this.notifications]));
   }
 
   /**
    * 通常メッセージを表示
    */
-  showMessage(
-    message: string, 
-    options: NotificationOptions = {}
-  ): string {
+  showMessage(message: string, options: NotificationOptions = {}): string {
     const id = `notification-${this.nextId++}`;
-    const type = options.type || 'info';
+    const type = options.type || "info";
     const duration = options.duration ?? 10000; // デフォルト 10 秒
 
     const notification: NotificationItem = {
@@ -89,12 +86,9 @@ class NotificationManager {
   /**
    * プログレスバーメッセージを表示
    */
-  showProgress(
-    message: string,
-    options: ProgressNotificationOptions = {}
-  ): string {
+  showProgress(message: string, options: ProgressNotificationOptions = {}): string {
     const id = `notification-${this.nextId++}`;
-    const type = options.type || 'info';
+    const type = options.type || "info";
 
     const notification: NotificationItem = {
       id,
@@ -126,8 +120,8 @@ class NotificationManager {
    * プログレスバーを更新
    */
   updateProgress(id: string, progress: number, message?: string): void {
-    const notification = this.notifications.find(n => n.id === id);
-    if (notification && 'progress' in notification) {
+    const notification = this.notifications.find((n) => n.id === id);
+    if (notification && "progress" in notification) {
       notification.progress = Math.min(100, Math.max(0, progress));
       if (message) {
         notification.message = message;
@@ -161,7 +155,7 @@ class NotificationManager {
       this.timers.delete(id);
     }
 
-    const index = this.notifications.findIndex(n => n.id === id);
+    const index = this.notifications.findIndex((n) => n.id === id);
     if (index !== -1) {
       this.notifications.splice(index, 1);
       this.notify();
@@ -194,28 +188,28 @@ class NotificationManager {
    * ショートカット：情報メッセージを表示
    */
   info(message: string, duration?: number): string {
-    return this.showMessage(message, { type: 'info', duration });
+    return this.showMessage(message, { type: "info", duration });
   }
 
   /**
    * ショートカット：警告メッセージを表示
    */
   warning(message: string, duration?: number): string {
-    return this.showMessage(message, { type: 'warning', duration });
+    return this.showMessage(message, { type: "warning", duration });
   }
 
   /**
    * ショートカット：エラーメッセージを表示
    */
   error(message: string, duration?: number): string {
-    return this.showMessage(message, { type: 'error', duration });
+    return this.showMessage(message, { type: "error", duration });
   }
 
   /**
    * ショートカット：成功メッセージを表示
    */
   success(message: string, duration?: number): string {
-    return this.showMessage(message, { type: 'success', duration });
+    return this.showMessage(message, { type: "success", duration });
   }
 }
 

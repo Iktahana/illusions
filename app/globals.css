@@ -2,7 +2,10 @@
 /* If local font files don't exist, Google Fonts will be used as fallback */
 
 /* Japanese novel plugin styles (vertical, manuscript, ruby, tcy) */
-@import '../packages/milkdown-plugin-japanese-novel/styles/index.css';
+@import "../packages/milkdown-plugin-japanese-novel/styles/index.css";
+
+/* xterm.js terminal styles */
+@import "@xterm/xterm/css/xterm.css";
 
 @tailwind base;
 @tailwind components;
@@ -126,8 +129,11 @@ html {
 body {
   color: rgb(var(--foreground));
   background: rgb(var(--background));
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  transition: background-color 0s, color 0s; /* Prevent transition flash */
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  transition:
+    background-color 0s,
+    color 0s; /* Prevent transition flash */
 }
 
 /* Override default background after theme is determined */
@@ -166,8 +172,14 @@ html:not(.dark) {
 }
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
@@ -175,8 +187,14 @@ html:not(.dark) {
 }
 
 @keyframes scale-in {
-  from { opacity: 0; transform: scale(0.96); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .animate-scale-in {
@@ -184,8 +202,13 @@ html:not(.dark) {
 }
 
 @keyframes fade-out {
-  0%, 70% { opacity: 1; }
-  100% { opacity: 0; }
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 .animate-fade-out {
@@ -216,7 +239,8 @@ html:not(.dark) {
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
   }
   50% {
@@ -238,7 +262,8 @@ html:not(.dark) {
 
 /* LLM status indicator blink (inferring state) */
 @keyframes llm-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -453,7 +478,6 @@ html:not(.dark) {
   color: rgb(var(--foreground-secondary));
 }
 
-
 /* Tooltip styles for info icons */
 .info-tooltip-wrapper {
   position: relative;
@@ -470,7 +494,6 @@ html:not(.dark) {
 .stats-panel * {
   color: var(--stats-text) !important;
 }
-
 
 .info-tooltip-content {
   position: fixed;
@@ -536,7 +559,9 @@ input[type="range"]::-webkit-slider-thumb {
   background: rgb(var(--accent));
   cursor: pointer;
   margin-top: -5px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
@@ -566,7 +591,9 @@ input[type="range"]::-moz-range-thumb {
   background: rgb(var(--accent));
   cursor: pointer;
   border: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 input[type="range"]::-moz-range-thumb:hover {

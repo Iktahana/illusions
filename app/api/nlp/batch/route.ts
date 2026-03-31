@@ -5,11 +5,11 @@
  * Delegates to shared NlpProcessor backend.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { nlpProcessor } from '@/lib/nlp-backend/nlp-processor';
-import type { BatchTokenizeRequest, BatchTokenizeResponse } from '@/lib/nlp-client/types';
+import { NextRequest, NextResponse } from "next/server";
+import { nlpProcessor } from "@/lib/nlp-backend/nlp-processor";
+import type { BatchTokenizeRequest, BatchTokenizeResponse } from "@/lib/nlp-client/types";
 
-const WEB_DIC_PATH = process.cwd() + '/public/dict';
+const WEB_DIC_PATH = process.cwd() + "/public/dict";
 
 /** Maximum number of paragraphs per batch request (matches Electron IPC limit) */
 const MAX_PARAGRAPHS = 10_000;
@@ -23,31 +23,33 @@ export async function POST(request: NextRequest) {
     const { paragraphs } = body;
 
     if (!Array.isArray(paragraphs)) {
-      return NextResponse.json(
-        { error: 'Invalid paragraphs parameter' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid paragraphs parameter" }, { status: 400 });
     }
 
     if (paragraphs.length > MAX_PARAGRAPHS) {
       return NextResponse.json(
         { error: `Batch exceeds maximum of ${MAX_PARAGRAPHS} paragraphs` },
-        { status: 413 }
+        { status: 413 },
       );
     }
 
     // Validate each paragraph structure and text length
     for (const p of paragraphs) {
-      if (typeof p?.text !== 'string' || typeof p?.pos !== 'number') {
+      if (typeof p?.text !== "string" || typeof p?.pos !== "number") {
         return NextResponse.json(
-          { error: 'Invalid paragraph structure: each entry must have { text: string, pos: number }' },
-          { status: 400 }
+          {
+            error:
+              "Invalid paragraph structure: each entry must have { text: string, pos: number }",
+          },
+          { status: 400 },
         );
       }
       if (p.text.length > MAX_PARAGRAPH_TEXT_LENGTH) {
         return NextResponse.json(
-          { error: `Paragraph text exceeds maximum length of ${MAX_PARAGRAPH_TEXT_LENGTH} characters` },
-          { status: 413 }
+          {
+            error: `Paragraph text exceeds maximum length of ${MAX_PARAGRAPH_TEXT_LENGTH} characters`,
+          },
+          { status: 413 },
         );
       }
     }
@@ -59,15 +61,14 @@ export async function POST(request: NextRequest) {
     const results = await nlpProcessor.tokenizeBatch(paragraphs);
     const response: BatchTokenizeResponse = { results };
     return NextResponse.json(response);
-
   } catch (error) {
-    console.error('[API /nlp/batch] Error:', error);
+    console.error("[API /nlp/batch] Error:", error);
     return NextResponse.json(
       {
-        error: 'Batch tokenization failed',
-        details: error instanceof Error ? error.message : String(error)
+        error: "Batch tokenization failed",
+        details: error instanceof Error ? error.message : String(error),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

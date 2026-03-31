@@ -3,10 +3,7 @@
 const PERSIST_FAILURE_WARNING = "ファイル参照の保存に失敗しました";
 
 import { useCallback, useRef } from "react";
-import {
-  openMdiFile,
-  saveMdiFile,
-} from "../project/mdi-file";
+import { openMdiFile, saveMdiFile } from "../project/mdi-file";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import { notificationManager } from "../services/notification-manager";
 import { getStorageService } from "../storage/storage-service";
@@ -15,13 +12,9 @@ import { getHistoryService } from "../services/history-service";
 import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../services/file-watcher";
 import type { SupportedFileExtension } from "../project/project-types";
-import type { TabId, TabState } from "./tab-types";
-import {
-  generateTabId,
-  inferFileType,
-  sanitizeMdiContent,
-  getErrorMessage,
-} from "./types";
+import type { TabId, TabState, EditorTabState } from "./tab-types";
+import { isEditorTab } from "./tab-types";
+import { generateTabId, inferFileType, sanitizeMdiContent, getErrorMessage } from "./types";
 import type { TabManagerCore } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -29,8 +22,8 @@ import type { TabManagerCore } from "./types";
 // ---------------------------------------------------------------------------
 
 export interface UseFileIOParams extends TabManagerCore {
-  updateTab: (tabId: TabId, updates: Partial<TabState>) => void;
-  findTabByPath: (path: string) => TabState | undefined;
+  updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
+  findTabByPath: (path: string) => EditorTabState | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,8 +109,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       if (!getVFS().isRootOpen()) return;
       try {
         const historyService = getHistoryService();
-        const shouldCreate =
-          await historyService.shouldCreateSnapshot(sourceFileName);
+        const shouldCreate = await historyService.shouldCreateSnapshot(sourceFileName);
         if (shouldCreate) {
           await historyService.createSnapshot({
             sourceFile: sourceFileName,
@@ -153,10 +145,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     const detectedFileType = inferFileType(descriptor.name);
 
     // Reuse current tab if untitled and clean
-    const cur = tabsRef.current.find(
-      (t) => t.id === activeTabIdRef.current,
-    );
-    if (cur && !cur.file && !cur.isDirty) {
+    const cur = tabsRef.current.find((t) => t.id === activeTabIdRef.current);
+    if (cur && isEditorTab(cur) && !cur.file && !cur.isDirty) {
       updateTab(cur.id, {
         file: descriptor,
         content: fileContent,
@@ -166,7 +156,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         fileType: detectedFileType,
       });
     } else {
-      const tab: TabState = {
+      const tab: EditorTabState = {
+        tabKind: "editor",
         id: generateTabId(),
         file: descriptor,
         content: fileContent,
@@ -177,6 +168,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         isSaving: false,
         isPreview: false,
         fileType: detectedFileType,
+        fileSyncStatus: "clean",
+        conflictDiskContent: null,
       };
       setTabs((prev) => [...prev, tab]);
       setActiveTabId(tab.id);
@@ -186,7 +179,15 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       const ok = await persistFileReference(descriptor, fileContent);
       if (!ok) notificationManager.warning(PERSIST_FAILURE_WARNING);
     })();
-  }, [findTabByPath, updateTab, persistFileReference, setTabs, setActiveTabId, tabsRef, activeTabIdRef]);
+  }, [
+    findTabByPath,
+    updateTab,
+    persistFileReference,
+    setTabs,
+    setActiveTabId,
+    tabsRef,
+    activeTabIdRef,
+  ]);
 
   /** Save the active tab */
   const saveFile = useCallback(
@@ -196,6 +197,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       const tabId = activeTabIdRef.current;
       const tab = tabsRef.current.find((t) => t.id === tabId);
       if (!tab) return;
+      // Only editor tabs can be saved
+      if (!isEditorTab(tab)) return;
 
       isSavingRef.current = true;
       updateTab(tabId, { isSaving: true });
@@ -210,7 +213,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           await vfs.writeFile(tab.file.path, sanitized);
           setTabs((prev) =>
             prev.map((t) =>
-              t.id === tabId
+              t.id === tabId && isEditorTab(t)
                 ? {
                     ...t,
                     lastSavedContent: sanitized,
@@ -235,7 +238,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         if (result) {
           setTabs((prev) =>
             prev.map((t) =>
-              t.id === tabId
+              t.id === tabId && isEditorTab(t)
                 ? {
                     ...t,
                     file: result.descriptor,
@@ -264,7 +267,15 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         isSavingRef.current = false;
       }
     },
-    [updateTab, persistFileReference, tryAutoSnapshot, setTabs, tabsRef, activeTabIdRef, isProjectRef],
+    [
+      updateTab,
+      persistFileReference,
+      tryAutoSnapshot,
+      setTabs,
+      tabsRef,
+      activeTabIdRef,
+      isProjectRef,
+    ],
   );
 
   /** Save As (always shows dialog) */
@@ -274,6 +285,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     const tabId = activeTabIdRef.current;
     const tab = tabsRef.current.find((t) => t.id === tabId);
     if (!tab) return;
+    // Only editor tabs can be saved
+    if (!isEditorTab(tab)) return;
 
     isSavingRef.current = true;
     updateTab(tabId, { isSaving: true });
@@ -331,10 +344,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       const sysFileType = inferFileType(sysFileName);
 
       // Reuse current tab if untitled and clean
-      const cur = tabsRef.current.find(
-        (t) => t.id === activeTabIdRef.current,
-      );
-      if (cur && !cur.file && !cur.isDirty) {
+      const cur = tabsRef.current.find((t) => t.id === activeTabIdRef.current);
+      if (cur && isEditorTab(cur) && !cur.file && !cur.isDirty) {
         updateTab(cur.id, {
           file: {
             path,
@@ -351,7 +362,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       }
 
       // New tab
-      const tab: TabState = {
+      const tab: EditorTabState = {
+        tabKind: "editor",
         id: generateTabId(),
         file: {
           path,
@@ -366,6 +378,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         isSaving: false,
         isPreview: false,
         fileType: sysFileType,
+        fileSyncStatus: "clean",
+        conflictDiskContent: null,
       };
       setTabs((prev) => [...prev, tab]);
       setActiveTabId(tab.id);
@@ -379,10 +393,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       const preview = options?.preview ?? false;
 
       // Deduplicate: if already open, switch to it
-      const existing = tabsRef.current.find(
-        (t) => t.file?.path === vfsPath,
-      );
-      if (existing) {
+      const existing = tabsRef.current.find((t) => isEditorTab(t) && t.file?.path === vfsPath);
+      if (existing && isEditorTab(existing)) {
         setActiveTabId(existing.id);
         // If double-click on existing preview tab, pin it
         if (!preview && existing.isPreview) {
@@ -411,7 +423,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         } catch (error) {
           console.error("ファイルの読み込みに失敗しました:", error);
           notificationManager.error(
-            `ファイルを開けませんでした: ${vfsPath.split("/").pop() || vfsPath}`
+            `ファイルを開けませんでした: ${vfsPath.split("/").pop() || vfsPath}`,
           );
           return;
         }
@@ -422,8 +434,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
         if (effectivePreview) {
           // Replace existing preview tab, or create new preview tab
-          const existingPreview = tabsRef.current.find((t) => t.isPreview);
-          if (existingPreview) {
+          const existingPreview = tabsRef.current.find((t) => isEditorTab(t) && t.isPreview);
+          if (existingPreview && isEditorTab(existingPreview)) {
             updateTab(existingPreview.id, {
               file: { path: vfsPath, handle: null, name: fileName },
               content: fileContent,
@@ -439,10 +451,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         }
 
         // Reuse current tab if untitled and clean
-        const cur = tabsRef.current.find(
-          (t) => t.id === activeTabIdRef.current,
-        );
-        if (cur && !cur.file && !cur.isDirty) {
+        const cur = tabsRef.current.find((t) => t.id === activeTabIdRef.current);
+        if (cur && isEditorTab(cur) && !cur.file && !cur.isDirty) {
           updateTab(cur.id, {
             file: { path: vfsPath, handle: null, name: fileName },
             content: fileContent,
@@ -456,7 +466,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         }
 
         // New tab — with atomic dedup guard inside the updater
-        const tab: TabState = {
+        const tab: EditorTabState = {
+          tabKind: "editor",
           id: generateTabId(),
           file: { path: vfsPath, handle: null, name: fileName },
           content: fileContent,
@@ -467,16 +478,16 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           isSaving: false,
           isPreview: effectivePreview,
           fileType: vfsFileType,
+          fileSyncStatus: "clean",
+          conflictDiskContent: null,
         };
         let existingTabId: TabId | null = null;
         setTabs((prev) => {
-          const dup = prev.find((t) => t.file?.path === vfsPath);
-          if (dup) {
+          const dup = prev.find((t) => isEditorTab(t) && t.file?.path === vfsPath);
+          if (dup && isEditorTab(dup)) {
             existingTabId = dup.id;
             if (!preview && dup.isPreview) {
-              return prev.map((t) =>
-                t.id === dup.id ? { ...t, isPreview: false } : t,
-              );
+              return prev.map((t) => (t.id === dup.id ? { ...t, isPreview: false } : t));
             }
             return prev;
           }

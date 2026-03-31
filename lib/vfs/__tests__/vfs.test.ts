@@ -26,7 +26,7 @@ import type { VFSEntry, VirtualFileSystem } from "../types";
 function createMockFileHandle(
   name: string,
   content: string,
-  lastModified = Date.now()
+  lastModified = Date.now(),
 ): FileSystemFileHandle {
   const mockFile = new File([content], name, {
     type: "text/plain",
@@ -64,15 +64,12 @@ function createMockFileHandle(
  */
 function createMockDirectoryHandle(
   name: string,
-  children: Map<string, { kind: "file" | "directory"; handle: unknown }>
+  children: Map<string, { kind: "file" | "directory"; handle: unknown }>,
 ): FileSystemDirectoryHandle {
   const handle: unknown = {
     kind: "directory" as const,
     name,
-    getFileHandle: async (
-      childName: string,
-      options?: { create?: boolean }
-    ) => {
+    getFileHandle: async (childName: string, options?: { create?: boolean }) => {
       const child = children.get(childName);
       if (child && child.kind === "file") {
         return child.handle;
@@ -82,34 +79,22 @@ function createMockDirectoryHandle(
         children.set(childName, { kind: "file", handle: newHandle });
         return newHandle;
       }
-      throw new DOMException(
-        `File "${childName}" not found`,
-        "NotFoundError"
-      );
+      throw new DOMException(`File "${childName}" not found`, "NotFoundError");
     },
-    getDirectoryHandle: async (
-      childName: string,
-      options?: { create?: boolean }
-    ) => {
+    getDirectoryHandle: async (childName: string, options?: { create?: boolean }) => {
       const child = children.get(childName);
       if (child && child.kind === "directory") {
         return child.handle;
       }
       if (options?.create) {
-        const newHandle = createMockDirectoryHandle(
-          childName,
-          new Map()
-        );
+        const newHandle = createMockDirectoryHandle(childName, new Map());
         children.set(childName, {
           kind: "directory",
           handle: newHandle,
         });
         return newHandle;
       }
-      throw new DOMException(
-        `Directory "${childName}" not found`,
-        "NotFoundError"
-      );
+      throw new DOMException(`Directory "${childName}" not found`, "NotFoundError");
     },
     removeEntry: async (_childName: string) => {
       children.delete(_childName);
@@ -151,9 +136,7 @@ describe("WebVFS", () => {
       delete (window as any).showDirectoryPicker;
       const vfs = new WebVFS();
 
-      await expect(vfs.openDirectory()).rejects.toThrow(
-        "File System Access API is not supported"
-      );
+      await expect(vfs.openDirectory()).rejects.toThrow("File System Access API is not supported");
     });
 
     it("should throw if user cancels the picker", async () => {
@@ -163,7 +146,7 @@ describe("WebVFS", () => {
 
       const vfs = new WebVFS();
       await expect(vfs.openDirectory()).rejects.toThrow(
-        "Directory picker was cancelled by the user"
+        "Directory picker was cancelled by the user",
       );
     });
 
@@ -183,20 +166,18 @@ describe("WebVFS", () => {
     it("should throw if no root directory is opened", async () => {
       const vfs = new WebVFS();
 
-      await expect(vfs.readFile("test.txt")).rejects.toThrow(
-        "No root directory has been opened"
-      );
+      await expect(vfs.readFile("test.txt")).rejects.toThrow("No root directory has been opened");
     });
 
     it("should read file content through path resolution", async () => {
       const fileHandle = createMockFileHandle("hello.txt", "Hello, world!");
       const subDir = createMockDirectoryHandle(
         "sub",
-        new Map([["hello.txt", { kind: "file", handle: fileHandle }]])
+        new Map([["hello.txt", { kind: "file", handle: fileHandle }]]),
       );
       const rootDir = createMockDirectoryHandle(
         "root",
-        new Map([["sub", { kind: "directory", handle: subDir }]])
+        new Map([["sub", { kind: "directory", handle: subDir }]]),
       );
 
       (window as any).showDirectoryPicker = async () => rootDir;
@@ -227,14 +208,10 @@ describe("WebVFS", () => {
   describe("getFileMetadata", () => {
     it("should return correct metadata", async () => {
       const timestamp = 1700000000000;
-      const fileHandle = createMockFileHandle(
-        "data.mdi",
-        "some content",
-        timestamp
-      );
+      const fileHandle = createMockFileHandle("data.mdi", "some content", timestamp);
       const rootDir = createMockDirectoryHandle(
         "root",
-        new Map([["data.mdi", { kind: "file", handle: fileHandle }]])
+        new Map([["data.mdi", { kind: "file", handle: fileHandle }]]),
       );
 
       (window as any).showDirectoryPicker = async () => rootDir;
@@ -261,7 +238,7 @@ describe("WebVFS", () => {
           ["a.txt", { kind: "file", handle: file1 }],
           ["b.txt", { kind: "file", handle: file2 }],
           ["sub", { kind: "directory", handle: subDir }],
-        ])
+        ]),
       );
 
       (window as any).showDirectoryPicker = async () => rootDir;
@@ -276,9 +253,7 @@ describe("WebVFS", () => {
       const fileEntries = entries.filter((e: VFSEntry) => e.kind === "file");
       expect(fileEntries.length).toBe(2);
 
-      const dirEntries = entries.filter(
-        (e: VFSEntry) => e.kind === "directory"
-      );
+      const dirEntries = entries.filter((e: VFSEntry) => e.kind === "directory");
       expect(dirEntries.length).toBe(1);
     });
   });
@@ -338,18 +313,14 @@ describe("ElectronVFS", () => {
       delete (window as any).electronAPI;
       const vfs = new ElectronVFS();
 
-      await expect(vfs.openDirectory()).rejects.toThrow(
-        "Electron API is not available"
-      );
+      await expect(vfs.openDirectory()).rejects.toThrow("Electron API is not available");
     });
 
     it("should throw if user cancels the dialog", async () => {
       mockBridge.openDirectory.mockResolvedValue(null);
       const vfs = new ElectronVFS();
 
-      await expect(vfs.openDirectory()).rejects.toThrow(
-        "Directory picker was cancelled"
-      );
+      await expect(vfs.openDirectory()).rejects.toThrow("Directory picker was cancelled");
     });
 
     it("should return a directory handle on success", async () => {
@@ -374,9 +345,7 @@ describe("ElectronVFS", () => {
       const content = await vfs.readFile("/absolute/path/file.txt");
 
       expect(content).toBe("file content");
-      expect(mockBridge.readFile).toHaveBeenCalledWith(
-        "/absolute/path/file.txt"
-      );
+      expect(mockBridge.readFile).toHaveBeenCalledWith("/absolute/path/file.txt");
     });
 
     it("should read file using relative path after openDirectory", async () => {
@@ -391,16 +360,14 @@ describe("ElectronVFS", () => {
       const content = await vfs.readFile("docs/readme.txt");
 
       expect(content).toBe("relative content");
-      expect(mockBridge.readFile).toHaveBeenCalledWith(
-        "/Users/test/project/docs/readme.txt"
-      );
+      expect(mockBridge.readFile).toHaveBeenCalledWith("/Users/test/project/docs/readme.txt");
     });
 
     it("should throw for relative path without root", async () => {
       const vfs = new ElectronVFS();
 
       await expect(vfs.readFile("relative/path.txt")).rejects.toThrow(
-        "no root directory has been opened"
+        "no root directory has been opened",
       );
     });
 
@@ -412,10 +379,7 @@ describe("ElectronVFS", () => {
       await vfs.writeFile("/absolute/path/file.txt", "content");
 
       expect(mockBridge.mkdir).toHaveBeenCalledWith("/absolute/path");
-      expect(mockBridge.writeFile).toHaveBeenCalledWith(
-        "/absolute/path/file.txt",
-        "content"
-      );
+      expect(mockBridge.writeFile).toHaveBeenCalledWith("/absolute/path/file.txt", "content");
     });
 
     it("should recognize Windows absolute paths with backslashes", async () => {
@@ -425,9 +389,7 @@ describe("ElectronVFS", () => {
       const content = await vfs.readFile("C:\\Users\\test\\file.txt");
 
       expect(content).toBe("win content");
-      expect(mockBridge.readFile).toHaveBeenCalledWith(
-        "C:\\Users\\test\\file.txt"
-      );
+      expect(mockBridge.readFile).toHaveBeenCalledWith("C:\\Users\\test\\file.txt");
     });
 
     it("should recognize Windows absolute paths with forward slashes", async () => {
@@ -437,9 +399,7 @@ describe("ElectronVFS", () => {
       const content = await vfs.readFile("G:/マイドライブ/原稿/幻.mdi");
 
       expect(content).toBe("win content");
-      expect(mockBridge.readFile).toHaveBeenCalledWith(
-        "G:/マイドライブ/原稿/幻.mdi"
-      );
+      expect(mockBridge.readFile).toHaveBeenCalledWith("G:/マイドライブ/原稿/幻.mdi");
     });
 
     it("should not double-prefix Windows absolute paths with root", async () => {
@@ -457,7 +417,7 @@ describe("ElectronVFS", () => {
       // Should NOT prepend rootPath to an already-absolute Windows path
       expect(mockBridge.writeFile).toHaveBeenCalledWith(
         "C:\\Users\\test\\project\\file.mdi",
-        "content"
+        "content",
       );
     });
 
@@ -471,7 +431,7 @@ describe("ElectronVFS", () => {
       // Should be treated as absolute (not joined with root)
       expect(mockBridge.writeFile).toHaveBeenCalledWith(
         "G:\\マイドライブ\\原稿\\幻/幻.mdi",
-        "content"
+        "content",
       );
     });
 
@@ -487,9 +447,7 @@ describe("ElectronVFS", () => {
       const content = await vfs.readFile("\\\\server\\share\\file.txt");
 
       expect(content).toBe("unc content");
-      expect(mockBridge.readFile).toHaveBeenCalledWith(
-        "\\\\server\\share\\file.txt"
-      );
+      expect(mockBridge.readFile).toHaveBeenCalledWith("\\\\server\\share\\file.txt");
     });
   });
 
@@ -576,9 +534,7 @@ describe("ElectronVFS", () => {
       });
 
       expect(subDir.name).toBe("subdir");
-      expect(mockBridge.mkdir).toHaveBeenCalledWith(
-        "/Users/test/project/subdir"
-      );
+      expect(mockBridge.mkdir).toHaveBeenCalledWith("/Users/test/project/subdir");
     });
   });
 });
