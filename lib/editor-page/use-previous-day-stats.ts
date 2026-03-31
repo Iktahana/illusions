@@ -49,12 +49,12 @@ function findPreviousDaySnapshot(snapshots: SnapshotEntry[]): SnapshotEntry | nu
 }
 
 /**
- * Hook to fetch previous day's character count for comparison.
- * Uses the history service to find the last snapshot from the most recent
- * day before today.
+ * Hook to fetch yesterday's character count for comparison.
+ * Uses the history service to find the last snapshot from yesterday.
+ * Returns null if no snapshot exists for yesterday.
  *
- * 前日の文字数を取得するフック。
- * 履歴サービスから今日以前の最新スナップショットを取得する。
+ * 昨日の文字数を取得するフック。
+ * 履歴サービスから昨日の最後のスナップショットを取得する。
  *
  * @param sourceFile - Source file name to filter snapshots (e.g. "main.mdi")
  * @param enabled - Whether the hook should fetch data (requires project mode)
