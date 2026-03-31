@@ -39,7 +39,7 @@ export type CommandId =
   // Panel toggles
   | "panel.explorer"
   | "panel.search"
-  | "panel.outline"
+  // | "panel.outline" // TODO: Outline feature — planned for v1.3.0
   // Format operations
   | "format.ruby"
   | "format.tcy";
@@ -76,7 +76,7 @@ export const ALL_COMMAND_IDS: CommandId[] = [
   "nav.search",
   "panel.explorer",
   "panel.search",
-  "panel.outline",
+  // "panel.outline", // TODO: Outline feature — planned for v1.3.0
   "format.ruby",
   "format.tcy",
 ];

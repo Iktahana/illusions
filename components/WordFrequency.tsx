@@ -49,10 +49,24 @@ const DICTIONARY_ACTIONS: Record<string, (word: string) => { url: string; title:
   }),
 };
 
-/** Derive cache path from a file path basename */
+/**
+ * Derive a unique cache path from the full file path.
+ * Uses a simple djb2-style hash of the full path so that files with the
+ * same basename in different directories never share a cache entry.
+ */
+function hashPath(filePath: string): string {
+  let hash = 5381;
+  for (let i = 0; i < filePath.length; i++) {
+    hash = ((hash << 5) + hash) ^ filePath.charCodeAt(i);
+    hash = hash >>> 0; // keep unsigned 32-bit
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
 function getCachePath(filePath: string): string {
   const basename = filePath.split("/").pop() ?? filePath;
-  return `.illusions/word_count/${basename}.json`;
+  const hash = hashPath(filePath);
+  return `.illusions/word_count/${basename}_${hash}.json`;
 }
 
 function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) {

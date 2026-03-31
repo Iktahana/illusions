@@ -232,13 +232,14 @@ export const SHORTCUT_REGISTRY: Record<CommandId, ShortcutEntry> = {
     defaultBinding: { modifiers: ["Ctrl", "Shift"], key: "f" },
     scope: "all",
   },
-  "panel.outline": {
-    id: "panel.outline",
-    label: "アウトラインを切替",
-    category: "panel",
-    defaultBinding: { modifiers: ["Ctrl", "Shift"], key: "o" },
-    scope: "all",
-  },
+  // TODO: Outline feature — planned for v1.3.0
+  // "panel.outline": {
+  //   id: "panel.outline",
+  //   label: "アウトラインを切替",
+  //   category: "panel",
+  //   defaultBinding: { modifiers: ["Ctrl", "Shift"], key: "o" },
+  //   scope: "all",
+  // },
 
   // -- Format ----------------------------------------------------------------
   "format.ruby": {

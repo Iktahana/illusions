@@ -55,7 +55,7 @@ interface ActivityBarItem {
 const VIEW_TO_COMMAND_ID: Partial<Record<ActivityBarView, CommandId>> = {
   explorer: "panel.explorer",
   search: "panel.search",
-  outline: "panel.outline",
+  // outline: "panel.outline", // TODO: Outline feature — planned for v1.3.0
   settings: "nav.settings",
 };
 
