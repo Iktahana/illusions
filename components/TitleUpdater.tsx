@@ -1,19 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
-import type { MdiFileDescriptor } from "@/lib/project/mdi-file";
+import { isProjectMode, type EditorMode } from "@/lib/project/project-types";
 
 interface TitleUpdaterProps {
-  currentFile: MdiFileDescriptor | null;
+  editorMode: EditorMode;
   isDirty: boolean;
 }
 
-export default function TitleUpdater({ currentFile, isDirty }: TitleUpdaterProps) {
+export default function TitleUpdater({ editorMode, isDirty }: TitleUpdaterProps) {
   useEffect(() => {
-    const fileName = currentFile?.name ?? (isDirty ? "新規ファイル *" : "新規ファイル");
-    const title = `${fileName} - illusions`;
-    document.title = title;
-  }, [currentFile?.name, isDirty]);
+    const name = isProjectMode(editorMode)
+      ? editorMode.name
+      : isDirty
+        ? "新規ファイル *"
+        : "新規ファイル";
+    document.title = `${name} - illusions`;
+  }, [editorMode, isDirty]);
 
   return null;
 }

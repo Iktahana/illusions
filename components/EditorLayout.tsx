@@ -182,7 +182,7 @@ export default function EditorLayout({
       <TerminalTabContext.Provider value={providers.terminalTabContextValue}>
         <EditorSettingsProvider settings={providers.settings} handlers={providers.settingsHandlers}>
           <div className="h-screen flex flex-col overflow-hidden relative">
-            <TitleUpdater currentFile={chrome.currentFile} isDirty={chrome.isDirty} />
+            <TitleUpdater editorMode={upgrade.editorMode} isDirty={chrome.isDirty} />
 
             {!chrome.isElectron && (
               <WebMenuBar
