@@ -309,8 +309,7 @@ export function useTabState(): UseTabStateReturn {
           isPreview: dirty ? false : tab.isPreview,
           // Escalate fileSyncStatus to "dirty" when user has unsaved edits.
           // Never downgrade from "conflicted" — user must resolve conflicts explicitly.
-          fileSyncStatus:
-            dirty && tab.fileSyncStatus === "clean" ? "dirty" : tab.fileSyncStatus,
+          fileSyncStatus: dirty && tab.fileSyncStatus === "clean" ? "dirty" : tab.fileSyncStatus,
         };
       }),
     );
