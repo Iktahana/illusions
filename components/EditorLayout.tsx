@@ -301,6 +301,10 @@ export default function EditorLayout({
                   }
                 }}
                 onNewTerminal={activityBar.handleNewTerminalTab}
+                onOpenAccountSettings={() => {
+                  dialogs.setSettingsInitialCategory("account");
+                  dialogs.setShowSettingsModal(true);
+                }}
               />
 
               {(activityBar.topView !== "none" || activityBar.bottomView !== "none") && (

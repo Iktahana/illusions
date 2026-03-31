@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { FileText, Save, Check, FolderOpen } from "lucide-react";
+import { FileText, Save, Check, FolderOpen, UserCircle } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NavbarProps {
   fileName: string | null;
@@ -11,6 +12,7 @@ interface NavbarProps {
   saveSuccessAt?: number | null;
   onClearSaveSuccess?: () => void;
   onOpenFile?: () => void;
+  onOpenAccountSettings?: () => void;
 }
 
 export default function Navbar({
@@ -20,7 +22,9 @@ export default function Navbar({
   saveSuccessAt,
   onClearSaveSuccess,
   onOpenFile,
+  onOpenAccountSettings,
 }: NavbarProps) {
+  const { isAuthenticated, user } = useAuth();
   useEffect(() => {
     if (saveSuccessAt == null) return;
     const t = setTimeout(() => {
@@ -76,6 +80,24 @@ export default function Navbar({
           </>
         )}
         <ThemeToggle />
+        {onOpenAccountSettings && (
+          <button
+            type="button"
+            onClick={onOpenAccountSettings}
+            className="flex items-center justify-center rounded-full transition-colors hover:bg-hover"
+            aria-label="アカウント"
+          >
+            {isAuthenticated && user?.image ? (
+              <img src={user.image} alt={user.name} className="h-7 w-7 rounded-full object-cover" />
+            ) : isAuthenticated && user ? (
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
+                {user.name.charAt(0).toUpperCase()}
+              </span>
+            ) : (
+              <UserCircle className="h-5 w-5 text-foreground-secondary" />
+            )}
+          </button>
+        )}
       </div>
 
       {showToast && (
