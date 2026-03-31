@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import DesktopAppDownloadButton from "@/components/DesktopAppDownloadButton";
 import GlassDialog from "@/components/GlassDialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
 interface RecentProject {
   projectId: string;
@@ -106,8 +105,8 @@ export default function WelcomeScreen({
 
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-background p-4">
-      {/* Account indicator (Electron only) */}
-      {isElectronRenderer() && onOpenAccountSettings && (
+      {/* Account indicator */}
+      {onOpenAccountSettings && (
         <button
           type="button"
           onClick={onOpenAccountSettings}

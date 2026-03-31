@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { FileText, Save, Check, FolderOpen, UserCircle } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
 interface NavbarProps {
   fileName: string | null;
@@ -81,7 +80,7 @@ export default function Navbar({
           </>
         )}
         <ThemeToggle />
-        {isElectronRenderer() && (
+        {onOpenAccountSettings && (
           <button
             type="button"
             onClick={onOpenAccountSettings}
