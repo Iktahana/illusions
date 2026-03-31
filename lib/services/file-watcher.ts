@@ -346,10 +346,11 @@ class ElectronFileWatcher implements FileWatcher {
    * 一時停止中に見逃した変更を確認し、ネイティブまたはフォールバックウォッチャーを開始する。
    */
   private async catchUpAndStartWatcher(previousModified: number): Promise<void> {
-    // Detect changes that occurred while the watcher was paused
-    if (previousModified > 0) {
-      try {
-        const metadata = await this.vfs.getFileMetadata(this.path);
+    // Always read current metadata to establish/update the baseline.
+    // When previousModified > 0, also detect changes that occurred while paused.
+    try {
+      const metadata = await this.vfs.getFileMetadata(this.path);
+      if (previousModified > 0) {
         if (
           this._isActive &&
           metadata.lastModified > previousModified &&
@@ -360,10 +361,16 @@ class ElectronFileWatcher implements FileWatcher {
             this.lastKnownModified = metadata.lastModified;
             this.onChanged(content, metadata.lastModified);
           }
+        } else {
+          // Update baseline even when no change detected
+          this.lastKnownModified = metadata.lastModified;
         }
-      } catch {
-        // File may not exist; proceed to start watcher normally
+      } else {
+        // First start: initialize baseline for future catch-up checks
+        this.lastKnownModified = metadata.lastModified;
       }
+    } catch {
+      // File may not exist; proceed to start watcher normally
     }
 
     if (!this._isActive) return;
