@@ -402,7 +402,7 @@ function buildApplicationMenu(recentProjects = []) {
         },
       },
       {
-        label: "AI回答の不適切報告",
+        label: "AI回答の不適切を報告",
         click: () => {
           shell.openExternal("https://github.com/Iktahana/illusions/issues/new");
         },
