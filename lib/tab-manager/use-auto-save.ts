@@ -88,6 +88,8 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                         isDirty: sanitizeMdiContent(t.content) !== sanitized,
                         lastSavedTime: Date.now(),
                         lastSaveWasAuto: true,
+                        fileSyncStatus: "clean",
+                        conflictDiskContent: null,
                       }
                     : t,
                 ),
@@ -110,6 +112,8 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                           isDirty: sanitizeMdiContent(t.content) !== sanitized,
                           lastSavedTime: Date.now(),
                           lastSaveWasAuto: true,
+                          fileSyncStatus: "clean",
+                          conflictDiskContent: null,
                         }
                       : t,
                   ),
