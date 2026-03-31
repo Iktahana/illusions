@@ -61,6 +61,15 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
     if (!isEditorTab(rawTab)) return;
     const tab = rawTab;
 
+    // Block save if the file has an unresolved external conflict
+    if (tab.fileSyncStatus === "conflicted") {
+      notificationManager.warning(
+        "ファイルが外部で変更されています。閉じる前にコンフリクトを解決してください。",
+      );
+      setPendingCloseTabId(null);
+      return;
+    }
+
     try {
       const sanitized = sanitizeMdiContent(tab.content);
 
@@ -83,6 +92,8 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
           file: result.descriptor,
           lastSavedContent: sanitized,
           isDirty: false,
+          fileSyncStatus: "clean",
+          conflictDiskContent: null,
         });
       }
     } catch (error) {
