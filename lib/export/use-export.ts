@@ -23,10 +23,36 @@ interface UseExportParams {
 }
 
 /**
- * Save text content to a file via browser download or File System Access API.
+ * Save text content to a file.
+ *
+ * In Electron, uses the native save dialog via the existing `saveFile` IPC
+ * channel (filePath = null triggers dialog.showSaveDialog in the main process).
+ * This avoids the user-gesture requirement of showSaveFilePicker, which causes
+ * a DOMException when the export is triggered from the application menu over IPC.
+ *
+ * In web browsers, falls back to the File System Access API when available,
+ * and finally to a Blob URL download.
+ *
+ * @param text - UTF-8 text content to write
+ * @param suggestedName - Default file name shown in the save dialog
+ * @param isElectron - True when running inside Electron renderer
  */
-async function saveTxtFile(text: string, suggestedName: string): Promise<boolean> {
-  // Try File System Access API first (Chromium browsers + Electron)
+async function saveTxtFile(
+  text: string,
+  suggestedName: string,
+  isElectron: boolean,
+): Promise<boolean> {
+  // Electron: delegate to main-process IPC — works regardless of user gesture
+  if (isElectron && window.electronAPI) {
+    const result = await window.electronAPI.saveFile(null, text, ".txt");
+    if (result === null) return false; // User cancelled the dialog
+    if (typeof result === "object" && "success" in result && !result.success) {
+      throw new Error(result.error);
+    }
+    return true;
+  }
+
+  // Web: try File System Access API (Chromium browsers)
   if (hasShowSaveFilePicker(window)) {
     try {
       const handle = await window.showSaveFilePicker({
@@ -44,14 +70,6 @@ async function saveTxtFile(text: string, suggestedName: string): Promise<boolean
       return true;
     } catch (error) {
       if ((error as { name?: string }).name === "AbortError") return false;
-      // "Must be handling a user gesture" — the browser requires a direct
-      // user interaction (click / key-press) in the active document to open
-      // the file picker.  Re-throw with a friendlier Japanese message.
-      if (error instanceof DOMException && error.message.includes("user gesture")) {
-        throw new Error(
-          "エクスポートするには、エディタ上をクリックしてフォーカスを合わせてから再度お試しください。",
-        );
-      }
       throw error;
     }
   }
@@ -119,7 +137,7 @@ export function useExport({
           const suffix = format === "txt-ruby" ? "_ruby" : "";
           const suggestedName = `${baseName}${suffix}.txt`;
 
-          const saved = await saveTxtFile(converted, suggestedName);
+          const saved = await saveTxtFile(converted, suggestedName, isElectron);
           notificationManager.dismiss(progressId);
 
           if (saved) {
