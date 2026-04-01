@@ -31,16 +31,6 @@ export interface EditorTabState {
   fileSyncStatus: FileSyncStatus;
   /** Disk content when status is "conflicted"; null otherwise. */
   conflictDiskContent: string | null;
-  /**
-   * Content from an external file change awaiting application to the editor.
-   * Set by file watcher when disk content changes on a clean tab.
-   * Consumed by the editor component to update ProseMirror without remounting.
-   *
-   * 外部ファイル変更による保留中コンテンツ。
-   * クリーンタブでディスク変更が検知された際にセットされる。
-   * エディタコンポーネントが再マウントなしで ProseMirror を更新するために使用。
-   */
-  pendingExternalContent?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -54,6 +44,8 @@ export interface TerminalTabState {
   tabKind: "terminal";
   id: TabId;
   sessionId: string;
+  /** Temporary correlation ID assigned before PTY spawn; cleared after sessionId is resolved. */
+  pendingId?: string | null;
   label: string;
   cwd: string;
   shell: string;
