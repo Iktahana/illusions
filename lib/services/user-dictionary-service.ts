@@ -43,7 +43,8 @@ class UserDictionaryService {
 
   /**
    * Load user dictionary entries from .illusions/user-dictionary.json.
-   * Returns empty array if the file does not exist.
+   * Returns empty array if the file does not exist (ENOENT).
+   * Re-throws on JSON corruption or permission errors to prevent data loss.
    */
   async loadEntries(): Promise<UserDictionaryEntry[]> {
     try {
@@ -53,9 +54,11 @@ class UserDictionaryService {
       const raw = await fileHandle.read();
       const data: UserDictionaryFile = JSON.parse(raw);
       return data.entries ?? [];
-    } catch {
+    } catch (err) {
       // File doesn't exist yet — that's fine
-      return [];
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+      // JSON corruption or permission error — re-throw to prevent overwriting existing data
+      throw err;
     }
   }
 
@@ -147,6 +150,7 @@ class UserDictionaryService {
   /**
    * Load user dictionary entries from StorageService for a specific file.
    * @param filePath - Full path to the file (used as storage key to avoid basename collisions).
+   * Returns empty array if no entry exists; re-throws on JSON corruption or storage errors.
    */
   async loadEntriesStandalone(filePath: string): Promise<UserDictionaryEntry[]> {
     try {
@@ -155,8 +159,11 @@ class UserDictionaryService {
       if (!raw) return [];
       const data: UserDictionaryFile = JSON.parse(raw);
       return data.entries ?? [];
-    } catch {
-      return [];
+    } catch (err) {
+      // No stored entry — that's fine
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+      // JSON corruption or storage error — re-throw to prevent overwriting existing data
+      throw err;
     }
   }
 
