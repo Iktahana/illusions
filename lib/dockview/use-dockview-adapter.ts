@@ -220,6 +220,7 @@ export function useDockviewAdapter({
               activeTabId,
               searchOpenTrigger,
               searchInitialTerm,
+              pendingExternalContent: tab.pendingExternalContent ?? null,
             },
           });
         } else if (isTerminalTab(tab)) {
@@ -327,6 +328,7 @@ export function useDockviewAdapter({
               activeTabId,
               searchOpenTrigger,
               searchInitialTerm,
+              pendingExternalContent: tab.pendingExternalContent ?? null,
             },
           });
         } else if (isTerminalTab(tab)) {
@@ -384,6 +386,7 @@ export function useDockviewAdapter({
           activeTabId,
           searchOpenTrigger,
           searchInitialTerm,
+          pendingExternalContent: tab.pendingExternalContent ?? null,
         });
       } else if (isTerminalTab(tab)) {
         if (panel.title !== tab.label) {
@@ -428,7 +431,7 @@ export function useDockviewAdapter({
     prevTabsRef.current = tabs;
     prevActiveTabRef.current = activeTabId;
     isSyncingRef.current = false;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- dockviewApi triggers re-sync after onReady
+     
   }, [tabs, activeTabId, editorKey, searchOpenTrigger, searchInitialTerm, dockviewApi]);
 
   // -- Restore saved layout (separate effect to avoid sync effect interference) --

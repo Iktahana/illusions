@@ -33,8 +33,10 @@ export function useAutoRestore({
     let timerId: ReturnType<typeof setTimeout> | undefined;
     isAutoRestoringRef.current = true;
     void (async () => {
+      let success = false;
       try {
         await handleOpenRecentProject(autoRestoreProjectId);
+        success = true;
       } catch {
         // handleOpenRecentProject catches its own errors internally
       }
@@ -42,7 +44,7 @@ export function useAutoRestore({
       signalVfsReady();
       timerId = setTimeout(() => {
         setIsRestoring((prev) => {
-          if (prev && isElectron) {
+          if (prev && isElectron && !success) {
             setRestoreError(
               "前回のプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。",
             );

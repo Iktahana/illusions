@@ -18,6 +18,8 @@ export interface UseAutoSaveParams extends TabManagerCore {
   autoSaveEnabled: boolean;
   /** Ref holding the latest saveFile function (for active tab). */
   saveFileRef: React.MutableRefObject<(isAutoSave?: boolean) => Promise<void>>;
+  /** Create an auto-snapshot if conditions are met (project mode only). */
+  tryAutoSnapshot: (sourcePath: string, displayName: string, savedContent: string) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -29,7 +31,15 @@ export interface UseAutoSaveParams extends TabManagerCore {
  * that have associated file descriptors.
  */
 export function useAutoSave(params: UseAutoSaveParams): void {
-  const { setTabs, tabsRef, activeTabIdRef, isProjectRef, autoSaveEnabled, saveFileRef } = params;
+  const {
+    setTabs,
+    tabsRef,
+    activeTabIdRef,
+    isProjectRef,
+    autoSaveEnabled,
+    saveFileRef,
+    tryAutoSnapshot,
+  } = params;
 
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const savingTabIdsRef = useRef<Set<string>>(new Set());
@@ -94,6 +104,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                     : t,
                 ),
               );
+              await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized);
             } else if (tab.file?.path || tab.file?.handle) {
               const result = await saveMdiFile({
                 descriptor: tab.file,
@@ -118,6 +129,9 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                       : t,
                   ),
                 );
+                if (result.descriptor.path) {
+                  await tryAutoSnapshot(result.descriptor.path, result.descriptor.name, sanitized);
+                }
               }
             }
           } catch (error) {
@@ -139,5 +153,13 @@ export function useAutoSave(params: UseAutoSaveParams): void {
         clearInterval(autoSaveTimerRef.current);
       }
     };
-  }, [autoSaveEnabled, setTabs, tabsRef, activeTabIdRef, isProjectRef, saveFileRef]);
+  }, [
+    autoSaveEnabled,
+    setTabs,
+    tabsRef,
+    activeTabIdRef,
+    isProjectRef,
+    saveFileRef,
+    tryAutoSnapshot,
+  ]);
 }

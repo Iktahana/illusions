@@ -125,6 +125,17 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
             if (!result) {
               // User cancelled the Save As dialog — abort close
               anyFailed = true;
+            } else {
+              // Write the newly-assigned file descriptor back to the tab so that
+              // the subsequent flushTabState call persists the saved path.
+              updateTab(tab.id, {
+                file: result.descriptor,
+                isDirty: false,
+                lastSavedContent: sanitized,
+                lastSavedTime: Date.now(),
+              });
+              // Re-flush so the persisted session reflects the new file path.
+              await flushTabStateRef.current?.();
             }
           } catch (error) {
             console.error("名前を付けて保存に失敗しました:", error);
@@ -206,6 +217,10 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
               lastSavedContent: diskContent,
               isDirty: false,
               lastSavedTime: Date.now(),
+              // Signal the active Milkdown editor to reload with the new content.
+              // Background tabs will naturally use the updated content on remount;
+              // the active editor needs this field in its React key to force remount.
+              pendingExternalContent: diskContent,
             });
           }
         } catch {
