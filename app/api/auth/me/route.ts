@@ -16,12 +16,22 @@ interface UserInfoResponse {
   plan: string;
 }
 
-async function refreshAccessToken(
-  refreshToken: string,
-): Promise<{ access_token: string; refresh_token: string; expires_in: number } | null> {
-  let res: Response;
+/** Result of a token refresh attempt. */
+type RefreshResult =
+  | { ok: true; tokens: { access_token: string; refresh_token: string; expires_in: number } }
+  | { ok: false; permanent: boolean };
+
+/**
+ * Returns whether an HTTP status code represents a permanent auth failure
+ * (token invalid/revoked) vs a transient error (server unavailable, network issue).
+ */
+function isPermanentAuthError(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
+async function refreshAccessToken(refreshToken: string): Promise<RefreshResult> {
   try {
-    res = await fetch(`${OAUTH_PROVIDER_URL}/api/oauth/token`, {
+    const res = await fetch(`${OAUTH_PROVIDER_URL}/api/oauth/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -30,42 +40,45 @@ async function refreshAccessToken(
         client_id: OAUTH_CLIENT_ID,
       }),
     });
-  } catch {
-    return null;
-  }
-  if (!res.ok) return null;
-  try {
-    return (await res.json()) as {
+    if (!res.ok) {
+      return { ok: false, permanent: isPermanentAuthError(res.status) };
+    }
+    const tokens = (await res.json()) as {
       access_token: string;
       refresh_token: string;
       expires_in: number;
     };
+    return { ok: true, tokens };
   } catch {
-    return null;
+    // Network error — transient
+    return { ok: false, permanent: false };
   }
 }
 
-async function fetchUserInfo(accessToken: string): Promise<UserInfoResponse | null> {
-  let res: Response;
+/** Result of a userinfo fetch attempt. */
+type UserInfoResult = { ok: true; userInfo: UserInfoResponse } | { ok: false; permanent: boolean };
+
+async function fetchUserInfo(accessToken: string): Promise<UserInfoResult> {
   try {
-    res = await fetch(`${OAUTH_PROVIDER_URL}/api/oauth/userinfo`, {
+    const res = await fetch(`${OAUTH_PROVIDER_URL}/api/oauth/userinfo`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+    if (!res.ok) {
+      return { ok: false, permanent: isPermanentAuthError(res.status) };
+    }
+    const userInfo = (await res.json()) as UserInfoResponse;
+    return { ok: true, userInfo };
   } catch {
-    return null;
-  }
-  if (!res.ok) return null;
-  try {
-    return (await res.json()) as UserInfoResponse;
-  } catch {
-    return null;
+    // Network error — transient
+    return { ok: false, permanent: false };
   }
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const cookies = getAuthCookies(request);
   if (!cookies) {
-    return NextResponse.json({ authenticated: false });
+    // No session cookies — permanent (not authenticated)
+    return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
   let { accessToken } = cookies;
@@ -75,38 +88,54 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Refresh if expired
   if (Date.now() >= expiresAt) {
-    newTokens = await refreshAccessToken(refreshToken);
-    if (!newTokens) {
-      const res = NextResponse.json({ authenticated: false });
-      clearAuthCookies(res);
-      return res;
+    const refreshResult = await refreshAccessToken(refreshToken);
+    if (!refreshResult.ok) {
+      if (refreshResult.permanent) {
+        // Token is invalid/revoked — clear cookies and signal permanent logout
+        const res = NextResponse.json({ authenticated: false }, { status: 401 });
+        clearAuthCookies(res);
+        return res;
+      }
+      // Transient error (5xx / network) — keep cookies, signal retry
+      return NextResponse.json({ authenticated: false }, { status: 503 });
     }
+    newTokens = refreshResult.tokens;
     accessToken = newTokens.access_token;
     tokensRefreshed = true;
   }
 
   // Fetch user info
-  let userInfo = await fetchUserInfo(accessToken);
+  let userInfoResult = await fetchUserInfo(accessToken);
 
   // If userinfo fails with original token, try refreshing once
-  if (!userInfo && !tokensRefreshed) {
-    newTokens = await refreshAccessToken(refreshToken);
-    if (!newTokens) {
-      const res = NextResponse.json({ authenticated: false });
+  if (!userInfoResult.ok && !tokensRefreshed) {
+    const refreshResult = await refreshAccessToken(refreshToken);
+    if (!refreshResult.ok) {
+      if (refreshResult.permanent) {
+        const res = NextResponse.json({ authenticated: false }, { status: 401 });
+        clearAuthCookies(res);
+        return res;
+      }
+      return NextResponse.json({ authenticated: false }, { status: 503 });
+    }
+    newTokens = refreshResult.tokens;
+    accessToken = newTokens.access_token;
+    tokensRefreshed = true;
+    userInfoResult = await fetchUserInfo(accessToken);
+  }
+
+  if (!userInfoResult.ok) {
+    if (userInfoResult.permanent) {
+      // Permanent failure even after refresh — token is invalid
+      const res = NextResponse.json({ authenticated: false }, { status: 401 });
       clearAuthCookies(res);
       return res;
     }
-    accessToken = newTokens.access_token;
-    tokensRefreshed = true;
-    userInfo = await fetchUserInfo(accessToken);
+    // Transient — keep cookies, signal retry
+    return NextResponse.json({ authenticated: false }, { status: 503 });
   }
 
-  if (!userInfo) {
-    const res = NextResponse.json({ authenticated: false });
-    clearAuthCookies(res);
-    return res;
-  }
-
+  const { userInfo } = userInfoResult;
   const res = NextResponse.json({
     authenticated: true,
     user: {
