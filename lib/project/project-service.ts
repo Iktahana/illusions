@@ -311,8 +311,10 @@ export class ProjectService {
     };
     await projectJsonHandle.write(JSON.stringify(updatedMetadata, null, 2));
 
-    // Update workspace.json
-    const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json");
+    // Update workspace.json (create: true to handle legacy projects without workspace.json)
+    const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json", {
+      create: true,
+    });
     await workspaceJsonHandle.write(JSON.stringify(project.workspaceState, null, 2));
   }
 
