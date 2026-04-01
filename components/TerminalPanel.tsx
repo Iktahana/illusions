@@ -164,27 +164,31 @@ export default function TerminalPanel({
     fitAddonRef.current = fitAddon;
 
     // --- Attach to PTY session ---
+    // Register the live data listener BEFORE calling attach() to prevent
+    // output loss during the gap between backlog retrieval and listener setup.
+    // Any data arriving while attach() is in-flight is captured immediately.
+    const unsubData = ptyApi.onData((payload) => {
+      if (payload.sessionId !== sessionId) return;
+      terminal.write(payload.data);
+    });
+    cleanupDataRef.current = unsubData;
+
     const attachResult = await ptyApi.attach(sessionId);
 
     if ("error" in attachResult) {
       setInitError(`セッションへの接続に失敗しました: ${attachResult.error}`);
+      unsubData();
+      cleanupDataRef.current = null;
       terminal.dispose();
       terminalRef.current = null;
       fitAddonRef.current = null;
       return;
     }
 
-    // Write buffered output from before attach
+    // Write buffered output first; live events registered above will follow.
     if (attachResult.outputBuffer) {
       terminal.write(attachResult.outputBuffer);
     }
-
-    // Subscribe to live PTY data events (filter by sessionId)
-    const unsubData = ptyApi.onData((payload) => {
-      if (payload.sessionId !== sessionId) return;
-      terminal.write(payload.data);
-    });
-    cleanupDataRef.current = unsubData;
 
     // Subscribe to PTY exit events
     const unsubExit = ptyApi.onExit((payload) => {
