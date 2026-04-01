@@ -41,6 +41,7 @@ const { registerSystemHandlers } = require("./ipc/system-ipc");
 const { registerPtyHandlers } = require("./ipc/pty-ipc");
 const { killAllSessions, killSessionsForWindow } = require("./ipc/terminal-session-registry");
 const { registerAuthHandlers, handleAuthCallback } = require("./ipc/auth-ipc");
+const { registerEditorHandlers } = require("./ipc/editor-ipc");
 
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
@@ -160,6 +161,7 @@ app.whenReady().then(async () => {
   registerSystemHandlers();
   registerPtyHandlers();
   registerAuthHandlers();
+  registerEditorHandlers();
 
   // Power state monitoring
   powerMonitor.on("on-ac", () => broadcastPowerState("ac"));
