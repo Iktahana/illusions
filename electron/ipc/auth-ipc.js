@@ -43,7 +43,6 @@ function registerAuthHandlers() {
       throw new Error("Invalid state parameter");
     }
     const { codeVerifier } = pendingAuth;
-    pendingAuth = null;
 
     const response = await fetch(`${PROVIDER_URL}/api/oauth/token`, {
       method: "POST",
@@ -61,6 +60,8 @@ function registerAuthHandlers() {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.error_description || "Token exchange failed");
     }
+
+    pendingAuth = null;
     return response.json();
   });
 

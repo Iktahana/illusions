@@ -71,14 +71,18 @@ export async function startWebLogin(): Promise<void> {
   window.location.href = `${OAUTH_PROVIDER_URL}/api/oauth/authorize?${params}`;
 }
 
-/** Read and consume the pending auth data stored before the redirect. */
-export function consumePendingAuth(): { state: string; codeVerifier: string } | null {
+/** Read the pending auth data stored before the redirect without removing it. */
+export function getPendingAuth(): { state: string; codeVerifier: string } | null {
   const raw = safeSessionStorageGet(PENDING_AUTH_KEY);
   if (!raw) return null;
-  safeSessionStorageRemove(PENDING_AUTH_KEY);
   try {
     return JSON.parse(raw) as { state: string; codeVerifier: string };
   } catch {
     return null;
   }
+}
+
+/** Remove the pending auth data after a successful token exchange. */
+export function clearPendingAuth(): void {
+  sessionStorage.removeItem(PENDING_AUTH_KEY);
 }
