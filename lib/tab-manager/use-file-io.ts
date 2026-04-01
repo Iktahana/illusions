@@ -228,6 +228,20 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           const vfs = getVFS();
           suppressFileWatch(tab.file.path);
           await vfs.writeFile(tab.file.path, sanitized);
+
+          // Update project.json lastModified so workspace metadata stays in sync.
+          // This mirrors what ProjectService.saveProject() does for the full save path.
+          try {
+            const projectJsonPath = ".illusions/project.json";
+            const projectJsonText = await vfs.readFile(projectJsonPath);
+            const projectJson = JSON.parse(projectJsonText) as Record<string, unknown>;
+            projectJson["lastModified"] = Date.now();
+            await vfs.writeFile(projectJsonPath, JSON.stringify(projectJson, null, 2));
+          } catch {
+            // Non-fatal: project.json update failure should not block the save
+            console.warn("project.json の lastModified 更新に失敗しました");
+          }
+
           setTabs((prev) =>
             prev.map((t) => {
               if (t.id !== tabId || !isEditorTab(t)) return t;

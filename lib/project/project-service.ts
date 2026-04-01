@@ -206,7 +206,9 @@ export class ProjectService {
       if (parentPath) {
         projectRootPath = `${parentPath}/${name}`;
         if ("setRootPath" in this.vfs) {
-          (this.vfs as { setRootPath: (p: string) => void }).setRootPath(projectRootPath);
+          await (this.vfs as { setRootPath: (p: string) => Promise<void> }).setRootPath(
+            projectRootPath,
+          );
         }
       }
     }
@@ -499,7 +501,9 @@ export class ProjectService {
     if (isElectronRenderer() && project.rootPath) {
       // Re-set the VFS root using the stored absolute path
       if ("setRootPath" in this.vfs) {
-        (this.vfs as { setRootPath: (p: string) => void }).setRootPath(project.rootPath);
+        await (this.vfs as { setRootPath: (p: string) => Promise<void> }).setRootPath(
+          project.rootPath,
+        );
       }
       return await this.vfs.getDirectoryHandle("");
     }
