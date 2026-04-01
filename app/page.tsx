@@ -29,6 +29,7 @@ import { useEditorMode } from "@/contexts/EditorModeContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode } from "@/lib/project/project-types";
 import { isEditorTab } from "@/lib/tab-manager/tab-types";
+import { sanitizeMdiContent } from "@/lib/tab-manager/types";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useEditorLifecycle } from "@/lib/editor-page/use-editor-lifecycle";
@@ -835,10 +836,16 @@ export default function EditorPage() {
     currentContent: content,
     onHistoryRestore: (restoredContent: string) => {
       setContent(restoredContent);
-      // Clear conflict state so the save guard is lifted after restoring a snapshot.
+      // Clear conflict state after restoring a snapshot.
+      // Set fileSyncStatus based on whether the restored content matches the last saved content,
+      // so that a restored snapshot that differs from disk is not treated as clean.
       if (activeTabId !== null) {
+        const currentTab = tabsRef.current.find((t) => t.id === activeTabId);
+        const lastSaved =
+          currentTab && isEditorTab(currentTab) ? (currentTab.lastSavedContent ?? "") : "";
+        const isClean = sanitizeMdiContent(restoredContent) === sanitizeMdiContent(lastSaved);
         updateTab(activeTabId, {
-          fileSyncStatus: "clean",
+          fileSyncStatus: isClean ? "clean" : "dirty",
           conflictDiskContent: null,
         });
       }
