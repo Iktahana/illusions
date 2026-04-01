@@ -156,6 +156,10 @@ function buildOnChanged(
                     isDirty: false,
                     fileSyncStatus: "clean",
                     conflictDiskContent: null,
+                    // Trigger live editor update via externalContent prop.
+                    // Without this, the tab state is updated but the active
+                    // editor instance continues to show the stale content.
+                    pendingExternalContent: diskContent,
                   } satisfies EditorTabState;
                 }),
               );
