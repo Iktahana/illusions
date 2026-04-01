@@ -41,6 +41,15 @@ const HISTORY_INDEX_FILENAME = "index.json";
 /** Name of the bookmarks file */
 const BOOKMARKS_FILENAME = ".history_bookmarks.json";
 
+/** Name of the file-level lock file used for cross-process/window index serialization */
+const INDEX_LOCK_FILENAME = ".index.lock";
+
+/** Maximum time in milliseconds to wait for the index lock before proceeding */
+const INDEX_LOCK_MAX_WAIT_MS = 5000;
+
+/** Polling interval in milliseconds while waiting for the index lock */
+const INDEX_LOCK_POLL_INTERVAL_MS = 50;
+
 // -----------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------
@@ -279,9 +288,9 @@ export class HistoryService {
       });
       await snapshotFileHandle.write(content);
 
-      // Update the index (serialized via mutex to prevent TOCTOU race)
-      const releaseLock = await this.indexMutex.acquire();
-      try {
+      // Update the index (serialized via mutex + file lock to prevent TOCTOU race
+      // both within the same process and across multiple renderer windows)
+      await this.withIndexLock(async () => {
         const index = await this.readHistoryIndex();
         index.snapshots.unshift(entry);
         await this.writeHistoryIndex(index);
@@ -289,9 +298,7 @@ export class HistoryService {
         // Auto-prune old snapshots (global and per-file, within same lock)
         await this.pruneOldSnapshotsUnsafe();
         await this.pruneSnapshotsPerFileUnsafe(sourcePath);
-      } finally {
-        releaseLock();
-      }
+      });
 
       return entry;
     } catch (error) {
@@ -364,12 +371,9 @@ export class HistoryService {
    * - retentionDays を超えるスナップショットを削除
    */
   async pruneOldSnapshots(): Promise<void> {
-    const releaseLock = await this.indexMutex.acquire();
-    try {
+    await this.withIndexLock(async () => {
       await this.pruneOldSnapshotsUnsafe();
-    } finally {
-      releaseLock();
-    }
+    });
   }
 
   /**
@@ -449,12 +453,9 @@ export class HistoryService {
    * @param sourcePath - The source file path to prune snapshots for
    */
   async pruneSnapshotsPerFile(sourcePath: string): Promise<void> {
-    const releaseLock = await this.indexMutex.acquire();
-    try {
+    await this.withIndexLock(async () => {
       await this.pruneSnapshotsPerFileUnsafe(sourcePath);
-    } finally {
-      releaseLock();
-    }
+    });
   }
 
   /**
@@ -622,8 +623,7 @@ export class HistoryService {
    * @param snapshotId - The ID of the snapshot to delete
    */
   async deleteSnapshot(snapshotId: string): Promise<void> {
-    const releaseLock = await this.indexMutex.acquire();
-    try {
+    await this.withIndexLock(async () => {
       const index = await this.readHistoryIndex();
       const entryIndex = index.snapshots.findIndex((s) => s.id === snapshotId);
 
@@ -644,9 +644,7 @@ export class HistoryService {
       // Remove from index
       index.snapshots.splice(entryIndex, 1);
       await this.writeHistoryIndex(index);
-    } finally {
-      releaseLock();
-    }
+    });
   }
 
   // -----------------------------------------------------------------------
@@ -708,6 +706,89 @@ export class HistoryService {
   // -----------------------------------------------------------------------
   // Private helpers
   // -----------------------------------------------------------------------
+
+  /**
+   * Acquire a file-level lock on the history index by creating a lock file.
+   * This prevents cross-process and cross-window TOCTOU races when multiple
+   * renderer windows update the snapshot index concurrently.
+   *
+   * The lock is backed by `.illusions/history/.index.lock`. If the lock file
+   * already exists, this method polls until it disappears or the timeout
+   * (INDEX_LOCK_MAX_WAIT_MS) expires — at which point it proceeds anyway to
+   * avoid permanent deadlock from a crashed renderer that left the lock behind.
+   *
+   * Callers MUST call the returned release function in a finally block.
+   *
+   * ファイルレベルのロックをインデックスに取得する。
+   * クロスプロセス・クロスウィンドウの競合を防ぐ。
+   *
+   * @returns An async function that removes the lock file when called.
+   */
+  private async acquireIndexFileLock(): Promise<() => Promise<void>> {
+    const historyDir = await this.ensureHistoryDirectory();
+
+    // Poll until the lock file disappears or we time out
+    const deadline = Date.now() + INDEX_LOCK_MAX_WAIT_MS;
+    while (Date.now() < deadline) {
+      // Check whether a lock file already exists
+      let lockExists = false;
+      try {
+        await historyDir.getFileHandle(INDEX_LOCK_FILENAME);
+        lockExists = true;
+      } catch {
+        // File does not exist — lock is free
+        lockExists = false;
+      }
+
+      if (!lockExists) {
+        break;
+      }
+
+      // Wait before polling again
+      await new Promise<void>((resolve) => setTimeout(resolve, INDEX_LOCK_POLL_INTERVAL_MS));
+    }
+
+    // Write the lock file (best-effort; if it fails we still proceed)
+    try {
+      const lockHandle = await historyDir.getFileHandle(INDEX_LOCK_FILENAME, { create: true });
+      await lockHandle.write(String(Date.now()));
+    } catch (err) {
+      console.warn("Failed to write history index lock file:", err);
+    }
+
+    // Return a release function
+    return async (): Promise<void> => {
+      try {
+        await historyDir.removeEntry(INDEX_LOCK_FILENAME);
+      } catch {
+        // Already removed or never created; ignore
+      }
+    };
+  }
+
+  /**
+   * Execute a callback while holding both the in-process AsyncMutex and the
+   * file-level index lock. This provides two layers of protection:
+   * - AsyncMutex: serializes operations within the same renderer process
+   * - File lock: serializes operations across different renderer windows/processes
+   *
+   * インプロセスのAsyncMutexとファイルレベルのロックを両方保持した状態でコールバックを実行する。
+   *
+   * @param fn - Async callback to run under the lock
+   * @returns The value returned by fn
+   */
+  private async withIndexLock<T>(fn: () => Promise<T>): Promise<T> {
+    // Acquire the in-process mutex first
+    const releaseMutex = await this.indexMutex.acquire();
+    // Then acquire the cross-process file lock
+    const releaseFileLock = await this.acquireIndexFileLock();
+    try {
+      return await fn();
+    } finally {
+      await releaseFileLock();
+      releaseMutex();
+    }
+  }
 
   /**
    * Read the history index from .illusions/history/index.json.
