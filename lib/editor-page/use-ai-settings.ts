@@ -8,6 +8,7 @@ import type {
   GuidelineId,
 } from "@/lib/linting/correction-config";
 import { DEFAULT_CORRECTION_CONFIG } from "@/lib/linting/correction-config";
+import { CORRECTION_MODES } from "@/lib/linting/correction-modes";
 
 export interface AiSettings {
   lintingEnabled: boolean;
@@ -110,8 +111,24 @@ export function useAiSettings(): UseAiSettingsResult {
     if (appState.autoPowerSaveOnBattery !== undefined)
       setAutoPowerSaveOnBattery(appState.autoPowerSaveOnBattery as boolean);
     if (appState.correctionMode) setCorrectionMode(appState.correctionMode as CorrectionModeId);
-    if (appState.correctionGuidelines)
-      setCorrectionGuidelines(appState.correctionGuidelines as GuidelineId[]);
+    if (appState.correctionGuidelines) {
+      const stored = appState.correctionGuidelines as GuidelineId[];
+      // Migration: guidelines that have implemented rules
+      const RULE_BEARING: GuidelineId[] = [
+        "jtf-style-3",
+        "editors-rulebook",
+        "gendai-kanazukai-1986",
+      ];
+      const hasAnyRuleBearing = stored.some((g) => RULE_BEARING.includes(g));
+      if (!hasAnyRuleBearing) {
+        // Stored guidelines lack any rule-bearing entries — reset to mode defaults
+        const mode = (appState.correctionMode as CorrectionModeId) || "novel";
+        const modeDefaults = CORRECTION_MODES[mode]?.defaultGuidelines;
+        setCorrectionGuidelines(modeDefaults ?? DEFAULT_CORRECTION_CONFIG.guidelines);
+      } else {
+        setCorrectionGuidelines(stored);
+      }
+    }
 
     if (typeof appState.characterExtractionBatchSize === "number") {
       setCharacterExtractionBatchSize(
