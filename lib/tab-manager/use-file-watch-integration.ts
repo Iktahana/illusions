@@ -2,12 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { createFileWatcher } from "../services/file-watcher";
-import { getHistoryService } from "../services/history-service";
 import { notificationManager } from "../services/notification-manager";
-import { getVFS } from "../vfs";
 import { isEditorTab } from "./tab-types";
 import type { FileWatcher } from "../services/file-watcher";
-import type { TabId, EditorTabState } from "./tab-types";
+import type { TabId, TabState, EditorTabState, DiffTabState } from "./tab-types";
 import type { TabManagerCore } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -38,34 +36,6 @@ export interface UseFileWatchIntegrationParams extends TabManagerCore {
 // ---------------------------------------------------------------------------
 
 /**
- * Snapshot the current editor content before an external change overwrites it.
- * Bypasses the normal 5-minute interval check since external changes are
- * infrequent and the snapshot preserves user work that might otherwise be lost.
- *
- * 外部変更でエディタの内容が上書きされる前にスナップショットを作成する。
- * 外部変更は頻繁には発生しないため、通常の5分間隔チェックをバイパスする。
- */
-function snapshotBeforeExternalChange(
-  sourcePath: string,
-  displayName: string,
-  editorContent: string,
-): void {
-  if (!getVFS().isRootOpen()) return;
-  const historyService = getHistoryService();
-  historyService
-    .createSnapshot({
-      sourcePath,
-      displayName,
-      content: editorContent,
-      type: "auto",
-      label: "外部変更前の自動保存",
-    })
-    .catch((error) => {
-      console.warn("外部変更前のスナップショット作成に失敗しました:", error);
-    });
-}
-
-/**
  * Build the onChanged callback for an editor tab.
  * Implements the state-transition logic described in issue #825.
  *
@@ -84,18 +54,9 @@ function buildOnChanged(
     if (!tab || !isEditorTab(tab)) return;
 
     const fileName = tab.file?.name ?? "ファイル";
-    const filePath = tab.file?.path;
 
     if (tab.fileSyncStatus === "clean") {
-      // Snapshot current content before overwriting with disk content
-      if (filePath) {
-        snapshotBeforeExternalChange(filePath, fileName, tab.content);
-      }
-
-      // Clean tab: update content state AND set pendingExternalContent.
-      // content is updated for state consistency (isDirty, auto-save, etc.).
-      // pendingExternalContent triggers the editor to apply the new content
-      // via ProseMirror transaction (preserves scroll position).
+      // Clean tab: auto-reload with disk content
       setTabs((prev) =>
         prev.map((t) => {
           if (t.id !== tabId || !isEditorTab(t)) return t;
@@ -106,17 +67,11 @@ function buildOnChanged(
             isDirty: false,
             fileSyncStatus: "clean",
             conflictDiskContent: null,
-            pendingExternalContent: diskContent,
           } satisfies EditorTabState;
         }),
       );
       notificationManager.info(`「${fileName}」が更新されました`, 3000);
     } else if (tab.fileSyncStatus === "dirty") {
-      // Snapshot current content before entering conflicted state
-      if (filePath) {
-        snapshotBeforeExternalChange(filePath, fileName, tab.content);
-      }
-
       // Dirty tab: do NOT touch buffer; enter conflicted state
       const localContent = tab.content;
 
@@ -156,10 +111,6 @@ function buildOnChanged(
                     isDirty: false,
                     fileSyncStatus: "clean",
                     conflictDiskContent: null,
-                    // Trigger live editor update via externalContent prop.
-                    // Without this, the tab state is updated but the active
-                    // editor instance continues to show the stale content.
-                    pendingExternalContent: diskContent,
                   } satisfies EditorTabState;
                 }),
               );
@@ -182,20 +133,8 @@ function buildOnChanged(
           },
         ],
       });
-    } else if (tab.fileSyncStatus === "conflicted") {
-      // Already conflicted: keep conflictDiskContent up to date so that
-      // "ディスクの内容を採用" always uses the latest disk version.
-      // Do not change isDirty or fileSyncStatus — the user must still resolve.
-      setTabs((prev) =>
-        prev.map((t) => {
-          if (t.id !== tabId || !isEditorTab(t)) return t;
-          return {
-            ...t,
-            conflictDiskContent: diskContent,
-          } satisfies EditorTabState;
-        }),
-      );
     }
+    // If already "conflicted", ignore further disk changes (user must resolve first)
   };
 }
 
@@ -232,6 +171,15 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
    */
   const watchersRef = useRef<Map<TabId, FileWatcher>>(new Map());
 
+  /**
+   * Map from tabId to the file path that the current watcher was created for.
+   * Used to detect path changes after Save As operations.
+   *
+   * tabId から現在のウォッチャーが生成された file path へのマップ。
+   * Save As 後の path 変更を検出するために使用する。
+   */
+  const watcherPathsRef = useRef<Map<TabId, string>>(new Map());
+
   // ---------------------------------------------------------------------------
   // Sync watchers when tabs change
   // ---------------------------------------------------------------------------
@@ -243,11 +191,14 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
     const watchers = watchersRef.current;
     const currentTabIds = new Set(tabs.map((t) => t.id));
 
+    const watcherPaths = watcherPathsRef.current;
+
     // Stop and remove watchers for tabs that no longer exist
     for (const [tabId, watcher] of watchers) {
       if (!currentTabIds.has(tabId)) {
         watcher.stop();
         watchers.delete(tabId);
+        watcherPaths.delete(tabId);
       }
     }
 
@@ -260,7 +211,16 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
       const isActiveTab = tab.id === activeTabId;
       const existing = watchers.get(tab.id);
 
-      if (!existing) {
+      // If the file path changed (e.g. after Save As), stop the old watcher
+      // so it no longer monitors the previous path.
+      // path が変わった場合（Save As 後など）は古いウォッチャーを停止して再生成する。
+      if (existing && watcherPaths.get(tab.id) !== filePath) {
+        existing.stop();
+        watchers.delete(tab.id);
+        watcherPaths.delete(tab.id);
+      }
+
+      if (!watchers.has(tab.id)) {
         // Create a new watcher for this tab
         const onChanged = buildOnChanged(tab.id, setTabs, tabsRef, openDiffTab);
         const watcher = createFileWatcher({ path: filePath, onChanged });
@@ -270,6 +230,7 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
         }
         // Background tabs are not started yet (started when becoming active)
         watchers.set(tab.id, watcher);
+        watcherPaths.set(tab.id, filePath);
       }
     }
   }, [tabs, activeTabId, isElectron, setTabs, tabsRef, openDiffTab]);
@@ -305,12 +266,12 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    const watchers = watchersRef.current;
     return () => {
-      for (const watcher of watchers.values()) {
+      for (const watcher of watchersRef.current.values()) {
         watcher.stop();
       }
-      watchers.clear();
+      watchersRef.current.clear();
+      watcherPathsRef.current.clear();
     };
   }, []);
 }
