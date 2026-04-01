@@ -313,15 +313,28 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       const result = await saveMdiFile({ descriptor, content: sanitized, fileType: tab.fileType });
 
       if (result) {
-        updateTab(tabId, {
-          file: result.descriptor,
-          lastSavedContent: sanitized,
-          isDirty: false,
-          lastSavedTime: Date.now(),
-          isSaving: false,
-          fileSyncStatus: "clean",
-          conflictDiskContent: null,
-        });
+        // Use functional updater to compare against the latest tab content at
+        // completion time, not at dialog-open time. Edits made while the async
+        // Save As dialog was open must not be silently marked as saved.
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === tabId && isEditorTab(t)
+              ? (() => {
+                  const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+                  return {
+                    ...t,
+                    file: result.descriptor,
+                    lastSavedContent: sanitized,
+                    isDirty: newIsDirty,
+                    fileSyncStatus: newIsDirty ? "dirty" : "clean",
+                    lastSavedTime: Date.now(),
+                    isSaving: false,
+                    conflictDiskContent: null,
+                  };
+                })()
+              : t,
+          ),
+        );
         if (!(await persistFileReference(result.descriptor, sanitized))) {
           notificationManager.warning(PERSIST_FAILURE_WARNING);
         }
@@ -339,7 +352,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     } finally {
       isSavingRef.current = false;
     }
-  }, [updateTab, persistFileReference, tryAutoSnapshot, tabsRef, activeTabIdRef]);
+  }, [updateTab, setTabs, persistFileReference, tryAutoSnapshot, tabsRef, activeTabIdRef]);
 
   /** Load a file by path + content into a new tab (or reuse/deduplicate) */
   const loadSystemFile = useCallback(

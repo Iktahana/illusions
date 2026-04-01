@@ -80,19 +80,19 @@ export function useAutoSave(params: UseAutoSaveParams): void {
               await vfs.writeFile(tab.file.path, sanitized);
               if (!mountedRef.current) return;
               setTabs((prev) =>
-                prev.map((t) =>
-                  t.id === tab.id && isEditorTab(t)
-                    ? {
-                        ...t,
-                        lastSavedContent: sanitized,
-                        isDirty: sanitizeMdiContent(t.content) !== sanitized,
-                        lastSavedTime: Date.now(),
-                        lastSaveWasAuto: true,
-                        fileSyncStatus: "clean",
-                        conflictDiskContent: null,
-                      }
-                    : t,
-                ),
+                prev.map((t) => {
+                  if (t.id !== tab.id || !isEditorTab(t)) return t;
+                  const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+                  return {
+                    ...t,
+                    lastSavedContent: sanitized,
+                    isDirty: newIsDirty,
+                    fileSyncStatus: newIsDirty ? "dirty" : "clean",
+                    conflictDiskContent: null,
+                    lastSavedTime: Date.now(),
+                    lastSaveWasAuto: true,
+                  };
+                }),
               );
             } else if (tab.file?.path || tab.file?.handle) {
               const result = await saveMdiFile({
@@ -103,20 +103,20 @@ export function useAutoSave(params: UseAutoSaveParams): void {
               if (result) {
                 if (!mountedRef.current) return;
                 setTabs((prev) =>
-                  prev.map((t) =>
-                    t.id === tab.id && isEditorTab(t)
-                      ? {
-                          ...t,
-                          file: result.descriptor,
-                          lastSavedContent: sanitized,
-                          isDirty: sanitizeMdiContent(t.content) !== sanitized,
-                          lastSavedTime: Date.now(),
-                          lastSaveWasAuto: true,
-                          fileSyncStatus: "clean",
-                          conflictDiskContent: null,
-                        }
-                      : t,
-                  ),
+                  prev.map((t) => {
+                    if (t.id !== tab.id || !isEditorTab(t)) return t;
+                    const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+                    return {
+                      ...t,
+                      file: result.descriptor,
+                      lastSavedContent: sanitized,
+                      isDirty: newIsDirty,
+                      fileSyncStatus: newIsDirty ? "dirty" : "clean",
+                      conflictDiskContent: null,
+                      lastSavedTime: Date.now(),
+                      lastSaveWasAuto: true,
+                    };
+                  }),
                 );
               }
             }
