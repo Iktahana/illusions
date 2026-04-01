@@ -19,8 +19,42 @@ export async function readFileHandle(handle: {
 }
 
 /**
+ * Read-only: open .illusions/project.json without creating anything.
+ * Returns null if the directory or file does not exist.
+ * Use this when restoring/opening an existing project — never auto-generate metadata.
+ */
+export async function readProjectJson(
+  rootDirHandle: AnyDirectoryHandle,
+): Promise<{ metadata: ProjectConfig; illusionsDir: AnyDirectoryHandle } | null> {
+  let illusionsDir: AnyDirectoryHandle;
+  try {
+    illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: false });
+  } catch {
+    // .illusions/ directory does not exist
+    return null;
+  }
+
+  let metadataText: string | undefined;
+  try {
+    const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: false });
+    const raw = await readFileHandle(projectJsonHandle as Parameters<typeof readFileHandle>[0]);
+    if (raw.trim()) metadataText = raw;
+  } catch {
+    // project.json does not exist or is unreadable
+    return null;
+  }
+
+  if (!metadataText) {
+    return null;
+  }
+
+  return { metadata: JSON.parse(metadataText) as ProjectConfig, illusionsDir };
+}
+
+/**
  * Read or auto-create .illusions/project.json.
  * If .illusions/ or project.json doesn't exist, creates them with sensible defaults.
+ * Use this only when creating a new project, not when restoring an existing one.
  */
 export async function ensureProjectJson(
   rootDirHandle: AnyDirectoryHandle,
