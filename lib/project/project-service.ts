@@ -233,12 +233,30 @@ export class ProjectService {
   async openProject(): Promise<ProjectMode> {
     const rootDirHandle = await this.vfs.openDirectory();
 
-    // Read .illusions/project.json (create if missing)
-    const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
-    const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
+    // Read .illusions/project.json — do NOT create; fail clearly if not found.
+    let illusionsDir: Awaited<ReturnType<typeof rootDirHandle.getDirectoryHandle>>;
+    try {
+      illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: false });
+    } catch {
+      throw new Error(
+        "選択したフォルダはプロジェクトフォルダではありません。.illusions フォルダが見つかりません。",
+      );
+    }
+
+    let projectJsonHandle: Awaited<ReturnType<typeof illusionsDir.getFileHandle>>;
+    try {
+      projectJsonHandle = await illusionsDir.getFileHandle("project.json");
+    } catch {
+      throw new Error(
+        "プロジェクトの設定ファイル (.illusions/project.json) が見つかりません。プロジェクトが破損している可能性があります。",
+      );
+    }
+
     const metadataText = await projectJsonHandle.read();
     if (!metadataText.trim()) {
-      throw new Error(".illusions/project.json is empty — project may need to be re-created.");
+      throw new Error(
+        "プロジェクトの設定ファイル (.illusions/project.json) が空です。プロジェクトが破損している可能性があります。",
+      );
     }
     const metadata: ProjectConfig = JSON.parse(metadataText) as ProjectConfig;
 
