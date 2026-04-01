@@ -215,6 +215,7 @@ function createDefaultHistoryIndex(): HistoryIndex {
 export class HistoryService {
   private vfs: VirtualFileSystem;
   private readonly indexMutex = new AsyncMutex();
+  private readonly bookmarkMutex = new AsyncMutex();
 
   constructor() {
     this.vfs = getVFS();
@@ -667,22 +668,27 @@ export class HistoryService {
    * 新しいブックマーク状態を返す。
    */
   async toggleBookmark(snapshotId: string): Promise<boolean> {
-    const bookmarks = await this.getBookmarks();
-    const isBookmarked = bookmarks.has(snapshotId);
+    const releaseLock = await this.bookmarkMutex.acquire();
+    try {
+      const bookmarks = await this.getBookmarks();
+      const isBookmarked = bookmarks.has(snapshotId);
 
-    if (isBookmarked) {
-      bookmarks.delete(snapshotId);
-    } else {
-      bookmarks.add(snapshotId);
+      if (isBookmarked) {
+        bookmarks.delete(snapshotId);
+      } else {
+        bookmarks.add(snapshotId);
+      }
+
+      const historyDir = await this.ensureHistoryDirectory();
+      const handle = await historyDir.getFileHandle(BOOKMARKS_FILENAME, {
+        create: true,
+      });
+      await handle.write(JSON.stringify([...bookmarks], null, 2));
+
+      return !isBookmarked;
+    } finally {
+      releaseLock();
     }
-
-    const historyDir = await this.ensureHistoryDirectory();
-    const handle = await historyDir.getFileHandle(BOOKMARKS_FILENAME, {
-      create: true,
-    });
-    await handle.write(JSON.stringify([...bookmarks], null, 2));
-
-    return !isBookmarked;
   }
 
   // -----------------------------------------------------------------------
