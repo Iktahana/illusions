@@ -61,11 +61,11 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
     if (!isEditorTab(rawTab)) return;
     const tab = rawTab;
 
-    // Block save if the file has an unresolved external conflict
+    // Block save if the file has an unresolved conflict.
+    // The in-editor content may be stale compared to the newer disk version,
+    // so writing it would silently discard the disk changes.
     if (tab.fileSyncStatus === "conflicted") {
-      notificationManager.warning(
-        "ファイルが外部で変更されています。閉じる前にコンフリクトを解決してください。",
-      );
+      notificationManager.error("競合状態のため保存できません。まず競合を解決してください。");
       setPendingCloseTabId(null);
       return;
     }
