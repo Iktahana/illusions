@@ -196,14 +196,6 @@ export default function TerminalPanel({
       return;
     }
 
-    // Subscribe to live PTY data events (filter by sessionId)
-    const unsubData = ptyApi.onData((payload) => {
-      if (payload.sessionId !== sessionId) return;
-      terminal.write(payload.data);
-    });
-    cleanupDataRef.current = unsubData;
-
-
     // Subscribe to PTY exit events
     const unsubExit = ptyApi.onExit((payload) => {
       if (payload.sessionId !== sessionId) return;
