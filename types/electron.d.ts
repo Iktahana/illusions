@@ -38,9 +38,10 @@ declare global {
       callback: (payload: { projectPath: string; initialFile: string }) => void,
     ) => (() => void) | void;
     getPendingFile?: () => Promise<
-      | { type: "project"; projectPath: string; initialFile: string }
-      | { type: "standalone"; path: string; content: string }
-      | null
+      Array<
+        | { type: "project"; projectPath: string; initialFile: string }
+        | { type: "standalone"; path: string; content: string }
+      >
     >;
     onMenuNew?: (callback: () => void) => (() => void) | void;
     onMenuOpen?: (callback: () => void) => (() => void) | void;

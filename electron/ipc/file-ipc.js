@@ -251,14 +251,15 @@ async function handleMdiFileOpen(filePath) {
 // --- Pull-model pending file handler ---
 // Renderer calls this after hooks are mounted, eliminating the race condition
 // with the old did-finish-load push model.
-let pendingFilePath = null;
+// Use a queue so multiple open requests before window-ready are all preserved.
+let pendingFilePaths = [];
 
 function getPendingFilePath() {
-  return pendingFilePath;
+  return pendingFilePaths.length > 0 ? pendingFilePaths[0] : null;
 }
 
 function setPendingFilePath(p) {
-  pendingFilePath = p;
+  pendingFilePaths.push(p);
 }
 
 function registerFileHandlers() {
@@ -443,36 +444,40 @@ function registerFileHandlers() {
   });
 
   ipcMain.handle("get-pending-file", async (event) => {
-    if (!pendingFilePath) return null;
+    if (pendingFilePaths.length === 0) return [];
 
-    const filePath = pendingFilePath;
-    pendingFilePath = null;
+    // Drain the queue and resolve each path
+    const paths = pendingFilePaths.slice();
+    pendingFilePaths = [];
 
-    try {
-      const dirPath = path.dirname(filePath);
-      const projectRoot = await findProjectRoot(dirPath);
+    const results = [];
+    for (const filePath of paths) {
+      try {
+        const dirPath = path.dirname(filePath);
+        const projectRoot = await findProjectRoot(dirPath);
 
-      if (projectRoot) {
-        const relativePath = path.relative(projectRoot, filePath);
-        return {
-          type: "project",
-          projectPath: projectRoot,
-          initialFile: relativePath,
-        };
+        if (projectRoot) {
+          const relativePath = path.relative(projectRoot, filePath);
+          results.push({
+            type: "project",
+            projectPath: projectRoot,
+            initialFile: relativePath,
+          });
+        } else {
+          // Standalone file: approve path for future saves, scoped to the requesting window
+          approveDialogPath(event.sender.id, path.resolve(filePath));
+          const content = await fs.readFile(filePath, "utf-8");
+          results.push({
+            type: "standalone",
+            path: filePath,
+            content,
+          });
+        }
+      } catch (err) {
+        log.error("get-pending-file failed:", err);
       }
-
-      // Standalone file: approve path for future saves, scoped to the requesting window
-      approveDialogPath(event.sender.id, path.resolve(filePath));
-      const content = await fs.readFile(filePath, "utf-8");
-      return {
-        type: "standalone",
-        path: filePath,
-        content,
-      };
-    } catch (err) {
-      log.error("get-pending-file failed:", err);
-      return null;
     }
+    return results;
   });
 
   // Clean up per-window approved paths when a BrowserWindow is closed/destroyed.
