@@ -259,6 +259,20 @@ export default function NovelEditor({
     setIsVertical((prev) => !prev);
   }, []);
 
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !isVertical) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaX !== 0) return;
+      e.preventDefault();
+      container.scrollBy({ left: -e.deltaY, behavior: "instant" });
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [isVertical]);
+
   // Per-pane local state for auto-calculated chars per line (avoids split panes overwriting each other)
   const [localAutoCharsPerLine, setLocalAutoCharsPerLine] = useState<number | null>(null);
   const effectiveCharsPerLine =
