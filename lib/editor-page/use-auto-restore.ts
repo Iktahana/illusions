@@ -35,7 +35,8 @@ export function useAutoRestore({
     void (async () => {
       let success = false;
       try {
-        success = await handleOpenRecentProject(autoRestoreProjectId);
+        await handleOpenRecentProject(autoRestoreProjectId);
+        success = true;
       } catch {
         // handleOpenRecentProject catches its own errors internally
       }
