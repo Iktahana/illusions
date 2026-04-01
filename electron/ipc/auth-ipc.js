@@ -77,7 +77,10 @@ function registerAuthHandlers() {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.error_description || "Token refresh failed");
+      const error = new Error(err.error_description || "Token refresh failed");
+      // Attach HTTP status so the renderer can distinguish permanent vs transient errors
+      error.status = response.status;
+      throw error;
     }
     return response.json();
   });
@@ -87,7 +90,12 @@ function registerAuthHandlers() {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
-    if (!response.ok) throw new Error("Failed to fetch user info");
+    if (!response.ok) {
+      const error = new Error("Failed to fetch user info");
+      // Attach HTTP status so the renderer can distinguish permanent vs transient errors
+      error.status = response.status;
+      throw error;
+    }
     return response.json();
   });
 
