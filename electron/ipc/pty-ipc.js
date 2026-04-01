@@ -206,7 +206,7 @@ function registerPtyHandlers() {
   // Payload: sessionId (string)
   // Returns: { status, exitCode, outputBuffer } | { error: string }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:attach", (_event, sessionId) => {
+  ipcMain.handle("pty:attach", (event, sessionId) => {
     if (typeof sessionId !== "string") {
       return { error: "sessionId must be a string" };
     }
@@ -214,6 +214,15 @@ function registerPtyHandlers() {
     const entry = getSession(sessionId);
     if (!entry) {
       return { error: `セッションが見つかりません: ${sessionId}` };
+    }
+
+    // Ownership check: only the window that spawned the session may attach.
+    if (event.sender.id !== entry.webContentsId) {
+      console.warn(
+        `[PTY] pty:attach — unauthorized access attempt on session ${sessionId} ` +
+          `by webContents ${event.sender.id} (owner: ${entry.webContentsId})`,
+      );
+      return { error: "このセッションへのアクセス権がありません" };
     }
 
     return {
@@ -229,13 +238,22 @@ function registerPtyHandlers() {
   // Payload: { sessionId, data }
   // Returns: { ok: boolean }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:write", (_event, { sessionId, data } = {}) => {
+  ipcMain.handle("pty:write", (event, { sessionId, data } = {}) => {
     if (typeof sessionId !== "string") return { ok: false };
 
     const entry = getSession(sessionId);
     if (!entry) {
       // Non-existent sessionId: log only, no exception
       console.warn(`[PTY] pty:write — session not found: ${sessionId}`);
+      return { ok: false };
+    }
+
+    // Ownership check: only the window that spawned the session may write.
+    if (event.sender.id !== entry.webContentsId) {
+      console.warn(
+        `[PTY] pty:write — unauthorized access attempt on session ${sessionId} ` +
+          `by webContents ${event.sender.id} (owner: ${entry.webContentsId})`,
+      );
       return { ok: false };
     }
 
@@ -261,12 +279,21 @@ function registerPtyHandlers() {
   // Payload: { sessionId, cols, rows }
   // Returns: { ok: boolean }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:resize", (_event, { sessionId, cols, rows } = {}) => {
+  ipcMain.handle("pty:resize", (event, { sessionId, cols, rows } = {}) => {
     if (typeof sessionId !== "string") return { ok: false };
 
     const entry = getSession(sessionId);
     if (!entry) {
       console.warn(`[PTY] pty:resize — session not found: ${sessionId}`);
+      return { ok: false };
+    }
+
+    // Ownership check: only the window that spawned the session may resize.
+    if (event.sender.id !== entry.webContentsId) {
+      console.warn(
+        `[PTY] pty:resize — unauthorized access attempt on session ${sessionId} ` +
+          `by webContents ${event.sender.id} (owner: ${entry.webContentsId})`,
+      );
       return { ok: false };
     }
 
@@ -302,12 +329,21 @@ function registerPtyHandlers() {
   // Payload: sessionId (string)
   // Returns: { ok: boolean }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:kill", (_event, sessionId) => {
+  ipcMain.handle("pty:kill", (event, sessionId) => {
     if (typeof sessionId !== "string") return { ok: false };
 
     const entry = getSession(sessionId);
     if (!entry) {
       console.warn(`[PTY] pty:kill — session not found: ${sessionId}`);
+      return { ok: false };
+    }
+
+    // Ownership check: only the window that spawned the session may kill it.
+    if (event.sender.id !== entry.webContentsId) {
+      console.warn(
+        `[PTY] pty:kill — unauthorized access attempt on session ${sessionId} ` +
+          `by webContents ${event.sender.id} (owner: ${entry.webContentsId})`,
+      );
       return { ok: false };
     }
 
@@ -321,7 +357,7 @@ function registerPtyHandlers() {
   // Payload: sessionId (string)
   // Returns: { sessionId, status, exitCode, shell, cwd, createdAt } | { error: string }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:status", (_event, sessionId) => {
+  ipcMain.handle("pty:status", (event, sessionId) => {
     if (typeof sessionId !== "string") {
       return { error: "sessionId must be a string" };
     }
@@ -329,6 +365,15 @@ function registerPtyHandlers() {
     const entry = getSession(sessionId);
     if (!entry) {
       return { error: `セッションが見つかりません: ${sessionId}` };
+    }
+
+    // Ownership check: only the window that spawned the session may query its status.
+    if (event.sender.id !== entry.webContentsId) {
+      console.warn(
+        `[PTY] pty:status — unauthorized access attempt on session ${sessionId} ` +
+          `by webContents ${event.sender.id} (owner: ${entry.webContentsId})`,
+      );
+      return { error: "このセッションへのアクセス権がありません" };
     }
 
     return {
