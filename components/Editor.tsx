@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Decoration } from "@milkdown/prose/view";
 import { MilkdownProvider } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
-import { getScrollProgress } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import clsx from "clsx";
 import type { EditorView } from "@milkdown/prose/view";
 import { useSpeech } from "@/lib/hooks/use-speech";
@@ -12,7 +11,6 @@ import SearchDialog, { type SearchMatch } from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
 import EditorToolbar from "./editor/EditorToolbar";
 import MilkdownEditor from "./editor/MilkdownEditor";
-import { scrollToSpeechTarget, cancelSpeechScroll } from "@/lib/editor-page/speech-auto-scroll";
 import { buildSegments, buildSpeechChunks, buildSpeechMap } from "@/lib/hooks/speech-utils";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
@@ -108,9 +106,6 @@ export default function NovelEditor({
   /** Max doc-position range processed per TTS chunk (~5 000 Japanese chars). */
   const MAX_SPEECH_CHUNK_RANGE = 10_000;
 
-  // Ref to indicate a mode switch is in progress (for scroll restoration)
-  const isModeSwitchingRef = useRef(false);
-
   /** Cache for DOM character-width measurement (invalidated when font settings change) */
   const charSizeCacheRef = useRef<{
     fontFamily: string;
@@ -155,7 +150,6 @@ export default function NovelEditor({
   }, []);
 
   const clearHighlight = useCallback(() => {
-    cancelSpeechScroll();
     const view = editorViewRef.current;
     if (!view) return;
     view.dispatch(view.state.tr.setMeta("speechDecorations", []));
@@ -191,13 +185,6 @@ export default function NovelEditor({
             if (from == null) return;
             const deco = Decoration.inline(from, to, { class: "speech-reading" });
             v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
-            requestAnimationFrame(() => {
-              const target = v.dom.querySelector(".speech-reading") as HTMLElement | null;
-              const container = scrollContainerRef.current;
-              if (target && container) {
-                scrollToSpeechTarget({ container, target, isVertical });
-              }
-            });
           },
           onEnd() {
             clearHighlight();
@@ -268,25 +255,9 @@ export default function NovelEditor({
     }
   }, [searchOpenTrigger, handleSearchOpen]);
 
-  // Save scroll progress (0-1) before mode switch
-  const savedScrollProgressRef = useRef<number>(0);
-
-  // Save current scroll progress on mode switch
   const handleToggleVertical = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (container) {
-      // Get current progress via abstraction layer
-      const progress = getScrollProgress({ container, isVertical });
-
-      // Save progress
-      savedScrollProgressRef.current = progress;
-
-      // Mark that scroll position needs restoration after mode switch
-      isModeSwitchingRef.current = true;
-    }
-
-    setIsVertical(!isVertical);
-  }, [isVertical, scrollContainerRef]);
+    setIsVertical((prev) => !prev);
+  }, []);
 
   // Per-pane local state for auto-calculated chars per line (avoids split panes overwriting each other)
   const [localAutoCharsPerLine, setLocalAutoCharsPerLine] = useState<number | null>(null);
@@ -435,8 +406,6 @@ export default function NovelEditor({
                 setEditorViewInstance(view);
                 onEditorViewReady?.(view);
               }}
-              isModeSwitchingRef={isModeSwitchingRef}
-              savedScrollProgressRef={savedScrollProgressRef}
               lintingRuleRunner={lintingRuleRunner}
               onLintIssuesUpdated={onLintIssuesUpdated}
               onNlpError={onNlpError}
@@ -454,16 +423,16 @@ export default function NovelEditor({
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
-
-        {/* 選択文字数（エディタ基準で配置） */}
-        {editorViewInstance && (
-          <SelectionCounter
-            editorView={editorViewInstance}
-            isVertical={isVertical}
-            containerRef={scrollContainerRef}
-          />
-        )}
       </div>
+
+      {/* 選択文字数（エディタ外枠基準で配置） */}
+      {editorViewInstance && (
+        <SelectionCounter
+          editorView={editorViewInstance}
+          isVertical={isVertical}
+          containerRef={scrollContainerRef}
+        />
+      )}
 
       {/* 検索ダイアログ */}
       <SearchDialog
