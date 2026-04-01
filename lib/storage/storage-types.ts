@@ -92,7 +92,7 @@ export interface AppState {
   characterExtractionBatchSize?: number;
   characterExtractionConcurrency?: number;
 
-  // Persisted character data
+  // Persisted character data (legacy: shared across all projects)
   characters?: Array<{
     id: string;
     name: string;
@@ -102,6 +102,22 @@ export interface AppState {
     personality: string;
     relationships: string;
   }>;
+
+  // Per-project character data keyed by project ID.
+  // Falls back to `characters` for migration.
+  // "__standalone__" is used when no project is open.
+  charactersByProject?: Record<
+    string,
+    Array<{
+      id: string;
+      name: string;
+      aliases: string[];
+      description: string;
+      appearance: string;
+      personality: string;
+      relationships: string;
+    }>
+  >;
 
   // 校正モード設定
   correctionMode?: CorrectionModeId;
