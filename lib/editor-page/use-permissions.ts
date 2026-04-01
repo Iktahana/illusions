@@ -25,10 +25,16 @@ export function usePermissions(
 
   const handlePermissionGranted = useCallback(() => {
     if (permissionPromptData) {
-      void openRestoredProject(permissionPromptData.handle);
+      const handle = permissionPromptData.handle;
+      // Dismiss the prompt immediately so the UI is unblocked, then open the project.
+      // Errors are surfaced inside openRestoredProject via notificationManager.
+      setShowPermissionPrompt(false);
+      setPermissionPromptData(null);
+      void openRestoredProject(handle);
+    } else {
+      setShowPermissionPrompt(false);
+      setPermissionPromptData(null);
     }
-    setShowPermissionPrompt(false);
-    setPermissionPromptData(null);
   }, [permissionPromptData, openRestoredProject]);
 
   const handlePermissionDenied = useCallback(() => {

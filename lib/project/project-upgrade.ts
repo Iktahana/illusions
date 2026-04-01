@@ -51,10 +51,17 @@ export class ProjectUpgradeService {
       editorSettings: standaloneMode.editorSettings,
     };
 
-    return {
+    const updatedProject: ProjectMode = {
       ...project,
       metadata: updatedMetadata,
     };
+
+    // Persist the updated editorSettings to .illusions/project.json so they
+    // survive the next load. Without this call, project.json would still
+    // contain the default editorSettings written by createProject().
+    await this.projectService.saveProjectMetadata(updatedProject);
+
+    return updatedProject;
   }
 }
 

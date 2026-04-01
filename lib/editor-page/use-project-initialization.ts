@@ -111,6 +111,7 @@ export function useProjectInitialization({
         }
       } catch (error) {
         console.error("Failed to load restored project:", error);
+        notificationManager.error("プロジェクトを開けませんでした。");
       }
     },
     [setProjectMode, loadProjectContent, isElectron, isAutoRestoringRef],

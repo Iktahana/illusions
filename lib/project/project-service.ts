@@ -339,6 +339,19 @@ export class ProjectService {
   }
 
   /**
+   * Save only the project metadata (project.json) without touching the main file.
+   * メインファイルを変更せずに、プロジェクトメタデータ（project.json）だけを保存する。
+   *
+   * @param project - The project whose metadata should be persisted
+   */
+  async saveProjectMetadata(project: ProjectMode): Promise<void> {
+    const rootDirHandle = await this.getVFSDirectoryHandle(project);
+    const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
+    const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
+    await projectJsonHandle.write(JSON.stringify(project.metadata, null, 2));
+  }
+
+  /**
    * Open a single file in standalone mode.
    * 単一ファイルをスタンドアロンモードで開く。
    *
@@ -368,6 +381,7 @@ export class ProjectService {
         fileName,
         fileExtension,
         editorSettings: getDefaultEditorSettings(fileExtension),
+        filePath: result.path,
       };
     }
 
@@ -457,6 +471,30 @@ export class ProjectService {
     const rootDirHandle = await this.getVFSDirectoryHandle(project);
     const mainFileHandle = await rootDirHandle.getFileHandle(project.metadata.mainFile);
     return mainFileHandle.read();
+  }
+
+  /**
+   * Read file content for a standalone mode file.
+   * スタンドアロンモードのファイル内容を読み込む。
+   *
+   * On Electron, reads via VFS using the absolute file path.
+   * On Web, reads from the FileSystemFileHandle.
+   *
+   * @param standalone - The standalone mode object returned by openStandaloneFile
+   * @returns The file content as text
+   */
+  async readStandaloneContent(standalone: StandaloneMode): Promise<string> {
+    if (isElectronRenderer() && standalone.filePath) {
+      const vfs = getVFS();
+      return vfs.readFile(standalone.filePath);
+    }
+
+    if (standalone.fileHandle) {
+      const file = await standalone.fileHandle.getFile();
+      return file.text();
+    }
+
+    throw new Error("ファイルの内容を読み込めませんでした。");
   }
 
   /**
