@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { RefreshCw, LoaderCircle } from "lucide-react";
 import clsx from "clsx";
 
@@ -76,6 +76,9 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
   const [lastAnalyzedContent, setLastAnalyzedContent] = useState<string>("");
   const [cacheTimestamp, setCacheTimestamp] = useState<number>(0);
 
+  /** Generation counter — incremented on each analysis start; stale async results are discarded (#1078) */
+  const genRef = useRef(0);
+
   const contextMenu = useContextMenu();
 
   const openDictionary = useCallback((word: string, url: string, title: string) => {
@@ -132,6 +135,9 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
       return;
     }
 
+    // Increment generation counter so any previously in-flight analysis is considered stale (#1078)
+    const myGen = ++genRef.current;
+
     setIsLoading(true);
     setError(null);
 
@@ -148,6 +154,8 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
           const meta = await vfs.getFileMetadata(filePath);
 
           if (cache.lastModified === meta.lastModified && cache.fileSize === meta.size) {
+            // Discard stale result if a newer analysis was started (#1078)
+            if (genRef.current !== myGen) return;
             setWords(cache.words);
             setLastAnalyzedContent(content);
             setCacheTimestamp(cache.analyzedAt);
@@ -162,6 +170,10 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
       // Run NLP analysis
       const nlpClient = getNlpClient();
       const wordEntries = await nlpClient.analyzeWordFrequency(content);
+
+      // Discard stale result if a newer analysis was started (#1078)
+      if (genRef.current !== myGen) return;
+
       setWords(wordEntries);
       setLastAnalyzedContent(content);
       const now = Date.now();
@@ -191,7 +203,10 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
       console.error("[WordFrequency] Analysis error:", err);
       setError("解析に失敗しました");
     } finally {
-      setIsLoading(false);
+      // Only clear the loading spinner for the current generation (#1078)
+      if (genRef.current === myGen) {
+        setIsLoading(false);
+      }
     }
   };
 
