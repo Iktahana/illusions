@@ -5,7 +5,7 @@ import { createFileWatcher } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
 import { isEditorTab } from "./tab-types";
 import type { FileWatcher } from "../services/file-watcher";
-import type { TabId, TabState, EditorTabState, DiffTabState } from "./tab-types";
+import type { TabId, EditorTabState } from "./tab-types";
 import type { TabManagerCore } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -133,8 +133,20 @@ function buildOnChanged(
           },
         ],
       });
+    } else if (tab.fileSyncStatus === "conflicted") {
+      // Already conflicted: keep conflictDiskContent up to date so that
+      // "ディスクの内容を採用" always uses the latest disk version.
+      // Do not change isDirty or fileSyncStatus — the user must still resolve.
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== tabId || !isEditorTab(t)) return t;
+          return {
+            ...t,
+            conflictDiskContent: diskContent,
+          } satisfies EditorTabState;
+        }),
+      );
     }
-    // If already "conflicted", ignore further disk changes (user must resolve first)
   };
 }
 
@@ -244,11 +256,12 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
+    const watchers = watchersRef.current;
     return () => {
-      for (const watcher of watchersRef.current.values()) {
+      for (const watcher of watchers.values()) {
         watcher.stop();
       }
-      watchersRef.current.clear();
+      watchers.clear();
     };
   }, []);
 }
