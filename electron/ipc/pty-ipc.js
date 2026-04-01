@@ -22,6 +22,7 @@ const {
   appendToOutputBuffer,
   addSession,
   getSession,
+  removeSession,
   killSession,
 } = require("./terminal-session-registry");
 
@@ -253,6 +254,10 @@ function registerPtyHandlers() {
       entry.status = "exited";
       entry.exitCode = exitCode;
       sendPtyExit(webContentsId, entry.sessionId, exitCode);
+      removeSession(entry.sessionId);
+      console.log(
+        `[PTY] Session ${entry.sessionId} exited (code=${exitCode}), removed from registry`,
+      );
     });
 
     console.log(`[PTY] Spawned session ${entry.sessionId} (shell=${shell}, cwd=${cwd})`);
@@ -406,7 +411,8 @@ function registerPtyHandlers() {
     }
 
     killSession(sessionId);
-    console.log(`[PTY] Killed session ${sessionId}`);
+    removeSession(sessionId);
+    console.log(`[PTY] Killed and removed session ${sessionId}`);
     return { ok: true };
   });
 
