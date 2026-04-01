@@ -142,10 +142,17 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
     const { descriptor, content: fileContent } = result;
 
-    // Deduplicate: switch to existing tab if same path
+    // Deduplicate: if the same path is already open, reload from disk and activate
     if (descriptor.path) {
       const existing = findTabByPath(descriptor.path);
       if (existing) {
+        // Force-refresh tab content so stale in-memory state is replaced with the
+        // latest content that was just read from disk by openMdiFile().
+        updateTab(existing.id, {
+          content: fileContent,
+          lastSavedContent: fileContent,
+          isDirty: false,
+        });
         setActiveTabId(existing.id);
         return;
       }
