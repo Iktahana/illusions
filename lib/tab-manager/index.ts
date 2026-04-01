@@ -80,6 +80,7 @@ export function useTabManager(options?: {
     isElectron: tabState.isElectron,
     autoSaveEnabled,
     saveFileRef: fileIO.saveFileRef,
+    tryAutoSnapshot: fileIO.tryAutoSnapshot,
   });
 
   // --- Electron IPC bindings & browser event listeners --------------------

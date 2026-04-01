@@ -45,6 +45,8 @@ export interface UseFileIOReturn {
   saveFileRef: React.MutableRefObject<(isAutoSave?: boolean) => Promise<void>>;
   /** Ref holding the latest saveAsFile function. */
   saveAsFileRef: React.MutableRefObject<() => Promise<void>>;
+  /** Create an auto-snapshot if conditions are met (project mode only). */
+  tryAutoSnapshot: (sourcePath: string, displayName: string, savedContent: string) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -534,5 +536,6 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     openProjectFile,
     saveFileRef,
     saveAsFileRef,
+    tryAutoSnapshot,
   };
 }
