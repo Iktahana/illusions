@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  MutableRefObject,
-  RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import {
@@ -28,12 +20,11 @@ import { clipboard } from "@milkdown/plugin-clipboard";
 import { cursor } from "@milkdown/plugin-cursor";
 import { Milkdown, useEditor } from "@milkdown/react";
 import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
-import { setScrollProgress } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
 import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import clsx from "clsx";
 import { EditorView } from "@milkdown/prose/view";
-import { AllSelection, Plugin, PluginKey } from "@milkdown/prose/state";
+import { AllSelection, Plugin } from "@milkdown/prose/state";
 import { $prose, replaceAll } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "../BubbleMenu";
 import { searchHighlightPlugin } from "@/lib/editor-page/search-highlight-plugin";
@@ -46,7 +37,6 @@ import {
   useTypographySettings,
   useLintingSettings,
   usePosHighlightSettings,
-  useScrollSettings,
 } from "@/contexts/EditorSettingsContext";
 
 interface MilkdownEditorProps {
@@ -57,8 +47,6 @@ interface MilkdownEditorProps {
   isVertical: boolean;
   scrollContainerRef: RefObject<HTMLDivElement>;
   onEditorViewReady?: (view: EditorView) => void;
-  isModeSwitchingRef: MutableRefObject<boolean>;
-  savedScrollProgressRef: RefObject<number>;
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[]) => void;
   onNlpError?: (error: Error) => void;
@@ -88,8 +76,6 @@ export default function MilkdownEditor({
   isVertical,
   scrollContainerRef,
   onEditorViewReady,
-  isModeSwitchingRef,
-  savedScrollProgressRef,
   lintingRuleRunner,
   onLintIssuesUpdated,
   onNlpError,
@@ -119,7 +105,6 @@ export default function MilkdownEditor({
   const { lintingEnabled } = useLintingSettings();
   const { posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes } =
     usePosHighlightSettings();
-  const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const [lintIssueAtCursor, setLintIssueAtCursor] = useState<LintIssue | null>(null);
@@ -148,37 +133,6 @@ export default function MilkdownEditor({
   useEffect(() => {
     onNlpErrorRef.current = onNlpError;
   }, [onNlpError]);
-
-  // 縦書き用のスクロール制御プラグインを作成
-  // isVertical の参照を保持
-  const isVerticalRef = useRef(isVertical);
-  // isVertical の変更を追跡
-  useEffect(() => {
-    isVerticalRef.current = isVertical;
-  }, [isVertical]);
-
-  // 縦書き時は完全にスクロール動作を禁止（ユーザーが手動でスクロールする）
-  const verticalScrollPlugin = useMemo(
-    () =>
-      $prose(
-        () =>
-          new Plugin({
-            key: new PluginKey("verticalScrollControl"),
-            props: {
-              handleScrollToSelection() {
-                // 縦書きモードではスクロール動作を完全に無視（排版完成後の明示的なスクロール以外）
-                if (isVerticalRef.current) {
-                  return true; // デフォルトのスクロールを完全に禁止
-                }
-
-                // 横書き時はデフォルトの動作を使用
-                return false;
-              },
-            },
-          }),
-      ),
-    [],
-  );
 
   const { get } = useEditor(
     (root) => {
@@ -217,7 +171,6 @@ export default function MilkdownEditor({
         .use(history)
         .use(clipboard)
         .use(cursor)
-        .use(verticalScrollPlugin)
         .use($prose(() => searchHighlightPlugin))
         .use($prose(() => speechHighlightPlugin))
         .use(
@@ -239,7 +192,7 @@ export default function MilkdownEditor({
 
       return editor;
     },
-    [isVertical, verticalScrollPlugin, mdiExtensionsEnabled, gfmEnabled],
+    [isVertical, mdiExtensionsEnabled, gfmEnabled],
   );
 
   // EditorView インスタンスを取得する
@@ -407,17 +360,12 @@ export default function MilkdownEditor({
           editorDom.style.height = `${targetHeight}px`;
           editorDom.style.maxHeight = `${targetHeight}px`;
           editorDom.style.minHeight = `${targetHeight}px`;
-          // Prevent browser caret-scroll on .ProseMirror itself (contenteditable + fixed height
-          // makes it implicitly scrollable in vertical-rl). clip prevents scrolling without
-          // creating a new formatting context, so layout is unaffected.
-          editorDom.style.overflow = "clip";
         } else {
           // 横書き: 幅を制限（1行あたりの文字数）し、中央寄せ
           const targetWidth = charSize * charsPerLine;
           editorDom.style.width = `${targetWidth}px`;
           editorDom.style.maxWidth = `${targetWidth}px`;
           editorDom.style.margin = "0 auto"; // 中央寄せ
-          editorDom.style.overflow = "";
         }
       }
 
@@ -453,37 +401,7 @@ export default function MilkdownEditor({
       }
     };
 
-    // Scroll handling callback after layout completes
     let onLayoutCompleteCallback: (() => void) | null = null;
-
-    // Restore scroll position after layout completes (mode switch or first render)
-    const handleScrollAfterLayout = () => {
-      const container = scrollContainerRef.current;
-      if (!container) {
-        isModeSwitchingRef.current = false;
-        return;
-      }
-
-      if (isModeSwitchingRef.current) {
-        // Mode switch: restore saved progress
-        const savedProgress = savedScrollProgressRef.current ?? 0;
-
-        setScrollProgress({ container, isVertical }, savedProgress);
-
-        // Delay clearing the flag with double rAF to outlast layout and focus updates
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            isModeSwitchingRef.current = false;
-          });
-        });
-      } else if (isFirstRender && isVertical) {
-        // First mount in vertical mode: scroll to start (rightmost position)
-        setScrollProgress({ container, isVertical }, 0);
-      }
-    };
-
-    // Set layout completion callback
-    onLayoutCompleteCallback = handleScrollAfterLayout;
 
     if (shouldAnimate) {
       // 変更前にフェードアウト
@@ -510,97 +428,7 @@ export default function MilkdownEditor({
       applyStyles(); // applyStyles will call onLayoutCompleteCallback after layout completes
       editorDom.style.opacity = "1";
     }
-  }, [
-    charsPerLine,
-    isVertical,
-    fontFamily,
-    fontScale,
-    lineHeight,
-    scrollContainerRef,
-    get,
-    savedScrollProgressRef,
-    isModeSwitchingRef,
-  ]);
-
-  // 縦書き時: コンテンツサイズ変更時に minWidth を再計算し、スクロール範囲を更新する
-  useEffect(() => {
-    if (!isVertical) return;
-
-    const container = scrollContainerRef.current;
-    const editorContainer = editorRef.current;
-    const editorDom = editorContainer?.querySelector(".milkdown .ProseMirror") as HTMLElement;
-    if (!container || !editorDom) return;
-
-    const observer = new ResizeObserver(() => {
-      const containerWidth = container.clientWidth;
-      const padding = 128; // scroll container's own padding (64px * 2)
-      const minWidth = containerWidth - padding;
-      editorDom.style.minWidth = `${minWidth}px`;
-    });
-
-    observer.observe(editorDom);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [isVertical, scrollContainerRef]);
-
-  // 縦書き時: マウスホイールの縦スクロールを横スクロールへ変換する
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container || !isVertical) return;
-
-    const handleWheel = (event: WheelEvent) => {
-      const sensitivity = scrollSensitivity;
-      const absX = Math.abs(event.deltaX);
-      const absY = Math.abs(event.deltaY);
-      const mouseHorizontalDelta = -event.deltaY * sensitivity;
-      const hasBothAxes = absX > 0 && absY > 0;
-      const hasFineGrainedValues = (absY > 0 && absY < 50) || (absX > 0 && absX < 50);
-      const isTrackpadInput =
-        verticalScrollBehavior === "trackpad" ||
-        (verticalScrollBehavior === "auto" &&
-          (hasBothAxes || (hasFineGrainedValues && !event.ctrlKey)));
-
-      if (verticalScrollBehavior === "mouse") {
-        if (absY >= absX && absY > 0) {
-          container.scrollLeft += mouseHorizontalDelta;
-          event.preventDefault();
-        } else if (absX > 0) {
-          container.scrollTop += event.deltaX * sensitivity;
-          event.preventDefault();
-        }
-        return;
-      }
-
-      if (isTrackpadInput) {
-        if (absY > 0) {
-          container.scrollLeft += event.deltaY * sensitivity;
-        }
-        if (absX > 0) {
-          container.scrollTop += event.deltaX * sensitivity;
-        }
-        event.preventDefault();
-        return;
-      }
-
-      // Mouse semantics: treat dominant deltaY as vertical wheel input and map it
-      // to horizontal movement for vertical writing.
-      if (absY >= absX && absY > 0) {
-        container.scrollLeft += mouseHorizontalDelta;
-        event.preventDefault();
-      } else if (absX > 0) {
-        container.scrollTop += event.deltaX * sensitivity;
-        event.preventDefault();
-      }
-    };
-
-    container.addEventListener("wheel", handleWheel, { passive: false });
-
-    return () => {
-      container.removeEventListener("wheel", handleWheel);
-    };
-  }, [isVertical, scrollContainerRef, verticalScrollBehavior, scrollSensitivity]);
+  }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get]);
 
   // Union of all Milkdown command keys used in handleFormat.
   // Each .key property is a branded CmdKey<T> string exported by @milkdown.
@@ -866,7 +694,6 @@ export default function MilkdownEditor({
           minHeight: "100%",
           display: "flex",
           alignItems: "center",
-          overflow: "clip" as const, // Prevent browser caret-scroll on intermediate elements
         }),
       }}
     >
