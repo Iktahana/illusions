@@ -95,7 +95,12 @@ export class ProjectManager {
           break;
       }
 
+      // Composite key prevents collision when duplicate directories share the same projectId (#1070).
+      // 複製されたプロジェクトが同一 projectId を持つ場合の衝突を防ぐ複合キー。
+      const handleKey = `${projectId}:${rootHandle.name}`;
+
       const record: StoredProjectHandle = {
+        handleKey,
         projectId,
         rootHandle,
         lastAccessedAt: Date.now(),
@@ -131,7 +136,9 @@ export class ProjectManager {
     const db = getWebStorageDatabase();
 
     try {
-      const stored = await db.projectHandles.get(projectId);
+      // Query by projectId index (PK is now the composite handleKey).
+      // projectId インデックスで検索（PK は複合キー handleKey に変更済み）。
+      const stored = await db.projectHandles.where("projectId").equals(projectId).first();
 
       if (!stored) {
         return {
@@ -150,7 +157,7 @@ export class ProjectManager {
           projectId,
         );
         try {
-          await db.projectHandles.delete(projectId);
+          await db.projectHandles.delete(stored.handleKey);
         } catch {
           // Ignore cleanup errors
         }
@@ -182,7 +189,7 @@ export class ProjectManager {
           break;
       }
 
-      await db.projectHandles.update(projectId, {
+      await db.projectHandles.update(stored.handleKey, {
         lastAccessedAt: Date.now(),
         permissionState,
       });
@@ -215,7 +222,8 @@ export class ProjectManager {
     const db = getWebStorageDatabase();
 
     try {
-      await db.projectHandles.delete(projectId);
+      // Delete all entries matching projectId (PK is now composite handleKey).
+      await db.projectHandles.where("projectId").equals(projectId).delete();
     } catch (error) {
       console.error("プロジェクトハンドルの削除に失敗しました:", error);
       throw error;
@@ -276,7 +284,8 @@ export class ProjectManager {
     const db = getWebStorageDatabase();
 
     try {
-      await db.projectHandles.update(projectId, {
+      // Update via projectId index (PK is now composite handleKey).
+      await db.projectHandles.where("projectId").equals(projectId).modify({
         lastAccessedAt: Date.now(),
       });
     } catch (error) {
