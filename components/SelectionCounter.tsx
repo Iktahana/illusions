@@ -1,16 +1,19 @@
 "use client";
 
+import type { RefObject } from "react";
 import { useEffect, useState } from "react";
 import { EditorView } from "@milkdown/prose/view";
 
 interface SelectionCounterProps {
   editorView: EditorView;
   isVertical?: boolean;
+  containerRef: RefObject<HTMLDivElement | null>;
 }
 
 export default function SelectionCounter({
   editorView,
   isVertical = false,
+  containerRef,
 }: SelectionCounterProps) {
   const [selectionCount, setSelectionCount] = useState<number>(0);
   const [isVisible, setIsVisible] = useState<boolean>(false);
@@ -29,30 +32,30 @@ export default function SelectionCounter({
       const { selection } = state;
       const { from, to } = selection;
 
-      // マウスイベントがある場合は表示位置も更新する
-      if (event && event instanceof MouseEvent) {
-        // エディタ領域の位置を取得
-        const editorContainer = editorView.dom.closest(".flex-1") as HTMLElement;
-        if (editorContainer) {
-          const rect = editorContainer.getBoundingClientRect();
+      // 表示位置を更新する
+      const container = containerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
 
-          if (isVertical) {
-            // 縦書き: X軸（横方向）基準で位置を決める
-            // 画面下部に固定し、マウスのX位置に合わせる
-            setPosition({
-              bottom: 16, // ビューポート下端から 16px
-              left: event.clientX, // マウスの横位置に追従
-            });
-          } else {
-            // 横書き: 従来通りX/Y基準
-            const topPosition = event.clientY;
-            const rightPosition = window.innerWidth - rect.right + 16; // エディタ右端から 16px
+        // キーボード選択時は選択末尾の座標をフォールバックに使う
+        const fallbackCoords = !(event instanceof MouseEvent) && from !== to
+          ? editorView.coordsAtPos(to)
+          : null;
 
-            setPosition({
-              top: topPosition,
-              right: rightPosition,
-            });
-          }
+        if (isVertical) {
+          // 縦書き: エディタの一番下に配置
+          const xPos = event instanceof MouseEvent ? event.clientX : (fallbackCoords?.left ?? rect.left + rect.width / 2);
+          setPosition({
+            bottom: window.innerHeight - rect.bottom + 16,
+            left: xPos,
+          });
+        } else {
+          // 横書き: エディタの一番右に配置
+          const yPos = event instanceof MouseEvent ? event.clientY : (fallbackCoords?.top ?? rect.top + rect.height / 2);
+          setPosition({
+            top: yPos,
+            right: window.innerWidth - rect.right + 16,
+          });
         }
       }
 
@@ -103,7 +106,7 @@ export default function SelectionCounter({
       editorDom.removeEventListener("keyup", handleKeyUp);
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, [editorView, isVertical]);
+  }, [editorView, isVertical, containerRef]);
 
   // 選択がない場合は描画しない
   if (selectionCount === 0 && !isVisible) {
