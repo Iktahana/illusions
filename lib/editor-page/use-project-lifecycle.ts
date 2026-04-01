@@ -47,7 +47,7 @@ export interface ProjectLifecycleHandlers {
   handleCreateProject: () => void;
   handleOpenProject: () => Promise<void>;
   handleOpenStandaloneFile: () => Promise<void>;
-  handleOpenRecentProject: (projectId: string) => Promise<void>;
+  handleOpenRecentProject: (projectId: string) => Promise<boolean>;
   handleDeleteRecentProject: (projectId: string) => Promise<void>;
   handleOpenAsProject: (projectPath: string, initialFile: string) => Promise<void>;
   handleProjectCreated: (project: ProjectMode) => Promise<void>;

@@ -13,8 +13,7 @@
       "Bash(git -C /Users/iktahana/Repositories/my.illusions.app status --short)",
       "Bash(git -C /Users/iktahana/Repositories/my.illusions.app branch --show-current)",
       "Bash(gh issue:*)",
-      "Bash(gh label:*)",
-      "Bash(gh repo:*)"
+      "Bash(gh label:*)"
     ]
   }
 }

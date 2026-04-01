@@ -7,7 +7,7 @@ interface UseAutoRestoreParams {
   setIsRestoring: React.Dispatch<React.SetStateAction<boolean>>;
   setRestoreError: React.Dispatch<React.SetStateAction<string | null>>;
   signalVfsReady: () => void;
-  handleOpenRecentProject: (projectId: string) => Promise<void>;
+  handleOpenRecentProject: (projectId: string) => Promise<boolean>;
 }
 
 /**
@@ -35,8 +35,7 @@ export function useAutoRestore({
     void (async () => {
       let success = false;
       try {
-        await handleOpenRecentProject(autoRestoreProjectId);
-        success = true;
+        success = await handleOpenRecentProject(autoRestoreProjectId);
       } catch {
         // handleOpenRecentProject catches its own errors internally
       }

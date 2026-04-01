@@ -29,7 +29,7 @@ interface UseFileOpeningParams {
 export interface UseFileOpeningResult {
   handleOpenProject: () => Promise<void>;
   handleOpenStandaloneFile: () => Promise<void>;
-  handleOpenRecentProject: (projectId: string) => Promise<void>;
+  handleOpenRecentProject: (projectId: string) => Promise<boolean>;
   handleOpenAsProject: (projectPath: string, initialFile: string) => Promise<void>;
 }
 
@@ -89,7 +89,7 @@ export function useFileOpening({
   }, [setStandaloneMode]);
 
   const handleOpenRecentProject = useCallback(
-    async (projectId: string) => {
+    async (projectId: string): Promise<boolean> => {
       try {
         if (isElectron) {
           const storage = getStorageService();
@@ -99,7 +99,7 @@ export function useFileOpening({
             if (!isAutoRestoringRef.current) {
               notificationManager.error("このプロジェクトが見つかりませんでした。");
             }
-            return;
+            return false;
           }
 
           try {
@@ -124,7 +124,7 @@ export function useFileOpening({
                   message: `プロジェクトのメタデータが見つかりませんでした。\n\nパス: ${project.rootPath}\n\n最近のプロジェクト一覧から削除しますか?`,
                 });
               }
-              return;
+              return false;
             }
 
             const { metadata, illusionsDir } = projectJsonResult;
@@ -160,6 +160,7 @@ export function useFileOpening({
             if (!isAutoRestoringRef.current || !isElectron) {
               await loadProjectContent(restoredProject);
             }
+            return true;
           } catch (error) {
             signalVfsReady();
             console.error("Failed to load project:", error);
@@ -182,8 +183,8 @@ export function useFileOpening({
                 notificationManager.error(message);
               }
             }
+            return false;
           }
-          return;
         }
 
         // Web: restore from IndexedDB project handles
@@ -198,7 +199,7 @@ export function useFileOpening({
               "このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。",
             );
           }
-          return;
+          return false;
         }
 
         if (restoreResult.permissionStatus.status === "prompt-required") {
@@ -208,12 +209,15 @@ export function useFileOpening({
             projectId,
           });
           setShowPermissionPrompt(true);
-          return;
+          // Permission prompt shown — outcome depends on user action, not a failure
+          return true;
         }
 
         await openRestoredProject(restoreResult.handle);
+        return true;
       } catch (error) {
         console.error("Failed to open recent project:", error);
+        return false;
       }
     },
     [
