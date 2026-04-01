@@ -8,28 +8,51 @@ const os = require("os");
 const log = require("electron-log");
 
 // --- save-file path security validation ---
-// Tracks file paths that have been approved via native dialog or system file association.
-// Paths provided directly by the renderer must be in this set or they will be rejected.
-// Uses a bounded LRU set to prevent unbounded memory growth in long sessions.
+// Tracks file paths that have been approved via native dialog or system file association,
+// scoped per BrowserWindow (webContentsId) to prevent cross-window path reuse.
+// Each window maintains its own bounded LRU set to prevent unbounded memory growth.
 const MAX_APPROVED_PATHS = 200;
+/** @type {Map<number, Map<string, true>>} webContentsId → (path → true) LRU map */
 const dialogApprovedPaths = new Map();
 
 /**
- * Add a path to the dialog-approved set with LRU eviction.
- * When the set exceeds MAX_APPROVED_PATHS, the least recently added entry is evicted.
+ * Get or create the per-window LRU path map for a given webContentsId.
+ * @param {number} webContentsId - The webContents ID of the BrowserWindow
+ * @returns {Map<string, true>}
+ */
+function getWindowApprovedPaths(webContentsId) {
+  if (!dialogApprovedPaths.has(webContentsId)) {
+    dialogApprovedPaths.set(webContentsId, new Map());
+  }
+  return dialogApprovedPaths.get(webContentsId);
+}
+
+/**
+ * Add a path to the dialog-approved set for a specific window, with LRU eviction.
+ * When the per-window set exceeds MAX_APPROVED_PATHS, the oldest entry is evicted.
+ * @param {number} webContentsId - The webContents ID of the approving window
  * @param {string} p - The resolved file path to approve
  */
-function approveDialogPath(p) {
+function approveDialogPath(webContentsId, p) {
+  const windowPaths = getWindowApprovedPaths(webContentsId);
   // Delete first so re-insertion moves it to the end (most recent)
-  dialogApprovedPaths.delete(p);
-  dialogApprovedPaths.set(p, true);
+  windowPaths.delete(p);
+  windowPaths.set(p, true);
   // Evict oldest entry if over capacity
-  if (dialogApprovedPaths.size > MAX_APPROVED_PATHS) {
-    const oldest = dialogApprovedPaths.keys().next().value;
+  if (windowPaths.size > MAX_APPROVED_PATHS) {
+    const oldest = windowPaths.keys().next().value;
     if (oldest !== undefined) {
-      dialogApprovedPaths.delete(oldest);
+      windowPaths.delete(oldest);
     }
   }
+}
+
+/**
+ * Remove the approved-path set for a destroyed window to prevent memory leaks.
+ * @param {number} webContentsId - The webContents ID of the destroyed window
+ */
+function revokeWindowApprovedPaths(webContentsId) {
+  dialogApprovedPaths.delete(webContentsId);
 }
 
 /**
@@ -99,11 +122,12 @@ const VALID_SAVE_FILE_TYPES = [".mdi", ".md", ".txt"];
  * Validate a file path provided by the renderer for the save-file IPC handler.
  * Returns an error object if validation fails, or null if the path is valid.
  * @param {string} filePath - The raw file path from the renderer
- * @param {{ skipApproval?: boolean }} [options] - Validation options
+ * @param {{ skipApproval?: boolean, webContentsId?: number }} [options] - Validation options
  * @param {boolean} [options.skipApproval=false] - Skip the dialog-approval check (for dialog-selected paths)
+ * @param {number} [options.webContentsId] - The webContents ID of the requesting window; required unless skipApproval is true
  * @returns {{ success: false, error: string, code: string } | null}
  */
-function validateSaveFilePath(filePath, { skipApproval = false } = {}) {
+function validateSaveFilePath(filePath, { skipApproval = false, webContentsId } = {}) {
   // Reject paths containing '..' to prevent directory traversal
   const resolved = path.resolve(filePath);
   const normalized = resolved.split(path.sep).join("/");
@@ -137,14 +161,20 @@ function validateSaveFilePath(filePath, { skipApproval = false } = {}) {
     return { success: false, error: `無効なファイル拡張子: ${ext}`, code: "INVALID_EXTENSION" };
   }
 
-  // Reject paths not previously approved via dialog or system file open
-  if (!skipApproval && !dialogApprovedPaths.has(resolved)) {
-    log.warn(`save-file path rejected (not dialog-approved): ${filePath}`);
-    return {
-      success: false,
-      error: "ダイアログで承認されていないファイルパスです",
-      code: "PATH_NOT_APPROVED",
-    };
+  // Reject paths not previously approved via dialog or system file open.
+  // Approval is scoped to the requesting window to prevent cross-window reuse.
+  if (!skipApproval) {
+    const windowPaths = webContentsId != null ? dialogApprovedPaths.get(webContentsId) : undefined;
+    if (!windowPaths || !windowPaths.has(resolved)) {
+      log.warn(
+        `save-file path rejected (not dialog-approved for window ${webContentsId}): ${filePath}`,
+      );
+      return {
+        success: false,
+        error: "ダイアログで承認されていないファイルパスです",
+        code: "PATH_NOT_APPROVED",
+      };
+    }
   }
 
   return null;
@@ -193,8 +223,8 @@ async function handleMdiFileOpen(filePath) {
     } else {
       // Open as standalone file
       log.info("Opening as standalone file:", filePath);
-      // Approve system-opened file path for future saves
-      approveDialogPath(path.resolve(filePath));
+      // Approve system-opened file path for future saves, scoped to the target window
+      approveDialogPath(targetWindow.webContents.id, path.resolve(filePath));
       const content = await fs.readFile(filePath, "utf-8");
       targetWindow.webContents.send("open-file-from-system", { path: filePath, content });
     }
@@ -219,7 +249,7 @@ function setPendingFilePath(p) {
 }
 
 function registerFileHandlers() {
-  ipcMain.handle("open-file", async () => {
+  ipcMain.handle("open-file", async (event) => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openFile"],
       filters: [
@@ -230,13 +260,16 @@ function registerFileHandlers() {
     });
     if (canceled || !filePaths[0]) return null;
     const filePath = filePaths[0];
-    // Approve opened file path so it can be saved back without a new dialog
-    approveDialogPath(path.resolve(filePath));
+    // Approve opened file path so it can be saved back without a new dialog.
+    // Scoped to the requesting window to prevent cross-window reuse.
+    approveDialogPath(event.sender.id, path.resolve(filePath));
     const content = await fs.readFile(filePath, "utf-8");
     return { path: filePath, content };
   });
 
-  ipcMain.handle("save-file", async (_event, filePath, content, fileType) => {
+  ipcMain.handle("save-file", async (event, filePath, content, fileType) => {
+    const senderWebContentsId = event.sender.id;
+
     // Validate inputs
     if (filePath != null && typeof filePath !== "string") {
       return { success: false, error: "Invalid file path", code: "INVALID_INPUT" };
@@ -250,8 +283,9 @@ function registerFileHandlers() {
 
     let target = filePath;
     if (target) {
-      // Validate renderer-provided path before writing
-      const validationError = validateSaveFilePath(target);
+      // Validate renderer-provided path before writing.
+      // Pass the sender's webContentsId to enforce per-window path approval.
+      const validationError = validateSaveFilePath(target, { webContentsId: senderWebContentsId });
       if (validationError) return validationError;
       // Resolve to canonical form (consistent with dialogApprovedPaths entries)
       target = path.resolve(target);
@@ -291,8 +325,8 @@ function registerFileHandlers() {
       // Validate dialog-selected path (skip approval check since it came from the dialog)
       const dialogValidationError = validateSaveFilePath(target, { skipApproval: true });
       if (dialogValidationError) return dialogValidationError;
-      // Approve this dialog-selected path for future saves
-      approveDialogPath(path.resolve(target));
+      // Approve this dialog-selected path for future saves, scoped to this window
+      approveDialogPath(senderWebContentsId, path.resolve(target));
     }
     try {
       log.info(`ファイル保存を試行中: ${target}`);
@@ -395,7 +429,7 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle("get-pending-file", async () => {
+  ipcMain.handle("get-pending-file", async (event) => {
     if (!pendingFilePath) return null;
 
     const filePath = pendingFilePath;
@@ -413,8 +447,8 @@ function registerFileHandlers() {
         };
       }
 
-      // Standalone file: approve path for future saves and return content
-      approveDialogPath(path.resolve(filePath));
+      // Standalone file: approve path for future saves, scoped to the requesting window
+      approveDialogPath(event.sender.id, path.resolve(filePath));
       const content = await fs.readFile(filePath, "utf-8");
       return {
         type: "standalone",
@@ -426,10 +460,22 @@ function registerFileHandlers() {
       return null;
     }
   });
+
+  // Clean up per-window approved paths when a BrowserWindow is closed/destroyed.
+  // This prevents memory leaks and ensures stale approvals from destroyed windows
+  // cannot accumulate in the dialogApprovedPaths map.
+  const { app } = require("electron");
+  app.on("web-contents-created", (_event, webContents) => {
+    webContents.on("destroyed", () => {
+      revokeWindowApprovedPaths(webContents.id);
+      log.debug(`Revoked approved paths for destroyed webContents id=${webContents.id}`);
+    });
+  });
 }
 
 module.exports = {
   approveDialogPath,
+  revokeWindowApprovedPaths,
   handleMdiFileOpen,
   getPendingFilePath,
   setPendingFilePath,
