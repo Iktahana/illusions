@@ -131,7 +131,7 @@ export default function TerminalPanel({
     // Create terminal instance with user settings
     const terminal = new XTerm({
       theme: buildXtermTheme(terminalAnsiColors, terminalBackground, terminalForeground),
-      fontFamily: terminalFontFamily,
+      fontFamily: `${terminalFontFamily}, "Noto Sans Mono CJK JP", "MS Gothic", "Menlo", monospace`,
       fontSize: terminalFontSize,
       lineHeight: terminalLineHeight,
       cursorStyle: terminalCursorStyle,
@@ -143,6 +143,11 @@ export default function TerminalPanel({
 
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
+
+    // Load Unicode11Addon for correct CJK/full-width character widths
+    const { Unicode11Addon } = await import("@xterm/addon-unicode11");
+    terminal.loadAddon(new Unicode11Addon());
+    terminal.unicode.activeVersion = "11";
 
     // Open terminal in the container element
     terminal.open(containerRef.current);
