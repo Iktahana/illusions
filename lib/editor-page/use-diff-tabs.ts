@@ -36,9 +36,16 @@ export function useDiffTabs({
 
   const prevTabIdsRef = useRef<Set<string>>(new Set());
 
+  /**
+   * Closes a tab, killing the associated PTY session first if the tab is a terminal.
+   * This is the single close path wired to the dockview onDidRemovePanel event,
+   * ensuring PTY processes are never orphaned when a terminal tab is closed. (#1105)
+   */
   const handleCloseTabWithPtyCleanup = useCallback(
     (tabId: string) => {
       const tab = tabsRef.current.find((candidate) => candidate.id === tabId);
+      // Kill the PTY session before removing the tab from state.
+      // Without this, closing a terminal tab leaves a ghost process running in the background.
       if (tab && isTerminalTab(tab) && tab.sessionId) {
         void window.electronAPI?.pty?.kill(tab.sessionId);
       }
