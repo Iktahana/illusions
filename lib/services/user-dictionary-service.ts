@@ -10,6 +10,7 @@
 
 import { getVFS } from "../vfs";
 import { getStorageService } from "../storage/storage-service";
+import { AsyncMutex } from "../utils/async-mutex";
 import type { VirtualFileSystem } from "../vfs/types";
 import type { IStorageService } from "../storage/storage-types";
 import type { UserDictionaryEntry, UserDictionaryFile } from "../project/project-types";
@@ -28,6 +29,8 @@ const STANDALONE_STORAGE_PREFIX = "illusions-user-dictionary:";
 class UserDictionaryService {
   private vfs: VirtualFileSystem;
   private storage: IStorageService;
+  /** Serializes all read-modify-write operations to prevent last-writer-wins data loss in multi-window scenarios. */
+  private readonly writeMutex = new AsyncMutex();
 
   constructor() {
     this.vfs = getVFS();
@@ -73,39 +76,57 @@ class UserDictionaryService {
 
   /**
    * Add a new entry. Deduplicates by word.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async addEntry(entry: UserDictionaryEntry): Promise<UserDictionaryEntry[]> {
-    const entries = await this.loadEntries();
-    const exists = entries.some((e) => e.id === entry.id);
-    if (exists) return entries;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const entries = await this.loadEntries();
+      const exists = entries.some((e) => e.id === entry.id);
+      if (exists) return entries;
 
-    entries.push(entry);
-    entries.sort((a, b) => a.word.localeCompare(b.word));
-    await this.saveEntries(entries);
-    return entries;
+      entries.push(entry);
+      entries.sort((a, b) => a.word.localeCompare(b.word));
+      await this.saveEntries(entries);
+      return entries;
+    } finally {
+      releaseLock();
+    }
   }
 
   /**
    * Update an existing entry by id.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async updateEntry(
     id: string,
     updates: Partial<UserDictionaryEntry>,
   ): Promise<UserDictionaryEntry[]> {
-    const entries = await this.loadEntries();
-    const updated = entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
-    await this.saveEntries(updated);
-    return updated;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const entries = await this.loadEntries();
+      const updated = entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
+      await this.saveEntries(updated);
+      return updated;
+    } finally {
+      releaseLock();
+    }
   }
 
   /**
    * Remove an entry by id.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async removeEntry(id: string): Promise<UserDictionaryEntry[]> {
-    const entries = await this.loadEntries();
-    const filtered = entries.filter((e) => e.id !== id);
-    await this.saveEntries(filtered);
-    return filtered;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const entries = await this.loadEntries();
+      const filtered = entries.filter((e) => e.id !== id);
+      await this.saveEntries(filtered);
+      return filtered;
+    } finally {
+      releaseLock();
+    }
   }
 
   // -------------------------------------------------------------------
@@ -154,43 +175,61 @@ class UserDictionaryService {
 
   /**
    * Add an entry in standalone mode.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async addEntryStandalone(
     fileName: string,
     entry: UserDictionaryEntry,
   ): Promise<UserDictionaryEntry[]> {
-    const entries = await this.loadEntriesStandalone(fileName);
-    const exists = entries.some((e) => e.id === entry.id);
-    if (exists) return entries;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const entries = await this.loadEntriesStandalone(fileName);
+      const exists = entries.some((e) => e.id === entry.id);
+      if (exists) return entries;
 
-    entries.push(entry);
-    entries.sort((a, b) => a.word.localeCompare(b.word));
-    await this.saveEntriesStandalone(fileName, entries);
-    return entries;
+      entries.push(entry);
+      entries.sort((a, b) => a.word.localeCompare(b.word));
+      await this.saveEntriesStandalone(fileName, entries);
+      return entries;
+    } finally {
+      releaseLock();
+    }
   }
 
   /**
    * Update an entry in standalone mode.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async updateEntryStandalone(
     fileName: string,
     id: string,
     updates: Partial<UserDictionaryEntry>,
   ): Promise<UserDictionaryEntry[]> {
-    const entries = await this.loadEntriesStandalone(fileName);
-    const updated = entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
-    await this.saveEntriesStandalone(fileName, updated);
-    return updated;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const entries = await this.loadEntriesStandalone(fileName);
+      const updated = entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
+      await this.saveEntriesStandalone(fileName, updated);
+      return updated;
+    } finally {
+      releaseLock();
+    }
   }
 
   /**
    * Remove an entry in standalone mode.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async removeEntryStandalone(fileName: string, id: string): Promise<UserDictionaryEntry[]> {
-    const entries = await this.loadEntriesStandalone(fileName);
-    const filtered = entries.filter((e) => e.id !== id);
-    await this.saveEntriesStandalone(fileName, filtered);
-    return filtered;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const entries = await this.loadEntriesStandalone(fileName);
+      const filtered = entries.filter((e) => e.id !== id);
+      await this.saveEntriesStandalone(fileName, filtered);
+      return filtered;
+    } finally {
+      releaseLock();
+    }
   }
 }
 
