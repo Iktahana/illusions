@@ -125,8 +125,13 @@ export interface RestoreResult {
 // -----------------------------------------------------------------------
 
 /**
- * Format a timestamp as YYYYMMDDHHmmss.
- * タイムスタンプを YYYYMMDDHHmmss 形式に変換する。
+ * Format a timestamp as YYYYMMDDHHmmss_xxxx.
+ * The 4-digit random suffix prevents filename collisions when multiple
+ * snapshots are created within the same second.
+ *
+ * タイムスタンプを YYYYMMDDHHmmss_xxxx 形式に変換する。
+ * 4桁の乱数サフィックスにより、同一秒内の複数スナップショットでの
+ * ファイル名衝突を防ぐ。
  */
 function formatTimestamp(timestamp: number): string {
   const d = new Date(timestamp);
@@ -136,7 +141,10 @@ function formatTimestamp(timestamp: number): string {
   const hours = String(d.getHours()).padStart(2, "0");
   const minutes = String(d.getMinutes()).padStart(2, "0");
   const seconds = String(d.getSeconds()).padStart(2, "0");
-  return `${year}${month}${day}${hours}${minutes}${seconds}`;
+  const rand = Math.floor(Math.random() * 10000)
+    .toString()
+    .padStart(4, "0");
+  return `${year}${month}${day}${hours}${minutes}${seconds}_${rand}`;
 }
 
 /**
@@ -650,15 +658,20 @@ export class HistoryService {
    * ブックマーク済みのスナップショットIDセットを取得する。
    */
   async getBookmarks(): Promise<Set<string>> {
+    let content: string;
     try {
       const historyDir = await this.getHistoryDirectory();
       const handle = await historyDir.getFileHandle(BOOKMARKS_FILENAME);
-      const content = await handle.read();
-      const ids = JSON.parse(content) as string[];
-      return new Set(ids);
+      content = await handle.read();
     } catch {
+      // Bookmarks file doesn't exist yet; return empty set
       return new Set();
     }
+
+    // Parse separately so JSON corruption throws and propagates to toggleBookmark,
+    // preventing a corrupt file from silently clearing all bookmarks.
+    const ids = JSON.parse(content) as string[];
+    return new Set(ids);
   }
 
   /**
@@ -704,15 +717,19 @@ export class HistoryService {
    * ファイルが存在しない場合はデフォルトのインデックスを作成する。
    */
   private async readHistoryIndex(): Promise<HistoryIndex> {
+    let content: string;
     try {
       const historyDir = await this.getHistoryDirectory();
       const indexHandle = await historyDir.getFileHandle(HISTORY_INDEX_FILENAME);
-      const content = await indexHandle.read();
-      return JSON.parse(content) as HistoryIndex;
+      content = await indexHandle.read();
     } catch {
-      // Index file doesn't exist or is invalid; return defaults
+      // Index file doesn't exist (e.g. ENOENT on first run); return defaults
       return createDefaultHistoryIndex();
     }
+
+    // Parse separately so JSON corruption throws and propagates to caller
+    // rather than silently returning an empty index that would overwrite data.
+    return JSON.parse(content) as HistoryIndex;
   }
 
   /**
