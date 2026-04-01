@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../services/file-watcher";
+import { notificationManager } from "../services/notification-manager";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, TabState, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
@@ -100,6 +101,15 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
       for (const tab of tabsRef.current) {
         if (!isEditorTab(tab)) continue;
         if (!tab.isDirty) continue;
+
+        // Block save if tab has unresolved external conflict
+        if (tab.fileSyncStatus === "conflicted") {
+          notificationManager.warning(
+            `「${tab.file?.name ?? "無題"}」のファイルが外部で変更されています。コンフリクトを解決してから保存してください。`,
+          );
+          anyFailed = true;
+          continue;
+        }
 
         const sanitized = sanitizeMdiContent(tab.content);
 
