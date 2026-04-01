@@ -251,32 +251,35 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
         const restoredTabs: EditorTabState[] = [];
         for (const serialized of openTabs.tabs) {
-          if (serialized.filePath) {
-            try {
-              const vfs = getVFS();
-              const fileContent = await vfs.readFile(serialized.filePath);
-              restoredTabs.push({
-                tabKind: "editor",
-                id: generateTabId(),
-                file: {
-                  path: serialized.filePath,
-                  handle: null,
-                  name: serialized.fileName,
-                },
-                content: fileContent,
-                lastSavedContent: fileContent,
-                isDirty: false,
-                lastSavedTime: Date.now(),
-                lastSaveWasAuto: false,
-                isSaving: false,
-                isPreview: serialized.isPreview ?? false,
-                fileType: serialized.fileType ?? inferFileType(serialized.fileName),
-                fileSyncStatus: "clean",
-                conflictDiskContent: null,
-              });
-            } catch (error) {
-              console.warn(`タブの復元に失敗しました (${serialized.filePath}):`, error);
-            }
+          if (!serialized.filePath) {
+            // Restore unsaved (new) tabs as blank tabs so they are not silently dropped.
+            restoredTabs.push(createNewTab(undefined, serialized.fileType ?? ".mdi"));
+            continue;
+          }
+          try {
+            const vfs = getVFS();
+            const fileContent = await vfs.readFile(serialized.filePath);
+            restoredTabs.push({
+              tabKind: "editor",
+              id: generateTabId(),
+              file: {
+                path: serialized.filePath,
+                handle: null,
+                name: serialized.fileName,
+              },
+              content: fileContent,
+              lastSavedContent: fileContent,
+              isDirty: false,
+              lastSavedTime: Date.now(),
+              lastSaveWasAuto: false,
+              isSaving: false,
+              isPreview: serialized.isPreview ?? false,
+              fileType: serialized.fileType ?? inferFileType(serialized.fileName),
+              fileSyncStatus: "clean",
+              conflictDiskContent: null,
+            });
+          } catch (error) {
+            console.warn(`タブの復元に失敗しました (${serialized.filePath}):`, error);
           }
         }
 
