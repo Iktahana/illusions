@@ -282,12 +282,13 @@ export class WebStorageProvider implements IStorageService {
     }
   }
 
-  async saveEditorBuffer(buffer: EditorBuffer): Promise<void> {
+  async saveEditorBuffer(buffer: EditorBuffer, fileKey?: string): Promise<void> {
     await this.initialize();
 
+    const id = fileKey ? `editor_buffer:${fileKey}` : "editor_buffer";
     try {
       await this.db.editorBuffer.put({
-        id: "editor_buffer",
+        id,
         data: buffer,
         fileHandle: buffer.fileHandle,
       });
@@ -297,11 +298,12 @@ export class WebStorageProvider implements IStorageService {
     }
   }
 
-  async loadEditorBuffer(): Promise<EditorBuffer | null> {
+  async loadEditorBuffer(fileKey?: string): Promise<EditorBuffer | null> {
     await this.initialize();
 
+    const id = fileKey ? `editor_buffer:${fileKey}` : "editor_buffer";
     try {
-      const stored = await this.db.editorBuffer.get("editor_buffer");
+      const stored = await this.db.editorBuffer.get(id);
       if (!stored?.data) return null;
 
       // fileHandle があれば復元する
@@ -316,11 +318,12 @@ export class WebStorageProvider implements IStorageService {
     }
   }
 
-  async clearEditorBuffer(): Promise<void> {
+  async clearEditorBuffer(fileKey?: string): Promise<void> {
     await this.initialize();
 
+    const id = fileKey ? `editor_buffer:${fileKey}` : "editor_buffer";
     try {
-      await this.db.editorBuffer.delete("editor_buffer");
+      await this.db.editorBuffer.delete(id);
     } catch (error) {
       console.error("エディタバッファの削除に失敗しました:", error);
       throw error;

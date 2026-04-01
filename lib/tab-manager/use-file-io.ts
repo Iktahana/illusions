@@ -84,11 +84,19 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         } else if (!isElectron && descriptor.handle) {
           const storage = getStorageService();
           await storage.initialize();
-          await storage.saveEditorBuffer({
-            content: fileContent,
-            timestamp: Date.now(),
-            fileHandle: descriptor.handle,
-          });
+          // Use the file name as the key to prevent cross-tab collisions when
+          // multiple browser tabs open different files simultaneously.
+          const fileKey = descriptor.handle.name;
+          await storage.saveEditorBuffer(
+            {
+              content: fileContent,
+              timestamp: Date.now(),
+              fileHandle: descriptor.handle,
+            },
+            fileKey,
+          );
+          // Record which fileKey this tab last used so restore can look it up.
+          await storage.setItem("last_editor_buffer_key", fileKey);
         }
         return true;
       } catch (error) {

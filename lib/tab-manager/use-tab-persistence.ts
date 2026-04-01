@@ -152,8 +152,11 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         let initialTab: EditorTabState | null = null;
 
         if (!skipAutoRestore && !isElectron && !savedEmpty) {
-          // Web: restore file handle from editor buffer
-          const buffer = await storage.loadEditorBuffer();
+          // Web: restore file handle from editor buffer.
+          // Look up the file key this tab last saved with to avoid loading
+          // another tab's buffer (cross-tab collision fix for #1064).
+          const lastFileKey = await storage.getItem("last_editor_buffer_key");
+          const buffer = await storage.loadEditorBuffer(lastFileKey ?? undefined);
           if (buffer?.fileHandle) {
             try {
               const file = await buffer.fileHandle.getFile();
@@ -176,7 +179,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
               setWasAutoRecovered(true);
             } catch (error) {
               console.warn("前回のファイルを復元できませんでした:", error);
-              await storage.clearEditorBuffer();
+              await storage.clearEditorBuffer(lastFileKey ?? undefined);
             }
           }
         }
