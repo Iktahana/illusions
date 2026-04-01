@@ -14,14 +14,9 @@ import EditorToolbar from "./editor/EditorToolbar";
 import MilkdownEditor from "./editor/MilkdownEditor";
 import { scrollToSpeechTarget, cancelSpeechScroll } from "@/lib/editor-page/speech-auto-scroll";
 import { buildSegments, buildSpeechChunks, buildSpeechMap } from "@/lib/hooks/speech-utils";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
-import {
-  useTypographySettings,
-  useScrollSettings,
-  useSpeechSettings,
-} from "@/contexts/EditorSettingsContext";
+import { useTypographySettings, useSpeechSettings } from "@/contexts/EditorSettingsContext";
 
 interface EditorProps {
   initialContent?: string;
@@ -32,8 +27,6 @@ interface EditorProps {
   searchOpenTrigger?: number;
   searchInitialTerm?: string;
   onEditorViewReady?: (view: EditorView) => void;
-  /** Ref that external code sets to true before programmatic scrolling */
-  programmaticScrollRef?: React.MutableRefObject<boolean>;
   onShowAllSearchResults?: (matches: SearchMatch[], searchTerm: string) => void;
   // リンティング設定
   lintingRuleRunner?: RuleRunner | null;
@@ -66,7 +59,6 @@ export default function NovelEditor({
   searchOpenTrigger = 0,
   searchInitialTerm,
   onEditorViewReady,
-  programmaticScrollRef,
   onShowAllSearchResults,
   lintingRuleRunner,
   onLintIssuesUpdated,
@@ -198,20 +190,12 @@ export default function NovelEditor({
             const to = (m.positions[chunk.highlightEnd - 1] ?? from) + 1;
             if (from == null) return;
             const deco = Decoration.inline(from, to, { class: "speech-reading" });
-            // Set programmatic scroll flag BEFORE dispatch so the scroll guard
-            // does not revert any browser scroll triggered by the DOM update.
-            if (programmaticScrollRef) {
-              programmaticScrollRef.current = true;
-            }
             v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
             requestAnimationFrame(() => {
               const target = v.dom.querySelector(".speech-reading") as HTMLElement | null;
               const container = scrollContainerRef.current;
               if (target && container) {
-                scrollToSpeechTarget({ container, target, isVertical, programmaticScrollRef });
-              } else if (programmaticScrollRef) {
-                // No scroll needed — clear flag
-                programmaticScrollRef.current = false;
+                scrollToSpeechTarget({ container, target, isVertical });
               }
             });
           },
@@ -229,18 +213,13 @@ export default function NovelEditor({
         },
       );
     },
-    [
-      speakSegments,
-      stop,
-      clearHighlight,
-      isVertical,
-      programmaticScrollRef,
-      MAX_SPEECH_CHUNK_RANGE,
-    ],
+    [speakSegments, stop, clearHighlight, isVertical, MAX_SPEECH_CHUNK_RANGE],
   );
 
   // Keep the ref in sync so onEnd can call startSpeechFromPos without a circular dep
-  startSpeechFromPosRef.current = startSpeechFromPos;
+  useEffect(() => {
+    startSpeechFromPosRef.current = startSpeechFromPos;
+  }, [startSpeechFromPos]);
 
   const startSpeechFromCursor = useCallback(() => {
     const view = editorViewRef.current;
@@ -264,7 +243,9 @@ export default function NovelEditor({
 
   // Restart speech from clicked position when clicking during playback
   const speechPlayingRef = useRef(false);
-  speechPlayingRef.current = speechState.isPlaying;
+  useEffect(() => {
+    speechPlayingRef.current = speechState.isPlaying;
+  }, [speechState.isPlaying]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -319,7 +300,9 @@ export default function NovelEditor({
 
   // Refs to avoid including charsPerLine / callback in useCallback deps (prevents recalc loop)
   const charsPerLineRef = useRef(effectiveCharsPerLine);
-  charsPerLineRef.current = effectiveCharsPerLine;
+  useEffect(() => {
+    charsPerLineRef.current = effectiveCharsPerLine;
+  }, [effectiveCharsPerLine]);
 
   // Calculate optimal chars per line based on editor width and font size
   const calculateOptimalCharsPerLine = useCallback(() => {
@@ -388,7 +371,6 @@ export default function NovelEditor({
         setLocalAutoCharsPerLine(clamped);
       }
     }
-     
   }, [fontFamily, fontScale, lineHeight, isVertical, scrollContainerRef]);
 
   // Add window resize listener to auto-adjust chars per line
@@ -453,7 +435,6 @@ export default function NovelEditor({
                 setEditorViewInstance(view);
                 onEditorViewReady?.(view);
               }}
-              programmaticScrollRef={programmaticScrollRef}
               isModeSwitchingRef={isModeSwitchingRef}
               savedScrollProgressRef={savedScrollProgressRef}
               lintingRuleRunner={lintingRuleRunner}
@@ -491,7 +472,6 @@ export default function NovelEditor({
         onClose={() => setIsSearchOpen(false)}
         onShowAllResults={onShowAllSearchResults}
         initialSearchTerm={contextMenuSearchTerm ?? searchInitialTerm}
-        programmaticScrollRef={programmaticScrollRef}
       />
     </div>
   );

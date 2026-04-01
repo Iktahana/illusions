@@ -353,7 +353,6 @@ export default function EditorPage() {
   const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
-  const programmaticScrollRef = useRef(false);
 
   // --- Ruby/TCY hook ---
   const { handleOpenRubyDialog, handleApplyRuby, handleToggleTcy } = useRubyTcy({
@@ -690,7 +689,6 @@ export default function EditorPage() {
     handleLintingRuleConfigsBatchChange,
     ignoreCorrection,
     triggerSwitchToCorrections,
-    programmaticScrollRef,
   });
 
   const fileName = currentFile?.name ?? "新規ファイル";
@@ -811,7 +809,6 @@ export default function EditorPage() {
     onInsertText: handleInsertText,
     searchResults,
     onCloseSearchResults: handleCloseSearchResults,
-    programmaticScrollRef,
     editorViewInstance,
     dictionarySearchTrigger,
     currentFilePath: currentFile?.path ?? undefined,
@@ -959,7 +956,6 @@ export default function EditorPage() {
         searchOpenTrigger,
         searchInitialTerm,
         setEditorViewInstance,
-        programmaticScrollRef,
         handleShowAllSearchResults,
         ruleRunner,
         handleLintIssuesUpdated,
