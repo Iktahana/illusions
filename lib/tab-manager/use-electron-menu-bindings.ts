@@ -104,10 +104,6 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
       for (const tab of tabsRef.current) {
         if (!isEditorTab(tab)) continue;
         if (!tab.isDirty) continue;
-        // Skip conflicted tabs — same guard as the regular Cmd+S save path.
-        // Saving over a conflicted file could overwrite newer disk content.
-        if (tab.fileSyncStatus === "conflicted") continue;
-
         // Block save if tab has unresolved external conflict
         if (tab.fileSyncStatus === "conflicted") {
           notificationManager.warning(
