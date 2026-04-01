@@ -105,6 +105,9 @@ function registerNlpHandlers() {
       // Process paragraphs with IPC progress reporting
       const results = [];
       const total = paragraphs.length;
+      // requestId is echoed back in progress events so the renderer can
+      // distinguish concurrent tokenizeDocument calls from each other.
+      const requestId = typeof request.requestId === "string" ? request.requestId : null;
 
       for (let i = 0; i < total; i++) {
         const { pos, text } = paragraphs[i];
@@ -114,6 +117,7 @@ function registerNlpHandlers() {
         // Send progress event every 10 paragraphs
         if ((i + 1) % 10 === 0 || i === total - 1) {
           event.sender.send("nlp:tokenize-progress", {
+            requestId,
             completed: i + 1,
             total: total,
             percentage: Math.round(((i + 1) / total) * 100),
