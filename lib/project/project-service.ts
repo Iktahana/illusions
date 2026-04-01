@@ -337,6 +337,19 @@ export class ProjectService {
   }
 
   /**
+   * Save only the project metadata (project.json) without touching the main file.
+   * メインファイルを変更せずに、プロジェクトメタデータ（project.json）だけを保存する。
+   *
+   * @param project - The project whose metadata should be persisted
+   */
+  async saveProjectMetadata(project: ProjectMode): Promise<void> {
+    const rootDirHandle = await this.getVFSDirectoryHandle(project);
+    const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
+    const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
+    await projectJsonHandle.write(JSON.stringify(project.metadata, null, 2));
+  }
+
+  /**
    * Open a single file in standalone mode.
    * 単一ファイルをスタンドアロンモードで開く。
    *
