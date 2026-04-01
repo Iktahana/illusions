@@ -83,14 +83,16 @@ export function useEditorLifecycle({
     const api = window.electronAPI;
     if (!api?.getPendingFile) return;
 
-    void api.getPendingFile().then((result) => {
-      if (!result) return;
+    void api.getPendingFile().then((results) => {
+      if (!results || results.length === 0) return;
 
-      if (result.type === "project") {
-        void handleOpenAsProject(result.projectPath, result.initialFile);
-      } else {
-        tabLoadSystemFile(result.path, result.content);
-        incrementEditorKey();
+      for (const result of results) {
+        if (result.type === "project") {
+          void handleOpenAsProject(result.projectPath, result.initialFile);
+        } else {
+          tabLoadSystemFile(result.path, result.content);
+          incrementEditorKey();
+        }
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
