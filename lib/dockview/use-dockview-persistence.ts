@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { DockviewApi } from "dockview-react";
 import type { DockviewLayoutState, SimplifiedGroupLayout } from "./types";
 import type { TabState } from "@/lib/tab-manager/tab-types";
-import { isEditorTab } from "@/lib/tab-manager/tab-types";
+import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
 import { persistAppState } from "@/lib/storage/app-state-manager";
 import { getStorageService } from "@/lib/storage/storage-service";
 
@@ -27,8 +27,35 @@ const LAYOUT_PERSIST_DEBOUNCE = 2000;
 // ---------------------------------------------------------------------------
 
 /**
+ * Build a stable, ID-independent key for a tab that survives session restarts.
+ *
+ * - Editor tab with saved file: the file path (e.g. "/home/user/novel.mdi")
+ * - Editor tab without file (unsaved): "unsaved:<tabId>"
+ * - Terminal tab: "terminal:<sessionId>"
+ * - Diff tab: "diff:<sourceTabId>"
+ */
+function stableKeyForTab(tab: TabState): string | null {
+  if (isEditorTab(tab)) {
+    return tab.file?.path ?? `unsaved:${tab.id}`;
+  }
+  if (isTerminalTab(tab)) {
+    return `terminal:${tab.sessionId}`;
+  }
+  if (isDiffTab(tab)) {
+    return `diff:${tab.sourceTabId}`;
+  }
+  return null;
+}
+
+/**
  * Extract a simplified, ID-independent layout from the current dockview state.
- * Uses file paths as stable keys so the layout survives tab ID regeneration.
+ * Uses stable keys so the layout survives tab ID regeneration.
+ *
+ * Stable key formats:
+ *   - Saved editor tab: file path
+ *   - Unsaved editor tab: "unsaved:<tabId>"
+ *   - Terminal tab: "terminal:<sessionId>"
+ *   - Diff tab: "diff:<sourceTabId>"
  */
 function extractSimplifiedLayout(
   api: DockviewApi,
@@ -37,12 +64,10 @@ function extractSimplifiedLayout(
   const groups = api.groups;
   if (groups.length <= 1) return undefined; // Single group = default layout, no need to save
 
-  // Build panelId → filePath lookup
+  // Build panelId → stable key lookup (covers all tab kinds)
   const pathByPanelId = new Map<string, string | null>();
   for (const tab of tabs) {
-    if (isEditorTab(tab)) {
-      pathByPanelId.set(tab.id, tab.file?.path ?? null);
-    }
+    pathByPanelId.set(tab.id, stableKeyForTab(tab));
   }
 
   // Extract orientation from serialized JSON (the API doesn't expose it directly)
