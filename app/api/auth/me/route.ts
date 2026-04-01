@@ -19,25 +19,47 @@ interface UserInfoResponse {
 async function refreshAccessToken(
   refreshToken: string,
 ): Promise<{ access_token: string; refresh_token: string; expires_in: number } | null> {
-  const res = await fetch(`${OAUTH_PROVIDER_URL}/api/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: OAUTH_CLIENT_ID,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${OAUTH_PROVIDER_URL}/api/oauth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: OAUTH_CLIENT_ID,
+      }),
+    });
+  } catch {
+    return null;
+  }
   if (!res.ok) return null;
-  return res.json() as Promise<{ access_token: string; refresh_token: string; expires_in: number }>;
+  try {
+    return (await res.json()) as {
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function fetchUserInfo(accessToken: string): Promise<UserInfoResponse | null> {
-  const res = await fetch(`${OAUTH_PROVIDER_URL}/api/oauth/userinfo`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${OAUTH_PROVIDER_URL}/api/oauth/userinfo`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    return null;
+  }
   if (!res.ok) return null;
-  return res.json() as Promise<UserInfoResponse>;
+  try {
+    return (await res.json()) as UserInfoResponse;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
