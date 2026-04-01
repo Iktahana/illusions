@@ -219,20 +219,20 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           suppressFileWatch(tab.file.path);
           await vfs.writeFile(tab.file.path, sanitized);
           setTabs((prev) =>
-            prev.map((t) =>
-              t.id === tabId && isEditorTab(t)
-                ? {
-                    ...t,
-                    lastSavedContent: sanitized,
-                    isDirty: sanitizeMdiContent(t.content) !== sanitized,
-                    lastSavedTime: Date.now(),
-                    lastSaveWasAuto: isAutoSave,
-                    isSaving: false,
-                    fileSyncStatus: "clean",
-                    conflictDiskContent: null,
-                  }
-                : t,
-            ),
+            prev.map((t) => {
+              if (t.id !== tabId || !isEditorTab(t)) return t;
+              const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+              return {
+                ...t,
+                lastSavedContent: sanitized,
+                isDirty: newIsDirty,
+                lastSavedTime: Date.now(),
+                lastSaveWasAuto: isAutoSave,
+                isSaving: false,
+                fileSyncStatus: newIsDirty ? "dirty" : "clean",
+                conflictDiskContent: null,
+              };
+            }),
           );
           await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized);
           return;
@@ -246,21 +246,21 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
         if (result) {
           setTabs((prev) =>
-            prev.map((t) =>
-              t.id === tabId && isEditorTab(t)
-                ? {
-                    ...t,
-                    file: result.descriptor,
-                    lastSavedContent: sanitized,
-                    isDirty: sanitizeMdiContent(t.content) !== sanitized,
-                    lastSavedTime: Date.now(),
-                    lastSaveWasAuto: isAutoSave,
-                    isSaving: false,
-                    fileSyncStatus: "clean",
-                    conflictDiskContent: null,
-                  }
-                : t,
-            ),
+            prev.map((t) => {
+              if (t.id !== tabId || !isEditorTab(t)) return t;
+              const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+              return {
+                ...t,
+                file: result.descriptor,
+                lastSavedContent: sanitized,
+                isDirty: newIsDirty,
+                lastSavedTime: Date.now(),
+                lastSaveWasAuto: isAutoSave,
+                isSaving: false,
+                fileSyncStatus: newIsDirty ? "dirty" : "clean",
+                conflictDiskContent: null,
+              };
+            }),
           );
           if (!(await persistFileReference(result.descriptor, sanitized))) {
             notificationManager.warning(PERSIST_FAILURE_WARNING);
