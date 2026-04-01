@@ -125,8 +125,8 @@ export interface RestoreResult {
 // -----------------------------------------------------------------------
 
 /**
- * Format a timestamp as YYYYMMDDHHmm.
- * タイムスタンプを YYYYMMDDHHmm 形式に変換する。
+ * Format a timestamp as YYYYMMDDHHmmss.
+ * タイムスタンプを YYYYMMDDHHmmss 形式に変換する。
  */
 function formatTimestamp(timestamp: number): string {
   const d = new Date(timestamp);
@@ -135,7 +135,8 @@ function formatTimestamp(timestamp: number): string {
   const day = String(d.getDate()).padStart(2, "0");
   const hours = String(d.getHours()).padStart(2, "0");
   const minutes = String(d.getMinutes()).padStart(2, "0");
-  return `${year}${month}${day}${hours}${minutes}`;
+  const seconds = String(d.getSeconds()).padStart(2, "0");
+  return `${year}${month}${day}${hours}${minutes}${seconds}`;
 }
 
 /**
