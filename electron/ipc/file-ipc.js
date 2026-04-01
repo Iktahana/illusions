@@ -154,27 +154,33 @@ function validateSaveFilePath(filePath, { skipApproval = false, webContentsId } 
     };
   }
 
-  // Validate file extension
-  const ext = path.extname(resolved).toLowerCase();
-  if (!VALID_SAVE_FILE_TYPES.includes(ext)) {
-    log.warn(`save-file path rejected (invalid extension "${ext}"): ${filePath}`);
-    return { success: false, error: `無効なファイル拡張子: ${ext}`, code: "INVALID_EXTENSION" };
+  // Check if this path was previously approved via dialog or system file open.
+  // Approval is scoped to the requesting window to prevent cross-window reuse.
+  // Dialog-approved paths bypass the extension check because the user already
+  // consented to the file (e.g. they opened a .json or .log file via the open dialog).
+  const windowPaths = webContentsId != null ? dialogApprovedPaths.get(webContentsId) : undefined;
+  const isApproved = skipApproval || (windowPaths != null && windowPaths.has(resolved));
+
+  // Validate file extension — skip for dialog-approved paths
+  if (!isApproved) {
+    const ext = path.extname(resolved).toLowerCase();
+    if (!VALID_SAVE_FILE_TYPES.includes(ext)) {
+      log.warn(`save-file path rejected (invalid extension "${ext}"): ${filePath}`);
+      return { success: false, error: `無効なファイル拡張子: ${ext}`, code: "INVALID_EXTENSION" };
+    }
   }
 
   // Reject paths not previously approved via dialog or system file open.
   // Approval is scoped to the requesting window to prevent cross-window reuse.
-  if (!skipApproval) {
-    const windowPaths = webContentsId != null ? dialogApprovedPaths.get(webContentsId) : undefined;
-    if (!windowPaths || !windowPaths.has(resolved)) {
-      log.warn(
-        `save-file path rejected (not dialog-approved for window ${webContentsId}): ${filePath}`,
-      );
-      return {
-        success: false,
-        error: "ダイアログで承認されていないファイルパスです",
-        code: "PATH_NOT_APPROVED",
-      };
-    }
+  if (!isApproved) {
+    log.warn(
+      `save-file path rejected (not dialog-approved for window ${webContentsId}): ${filePath}`,
+    );
+    return {
+      success: false,
+      error: "ダイアログで承認されていないファイルパスです",
+      code: "PATH_NOT_APPROVED",
+    };
   }
 
   return null;
