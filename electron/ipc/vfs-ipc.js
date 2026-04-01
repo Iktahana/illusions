@@ -292,9 +292,23 @@ function registerVFSHandlers() {
       throw error;
     }
 
-    // 3. Path is allowed — isDeniedPath already blocks sensitive paths,
-    //    and fs.stat above verifies the directory exists.
-    //    No additional restrictions needed for vfs:set-root.
+    // 3. Require prior dialog approval — the path (or an ancestor) must have been
+    //    explicitly selected by the user via the native file-open dialog.
+    //    This prevents a compromised renderer from escalating an arbitrary path to
+    //    an allowed root without explicit user consent (fixes security issue #1043).
+    const isApproved = Array.from(dialogApprovedPaths.keys()).some((approved) => {
+      const normalizedApproved = normalizePath(approved);
+      // Allow exact match or if resolved is a subdirectory of an approved path
+      return (
+        normalizedResolved === normalizedApproved ||
+        normalizedResolved.startsWith(normalizedApproved + "/")
+      );
+    });
+    if (!isApproved) {
+      throw new Error(
+        "このディレクトリはファイルダイアログで承認されていません。ダイアログからディレクトリを開いてください",
+      );
+    }
 
     allowedRoots.set(event.sender.id, resolved);
     return { path: resolved, name: path.basename(resolved) };
