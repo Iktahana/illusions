@@ -29,6 +29,15 @@ export interface RestoreResult {
   success: boolean;
   handle: FileSystemDirectoryHandle | null;
   permissionStatus: PermissionStatus;
+  /**
+   * True when the handle is valid but requires a user-gesture permission prompt
+   * before the project can be opened (prompt-required or read-only states).
+   * The caller must show a permission request UI before proceeding.
+   *
+   * ハンドルは有効だが、権限プロンプトが必要な場合に true。
+   * 呼び出し元は権限リクエスト UI を表示する必要がある。
+   */
+  needsPermission?: boolean;
   error?: string;
 }
 
@@ -187,8 +196,27 @@ export class ProjectManager {
         permissionState,
       });
 
+      // #1049: prompt-required means the handle is valid but needs a user-gesture
+      // permission prompt before opening. Return success:false with needsPermission:true
+      // so the caller can show the permission request UI instead of treating it as an error.
+      //
+      // #1057: read-only means write permission was explicitly denied. We also surface
+      // needsPermission:true so the caller can prompt the user to grant write access
+      // or explicitly open in read-only mode.
+      if (
+        permissionStatus.status === "prompt-required" ||
+        permissionStatus.status === "read-only"
+      ) {
+        return {
+          success: false,
+          needsPermission: true,
+          handle: stored.rootHandle,
+          permissionStatus,
+        };
+      }
+
       return {
-        success: permissionStatus.canRead,
+        success: permissionStatus.canRead && permissionStatus.canWrite,
         handle: stored.rootHandle,
         permissionStatus,
       };
