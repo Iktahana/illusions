@@ -356,7 +356,7 @@ export class ProjectService {
         throw new Error("ファイル選択がキャンセルされました。");
       }
 
-      const fileName = result.path.split("/").pop() ?? result.path;
+      const fileName = result.path.split(/[/\\]/).pop() ?? result.path;
       const fileExtension = this.getFileExtension(fileName);
 
       // Electron does not have FileSystemFileHandle, so we create a minimal shim.
