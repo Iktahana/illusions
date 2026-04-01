@@ -43,6 +43,12 @@ interface StoredKvItem {
  * プロジェクトの FileSystemDirectoryHandle を IndexedDB に永続化するための型。
  */
 export interface StoredProjectHandle {
+  /**
+   * Composite primary key: `projectId + ":" + rootDirName`.
+   * Prevents collisions when duplicate project directories share the same projectId.
+   * 複製されたプロジェクトディレクトリが同一 projectId を持つ場合の衝突を防ぐ複合キー。
+   */
+  handleKey: string;
   projectId: string;
   rootHandle: FileSystemDirectoryHandle;
   lastAccessedAt: number;
@@ -57,7 +63,7 @@ class WebStorageDatabase extends Dexie {
   appState!: Table<StoredAppState, string>;
   recentFiles!: Table<StoredRecentFile, string>;
   editorBuffer!: Table<StoredEditorBuffer, string>;
-  projectHandles!: Table<StoredProjectHandle, string>;
+  projectHandles!: Table<StoredProjectHandle, string>; // PK = handleKey
   kvStore!: Table<StoredKvItem, string>;
 
   constructor() {
@@ -84,6 +90,17 @@ class WebStorageDatabase extends Dexie {
       recentFiles: "id, path",
       editorBuffer: "id",
       projectHandles: "projectId, lastAccessedAt",
+      kvStore: "key",
+    });
+
+    // v4: Change projectHandles primary key to composite handleKey (projectId:rootDirName)
+    // to prevent PRIMARY KEY collision when duplicate project directories share the same projectId.
+    // 複製されたプロジェクトディレクトリが同一 projectId を持つ場合の衝突修正 (#1070)。
+    this.version(4).stores({
+      appState: "id",
+      recentFiles: "id, path",
+      editorBuffer: "id",
+      projectHandles: "handleKey, projectId, lastAccessedAt",
       kvStore: "key",
     });
   }
@@ -357,6 +374,7 @@ export class WebStorageProvider implements IStorageService {
   /**
    * No-op for Web. Project handles are managed by ProjectManager via IndexedDB.
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async addRecentProject(_project: RecentProject): Promise<void> {
     // Web uses ProjectManager for directory handle persistence, not this API.
   }
@@ -372,6 +390,7 @@ export class WebStorageProvider implements IStorageService {
   /**
    * No-op for Web. Project handles are managed by ProjectManager via IndexedDB.
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async removeRecentProject(_projectId: string): Promise<void> {
     // Web uses ProjectManager for directory handle persistence, not this API.
   }
