@@ -54,6 +54,8 @@ export interface TerminalTabState {
   tabKind: "terminal";
   id: TabId;
   sessionId: string;
+  /** Temporary correlation ID assigned before PTY spawn; cleared after sessionId is resolved. */
+  pendingId?: string | null;
   label: string;
   cwd: string;
   shell: string;

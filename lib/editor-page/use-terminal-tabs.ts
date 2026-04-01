@@ -10,11 +10,14 @@ import { isTerminalTab, type TabState, type TerminalTabState } from "@/lib/tab-m
 
 interface UseTerminalTabsParams {
   tabs: TabState[];
-  newTerminalTab: () => void;
+  newTerminalTab: (pendingId?: string) => void;
   updateTerminalTab: (
     tabId: string,
     updates: Partial<
-      Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">
+      Pick<
+        TerminalTabState,
+        "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell" | "pendingId"
+      >
     >,
   ) => void;
   forceCloseTab: (tabId: string) => void;
@@ -52,7 +55,9 @@ export function useTerminalTabs({
       const ptyApi = window.electronAPI?.pty;
       if (!ptyApi) return;
 
-      newTerminalTab();
+      // Assign a unique pendingId before spawn so parallel spawns can be correlated correctly.
+      const pendingId = crypto.randomUUID();
+      newTerminalTab(pendingId);
 
       void (async () => {
         const cwd = isProjectMode(editorMode) ? editorMode.rootPath : undefined;
@@ -60,11 +65,10 @@ export function useTerminalTabs({
         const result = await ptyApi.spawn({ cwd, shell });
         if ("error" in result) {
           console.error("[Terminal] PTY spawn failed:", result.error);
-          // PTY spawn failed — remove the stuck "connecting" tab
-          const stuckTab = tabsRef.current
-            .slice()
-            .reverse()
-            .find((tab) => isTerminalTab(tab) && tab.sessionId === "");
+          // PTY spawn failed — remove the specific placeholder tab identified by pendingId.
+          const stuckTab = tabsRef.current.find(
+            (tab) => isTerminalTab(tab) && tab.pendingId === pendingId,
+          );
           if (stuckTab) {
             forceCloseTab(stuckTab.id);
           }
@@ -72,13 +76,17 @@ export function useTerminalTabs({
         }
 
         const { sessionId } = result;
-        const targetTab = tabsRef.current
-          .slice()
-          .reverse()
-          .find((tab) => isTerminalTab(tab) && tab.sessionId === "");
+        // Find the specific placeholder tab by pendingId instead of searching for the last empty sessionId.
+        const targetTab = tabsRef.current.find(
+          (tab) => isTerminalTab(tab) && tab.pendingId === pendingId,
+        );
 
         if (targetTab) {
-          updateTerminalTabRef.current(targetTab.id, { sessionId, status: "running" });
+          updateTerminalTabRef.current(targetTab.id, {
+            sessionId,
+            pendingId: null,
+            status: "running",
+          });
         }
       })();
     } else {
