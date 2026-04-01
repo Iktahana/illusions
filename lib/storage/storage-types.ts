@@ -247,18 +247,22 @@ export interface IStorageService {
 
   /**
    * エディタバッファ（未保存下書き）を保存する。
+   * @param buffer - 保存するバッファデータ
+   * @param fileKey - ファイルを識別するキー（省略時は "editor_buffer"）。Web 環境でのタブ間衝突を防ぐために使用する。
    */
-  saveEditorBuffer(buffer: EditorBuffer): Promise<void>;
+  saveEditorBuffer(buffer: EditorBuffer, fileKey?: string): Promise<void>;
 
   /**
    * エディタバッファを読み込む。
+   * @param fileKey - ファイルを識別するキー（省略時は "editor_buffer"）。saveEditorBuffer と同じ値を渡す。
    */
-  loadEditorBuffer(): Promise<EditorBuffer | null>;
+  loadEditorBuffer(fileKey?: string): Promise<EditorBuffer | null>;
 
   /**
    * エディタバッファを削除する。
+   * @param fileKey - ファイルを識別するキー（省略時は "editor_buffer"）。saveEditorBuffer と同じ値を渡す。
    */
-  clearEditorBuffer(): Promise<void>;
+  clearEditorBuffer(fileKey?: string): Promise<void>;
 
   /**
    * Add a project to the recent projects list.

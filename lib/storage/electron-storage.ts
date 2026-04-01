@@ -96,19 +96,22 @@ export class ElectronStorageProvider implements IStorageService {
     return api.clearRecent();
   }
 
-  async saveEditorBuffer(buffer: EditorBuffer): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async saveEditorBuffer(buffer: EditorBuffer, _fileKey?: string): Promise<void> {
     await this.initialize();
     const api = this.getElectronAPI();
     return api.saveEditorBuffer(buffer);
   }
 
-  async loadEditorBuffer(): Promise<EditorBuffer | null> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async loadEditorBuffer(_fileKey?: string): Promise<EditorBuffer | null> {
     await this.initialize();
     const api = this.getElectronAPI();
     return api.loadEditorBuffer();
   }
 
-  async clearEditorBuffer(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async clearEditorBuffer(_fileKey?: string): Promise<void> {
     await this.initialize();
     const api = this.getElectronAPI();
     return api.clearEditorBuffer();
