@@ -97,19 +97,45 @@ function positionTerminalPanel(api: DockviewApi, newPanel: IDockviewPanel, tabs:
 // ---------------------------------------------------------------------------
 
 /**
+ * Build the stable key for a tab to match against saved layout keys.
+ *
+ * Must mirror the logic in use-dockview-persistence.ts:stableKeyForTab().
+ */
+function stableKeyForTab(tab: TabState): string | null {
+  if (isEditorTab(tab)) {
+    return tab.file?.path ?? `unsaved:${tab.id}`;
+  }
+  if (isTerminalTab(tab)) {
+    return `terminal:${tab.sessionId}`;
+  }
+  if (isDiffTab(tab)) {
+    return `diff:${tab.sourceTabId}`;
+  }
+  return null;
+}
+
+/**
  * Apply a saved simplified layout to the current dockview state.
- * Matches panels to saved groups by file path and uses moveTo() to redistribute.
+ * Matches panels to saved groups by stable key and uses moveTo() to redistribute.
+ * After repositioning, applies saved proportional sizes to the groups.
+ *
+ * Handles:
+ *   - Saved editor tabs (by file path)
+ *   - Unsaved editor tabs (by "unsaved:<tabId>" — best-effort match)
+ *   - Terminal tabs (by "terminal:<sessionId>")
+ *   - Diff tabs (by "diff:<sourceTabId>")
  */
 function applySimplifiedLayout(
   api: DockviewApi,
   layout: SimplifiedGroupLayout,
   tabs: TabState[],
 ): void {
-  // Build filePath → panelId lookup from current tabs
-  const panelIdByPath = new Map<string, string>();
+  // Build stable-key → panelId lookup from current tabs (all tab kinds)
+  const panelIdByKey = new Map<string, string>();
   for (const tab of tabs) {
-    if (isEditorTab(tab) && tab.file?.path) {
-      panelIdByPath.set(tab.file.path, tab.id);
+    const key = stableKeyForTab(tab);
+    if (key) {
+      panelIdByKey.set(key, tab.id);
     }
   }
 
@@ -121,6 +147,9 @@ function applySimplifiedLayout(
   // Strategy: for each subsequent saved group, pick a reference panel from
   // the first group, then move the target panels to create new groups.
 
+  // Track a representative panel per created group to apply sizes afterward
+  const groupRepresentatives: Array<IDockviewPanel | null> = [null]; // index 0 = original group
+
   for (let i = 1; i < layout.groups.length; i++) {
     const savedGroup = layout.groups[i];
     // In dockview, HORIZONTAL orientation = horizontal split bar = panels stacked top-bottom
@@ -128,9 +157,9 @@ function applySimplifiedLayout(
 
     let firstPanelInGroup: IDockviewPanel | null = null;
 
-    for (const filePath of savedGroup.tabPaths) {
-      if (!filePath) continue;
-      const panelId = panelIdByPath.get(filePath);
+    for (const savedKey of savedGroup.tabPaths) {
+      if (!savedKey) continue;
+      const panelId = panelIdByKey.get(savedKey);
       if (!panelId) continue;
       const panel = api.getPanel(panelId);
       if (!panel) continue;
@@ -161,6 +190,39 @@ function applySimplifiedLayout(
           });
         } catch {
           // Move failed; panel stays where it is
+        }
+      }
+    }
+
+    groupRepresentatives.push(firstPanelInGroup);
+  }
+
+  // Apply saved proportional sizes (#1075)
+  // Use the total container dimension along the split axis to compute absolute pixel sizes.
+  if (layout.sizes && layout.sizes.length > 0) {
+    const isHorizontal = layout.orientation === "HORIZONTAL";
+    const totalPx = isHorizontal ? api.height : api.width;
+    if (totalPx > 0) {
+      // Find a representative panel for group 0 (the default/first group)
+      const firstGroupKey = layout.groups[0]?.tabPaths[0] ?? null;
+      const firstGroupPanelId = firstGroupKey ? panelIdByKey.get(firstGroupKey) : null;
+      const firstGroupRepresentative = firstGroupPanelId
+        ? (api.getPanel(firstGroupPanelId) ?? (api.panels.length > 0 ? api.panels[0] : null))
+        : api.panels.length > 0
+          ? api.panels[0]
+          : null;
+      groupRepresentatives[0] = firstGroupRepresentative;
+
+      for (let i = 0; i < layout.groups.length; i++) {
+        const proportion = layout.sizes[i];
+        if (typeof proportion !== "number" || proportion <= 0) continue;
+        const targetPx = Math.round(proportion * totalPx);
+        const rep = groupRepresentatives[i];
+        if (!rep) continue;
+        try {
+          rep.group.api.setSize(isHorizontal ? { height: targetPx } : { width: targetPx });
+        } catch {
+          // setSize may fail if the group is already the right size or no longer exists
         }
       }
     }
@@ -431,7 +493,6 @@ export function useDockviewAdapter({
     prevTabsRef.current = tabs;
     prevActiveTabRef.current = activeTabId;
     isSyncingRef.current = false;
-     
   }, [tabs, activeTabId, editorKey, searchOpenTrigger, searchInitialTerm, dockviewApi]);
 
   // -- Restore saved layout (separate effect to avoid sync effect interference) --
