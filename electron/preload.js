@@ -194,6 +194,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     mkdir: (dirPath) => ipcRenderer.invoke("vfs:mkdir", dirPath),
     delete: (targetPath, options) => ipcRenderer.invoke("vfs:delete", targetPath, options),
     rename: (oldPath, newPath) => ipcRenderer.invoke("vfs:rename", oldPath, newPath),
+    /** Acquire the cross-window history index lock for the given key */
+    indexLockAcquire: (key) => ipcRenderer.invoke("vfs:index-lock:acquire", key),
+    /** Release the cross-window history index lock for the given key */
+    indexLockRelease: (key) => ipcRenderer.invoke("vfs:index-lock:release", key),
   },
   auth: {
     startLogin: () => ipcRenderer.invoke("auth:start-login"),

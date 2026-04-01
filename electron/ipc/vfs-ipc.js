@@ -330,6 +330,79 @@ function registerVFSHandlers() {
       allowedRoots.delete(contents.id);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Cross-window history index lock (HistoryService)
+  // ---------------------------------------------------------------------------
+  // In-memory lock registry — atomic because the main-process event loop is
+  // single-threaded. Each entry maps a lock key to the webContents id that
+  // holds it. A queue of { resolve } entries handles waiters.
+  const indexLockOwner = new Map(); // key -> webContentsId
+  const indexLockQueue = new Map(); // key -> Array<{ resolve: () => void }>
+
+  /**
+   * Dequeue the next waiter for a lock key, if any.
+   * The dequeued entry's resolve() will set the owner itself.
+   * @param {string} key
+   */
+  function processIndexLockQueue(key) {
+    const queue = indexLockQueue.get(key) || [];
+    if (queue.length > 0 && !indexLockOwner.has(key)) {
+      const next = queue.shift();
+      if (queue.length === 0) {
+        indexLockQueue.delete(key);
+      }
+      next.resolve();
+    }
+  }
+
+  ipcMain.handle("vfs:index-lock:acquire", async (event, key) => {
+    const senderId = event.sender.id;
+
+    if (!indexLockOwner.has(key)) {
+      // Lock is free — acquire immediately
+      indexLockOwner.set(key, senderId);
+      return;
+    }
+
+    // Lock is held — enqueue this waiter and suspend until released
+    await new Promise((resolve) => {
+      const queue = indexLockQueue.get(key) || [];
+      queue.push({ resolve });
+      indexLockQueue.set(key, queue);
+    });
+
+    // Now the lock is free for us (processIndexLockQueue verified this before calling resolve)
+    indexLockOwner.set(key, senderId);
+  });
+
+  ipcMain.handle("vfs:index-lock:release", (event, key) => {
+    const senderId = event.sender.id;
+    if (indexLockOwner.get(key) === senderId) {
+      indexLockOwner.delete(key);
+      processIndexLockQueue(key);
+    }
+  });
+
+  /**
+   * Release all locks held by a specific window (called when the window closes).
+   * @param {number} webContentsId
+   */
+  function releaseLocksForWindow(webContentsId) {
+    for (const [key, ownerId] of indexLockOwner) {
+      if (ownerId === webContentsId) {
+        indexLockOwner.delete(key);
+        processIndexLockQueue(key);
+      }
+    }
+  }
+
+  // Release index locks automatically when a window is destroyed
+  app.on("browser-window-created", (_, win) => {
+    win.webContents.on("destroyed", () => {
+      releaseLocksForWindow(win.webContents.id);
+    });
+  });
 }
 
 module.exports = { registerVFSHandlers };

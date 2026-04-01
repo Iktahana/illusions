@@ -7,6 +7,7 @@
 
 import { getVFS } from "../vfs";
 import { AsyncMutex } from "../utils/async-mutex";
+import { isElectronRenderer } from "../utils/runtime-env";
 
 import type { VirtualFileSystem, VFSDirectoryHandle } from "../vfs/types";
 
@@ -40,6 +41,9 @@ const HISTORY_INDEX_FILENAME = "index.json";
 
 /** Name of the bookmarks file */
 const BOOKMARKS_FILENAME = ".history_bookmarks.json";
+
+/** Lock key for the history index — shared across all windows in the same app instance */
+const HISTORY_INDEX_LOCK_KEY = "history-index";
 
 // -----------------------------------------------------------------------
 // Types
@@ -279,9 +283,9 @@ export class HistoryService {
       });
       await snapshotFileHandle.write(content);
 
-      // Update the index (serialized via mutex to prevent TOCTOU race)
-      const releaseLock = await this.indexMutex.acquire();
-      try {
+      // Update the index (serialized via mutex + IPC lock to prevent TOCTOU race
+      // both within the same renderer and across multiple Electron windows)
+      await this.withIndexLock(async () => {
         const index = await this.readHistoryIndex();
         index.snapshots.unshift(entry);
         await this.writeHistoryIndex(index);
@@ -289,9 +293,7 @@ export class HistoryService {
         // Auto-prune old snapshots (global and per-file, within same lock)
         await this.pruneOldSnapshotsUnsafe();
         await this.pruneSnapshotsPerFileUnsafe(sourcePath);
-      } finally {
-        releaseLock();
-      }
+      });
 
       return entry;
     } catch (error) {
@@ -364,12 +366,9 @@ export class HistoryService {
    * - retentionDays を超えるスナップショットを削除
    */
   async pruneOldSnapshots(): Promise<void> {
-    const releaseLock = await this.indexMutex.acquire();
-    try {
+    await this.withIndexLock(async () => {
       await this.pruneOldSnapshotsUnsafe();
-    } finally {
-      releaseLock();
-    }
+    });
   }
 
   /**
@@ -449,12 +448,9 @@ export class HistoryService {
    * @param sourcePath - The source file path to prune snapshots for
    */
   async pruneSnapshotsPerFile(sourcePath: string): Promise<void> {
-    const releaseLock = await this.indexMutex.acquire();
-    try {
+    await this.withIndexLock(async () => {
       await this.pruneSnapshotsPerFileUnsafe(sourcePath);
-    } finally {
-      releaseLock();
-    }
+    });
   }
 
   /**
@@ -622,8 +618,7 @@ export class HistoryService {
    * @param snapshotId - The ID of the snapshot to delete
    */
   async deleteSnapshot(snapshotId: string): Promise<void> {
-    const releaseLock = await this.indexMutex.acquire();
-    try {
+    await this.withIndexLock(async () => {
       const index = await this.readHistoryIndex();
       const entryIndex = index.snapshots.findIndex((s) => s.id === snapshotId);
 
@@ -644,9 +639,7 @@ export class HistoryService {
       // Remove from index
       index.snapshots.splice(entryIndex, 1);
       await this.writeHistoryIndex(index);
-    } finally {
-      releaseLock();
-    }
+    });
   }
 
   // -----------------------------------------------------------------------
@@ -708,6 +701,55 @@ export class HistoryService {
   // -----------------------------------------------------------------------
   // Private helpers
   // -----------------------------------------------------------------------
+
+  /**
+   * Execute a callback while holding the history index lock.
+   *
+   * In Electron, uses an IPC-based lock registry in the main process. Because
+   * the main-process event loop is single-threaded, Map operations there are
+   * inherently atomic — no TOCTOU race is possible. Locks are automatically
+   * released by the main process when a window closes.
+   *
+   * In the web build, only the in-process AsyncMutex is used. A single-page
+   * web app has exactly one renderer, so the mutex is sufficient.
+   *
+   * Electron では IPC を使ってメインプロセス内のロックレジストリで排他制御する。
+   * Web ビルドでは AsyncMutex のみを使用する（レンダラは常に 1 つのため）。
+   *
+   * @param fn - Async callback to run under the lock
+   * @returns The value returned by fn
+   */
+  private async withIndexLock<T>(fn: () => Promise<T>): Promise<T> {
+    // Acquire the in-process mutex to serialize calls within this renderer
+    const releaseMutex = await this.indexMutex.acquire();
+
+    if (isElectronRenderer()) {
+      // Acquire the cross-window IPC lock in the main process
+      const vfs = window.electronAPI?.vfs;
+      if (!vfs) {
+        // vfs bridge is unexpectedly absent — fall back to mutex-only
+        try {
+          return await fn();
+        } finally {
+          releaseMutex();
+        }
+      }
+      await vfs.indexLockAcquire(HISTORY_INDEX_LOCK_KEY);
+      try {
+        return await fn();
+      } finally {
+        await vfs.indexLockRelease(HISTORY_INDEX_LOCK_KEY);
+        releaseMutex();
+      }
+    } else {
+      // Web build: in-process mutex is sufficient
+      try {
+        return await fn();
+      } finally {
+        releaseMutex();
+      }
+    }
+  }
 
   /**
    * Read the history index from .illusions/history/index.json.
