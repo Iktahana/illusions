@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { getStorageService } from "../storage/storage-service";
 import { fetchAppState, persistAppState } from "../storage/app-state-manager";
 import type { TabState, SerializedTab, TabPersistenceState, EditorTabState } from "./tab-types";
@@ -18,6 +19,12 @@ export interface UseTabPersistenceParams extends TabManagerCore {
   skipAutoRestore: boolean;
   /** Promise that resolves once the VFS root is set (Electron only). */
   vfsReadyPromise?: Promise<void>;
+  /**
+   * Optional setter for surfacing a restore error to parent UI.
+   * Called when all file-backed tabs fail to restore so the session is not
+   * silently overwritten with a blank default tab.
+   */
+  setRestoreError?: Dispatch<SetStateAction<string | null>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +62,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     isElectron,
     skipAutoRestore,
     vfsReadyPromise,
+    setRestoreError,
   } = params;
 
   const [wasAutoRecovered, setWasAutoRecovered] = useState(false);
@@ -277,6 +285,18 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
           const activeIdx = Math.min(openTabs.activeIndex, restoredTabs.length - 1);
           setActiveTabId(restoredTabs[activeIdx].id);
         } else {
+          // Check whether any of the saved tabs had a file path.
+          const hadFileBacked = openTabs.tabs.some((t) => Boolean(t.filePath));
+          if (hadFileBacked) {
+            // All file-backed tabs failed to restore — do NOT create a blank
+            // default tab, as that would overwrite the saved session on the
+            // next debounced persist. Surface an error instead so the UI can
+            // inform the user.
+            setRestoreError?.(
+              "前回開いていたファイルを復元できませんでした。ファイルが移動または削除された可能性があります。",
+            );
+            return;
+          }
           // Saved tabs were all untitled (no file path) — create a default tab.
           const defaultTab = createNewTab();
           setTabs((prev) => (prev.length > 0 ? prev : [defaultTab]));
@@ -291,7 +311,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     };
 
     void restoreTabs();
-  }, [isElectron, skipAutoRestore, setTabs, setActiveTabId, vfsReadyPromise]);
+  }, [isElectron, skipAutoRestore, setTabs, setActiveTabId, vfsReadyPromise, setRestoreError]);
 
   return { wasAutoRecovered, flushTabState };
 }
