@@ -41,18 +41,24 @@ function registerSystemHandlers() {
     return true;
   });
 
-  // Sync UI state from renderer to update menu checked states
-  ipcMain.handle("menu:sync-ui-state", async (_event, state) => {
+  // Sync UI state from renderer to update menu checked states (per-window)
+  ipcMain.handle("menu:sync-ui-state", async (event, state) => {
     const { setMenuUiState, rebuildApplicationMenu } = require("../menu");
-    setMenuUiState(state);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+      setMenuUiState(state, win.id);
+    }
     await rebuildApplicationMenu();
     return true;
   });
 
-  // Sync keymap overrides from renderer to update menu accelerators
-  ipcMain.handle("menu:update-keymap-overrides", async (_event, overrides) => {
+  // Sync keymap overrides from renderer to update menu accelerators (per-window)
+  ipcMain.handle("menu:update-keymap-overrides", async (event, overrides) => {
     const { setKeymapOverrides, rebuildApplicationMenu } = require("../menu");
-    setKeymapOverrides(overrides);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+      setKeymapOverrides(overrides, win.id);
+    }
     await rebuildApplicationMenu();
     return true;
   });

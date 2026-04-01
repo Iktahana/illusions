@@ -185,12 +185,22 @@ app.on("before-quit", () => {
   killAllSessions();
 });
 
+// Per-window menu state lifecycle: focus → swap active state; closed → cleanup
+app.on("browser-window-focus", (_event, win) => {
+  const { setActiveWindowId, rebuildApplicationMenu } = require("./menu");
+  setActiveWindowId(win.id);
+  void rebuildApplicationMenu();
+});
+
 // Kill PTY sessions for a window when it is closed
 app.on("browser-window-created", (_event, win) => {
   const wcId = win.webContents.id;
 
   win.on("closed", () => {
     killSessionsForWindow(wcId);
+    // Remove per-window menu state to prevent memory leak
+    const { removeWindowState } = require("./menu");
+    removeWindowState(win.id);
   });
 
   // Kill orphaned PTYs if the renderer crashes
