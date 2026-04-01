@@ -12,8 +12,7 @@ import { persistAppState } from "../storage/app-state-manager";
 import { getHistoryService } from "../services/history-service";
 import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../services/file-watcher";
-import type { SupportedFileExtension } from "../project/project-types";
-import type { TabId, TabState, EditorTabState } from "./tab-types";
+import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import { generateTabId, inferFileType, sanitizeMdiContent, getErrorMessage } from "./types";
 import type { TabManagerCore } from "./types";
@@ -54,9 +53,7 @@ export interface UseFileIOReturn {
 
 export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   const {
-    tabs,
     setTabs,
-    activeTabId,
     setActiveTabId,
     tabsRef,
     activeTabIdRef,
