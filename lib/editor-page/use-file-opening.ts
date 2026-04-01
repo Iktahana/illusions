@@ -192,17 +192,11 @@ export function useFileOpening({
         const projectManager = getProjectManager();
         const restoreResult = await projectManager.restoreProjectHandle(projectId);
 
-        if (!restoreResult.success || !restoreResult.handle) {
-          console.error("Failed to restore project handle:", restoreResult.error);
-          if (!isAutoRestoringRef.current) {
-            notificationManager.error(
-              "このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。",
-            );
-          }
-          return false;
-        }
-
-        if (restoreResult.permissionStatus.status === "prompt-required") {
+        // #1049/#1057: needsPermission indicates the handle is valid but requires
+        // a user-gesture permission prompt (covers prompt-required and read-only states).
+        // Must be checked before the general failure guard below, because needsPermission
+        // results have success:false but should route to the permission UI, not an error.
+        if (restoreResult.needsPermission && restoreResult.handle) {
           setPermissionPromptData({
             projectName: projectId,
             handle: restoreResult.handle,
@@ -211,6 +205,16 @@ export function useFileOpening({
           setShowPermissionPrompt(true);
           // Permission prompt shown — outcome depends on user action, not a failure
           return true;
+        }
+
+        if (!restoreResult.success || !restoreResult.handle) {
+          console.error("Failed to restore project handle:", restoreResult.error);
+          if (!isAutoRestoringRef.current) {
+            notificationManager.error(
+              "このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。",
+            );
+          }
+          return false;
         }
 
         await openRestoredProject(restoreResult.handle);

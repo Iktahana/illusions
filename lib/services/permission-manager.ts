@@ -100,7 +100,14 @@ export class PermissionManager {
         return { status: "granted", canWrite: true, canRead: true };
       }
 
-      if (readState === "granted") {
+      // #1068: If read is granted but write is not yet granted (prompt),
+      // return prompt-required so the caller can request write permission.
+      // Returning read-only here would incorrectly skip the permission request flow.
+      if (readState === "granted" && writeState === "prompt") {
+        return { status: "prompt-required", canWrite: false, canRead: true };
+      }
+
+      if (readState === "granted" && writeState === "denied") {
         return { status: "read-only", canWrite: false, canRead: true };
       }
 
@@ -203,7 +210,14 @@ export class PermissionManager {
         return { status: "granted", canWrite: true, canRead: true };
       }
 
-      if (readState === "granted") {
+      // #1068: If read is granted but write is not yet granted (prompt),
+      // return prompt-required so the caller can request write permission.
+      // Returning read-only here would incorrectly skip the permission request flow.
+      if (readState === "granted" && writeState === "prompt") {
+        return { status: "prompt-required", canWrite: false, canRead: true };
+      }
+
+      if (readState === "granted" && writeState === "denied") {
         return { status: "read-only", canWrite: false, canRead: true };
       }
 
