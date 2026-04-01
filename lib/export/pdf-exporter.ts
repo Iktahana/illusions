@@ -105,9 +105,11 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
     typesetting,
   });
 
-  // Use an isolated partition so the CSP webRequest hook does not affect
-  // the shared default session. Each export gets a fresh in-memory session
-  // that is automatically cleaned up when the BrowserWindow is destroyed.
+  // Use a unique in-memory partition (no "persist:" prefix) per export so
+  // that the CSP webRequest hook is registered on a fresh, isolated session.
+  // The session is automatically GC'd when the BrowserWindow is destroyed,
+  // preventing hook accumulation on the shared default session (#1034).
+  const partition = `pdf-export-${Date.now()}`;
   const hiddenWin = new BrowserWindow({
     show: false,
     width: 800,
@@ -117,14 +119,14 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      partition: "pdf-export",
+      partition,
     },
   });
 
   // Set a strict CSP header to block all script execution and data: URLs.
   // This is a defense-in-depth measure alongside html:false in markdown-it
   // and the CSP meta tag in the HTML document.
-  // The hook is registered on the isolated "pdf-export" partition session,
+  // The hook is registered on the isolated per-export partition session,
   // so it never leaks into the shared default session (#1034).
   hiddenWin.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
