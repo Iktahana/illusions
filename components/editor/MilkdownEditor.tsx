@@ -326,6 +326,7 @@ export default function MilkdownEditor({
       editorDom.style.height = "";
       editorDom.style.maxHeight = "";
       editorDom.style.minHeight = "";
+      editorDom.style.minWidth = "";
       editorDom.style.margin = "";
 
       // 既存のスペーサーを削除
@@ -369,36 +370,10 @@ export default function MilkdownEditor({
         }
       }
 
-      // 縦書き: コンテナ幅を埋める最小幅を設定し、短文でも右側に寄り切るのを防ぐ
-      if (isVertical && scrollContainerRef.current) {
-        // DOM更新後に計算する
-        requestAnimationFrame(() => {
-          const container = scrollContainerRef.current;
-          if (!container) return;
-
-          const containerWidth = container.clientWidth;
-          // clientWidth includes scroll container's own padding (64px * 2)
-          const padding = 128;
-          const minWidth = containerWidth - padding;
-
-          // ProseMirror に最小幅を設定
-          // vertical-rl では右→左へ流れるため、最小幅を確保すると開始位置が右端に揃う
-          editorDom.style.minWidth = `${minWidth}px`;
-
-          // Wait one more frame for layout to fully stabilize after writing-mode + minWidth change
-          requestAnimationFrame(() => {
-            onLayoutCompleteCallback?.();
-          });
-        });
-      } else {
-        // 横書きでは最小幅を解除
-        editorDom.style.minWidth = "";
-
-        // Wait one frame for layout to stabilize after writing-mode change
-        requestAnimationFrame(() => {
-          onLayoutCompleteCallback?.();
-        });
-      }
+      // Wait one frame for layout to stabilize after writing-mode/size changes
+      requestAnimationFrame(() => {
+        onLayoutCompleteCallback?.();
+      });
     };
 
     let onLayoutCompleteCallback: (() => void) | null = null;
@@ -685,15 +660,18 @@ export default function MilkdownEditor({
     <div
       ref={editorRef}
       onClick={handleEditorClick}
-      className={clsx("editor-content-area", isVertical ? "py-8 min-w-fit" : "p-8 mx-auto")}
+      className={clsx("editor-content-area", isVertical ? "py-8" : "p-8 mx-auto")}
       style={{
         fontSize: `${fontScale}%`,
         fontFamily: `"${fontFamily}", serif`,
         lineHeight: lineHeight,
         ...(isVertical && {
           minHeight: "100%",
+          minWidth: "100%",
+          width: "max-content",
           display: "flex",
-          alignItems: "center",
+          justifyContent: "flex-end",
+          alignItems: "flex-start",
         }),
       }}
     >

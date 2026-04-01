@@ -11,12 +11,7 @@ import type { EditorView } from "@milkdown/prose/view";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import type { Token as NlpToken } from "@/lib/nlp-client/types";
 import { LRUCache } from "@/lib/utils/lru-cache";
-import {
-  getAtomOffset,
-  collectParagraphs,
-  findScrollContainer,
-  getVisibleParagraphs,
-} from "../shared/paragraph-helpers";
+import { getAtomOffset, collectParagraphs } from "../shared/paragraph-helpers";
 import { getPosColor, DEFAULT_POS_COLORS } from "./pos-colors";
 import type { PosColorConfig } from "./types";
 
@@ -113,33 +108,14 @@ export function createPosHighlightPlugin(
     },
 
     view(editorView) {
-      let scrollTimer: ReturnType<typeof setTimeout> | null = null;
-
-      // スクロールコンテナを特定
-      const scrollContainer = findScrollContainer(editorView.dom);
-
-      // スクロールイベントハンドラ
-      const handleScroll = () => {
-        const state = posHighlightKey.getState(editorView.state);
-        if (!state?.enabled) return;
-
-        if (scrollTimer) clearTimeout(scrollTimer);
-        scrollTimer = setTimeout(() => {
-          scheduleViewportUpdate(editorView);
-        }, 150);
-      };
-
-      // スクロールコンテナにリスナーを追加
-      scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
-
       // 初期化時に実行
       if (enabled) {
         scheduleViewportUpdate(editorView);
       }
 
       /**
-       * ビューポート内の段落のみを処理
-       * キャッシュ済みの段落はNLP呼び出しをスキップし、デコレーションのみ再構築
+       * ドキュメント全体を処理する。
+       * スクロール位置依存の更新を避け、レイアウト揺れを抑える。
        */
       async function scheduleViewportUpdate(view: EditorView) {
         if (debounceTimer) clearTimeout(debounceTimer);
@@ -152,10 +128,9 @@ export function createPosHighlightPlugin(
 
           const nlpClient = getNlpClient();
           const allParagraphs = collectParagraphs(view.state.doc);
-          const visibleParagraphs = getVisibleParagraphs(view, allParagraphs, 2);
 
           // キャッシュにない段落のみをNLPで処理
-          const uncachedParagraphs = visibleParagraphs.filter((p) => !tokenCache.has(p.text));
+          const uncachedParagraphs = allParagraphs.filter((p) => !tokenCache.has(p.text));
 
           if (uncachedParagraphs.length > 0) {
             try {
@@ -257,8 +232,6 @@ export function createPosHighlightPlugin(
         },
         destroy() {
           if (debounceTimer) clearTimeout(debounceTimer);
-          if (scrollTimer) clearTimeout(scrollTimer);
-          scrollContainer.removeEventListener("scroll", handleScroll);
           tokenCache.clear();
         },
       };
