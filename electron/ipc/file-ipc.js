@@ -181,17 +181,29 @@ function validateSaveFilePath(filePath, { skipApproval = false, webContentsId } 
 }
 
 /**
- * Check if a directory contains a .illusions folder (project marker).
- * @param {string} dirPath - Directory path to check
- * @returns {Promise<boolean>} True if .illusions folder exists
+ * Walk up the directory tree from the given path to find a project root
+ * (a directory that contains a .illusions/ folder).
+ * @param {string} dirPath - Directory path to start searching from
+ * @returns {Promise<string|null>} The project root path if found, null otherwise
  */
-async function isProjectDirectory(dirPath) {
-  try {
-    const illusionsPath = path.join(dirPath, ".illusions");
-    const stats = await fs.stat(illusionsPath);
-    return stats.isDirectory();
-  } catch {
-    return false;
+async function findProjectRoot(dirPath) {
+  let current = path.resolve(dirPath);
+  while (true) {
+    try {
+      const illusionsPath = path.join(current, ".illusions");
+      const stats = await fs.stat(illusionsPath);
+      if (stats.isDirectory()) {
+        return current;
+      }
+    } catch {
+      // .illusions not found at this level, continue walking up
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      // Reached filesystem root without finding a project
+      return null;
+    }
+    current = parent;
   }
 }
 
@@ -211,14 +223,15 @@ async function handleMdiFileOpen(filePath) {
 
   try {
     const dirPath = path.dirname(filePath);
-    const isProject = await isProjectDirectory(dirPath);
+    const projectRoot = await findProjectRoot(dirPath);
 
-    if (isProject) {
-      // Open as project with this file as initial file
-      log.info("Opening as project:", dirPath, "Initial file:", path.basename(filePath));
+    if (projectRoot) {
+      // Open as project with this file as initial file (relative to project root)
+      const relativePath = path.relative(projectRoot, filePath);
+      log.info("Opening as project:", projectRoot, "Initial file:", relativePath);
       targetWindow.webContents.send("open-as-project", {
-        projectPath: dirPath,
-        initialFile: path.basename(filePath),
+        projectPath: projectRoot,
+        initialFile: relativePath,
       });
     } else {
       // Open as standalone file
@@ -437,13 +450,14 @@ function registerFileHandlers() {
 
     try {
       const dirPath = path.dirname(filePath);
-      const isProject = await isProjectDirectory(dirPath);
+      const projectRoot = await findProjectRoot(dirPath);
 
-      if (isProject) {
+      if (projectRoot) {
+        const relativePath = path.relative(projectRoot, filePath);
         return {
           type: "project",
-          projectPath: dirPath,
-          initialFile: path.basename(filePath),
+          projectPath: projectRoot,
+          initialFile: relativePath,
         };
       }
 
