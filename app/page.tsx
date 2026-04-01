@@ -835,6 +835,13 @@ export default function EditorPage() {
     currentContent: content,
     onHistoryRestore: (restoredContent: string) => {
       setContent(restoredContent);
+      // Clear conflict state so the save guard is lifted after restoring a snapshot.
+      if (activeTabId !== null) {
+        updateTab(activeTabId, {
+          fileSyncStatus: "clean",
+          conflictDiskContent: null,
+        });
+      }
       incrementEditorKey();
     },
     onCompareInEditor: setEditorDiff,
