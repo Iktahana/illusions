@@ -12,6 +12,7 @@ const { ipcMain, BrowserWindow } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const { execSync } = require("child_process");
 
 const {
   MAX_SESSIONS_PER_WINDOW,
@@ -44,16 +45,73 @@ try {
 // -----------------------------------------------------------------------
 
 /**
+ * Resolve the absolute path to a shell executable on Windows using PATH lookup.
+ * Uses `where` command (Windows equivalent of `which`) to find the executable.
+ * @param {string} name - executable name (e.g. "powershell.exe")
+ * @returns {string|null} absolute path or null if not found
+ */
+function resolveWindowsShellByName(name) {
+  try {
+    const result = execSync(`where "${name}"`, { encoding: "utf8", timeout: 3000 });
+    const firstLine = result.split(/\r?\n/)[0].trim();
+    if (firstLine && path.isAbsolute(firstLine)) return firstLine;
+  } catch {
+    // `where` exited non-zero — executable not on PATH
+  }
+  return null;
+}
+
+/**
  * Resolve the default shell for the current platform.
+ * On Windows, returns an absolute path so that fs.accessSync() can verify it.
+ * Priority order:
+ *   1. %COMSPEC% environment variable (usually cmd.exe with full path)
+ *   2. Well-known absolute path for PowerShell 5 (inbox on all Windows)
+ *   3. PATH lookup via `where powershell`
+ *   4. PATH lookup via `where cmd`
  * @returns {string}
  */
 function resolveDefaultShell() {
-  if (process.platform === "win32") return "powershell.exe";
-  return process.env.SHELL || "/bin/sh";
+  if (process.platform !== "win32") {
+    return process.env.SHELL || "/bin/sh";
+  }
+
+  // 1. COMSPEC is set by Windows and always points to an absolute path (cmd.exe)
+  if (process.env.COMSPEC && path.isAbsolute(process.env.COMSPEC)) {
+    return process.env.COMSPEC;
+  }
+
+  // 2. Well-known absolute paths for PowerShell (inbox, present on all Windows)
+  const powershellCandidates = [
+    "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe",
+  ];
+  for (const candidate of powershellCandidates) {
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {
+      // not found at this path, try next
+    }
+  }
+
+  // 3. PATH lookup for PowerShell via `where`
+  const powershellOnPath = resolveWindowsShellByName("powershell.exe");
+  if (powershellOnPath) return powershellOnPath;
+
+  // 4. PATH lookup for cmd.exe via `where`
+  const cmdOnPath = resolveWindowsShellByName("cmd.exe");
+  if (cmdOnPath) return cmdOnPath;
+
+  // 5. Last resort: absolute system path for cmd.exe
+  return "C:\\Windows\\System32\\cmd.exe";
 }
 
 /**
  * Verify that a shell executable exists and is accessible.
+ * On Windows, bare executable names (e.g. "powershell.exe") cannot be verified
+ * with fs.accessSync because it requires an absolute path; resolveDefaultShell()
+ * always returns absolute paths on Windows, so this check remains valid.
  * @param {string} shellPath
  * @returns {boolean}
  */
