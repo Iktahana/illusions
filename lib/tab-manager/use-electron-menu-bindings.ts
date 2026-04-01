@@ -36,6 +36,15 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
   flushTabState?: () => Promise<void>;
   /** Immediately flush pending dockview layout to storage. */
   flushLayoutState?: () => Promise<void>;
+  /**
+   * Attempt to create a history snapshot after saving (project mode only).
+   * Provided by useFileIO.
+   */
+  tryAutoSnapshot?: (
+    sourcePath: string,
+    displayName: string,
+    savedContent: string,
+  ) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,6 +76,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     systemFileOpenHandlerRef,
     flushTabState,
     flushLayoutState,
+    tryAutoSnapshot,
   } = params;
 
   // Stable refs for callbacks that change frequently
@@ -87,6 +97,8 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
   flushTabStateRef.current = flushTabState;
   const flushLayoutStateRef = useRef(flushLayoutState);
   flushLayoutStateRef.current = flushLayoutState;
+  const tryAutoSnapshotRef = useRef(tryAutoSnapshot);
+  tryAutoSnapshotRef.current = tryAutoSnapshot;
 
   // Save all dirty tabs before Electron window close
   useEffect(() => {
@@ -149,11 +161,17 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
             const vfs = getVFS();
             suppressFileWatch(tab.file.path);
             await vfs.writeFile(tab.file.path, sanitized);
+            await tryAutoSnapshotRef.current?.(tab.file.path, tab.file.name, sanitized);
           } else {
             await saveMdiFile({
               descriptor: tab.file,
               content: sanitized,
             });
+            await tryAutoSnapshotRef.current?.(
+              tab.file.path ?? tab.file.name,
+              tab.file.name,
+              sanitized,
+            );
           }
         } catch (error) {
           console.error(`保存に失敗しました (${tab.file.name}):`, error);

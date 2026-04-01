@@ -65,6 +65,7 @@ export function useTabManager(options?: {
     setPendingCloseTabId: tabState.setPendingCloseTabId,
     updateTab: tabState.updateTab,
     forceCloseTab: tabState.forceCloseTab,
+    tryAutoSnapshot: fileIO.tryAutoSnapshot,
   });
 
   // --- Auto-save ----------------------------------------------------------
@@ -109,6 +110,7 @@ export function useTabManager(options?: {
     systemFileOpenHandlerRef,
     flushTabState: flushTabStateRef.current,
     flushLayoutState: options?.flushLayoutState,
+    tryAutoSnapshot: fileIO.tryAutoSnapshot,
   });
 
   // --- File watch integration (external change detection) -----------------
