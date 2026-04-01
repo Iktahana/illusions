@@ -292,7 +292,7 @@ function registerPtyHandlers() {
       sessionId: entry.sessionId,
       status: entry.status,
       exitCode: entry.exitCode,
-      outputBuffer: entry.outputBuffer.join("\n"),
+      outputBuffer: entry.outputBuffer,
     };
   });
 
