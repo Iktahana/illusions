@@ -20,17 +20,22 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const tokenRes = await fetch(`${OAUTH_PROVIDER_URL}/api/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: redirectUri,
-      client_id: OAUTH_CLIENT_ID,
-      code_verifier: codeVerifier,
-    }),
-  });
+  let tokenRes: Response;
+  try {
+    tokenRes = await fetch(`${OAUTH_PROVIDER_URL}/api/oauth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+        client_id: OAUTH_CLIENT_ID,
+        code_verifier: codeVerifier,
+      }),
+    });
+  } catch {
+    return NextResponse.json({ error: "network_error" }, { status: 503 });
+  }
 
   if (!tokenRes.ok) {
     const err = await tokenRes.json().catch(() => ({}));
@@ -42,11 +47,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const tokens = (await tokenRes.json()) as {
-    access_token: string;
-    refresh_token: string;
-    expires_in: number;
-  };
+  let tokens: { access_token: string; refresh_token: string; expires_in: number };
+  try {
+    tokens = (await tokenRes.json()) as {
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+    };
+  } catch {
+    return NextResponse.json({ error: "upstream_error" }, { status: 502 });
+  }
 
   const response = NextResponse.json({ success: true });
   setAuthCookies(response, {
