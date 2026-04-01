@@ -7,6 +7,7 @@
 
 import { getVFS } from "../vfs";
 import { AsyncMutex } from "../utils/async-mutex";
+import { isElectronRenderer } from "../utils/runtime-env";
 
 import type { VirtualFileSystem, VFSDirectoryHandle } from "../vfs/types";
 
@@ -41,14 +42,8 @@ const HISTORY_INDEX_FILENAME = "index.json";
 /** Name of the bookmarks file */
 const BOOKMARKS_FILENAME = ".history_bookmarks.json";
 
-/** Name of the file-level lock file used for cross-process/window index serialization */
-const INDEX_LOCK_FILENAME = ".index.lock";
-
-/** Maximum time in milliseconds to wait for the index lock before proceeding */
-const INDEX_LOCK_MAX_WAIT_MS = 5000;
-
-/** Polling interval in milliseconds while waiting for the index lock */
-const INDEX_LOCK_POLL_INTERVAL_MS = 50;
+/** Lock key for the history index — shared across all windows in the same app instance */
+const HISTORY_INDEX_LOCK_KEY = "history-index";
 
 // -----------------------------------------------------------------------
 // Types
@@ -288,8 +283,8 @@ export class HistoryService {
       });
       await snapshotFileHandle.write(content);
 
-      // Update the index (serialized via mutex + file lock to prevent TOCTOU race
-      // both within the same process and across multiple renderer windows)
+      // Update the index (serialized via mutex + IPC lock to prevent TOCTOU race
+      // both within the same renderer and across multiple Electron windows)
       await this.withIndexLock(async () => {
         const index = await this.readHistoryIndex();
         index.snapshots.unshift(entry);
@@ -708,85 +703,51 @@ export class HistoryService {
   // -----------------------------------------------------------------------
 
   /**
-   * Acquire a file-level lock on the history index by creating a lock file.
-   * This prevents cross-process and cross-window TOCTOU races when multiple
-   * renderer windows update the snapshot index concurrently.
+   * Execute a callback while holding the history index lock.
    *
-   * The lock is backed by `.illusions/history/.index.lock`. If the lock file
-   * already exists, this method polls until it disappears or the timeout
-   * (INDEX_LOCK_MAX_WAIT_MS) expires — at which point it proceeds anyway to
-   * avoid permanent deadlock from a crashed renderer that left the lock behind.
+   * In Electron, uses an IPC-based lock registry in the main process. Because
+   * the main-process event loop is single-threaded, Map operations there are
+   * inherently atomic — no TOCTOU race is possible. Locks are automatically
+   * released by the main process when a window closes.
    *
-   * Callers MUST call the returned release function in a finally block.
+   * In the web build, only the in-process AsyncMutex is used. A single-page
+   * web app has exactly one renderer, so the mutex is sufficient.
    *
-   * ファイルレベルのロックをインデックスに取得する。
-   * クロスプロセス・クロスウィンドウの競合を防ぐ。
-   *
-   * @returns An async function that removes the lock file when called.
-   */
-  private async acquireIndexFileLock(): Promise<() => Promise<void>> {
-    const historyDir = await this.ensureHistoryDirectory();
-
-    // Poll until the lock file disappears or we time out
-    const deadline = Date.now() + INDEX_LOCK_MAX_WAIT_MS;
-    while (Date.now() < deadline) {
-      // Check whether a lock file already exists
-      let lockExists = false;
-      try {
-        await historyDir.getFileHandle(INDEX_LOCK_FILENAME);
-        lockExists = true;
-      } catch {
-        // File does not exist — lock is free
-        lockExists = false;
-      }
-
-      if (!lockExists) {
-        break;
-      }
-
-      // Wait before polling again
-      await new Promise<void>((resolve) => setTimeout(resolve, INDEX_LOCK_POLL_INTERVAL_MS));
-    }
-
-    // Write the lock file (best-effort; if it fails we still proceed)
-    try {
-      const lockHandle = await historyDir.getFileHandle(INDEX_LOCK_FILENAME, { create: true });
-      await lockHandle.write(String(Date.now()));
-    } catch (err) {
-      console.warn("Failed to write history index lock file:", err);
-    }
-
-    // Return a release function
-    return async (): Promise<void> => {
-      try {
-        await historyDir.removeEntry(INDEX_LOCK_FILENAME);
-      } catch {
-        // Already removed or never created; ignore
-      }
-    };
-  }
-
-  /**
-   * Execute a callback while holding both the in-process AsyncMutex and the
-   * file-level index lock. This provides two layers of protection:
-   * - AsyncMutex: serializes operations within the same renderer process
-   * - File lock: serializes operations across different renderer windows/processes
-   *
-   * インプロセスのAsyncMutexとファイルレベルのロックを両方保持した状態でコールバックを実行する。
+   * Electron では IPC を使ってメインプロセス内のロックレジストリで排他制御する。
+   * Web ビルドでは AsyncMutex のみを使用する（レンダラは常に 1 つのため）。
    *
    * @param fn - Async callback to run under the lock
    * @returns The value returned by fn
    */
   private async withIndexLock<T>(fn: () => Promise<T>): Promise<T> {
-    // Acquire the in-process mutex first
+    // Acquire the in-process mutex to serialize calls within this renderer
     const releaseMutex = await this.indexMutex.acquire();
-    // Then acquire the cross-process file lock
-    const releaseFileLock = await this.acquireIndexFileLock();
-    try {
-      return await fn();
-    } finally {
-      await releaseFileLock();
-      releaseMutex();
+
+    if (isElectronRenderer()) {
+      // Acquire the cross-window IPC lock in the main process
+      const vfs = window.electronAPI?.vfs;
+      if (!vfs) {
+        // vfs bridge is unexpectedly absent — fall back to mutex-only
+        try {
+          return await fn();
+        } finally {
+          releaseMutex();
+        }
+      }
+      await vfs.indexLockAcquire(HISTORY_INDEX_LOCK_KEY);
+      try {
+        return await fn();
+      } finally {
+        await vfs.indexLockRelease(HISTORY_INDEX_LOCK_KEY);
+        releaseMutex();
+      }
+    } else {
+      // Web build: in-process mutex is sufficient
+      try {
+        return await fn();
+      } finally {
+        releaseMutex();
+      }
     }
   }
 
