@@ -106,6 +106,40 @@ function isFileSuppressed(filePath: string): boolean {
 }
 
 // -----------------------------------------------------------------------
+// Content Hashing
+// -----------------------------------------------------------------------
+
+/**
+ * Compute a lightweight hash of file content for change detection.
+ * Used to detect same-second file modifications where filesystem timestamp
+ * granularity (e.g., HFS+ 1-second resolution) makes mtime comparison unreliable.
+ *
+ * This is intentionally a fast, non-cryptographic hash (djb2 variant).
+ * Collision resistance is not required; false negatives (missed changes) are
+ * more harmful than false positives (spurious reloads).
+ *
+ * ファイルコンテンツの軽量ハッシュを計算する。変更検出に使用する。
+ * ファイルシステムのタイムスタンプ精度（例: HFS+ 1 秒精度）により mtime 比較が
+ * 信頼できない場合の、同一秒内のファイル変更検出に使用する。
+ *
+ * 高速な非暗号論的ハッシュ（djb2 亜種）を使用する。
+ * 衝突耐性は不要であり、偽陰性（変更見逃し）の方が偽陽性（余分なリロード）より有害である。
+ *
+ * @param content - File content string to hash
+ * @returns A string representation of the hash
+ */
+function hashContent(content: string): string {
+  let hash = 5381;
+  for (let i = 0; i < content.length; i++) {
+    // djb2: hash = hash * 33 ^ charCode
+    hash = ((hash << 5) + hash) ^ content.charCodeAt(i);
+    // Keep as 32-bit integer
+    hash = hash | 0;
+  }
+  return hash.toString(36);
+}
+
+// -----------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------
 
@@ -308,6 +342,27 @@ class ElectronFileWatcher implements FileWatcher {
   private _isActive = false;
   /** Last known mtime — preserved across stop/start for catch-up detection */
   private lastKnownModified: number = 0;
+  /**
+   * Timestamp recorded when the watcher was stopped (paused).
+   * Used to detect same-second changes: if the file's mtime equals the last
+   * known mtime but the pause occurred after that mtime, the file may have
+   * changed within the same second due to filesystem timestamp granularity
+   * (e.g., HFS+ has 1-second resolution).
+   *
+   * ウォッチャーが停止（一時停止）した時刻。
+   * 同一秒内の変更を検出するために使用する: ファイルの mtime が最終既知
+   * mtime と同じでも、一時停止がその後に発生していれば、ファイルシステムの
+   * タイムスタンプ精度（例: HFS+ は 1 秒精度）により変更が見逃される可能性がある。
+   */
+  private pausedAt: number = 0;
+  /**
+   * Hash of the last known file content, used to detect same-second changes
+   * when mtime alone is insufficient.
+   *
+   * 最終既知コンテンツのハッシュ。mtime だけでは不十分な場合に
+   * 同一秒内の変更を検出するために使用する。
+   */
+  private lastKnownContentHash: string = "";
 
   constructor(options: FileWatcherOptions) {
     this.vfs = getVFS();
@@ -343,7 +398,22 @@ class ElectronFileWatcher implements FileWatcher {
 
   /**
    * Check for missed changes during pause, then start native or fallback watcher.
+   *
+   * Handles two cases:
+   * 1. mtime advanced while paused (standard case) — fires onChanged.
+   * 2. mtime unchanged but pause occurred after the last known mtime — the file
+   *    may have been modified within the same filesystem-clock second (e.g., HFS+
+   *    has 1-second granularity). In this case we read the file and compare its
+   *    content hash against the last known hash to confirm whether a change occurred.
+   *
    * 一時停止中に見逃した変更を確認し、ネイティブまたはフォールバックウォッチャーを開始する。
+   *
+   * 2 つのケースを処理する:
+   * 1. 一時停止中に mtime が進んだ場合（通常ケース）— onChanged を発火する。
+   * 2. mtime が変わらないが、最終既知 mtime より後に一時停止が発生した場合 —
+   *    ファイルシステムのクロック精度（例: HFS+ は 1 秒精度）により同一秒内に
+   *    変更されている可能性がある。この場合はファイルを読み込み、コンテンツハッシュを
+   *    最終既知ハッシュと比較して変更の有無を確認する。
    */
   private async catchUpAndStartWatcher(previousModified: number): Promise<void> {
     // Always read current metadata to establish/update the baseline.
@@ -351,15 +421,31 @@ class ElectronFileWatcher implements FileWatcher {
     try {
       const metadata = await this.vfs.getFileMetadata(this.path);
       if (previousModified > 0) {
+        const mtimeAdvanced = metadata.lastModified > previousModified;
+        // Detect same-second changes: mtime unchanged but we paused *after* the last
+        // known mtime, so any edit within that second would be invisible to mtime-only
+        // comparison.
+        const possibleSameSecondChange =
+          !mtimeAdvanced &&
+          this.pausedAt > previousModified &&
+          metadata.lastModified === previousModified;
+
         if (
           this._isActive &&
-          metadata.lastModified > previousModified &&
+          (mtimeAdvanced || possibleSameSecondChange) &&
           !isFileSuppressed(this.path)
         ) {
           const content = await this.vfs.readFile(this.path);
           if (this._isActive) {
+            const contentHash = hashContent(content);
+            const contentChanged = contentHash !== this.lastKnownContentHash;
+
             this.lastKnownModified = metadata.lastModified;
-            this.onChanged(content, metadata.lastModified);
+
+            if (mtimeAdvanced || contentChanged) {
+              this.lastKnownContentHash = contentHash;
+              this.onChanged(content, metadata.lastModified);
+            }
           }
         } else {
           // Update baseline even when no change detected
@@ -368,10 +454,20 @@ class ElectronFileWatcher implements FileWatcher {
       } else {
         // First start: initialize baseline for future catch-up checks
         this.lastKnownModified = metadata.lastModified;
+        // Initialize content hash so same-second detection works on first pause/resume
+        try {
+          const content = await this.vfs.readFile(this.path);
+          this.lastKnownContentHash = hashContent(content);
+        } catch {
+          // File unreadable; hash stays empty — catch-up will handle this gracefully
+        }
       }
     } catch {
       // File may not exist; proceed to start watcher normally
     }
+
+    // Reset pausedAt after catch-up is complete
+    this.pausedAt = 0;
 
     if (!this._isActive) return;
 
@@ -391,7 +487,11 @@ class ElectronFileWatcher implements FileWatcher {
 
   /**
    * Stop watching for file changes.
+   * Records the pause timestamp so that same-second changes can be detected
+   * when the watcher is resumed via start().
+   *
    * ファイル変更監視を停止する。
+   * start() で再開した際に同一秒内の変更を検出できるよう、一時停止時刻を記録する。
    */
   stop(): void {
     if (this.nativeWatcher) {
@@ -404,6 +504,7 @@ class ElectronFileWatcher implements FileWatcher {
       this.fallbackWatcher = null;
     }
 
+    this.pausedAt = Date.now();
     this._isActive = false;
   }
 
@@ -455,6 +556,7 @@ class ElectronFileWatcher implements FileWatcher {
         this.vfs.getFileMetadata(this.path),
       ]);
       this.lastKnownModified = metadata.lastModified;
+      this.lastKnownContentHash = hashContent(content);
       this.onChanged(content, metadata.lastModified);
     } catch (error) {
       // Check for permission-related errors (DOMException with NotAllowedError)
