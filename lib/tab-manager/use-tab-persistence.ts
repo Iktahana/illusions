@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { getStorageService } from "../storage/storage-service";
-import { fetchAppState, persistAppState } from "../storage/app-state-manager";
+import { fetchWindowState, persistWindowState } from "../storage/app-state-manager";
 import type { TabState, SerializedTab, TabPersistenceState, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import type { TabManagerCore } from "./types";
@@ -25,6 +25,17 @@ export interface UseTabPersistenceParams extends TabManagerCore {
    * silently overwritten with a blank default tab.
    */
   setRestoreError?: Dispatch<SetStateAction<string | null>>;
+  /**
+   * Stable key identifying this window's project context (e.g. project root path).
+   * When provided, tabs are stored per-window so multiple windows with different
+   * projects do not overwrite each other's state.
+   * When null/undefined, falls back to the legacy global AppState storage.
+   *
+   * このウィンドウのプロジェクトコンテキストを識別する安定したキー（例: プロジェクトルートパス）。
+   * 指定時はウィンドウごとにタブ状態を保存し、異なるプロジェクトの複数ウィンドウが
+   * 互いの状態を上書きしないようにする。
+   */
+  windowKey?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +74,13 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     skipAutoRestore,
     vfsReadyPromise,
     setRestoreError,
+    windowKey,
   } = params;
+
+  // Keep a ref so async callbacks always see the latest window key without
+  // being captured in stale closures.
+  const windowKeyRef = useRef(windowKey ?? null);
+  windowKeyRef.current = windowKey ?? null;
 
   const [wasAutoRecovered, setWasAutoRecovered] = useState(false);
 
@@ -92,7 +109,21 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
       tabs: serializedTabs,
       activeIndex: Math.max(0, activeEditorIndex),
     };
-    await persistAppState({ openTabs: state });
+    const key = windowKeyRef.current;
+    if (key) {
+      await persistWindowState(key, { openTabs: state });
+    }
+    // Always also write to global AppState as a single-window fallback and for
+    // tools (e.g. crash-recovery) that still read from there.
+    // NOTE: We intentionally do NOT import/call persistAppState here to avoid a
+    // circular-import risk; the global write is handled by the dockview persistence
+    // path which also writes the combined state. For the tab-only path, we just
+    // use the per-window store when a key is available, and still write global when
+    // no key is set (legacy / web mode).
+    if (!key) {
+      const { persistAppState } = await import("../storage/app-state-manager");
+      await persistAppState({ openTabs: state });
+    }
   }, [tabsRef, activeTabIdRef]);
 
   /** Flush pending tab state: cancel debounce and persist immediately. */
@@ -147,10 +178,15 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
       try {
         const storage = getStorageService();
         await storage.initialize();
-        const appState = await storage.loadAppState();
+
+        // Use per-window storage when a key is available.
+        // For Web, the key may not yet be set on first mount; fall back to global.
+        const key = windowKeyRef.current;
+        const windowState = key ? await fetchWindowState(key) : null;
+        const appState = windowState ? null : await storage.loadAppState();
 
         // Check if we have previously saved tab state
-        const savedOpenTabs = appState?.openTabs;
+        const savedOpenTabs = windowState?.openTabs ?? appState?.openTabs;
 
         // If saved state explicitly has 0 tabs, restore empty state — no tab needed.
         const savedEmpty = savedOpenTabs && savedOpenTabs.tabs.length === 0;
@@ -241,8 +277,11 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
           await Promise.race([vfsReadyPromise, new Promise<void>((r) => setTimeout(r, 5000))]);
         }
 
-        const appState = await fetchAppState();
-        const openTabs = appState?.openTabs;
+        // Use per-window storage when a key is available; fall back to global
+        // AppState for legacy sessions (migration handled inside fetchWindowState).
+        const key = windowKeyRef.current;
+        const windowState = await fetchWindowState(key ?? "__global__");
+        const openTabs = windowState?.openTabs;
         // No saved state at all: first use — initializeStorage handles default tab.
         if (!openTabs) return;
 

@@ -36,6 +36,11 @@ export interface UseDockviewAdapterOptions {
   searchOpenTrigger: number;
   /** Initial search term to pre-fill when search dialog opens */
   searchInitialTerm?: string;
+  /**
+   * Stable per-window key used to scope the saved dockview layout so that
+   * multiple windows with different projects do not share the same layout record.
+   */
+  windowKey?: string | null;
 }
 
 export interface UseDockviewAdapterReturn {
@@ -238,6 +243,7 @@ export function useDockviewAdapter({
   editorKey,
   searchOpenTrigger,
   searchInitialTerm,
+  windowKey,
 }: UseDockviewAdapterOptions): UseDockviewAdapterReturn {
   const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
   const apiRef = useRef<DockviewApi | null>(null);
@@ -332,10 +338,14 @@ export function useDockviewAdapter({
   );
 
   // -- Pre-load saved layout for restoration --------------------------------
+  // Re-runs when windowKey changes from null to a real value (project loaded).
+  // layoutAppliedRef ensures the layout is only applied once even if this
+  // effect fires multiple times.
 
   useEffect(() => {
+    if (layoutAppliedRef.current) return; // Already applied; do not override
     let cancelled = false;
-    void loadDockviewLayout().then((state) => {
+    void loadDockviewLayout(windowKey).then((state) => {
       if (cancelled) return;
       if (state?.simplifiedLayout) {
         savedLayoutRef.current = state.simplifiedLayout;
@@ -345,7 +355,8 @@ export function useDockviewAdapter({
     return () => {
       cancelled = true;
     };
-  }, []);
+     
+  }, [windowKey]);
 
   // -- Pending split tracking -----------------------------------------------
 

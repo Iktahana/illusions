@@ -181,6 +181,22 @@ export interface StorageSession {
 }
 
 /**
+ * Per-window state scoped by a stable window key (e.g. project root path).
+ * Stored separately from the global AppState so that multiple windows
+ * with different projects do not overwrite each other's tab / layout state.
+ *
+ * ウィンドウごとのタブ・レイアウト状態。
+ * プロジェクトルートパスなどの安定したキーでスコープされ、
+ * マルチウィンドウ環境で各ウィンドウが互いの状態を上書きしないようにする。
+ */
+export interface WindowState {
+  /** Persisted tab set for this window. */
+  openTabs?: TabPersistenceState;
+  /** Persisted dockview split-pane layout for this window. */
+  dockviewLayout?: DockviewLayoutState;
+}
+
+/**
  * Recent project entry for project-based storage.
  * Used by Electron (SQLite) to persist recently opened project directories.
  */

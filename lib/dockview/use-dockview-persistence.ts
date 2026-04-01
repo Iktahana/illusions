@@ -13,7 +13,11 @@ import type { DockviewApi } from "dockview-react";
 import type { DockviewLayoutState, SimplifiedGroupLayout } from "./types";
 import type { TabState } from "@/lib/tab-manager/tab-types";
 import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
-import { persistAppState } from "@/lib/storage/app-state-manager";
+import {
+  persistAppState,
+  persistWindowState,
+  fetchWindowState,
+} from "@/lib/storage/app-state-manager";
 import { getStorageService } from "@/lib/storage/storage-service";
 
 // ---------------------------------------------------------------------------
@@ -111,6 +115,16 @@ export interface UseDockviewPersistenceOptions {
   /** Current tab state for extracting file paths */
   tabs?: TabState[];
   enabled?: boolean;
+  /**
+   * Stable key identifying this window's project context (e.g. project root path).
+   * When provided, layout is stored per-window so multiple windows with different
+   * projects do not overwrite each other's dockview state.
+   *
+   * このウィンドウのプロジェクトコンテキストを識別する安定したキー（例: プロジェクトルートパス）。
+   * 指定時はウィンドウごとにレイアウト状態を保存し、異なるプロジェクトの複数ウィンドウが
+   * 互いの状態を上書きしないようにする。
+   */
+  windowKey?: string | null;
 }
 
 export interface UseDockviewPersistenceReturn {
@@ -122,12 +136,15 @@ export function useDockviewPersistence({
   dockviewApi,
   tabs = [],
   enabled = true,
+  windowKey,
 }: UseDockviewPersistenceOptions): UseDockviewPersistenceReturn {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const apiRef = useRef<DockviewApi | null>(null);
   apiRef.current = dockviewApi;
   const tabsRef = useRef<TabState[]>(tabs);
   tabsRef.current = tabs;
+  const windowKeyRef = useRef(windowKey ?? null);
+  windowKeyRef.current = windowKey ?? null;
 
   /** Serialize and persist the current layout immediately. */
   const persistLayoutNow = useCallback(async () => {
@@ -141,7 +158,13 @@ export function useDockviewPersistence({
         buffers: [],
         simplifiedLayout: simplified,
       };
-      await persistAppState({ dockviewLayout: layoutState });
+      const key = windowKeyRef.current;
+      if (key) {
+        await persistWindowState(key, { dockviewLayout: layoutState });
+      } else {
+        // Fallback: no per-window key yet — write to global AppState.
+        await persistAppState({ dockviewLayout: layoutState });
+      }
     } catch (err) {
       console.warn("[dockview-persistence] Failed to serialize layout:", err);
     }
@@ -190,11 +213,20 @@ export function useDockviewPersistence({
 // ---------------------------------------------------------------------------
 
 /**
- * Load saved dockview layout from AppState.
+ * Load saved dockview layout for the given window key (or global AppState as fallback).
  * Returns null if no saved layout exists.
+ *
+ * @param windowKey - Stable key for the current window. When provided, the per-window
+ *   store is checked first; falls back to global AppState for migration.
  */
-export async function loadDockviewLayout(): Promise<DockviewLayoutState | null> {
+export async function loadDockviewLayout(
+  windowKey?: string | null,
+): Promise<DockviewLayoutState | null> {
   try {
+    if (windowKey) {
+      const windowState = await fetchWindowState(windowKey);
+      if (windowState?.dockviewLayout) return windowState.dockviewLayout;
+    }
     const appState = await getStorageService().loadAppState();
     return appState?.dockviewLayout ?? null;
   } catch {
