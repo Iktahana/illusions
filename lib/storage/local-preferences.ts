@@ -28,13 +28,18 @@ function migrateOldKeys(): void {
     // "illusions:sidebar-top-order" === KEYS.sidebarTopOrder
     // "illusions:sidebar-bottom-order" === KEYS.sidebarBottomOrder
   ];
-  for (const [oldKey, newKey] of migrations) {
-    if (oldKey === newKey) continue;
-    const value = localStorage.getItem(oldKey);
-    if (value !== null && localStorage.getItem(newKey) === null) {
-      localStorage.setItem(newKey, value);
-      localStorage.removeItem(oldKey);
+  try {
+    for (const [oldKey, newKey] of migrations) {
+      if (oldKey === newKey) continue;
+      const value = localStorage.getItem(oldKey);
+      if (value !== null && localStorage.getItem(newKey) === null) {
+        localStorage.setItem(newKey, value);
+        localStorage.removeItem(oldKey);
+      }
     }
+  } catch {
+    // localStorage may throw SecurityError in private browsing or sandboxed contexts;
+    // silently skip migration rather than crashing the module.
   }
 }
 
@@ -43,12 +48,20 @@ migrateOldKeys();
 
 function get(key: string): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(key);
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
 }
 
 function set(key: string, value: string): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(key, value);
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Silently ignore write failures (e.g. SecurityError, QuotaExceededError).
+  }
 }
 
 export type ThemeMode = "light" | "dark" | "auto";
