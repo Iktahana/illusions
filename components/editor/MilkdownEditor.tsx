@@ -57,7 +57,6 @@ interface MilkdownEditorProps {
   isVertical: boolean;
   scrollContainerRef: RefObject<HTMLDivElement>;
   onEditorViewReady?: (view: EditorView) => void;
-  programmaticScrollRef?: React.MutableRefObject<boolean>;
   isModeSwitchingRef: MutableRefObject<boolean>;
   savedScrollProgressRef: RefObject<number>;
   lintingRuleRunner?: RuleRunner | null;
@@ -89,7 +88,6 @@ export default function MilkdownEditor({
   isVertical,
   scrollContainerRef,
   onEditorViewReady,
-  programmaticScrollRef,
   isModeSwitchingRef,
   savedScrollProgressRef,
   lintingRuleRunner,
@@ -151,10 +149,6 @@ export default function MilkdownEditor({
     onNlpErrorRef.current = onNlpError;
   }, [onNlpError]);
 
-  // 縦書き: ブラウザの自動スクロールを防止するための保存位置
-  const savedScrollPosRef = useRef({ left: 0, top: 0 });
-  const userScrollingRef = useRef(false);
-
   // 縦書き用のスクロール制御プラグインを作成
   // isVertical の参照を保持
   const isVerticalRef = useRef(isVertical);
@@ -171,7 +165,7 @@ export default function MilkdownEditor({
           new Plugin({
             key: new PluginKey("verticalScrollControl"),
             props: {
-              handleScrollToSelection(_view) {
+              handleScrollToSelection() {
                 // 縦書きモードではスクロール動作を完全に無視（排版完成後の明示的なスクロール以外）
                 if (isVerticalRef.current) {
                   return true; // デフォルトのスクロールを完全に禁止
@@ -476,10 +470,7 @@ export default function MilkdownEditor({
 
         setScrollProgress({ container, isVertical }, savedProgress);
 
-        // Update the saved position for auto-scroll prevention
-        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
-
-        // Delay clearing the flag with double rAF to outlast any browser auto-scroll or ProseMirror focus management
+        // Delay clearing the flag with double rAF to outlast layout and focus updates
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             isModeSwitchingRef.current = false;
@@ -488,7 +479,6 @@ export default function MilkdownEditor({
       } else if (isFirstRender && isVertical) {
         // First mount in vertical mode: scroll to start (rightmost position)
         setScrollProgress({ container, isVertical }, 0);
-        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
       }
     };
 
@@ -561,35 +551,47 @@ export default function MilkdownEditor({
     if (!container || !isVertical) return;
 
     const handleWheel = (event: WheelEvent) => {
-      let isTouchpad: boolean;
-
-      if (verticalScrollBehavior === "trackpad") {
-        isTouchpad = true;
-      } else if (verticalScrollBehavior === "mouse") {
-        isTouchpad = false;
-      } else {
-        // "auto": existing heuristic
-        const hasBothAxes = Math.abs(event.deltaX) > 0 && Math.abs(event.deltaY) > 0;
-        const hasFineGrainedValues =
-          (Math.abs(event.deltaY) < 50 && Math.abs(event.deltaY) > 0) ||
-          (Math.abs(event.deltaX) < 50 && Math.abs(event.deltaX) > 0);
-        isTouchpad = hasBothAxes || (hasFineGrainedValues && !event.ctrlKey);
-      }
-
       const sensitivity = scrollSensitivity;
+      const absX = Math.abs(event.deltaX);
+      const absY = Math.abs(event.deltaY);
+      const mouseHorizontalDelta = -event.deltaY * sensitivity;
+      const hasBothAxes = absX > 0 && absY > 0;
+      const hasFineGrainedValues = (absY > 0 && absY < 50) || (absX > 0 && absX < 50);
+      const isTrackpadInput =
+        verticalScrollBehavior === "trackpad" ||
+        (verticalScrollBehavior === "auto" &&
+          (hasBothAxes || (hasFineGrainedValues && !event.ctrlKey)));
 
-      if (isTouchpad) {
-        container.scrollLeft += event.deltaX * sensitivity;
-        container.scrollTop += event.deltaY * sensitivity;
-        event.preventDefault();
-      } else {
-        if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
-          container.scrollLeft += event.deltaY * sensitivity;
+      if (verticalScrollBehavior === "mouse") {
+        if (absY >= absX && absY > 0) {
+          container.scrollLeft += mouseHorizontalDelta;
           event.preventDefault();
-        } else if (Math.abs(event.deltaX) > 0) {
+        } else if (absX > 0) {
           container.scrollTop += event.deltaX * sensitivity;
           event.preventDefault();
         }
+        return;
+      }
+
+      if (isTrackpadInput) {
+        if (absY > 0) {
+          container.scrollLeft += event.deltaY * sensitivity;
+        }
+        if (absX > 0) {
+          container.scrollTop += event.deltaX * sensitivity;
+        }
+        event.preventDefault();
+        return;
+      }
+
+      // Mouse semantics: treat dominant deltaY as vertical wheel input and map it
+      // to horizontal movement for vertical writing.
+      if (absY >= absX && absY > 0) {
+        container.scrollLeft += mouseHorizontalDelta;
+        event.preventDefault();
+      } else if (absX > 0) {
+        container.scrollTop += event.deltaX * sensitivity;
+        event.preventDefault();
       }
     };
 
@@ -599,97 +601,6 @@ export default function MilkdownEditor({
       container.removeEventListener("wheel", handleWheel);
     };
   }, [isVertical, scrollContainerRef, verticalScrollBehavior, scrollSensitivity]);
-
-  // Auto-scroll prevention for both modes
-  // Prevents browser from overriding scroll position during text selection, editing, and mode switches
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    let userScrollTimer: ReturnType<typeof setTimeout> | null = null;
-    let isReverting = false;
-    let isPointerDown = false; // マウスドラッグ中（テキスト選択中）のフラグ
-
-    // Initialize saved position
-    savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
-
-    const markUserScroll = () => {
-      userScrollingRef.current = true;
-      if (userScrollTimer) clearTimeout(userScrollTimer);
-      userScrollTimer = setTimeout(() => {
-        userScrollingRef.current = false;
-      }, 200);
-    };
-
-    // Track user-initiated scroll sources
-    const onWheel = () => markUserScroll();
-    const onPointerDown = () => {
-      // マウスボタンが押されている間はドラッグ選択の可能性がある
-      isPointerDown = true;
-    };
-    const onPointerUp = () => {
-      isPointerDown = false;
-    };
-    const onTouchStart = () => markUserScroll();
-
-    // Intercept and revert browser auto-scrolls
-    const onScroll = () => {
-      if (isReverting) return;
-
-      if (
-        userScrollingRef.current ||
-        isModeSwitchingRef.current ||
-        programmaticScrollRef?.current
-      ) {
-        // User interaction, mode switch, or programmatic navigation: save position
-        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
-      } else if (isPointerDown && isVertical) {
-        // Mouse drag (text selection) in vertical-rl: browser may fire native caret-scroll-into-view
-        // which computes wrong positions. Detect large jumps and revert them.
-        // Only applies to vertical mode — horizontal selection scrolls are legitimate.
-        const dx = Math.abs(container.scrollLeft - savedScrollPosRef.current.left);
-        const dy = Math.abs(container.scrollTop - savedScrollPosRef.current.top);
-        if (dx > 50 || dy > 50) {
-          // Large jump → browser auto-scroll in vertical-rl, revert
-          isReverting = true;
-          container.scrollLeft = savedScrollPosRef.current.left;
-          container.scrollTop = savedScrollPosRef.current.top;
-          requestAnimationFrame(() => {
-            isReverting = false;
-          });
-        } else {
-          // Small movement → legitimate edge-drag scroll, allow
-          savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
-        }
-      } else if (isPointerDown) {
-        // Horizontal mode pointer drag: save position normally
-        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
-      } else {
-        // Browser auto-scroll (e.g., DOM update): revert
-        isReverting = true;
-        container.scrollLeft = savedScrollPosRef.current.left;
-        container.scrollTop = savedScrollPosRef.current.top;
-        requestAnimationFrame(() => {
-          isReverting = false;
-        });
-      }
-    };
-
-    container.addEventListener("wheel", onWheel, { passive: true });
-    container.addEventListener("pointerdown", onPointerDown, { passive: true });
-    document.addEventListener("pointerup", onPointerUp);
-    container.addEventListener("touchstart", onTouchStart, { passive: true });
-    container.addEventListener("scroll", onScroll, { passive: true });
-
-    return () => {
-      container.removeEventListener("wheel", onWheel);
-      container.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("pointerup", onPointerUp);
-      container.removeEventListener("touchstart", onTouchStart);
-      container.removeEventListener("scroll", onScroll);
-      if (userScrollTimer) clearTimeout(userScrollTimer);
-    };
-  }, [isVertical, scrollContainerRef, isModeSwitchingRef, savedScrollPosRef, userScrollingRef]);
 
   // Union of all Milkdown command keys used in handleFormat.
   // Each .key property is a branded CmdKey<T> string exported by @milkdown.

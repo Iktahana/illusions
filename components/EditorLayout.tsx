@@ -45,8 +45,6 @@ import type { LintIssue } from "@/lib/linting/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { RuleRunner } from "@/lib/linting/rule-runner";
 import { DockviewReact } from "dockview-react";
-import type { EditorView } from "@milkdown/prose/view";
-
 type SidebarPanelSharedProps = Omit<React.ComponentProps<typeof SidebarPanel>, "view">;
 
 interface ConfirmRemoveRecentState {
@@ -146,7 +144,6 @@ interface EditorLayoutProps {
     setEditorViewInstance: NonNullable<
       React.ComponentProps<typeof NovelEditor>["onEditorViewReady"]
     >;
-    programmaticScrollRef: MutableRefObject<boolean>;
     handleShowAllSearchResults: NonNullable<
       React.ComponentProps<typeof NovelEditor>["onShowAllSearchResults"]
     >;
@@ -425,7 +422,6 @@ export default function EditorLayout({
                                   searchOpenTrigger={panelSearchOpenTrigger}
                                   searchInitialTerm={panelSearchInitialTerm}
                                   onEditorViewReady={mainArea.setEditorViewInstance}
-                                  programmaticScrollRef={mainArea.programmaticScrollRef}
                                   onShowAllSearchResults={mainArea.handleShowAllSearchResults}
                                   lintingRuleRunner={mainArea.ruleRunner}
                                   onLintIssuesUpdated={mainArea.handleLintIssuesUpdated}

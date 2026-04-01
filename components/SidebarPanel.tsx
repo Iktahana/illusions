@@ -1,7 +1,5 @@
 "use client";
 
-import { MutableRefObject } from "react";
-
 import Explorer, { FilesPanel } from "@/components/Explorer";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import SearchResults from "@/components/SearchResults";
@@ -32,8 +30,6 @@ interface SidebarPanelProps {
   searchResults: { matches: { from: number; to: number }[]; searchTerm: string } | null;
   /** Called when the search panel should close. */
   onCloseSearchResults: () => void;
-  /** Ref used to suppress auto-scroll interference during programmatic navigation. */
-  programmaticScrollRef: MutableRefObject<boolean>;
   /** The active ProseMirror EditorView (required by the search panel). */
   editorViewInstance: EditorView | null;
   /** Dictionary search trigger (changes trigger a new search). */
@@ -65,13 +61,11 @@ export default function SidebarPanel({
   onInsertText,
   searchResults,
   onCloseSearchResults,
-  programmaticScrollRef,
   editorViewInstance,
   dictionarySearchTrigger,
   currentFilePath,
   newFileTrigger,
   openProjectFile,
-  incrementEditorKey,
   onWordSearch,
 }: SidebarPanelProps): React.ReactElement | null {
   switch (view) {
@@ -113,7 +107,6 @@ export default function SidebarPanel({
           matches={searchResults?.matches}
           searchTerm={searchResults?.searchTerm}
           onClose={onCloseSearchResults}
-          programmaticScrollRef={programmaticScrollRef}
         />
       );
     case "outline":

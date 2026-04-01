@@ -5,6 +5,7 @@ import { Search, X, Replace, ReplaceAll, ChevronRight, ChevronDown } from "lucid
 import { EditorView, Decoration } from "@milkdown/prose/view";
 import { TextSelection } from "@milkdown/prose/state";
 import clsx from "clsx";
+import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
 
 interface SearchMatch {
   from: number;
@@ -16,7 +17,6 @@ interface SearchResultsProps {
   matches?: SearchMatch[];
   searchTerm?: string;
   onClose: () => void;
-  programmaticScrollRef?: React.MutableRefObject<boolean>;
 }
 
 export default function SearchResults({
@@ -24,7 +24,6 @@ export default function SearchResults({
   matches: initialMatches,
   searchTerm: initialSearchTerm,
   onClose,
-  programmaticScrollRef,
 }: SearchResultsProps) {
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm || "");
   const [replaceTerm, setReplaceTerm] = useState("");
@@ -145,58 +144,16 @@ export default function SearchResults({
         );
       });
 
-      // Allow the scroll guard to accept our programmatic scroll
-      if (programmaticScrollRef) {
-        programmaticScrollRef.current = true;
-      }
-
       // Pass decoration info via meta
       const tr = state.tr.setMeta("searchDecorations", decorations);
 
-      // Scroll to match (don't select text, just move cursor)
-      const scrollTr = tr
-        .setSelection(TextSelection.create(tr.doc, match.from, match.from))
-        .scrollIntoView();
-
-      dispatch(scrollTr);
-
-      // DOM-level scroll for both horizontal and vertical writing modes
-      try {
-        const coords = editorView.coordsAtPos(match.from);
-        const scrollContainer = editorView.dom.closest(
-          ".flex-1.bg-background-secondary",
-        ) as HTMLElement | null;
-        if (scrollContainer) {
-          const containerRect = scrollContainer.getBoundingClientRect();
-          const offsetY = coords.top - containerRect.top + scrollContainer.scrollTop;
-          const offsetX = coords.left - containerRect.left + scrollContainer.scrollLeft;
-          scrollContainer.scrollTo({
-            left: offsetX - containerRect.width / 2,
-            top: offsetY - containerRect.height / 2,
-            behavior: "smooth",
-          });
-        }
-      } catch {
-        try {
-          const domResult = editorView.domAtPos(match.from);
-          const target =
-            domResult.node instanceof HTMLElement ? domResult.node : domResult.node.parentElement;
-          target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-        } catch {
-          // ignore
-        }
-      }
-
-      // Reset the flag after smooth scroll completes
-      setTimeout(() => {
-        if (programmaticScrollRef) {
-          programmaticScrollRef.current = false;
-        }
-      }, 500);
+      const selectTr = tr.setSelection(TextSelection.create(tr.doc, match.from, match.from));
+      dispatch(selectTr);
+      centerEditorPosition(editorView, match.from);
 
       editorView.focus();
     },
-    [editorView, matches, programmaticScrollRef],
+    [editorView, matches],
   );
 
   // Replace single match

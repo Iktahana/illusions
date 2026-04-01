@@ -144,10 +144,15 @@ export default function TerminalPanel({
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
 
-    // Load Unicode11Addon for correct CJK/full-width character widths
-    const { Unicode11Addon } = await import("@xterm/addon-unicode11");
-    terminal.loadAddon(new Unicode11Addon());
-    terminal.unicode.activeVersion = "11";
+    // Load Unicode11Addon when available so CJK width handling still works,
+    // but do not fail the entire editor page if the optional addon is absent.
+    try {
+      const { Unicode11Addon } = await import("@xterm/" + "addon-unicode11");
+      terminal.loadAddon(new Unicode11Addon());
+      terminal.unicode.activeVersion = "11";
+    } catch (error) {
+      console.warn("[TerminalPanel] Unicode11 addon unavailable:", error);
+    }
 
     // Open terminal in the container element
     terminal.open(containerRef.current);
