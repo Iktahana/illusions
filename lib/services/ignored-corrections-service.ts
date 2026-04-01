@@ -10,6 +10,7 @@
 
 import { getVFS } from "../vfs";
 import { getStorageService } from "../storage/storage-service";
+import { AsyncMutex } from "../utils/async-mutex";
 import type { VirtualFileSystem } from "../vfs/types";
 import type { IStorageService } from "../storage/storage-types";
 import type { IgnoredCorrection, IgnoredCorrectionsFile } from "../project/project-types";
@@ -28,6 +29,8 @@ const STANDALONE_STORAGE_PREFIX = "illusions-ignored-corrections:";
 class IgnoredCorrectionsService {
   private vfs: VirtualFileSystem;
   private storage: IStorageService;
+  /** Serializes all read-modify-write operations to prevent last-writer-wins data loss in multi-window scenarios. */
+  private readonly writeMutex = new AsyncMutex();
 
   constructor() {
     this.vfs = getVFS();
@@ -75,43 +78,55 @@ class IgnoredCorrectionsService {
 
   /**
    * Add an ignored correction. Deduplicates by (ruleId, text, context).
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async addIgnoredCorrection(
     ruleId: string,
     text: string,
     context?: string,
   ): Promise<IgnoredCorrection[]> {
-    const corrections = await this.loadIgnoredCorrections();
-    const exists = corrections.some(
-      (c) => c.ruleId === ruleId && c.text === text && c.context === context,
-    );
-    if (exists) return corrections;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const corrections = await this.loadIgnoredCorrections();
+      const exists = corrections.some(
+        (c) => c.ruleId === ruleId && c.text === text && c.context === context,
+      );
+      if (exists) return corrections;
 
-    const entry: IgnoredCorrection = {
-      ruleId,
-      text,
-      addedAt: Date.now(),
-      ...(context !== undefined ? { context } : {}),
-    };
-    corrections.push(entry);
-    await this.saveIgnoredCorrections(corrections);
-    return corrections;
+      const entry: IgnoredCorrection = {
+        ruleId,
+        text,
+        addedAt: Date.now(),
+        ...(context !== undefined ? { context } : {}),
+      };
+      corrections.push(entry);
+      await this.saveIgnoredCorrections(corrections);
+      return corrections;
+    } finally {
+      releaseLock();
+    }
   }
 
   /**
    * Remove an ignored correction by (ruleId, text, context).
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async removeIgnoredCorrection(
     ruleId: string,
     text: string,
     context?: string,
   ): Promise<IgnoredCorrection[]> {
-    const corrections = await this.loadIgnoredCorrections();
-    const filtered = corrections.filter(
-      (c) => !(c.ruleId === ruleId && c.text === text && c.context === context),
-    );
-    await this.saveIgnoredCorrections(filtered);
-    return filtered;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const corrections = await this.loadIgnoredCorrections();
+      const filtered = corrections.filter(
+        (c) => !(c.ruleId === ruleId && c.text === text && c.context === context),
+      );
+      await this.saveIgnoredCorrections(filtered);
+      return filtered;
+    } finally {
+      releaseLock();
+    }
   }
 
   // -------------------------------------------------------------------
@@ -163,6 +178,7 @@ class IgnoredCorrectionsService {
 
   /**
    * Add an ignored correction in standalone mode.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async addIgnoredCorrectionStandalone(
     fileName: string,
@@ -170,25 +186,31 @@ class IgnoredCorrectionsService {
     text: string,
     context?: string,
   ): Promise<IgnoredCorrection[]> {
-    const corrections = await this.loadIgnoredCorrectionsStandalone(fileName);
-    const exists = corrections.some(
-      (c) => c.ruleId === ruleId && c.text === text && c.context === context,
-    );
-    if (exists) return corrections;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const corrections = await this.loadIgnoredCorrectionsStandalone(fileName);
+      const exists = corrections.some(
+        (c) => c.ruleId === ruleId && c.text === text && c.context === context,
+      );
+      if (exists) return corrections;
 
-    const entry: IgnoredCorrection = {
-      ruleId,
-      text,
-      addedAt: Date.now(),
-      ...(context !== undefined ? { context } : {}),
-    };
-    corrections.push(entry);
-    await this.saveIgnoredCorrectionsStandalone(fileName, corrections);
-    return corrections;
+      const entry: IgnoredCorrection = {
+        ruleId,
+        text,
+        addedAt: Date.now(),
+        ...(context !== undefined ? { context } : {}),
+      };
+      corrections.push(entry);
+      await this.saveIgnoredCorrectionsStandalone(fileName, corrections);
+      return corrections;
+    } finally {
+      releaseLock();
+    }
   }
 
   /**
    * Remove an ignored correction in standalone mode.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async removeIgnoredCorrectionStandalone(
     fileName: string,
@@ -196,12 +218,17 @@ class IgnoredCorrectionsService {
     text: string,
     context?: string,
   ): Promise<IgnoredCorrection[]> {
-    const corrections = await this.loadIgnoredCorrectionsStandalone(fileName);
-    const filtered = corrections.filter(
-      (c) => !(c.ruleId === ruleId && c.text === text && c.context === context),
-    );
-    await this.saveIgnoredCorrectionsStandalone(fileName, filtered);
-    return filtered;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const corrections = await this.loadIgnoredCorrectionsStandalone(fileName);
+      const filtered = corrections.filter(
+        (c) => !(c.ruleId === ruleId && c.text === text && c.context === context),
+      );
+      await this.saveIgnoredCorrectionsStandalone(fileName, filtered);
+      return filtered;
+    } finally {
+      releaseLock();
+    }
   }
 }
 
