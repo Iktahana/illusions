@@ -4,7 +4,7 @@
  * Provides file system operations for the renderer process
  */
 
-const { ipcMain, dialog, app } = require("electron");
+const { ipcMain, dialog, app, BrowserWindow } = require("electron");
 const fs = require("fs/promises");
 const path = require("path");
 const os = require("os");
@@ -292,22 +292,32 @@ function registerVFSHandlers() {
       throw error;
     }
 
-    // 3. Require prior dialog approval — the path (or an ancestor) must have been
-    //    explicitly selected by the user via the native file-open dialog.
-    //    This prevents a compromised renderer from escalating an arbitrary path to
-    //    an allowed root without explicit user consent (fixes security issue #1043).
-    const isApproved = Array.from(dialogApprovedPaths.keys()).some((approved) => {
-      const normalizedApproved = normalizePath(approved);
-      // Allow exact match or if resolved is a subdirectory of an approved path
-      return (
-        normalizedResolved === normalizedApproved ||
-        normalizedResolved.startsWith(normalizedApproved + "/")
-      );
-    });
-    if (!isApproved) {
-      throw new Error(
-        "このディレクトリはファイルダイアログで承認されていません。ダイアログからディレクトリを開いてください",
-      );
+    // 3. Require dialog approval — renderer cannot promote arbitrary paths
+    //    to VFS root without prior native dialog consent.
+    //    If the path was not previously approved (e.g. after app restart),
+    //    prompt the user with a native directory dialog for confirmation.
+    //    This prevents a compromised renderer from escalating an arbitrary
+    //    path to an allowed root (fixes security issue #1043).
+    if (!dialogApprovedPaths.has(resolved)) {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const result = await dialog.showOpenDialog(win ?? undefined, {
+        title: "プロジェクトフォルダへのアクセスを許可",
+        defaultPath: resolved,
+        properties: ["openDirectory"],
+        message: `「${path.basename(resolved)}」フォルダへのアクセスを許可しますか？`,
+      });
+
+      if (result.canceled || !result.filePaths[0]) {
+        throw new Error("ディレクトリへのアクセスが許可されませんでした");
+      }
+
+      // Only accept the exact path the user confirmed in the dialog
+      const confirmedPath = path.resolve(result.filePaths[0]);
+      if (normalizePath(confirmedPath) !== normalizedResolved) {
+        throw new Error("選択されたディレクトリが要求されたパスと一致しません");
+      }
+
+      approveDialogPath(confirmedPath);
     }
 
     allowedRoots.set(event.sender.id, resolved);
