@@ -6,7 +6,7 @@ import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
 import type { SupportedFileExtension } from "../project/project-types";
-import type { TabId, TabState, EditorTabState } from "./tab-types";
+import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import { sanitizeMdiContent } from "./types";
 import type { TabManagerCore } from "./types";
@@ -53,7 +53,6 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
 export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): void {
   const {
     tabs,
-    setTabs,
     tabsRef,
     activeTabIdRef,
     isProjectRef,
@@ -71,8 +70,10 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
 
   // Stable refs for callbacks that change frequently
   const closeTabRef = useRef(closeTab);
+  // eslint-disable-next-line react-hooks/refs
   closeTabRef.current = closeTab;
   const newTabRef = useRef(newTab);
+  // eslint-disable-next-line react-hooks/refs
   newTabRef.current = newTab;
 
   // Dirty state → Electron title dot
@@ -84,8 +85,10 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
 
   // Stable refs for flush callbacks
   const flushTabStateRef = useRef(flushTabState);
+  // eslint-disable-next-line react-hooks/refs
   flushTabStateRef.current = flushTabState;
   const flushLayoutStateRef = useRef(flushLayoutState);
+  // eslint-disable-next-line react-hooks/refs
   flushLayoutStateRef.current = flushLayoutState;
 
   // Save all dirty tabs before Electron window close
@@ -101,6 +104,9 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
       for (const tab of tabsRef.current) {
         if (!isEditorTab(tab)) continue;
         if (!tab.isDirty) continue;
+        // Skip conflicted tabs — same guard as the regular Cmd+S save path.
+        // Saving over a conflicted file could overwrite newer disk content.
+        if (tab.fileSyncStatus === "conflicted") continue;
 
         // Block save if tab has unresolved external conflict
         if (tab.fileSyncStatus === "conflicted") {
