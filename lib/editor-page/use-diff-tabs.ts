@@ -31,6 +31,7 @@ export function useDiffTabs({
   closeTab,
 }: UseDiffTabsParams): UseDiffTabsResult {
   const tabsRef = useRef(tabs);
+  // eslint-disable-next-line react-hooks/refs -- intentional ref-sync pattern to avoid stale closure without extra re-renders
   tabsRef.current = tabs;
 
   const prevTabIdsRef = useRef<Set<string>>(new Set());
@@ -96,8 +97,11 @@ export function useDiffTabs({
         (tab) => isEditorTab(tab) && tab.id === diffTab.sourceTabId,
       );
       if (sourceTab && isEditorTab(sourceTab)) {
+        // Keep editor content as-is; mark dirty so auto-reload cannot overwrite
+        // unsaved local edits. (Mirrors the notification-action path in
+        // use-file-watch-integration.ts which also sets "dirty" here.)
         updateTab(sourceTab.id, {
-          fileSyncStatus: "clean",
+          fileSyncStatus: "dirty",
           conflictDiskContent: null,
         });
       }
