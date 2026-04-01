@@ -10,16 +10,26 @@ const allWindows = new Set();
 
 // --- Power state monitoring ---
 let powerDebounceTimer = null;
+let lastBroadcastedPowerState = null;
 
+/**
+ * Broadcast a power state change to all renderer windows.
+ * Uses a short debounce (300ms) to coalesce rapid OS events,
+ * and skips dispatch if the state has not changed since the last broadcast.
+ */
 function broadcastPowerState(state) {
   clearTimeout(powerDebounceTimer);
   powerDebounceTimer = setTimeout(() => {
+    if (state === lastBroadcastedPowerState) {
+      return;
+    }
+    lastBroadcastedPowerState = state;
     for (const win of allWindows) {
       if (!win.isDestroyed()) {
         win.webContents.send("power:state-changed", state);
       }
     }
-  }, 60_000); // 1-minute debounce
+  }, 300); // 300ms debounce — coalesces rapid OS events without noticeable delay
 }
 
 function getMainWindow() {
