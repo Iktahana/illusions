@@ -234,7 +234,10 @@ function registerPtyHandlers() {
         cols,
         rows,
         cwd,
-        env: { ...process.env },
+        env: {
+          ...process.env,
+          ...(process.platform !== "win32" ? { LANG: "en_US.UTF-8", LC_ALL: "en_US.UTF-8" } : {}),
+        },
       });
     } catch (err) {
       console.error("[PTY] Failed to spawn PTY:", err);
