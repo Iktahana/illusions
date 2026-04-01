@@ -130,14 +130,38 @@ export class WebStorageProvider implements IStorageService {
     await this.initialize();
 
     try {
-      // すべてを並列で保存
-      await Promise.all([
-        this.saveAppState(session.appState),
-        this.saveRecentFiles(session.recentFiles),
-        session.editorBuffer
-          ? this.saveEditorBuffer(session.editorBuffer)
-          : this.clearEditorBuffer(),
-      ]);
+      // Dexie transaction で atomic に保存する（partial write を防ぐ）
+      await this.db.transaction(
+        "rw",
+        [this.db.appState, this.db.recentFiles, this.db.editorBuffer],
+        async () => {
+          // appState
+          await this.db.appState.put({
+            id: "app_state",
+            data: session.appState,
+          });
+
+          // recentFiles: 既存を全削除してから一括追加
+          await this.db.recentFiles.clear();
+          const recentRecords = session.recentFiles.map((file) => ({
+            id: `recent_${file.path}`,
+            path: file.path,
+            data: file,
+          }));
+          await this.db.recentFiles.bulkPut(recentRecords);
+
+          // editorBuffer
+          if (session.editorBuffer) {
+            await this.db.editorBuffer.put({
+              id: "editor_buffer",
+              data: session.editorBuffer,
+              fileHandle: session.editorBuffer.fileHandle,
+            });
+          } else {
+            await this.db.editorBuffer.delete("editor_buffer");
+          }
+        },
+      );
     } catch (error) {
       console.error("セッションの保存に失敗しました:", error);
       throw error;
