@@ -214,11 +214,22 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
       const upgradeService = getProjectUpgradeService();
       const project = await upgradeService.upgradeToProject(editorMode, content);
       setProjectMode(project);
+      await loadProjectContent(project);
+
+      if (isElectron && project.rootPath) {
+        const storage = getStorageService();
+        await storage.addRecentProject({
+          id: project.projectId,
+          rootPath: project.rootPath,
+          name: project.name,
+        });
+        void window.electronAPI?.rebuildMenu?.();
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       console.error("Failed to upgrade to project:", error);
     }
-  }, [editorMode, content, setProjectMode]);
+  }, [editorMode, content, setProjectMode, loadProjectContent, isElectron]);
 
   return {
     state: {
