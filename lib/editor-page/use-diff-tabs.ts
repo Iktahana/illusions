@@ -77,6 +77,10 @@ export function useDiffTabs({
           isDirty: false,
           fileSyncStatus: "clean",
           conflictDiskContent: null,
+          // Set pendingExternalContent so the live editor instance reflects the new content.
+          // EditorLayout passes this as externalContent prop to NovelEditor, which applies
+          // it via ProseMirror replaceAll and then clears it via onExternalContentApplied.
+          pendingExternalContent: diffTab.remoteContent,
         });
       }
 
