@@ -44,26 +44,58 @@ try {
 // -----------------------------------------------------------------------
 
 /**
- * Resolve the default shell for the current platform.
- * @returns {string}
- */
-function resolveDefaultShell() {
-  if (process.platform === "win32") return "powershell.exe";
-  return process.env.SHELL || "/bin/sh";
-}
-
-/**
  * Verify that a shell executable exists and is accessible.
+ * On Windows, fs.constants.X_OK is unreliable, so we check R_OK instead.
  * @param {string} shellPath
  * @returns {boolean}
  */
 function shellExists(shellPath) {
   try {
-    fs.accessSync(shellPath, fs.constants.X_OK);
+    const mode = process.platform === "win32" ? fs.constants.R_OK : fs.constants.X_OK;
+    fs.accessSync(shellPath, mode);
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * Auto-detect the best available shell on Windows by probing well-known paths.
+ * Priority: PowerShell 7 (pwsh) → Windows PowerShell 5.1 → cmd.exe
+ * @returns {string}
+ */
+function resolveWindowsShell() {
+  const systemRoot = process.env.SystemRoot || "C:\\Windows";
+  const programFiles = process.env.ProgramFiles || "C:\\Program Files";
+
+  const candidates = [
+    // PowerShell 7+ (cross-platform, modern)
+    path.join(programFiles, "PowerShell", "7", "pwsh.exe"),
+    // Windows PowerShell 5.1 (built-in)
+    path.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+    // cmd.exe via COMSPEC env (respects system configuration)
+    process.env.COMSPEC,
+    // cmd.exe at well-known path
+    path.join(systemRoot, "System32", "cmd.exe"),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && shellExists(candidate)) return candidate;
+  }
+
+  // Fallback — return basename; pty:spawn will report a clear error if not found
+  return "powershell.exe";
+}
+
+/**
+ * Resolve the default shell for the current platform.
+ * On Windows, probes well-known paths for PowerShell / cmd.exe.
+ * On Unix/macOS, uses $SHELL or /bin/sh.
+ * @returns {string}
+ */
+function resolveDefaultShell() {
+  if (process.platform === "win32") return resolveWindowsShell();
+  return process.env.SHELL || "/bin/sh";
 }
 
 /**
