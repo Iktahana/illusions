@@ -52,6 +52,15 @@ export interface EditorPanelParams {
   searchOpenTrigger: number;
   /** Initial search term to pre-fill when search dialog opens */
   searchInitialTerm?: string;
+  /**
+   * Opaque string that changes when the tab's content was refreshed from disk
+   * (e.g. visibility-change reload). Including it in the NovelEditor React key
+   * forces the active editor to remount with the new content.
+   *
+   * アクティブエディタが新しいディスク内容でリマウントするためのキー。
+   * visibilitychange 後のリロード時に変化する。
+   */
+  pendingExternalContent?: string | null;
 }
 
 /** Params for a terminal panel */

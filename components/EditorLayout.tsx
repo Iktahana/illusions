@@ -367,7 +367,7 @@ export default function EditorLayout({
                   </div>
                 )}
 
-                {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                { }
                 <div
                   className="flex-1 flex flex-col overflow-hidden"
                   onContextMenu={mainArea.handleTabBarContextMenu}
@@ -417,7 +417,7 @@ export default function EditorLayout({
                                 className="h-full"
                               >
                                 <NovelEditor
-                                  key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}`}
+                                  key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}-${panelParams?.pendingExternalContent ?? ""}`}
                                   initialContent={panelContent}
                                   onChange={mainArea.handleChange}
                                   onInsertText={mainArea.handleInsertText}
