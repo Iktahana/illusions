@@ -27,6 +27,11 @@ export function useTabManager(options?: {
   vfsReadyPromise?: Promise<void>;
   /** External flush callback for dockview layout persistence. */
   flushLayoutState?: () => Promise<void>;
+  /**
+   * Stable per-window key (e.g. project root path) used to scope tab and layout
+   * state so multiple windows with different projects do not overwrite each other.
+   */
+  windowKey?: string | null;
 }): UseTabManagerReturn {
   const skipAutoRestore = options?.skipAutoRestore ?? false;
   const autoSaveEnabled = options?.autoSave ?? true;
@@ -140,6 +145,7 @@ export function useTabManager(options?: {
     isElectron: tabState.isElectron,
     skipAutoRestore,
     vfsReadyPromise: options?.vfsReadyPromise,
+    windowKey: options?.windowKey,
   });
 
   // Update the ref so useElectronMenuBindings can access flushTabState

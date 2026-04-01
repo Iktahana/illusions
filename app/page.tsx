@@ -171,6 +171,12 @@ export default function EditorPage() {
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
+  // Derive a stable per-window key from the project root path (Electron project mode).
+  // This key scopes tabs and dockview layout so multiple windows with different projects
+  // do not overwrite each other's state (fixes #1042).
+  // Standalone mode and Web mode use null — they rely on the legacy global AppState path.
+  const windowKey = isProjectMode(editorMode) && editorMode.rootPath ? editorMode.rootPath : null;
+
   // --- Power saving hook ---
   usePowerSaving({
     powerSaveMode,
@@ -213,6 +219,7 @@ export default function EditorPage() {
     autoSave,
     vfsReadyPromise: vfsGate.promise,
     flushLayoutState: stableFlushLayoutState,
+    windowKey,
   });
   const {
     content,
@@ -293,10 +300,12 @@ export default function EditorPage() {
     editorKey,
     searchOpenTrigger,
     searchInitialTerm,
+    windowKey,
   });
   const { flushLayoutState } = useDockviewPersistence({
     dockviewApi,
     tabs: tabManagerWithPtyCleanup.tabs,
+    windowKey,
   });
   flushLayoutStateRef.current = flushLayoutState;
 
