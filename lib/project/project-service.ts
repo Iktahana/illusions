@@ -379,6 +379,7 @@ export class ProjectService {
         fileName,
         fileExtension,
         editorSettings: getDefaultEditorSettings(fileExtension),
+        filePath: result.path,
       };
     }
 
@@ -468,6 +469,30 @@ export class ProjectService {
     const rootDirHandle = await this.getVFSDirectoryHandle(project);
     const mainFileHandle = await rootDirHandle.getFileHandle(project.metadata.mainFile);
     return mainFileHandle.read();
+  }
+
+  /**
+   * Read file content for a standalone mode file.
+   * スタンドアロンモードのファイル内容を読み込む。
+   *
+   * On Electron, reads via VFS using the absolute file path.
+   * On Web, reads from the FileSystemFileHandle.
+   *
+   * @param standalone - The standalone mode object returned by openStandaloneFile
+   * @returns The file content as text
+   */
+  async readStandaloneContent(standalone: StandaloneMode): Promise<string> {
+    if (isElectronRenderer() && standalone.filePath) {
+      const vfs = getVFS();
+      return vfs.readFile(standalone.filePath);
+    }
+
+    if (standalone.fileHandle) {
+      const file = await standalone.fileHandle.getFile();
+      return file.text();
+    }
+
+    throw new Error("ファイルの内容を読み込めませんでした。");
   }
 
   /**

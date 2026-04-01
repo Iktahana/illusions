@@ -172,6 +172,8 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     signalVfsReady,
     loadProjectContent,
     openRestoredProject,
+    tabLoadSystemFile,
+    incrementEditorKey,
   });
 
   // Auto-restore the last opened project on startup

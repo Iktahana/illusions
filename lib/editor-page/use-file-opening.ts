@@ -24,6 +24,10 @@ interface UseFileOpeningParams {
   loadProjectContent: (project: ProjectMode) => Promise<void>;
   /** Read project.json from a restored directory handle and enter project mode */
   openRestoredProject: (handle: FileSystemDirectoryHandle) => Promise<void>;
+  /** Load a file into the tab manager by path and content */
+  tabLoadSystemFile: (path: string, content: string) => void;
+  /** Increment editor key to force editor remount */
+  incrementEditorKey: () => void;
 }
 
 export interface UseFileOpeningResult {
@@ -53,6 +57,8 @@ export function useFileOpening({
   signalVfsReady,
   loadProjectContent,
   openRestoredProject,
+  tabLoadSystemFile,
+  incrementEditorKey,
 }: UseFileOpeningParams): UseFileOpeningResult {
   const handleOpenProject = useCallback(async () => {
     try {
@@ -82,11 +88,19 @@ export function useFileOpening({
       const projectService = getProjectService();
       const standalone = await projectService.openStandaloneFile();
       setStandaloneMode(standalone);
+
+      // Load file content into the tab manager so the editor shows the file contents
+      const content = await projectService.readStandaloneContent(standalone);
+      const tabPath = standalone.filePath ?? standalone.fileName;
+      tabLoadSystemFile(tabPath, content);
+      incrementEditorKey();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
+      if (error instanceof Error && error.message.includes("キャンセル")) return;
       console.error("Failed to open file:", error);
+      notificationManager.error("ファイルを開けませんでした。");
     }
-  }, [setStandaloneMode]);
+  }, [setStandaloneMode, tabLoadSystemFile, incrementEditorKey]);
 
   const handleOpenRecentProject = useCallback(
     async (projectId: string) => {

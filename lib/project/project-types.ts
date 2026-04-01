@@ -90,6 +90,8 @@ export interface StandaloneMode {
   fileName: string;
   fileExtension: SupportedFileExtension;
   editorSettings: EditorSettings;
+  /** Absolute file path (Electron only). Used for VFS read/write operations. */
+  filePath?: string;
 }
 
 /** Current editor mode (null when no file/project is open) */
