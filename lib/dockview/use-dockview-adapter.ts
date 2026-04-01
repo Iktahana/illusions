@@ -61,40 +61,38 @@ export interface UseDockviewAdapterReturn {
 // ---------------------------------------------------------------------------
 
 /**
- * Position a newly added terminal panel in the bottom split.
- * - If another terminal already exists, move into its group ("center").
- * - Otherwise, split below an existing editor panel ("bottom").
+ * Build the `position` option for `addPanel` so a new terminal panel is placed
+ * in the correct location immediately, without a post-hoc `moveTo()` call.
+ *
+ * - If another terminal panel already exists → use `direction: 'within'` to
+ *   open the new terminal as a tab in the same group (VS Code behaviour).
+ * - Otherwise → use `direction: 'below'` relative to the active (or first)
+ *   editor panel to create a bottom split.
+ * - If there are no other panels yet → return undefined (panel becomes the
+ *   only panel in the layout).
  */
-function positionTerminalPanel(api: DockviewApi, newPanel: IDockviewPanel, tabs: TabState[]): void {
+function buildTerminalPanelPosition(
+  api: DockviewApi,
+  newPanelId: string,
+  tabs: TabState[],
+): { referencePanel: string; direction: "within" | "below" } | undefined {
   // Look for an existing terminal panel to group with
   for (const panel of api.panels) {
-    if (panel.id === newPanel.id) continue;
+    if (panel.id === newPanelId) continue;
     const tab = tabs.find((t) => t.id === panel.id);
     if (tab && isTerminalTab(tab)) {
-      try {
-        newPanel.api.moveTo({
-          group: panel.group,
-          position: "center",
-        });
-      } catch {
-        // Move failed; panel stays in default group
-      }
-      return;
+      return { referencePanel: panel.id, direction: "within" };
     }
   }
 
   // No terminal group yet — split below the active (or first) editor panel
   const refPanel = api.activePanel ?? api.panels[0];
-  if (refPanel && refPanel.id !== newPanel.id) {
-    try {
-      newPanel.api.moveTo({
-        group: refPanel.group,
-        position: "bottom",
-      });
-    } catch {
-      // Move failed; panel stays in default group
-    }
+  if (refPanel && refPanel.id !== newPanelId) {
+    return { referencePanel: refPanel.id, direction: "below" };
   }
+
+  // No other panels — let dockview place the panel freely
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -292,11 +290,13 @@ export function useDockviewAdapter({
             },
           });
         } else if (isTerminalTab(tab)) {
+          const termPosition = buildTerminalPanelPosition(api, tab.id, tabs);
           api.addPanel<TerminalPanelParams>({
             id: tab.id,
             component: "terminal",
             title: tab.label,
             params: { sessionId: tab.sessionId },
+            ...(termPosition ? { position: termPosition } : {}),
           });
         } else if (isDiffTab(tab)) {
           api.addPanel<DiffPanelParams>({
@@ -404,14 +404,16 @@ export function useDockviewAdapter({
             },
           });
         } else if (isTerminalTab(tab)) {
-          // Add terminal panel then move it to the bottom split (like VS Code)
-          const termPanel = api.addPanel<TerminalPanelParams>({
+          // Add terminal panel with the correct position directly in addPanel,
+          // avoiding a post-hoc moveTo() that silently fails.
+          const termPosition = buildTerminalPanelPosition(api, tab.id, tabs);
+          api.addPanel<TerminalPanelParams>({
             id: tab.id,
             component: "terminal",
             title: tab.label,
             params: { sessionId: tab.sessionId },
+            ...(termPosition ? { position: termPosition } : {}),
           });
-          positionTerminalPanel(api, termPanel, tabs);
         } else if (isDiffTab(tab)) {
           api.addPanel<DiffPanelParams>({
             id: tab.id,
