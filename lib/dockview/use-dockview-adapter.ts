@@ -431,7 +431,6 @@ export function useDockviewAdapter({
     prevTabsRef.current = tabs;
     prevActiveTabRef.current = activeTabId;
     isSyncingRef.current = false;
-     
   }, [tabs, activeTabId, editorKey, searchOpenTrigger, searchInitialTerm, dockviewApi]);
 
   // -- Restore saved layout (separate effect to avoid sync effect interference) --

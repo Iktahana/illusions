@@ -367,7 +367,7 @@ export default function EditorLayout({
                   </div>
                 )}
 
-                { }
+                {}
                 <div
                   className="flex-1 flex flex-col overflow-hidden"
                   onContextMenu={mainArea.handleTabBarContextMenu}
