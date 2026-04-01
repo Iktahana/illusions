@@ -355,7 +355,6 @@ export function useDockviewAdapter({
     return () => {
       cancelled = true;
     };
-     
   }, [windowKey]);
 
   // -- Pending split tracking -----------------------------------------------

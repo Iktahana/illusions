@@ -388,7 +388,7 @@ export default function NovelEditor({
         setLocalAutoCharsPerLine(clamped);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- charsPerLine & callback read via refs to break recalc loop
+     
   }, [fontFamily, fontScale, lineHeight, isVertical, scrollContainerRef]);
 
   // Add window resize listener to auto-adjust chars per line
@@ -476,7 +476,11 @@ export default function NovelEditor({
 
         {/* 選択文字数（エディタ基準で配置） */}
         {editorViewInstance && (
-          <SelectionCounter editorView={editorViewInstance} isVertical={isVertical} containerRef={scrollContainerRef} />
+          <SelectionCounter
+            editorView={editorViewInstance}
+            isVertical={isVertical}
+            containerRef={scrollContainerRef}
+          />
         )}
       </div>
 

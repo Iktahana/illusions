@@ -38,20 +38,25 @@ export default function SelectionCounter({
         const rect = container.getBoundingClientRect();
 
         // キーボード選択時は選択末尾の座標をフォールバックに使う
-        const fallbackCoords = !(event instanceof MouseEvent) && from !== to
-          ? editorView.coordsAtPos(to)
-          : null;
+        const fallbackCoords =
+          !(event instanceof MouseEvent) && from !== to ? editorView.coordsAtPos(to) : null;
 
         if (isVertical) {
           // 縦書き: エディタの一番下に配置
-          const xPos = event instanceof MouseEvent ? event.clientX : (fallbackCoords?.left ?? rect.left + rect.width / 2);
+          const xPos =
+            event instanceof MouseEvent
+              ? event.clientX
+              : (fallbackCoords?.left ?? rect.left + rect.width / 2);
           setPosition({
             bottom: window.innerHeight - rect.bottom + 16,
             left: xPos,
           });
         } else {
           // 横書き: エディタの一番右に配置
-          const yPos = event instanceof MouseEvent ? event.clientY : (fallbackCoords?.top ?? rect.top + rect.height / 2);
+          const yPos =
+            event instanceof MouseEvent
+              ? event.clientY
+              : (fallbackCoords?.top ?? rect.top + rect.height / 2);
           setPosition({
             top: yPos,
             right: window.innerWidth - rect.right + 16,
