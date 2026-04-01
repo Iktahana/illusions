@@ -194,7 +194,7 @@ export function useDockviewAdapter({
   // effect to re-run (which would duplicate addPanel calls).
   const [layoutReadyTick, setLayoutReadyTick] = useState(0);
 
-  const { tabs, activeTabId, switchTab, closeTab, cloneTab } = tabManager;
+  const { tabs, activeTabId, switchTab, closeTab, cloneTab, updateTab } = tabManager;
 
   // -- onReady callback -----------------------------------------------------
 
@@ -539,9 +539,16 @@ export function useDockviewAdapter({
     if (!electronAPI?.editor) return;
 
     const unsubSync = electronAPI.editor.onBufferSync((data) => {
-      // Another window changed a buffer — update if it's our active editor tab
-      const activeTab = tabs.find((t) => t.id === activeTabId);
-      if (data.bufferId === activeTabId && activeTab && isEditorTab(activeTab)) {
+      // Another window changed a buffer — update all matching tabs' state,
+      // and apply to the editor view only for the active tab.
+      for (const tab of tabs) {
+        if (tab.id === data.bufferId && isEditorTab(tab)) {
+          // Update tab state in memory regardless of active/inactive status
+          updateTab(tab.id, { content: data.content });
+        }
+      }
+      // Apply to editor view (ProseMirror) only when the active tab matches
+      if (data.bufferId === activeTabId) {
         tabSetContent(data.content);
       }
     });
@@ -554,7 +561,7 @@ export function useDockviewAdapter({
       if (typeof unsubSync === "function") unsubSync();
       if (typeof unsubClose === "function") unsubClose();
     };
-  }, [activeTabId, tabs, tabSetContent]);
+  }, [activeTabId, tabs, tabSetContent, updateTab]);
 
   // Broadcast content changes to other windows (editor tabs only)
   useEffect(() => {
