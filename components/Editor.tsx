@@ -468,7 +468,7 @@ export default function NovelEditor({
 
         {/* 選択文字数（エディタ基準で配置） */}
         {editorViewInstance && (
-          <SelectionCounter editorView={editorViewInstance} isVertical={isVertical} />
+          <SelectionCounter editorView={editorViewInstance} isVertical={isVertical} containerRef={scrollContainerRef} />
         )}
       </div>
 
