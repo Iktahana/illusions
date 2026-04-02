@@ -300,12 +300,9 @@ export default function MilkdownEditor({
 
   // 1行あたりの文字数制限を、スクロールルートではなく内側の measure box に適用する
   useEffect(() => {
-    const editorContainer = editorRef.current;
     const measureBox = measureBoxRef.current;
-    const milkdownRoot = editorContainer?.querySelector(".milkdown") as HTMLElement | null;
-    const editorDom = editorContainer?.querySelector(
-      ".milkdown .ProseMirror",
-    ) as HTMLElement | null;
+    const editorDom = editorViewInstance?.dom ?? null;
+    const milkdownRoot = editorDom?.closest(".milkdown") as HTMLElement | null;
     if (!measureBox || !milkdownRoot || !editorDom) return;
 
     const prev = prevStyleRef.current;
@@ -401,7 +398,7 @@ export default function MilkdownEditor({
       applyStyles();
       editorDom.style.opacity = "1";
     }
-  }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight]);
+  }, [charsPerLine, editorViewInstance, isVertical, fontFamily, fontScale, lineHeight]);
 
   // Union of all Milkdown command keys used in handleFormat.
   // Each .key property is a branded CmdKey<T> string exported by @milkdown.
