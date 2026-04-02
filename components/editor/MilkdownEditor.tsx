@@ -780,7 +780,7 @@ export default function MilkdownEditor({
         className={clsx(
           "editor-layout-frame flex min-h-full",
           isVertical
-            ? "min-w-full w-max justify-end items-center"
+            ? "min-w-full w-max justify-end items-start"
             : "w-full justify-center items-start",
         )}
       >
