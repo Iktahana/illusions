@@ -668,12 +668,18 @@ export default function MilkdownEditor({
       onClick={handleEditorClick}
       className={clsx(
         "editor-content-area",
-        isVertical ? "py-8 min-h-full min-w-full" : "p-8 min-h-full",
+        isVertical ? "py-8 h-full min-h-full min-w-full" : "p-8 min-h-full",
       )}
       style={{
         fontSize: `${fontScale}%`,
         fontFamily: `"${fontFamily}", serif`,
         lineHeight: lineHeight,
+        ...(isVertical && {
+          width: "max-content",
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+        }),
       }}
     >
       <style jsx>{`
@@ -778,10 +784,10 @@ export default function MilkdownEditor({
       `}</style>
       <div
         className={clsx(
-          "editor-layout-frame flex min-h-full",
+          "editor-layout-frame flex",
           isVertical
-            ? "min-w-full w-max justify-end items-start"
-            : "w-full justify-center items-start",
+            ? "min-w-full w-max justify-end"
+            : "min-h-full w-full justify-center items-start",
         )}
       >
         <div
