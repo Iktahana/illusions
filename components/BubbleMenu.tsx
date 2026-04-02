@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import type { RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Bold,
@@ -15,10 +16,12 @@ import {
   Code,
 } from "lucide-react";
 import clsx from "clsx";
-import type { EditorView } from "@milkdown/prose/view";
+
+import type { EditorSelectionState } from "@/lib/editor-page/use-selection-tracking";
 
 interface BubbleMenuProps {
-  editorView: EditorView | null;
+  selectionState: EditorSelectionState;
+  scrollContainerRef: RefObject<HTMLDivElement | null>;
   onFormat: (format: FormatType, level?: number) => void;
   isVertical?: boolean;
 }
@@ -33,10 +36,13 @@ export type FormatType =
   | "blockquote"
   | "code";
 
-export default function BubbleMenu({ editorView, onFormat, isVertical = false }: BubbleMenuProps) {
+export default function BubbleMenu({
+  selectionState,
+  scrollContainerRef,
+  onFormat,
+  isVertical = false,
+}: BubbleMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const frameRef = useRef<number | null>(null);
-  const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: -9999, left: -9999 });
   const [showHeadingDropdown, setShowHeadingDropdown] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -46,46 +52,30 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
     setMounted(true);
   }, []);
 
-  const updatePosition = useCallback(() => {
-    if (!editorView) return;
-
-    const { state } = editorView;
-    const { selection } = state;
-    const { from, to } = selection;
-
-    if (from === to) {
-      setIsVisible(false);
-      setShowHeadingDropdown(false);
+  useEffect(() => {
+    if (!selectionState.hasSelection) {
+      setPosition({ top: -9999, left: -9999 });
       return;
     }
 
-    setIsVisible(true);
-
     const menuEl = menuRef.current;
     if (!menuEl) return;
+    const startCoords = selectionState.startCoords;
+    if (!startCoords) return;
+
     const menuWidth = menuEl.offsetWidth;
     const menuHeight = menuEl.offsetHeight;
     const gap = 8;
-
-    // coordsAtPos returns viewport-relative coordinates
-    const startCoords = editorView.coordsAtPos(from);
-
-    // Clamp within the scroll container bounds
-    const scrollContainer = editorView.dom.closest(
-      ".bg-background-secondary",
-    ) as HTMLElement | null;
-    const bounds = scrollContainer
-      ? scrollContainer.getBoundingClientRect()
+    const bounds = scrollContainerRef.current
+      ? scrollContainerRef.current.getBoundingClientRect()
       : { left: 0, right: window.innerWidth, top: 0, bottom: window.innerHeight };
-
     const clampX = (x: number): number =>
       Math.max(bounds.left, Math.min(bounds.right - menuWidth, x));
     const clampY = (y: number): number =>
       Math.max(bounds.top, Math.min(bounds.bottom - menuHeight, y));
 
     if (isVertical) {
-      // Vertical mode: place to the LEFT of the selection to avoid blocking text
-      const endCoords = editorView.coordsAtPos(to);
+      const endCoords = selectionState.endCoords ?? startCoords;
       const selLeft = Math.min(startCoords.left, endCoords.left);
       setPosition({
         left: clampX(selLeft - menuWidth - gap),
@@ -99,35 +89,13 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
       left: clampX(startCoords.left),
       top: clampY(startCoords.top - menuHeight - gap),
     });
-  }, [editorView, isVertical]);
-
-  const scheduleUpdatePosition = useCallback(() => {
-    if (frameRef.current !== null) return;
-    frameRef.current = requestAnimationFrame(() => {
-      frameRef.current = null;
-      updatePosition();
-    });
-  }, [updatePosition]);
-
-  useEffect(() => {
-    if (!editorView) return;
-
-    document.addEventListener("selectionchange", scheduleUpdatePosition);
-    editorView.dom.addEventListener("mouseup", scheduleUpdatePosition);
-    editorView.dom.addEventListener("keyup", scheduleUpdatePosition);
-    window.addEventListener("resize", scheduleUpdatePosition);
-
-    return () => {
-      document.removeEventListener("selectionchange", scheduleUpdatePosition);
-      editorView.dom.removeEventListener("mouseup", scheduleUpdatePosition);
-      editorView.dom.removeEventListener("keyup", scheduleUpdatePosition);
-      window.removeEventListener("resize", scheduleUpdatePosition);
-      if (frameRef.current !== null) {
-        cancelAnimationFrame(frameRef.current);
-        frameRef.current = null;
-      }
-    };
-  }, [editorView, scheduleUpdatePosition]);
+  }, [
+    isVertical,
+    scrollContainerRef,
+    selectionState.endCoords,
+    selectionState.hasSelection,
+    selectionState.startCoords,
+  ]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -166,7 +134,7 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
       className={clsx(
         "fixed z-50 bg-background-elevated rounded-lg shadow-lg border border-border flex gap-1 p-1 transition-opacity duration-100",
         isVertical ? "flex-col items-center" : "items-center",
-        isVisible ? "opacity-100" : "opacity-0 pointer-events-none",
+        selectionState.hasSelection ? "opacity-100" : "opacity-0 pointer-events-none",
       )}
       style={{
         top: `${position.top}px`,
@@ -186,7 +154,7 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
           <Heading1 className="w-4 h-4 text-foreground-secondary" />
         </button>
 
-        {showHeadingDropdown && (
+        {showHeadingDropdown && selectionState.hasSelection && (
           <div
             className={clsx(
               "absolute bg-background-elevated rounded-lg shadow-lg border border-border py-1 min-w-[120px]",

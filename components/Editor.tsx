@@ -12,6 +12,7 @@ import SelectionCounter from "./SelectionCounter";
 import EditorToolbar from "./editor/EditorToolbar";
 import MilkdownEditor from "./editor/MilkdownEditor";
 import { buildSegments, buildSpeechChunks, buildSpeechMap } from "@/lib/hooks/speech-utils";
+import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
 import { useTypographySettings, useSpeechSettings } from "@/contexts/EditorSettingsContext";
@@ -98,21 +99,14 @@ export default function NovelEditor({
   });
   const editorViewRef = useRef<EditorView | null>(null);
   const speechMapRef = useRef<{ text: string; positions: number[] } | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const isPointerSelectingRef = useRef(false);
-  const isSelectionScrollLockedRef = useRef(false);
-  const clearPointerSelectionFrameRef = useRef<number | null>(null);
-  const unlockScrollLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const unlockDeadlineRef = useRef(0);
-  const lockedScrollPosRef = useRef<{ left: number; top: number } | null>(null);
-  const restoringLockedScrollRef = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null);
   /** Doc position to resume TTS from after the current chunk ends. null = no continuation. */
   const speechContinuationPosRef = useRef<number | null>(null);
   /** Stable ref to startSpeechFromPos, allowing onEnd to recurse without circular deps. */
   const startSpeechFromPosRef = useRef<((pos: number) => void) | null>(null);
   /** Max doc-position range processed per TTS chunk (~5 000 Japanese chars). */
   const MAX_SPEECH_CHUNK_RANGE = 10_000;
-  const SELECTION_SCROLL_UNLOCK_DELAY_MS = 500;
 
   /** Cache for DOM character-width measurement (invalidated when font settings change) */
   const charSizeCacheRef = useRef<{
@@ -121,6 +115,15 @@ export default function NovelEditor({
     lineHeight: number;
     size: number;
   } | null>(null);
+  const selectionState = useSelectionTracking({
+    editorViewInstance,
+    scrollContainerRef,
+    onSelectionChange,
+  });
+  const handleScrollContainerRef = useCallback((node: HTMLDivElement | null) => {
+    scrollContainerRef.current = node;
+    setScrollContainerElement(node);
+  }, []);
 
   useEffect(() => {
     setIsMounted(true);
@@ -269,131 +272,11 @@ export default function NovelEditor({
 
   useEffect(() => {
     const container = scrollContainerRef.current;
-    const editorDom = editorViewInstance?.dom;
-    if (!container || !editorDom) return;
-
-    const clearScrollLock = () => {
-      unlockDeadlineRef.current = 0;
-      isSelectionScrollLockedRef.current = false;
-      if (!isPointerSelectingRef.current) {
-        lockedScrollPosRef.current = null;
-      }
-      if (unlockScrollLockTimerRef.current !== null) {
-        clearTimeout(unlockScrollLockTimerRef.current);
-        unlockScrollLockTimerRef.current = null;
-      }
-    };
-
-    const activatePostSelectionGuard = () => {
-      unlockDeadlineRef.current = Date.now() + SELECTION_SCROLL_UNLOCK_DELAY_MS;
-      isSelectionScrollLockedRef.current = true;
-      lockedScrollPosRef.current ??= {
-        left: container.scrollLeft,
-        top: container.scrollTop,
-      };
-      if (unlockScrollLockTimerRef.current !== null) {
-        clearTimeout(unlockScrollLockTimerRef.current);
-      }
-      unlockScrollLockTimerRef.current = setTimeout(() => {
-        unlockScrollLockTimerRef.current = null;
-        if (!isPointerSelectingRef.current) {
-          clearScrollLock();
-        }
-      }, SELECTION_SCROLL_UNLOCK_DELAY_MS);
-    };
-
-    const handleEditorMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return;
-      if (clearPointerSelectionFrameRef.current !== null) {
-        cancelAnimationFrame(clearPointerSelectionFrameRef.current);
-        clearPointerSelectionFrameRef.current = null;
-      }
-      clearScrollLock();
-      isPointerSelectingRef.current = true;
-      lockedScrollPosRef.current = {
-        left: container.scrollLeft,
-        top: container.scrollTop,
-      };
-    };
-
-    const clearPointerSelection = () => {
-      if (clearPointerSelectionFrameRef.current !== null) {
-        cancelAnimationFrame(clearPointerSelectionFrameRef.current);
-      }
-      clearPointerSelectionFrameRef.current = requestAnimationFrame(() => {
-        isPointerSelectingRef.current = false;
-        activatePostSelectionGuard();
-        clearPointerSelectionFrameRef.current = null;
-      });
-    };
-
-    const handleContainerMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return;
-      const target = e.target;
-      if (!(target instanceof Node)) return;
-      if (!editorDom.contains(target)) {
-        clearScrollLock();
-      }
-    };
-
-    const handleUserWheelIntent = () => {
-      if (!isPointerSelectingRef.current && unlockDeadlineRef.current > Date.now()) {
-        clearScrollLock();
-      }
-    };
-
-    const handleScroll = () => {
-      const locked = lockedScrollPosRef.current;
-      if (
-        (!isPointerSelectingRef.current && unlockDeadlineRef.current <= Date.now()) ||
-        !locked ||
-        restoringLockedScrollRef.current
-      ) {
-        return;
-      }
-      if (container.scrollLeft === locked.left && container.scrollTop === locked.top) {
-        return;
-      }
-      restoringLockedScrollRef.current = true;
-      container.scrollTo({
-        left: locked.left,
-        top: locked.top,
-        behavior: "instant",
-      });
-      restoringLockedScrollRef.current = false;
-    };
-
-    editorDom.addEventListener("mousedown", handleEditorMouseDown);
-    container.addEventListener("mousedown", handleContainerMouseDown);
-    container.addEventListener("wheel", handleUserWheelIntent, { passive: true });
-    container.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("mouseup", clearPointerSelection);
-    window.addEventListener("dragend", clearPointerSelection);
-    window.addEventListener("blur", clearPointerSelection);
-
-    return () => {
-      editorDom.removeEventListener("mousedown", handleEditorMouseDown);
-      container.removeEventListener("mousedown", handleContainerMouseDown);
-      container.removeEventListener("wheel", handleUserWheelIntent);
-      container.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("mouseup", clearPointerSelection);
-      window.removeEventListener("dragend", clearPointerSelection);
-      window.removeEventListener("blur", clearPointerSelection);
-      if (clearPointerSelectionFrameRef.current !== null) {
-        cancelAnimationFrame(clearPointerSelectionFrameRef.current);
-        clearPointerSelectionFrameRef.current = null;
-      }
-      clearScrollLock();
-    };
-  }, [SELECTION_SCROLL_UNLOCK_DELAY_MS, editorViewInstance]);
-
-  useEffect(() => {
-    const container = scrollContainerRef.current;
     if (!container || !isVertical) return;
 
     const handleWheel = (e: WheelEvent) => {
       if (e.deltaX !== 0 || e.deltaY === 0) return;
-      if (isPointerSelectingRef.current || (e.buttons & 1) === 1) return;
+      if ((e.buttons & 1) === 1) return;
       e.preventDefault();
       container.scrollBy({ left: -e.deltaY, behavior: "instant" });
     };
@@ -523,7 +406,7 @@ export default function NovelEditor({
 
       {/* エディタ領域 */}
       <div
-        ref={scrollContainerRef}
+        ref={handleScrollContainerRef}
         className="flex-1 bg-background-secondary relative min-h-0 pt-12"
         style={{
           overflowX: isVertical ? "auto" : "hidden",
@@ -542,10 +425,9 @@ export default function NovelEditor({
               initialContent={initialContent}
               onChange={onChange}
               onInsertText={onInsertText}
-              onSelectionChange={onSelectionChange}
+              selectionState={selectionState}
               isVertical={isVertical}
               scrollContainerRef={scrollContainerRef}
-              pointerSelectionStateRef={isPointerSelectingRef}
               overrideCharsPerLine={effectiveCharsPerLine}
               onEditorViewReady={(view) => {
                 setEditorViewInstance(view);
@@ -573,9 +455,9 @@ export default function NovelEditor({
       {/* 選択文字数（エディタ外枠基準で配置） */}
       {editorViewInstance && (
         <SelectionCounter
-          editorView={editorViewInstance}
+          selectionState={selectionState}
           isVertical={isVertical}
-          containerRef={scrollContainerRef}
+          containerElement={scrollContainerElement}
         />
       )}
 

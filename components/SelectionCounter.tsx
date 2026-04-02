@@ -1,164 +1,77 @@
 "use client";
 
-import type { RefObject } from "react";
-import { useEffect, useState } from "react";
-import { EditorView } from "@milkdown/prose/view";
+import type { CSSProperties } from "react";
+import { useMemo } from "react";
+
+import type { EditorSelectionState } from "@/lib/editor-page/use-selection-tracking";
 
 interface SelectionCounterProps {
-  editorView: EditorView;
+  selectionState: EditorSelectionState;
   isVertical?: boolean;
-  containerRef: RefObject<HTMLDivElement | null>;
+  containerElement: HTMLDivElement | null;
 }
 
-/**
- * 選択文字数バッジ。
- *
- * Editor の外枠 wrapper（position: relative）の子として描画し、
- * position: absolute で配置する。
- *
- * - 横書き: 外枠の右端に貼り付け、Y はマウスカーソル位置に合わせる
- * - 縦書き: 外枠の下端に貼り付け、X はセレクション右端列に合わせる
- */
 export default function SelectionCounter({
-  editorView,
+  selectionState,
   isVertical = false,
-  containerRef,
+  containerElement,
 }: SelectionCounterProps) {
-  const [selectionCount, setSelectionCount] = useState<number>(0);
-  const [isVisible, setIsVisible] = useState<boolean>(false);
-  const [style, setStyle] = useState<React.CSSProperties>({});
+  const isVisible = selectionState.hasSelection && selectionState.selectionCount > 0;
+  const displayCount = isVisible ? selectionState.selectionCount : 0;
 
-  useEffect(() => {
-    if (!editorView) return;
+  const style = useMemo<CSSProperties | null>(() => {
+    const wrapper = containerElement?.parentElement;
+    if (!containerElement || !wrapper) return null;
 
-    const lastPointerYRef = { current: null as number | null };
-    const frameRef = { current: null as number | null };
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const padding = 16;
 
-    const updateSelectionCount = (pointerY?: number | null) => {
-      const { state } = editorView;
-      const { selection } = state;
-      const { from, to } = selection;
+    if (isVertical) {
+      const startRight = selectionState.startCoords?.right ?? selectionState.rangeRect?.right;
+      const endRight = selectionState.endCoords?.right ?? selectionState.rangeRect?.right;
+      const xRight = Math.max(
+        startRight ?? wrapperRect.right - padding,
+        endRight ?? wrapperRect.right - padding,
+      );
+      const relativeX = Math.max(
+        padding,
+        Math.min(wrapperRect.width - padding, xRight - wrapperRect.left),
+      );
 
-      // 位置を計算する
-      // 親要素（Editor 外枠 wrapper, position: relative）を基準にする
-      const container = containerRef.current;
-      const wrapper = container?.parentElement;
-      if (wrapper) {
-        const wrapperRect = wrapper.getBoundingClientRect();
-        const padding = 16;
+      return {
+        position: "absolute",
+        bottom: padding,
+        left: relativeX,
+        transform: "translateX(-100%)",
+      };
+    }
 
-        // キーボード選択時は選択末尾の座標をフォールバックに使う
-        const fallbackCoords =
-          !(event instanceof MouseEvent) && from !== to ? editorView.coordsAtPos(to) : null;
+    const fallbackY = selectionState.endCoords?.top ?? selectionState.rangeRect?.top;
+    const cursorY =
+      typeof selectionState.pointerClientY === "number"
+        ? selectionState.pointerClientY
+        : (fallbackY ?? wrapperRect.top + wrapperRect.height / 2);
+    const relativeY = Math.max(
+      padding,
+      Math.min(wrapperRect.height - padding, cursorY - wrapperRect.top),
+    );
 
-        if (isVertical) {
-          // 縦書き: 外枠の下端に固定、X はセレクション右端列に合わせる
-          let xRight = wrapperRect.right - padding;
-          if (from !== to) {
-            try {
-              const startCoords = editorView.coordsAtPos(from);
-              const endCoords = editorView.coordsAtPos(to);
-              xRight = Math.max(startCoords.right, endCoords.right);
-            } catch {
-              xRight = fallbackCoords?.right ?? xRight;
-            }
-          }
-          // viewport 座標を wrapper 相対に変換
-          const relativeX = Math.max(
-            padding,
-            Math.min(wrapperRect.width - padding, xRight - wrapperRect.left),
-          );
-          setStyle({
-            position: "absolute",
-            bottom: padding,
-            left: relativeX,
-            transform: "translateX(-100%)",
-          });
-        } else {
-          // 横書き: 外枠の右端に貼り付け、Y はマウス位置に合わせる
-          let cursorY: number;
-          if (typeof pointerY === "number") {
-            cursorY = pointerY;
-          } else if (fallbackCoords) {
-            cursorY = fallbackCoords.top;
-          } else {
-            cursorY = wrapperRect.top + wrapperRect.height / 2;
-          }
-          // viewport 座標を wrapper 相対に変換し、wrapper 内にクランプ
-          const relativeY = Math.max(
-            padding,
-            Math.min(wrapperRect.height - padding, cursorY - wrapperRect.top),
-          );
-          setStyle({
-            position: "absolute",
-            top: relativeY,
-            right: padding,
-            transform: "translateY(-50%)",
-          });
-        }
-      }
-
-      // 選択がない場合は非表示
-      if (from === to) {
-        setIsVisible(false);
-        setTimeout(() => setSelectionCount(0), 300);
-        return;
-      }
-
-      const selectedText = state.doc.textBetween(from, to);
-      const count = selectedText.replace(/\s/g, "").length;
-      setSelectionCount(count);
-      setIsVisible(true);
+    return {
+      position: "absolute",
+      top: relativeY,
+      right: padding,
+      transform: "translateY(-50%)",
     };
+  }, [
+    containerElement,
+    isVertical,
+    selectionState.endCoords,
+    selectionState.pointerClientY,
+    selectionState.rangeRect,
+    selectionState.startCoords,
+  ]);
 
-    const scheduleUpdate = (pointerY?: number | null) => {
-      if (typeof pointerY === "number") {
-        lastPointerYRef.current = pointerY;
-      }
-      if (frameRef.current !== null) return;
-      frameRef.current = requestAnimationFrame(() => {
-        frameRef.current = null;
-        updateSelectionCount(lastPointerYRef.current);
-      });
-    };
-
-    const editorDom = editorView.dom;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      lastPointerYRef.current = e.clientY;
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      scheduleUpdate(e.clientY);
-    };
-
-    const handleKeyUp = () => {
-      scheduleUpdate();
-    };
-
-    const handleSelectionChange = () => {
-      scheduleUpdate();
-    };
-
-    editorDom.addEventListener("mousemove", handleMouseMove);
-    editorDom.addEventListener("mouseup", handleMouseUp);
-    editorDom.addEventListener("keyup", handleKeyUp);
-    document.addEventListener("selectionchange", handleSelectionChange);
-
-    updateSelectionCount(lastPointerYRef.current);
-
-    return () => {
-      editorDom.removeEventListener("mousemove", handleMouseMove);
-      editorDom.removeEventListener("mouseup", handleMouseUp);
-      editorDom.removeEventListener("keyup", handleKeyUp);
-      document.removeEventListener("selectionchange", handleSelectionChange);
-      if (frameRef.current !== null) {
-        cancelAnimationFrame(frameRef.current);
-      }
-    };
-  }, [editorView, isVertical, containerRef]);
-
-  if (selectionCount === 0 && !isVisible) {
+  if (!isVisible || displayCount === 0 || !style) {
     return null;
   }
 
@@ -169,7 +82,7 @@ export default function SelectionCounter({
       }`}
       style={style}
     >
-      <span className="font-semibold">{selectionCount}</span>
+      <span className="font-semibold">{displayCount}</span>
       <span className="ml-1">文字</span>
     </div>
   );

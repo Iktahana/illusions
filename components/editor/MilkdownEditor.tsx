@@ -1,6 +1,6 @@
 "use client";
 
-import { MutableRefObject, RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import {
@@ -29,7 +29,7 @@ import { $prose, replaceAll } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "../BubbleMenu";
 import { searchHighlightPlugin } from "@/lib/editor-page/search-highlight-plugin";
 import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin";
-import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
+import type { EditorSelectionState } from "@/lib/editor-page/use-selection-tracking";
 import EditorContextMenu, { type ContextMenuAction } from "../EditorContextMenu";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
@@ -43,10 +43,9 @@ interface MilkdownEditorProps {
   initialContent: string;
   onChange?: (content: string) => void;
   onInsertText?: (text: string) => void;
-  onSelectionChange?: (charCount: number) => void;
+  selectionState: EditorSelectionState;
   isVertical: boolean;
   scrollContainerRef: RefObject<HTMLDivElement>;
-  pointerSelectionStateRef: MutableRefObject<boolean>;
   onEditorViewReady?: (view: EditorView) => void;
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[]) => void;
@@ -73,10 +72,9 @@ export default function MilkdownEditor({
   initialContent,
   onChange,
   onInsertText,
-  onSelectionChange,
+  selectionState,
   isVertical,
   scrollContainerRef,
-  pointerSelectionStateRef,
   onEditorViewReady,
   lintingRuleRunner,
   onLintIssuesUpdated,
@@ -108,6 +106,7 @@ export default function MilkdownEditor({
   const { posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes } =
     usePosHighlightSettings();
   const editorRef = useRef<HTMLDivElement>(null);
+  const measureBoxRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const [lintIssueAtCursor, setLintIssueAtCursor] = useState<LintIssue | null>(null);
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
@@ -179,7 +178,7 @@ export default function MilkdownEditor({
               new Plugin({
                 props: {
                   handleScrollToSelection(view) {
-                    return pointerSelectionStateRef.current || !view.state.selection.empty;
+                    return !view.state.selection.empty;
                   },
                 },
               }),
@@ -206,7 +205,7 @@ export default function MilkdownEditor({
 
       return editor;
     },
-    [isVertical, mdiExtensionsEnabled, gfmEnabled, pointerSelectionStateRef],
+    [isVertical, mdiExtensionsEnabled, gfmEnabled],
   );
 
   // EditorView インスタンスを取得する
@@ -295,21 +294,19 @@ export default function MilkdownEditor({
       });
   }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
 
-  // 選択文字数の追跡
-  const { hasSelection } = useSelectionTracking({
-    editorViewInstance,
-    onSelectionChange: onSelectionChange,
-  });
-
   // 不要なアニメーションを避けるため、直前のスタイル値を保持する
   const prevStyleRef = useRef({ charsPerLine, isVertical, fontFamily, fontScale, lineHeight });
   const isFirstRenderRef = useRef(true);
 
-  // 1行あたりの文字数制限を、実測値を使って適用する
+  // 1行あたりの文字数制限を、スクロールルートではなく内側の measure box に適用する
   useEffect(() => {
     const editorContainer = editorRef.current;
-    const editorDom = editorContainer?.querySelector(".milkdown .ProseMirror") as HTMLElement;
-    if (!editorDom) return;
+    const measureBox = measureBoxRef.current;
+    const milkdownRoot = editorContainer?.querySelector(".milkdown") as HTMLElement | null;
+    const editorDom = editorContainer?.querySelector(
+      ".milkdown .ProseMirror",
+    ) as HTMLElement | null;
+    if (!measureBox || !milkdownRoot || !editorDom) return;
 
     const prev = prevStyleRef.current;
     const styleChanged =
@@ -328,29 +325,34 @@ export default function MilkdownEditor({
     isFirstRenderRef.current = false;
 
     const applyStyles = () => {
-      // writing-mode class toggle (atomic with style application)
       editorDom.classList.remove("milkdown-japanese-vertical", "milkdown-japanese-horizontal");
       editorDom.classList.add(
         isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal",
       );
 
-      // まずスタイルをリセット
-      editorDom.style.width = "";
-      editorDom.style.maxWidth = "";
-      editorDom.style.height = "";
+      measureBox.style.width = "";
+      measureBox.style.maxWidth = "";
+      measureBox.style.height = "";
+      measureBox.style.maxHeight = "";
+      measureBox.style.minHeight = "";
+      measureBox.style.minWidth = "";
+      measureBox.style.margin = "";
+
+      milkdownRoot.style.width = isVertical ? "max-content" : "100%";
+      milkdownRoot.style.maxWidth = isVertical ? "" : "100%";
+      milkdownRoot.style.height = isVertical && charsPerLine > 0 ? "100%" : "";
+      milkdownRoot.style.maxHeight = "";
+      milkdownRoot.style.minHeight = isVertical && charsPerLine > 0 ? "100%" : "";
+
+      editorDom.style.width = isVertical ? "max-content" : "100%";
+      editorDom.style.maxWidth = isVertical ? "" : "100%";
+      editorDom.style.height = isVertical && charsPerLine > 0 ? "100%" : "";
       editorDom.style.maxHeight = "";
-      editorDom.style.minHeight = "";
+      editorDom.style.minHeight = isVertical && charsPerLine > 0 ? "100%" : "";
       editorDom.style.minWidth = "";
       editorDom.style.margin = "";
 
-      // 既存のスペーサーを削除
-      const existingSpacer = editorContainer?.querySelector(".vertical-spacer");
-      if (existingSpacer) {
-        existingSpacer.remove();
-      }
-
       if (charsPerLine > 0) {
-        // 実際の文字サイズを測るための要素を作る
         const measureEl = document.createElement("span");
         measureEl.style.cssText = `
           position: absolute;
@@ -360,48 +362,32 @@ export default function MilkdownEditor({
           font-size: ${fontScale}%;
           line-height: ${lineHeight};
         `;
-        measureEl.textContent = "国"; // 全角文字で測定
+        measureEl.textContent = "国";
         document.body.appendChild(measureEl);
 
-        // 和文の全角文字は概ね正方形に近い
         const charSize = measureEl.offsetWidth;
         document.body.removeChild(measureEl);
 
-        // 計算したサイズをエディタへ適用
         if (isVertical) {
-          // 縦書き: 高さを制限（1列あたりの文字数）
-          // 高さ計算の誤差を修正: 1文字分を減算
-          const targetHeight = charSize * (charsPerLine - 1);
-          editorDom.style.height = `${targetHeight}px`;
-          editorDom.style.maxHeight = `${targetHeight}px`;
-          editorDom.style.minHeight = `${targetHeight}px`;
+          const targetHeight = charSize * Math.max(charsPerLine - 1, 1);
+          measureBox.style.height = `${targetHeight}px`;
+          measureBox.style.maxHeight = `${targetHeight}px`;
+          measureBox.style.minHeight = `${targetHeight}px`;
         } else {
-          // 横書き: 幅を制限（1行あたりの文字数）し、中央寄せ
           const targetWidth = charSize * charsPerLine;
-          editorDom.style.width = `${targetWidth}px`;
-          editorDom.style.maxWidth = `${targetWidth}px`;
-          editorDom.style.margin = "0 auto"; // 中央寄せ
+          measureBox.style.width = `${targetWidth}px`;
+          measureBox.style.maxWidth = `${targetWidth}px`;
         }
       }
-
-      // Wait one frame for layout to stabilize after writing-mode/size changes
-      requestAnimationFrame(() => {
-        onLayoutCompleteCallback?.();
-      });
     };
 
-    let onLayoutCompleteCallback: (() => void) | null = null;
-
     if (shouldAnimate) {
-      // 変更前にフェードアウト
       editorDom.style.transition = "opacity 0.15s ease-out";
       editorDom.style.opacity = "0";
 
-      // DOMの準備とフェードアウト完了を待って適用
       const timer = setTimeout(() => {
-        applyStyles(); // applyStyles will call onLayoutCompleteCallback after layout completes
+        applyStyles();
 
-        // 適用後にフェードイン
         requestAnimationFrame(() => {
           editorDom.style.transition = "opacity 0.25s ease-in";
           editorDom.style.opacity = "1";
@@ -410,14 +396,12 @@ export default function MilkdownEditor({
 
       return () => {
         clearTimeout(timer);
-        onLayoutCompleteCallback = null;
       };
     } else {
-      // アニメーションなしで即時適用
-      applyStyles(); // applyStyles will call onLayoutCompleteCallback after layout completes
+      applyStyles();
       editorDom.style.opacity = "1";
     }
-  }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight, scrollContainerRef, get]);
+  }, [charsPerLine, isVertical, fontFamily, fontScale, lineHeight]);
 
   // Union of all Milkdown command keys used in handleFormat.
   // Each .key property is a branded CmdKey<T> string exported by @milkdown.
@@ -620,7 +604,7 @@ export default function MilkdownEditor({
               { label: "-", action: "_separator" },
             ]
           : []),
-        ...(hasSelection
+        ...(selectionState.hasSelection
           ? [
               { label: "切り取り", action: "cut", accelerator: "CmdOrCtrl+X" },
               { label: "コピー", action: "copy", accelerator: "CmdOrCtrl+C" },
@@ -633,7 +617,7 @@ export default function MilkdownEditor({
           accelerator: "Shift+CmdOrCtrl+V",
         },
         { label: "-", action: "_separator" },
-        ...(hasSelection && mdiExtensionsEnabled
+        ...(selectionState.hasSelection && mdiExtensionsEnabled
           ? [
               { label: "ルビ", action: "ruby", accelerator: "Shift+CmdOrCtrl+R" },
               { label: "縦中横", action: "tcy", accelerator: "Shift+CmdOrCtrl+T" },
@@ -641,7 +625,7 @@ export default function MilkdownEditor({
             ]
           : []),
         { label: "検索", action: "find", accelerator: "CmdOrCtrl+F" },
-        ...(hasSelection
+        ...(selectionState.hasSelection
           ? [
               { label: "Googleで検索", action: "google-search" },
               { label: "辞書で調べる", action: "dictionary" },
@@ -655,7 +639,12 @@ export default function MilkdownEditor({
       const action = await window.electronAPI?.showContextMenu?.(items);
       if (action) handleContextMenuAction(action as ContextMenuAction);
     },
-    [hasSelection, handleContextMenuAction, mdiExtensionsEnabled, getLintIssueAtCoords],
+    [
+      getLintIssueAtCoords,
+      handleContextMenuAction,
+      mdiExtensionsEnabled,
+      selectionState.hasSelection,
+    ],
   );
 
   // Left-click on lint decoration → auto-switch to corrections tab
@@ -674,19 +663,14 @@ export default function MilkdownEditor({
     <div
       ref={editorRef}
       onClick={handleEditorClick}
-      className={clsx("editor-content-area", isVertical ? "py-8" : "p-8 mx-auto")}
+      className={clsx(
+        "editor-content-area",
+        isVertical ? "py-8 min-h-full min-w-full" : "p-8 min-h-full",
+      )}
       style={{
         fontSize: `${fontScale}%`,
         fontFamily: `"${fontFamily}", serif`,
         lineHeight: lineHeight,
-        ...(isVertical && {
-          minHeight: "100%",
-          minWidth: "100%",
-          width: "max-content",
-          display: "flex",
-          justifyContent: "flex-end",
-          alignItems: "center",
-        }),
       }}
     >
       <style jsx>{`
@@ -765,11 +749,45 @@ export default function MilkdownEditor({
       `}</style>
       <style jsx global>{`
         /* 初期表示は透明にし、レイアウト確定後にJSでフェードインする */
+        .editor-content-area .editor-measure-box {
+          position: relative;
+        }
+        .editor-content-area .editor-measure-box > .milkdown {
+          width: 100%;
+          max-width: 100%;
+        }
+        .editor-content-area
+          .editor-measure-box
+          > .milkdown
+          .ProseMirror.milkdown-japanese-horizontal {
+          width: 100%;
+          max-width: 100%;
+        }
+        .editor-content-area
+          .editor-measure-box
+          > .milkdown
+          .ProseMirror.milkdown-japanese-vertical {
+          min-height: 100%;
+        }
         .editor-content-area .milkdown .ProseMirror {
           opacity: 0;
         }
       `}</style>
-      <Milkdown />
+      <div
+        className={clsx(
+          "editor-layout-frame flex min-h-full",
+          isVertical
+            ? "min-w-full w-max justify-end items-center"
+            : "w-full justify-center items-start",
+        )}
+      >
+        <div
+          ref={measureBoxRef}
+          className={clsx("editor-measure-box shrink-0", !isVertical && "w-full max-w-full")}
+        >
+          <Milkdown />
+        </div>
+      </div>
     </div>
   );
 
@@ -779,7 +797,7 @@ export default function MilkdownEditor({
       {!isElectron ? (
         <EditorContextMenu
           onAction={handleContextMenuAction}
-          hasSelection={hasSelection}
+          hasSelection={selectionState.hasSelection}
           lintIssueAtCursor={lintIssueAtCursor}
           onContextMenuOpen={(e) =>
             setLintIssueAtCursor(getLintIssueAtCoords(e.clientX, e.clientY))
@@ -794,7 +812,8 @@ export default function MilkdownEditor({
       )}
       {editorViewInstance && (
         <BubbleMenu
-          editorView={editorViewInstance}
+          selectionState={selectionState}
+          scrollContainerRef={scrollContainerRef}
           onFormat={handleFormat}
           isVertical={isVertical}
         />
