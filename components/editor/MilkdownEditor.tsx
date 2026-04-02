@@ -337,15 +337,15 @@ export default function MilkdownEditor({
 
       milkdownRoot.style.width = isVertical ? "max-content" : "100%";
       milkdownRoot.style.maxWidth = isVertical ? "" : "100%";
-      milkdownRoot.style.height = isVertical && charsPerLine > 0 ? "100%" : "";
+      milkdownRoot.style.height = "";
       milkdownRoot.style.maxHeight = "";
-      milkdownRoot.style.minHeight = isVertical && charsPerLine > 0 ? "100%" : "";
+      milkdownRoot.style.minHeight = "";
 
       editorDom.style.width = isVertical ? "max-content" : "100%";
       editorDom.style.maxWidth = isVertical ? "" : "100%";
-      editorDom.style.height = isVertical && charsPerLine > 0 ? "100%" : "";
+      editorDom.style.height = "";
       editorDom.style.maxHeight = "";
-      editorDom.style.minHeight = isVertical && charsPerLine > 0 ? "100%" : "";
+      editorDom.style.minHeight = "";
       editorDom.style.minWidth = "";
       editorDom.style.margin = "";
 
@@ -370,6 +370,12 @@ export default function MilkdownEditor({
           measureBox.style.height = `${targetHeight}px`;
           measureBox.style.maxHeight = `${targetHeight}px`;
           measureBox.style.minHeight = `${targetHeight}px`;
+          milkdownRoot.style.height = `${targetHeight}px`;
+          milkdownRoot.style.maxHeight = `${targetHeight}px`;
+          milkdownRoot.style.minHeight = `${targetHeight}px`;
+          editorDom.style.height = `${targetHeight}px`;
+          editorDom.style.maxHeight = `${targetHeight}px`;
+          editorDom.style.minHeight = `${targetHeight}px`;
         } else {
           const targetWidth = charSize * charsPerLine;
           measureBox.style.width = `${targetWidth}px`;
