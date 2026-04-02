@@ -18,7 +18,7 @@ interface UseSelectionTrackingResult {
  * Tracks the editor's text selection and reports the selected character count.
  *
  * Attaches mouseup/keyup/selectionchange listeners to the ProseMirror DOM and
- * debounces updates by 10 ms to avoid excessive re-renders during rapid key events.
+ * batches updates to the next animation frame to avoid excessive re-renders.
  */
 export function useSelectionTracking({
   editorViewInstance,
@@ -53,16 +53,16 @@ export function useSelectionTracking({
     onSelectionChangeRef.current?.(count);
   }, [editorViewInstance]);
 
-  // 選択変更のスケジューリング（10ms デバウンス、前回のタイマーをキャンセル）
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 選択変更のスケジューリング（同一フレーム内の重複更新を抑制）
+  const frameRef = useRef<number | null>(null);
   const scheduleUpdate = useCallback(() => {
-    if (debounceTimerRef.current !== null) {
-      clearTimeout(debounceTimerRef.current);
+    if (frameRef.current !== null) {
+      return;
     }
-    debounceTimerRef.current = setTimeout(() => {
-      debounceTimerRef.current = null;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
       updateSelectionCount();
-    }, 10);
+    });
   }, [updateSelectionCount]);
 
   // 選択範囲の変更を追跡する
@@ -76,18 +76,18 @@ export function useSelectionTracking({
     document.addEventListener("selectionchange", scheduleUpdate);
 
     // 初期値
-    updateSelectionCount();
+    scheduleUpdate();
 
     return () => {
       editorDom.removeEventListener("mouseup", scheduleUpdate);
       editorDom.removeEventListener("keyup", scheduleUpdate);
       document.removeEventListener("selectionchange", scheduleUpdate);
-      if (debounceTimerRef.current !== null) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
       }
     };
-  }, [editorViewInstance, scheduleUpdate, updateSelectionCount]);
+  }, [editorViewInstance, scheduleUpdate]);
 
   return { hasSelection };
 }

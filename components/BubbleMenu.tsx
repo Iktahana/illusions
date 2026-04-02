@@ -35,6 +35,7 @@ export type FormatType =
 
 export default function BubbleMenu({ editorView, onFormat, isVertical = false }: BubbleMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<number | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: -9999, left: -9999 });
   const [showHeadingDropdown, setShowHeadingDropdown] = useState(false);
@@ -100,21 +101,33 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
     });
   }, [editorView, isVertical]);
 
+  const scheduleUpdatePosition = useCallback(() => {
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      updatePosition();
+    });
+  }, [updatePosition]);
+
   useEffect(() => {
     if (!editorView) return;
 
-    document.addEventListener("selectionchange", updatePosition);
-    editorView.dom.addEventListener("mouseup", updatePosition);
-    editorView.dom.addEventListener("keyup", updatePosition);
-    window.addEventListener("resize", updatePosition);
+    document.addEventListener("selectionchange", scheduleUpdatePosition);
+    editorView.dom.addEventListener("mouseup", scheduleUpdatePosition);
+    editorView.dom.addEventListener("keyup", scheduleUpdatePosition);
+    window.addEventListener("resize", scheduleUpdatePosition);
 
     return () => {
-      document.removeEventListener("selectionchange", updatePosition);
-      editorView.dom.removeEventListener("mouseup", updatePosition);
-      editorView.dom.removeEventListener("keyup", updatePosition);
-      window.removeEventListener("resize", updatePosition);
+      document.removeEventListener("selectionchange", scheduleUpdatePosition);
+      editorView.dom.removeEventListener("mouseup", scheduleUpdatePosition);
+      editorView.dom.removeEventListener("keyup", scheduleUpdatePosition);
+      window.removeEventListener("resize", scheduleUpdatePosition);
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
     };
-  }, [editorView, updatePosition]);
+  }, [editorView, scheduleUpdatePosition]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

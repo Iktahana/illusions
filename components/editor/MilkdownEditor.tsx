@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { MutableRefObject, RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import {
@@ -46,6 +46,7 @@ interface MilkdownEditorProps {
   onSelectionChange?: (charCount: number) => void;
   isVertical: boolean;
   scrollContainerRef: RefObject<HTMLDivElement>;
+  pointerSelectionStateRef: MutableRefObject<boolean>;
   onEditorViewReady?: (view: EditorView) => void;
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[]) => void;
@@ -75,6 +76,7 @@ export default function MilkdownEditor({
   onSelectionChange,
   isVertical,
   scrollContainerRef,
+  pointerSelectionStateRef,
   onEditorViewReady,
   lintingRuleRunner,
   onLintIssuesUpdated,
@@ -171,6 +173,18 @@ export default function MilkdownEditor({
         .use(history)
         .use(clipboard)
         .use(cursor)
+        .use(
+          $prose(
+            () =>
+              new Plugin({
+                props: {
+                  handleScrollToSelection(view) {
+                    return pointerSelectionStateRef.current || !view.state.selection.empty;
+                  },
+                },
+              }),
+          ),
+        )
         .use($prose(() => searchHighlightPlugin))
         .use($prose(() => speechHighlightPlugin))
         .use(
@@ -192,7 +206,7 @@ export default function MilkdownEditor({
 
       return editor;
     },
-    [isVertical, mdiExtensionsEnabled, gfmEnabled],
+    [isVertical, mdiExtensionsEnabled, gfmEnabled, pointerSelectionStateRef],
   );
 
   // EditorView インスタンスを取得する

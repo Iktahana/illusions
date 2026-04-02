@@ -31,7 +31,10 @@ export default function SelectionCounter({
   useEffect(() => {
     if (!editorView) return;
 
-    const updateSelectionCount = (event?: MouseEvent | Event) => {
+    const lastPointerYRef = { current: null as number | null };
+    const frameRef = { current: null as number | null };
+
+    const updateSelectionCount = (pointerY?: number | null) => {
       const { state } = editorView;
       const { selection } = state;
       const { from, to } = selection;
@@ -74,8 +77,8 @@ export default function SelectionCounter({
         } else {
           // 横書き: 外枠の右端に貼り付け、Y はマウス位置に合わせる
           let cursorY: number;
-          if (event instanceof MouseEvent) {
-            cursorY = event.clientY;
+          if (typeof pointerY === "number") {
+            cursorY = pointerY;
           } else if (fallbackCoords) {
             cursorY = fallbackCoords.top;
           } else {
@@ -108,26 +111,33 @@ export default function SelectionCounter({
       setIsVisible(true);
     };
 
+    const scheduleUpdate = (pointerY?: number | null) => {
+      if (typeof pointerY === "number") {
+        lastPointerYRef.current = pointerY;
+      }
+      if (frameRef.current !== null) return;
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
+        updateSelectionCount(lastPointerYRef.current);
+      });
+    };
+
     const editorDom = editorView.dom;
 
-    // マウス位置を常に追跡（selectionchange 時にも使えるように）
-    let lastMouseEvent: MouseEvent | null = null;
-
     const handleMouseMove = (e: MouseEvent) => {
-      lastMouseEvent = e;
+      lastPointerYRef.current = e.clientY;
     };
 
     const handleMouseUp = (e: MouseEvent) => {
-      lastMouseEvent = e;
-      setTimeout(() => updateSelectionCount(e), 10);
+      scheduleUpdate(e.clientY);
     };
 
     const handleKeyUp = () => {
-      setTimeout(() => updateSelectionCount(), 10);
+      scheduleUpdate();
     };
 
     const handleSelectionChange = () => {
-      setTimeout(() => updateSelectionCount(lastMouseEvent ?? undefined), 10);
+      scheduleUpdate();
     };
 
     editorDom.addEventListener("mousemove", handleMouseMove);
@@ -135,13 +145,16 @@ export default function SelectionCounter({
     editorDom.addEventListener("keyup", handleKeyUp);
     document.addEventListener("selectionchange", handleSelectionChange);
 
-    updateSelectionCount();
+    updateSelectionCount(lastPointerYRef.current);
 
     return () => {
       editorDom.removeEventListener("mousemove", handleMouseMove);
       editorDom.removeEventListener("mouseup", handleMouseUp);
       editorDom.removeEventListener("keyup", handleKeyUp);
       document.removeEventListener("selectionchange", handleSelectionChange);
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+      }
     };
   }, [editorView, isVertical, containerRef]);
 
