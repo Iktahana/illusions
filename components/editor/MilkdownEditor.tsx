@@ -671,7 +671,7 @@ export default function MilkdownEditor({
           width: "max-content",
           display: "flex",
           justifyContent: "flex-end",
-          alignItems: "flex-start",
+          alignItems: "center",
         }),
       }}
     >
