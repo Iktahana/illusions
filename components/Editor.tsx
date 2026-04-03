@@ -16,10 +16,7 @@ import SelectionCounter from "./SelectionCounter";
 import EditorToolbar from "./editor/EditorToolbar";
 import MilkdownEditor from "./editor/MilkdownEditor";
 import { buildSegments, buildSpeechChunks, buildSpeechMap } from "@/lib/hooks/speech-utils";
-import {
-  scrollToSpeechTarget,
-  cancelSpeechScroll,
-} from "@/lib/editor-page/speech-auto-scroll";
+import { scrollToSpeechTarget, cancelSpeechScroll } from "@/lib/editor-page/speech-auto-scroll";
 import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
