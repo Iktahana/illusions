@@ -126,6 +126,20 @@ export function usePosHighlightSettings() {
   );
 }
 
+/** Scroll behavior configuration */
+export function useScrollSettings() {
+  const { settings, handlers } = useEditorSettingsContext();
+  return useMemo(
+    () => ({
+      verticalScrollBehavior: settings.verticalScrollBehavior,
+      scrollSensitivity: settings.scrollSensitivity,
+      onVerticalScrollBehaviorChange: handlers.handleVerticalScrollBehaviorChange,
+      onScrollSensitivityChange: handlers.handleScrollSensitivityChange,
+    }),
+    [settings, handlers],
+  );
+}
+
 /** Power saving configuration */
 export function usePowerSettings() {
   const { settings, handlers } = useEditorSettingsContext();

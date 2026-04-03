@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import {
@@ -24,7 +24,7 @@ import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-high
 import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import clsx from "clsx";
 import { EditorView } from "@milkdown/prose/view";
-import { AllSelection, Plugin } from "@milkdown/prose/state";
+import { AllSelection, Plugin, PluginKey } from "@milkdown/prose/state";
 import { $prose, replaceAll } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "../BubbleMenu";
 import { searchHighlightPlugin } from "@/lib/editor-page/search-highlight-plugin";
@@ -41,6 +41,7 @@ import {
   useTypographySettings,
   useLintingSettings,
   usePosHighlightSettings,
+  useScrollSettings,
 } from "@/contexts/EditorSettingsContext";
 
 interface MilkdownEditorProps {
@@ -112,6 +113,7 @@ export default function MilkdownEditor({
   const { lintingEnabled } = useLintingSettings();
   const { posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes } =
     usePosHighlightSettings();
+  const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
   const editorRef = useRef<HTMLDivElement>(null);
   const measureBoxRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
@@ -141,6 +143,32 @@ export default function MilkdownEditor({
   useEffect(() => {
     onNlpErrorRef.current = onNlpError;
   }, [onNlpError]);
+
+  // 縦書き用のスクロール制御プラグインを作成
+  const isVerticalRef = useRef(isVertical);
+  useEffect(() => {
+    isVerticalRef.current = isVertical;
+  }, [isVertical]);
+
+  // 縦書き時は handleScrollToSelection を抑制（ユーザーが手動でスクロールする）
+  const verticalScrollPlugin = useMemo(
+    () =>
+      $prose(
+        () =>
+          new Plugin({
+            key: new PluginKey("verticalScrollControl"),
+            props: {
+              handleScrollToSelection() {
+                if (isVerticalRef.current) {
+                  return true; // デフォルトのスクロールを完全に禁止
+                }
+                return false;
+              },
+            },
+          }),
+      ),
+    [],
+  );
 
   const { get } = useEditor(
     (root) => {
@@ -179,18 +207,7 @@ export default function MilkdownEditor({
         .use(history)
         .use(clipboard)
         .use(cursor)
-        .use(
-          $prose(
-            () =>
-              new Plugin({
-                props: {
-                  handleScrollToSelection(view) {
-                    return !view.state.selection.empty;
-                  },
-                },
-              }),
-          ),
-        )
+        .use(verticalScrollPlugin)
         .use($prose(() => searchHighlightPlugin))
         .use($prose(() => speechHighlightPlugin))
         .use(
@@ -212,7 +229,7 @@ export default function MilkdownEditor({
 
       return editor;
     },
-    [isVertical, mdiExtensionsEnabled, gfmEnabled],
+    [isVertical, verticalScrollPlugin, mdiExtensionsEnabled, gfmEnabled],
   );
 
   // EditorView インスタンスを取得する
@@ -317,6 +334,63 @@ export default function MilkdownEditor({
         console.error("[Editor] Failed to update linting settings:", err);
       });
   }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
+
+  // 縦書き時: マウスホイールの縦スクロールを横スクロールへ変換する
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !isVertical) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      const sensitivity = scrollSensitivity;
+      const absX = Math.abs(event.deltaX);
+      const absY = Math.abs(event.deltaY);
+      const mouseHorizontalDelta = -event.deltaY * sensitivity;
+      const hasBothAxes = absX > 0 && absY > 0;
+      const hasFineGrainedValues = (absY > 0 && absY < 50) || (absX > 0 && absX < 50);
+      const isTrackpadInput =
+        verticalScrollBehavior === "trackpad" ||
+        (verticalScrollBehavior === "auto" &&
+          (hasBothAxes || (hasFineGrainedValues && !event.ctrlKey)));
+
+      if (verticalScrollBehavior === "mouse") {
+        if (absY >= absX && absY > 0) {
+          container.scrollLeft += mouseHorizontalDelta;
+          event.preventDefault();
+        } else if (absX > 0) {
+          container.scrollTop += event.deltaX * sensitivity;
+          event.preventDefault();
+        }
+        return;
+      }
+
+      if (isTrackpadInput) {
+        if (absY > 0) {
+          container.scrollLeft += event.deltaY * sensitivity;
+        }
+        if (absX > 0) {
+          container.scrollTop += event.deltaX * sensitivity;
+        }
+        event.preventDefault();
+        return;
+      }
+
+      // Mouse semantics: treat dominant deltaY as vertical wheel input and map it
+      // to horizontal movement for vertical writing.
+      if (absY >= absX && absY > 0) {
+        container.scrollLeft += mouseHorizontalDelta;
+        event.preventDefault();
+      } else if (absX > 0) {
+        container.scrollTop += event.deltaX * sensitivity;
+        event.preventDefault();
+      }
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+    };
+  }, [isVertical, scrollContainerRef, verticalScrollBehavior, scrollSensitivity]);
 
   // 不要なアニメーションを避けるため、直前のスタイル値を保持する
   const prevStyleRef = useRef({ charsPerLine, isVertical, fontFamily, fontScale, lineHeight });
