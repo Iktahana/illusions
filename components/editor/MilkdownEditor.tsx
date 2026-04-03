@@ -806,15 +806,16 @@ export default function MilkdownEditor({
     >
       {/* Hidden character width measurement element — CSS class provides letter-spacing
           and font-feature-settings; inline styles override the class's font-family/size
-          so the measurement matches the user's actual typography settings. */}
+          so the measurement matches the user's actual typography settings.
+          Use fixed positioning so the measurement node can never affect any scroll container. */}
       <span
         ref={charMeasureRef}
         aria-hidden="true"
         className={isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal"}
         style={{
-          position: "absolute",
-          top: "-9999px",
-          left: "-9999px",
+          position: "fixed",
+          top: 0,
+          left: 0,
           visibility: "hidden",
           pointerEvents: "none",
           whiteSpace: "nowrap",

@@ -7,9 +7,12 @@ const MEASURE_CHAR_COUNT = 40;
 const MEASURE_TEXT = "国".repeat(MEASURE_CHAR_COUNT);
 
 /**
- * Measures actual per-character width by rendering a hidden span with
+ * Measures actual per-character size by rendering a hidden span with
  * {@link MEASURE_CHAR_COUNT} full-width characters that inherits the same CSS
  * (letter-spacing, font-feature-settings, etc.) as the editor text.
+ *
+ * In vertical writing mode the span grows in height (not width), so the hook
+ * reads `.height` instead of `.width` from `getBoundingClientRect()`.
  *
  * Attach the returned `measureRef` to a `<span>` in the JSX that has the
  * correct editor CSS class and lives inside a container with the right
@@ -44,8 +47,10 @@ export function useCharWidth({
     if (!el) return;
 
     const measure = () => {
-      const w = el.getBoundingClientRect().width / MEASURE_CHAR_COUNT;
-      if (w > 0) setCharWidth(w);
+      const rect = el.getBoundingClientRect();
+      // In vertical-rl the 40-char span grows in height, not width
+      const size = isVertical ? rect.height : rect.width;
+      if (size > 0) setCharWidth(size / MEASURE_CHAR_COUNT);
     };
 
     measure();

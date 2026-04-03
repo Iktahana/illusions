@@ -424,9 +424,9 @@ export default function NovelEditor({
           aria-hidden="true"
           className={isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal"}
           style={{
-            position: "absolute",
-            top: "-9999px",
-            left: "-9999px",
+            position: "fixed",
+            top: 0,
+            left: 0,
             visibility: "hidden",
             pointerEvents: "none",
             whiteSpace: "nowrap",
