@@ -1,3 +1,14 @@
+---
+title: テーマカラーガイド
+slug: theme-colors
+type: guide
+status: active
+updated: 2026-04-03
+tags:
+  - guide
+  - theme
+---
+
 # テーマカラー利用ガイド
 
 ## 概要

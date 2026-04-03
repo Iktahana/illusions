@@ -1,3 +1,14 @@
+---
+title: Virtual File System
+slug: vfs
+type: architecture
+status: active
+updated: 2026-04-03
+tags:
+  - architecture
+  - file-system
+---
+
 # Virtual File System (VFS) Documentation
 
 Platform-agnostic file operations abstraction for the illusions editor.
