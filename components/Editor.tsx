@@ -7,6 +7,10 @@ import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import clsx from "clsx";
 import type { EditorView } from "@milkdown/prose/view";
 import { useSpeech } from "@/lib/hooks/use-speech";
+import {
+  getScrollProgress,
+  setScrollProgress,
+} from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import SearchDialog, { type SearchMatch } from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
 import EditorToolbar from "./editor/EditorToolbar";
@@ -43,9 +47,9 @@ interface EditorProps {
   // Editor mode controls
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
-  /** External content to apply to the editor (from file watcher). Preserves scroll position. */
+  /** External content to apply to the editor (from file watcher). Best-effort scroll position preservation. */
   externalContent?: string | null;
-  /** Called after externalContent has been applied to ProseMirror. */
+  /** Called after externalContent has been applied and scroll restored (best-effort). */
   onExternalContentApplied?: () => void;
 }
 
@@ -267,22 +271,43 @@ export default function NovelEditor({
   }, [searchOpenTrigger, handleSearchOpen]);
 
   // Track whether initial vertical scroll has been performed for this pane instance.
-  // Reset when switching modes so the next onLayoutReady triggers a scroll.
   const hasVerticalInitialScrollRef = useRef(false);
+  // Pending scroll progress to restore after layout reflow (mode switch).
+  const pendingScrollRestoreRef = useRef<number | null>(null);
 
   const handleToggleVertical = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      // Progress is already normalized: 0 = beginning, 1 = end regardless of mode.
+      pendingScrollRestoreRef.current = getScrollProgress({ container, isVertical });
+    }
     hasVerticalInitialScrollRef.current = false;
     setIsVertical((prev) => !prev);
-  }, []);
+  }, [isVertical]);
 
   const handleLayoutReady = useCallback(() => {
     const container = scrollContainerRef.current;
-    if (!container || !isVertical || hasVerticalInitialScrollRef.current) return;
+    if (!container) return;
 
-    const maxScroll = container.scrollWidth - container.clientWidth;
-    if (maxScroll > 0) {
-      container.scrollLeft = maxScroll;
-      hasVerticalInitialScrollRef.current = true;
+    // Mode switch: restore saved reading position
+    if (pendingScrollRestoreRef.current != null) {
+      const restored = setScrollProgress(
+        { container, isVertical },
+        pendingScrollRestoreRef.current,
+      );
+      if (restored) {
+        pendingScrollRestoreRef.current = null;
+        hasVerticalInitialScrollRef.current = true;
+      }
+      // If restore failed (no scrollbar yet), keep pending for next onLayoutReady
+      return;
+    }
+
+    // First entry to vertical mode: scroll to document start (right edge)
+    if (isVertical && !hasVerticalInitialScrollRef.current) {
+      if (setScrollProgress({ container, isVertical: true }, 0)) {
+        hasVerticalInitialScrollRef.current = true;
+      }
     }
   }, [isVertical]);
 
@@ -386,26 +411,28 @@ export default function NovelEditor({
     }
   }, [fontFamily, fontScale, lineHeight, isVertical, scrollContainerRef]);
 
-  // Add window resize listener to auto-adjust chars per line
+  // Use ResizeObserver on scroll container to auto-adjust chars per line.
+  // This catches both window resizes and Dockview split pane resizes.
   useEffect(() => {
     if (!autoCharsPerLine) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
     // Calculate on mount
     const timer = setTimeout(calculateOptimalCharsPerLine, 100);
 
-    // Debounce resize events to 300ms to avoid excessive recalculation during window drag
+    // Debounce resize observations to 300ms
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
-    const handleResize = () => {
+    const observer = new ResizeObserver(() => {
       if (resizeTimer !== null) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(calculateOptimalCharsPerLine, 300);
-    };
-
-    window.addEventListener("resize", handleResize);
+    });
+    observer.observe(container);
 
     return () => {
       clearTimeout(timer);
       if (resizeTimer !== null) clearTimeout(resizeTimer);
-      window.removeEventListener("resize", handleResize);
+      observer.disconnect();
     };
   }, [calculateOptimalCharsPerLine, autoCharsPerLine]);
 

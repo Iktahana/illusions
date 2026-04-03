@@ -32,6 +32,10 @@ import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin
 import type { EditorSelectionState } from "@/lib/editor-page/use-selection-tracking";
 import EditorContextMenu, { type ContextMenuAction } from "../EditorContextMenu";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import {
+  getScrollProgress,
+  setScrollProgress,
+} from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
 import {
   useTypographySettings,
@@ -62,9 +66,9 @@ interface MilkdownEditorProps {
   onFind?: (initialTerm?: string) => void;
   /** Per-pane override for charsPerLine (used by auto mode to avoid global state conflicts in split editors) */
   overrideCharsPerLine?: number;
-  /** External content to apply to the editor (from file watcher). Preserves scroll position. */
+  /** External content to apply to the editor (from file watcher). Best-effort scroll position preservation. */
   externalContent?: string | null;
-  /** Called after externalContent has been applied to ProseMirror. */
+  /** Called after externalContent has been applied and scroll restored (best-effort). */
   onExternalContentApplied?: () => void;
   /** Called after layout reflow completes (style application + browser paint). */
   onLayoutReady?: () => void;
@@ -251,13 +255,30 @@ export default function MilkdownEditor({
     if (externalContent == null) return;
     const editor = get();
     if (!editor) return;
+
+    // Save scroll progress before replacing content
+    const container = scrollContainerRef.current;
+    let savedProgress: number | null = null;
+    if (container) {
+      savedProgress = getScrollProgress({ container, isVertical });
+    }
+
     try {
       editor.action(replaceAll(externalContent));
-      onExternalContentAppliedRef.current?.();
+      // Restore scroll progress after layout settles
+      if (container && savedProgress != null) {
+        const progress = savedProgress;
+        requestAnimationFrame(() => {
+          setScrollProgress({ container, isVertical }, progress);
+          onExternalContentAppliedRef.current?.();
+        });
+      } else {
+        onExternalContentAppliedRef.current?.();
+      }
     } catch (error) {
       console.warn("外部コンテンツの適用に失敗しました:", error);
     }
-  }, [externalContent, get]);
+  }, [externalContent, get, isVertical, scrollContainerRef]);
 
   // posHighlight 設定を動的に更新（Editor を再作成せずに）
   useEffect(() => {
