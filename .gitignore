@@ -64,6 +64,14 @@ public/swe-worker*
 # WebStorm
 .idea
 
+# Obsidian (local vault config)
+docs/.obsidian/
+
+# Review loop artifacts
+reviews/
+.claude/review-loop.log
+.claude/*.local.md
+
 # auto-generated files
 /generated/
 
