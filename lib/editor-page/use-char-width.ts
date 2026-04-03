@@ -1,5 +1,6 @@
 "use client";
 
+import type { RefObject } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const MEASURE_CHAR_COUNT = 40;
@@ -27,15 +28,18 @@ export function useCharWidth({
   fontScale: number;
   lineHeight: number;
   isVertical: boolean;
-}): { measureRef: React.RefObject<HTMLSpanElement | null>; charWidth: number } {
-  const measureRef = useRef<HTMLSpanElement | null>(null);
+}): { measureRef: RefObject<HTMLSpanElement>; charWidth: number } {
+  const measureRef = useRef<HTMLSpanElement>(null);
   const [charWidth, setCharWidth] = useState(0);
 
-  // Synchronous measurement after DOM update (handles prop-driven changes)
+  // Synchronous measurement after DOM update (handles prop-driven changes).
+  // Uses getBoundingClientRect() for sub-pixel precision — offsetWidth rounds to
+  // integers, which can lose fractional pixels across 40 characters and cause the
+  // last character to overflow.
   useLayoutEffect(() => {
     const el = measureRef.current;
     if (!el) return;
-    const w = el.offsetWidth / MEASURE_CHAR_COUNT;
+    const w = el.getBoundingClientRect().width / MEASURE_CHAR_COUNT;
     if (w > 0) setCharWidth(w);
   }, [fontFamily, fontScale, lineHeight, isVertical]);
 
@@ -44,7 +48,7 @@ export function useCharWidth({
     const el = measureRef.current;
     if (!el) return;
     const observer = new ResizeObserver(() => {
-      const w = el.offsetWidth / MEASURE_CHAR_COUNT;
+      const w = el.getBoundingClientRect().width / MEASURE_CHAR_COUNT;
       if (w > 0) setCharWidth(w);
     });
     observer.observe(el);

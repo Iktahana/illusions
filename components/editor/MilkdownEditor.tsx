@@ -798,7 +798,9 @@ export default function MilkdownEditor({
         }),
       }}
     >
-      {/* Hidden character width measurement element — inherits editor CSS for accurate measurement */}
+      {/* Hidden character width measurement element — CSS class provides letter-spacing
+          and font-feature-settings; inline styles override the class's font-family/size
+          so the measurement matches the user's actual typography settings. */}
       <span
         ref={charMeasureRef}
         aria-hidden="true"
@@ -810,6 +812,9 @@ export default function MilkdownEditor({
           visibility: "hidden",
           pointerEvents: "none",
           whiteSpace: "nowrap",
+          fontFamily: `"${fontFamily}", serif`,
+          fontSize: `${fontScale}%`,
+          lineHeight: lineHeight,
         }}
       >
         {MEASURE_TEXT}
