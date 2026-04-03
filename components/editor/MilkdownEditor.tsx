@@ -66,6 +66,8 @@ interface MilkdownEditorProps {
   externalContent?: string | null;
   /** Called after externalContent has been applied to ProseMirror. */
   onExternalContentApplied?: () => void;
+  /** Called after layout reflow completes (style application + browser paint). */
+  onLayoutReady?: () => void;
 }
 
 export default function MilkdownEditor({
@@ -91,6 +93,7 @@ export default function MilkdownEditor({
   overrideCharsPerLine,
   externalContent,
   onExternalContentApplied,
+  onLayoutReady,
 }: MilkdownEditorProps) {
   const {
     fontScale,
@@ -394,6 +397,7 @@ export default function MilkdownEditor({
         requestAnimationFrame(() => {
           editorDom.style.transition = "opacity 0.25s ease-in";
           editorDom.style.opacity = "1";
+          onLayoutReady?.();
         });
       }, 150);
 
@@ -403,8 +407,17 @@ export default function MilkdownEditor({
     } else {
       applyStyles();
       editorDom.style.opacity = "1";
+      onLayoutReady?.();
     }
-  }, [charsPerLine, editorViewInstance, isVertical, fontFamily, fontScale, lineHeight]);
+  }, [
+    charsPerLine,
+    editorViewInstance,
+    isVertical,
+    fontFamily,
+    fontScale,
+    lineHeight,
+    onLayoutReady,
+  ]);
 
   // Union of all Milkdown command keys used in handleFormat.
   // Each .key property is a branded CmdKey<T> string exported by @milkdown.

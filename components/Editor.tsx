@@ -266,9 +266,25 @@ export default function NovelEditor({
     }
   }, [searchOpenTrigger, handleSearchOpen]);
 
+  // Track whether initial vertical scroll has been performed for this pane instance.
+  // Reset when switching modes so the next onLayoutReady triggers a scroll.
+  const hasVerticalInitialScrollRef = useRef(false);
+
   const handleToggleVertical = useCallback(() => {
+    hasVerticalInitialScrollRef.current = false;
     setIsVertical((prev) => !prev);
   }, []);
+
+  const handleLayoutReady = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !isVertical || hasVerticalInitialScrollRef.current) return;
+
+    const maxScroll = container.scrollWidth - container.clientWidth;
+    if (maxScroll > 0) {
+      container.scrollLeft = maxScroll;
+      hasVerticalInitialScrollRef.current = true;
+    }
+  }, [isVertical]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -447,6 +463,7 @@ export default function NovelEditor({
               onFind={handleFind}
               externalContent={externalContent}
               onExternalContentApplied={onExternalContentApplied}
+              onLayoutReady={handleLayoutReady}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
