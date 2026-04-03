@@ -32,6 +32,7 @@ import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin
 import type { EditorSelectionState } from "@/lib/editor-page/use-selection-tracking";
 import EditorContextMenu, { type ContextMenuAction } from "../EditorContextMenu";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { useCharWidth, MEASURE_TEXT } from "@/lib/editor-page/use-char-width";
 import {
   getScrollProgress,
   setScrollProgress,
@@ -114,6 +115,12 @@ export default function MilkdownEditor({
   const { posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes } =
     usePosHighlightSettings();
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
+  const { measureRef: charMeasureRef, charWidth } = useCharWidth({
+    fontFamily,
+    fontScale,
+    lineHeight,
+    isVertical,
+  });
   const editorRef = useRef<HTMLDivElement>(null);
   const measureBoxRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
@@ -393,7 +400,14 @@ export default function MilkdownEditor({
   }, [isVertical, scrollContainerRef, verticalScrollBehavior, scrollSensitivity]);
 
   // 不要なアニメーションを避けるため、直前のスタイル値を保持する
-  const prevStyleRef = useRef({ charsPerLine, isVertical, fontFamily, fontScale, lineHeight });
+  const prevStyleRef = useRef({
+    charsPerLine,
+    isVertical,
+    fontFamily,
+    fontScale,
+    lineHeight,
+    charWidth,
+  });
   const isFirstRenderRef = useRef(true);
 
   // 1行あたりの文字数制限を、スクロールルートではなく内側の measure box に適用する
@@ -409,10 +423,18 @@ export default function MilkdownEditor({
       prev.isVertical !== isVertical ||
       prev.fontFamily !== fontFamily ||
       prev.fontScale !== fontScale ||
-      prev.lineHeight !== lineHeight;
+      prev.lineHeight !== lineHeight ||
+      prev.charWidth !== charWidth;
 
     // 直前値を更新
-    prevStyleRef.current = { charsPerLine, isVertical, fontFamily, fontScale, lineHeight };
+    prevStyleRef.current = {
+      charsPerLine,
+      isVertical,
+      fontFamily,
+      fontScale,
+      lineHeight,
+      charWidth,
+    };
 
     // スタイルが変わっていない場合はアニメーションをしない（保存による再構築など）
     const isFirstRender = isFirstRenderRef.current;
@@ -447,24 +469,9 @@ export default function MilkdownEditor({
       editorDom.style.minWidth = "";
       editorDom.style.margin = "";
 
-      if (charsPerLine > 0) {
-        const measureEl = document.createElement("span");
-        measureEl.style.cssText = `
-          position: absolute;
-          visibility: hidden;
-          white-space: nowrap;
-          font-family: "${fontFamily}", serif;
-          font-size: ${fontScale}%;
-          line-height: ${lineHeight};
-        `;
-        measureEl.textContent = "国";
-        document.body.appendChild(measureEl);
-
-        const charSize = measureEl.offsetWidth;
-        document.body.removeChild(measureEl);
-
+      if (charsPerLine > 0 && charWidth > 0) {
         if (isVertical) {
-          const targetHeight = charSize * Math.max(charsPerLine - 1, 1);
+          const targetHeight = charWidth * Math.max(charsPerLine - 1, 1);
           measureBox.style.height = `${targetHeight}px`;
           measureBox.style.maxHeight = `${targetHeight}px`;
           measureBox.style.minHeight = `${targetHeight}px`;
@@ -475,7 +482,7 @@ export default function MilkdownEditor({
           editorDom.style.maxHeight = `${targetHeight}px`;
           editorDom.style.minHeight = `${targetHeight}px`;
         } else {
-          const targetWidth = charSize * charsPerLine;
+          const targetWidth = charWidth * charsPerLine;
           measureBox.style.width = `${targetWidth}px`;
           measureBox.style.maxWidth = `${targetWidth}px`;
         }
@@ -506,6 +513,7 @@ export default function MilkdownEditor({
     }
   }, [
     charsPerLine,
+    charWidth,
     editorViewInstance,
     isVertical,
     fontFamily,
@@ -790,6 +798,22 @@ export default function MilkdownEditor({
         }),
       }}
     >
+      {/* Hidden character width measurement element — inherits editor CSS for accurate measurement */}
+      <span
+        ref={charMeasureRef}
+        aria-hidden="true"
+        className={isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal"}
+        style={{
+          position: "absolute",
+          top: "-9999px",
+          left: "-9999px",
+          visibility: "hidden",
+          pointerEvents: "none",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {MEASURE_TEXT}
+      </span>
       <style jsx>{`
         div :global(.milkdown .ProseMirror) {
           font-family: "${fontFamily}", serif;
