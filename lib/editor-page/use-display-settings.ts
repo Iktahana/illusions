@@ -16,6 +16,8 @@ export interface DisplaySettings {
   posHighlightEnabled: boolean;
   posHighlightColors: Record<string, string>;
   posHighlightDisabledTypes: string[];
+  verticalScrollBehavior: "auto" | "mouse" | "trackpad";
+  scrollSensitivity: number;
   compactMode: boolean;
   showSettingsModal: boolean;
   speechVoiceURI: string;
@@ -51,6 +53,8 @@ export interface DisplaySettingsHandlers {
   handlePosHighlightEnabledChange: (value: boolean) => void;
   handlePosHighlightColorsChange: (value: Record<string, string>) => void;
   handlePosHighlightDisabledTypesChange: (value: string[]) => void;
+  handleVerticalScrollBehaviorChange: (value: "auto" | "mouse" | "trackpad") => void;
+  handleScrollSensitivityChange: (value: number) => void;
   handleToggleCompactMode: () => void;
   setShowSettingsModal: (value: boolean) => void;
   handleSpeechVoiceURIChange: (value: string) => void;
@@ -114,6 +118,10 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
   const [speechRate, setSpeechRate] = useState(1.0);
   const [speechPitch, setSpeechPitch] = useState(1.0);
   const [speechVolume, setSpeechVolume] = useState(1.0);
+  const [verticalScrollBehavior, setVerticalScrollBehavior] = useState<
+    "auto" | "mouse" | "trackpad"
+  >("auto");
+  const [scrollSensitivity, setScrollSensitivity] = useState(1.0);
   const [compactMode, setCompactMode] = useState(false);
 
   // Terminal settings
@@ -173,6 +181,11 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
     if (Array.isArray(appState.posHighlightDisabledTypes)) {
       setPosHighlightDisabledTypes(appState.posHighlightDisabledTypes as string[]);
     }
+    if (appState.verticalScrollBehavior) {
+      setVerticalScrollBehavior(appState.verticalScrollBehavior as "auto" | "mouse" | "trackpad");
+    }
+    if (typeof appState.scrollSensitivity === "number")
+      setScrollSensitivity(appState.scrollSensitivity);
     if (typeof appState.compactMode === "boolean") setCompactMode(appState.compactMode);
     if (typeof appState.speechVoiceURI === "string") setSpeechVoiceURI(appState.speechVoiceURI);
     if (typeof appState.speechRate === "number") setSpeechRate(appState.speechRate);
@@ -363,6 +376,20 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
     );
   }, []);
 
+  const handleVerticalScrollBehaviorChange = useCallback((value: "auto" | "mouse" | "trackpad") => {
+    setVerticalScrollBehavior(value);
+    void persistAppState({ verticalScrollBehavior: value }).catch((e) =>
+      console.error("Failed to persist verticalScrollBehavior:", e),
+    );
+  }, []);
+
+  const handleScrollSensitivityChange = useCallback((value: number) => {
+    setScrollSensitivity(value);
+    void persistAppState({ scrollSensitivity: value }).catch((e) =>
+      console.error("Failed to persist scrollSensitivity:", e),
+    );
+  }, []);
+
   const handleToggleCompactMode = useCallback(() => {
     setCompactMode((prev) => {
       const next = !prev;
@@ -539,6 +566,8 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
       posHighlightEnabled,
       posHighlightColors,
       posHighlightDisabledTypes,
+      verticalScrollBehavior,
+      scrollSensitivity,
       compactMode,
       showSettingsModal,
       speechVoiceURI,
@@ -572,6 +601,8 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
       handlePosHighlightEnabledChange,
       handlePosHighlightColorsChange,
       handlePosHighlightDisabledTypesChange,
+      handleVerticalScrollBehaviorChange,
+      handleScrollSensitivityChange,
       handleToggleCompactMode,
       setShowSettingsModal,
       handleSpeechVoiceURIChange,
