@@ -214,7 +214,7 @@ export default function EditorContextMenu({
               <Separator />
               <MenuItem
                 icon={<Play className="w-4 h-4" />}
-                label="開始朗読"
+                label="読み上げ開始"
                 shortcut=""
                 onClick={() => onAction("start-speech")}
               />

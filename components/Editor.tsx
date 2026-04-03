@@ -20,6 +20,7 @@ import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
 import { useTypographySettings, useSpeechSettings } from "@/contexts/EditorSettingsContext";
+import { useCharWidth, MEASURE_TEXT } from "@/lib/editor-page/use-char-width";
 
 interface EditorProps {
   initialContent?: string;
@@ -112,13 +113,12 @@ export default function NovelEditor({
   /** Max doc-position range processed per TTS chunk (~5 000 Japanese chars). */
   const MAX_SPEECH_CHUNK_RANGE = 10_000;
 
-  /** Cache for DOM character-width measurement (invalidated when font settings change) */
-  const charSizeCacheRef = useRef<{
-    fontFamily: string;
-    fontScale: number;
-    lineHeight: number;
-    size: number;
-  } | null>(null);
+  const { measureRef: autoCharMeasureRef, charWidth: autoCharWidth } = useCharWidth({
+    fontFamily,
+    fontScale,
+    lineHeight,
+    isVertical,
+  });
   const selectionState = useSelectionTracking({
     editorViewInstance,
     scrollContainerRef,
@@ -327,7 +327,7 @@ export default function NovelEditor({
     charsPerLineRef.current = effectiveCharsPerLine;
   }, [effectiveCharsPerLine]);
 
-  // Calculate optimal chars per line based on editor width and font size
+  // Calculate optimal chars per line based on editor width and measured char width
   const calculateOptimalCharsPerLine = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -335,37 +335,8 @@ export default function NovelEditor({
     // Skip calculation when container is not visible (e.g., hidden dockview panel)
     if (container.clientWidth <= 0 || container.clientHeight <= 0) return;
 
-    // Use cached charSize when font settings are unchanged (avoids DOM element creation on every resize)
-    let charSize: number;
-    const cache = charSizeCacheRef.current;
-    if (
-      cache &&
-      cache.fontFamily === fontFamily &&
-      cache.fontScale === fontScale &&
-      cache.lineHeight === lineHeight
-    ) {
-      charSize = cache.size;
-    } else {
-      // Measure character width via a temporary DOM element
-      const measureEl = document.createElement("span");
-      measureEl.style.cssText = `
-        position: absolute;
-        visibility: hidden;
-        white-space: nowrap;
-        font-family: "${fontFamily}", serif;
-        font-size: ${fontScale}%;
-        line-height: ${lineHeight};
-      `;
-      measureEl.textContent = "国"; // Measure with full-width character
-      document.body.appendChild(measureEl);
-      charSize = measureEl.offsetWidth;
-      document.body.removeChild(measureEl);
-
-      // Cache the result for subsequent resize events with the same font settings
-      charSizeCacheRef.current = { fontFamily, fontScale, lineHeight, size: charSize };
-    }
-
-    if (charSize <= 0) return;
+    // charWidth is measured by the persistent hidden element (includes letter-spacing, palt, etc.)
+    if (autoCharWidth <= 0) return;
 
     // Get available space (subtract padding)
     const padding = 128; // 64px * 2 for left and right
@@ -377,7 +348,7 @@ export default function NovelEditor({
       const topPadding = 48; // pt-12 = 48px
       const availableHeight = container.clientHeight - topPadding;
 
-      const optimalChars = Math.max(10, Math.floor(availableHeight / charSize));
+      const optimalChars = Math.max(10, Math.floor(availableHeight / autoCharWidth));
       // Clamp: max 40 characters
       const clamped = Math.min(40, optimalChars);
 
@@ -386,7 +357,7 @@ export default function NovelEditor({
       }
     } else {
       // For horizontal writing: calculate based on available width
-      const optimalChars = Math.max(10, Math.floor(availableWidth / charSize));
+      const optimalChars = Math.max(10, Math.floor(availableWidth / autoCharWidth));
       // Clamp: max 40 characters
       const clamped = Math.min(40, optimalChars);
 
@@ -394,7 +365,7 @@ export default function NovelEditor({
         setLocalAutoCharsPerLine(clamped);
       }
     }
-  }, [fontFamily, fontScale, lineHeight, isVertical, scrollContainerRef]);
+  }, [autoCharWidth, isVertical, scrollContainerRef]);
 
   // Use ResizeObserver on scroll container to auto-adjust chars per line.
   // This catches both window resizes and Dockview split pane resizes.
@@ -447,6 +418,25 @@ export default function NovelEditor({
           ...(isVertical ? { paddingLeft: 64, paddingRight: 64 } : {}),
         }}
       >
+        {/* Hidden character width measurement element for auto chars-per-line calculation */}
+        <span
+          ref={autoCharMeasureRef}
+          aria-hidden="true"
+          className={isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal"}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            visibility: "hidden",
+            pointerEvents: "none",
+            whiteSpace: "nowrap",
+            fontSize: `${fontScale}%`,
+            fontFamily: `"${fontFamily}", serif`,
+            lineHeight: lineHeight,
+          }}
+        >
+          {MEASURE_TEXT}
+        </span>
         <MilkdownProvider>
           <ProsemirrorAdapterProvider>
             <MilkdownEditor
