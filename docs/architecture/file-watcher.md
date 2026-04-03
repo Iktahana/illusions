@@ -1,3 +1,14 @@
+---
+title: ファイル監視
+slug: file-watcher
+type: architecture
+status: active
+updated: 2026-04-03
+tags:
+  - architecture
+  - file-system
+---
+
 # File Watcher Documentation
 
 Dual-mode file change monitoring with save suppression to prevent false notifications from the application's own writes.

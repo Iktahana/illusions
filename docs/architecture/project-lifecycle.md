@@ -1,3 +1,14 @@
+---
+title: プロジェクトライフサイクル
+slug: project-lifecycle
+type: architecture
+status: active
+updated: 2026-04-03
+tags:
+  - architecture
+  - project
+---
+
 # Project Lifecycle Documentation
 
 Project vs Standalone mode management with `.illusions/` directory structure, metadata persistence, and workspace state.

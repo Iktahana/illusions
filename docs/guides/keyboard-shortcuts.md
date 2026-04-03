@@ -1,230 +1,129 @@
-# Keyboard Shortcuts Reference
-
-## Overview
-
-illusions supports keyboard shortcuts across both Electron (desktop) and Web environments. Shortcuts are defined in `lib/menu-definitions.ts` and handled by `lib/use-global-shortcuts.ts`. The menu system uses Japanese labels for all user-facing items.
-
+---
+title: キーボードショートカット
+slug: keyboard-shortcuts
+type: guide
+status: active
+updated: 2026-04-03
+tags:
+  - guide
+  - shortcuts
 ---
 
-## Complete Shortcut Table
+# キーボードショートカット
 
-### File Operations
+このページは、現在の `illusions` がどの経路でショートカットを処理しているかを、実装に合わせて整理したものです。  
+以前のような「すべて `useGlobalShortcuts` が処理する」という説明は現状と一致しません。
 
-| Shortcut (macOS) | Shortcut (Windows) | Action     | Japanese Label   | Context |
-| ---------------- | ------------------ | ---------- | ---------------- | ------- |
-| Cmd+N            | Ctrl+N             | New window | 新規ウィンドウ   | Global  |
-| Cmd+O            | Ctrl+O             | Open file  | 開く             | Global  |
-| Cmd+S            | Ctrl+S             | Save       | 保存             | Global  |
-| Shift+Cmd+S      | Shift+Ctrl+S       | Save as    | 名前を付けて保存 | Global  |
-| Cmd+W            | Ctrl+W             | Close tab  | タブを閉じる     | Global  |
+## 現在の責務分担
 
-### Tab Management (Electron Only)
+### 1. 単一のソースオブトゥルース
 
-| Shortcut (macOS) | Shortcut (Windows) | Action             | Japanese Label       | Context       |
-| ---------------- | ------------------ | ------------------ | -------------------- | ------------- |
-| Cmd+T            | Ctrl+T             | New tab            | 新しいタブ           | Electron only |
-| Cmd+1            | Ctrl+1             | Switch to tab 1    | タブ1に切り替え      | Electron only |
-| Cmd+2            | Ctrl+2             | Switch to tab 2    | タブ2に切り替え      | Electron only |
-| Cmd+3            | Ctrl+3             | Switch to tab 3    | タブ3に切り替え      | Electron only |
-| Cmd+4            | Ctrl+4             | Switch to tab 4    | タブ4に切り替え      | Electron only |
-| Cmd+5            | Ctrl+5             | Switch to tab 5    | タブ5に切り替え      | Electron only |
-| Cmd+6            | Ctrl+6             | Switch to tab 6    | タブ6に切り替え      | Electron only |
-| Cmd+7            | Ctrl+7             | Switch to tab 7    | タブ7に切り替え      | Electron only |
-| Cmd+8            | Ctrl+8             | Switch to tab 8    | タブ8に切り替え      | Electron only |
-| Cmd+9            | Ctrl+9             | Switch to last tab | 最後のタブに切り替え | Electron only |
+デフォルトのショートカット定義は [`lib/keymap/shortcut-registry.ts`](../../lib/keymap/shortcut-registry.ts) にあります。  
+コマンド ID の一覧は [`lib/keymap/command-ids.ts`](../../lib/keymap/command-ids.ts) が source of truth です。
 
-### Editing
+### 2. Web のグローバル処理
 
-| Shortcut (macOS)    | Shortcut (Windows) | Action              | Japanese Label                 | Context |
-| ------------------- | ------------------ | ------------------- | ------------------------------ | ------- |
-| Cmd+Z               | Ctrl+Z             | Undo                | 元に戻す                       | Editor  |
-| Cmd+Y / Shift+Cmd+Z | Ctrl+Y             | Redo                | やり直す                       | Editor  |
-| Cmd+X               | Ctrl+X             | Cut                 | 切り取り                       | Editor  |
-| Cmd+C               | Ctrl+C             | Copy                | コピー                         | Editor  |
-| Cmd+V               | Ctrl+V             | Paste               | 貼り付け                       | Editor  |
-| Shift+Cmd+V         | Shift+Ctrl+V       | Paste as plain text | プレーンテキストとして貼り付け | Editor  |
-| Cmd+A               | Ctrl+A             | Select all          | すべて選択                     | Editor  |
-| Cmd+F               | Ctrl+F             | Find                | 検索                           | Editor  |
+[`lib/hooks/use-global-shortcuts.ts`](../../lib/hooks/use-global-shortcuts.ts) は、現在は **`Cmd/Ctrl + R` をブロックするだけ** です。  
+保存、検索、ズーム、ファイル操作などをここで配布しているわけではありません。
 
-### Formatting
+### 3. 通常のショートカット配布
 
-| Shortcut (macOS) | Shortcut (Windows) | Action          | Japanese Label | Context                     |
-| ---------------- | ------------------ | --------------- | -------------- | --------------------------- |
-| Shift+Cmd+R      | Shift+Ctrl+R       | Ruby annotation | ルビ           | Editor (requires selection) |
+[`lib/editor-page/use-keyboard-shortcuts.ts`](../../lib/editor-page/use-keyboard-shortcuts.ts) が `useKeymapListener()` を使ってコマンドを配布します。
 
-### View Controls
+- editor 専用コマンド
+  - `format.ruby`
+  - `format.tcy`
+  - `nav.search`
+  - `edit.pasteAsPlaintext`
+- タブ操作
+  - `nav.nextTab`
+  - `nav.prevTab`
+  - `nav.tab1` から `nav.tab9`
+- Web でだけメニュー action に橋渡しするコマンド
+  - `file.open`
+  - `file.saveAs`
+  - `file.newWindow`
+  - `view.zoomIn`
+  - `view.zoomOut`
+  - `view.resetZoom`
 
-| Shortcut (macOS) | Shortcut (Windows) | Action     | Japanese Label | Context |
-| ---------------- | ------------------ | ---------- | -------------- | ------- |
-| Cmd+0            | Ctrl+0             | Reset zoom | ズームリセット | Global  |
-| Cmd++            | Ctrl++             | Zoom in    | 拡大           | Global  |
-| Cmd+-            | Ctrl+-             | Zoom out   | 縮小           | Global  |
+### 4. Web メニューとの対応
 
----
+Web メニューの見た目と action 文字列は [`lib/menu/menu-definitions.ts`](../../lib/menu/menu-definitions.ts) にあります。  
+実行側は [`lib/menu/use-web-menu-handlers.ts`](../../lib/menu/use-web-menu-handlers.ts) で、`open-file` や `paste-plaintext` などの action を処理します。
 
-## Web Menu Structure
+重要なのは、**command id と menu action は別物** という点です。
 
-In the web version, the menu is rendered as a UI component (`WEB_MENU_STRUCTURE`) with five top-level menus. All labels are in Japanese.
+- command id の例: `file.saveAs`
+- menu action の例: `save-as`
 
-### ファイル (File)
+## デフォルトショートカット一覧
 
-| Menu Item        | Action ID         | Shortcut         |
-| ---------------- | ----------------- | ---------------- |
-| 新規ウィンドウ   | `file:new-window` | Cmd/Ctrl+N       |
-| 開く             | `file:open`       | Cmd/Ctrl+O       |
-| 保存             | `file:save`       | Cmd/Ctrl+S       |
-| 名前を付けて保存 | `file:save-as`    | Shift+Cmd/Ctrl+S |
-| タブを閉じる     | `file:close-tab`  | Cmd/Ctrl+W       |
+以下は `shortcut-registry.ts` にある現行の既定値です。
 
-### 編集 (Edit)
+| コマンド ID                | 既定キー                       | 説明                     |
+| -------------------------- | ------------------------------ | ------------------------ |
+| `file.save`                | `Cmd/Ctrl+S`                   | 保存                     |
+| `file.saveAs`              | `Shift+Cmd/Ctrl+S`             | 別名で保存               |
+| `file.open`                | `Cmd/Ctrl+O`                   | ファイルを開く           |
+| `file.newWindow`           | `Cmd/Ctrl+N`                   | 新規ウィンドウ           |
+| `file.newTab`              | `Cmd/Ctrl+T`                   | 新規タブ                 |
+| `file.closeTab`            | `Cmd/Ctrl+W`                   | タブを閉じる             |
+| `edit.undo`                | `Cmd/Ctrl+Z`                   | 元に戻す                 |
+| `edit.redo`                | `Cmd/Ctrl+Y`                   | やり直す                 |
+| `edit.pasteAsPlaintext`    | `Shift+Cmd/Ctrl+V`             | プレーンテキスト貼り付け |
+| `edit.selectAll`           | `Cmd/Ctrl+A`                   | すべて選択               |
+| `view.zoomIn`              | `Cmd/Ctrl++`                   | 拡大                     |
+| `view.zoomOut`             | `Cmd/Ctrl+-`                   | 縮小                     |
+| `view.resetZoom`           | `Cmd/Ctrl+0`                   | ズームリセット           |
+| `view.compactMode`         | `Shift+Cmd/Ctrl+M`             | コンパクトモード切替     |
+| `view.splitRight`          | `Cmd/Ctrl+\\`                  | 右に分割                 |
+| `view.splitDown`           | `Shift+Cmd/Ctrl+\\`            | 下に分割                 |
+| `nav.nextTab`              | `Ctrl+Tab`                     | 次のタブ                 |
+| `nav.prevTab`              | `Ctrl+Shift+Tab`               | 前のタブ                 |
+| `nav.tab1` から `nav.tab9` | `Cmd/Ctrl+1` から `Cmd/Ctrl+9` | 番号付きタブへ移動       |
+| `nav.settings`             | `Cmd/Ctrl+,`                   | 設定を開く               |
+| `nav.search`               | `Cmd/Ctrl+F`                   | 検索を開く               |
+| `panel.explorer`           | `Ctrl+Shift+E`                 | エクスプローラー切替     |
+| `panel.search`             | `Ctrl+Shift+F`                 | 検索パネル切替           |
+| `format.ruby`              | `Shift+Cmd/Ctrl+R`             | ルビダイアログ           |
+| `format.tcy`               | `Shift+Cmd/Ctrl+T`             | 縦中横切替               |
 
-| Menu Item                      | Action ID          | Shortcut         |
-| ------------------------------ | ------------------ | ---------------- |
-| 元に戻す                       | `edit:undo`        | Cmd/Ctrl+Z       |
-| やり直す                       | `edit:redo`        | Cmd/Ctrl+Y       |
-| 切り取り                       | `edit:cut`         | Cmd/Ctrl+X       |
-| コピー                         | `edit:copy`        | Cmd/Ctrl+C       |
-| 貼り付け                       | `edit:paste`       | Cmd/Ctrl+V       |
-| プレーンテキストとして貼り付け | `edit:paste-plain` | Shift+Cmd/Ctrl+V |
-| すべて選択                     | `edit:select-all`  | Cmd/Ctrl+A       |
-| 検索                           | `edit:find`        | Cmd/Ctrl+F       |
-| ルビ                           | `edit:ruby`        | Shift+Cmd/Ctrl+R |
+## Web と Electron の違い
 
-### 表示 (View)
+### Web
 
-| Menu Item      | Action ID         | Shortcut   |
-| -------------- | ----------------- | ---------- |
-| 拡大           | `view:zoom-in`    | Cmd/Ctrl++ |
-| 縮小           | `view:zoom-out`   | Cmd/Ctrl+- |
-| ズームリセット | `view:zoom-reset` | Cmd/Ctrl+0 |
+- `useGlobalShortcuts()` は reload 防止のみ
+- 実際のショートカット配布は keymap registry + `useKeyboardShortcuts()`
+- メニュー action は `useWebMenuHandlers()` が処理
 
-### ウィンドウ (Window)
+### Electron
 
-| Menu Item      | Action ID           | Shortcut |
-| -------------- | ------------------- | -------- |
-| 最小化         | `window:minimize`   | --       |
-| フルスクリーン | `window:fullscreen` | --       |
+- 同じ command id / keymap registry を前提に UI を組んでいる
+- レンダラ側では Web 専用の menu action bridge を使わないコマンドがある
+- ストレージされたキーマップ override は `KeymapContext` から Electron メニュー更新にも同期される
 
-### ヘルプ (Help)
+## カスタマイズ
 
-| Menu Item      | Action ID    | Shortcut |
-| -------------- | ------------ | -------- |
-| バージョン情報 | `help:about` | --       |
+キーマップの既定値は [`contexts/KeymapContext.tsx`](../../contexts/KeymapContext.tsx) で `SHORTCUT_REGISTRY` から組み立てられ、ユーザー override とマージされます。
 
----
+- 既定値: `shortcut-registry.ts`
+- override 永続化: `lib/keymap/keymap-storage.ts`
+- 実行時マッチング: `lib/keymap/use-keymap-listener.ts`
 
-## Electron vs Web Comparison
+新しいショートカットを追加する場合は、少なくとも次の 3 箇所を揃えてください。
 
-| Feature                      | Electron                            | Web                                               |
-| ---------------------------- | ----------------------------------- | ------------------------------------------------- |
-| Menu rendering               | Native OS menu bar                  | `WEB_MENU_STRUCTURE` rendered in the UI           |
-| Shortcut handling            | OS-level accelerators via Electron  | `useGlobalShortcuts` hook with `keydown` listener |
-| Editor key bindings          | Electron passes through to Milkdown | Milkdown handles directly                         |
-| Tab switching (Cmd/Ctrl+1-9) | Supported                           | Not available                                     |
-| Browser reload blocking      | Not needed                          | Actively blocked (Cmd/Ctrl+R intercepted)         |
-| Window management            | Native window controls              | Limited (minimize, fullscreen via API)            |
+1. `command-ids.ts` に command id を追加する
+2. `shortcut-registry.ts` に既定 binding と label を追加する
+3. 実行側で handler を接続する
 
-### Key Differences
+## 注意点
 
-**Electron:** Menu definitions are converted to Electron's `Menu.buildFromTemplate()` format. Accelerators are registered at the OS level, so they work regardless of which UI element has focus.
+- `Cmd/Ctrl+1` から `9` は現在の実装では Electron 専用ではありません
+- `useGlobalShortcuts()` はショートカットの中央配布層ではありません
+- menu のラベル、menu action、command id は 1 対 1 の同名ではありません
 
-**Web:** The `useGlobalShortcuts` hook attaches a `keydown` event listener to the document. It must coordinate with the Milkdown editor to avoid conflicts -- shortcuts only fire when the editor does not have focus for the same key combination.
+## 関連
 
----
-
-## useGlobalShortcuts Hook
-
-**File:** `lib/use-global-shortcuts.ts`
-
-The `useGlobalShortcuts` hook manages keyboard shortcut handling in the web environment.
-
-### Behavior
-
-1. **Focus-aware**: Only fires for shortcuts when the editor does not have focus for the relevant key combination. This prevents conflicts where both the hook and the editor would respond to the same keystroke.
-
-2. **Platform detection**: Automatically detects macOS vs. Windows/Linux and maps modifier keys accordingly:
-   - macOS: `Cmd` (Meta key)
-   - Windows/Linux: `Ctrl`
-
-3. **Browser reload blocking**: Intercepts `Cmd+R` / `Ctrl+R` to prevent accidental page reloads that would lose unsaved work.
-
-### formatAccelerator()
-
-Converts internal shortcut format to platform-appropriate display strings:
-
-```typescript
-import { formatAccelerator } from "@/lib/use-global-shortcuts";
-
-// On macOS:
-formatAccelerator("Ctrl+S"); // Returns: "⌘S"
-formatAccelerator("Ctrl+Shift+R"); // Returns: "⇧⌘R"
-
-// On Windows:
-formatAccelerator("Ctrl+S"); // Returns: "Ctrl+S"
-formatAccelerator("Ctrl+Shift+R"); // Returns: "Shift+Ctrl+R"
-```
-
-The internal format always uses `Ctrl` as the primary modifier. On macOS, this is displayed as the Command symbol. Modifier key display mapping:
-
-| Internal | macOS Display | Windows Display |
-| -------- | ------------- | --------------- |
-| `Ctrl`   | `⌘` (Command) | `Ctrl`          |
-| `Shift`  | `⇧`           | `Shift`         |
-| `Alt`    | `⌥` (Option)  | `Alt`           |
-
-### Usage Example
-
-```typescript
-import { useGlobalShortcuts } from "@/lib/use-global-shortcuts";
-
-function App() {
-  const handlers = {
-    "file:save": () => saveCurrentFile(),
-    "file:open": () => openFileDialog(),
-    "edit:find": () => toggleSearchPanel(),
-  };
-
-  useGlobalShortcuts(handlers);
-
-  return <Editor />;
-}
-```
-
----
-
-## Adding a New Shortcut
-
-To add a new keyboard shortcut:
-
-1. **Define the action** in `lib/menu-definitions.ts` with the appropriate menu section, Japanese label, and accelerator string.
-
-2. **Add the handler** in the component or hook that should respond to the shortcut.
-
-3. **For Electron**, the menu definition is automatically picked up by the native menu builder.
-
-4. **For Web**, ensure the action ID is handled in the `useGlobalShortcuts` callback map.
-
-5. **Update the menu structure** in `WEB_MENU_STRUCTURE` if the shortcut should appear in the web menu.
-
-Example:
-
-```typescript
-// In menu-definitions.ts
-{
-  label: "新しいアクション",
-  actionId: "edit:new-action",
-  accelerator: "Ctrl+Shift+A",
-}
-```
-
-```typescript
-// In useGlobalShortcuts handler map
-"edit:new-action": () => performNewAction(),
-```
-
----
-
-## Related Documentation
-
-- [Milkdown Plugin Development Guide](./milkdown-plugin.md) -- Editor plugin architecture
-- [Linting Rules Guide](./linting-rules.md) -- Text quality rules and configuration
+- [Milkdown プラグイン開発](./milkdown-plugin.md)
+- [lint ルール](./linting-rules.md)

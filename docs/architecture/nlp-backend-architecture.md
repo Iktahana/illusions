@@ -1,3 +1,14 @@
+---
+title: NLP バックエンド
+slug: nlp-backend
+type: architecture
+status: active
+updated: 2026-04-03
+tags:
+  - architecture
+  - nlp
+---
+
 # NLP Backend Architecture
 
 This document describes the NLP (Natural Language Processing) backend architecture for the illusions project after the migration from frontend to backend processing.

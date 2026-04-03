@@ -1,341 +1,152 @@
-# Milkdown Plugin Development Guide
-
-## Overview
-
-The `milkdown-plugin-japanese-novel` package provides Japanese-specific editing capabilities for the Milkdown editor (ProseMirror-based). It extends Milkdown with custom nodes, remark syntax plugins, and decoration systems tailored for Japanese novel writing.
-
-**Key features:**
-
-- Ruby annotations (furigana)
-- Tate-chu-yoko (horizontal-in-vertical text)
-- No-break spans
-- Character kerning
-- Part-of-speech (POS) highlighting via kuromoji
-- Linting decorations (L1/L2/L3 rules)
-
-**Package location:** `packages/milkdown-plugin-japanese-novel/`
-
+---
+title: Milkdown プラグイン開発
+slug: milkdown-plugin
+type: guide
+status: active
+updated: 2026-04-03
+tags:
+  - guide
+  - milkdown
+  - mdi
 ---
 
-## Entry Point
+# Milkdown プラグイン開発
 
-```typescript
+このページは、`packages/milkdown-plugin-japanese-novel` の **現在の実装** を追うためのガイドです。  
+以前の文書には、存在しない fixer や簡略化しすぎた構成説明が含まれていました。ここでは現行コードにあるものだけを記します。
+
+## パッケージの役割
+
+[`packages/milkdown-plugin-japanese-novel`](../../packages/milkdown-plugin-japanese-novel/) は、Milkdown / ProseMirror に日本語小説向けの編集機能を足すパッケージです。
+
+主な責務は次の 3 系統です。
+
+- MDI 由来の inline 構文を remark で解釈する
+- カスタム node / schema を ProseMirror に追加する
+- ProseMirror plugin で editor DOM や編集補助を整える
+
+補助機能として、同じ package 配下に次の 2 つがあります。
+
+- `pos-highlight/`
+- `linting-plugin/`
+
+## エントリーポイント
+
+メインのエントリーポイントは [`index.ts`](../../packages/milkdown-plugin-japanese-novel/index.ts) の `japaneseNovel()` です。
+
+```ts
 import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
 
-// Use with Milkdown Editor
-Editor.make().use(japaneseNovel(options)).create();
+Editor.make()
+  .use(japaneseNovel({ isVertical: true }))
+  .create();
 ```
 
-### JapaneseNovelOptions
+`japaneseNovel()` は `MilkdownPlugin[]` を返します。  
+オプション型は [`config.ts`](../../packages/milkdown-plugin-japanese-novel/config.ts) の `JapaneseNovelOptions` です。
 
-| Option               | Type      | Default | Description                  |
-| -------------------- | --------- | ------- | ---------------------------- |
-| `isVertical`         | `boolean` | `false` | Enable vertical writing mode |
-| `showManuscriptLine` | `boolean` | `false` | Show manuscript grid lines   |
-| `enableTcy`          | `boolean` | `true`  | Enable tate-chu-yoko nodes   |
-| `enableRuby`         | `boolean` | `true`  | Enable ruby annotation nodes |
-| `enableNoBreak`      | `boolean` | `true`  | Enable no-break span nodes   |
-| `enableKern`         | `boolean` | `true`  | Enable kerning span nodes    |
+現行オプション:
 
-The function returns `MilkdownPlugin[]`, which can be spread into the editor's plugin chain.
+| Option               | Default | 説明                         |
+| -------------------- | ------- | ---------------------------- |
+| `isVertical`         | `false` | 縦書き class を付与する      |
+| `showManuscriptLine` | `false` | 原稿用紙風 class を付与する  |
+| `enableRuby`         | `true`  | ルビ構文を有効化する         |
+| `enableTcy`          | `true`  | 縦中横構文を有効化する       |
+| `enableNoBreak`      | `true`  | 改行禁止 span を有効化する   |
+| `enableKern`         | `true`  | カーニング span を有効化する |
 
----
+## 構文とノード
 
-## Custom Nodes
+現行のカスタム schema / node は次のとおりです。
 
-The package defines four custom ProseMirror node types. Each follows the `$nodeSchema` pattern and implements `parseDOM`, `toDOM`, `parseMarkdown`, and `toMarkdown`.
+| ノード           | ファイル                  | 役割                   |
+| ---------------- | ------------------------- | ---------------------- |
+| `ruby`           | `nodes/ruby.ts`           | `{親文字\|ルビ}`       |
+| `tcy`            | `nodes/tcy.ts`            | `^12^` のような縦中横  |
+| `nobreak`        | `nodes/nobreak.ts`        | `[[no-break:...]]`     |
+| `kern`           | `nodes/kern.ts`           | `[[kern:0.2em:...]]`   |
+| `heading-anchor` | `nodes/heading-anchor.ts` | 見出しアンカー用ノード |
 
-### 1. Ruby Node
+### 構文パーサ
 
-**File:** `nodes/ruby.ts`
+remark 側の構文プラグインは [`syntax.ts`](../../packages/milkdown-plugin-japanese-novel/syntax.ts) にあります。
 
-**Markdown syntax:** `{base|ruby}`
+- `remarkRubyPlugin`
+- `remarkTcyPlugin`
+- `remarkNoBreakPlugin`
+- `remarkKernPlugin`
+- `remarkHeadingAnchorPlugin`
 
-**HTML output:**
+以前の文書で触れていた `paragraph-id-fixer` は、現在の package 構成には存在しません。
 
-```html
-<ruby><rb>base</rb><rt>ruby</rt></ruby>
-```
+## ProseMirror プラグイン
 
-Ruby annotations provide furigana (reading aids) above or beside kanji characters.
+`japaneseNovel()` が常に組み込む ProseMirror plugin は次の 3 つです。
 
-**Split ruby** assigns individual readings to each character using a dot separator:
+| プラグイン              | ファイル                      | 役割                                            |
+| ----------------------- | ----------------------------- | ----------------------------------------------- |
+| `stylePlugin`           | `index.ts` 内                 | `.milkdown-japanese-vertical` などの class 付与 |
+| `headingIdFixerPlugin`  | `plugins/heading-id-fixer.ts` | 見出し ID を安定化                              |
+| `hardbreakIndentPlugin` | `plugins/hardbreak-indent.ts` | hard break 周りの字下げ補助                     |
 
-```markdown
-{東京|とう.きょう}
-```
+ここでも、旧文書にあった `paragraph-id-fixer` は現行実装にはありません。
 
-This renders each character with its own `<rt>` annotation, producing per-character ruby pairs:
+## `MilkdownEditor.tsx` との接続
 
-- 東 -> とう
-- 京 -> きょう
+アプリ本体側の接続は [`components/editor/MilkdownEditor.tsx`](../../components/editor/MilkdownEditor.tsx) です。
 
-**Example usage in MDI:**
+現在このコンポーネントでは:
 
-```markdown
-{漢字|かんじ}の読みを付ける
-{薔薇|ばら}は美しい
-{東京都|とう.きょう.と}に住んでいます
-```
+- `japaneseNovel({ isVertical, showManuscriptLine: false, enableRuby, enableTcy })`
+- `posHighlight(...)`
+- `linting(...)`
 
-### 2. Tate-Chu-Yoko Node
+を editor 作成時に組み込み、`editorViewInstance` に対して一部設定を動的更新します。
 
-**File:** `nodes/tcy.ts`
+実装上の特徴:
 
-**Markdown syntax:** `^text^`
+- `enableRuby` と `enableTcy` は UI 設定に合わせて切り替える
+- `posHighlight` と `linting` は editor を再作成せずに設定更新する
+- editor の縦横レイアウトや measure box は `MilkdownEditor.tsx` 側で制御しており、`japaneseNovel()` 本体は scroll viewport を持ちません
 
-**HTML output:**
+## 品詞ハイライト
 
-```html
-<span class="tcy">text</span>
-```
+品詞ハイライトは [`pos-highlight/`](../../packages/milkdown-plugin-japanese-novel/pos-highlight/) にあります。
 
-Tate-chu-yoko (TCY) renders horizontal text within vertical writing mode. This is commonly used for two-digit numbers, abbreviations, and short Latin strings in Japanese vertical text.
+現行実装の事実:
 
-**Example usage in MDI:**
+- `getNlpClient()` を使って NLP バックエンドに接続する
+- ProseMirror decoration plugin として動作する
+- paragraph 単位で結果をキャッシュする
+- 設定更新は `updatePosHighlightSettings()` で editor 再作成なしに行う
 
-```markdown
-^12^月^31^日
-^OK^をクリックする
-```
+## linting プラグイン
 
-### 3. No-Break Node
+linting は [`linting-plugin/`](../../packages/milkdown-plugin-japanese-novel/linting-plugin/) にあります。
 
-**File:** `nodes/nobreak.ts`
+現行実装の事実:
 
-**Markdown syntax:** `[[no-break:text]]`
+- `RuleRunner` を受け取ってルールを実行する
+- 必要なときだけ `INlpClient` を使って形態素解析する
+- ProseMirror decorations で issue を表示する
+- viewport-aware な段落処理と cache を持つ
+- document-level rule があれば全文脈の処理も走る
+- `updateLintingSettings()` で change reason 付きの動的更新ができる
 
-**HTML output:**
+## 開発時の見方
 
-```html
-<span class="mdi-nobr">text</span>
-```
+機能を追うときは次の順で見ると早いです。
 
-Prevents line breaking within the wrapped text. Useful for keeping compound terms or proper nouns on a single line.
+1. `components/editor/MilkdownEditor.tsx`
+2. `packages/milkdown-plugin-japanese-novel/index.ts`
+3. `packages/milkdown-plugin-japanese-novel/syntax.ts`
+4. `packages/milkdown-plugin-japanese-novel/nodes/*`
+5. `packages/milkdown-plugin-japanese-novel/pos-highlight/*`
+6. `packages/milkdown-plugin-japanese-novel/linting-plugin/*`
 
-**Example usage in MDI:**
+## 関連
 
-```markdown
-[[no-break:令和六年]]の出来事
-[[no-break:東京スカイツリー]]を訪れた
-```
-
-### 4. Kern Node
-
-**File:** `nodes/kern.ts`
-
-**Markdown syntax:** `[[kern:value:text]]`
-
-**HTML output:**
-
-```html
-<span class="mdi-kern" style="--mdi-kern:0.2em;">text</span>
-```
-
-Provides fine-grained character spacing control. The `value` is a CSS length unit applied as letter-spacing via a CSS custom property.
-
-**Example usage in MDI:**
-
-```markdown
-[[kern:0.2em:タイトル]]
-[[kern:-0.05em:（注）]]
-```
-
----
-
-## Remark Plugins
-
-**File:** `syntax.ts`
-
-Five remark plugins parse inline notation from Markdown/MDI source into the custom nodes above. Each plugin supports an `enable` toggle to selectively activate or deactivate parsing.
-
-| Plugin                      | Syntax                | Purpose                        |
-| --------------------------- | --------------------- | ------------------------------ |
-| `remarkRubyPlugin`          | `{base\|ruby}`        | Ruby annotation parsing        |
-| `remarkTcyPlugin`           | `^text^`              | Tate-chu-yoko parsing          |
-| `remarkNoBreakPlugin`       | `[[no-break:text]]`   | No-break span parsing          |
-| `remarkKernPlugin`          | `[[kern:value:text]]` | Kerning span parsing           |
-| `remarkHeadingAnchorPlugin` | N/A                   | Auto-generates heading anchors |
-
-These plugins operate at the remark (Markdown AST) level, transforming raw text into typed MDAST nodes that Milkdown then converts into ProseMirror nodes.
-
----
-
-## ID Fixers
-
-### Heading ID Fixer
-
-**File:** `plugins/heading-id-fixer.ts`
-
-Automatically generates deterministic IDs for heading nodes based on their text content. Uses `encodeURIComponent()` to produce URL-safe IDs.
-
-**Behavior:**
-
-- Runs on every document change (transaction)
-- Includes infinite loop prevention to avoid recursive dispatch
-- Ensures all headings have stable, content-derived IDs for anchor linking
-
-### Paragraph ID Fixer
-
-**File:** `plugins/paragraph-id-fixer.ts`
-
-Assigns sequential IDs to all textblock nodes in the document.
-
-**Behavior:**
-
-- Runs only on Markdown load (not on every change)
-- Applies IDs in reverse document order to avoid position shifts caused by earlier mutations
-- Provides stable paragraph identifiers for linting and cross-referencing
-
----
-
-## POS Highlighting System
-
-**Directory:** `pos-highlight/`
-
-The POS (Part-of-Speech) highlighting system colorizes tokens in the editor based on their grammatical role, using kuromoji morphological analysis.
-
-### Entry Points
-
-```typescript
-import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
-
-// Initialize
-Editor.make().use(posHighlight(options)).create();
-
-// Update settings at runtime
-import { updatePosHighlightSettings } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
-updatePosHighlightSettings(view, newSettings);
-```
-
-### Architecture
-
-- **Decoration plugin** with `LRUCache(200)` for caching token results per paragraph
-- **Viewport-aware**: only tokenizes paragraphs currently visible in the scroll container
-- **Debounced**: 300ms delay before re-tokenization on document changes
-- **Tokenization**: Uses `getNlpClient()` to access the kuromoji backend
-
-### Supported POS Types
-
-The system recognizes 12 part-of-speech categories, each with a configurable highlight color:
-
-| POS            | Japanese Label | Description                        |
-| -------------- | -------------- | ---------------------------------- |
-| Noun           | 名詞           | Nouns and noun phrases             |
-| Verb           | 動詞           | Verbs                              |
-| Adjective      | 形容詞         | I-adjectives                       |
-| Adverb         | 副詞           | Adverbs                            |
-| Particle       | 助詞           | Particles (は, が, を, etc.)       |
-| Auxiliary Verb | 助動詞         | Auxiliary verbs (です, ます, etc.) |
-| Conjunction    | 接続詞         | Conjunctions                       |
-| Interjection   | 感動詞         | Interjections                      |
-| Symbol         | 記号           | Symbols and punctuation            |
-| Adnominal      | 連体詞         | Pre-noun adjectivals               |
-| Filler         | フィラー       | Fillers (えーと, あのー, etc.)     |
-| Other          | その他         | Unclassified tokens                |
-
----
-
-## Linting Plugin
-
-**Directory:** `linting-plugin/`
-
-The linting plugin provides real-time Japanese text quality checks with inline decorations showing issues and suggested fixes.
-
-### Entry Points
-
-```typescript
-import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
-
-// Initialize
-Editor.make().use(linting(options)).create();
-
-// Update settings at runtime
-import { updateLintingSettings } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
-updateLintingSettings(view, newSettings, reason);
-```
-
-### Architecture
-
-- **Dual caches**: Separate `issueCache` and `tokenCache`, both `LRUCache(200)`
-- **Viewport-aware**: only lints paragraphs visible in the scroll container
-- **Debounced**: 500ms delay before re-linting on document changes
-- **Three rule levels**:
-  - **L1 (Regex)**: Pattern matching, no external dependencies
-  - **L2 (Morphological)**: Requires kuromoji tokenization via `INlpClient`
-  - **L3 (LLM)**: Async inference with 8-second debounce and `AbortSignal` support
-- **Ignored corrections**: Filters out dismissed issues via hash matching
-
-### LLM Validation (L3)
-
-L3 rules submit candidate issues to an LLM for validation. This avoids false positives for context-dependent checks (e.g., homophone disambiguation).
-
-- Uses an 8-second debounce to batch requests
-- Supports `AbortSignal` for cancellation when the user edits during validation
-- Results are cached and marked with `llmValidated: true`
-
----
-
-## Shared Utilities
-
-**File:** `shared/paragraph-helpers.ts`
-
-### ParagraphInfo
-
-```typescript
-interface ParagraphInfo {
-  node: ProseMirrorNode; // The ProseMirror node
-  pos: number; // Absolute position in the document
-  text: string; // Plain text content
-  atomAdjustments: number[]; // Offset adjustments for atom nodes
-  index: number; // Paragraph index in the document
-}
-```
-
-### Functions
-
-| Function                 | Description                                                                |
-| ------------------------ | -------------------------------------------------------------------------- |
-| `collectParagraphs()`    | Gathers all paragraph-level nodes with their positions and text            |
-| `getAtomOffset()`        | Calculates position offset caused by atom nodes (ruby, tcy, kern, nobreak) |
-| `getVisibleParagraphs()` | Filters paragraphs to only those visible in the current viewport           |
-| `findScrollContainer()`  | Locates the nearest scrollable ancestor element                            |
-
-### Why Atom Adjustments Matter
-
-Custom inline nodes (ruby, tcy, kern, nobreak) occupy space in the ProseMirror document model but do not appear in `textContent`. When mapping lint issue positions (based on plain text offsets) back to ProseMirror positions, these atom adjustments correct for the discrepancy.
-
----
-
-## File Structure
-
-```
-packages/milkdown-plugin-japanese-novel/
-├── index.ts                  # Entry point: japaneseNovel()
-├── syntax.ts                 # Remark plugins (5 parsers)
-├── nodes/
-│   ├── ruby.ts               # Ruby annotation node
-│   ├── tcy.ts                # Tate-chu-yoko node
-│   ├── nobreak.ts            # No-break span node
-│   └── kern.ts               # Kerning span node
-├── plugins/
-│   ├── heading-id-fixer.ts   # Auto-generate heading IDs
-│   └── paragraph-id-fixer.ts # Sequential paragraph IDs
-├── pos-highlight/
-│   ├── index.ts              # POS highlight entry point
-│   └── ...                   # Decoration plugin, settings
-├── linting-plugin/
-│   ├── index.ts              # Linting entry point
-│   └── ...                   # Decoration plugin, caches
-└── shared/
-    └── paragraph-helpers.ts  # ParagraphInfo, atom adjustments
-```
-
----
-
-## Related Documentation
-
-- [Linting Rules Guide](./linting-rules.md) -- How to write and register linting rules
-- [Keyboard Shortcuts Reference](./keyboard-shortcuts.md) -- Editor shortcuts and menu structure
-- [MDI Syntax Specification](../../MDI.md) -- Full MDI file format specification
-- [Storage Architecture](../architecture/storage-architecture.md) -- Persistence layer used by editor state
+- [MDI 構文仕様](../MDI/spec.md)
+- [MDI 実装ノート](../MDI/implementation.md)
+- [lint ルール](./linting-rules.md)

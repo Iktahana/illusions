@@ -1,3 +1,14 @@
+---
+title: Bug Label Verification Report
+slug: bug-verification-2026-02-15
+type: archive
+status: archived
+updated: 2026-02-15
+tags:
+  - archive
+  - issues
+---
+
 # Bug Label Verification Report
 
 **Date**: 2026-02-15  
