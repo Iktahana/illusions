@@ -1,3 +1,14 @@
+---
+title: Claude Code Review 設定
+slug: claude-review-setup
+type: setup
+status: active
+updated: 2026-04-03
+tags:
+  - setup
+  - claude
+---
+
 # Claude Code Review Setup Guide
 
 This guide will help you complete the setup for automated PR reviews using Claude Code.

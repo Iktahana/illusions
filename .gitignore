@@ -64,6 +64,11 @@ public/swe-worker*
 # WebStorm
 .idea
 
+# Obsidian workspace-local files
+docs/.obsidian/workspace.json
+docs/.obsidian/workspace-mobile.json
+docs/.obsidian/cache/
+
 # auto-generated files
 /generated/
 

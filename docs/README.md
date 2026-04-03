@@ -1,97 +1,82 @@
-# illusions Documentation
-
-Documentation for the illusions Japanese novel editor.
-
+---
+title: illusions ドキュメント
+slug: docs-index
+type: moc
+status: active
+updated: 2026-04-03
+tags:
+  - docs
+  - index
 ---
 
-## Architecture
+# illusions ドキュメント
 
-System architecture and design documents.
+`docs/` は、illusions の実装・設計・仕様を GitHub と Obsidian の両方から扱えるように整理した文書庫です。
 
-| Document                                                        | Description                                  | Key Files                                           |
-| --------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------- |
-| [Storage System](architecture/storage-system.md)                | Unified storage service (SQLite / IndexedDB) | `lib/storage-service.ts`, `lib/electron-storage.ts` |
-| [Virtual File System](architecture/vfs.md)                      | VFS abstraction with security sandbox        | `lib/vfs/`, `electron-vfs-ipc-handlers.js`          |
-| [LLM Engine](architecture/llm-engine.md)                        | Dual LLM engine (local + online)             | `llm-service/`, `lib/llm-client/`                   |
-| [Tab Manager](architecture/tab-manager.md)                      | Multi-tab state management and persistence   | `lib/tab-manager/`                                  |
-| [Export System](architecture/export-system.md)                  | MDI export pipeline (PDF/EPUB/DOCX/TXT)      | `lib/export/`                                       |
-| [File Watcher](architecture/file-watcher.md)                    | External file change detection               | `lib/file-watcher.ts`                               |
-| [History Service](architecture/history-service.md)              | Snapshot history with character-level diff   | `lib/history-service.ts`, `lib/diff-service.ts`     |
-| [Project Lifecycle](architecture/project-lifecycle.md)          | Project vs standalone mode management        | `lib/project-service.ts`, `lib/project-manager.ts`  |
-| [NLP Backend](architecture/nlp-backend-architecture.md)         | Japanese text processing (kuromoji)          | `lib/nlp-backend/`, `lib/nlp-client/`               |
-| [Notification System](architecture/notification-system.md)      | Toast notification API                       | `lib/notification-manager.ts`                       |
-| [Correction AI System](architecture/correction-ai-system.ja.md) | AI-powered proofreading architecture         | `lib/linting/`, `llm-service/`                      |
+- GitHub から読む場合の入口: この `README.md`
+- Obsidian から読む場合の入口: [Home.md](Home.md)
 
-## Guides
+## 読み始める場所
 
-Development guides and how-to documents.
+- [MDI ドキュメント](MDI/README.md)
+  `.mdi` フォーマット、構文仕様、実装上の扱いを追いたい場合の入口です。
+- [アーキテクチャ](architecture/)
+  ストレージ、VFS、タブ管理、エクスポートなど、主要サブシステムの設計文書です。
+- [開発ガイド](guides/)
+  lint ルール、Milkdown 拡張、ショートカット、テーマなどの実務ガイドです。
+- [セットアップ](setup/)
+  ツール導入や開発支援の手順です。
+- [リファレンス](references/README.md)
+  外部規格や補助資料の置き場です。
 
-| Guide                                                    | Description                                                        |
-| -------------------------------------------------------- | ------------------------------------------------------------------ |
-| [Milkdown Plugin Development](guides/milkdown-plugin.md) | Custom ProseMirror nodes, linting decorations, plugin architecture |
-| [Writing Linting Rules](guides/linting-rules.md)         | L1/L2/document-level rule hierarchy, presets, adding new rules     |
-| [Keyboard Shortcuts](guides/keyboard-shortcuts.md)       | Full shortcut table, menu structure, platform differences          |
-| [Theme Colors](guides/THEME_COLORS.md)                   | Theming system and CSS custom properties                           |
+## 主要ドキュメント
 
-## References
+### MDI
 
-Reference materials and component catalogs.
+- [MDI 概要](MDI/README.md)
+- [MDI 構文仕様](MDI/spec.md)
+- [MDI 実装ノート](MDI/implementation.md)
+- [MDI ロードマップ](MDI/roadmap.md)
 
-| Reference                                | Description                                               |
-| ---------------------------------------- | --------------------------------------------------------- |
-| [UI Overlays](references/ui-overlays.md) | All overlay components (dialogs, toasts, menus, tooltips) |
-| [Japanese Standards (PDFs)](references/) | JIS X 4051, JTF style guide, joyo kanji table, etc.       |
+### アーキテクチャ
 
-## Setup
+- [ストレージシステム](architecture/storage-system.md)
+- [Virtual File System](architecture/vfs.md)
+- [タブ管理](architecture/tab-manager.md)
+- [文書化ギャップマップ](architecture/documentation-gap-map.md)
+- [エクスポートシステム](architecture/export-system.md)
+- [ファイル監視](architecture/file-watcher.md)
+- [履歴サービス](architecture/history-service.md)
+- [プロジェクトライフサイクル](architecture/project-lifecycle.md)
+- [NLP バックエンド](architecture/nlp-backend-architecture.md)
+- [通知システム](architecture/notification-system.md)
+- [校正・AI 校正システム](architecture/correction-ai-system.ja.md)
 
-Configuration and setup guides.
+### ガイド
 
-| Guide                                                    | Description                     |
-| -------------------------------------------------------- | ------------------------------- |
-| [Claude Code Review Setup](setup/CLAUDE_REVIEW_SETUP.md) | Automated PR review with Claude |
+- [Milkdown プラグイン開発](guides/milkdown-plugin.md)
+- [Lint ルール作成](guides/linting-rules.md)
+- [キーボードショートカット](guides/keyboard-shortcuts.md)
+- [テーマカラー](guides/theme-colors.md)
 
-## Project Root
+## これから補う文書
 
-| File                      | Description                              |
-| ------------------------- | ---------------------------------------- |
-| [README.md](../README.md) | Project overview, features, installation |
-| [CLAUDE.md](../CLAUDE.md) | AI agent rules and code review standards |
-| [MDI.md](../MDI.md)       | MDI file format syntax specification     |
-| [TERMS.md](../TERMS.md)   | Terms of service                         |
+- [文書化ギャップマップ](architecture/documentation-gap-map.md)
+  現在の実装に対して、まだ正式ページがないサブシステムを整理した一覧です。
 
----
+- 今の優先対象
+  - dockview / pane layout
+  - terminal subsystem
+  - user dictionary / ignored corrections
+  - project upgrade / permissions
+  - keymap system
+  - onboarding / welcome flow
 
-## Directory Structure
+### セットアップ
 
-```
-docs/
-├── README.md                              # This index file
-├── architecture/                          # System architecture
-│   ├── correction-ai-system.ja.md         # AI proofreading system
-│   ├── export-system.md                   # Export pipeline
-│   ├── file-watcher.md                    # File change detection
-│   ├── history-service.md                 # Snapshot history
-│   ├── llm-engine.md                      # LLM engine (local + online)
-│   ├── nlp-backend-architecture.md        # NLP processing
-│   ├── notification-system.md             # Notification API
-│   ├── project-lifecycle.md               # Project management
-│   ├── storage-system.md                  # Storage service
-│   ├── tab-manager.md                     # Tab management
-│   └── vfs.md                             # Virtual file system
-├── guides/                                # Development guides
-│   ├── keyboard-shortcuts.md              # Shortcuts reference
-│   ├── linting-rules.md                   # Linting rule development
-│   ├── milkdown-plugin.md                 # Plugin development
-│   └── THEME_COLORS.md                    # Theming system
-├── references/                            # Reference materials
-│   ├── ui-overlays.md                     # UI overlay components
-│   └── *.pdf                              # Japanese language standards
-├── setup/                                 # Setup guides
-│   └── CLAUDE_REVIEW_SETUP.md             # Claude review config
-└── archive/                               # Archived documents
-    └── bug-verification-2026-02-15.md     # Historical bug report
-```
+- [Claude Code Review 設定](setup/CLAUDE_REVIEW_SETUP.md)
 
----
+## 補足
 
-**Last Updated**: 2026-02-25
+- 旧来のルート `MDI.md` は互換性のために残し、正式な入口は `docs/MDI/` に移しました。
+- 歴史的な検証メモや単発レポートは [archive/](archive/) に置きます。

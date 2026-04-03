@@ -1,3 +1,14 @@
+---
+title: 通知システム
+slug: notification-system
+type: architecture
+status: active
+updated: 2026-04-03
+tags:
+  - architecture
+  - ui
+---
+
 # 通知ポップアップシステム使用ガイド
 
 VS Code 風の通知ポップアップシステム。info（情報）、warning（警告）、error（エラー）の3種類と、進捗バー付き通知をサポートしています。

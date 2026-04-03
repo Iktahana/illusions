@@ -1,3 +1,14 @@
+---
+title: Lint ルール作成ガイド
+slug: linting-rules
+type: guide
+status: active
+updated: 2026-04-03
+tags:
+  - guide
+  - linting
+---
+
 # Writing Linting Rules Guide
 
 ## Overview
