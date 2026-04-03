@@ -1,3 +1,15 @@
+---
+title: エクスポートシステム
+slug: export-system
+type: architecture
+status: active
+updated: 2026-04-03
+tags:
+  - architecture
+  - mdi
+  - export
+---
+
 # Export System Documentation
 
 Modular MDI export pipeline supporting 5 output formats with secure HTML rendering and Electron IPC integration.
@@ -268,7 +280,7 @@ All IPC handlers call `dialog.showSaveDialog` in the main process to let the use
 
 - [Storage System](./storage-system.md) -- Persistence layer used for export preferences
 - [NLP Backend Architecture](./nlp-backend-architecture.md) -- Text processing backend
-- [MDI Syntax Specification](../../MDI.md) -- Full MDI syntax reference
+- [MDI Syntax Specification](../MDI/spec.md) -- Full MDI syntax reference
 
 ---
 

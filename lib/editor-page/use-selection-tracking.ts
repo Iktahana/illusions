@@ -1,93 +1,249 @@
+import type { RefObject } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { EditorView } from "@milkdown/prose/view";
 
+export interface ViewportRect {
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+}
+
+export interface EditorSelectionState {
+  hasSelection: boolean;
+  selectionCount: number;
+  isCollapsed: boolean;
+  from: number;
+  to: number;
+  startCoords: ViewportRect | null;
+  endCoords: ViewportRect | null;
+  rangeRect: ViewportRect | null;
+  pointerClientY: number | null;
+}
+
 interface UseSelectionTrackingOptions {
-  /** The current ProseMirror EditorView instance. */
   editorViewInstance: EditorView | null;
-  /** Called with the non-whitespace character count of the current selection (0 when nothing is selected). */
+  scrollContainerRef: RefObject<HTMLDivElement | null>;
   onSelectionChange?: (charCount: number) => void;
 }
 
-interface UseSelectionTrackingResult {
-  /** Whether the editor currently has a non-empty text selection. */
-  hasSelection: boolean;
+const EMPTY_SELECTION_STATE: EditorSelectionState = {
+  hasSelection: false,
+  selectionCount: 0,
+  isCollapsed: true,
+  from: 0,
+  to: 0,
+  startCoords: null,
+  endCoords: null,
+  rangeRect: null,
+  pointerClientY: null,
+};
+
+function toViewportRect(rect: {
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+}): ViewportRect {
+  return {
+    top: rect.top,
+    left: rect.left,
+    right: rect.right,
+    bottom: rect.bottom,
+  };
 }
 
-/**
- * Tracks the editor's text selection and reports the selected character count.
- *
- * Attaches mouseup/keyup/selectionchange listeners to the ProseMirror DOM and
- * debounces updates by 10 ms to avoid excessive re-renders during rapid key events.
- */
+function sameRect(a: ViewportRect | null, b: ViewportRect | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.top === b.top && a.left === b.left && a.right === b.right && a.bottom === b.bottom;
+}
+
+function sameSelectionState(a: EditorSelectionState, b: EditorSelectionState): boolean {
+  return (
+    a.hasSelection === b.hasSelection &&
+    a.selectionCount === b.selectionCount &&
+    a.isCollapsed === b.isCollapsed &&
+    a.from === b.from &&
+    a.to === b.to &&
+    a.pointerClientY === b.pointerClientY &&
+    sameRect(a.startCoords, b.startCoords) &&
+    sameRect(a.endCoords, b.endCoords) &&
+    sameRect(a.rangeRect, b.rangeRect)
+  );
+}
+
+function safeCoordsAtPos(editorViewInstance: EditorView, pos: number): ViewportRect | null {
+  try {
+    return toViewportRect(editorViewInstance.coordsAtPos(pos));
+  } catch {
+    return null;
+  }
+}
+
+function selectionBelongsToEditor(selection: Selection | null, editorDom: HTMLElement): boolean {
+  if (!selection || selection.rangeCount === 0) return false;
+  const { anchorNode, focusNode } = selection;
+  return (
+    !!anchorNode && !!focusNode && editorDom.contains(anchorNode) && editorDom.contains(focusNode)
+  );
+}
+
 export function useSelectionTracking({
   editorViewInstance,
+  scrollContainerRef,
   onSelectionChange,
-}: UseSelectionTrackingOptions): UseSelectionTrackingResult {
-  const [hasSelection, setHasSelection] = useState(false);
-
-  // コールバック参照（レンダリングのたびにエフェクトを再登録しないように）
+}: UseSelectionTrackingOptions): EditorSelectionState {
+  const [selectionState, setSelectionState] = useState<EditorSelectionState>(EMPTY_SELECTION_STATE);
+  const selectionStateRef = useRef(selectionState);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const lastPointerYRef = useRef<number | null>(null);
+  const lastReportedCountRef = useRef(0);
+  const frameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    selectionStateRef.current = selectionState;
+  }, [selectionState]);
+
   useEffect(() => {
     onSelectionChangeRef.current = onSelectionChange;
   }, [onSelectionChange]);
 
-  // 選択文字数を更新する（editorViewInstance が変わったときだけ再生成）
-  const updateSelectionCount = useCallback(() => {
-    if (!editorViewInstance) return;
-    const { state } = editorViewInstance;
-    const { selection } = state;
-    const { from, to } = selection;
-
-    // 選択がない場合は 0
-    if (from === to) {
-      setHasSelection(false);
-      onSelectionChangeRef.current?.(0);
+  const updateSelectionState = useCallback(() => {
+    if (!editorViewInstance) {
+      if (lastReportedCountRef.current !== 0) {
+        lastReportedCountRef.current = 0;
+        onSelectionChangeRef.current?.(0);
+      }
+      setSelectionState((prev) =>
+        sameSelectionState(prev, EMPTY_SELECTION_STATE) ? prev : EMPTY_SELECTION_STATE,
+      );
       return;
     }
 
-    // 選択文字列の文字数を数える（空白は除外）
-    const selectedText = state.doc.textBetween(from, to);
-    const count = selectedText.replace(/\s/g, "").length;
-    setHasSelection(count > 0);
-    onSelectionChangeRef.current?.(count);
+    const { state, dom } = editorViewInstance;
+    const { selection } = state;
+    const domSelection = document.getSelection();
+    const belongsToEditor = selectionBelongsToEditor(domSelection, dom);
+
+    let nextState = {
+      ...EMPTY_SELECTION_STATE,
+      from: selection.from,
+      to: selection.to,
+      pointerClientY: lastPointerYRef.current,
+    };
+
+    if (!selection.empty && belongsToEditor) {
+      const selectedText = state.doc.textBetween(selection.from, selection.to);
+      const selectionCount = selectedText.replace(/\s/g, "").length;
+      const range =
+        domSelection && domSelection.rangeCount > 0
+          ? domSelection.getRangeAt(0).getBoundingClientRect()
+          : null;
+
+      nextState = {
+        hasSelection: selectionCount > 0,
+        selectionCount,
+        isCollapsed: false,
+        from: selection.from,
+        to: selection.to,
+        startCoords: safeCoordsAtPos(editorViewInstance, selection.from),
+        endCoords: safeCoordsAtPos(editorViewInstance, selection.to),
+        rangeRect:
+          range && !(range.width === 0 && range.height === 0) ? toViewportRect(range) : null,
+        pointerClientY: lastPointerYRef.current,
+      };
+    }
+
+    if (lastReportedCountRef.current !== nextState.selectionCount) {
+      lastReportedCountRef.current = nextState.selectionCount;
+      onSelectionChangeRef.current?.(nextState.selectionCount);
+    }
+
+    setSelectionState((prev) => (sameSelectionState(prev, nextState) ? prev : nextState));
   }, [editorViewInstance]);
 
-  // 選択変更のスケジューリング（10ms デバウンス、前回のタイマーをキャンセル）
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scheduleUpdate = useCallback(() => {
-    if (debounceTimerRef.current !== null) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    debounceTimerRef.current = setTimeout(() => {
-      debounceTimerRef.current = null;
-      updateSelectionCount();
-    }, 10);
-  }, [updateSelectionCount]);
+  const scheduleUpdate = useCallback(
+    (pointerClientY?: number | null) => {
+      if (typeof pointerClientY === "number") {
+        lastPointerYRef.current = pointerClientY;
+      } else if (pointerClientY === null) {
+        lastPointerYRef.current = null;
+      }
 
-  // 選択範囲の変更を追跡する
+      if (frameRef.current !== null) {
+        return;
+      }
+
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
+        updateSelectionState();
+      });
+    },
+    [updateSelectionState],
+  );
+
   useEffect(() => {
-    if (!editorViewInstance) return;
+    if (!editorViewInstance) {
+      scheduleUpdate(null);
+      return;
+    }
 
     const editorDom = editorViewInstance.dom;
+    const scrollContainer = scrollContainerRef.current;
 
-    editorDom.addEventListener("mouseup", scheduleUpdate);
-    editorDom.addEventListener("keyup", scheduleUpdate);
-    document.addEventListener("selectionchange", scheduleUpdate);
-
-    // 初期値
-    updateSelectionCount();
-
-    return () => {
-      editorDom.removeEventListener("mouseup", scheduleUpdate);
-      editorDom.removeEventListener("keyup", scheduleUpdate);
-      document.removeEventListener("selectionchange", scheduleUpdate);
-      if (debounceTimerRef.current !== null) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
+    const handleMouseMove = (event: MouseEvent) => {
+      if ((event.buttons & 1) === 1) {
+        scheduleUpdate(event.clientY);
       }
     };
-  }, [editorViewInstance, scheduleUpdate, updateSelectionCount]);
 
-  return { hasSelection };
+    const handleMouseUp = (event: MouseEvent) => {
+      scheduleUpdate(event.clientY);
+    };
+
+    const handleKeyUp = () => {
+      scheduleUpdate();
+    };
+
+    const handleSelectionChange = () => {
+      const domSelection = document.getSelection();
+      const belongsToEditor = selectionBelongsToEditor(domSelection, editorDom);
+      if (!belongsToEditor && !selectionStateRef.current.hasSelection) {
+        return;
+      }
+      scheduleUpdate();
+    };
+
+    const handleViewportMove = () => {
+      if (selectionStateRef.current.hasSelection) {
+        scheduleUpdate();
+      }
+    };
+
+    editorDom.addEventListener("mousemove", handleMouseMove);
+    editorDom.addEventListener("mouseup", handleMouseUp);
+    editorDom.addEventListener("keyup", handleKeyUp);
+    document.addEventListener("selectionchange", handleSelectionChange);
+    scrollContainer?.addEventListener("scroll", handleViewportMove, { passive: true });
+    window.addEventListener("resize", handleViewportMove);
+
+    scheduleUpdate();
+
+    return () => {
+      editorDom.removeEventListener("mousemove", handleMouseMove);
+      editorDom.removeEventListener("mouseup", handleMouseUp);
+      editorDom.removeEventListener("keyup", handleKeyUp);
+      document.removeEventListener("selectionchange", handleSelectionChange);
+      scrollContainer?.removeEventListener("scroll", handleViewportMove);
+      window.removeEventListener("resize", handleViewportMove);
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
+  }, [editorViewInstance, scheduleUpdate, scrollContainerRef]);
+
+  return selectionState;
 }

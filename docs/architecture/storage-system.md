@@ -1,421 +1,173 @@
-# Storage Service Documentation
-
-Complete guide to the illusions storage system architecture and API.
-
+---
+title: ストレージシステム
+slug: storage-system
+type: architecture
+status: active
+updated: 2026-04-03
+tags:
+  - architecture
+  - storage
 ---
 
-## Quick Start
+# ストレージシステム
 
-```typescript
-import { getStorageService } from "@/lib/storage-service";
+この文書は、現在の `illusions` が使っているストレージ抽象層の実装に合わせて整理したものです。  
+古い文書にあった簡略化された API 例や旧型定義ではなく、現行の `lib/storage/*` を基準にしています。
+
+## 全体像
+
+ストレージの入口は [`lib/storage/storage-service.ts`](../../lib/storage/storage-service.ts) の `getStorageService()` です。
+
+```ts
+import { getStorageService } from "@/lib/storage/storage-service";
 
 const storage = getStorageService();
-
-// Initialize (called automatically on first use)
 await storage.initialize();
-
-// Save session
-await storage.saveSession({
-  appState: { lastOpenedMdiPath: "/path/to/file.mdi" },
-  recentFiles: [],
-  editorBuffer: { content: "...", timestamp: Date.now() },
-});
-
-// Load session
-const session = await storage.loadSession();
 ```
 
----
+この factory は実行環境を見て provider を切り替えます。
 
-## Architecture Overview
+- Web
+  - [`lib/storage/web-storage.ts`](../../lib/storage/web-storage.ts)
+  - IndexedDB / Dexie
+- Electron
+  - [`lib/storage/electron-storage.ts`](../../lib/storage/electron-storage.ts)
+  - preload bridge + IPC
+  - main process 側は [`electron/ipc/storage-ipc.js`](../../electron/ipc/storage-ipc.js)
+  - 実ストアは [`lib/storage/electron-storage-manager.ts`](../../lib/storage/electron-storage-manager.ts)
 
-### System Diagram
+## 共通インターフェース
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│              Application (React/Next.js)                     │
-│                  Uses: getStorageService()                   │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│        StorageService Factory (storage-service.ts)           │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │ createStorageService() - Environment Detection       │   │
-│  │ getStorageService() - Singleton Instance             │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────┬───────────────────────────┬───────────────────┘
-              │                           │
-    ┌─────────┴──────────┐        ┌──────┴──────────────┐
-    │                    │        │                     │
-    ▼                    ▼        ▼                     ▼
-Electron?          ┌──────────────────────┐       ┌──────────┐
-  YES              │  WebStorageProvider  │       │ Browser? │
-    │              │ (web-storage.ts)     │       │   YES    │
-    │              │                      │       │          │
-    ▼              │ IndexedDB via Dexie │       ▼          │
-┌──────────────────────┐ (Async API)     │  ┌──────────┐   │
-│  ElectronStorage     │                  │  │IndexedDB │   │
-│  Provider            └──────────────────┘  └──────────┘   │
-│ (electron-storage.ts)│                                     │
-│                      │                                     │
-│ IPC Client:          │                                     │
-│ - ipcRenderer.invoke │                                     │
-└──────────┬───────────┘                                     │
-           │                                                 │
-           │ IPC                                             │
-           ▼                                                 │
-┌──────────────────────────────────────────────┐            │
-│ Electron Main Process (main.js)              │            │
-│ + IPC Handlers                               │            │
-│                                              │            │
-│ ┌────────────────────────────────────────┐   │            │
-│ │ ElectronStorageManager                 │   │            │
-│ │ (electron-storage-manager.ts)          │   │            │
-│ │                                        │   │            │
-│ │ better-sqlite3 (Synchronous API)       │   │            │
-│ │                                        │   │            │
-│ │ ~/Library/Application Support/...      │   │            │
-│ │ illusions-storage.db                   │   │            │
-│ │                                        │   │            │
-│ │ Tables:                                │   │            │
-│ │ - app_state                            │   │            │
-│ │ - recent_files                         │   │            │
-│ │ - editor_buffer                        │   │            │
-│ └────────────────────────────────────────┘   │            │
-└──────────────────────────────────────────────┘            │
-```
+現在の共通型は [`lib/storage/storage-types.ts`](../../lib/storage/storage-types.ts) の `IStorageService` です。
 
-### Environment Detection
+主な責務:
 
-The storage service automatically detects the runtime environment:
+- セッション保存 / 復元
+- `AppState` 保存 / 復元
+- 最近使ったファイル
+- editor buffer
+- recent projects
+- 汎用 key-value store
 
-- **Electron**: Uses SQLite via better-sqlite3 (main process)
-- **Web**: Uses IndexedDB via Dexie.js (browser)
+### 主要メソッド
 
----
+| メソッド                                                            | 用途                                                         |
+| ------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `initialize()`                                                      | provider 初期化                                              |
+| `saveSession()` / `loadSession()`                                   | `appState` / `recentFiles` / `editorBuffer` を一括保存・復元 |
+| `saveAppState()` / `loadAppState()`                                 | UI 設定・プロジェクト状態などの永続化                        |
+| `addToRecent()` / `getRecentFiles()`                                | 最近使ったファイル                                           |
+| `saveEditorBuffer()` / `loadEditorBuffer()` / `clearEditorBuffer()` | 未保存下書き                                                 |
+| `addRecentProject()` / `getRecentProjects()`                        | 最近使ったプロジェクト                                       |
+| `setItem()` / `getItem()` / `removeItem()`                          | 汎用 KV ストア                                               |
+| `clearAll()`                                                        | 全削除                                                       |
 
-## API Reference
+## `AppState` に入るもの
 
-### Core Methods
+`AppState` はかなり広く使われています。現行型には少なくとも次が含まれます。
 
-#### `initialize(): Promise<void>`
+- editor 表示設定
+  - `fontScale`
+  - `lineHeight`
+  - `paragraphSpacing`
+  - `textIndent`
+  - `fontFamily`
+  - `charsPerLine`
+  - `autoCharsPerLine`
+  - `showParagraphNumbers`
+- 品詞ハイライト設定
+- linting / correction mode / guideline 設定
+- LLM 関連設定
+- TTS 設定
+- terminal 設定
+- open tabs / dockview layout
+- keymap overrides
+- project / character data
 
-Initialize the storage service. Called automatically on first use.
+つまり、これは単なる「最近開いたファイル」保存ではなく、エディタ全体の持続設定の集約先です。
 
-#### `saveSession(session: StorageSession): Promise<void>`
+## Web 実装
 
-Save the complete session (app state, recent files, editor buffer).
+Web は [`web-storage.ts`](../../lib/storage/web-storage.ts) の `WebStorageProvider` が担当します。
 
-#### `loadSession(): Promise<StorageSession | null>`
+現行実装の事実:
 
-Load the complete session.
+- Dexie DB 名は `illusionsStorage`
+- `appState` / `recentFiles` / `editorBuffer` / `projectHandles` / `kvStore` を持つ
+- `saveSession()` は Dexie transaction で一括保存する
+- `saveEditorBuffer(buffer, fileKey?)` は `fileKey` を使える
+- `projectHandles` は `ProjectManager` と連携して Web のディレクトリハンドル永続化を支える
 
-### App State
+補足:
 
-#### `saveAppState(appState: AppState): Promise<void>`
+- Web での recent project / project handle 管理は、`IStorageService` 単体では完結せず、`lib/project/*` と分担しています
+- `FileSystemFileHandle` / `FileSystemDirectoryHandle` を使うため、ブラウザ依存の制約があります
 
-Save application state.
+## Electron 実装
 
-```typescript
-await storage.saveAppState({
-  lastOpenedMdiPath: "/path/to/file.mdi",
-});
-```
+Electron は [`electron-storage.ts`](../../lib/storage/electron-storage.ts) の `ElectronStorageProvider` が担当します。
 
-#### `loadAppState(): Promise<AppState | null>`
+現行実装の事実:
 
-Load application state.
+- レンダラ側 provider 自体は薄い IPC ラッパ
+- preload から `window.electronAPI.storage` を介して main process に渡す
+- 実 DB 操作は `ElectronStorageManager`
+- SQLite 実装に `better-sqlite3` を使う
 
-### Recent Files
+注意点:
 
-#### `addToRecent(file: RecentFile): Promise<void>`
+- Electron 版の `saveEditorBuffer(buffer, fileKey?)` は interface 上は `fileKey` を受けるが、現状 provider 側では無視する
+- つまり `fileKey` による editor buffer 分離は、現時点では Web 実装のほうが実質的に強い
 
-Add file to recent files list (max 10 files).
+## recent files と recent projects
 
-```typescript
-await storage.addToRecent({
-  name: "Document.mdi",
-  path: "/path/to/Document.mdi",
-  lastModified: Date.now(),
-  snippet: "Content preview...",
-});
-```
+このストレージ層には 2 系統の最近使った項目があります。
 
-#### `getRecentFiles(): Promise<RecentFile[]>`
+### recent files
 
-Get list of recent files (sorted by last modified).
+- `RecentFile`
+- 単一ファイルを開く流れで使う
+- `path` ベース
 
-#### `removeFromRecent(path: string): Promise<void>`
+### recent projects
 
-Remove file from recent files list.
+- `RecentProject`
+- project root 単位で扱う
+- Electron では SQLite に永続化
+- Web では project handle と組み合わせた別管理が入る
 
-#### `clearRecent(): Promise<void>`
+## editor buffer
 
-Clear all recent files.
+`EditorBuffer` はクラッシュ復旧や保存前ドラフト維持のためのデータです。
 
-### Editor Buffer
+現行型:
 
-#### `saveEditorBuffer(buffer: EditorBuffer): Promise<void>`
-
-Save editor content for crash recovery.
-
-```typescript
-await storage.saveEditorBuffer({
-  content: editorContent,
-  timestamp: Date.now(),
-});
-```
-
-#### `loadEditorBuffer(): Promise<EditorBuffer | null>`
-
-Load saved editor buffer.
-
-#### `clearEditorBuffer(): Promise<void>`
-
-Clear editor buffer (e.g., after successful save).
-
-### Maintenance
-
-#### `clearAll(): Promise<void>`
-
-Clear all stored data. ⚠️ **Cannot be undone!**
-
----
-
-## Type Definitions
-
-```typescript
-interface RecentFile {
-  name: string; // File name
-  path: string; // File path
-  lastModified: number; // Timestamp (ms)
-  snippet?: string; // Content preview
-}
-
-interface AppState {
-  lastOpenedMdiPath?: string;
-  // Add more app-level state fields here
-}
-
+```ts
 interface EditorBuffer {
-  content: string; // Editor content
-  timestamp: number; // Timestamp
-}
-
-interface StorageSession {
-  appState: AppState;
-  recentFiles: RecentFile[];
-  editorBuffer: EditorBuffer | null;
-}
-
-interface IStorageService {
-  initialize(): Promise<void>;
-
-  saveSession(session: StorageSession): Promise<void>;
-  loadSession(): Promise<StorageSession | null>;
-
-  saveAppState(appState: AppState): Promise<void>;
-  loadAppState(): Promise<AppState | null>;
-
-  addToRecent(file: RecentFile): Promise<void>;
-  getRecentFiles(): Promise<RecentFile[]>;
-  removeFromRecent(path: string): Promise<void>;
-  clearRecent(): Promise<void>;
-
-  saveEditorBuffer(buffer: EditorBuffer): Promise<void>;
-  loadEditorBuffer(): Promise<EditorBuffer | null>;
-  clearEditorBuffer(): Promise<void>;
-
-  clearAll(): Promise<void>;
+  content: string;
+  timestamp: number;
+  fileHandle?: FileSystemFileHandle;
 }
 ```
 
----
+補足:
 
-## Usage Patterns
+- Web では `fileHandle` を保持できる
+- Electron では IPC を通すが、`fileHandle` 前提の流れは Web ほど強くない
 
-### Pattern 1: Restore on Startup
+## 実装上の境界
 
-```typescript
-useEffect(() => {
-  const restore = async () => {
-    const storage = getStorageService();
-    const session = await storage.loadSession();
+この層は「保存 API の共通化」を担いますが、次の責務は外にあります。
 
-    if (session?.appState.lastOpenedMdiPath) {
-      await openFile(session.appState.lastOpenedMdiPath);
-    }
+- project lifecycle 全体
+- directory handle の復元フロー
+- tab manager のビジネスロジック
+- dockview のレイアウト復元ロジック
 
-    if (session?.editorBuffer) {
-      restoreContent(session.editorBuffer.content);
-    }
-  };
+つまり storage service は、状態を保存する基盤であって、アプリ全体の復元オーケストレーションそのものではありません。
 
-  restore();
-}, []);
-```
+## 関連
 
-### Pattern 2: Auto-save Every 30 Seconds
-
-```typescript
-useEffect(() => {
-  const storage = getStorageService();
-
-  const interval = setInterval(async () => {
-    await storage.saveEditorBuffer({
-      content: editorContent,
-      timestamp: Date.now(),
-    });
-  }, 30000);
-
-  return () => clearInterval(interval);
-}, [editorContent]);
-```
-
-### Pattern 3: Update Recent Files on Save
-
-```typescript
-async function saveFile(path: string, content: string) {
-  const storage = getStorageService();
-
-  // ... save to filesystem ...
-
-  await storage.addToRecent({
-    name: path.split("/").pop() || "Untitled",
-    path,
-    lastModified: Date.now(),
-    snippet: content.substring(0, 100),
-  });
-
-  await storage.clearEditorBuffer();
-}
-```
-
----
-
-## Environment Differences
-
-### Electron
-
-- ✅ **Fast**: Synchronous SQLite operations
-- ✅ **No limits**: Storage limited only by disk space
-- ✅ **Persistent**: Stored in OS-specific application data directory
-- ❌ **Requires IPC**: Must communicate with main process
-
-**Storage Location:**
-
-- macOS: `~/Library/Application Support/illusions/illusions-storage.db`
-- Windows: `%APPDATA%\illusions\illusions-storage.db`
-- Linux: `~/.config/illusions/illusions-storage.db`
-
-### Web (IndexedDB)
-
-- ✅ **Universal**: Works in any browser
-- ✅ **No backend**: Client-side only
-- ❌ **Async only**: All operations are Promise-based
-- ❌ **Quota limits**: ~50MB typical quota (varies by browser)
-- ❌ **Private browsing**: May not persist data
-
----
-
-## Debugging
-
-### Inspect Electron Database
-
-```bash
-# macOS
-sqlite3 ~/Library/Application\ Support/illusions/illusions-storage.db
-
-# View schema
-.schema
-
-# Query data
-SELECT * FROM app_state;
-SELECT * FROM recent_files;
-SELECT * FROM editor_buffer;
-```
-
-### Inspect Web IndexedDB
-
-1. Open DevTools (F12)
-2. Go to **Application** tab
-3. Expand **IndexedDB**
-4. Select **illusionsStorage** database
-5. Browse tables: `appState`, `recentFiles`, `editorBuffer`
-
----
-
-## Migration & Compatibility
-
-### Breaking Changes from v1
-
-- ❌ `MockStorageAdapter` removed
-- ❌ Direct tokenizer imports no longer work
-- ❌ CDN tokenizer removed
-
-### Migration Guide
-
-```typescript
-// Before (v1)
-import { MockStorageAdapter } from "@/lib/storage-adapter";
-const adapter = new MockStorageAdapter();
-
-// After (v2)
-import { getStorageService } from "@/lib/storage-service";
-const storage = getStorageService();
-```
-
-### Data Portability
-
-**Q: Can I share data between Web and Electron?**
-
-A: No direct sharing. Web uses IndexedDB, Electron uses SQLite. To transfer data:
-
-1. Export data as JSON from one environment
-2. Import JSON into the other environment
-
-**Q: Can I encrypt sensitive data?**
-
-A: Yes, encrypt data before calling `saveAppState()` and decrypt after `loadAppState()`.
-
----
-
-## FAQ
-
-**Q: What happens if storage initialization fails?**
-
-A: The service will throw an error. Catch it and show a user-friendly message.
-
-**Q: How do I clear all data for testing?**
-
-A: Call `await storage.clearAll()`. ⚠️ This cannot be undone!
-
-**Q: Can I use this with React Server Components?**
-
-A: No, this is a client-side service. Use it only in `"use client"` components.
-
-**Q: What if IndexedDB quota is exceeded?**
-
-A: The service will throw a `QuotaExceededError`. Handle it by:
-
-- Clearing old data
-- Asking user to free up space
-- Implementing data compression
-
----
-
-## Integration Checklist
-
-- [ ] Install `better-sqlite3` (for Electron)
-- [ ] Add IPC handlers in `electron/main.ts`
-- [ ] Expose storage API in `electron/preload.ts`
-- [ ] Call `loadSession()` on app startup
-- [ ] Test in both Electron and Web environments
-- [ ] Implement error handling for quota limits
-- [ ] Add data export/import features (optional)
-
----
-
-**Last Updated**: 2026-02-06  
-**Version**: 2.0.0
+- [project lifecycle](./project-lifecycle.md)
+- [tab manager](./tab-manager.md)
+- [VFS](./vfs.md)

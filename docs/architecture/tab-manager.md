@@ -1,3 +1,14 @@
+---
+title: タブ管理
+slug: tab-manager
+type: architecture
+status: active
+updated: 2026-04-03
+tags:
+  - architecture
+  - tabs
+---
+
 # Tab Manager Documentation
 
 Composable React hook system for multi-tab editing in the illusions editor.

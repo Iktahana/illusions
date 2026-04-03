@@ -1,136 +1,88 @@
 "use client";
 
-import type { RefObject } from "react";
-import { useEffect, useState } from "react";
-import { EditorView } from "@milkdown/prose/view";
+import type { CSSProperties } from "react";
+import { useMemo } from "react";
+
+import type { EditorSelectionState } from "@/lib/editor-page/use-selection-tracking";
 
 interface SelectionCounterProps {
-  editorView: EditorView;
+  selectionState: EditorSelectionState;
   isVertical?: boolean;
-  containerRef: RefObject<HTMLDivElement | null>;
+  containerElement: HTMLDivElement | null;
 }
 
 export default function SelectionCounter({
-  editorView,
+  selectionState,
   isVertical = false,
-  containerRef,
+  containerElement,
 }: SelectionCounterProps) {
-  const [selectionCount, setSelectionCount] = useState<number>(0);
-  const [isVisible, setIsVisible] = useState<boolean>(false);
-  const [position, setPosition] = useState<{
-    top?: number;
-    right?: number;
-    bottom?: number;
-    left?: number;
-  }>({ top: 0, right: 0 });
+  const isVisible = selectionState.hasSelection && selectionState.selectionCount > 0;
+  const displayCount = isVisible ? selectionState.selectionCount : 0;
 
-  useEffect(() => {
-    if (!editorView) return;
+  const style = useMemo<CSSProperties | null>(() => {
+    const wrapper = containerElement?.parentElement;
+    if (!containerElement || !wrapper) return null;
 
-    const updateSelectionCount = (event?: MouseEvent | Event) => {
-      const { state } = editorView;
-      const { selection } = state;
-      const { from, to } = selection;
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const padding = 16;
 
-      // 表示位置を更新する
-      const container = containerRef.current;
-      if (container) {
-        const rect = container.getBoundingClientRect();
+    if (isVertical) {
+      const startRight = selectionState.startCoords?.right ?? selectionState.rangeRect?.right;
+      const endRight = selectionState.endCoords?.right ?? selectionState.rangeRect?.right;
+      const xRight = Math.max(
+        startRight ?? wrapperRect.right - padding,
+        endRight ?? wrapperRect.right - padding,
+      );
+      const relativeX = Math.max(
+        padding,
+        Math.min(wrapperRect.width - padding, xRight - wrapperRect.left),
+      );
 
-        // キーボード選択時は選択末尾の座標をフォールバックに使う
-        const fallbackCoords =
-          !(event instanceof MouseEvent) && from !== to ? editorView.coordsAtPos(to) : null;
+      return {
+        position: "absolute",
+        bottom: padding,
+        left: relativeX,
+        transform: "translateX(-100%)",
+      };
+    }
 
-        if (isVertical) {
-          // 縦書き: エディタの一番下に配置
-          const xPos =
-            event instanceof MouseEvent
-              ? event.clientX
-              : (fallbackCoords?.left ?? rect.left + rect.width / 2);
-          setPosition({
-            bottom: window.innerHeight - rect.bottom + 16,
-            left: xPos,
-          });
-        } else {
-          // 横書き: エディタの一番右に配置
-          const yPos =
-            event instanceof MouseEvent
-              ? event.clientY
-              : (fallbackCoords?.top ?? rect.top + rect.height / 2);
-          setPosition({
-            top: yPos,
-            right: window.innerWidth - rect.right + 16,
-          });
-        }
-      }
+    const fallbackY = selectionState.endCoords?.top ?? selectionState.rangeRect?.top;
+    const cursorY =
+      typeof selectionState.pointerClientY === "number"
+        ? selectionState.pointerClientY
+        : (fallbackY ?? wrapperRect.top + wrapperRect.height / 2);
+    const relativeY = Math.max(
+      padding,
+      Math.min(wrapperRect.height - padding, cursorY - wrapperRect.top),
+    );
 
-      // 選択がない場合は非表示
-      if (from === to) {
-        setIsVisible(false);
-        // フェードアウトのため、少し遅らせてカウントを消す
-        setTimeout(() => setSelectionCount(0), 300);
-        return;
-      }
-
-      // 選択文字列を取得
-      const selectedText = state.doc.textBetween(from, to);
-
-      // 文字数を数える（空白除外。アプリのカウント方法に合わせる）
-      const count = selectedText.replace(/\s/g, "").length;
-      setSelectionCount(count);
-      setIsVisible(true);
+    return {
+      position: "absolute",
+      top: relativeY,
+      right: padding,
+      transform: "translateY(-50%)",
     };
+  }, [
+    containerElement,
+    isVertical,
+    selectionState.endCoords,
+    selectionState.pointerClientY,
+    selectionState.rangeRect,
+    selectionState.startCoords,
+  ]);
 
-    // 選択変更を購読
-    const editorDom = editorView.dom;
-
-    const handleMouseUp = (e: MouseEvent) => {
-      // 選択確定を待つ
-      setTimeout(() => updateSelectionCount(e), 10);
-    };
-
-    const handleKeyUp = () => {
-      // キーボード選択は直近の位置を使う
-      setTimeout(() => updateSelectionCount(), 10);
-    };
-
-    const handleSelectionChange = () => {
-      // ネイティブの selectionchange（ドラッグ/三連クリック等）を扱う
-      setTimeout(() => updateSelectionCount(), 10);
-    };
-
-    editorDom.addEventListener("mouseup", handleMouseUp);
-    editorDom.addEventListener("keyup", handleKeyUp);
-    document.addEventListener("selectionchange", handleSelectionChange);
-
-    // 初期値
-    updateSelectionCount();
-
-    return () => {
-      editorDom.removeEventListener("mouseup", handleMouseUp);
-      editorDom.removeEventListener("keyup", handleKeyUp);
-      document.removeEventListener("selectionchange", handleSelectionChange);
-    };
-  }, [editorView, isVertical, containerRef]);
-
-  // 選択がない場合は描画しない
-  if (selectionCount === 0 && !isVisible) {
+  if (!isVisible || displayCount === 0 || !style) {
     return null;
   }
 
   return (
     <div
-      className={`fixed z-30 px-2 py-1 text-sm text-foreground-tertiary pointer-events-none transition-opacity duration-300 ${
+      className={`z-30 px-2 py-1 text-sm text-foreground-tertiary pointer-events-none transition-opacity duration-300 whitespace-nowrap ${
         isVisible ? "opacity-100" : "opacity-0"
       }`}
-      style={{
-        top: position.top !== undefined ? `${position.top}px` : undefined,
-        right: position.right !== undefined ? `${position.right}px` : undefined,
-        bottom: position.bottom !== undefined ? `${position.bottom}px` : undefined,
-        left: position.left !== undefined ? `${position.left}px` : undefined,
-      }}
+      style={style}
     >
-      <span className="font-semibold">{selectionCount}</span>
+      <span className="font-semibold">{displayCount}</span>
       <span className="ml-1">文字</span>
     </div>
   );

@@ -1,3 +1,14 @@
+---
+title: 履歴サービス
+slug: history-service
+type: architecture
+status: active
+updated: 2026-04-03
+tags:
+  - architecture
+  - history
+---
+
 # History Service Documentation
 
 Version history with auto/manual/milestone snapshots and character-level diff for Japanese text.
