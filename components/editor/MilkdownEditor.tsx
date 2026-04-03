@@ -437,8 +437,10 @@ export default function MilkdownEditor({
     };
 
     // スタイルが変わっていない場合はアニメーションをしない（保存による再構築など）
+    // charWidth が 0→計測値 へ初期化される遷移ではアニメーション不要
     const isFirstRender = isFirstRenderRef.current;
-    const shouldAnimate = styleChanged && !isFirstRender;
+    const isCharWidthInit = prev.charWidth === 0 && charWidth > 0;
+    const shouldAnimate = styleChanged && !isFirstRender && !isCharWidthInit;
     isFirstRenderRef.current = false;
 
     const applyStyles = () => {
@@ -508,8 +510,12 @@ export default function MilkdownEditor({
       };
     } else {
       applyStyles();
-      editorDom.style.opacity = "1";
-      onLayoutReady?.();
+      // charWidth が未計測（0）の間はエディタを透明のまま維持し、
+      // 幅制約なしの状態が一瞬描画されるのを防ぐ
+      if (charWidth > 0 || charsPerLine <= 0) {
+        editorDom.style.opacity = "1";
+        onLayoutReady?.();
+      }
     }
   }, [
     charsPerLine,

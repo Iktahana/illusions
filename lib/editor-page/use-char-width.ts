@@ -1,7 +1,7 @@
 "use client";
 
 import type { RefObject } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 const MEASURE_CHAR_COUNT = 40;
 const MEASURE_TEXT = "国".repeat(MEASURE_CHAR_COUNT);
@@ -32,28 +32,28 @@ export function useCharWidth({
   const measureRef = useRef<HTMLSpanElement>(null);
   const [charWidth, setCharWidth] = useState(0);
 
-  // Synchronous measurement after DOM update (handles prop-driven changes).
+  // Synchronous measurement + ResizeObserver in a single effect.
+  // useLayoutEffect guarantees the measurement runs before the browser paints,
+  // so downstream effects always have an up-to-date charWidth on the first frame.
+  // ResizeObserver catches async changes (e.g. web font swap after initial render).
   // Uses getBoundingClientRect() for sub-pixel precision — offsetWidth rounds to
   // integers, which can lose fractional pixels across 40 characters and cause the
   // last character to overflow.
   useLayoutEffect(() => {
     const el = measureRef.current;
     if (!el) return;
-    const w = el.getBoundingClientRect().width / MEASURE_CHAR_COUNT;
-    if (w > 0) setCharWidth(w);
-  }, [fontFamily, fontScale, lineHeight, isVertical]);
 
-  // ResizeObserver for async changes (e.g. web font swap, system font load)
-  useEffect(() => {
-    const el = measureRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(() => {
+    const measure = () => {
       const w = el.getBoundingClientRect().width / MEASURE_CHAR_COUNT;
       if (w > 0) setCharWidth(w);
-    });
+    };
+
+    measure();
+
+    const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [fontFamily, fontScale, lineHeight, isVertical]);
 
   return { measureRef, charWidth };
 }
