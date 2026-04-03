@@ -16,6 +16,10 @@ import SelectionCounter from "./SelectionCounter";
 import EditorToolbar from "./editor/EditorToolbar";
 import MilkdownEditor from "./editor/MilkdownEditor";
 import { buildSegments, buildSpeechChunks, buildSpeechMap } from "@/lib/hooks/speech-utils";
+import {
+  scrollToSpeechTarget,
+  cancelSpeechScroll,
+} from "@/lib/editor-page/speech-auto-scroll";
 import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
@@ -104,6 +108,7 @@ export default function NovelEditor({
   const editorViewRef = useRef<EditorView | null>(null);
   const speechMapRef = useRef<{ text: string; positions: number[] } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isVerticalRef = useRef(false);
   const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null);
   /** Doc position to resume TTS from after the current chunk ends. null = no continuation. */
   const speechContinuationPosRef = useRef<number | null>(null);
@@ -137,6 +142,10 @@ export default function NovelEditor({
     editorViewRef.current = editorViewInstance;
   }, [editorViewInstance]);
 
+  useEffect(() => {
+    isVerticalRef.current = isVertical;
+  }, [isVertical]);
+
   // 変更時に縦書き状態を localStorage に保存する
   useEffect(() => {
     if (!isMounted) return;
@@ -165,6 +174,7 @@ export default function NovelEditor({
   }, []);
 
   const clearHighlight = useCallback(() => {
+    cancelSpeechScroll();
     const view = editorViewRef.current;
     if (!view) return;
     view.dispatch(view.state.tr.setMeta("speechDecorations", []));
@@ -200,6 +210,26 @@ export default function NovelEditor({
             if (from == null) return;
             const deco = Decoration.inline(from, to, { class: "speech-reading" });
             v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
+            // Auto-scroll to keep the highlighted word in view
+            const container = scrollContainerRef.current;
+            if (container) {
+              try {
+                const domResult = v.domAtPos(from);
+                const target =
+                  domResult.node instanceof HTMLElement
+                    ? domResult.node
+                    : domResult.node.parentElement;
+                if (target) {
+                  scrollToSpeechTarget({
+                    container,
+                    target,
+                    isVertical: isVerticalRef.current,
+                  });
+                }
+              } catch {
+                // domAtPos may throw if the position is out of range
+              }
+            }
           },
           onEnd() {
             clearHighlight();
