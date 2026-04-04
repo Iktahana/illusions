@@ -74,6 +74,7 @@ docs/.obsidian/
 reviews/
 .claude/review-loop.log
 .claude/*.local.md
+.claude/settings.local.json
 
 # auto-generated files
 /generated/
