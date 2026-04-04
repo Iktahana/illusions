@@ -29,6 +29,15 @@ export interface UseFileWatchIntegrationParams extends TabManagerCore {
     remoteContent: string,
     remoteTimestamp: number,
   ) => void;
+  /**
+   * Callback to trigger an editor remount (increment editorKey).
+   * Called after applying external content so the Milkdown instance
+   * re-initializes with the updated content.
+   *
+   * エディタの再マウントをトリガーするコールバック（editorKey をインクリメント）。
+   * 外部コンテンツ適用後に呼び出し、Milkdown インスタンスを再初期化する。
+   */
+  onEditorRemountNeeded?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -47,6 +56,7 @@ function buildOnChanged(
   setTabs: TabManagerCore["setTabs"],
   tabsRef: TabManagerCore["tabsRef"],
   openDiffTab: UseFileWatchIntegrationParams["openDiffTab"],
+  onEditorRemountNeeded?: () => void,
 ): (diskContent: string, lastModified: number) => void {
   return (diskContent: string, lastModified: number) => {
     const currentTabs = tabsRef.current;
@@ -70,6 +80,7 @@ function buildOnChanged(
           } satisfies EditorTabState;
         }),
       );
+      onEditorRemountNeeded?.();
       notificationManager.info(`「${fileName}」が更新されました`, 3000);
     } else if (tab.fileSyncStatus === "dirty") {
       // Dirty tab: do NOT touch buffer; enter conflicted state
@@ -111,13 +122,10 @@ function buildOnChanged(
                     isDirty: false,
                     fileSyncStatus: "clean",
                     conflictDiskContent: null,
-                    // Trigger live editor update via externalContent prop.
-                    // Without this, the tab state is updated but the active
-                    // editor instance continues to show the stale content.
-                    pendingExternalContent: diskContent,
                   } satisfies EditorTabState;
                 }),
               );
+              onEditorRemountNeeded?.();
             },
           },
           {
@@ -164,7 +172,8 @@ function buildOnChanged(
  * CPU 節約のため一時停止する。タブを閉じるとウォッチャーも停止する。
  */
 export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): void {
-  const { tabs, setTabs, activeTabId, tabsRef, isElectron, openDiffTab } = params;
+  const { tabs, setTabs, activeTabId, tabsRef, isElectron, openDiffTab, onEditorRemountNeeded } =
+    params;
 
   /**
    * Map from tabId to its FileWatcher instance.
@@ -226,7 +235,13 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
 
       if (!watchers.has(tab.id)) {
         // Create a new watcher for this tab
-        const onChanged = buildOnChanged(tab.id, setTabs, tabsRef, openDiffTab);
+        const onChanged = buildOnChanged(
+          tab.id,
+          setTabs,
+          tabsRef,
+          openDiffTab,
+          onEditorRemountNeeded,
+        );
         const watcher = createFileWatcher({ path: filePath, onChanged });
 
         if (isActiveTab) {
@@ -237,7 +252,7 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
         watcherPaths.set(tab.id, filePath);
       }
     }
-  }, [tabs, activeTabId, isElectron, setTabs, tabsRef, openDiffTab]);
+  }, [tabs, activeTabId, isElectron, setTabs, tabsRef, openDiffTab, onEditorRemountNeeded]);
 
   // ---------------------------------------------------------------------------
   // Pause/resume watchers based on active tab

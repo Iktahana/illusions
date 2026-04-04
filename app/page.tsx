@@ -219,6 +219,7 @@ export default function EditorPage() {
     vfsReadyPromise: vfsGate.promise,
     flushLayoutState: stableFlushLayoutState,
     windowKey,
+    onEditorRemountNeeded: incrementEditorKey,
   });
   const {
     content,

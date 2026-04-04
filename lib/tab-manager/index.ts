@@ -32,6 +32,8 @@ export function useTabManager(options?: {
    * state so multiple windows with different projects do not overwrite each other.
    */
   windowKey?: string | null;
+  /** Callback to trigger editor remount when external file changes are detected. */
+  onEditorRemountNeeded?: () => void;
 }): UseTabManagerReturn {
   const skipAutoRestore = options?.skipAutoRestore ?? false;
   const autoSaveEnabled = options?.autoSave ?? true;
@@ -130,6 +132,7 @@ export function useTabManager(options?: {
     isProjectRef: tabState.isProjectRef,
     isElectron: tabState.isElectron,
     openDiffTab: tabState.openDiffTab,
+    onEditorRemountNeeded: options?.onEditorRemountNeeded,
   });
 
   // --- Tab persistence (save/restore to AppState) -------------------------

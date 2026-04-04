@@ -47,6 +47,7 @@ function buildOnChangedForTest(
   setTabs: SetTabsFn,
   tabsRef: MutableRefObject<TabState[]>,
   notifications: SimulatedNotification[],
+  onEditorRemountNeeded?: () => void,
 ): (diskContent: string, lastModified: number) => void {
   return (diskContent: string, _lastModified: number) => {
     const currentTabs = tabsRef.current;
@@ -70,6 +71,7 @@ function buildOnChangedForTest(
           } as EditorTabState;
         }),
       );
+      onEditorRemountNeeded?.();
       notifications.push({
         message: `「${fileName}」が更新されました`,
         type: "info",
@@ -115,6 +117,7 @@ function buildOnChangedForTest(
             } as EditorTabState;
           }),
         );
+        onEditorRemountNeeded?.();
       };
 
       notifications.push({
@@ -159,11 +162,18 @@ function buildContext(initialTab: EditorTabState) {
   };
 
   const notifications: SimulatedNotification[] = [];
-  const onChanged = buildOnChangedForTest(initialTab.id, setTabs, tabsRef, notifications);
+  const onEditorRemountNeeded = vi.fn();
+  const onChanged = buildOnChangedForTest(
+    initialTab.id,
+    setTabs,
+    tabsRef,
+    notifications,
+    onEditorRemountNeeded,
+  );
 
   const getTab = () => tabs.find((t) => t.id === initialTab.id) as EditorTabState;
 
-  return { onChanged, getTab, notifications };
+  return { onChanged, getTab, notifications, onEditorRemountNeeded };
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +215,15 @@ describe("file-watch: clean tab receives external change", () => {
     onChanged("new disk content", Date.now());
 
     expect(getTab().pendingExternalContent).toBe("new disk content");
+  });
+
+  it("calls onEditorRemountNeeded after auto-reload", () => {
+    const tab = makeEditorTab({ fileSyncStatus: "clean", content: "old", lastSavedContent: "old" });
+    const { onChanged, onEditorRemountNeeded } = buildContext(tab);
+
+    onChanged("new disk content", Date.now());
+
+    expect(onEditorRemountNeeded).toHaveBeenCalledTimes(1);
   });
 
   it("emits an info notification", () => {
@@ -361,6 +380,20 @@ describe("file-watch: 'ディスクの内容を採用' action", () => {
     adoptAction?.onClick();
 
     expect(getTab().conflictDiskContent).toBeNull();
+  });
+
+  it("calls onEditorRemountNeeded after adopting disk content", () => {
+    const tab = makeEditorTab({ fileSyncStatus: "dirty", content: "my edits", isDirty: true });
+    const { onChanged, notifications, onEditorRemountNeeded } = buildContext(tab);
+
+    onChanged("disk changes", Date.now());
+    // onEditorRemountNeeded should NOT be called for dirty→conflicted transition
+    expect(onEditorRemountNeeded).not.toHaveBeenCalled();
+
+    const adoptAction = notifications[0].actions.find((a) => a.label === "ディスクの内容を採用");
+    adoptAction?.onClick();
+
+    expect(onEditorRemountNeeded).toHaveBeenCalledTimes(1);
   });
 });
 
