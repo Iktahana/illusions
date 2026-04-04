@@ -61,6 +61,14 @@ describe("extractVisibleText", () => {
     expect(extractVisibleText("*斜体*")).toBe("斜体");
   });
 
+  it("強調記号を除去して内容を残す (_)", () => {
+    expect(extractVisibleText("_italic_")).toBe("italic");
+  });
+
+  it("語中のアンダースコアは強調として扱わない", () => {
+    expect(extractVisibleText("file_name_here")).toBe("file_name_here");
+  });
+
   it("打ち消し線を除去して内容を残す (~~)", () => {
     expect(extractVisibleText("~~削除~~")).toBe("削除");
   });
@@ -174,7 +182,7 @@ describe("countManuscriptPages", () => {
     expect(countManuscriptPages(800)).toBe(2);
   });
 
-  it("1マス → 1ページ（切り上げ）", () => {
+  it("20マス → 1ページ（切り上げ）", () => {
     expect(countManuscriptPages(20)).toBe(1);
   });
 });

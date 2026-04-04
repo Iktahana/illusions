@@ -99,11 +99,14 @@ export function extractVisibleText(rawContent: string): string {
   text = text.replace(/^#{1,6} /gm, "");
 
   // 11. 強調記号のみ除去（内容は残す）
+  // ** と __ を先に処理してから単体 * と _ を処理する順番を守ること。
   text = text.replace(/~~([^~]*)~~/g, "$1");
   text = text.replace(/\*\*([^*]*)\*\*/g, "$1");
   text = text.replace(/__([^_]*)__/g, "$1");
-  text = text.replace(/\*([^*]*)\*/g, "$1");
-  text = text.replace(/_([^_]*)_/g, "$1");
+  // 単体 * / _ は語中の記号との誤マッチを防ぐため語境界（非 ASCII も考慮）を要求する。
+  // 例: file_name_here の _ は強調として扱わない（\w で囲まれているため不一致）。
+  text = text.replace(/(?<!\*)\*(?!\*)([^*\n]+?)(?<!\*)\*(?!\*)/g, "$1");
+  text = text.replace(/(?<!\w)_(?!_)([^_\n]+?)_(?!\w)(?!_)/g, "$1");
 
   // 12. バックスラッシュエスケープ（バックスラッシュのみ除去）
   text = text.replace(/\\(.)/g, "$1");
@@ -173,7 +176,9 @@ export function countManuscriptCells(visibleText: string): number {
  * 禁則処理（行頭禁則・行末禁則）を適用する。
  */
 function simulateLineBreaks(chars: string[]): number {
-  if (chars.length === 0) return 1; // 空段落は1行
+  // 注: chars が空の場合は呼び出し元（countManuscriptCells）で除外済み。
+  // このガードは防衛的コードとして残す。
+  if (chars.length === 0) return 1;
 
   const lines: string[][] = [[]];
 
@@ -219,7 +224,9 @@ function applyKinsoku(lines: string[][]): void {
       }
 
       // 行頭禁則: 次行の最初の文字が行頭禁則文字の場合
-      // → 現在行へ押し込む（前行に追加）
+      // → 現在行へ押し込む（追い込み）。
+      // 行詰め処理のため、前行の文字数が CHARS_PER_LINE を超えることがある。
+      // セル数は lines.length × CHARS_PER_LINE で計算するため枚数計算には影響しない。
       if (nextLine !== undefined && nextLine.length > 0) {
         const firstChar = nextLine[0];
         if (LINE_HEAD_PROHIBITED.has(firstChar)) {

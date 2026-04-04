@@ -172,8 +172,9 @@ export default function Inspector({
     setIsEditingFileName(false);
   }, [baseName]);
 
-  // 原稿用紙換算枚数：props で渡された値を優先し、なければ文字数から概算
-  const manuscriptPages = manuscriptPagesProp ?? Math.ceil(charCount / 400);
+  // 原稿用紙換算枚数：app/page.tsx から常に渡される。
+  // undefined になるのは Inspector を直接使うテスト等のレアケースのみ。
+  const manuscriptPages = manuscriptPagesProp ?? 0;
 
   return (
     <aside
