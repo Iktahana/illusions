@@ -241,7 +241,11 @@ export class HistoryService {
 
   private notifySnapshotCreated(): void {
     for (const listener of this.snapshotListeners) {
-      listener();
+      try {
+        listener();
+      } catch (err) {
+        console.error("Snapshot listener error / スナップショットリスナーエラー:", err);
+      }
     }
   }
 
