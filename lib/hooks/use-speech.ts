@@ -103,11 +103,15 @@ export function useSpeech(config?: SpeechConfig): {
 
     // Cancel whatever is currently playing before starting new speech.
     window.speechSynthesis.cancel();
+    // Chromium/Electron bug: speechSynthesis can remain in a paused state after
+    // cancel(). Calling resume() before speak() ensures the queue is unblocked.
+    window.speechSynthesis.resume();
 
     const cfg = configRef.current;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "ja-JP";
 
+    // Re-fetch voices at speak time — stale voice references cause silence in Chromium/Electron.
     const voice = findJapaneseVoice(cfg?.voiceURI);
     if (voice !== undefined) {
       utterance.voice = voice;
@@ -158,8 +162,11 @@ export function useSpeech(config?: SpeechConfig): {
     onEndRef.current = callbacks?.onEnd;
 
     window.speechSynthesis.cancel();
+    // Chromium/Electron bug: resume() needed after cancel() to unblock the queue.
+    window.speechSynthesis.resume();
 
     const cfg = configRef.current;
+    // Re-fetch voices at speak time to avoid stale references.
     const voice = findJapaneseVoice(cfg?.voiceURI);
     const utterances = segments.map((text, i) => {
       const u = new SpeechSynthesisUtterance(text);
