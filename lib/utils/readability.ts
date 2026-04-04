@@ -12,7 +12,21 @@
  *   const enhanced = enrichReadabilityWithMorphology(base, tokens);
  */
 
-import { cleanMarkdown } from "./index";
+/** 文字数カウント用にMarkdownを整形する */
+export function cleanMarkdown(markdown: string): string {
+  return (
+    markdown
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/`[^`]+`/g, "")
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
+      .replace(/!\[([^\]]*)\]\([^\)]+\)/g, "")
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1")
+      .replace(/^>\s+/gm, "")
+      .replace(/^[-*_]{3,}$/gm, "")
+      .trim()
+  );
+}
 import type {
   EnhancedReadabilityAnalysis,
   ParagraphMetrics,
@@ -40,7 +54,7 @@ const DOUBLE_NEGATIVE_PATTERNS = [
 ];
 
 /** 句読点文字（間隔計算用）*/
-const PUNCTUATION_RE = /[、。！？]/g;
+const PUNCTUATION_RE = /[、。！？]/;
 
 /** 括弧の開き文字 */
 const BRACKET_OPEN = new Set([..."（(【「『〔〈《"]);
@@ -101,7 +115,6 @@ function calcAvgPunctuationSpacing(text: string): number {
   for (let i = 0; i < text.length; i++) {
     if (PUNCTUATION_RE.test(text[i])) indices.push(i);
   }
-  PUNCTUATION_RE.lastIndex = 0; // reset global regex
   if (indices.length <= 1) return 0;
   let total = 0;
   for (let i = 1; i < indices.length; i++) {

@@ -2,9 +2,9 @@
  * illusions エディタ用のユーティリティ
  */
 
-import { analyzeReadability } from "./readability";
+import { analyzeReadability, cleanMarkdown } from "./readability";
 export type { EnhancedReadabilityAnalysis, ReadabilitySubScores } from "./readability-types";
-export { analyzeReadability, enrichReadabilityWithMorphology } from "./readability";
+export { analyzeReadability, enrichReadabilityWithMorphology, cleanMarkdown } from "./readability";
 
 /**
  * 文字数から原稿用紙枚数を算出する
@@ -106,32 +106,6 @@ export function validateTitle(title: string): { valid: boolean; error?: string }
     return { valid: false, error: "タイトルは100文字以内にしてください" };
   }
   return { valid: true };
-}
-
-/**
- * 文字数カウント用にMarkdownを整形する
- */
-export function cleanMarkdown(markdown: string): string {
-  return (
-    markdown
-      // コードブロックを除去
-      .replace(/```[\s\S]*?```/g, "")
-      // インラインコードを除去
-      .replace(/`[^`]+`/g, "")
-      // リンクはテキストだけ残す
-      .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
-      // 画像を除去
-      .replace(/!\[([^\]]*)\]\([^\)]+\)/g, "")
-      // 見出し記号を除去
-      .replace(/^#{1,6}\s+/gm, "")
-      // 強調記号を除去
-      .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1")
-      // 引用記号を除去
-      .replace(/^>\s+/gm, "")
-      // 罫線を除去
-      .replace(/^[-*_]{3,}$/gm, "")
-      .trim()
-  );
 }
 
 /**
