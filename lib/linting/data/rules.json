@@ -1179,7 +1179,7 @@
     "Rules": [
       {
         "Rule_ID": "rule_GK_2_1_particle_o",
-        "Level": "L1",
+        "Level": "L2",
         "Description": "助詞の「を」は，「を」と書く。",
         "Pattern/Logic": "助詞として用いられる場合は「を」を使用する。「お」は使用しない。",
         "Positive_Example": "本を読む",
@@ -1189,7 +1189,7 @@
       },
       {
         "Rule_ID": "rule_GK_2_2_particle_ha",
-        "Level": "L1",
+        "Level": "L2",
         "Description": "助詞の「は」は，「は」と書く。",
         "Pattern/Logic": "助詞として用いられる場合は「は」を使用する。「わ」は使用しない。",
         "Positive_Example": "今日は日曜です",
@@ -1199,7 +1199,7 @@
       },
       {
         "Rule_ID": "rule_GK_2_3_particle_he",
-        "Level": "L1",
+        "Level": "L2",
         "Description": "助詞の「へ」は，「へ」と書く。",
         "Pattern/Logic": "助詞として用いられる場合は「へ」を使用する。「え」は使用しない。",
         "Positive_Example": "故郷へ帰る",

@@ -4,7 +4,7 @@ import { RuleRunner } from "../rule-runner";
 import type { LintIssue, LintRuleConfig } from "../types";
 import { AbstractLintRule } from "../base-rule";
 import { createJtfL1Rules } from "../rules/json-l1/jtf-l1-rules";
-import { createGendaiKanazukaiL1Rules } from "../rules/json-l1/gendai-kanazukai-l1-rules";
+import { createGendaiKanazukaiL2Rules } from "../rules/l2/gendai-kanazukai-l2-rules";
 
 /** A minimal test rule for unit testing the runner */
 class TestRule extends AbstractLintRule {
@@ -193,7 +193,7 @@ describe("RuleRunner", () => {
     it("should return only enabled rules", () => {
       const runner = new RuleRunner();
       runner.registerRule(new TestRule());
-      const gkRules = createGendaiKanazukaiL1Rules();
+      const gkRules = createGendaiKanazukaiL2Rules();
       if (gkRules.length > 0) {
         runner.registerRule(gkRules[0]);
       }

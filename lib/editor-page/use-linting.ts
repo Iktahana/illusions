@@ -5,7 +5,11 @@ import { RuleRunner } from "@/lib/linting/rule-runner";
 import type { LintIssue, Severity } from "@/lib/linting/types";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
-import { getAllRules, createJsonDrivenRules } from "@/lib/linting/rule-registry";
+import {
+  getAllRules,
+  createJsonDrivenRules,
+  createMorphologicalRules,
+} from "@/lib/linting/rule-registry";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import { notificationManager } from "@/lib/services/notification-manager";
 
@@ -44,6 +48,7 @@ export function useLinting(
     const runner = new RuleRunner();
     for (const rule of getAllRules()) runner.registerRule(rule);
     for (const rule of createJsonDrivenRules()) runner.registerRule(rule);
+    for (const rule of createMorphologicalRules()) runner.registerRule(rule);
 
     runner.setGuidelineMap(RULE_GUIDELINE_MAP);
 
