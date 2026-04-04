@@ -15,8 +15,6 @@
  * Note: VFS is fully mocked. No real filesystem access.
  */
 
- 
-
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import type { VFSDirectoryHandle, VFSFileHandle } from "@/lib/vfs/types";
