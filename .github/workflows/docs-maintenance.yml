@@ -202,6 +202,17 @@ jobs:
             echo "DIFF_EOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Ensure documentation label exists
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "documentation" \
+            --repo "${{ github.repository }}" \
+            --color "0075ca" \
+            --description "Improvements or additions to documentation" \
+            2>/dev/null || true
+
       - name: Close stale README update issues
         if: steps.changes.outputs.has_changes == 'true'
         env:
