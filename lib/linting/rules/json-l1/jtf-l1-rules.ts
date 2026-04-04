@@ -164,9 +164,13 @@ const HIRAGANA_TO_KANJI: ReadonlyArray<[string, string]> = [
 /**
  * Known compound words that start with a HIRAGANA_TO_KANJI entry but form a
  * different word. Used to suppress false positives in substring matching.
+ *
+ * Add new entries here when a HIRAGANA_TO_KANJI word is a prefix of a
+ * compound that should not be converted (e.g. もっとも vs もっともらしい).
  */
 const KANJI_EXCLUSION_PATTERNS: ReadonlyMap<string, RegExp> = new Map([
   ["もっとも", /もっともらし/],
+  ["すべて", /すべからく/],
 ]);
 
 // ============================================================================
