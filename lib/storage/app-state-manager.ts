@@ -105,7 +105,11 @@ export async function fetchWindowState(windowKey: string): Promise<WindowState |
   const key = `window_state:${windowKey}`;
   const data = await storage.getItem(key);
   if (data) {
-    return JSON.parse(data) as WindowState;
+    try {
+      return JSON.parse(data) as WindowState;
+    } catch {
+      // Corrupted data — fall through to migration fallback
+    }
   }
   // Migration fallback: existing sessions stored tabs/layout in global AppState.
   const appState = await storage.loadAppState();
