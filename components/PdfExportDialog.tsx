@@ -3,7 +3,12 @@
 import { useState, useCallback, useEffect, useRef, useMemo, type KeyboardEvent } from "react";
 import clsx from "clsx";
 import GlassDialog from "./GlassDialog";
-import { loadPdfExportSettings, savePdfExportSettings, calculateTypesetting, PAGE_DIMENSIONS } from "@/lib/export/pdf-export-settings";
+import {
+  loadPdfExportSettings,
+  savePdfExportSettings,
+  calculateTypesetting,
+  PAGE_DIMENSIONS,
+} from "@/lib/export/pdf-export-settings";
 import { mdiToHtml } from "@/lib/export/mdi-to-html";
 
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
@@ -43,22 +48,68 @@ const labelClass = "block text-sm font-medium text-foreground mb-1";
 
 // 96dpi: 1mm = 96/25.4 px
 const MM_TO_PX = 96 / 25.4;
-// Fixed width of the preview thumbnail container in px
-const PREVIEW_CONTAINER_WIDTH = 300;
+// Fixed width of each page thumbnail in px
+const PREVIEW_PAGE_WIDTH = 300;
+// Pages shown initially before lazy loading
+const INITIAL_PAGES = 5;
+// Additional pages loaded per scroll batch
+const PAGES_PER_BATCH = 3;
+
+/**
+ * Split MDI content into page-sized chunks based on estimated chars per page.
+ * Splits on paragraph boundaries (double newlines) to avoid breaking mid-paragraph.
+ */
+function splitContentIntoPages(content: string, charsPerPage: number): string[] {
+  const trimmed = content.trim();
+  if (!trimmed) return [];
+
+  const paragraphs = trimmed.split(/\n{2,}/);
+  const pages: string[] = [];
+  let current = "";
+
+  for (const para of paragraphs) {
+    if (current.length > 0 && current.length + para.length > charsPerPage) {
+      pages.push(current);
+      current = para;
+    } else {
+      current = current ? current + "\n\n" + para : para;
+    }
+  }
+  if (current.trim()) pages.push(current);
+
+  return pages.length > 0 ? pages : [trimmed];
+}
 
 /**
  * Wrapper that unmounts the inner form when closed,
  * so useState initializer reloads settings each time the dialog opens.
  */
-export default function PdfExportDialog({ isOpen, onClose, onExport, content, metadata }: PdfExportDialogProps) {
+export default function PdfExportDialog({
+  isOpen,
+  onClose,
+  onExport,
+  content,
+  metadata,
+}: PdfExportDialogProps) {
   if (!isOpen) return null;
-  return <PdfExportDialogInner onClose={onClose} onExport={onExport} content={content} metadata={metadata} />;
+  return (
+    <PdfExportDialogInner onClose={onClose} onExport={onExport} content={content} metadata={metadata} />
+  );
 }
 
-function PdfExportDialogInner({ onClose, onExport, content, metadata }: Omit<PdfExportDialogProps, "isOpen">) {
+function PdfExportDialogInner({
+  onClose,
+  onExport,
+  content,
+  metadata,
+}: Omit<PdfExportDialogProps, "isOpen">) {
   const [settings, setSettings] = useState<PdfExportSettings>(() => loadPdfExportSettings());
-  const [previewHtml, setPreviewHtml] = useState("");
+  // Page content chunks (split by estimated chars per page)
+  const [pageChunks, setPageChunks] = useState<string[]>([]);
+  // How many pages are currently rendered in the preview
+  const [visibleCount, setVisibleCount] = useState(INITIAL_PAGES);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const updateField = useCallback(
     <K extends keyof PdfExportSettings>(key: K, value: PdfExportSettings[K]) => {
@@ -86,45 +137,76 @@ function PdfExportDialogInner({ onClose, onExport, content, metadata }: Omit<Pdf
     [onClose],
   );
 
-  // Regenerate preview HTML with debounce when settings or content change
+  // Debounced re-split when settings or content change
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
-        settings.pageSize,
-        settings.margins,
-        settings.charsPerLine,
-        settings.linesPerPage,
-        settings.verticalWriting,
-      );
-      const html = mdiToHtml(content, {
-        metadata,
-        verticalWriting: settings.verticalWriting,
-        typesetting: {
-          fontFamily: settings.fontFamily,
-          fontSizeMm,
-          lineHeightRatio,
-          textIndentEm: settings.textIndent,
-          margins: settings.margins,
-        },
-      });
-      setPreviewHtml(html);
+      const charsPerPage = settings.charsPerLine * settings.linesPerPage;
+      const chunks = splitContentIntoPages(content, charsPerPage);
+      setPageChunks(chunks);
+      setVisibleCount(INITIAL_PAGES);
     }, 300);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [settings, content, metadata]);
+  }, [settings, content]);
 
-  // Calculate iframe scale from page size
-  const { pageWidthPx, pageHeightPx, scale } = useMemo(() => {
-    const dims = PAGE_DIMENSIONS[settings.pageSize] ?? PAGE_DIMENSIONS["A5"];
-    const w = dims.width * MM_TO_PX;
-    const h = dims.height * MM_TO_PX;
-    return { pageWidthPx: w, pageHeightPx: h, scale: PREVIEW_CONTAINER_WIDTH / w };
+  // IntersectionObserver: load more pages when sentinel scrolls into view
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => prev + PAGES_PER_BATCH);
+        }
+      },
+      { threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
+  // Memoize typesetting options from current settings
+  const typesettingOptions = useMemo(() => {
+    const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
+      settings.pageSize,
+      settings.margins,
+      settings.charsPerLine,
+      settings.linesPerPage,
+      settings.verticalWriting,
+    );
+    return {
+      metadata,
+      verticalWriting: settings.verticalWriting,
+      typesetting: {
+        fontFamily: settings.fontFamily,
+        fontSizeMm,
+        lineHeightRatio,
+        textIndentEm: settings.textIndent,
+        margins: settings.margins,
+      },
+    };
+  }, [settings, metadata]);
+
+  // Generate HTML only for currently visible pages
+  const visiblePageHtml = useMemo(() => {
+    const limit = Math.min(visibleCount, pageChunks.length);
+    return pageChunks.slice(0, limit).map((chunk) => mdiToHtml(chunk, typesettingOptions));
+  }, [pageChunks, visibleCount, typesettingOptions]);
+
+  // Page thumbnail dimensions
+  const { pageWidthPx, pageHeightPx, scale, dims } = useMemo(() => {
+    const d = PAGE_DIMENSIONS[settings.pageSize] ?? PAGE_DIMENSIONS["A5"];
+    const w = d.width * MM_TO_PX;
+    const h = d.height * MM_TO_PX;
+    return { pageWidthPx: w, pageHeightPx: h, scale: PREVIEW_PAGE_WIDTH / w, dims: d };
   }, [settings.pageSize]);
 
   const scaledHeight = Math.round(pageHeightPx * scale);
-  const dims = PAGE_DIMENSIONS[settings.pageSize] ?? PAGE_DIMENSIONS["A5"];
+  const hasMore = visibleCount < pageChunks.length;
+  const isEmpty = pageChunks.length === 0;
 
   return (
     <GlassDialog
@@ -317,48 +399,94 @@ function PdfExportDialogInner({ onClose, onExport, content, metadata }: Omit<Pdf
             <span className="text-sm font-medium text-foreground">プレビュー</span>
             <span className="text-xs text-foreground-tertiary">
               {settings.pageSize} · {settings.verticalWriting ? "縦書き" : "横書き"}
+              {pageChunks.length > 0 && ` · 全${pageChunks.length}ページ`}
             </span>
           </div>
 
-          <div className="flex-1 overflow-auto flex items-start justify-center p-6">
-            {previewHtml ? (
-              <div className="flex flex-col items-center gap-2">
-                <div
-                  className="shadow-xl bg-white"
-                  style={{
-                    width: PREVIEW_CONTAINER_WIDTH,
-                    height: scaledHeight,
-                    overflow: "hidden",
-                    flexShrink: 0,
-                  }}
-                >
-                  <iframe
-                    srcDoc={previewHtml}
-                    sandbox="allow-same-origin"
-                    title="プレビュー"
-                    style={{
-                      width: pageWidthPx,
-                      height: pageHeightPx,
-                      transform: `scale(${scale})`,
-                      transformOrigin: "top left",
-                      border: "none",
-                      display: "block",
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-foreground-tertiary">
-                  {dims.width}×{dims.height}mm
-                </p>
-              </div>
-            ) : (
+          <div className="flex-1 overflow-y-auto">
+            {isEmpty ? (
               <div className="flex items-center justify-center h-full text-foreground-tertiary text-sm">
                 生成中...
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-4 p-6">
+                {visiblePageHtml.map((html, i) => (
+                  <PageThumbnail
+                    key={i}
+                    html={html}
+                    pageNumber={i + 1}
+                    pageWidthPx={pageWidthPx}
+                    pageHeightPx={pageHeightPx}
+                    scale={scale}
+                    scaledHeight={scaledHeight}
+                    dims={dims}
+                  />
+                ))}
+
+                {/* Sentinel: triggers loading more pages when scrolled into view */}
+                {hasMore && (
+                  <div ref={sentinelRef} className="w-full flex justify-center py-2">
+                    <span className="text-xs text-foreground-tertiary">読み込み中...</span>
+                  </div>
+                )}
+
+                {!hasMore && pageChunks.length > 0 && (
+                  <p className="text-xs text-foreground-tertiary py-2">
+                    全{pageChunks.length}ページ表示済み
+                  </p>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
     </GlassDialog>
+  );
+}
+
+interface PageThumbnailProps {
+  html: string;
+  pageNumber: number;
+  pageWidthPx: number;
+  pageHeightPx: number;
+  scale: number;
+  scaledHeight: number;
+  dims: { width: number; height: number };
+}
+
+function PageThumbnail({
+  html,
+  pageNumber,
+  pageWidthPx,
+  pageHeightPx,
+  scale,
+  scaledHeight,
+  dims,
+}: PageThumbnailProps) {
+  return (
+    <div className="flex flex-col items-center gap-1 flex-shrink-0">
+      <div
+        className="shadow-lg bg-white"
+        style={{ width: PREVIEW_PAGE_WIDTH, height: scaledHeight, overflow: "hidden" }}
+      >
+        <iframe
+          srcDoc={html}
+          sandbox="allow-same-origin"
+          title={`ページ ${pageNumber}`}
+          style={{
+            width: pageWidthPx,
+            height: pageHeightPx,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+            border: "none",
+            display: "block",
+          }}
+        />
+      </div>
+      <span className="text-xs text-foreground-tertiary">
+        {pageNumber} / {dims.width}×{dims.height}mm
+      </span>
+    </div>
   );
 }
 
