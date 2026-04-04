@@ -14,18 +14,16 @@
 
 /** 文字数カウント用にMarkdownを整形する */
 export function cleanMarkdown(markdown: string): string {
-  return (
-    markdown
-      .replace(/```[\s\S]*?```/g, "")
-      .replace(/`[^`]+`/g, "")
-      .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
-      .replace(/!\[([^\]]*)\]\([^\)]+\)/g, "")
-      .replace(/^#{1,6}\s+/gm, "")
-      .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1")
-      .replace(/^>\s+/gm, "")
-      .replace(/^[-*_]{3,}$/gm, "")
-      .trim()
-  );
+  return markdown
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`[^`]+`/g, "")
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^\)]+\)/g, "")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1")
+    .replace(/^>\s+/gm, "")
+    .replace(/^[-*_]{3,}$/gm, "")
+    .trim();
 }
 import type {
   EnhancedReadabilityAnalysis,
