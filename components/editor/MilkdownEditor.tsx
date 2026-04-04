@@ -757,7 +757,7 @@ export default function MilkdownEditor({
             ]
           : []),
         { label: "-", action: "_separator" },
-        { label: "開始朗読", action: "start-speech" },
+        { label: "読み上げ開始", action: "start-speech" },
         { label: "-", action: "_separator" },
         { label: "すべて選択", action: "select-all", accelerator: "CmdOrCtrl+A" },
       ];
