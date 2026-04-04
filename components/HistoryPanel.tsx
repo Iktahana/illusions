@@ -127,6 +127,14 @@ export default function HistoryPanel({
     setDisplayCount(SNAPSHOTS_PER_PAGE);
   }, [loadSnapshots]);
 
+  // Refresh when new snapshots are created (auto-save or manual from other source)
+  useEffect(() => {
+    const historyService = getHistoryService();
+    return historyService.onSnapshotCreated(() => {
+      void loadSnapshots();
+    });
+  }, [loadSnapshots]);
+
   /** Map of snapshot ID → diff stats relative to previous version */
   const [diffStatsMap, setDiffStatsMap] = useState<Map<string, DiffStats>>(new Map());
 
