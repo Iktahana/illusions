@@ -22,11 +22,11 @@ interface GuidelineListProps {
   onChange: (guidelines: GuidelineId[]) => void;
 }
 
-/** Build a Google Shopping URL for a given guideline. */
+/** Build an Amazon Japan search URL for a given guideline. */
 function buildShoppingUrl(meta: Guideline): string {
   const parts = [meta.nameJa, meta.publisherJa];
   if (meta.year !== null) parts.push(String(meta.year));
-  return `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(parts.join(" "))}`;
+  return `https://www.amazon.co.jp/s?k=${encodeURIComponent(parts.join(" "))}`;
 }
 
 /**
