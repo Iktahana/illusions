@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  MutableRefObject,
-  RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import {
@@ -28,19 +20,23 @@ import { clipboard } from "@milkdown/plugin-clipboard";
 import { cursor } from "@milkdown/plugin-cursor";
 import { Milkdown, useEditor } from "@milkdown/react";
 import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
-import { setScrollProgress } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
 import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import clsx from "clsx";
 import { EditorView } from "@milkdown/prose/view";
 import { AllSelection, Plugin, PluginKey } from "@milkdown/prose/state";
-import { $prose } from "@milkdown/utils";
+import { $prose, replaceAll } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "../BubbleMenu";
 import { searchHighlightPlugin } from "@/lib/editor-page/search-highlight-plugin";
 import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin";
-import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
+import type { EditorSelectionState } from "@/lib/editor-page/use-selection-tracking";
 import EditorContextMenu, { type ContextMenuAction } from "../EditorContextMenu";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { useCharWidth, MEASURE_TEXT } from "@/lib/editor-page/use-char-width";
+import {
+  getScrollProgress,
+  setScrollProgress,
+} from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
 import {
   useTypographySettings,
@@ -53,13 +49,10 @@ interface MilkdownEditorProps {
   initialContent: string;
   onChange?: (content: string) => void;
   onInsertText?: (text: string) => void;
-  onSelectionChange?: (charCount: number) => void;
+  selectionState: EditorSelectionState;
   isVertical: boolean;
   scrollContainerRef: RefObject<HTMLDivElement>;
   onEditorViewReady?: (view: EditorView) => void;
-  programmaticScrollRef?: React.MutableRefObject<boolean>;
-  isModeSwitchingRef: MutableRefObject<boolean>;
-  savedScrollProgressRef: RefObject<number>;
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[]) => void;
   onNlpError?: (error: Error) => void;
@@ -75,19 +68,22 @@ interface MilkdownEditorProps {
   onFind?: (initialTerm?: string) => void;
   /** Per-pane override for charsPerLine (used by auto mode to avoid global state conflicts in split editors) */
   overrideCharsPerLine?: number;
+  /** External content to apply to the editor (from file watcher). Best-effort scroll position preservation. */
+  externalContent?: string | null;
+  /** Called after externalContent has been applied and scroll restored (best-effort). */
+  onExternalContentApplied?: () => void;
+  /** Called after layout reflow completes (style application + browser paint). */
+  onLayoutReady?: () => void;
 }
 
 export default function MilkdownEditor({
   initialContent,
   onChange,
   onInsertText,
-  onSelectionChange,
+  selectionState,
   isVertical,
   scrollContainerRef,
   onEditorViewReady,
-  programmaticScrollRef,
-  isModeSwitchingRef,
-  savedScrollProgressRef,
   lintingRuleRunner,
   onLintIssuesUpdated,
   onNlpError,
@@ -101,6 +97,9 @@ export default function MilkdownEditor({
   onStartSpeech,
   onFind,
   overrideCharsPerLine,
+  externalContent,
+  onExternalContentApplied,
+  onLayoutReady,
 }: MilkdownEditorProps) {
   const {
     fontScale,
@@ -116,7 +115,14 @@ export default function MilkdownEditor({
   const { posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes } =
     usePosHighlightSettings();
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
+  const { measureRef: charMeasureRef, charWidth } = useCharWidth({
+    fontFamily,
+    fontScale,
+    lineHeight,
+    isVertical,
+  });
   const editorRef = useRef<HTMLDivElement>(null);
+  const measureBoxRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const [lintIssueAtCursor, setLintIssueAtCursor] = useState<LintIssue | null>(null);
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
@@ -145,19 +151,13 @@ export default function MilkdownEditor({
     onNlpErrorRef.current = onNlpError;
   }, [onNlpError]);
 
-  // 縦書き: ブラウザの自動スクロールを防止するための保存位置
-  const savedScrollPosRef = useRef({ left: 0, top: 0 });
-  const userScrollingRef = useRef(false);
-
   // 縦書き用のスクロール制御プラグインを作成
-  // isVertical の参照を保持
   const isVerticalRef = useRef(isVertical);
-  // isVertical の変更を追跡
   useEffect(() => {
     isVerticalRef.current = isVertical;
   }, [isVertical]);
 
-  // 縦書き時は完全にスクロール動作を禁止（ユーザーが手動でスクロールする）
+  // 縦書き時は handleScrollToSelection を抑制（ユーザーが手動でスクロールする）
   const verticalScrollPlugin = useMemo(
     () =>
       $prose(
@@ -165,13 +165,10 @@ export default function MilkdownEditor({
           new Plugin({
             key: new PluginKey("verticalScrollControl"),
             props: {
-              handleScrollToSelection(_view) {
-                // 縦書きモードではスクロール動作を完全に無視（排版完成後の明示的なスクロール以外）
+              handleScrollToSelection() {
                 if (isVerticalRef.current) {
                   return true; // デフォルトのスクロールを完全に禁止
                 }
-
-                // 横書き時はデフォルトの動作を使用
                 return false;
               },
             },
@@ -274,6 +271,39 @@ export default function MilkdownEditor({
     return () => clearTimeout(timer);
   }, [get, onEditorViewReady]);
 
+  // 外部ファイル変更時にスクロール位置を保持したまま内容を更新する
+  const onExternalContentAppliedRef = useRef(onExternalContentApplied);
+  onExternalContentAppliedRef.current = onExternalContentApplied;
+
+  useEffect(() => {
+    if (externalContent == null) return;
+    const editor = get();
+    if (!editor) return;
+
+    // Save scroll progress before replacing content
+    const container = scrollContainerRef.current;
+    let savedProgress: number | null = null;
+    if (container) {
+      savedProgress = getScrollProgress({ container, isVertical });
+    }
+
+    try {
+      editor.action(replaceAll(externalContent));
+      // Restore scroll progress after layout settles
+      if (container && savedProgress != null) {
+        const progress = savedProgress;
+        requestAnimationFrame(() => {
+          setScrollProgress({ container, isVertical }, progress);
+          onExternalContentAppliedRef.current?.();
+        });
+      } else {
+        onExternalContentAppliedRef.current?.();
+      }
+    } catch (error) {
+      console.warn("外部コンテンツの適用に失敗しました:", error);
+    }
+  }, [externalContent, get, isVertical, scrollContainerRef]);
+
   // posHighlight 設定を動的に更新（Editor を再作成せずに）
   useEffect(() => {
     if (!editorViewInstance) return;
@@ -312,262 +342,53 @@ export default function MilkdownEditor({
       });
   }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
 
-  // 選択文字数の追跡
-  const { hasSelection } = useSelectionTracking({
-    editorViewInstance,
-    onSelectionChange: onSelectionChange,
-  });
-
-  // 不要なアニメーションを避けるため、直前のスタイル値を保持する
-  const prevStyleRef = useRef({ charsPerLine, isVertical, fontFamily, fontScale, lineHeight });
-  const isFirstRenderRef = useRef(true);
-
-  // 1行あたりの文字数制限を、実測値を使って適用する
-  useEffect(() => {
-    const editorContainer = editorRef.current;
-    const editorDom = editorContainer?.querySelector(".milkdown .ProseMirror") as HTMLElement;
-    if (!editorDom) return;
-
-    const prev = prevStyleRef.current;
-    const styleChanged =
-      prev.charsPerLine !== charsPerLine ||
-      prev.isVertical !== isVertical ||
-      prev.fontFamily !== fontFamily ||
-      prev.fontScale !== fontScale ||
-      prev.lineHeight !== lineHeight;
-
-    // 直前値を更新
-    prevStyleRef.current = { charsPerLine, isVertical, fontFamily, fontScale, lineHeight };
-
-    // スタイルが変わっていない場合はアニメーションをしない（保存による再構築など）
-    const isFirstRender = isFirstRenderRef.current;
-    const shouldAnimate = styleChanged && !isFirstRender;
-    isFirstRenderRef.current = false;
-
-    const applyStyles = () => {
-      // writing-mode class toggle (atomic with style application)
-      editorDom.classList.remove("milkdown-japanese-vertical", "milkdown-japanese-horizontal");
-      editorDom.classList.add(
-        isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal",
-      );
-
-      // まずスタイルをリセット
-      editorDom.style.width = "";
-      editorDom.style.maxWidth = "";
-      editorDom.style.height = "";
-      editorDom.style.maxHeight = "";
-      editorDom.style.minHeight = "";
-      editorDom.style.margin = "";
-
-      // 既存のスペーサーを削除
-      const existingSpacer = editorContainer?.querySelector(".vertical-spacer");
-      if (existingSpacer) {
-        existingSpacer.remove();
-      }
-
-      if (charsPerLine > 0) {
-        // 実際の文字サイズを測るための要素を作る
-        const measureEl = document.createElement("span");
-        measureEl.style.cssText = `
-          position: absolute;
-          visibility: hidden;
-          white-space: nowrap;
-          font-family: "${fontFamily}", serif;
-          font-size: ${fontScale}%;
-          line-height: ${lineHeight};
-        `;
-        measureEl.textContent = "国"; // 全角文字で測定
-        document.body.appendChild(measureEl);
-
-        // 和文の全角文字は概ね正方形に近い
-        const charSize = measureEl.offsetWidth;
-        document.body.removeChild(measureEl);
-
-        // 計算したサイズをエディタへ適用
-        if (isVertical) {
-          // 縦書き: 高さを制限（1列あたりの文字数）
-          // 高さ計算の誤差を修正: 1文字分を減算
-          const targetHeight = charSize * (charsPerLine - 1);
-          editorDom.style.height = `${targetHeight}px`;
-          editorDom.style.maxHeight = `${targetHeight}px`;
-          editorDom.style.minHeight = `${targetHeight}px`;
-          // Prevent browser caret-scroll on .ProseMirror itself (contenteditable + fixed height
-          // makes it implicitly scrollable in vertical-rl). clip prevents scrolling without
-          // creating a new formatting context, so layout is unaffected.
-          editorDom.style.overflow = "clip";
-        } else {
-          // 横書き: 幅を制限（1行あたりの文字数）し、中央寄せ
-          const targetWidth = charSize * charsPerLine;
-          editorDom.style.width = `${targetWidth}px`;
-          editorDom.style.maxWidth = `${targetWidth}px`;
-          editorDom.style.margin = "0 auto"; // 中央寄せ
-          editorDom.style.overflow = "";
-        }
-      }
-
-      // 縦書き: コンテナ幅を埋める最小幅を設定し、短文でも右側に寄り切るのを防ぐ
-      if (isVertical && scrollContainerRef.current) {
-        // DOM更新後に計算する
-        requestAnimationFrame(() => {
-          const container = scrollContainerRef.current;
-          if (!container) return;
-
-          const containerWidth = container.clientWidth;
-          // clientWidth includes scroll container's own padding (64px * 2)
-          const padding = 128;
-          const minWidth = containerWidth - padding;
-
-          // ProseMirror に最小幅を設定
-          // vertical-rl では右→左へ流れるため、最小幅を確保すると開始位置が右端に揃う
-          editorDom.style.minWidth = `${minWidth}px`;
-
-          // Wait one more frame for layout to fully stabilize after writing-mode + minWidth change
-          requestAnimationFrame(() => {
-            onLayoutCompleteCallback?.();
-          });
-        });
-      } else {
-        // 横書きでは最小幅を解除
-        editorDom.style.minWidth = "";
-
-        // Wait one frame for layout to stabilize after writing-mode change
-        requestAnimationFrame(() => {
-          onLayoutCompleteCallback?.();
-        });
-      }
-    };
-
-    // Scroll handling callback after layout completes
-    let onLayoutCompleteCallback: (() => void) | null = null;
-
-    // Restore scroll position after layout completes (mode switch or first render)
-    const handleScrollAfterLayout = () => {
-      const container = scrollContainerRef.current;
-      if (!container) {
-        isModeSwitchingRef.current = false;
-        return;
-      }
-
-      if (isModeSwitchingRef.current) {
-        // Mode switch: restore saved progress
-        const savedProgress = savedScrollProgressRef.current ?? 0;
-
-        setScrollProgress({ container, isVertical }, savedProgress);
-
-        // Update the saved position for auto-scroll prevention
-        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
-
-        // Delay clearing the flag with double rAF to outlast any browser auto-scroll or ProseMirror focus management
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            isModeSwitchingRef.current = false;
-          });
-        });
-      } else if (isFirstRender && isVertical) {
-        // First mount in vertical mode: scroll to start (rightmost position)
-        setScrollProgress({ container, isVertical }, 0);
-        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
-      }
-    };
-
-    // Set layout completion callback
-    onLayoutCompleteCallback = handleScrollAfterLayout;
-
-    if (shouldAnimate) {
-      // 変更前にフェードアウト
-      editorDom.style.transition = "opacity 0.15s ease-out";
-      editorDom.style.opacity = "0";
-
-      // DOMの準備とフェードアウト完了を待って適用
-      const timer = setTimeout(() => {
-        applyStyles(); // applyStyles will call onLayoutCompleteCallback after layout completes
-
-        // 適用後にフェードイン
-        requestAnimationFrame(() => {
-          editorDom.style.transition = "opacity 0.25s ease-in";
-          editorDom.style.opacity = "1";
-        });
-      }, 150);
-
-      return () => {
-        clearTimeout(timer);
-        onLayoutCompleteCallback = null;
-      };
-    } else {
-      // アニメーションなしで即時適用
-      applyStyles(); // applyStyles will call onLayoutCompleteCallback after layout completes
-      editorDom.style.opacity = "1";
-    }
-  }, [
-    charsPerLine,
-    isVertical,
-    fontFamily,
-    fontScale,
-    lineHeight,
-    scrollContainerRef,
-    get,
-    savedScrollProgressRef,
-    isModeSwitchingRef,
-  ]);
-
-  // 縦書き時: コンテンツサイズ変更時に minWidth を再計算し、スクロール範囲を更新する
-  useEffect(() => {
-    if (!isVertical) return;
-
-    const container = scrollContainerRef.current;
-    const editorContainer = editorRef.current;
-    const editorDom = editorContainer?.querySelector(".milkdown .ProseMirror") as HTMLElement;
-    if (!container || !editorDom) return;
-
-    const observer = new ResizeObserver(() => {
-      const containerWidth = container.clientWidth;
-      const padding = 128; // scroll container's own padding (64px * 2)
-      const minWidth = containerWidth - padding;
-      editorDom.style.minWidth = `${minWidth}px`;
-    });
-
-    observer.observe(editorDom);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [isVertical, scrollContainerRef]);
-
   // 縦書き時: マウスホイールの縦スクロールを横スクロールへ変換する
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || !isVertical) return;
 
     const handleWheel = (event: WheelEvent) => {
-      let isTouchpad: boolean;
-
-      if (verticalScrollBehavior === "trackpad") {
-        isTouchpad = true;
-      } else if (verticalScrollBehavior === "mouse") {
-        isTouchpad = false;
-      } else {
-        // "auto": existing heuristic
-        const hasBothAxes = Math.abs(event.deltaX) > 0 && Math.abs(event.deltaY) > 0;
-        const hasFineGrainedValues =
-          (Math.abs(event.deltaY) < 50 && Math.abs(event.deltaY) > 0) ||
-          (Math.abs(event.deltaX) < 50 && Math.abs(event.deltaX) > 0);
-        isTouchpad = hasBothAxes || (hasFineGrainedValues && !event.ctrlKey);
-      }
-
       const sensitivity = scrollSensitivity;
+      const absX = Math.abs(event.deltaX);
+      const absY = Math.abs(event.deltaY);
+      const mouseHorizontalDelta = -event.deltaY * sensitivity;
+      const hasBothAxes = absX > 0 && absY > 0;
+      const hasFineGrainedValues = (absY > 0 && absY < 50) || (absX > 0 && absX < 50);
+      const isTrackpadInput =
+        verticalScrollBehavior === "trackpad" ||
+        (verticalScrollBehavior === "auto" &&
+          (hasBothAxes || (hasFineGrainedValues && !event.ctrlKey)));
 
-      if (isTouchpad) {
-        container.scrollLeft += event.deltaX * sensitivity;
-        container.scrollTop += event.deltaY * sensitivity;
-        event.preventDefault();
-      } else {
-        if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
-          container.scrollLeft += event.deltaY * sensitivity;
+      if (verticalScrollBehavior === "mouse") {
+        if (absY >= absX && absY > 0) {
+          container.scrollLeft += mouseHorizontalDelta;
           event.preventDefault();
-        } else if (Math.abs(event.deltaX) > 0) {
+        } else if (absX > 0) {
           container.scrollTop += event.deltaX * sensitivity;
           event.preventDefault();
         }
+        return;
+      }
+
+      if (isTrackpadInput) {
+        if (absY > 0) {
+          container.scrollLeft += event.deltaY * sensitivity;
+        }
+        if (absX > 0) {
+          container.scrollTop += event.deltaX * sensitivity;
+        }
+        event.preventDefault();
+        return;
+      }
+
+      // Mouse semantics: treat dominant deltaY as vertical wheel input and map it
+      // to horizontal movement for vertical writing.
+      if (absY >= absX && absY > 0) {
+        container.scrollLeft += mouseHorizontalDelta;
+        event.preventDefault();
+      } else if (absX > 0) {
+        container.scrollTop += event.deltaX * sensitivity;
+        event.preventDefault();
       }
     };
 
@@ -578,96 +399,134 @@ export default function MilkdownEditor({
     };
   }, [isVertical, scrollContainerRef, verticalScrollBehavior, scrollSensitivity]);
 
-  // Auto-scroll prevention for both modes
-  // Prevents browser from overriding scroll position during text selection, editing, and mode switches
+  // 不要なアニメーションを避けるため、直前のスタイル値を保持する
+  const prevStyleRef = useRef({
+    charsPerLine,
+    isVertical,
+    fontFamily,
+    fontScale,
+    lineHeight,
+    charWidth,
+  });
+  const isFirstRenderRef = useRef(true);
+
+  // 1行あたりの文字数制限を、スクロールルートではなく内側の measure box に適用する
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+    const measureBox = measureBoxRef.current;
+    const editorDom = editorViewInstance?.dom ?? null;
+    const milkdownRoot = editorDom?.closest(".milkdown") as HTMLElement | null;
+    if (!measureBox || !milkdownRoot || !editorDom) return;
 
-    let userScrollTimer: ReturnType<typeof setTimeout> | null = null;
-    let isReverting = false;
-    let isPointerDown = false; // マウスドラッグ中（テキスト選択中）のフラグ
+    const prev = prevStyleRef.current;
+    const styleChanged =
+      prev.charsPerLine !== charsPerLine ||
+      prev.isVertical !== isVertical ||
+      prev.fontFamily !== fontFamily ||
+      prev.fontScale !== fontScale ||
+      prev.lineHeight !== lineHeight ||
+      prev.charWidth !== charWidth;
 
-    // Initialize saved position
-    savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
-
-    const markUserScroll = () => {
-      userScrollingRef.current = true;
-      if (userScrollTimer) clearTimeout(userScrollTimer);
-      userScrollTimer = setTimeout(() => {
-        userScrollingRef.current = false;
-      }, 200);
+    // 直前値を更新
+    prevStyleRef.current = {
+      charsPerLine,
+      isVertical,
+      fontFamily,
+      fontScale,
+      lineHeight,
+      charWidth,
     };
 
-    // Track user-initiated scroll sources
-    const onWheel = () => markUserScroll();
-    const onPointerDown = () => {
-      // マウスボタンが押されている間はドラッグ選択の可能性がある
-      isPointerDown = true;
-    };
-    const onPointerUp = () => {
-      isPointerDown = false;
-    };
-    const onTouchStart = () => markUserScroll();
+    // スタイルが変わっていない場合はアニメーションをしない（保存による再構築など）
+    // charWidth が 0→計測値 へ初期化される遷移ではアニメーション不要
+    const isFirstRender = isFirstRenderRef.current;
+    const isCharWidthInit = prev.charWidth === 0 && charWidth > 0;
+    const shouldAnimate = styleChanged && !isFirstRender && !isCharWidthInit;
+    isFirstRenderRef.current = false;
 
-    // Intercept and revert browser auto-scrolls
-    const onScroll = () => {
-      if (isReverting) return;
+    const applyStyles = () => {
+      editorDom.classList.remove("milkdown-japanese-vertical", "milkdown-japanese-horizontal");
+      editorDom.classList.add(
+        isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal",
+      );
 
-      if (
-        userScrollingRef.current ||
-        isModeSwitchingRef.current ||
-        programmaticScrollRef?.current
-      ) {
-        // User interaction, mode switch, or programmatic navigation: save position
-        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
-      } else if (isPointerDown && isVertical) {
-        // Mouse drag (text selection) in vertical-rl: browser may fire native caret-scroll-into-view
-        // which computes wrong positions. Detect large jumps and revert them.
-        // Only applies to vertical mode — horizontal selection scrolls are legitimate.
-        const dx = Math.abs(container.scrollLeft - savedScrollPosRef.current.left);
-        const dy = Math.abs(container.scrollTop - savedScrollPosRef.current.top);
-        if (dx > 50 || dy > 50) {
-          // Large jump → browser auto-scroll in vertical-rl, revert
-          isReverting = true;
-          container.scrollLeft = savedScrollPosRef.current.left;
-          container.scrollTop = savedScrollPosRef.current.top;
-          requestAnimationFrame(() => {
-            isReverting = false;
-          });
+      measureBox.style.width = "";
+      measureBox.style.maxWidth = "";
+      measureBox.style.height = "";
+      measureBox.style.maxHeight = "";
+      measureBox.style.minHeight = "";
+      measureBox.style.minWidth = "";
+      measureBox.style.margin = "";
+
+      milkdownRoot.style.width = isVertical ? "max-content" : "100%";
+      milkdownRoot.style.maxWidth = isVertical ? "" : "100%";
+      milkdownRoot.style.height = "";
+      milkdownRoot.style.maxHeight = "";
+      milkdownRoot.style.minHeight = "";
+
+      editorDom.style.width = isVertical ? "max-content" : "100%";
+      editorDom.style.maxWidth = isVertical ? "" : "100%";
+      editorDom.style.height = "";
+      editorDom.style.maxHeight = "";
+      editorDom.style.minHeight = "";
+      editorDom.style.minWidth = "";
+      editorDom.style.margin = "";
+
+      if (charsPerLine > 0 && charWidth > 0) {
+        if (isVertical) {
+          const targetHeight = charWidth * charsPerLine;
+          measureBox.style.height = `${targetHeight}px`;
+          measureBox.style.maxHeight = `${targetHeight}px`;
+          measureBox.style.minHeight = `${targetHeight}px`;
+          milkdownRoot.style.height = `${targetHeight}px`;
+          milkdownRoot.style.maxHeight = `${targetHeight}px`;
+          milkdownRoot.style.minHeight = `${targetHeight}px`;
+          editorDom.style.height = `${targetHeight}px`;
+          editorDom.style.maxHeight = `${targetHeight}px`;
+          editorDom.style.minHeight = `${targetHeight}px`;
         } else {
-          // Small movement → legitimate edge-drag scroll, allow
-          savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
+          const targetWidth = charWidth * charsPerLine;
+          measureBox.style.width = `${targetWidth}px`;
+          measureBox.style.maxWidth = `${targetWidth}px`;
         }
-      } else if (isPointerDown) {
-        // Horizontal mode pointer drag: save position normally
-        savedScrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop };
-      } else {
-        // Browser auto-scroll (e.g., DOM update): revert
-        isReverting = true;
-        container.scrollLeft = savedScrollPosRef.current.left;
-        container.scrollTop = savedScrollPosRef.current.top;
-        requestAnimationFrame(() => {
-          isReverting = false;
-        });
       }
     };
 
-    container.addEventListener("wheel", onWheel, { passive: true });
-    container.addEventListener("pointerdown", onPointerDown, { passive: true });
-    document.addEventListener("pointerup", onPointerUp);
-    container.addEventListener("touchstart", onTouchStart, { passive: true });
-    container.addEventListener("scroll", onScroll, { passive: true });
+    if (shouldAnimate) {
+      editorDom.style.transition = "opacity 0.15s ease-out";
+      editorDom.style.opacity = "0";
 
-    return () => {
-      container.removeEventListener("wheel", onWheel);
-      container.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("pointerup", onPointerUp);
-      container.removeEventListener("touchstart", onTouchStart);
-      container.removeEventListener("scroll", onScroll);
-      if (userScrollTimer) clearTimeout(userScrollTimer);
-    };
-  }, [isVertical, scrollContainerRef, isModeSwitchingRef, savedScrollPosRef, userScrollingRef]);
+      const timer = setTimeout(() => {
+        applyStyles();
+
+        requestAnimationFrame(() => {
+          editorDom.style.transition = "opacity 0.25s ease-in";
+          editorDom.style.opacity = "1";
+          onLayoutReady?.();
+        });
+      }, 150);
+
+      return () => {
+        clearTimeout(timer);
+      };
+    } else {
+      applyStyles();
+      // charWidth が未計測（0）の間はエディタを透明のまま維持し、
+      // 幅制約なしの状態が一瞬描画されるのを防ぐ
+      if (charWidth > 0 || charsPerLine <= 0) {
+        editorDom.style.opacity = "1";
+        onLayoutReady?.();
+      }
+    }
+  }, [
+    charsPerLine,
+    charWidth,
+    editorViewInstance,
+    isVertical,
+    fontFamily,
+    fontScale,
+    lineHeight,
+    onLayoutReady,
+  ]);
 
   // Union of all Milkdown command keys used in handleFormat.
   // Each .key property is a branded CmdKey<T> string exported by @milkdown.
@@ -870,7 +729,7 @@ export default function MilkdownEditor({
               { label: "-", action: "_separator" },
             ]
           : []),
-        ...(hasSelection
+        ...(selectionState.hasSelection
           ? [
               { label: "切り取り", action: "cut", accelerator: "CmdOrCtrl+X" },
               { label: "コピー", action: "copy", accelerator: "CmdOrCtrl+C" },
@@ -883,7 +742,7 @@ export default function MilkdownEditor({
           accelerator: "Shift+CmdOrCtrl+V",
         },
         { label: "-", action: "_separator" },
-        ...(hasSelection && mdiExtensionsEnabled
+        ...(selectionState.hasSelection && mdiExtensionsEnabled
           ? [
               { label: "ルビ", action: "ruby", accelerator: "Shift+CmdOrCtrl+R" },
               { label: "縦中横", action: "tcy", accelerator: "Shift+CmdOrCtrl+T" },
@@ -891,21 +750,26 @@ export default function MilkdownEditor({
             ]
           : []),
         { label: "検索", action: "find", accelerator: "CmdOrCtrl+F" },
-        ...(hasSelection
+        ...(selectionState.hasSelection
           ? [
               { label: "Googleで検索", action: "google-search" },
               { label: "辞書で調べる", action: "dictionary" },
             ]
           : []),
         { label: "-", action: "_separator" },
-        { label: "開始朗読", action: "start-speech" },
+        { label: "読み上げ開始", action: "start-speech" },
         { label: "-", action: "_separator" },
         { label: "すべて選択", action: "select-all", accelerator: "CmdOrCtrl+A" },
       ];
       const action = await window.electronAPI?.showContextMenu?.(items);
       if (action) handleContextMenuAction(action as ContextMenuAction);
     },
-    [hasSelection, handleContextMenuAction, mdiExtensionsEnabled, getLintIssueAtCoords],
+    [
+      getLintIssueAtCoords,
+      handleContextMenuAction,
+      mdiExtensionsEnabled,
+      selectionState.hasSelection,
+    ],
   );
 
   // Left-click on lint decoration → auto-switch to corrections tab
@@ -924,19 +788,44 @@ export default function MilkdownEditor({
     <div
       ref={editorRef}
       onClick={handleEditorClick}
-      className={clsx("editor-content-area", isVertical ? "py-8 min-w-fit" : "p-8 mx-auto")}
+      className={clsx(
+        "editor-content-area",
+        isVertical ? "py-8 h-full min-h-full min-w-full" : "p-8 min-h-full",
+      )}
       style={{
         fontSize: `${fontScale}%`,
         fontFamily: `"${fontFamily}", serif`,
         lineHeight: lineHeight,
         ...(isVertical && {
-          minHeight: "100%",
+          width: "max-content",
           display: "flex",
+          justifyContent: "flex-end",
           alignItems: "center",
-          overflow: "clip" as const, // Prevent browser caret-scroll on intermediate elements
         }),
       }}
     >
+      {/* Hidden character width measurement element — CSS class provides letter-spacing
+          and font-feature-settings; inline styles override the class's font-family/size
+          so the measurement matches the user's actual typography settings.
+          Use fixed positioning so the measurement node can never affect any scroll container. */}
+      <span
+        ref={charMeasureRef}
+        aria-hidden="true"
+        className={isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal"}
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          visibility: "hidden",
+          pointerEvents: "none",
+          whiteSpace: "nowrap",
+          fontFamily: `"${fontFamily}", serif`,
+          fontSize: `${fontScale}%`,
+          lineHeight: lineHeight,
+        }}
+      >
+        {MEASURE_TEXT}
+      </span>
       <style jsx>{`
         div :global(.milkdown .ProseMirror) {
           font-family: "${fontFamily}", serif;
@@ -952,6 +841,7 @@ export default function MilkdownEditor({
         div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p) {
           text-indent: ${textIndent}em;
           margin-left: ${paragraphSpacing}em;
+          margin-bottom: 0;
           ${showParagraphNumbers ? "counter-increment: paragraph;" : ""}
           ${showParagraphNumbers ? "position: relative;" : ""}
         }
@@ -1013,11 +903,45 @@ export default function MilkdownEditor({
       `}</style>
       <style jsx global>{`
         /* 初期表示は透明にし、レイアウト確定後にJSでフェードインする */
+        .editor-content-area .editor-measure-box {
+          position: relative;
+        }
+        .editor-content-area .editor-measure-box > .milkdown {
+          width: 100%;
+          max-width: 100%;
+        }
+        .editor-content-area
+          .editor-measure-box
+          > .milkdown
+          .ProseMirror.milkdown-japanese-horizontal {
+          width: 100%;
+          max-width: 100%;
+        }
+        .editor-content-area
+          .editor-measure-box
+          > .milkdown
+          .ProseMirror.milkdown-japanese-vertical {
+          min-height: 100%;
+        }
         .editor-content-area .milkdown .ProseMirror {
           opacity: 0;
         }
       `}</style>
-      <Milkdown />
+      <div
+        className={clsx(
+          "editor-layout-frame flex",
+          isVertical
+            ? "min-w-full w-max justify-end"
+            : "min-h-full w-full justify-center items-start",
+        )}
+      >
+        <div
+          ref={measureBoxRef}
+          className={clsx("editor-measure-box shrink-0", !isVertical && "w-full max-w-full")}
+        >
+          <Milkdown />
+        </div>
+      </div>
     </div>
   );
 
@@ -1027,7 +951,7 @@ export default function MilkdownEditor({
       {!isElectron ? (
         <EditorContextMenu
           onAction={handleContextMenuAction}
-          hasSelection={hasSelection}
+          hasSelection={selectionState.hasSelection}
           lintIssueAtCursor={lintIssueAtCursor}
           onContextMenuOpen={(e) =>
             setLintIssueAtCursor(getLintIssueAtCoords(e.clientX, e.clientY))
@@ -1042,7 +966,8 @@ export default function MilkdownEditor({
       )}
       {editorViewInstance && (
         <BubbleMenu
-          editorView={editorViewInstance}
+          selectionState={selectionState}
+          scrollContainerRef={scrollContainerRef}
           onFormat={handleFormat}
           isVertical={isVertical}
         />

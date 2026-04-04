@@ -6,13 +6,23 @@
  */
 
 import type { ExportMetadata } from "./types";
+import { calculateTypesetting, PAGE_DIMENSIONS } from "./pdf-export-settings";
 
 export interface PdfExportOptions {
   metadata: ExportMetadata;
   verticalWriting?: boolean;
   pageSize?: "A4" | "A5" | "B5" | "B6";
   landscape?: boolean;
-  marginsType?: 0 | 1 | 2; // 0=default, 1=none, 2=minimum
+  /** Explicit margins in mm. Takes precedence over marginsType. */
+  margins?: { top: number; bottom: number; left: number; right: number };
+  /** @deprecated Use margins instead */
+  marginsType?: 0 | 1 | 2;
+  charsPerLine?: number;
+  linesPerPage?: number;
+  fontFamily?: string;
+  showPageNumbers?: boolean;
+  /** First-line indent in em units */
+  textIndent?: number;
 }
 
 /**
@@ -30,11 +40,41 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
   const { BrowserWindow } = await import("electron");
   const { mdiToHtml } = await import("./mdi-to-html");
 
+  // Build typesetting options when chars/lines are specified
+  const hasTypesetting = options.charsPerLine != null && options.linesPerPage != null;
+  const typesetting = hasTypesetting
+    ? (() => {
+        const pageSize = options.pageSize ?? "A5";
+        const margins = options.margins ?? { top: 20, bottom: 20, left: 15, right: 15 };
+        const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
+          pageSize,
+          margins,
+          options.charsPerLine!,
+          options.linesPerPage!,
+          options.verticalWriting ?? false,
+          options.landscape ?? false,
+        );
+        return {
+          fontFamily: options.fontFamily,
+          fontSizeMm,
+          lineHeightRatio,
+          textIndentEm: options.textIndent,
+          margins,
+        };
+      })()
+    : undefined;
+
   const html = mdiToHtml(content, {
     metadata: options.metadata,
     verticalWriting: options.verticalWriting,
+    typesetting,
   });
 
+  // Use a unique in-memory partition (no "persist:" prefix) per export so
+  // that the CSP webRequest hook is registered on a fresh, isolated session.
+  // The session is automatically GC'd when the BrowserWindow is destroyed,
+  // preventing hook accumulation on the shared default session (#1034).
+  const partition = `pdf-export-${Date.now()}`;
   const hiddenWin = new BrowserWindow({
     show: false,
     width: 800,
@@ -44,12 +84,15 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      partition,
     },
   });
 
   // Set a strict CSP header to block all script execution and data: URLs.
   // This is a defense-in-depth measure alongside html:false in markdown-it
   // and the CSP meta tag in the HTML document.
+  // The hook is registered on the isolated per-export partition session,
+  // so it never leaks into the shared default session (#1034).
   hiddenWin.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -79,27 +122,40 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
     // Brief delay to allow CSS paint to complete
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Map page size to physical dimensions in microns
-    const pageSizes: Record<string, { width: number; height: number }> = {
-      A4: { width: 210000, height: 297000 },
-      A5: { width: 148000, height: 210000 },
-      B5: { width: 176000, height: 250000 },
-      B6: { width: 125000, height: 176000 },
-    };
+    // Derive physical dimensions in microns from PAGE_DIMENSIONS (mm)
+    const dims = PAGE_DIMENSIONS[options.pageSize ?? "A5"] ?? PAGE_DIMENSIONS["A5"];
+    const size = { width: dims.width * 1000, height: dims.height * 1000 };
 
-    const size = pageSizes[options.pageSize ?? "A5"];
+    // When explicit margins are provided via @page CSS, set printToPDF margins to zero
+    // to avoid double-margin. Otherwise fall back to legacy marginsType behavior.
+    let pdfMargins: { top: number; bottom: number; left: number; right: number } | undefined;
+    if (typesetting?.margins) {
+      pdfMargins = { top: 0, bottom: 0, left: 0, right: 0 };
+    } else if (options.marginsType === 1) {
+      pdfMargins = { top: 0, bottom: 0, left: 0, right: 0 };
+    } else if (options.marginsType === 2) {
+      pdfMargins = { top: 4, bottom: 4, left: 4, right: 4 };
+    }
 
-    const pdfBuffer = await hiddenWin.webContents.printToPDF({
+    // Build printToPDF options
+    const printOptions: Electron.PrintToPDFOptions = {
       landscape: options.landscape ?? false,
       pageSize: { width: size.width, height: size.height },
       printBackground: true,
-      margins:
-        options.marginsType === 1
-          ? { top: 0, bottom: 0, left: 0, right: 0 }
-          : options.marginsType === 2
-            ? { top: 4, bottom: 4, left: 4, right: 4 }
-            : undefined,
-    });
+      margins: pdfMargins,
+    };
+
+    // Page numbers via Electron's header/footer template
+    if (options.showPageNumbers) {
+      printOptions.displayHeaderFooter = true;
+      printOptions.headerTemplate = "<span></span>";
+      printOptions.footerTemplate =
+        '<div style="font-size:8px; text-align:center; width:100%; color:#666;">' +
+        '<span class="pageNumber"></span> / <span class="totalPages"></span>' +
+        "</div>";
+    }
+
+    const pdfBuffer = await hiddenWin.webContents.printToPDF(printOptions);
 
     return Buffer.from(pdfBuffer);
   } finally {

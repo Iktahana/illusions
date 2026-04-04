@@ -13,13 +13,6 @@ function easeOutCubic(t: number): number {
 
 let activeAnimationId: number | null = null;
 
-/** Clear the programmatic scroll flag (used when no scroll animation is needed). */
-function clearProgrammaticFlag(ref?: { current: boolean | null } | null): void {
-  if (ref) {
-    ref.current = false;
-  }
-}
-
 /**
  * Cancel any in-progress scroll animation.
  */
@@ -34,8 +27,6 @@ interface SpeechScrollOptions {
   container: HTMLElement;
   target: HTMLElement;
   isVertical: boolean;
-  /** Ref to signal programmatic scrolling to the scroll-guard in Editor.tsx */
-  programmaticScrollRef?: React.MutableRefObject<boolean>;
   /** Duration in ms (default 400) */
   duration?: number;
   /** How far from the edge (0-1) the target must be before triggering a scroll.
@@ -55,7 +46,6 @@ export function scrollToSpeechTarget({
   container,
   target,
   isVertical,
-  programmaticScrollRef,
   duration = 400,
   edgeThreshold = 0.25,
 }: SpeechScrollOptions): void {
@@ -74,7 +64,6 @@ export function scrollToSpeechTarget({
 
     if (targetCenterX > leftThreshold && targetCenterX < rightThreshold) {
       // Target is in the comfortable zone — no scroll needed
-      clearProgrammaticFlag(programmaticScrollRef);
       return;
     }
 
@@ -82,13 +71,7 @@ export function scrollToSpeechTarget({
     const desiredX = viewportWidth * 0.7;
     const scrollDelta = targetCenterX - desiredX;
 
-    animateScroll(
-      container,
-      "scrollLeft",
-      container.scrollLeft + scrollDelta,
-      duration,
-      programmaticScrollRef,
-    );
+    animateScroll(container, "scrollLeft", container.scrollLeft + scrollDelta, duration);
   } else {
     // Horizontal writing mode: text flows top-to-bottom.
     const viewportHeight = containerRect.height;
@@ -98,7 +81,6 @@ export function scrollToSpeechTarget({
     const bottomThreshold = viewportHeight * (1 - edgeThreshold);
 
     if (targetCenterY > topThreshold && targetCenterY < bottomThreshold) {
-      clearProgrammaticFlag(programmaticScrollRef);
       return;
     }
 
@@ -106,13 +88,7 @@ export function scrollToSpeechTarget({
     const desiredY = viewportHeight * 0.3;
     const scrollDelta = targetCenterY - desiredY;
 
-    animateScroll(
-      container,
-      "scrollTop",
-      container.scrollTop + scrollDelta,
-      duration,
-      programmaticScrollRef,
-    );
+    animateScroll(container, "scrollTop", container.scrollTop + scrollDelta, duration);
   }
 }
 
@@ -121,20 +97,13 @@ function animateScroll(
   prop: "scrollLeft" | "scrollTop",
   targetValue: number,
   duration: number,
-  programmaticScrollRef?: React.MutableRefObject<boolean>,
 ): void {
   cancelSpeechScroll();
 
   const start = container[prop];
   const delta = targetValue - start;
   if (Math.abs(delta) < 1) {
-    clearProgrammaticFlag(programmaticScrollRef);
     return;
-  }
-
-  // Signal to the scroll guard that this is a programmatic scroll
-  if (programmaticScrollRef) {
-    programmaticScrollRef.current = true;
   }
 
   const startTime = performance.now();
@@ -150,10 +119,6 @@ function animateScroll(
       activeAnimationId = requestAnimationFrame(step);
     } else {
       activeAnimationId = null;
-      // Clear the programmatic scroll flag after animation completes
-      if (programmaticScrollRef) {
-        programmaticScrollRef.current = false;
-      }
     }
   }
 

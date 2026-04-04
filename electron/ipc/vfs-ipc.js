@@ -4,7 +4,7 @@
  * Provides file system operations for the renderer process
  */
 
-const { ipcMain, dialog, app } = require("electron");
+const { ipcMain, dialog, app, BrowserWindow } = require("electron");
 const fs = require("fs/promises");
 const path = require("path");
 const os = require("os");
@@ -292,9 +292,33 @@ function registerVFSHandlers() {
       throw error;
     }
 
-    // 3. Path is allowed — isDeniedPath already blocks sensitive paths,
-    //    and fs.stat above verifies the directory exists.
-    //    No additional restrictions needed for vfs:set-root.
+    // 3. Require dialog approval — renderer cannot promote arbitrary paths
+    //    to VFS root without prior native dialog consent.
+    //    If the path was not previously approved (e.g. after app restart),
+    //    prompt the user with a native directory dialog for confirmation.
+    //    This prevents a compromised renderer from escalating an arbitrary
+    //    path to an allowed root (fixes security issue #1043).
+    if (!dialogApprovedPaths.has(resolved)) {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const result = await dialog.showOpenDialog(win ?? undefined, {
+        title: "プロジェクトフォルダへのアクセスを許可",
+        defaultPath: resolved,
+        properties: ["openDirectory"],
+        message: `「${path.basename(resolved)}」フォルダへのアクセスを許可しますか？`,
+      });
+
+      if (result.canceled || !result.filePaths[0]) {
+        throw new Error("ディレクトリへのアクセスが許可されませんでした");
+      }
+
+      // Only accept the exact path the user confirmed in the dialog
+      const confirmedPath = path.resolve(result.filePaths[0]);
+      if (normalizePath(confirmedPath) !== normalizedResolved) {
+        throw new Error("選択されたディレクトリが要求されたパスと一致しません");
+      }
+
+      approveDialogPath(confirmedPath);
+    }
 
     allowedRoots.set(event.sender.id, resolved);
     return { path: resolved, name: path.basename(resolved) };
@@ -304,6 +328,79 @@ function registerVFSHandlers() {
   app.on("web-contents-created", (_, contents) => {
     contents.on("destroyed", () => {
       allowedRoots.delete(contents.id);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Cross-window history index lock (HistoryService)
+  // ---------------------------------------------------------------------------
+  // In-memory lock registry — atomic because the main-process event loop is
+  // single-threaded. Each entry maps a lock key to the webContents id that
+  // holds it. A queue of { resolve } entries handles waiters.
+  const indexLockOwner = new Map(); // key -> webContentsId
+  const indexLockQueue = new Map(); // key -> Array<{ resolve: () => void }>
+
+  /**
+   * Dequeue the next waiter for a lock key, if any.
+   * The dequeued entry's resolve() will set the owner itself.
+   * @param {string} key
+   */
+  function processIndexLockQueue(key) {
+    const queue = indexLockQueue.get(key) || [];
+    if (queue.length > 0 && !indexLockOwner.has(key)) {
+      const next = queue.shift();
+      if (queue.length === 0) {
+        indexLockQueue.delete(key);
+      }
+      next.resolve();
+    }
+  }
+
+  ipcMain.handle("vfs:index-lock:acquire", async (event, key) => {
+    const senderId = event.sender.id;
+
+    if (!indexLockOwner.has(key)) {
+      // Lock is free — acquire immediately
+      indexLockOwner.set(key, senderId);
+      return;
+    }
+
+    // Lock is held — enqueue this waiter and suspend until released
+    await new Promise((resolve) => {
+      const queue = indexLockQueue.get(key) || [];
+      queue.push({ resolve });
+      indexLockQueue.set(key, queue);
+    });
+
+    // Now the lock is free for us (processIndexLockQueue verified this before calling resolve)
+    indexLockOwner.set(key, senderId);
+  });
+
+  ipcMain.handle("vfs:index-lock:release", (event, key) => {
+    const senderId = event.sender.id;
+    if (indexLockOwner.get(key) === senderId) {
+      indexLockOwner.delete(key);
+      processIndexLockQueue(key);
+    }
+  });
+
+  /**
+   * Release all locks held by a specific window (called when the window closes).
+   * @param {number} webContentsId
+   */
+  function releaseLocksForWindow(webContentsId) {
+    for (const [key, ownerId] of indexLockOwner) {
+      if (ownerId === webContentsId) {
+        indexLockOwner.delete(key);
+        processIndexLockQueue(key);
+      }
+    }
+  }
+
+  // Release index locks automatically when a window is destroyed
+  app.on("browser-window-created", (_, win) => {
+    win.webContents.on("destroyed", () => {
+      releaseLocksForWindow(win.webContents.id);
     });
   });
 }

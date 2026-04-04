@@ -2,11 +2,19 @@
 
 import InfoTooltip from "./InfoTooltip";
 
+import type { PreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
+
 interface StatsPanelProps {
+  /** 可視本文文字数（空白・改行・記法を除く） */
   charCount: number;
+  /** 選択中の可視本文文字数 */
   selectedCharCount: number;
+  /** 段落数 */
   paragraphCount: number;
+  /** 原稿用紙換算枚数 */
   manuscriptPages: number;
+  /** 原稿用紙マス数（20×20） */
+  manuscriptCellCount?: number;
   sentenceCount?: number;
   charTypeAnalysis?: {
     kanji: number;
@@ -25,7 +33,22 @@ interface StatsPanelProps {
     level: string;
     avgSentenceLength: number;
     avgPunctuationSpacing: number;
+    subScores?: {
+      sentenceLoad: number;
+      vocabulary: number;
+      syntaxComplexity: number;
+      paragraphDensity: number;
+    };
+    hasMorphologicalAnalysis?: boolean;
   };
+  previousDayStats?: PreviousDayStats | null;
+}
+
+/** Format a diff value with sign prefix */
+function formatDiff(diff: number, unit: string): string {
+  if (diff > 0) return `+${diff.toLocaleString()}${unit}`;
+  if (diff < 0) return `${diff.toLocaleString()}${unit}`;
+  return `±0${unit}`;
 }
 
 /** Statistics panel displaying character counts, readability, and reading time */
@@ -34,13 +57,22 @@ export default function StatsPanel({
   selectedCharCount,
   paragraphCount,
   manuscriptPages,
+  manuscriptCellCount,
   sentenceCount = 0,
   charTypeAnalysis,
   charUsageRates,
   readabilityAnalysis,
+  previousDayStats,
 }: StatsPanelProps) {
   const isSelection = selectedCharCount > 0;
   const activeCharCount = isSelection ? selectedCharCount : charCount;
+
+  // Previous day comparison（可視本文文字数ベースで比較）
+  const prevDayCharDiff = previousDayStats ? charCount - previousDayStats.charCount : null;
+  const prevDayPageDiff =
+    previousDayStats && previousDayStats.manuscriptPages !== undefined
+      ? manuscriptPages - previousDayStats.manuscriptPages
+      : null;
 
   // Approximate punctuation estimation
   const estimatedPunctuation = Math.floor(activeCharCount * 0.12);
@@ -119,11 +151,27 @@ export default function StatsPanel({
         <div className="bg-background-secondary rounded-lg p-3 border border-border flex items-center justify-between">
           <div>
             <p className="text-xs text-foreground-tertiary font-medium mb-1 flex items-center">
-              <InfoTooltip content="400字詰め原稿用紙に換算した枚数">原稿用紙</InfoTooltip>
+              <InfoTooltip content="400字詰め原稿用紙（20×20）に換算した枚数。明示改行で行送り、禁則処理あり。端数切り上げ。">
+                原稿用紙
+              </InfoTooltip>
             </p>
-            <p className="text-xs text-foreground-tertiary">400字詰原稿用紙</p>
+            <p className="text-xs text-foreground-tertiary">
+              400字詰原稿用紙
+              {manuscriptCellCount !== undefined && (
+                <span className="ml-1 opacity-70">({manuscriptCellCount}マス)</span>
+              )}
+            </p>
           </div>
-          <span className="text-sm font-bold text-foreground">{manuscriptPages}枚</span>
+          <div className="text-right">
+            <span className="text-sm font-bold text-foreground">{manuscriptPages}枚</span>
+            {prevDayPageDiff !== null && (
+              <p
+                className={`text-xs font-medium ${prevDayPageDiff > 0 ? "text-success" : prevDayPageDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
+              >
+                {formatDiff(prevDayPageDiff, "枚")}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -172,7 +220,7 @@ export default function StatsPanel({
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex items-center gap-1 min-w-0">
                 <InfoTooltip
-                  content={`80点以上：やさしい\n50-79点：普通\n50点未満：難しい`}
+                  content={`75点以上：やさしい\n50〜74点：普通\n50点未満：難しい`}
                   className="text-sm text-foreground-secondary whitespace-nowrap"
                 >
                   難易度
@@ -210,6 +258,67 @@ export default function StatsPanel({
                 </span>
               </div>
             </div>
+            {/* サブスコア詳細 */}
+            {readabilityAnalysis.subScores && (
+              <div className="pt-2 border-t border-border space-y-1.5">
+                <p className="text-[10px] text-foreground-tertiary font-medium uppercase tracking-wide flex items-center gap-1">
+                  詳細スコア
+                  {readabilityAnalysis.hasMorphologicalAnalysis === false && (
+                    <span className="opacity-50 normal-case font-normal">(基本分析)</span>
+                  )}
+                </p>
+                {(
+                  [
+                    [
+                      "文の負荷",
+                      readabilityAnalysis.subScores.sentenceLoad,
+                      "文長・句読点・括弧の配置から評価",
+                    ],
+                    [
+                      "語彙の難しさ",
+                      readabilityAnalysis.subScores.vocabulary,
+                      "漢字・カタカナ・専門語の密度から評価",
+                    ],
+                    [
+                      "構文の複雑さ",
+                      readabilityAnalysis.subScores.syntaxComplexity,
+                      "接続詞・二重否定・受け身構文の頻度から評価",
+                    ],
+                    [
+                      "段落の密度",
+                      readabilityAnalysis.subScores.paragraphDensity,
+                      "段落の長さと分布から評価",
+                    ],
+                  ] as [string, number, string][]
+                ).map(([label, value, tooltip]) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <InfoTooltip
+                      content={tooltip}
+                      className="text-[10px] text-foreground-tertiary whitespace-nowrap w-20 flex-shrink-0"
+                    >
+                      {label}
+                    </InfoTooltip>
+                    <div className="flex-1 h-1.5 bg-background rounded-full overflow-hidden border border-border-secondary">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${value}%`,
+                          backgroundColor:
+                            value >= 75
+                              ? "var(--color-success)"
+                              : value >= 50
+                                ? "var(--color-warning, #f59e0b)"
+                                : "var(--color-error)",
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-foreground-tertiary w-6 text-right flex-shrink-0">
+                      {value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -220,18 +329,27 @@ export default function StatsPanel({
           文字数
         </h4>
         <div className="space-y-1.5">
-          <div className="flex justify-between items-baseline gap-2">
+          <div className="flex justify-between items-center gap-2">
             <div className="flex items-center gap-1 min-w-0">
               <InfoTooltip
-                content="空白・改行を含むすべての文字数（原稿用紙換算の基準）"
+                content="記法を除いた可視本文の文字数（空白・改行は含まない）"
                 className="text-sm text-foreground-secondary whitespace-nowrap"
               >
                 総字数
               </InfoTooltip>
             </div>
-            <span className="text-base font-semibold text-foreground flex-shrink-0">
-              {activeCharCount.toLocaleString()}
-            </span>
+            <div className="flex-shrink-0 text-right">
+              <span className="text-base font-semibold text-foreground">
+                {activeCharCount.toLocaleString()}
+              </span>
+              {!isSelection && prevDayCharDiff !== null && (
+                <p
+                  className={`text-xs font-medium ${prevDayCharDiff > 0 ? "text-success" : prevDayCharDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
+                >
+                  {formatDiff(prevDayCharDiff, "字")}
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex justify-between items-baseline gap-2">
             <div className="flex items-center gap-1 min-w-0">

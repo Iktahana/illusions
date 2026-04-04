@@ -206,7 +206,9 @@ export class ProjectService {
       if (parentPath) {
         projectRootPath = `${parentPath}/${name}`;
         if ("setRootPath" in this.vfs) {
-          (this.vfs as { setRootPath: (p: string) => void }).setRootPath(projectRootPath);
+          await (this.vfs as { setRootPath: (p: string) => Promise<void> }).setRootPath(
+            projectRootPath,
+          );
         }
       }
     }
@@ -233,12 +235,30 @@ export class ProjectService {
   async openProject(): Promise<ProjectMode> {
     const rootDirHandle = await this.vfs.openDirectory();
 
-    // Read .illusions/project.json (create if missing)
-    const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
-    const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
+    // Read .illusions/project.json — do NOT create; fail clearly if not found.
+    let illusionsDir: Awaited<ReturnType<typeof rootDirHandle.getDirectoryHandle>>;
+    try {
+      illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: false });
+    } catch {
+      throw new Error(
+        "選択したフォルダはプロジェクトフォルダではありません。.illusions フォルダが見つかりません。",
+      );
+    }
+
+    let projectJsonHandle: Awaited<ReturnType<typeof illusionsDir.getFileHandle>>;
+    try {
+      projectJsonHandle = await illusionsDir.getFileHandle("project.json");
+    } catch {
+      throw new Error(
+        "プロジェクトの設定ファイル (.illusions/project.json) が見つかりません。プロジェクトが破損している可能性があります。",
+      );
+    }
+
     const metadataText = await projectJsonHandle.read();
     if (!metadataText.trim()) {
-      throw new Error(".illusions/project.json is empty — project may need to be re-created.");
+      throw new Error(
+        "プロジェクトの設定ファイル (.illusions/project.json) が空です。プロジェクトが破損している可能性があります。",
+      );
     }
     const metadata: ProjectConfig = JSON.parse(metadataText) as ProjectConfig;
 
@@ -311,9 +331,24 @@ export class ProjectService {
     };
     await projectJsonHandle.write(JSON.stringify(updatedMetadata, null, 2));
 
-    // Update workspace.json
-    const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json");
+    // Update workspace.json (create: true to handle legacy projects without workspace.json)
+    const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json", {
+      create: true,
+    });
     await workspaceJsonHandle.write(JSON.stringify(project.workspaceState, null, 2));
+  }
+
+  /**
+   * Save only the project metadata (project.json) without touching the main file.
+   * メインファイルを変更せずに、プロジェクトメタデータ（project.json）だけを保存する。
+   *
+   * @param project - The project whose metadata should be persisted
+   */
+  async saveProjectMetadata(project: ProjectMode): Promise<void> {
+    const rootDirHandle = await this.getVFSDirectoryHandle(project);
+    const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
+    const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
+    await projectJsonHandle.write(JSON.stringify(project.metadata, null, 2));
   }
 
   /**
@@ -334,7 +369,7 @@ export class ProjectService {
         throw new Error("ファイル選択がキャンセルされました。");
       }
 
-      const fileName = result.path.split("/").pop() ?? result.path;
+      const fileName = result.path.split(/[/\\]/).pop() ?? result.path;
       const fileExtension = this.getFileExtension(fileName);
 
       // Electron does not have FileSystemFileHandle, so we create a minimal shim.
@@ -346,6 +381,7 @@ export class ProjectService {
         fileName,
         fileExtension,
         editorSettings: getDefaultEditorSettings(fileExtension),
+        filePath: result.path,
       };
     }
 
@@ -438,6 +474,30 @@ export class ProjectService {
   }
 
   /**
+   * Read file content for a standalone mode file.
+   * スタンドアロンモードのファイル内容を読み込む。
+   *
+   * On Electron, reads via VFS using the absolute file path.
+   * On Web, reads from the FileSystemFileHandle.
+   *
+   * @param standalone - The standalone mode object returned by openStandaloneFile
+   * @returns The file content as text
+   */
+  async readStandaloneContent(standalone: StandaloneMode): Promise<string> {
+    if (isElectronRenderer() && standalone.filePath) {
+      const vfs = getVFS();
+      return vfs.readFile(standalone.filePath);
+    }
+
+    if (standalone.fileHandle) {
+      const file = await standalone.fileHandle.getFile();
+      return file.text();
+    }
+
+    throw new Error("ファイルの内容を読み込めませんでした。");
+  }
+
+  /**
    * Get default initial content for a new file based on its extension.
    * 新規ファイルのデフォルト初期コンテンツを取得する。
    */
@@ -479,7 +539,9 @@ export class ProjectService {
     if (isElectronRenderer() && project.rootPath) {
       // Re-set the VFS root using the stored absolute path
       if ("setRootPath" in this.vfs) {
-        (this.vfs as { setRootPath: (p: string) => void }).setRootPath(project.rootPath);
+        await (this.vfs as { setRootPath: (p: string) => Promise<void> }).setRootPath(
+          project.rootPath,
+        );
       }
       return await this.vfs.getDirectoryHandle("");
     }

@@ -1,4 +1,5 @@
 import type { LintIssue, Severity } from "@/lib/linting";
+import type { PreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
 
 export type Tab = "corrections" | "stats" | "history";
 
@@ -33,9 +34,14 @@ export interface EnrichedLintIssue extends LintIssue {
 export interface InspectorProps {
   className?: string;
   compactMode?: boolean;
+  /** 可視本文文字数（空白・改行・記法を除く） */
   charCount?: number;
   selectedCharCount?: number;
   paragraphCount?: number;
+  /** 原稿用紙マス数（20×20、禁則処理あり） */
+  manuscriptCellCount?: number;
+  /** 原稿用紙換算枚数（切り上げ） */
+  manuscriptPages?: number;
   fileName?: string;
   isDirty?: boolean;
   isSaving?: boolean;
@@ -60,10 +66,18 @@ export interface InspectorProps {
     level: string;
     avgSentenceLength: number;
     avgPunctuationSpacing: number;
+    subScores?: {
+      sentenceLoad: number;
+      vocabulary: number;
+      syntaxComplexity: number;
+      paragraphDensity: number;
+    };
+    hasMorphologicalAnalysis?: boolean;
   };
   onOpenPosHighlightSettings?: () => void;
   onHistoryRestore?: (content: string) => void;
   activeFileName?: string;
+  activeFilePath?: string;
   currentContent?: string;
   onCompareInEditor?: (data: {
     snapshotContent: string;
@@ -78,8 +92,12 @@ export interface InspectorProps {
   isLinting?: boolean;
   activeLintIssueIndex?: number | null;
   onOpenLintingSettings?: () => void;
-  onApplyLintPreset?: (presetId: string) => void;
-  activeLintPresetId?: string;
+  correctionMode?: import("@/lib/linting/correction-config").CorrectionModeId;
+  onCorrectionModeChange?: (
+    modeId: import("@/lib/linting/correction-config").CorrectionModeId,
+  ) => void;
   /** Monotonically increasing trigger to switch to the corrections tab from outside */
   switchToCorrectionsTrigger?: number;
+  /** Previous day's stats for comparison display */
+  previousDayStats?: PreviousDayStats | null;
 }

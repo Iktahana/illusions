@@ -8,13 +8,18 @@ import dynamic from "next/dynamic";
 
 import type { Severity } from "@/lib/linting/types";
 import type { CorrectionConfig } from "@/lib/linting/correction-config";
+import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import {
   LINT_RULES_META,
   LINT_RULE_CATEGORIES,
   LINT_PRESETS,
   LINT_DEFAULT_CONFIGS,
 } from "@/lib/linting/lint-presets";
-import { CORRECTION_MODE_IDS, CORRECTION_MODES } from "@/lib/linting/correction-modes";
+import {
+  CORRECTION_MODE_IDS,
+  CORRECTION_MODES,
+  MODE_TO_PRESET,
+} from "@/lib/linting/correction-modes";
 import GuidelineList from "@/components/GuidelineList";
 
 /** Map of rule ID -> supportsSkipDialogue from metadata */
@@ -138,36 +143,22 @@ export default function LintingSettings({
   // Memoized map to avoid recreation on every render (LINT_RULES_META is a module-level constant)
   const ruleMetaMap = useMemo(() => new Map(LINT_RULES_META.map((r) => [r.id, r])), []);
 
-  /** Detect which preset matches the current config (if any) */
-  const activePresetId = useMemo(() => {
-    for (const [id, preset] of Object.entries(LINT_PRESETS)) {
-      const allMatch = LINT_RULES_META.every((rule) => {
-        const current = getConfig(rule.id, lintingRuleConfigs);
-        const presetCfg = preset.configs[rule.id];
-        if (!presetCfg) return false;
-        return (
-          current.enabled === presetCfg.enabled &&
-          current.severity === presetCfg.severity &&
-          (current.skipDialogue ?? false) === (presetCfg.skipDialogue ?? false)
-        );
-      });
-      if (allMatch) return id;
-    }
-    return "";
-  }, [lintingRuleConfigs]);
-
-  /** Handle correction mode change: update mode and reset guidelines to mode defaults */
+  /** Handle correction mode change: update mode, guidelines, and apply corresponding preset */
   const handleModeChange = useCallback(
     (modeId: string) => {
       if (!onCorrectionConfigChange) return;
-      const mode = CORRECTION_MODES[modeId as keyof typeof CORRECTION_MODES];
+      const mode = CORRECTION_MODES[modeId as CorrectionModeId];
       if (!mode) return;
       onCorrectionConfigChange({
         mode: mode.id,
         guidelines: [...mode.defaultGuidelines],
       });
+      const presetId = MODE_TO_PRESET[modeId as CorrectionModeId];
+      if (presetId) {
+        handleApplyPreset(presetId);
+      }
     },
-    [onCorrectionConfigChange],
+    [onCorrectionConfigChange, handleApplyPreset],
   );
 
   /** Handle guideline priority list change */
@@ -243,11 +234,11 @@ export default function LintingSettings({
             )}
           </div>
 
-          {/* Guideline priority list */}
+          {/* Guideline list */}
           <div>
-            <h4 className="text-sm font-medium text-foreground mb-1">ガイドライン優先順位</h4>
+            <h4 className="text-sm font-medium text-foreground mb-1">ガイドライン</h4>
             <p className="text-xs text-foreground-tertiary mb-2">
-              上位のガイドラインが優先されます。不要なガイドラインはオフにしてください。
+              有効にしたガイドラインに基づいてルールが適用されます。
             </p>
             <GuidelineList
               guidelines={correctionConfig.guidelines}
@@ -266,24 +257,8 @@ export default function LintingSettings({
       >
         <h3 className="text-sm font-medium text-foreground">校正ルール</h3>
 
-        {/* Preset dropdown + bulk actions */}
+        {/* Bulk actions */}
         <div className="flex items-center gap-2 flex-wrap">
-          <select
-            value={activePresetId}
-            onChange={(e) => {
-              if (e.target.value) {
-                handleApplyPreset(e.target.value);
-              }
-            }}
-            className="text-xs px-2 py-1.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            {!activePresetId && <option value="">カスタム</option>}
-            {Object.entries(LINT_PRESETS).map(([id, preset]) => (
-              <option key={id} value={id}>
-                {preset.nameJa}
-              </option>
-            ))}
-          </select>
           <div className="flex-1" />
           <button
             onClick={handleEnableAll}

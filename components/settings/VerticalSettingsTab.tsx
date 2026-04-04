@@ -8,7 +8,7 @@ const SCROLL_BEHAVIORS = [
   {
     value: "auto" as const,
     label: "自動検出",
-    description: "マウスとトラックパッドを自動的に判別します",
+    description: "入力の軸と粒度からマウス/トラックパッドを推定します",
   },
   {
     value: "mouse" as const,

@@ -70,6 +70,9 @@ const mockKvStoreTable = createMockTable<any>("key");
 
 const mockDb = {
   open: vi.fn(async () => {}),
+  transaction: vi.fn(async (_mode: string, _tables: unknown[], fn: () => Promise<void>) => {
+    await fn();
+  }),
   appState: mockAppStateTable,
   recentFiles: mockRecentFilesTable,
   editorBuffer: mockEditorBufferTable,
@@ -89,6 +92,7 @@ vi.mock("dexie", () => {
       // can reference them through the instance.
       Object.assign(this, {
         open: mockDb.open,
+        transaction: mockDb.transaction,
         appState: mockDb.appState,
         recentFiles: mockDb.recentFiles,
         editorBuffer: mockDb.editorBuffer,

@@ -41,6 +41,7 @@ const { registerSystemHandlers } = require("./ipc/system-ipc");
 const { registerPtyHandlers } = require("./ipc/pty-ipc");
 const { killAllSessions, killSessionsForWindow } = require("./ipc/terminal-session-registry");
 const { registerAuthHandlers, handleAuthCallback } = require("./ipc/auth-ipc");
+const { registerEditorHandlers } = require("./ipc/editor-ipc");
 
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
@@ -160,6 +161,7 @@ app.whenReady().then(async () => {
   registerSystemHandlers();
   registerPtyHandlers();
   registerAuthHandlers();
+  registerEditorHandlers();
 
   // Power state monitoring
   powerMonitor.on("on-ac", () => broadcastPowerState("ac"));
@@ -183,12 +185,22 @@ app.on("before-quit", () => {
   killAllSessions();
 });
 
+// Per-window menu state lifecycle: focus → swap active state; closed → cleanup
+app.on("browser-window-focus", (_event, win) => {
+  const { setActiveWindowId, rebuildApplicationMenu } = require("./menu");
+  setActiveWindowId(win.id);
+  void rebuildApplicationMenu();
+});
+
 // Kill PTY sessions for a window when it is closed
 app.on("browser-window-created", (_event, win) => {
   const wcId = win.webContents.id;
 
   win.on("closed", () => {
     killSessionsForWindow(wcId);
+    // Remove per-window menu state to prevent memory leak
+    const { removeWindowState } = require("./menu");
+    removeWindowState(win.id);
   });
 
   // Kill orphaned PTYs if the renderer crashes

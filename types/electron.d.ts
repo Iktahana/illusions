@@ -38,9 +38,10 @@ declare global {
       callback: (payload: { projectPath: string; initialFile: string }) => void,
     ) => (() => void) | void;
     getPendingFile?: () => Promise<
-      | { type: "project"; projectPath: string; initialFile: string }
-      | { type: "standalone"; path: string; content: string }
-      | null
+      Array<
+        | { type: "project"; projectPath: string; initialFile: string }
+        | { type: "standalone"; path: string; content: string }
+      >
     >;
     onMenuNew?: (callback: () => void) => (() => void) | void;
     onMenuOpen?: (callback: () => void) => (() => void) | void;
@@ -73,6 +74,13 @@ declare global {
         metadata: { title: string; author?: string; date?: string; language?: string };
         verticalWriting?: boolean;
         pageSize?: "A4" | "A5" | "B5" | "B6";
+        landscape?: boolean;
+        margins?: { top: number; bottom: number; left: number; right: number };
+        charsPerLine?: number;
+        linesPerPage?: number;
+        fontFamily?: string;
+        showPageNumbers?: boolean;
+        textIndent?: number;
       },
     ) => Promise<string | { success: false; error: string } | null>;
     exportEPUB?: (
@@ -110,6 +118,16 @@ declare global {
       delete: (targetPath: string, options?: { recursive?: boolean }) => Promise<void>;
       /** Watch a file for changes (optional) */
       watch?: (filePath: string, callback: (event: VFSWatchEvent) => void) => { stop: () => void };
+      /**
+       * Acquire the cross-window history index lock for the given key.
+       * Suspends until the lock is available (main-process queue-based, atomic).
+       */
+      indexLockAcquire: (key: string) => Promise<void>;
+      /**
+       * Release the cross-window history index lock for the given key.
+       * Must be called from the window that acquired it.
+       */
+      indexLockRelease: (key: string) => Promise<void>;
     };
     storage?: {
       saveSession: (session: StorageSession) => Promise<void>;

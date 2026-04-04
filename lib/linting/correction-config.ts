@@ -53,7 +53,7 @@ export interface CorrectionConfig {
 export const DEFAULT_CORRECTION_CONFIG: CorrectionConfig = {
   enabled: true,
   mode: "novel",
-  guidelines: ["joyo-kanji-2010", "novel-manuscript"],
+  guidelines: ["novel-manuscript", "gendai-kanazukai-1986", "editors-rulebook", "joyo-kanji-2010"],
   ruleOverrides: {},
   ignoredCorrections: [],
 };

@@ -40,12 +40,15 @@ export interface UseTabManagerReturn {
   switchToIndex: (index: number) => void;
   openProjectFile: (vfsPath: string, options?: { preview?: boolean }) => Promise<void>;
   pinTab: (tabId: TabId) => void;
-  newTerminalTab: () => void;
+  newTerminalTab: (pendingId?: string) => void;
   /** Update mutable fields on a terminal tab (e.g. status, exitCode after PTY exits). */
   updateTerminalTab: (
     tabId: TabId,
     updates: Partial<
-      Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">
+      Pick<
+        TerminalTabState,
+        "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell" | "pendingId"
+      >
     >,
   ) => void;
   openDiffTab: (

@@ -41,13 +41,16 @@ export interface UseTabStateReturn extends TabManagerCore {
   newTab: (fileType?: SupportedFileExtension) => void;
   /** Create a new editor tab pre-populated with content and file association from a source tab. */
   cloneTab: (source: EditorTabState) => void;
-  /** Open a new terminal tab with placeholder values. */
-  newTerminalTab: () => void;
-  /** Update a terminal tab's mutable fields (status, exitCode, sessionId). */
+  /** Open a new terminal tab with placeholder values. Optionally pass a pendingId for spawn correlation. */
+  newTerminalTab: (pendingId?: string) => void;
+  /** Update a terminal tab's mutable fields (status, exitCode, sessionId, pendingId). */
   updateTerminalTab: (
     tabId: TabId,
     updates: Partial<
-      Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">
+      Pick<
+        TerminalTabState,
+        "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell" | "pendingId"
+      >
     >,
   ) => void;
   /** Open a diff tab for the given source tab. */
@@ -156,11 +159,12 @@ export function useTabState(): UseTabStateReturn {
     setActiveTabId(tab.id);
   }, []);
 
-  const newTerminalTab = useCallback(() => {
+  const newTerminalTab = useCallback((pendingId?: string) => {
     const tab: TerminalTabState = {
       tabKind: "terminal",
       id: generateTabId(),
       sessionId: "",
+      pendingId: pendingId ?? null,
       label: "ターミナル",
       cwd: "",
       shell: "",
@@ -177,7 +181,10 @@ export function useTabState(): UseTabStateReturn {
     (
       tabId: TabId,
       updates: Partial<
-        Pick<TerminalTabState, "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell">
+        Pick<
+          TerminalTabState,
+          "sessionId" | "status" | "exitCode" | "label" | "cwd" | "shell" | "pendingId"
+        >
       >,
     ) => {
       setTabs((prev) =>

@@ -35,6 +35,8 @@ export default function Inspector({
   charCount = 0,
   selectedCharCount = 0,
   paragraphCount = 0,
+  manuscriptCellCount,
+  manuscriptPages: manuscriptPagesProp,
   fileName = "無題",
   isDirty = false,
   isSaving = false,
@@ -48,6 +50,7 @@ export default function Inspector({
   onOpenPosHighlightSettings,
   onHistoryRestore,
   activeFileName,
+  activeFilePath,
   currentContent = "",
   onCompareInEditor,
   lintIssues,
@@ -58,9 +61,10 @@ export default function Inspector({
   isLinting = false,
   activeLintIssueIndex,
   onOpenLintingSettings,
-  onApplyLintPreset,
-  activeLintPresetId,
+  correctionMode,
+  onCorrectionModeChange,
   switchToCorrectionsTrigger = 0,
+  previousDayStats,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
   const projectMode = isProject ? (editorMode as ProjectMode) : null;
@@ -168,8 +172,9 @@ export default function Inspector({
     setIsEditingFileName(false);
   }, [baseName]);
 
-  // 原稿用紙換算（400字/枚）
-  const manuscriptPages = Math.ceil(charCount / 400);
+  // 原稿用紙換算枚数：app/page.tsx から常に渡される。
+  // undefined になるのは Inspector を直接使うテスト等のレアケースのみ。
+  const manuscriptPages = manuscriptPagesProp ?? 0;
 
   return (
     <aside
@@ -365,8 +370,8 @@ export default function Inspector({
             isLinting={isLinting}
             activeLintIssueIndex={activeLintIssueIndex}
             onOpenLintingSettings={onOpenLintingSettings}
-            onApplyLintPreset={onApplyLintPreset}
-            activeLintPresetId={activeLintPresetId}
+            correctionMode={correctionMode}
+            onCorrectionModeChange={onCorrectionModeChange}
           />
         )}
         {activeTab === "stats" && (
@@ -379,12 +384,18 @@ export default function Inspector({
             charTypeAnalysis={charTypeAnalysis}
             charUsageRates={charUsageRates}
             readabilityAnalysis={readabilityAnalysis}
+            previousDayStats={previousDayStats}
           />
         )}
         {activeTab === "history" && projectMode && onHistoryRestore && (
           <HistoryPanel
             projectId={projectMode.projectId}
-            mainFileName={activeFileName || projectMode.metadata.mainFile}
+            sourcePath={activeFilePath || projectMode.metadata.mainFile}
+            displayName={
+              activeFileName ||
+              (activeFilePath || projectMode.metadata.mainFile).split("/").pop() ||
+              projectMode.metadata.mainFile
+            }
             onRestore={onHistoryRestore}
             currentContent={currentContent}
             onCompareInEditor={onCompareInEditor}

@@ -75,6 +75,9 @@ export function useSpeech(config?: SpeechConfig): {
   const onBoundaryRef = useRef<SpeechCallbacks["onBoundary"]>(undefined);
   const onEndRef = useRef<SpeechCallbacks["onEnd"]>(undefined);
   const onSegmentStartRef = useRef<SegmentCallbacks["onSegmentStart"]>(undefined);
+  // Flag set during stop() so cancel-triggered onend/onerror events are ignored.
+  // This prevents stop() from being mistaken for natural completion by continuation logic.
+  const isStoppingRef = useRef(false);
 
   // Detect support on the client after mount (window is not available during SSR).
   useEffect(() => {
@@ -100,11 +103,15 @@ export function useSpeech(config?: SpeechConfig): {
 
     // Cancel whatever is currently playing before starting new speech.
     window.speechSynthesis.cancel();
+    // Chromium/Electron bug: speechSynthesis can remain in a paused state after
+    // cancel(). Calling resume() before speak() ensures the queue is unblocked.
+    window.speechSynthesis.resume();
 
     const cfg = configRef.current;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "ja-JP";
 
+    // Re-fetch voices at speak time — stale voice references cause silence in Chromium/Electron.
     const voice = findJapaneseVoice(cfg?.voiceURI);
     if (voice !== undefined) {
       utterance.voice = voice;
@@ -117,12 +124,16 @@ export function useSpeech(config?: SpeechConfig): {
 
     utterance.onend = () => {
       setState({ isPlaying: false, isPaused: false, isSupported: true });
-      onEndRef.current?.();
+      if (!isStoppingRef.current) {
+        onEndRef.current?.();
+      }
     };
 
     utterance.onerror = () => {
       setState({ isPlaying: false, isPaused: false, isSupported: true });
-      onEndRef.current?.();
+      if (!isStoppingRef.current) {
+        onEndRef.current?.();
+      }
     };
 
     utterance.onpause = () => {
@@ -151,8 +162,11 @@ export function useSpeech(config?: SpeechConfig): {
     onEndRef.current = callbacks?.onEnd;
 
     window.speechSynthesis.cancel();
+    // Chromium/Electron bug: resume() needed after cancel() to unblock the queue.
+    window.speechSynthesis.resume();
 
     const cfg = configRef.current;
+    // Re-fetch voices at speak time to avoid stale references.
     const voice = findJapaneseVoice(cfg?.voiceURI);
     const utterances = segments.map((text, i) => {
       const u = new SpeechSynthesisUtterance(text);
@@ -173,7 +187,9 @@ export function useSpeech(config?: SpeechConfig): {
       u.onerror = () => {
         window.speechSynthesis.cancel();
         setState({ isPlaying: false, isPaused: false, isSupported: true });
-        onEndRef.current?.();
+        if (!isStoppingRef.current) {
+          onEndRef.current?.();
+        }
       };
       return u;
     });
@@ -181,7 +197,9 @@ export function useSpeech(config?: SpeechConfig): {
     // Only the last utterance's onend resets state and fires callback
     utterances[utterances.length - 1].onend = () => {
       setState({ isPlaying: false, isPaused: false, isSupported: true });
-      onEndRef.current?.();
+      if (!isStoppingRef.current) {
+        onEndRef.current?.();
+      }
     };
 
     // Queue all utterances — speechSynthesis plays them in order
@@ -202,9 +220,15 @@ export function useSpeech(config?: SpeechConfig): {
 
   const stop = useCallback(() => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      // Set the flag BEFORE cancel() so any synchronously-fired onend/onerror
+      // events know this was a user stop, not natural completion.
+      isStoppingRef.current = true;
       window.speechSynthesis.cancel();
       setState((prev) => ({ ...prev, isPlaying: false, isPaused: false }));
-      onEndRef.current?.();
+      // Reset the flag after a microtask so async event handlers are also covered.
+      Promise.resolve().then(() => {
+        isStoppingRef.current = false;
+      });
     }
   }, []);
 

@@ -9,17 +9,16 @@ let mainWindow = null;
 const allWindows = new Set();
 
 // --- Power state monitoring ---
-let powerDebounceTimer = null;
 
+/**
+ * Broadcast a power state change to all renderer windows.
+ */
 function broadcastPowerState(state) {
-  clearTimeout(powerDebounceTimer);
-  powerDebounceTimer = setTimeout(() => {
-    for (const win of allWindows) {
-      if (!win.isDestroyed()) {
-        win.webContents.send("power:state-changed", state);
-      }
+  for (const win of allWindows) {
+    if (!win.isDestroyed()) {
+      win.webContents.send("power:state-changed", state);
     }
-  }, 60_000); // 1-minute debounce
+  }
 }
 
 function getMainWindow() {

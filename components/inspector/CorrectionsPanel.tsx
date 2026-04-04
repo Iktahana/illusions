@@ -15,7 +15,9 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 
-import { LINT_PRESETS, LINT_RULE_CATEGORIES } from "@/lib/linting/lint-presets";
+import { LINT_RULE_CATEGORIES } from "@/lib/linting/lint-presets";
+import { CORRECTION_MODE_IDS, CORRECTION_MODES } from "@/lib/linting/correction-modes";
+import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import InfoTooltip from "./InfoTooltip";
 import IssueCard from "./IssueCard";
@@ -37,8 +39,8 @@ interface CorrectionsPanelProps {
   isLinting?: boolean;
   activeLintIssueIndex?: number | null;
   onOpenLintingSettings?: () => void;
-  onApplyLintPreset?: (presetId: string) => void;
-  activeLintPresetId?: string;
+  correctionMode?: CorrectionModeId;
+  onCorrectionModeChange?: (modeId: CorrectionModeId) => void;
 }
 
 const SEVERITY_ORDER: Record<Severity, number> = {
@@ -85,8 +87,8 @@ export default function CorrectionsPanel({
   isLinting = false,
   activeLintIssueIndex,
   onOpenLintingSettings,
-  onApplyLintPreset,
-  activeLintPresetId = "",
+  correctionMode,
+  onCorrectionModeChange,
 }: CorrectionsPanelProps): React.JSX.Element {
   const {
     posHighlightEnabled,
@@ -448,6 +450,21 @@ export default function CorrectionsPanel({
               <h3 className="text-sm font-medium text-foreground-secondary">検出結果</h3>
               <span className="text-xs text-foreground-tertiary">{lintIssues.length}件</span>
             </div>
+            {/* Row 1b: correction mode selector */}
+            {onCorrectionModeChange && (
+              <select
+                value={correctionMode ?? "novel"}
+                onChange={(e) => onCorrectionModeChange(e.target.value as CorrectionModeId)}
+                className="w-full text-xs px-1.5 py-1 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                title="校正モード"
+              >
+                {CORRECTION_MODE_IDS.map((modeId) => (
+                  <option key={modeId} value={modeId}>
+                    {CORRECTION_MODES[modeId].nameJa}
+                  </option>
+                ))}
+              </select>
+            )}
             {/* Row 2: sort + refresh + settings */}
             <div className="flex items-center gap-1">
               <select
@@ -486,26 +503,6 @@ export default function CorrectionsPanel({
                 </button>
               )}
             </div>
-            {/* Row 3: preset selector */}
-            {onApplyLintPreset && (
-              <select
-                value={activeLintPresetId}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    onApplyLintPreset(e.target.value);
-                  }
-                }}
-                className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent w-full"
-                title="プリセットを適用"
-              >
-                {!activeLintPresetId && <option value="">カスタム</option>}
-                {Object.entries(LINT_PRESETS).map(([id, preset]) => (
-                  <option key={id} value={id}>
-                    {preset.nameJa}
-                  </option>
-                ))}
-              </select>
-            )}
           </div>
 
           {/* Severity filter buttons */}

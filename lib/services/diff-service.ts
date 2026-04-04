@@ -9,6 +9,18 @@ import { diffChars } from "diff";
 
 import type { Change } from "diff";
 
+/**
+ * Normalize text for diff comparison by stripping HTML tags.
+ * Converts `<br>` to newlines and removes other HTML tags so that
+ * formatting-only changes don't appear as content diffs.
+ *
+ * diff比較用にHTMLタグを除去する。`<br>`は改行に変換し、
+ * その他のHTMLタグは削除する。
+ */
+export function stripHtmlForDiff(text: string): string {
+  return text.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "");
+}
+
 /** A single diff chunk with type and value */
 export interface DiffChunk {
   type: "added" | "removed" | "unchanged";
@@ -27,7 +39,7 @@ export interface DiffChunk {
  * @returns Array of diff chunks
  */
 export function computeDiff(oldText: string, newText: string): DiffChunk[] {
-  const changes: Change[] = diffChars(oldText, newText);
+  const changes: Change[] = diffChars(stripHtmlForDiff(oldText), stripHtmlForDiff(newText));
 
   return changes.map((change) => ({
     type: change.added ? "added" : change.removed ? "removed" : "unchanged",

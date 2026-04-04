@@ -12,6 +12,7 @@ const { ipcMain, BrowserWindow } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const { execSync } = require("child_process");
 
 const {
   MAX_SESSIONS_PER_WINDOW,
@@ -21,6 +22,7 @@ const {
   appendToOutputBuffer,
   addSession,
   getSession,
+  removeSession,
   killSession,
 } = require("./terminal-session-registry");
 
@@ -44,16 +46,73 @@ try {
 // -----------------------------------------------------------------------
 
 /**
+ * Resolve the absolute path to a shell executable on Windows using PATH lookup.
+ * Uses `where` command (Windows equivalent of `which`) to find the executable.
+ * @param {string} name - executable name (e.g. "powershell.exe")
+ * @returns {string|null} absolute path or null if not found
+ */
+function resolveWindowsShellByName(name) {
+  try {
+    const result = execSync(`where "${name}"`, { encoding: "utf8", timeout: 3000 });
+    const firstLine = result.split(/\r?\n/)[0].trim();
+    if (firstLine && path.isAbsolute(firstLine)) return firstLine;
+  } catch {
+    // `where` exited non-zero — executable not on PATH
+  }
+  return null;
+}
+
+/**
  * Resolve the default shell for the current platform.
+ * On Windows, returns an absolute path so that fs.accessSync() can verify it.
+ * Priority order:
+ *   1. %COMSPEC% environment variable (usually cmd.exe with full path)
+ *   2. Well-known absolute path for PowerShell 5 (inbox on all Windows)
+ *   3. PATH lookup via `where powershell`
+ *   4. PATH lookup via `where cmd`
  * @returns {string}
  */
 function resolveDefaultShell() {
-  if (process.platform === "win32") return "powershell.exe";
-  return process.env.SHELL || "/bin/sh";
+  if (process.platform !== "win32") {
+    return process.env.SHELL || "/bin/sh";
+  }
+
+  // 1. COMSPEC is set by Windows and always points to an absolute path (cmd.exe)
+  if (process.env.COMSPEC && path.isAbsolute(process.env.COMSPEC)) {
+    return process.env.COMSPEC;
+  }
+
+  // 2. Well-known absolute paths for PowerShell (inbox, present on all Windows)
+  const powershellCandidates = [
+    "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe",
+  ];
+  for (const candidate of powershellCandidates) {
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {
+      // not found at this path, try next
+    }
+  }
+
+  // 3. PATH lookup for PowerShell via `where`
+  const powershellOnPath = resolveWindowsShellByName("powershell.exe");
+  if (powershellOnPath) return powershellOnPath;
+
+  // 4. PATH lookup for cmd.exe via `where`
+  const cmdOnPath = resolveWindowsShellByName("cmd.exe");
+  if (cmdOnPath) return cmdOnPath;
+
+  // 5. Last resort: absolute system path for cmd.exe
+  return "C:\\Windows\\System32\\cmd.exe";
 }
 
 /**
  * Verify that a shell executable exists and is accessible.
+ * On Windows, bare executable names (e.g. "powershell.exe") cannot be verified
+ * with fs.accessSync because it requires an absolute path; resolveDefaultShell()
+ * always returns absolute paths on Windows, so this check remains valid.
  * @param {string} shellPath
  * @returns {boolean}
  */
@@ -175,7 +234,10 @@ function registerPtyHandlers() {
         cols,
         rows,
         cwd,
-        env: { ...process.env },
+        env: {
+          ...process.env,
+          ...(process.platform !== "win32" ? { LANG: "en_US.UTF-8", LC_ALL: "en_US.UTF-8" } : {}),
+        },
       });
     } catch (err) {
       console.error("[PTY] Failed to spawn PTY:", err);
@@ -195,6 +257,10 @@ function registerPtyHandlers() {
       entry.status = "exited";
       entry.exitCode = exitCode;
       sendPtyExit(webContentsId, entry.sessionId, exitCode);
+      removeSession(entry.sessionId);
+      console.log(
+        `[PTY] Session ${entry.sessionId} exited (code=${exitCode}), removed from registry`,
+      );
     });
 
     console.log(`[PTY] Spawned session ${entry.sessionId} (shell=${shell}, cwd=${cwd})`);
@@ -206,7 +272,7 @@ function registerPtyHandlers() {
   // Payload: sessionId (string)
   // Returns: { status, exitCode, outputBuffer } | { error: string }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:attach", (_event, sessionId) => {
+  ipcMain.handle("pty:attach", (event, sessionId) => {
     if (typeof sessionId !== "string") {
       return { error: "sessionId must be a string" };
     }
@@ -216,11 +282,20 @@ function registerPtyHandlers() {
       return { error: `セッションが見つかりません: ${sessionId}` };
     }
 
+    // Ownership check: only the window that spawned the session may attach.
+    if (event.sender.id !== entry.webContentsId) {
+      console.warn(
+        `[PTY] pty:attach — unauthorized access attempt on session ${sessionId} ` +
+          `by webContents ${event.sender.id} (owner: ${entry.webContentsId})`,
+      );
+      return { error: "このセッションへのアクセス権がありません" };
+    }
+
     return {
       sessionId: entry.sessionId,
       status: entry.status,
       exitCode: entry.exitCode,
-      outputBuffer: entry.outputBuffer.join("\n"),
+      outputBuffer: entry.outputBuffer,
     };
   });
 
@@ -229,13 +304,22 @@ function registerPtyHandlers() {
   // Payload: { sessionId, data }
   // Returns: { ok: boolean }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:write", (_event, { sessionId, data } = {}) => {
+  ipcMain.handle("pty:write", (event, { sessionId, data } = {}) => {
     if (typeof sessionId !== "string") return { ok: false };
 
     const entry = getSession(sessionId);
     if (!entry) {
       // Non-existent sessionId: log only, no exception
       console.warn(`[PTY] pty:write — session not found: ${sessionId}`);
+      return { ok: false };
+    }
+
+    // Ownership check: only the window that spawned the session may write.
+    if (event.sender.id !== entry.webContentsId) {
+      console.warn(
+        `[PTY] pty:write — unauthorized access attempt on session ${sessionId} ` +
+          `by webContents ${event.sender.id} (owner: ${entry.webContentsId})`,
+      );
       return { ok: false };
     }
 
@@ -261,12 +345,21 @@ function registerPtyHandlers() {
   // Payload: { sessionId, cols, rows }
   // Returns: { ok: boolean }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:resize", (_event, { sessionId, cols, rows } = {}) => {
+  ipcMain.handle("pty:resize", (event, { sessionId, cols, rows } = {}) => {
     if (typeof sessionId !== "string") return { ok: false };
 
     const entry = getSession(sessionId);
     if (!entry) {
       console.warn(`[PTY] pty:resize — session not found: ${sessionId}`);
+      return { ok: false };
+    }
+
+    // Ownership check: only the window that spawned the session may resize.
+    if (event.sender.id !== entry.webContentsId) {
+      console.warn(
+        `[PTY] pty:resize — unauthorized access attempt on session ${sessionId} ` +
+          `by webContents ${event.sender.id} (owner: ${entry.webContentsId})`,
+      );
       return { ok: false };
     }
 
@@ -302,7 +395,7 @@ function registerPtyHandlers() {
   // Payload: sessionId (string)
   // Returns: { ok: boolean }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:kill", (_event, sessionId) => {
+  ipcMain.handle("pty:kill", (event, sessionId) => {
     if (typeof sessionId !== "string") return { ok: false };
 
     const entry = getSession(sessionId);
@@ -311,8 +404,18 @@ function registerPtyHandlers() {
       return { ok: false };
     }
 
+    // Ownership check: only the window that spawned the session may kill it.
+    if (event.sender.id !== entry.webContentsId) {
+      console.warn(
+        `[PTY] pty:kill — unauthorized access attempt on session ${sessionId} ` +
+          `by webContents ${event.sender.id} (owner: ${entry.webContentsId})`,
+      );
+      return { ok: false };
+    }
+
     killSession(sessionId);
-    console.log(`[PTY] Killed session ${sessionId}`);
+    removeSession(sessionId);
+    console.log(`[PTY] Killed and removed session ${sessionId}`);
     return { ok: true };
   });
 
@@ -321,7 +424,7 @@ function registerPtyHandlers() {
   // Payload: sessionId (string)
   // Returns: { sessionId, status, exitCode, shell, cwd, createdAt } | { error: string }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:status", (_event, sessionId) => {
+  ipcMain.handle("pty:status", (event, sessionId) => {
     if (typeof sessionId !== "string") {
       return { error: "sessionId must be a string" };
     }
@@ -329,6 +432,15 @@ function registerPtyHandlers() {
     const entry = getSession(sessionId);
     if (!entry) {
       return { error: `セッションが見つかりません: ${sessionId}` };
+    }
+
+    // Ownership check: only the window that spawned the session may query its status.
+    if (event.sender.id !== entry.webContentsId) {
+      console.warn(
+        `[PTY] pty:status — unauthorized access attempt on session ${sessionId} ` +
+          `by webContents ${event.sender.id} (owner: ${entry.webContentsId})`,
+      );
+      return { error: "このセッションへのアクセス権がありません" };
     }
 
     return {

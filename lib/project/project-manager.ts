@@ -29,6 +29,15 @@ export interface RestoreResult {
   success: boolean;
   handle: FileSystemDirectoryHandle | null;
   permissionStatus: PermissionStatus;
+  /**
+   * True when the handle is valid but requires a user-gesture permission prompt
+   * before the project can be opened (prompt-required or read-only states).
+   * The caller must show a permission request UI before proceeding.
+   *
+   * ハンドルは有効だが、権限プロンプトが必要な場合に true。
+   * 呼び出し元は権限リクエスト UI を表示する必要がある。
+   */
+  needsPermission?: boolean;
   error?: string;
 }
 
@@ -95,7 +104,12 @@ export class ProjectManager {
           break;
       }
 
+      // Composite key prevents collision when duplicate directories share the same projectId (#1070).
+      // 複製されたプロジェクトが同一 projectId を持つ場合の衝突を防ぐ複合キー。
+      const handleKey = `${projectId}:${rootHandle.name}`;
+
       const record: StoredProjectHandle = {
+        handleKey,
         projectId,
         rootHandle,
         lastAccessedAt: Date.now(),
@@ -131,7 +145,9 @@ export class ProjectManager {
     const db = getWebStorageDatabase();
 
     try {
-      const stored = await db.projectHandles.get(projectId);
+      // Query by projectId index (PK is now the composite handleKey).
+      // projectId インデックスで検索（PK は複合キー handleKey に変更済み）。
+      const stored = await db.projectHandles.where("projectId").equals(projectId).first();
 
       if (!stored) {
         return {
@@ -150,7 +166,7 @@ export class ProjectManager {
           projectId,
         );
         try {
-          await db.projectHandles.delete(projectId);
+          await db.projectHandles.delete(stored.handleKey);
         } catch {
           // Ignore cleanup errors
         }
@@ -182,13 +198,32 @@ export class ProjectManager {
           break;
       }
 
-      await db.projectHandles.update(projectId, {
+      await db.projectHandles.update(stored.handleKey, {
         lastAccessedAt: Date.now(),
         permissionState,
       });
 
+      // #1049: prompt-required means the handle is valid but needs a user-gesture
+      // permission prompt before opening. Return success:false with needsPermission:true
+      // so the caller can show the permission request UI instead of treating it as an error.
+      //
+      // #1057: read-only means write permission was explicitly denied. We also surface
+      // needsPermission:true so the caller can prompt the user to grant write access
+      // or explicitly open in read-only mode.
+      if (
+        permissionStatus.status === "prompt-required" ||
+        permissionStatus.status === "read-only"
+      ) {
+        return {
+          success: false,
+          needsPermission: true,
+          handle: stored.rootHandle,
+          permissionStatus,
+        };
+      }
+
       return {
-        success: permissionStatus.canRead,
+        success: permissionStatus.canRead && permissionStatus.canWrite,
         handle: stored.rootHandle,
         permissionStatus,
       };
@@ -215,7 +250,8 @@ export class ProjectManager {
     const db = getWebStorageDatabase();
 
     try {
-      await db.projectHandles.delete(projectId);
+      // Delete all entries matching projectId (PK is now composite handleKey).
+      await db.projectHandles.where("projectId").equals(projectId).delete();
     } catch (error) {
       console.error("プロジェクトハンドルの削除に失敗しました:", error);
       throw error;
@@ -276,7 +312,8 @@ export class ProjectManager {
     const db = getWebStorageDatabase();
 
     try {
-      await db.projectHandles.update(projectId, {
+      // Update via projectId index (PK is now composite handleKey).
+      await db.projectHandles.where("projectId").equals(projectId).modify({
         lastAccessedAt: Date.now(),
       });
     } catch (error) {

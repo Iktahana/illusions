@@ -4,6 +4,30 @@ const OAUTH_PROVIDER_URL = "https://my.illusions.app";
 const OAUTH_CLIENT_ID = "illusions";
 const PENDING_AUTH_KEY = "illusions:oauth_pending";
 
+function safeSessionStorageGet(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSessionStorageSet(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // Ignore errors (e.g. storage quota exceeded, private browsing restrictions)
+  }
+}
+
+function safeSessionStorageRemove(key: string): void {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // Ignore errors
+  }
+}
+
 function toBase64Url(buffer: ArrayBuffer | Uint8Array): string {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   let binary = "";
@@ -32,7 +56,7 @@ export async function startWebLogin(): Promise<void> {
   const codeChallenge = await generateCodeChallenge(codeVerifier);
   const redirectUri = `${window.location.origin}/auth/callback/`;
 
-  sessionStorage.setItem(PENDING_AUTH_KEY, JSON.stringify({ state, codeVerifier }));
+  safeSessionStorageSet(PENDING_AUTH_KEY, JSON.stringify({ state, codeVerifier }));
 
   const params = new URLSearchParams({
     response_type: "code",
@@ -47,14 +71,18 @@ export async function startWebLogin(): Promise<void> {
   window.location.href = `${OAUTH_PROVIDER_URL}/api/oauth/authorize?${params}`;
 }
 
-/** Read and consume the pending auth data stored before the redirect. */
-export function consumePendingAuth(): { state: string; codeVerifier: string } | null {
-  const raw = sessionStorage.getItem(PENDING_AUTH_KEY);
+/** Read the pending auth data stored before the redirect without removing it. */
+export function getPendingAuth(): { state: string; codeVerifier: string } | null {
+  const raw = safeSessionStorageGet(PENDING_AUTH_KEY);
   if (!raw) return null;
-  sessionStorage.removeItem(PENDING_AUTH_KEY);
   try {
     return JSON.parse(raw) as { state: string; codeVerifier: string };
   } catch {
     return null;
   }
+}
+
+/** Remove the pending auth data after a successful token exchange. */
+export function clearPendingAuth(): void {
+  sessionStorage.removeItem(PENDING_AUTH_KEY);
 }

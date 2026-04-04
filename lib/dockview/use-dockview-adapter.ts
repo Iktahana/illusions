@@ -32,6 +32,15 @@ export interface UseDockviewAdapterOptions {
   tabManager: UseTabManagerReturn;
   /** Monotonic counter to force editor remount (e.g. after settings change) */
   editorKey: number;
+  /** Monotonic counter to trigger search dialog open in the active editor panel */
+  searchOpenTrigger: number;
+  /** Initial search term to pre-fill when search dialog opens */
+  searchInitialTerm?: string;
+  /**
+   * Stable per-window key used to scope the saved dockview layout so that
+   * multiple windows with different projects do not share the same layout record.
+   */
+  windowKey?: string | null;
 }
 
 export interface UseDockviewAdapterReturn {
@@ -52,40 +61,38 @@ export interface UseDockviewAdapterReturn {
 // ---------------------------------------------------------------------------
 
 /**
- * Position a newly added terminal panel in the bottom split.
- * - If another terminal already exists, move into its group ("center").
- * - Otherwise, split below an existing editor panel ("bottom").
+ * Build the `position` option for `addPanel` so a new terminal panel is placed
+ * in the correct location immediately, without a post-hoc `moveTo()` call.
+ *
+ * - If another terminal panel already exists → use `direction: 'within'` to
+ *   open the new terminal as a tab in the same group (VS Code behaviour).
+ * - Otherwise → use `direction: 'below'` relative to the active (or first)
+ *   editor panel to create a bottom split.
+ * - If there are no other panels yet → return undefined (panel becomes the
+ *   only panel in the layout).
  */
-function positionTerminalPanel(api: DockviewApi, newPanel: IDockviewPanel, tabs: TabState[]): void {
+function buildTerminalPanelPosition(
+  api: DockviewApi,
+  newPanelId: string,
+  tabs: TabState[],
+): { referencePanel: string; direction: "within" | "below" } | undefined {
   // Look for an existing terminal panel to group with
   for (const panel of api.panels) {
-    if (panel.id === newPanel.id) continue;
+    if (panel.id === newPanelId) continue;
     const tab = tabs.find((t) => t.id === panel.id);
     if (tab && isTerminalTab(tab)) {
-      try {
-        newPanel.api.moveTo({
-          group: panel.group,
-          position: "center",
-        });
-      } catch {
-        // Move failed; panel stays in default group
-      }
-      return;
+      return { referencePanel: panel.id, direction: "within" };
     }
   }
 
   // No terminal group yet — split below the active (or first) editor panel
   const refPanel = api.activePanel ?? api.panels[0];
-  if (refPanel && refPanel.id !== newPanel.id) {
-    try {
-      newPanel.api.moveTo({
-        group: refPanel.group,
-        position: "bottom",
-      });
-    } catch {
-      // Move failed; panel stays in default group
-    }
+  if (refPanel && refPanel.id !== newPanelId) {
+    return { referencePanel: refPanel.id, direction: "below" };
   }
+
+  // No other panels — let dockview place the panel freely
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,19 +100,45 @@ function positionTerminalPanel(api: DockviewApi, newPanel: IDockviewPanel, tabs:
 // ---------------------------------------------------------------------------
 
 /**
+ * Build the stable key for a tab to match against saved layout keys.
+ *
+ * Must mirror the logic in use-dockview-persistence.ts:stableKeyForTab().
+ */
+function stableKeyForTab(tab: TabState): string | null {
+  if (isEditorTab(tab)) {
+    return tab.file?.path ?? `unsaved:${tab.id}`;
+  }
+  if (isTerminalTab(tab)) {
+    return `terminal:${tab.sessionId}`;
+  }
+  if (isDiffTab(tab)) {
+    return `diff:${tab.sourceTabId}`;
+  }
+  return null;
+}
+
+/**
  * Apply a saved simplified layout to the current dockview state.
- * Matches panels to saved groups by file path and uses moveTo() to redistribute.
+ * Matches panels to saved groups by stable key and uses moveTo() to redistribute.
+ * After repositioning, applies saved proportional sizes to the groups.
+ *
+ * Handles:
+ *   - Saved editor tabs (by file path)
+ *   - Unsaved editor tabs (by "unsaved:<tabId>" — best-effort match)
+ *   - Terminal tabs (by "terminal:<sessionId>")
+ *   - Diff tabs (by "diff:<sourceTabId>")
  */
 function applySimplifiedLayout(
   api: DockviewApi,
   layout: SimplifiedGroupLayout,
   tabs: TabState[],
 ): void {
-  // Build filePath → panelId lookup from current tabs
-  const panelIdByPath = new Map<string, string>();
+  // Build stable-key → panelId lookup from current tabs (all tab kinds)
+  const panelIdByKey = new Map<string, string>();
   for (const tab of tabs) {
-    if (isEditorTab(tab) && tab.file?.path) {
-      panelIdByPath.set(tab.file.path, tab.id);
+    const key = stableKeyForTab(tab);
+    if (key) {
+      panelIdByKey.set(key, tab.id);
     }
   }
 
@@ -117,6 +150,9 @@ function applySimplifiedLayout(
   // Strategy: for each subsequent saved group, pick a reference panel from
   // the first group, then move the target panels to create new groups.
 
+  // Track a representative panel per created group to apply sizes afterward
+  const groupRepresentatives: Array<IDockviewPanel | null> = [null]; // index 0 = original group
+
   for (let i = 1; i < layout.groups.length; i++) {
     const savedGroup = layout.groups[i];
     // In dockview, HORIZONTAL orientation = horizontal split bar = panels stacked top-bottom
@@ -124,9 +160,9 @@ function applySimplifiedLayout(
 
     let firstPanelInGroup: IDockviewPanel | null = null;
 
-    for (const filePath of savedGroup.tabPaths) {
-      if (!filePath) continue;
-      const panelId = panelIdByPath.get(filePath);
+    for (const savedKey of savedGroup.tabPaths) {
+      if (!savedKey) continue;
+      const panelId = panelIdByKey.get(savedKey);
       if (!panelId) continue;
       const panel = api.getPanel(panelId);
       if (!panel) continue;
@@ -160,6 +196,39 @@ function applySimplifiedLayout(
         }
       }
     }
+
+    groupRepresentatives.push(firstPanelInGroup);
+  }
+
+  // Apply saved proportional sizes (#1075)
+  // Use the total container dimension along the split axis to compute absolute pixel sizes.
+  if (layout.sizes && layout.sizes.length > 0) {
+    const isHorizontal = layout.orientation === "HORIZONTAL";
+    const totalPx = isHorizontal ? api.height : api.width;
+    if (totalPx > 0) {
+      // Find a representative panel for group 0 (the default/first group)
+      const firstGroupKey = layout.groups[0]?.tabPaths[0] ?? null;
+      const firstGroupPanelId = firstGroupKey ? panelIdByKey.get(firstGroupKey) : null;
+      const firstGroupRepresentative = firstGroupPanelId
+        ? (api.getPanel(firstGroupPanelId) ?? (api.panels.length > 0 ? api.panels[0] : null))
+        : api.panels.length > 0
+          ? api.panels[0]
+          : null;
+      groupRepresentatives[0] = firstGroupRepresentative;
+
+      for (let i = 0; i < layout.groups.length; i++) {
+        const proportion = layout.sizes[i];
+        if (typeof proportion !== "number" || proportion <= 0) continue;
+        const targetPx = Math.round(proportion * totalPx);
+        const rep = groupRepresentatives[i];
+        if (!rep) continue;
+        try {
+          rep.group.api.setSize(isHorizontal ? { height: targetPx } : { width: targetPx });
+        } catch {
+          // setSize may fail if the group is already the right size or no longer exists
+        }
+      }
+    }
   }
 }
 
@@ -170,6 +239,9 @@ function applySimplifiedLayout(
 export function useDockviewAdapter({
   tabManager,
   editorKey,
+  searchOpenTrigger,
+  searchInitialTerm,
+  windowKey,
 }: UseDockviewAdapterOptions): UseDockviewAdapterReturn {
   const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
   const apiRef = useRef<DockviewApi | null>(null);
@@ -188,7 +260,7 @@ export function useDockviewAdapter({
   // effect to re-run (which would duplicate addPanel calls).
   const [layoutReadyTick, setLayoutReadyTick] = useState(0);
 
-  const { tabs, activeTabId, switchTab, closeTab, cloneTab } = tabManager;
+  const { tabs, activeTabId, switchTab, closeTab, cloneTab, updateTab } = tabManager;
 
   // -- onReady callback -----------------------------------------------------
 
@@ -212,14 +284,19 @@ export function useDockviewAdapter({
               fileType: tab.fileType,
               editorKey,
               activeTabId,
+              searchOpenTrigger,
+              searchInitialTerm,
+              pendingExternalContent: tab.pendingExternalContent ?? null,
             },
           });
         } else if (isTerminalTab(tab)) {
+          const termPosition = buildTerminalPanelPosition(api, tab.id, tabs);
           api.addPanel<TerminalPanelParams>({
             id: tab.id,
             component: "terminal",
             title: tab.label,
             params: { sessionId: tab.sessionId },
+            ...(termPosition ? { position: termPosition } : {}),
           });
         } else if (isDiffTab(tab)) {
           api.addPanel<DiffPanelParams>({
@@ -261,10 +338,14 @@ export function useDockviewAdapter({
   );
 
   // -- Pre-load saved layout for restoration --------------------------------
+  // Re-runs when windowKey changes from null to a real value (project loaded).
+  // layoutAppliedRef ensures the layout is only applied once even if this
+  // effect fires multiple times.
 
   useEffect(() => {
+    if (layoutAppliedRef.current) return; // Already applied; do not override
     let cancelled = false;
-    void loadDockviewLayout().then((state) => {
+    void loadDockviewLayout(windowKey).then((state) => {
       if (cancelled) return;
       if (state?.simplifiedLayout) {
         savedLayoutRef.current = state.simplifiedLayout;
@@ -274,7 +355,7 @@ export function useDockviewAdapter({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [windowKey]);
 
   // -- Pending split tracking -----------------------------------------------
 
@@ -317,17 +398,22 @@ export function useDockviewAdapter({
               fileType: tab.fileType,
               editorKey,
               activeTabId,
+              searchOpenTrigger,
+              searchInitialTerm,
+              pendingExternalContent: tab.pendingExternalContent ?? null,
             },
           });
         } else if (isTerminalTab(tab)) {
-          // Add terminal panel then move it to the bottom split (like VS Code)
-          const termPanel = api.addPanel<TerminalPanelParams>({
+          // Add terminal panel with the correct position directly in addPanel,
+          // avoiding a post-hoc moveTo() that silently fails.
+          const termPosition = buildTerminalPanelPosition(api, tab.id, tabs);
+          api.addPanel<TerminalPanelParams>({
             id: tab.id,
             component: "terminal",
             title: tab.label,
             params: { sessionId: tab.sessionId },
+            ...(termPosition ? { position: termPosition } : {}),
           });
-          positionTerminalPanel(api, termPanel, tabs);
         } else if (isDiffTab(tab)) {
           api.addPanel<DiffPanelParams>({
             id: tab.id,
@@ -372,6 +458,9 @@ export function useDockviewAdapter({
           fileType: tab.fileType,
           editorKey,
           activeTabId,
+          searchOpenTrigger,
+          searchInitialTerm,
+          pendingExternalContent: tab.pendingExternalContent ?? null,
         });
       } else if (isTerminalTab(tab)) {
         if (panel.title !== tab.label) {
@@ -416,8 +505,7 @@ export function useDockviewAdapter({
     prevTabsRef.current = tabs;
     prevActiveTabRef.current = activeTabId;
     isSyncingRef.current = false;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- dockviewApi triggers re-sync after onReady
-  }, [tabs, activeTabId, editorKey, dockviewApi]);
+  }, [tabs, activeTabId, editorKey, searchOpenTrigger, searchInitialTerm, dockviewApi]);
 
   // -- Restore saved layout (separate effect to avoid sync effect interference) --
   // Using a dedicated effect prevents savedLayout changes from re-triggering
@@ -524,9 +612,16 @@ export function useDockviewAdapter({
     if (!electronAPI?.editor) return;
 
     const unsubSync = electronAPI.editor.onBufferSync((data) => {
-      // Another window changed a buffer — update if it's our active editor tab
-      const activeTab = tabs.find((t) => t.id === activeTabId);
-      if (data.bufferId === activeTabId && activeTab && isEditorTab(activeTab)) {
+      // Another window changed a buffer — update all matching tabs' state,
+      // and apply to the editor view only for the active tab.
+      for (const tab of tabs) {
+        if (tab.id === data.bufferId && isEditorTab(tab)) {
+          // Update tab state in memory regardless of active/inactive status
+          updateTab(tab.id, { content: data.content });
+        }
+      }
+      // Apply to editor view (ProseMirror) only when the active tab matches
+      if (data.bufferId === activeTabId) {
         tabSetContent(data.content);
       }
     });
@@ -539,7 +634,7 @@ export function useDockviewAdapter({
       if (typeof unsubSync === "function") unsubSync();
       if (typeof unsubClose === "function") unsubClose();
     };
-  }, [activeTabId, tabs, tabSetContent]);
+  }, [activeTabId, tabs, tabSetContent, updateTab]);
 
   // Broadcast content changes to other windows (editor tabs only)
   useEffect(() => {

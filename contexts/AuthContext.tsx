@@ -111,6 +111,12 @@ interface MeResponse {
   authenticated: boolean;
   user?: AuthUser;
   expiresAt?: number;
+  /**
+   * Indicates whether the auth failure is permanent (token invalid/revoked)
+   * or transient (network error, server unavailable).
+   * Only meaningful when authenticated === false.
+   */
+  permanent?: boolean;
 }
 
 async function fetchMe(): Promise<MeResponse> {
@@ -119,11 +125,36 @@ async function fetchMe(): Promise<MeResponse> {
       method: "POST",
       credentials: "same-origin",
     });
-    if (!res.ok) return { authenticated: false };
-    return (await res.json()) as MeResponse;
+    if (res.ok) {
+      return (await res.json()) as MeResponse;
+    }
+    // 401/403 = permanent (token invalid or no session)
+    // 5xx = transient (server error)
+    const permanent = res.status === 401 || res.status === 403;
+    return { authenticated: false, permanent };
   } catch {
-    return { authenticated: false };
+    // Network error — transient
+    return { authenticated: false, permanent: false };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns whether an error thrown by the Electron auth IPC represents a
+ * permanent auth failure (token invalid/revoked) vs a transient error
+ * (server unavailable, network issue).
+ * The IPC handlers attach `error.status` with the upstream HTTP status code.
+ */
+function isElectronAuthErrorPermanent(err: unknown): boolean {
+  if (err instanceof Error && "status" in err) {
+    const status = (err as Error & { status: unknown }).status;
+    return status === 401 || status === 403;
+  }
+  // No status attached (network/IPC error) — treat as transient
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // --- Electron refresh scheduler (unchanged from original) ---
+  // --- Electron refresh scheduler ---
   const scheduleElectronRefresh = useCallback(
     (expiresAt: number, refreshToken: string) => {
       clearRefreshTimer();
@@ -172,9 +203,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
 
           scheduleElectronRefresh(newExpiresAt, tokenResponse.refresh_token);
-        } catch {
-          setUser(null);
-          await clearTokens();
+        } catch (err) {
+          if (isElectronAuthErrorPermanent(err)) {
+            // Permanent failure (401/403): token is invalid — log out
+            setUser(null);
+            await clearTokens();
+          } else {
+            // Transient failure (5xx / network): keep session, retry at next scheduled interval
+            scheduleElectronRefresh(expiresAt, refreshToken);
+          }
         }
       }, refreshIn);
     },
@@ -192,8 +229,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (me.authenticated && me.user) {
           setUser(me.user);
           if (me.expiresAt) scheduleWebRefresh(me.expiresAt);
-        } else {
+        } else if (me.permanent) {
+          // Permanent failure (401/403): token is invalid — log out
           setUser(null);
+        } else {
+          // Transient failure (5xx / network): keep session, retry at next scheduled interval
+          scheduleWebRefresh(expiresAt);
         }
       }, refreshIn);
     },
@@ -242,8 +283,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 plan: userInfo.plan,
               });
               scheduleElectronRefresh(newExpiresAt, tokenResponse.refresh_token);
-            } catch {
-              await clearTokens();
+            } catch (err) {
+              // Only clear tokens on permanent failures (401/403); ignore transient errors on startup
+              if (isElectronAuthErrorPermanent(err)) {
+                await clearTokens();
+              }
             }
           } else {
             if (!api?.auth) {
@@ -280,8 +324,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   plan: userInfo.plan,
                 });
                 scheduleElectronRefresh(newExpiresAt, tokenResponse.refresh_token);
-              } catch {
-                await clearTokens();
+              } catch (err) {
+                // Only clear tokens on permanent failures (401/403); ignore transient errors on startup
+                if (isElectronAuthErrorPermanent(err)) {
+                  await clearTokens();
+                }
               }
             }
           }

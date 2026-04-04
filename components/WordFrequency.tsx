@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { RefreshCw, LoaderCircle } from "lucide-react";
 import clsx from "clsx";
 
@@ -49,10 +49,24 @@ const DICTIONARY_ACTIONS: Record<string, (word: string) => { url: string; title:
   }),
 };
 
-/** Derive cache path from a file path basename */
+/**
+ * Derive a unique cache path from the full file path.
+ * Uses a simple djb2-style hash of the full path so that files with the
+ * same basename in different directories never share a cache entry.
+ */
+function hashPath(filePath: string): string {
+  let hash = 5381;
+  for (let i = 0; i < filePath.length; i++) {
+    hash = ((hash << 5) + hash) ^ filePath.charCodeAt(i);
+    hash = hash >>> 0; // keep unsigned 32-bit
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
 function getCachePath(filePath: string): string {
   const basename = filePath.split("/").pop() ?? filePath;
-  return `.illusions/word_count/${basename}.json`;
+  const hash = hashPath(filePath);
+  return `.illusions/word_count/${basename}_${hash}.json`;
 }
 
 function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) {
@@ -61,6 +75,9 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
   const [error, setError] = useState<string | null>(null);
   const [lastAnalyzedContent, setLastAnalyzedContent] = useState<string>("");
   const [cacheTimestamp, setCacheTimestamp] = useState<number>(0);
+
+  /** Generation counter — incremented on each analysis start; stale async results are discarded (#1078) */
+  const genRef = useRef(0);
 
   const contextMenu = useContextMenu();
 
@@ -118,6 +135,9 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
       return;
     }
 
+    // Increment generation counter so any previously in-flight analysis is considered stale (#1078)
+    const myGen = ++genRef.current;
+
     setIsLoading(true);
     setError(null);
 
@@ -134,6 +154,8 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
           const meta = await vfs.getFileMetadata(filePath);
 
           if (cache.lastModified === meta.lastModified && cache.fileSize === meta.size) {
+            // Discard stale result if a newer analysis was started (#1078)
+            if (genRef.current !== myGen) return;
             setWords(cache.words);
             setLastAnalyzedContent(content);
             setCacheTimestamp(cache.analyzedAt);
@@ -148,6 +170,10 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
       // Run NLP analysis
       const nlpClient = getNlpClient();
       const wordEntries = await nlpClient.analyzeWordFrequency(content);
+
+      // Discard stale result if a newer analysis was started (#1078)
+      if (genRef.current !== myGen) return;
+
       setWords(wordEntries);
       setLastAnalyzedContent(content);
       const now = Date.now();
@@ -177,7 +203,10 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
       console.error("[WordFrequency] Analysis error:", err);
       setError("解析に失敗しました");
     } finally {
-      setIsLoading(false);
+      // Only clear the loading spinner for the current generation (#1078)
+      if (genRef.current === myGen) {
+        setIsLoading(false);
+      }
     }
   };
 

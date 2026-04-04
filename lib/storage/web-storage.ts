@@ -43,6 +43,12 @@ interface StoredKvItem {
  * プロジェクトの FileSystemDirectoryHandle を IndexedDB に永続化するための型。
  */
 export interface StoredProjectHandle {
+  /**
+   * Composite primary key: `projectId + ":" + rootDirName`.
+   * Prevents collisions when duplicate project directories share the same projectId.
+   * 複製されたプロジェクトディレクトリが同一 projectId を持つ場合の衝突を防ぐ複合キー。
+   */
+  handleKey: string;
   projectId: string;
   rootHandle: FileSystemDirectoryHandle;
   lastAccessedAt: number;
@@ -57,7 +63,7 @@ class WebStorageDatabase extends Dexie {
   appState!: Table<StoredAppState, string>;
   recentFiles!: Table<StoredRecentFile, string>;
   editorBuffer!: Table<StoredEditorBuffer, string>;
-  projectHandles!: Table<StoredProjectHandle, string>;
+  projectHandles!: Table<StoredProjectHandle, string>; // PK = handleKey
   kvStore!: Table<StoredKvItem, string>;
 
   constructor() {
@@ -84,6 +90,17 @@ class WebStorageDatabase extends Dexie {
       recentFiles: "id, path",
       editorBuffer: "id",
       projectHandles: "projectId, lastAccessedAt",
+      kvStore: "key",
+    });
+
+    // v4: Change projectHandles primary key to composite handleKey (projectId:rootDirName)
+    // to prevent PRIMARY KEY collision when duplicate project directories share the same projectId.
+    // 複製されたプロジェクトディレクトリが同一 projectId を持つ場合の衝突修正 (#1070)。
+    this.version(4).stores({
+      appState: "id",
+      recentFiles: "id, path",
+      editorBuffer: "id",
+      projectHandles: "handleKey, projectId, lastAccessedAt",
       kvStore: "key",
     });
   }
@@ -130,14 +147,38 @@ export class WebStorageProvider implements IStorageService {
     await this.initialize();
 
     try {
-      // すべてを並列で保存
-      await Promise.all([
-        this.saveAppState(session.appState),
-        this.saveRecentFiles(session.recentFiles),
-        session.editorBuffer
-          ? this.saveEditorBuffer(session.editorBuffer)
-          : this.clearEditorBuffer(),
-      ]);
+      // Dexie transaction で atomic に保存する（partial write を防ぐ）
+      await this.db.transaction(
+        "rw",
+        [this.db.appState, this.db.recentFiles, this.db.editorBuffer],
+        async () => {
+          // appState
+          await this.db.appState.put({
+            id: "app_state",
+            data: session.appState,
+          });
+
+          // recentFiles: 既存を全削除してから一括追加
+          await this.db.recentFiles.clear();
+          const recentRecords = session.recentFiles.map((file) => ({
+            id: `recent_${file.path}`,
+            path: file.path,
+            data: file,
+          }));
+          await this.db.recentFiles.bulkPut(recentRecords);
+
+          // editorBuffer
+          if (session.editorBuffer) {
+            await this.db.editorBuffer.put({
+              id: "editor_buffer",
+              data: session.editorBuffer,
+              fileHandle: session.editorBuffer.fileHandle,
+            });
+          } else {
+            await this.db.editorBuffer.delete("editor_buffer");
+          }
+        },
+      );
     } catch (error) {
       console.error("セッションの保存に失敗しました:", error);
       throw error;
@@ -282,12 +323,13 @@ export class WebStorageProvider implements IStorageService {
     }
   }
 
-  async saveEditorBuffer(buffer: EditorBuffer): Promise<void> {
+  async saveEditorBuffer(buffer: EditorBuffer, fileKey?: string): Promise<void> {
     await this.initialize();
 
+    const id = fileKey ? `editor_buffer:${fileKey}` : "editor_buffer";
     try {
       await this.db.editorBuffer.put({
-        id: "editor_buffer",
+        id,
         data: buffer,
         fileHandle: buffer.fileHandle,
       });
@@ -297,11 +339,12 @@ export class WebStorageProvider implements IStorageService {
     }
   }
 
-  async loadEditorBuffer(): Promise<EditorBuffer | null> {
+  async loadEditorBuffer(fileKey?: string): Promise<EditorBuffer | null> {
     await this.initialize();
 
+    const id = fileKey ? `editor_buffer:${fileKey}` : "editor_buffer";
     try {
-      const stored = await this.db.editorBuffer.get("editor_buffer");
+      const stored = await this.db.editorBuffer.get(id);
       if (!stored?.data) return null;
 
       // fileHandle があれば復元する
@@ -316,11 +359,12 @@ export class WebStorageProvider implements IStorageService {
     }
   }
 
-  async clearEditorBuffer(): Promise<void> {
+  async clearEditorBuffer(fileKey?: string): Promise<void> {
     await this.initialize();
 
+    const id = fileKey ? `editor_buffer:${fileKey}` : "editor_buffer";
     try {
-      await this.db.editorBuffer.delete("editor_buffer");
+      await this.db.editorBuffer.delete(id);
     } catch (error) {
       console.error("エディタバッファの削除に失敗しました:", error);
       throw error;
@@ -330,6 +374,7 @@ export class WebStorageProvider implements IStorageService {
   /**
    * No-op for Web. Project handles are managed by ProjectManager via IndexedDB.
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async addRecentProject(_project: RecentProject): Promise<void> {
     // Web uses ProjectManager for directory handle persistence, not this API.
   }
@@ -345,6 +390,7 @@ export class WebStorageProvider implements IStorageService {
   /**
    * No-op for Web. Project handles are managed by ProjectManager via IndexedDB.
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async removeRecentProject(_projectId: string): Promise<void> {
     // Web uses ProjectManager for directory handle persistence, not this API.
   }

@@ -1178,36 +1178,6 @@
     },
     "Rules": [
       {
-        "Rule_ID": "rule_GK_2_1_particle_o",
-        "Level": "L1",
-        "Description": "助詞の「を」は，「を」と書く。",
-        "Pattern/Logic": "助詞として用いられる場合は「を」を使用する。「お」は使用しない。",
-        "Positive_Example": "本を読む",
-        "Negative_Example": "本をお読む",
-        "Source_Reference": "現代仮名遣い 第2 1",
-        "prompt": "none"
-      },
-      {
-        "Rule_ID": "rule_GK_2_2_particle_ha",
-        "Level": "L1",
-        "Description": "助詞の「は」は，「は」と書く。",
-        "Pattern/Logic": "助詞として用いられる場合は「は」を使用する。「わ」は使用しない。",
-        "Positive_Example": "今日は日曜です",
-        "Negative_Example": "今日わ日曜です",
-        "Source_Reference": "現代仮名遣い 第2 2",
-        "prompt": "none"
-      },
-      {
-        "Rule_ID": "rule_GK_2_3_particle_he",
-        "Level": "L1",
-        "Description": "助詞の「へ」は，「へ」と書く。",
-        "Pattern/Logic": "助詞として用いられる場合は「へ」を使用する。「え」は使用しない。",
-        "Positive_Example": "故郷へ帰る",
-        "Negative_Example": "故郷え帰る",
-        "Source_Reference": "現代仮名遣い 第2 3",
-        "prompt": "none"
-      },
-      {
         "Rule_ID": "rule_GK_2_4_verb_iu",
         "Level": "L2",
         "Description": "動詞の「いう（言）」は，「いう」と書く。",

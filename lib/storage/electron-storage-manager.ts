@@ -303,9 +303,10 @@ export class ElectronStorageManager {
     try {
       db.exec("BEGIN TRANSACTION");
 
-      // Remove existing entry for this root path
-      const deleteStmt = db.prepare("DELETE FROM recent_projects WHERE root_path = ?");
-      deleteStmt.run(project.rootPath);
+      // Remove existing entries for this root path OR this id to prevent PRIMARY KEY collision
+      // when a duplicated project directory shares the same projectId with a different path.
+      const deleteStmt = db.prepare("DELETE FROM recent_projects WHERE root_path = ? OR id = ?");
+      deleteStmt.run(project.rootPath, project.id);
 
       // Insert new entry
       const insertStmt = db.prepare(`

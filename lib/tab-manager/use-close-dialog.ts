@@ -23,6 +23,11 @@ export interface UseCloseDialogParams extends TabManagerCore {
   updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
   /** Force-close a tab without dirty check. */
   forceCloseTab: (tabId: TabId) => void;
+  /**
+   * Attempt to create a history snapshot after saving (project mode only).
+   * Provided by useFileIO.
+   */
+  tryAutoSnapshot: (sourcePath: string, displayName: string, savedContent: string) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,6 +56,7 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
     setPendingCloseTabId,
     updateTab,
     forceCloseTab,
+    tryAutoSnapshot,
   } = params;
 
   const handleCloseTabSave = useCallback(async () => {
@@ -61,6 +67,15 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
     if (!isEditorTab(rawTab)) return;
     const tab = rawTab;
 
+    // Block save if the file has an unresolved conflict.
+    // The in-editor content may be stale compared to the newer disk version,
+    // so writing it would silently discard the disk changes.
+    if (tab.fileSyncStatus === "conflicted") {
+      notificationManager.error("競合状態のため保存できません。まず競合を解決してください。");
+      setPendingCloseTabId(null);
+      return;
+    }
+
     try {
       const sanitized = sanitizeMdiContent(tab.content);
 
@@ -68,6 +83,7 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
         const vfs = getVFS();
         suppressFileWatch(tab.file.path);
         await vfs.writeFile(tab.file.path, sanitized);
+        await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized);
       } else {
         const result = await saveMdiFile({
           descriptor: tab.file,
@@ -83,7 +99,14 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
           file: result.descriptor,
           lastSavedContent: sanitized,
           isDirty: false,
+          fileSyncStatus: "clean",
+          conflictDiskContent: null,
         });
+        await tryAutoSnapshot(
+          result.descriptor.path ?? result.descriptor.name,
+          result.descriptor.name,
+          sanitized,
+        );
       }
     } catch (error) {
       console.error("保存に失敗しました:", error);
@@ -95,7 +118,15 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
 
     forceCloseTab(pendingCloseTabId);
     setPendingCloseTabId(null);
-  }, [pendingCloseTabId, updateTab, forceCloseTab, tabsRef, isProjectRef, setPendingCloseTabId]);
+  }, [
+    pendingCloseTabId,
+    updateTab,
+    forceCloseTab,
+    tabsRef,
+    isProjectRef,
+    setPendingCloseTabId,
+    tryAutoSnapshot,
+  ]);
 
   const handleCloseTabDiscard = useCallback(() => {
     if (pendingCloseTabId) {

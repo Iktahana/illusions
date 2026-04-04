@@ -1,27 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { notificationManager } from "@/lib/services/notification-manager";
-import { LINT_PRESETS, LINT_RULES_META, LINT_DEFAULT_CONFIGS } from "@/lib/linting/lint-presets";
 import type { EditorView } from "@milkdown/prose/view";
-import type { LintIssue, LintRuleConfig } from "@/lib/linting/types";
+import type { LintIssue } from "@/lib/linting/types";
+import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
 
 interface UseLintHandlersOptions {
   editorViewInstance: EditorView | null;
   lintIssues: LintIssue[];
-  lintingRuleConfigs: Record<string, LintRuleConfig>;
-  handleLintingRuleConfigsBatchChange: (configs: Record<string, LintRuleConfig>) => void;
   ignoreCorrection: (ruleId: string, text: string, paragraphText?: string) => void;
   triggerSwitchToCorrections: () => void;
-  programmaticScrollRef: React.MutableRefObject<boolean>;
 }
 
 export function useLintHandlers({
   editorViewInstance,
   lintIssues,
-  lintingRuleConfigs,
-  handleLintingRuleConfigsBatchChange,
   ignoreCorrection,
   triggerSwitchToCorrections,
-  programmaticScrollRef,
 }: UseLintHandlersOptions) {
   // Enrich lint issues with original text from the document
   const enrichedLintIssues = useMemo(() => {
@@ -36,14 +30,6 @@ export function useLintHandlers({
       }
     });
   }, [editorViewInstance, lintIssues]);
-
-  // Timeout ref for navigate-to-issue scroll reset; cleared on unmount
-  const navigateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    return () => {
-      if (navigateTimeoutRef.current) clearTimeout(navigateTimeoutRef.current);
-    };
-  }, []);
 
   // Cursor → issue sync: track which issue the cursor is on
   const [activeLintIssueIndex, setActiveLintIssueIndex] = useState<number | null>(null);
@@ -76,49 +62,13 @@ export function useLintHandlers({
         const clampedTo = Math.min(issue.to, state.doc.content.size);
         const clampedFrom = Math.min(issue.from, clampedTo);
         const selection = TextSelection.create(state.doc, clampedFrom, clampedTo);
-
-        // Allow the scroll protection to accept our programmatic scroll
-        programmaticScrollRef.current = true;
-
-        dispatch(state.tr.setSelection(selection).scrollIntoView());
-
-        // DOM-level scroll for vertical writing mode
-        try {
-          const coords = editorViewInstance.coordsAtPos(clampedFrom);
-          const scrollContainer = editorViewInstance.dom.closest(
-            ".flex-1.bg-background-secondary",
-          ) as HTMLElement | null;
-          if (scrollContainer) {
-            const containerRect = scrollContainer.getBoundingClientRect();
-            const offsetY = coords.top - containerRect.top + scrollContainer.scrollTop;
-            const offsetX = coords.left - containerRect.left + scrollContainer.scrollLeft;
-            scrollContainer.scrollTo({
-              left: offsetX - containerRect.width / 2,
-              top: offsetY - containerRect.height / 2,
-              behavior: "smooth",
-            });
-          }
-        } catch {
-          // fallback
-          try {
-            const domResult = editorViewInstance.domAtPos(clampedFrom);
-            const target =
-              domResult.node instanceof HTMLElement ? domResult.node : domResult.node.parentElement;
-            target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-          } catch {
-            // ignore
-          }
-        }
-
-        // Reset the flag after smooth scroll completes
-        navigateTimeoutRef.current = setTimeout(() => {
-          programmaticScrollRef.current = false;
-        }, 500);
+        dispatch(state.tr.setSelection(selection));
+        centerEditorPosition(editorViewInstance, clampedFrom);
 
         editorViewInstance.focus();
       });
     },
-    [editorViewInstance, programmaticScrollRef],
+    [editorViewInstance],
   );
 
   /** Navigate to a lint issue from context menu (also switches Inspector to corrections tab) */
@@ -190,32 +140,6 @@ export function useLintHandlers({
     [editorViewInstance],
   );
 
-  /** Apply a lint preset from the Inspector dropdown */
-  const handleApplyLintPreset = useCallback(
-    (presetId: string) => {
-      const preset = LINT_PRESETS[presetId];
-      if (preset) {
-        handleLintingRuleConfigsBatchChange({ ...preset.configs });
-      }
-    },
-    [handleLintingRuleConfigsBatchChange],
-  );
-
-  /** Detect which preset matches the current linting config */
-  const activeLintPresetId = useMemo(() => {
-    for (const [id, preset] of Object.entries(LINT_PRESETS)) {
-      const allMatch = LINT_RULES_META.every((rule) => {
-        const current = lintingRuleConfigs[rule.id] ??
-          LINT_DEFAULT_CONFIGS[rule.id] ?? { enabled: true, severity: "warning" };
-        const presetCfg = preset.configs[rule.id];
-        if (!presetCfg) return false;
-        return current.enabled === presetCfg.enabled && current.severity === presetCfg.severity;
-      });
-      if (allMatch) return id;
-    }
-    return "";
-  }, [lintingRuleConfigs]);
-
   return {
     enrichedLintIssues,
     activeLintIssueIndex,
@@ -223,7 +147,5 @@ export function useLintHandlers({
     handleShowLintHint,
     handleIgnoreCorrection,
     handleApplyFix,
-    handleApplyLintPreset,
-    activeLintPresetId,
   };
 }

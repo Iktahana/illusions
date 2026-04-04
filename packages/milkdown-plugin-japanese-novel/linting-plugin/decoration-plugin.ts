@@ -15,12 +15,7 @@ import type { Token } from "@/lib/nlp-client/types";
 import type { IgnoredCorrection } from "@/lib/project/project-types";
 import { LRUCache } from "@/lib/utils/lru-cache";
 import { hashString } from "@/lib/utils/hash-string";
-import {
-  getAtomOffset,
-  collectParagraphs,
-  findScrollContainer,
-  getVisibleParagraphs,
-} from "../shared/paragraph-helpers";
+import { getAtomOffset, collectParagraphs } from "../shared/paragraph-helpers";
 import type { LintingPluginState, LintingPluginOptions, LintingSettingsUpdate } from "./types";
 
 export const lintingKey = new PluginKey<LintingPluginState>("linting");
@@ -208,25 +203,6 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
     },
 
     view(editorView) {
-      let scrollTimer: ReturnType<typeof setTimeout> | null = null;
-
-      // Identify the scroll container
-      const scrollContainer = findScrollContainer(editorView.dom);
-
-      // Scroll event handler
-      const handleScroll = (): void => {
-        const state = lintingKey.getState(editorView.state);
-        if (!state?.enabled) return;
-
-        if (scrollTimer) clearTimeout(scrollTimer);
-        scrollTimer = setTimeout(() => {
-          scheduleViewportUpdate(editorView);
-        }, 150);
-      };
-
-      // Add scroll listener
-      scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
-
       // Run on initialization if enabled
       if (enabled && currentRuleRunner) {
         scheduleViewportUpdate(editorView);
@@ -250,12 +226,10 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
           if (!state?.enabled || !currentRuleRunner) return;
 
           const allParagraphs = collectParagraphs(view.state.doc);
-          // Use all paragraphs if full scan was requested, otherwise viewport-only
-          const isFullScan = pendingFullScan;
+          // Always process against the current full document to avoid
+          // scroll-driven viewport recomputation causing layout jitter.
           if (pendingFullScan) pendingFullScan = false;
-          const targetParagraphs = isFullScan
-            ? allParagraphs
-            : getVisibleParagraphs(view, allParagraphs, 2);
+          const targetParagraphs = allParagraphs;
 
           // Check if morphological rules are active
           const hasMorphRules = currentRuleRunner.hasMorphologicalRules();
@@ -450,8 +424,6 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
         },
         destroy() {
           if (debounceTimer) clearTimeout(debounceTimer);
-          if (scrollTimer) clearTimeout(scrollTimer);
-          scrollContainer.removeEventListener("scroll", handleScroll);
           issueCache.clear();
           tokenCache.clear();
           documentIssueCache = null;
