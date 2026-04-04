@@ -182,7 +182,7 @@ export const LINT_RULES_META: LintRuleMeta[] = [
   {
     id: "me2-13-unit-symbols",
     nameJa: "単位記号の表記",
-    descriptionJa: "横組では数値と欧字単位記号の間にスペースを入れます",
+    descriptionJa: "数値と欧字単位記号の間にスペースがない箇所を検出します",
     guidelineId: "editors-rulebook",
   },
   {
@@ -429,7 +429,7 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "me2-4-kanji-font": { enabled: true, severity: "error" },
       "me2-8-katakana": { enabled: true, severity: "warning" },
       "me2-9-foreign-words": { enabled: true, severity: "error" },
-      "me2-11-vertical-numbers": { enabled: true, severity: "warning" },
+      "me2-11-vertical-numbers": { enabled: false, severity: "warning" },
       "me2-12-horizontal-numbers": { enabled: true, severity: "warning" },
       "me2-13-unit-symbols": { enabled: true, severity: "warning" },
       "me2-14-pre-post-symbols": { enabled: true, severity: "error" },
