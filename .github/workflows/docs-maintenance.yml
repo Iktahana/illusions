@@ -1,0 +1,383 @@
+name: Docs Maintenance
+
+on:
+  schedule:
+    # Daily at 02:00 UTC — check for code changes that need docs/ updates
+    - cron: "0 2 * * *"
+    # Daily at 02:30 UTC — check for code changes that need README update
+    - cron: "30 2 * * *"
+    # Weekly on Wednesday at 03:00 UTC — full docs audit
+    - cron: "0 3 * * 3"
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Which task to run manually"
+        type: choice
+        options:
+          - daily-docs-updater
+          - daily-readme-updater
+          - weekly-docs-auditor
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Daily: create a Copilot issue when code changes need docs updates
+  # ──────────────────────────────────────────────
+  daily-docs-updater:
+    if: |
+      (github.event_name == 'schedule' && github.event.schedule == '0 2 * * *') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'daily-docs-updater')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Collect code-only commits from last 24h
+        id: changes
+        run: |
+          # Commits in the last 24 hours that touch code paths (exclude docs: prefix)
+          COMMITS=$(git log \
+            --oneline \
+            --since="24 hours ago" \
+            --format="%h %s" \
+            -- \
+            '*.ts' '*.tsx' '*.js' '*.mjs' \
+            'components/**' 'lib/**' 'electron/**' 'app/**' \
+            'contexts/**' 'packages/**' \
+            | grep -v "^[0-9a-f]* docs:" \
+            || true)
+
+          if [ -z "$COMMITS" ]; then
+            echo "No code changes in the last 24h, skipping."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+          # Diff stat for changed code files
+          DIFF_STAT=$(git diff --stat "HEAD@{24 hours ago}" HEAD \
+            -- \
+            '*.ts' '*.tsx' '*.js' '*.mjs' \
+            'components/**' 'lib/**' 'electron/**' 'app/**' \
+            'contexts/**' 'packages/**' \
+            2>/dev/null || echo "Diff not available")
+
+          {
+            echo "commits<<COMMITS_EOF"
+            echo "$COMMITS"
+            echo "COMMITS_EOF"
+            echo "diff_stat<<DIFF_EOF"
+            echo "$DIFF_STAT"
+            echo "DIFF_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Ensure docs-update label exists
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "docs-update" \
+            --repo "${{ github.repository }}" \
+            --color "0052CC" \
+            --description "Documentation update needed" \
+            2>/dev/null || true
+
+      - name: Close stale docs-update issues
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue list \
+            --repo "${{ github.repository }}" \
+            --label "copilot" \
+            --label "docs-update" \
+            --state open \
+            --json number \
+            --jq '.[].number' | while read -r num; do
+            gh issue close "$num" \
+              --repo "${{ github.repository }}" \
+              --comment "Superseded by a newer daily docs check." || true
+          done
+
+      - name: Create issue for Copilot
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "docs: update docs/ to reflect recent code changes" \
+            --label "copilot,docs-update" \
+            --body "$(cat <<'EOF'
+          ## Task
+
+          Recent code commits may require updates to `docs/`. Review the changes below and update any affected documentation.
+
+          ## Recent Code Commits (last 24h)
+
+          ```
+          ${{ steps.changes.outputs.commits }}
+          ```
+
+          ## Changed Files (diff stat)
+
+          ```
+          ${{ steps.changes.outputs.diff_stat }}
+          ```
+
+          ## Instructions
+
+          Follow the instructions in `.github/agents/docs-updater.agent.md`:
+
+          1. Read the commits and diff stat listed above.
+          2. Identify which docs files are affected using the trigger table in the agent instructions.
+          3. If no documentation update is needed, post a comment explaining why and close this issue.
+          4. Otherwise, make **minimal, surgical edits** to the relevant docs files.
+          5. Create a PR targeting the **`dev` branch** (NEVER `main`).
+          6. PR title: `docs: update docs/ to reflect recent code changes`
+
+          **Language rules**: English and Japanese only. No Chinese or Korean.
+          EOF
+          )"
+
+  # ──────────────────────────────────────────────
+  # Daily: create a Copilot issue when code changes need README update
+  # ──────────────────────────────────────────────
+  daily-readme-updater:
+    if: |
+      (github.event_name == 'schedule' && github.event.schedule == '30 2 * * *') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'daily-readme-updater')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Collect code-only commits from last 24h
+        id: changes
+        run: |
+          # Commits in the last 24 hours that touch user-facing code (exclude docs:/README commits)
+          COMMITS=$(git log \
+            --oneline \
+            --since="24 hours ago" \
+            --format="%h %s" \
+            -- \
+            '*.ts' '*.tsx' '*.js' '*.mjs' \
+            'components/**' 'lib/**' 'electron/**' 'app/**' \
+            'contexts/**' 'packages/**' 'package.json' \
+            | grep -v "^[0-9a-f]* docs:" \
+            | grep -v "^[0-9a-f]* chore:" \
+            || true)
+
+          if [ -z "$COMMITS" ]; then
+            echo "No code changes in the last 24h, skipping."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+          DIFF_STAT=$(git diff --stat "HEAD@{24 hours ago}" HEAD \
+            -- \
+            '*.ts' '*.tsx' '*.js' '*.mjs' \
+            'components/**' 'lib/**' 'electron/**' 'app/**' \
+            'contexts/**' 'packages/**' 'package.json' \
+            2>/dev/null || echo "Diff not available")
+
+          {
+            echo "commits<<COMMITS_EOF"
+            echo "$COMMITS"
+            echo "COMMITS_EOF"
+            echo "diff_stat<<DIFF_EOF"
+            echo "$DIFF_STAT"
+            echo "DIFF_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Close stale README update issues
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue list \
+            --repo "${{ github.repository }}" \
+            --label "copilot" \
+            --label "documentation" \
+            --state open \
+            --json number \
+            --jq '.[].number' | while read -r num; do
+            gh issue close "$num" \
+              --repo "${{ github.repository }}" \
+              --comment "Superseded by a newer daily README check." || true
+          done
+
+      - name: Create issue for Copilot
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "docs: update README.md to reflect recent changes" \
+            --label "copilot,documentation" \
+            --body "$(cat <<'EOF'
+          ## Task
+
+          Update `README.md` to reflect the latest code changes merged to `dev`.
+
+          ## Recent Code Commits (last 24h)
+
+          ```
+          ${{ steps.changes.outputs.commits }}
+          ```
+
+          ## Changed Files (diff stat)
+
+          ```
+          ${{ steps.changes.outputs.diff_stat }}
+          ```
+
+          ## Instructions
+
+          Follow the instructions in `.github/agents/readme-updater.agent.md`:
+
+          1. Read the commits and diff stat listed above.
+          2. Determine if any user-facing features were added, removed, or changed.
+          3. If changes are internal refactoring with no user-facing impact, close this issue with "No README update needed".
+          4. Otherwise, make **minimal, surgical edits** to `README.md` — do NOT rewrite the entire file.
+          5. Commit with message: `docs: update README to reflect recent changes`
+
+          **Language rules**: English and Japanese only. No Chinese or Korean.
+          EOF
+          )"
+
+  # ──────────────────────────────────────────────
+  # Weekly (Wednesday): audit docs/ for broken links and missing anchor files
+  # ──────────────────────────────────────────────
+  weekly-docs-auditor:
+    if: |
+      (github.event_name == 'schedule' && github.event.schedule == '0 3 * * 3') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'weekly-docs-auditor')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 1
+
+      - name: Run docs audit
+        id: audit
+        run: |
+          FINDINGS=""
+
+          # ── Check A: Broken relative links in docs/**/*.md ──
+          # Find all relative markdown links (excluding external URLs and anchor-only)
+          while IFS= read -r md_file; do
+            # Skip archive directory
+            if echo "$md_file" | grep -q "docs/archive/"; then
+              continue
+            fi
+
+            doc_dir=$(dirname "$md_file")
+
+            # Extract relative links: ](../path) or ](./path) — not http and not #anchor
+            while IFS= read -r link; do
+              # Strip markdown link syntax: extract path between ]( and )
+              path=$(echo "$link" | sed 's/.*](\(.*\))/\1/' | sed 's/#.*//' | tr -d ' ')
+
+              if [ -z "$path" ]; then
+                continue
+              fi
+
+              # Resolve relative path from the doc's directory
+              resolved=$(realpath --relative-to="." "$doc_dir/$path" 2>/dev/null || echo "")
+
+              if [ -n "$resolved" ] && [ ! -e "$resolved" ]; then
+                FINDINGS="${FINDINGS}\n- **Broken link** in \`$md_file\`: \`$path\` → resolved to \`$resolved\` (not found)"
+              fi
+            done < <(grep -oP '\]\(\K[^)]+' "$md_file" | grep -v '^http' | grep -v '^#' || true)
+          done < <(find docs -name "*.md" -not -path "docs/.obsidian/*")
+
+          # ── Check B: Anchor file existence ──
+          ANCHOR_FILES=(
+            "lib/storage/storage-service.ts"
+            "lib/storage/storage-types.ts"
+            "lib/storage/electron-storage.ts"
+            "lib/storage/web-storage.ts"
+            "lib/vfs/index.ts"
+            "lib/linting/rule-runner.ts"
+            "lib/linting/types.ts"
+            "lib/linting/base-rule.ts"
+            "lib/nlp-client/nlp-client.ts"
+          )
+
+          for f in "${ANCHOR_FILES[@]}"; do
+            if [ ! -f "$f" ]; then
+              FINDINGS="${FINDINGS}\n- **Missing anchor file**: \`$f\` (referenced in architecture docs but not found on disk)"
+            fi
+          done
+
+          # ── Report ──
+          if [ -z "$FINDINGS" ]; then
+            echo "No issues found, skipping issue creation."
+            echo "has_findings=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_findings=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "findings<<FINDINGS_EOF"
+              echo -e "$FINDINGS"
+              echo "FINDINGS_EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ensure docs-audit label exists
+        if: steps.audit.outputs.has_findings == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "docs-audit" \
+            --repo "${{ github.repository }}" \
+            --color "5319E7" \
+            --description "Weekly docs audit finding" \
+            2>/dev/null || true
+
+      - name: Create audit issue
+        if: steps.audit.outputs.has_findings == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TODAY=$(date -u +"%Y-%m-%d")
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "docs: weekly audit findings ($TODAY)" \
+            --label "docs-audit" \
+            --body "$(cat <<'EOF'
+          ## Weekly Docs Audit
+
+          The weekly docs audit found issues that need attention.
+
+          ## Findings
+
+          ${{ steps.audit.outputs.findings }}
+
+          ## Instructions
+
+          Follow the instructions in `.github/agents/docs-auditor.agent.md`:
+
+          1. Analyse each finding above.
+          2. Post a structured analysis comment on this issue.
+          3. For each finding that requires a fix, create a new issue with the `docs-update` label.
+          4. **Do NOT edit files or create PRs directly** — delegate all fixes via new issues.
+
+          **Language rules**: English and Japanese only. No Chinese or Korean.
+          EOF
+          )"
