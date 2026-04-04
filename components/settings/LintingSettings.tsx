@@ -15,7 +15,11 @@ import {
   LINT_PRESETS,
   LINT_DEFAULT_CONFIGS,
 } from "@/lib/linting/lint-presets";
-import { CORRECTION_MODE_IDS, CORRECTION_MODES, MODE_TO_PRESET } from "@/lib/linting/correction-modes";
+import {
+  CORRECTION_MODE_IDS,
+  CORRECTION_MODES,
+  MODE_TO_PRESET,
+} from "@/lib/linting/correction-modes";
 import GuidelineList from "@/components/GuidelineList";
 
 /** Map of rule ID -> supportsSkipDialogue from metadata */
