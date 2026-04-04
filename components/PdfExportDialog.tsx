@@ -109,6 +109,8 @@ function PdfExportDialogInner({
   metadata,
 }: Omit<PdfExportDialogProps, "isOpen">) {
   const [settings, setSettings] = useState<PdfExportSettings>(() => loadPdfExportSettings());
+  // Debounced copy of settings used for preview rendering (updated every 300ms)
+  const [previewSettings, setPreviewSettings] = useState<PdfExportSettings>(settings);
   // Page content chunks (split by estimated chars per page)
   const [pageChunks, setPageChunks] = useState<string[]>([]);
   // Whether the initial debounce has completed (to distinguish "loading" from "no content")
@@ -148,6 +150,7 @@ function PdfExportDialogInner({
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
+      setPreviewSettings(settings);
       const charsPerPage = settings.charsPerLine * settings.linesPerPage;
       const chunks = splitContentIntoPages(content, charsPerPage);
       setPageChunks(chunks);
@@ -180,28 +183,28 @@ function PdfExportDialogInner({
     return () => observer.disconnect();
   }, [hasMore]);
 
-  // Memoize typesetting options from current settings
+  // Memoize typesetting options from debounced settings so preview updates at most every 300ms
   const typesettingOptions = useMemo(() => {
     const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
-      settings.pageSize,
-      settings.margins,
-      settings.charsPerLine,
-      settings.linesPerPage,
-      settings.verticalWriting,
-      settings.landscape,
+      previewSettings.pageSize,
+      previewSettings.margins,
+      previewSettings.charsPerLine,
+      previewSettings.linesPerPage,
+      previewSettings.verticalWriting,
+      previewSettings.landscape,
     );
     return {
       metadata,
-      verticalWriting: settings.verticalWriting,
+      verticalWriting: previewSettings.verticalWriting,
       typesetting: {
-        fontFamily: settings.fontFamily,
+        fontFamily: previewSettings.fontFamily,
         fontSizeMm,
         lineHeightRatio,
-        textIndentEm: settings.textIndent,
-        margins: settings.margins,
+        textIndentEm: previewSettings.textIndent,
+        margins: previewSettings.margins,
       },
     };
-  }, [settings, metadata]);
+  }, [previewSettings, metadata]);
 
   // Generate HTML only for currently visible pages
   const visiblePageHtml = useMemo(() => {
@@ -209,14 +212,14 @@ function PdfExportDialogInner({
     return pageChunks.slice(0, limit).map((chunk) => mdiToHtml(chunk, typesettingOptions));
   }, [pageChunks, visibleCount, typesettingOptions]);
 
-  // Page thumbnail dimensions (swap width/height when landscape)
+  // Page thumbnail dimensions (swap width/height when landscape) — uses debounced settings
   const { pageWidthPx, pageHeightPx, scale, dims } = useMemo(() => {
-    const base = PAGE_DIMENSIONS[settings.pageSize] ?? PAGE_DIMENSIONS["A5"];
-    const d = settings.landscape ? { width: base.height, height: base.width } : base;
+    const base = PAGE_DIMENSIONS[previewSettings.pageSize] ?? PAGE_DIMENSIONS["A5"];
+    const d = previewSettings.landscape ? { width: base.height, height: base.width } : base;
     const w = d.width * MM_TO_PX;
     const h = d.height * MM_TO_PX;
     return { pageWidthPx: w, pageHeightPx: h, scale: PREVIEW_PAGE_WIDTH / w, dims: d };
-  }, [settings.pageSize, settings.landscape]);
+  }, [previewSettings.pageSize, previewSettings.landscape]);
 
   const scaledHeight = Math.round(pageHeightPx * scale);
   const isEmpty = pageChunks.length === 0;
@@ -361,7 +364,7 @@ function PdfExportDialogInner({
             {/* Indent + Page numbers */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelClass}>字下げ（文字）</label>
+                <label className={labelClass}>字下げ（em）</label>
                 <input
                   type="number"
                   className={numberInputClass + " w-full"}
@@ -442,8 +445,8 @@ function PdfExportDialogInner({
           <div className="px-4 py-3 border-b border-border flex items-center justify-between flex-shrink-0">
             <span className="text-sm font-medium text-foreground">プレビュー</span>
             <span className="text-xs text-foreground-tertiary">
-              {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
-              {settings.verticalWriting ? "縦書き" : "横書き"}
+              {previewSettings.pageSize} · {previewSettings.landscape ? "横置き" : "縦置き"} ·{" "}
+              {previewSettings.verticalWriting ? "縦書き" : "横書き"}
               {pageChunks.length > 0 && ` · 全${pageChunks.length}ページ`}
             </span>
           </div>
