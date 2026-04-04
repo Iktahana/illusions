@@ -12,6 +12,16 @@
  *   const enhanced = enrichReadabilityWithMorphology(base, tokens);
  */
 
+import type { Token } from "@/lib/nlp-client/types";
+import type {
+  EnhancedReadabilityAnalysis,
+  ParagraphMetrics,
+  ReadabilitySubScores,
+  SentenceLengthMetrics,
+  SyntaxMetrics,
+  VocabularyMetrics,
+} from "./readability-types";
+
 /** 文字数カウント用にMarkdownを整形する */
 export function cleanMarkdown(markdown: string): string {
   return markdown
@@ -25,15 +35,6 @@ export function cleanMarkdown(markdown: string): string {
     .replace(/^[-*_]{3,}$/gm, "")
     .trim();
 }
-import type {
-  EnhancedReadabilityAnalysis,
-  ParagraphMetrics,
-  ReadabilitySubScores,
-  SentenceLengthMetrics,
-  SyntaxMetrics,
-  VocabularyMetrics,
-} from "./readability-types";
-import type { Token } from "@/lib/nlp-client/types";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
