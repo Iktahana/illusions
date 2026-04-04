@@ -5,16 +5,23 @@ const { app, BrowserWindow, Menu, shell } = require("electron");
 const { APP_NAME, isDev } = require("./app-constants");
 const { getStorageManager } = require("./ipc/storage-ipc");
 
-// UI state synced from renderer for menu checked states
-let menuUiState = {
+// Default UI state for menu checked states
+const DEFAULT_MENU_UI_STATE = {
   compactMode: false,
   showParagraphNumbers: true,
   themeMode: "auto", // 'auto' | 'light' | 'dark'
   autoCharsPerLine: true,
 };
 
-// Keymap overrides synced from renderer (only differences from defaults)
-let keymapOverrides = {};
+// Per-window UI state (BrowserWindow.id → menuUiState object)
+const windowMenuStates = new Map();
+
+// Per-window keymap overrides (BrowserWindow.id → overrides object)
+const windowKeymapOverrides = new Map();
+
+// The ID of the currently focused window; used to select the correct per-window state
+// when building the application menu.
+let activeWindowId = null;
 
 /**
  * Default Electron accelerator strings keyed by CommandId.
@@ -35,12 +42,75 @@ const DEFAULT_ACCELERATORS = {
 };
 
 /**
+ * Returns the UI state for the currently active window.
+ * Falls back to the default state if no window state has been registered yet.
+ * @returns {typeof DEFAULT_MENU_UI_STATE}
+ */
+function getMenuUiState() {
+  if (activeWindowId !== null && windowMenuStates.has(activeWindowId)) {
+    return windowMenuStates.get(activeWindowId);
+  }
+  return { ...DEFAULT_MENU_UI_STATE };
+}
+
+/**
+ * Stores the UI state for a specific window.
+ * @param {Partial<typeof DEFAULT_MENU_UI_STATE>} state
+ * @param {number} windowId - BrowserWindow.id
+ */
+function setMenuUiState(state, windowId) {
+  const existing = windowMenuStates.get(windowId) ?? { ...DEFAULT_MENU_UI_STATE };
+  windowMenuStates.set(windowId, { ...existing, ...state });
+}
+
+/**
+ * Returns the keymap overrides for the currently active window.
+ * @returns {Record<string, unknown>}
+ */
+function getKeymapOverrides() {
+  if (activeWindowId !== null && windowKeymapOverrides.has(activeWindowId)) {
+    return windowKeymapOverrides.get(activeWindowId);
+  }
+  return {};
+}
+
+/**
+ * Stores keymap overrides for a specific window.
+ * @param {Record<string, unknown>} overrides
+ * @param {number} windowId - BrowserWindow.id
+ */
+function setKeymapOverrides(overrides, windowId) {
+  windowKeymapOverrides.set(windowId, overrides ?? {});
+}
+
+/**
+ * Sets the active window ID so that subsequent menu builds reflect that window's state.
+ * @param {number | null} windowId - BrowserWindow.id, or null to clear
+ */
+function setActiveWindowId(windowId) {
+  activeWindowId = windowId;
+}
+
+/**
+ * Removes all per-window state for a closed window.
+ * @param {number} windowId - BrowserWindow.id
+ */
+function removeWindowState(windowId) {
+  windowMenuStates.delete(windowId);
+  windowKeymapOverrides.delete(windowId);
+  if (activeWindowId === windowId) {
+    activeWindowId = null;
+  }
+}
+
+/**
  * Resolves the Electron accelerator for a command, applying user overrides.
  * @param {string} commandId
  * @returns {string | undefined}
  */
 function resolveAccelerator(commandId) {
-  const override = keymapOverrides[commandId];
+  const overrides = getKeymapOverrides();
+  const override = overrides[commandId];
   if (override === null) return undefined; // intentionally unbound
   if (override) {
     // Convert KeyBinding { modifiers: [...], key: "s" } to "CmdOrCtrl+Shift+S"
@@ -61,24 +131,10 @@ function resolveAccelerator(commandId) {
   return DEFAULT_ACCELERATORS[commandId];
 }
 
-function getMenuUiState() {
-  return menuUiState;
-}
-
-function setMenuUiState(state) {
-  menuUiState = { ...menuUiState, ...state };
-}
-
-function getKeymapOverrides() {
-  return keymapOverrides;
-}
-
-function setKeymapOverrides(overrides) {
-  keymapOverrides = overrides ?? {};
-}
-
 function buildApplicationMenu(recentProjects = []) {
   const isMac = process.platform === "darwin";
+  // Snapshot the active window's UI state once for this build
+  const menuUiState = getMenuUiState();
 
   /** Send an IPC message to the focused window instead of mainWindow */
   const sendToFocused = (channel, ...args) => {
@@ -435,4 +491,6 @@ module.exports = {
   setMenuUiState,
   getKeymapOverrides,
   setKeymapOverrides,
+  setActiveWindowId,
+  removeWindowState,
 };

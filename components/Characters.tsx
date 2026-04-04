@@ -31,12 +31,25 @@ function Characters({ content }: CharactersProps) {
     relationships: "",
   });
 
-  // Restore characters from persistent storage on mount
+  // Cache the project ID resolved during restore so the persist effect uses the same key.
+  const projectIdRef = useRef<string>("__standalone__");
+
+  // Restore characters from persistent storage on mount.
+  // Reads from charactersByProject[projectId] and falls back to the legacy
+  // characters field for one-time migration.
   useEffect(() => {
     const restore = async () => {
       try {
         const appState = await fetchAppState();
-        if (appState?.characters && appState.characters.length > 0) {
+        const projectId = appState?.currentProjectId ?? "__standalone__";
+        projectIdRef.current = projectId;
+
+        const perProject = appState?.charactersByProject?.[projectId];
+        if (perProject && perProject.length > 0) {
+          // Use the per-project data if it already exists.
+          setCharacters(perProject);
+        } else if (appState?.characters && appState.characters.length > 0) {
+          // One-time migration: move legacy flat array into per-project bucket.
           setCharacters(appState.characters);
         }
       } catch (err) {
@@ -48,14 +61,25 @@ function Characters({ content }: CharactersProps) {
     void restore();
   }, []);
 
-  // Persist characters to storage on change (debounced)
+  // Persist characters to per-project storage on change (debounced).
   useEffect(() => {
     if (!isLoaded) return; // skip initial empty state
 
     const timer = setTimeout(() => {
-      void persistAppState({ characters }).catch((err) => {
-        console.error("Failed to persist characters:", err);
-      });
+      const projectId = projectIdRef.current;
+      void (async () => {
+        try {
+          const appState = await fetchAppState();
+          await persistAppState({
+            charactersByProject: {
+              ...appState?.charactersByProject,
+              [projectId]: characters,
+            },
+          });
+        } catch (err) {
+          console.error("Failed to persist characters:", err);
+        }
+      })();
     }, 500);
 
     return () => clearTimeout(timer);

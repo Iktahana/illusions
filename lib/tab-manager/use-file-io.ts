@@ -1,5 +1,6 @@
 "use client";
 
+/** Warning message shown when file handle persistence fails. */
 const PERSIST_FAILURE_WARNING = "ファイル参照の保存に失敗しました";
 
 import { useCallback, useRef } from "react";
@@ -11,8 +12,7 @@ import { persistAppState } from "../storage/app-state-manager";
 import { getHistoryService } from "../services/history-service";
 import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../services/file-watcher";
-import type { SupportedFileExtension } from "../project/project-types";
-import type { TabId, TabState, EditorTabState } from "./tab-types";
+import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import { generateTabId, inferFileType, sanitizeMdiContent, getErrorMessage } from "./types";
 import type { TabManagerCore } from "./types";
@@ -45,6 +45,8 @@ export interface UseFileIOReturn {
   saveFileRef: React.MutableRefObject<(isAutoSave?: boolean) => Promise<void>>;
   /** Ref holding the latest saveAsFile function. */
   saveAsFileRef: React.MutableRefObject<() => Promise<void>>;
+  /** Create an auto-snapshot if conditions are met (project mode only). */
+  tryAutoSnapshot: (sourcePath: string, displayName: string, savedContent: string) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,9 +55,7 @@ export interface UseFileIOReturn {
 
 export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   const {
-    tabs,
     setTabs,
-    activeTabId,
     setActiveTabId,
     tabsRef,
     activeTabIdRef,
@@ -86,11 +86,19 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         } else if (!isElectron && descriptor.handle) {
           const storage = getStorageService();
           await storage.initialize();
-          await storage.saveEditorBuffer({
-            content: fileContent,
-            timestamp: Date.now(),
-            fileHandle: descriptor.handle,
-          });
+          // Use the file name as the key to prevent cross-tab collisions when
+          // multiple browser tabs open different files simultaneously.
+          const fileKey = descriptor.handle.name;
+          await storage.saveEditorBuffer(
+            {
+              content: fileContent,
+              timestamp: Date.now(),
+              fileHandle: descriptor.handle,
+            },
+            fileKey,
+          );
+          // Record which fileKey this tab last used so restore can look it up.
+          await storage.setItem("last_editor_buffer_key", fileKey);
         }
         return true;
       } catch (error) {
@@ -104,15 +112,16 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   // --- Auto-snapshot (project mode) ---------------------------------------
 
   const tryAutoSnapshot = useCallback(
-    async (sourceFileName: string, savedContent: string) => {
+    async (sourcePath: string, displayName: string, savedContent: string) => {
       if (!isProjectRef.current) return;
       if (!getVFS().isRootOpen()) return;
       try {
         const historyService = getHistoryService();
-        const shouldCreate = await historyService.shouldCreateSnapshot(sourceFileName);
+        const shouldCreate = await historyService.shouldCreateSnapshot(sourcePath);
         if (shouldCreate) {
           await historyService.createSnapshot({
-            sourceFile: sourceFileName,
+            sourcePath,
+            displayName,
             content: savedContent,
             type: "auto",
           });
@@ -133,10 +142,17 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
     const { descriptor, content: fileContent } = result;
 
-    // Deduplicate: switch to existing tab if same path
+    // Deduplicate: if the same path is already open, reload from disk and activate
     if (descriptor.path) {
       const existing = findTabByPath(descriptor.path);
       if (existing) {
+        // Force-refresh tab content so stale in-memory state is replaced with the
+        // latest content that was just read from disk by openMdiFile().
+        updateTab(existing.id, {
+          content: fileContent,
+          lastSavedContent: fileContent,
+          isDirty: false,
+        });
         setActiveTabId(existing.id);
         return;
       }
@@ -200,6 +216,14 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       // Only editor tabs can be saved
       if (!isEditorTab(tab)) return;
 
+      // Block save if tab has unresolved external conflict
+      if (tab.fileSyncStatus === "conflicted") {
+        notificationManager.warning(
+          "ファイルが外部で変更されています。保存する前にコンフリクトを解決してください。",
+        );
+        return;
+      }
+
       isSavingRef.current = true;
       updateTab(tabId, { isSaving: true });
 
@@ -211,21 +235,37 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           const vfs = getVFS();
           suppressFileWatch(tab.file.path);
           await vfs.writeFile(tab.file.path, sanitized);
+
+          // Update project.json lastModified so workspace metadata stays in sync.
+          // This mirrors what ProjectService.saveProject() does for the full save path.
+          try {
+            const projectJsonPath = ".illusions/project.json";
+            const projectJsonText = await vfs.readFile(projectJsonPath);
+            const projectJson = JSON.parse(projectJsonText) as Record<string, unknown>;
+            projectJson["lastModified"] = Date.now();
+            await vfs.writeFile(projectJsonPath, JSON.stringify(projectJson, null, 2));
+          } catch {
+            // Non-fatal: project.json update failure should not block the save
+            console.warn("project.json の lastModified 更新に失敗しました");
+          }
+
           setTabs((prev) =>
-            prev.map((t) =>
-              t.id === tabId && isEditorTab(t)
-                ? {
-                    ...t,
-                    lastSavedContent: sanitized,
-                    isDirty: sanitizeMdiContent(t.content) !== sanitized,
-                    lastSavedTime: Date.now(),
-                    lastSaveWasAuto: isAutoSave,
-                    isSaving: false,
-                  }
-                : t,
-            ),
+            prev.map((t) => {
+              if (t.id !== tabId || !isEditorTab(t)) return t;
+              const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+              return {
+                ...t,
+                lastSavedContent: sanitized,
+                isDirty: newIsDirty,
+                lastSavedTime: Date.now(),
+                lastSaveWasAuto: isAutoSave,
+                isSaving: false,
+                fileSyncStatus: newIsDirty ? "dirty" : "clean",
+                conflictDiskContent: null,
+              };
+            }),
           );
-          await tryAutoSnapshot(tab.file.name, sanitized);
+          await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized);
           return;
         }
 
@@ -237,24 +277,28 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
         if (result) {
           setTabs((prev) =>
-            prev.map((t) =>
-              t.id === tabId && isEditorTab(t)
-                ? {
-                    ...t,
-                    file: result.descriptor,
-                    lastSavedContent: sanitized,
-                    isDirty: sanitizeMdiContent(t.content) !== sanitized,
-                    lastSavedTime: Date.now(),
-                    lastSaveWasAuto: isAutoSave,
-                    isSaving: false,
-                  }
-                : t,
-            ),
+            prev.map((t) => {
+              if (t.id !== tabId || !isEditorTab(t)) return t;
+              const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+              return {
+                ...t,
+                file: result.descriptor,
+                lastSavedContent: sanitized,
+                isDirty: newIsDirty,
+                lastSavedTime: Date.now(),
+                lastSaveWasAuto: isAutoSave,
+                isSaving: false,
+                fileSyncStatus: newIsDirty ? "dirty" : "clean",
+                conflictDiskContent: null,
+              };
+            }),
           );
           if (!(await persistFileReference(result.descriptor, sanitized))) {
             notificationManager.warning(PERSIST_FAILURE_WARNING);
           }
-          await tryAutoSnapshot(result.descriptor.name, sanitized);
+          if (result.descriptor.path) {
+            await tryAutoSnapshot(result.descriptor.path, result.descriptor.name, sanitized);
+          }
         } else {
           updateTab(tabId, { isSaving: false });
         }
@@ -300,17 +344,34 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       const result = await saveMdiFile({ descriptor, content: sanitized, fileType: tab.fileType });
 
       if (result) {
-        updateTab(tabId, {
-          file: result.descriptor,
-          lastSavedContent: sanitized,
-          isDirty: false,
-          lastSavedTime: Date.now(),
-          isSaving: false,
-        });
+        // Use functional updater to compare against the latest tab content at
+        // completion time, not at dialog-open time. Edits made while the async
+        // Save As dialog was open must not be silently marked as saved.
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === tabId && isEditorTab(t)
+              ? (() => {
+                  const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+                  return {
+                    ...t,
+                    file: result.descriptor,
+                    lastSavedContent: sanitized,
+                    isDirty: newIsDirty,
+                    fileSyncStatus: newIsDirty ? "dirty" : "clean",
+                    lastSavedTime: Date.now(),
+                    isSaving: false,
+                    conflictDiskContent: null,
+                  };
+                })()
+              : t,
+          ),
+        );
         if (!(await persistFileReference(result.descriptor, sanitized))) {
           notificationManager.warning(PERSIST_FAILURE_WARNING);
         }
-        await tryAutoSnapshot(result.descriptor.name, sanitized);
+        if (result.descriptor.path) {
+          await tryAutoSnapshot(result.descriptor.path, result.descriptor.name, sanitized);
+        }
       } else {
         updateTab(tabId, { isSaving: false });
       }
@@ -322,7 +383,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     } finally {
       isSavingRef.current = false;
     }
-  }, [updateTab, persistFileReference, tryAutoSnapshot, tabsRef, activeTabIdRef]);
+  }, [updateTab, setTabs, persistFileReference, tryAutoSnapshot, tabsRef, activeTabIdRef]);
 
   /** Load a file by path + content into a new tab (or reuse/deduplicate) */
   const loadSystemFile = useCallback(
@@ -517,5 +578,6 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     openProjectFile,
     saveFileRef,
     saveAsFileRef,
+    tryAutoSnapshot,
   };
 }

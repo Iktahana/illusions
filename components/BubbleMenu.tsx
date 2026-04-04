@@ -1,6 +1,8 @@
 "use client";
 
+import type { RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Bold,
   Italic,
@@ -14,10 +16,12 @@ import {
   Code,
 } from "lucide-react";
 import clsx from "clsx";
-import { EditorView } from "@milkdown/prose/view";
+
+import type { EditorSelectionState } from "@/lib/editor-page/use-selection-tracking";
 
 interface BubbleMenuProps {
-  editorView: EditorView | null;
+  selectionState: EditorSelectionState;
+  scrollContainerRef: RefObject<HTMLDivElement | null>;
   onFormat: (format: FormatType, level?: number) => void;
   isVertical?: boolean;
 }
@@ -32,67 +36,67 @@ export type FormatType =
   | "blockquote"
   | "code";
 
-export default function BubbleMenu({ editorView, onFormat, isVertical = false }: BubbleMenuProps) {
+export default function BubbleMenu({
+  selectionState,
+  scrollContainerRef,
+  onFormat,
+  isVertical = false,
+}: BubbleMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [position, setPosition] = useState({ top: -9999, left: -9999 });
   const [showHeadingDropdown, setShowHeadingDropdown] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Portal needs to wait for client-side mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
-    if (!editorView) return;
+    if (!selectionState.hasSelection) {
+      setPosition({ top: -9999, left: -9999 });
+      return;
+    }
 
-    const updatePosition = () => {
-      const { state } = editorView;
-      const { selection } = state;
-      const { from, to } = selection;
+    const menuEl = menuRef.current;
+    if (!menuEl) return;
+    const startCoords = selectionState.startCoords;
+    if (!startCoords) return;
 
-      // 選択があるときだけ表示
-      if (from === to) {
-        setIsVisible(false);
-        setShowHeadingDropdown(false);
-        return;
-      }
+    const menuWidth = menuEl.offsetWidth;
+    const menuHeight = menuEl.offsetHeight;
+    const gap = 8;
+    const bounds = scrollContainerRef.current
+      ? scrollContainerRef.current.getBoundingClientRect()
+      : { left: 0, right: window.innerWidth, top: 0, bottom: window.innerHeight };
+    const clampX = (x: number): number =>
+      Math.max(bounds.left, Math.min(bounds.right - menuWidth, x));
+    const clampY = (y: number): number =>
+      Math.max(bounds.top, Math.min(bounds.bottom - menuHeight, y));
 
-      setIsVisible(true);
+    if (isVertical) {
+      const endCoords = selectionState.endCoords ?? startCoords;
+      const selLeft = Math.min(startCoords.left, endCoords.left);
+      setPosition({
+        left: clampX(selLeft - menuWidth - gap),
+        top: clampY(startCoords.top),
+      });
+      return;
+    }
 
-      // 選択範囲の座標を取得
-      const start = editorView.coordsAtPos(from);
-      const end = editorView.coordsAtPos(to);
+    // Horizontal: above selection start, left-aligned to cursor
+    setPosition({
+      left: clampX(startCoords.left),
+      top: clampY(startCoords.top - menuHeight - gap),
+    });
+  }, [
+    isVertical,
+    scrollContainerRef,
+    selectionState.endCoords,
+    selectionState.hasSelection,
+    selectionState.startCoords,
+  ]);
 
-      if (isVertical) {
-        const top = (start.top + end.top) / 2;
-        const left = start.left - 56;
-        setPosition({
-          left,
-          top,
-        });
-      } else {
-        // 選択範囲の上に配置
-        const left = (start.left + end.left) / 2;
-        const top = start.top;
-        setPosition({
-          left: left,
-          top: top - 50, // 選択範囲の上
-        });
-      }
-    };
-
-    // 選択変更で位置を更新
-    const handleUpdate = () => {
-      updatePosition();
-    };
-
-    // エディタ更新を購読
-    editorView.dom.addEventListener("mouseup", handleUpdate);
-    editorView.dom.addEventListener("keyup", handleUpdate);
-
-    return () => {
-      editorView.dom.removeEventListener("mouseup", handleUpdate);
-      editorView.dom.removeEventListener("keyup", handleUpdate);
-    };
-  }, [editorView, isVertical]);
-
-  // 外側クリックで見出しドロップダウンを閉じる
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -109,8 +113,6 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
     };
   }, [showHeadingDropdown]);
 
-  if (!isVisible) return null;
-
   const buttons: Array<{
     icon: typeof Bold;
     label: string;
@@ -126,17 +128,17 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
     { icon: Code, label: "コード", format: "code" },
   ];
 
-  return (
+  const menu = (
     <div
       ref={menuRef}
       className={clsx(
-        "fixed z-50 bg-background-elevated rounded-lg shadow-lg border border-border flex gap-1 p-1",
+        "fixed z-50 bg-background-elevated rounded-lg shadow-lg border border-border flex gap-1 p-1 transition-opacity duration-100",
         isVertical ? "flex-col items-center" : "items-center",
+        selectionState.hasSelection ? "opacity-100" : "opacity-0 pointer-events-none",
       )}
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
-        transform: isVertical ? "translateY(-50%)" : "translateX(-50%)",
       }}
     >
       {/* 見出し */}
@@ -152,7 +154,7 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
           <Heading1 className="w-4 h-4 text-foreground-secondary" />
         </button>
 
-        {showHeadingDropdown && (
+        {showHeadingDropdown && selectionState.hasSelection && (
           <div
             className={clsx(
               "absolute bg-background-elevated rounded-lg shadow-lg border border-border py-1 min-w-[120px]",
@@ -199,4 +201,8 @@ export default function BubbleMenu({ editorView, onFormat, isVertical = false }:
       ))}
     </div>
   );
+
+  // Render via portal to document.body to escape dockview's transform context
+  if (!mounted) return null;
+  return createPortal(menu, document.body);
 }

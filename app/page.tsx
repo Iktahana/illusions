@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/rules-of-hooks, @typescript-eslint/no-unused-vars */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -17,6 +18,9 @@ import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence"
 import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
+import type { ExportMetadata } from "@/lib/export/types";
+import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
+import { notificationManager } from "@/lib/services/notification-manager";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
 import { useGlobalShortcuts } from "@/lib/hooks/use-global-shortcuts";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
@@ -25,12 +29,16 @@ import { useEditorMode } from "@/contexts/EditorModeContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode } from "@/lib/project/project-types";
 import { isEditorTab } from "@/lib/tab-manager/tab-types";
+import { sanitizeMdiContent } from "@/lib/tab-manager/types";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useEditorLifecycle } from "@/lib/editor-page/use-editor-lifecycle";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
 import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
+import { CORRECTION_MODES, MODE_TO_PRESET } from "@/lib/linting/correction-modes";
+import { LINT_PRESETS } from "@/lib/linting/lint-presets";
+import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
@@ -39,6 +47,7 @@ import { useSaveToast } from "@/lib/editor-page/use-save-toast";
 import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
 import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
+import { usePreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
@@ -129,8 +138,6 @@ export default function EditorPage() {
     autoSave,
     posHighlightEnabled,
     posHighlightColors,
-    verticalScrollBehavior,
-    scrollSensitivity,
     compactMode,
     showSettingsModal,
     lintingEnabled,
@@ -151,8 +158,6 @@ export default function EditorPage() {
     handleAutoSaveChange,
     handlePosHighlightEnabledChange,
     handlePosHighlightColorsChange,
-    handleVerticalScrollBehaviorChange,
-    handleScrollSensitivityChange,
     handleToggleCompactMode,
     setShowSettingsModal,
     handleLintingEnabledChange,
@@ -164,6 +169,12 @@ export default function EditorPage() {
   } = settingsHandlers;
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
+
+  // Derive a stable per-window key from the project root path (Electron project mode).
+  // This key scopes tabs and dockview layout so multiple windows with different projects
+  // do not overwrite each other's state (fixes #1042).
+  // Standalone mode and Web mode use null — they rely on the legacy global AppState path.
+  const windowKey = isProjectMode(editorMode) && editorMode.rootPath ? editorMode.rootPath : null;
 
   // --- Power saving hook ---
   usePowerSaving({
@@ -207,6 +218,8 @@ export default function EditorPage() {
     autoSave,
     vfsReadyPromise: vfsGate.promise,
     flushLayoutState: stableFlushLayoutState,
+    windowKey,
+    onEditorRemountNeeded: incrementEditorKey,
   });
   const {
     content,
@@ -277,14 +290,22 @@ export default function EditorPage() {
   // triggers PTY kill before removing the tab from state.
   const tabManagerWithPtyCleanup = { ...tabManager, closeTab: handleCloseTabWithPtyCleanup };
 
+  // Search state — declared before useDockviewAdapter so it can be passed as options
+  const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
+  const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
+
   // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
   const { handleDockviewReady, dockviewApi, splitEditor } = useDockviewAdapter({
     tabManager: tabManagerWithPtyCleanup,
     editorKey,
+    searchOpenTrigger,
+    searchInitialTerm,
+    windowKey,
   });
   const { flushLayoutState } = useDockviewPersistence({
     dockviewApi,
     tabs: tabManagerWithPtyCleanup.tabs,
+    windowKey,
   });
   flushLayoutStateRef.current = flushLayoutState;
 
@@ -327,14 +348,11 @@ export default function EditorPage() {
   const editorDomRef = useRef<HTMLDivElement>(null);
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [recoveryExiting, setRecoveryExiting] = useState(false);
-  const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
   const [newFileTrigger, setNewFileTrigger] = useState(0);
-  const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
   const [selectedCharCount, setSelectedCharCount] = useState(0);
   const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
-  const programmaticScrollRef = useRef(false);
 
   // --- Ruby/TCY hook ---
   const { handleOpenRubyDialog, handleApplyRuby, handleToggleTcy } = useRubyTcy({
@@ -462,10 +480,71 @@ export default function EditorPage() {
     return name.replace(/\.[^.]+$/, "");
   }, [tabs, activeTabId]);
 
+  // PDF export dialog state
+  const [showPdfExportDialog, setShowPdfExportDialog] = useState(false);
+  const [pdfExportContent, setPdfExportContent] = useState("");
+  const [pdfExportMetadata, setPdfExportMetadata] = useState<ExportMetadata>({ title: "" });
+  const pdfExportContentRef = useRef("");
+  const pdfExportMetadataRef = useRef<ExportMetadata>({ title: "" });
+
+  const handlePdfExportRequest = useCallback((pdfContent: string, metadata: ExportMetadata) => {
+    pdfExportContentRef.current = pdfContent;
+    pdfExportMetadataRef.current = metadata;
+    setPdfExportContent(pdfContent);
+    setPdfExportMetadata(metadata);
+    setShowPdfExportDialog(true);
+  }, []);
+
+  const handlePdfExportConfirm = useCallback(async (settings: PdfExportSettings) => {
+    setShowPdfExportDialog(false);
+
+    if (!window.electronAPI?.exportPDF) {
+      notificationManager.error("PDFエクスポートはデスクトップアプリでのみ利用可能です");
+      return;
+    }
+
+    const progressId = notificationManager.showProgress("PDFをエクスポート中...", {
+      type: "info",
+    });
+
+    try {
+      const result = await window.electronAPI.exportPDF(pdfExportContentRef.current, {
+        metadata: pdfExportMetadataRef.current,
+        verticalWriting: settings.verticalWriting,
+        pageSize: settings.pageSize,
+        landscape: settings.landscape,
+        margins: settings.margins,
+        charsPerLine: settings.charsPerLine,
+        linesPerPage: settings.linesPerPage,
+        fontFamily: settings.fontFamily,
+        showPageNumbers: settings.showPageNumbers,
+        textIndent: settings.textIndent,
+      });
+
+      notificationManager.dismiss(progressId);
+
+      if (result === null || result === undefined) return;
+
+      if (typeof result === "object" && "success" in result && !result.success) {
+        notificationManager.error(
+          `PDFのエクスポートに失敗しました: ${(result as { error: string }).error}`,
+        );
+        return;
+      }
+
+      notificationManager.success("PDFをエクスポートしました");
+    } catch (error) {
+      notificationManager.dismiss(progressId);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
+    }
+  }, []);
+
   const { exportAs } = useExport({
     getContent: getExportContent,
     getTitle: getExportTitle,
     getIsEditorTabActive: useCallback(() => isEditorTabActiveRef.current, []),
+    onPdfExportRequest: handlePdfExportRequest,
   });
 
   // System file open: tab manager handles loading; we just update editor key
@@ -554,13 +633,21 @@ export default function EditorPage() {
 
   // --- Text statistics hook ---
   const {
-    charCount,
+    visibleTextCharCount,
+    manuscriptCellCount,
+    manuscriptPages,
     paragraphCount,
     sentenceCount,
     charTypeAnalysis,
     charUsageRates,
     readabilityAnalysis,
   } = useTextStatistics(content);
+
+  // charCount は旧インターフェース互換用エイリアス（可視本文文字数）
+  const charCount = visibleTextCharCount;
+
+  // --- Previous day comparison ---
+  const previousDayStats = usePreviousDayStats(currentFile?.name, isProjectMode(editorMode));
 
   // --- Linting hook ---
   const {
@@ -603,16 +690,11 @@ export default function EditorPage() {
     handleShowLintHint,
     handleIgnoreCorrection,
     handleApplyFix,
-    handleApplyLintPreset,
-    activeLintPresetId,
   } = useLintHandlers({
     editorViewInstance,
     lintIssues,
-    lintingRuleConfigs,
-    handleLintingRuleConfigsBatchChange,
     ignoreCorrection,
     triggerSwitchToCorrections,
-    programmaticScrollRef,
   });
 
   const fileName = currentFile?.name ?? "新規ファイル";
@@ -733,7 +815,6 @@ export default function EditorPage() {
     onInsertText: handleInsertText,
     searchResults,
     onCloseSearchResults: handleCloseSearchResults,
-    programmaticScrollRef,
     editorViewInstance,
     dictionarySearchTrigger,
     currentFilePath: currentFile?.path ?? undefined,
@@ -751,6 +832,8 @@ export default function EditorPage() {
     charCount,
     selectedCharCount,
     paragraphCount,
+    manuscriptCellCount,
+    manuscriptPages,
     fileName,
     isDirty,
     isSaving,
@@ -763,9 +846,23 @@ export default function EditorPage() {
     readabilityAnalysis,
     onOpenPosHighlightSettings: handleOpenPosHighlightSettings,
     activeFileName: currentFile?.name,
+    activeFilePath: currentFile?.path ?? undefined,
     currentContent: content,
     onHistoryRestore: (restoredContent: string) => {
       setContent(restoredContent);
+      // Clear conflict state after restoring a snapshot.
+      // Set fileSyncStatus based on whether the restored content matches the last saved content,
+      // so that a restored snapshot that differs from disk is not treated as clean.
+      if (activeTabId !== null) {
+        const currentTab = tabsRef.current.find((t) => t.id === activeTabId);
+        const lastSaved =
+          currentTab && isEditorTab(currentTab) ? (currentTab.lastSavedContent ?? "") : "";
+        const isClean = sanitizeMdiContent(restoredContent) === sanitizeMdiContent(lastSaved);
+        updateTab(activeTabId, {
+          fileSyncStatus: isClean ? "clean" : "dirty",
+          conflictDiskContent: null,
+        });
+      }
       incrementEditorKey();
     },
     onCompareInEditor: setEditorDiff,
@@ -777,9 +874,15 @@ export default function EditorPage() {
     isLinting,
     activeLintIssueIndex,
     onOpenLintingSettings: handleOpenLintingSettings,
-    onApplyLintPreset: handleApplyLintPreset,
-    activeLintPresetId,
+    correctionMode: correctionConfig.mode,
+    onCorrectionModeChange: (modeId: CorrectionModeId) => {
+      const mode = CORRECTION_MODES[modeId];
+      handleCorrectionConfigChange({ mode: modeId, guidelines: [...mode.defaultGuidelines] });
+      const preset = LINT_PRESETS[MODE_TO_PRESET[modeId]];
+      if (preset) handleLintingRuleConfigsBatchChange({ ...preset.configs });
+    },
     switchToCorrectionsTrigger,
+    previousDayStats,
   } as const;
 
   return (
@@ -818,6 +921,11 @@ export default function EditorPage() {
         setShowRubyDialog,
         rubySelectedText,
         handleApplyRuby,
+        showPdfExportDialog,
+        setShowPdfExportDialog,
+        handlePdfExportConfirm,
+        pdfExportContent,
+        pdfExportMetadata,
       }}
       recovery={{
         wasAutoRecovered,
@@ -863,7 +971,6 @@ export default function EditorPage() {
         searchOpenTrigger,
         searchInitialTerm,
         setEditorViewInstance,
-        programmaticScrollRef,
         handleShowAllSearchResults,
         ruleRunner,
         handleLintIssuesUpdated,
@@ -874,6 +981,7 @@ export default function EditorPage() {
         handleShowLintHint,
         handleIgnoreCorrection,
         switchTab,
+        updateTab,
       }}
       inspector={{
         isRightPanelCollapsed,

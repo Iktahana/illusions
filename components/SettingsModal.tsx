@@ -188,7 +188,7 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
                 )}
               >
                 <AudioLines className="w-4 h-4" />
-                聴写/朗読
+                音声入力/読み上げ
               </button>
               <button
                 onClick={() => setActiveCategory("keymap")}

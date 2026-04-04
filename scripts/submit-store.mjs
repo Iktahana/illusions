@@ -321,10 +321,17 @@ async function pollSubmissionStatus(token, submissionId) {
 
   while (Date.now() - start < POLL_TIMEOUT_MS) {
     const sub = await apiGet(token, `/applications/${APP_ID}/submissions/${submissionId}`);
-    console.log(`  commitStatus: ${sub.commitStatus}`);
+    // The Store API uses "status" for newer endpoints and "commitStatus" for legacy
+    const status = sub.commitStatus ?? sub.status;
+    console.log(`  commitStatus: ${sub.commitStatus}, status: ${sub.status}`);
 
-    if (sub.commitStatus !== "CommitStarted") {
+    if (status && status !== "CommitStarted" && status !== "InProgress") {
       return sub;
+    }
+
+    // If status is undefined on first poll, wait and retry before giving up
+    if (!status) {
+      console.log("  Status is undefined — waiting for Store API to reflect commit...");
     }
 
     await new Promise((r) => setTimeout(r, intervalMs));
@@ -474,7 +481,12 @@ async function main() {
 
   // --- Step 10: Commit ---
   console.log("\nCommitting submission...");
-  await apiPost(token, `/applications/${APP_ID}/submissions/${submissionId}/commit`, null);
+  const commitResponse = await apiPost(
+    token,
+    `/applications/${APP_ID}/submissions/${submissionId}/commit`,
+    null,
+  );
+  console.log(`  Commit response: ${JSON.stringify(commitResponse)}`);
 
   // --- Step 11: Poll ---
   console.log("\nPolling submission status...");
@@ -482,10 +494,15 @@ async function main() {
     ? { commitStatus: "CommitStarted (dry-run)" }
     : await pollSubmissionStatus(token, submissionId);
 
-  console.log(`\nFinal status: ${finalSubmission.commitStatus}`);
+  const finalStatus = finalSubmission.commitStatus ?? finalSubmission.status;
+  console.log(
+    `\nFinal status: commitStatus=${finalSubmission.commitStatus}, status=${finalSubmission.status}`,
+  );
 
-  if (finalSubmission.commitStatus === "CommitFailed") {
-    throw new Error(`Submission commit failed: ${JSON.stringify(finalSubmission.statusDetails)}`);
+  if (finalStatus === "CommitFailed" || finalStatus === "Failed") {
+    throw new Error(
+      `Submission commit failed: ${JSON.stringify(finalSubmission.statusDetails ?? finalSubmission)}`,
+    );
   }
 
   console.log("\nStore submission completed successfully.");

@@ -27,6 +27,13 @@ export function useTabManager(options?: {
   vfsReadyPromise?: Promise<void>;
   /** External flush callback for dockview layout persistence. */
   flushLayoutState?: () => Promise<void>;
+  /**
+   * Stable per-window key (e.g. project root path) used to scope tab and layout
+   * state so multiple windows with different projects do not overwrite each other.
+   */
+  windowKey?: string | null;
+  /** Callback to trigger editor remount when external file changes are detected. */
+  onEditorRemountNeeded?: () => void;
 }): UseTabManagerReturn {
   const skipAutoRestore = options?.skipAutoRestore ?? false;
   const autoSaveEnabled = options?.autoSave ?? true;
@@ -65,6 +72,7 @@ export function useTabManager(options?: {
     setPendingCloseTabId: tabState.setPendingCloseTabId,
     updateTab: tabState.updateTab,
     forceCloseTab: tabState.forceCloseTab,
+    tryAutoSnapshot: fileIO.tryAutoSnapshot,
   });
 
   // --- Auto-save ----------------------------------------------------------
@@ -80,6 +88,7 @@ export function useTabManager(options?: {
     isElectron: tabState.isElectron,
     autoSaveEnabled,
     saveFileRef: fileIO.saveFileRef,
+    tryAutoSnapshot: fileIO.tryAutoSnapshot,
   });
 
   // --- Electron IPC bindings & browser event listeners --------------------
@@ -108,6 +117,7 @@ export function useTabManager(options?: {
     systemFileOpenHandlerRef,
     flushTabState: flushTabStateRef.current,
     flushLayoutState: options?.flushLayoutState,
+    tryAutoSnapshot: fileIO.tryAutoSnapshot,
   });
 
   // --- File watch integration (external change detection) -----------------
@@ -122,6 +132,7 @@ export function useTabManager(options?: {
     isProjectRef: tabState.isProjectRef,
     isElectron: tabState.isElectron,
     openDiffTab: tabState.openDiffTab,
+    onEditorRemountNeeded: options?.onEditorRemountNeeded,
   });
 
   // --- Tab persistence (save/restore to AppState) -------------------------
@@ -137,6 +148,7 @@ export function useTabManager(options?: {
     isElectron: tabState.isElectron,
     skipAutoRestore,
     vfsReadyPromise: options?.vfsReadyPromise,
+    windowKey: options?.windowKey,
   });
 
   // Update the ref so useElectronMenuBindings can access flushTabState

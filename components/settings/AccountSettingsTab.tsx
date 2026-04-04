@@ -2,6 +2,14 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 
+function openExternal(url: string): void {
+  if (window.electronAPI?.openExternal) {
+    void window.electronAPI.openExternal(url);
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
 function UserInitials({ name }: { name: string }) {
   const initials = name
     .split(/\s+/)
@@ -84,13 +92,22 @@ export default function AccountSettingsTab() {
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => void logout()}
-        className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground-secondary transition-colors hover:bg-hover hover:text-foreground"
-      >
-        ログアウト
-      </button>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => openExternal("https://my.illusions.app/")}
+          className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+        >
+          アカウントを管理
+        </button>
+        <button
+          type="button"
+          onClick={() => void logout()}
+          className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground-secondary transition-colors hover:bg-hover hover:text-foreground"
+        >
+          ログアウト
+        </button>
+      </div>
     </div>
   );
 }

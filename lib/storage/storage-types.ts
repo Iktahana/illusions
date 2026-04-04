@@ -92,7 +92,7 @@ export interface AppState {
   characterExtractionBatchSize?: number;
   characterExtractionConcurrency?: number;
 
-  // Persisted character data
+  // Persisted character data (legacy: shared across all projects)
   characters?: Array<{
     id: string;
     name: string;
@@ -102,6 +102,22 @@ export interface AppState {
     personality: string;
     relationships: string;
   }>;
+
+  // Per-project character data keyed by project ID.
+  // Falls back to `characters` for migration.
+  // "__standalone__" is used when no project is open.
+  charactersByProject?: Record<
+    string,
+    Array<{
+      id: string;
+      name: string;
+      aliases: string[];
+      description: string;
+      appearance: string;
+      personality: string;
+      relationships: string;
+    }>
+  >;
 
   // 校正モード設定
   correctionMode?: CorrectionModeId;
@@ -116,7 +132,7 @@ export interface AppState {
     llmEnabled?: boolean;
   } | null;
 
-  // 朗読（TTS）設定
+  // 読み上げ（TTS）設定
   speechVoiceURI?: string;
   speechRate?: number;
   speechPitch?: number;
@@ -178,6 +194,22 @@ export interface StorageSession {
   appState: AppState;
   recentFiles: RecentFile[];
   editorBuffer: EditorBuffer | null;
+}
+
+/**
+ * Per-window state scoped by a stable window key (e.g. project root path).
+ * Stored separately from the global AppState so that multiple windows
+ * with different projects do not overwrite each other's tab / layout state.
+ *
+ * ウィンドウごとのタブ・レイアウト状態。
+ * プロジェクトルートパスなどの安定したキーでスコープされ、
+ * マルチウィンドウ環境で各ウィンドウが互いの状態を上書きしないようにする。
+ */
+export interface WindowState {
+  /** Persisted tab set for this window. */
+  openTabs?: TabPersistenceState;
+  /** Persisted dockview split-pane layout for this window. */
+  dockviewLayout?: DockviewLayoutState;
 }
 
 /**
@@ -247,18 +279,22 @@ export interface IStorageService {
 
   /**
    * エディタバッファ（未保存下書き）を保存する。
+   * @param buffer - 保存するバッファデータ
+   * @param fileKey - ファイルを識別するキー（省略時は "editor_buffer"）。Web 環境でのタブ間衝突を防ぐために使用する。
    */
-  saveEditorBuffer(buffer: EditorBuffer): Promise<void>;
+  saveEditorBuffer(buffer: EditorBuffer, fileKey?: string): Promise<void>;
 
   /**
    * エディタバッファを読み込む。
+   * @param fileKey - ファイルを識別するキー（省略時は "editor_buffer"）。saveEditorBuffer と同じ値を渡す。
    */
-  loadEditorBuffer(): Promise<EditorBuffer | null>;
+  loadEditorBuffer(fileKey?: string): Promise<EditorBuffer | null>;
 
   /**
    * エディタバッファを削除する。
+   * @param fileKey - ファイルを識別するキー（省略時は "editor_buffer"）。saveEditorBuffer と同じ値を渡す。
    */
-  clearEditorBuffer(): Promise<void>;
+  clearEditorBuffer(fileKey?: string): Promise<void>;
 
   /**
    * Add a project to the recent projects list.

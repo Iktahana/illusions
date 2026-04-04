@@ -19,8 +19,12 @@ import {
   calculateCharacterUsageRates,
   calculateAveragePunctuationSpacing,
   calculateReadabilityScore,
+  analyzeReadability,
+  enrichReadabilityWithMorphology,
   getChaptersFromDOM,
 } from "@/lib/utils";
+
+import type { EnhancedReadabilityAnalysis } from "@/lib/utils";
 
 import type { CharacterTypeAnalysis } from "@/lib/utils";
 
@@ -866,5 +870,189 @@ describe("getChaptersFromDOM", () => {
 
     // Cleanup
     document.body.removeChild(container);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// analyzeReadability
+// ---------------------------------------------------------------------------
+describe("analyzeReadability", () => {
+  it("should return score in 0-100 range with all subScores", () => {
+    const result = analyzeReadability("吾輩は猫である。名前はまだない。");
+    expect(result.score).toBeGreaterThanOrEqual(0);
+    expect(result.score).toBeLessThanOrEqual(100);
+    expect(result.subScores.sentenceLoad).toBeGreaterThanOrEqual(0);
+    expect(result.subScores.vocabulary).toBeGreaterThanOrEqual(0);
+    expect(result.subScores.syntaxComplexity).toBeGreaterThanOrEqual(0);
+    expect(result.subScores.paragraphDensity).toBeGreaterThanOrEqual(0);
+  });
+
+  it("should set hasMorphologicalAnalysis to false for surface analysis", () => {
+    const result = analyzeReadability("テストです。");
+    expect(result.hasMorphologicalAnalysis).toBe(false);
+  });
+
+  it("should penalize dense kanji runs in vocabulary sub-score", () => {
+    // 6字以上の漢字連続列を複数含む文章 → vocabulary 減点
+    const dense = "行政機関職員配置基準策定委員会規程改正案審議結果についての報告書。";
+    const plain = "彼は昨日、東京に行った。天気はよかった。";
+    const denseResult = analyzeReadability(dense);
+    const plainResult = analyzeReadability(plain);
+    expect(denseResult.subScores.vocabulary).toBeLessThan(plainResult.subScores.vocabulary);
+  });
+
+  it("should penalize high conjunction rate in syntaxComplexity sub-score", () => {
+    // 接続詞で始まる文が連続する文章
+    const conjunctive =
+      "しかし状況は変わった。ただし完全にではない。それにもかかわらず前進は続いた。なぜなら目標があったからだ。したがって撤退はなかった。";
+    const normal = "春の風が吹く。桜が咲いた。花見に行く。楽しい日だ。";
+    const conjResult = analyzeReadability(conjunctive);
+    const normalResult = analyzeReadability(normal);
+    expect(conjResult.subScores.syntaxComplexity).toBeLessThan(
+      normalResult.subScores.syntaxComplexity,
+    );
+  });
+
+  it("should penalize deeply nested brackets in syntaxComplexity sub-score", () => {
+    // 括弧ネスト深さ3
+    const nested =
+      "彼（当時32歳、東京（大田区）在住、元エンジニア（ソフトウェア開発部門））は昨年退職した。";
+    const plain = "彼は昨年退職した。";
+    const nestedResult = analyzeReadability(nested);
+    const plainResult = analyzeReadability(plain);
+    expect(nestedResult.subScores.syntaxComplexity).toBeLessThan(
+      plainResult.subScores.syntaxComplexity,
+    );
+  });
+
+  it("should strip Markdown syntax before scoring (bug fix)", () => {
+    const withMarkdown = "# 見出し\n\n**太字**の文章です。[リンク](http://example.com)もある。";
+    const plain = "見出し\n\n太字の文章です。リンクもある。";
+    const mdResult = analyzeReadability(withMarkdown);
+    const plainResult = analyzeReadability(plain);
+    // Markdown記法が漢字率等に混入しないため、スコアが近い値になる
+    expect(Math.abs(mdResult.score - plainResult.score)).toBeLessThan(15);
+  });
+
+  it("should score plain easy text higher than specialist-heavy text", () => {
+    // 設計書テスト例: 平明な量子力学解説 vs 霞ヶ関文体
+    const easy =
+      "電子は観測するまで、どこにあるかが決まっていない。波のように広がっているが、測った瞬間に一点に決まる。これを重ね合わせと呼ぶ。";
+    const hard =
+      "本事業実施主体選定基準策定委員会規程改正案審議結果についての報告書提出期限延長申請書記載要領説明会実施要領。";
+    const easyResult = analyzeReadability(easy);
+    const hardResult = analyzeReadability(hard);
+    expect(easyResult.score).toBeGreaterThan(hardResult.score);
+  });
+
+  it("should handle empty string without throwing", () => {
+    const result = analyzeReadability("");
+    expect(result.score).toBeGreaterThanOrEqual(0);
+    expect(result.score).toBeLessThanOrEqual(100);
+    expect(result.avgSentenceLength).toBe(0);
+  });
+
+  it("backward compat: calculateReadabilityScore returns same score as analyzeReadability", () => {
+    const text = "吾輩は猫である。名前はまだない。どこで生まれたかとんと見当がつかぬ。";
+    const enhanced = analyzeReadability(text);
+    const legacy = calculateReadabilityScore(text);
+    expect(legacy.score).toBe(enhanced.score);
+    expect(legacy.level).toBe(enhanced.level);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// enrichReadabilityWithMorphology
+// ---------------------------------------------------------------------------
+describe("enrichReadabilityWithMorphology", () => {
+  /** 最小限の Token オブジェクトを生成するヘルパー */
+  function makeToken(
+    surface: string,
+    pos: string,
+    opts: {
+      pos_detail_1?: string;
+      basic_form?: string;
+    } = {},
+  ) {
+    return {
+      surface,
+      pos,
+      pos_detail_1: opts.pos_detail_1,
+      basic_form: opts.basic_form ?? surface,
+      start: 0,
+      end: surface.length,
+    };
+  }
+
+  let base: EnhancedReadabilityAnalysis;
+
+  beforeEach(() => {
+    base = analyzeReadability(
+      "吾輩は猫である。名前はまだない。どこで生まれたかとんと見当がつかぬ。",
+    );
+  });
+
+  it("should set hasMorphologicalAnalysis to true", () => {
+    const result = enrichReadabilityWithMorphology(base, []);
+    expect(result.hasMorphologicalAnalysis).toBe(true);
+  });
+
+  it("should return base values when token array is empty", () => {
+    const result = enrichReadabilityWithMorphology(base, []);
+    expect(result.score).toBe(base.score);
+    expect(result.subScores.sentenceLoad).toBe(base.subScores.sentenceLoad);
+  });
+
+  it("should penalize many consecutive noun tokens (名詞連接)", () => {
+    // 連続する名詞 token を5個生成
+    const nounChain = [
+      makeToken("行政", "名詞", { pos_detail_1: "一般" }),
+      makeToken("機関", "名詞", { pos_detail_1: "一般" }),
+      makeToken("職員", "名詞", { pos_detail_1: "一般" }),
+      makeToken("配置", "名詞", { pos_detail_1: "サ変接続" }),
+      makeToken("基準", "名詞", { pos_detail_1: "一般" }),
+      makeToken("策定", "名詞", { pos_detail_1: "サ変接続" }),
+      makeToken("は", "助詞"),
+    ];
+    const result = enrichReadabilityWithMorphology(base, nounChain);
+    expect(result.subScores.vocabulary).toBeLessThanOrEqual(base.subScores.vocabulary);
+  });
+
+  it("should penalize many passive verb forms (受け身)", () => {
+    // 受け身動詞を多数生成（表層形が〜れる/〜られる）
+    const passiveTokens = [
+      makeToken("見られる", "動詞", { basic_form: "見る" }),
+      makeToken("言われる", "動詞", { basic_form: "言う" }),
+      makeToken("使われる", "動詞", { basic_form: "使う" }),
+      makeToken("決められる", "動詞", { basic_form: "決める" }),
+      makeToken("行く", "動詞", { basic_form: "行く" }), // 非受け身1件
+    ];
+    const result = enrichReadabilityWithMorphology(base, passiveTokens);
+    // 受け身率80%なのでsyntaxComplexityが下がるはず
+    expect(result.subScores.syntaxComplexity).toBeLessThanOrEqual(base.subScores.syntaxComplexity);
+  });
+
+  it("should set properNounRate when proper noun tokens are present", () => {
+    const tokens = [
+      makeToken("東京", "名詞", { pos_detail_1: "固有名詞" }),
+      makeToken("大阪", "名詞", { pos_detail_1: "固有名詞" }),
+      makeToken("日本", "名詞", { pos_detail_1: "固有名詞" }),
+      makeToken("は", "助詞"),
+    ];
+    const result = enrichReadabilityWithMorphology(base, tokens);
+    expect(result.detail.vocabulary.properNounRate).toBeDefined();
+    expect(result.detail.vocabulary.properNounRate).toBeGreaterThan(0);
+  });
+
+  it("should compute TTR from content words", () => {
+    const tokens = [
+      makeToken("猫", "名詞", { basic_form: "猫" }),
+      makeToken("猫", "名詞", { basic_form: "猫" }), // 重複
+      makeToken("走る", "動詞", { basic_form: "走る" }),
+      makeToken("速い", "形容詞", { basic_form: "速い" }),
+    ];
+    const result = enrichReadabilityWithMorphology(base, tokens);
+    // unique=3, total=4 → ttr=0.75
+    expect(result.detail.vocabulary.ttr).toBeCloseTo(0.75, 1);
   });
 });

@@ -161,6 +161,18 @@ const HIRAGANA_TO_KANJI: ReadonlyArray<[string, string]> = [
   ["わずか", "僅か"],
 ];
 
+/**
+ * Known compound words that start with a HIRAGANA_TO_KANJI entry but form a
+ * different word. Used to suppress false positives in substring matching.
+ *
+ * Add new entries here when a HIRAGANA_TO_KANJI word is a prefix of a
+ * compound that should not be converted (e.g. もっとも vs もっともらしい).
+ */
+const KANJI_EXCLUSION_PATTERNS: ReadonlyMap<string, RegExp> = new Map([
+  ["もっとも", /もっともらし/],
+  ["すべて", /すべからく/],
+]);
+
 // ============================================================================
 // Implemented rule classes (21 rules)
 // ============================================================================
@@ -516,8 +528,14 @@ class JtfKanjiRule extends AbstractL1Rule {
 
     for (const [hiragana, kanji] of HIRAGANA_TO_KANJI) {
       const pattern = new RegExp(hiragana, "g");
+      const exclusion = KANJI_EXCLUSION_PATTERNS.get(hiragana);
       let m: RegExpExecArray | null;
       while ((m = pattern.exec(text)) !== null) {
+        // Skip if this match is part of a known compound word
+        if (exclusion) {
+          const slice = text.slice(m.index);
+          if (exclusion.test(slice)) continue;
+        }
         issues.push({
           ruleId: this.id,
           severity: config.severity,

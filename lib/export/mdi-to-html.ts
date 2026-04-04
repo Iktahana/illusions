@@ -37,20 +37,26 @@ function isValidKernAmount(amount: string): boolean {
  * Build ruby HTML from base text and ruby text.
  * If ruby contains dots, split into per-character ruby pairs.
  * Otherwise, wrap the entire base with a single ruby annotation.
+ *
+ * base and ruby are HTML-escaped to prevent injection from user content.
  */
 function buildRubyHtml(base: string, ruby: string): string {
   const rubyParts = ruby.split(".");
+  const baseChars = [...base];
 
-  if (rubyParts.length > 1 && rubyParts.length === [...base].length) {
+  if (rubyParts.length > 1 && rubyParts.length === baseChars.length) {
     // Split ruby: each dot-separated segment corresponds to one character
-    const baseChars = [...base];
     return (
-      "<ruby>" + baseChars.map((char, i) => `${char}<rt>${rubyParts[i]}</rt>`).join("") + "</ruby>"
+      "<ruby>" +
+      baseChars
+        .map((char, i) => `${escapeHtml(char)}<rt>${escapeHtml(rubyParts[i])}</rt>`)
+        .join("") +
+      "</ruby>"
     );
   }
 
   // Group ruby: wrap entire base text
-  return `<ruby>${base}<rt>${ruby}</rt></ruby>`;
+  return `<ruby>${escapeHtml(base)}<rt>${escapeHtml(ruby)}</rt></ruby>`;
 }
 
 /** Result of MDI syntax pre-processing before markdown-it rendering */
@@ -102,21 +108,24 @@ function preProcessMdiSyntax(markdown: string): MdiPreProcessResult {
 
   // 3. Tate-chu-yoko: ^text^
   result = result.replace(MDI_TCY_RE, (_match, text: string) =>
-    addPlaceholder(`<span class="mdi-tcy">${text}</span>`),
+    addPlaceholder(`<span class="mdi-tcy">${escapeHtml(text)}</span>`),
   );
 
   // 4. No-break: [[no-break:text]]
   result = result.replace(MDI_NOBR_RE, (_match, text: string) =>
-    addPlaceholder(`<span class="mdi-nobr">${text}</span>`),
+    addPlaceholder(`<span class="mdi-nobr">${escapeHtml(text)}</span>`),
   );
 
   // 5. Kerning: [[kern:amount:text]]
+  // amount is validated against MDI_KERN_AMOUNT_RE (digits, dots, +/-, em only) before use.
   result = result.replace(MDI_KERN_RE, (_match, amount: string, text: string) => {
     if (!isValidKernAmount(amount)) {
       // Invalid kern amount: return the original text unmodified
       return _match;
     }
-    return addPlaceholder(`<span class="mdi-kern" style="--mdi-kern:${amount};">${text}</span>`);
+    return addPlaceholder(
+      `<span class="mdi-kern" style="--mdi-kern:${amount};">${escapeHtml(text)}</span>`,
+    );
   });
 
   return { text: result, placeholders };
@@ -152,13 +161,27 @@ function createMarkdownIt(): MarkdownIt {
   });
 }
 
+/** Options for PDF typesetting CSS generation */
+export interface MdiStylesheetOptions {
+  verticalWriting?: boolean;
+  fontFamily?: string;
+  /** Font size in mm (calculated from page size, margins, and chars per line) */
+  fontSizeMm?: number;
+  /** Line height ratio (calculated from lines per page) */
+  lineHeightRatio?: number;
+  /** First-line indent in em units */
+  textIndentEm?: number;
+  /** Page margins in mm */
+  margins?: { top: number; bottom: number; left: number; right: number };
+}
+
 /**
  * Get CSS styles for MDI elements.
  *
- * @param options.verticalWriting - Include vertical writing mode styles
- * @returns CSS stylesheet string
+ * When typesetting options (fontSizeMm, lineHeightRatio, etc.) are provided,
+ * generates layout CSS for PDF export. Otherwise returns base MDI styles only.
  */
-export function getMdiStylesheet(options?: { verticalWriting?: boolean }): string {
+export function getMdiStylesheet(options?: MdiStylesheetOptions): string {
   const rules: string[] = [
     ".mdi-tcy { text-combine-upright: all; }",
     ".mdi-nobr { white-space: nowrap; word-break: keep-all; }",
@@ -166,8 +189,39 @@ export function getMdiStylesheet(options?: { verticalWriting?: boolean }): strin
     "ruby rt { font-size: 0.5em; }",
   ];
 
+  // Body styles for typesetting
+  const bodyDecls: string[] = [];
+  const hasTypesetting = options?.fontSizeMm != null || options?.lineHeightRatio != null;
+
   if (options?.verticalWriting) {
-    rules.push("body { writing-mode: vertical-rl; text-orientation: mixed; }");
+    bodyDecls.push("writing-mode: vertical-rl", "text-orientation: mixed");
+  }
+  if (options?.fontFamily) {
+    bodyDecls.push(`font-family: ${sanitizeFontFamily(options.fontFamily)}`);
+  }
+  if (options?.fontSizeMm != null) {
+    bodyDecls.push(`font-size: ${options.fontSizeMm.toFixed(2)}mm`);
+  }
+  if (options?.lineHeightRatio != null) {
+    bodyDecls.push(`line-height: ${options.lineHeightRatio.toFixed(3)}`);
+  }
+  if (hasTypesetting) {
+    bodyDecls.push("margin: 0", "padding: 0");
+  }
+
+  if (bodyDecls.length > 0) {
+    rules.push(`body { ${bodyDecls.join("; ")}; }`);
+  }
+
+  // Paragraph indent
+  if (options?.textIndentEm != null && options.textIndentEm > 0) {
+    rules.push(`p { text-indent: ${options.textIndentEm}em; }`);
+  }
+
+  // @page margins for printToPDF
+  if (options?.margins) {
+    const { top, bottom, left, right } = options.margins;
+    rules.push(`@page { margin: ${top}mm ${right}mm ${bottom}mm ${left}mm; }`);
   }
 
   return rules.join("\n");
@@ -180,6 +234,7 @@ export function getMdiStylesheet(options?: { verticalWriting?: boolean }): strin
  * @param options.metadata - Document metadata (title, author, etc.)
  * @param options.verticalWriting - Enable vertical writing mode
  * @param options.bodyOnly - If true, return only the inner HTML content without document wrapper
+ * @param options.typesetting - PDF typesetting options forwarded to getMdiStylesheet()
  * @returns Complete HTML document string, or body content if bodyOnly is true
  */
 export function mdiToHtml(
@@ -188,6 +243,7 @@ export function mdiToHtml(
     metadata?: ExportMetadata;
     verticalWriting?: boolean;
     bodyOnly?: boolean;
+    typesetting?: Omit<MdiStylesheetOptions, "verticalWriting">;
   },
 ): string {
   const md = createMarkdownIt();
@@ -206,6 +262,7 @@ export function mdiToHtml(
   const title = options?.metadata?.title ?? "";
   const stylesheet = getMdiStylesheet({
     verticalWriting: options?.verticalWriting,
+    ...options?.typesetting,
   });
 
   // Build <meta> tags for optional metadata
@@ -297,6 +354,24 @@ export function splitIntoChapters(markdown: string): Chapter[] {
   }
 
   return chapters;
+}
+
+/** Known safe font-family values. Used to validate user-selected fonts. */
+const ALLOWED_FONT_FAMILIES = new Set([
+  "serif",
+  "sans-serif",
+  '"游明朝", "Yu Mincho", serif',
+  '"ヒラギノ明朝 ProN", "Hiragino Mincho ProN", serif',
+  '"Noto Serif JP", serif',
+  '"游ゴシック", "Yu Gothic", sans-serif',
+]);
+
+/**
+ * Sanitize a font-family CSS value.
+ * Returns the value only if it matches a known safe font, otherwise falls back to "serif".
+ */
+function sanitizeFontFamily(value: string): string {
+  return ALLOWED_FONT_FAMILIES.has(value) ? value : "serif";
 }
 
 /**

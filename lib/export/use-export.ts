@@ -4,7 +4,7 @@ import { useCallback, useEffect } from "react";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { mdiToPlainText, mdiToRubyText } from "./txt-exporter";
-import type { ExportFormat } from "./types";
+import type { ExportFormat, ExportMetadata } from "./types";
 
 interface UseExportParams {
   /** Returns the current editor content as markdown */
@@ -14,13 +14,45 @@ interface UseExportParams {
   /** Returns true when the active tab is an editor tab.
    *  Export operations no-op when false (e.g. terminal or diff tab is active). */
   getIsEditorTabActive: () => boolean;
+  /**
+   * When provided, PDF export opens a settings dialog instead of exporting directly.
+   * The callback receives the content and metadata so the parent can show the dialog
+   * and later call the IPC with user-configured options.
+   */
+  onPdfExportRequest?: (content: string, metadata: ExportMetadata) => void;
 }
 
 /**
- * Save text content to a file via browser download or File System Access API.
+ * Save text content to a file.
+ *
+ * In Electron, uses the native save dialog via the existing `saveFile` IPC
+ * channel (filePath = null triggers dialog.showSaveDialog in the main process).
+ * This avoids the user-gesture requirement of showSaveFilePicker, which causes
+ * a DOMException when the export is triggered from the application menu over IPC.
+ *
+ * In web browsers, falls back to the File System Access API when available,
+ * and finally to a Blob URL download.
+ *
+ * @param text - UTF-8 text content to write
+ * @param suggestedName - Default file name shown in the save dialog
+ * @param isElectron - True when running inside Electron renderer
  */
-async function saveTxtFile(text: string, suggestedName: string): Promise<boolean> {
-  // Try File System Access API first (Chromium browsers + Electron)
+async function saveTxtFile(
+  text: string,
+  suggestedName: string,
+  isElectron: boolean,
+): Promise<boolean> {
+  // Electron: delegate to main-process IPC — works regardless of user gesture
+  if (isElectron && window.electronAPI) {
+    const result = await window.electronAPI.saveFile(null, text, ".txt");
+    if (result === null) return false; // User cancelled the dialog
+    if (typeof result === "object" && "success" in result && !result.success) {
+      throw new Error(result.error);
+    }
+    return true;
+  }
+
+  // Web: try File System Access API (Chromium browsers)
   if (hasShowSaveFilePicker(window)) {
     try {
       const handle = await window.showSaveFilePicker({
@@ -59,7 +91,12 @@ async function saveTxtFile(text: string, suggestedName: string): Promise<boolean
  * Hook that provides export functionality and registers Electron menu handlers.
  * Handles PDF, EPUB, DOCX, TXT export with progress notifications.
  */
-export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExportParams): {
+export function useExport({
+  getContent,
+  getTitle,
+  getIsEditorTabActive,
+  onPdfExportRequest,
+}: UseExportParams): {
   exportAs: (format: ExportFormat) => Promise<void>;
 } {
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
@@ -100,7 +137,7 @@ export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExp
           const suffix = format === "txt-ruby" ? "_ruby" : "";
           const suggestedName = `${baseName}${suffix}.txt`;
 
-          const saved = await saveTxtFile(converted, suggestedName);
+          const saved = await saveTxtFile(converted, suggestedName, isElectron);
           notificationManager.dismiss(progressId);
 
           if (saved) {
@@ -111,6 +148,12 @@ export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExp
           const message = error instanceof Error ? error.message : "Unknown error";
           notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
         }
+        return;
+      }
+
+      // PDF export: delegate to settings dialog when callback is provided
+      if (format === "pdf" && onPdfExportRequest && isElectronRenderer()) {
+        onPdfExportRequest(content, metadata);
         return;
       }
 
@@ -163,7 +206,7 @@ export function useExport({ getContent, getTitle, getIsEditorTabActive }: UseExp
         notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
       }
     },
-    [getContent, getTitle, getIsEditorTabActive, isElectron],
+    [getContent, getTitle, getIsEditorTabActive, isElectron, onPdfExportRequest],
   );
 
   // Register Electron menu event handlers

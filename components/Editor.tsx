@@ -4,24 +4,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Decoration } from "@milkdown/prose/view";
 import { MilkdownProvider } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
-import { getScrollProgress } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import clsx from "clsx";
 import type { EditorView } from "@milkdown/prose/view";
 import { useSpeech } from "@/lib/hooks/use-speech";
+import {
+  getScrollProgress,
+  setScrollProgress,
+} from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import SearchDialog, { type SearchMatch } from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
 import EditorToolbar from "./editor/EditorToolbar";
 import MilkdownEditor from "./editor/MilkdownEditor";
-import { scrollToSpeechTarget, cancelSpeechScroll } from "@/lib/editor-page/speech-auto-scroll";
 import { buildSegments, buildSpeechChunks, buildSpeechMap } from "@/lib/hooks/speech-utils";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { scrollToSpeechTarget, cancelSpeechScroll } from "@/lib/editor-page/speech-auto-scroll";
+import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { RuleRunner, LintIssue } from "@/lib/linting";
-import {
-  useTypographySettings,
-  useScrollSettings,
-  useSpeechSettings,
-} from "@/contexts/EditorSettingsContext";
+import { useTypographySettings, useSpeechSettings } from "@/contexts/EditorSettingsContext";
+import { useCharWidth, MEASURE_TEXT } from "@/lib/editor-page/use-char-width";
 
 interface EditorProps {
   initialContent?: string;
@@ -32,13 +32,13 @@ interface EditorProps {
   searchOpenTrigger?: number;
   searchInitialTerm?: string;
   onEditorViewReady?: (view: EditorView) => void;
-  /** Ref that external code sets to true before programmatic scrolling */
-  programmaticScrollRef?: React.MutableRefObject<boolean>;
   onShowAllSearchResults?: (matches: SearchMatch[], searchTerm: string) => void;
   // リンティング設定
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
   onNlpError?: (error: Error) => void;
+  // 音声設定を開くコールバック
+  onOpenSpeechSettings?: () => void;
   // 書式コールバック
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
@@ -51,6 +51,10 @@ interface EditorProps {
   // Editor mode controls
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
+  /** External content to apply to the editor (from file watcher). Best-effort scroll position preservation. */
+  externalContent?: string | null;
+  /** Called after externalContent has been applied and scroll restored (best-effort). */
+  onExternalContentApplied?: () => void;
 }
 
 export default function NovelEditor({
@@ -62,11 +66,11 @@ export default function NovelEditor({
   searchOpenTrigger = 0,
   searchInitialTerm,
   onEditorViewReady,
-  programmaticScrollRef,
   onShowAllSearchResults,
   lintingRuleRunner,
   onLintIssuesUpdated,
   onNlpError,
+  onOpenSpeechSettings,
   onOpenRubyDialog,
   onToggleTcy,
   onOpenDictionary,
@@ -74,6 +78,8 @@ export default function NovelEditor({
   onIgnoreCorrection,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
+  externalContent,
+  onExternalContentApplied,
 }: EditorProps) {
   const { fontScale, lineHeight, fontFamily, charsPerLine, autoCharsPerLine } =
     useTypographySettings();
@@ -102,7 +108,9 @@ export default function NovelEditor({
   });
   const editorViewRef = useRef<EditorView | null>(null);
   const speechMapRef = useRef<{ text: string; positions: number[] } | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isVerticalRef = useRef(false);
+  const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null);
   /** Doc position to resume TTS from after the current chunk ends. null = no continuation. */
   const speechContinuationPosRef = useRef<number | null>(null);
   /** Stable ref to startSpeechFromPos, allowing onEnd to recurse without circular deps. */
@@ -110,16 +118,21 @@ export default function NovelEditor({
   /** Max doc-position range processed per TTS chunk (~5 000 Japanese chars). */
   const MAX_SPEECH_CHUNK_RANGE = 10_000;
 
-  // Ref to indicate a mode switch is in progress (for scroll restoration)
-  const isModeSwitchingRef = useRef(false);
-
-  /** Cache for DOM character-width measurement (invalidated when font settings change) */
-  const charSizeCacheRef = useRef<{
-    fontFamily: string;
-    fontScale: number;
-    lineHeight: number;
-    size: number;
-  } | null>(null);
+  const { measureRef: autoCharMeasureRef, charWidth: autoCharWidth } = useCharWidth({
+    fontFamily,
+    fontScale,
+    lineHeight,
+    isVertical,
+  });
+  const selectionState = useSelectionTracking({
+    editorViewInstance,
+    scrollContainerRef,
+    onSelectionChange,
+  });
+  const handleScrollContainerRef = useCallback((node: HTMLDivElement | null) => {
+    scrollContainerRef.current = node;
+    setScrollContainerElement(node);
+  }, []);
 
   useEffect(() => {
     setIsMounted(true);
@@ -128,6 +141,10 @@ export default function NovelEditor({
   useEffect(() => {
     editorViewRef.current = editorViewInstance;
   }, [editorViewInstance]);
+
+  useEffect(() => {
+    isVerticalRef.current = isVertical;
+  }, [isVertical]);
 
   // 変更時に縦書き状態を localStorage に保存する
   useEffect(() => {
@@ -192,22 +209,27 @@ export default function NovelEditor({
             const to = (m.positions[chunk.highlightEnd - 1] ?? from) + 1;
             if (from == null) return;
             const deco = Decoration.inline(from, to, { class: "speech-reading" });
-            // Set programmatic scroll flag BEFORE dispatch so the scroll guard
-            // does not revert any browser scroll triggered by the DOM update.
-            if (programmaticScrollRef) {
-              programmaticScrollRef.current = true;
-            }
             v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
-            requestAnimationFrame(() => {
-              const target = v.dom.querySelector(".speech-reading") as HTMLElement | null;
-              const container = scrollContainerRef.current;
-              if (target && container) {
-                scrollToSpeechTarget({ container, target, isVertical, programmaticScrollRef });
-              } else if (programmaticScrollRef) {
-                // No scroll needed — clear flag
-                programmaticScrollRef.current = false;
+            // Auto-scroll to keep the highlighted word in view
+            const container = scrollContainerRef.current;
+            if (container) {
+              try {
+                const domResult = v.domAtPos(from);
+                const target =
+                  domResult.node instanceof HTMLElement
+                    ? domResult.node
+                    : domResult.node.parentElement;
+                if (target) {
+                  scrollToSpeechTarget({
+                    container,
+                    target,
+                    isVertical: isVerticalRef.current,
+                  });
+                }
+              } catch {
+                // domAtPos may throw if the position is out of range
               }
-            });
+            }
           },
           onEnd() {
             clearHighlight();
@@ -223,18 +245,13 @@ export default function NovelEditor({
         },
       );
     },
-    [
-      speakSegments,
-      stop,
-      clearHighlight,
-      isVertical,
-      programmaticScrollRef,
-      MAX_SPEECH_CHUNK_RANGE,
-    ],
+    [speakSegments, stop, clearHighlight, MAX_SPEECH_CHUNK_RANGE],
   );
 
   // Keep the ref in sync so onEnd can call startSpeechFromPos without a circular dep
-  startSpeechFromPosRef.current = startSpeechFromPos;
+  useEffect(() => {
+    startSpeechFromPosRef.current = startSpeechFromPos;
+  }, [startSpeechFromPos]);
 
   const startSpeechFromCursor = useCallback(() => {
     const view = editorViewRef.current;
@@ -258,7 +275,9 @@ export default function NovelEditor({
 
   // Restart speech from clicked position when clicking during playback
   const speechPlayingRef = useRef(false);
-  speechPlayingRef.current = speechState.isPlaying;
+  useEffect(() => {
+    speechPlayingRef.current = speechState.isPlaying;
+  }, [speechState.isPlaying]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -281,25 +300,46 @@ export default function NovelEditor({
     }
   }, [searchOpenTrigger, handleSearchOpen]);
 
-  // Save scroll progress (0-1) before mode switch
-  const savedScrollProgressRef = useRef<number>(0);
+  // Track whether initial vertical scroll has been performed for this pane instance.
+  const hasVerticalInitialScrollRef = useRef(false);
+  // Pending scroll progress to restore after layout reflow (mode switch).
+  const pendingScrollRestoreRef = useRef<number | null>(null);
 
-  // Save current scroll progress on mode switch
   const handleToggleVertical = useCallback(() => {
     const container = scrollContainerRef.current;
     if (container) {
-      // Get current progress via abstraction layer
-      const progress = getScrollProgress({ container, isVertical });
+      // Progress is already normalized: 0 = beginning, 1 = end regardless of mode.
+      pendingScrollRestoreRef.current = getScrollProgress({ container, isVertical });
+    }
+    hasVerticalInitialScrollRef.current = false;
+    setIsVertical((prev) => !prev);
+  }, [isVertical]);
 
-      // Save progress
-      savedScrollProgressRef.current = progress;
+  const handleLayoutReady = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-      // Mark that scroll position needs restoration after mode switch
-      isModeSwitchingRef.current = true;
+    // Mode switch: restore saved reading position
+    if (pendingScrollRestoreRef.current != null) {
+      const restored = setScrollProgress(
+        { container, isVertical },
+        pendingScrollRestoreRef.current,
+      );
+      if (restored) {
+        pendingScrollRestoreRef.current = null;
+        hasVerticalInitialScrollRef.current = true;
+      }
+      // If restore failed (no scrollbar yet), keep pending for next onLayoutReady
+      return;
     }
 
-    setIsVertical(!isVertical);
-  }, [isVertical, scrollContainerRef]);
+    // First entry to vertical mode: scroll to document start (right edge)
+    if (isVertical && !hasVerticalInitialScrollRef.current) {
+      if (setScrollProgress({ container, isVertical: true }, 0)) {
+        hasVerticalInitialScrollRef.current = true;
+      }
+    }
+  }, [isVertical]);
 
   // Per-pane local state for auto-calculated chars per line (avoids split panes overwriting each other)
   const [localAutoCharsPerLine, setLocalAutoCharsPerLine] = useState<number | null>(null);
@@ -313,9 +353,11 @@ export default function NovelEditor({
 
   // Refs to avoid including charsPerLine / callback in useCallback deps (prevents recalc loop)
   const charsPerLineRef = useRef(effectiveCharsPerLine);
-  charsPerLineRef.current = effectiveCharsPerLine;
+  useEffect(() => {
+    charsPerLineRef.current = effectiveCharsPerLine;
+  }, [effectiveCharsPerLine]);
 
-  // Calculate optimal chars per line based on editor width and font size
+  // Calculate optimal chars per line based on editor width and measured char width
   const calculateOptimalCharsPerLine = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -323,37 +365,8 @@ export default function NovelEditor({
     // Skip calculation when container is not visible (e.g., hidden dockview panel)
     if (container.clientWidth <= 0 || container.clientHeight <= 0) return;
 
-    // Use cached charSize when font settings are unchanged (avoids DOM element creation on every resize)
-    let charSize: number;
-    const cache = charSizeCacheRef.current;
-    if (
-      cache &&
-      cache.fontFamily === fontFamily &&
-      cache.fontScale === fontScale &&
-      cache.lineHeight === lineHeight
-    ) {
-      charSize = cache.size;
-    } else {
-      // Measure character width via a temporary DOM element
-      const measureEl = document.createElement("span");
-      measureEl.style.cssText = `
-        position: absolute;
-        visibility: hidden;
-        white-space: nowrap;
-        font-family: "${fontFamily}", serif;
-        font-size: ${fontScale}%;
-        line-height: ${lineHeight};
-      `;
-      measureEl.textContent = "国"; // Measure with full-width character
-      document.body.appendChild(measureEl);
-      charSize = measureEl.offsetWidth;
-      document.body.removeChild(measureEl);
-
-      // Cache the result for subsequent resize events with the same font settings
-      charSizeCacheRef.current = { fontFamily, fontScale, lineHeight, size: charSize };
-    }
-
-    if (charSize <= 0) return;
+    // charWidth is measured by the persistent hidden element (includes letter-spacing, palt, etc.)
+    if (autoCharWidth <= 0) return;
 
     // Get available space (subtract padding)
     const padding = 128; // 64px * 2 for left and right
@@ -365,7 +378,7 @@ export default function NovelEditor({
       const topPadding = 48; // pt-12 = 48px
       const availableHeight = container.clientHeight - topPadding;
 
-      const optimalChars = Math.max(10, Math.floor(availableHeight / charSize));
+      const optimalChars = Math.max(10, Math.floor(availableHeight / autoCharWidth));
       // Clamp: max 40 characters
       const clamped = Math.min(40, optimalChars);
 
@@ -374,7 +387,7 @@ export default function NovelEditor({
       }
     } else {
       // For horizontal writing: calculate based on available width
-      const optimalChars = Math.max(10, Math.floor(availableWidth / charSize));
+      const optimalChars = Math.max(10, Math.floor(availableWidth / autoCharWidth));
       // Clamp: max 40 characters
       const clamped = Math.min(40, optimalChars);
 
@@ -382,29 +395,30 @@ export default function NovelEditor({
         setLocalAutoCharsPerLine(clamped);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- charsPerLine & callback read via refs to break recalc loop
-  }, [fontFamily, fontScale, lineHeight, isVertical, scrollContainerRef]);
+  }, [autoCharWidth, isVertical, scrollContainerRef]);
 
-  // Add window resize listener to auto-adjust chars per line
+  // Use ResizeObserver on scroll container to auto-adjust chars per line.
+  // This catches both window resizes and Dockview split pane resizes.
   useEffect(() => {
     if (!autoCharsPerLine) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
     // Calculate on mount
     const timer = setTimeout(calculateOptimalCharsPerLine, 100);
 
-    // Debounce resize events to 300ms to avoid excessive recalculation during window drag
+    // Debounce resize observations to 300ms
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
-    const handleResize = () => {
+    const observer = new ResizeObserver(() => {
       if (resizeTimer !== null) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(calculateOptimalCharsPerLine, 300);
-    };
-
-    window.addEventListener("resize", handleResize);
+    });
+    observer.observe(container);
 
     return () => {
       clearTimeout(timer);
       if (resizeTimer !== null) clearTimeout(resizeTimer);
-      window.removeEventListener("resize", handleResize);
+      observer.disconnect();
     };
   }, [calculateOptimalCharsPerLine, autoCharsPerLine]);
 
@@ -417,15 +431,17 @@ export default function NovelEditor({
         onSearchClick={handleSearchToggle}
         speechState={speechState}
         onSpeakToggle={handleSpeakToggle}
+        onOpenSpeechSettings={onOpenSpeechSettings}
       />
 
       {/* エディタ領域 */}
       <div
-        ref={scrollContainerRef}
+        ref={handleScrollContainerRef}
         className="flex-1 bg-background-secondary relative min-h-0 pt-12"
         style={{
-          overflowX: "auto",
-          overflowY: "auto",
+          overflowX: isVertical ? "auto" : "hidden",
+          overflowY: isVertical ? "hidden" : "auto",
+          overscrollBehavior: "contain",
           // Disable browser scroll anchoring to prevent auto-scroll adjustment during DOM updates in vertical mode
           overflowAnchor: "none",
           // In vertical-rl, padding on child elements causes Chromium to miscalculate scrollWidth.
@@ -433,13 +449,32 @@ export default function NovelEditor({
           ...(isVertical ? { paddingLeft: 64, paddingRight: 64 } : {}),
         }}
       >
+        {/* Hidden character width measurement element for auto chars-per-line calculation */}
+        <span
+          ref={autoCharMeasureRef}
+          aria-hidden="true"
+          className={isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal"}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            visibility: "hidden",
+            pointerEvents: "none",
+            whiteSpace: "nowrap",
+            fontSize: `${fontScale}%`,
+            fontFamily: `"${fontFamily}", serif`,
+            lineHeight: lineHeight,
+          }}
+        >
+          {MEASURE_TEXT}
+        </span>
         <MilkdownProvider>
           <ProsemirrorAdapterProvider>
             <MilkdownEditor
               initialContent={initialContent}
               onChange={onChange}
               onInsertText={onInsertText}
-              onSelectionChange={onSelectionChange}
+              selectionState={selectionState}
               isVertical={isVertical}
               scrollContainerRef={scrollContainerRef}
               overrideCharsPerLine={effectiveCharsPerLine}
@@ -447,9 +482,6 @@ export default function NovelEditor({
                 setEditorViewInstance(view);
                 onEditorViewReady?.(view);
               }}
-              programmaticScrollRef={programmaticScrollRef}
-              isModeSwitchingRef={isModeSwitchingRef}
-              savedScrollProgressRef={savedScrollProgressRef}
               lintingRuleRunner={lintingRuleRunner}
               onLintIssuesUpdated={onLintIssuesUpdated}
               onNlpError={onNlpError}
@@ -462,15 +494,22 @@ export default function NovelEditor({
               gfmEnabled={gfmEnabled}
               onStartSpeech={startSpeechFromCursor}
               onFind={handleFind}
+              externalContent={externalContent}
+              onExternalContentApplied={onExternalContentApplied}
+              onLayoutReady={handleLayoutReady}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
-
-        {/* 選択文字数（エディタ基準で配置） */}
-        {editorViewInstance && (
-          <SelectionCounter editorView={editorViewInstance} isVertical={isVertical} />
-        )}
       </div>
+
+      {/* 選択文字数（エディタ外枠基準で配置） */}
+      {editorViewInstance && (
+        <SelectionCounter
+          selectionState={selectionState}
+          isVertical={isVertical}
+          containerElement={scrollContainerElement}
+        />
+      )}
 
       {/* 検索ダイアログ */}
       <SearchDialog
@@ -479,7 +518,6 @@ export default function NovelEditor({
         onClose={() => setIsSearchOpen(false)}
         onShowAllResults={onShowAllSearchResults}
         initialSearchTerm={contextMenuSearchTerm ?? searchInitialTerm}
-        programmaticScrollRef={programmaticScrollRef}
       />
     </div>
   );

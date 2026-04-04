@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { consumePendingAuth } from "@/lib/auth/web-auth";
+import { getPendingAuth, clearPendingAuth } from "@/lib/auth/web-auth";
 
 function AuthCallbackContent() {
   const searchParams = useSearchParams();
@@ -28,7 +28,7 @@ function AuthCallbackContent() {
       return;
     }
 
-    const pending = consumePendingAuth();
+    const pending = getPendingAuth();
     if (!pending || pending.state !== state) {
       queueMicrotask(() => setError("認証セッションが無効です。もう一度ログインしてください。"));
       return;
@@ -52,6 +52,7 @@ function AuthCallbackContent() {
           return;
         }
 
+        clearPendingAuth();
         window.location.href = "/";
       } catch {
         setError("ログイン処理中にエラーが発生しました。");

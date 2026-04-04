@@ -35,7 +35,7 @@ interface UseElectronEventsParams {
   handleOpenProject: () => Promise<void>;
 
   // Open recent project from menu
-  handleOpenRecentProject: (projectId: string) => Promise<void>;
+  handleOpenRecentProject: (projectId: string) => Promise<boolean>;
 
   // Open as project (double-clicked .mdi in project dir)
   handleOpenAsProject: (projectPath: string, initialFile: string) => Promise<void>;
@@ -228,7 +228,7 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
   useEffect(() => {
     if (!isElectron || typeof window === "undefined") return;
     const cleanup = window.electronAPI?.onMenuOpenRecentProject?.((projectId: string) => {
-      void confirmBeforeAction(() => handleOpenRecentProject(projectId));
+      void confirmBeforeAction(() => void handleOpenRecentProject(projectId));
     });
     return () => {
       cleanup?.();

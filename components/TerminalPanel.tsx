@@ -131,7 +131,7 @@ export default function TerminalPanel({
     // Create terminal instance with user settings
     const terminal = new XTerm({
       theme: buildXtermTheme(terminalAnsiColors, terminalBackground, terminalForeground),
-      fontFamily: terminalFontFamily,
+      fontFamily: `${terminalFontFamily}, "Noto Sans Mono CJK JP", "MS Gothic", "Menlo", monospace`,
       fontSize: terminalFontSize,
       lineHeight: terminalLineHeight,
       cursorStyle: terminalCursorStyle,
@@ -143,6 +143,16 @@ export default function TerminalPanel({
 
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
+
+    // Load Unicode11Addon when available so CJK width handling still works,
+    // but do not fail the entire editor page if the optional addon is absent.
+    try {
+      const { Unicode11Addon } = await import("@xterm/" + "addon-unicode11");
+      terminal.loadAddon(new Unicode11Addon());
+      terminal.unicode.activeVersion = "11";
+    } catch (error) {
+      console.warn("[TerminalPanel] Unicode11 addon unavailable:", error);
+    }
 
     // Open terminal in the container element
     terminal.open(containerRef.current);
@@ -164,27 +174,37 @@ export default function TerminalPanel({
     fitAddonRef.current = fitAddon;
 
     // --- Attach to PTY session ---
+    // Register the live data listener BEFORE calling attach() to prevent
+    // output loss during the gap between backlog retrieval and listener setup.
+    // Any data arriving while attach() is in-flight is captured immediately.
+    const unsubData = ptyApi.onData((payload) => {
+      if (payload.sessionId !== sessionId) return;
+      terminal.write(payload.data);
+    });
+    cleanupDataRef.current = unsubData;
+
     const attachResult = await ptyApi.attach(sessionId);
 
     if ("error" in attachResult) {
       setInitError(`セッションへの接続に失敗しました: ${attachResult.error}`);
+      unsubData();
+      cleanupDataRef.current = null;
       terminal.dispose();
       terminalRef.current = null;
       fitAddonRef.current = null;
       return;
     }
 
-    // Write buffered output from before attach
+    // Write buffered output first; live events registered above will follow.
     if (attachResult.outputBuffer) {
       terminal.write(attachResult.outputBuffer);
     }
 
-    // Subscribe to live PTY data events (filter by sessionId)
-    const unsubData = ptyApi.onData((payload) => {
-      if (payload.sessionId !== sessionId) return;
-      terminal.write(payload.data);
-    });
-    cleanupDataRef.current = unsubData;
+    // If the PTY already exited while the panel was unmounted, notify parent immediately
+    if (attachResult.status === "exited" || attachResult.status === "killed") {
+      onExit?.(attachResult.exitCode ?? 0);
+      return;
+    }
 
     // Subscribe to PTY exit events
     const unsubExit = ptyApi.onExit((payload) => {

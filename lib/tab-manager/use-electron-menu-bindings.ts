@@ -4,8 +4,9 @@ import { useEffect, useRef } from "react";
 import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
 import { suppressFileWatch } from "../services/file-watcher";
+import { notificationManager } from "../services/notification-manager";
 import type { SupportedFileExtension } from "../project/project-types";
-import type { TabId, TabState, EditorTabState } from "./tab-types";
+import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import { sanitizeMdiContent } from "./types";
 import type { TabManagerCore } from "./types";
@@ -35,6 +36,15 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
   flushTabState?: () => Promise<void>;
   /** Immediately flush pending dockview layout to storage. */
   flushLayoutState?: () => Promise<void>;
+  /**
+   * Attempt to create a history snapshot after saving (project mode only).
+   * Provided by useFileIO.
+   */
+  tryAutoSnapshot?: (
+    sourcePath: string,
+    displayName: string,
+    savedContent: string,
+  ) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,7 +62,6 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
 export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): void {
   const {
     tabs,
-    setTabs,
     tabsRef,
     activeTabIdRef,
     isProjectRef,
@@ -66,12 +75,15 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     systemFileOpenHandlerRef,
     flushTabState,
     flushLayoutState,
+    tryAutoSnapshot,
   } = params;
 
   // Stable refs for callbacks that change frequently
   const closeTabRef = useRef(closeTab);
+  // eslint-disable-next-line react-hooks/refs
   closeTabRef.current = closeTab;
   const newTabRef = useRef(newTab);
+  // eslint-disable-next-line react-hooks/refs
   newTabRef.current = newTab;
 
   // Dirty state → Electron title dot
@@ -83,9 +95,13 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
 
   // Stable refs for flush callbacks
   const flushTabStateRef = useRef(flushTabState);
+  // eslint-disable-next-line react-hooks/refs
   flushTabStateRef.current = flushTabState;
   const flushLayoutStateRef = useRef(flushLayoutState);
+  // eslint-disable-next-line react-hooks/refs
   flushLayoutStateRef.current = flushLayoutState;
+  const tryAutoSnapshotRef = useRef(tryAutoSnapshot);
+  tryAutoSnapshotRef.current = tryAutoSnapshot;
 
   // Save all dirty tabs before Electron window close
   useEffect(() => {
@@ -100,6 +116,14 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
       for (const tab of tabsRef.current) {
         if (!isEditorTab(tab)) continue;
         if (!tab.isDirty) continue;
+        // Block save if tab has unresolved external conflict
+        if (tab.fileSyncStatus === "conflicted") {
+          notificationManager.warning(
+            `「${tab.file?.name ?? "無題"}」のファイルが外部で変更されています。コンフリクトを解決してから保存してください。`,
+          );
+          anyFailed = true;
+          continue;
+        }
 
         const sanitized = sanitizeMdiContent(tab.content);
 
@@ -115,6 +139,17 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
             if (!result) {
               // User cancelled the Save As dialog — abort close
               anyFailed = true;
+            } else {
+              // Write the newly-assigned file descriptor back to the tab so that
+              // the subsequent flushTabState call persists the saved path.
+              updateTab(tab.id, {
+                file: result.descriptor,
+                isDirty: false,
+                lastSavedContent: sanitized,
+                lastSavedTime: Date.now(),
+              });
+              // Re-flush so the persisted session reflects the new file path.
+              await flushTabStateRef.current?.();
             }
           } catch (error) {
             console.error("名前を付けて保存に失敗しました:", error);
@@ -128,11 +163,17 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
             const vfs = getVFS();
             suppressFileWatch(tab.file.path);
             await vfs.writeFile(tab.file.path, sanitized);
+            await tryAutoSnapshotRef.current?.(tab.file.path, tab.file.name, sanitized);
           } else {
             await saveMdiFile({
               descriptor: tab.file,
               content: sanitized,
             });
+            await tryAutoSnapshotRef.current?.(
+              tab.file.path ?? tab.file.name,
+              tab.file.name,
+              sanitized,
+            );
           }
         } catch (error) {
           console.error(`保存に失敗しました (${tab.file.name}):`, error);
@@ -196,6 +237,10 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
               lastSavedContent: diskContent,
               isDirty: false,
               lastSavedTime: Date.now(),
+              // Signal the active Milkdown editor to reload with the new content.
+              // Background tabs will naturally use the updated content on remount;
+              // the active editor needs this field in its React key to force remount.
+              pendingExternalContent: diskContent,
             });
           }
         } catch {

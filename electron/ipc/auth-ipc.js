@@ -1,11 +1,12 @@
-const { ipcMain, shell, BrowserWindow } = require("electron");
+const { ipcMain, shell, BrowserWindow, app } = require("electron");
 const crypto = require("crypto");
 
 const PROVIDER_URL = "https://my.illusions.app";
 const OAUTH_CLIENT_ID = "illusions";
 const REDIRECT_URI = "illusions://auth/callback";
 
-let pendingAuth = null; // { state, codeVerifier }
+/** @type {Map<string, { codeVerifier: string, windowId: number }>} state → { codeVerifier, windowId } */
+const pendingAuthByState = new Map();
 
 function generateCodeVerifier() {
   return crypto.randomBytes(32).toString("base64url");
@@ -16,12 +17,14 @@ function generateCodeChallenge(verifier) {
 }
 
 function registerAuthHandlers() {
-  ipcMain.handle("auth:start-login", async () => {
+  ipcMain.handle("auth:start-login", async (event) => {
     const state = crypto.randomBytes(16).toString("hex");
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    pendingAuth = { state, codeVerifier };
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const windowId = win ? win.id : -1;
+    pendingAuthByState.set(state, { codeVerifier, windowId });
 
     const params = new URLSearchParams({
       response_type: "code",
@@ -39,11 +42,12 @@ function registerAuthHandlers() {
   });
 
   ipcMain.handle("auth:exchange-code", async (_event, { code, state }) => {
-    if (!pendingAuth || pendingAuth.state !== state) {
+    const entry = pendingAuthByState.get(state);
+    if (!entry) {
       throw new Error("Invalid state parameter");
     }
-    const { codeVerifier } = pendingAuth;
-    pendingAuth = null;
+    const { codeVerifier } = entry;
+    pendingAuthByState.delete(state);
 
     const response = await fetch(`${PROVIDER_URL}/api/oauth/token`, {
       method: "POST",
@@ -61,6 +65,7 @@ function registerAuthHandlers() {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.error_description || "Token exchange failed");
     }
+
     return response.json();
   });
 
@@ -77,7 +82,10 @@ function registerAuthHandlers() {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.error_description || "Token refresh failed");
+      const error = new Error(err.error_description || "Token refresh failed");
+      // Attach HTTP status so the renderer can distinguish permanent vs transient errors
+      error.status = response.status;
+      throw error;
     }
     return response.json();
   });
@@ -87,13 +95,32 @@ function registerAuthHandlers() {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
-    if (!response.ok) throw new Error("Failed to fetch user info");
+    if (!response.ok) {
+      const error = new Error("Failed to fetch user info");
+      // Attach HTTP status so the renderer can distinguish permanent vs transient errors
+      error.status = response.status;
+      throw error;
+    }
     return response.json();
   });
 
-  ipcMain.handle("auth:logout", async () => {
-    pendingAuth = null;
+  ipcMain.handle("auth:logout", async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+      const winId = win.id;
+      for (const [state, entry] of pendingAuthByState) {
+        if (entry.windowId === winId) pendingAuthByState.delete(state);
+      }
+    }
     return { success: true };
+  });
+
+  // Clean up pending auth entries when a window is closed
+  app.on("browser-window-close", (_, win) => {
+    const winId = win.id;
+    for (const [state, entry] of pendingAuthByState) {
+      if (entry.windowId === winId) pendingAuthByState.delete(state);
+    }
   });
 }
 
@@ -107,9 +134,24 @@ function handleAuthCallback(url) {
     const state = parsed.searchParams.get("state");
     const error = parsed.searchParams.get("error");
 
-    // Find the main window (first non-destroyed window)
-    const windows = BrowserWindow.getAllWindows();
-    const targetWindow = windows.find((w) => !w.isDestroyed());
+    let targetWindow = null;
+
+    // Route callback to the specific window that initiated the login flow
+    const entry = state ? pendingAuthByState.get(state) : null;
+    if (entry) {
+      const originWin = BrowserWindow.fromId(entry.windowId);
+      if (originWin && !originWin.isDestroyed()) {
+        targetWindow = originWin;
+      }
+    }
+
+    // Fall back to the focused window or first non-destroyed window
+    if (!targetWindow) {
+      targetWindow =
+        BrowserWindow.getFocusedWindow() ||
+        BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+    }
+
     if (targetWindow) {
       if (targetWindow.isMinimized()) targetWindow.restore();
       targetWindow.focus();

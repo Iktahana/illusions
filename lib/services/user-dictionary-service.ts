@@ -10,6 +10,7 @@
 
 import { getVFS } from "../vfs";
 import { getStorageService } from "../storage/storage-service";
+import { AsyncMutex } from "../utils/async-mutex";
 import type { VirtualFileSystem } from "../vfs/types";
 import type { IStorageService } from "../storage/storage-types";
 import type { UserDictionaryEntry, UserDictionaryFile } from "../project/project-types";
@@ -28,6 +29,8 @@ const STANDALONE_STORAGE_PREFIX = "illusions-user-dictionary:";
 class UserDictionaryService {
   private vfs: VirtualFileSystem;
   private storage: IStorageService;
+  /** Serializes all read-modify-write operations to prevent last-writer-wins data loss in multi-window scenarios. */
+  private readonly writeMutex = new AsyncMutex();
 
   constructor() {
     this.vfs = getVFS();
@@ -40,7 +43,8 @@ class UserDictionaryService {
 
   /**
    * Load user dictionary entries from .illusions/user-dictionary.json.
-   * Returns empty array if the file does not exist.
+   * Returns empty array if the file does not exist (ENOENT).
+   * Re-throws on JSON corruption or permission errors to prevent data loss.
    */
   async loadEntries(): Promise<UserDictionaryEntry[]> {
     try {
@@ -50,9 +54,11 @@ class UserDictionaryService {
       const raw = await fileHandle.read();
       const data: UserDictionaryFile = JSON.parse(raw);
       return data.entries ?? [];
-    } catch {
+    } catch (err) {
       // File doesn't exist yet — that's fine
-      return [];
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+      // JSON corruption or permission error — re-throw to prevent overwriting existing data
+      throw err;
     }
   }
 
@@ -73,39 +79,57 @@ class UserDictionaryService {
 
   /**
    * Add a new entry. Deduplicates by word.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async addEntry(entry: UserDictionaryEntry): Promise<UserDictionaryEntry[]> {
-    const entries = await this.loadEntries();
-    const exists = entries.some((e) => e.id === entry.id);
-    if (exists) return entries;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const entries = await this.loadEntries();
+      const exists = entries.some((e) => e.id === entry.id);
+      if (exists) return entries;
 
-    entries.push(entry);
-    entries.sort((a, b) => a.word.localeCompare(b.word));
-    await this.saveEntries(entries);
-    return entries;
+      entries.push(entry);
+      entries.sort((a, b) => a.word.localeCompare(b.word));
+      await this.saveEntries(entries);
+      return entries;
+    } finally {
+      releaseLock();
+    }
   }
 
   /**
    * Update an existing entry by id.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async updateEntry(
     id: string,
     updates: Partial<UserDictionaryEntry>,
   ): Promise<UserDictionaryEntry[]> {
-    const entries = await this.loadEntries();
-    const updated = entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
-    await this.saveEntries(updated);
-    return updated;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const entries = await this.loadEntries();
+      const updated = entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
+      await this.saveEntries(updated);
+      return updated;
+    } finally {
+      releaseLock();
+    }
   }
 
   /**
    * Remove an entry by id.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async removeEntry(id: string): Promise<UserDictionaryEntry[]> {
-    const entries = await this.loadEntries();
-    const filtered = entries.filter((e) => e.id !== id);
-    await this.saveEntries(filtered);
-    return filtered;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const entries = await this.loadEntries();
+      const filtered = entries.filter((e) => e.id !== id);
+      await this.saveEntries(filtered);
+      return filtered;
+    } finally {
+      releaseLock();
+    }
   }
 
   // -------------------------------------------------------------------
@@ -113,25 +137,42 @@ class UserDictionaryService {
   // -------------------------------------------------------------------
 
   /**
-   * Load user dictionary entries from StorageService for a specific file.
+   * Build a storage key from the full file path to avoid basename collisions.
+   * Normalizes path separators so keys are consistent across platforms.
    */
-  async loadEntriesStandalone(fileName: string): Promise<UserDictionaryEntry[]> {
+  private buildStandaloneKey(filePath: string): string {
+    // Normalize backslashes to forward slashes and strip leading slash
+    // so keys are deterministic regardless of platform separator.
+    const normalized = filePath.replace(/\\/g, "/").replace(/^\//, "");
+    return STANDALONE_STORAGE_PREFIX + normalized;
+  }
+
+  /**
+   * Load user dictionary entries from StorageService for a specific file.
+   * @param filePath - Full path to the file (used as storage key to avoid basename collisions).
+   * Returns empty array if no entry exists; re-throws on JSON corruption or storage errors.
+   */
+  async loadEntriesStandalone(filePath: string): Promise<UserDictionaryEntry[]> {
     try {
-      const key = STANDALONE_STORAGE_PREFIX + fileName;
+      const key = this.buildStandaloneKey(filePath);
       const raw = await this.storage.getItem(key);
       if (!raw) return [];
       const data: UserDictionaryFile = JSON.parse(raw);
       return data.entries ?? [];
-    } catch {
-      return [];
+    } catch (err) {
+      // No stored entry — that's fine
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+      // JSON corruption or storage error — re-throw to prevent overwriting existing data
+      throw err;
     }
   }
 
   /**
    * Save user dictionary entries to StorageService for a specific file.
+   * @param filePath - Full path to the file (used as storage key to avoid basename collisions).
    */
-  async saveEntriesStandalone(fileName: string, entries: UserDictionaryEntry[]): Promise<void> {
-    const key = STANDALONE_STORAGE_PREFIX + fileName;
+  async saveEntriesStandalone(filePath: string, entries: UserDictionaryEntry[]): Promise<void> {
+    const key = this.buildStandaloneKey(filePath);
     const data: UserDictionaryFile = {
       version: "1.0.0",
       entries,
@@ -141,43 +182,61 @@ class UserDictionaryService {
 
   /**
    * Add an entry in standalone mode.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async addEntryStandalone(
     fileName: string,
     entry: UserDictionaryEntry,
   ): Promise<UserDictionaryEntry[]> {
-    const entries = await this.loadEntriesStandalone(fileName);
-    const exists = entries.some((e) => e.id === entry.id);
-    if (exists) return entries;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const entries = await this.loadEntriesStandalone(fileName);
+      const exists = entries.some((e) => e.id === entry.id);
+      if (exists) return entries;
 
-    entries.push(entry);
-    entries.sort((a, b) => a.word.localeCompare(b.word));
-    await this.saveEntriesStandalone(fileName, entries);
-    return entries;
+      entries.push(entry);
+      entries.sort((a, b) => a.word.localeCompare(b.word));
+      await this.saveEntriesStandalone(fileName, entries);
+      return entries;
+    } finally {
+      releaseLock();
+    }
   }
 
   /**
    * Update an entry in standalone mode.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async updateEntryStandalone(
     fileName: string,
     id: string,
     updates: Partial<UserDictionaryEntry>,
   ): Promise<UserDictionaryEntry[]> {
-    const entries = await this.loadEntriesStandalone(fileName);
-    const updated = entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
-    await this.saveEntriesStandalone(fileName, updated);
-    return updated;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const entries = await this.loadEntriesStandalone(fileName);
+      const updated = entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
+      await this.saveEntriesStandalone(fileName, updated);
+      return updated;
+    } finally {
+      releaseLock();
+    }
   }
 
   /**
    * Remove an entry in standalone mode.
+   * Guarded by writeMutex to prevent concurrent read-modify-write races.
    */
   async removeEntryStandalone(fileName: string, id: string): Promise<UserDictionaryEntry[]> {
-    const entries = await this.loadEntriesStandalone(fileName);
-    const filtered = entries.filter((e) => e.id !== id);
-    await this.saveEntriesStandalone(fileName, filtered);
-    return filtered;
+    const releaseLock = await this.writeMutex.acquire();
+    try {
+      const entries = await this.loadEntriesStandalone(fileName);
+      const filtered = entries.filter((e) => e.id !== id);
+      await this.saveEntriesStandalone(fileName, filtered);
+      return filtered;
+    } finally {
+      releaseLock();
+    }
   }
 }
 

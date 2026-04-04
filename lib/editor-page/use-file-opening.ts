@@ -7,7 +7,7 @@ import { getVFS } from "@/lib/vfs";
 import { notificationManager } from "@/lib/services/notification-manager";
 
 import type { ProjectMode, StandaloneMode } from "@/lib/project/project-types";
-import { ensureProjectJson, readFileHandle } from "./project-file-utils";
+import { ensureProjectJson, readProjectJson, readFileHandle } from "./project-file-utils";
 
 interface UseFileOpeningParams {
   isElectron: boolean;
@@ -24,12 +24,16 @@ interface UseFileOpeningParams {
   loadProjectContent: (project: ProjectMode) => Promise<void>;
   /** Read project.json from a restored directory handle and enter project mode */
   openRestoredProject: (handle: FileSystemDirectoryHandle) => Promise<void>;
+  /** Load a file into the tab manager by path and content */
+  tabLoadSystemFile: (path: string, content: string) => void;
+  /** Increment editor key to force editor remount */
+  incrementEditorKey: () => void;
 }
 
 export interface UseFileOpeningResult {
   handleOpenProject: () => Promise<void>;
   handleOpenStandaloneFile: () => Promise<void>;
-  handleOpenRecentProject: (projectId: string) => Promise<void>;
+  handleOpenRecentProject: (projectId: string) => Promise<boolean>;
   handleOpenAsProject: (projectPath: string, initialFile: string) => Promise<void>;
 }
 
@@ -53,6 +57,8 @@ export function useFileOpening({
   signalVfsReady,
   loadProjectContent,
   openRestoredProject,
+  tabLoadSystemFile,
+  incrementEditorKey,
 }: UseFileOpeningParams): UseFileOpeningResult {
   const handleOpenProject = useCallback(async () => {
     try {
@@ -82,14 +88,22 @@ export function useFileOpening({
       const projectService = getProjectService();
       const standalone = await projectService.openStandaloneFile();
       setStandaloneMode(standalone);
+
+      // Load file content into the tab manager so the editor shows the file contents
+      const content = await projectService.readStandaloneContent(standalone);
+      const tabPath = standalone.filePath ?? standalone.fileName;
+      tabLoadSystemFile(tabPath, content);
+      incrementEditorKey();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
+      if (error instanceof Error && error.message.includes("キャンセル")) return;
       console.error("Failed to open file:", error);
+      notificationManager.error("ファイルを開けませんでした。");
     }
-  }, [setStandaloneMode]);
+  }, [setStandaloneMode, tabLoadSystemFile, incrementEditorKey]);
 
   const handleOpenRecentProject = useCallback(
-    async (projectId: string) => {
+    async (projectId: string): Promise<boolean> => {
       try {
         if (isElectron) {
           const storage = getStorageService();
@@ -99,7 +113,7 @@ export function useFileOpening({
             if (!isAutoRestoringRef.current) {
               notificationManager.error("このプロジェクトが見つかりませんでした。");
             }
-            return;
+            return false;
           }
 
           try {
@@ -111,7 +125,23 @@ export function useFileOpening({
             }
             signalVfsReady();
             const rootDirHandle = await vfs.getDirectoryHandle("");
-            const { metadata, illusionsDir } = await ensureProjectJson(rootDirHandle);
+            const projectJsonResult = await readProjectJson(rootDirHandle);
+            if (!projectJsonResult) {
+              signalVfsReady();
+              console.error(
+                "Failed to load recent project: .illusions/project.json not found at",
+                project.rootPath,
+              );
+              if (!isAutoRestoringRef.current) {
+                setConfirmRemoveRecent({
+                  projectId,
+                  message: `プロジェクトのメタデータが見つかりませんでした。\n\nパス: ${project.rootPath}\n\n最近のプロジェクト一覧から削除しますか?`,
+                });
+              }
+              return false;
+            }
+
+            const { metadata, illusionsDir } = projectJsonResult;
 
             let workspaceState: ProjectMode["workspaceState"];
             try {
@@ -144,6 +174,7 @@ export function useFileOpening({
             if (!isAutoRestoringRef.current || !isElectron) {
               await loadProjectContent(restoredProject);
             }
+            return true;
           } catch (error) {
             signalVfsReady();
             console.error("Failed to load project:", error);
@@ -166,14 +197,29 @@ export function useFileOpening({
                 notificationManager.error(message);
               }
             }
+            return false;
           }
-          return;
         }
 
         // Web: restore from IndexedDB project handles
         const { getProjectManager } = await import("@/lib/project/project-manager");
         const projectManager = getProjectManager();
         const restoreResult = await projectManager.restoreProjectHandle(projectId);
+
+        // #1049/#1057: needsPermission indicates the handle is valid but requires
+        // a user-gesture permission prompt (covers prompt-required and read-only states).
+        // Must be checked before the general failure guard below, because needsPermission
+        // results have success:false but should route to the permission UI, not an error.
+        if (restoreResult.needsPermission && restoreResult.handle) {
+          setPermissionPromptData({
+            projectName: projectId,
+            handle: restoreResult.handle,
+            projectId,
+          });
+          setShowPermissionPrompt(true);
+          // Permission prompt shown — outcome depends on user action, not a failure
+          return true;
+        }
 
         if (!restoreResult.success || !restoreResult.handle) {
           console.error("Failed to restore project handle:", restoreResult.error);
@@ -182,22 +228,14 @@ export function useFileOpening({
               "このプロジェクトを開けませんでした。「プロジェクトを開く」から再度選択してください。",
             );
           }
-          return;
-        }
-
-        if (restoreResult.permissionStatus.status === "prompt-required") {
-          setPermissionPromptData({
-            projectName: projectId,
-            handle: restoreResult.handle,
-            projectId,
-          });
-          setShowPermissionPrompt(true);
-          return;
+          return false;
         }
 
         await openRestoredProject(restoreResult.handle);
+        return true;
       } catch (error) {
         console.error("Failed to open recent project:", error);
+        return false;
       }
     },
     [

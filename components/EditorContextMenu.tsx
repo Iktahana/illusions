@@ -208,13 +208,13 @@ export default function EditorContextMenu({
             />
           )}
 
-          {/* 朗読: hide when speech feature is not available */}
+          {/* 読み上げ: hide when speech feature is not available */}
           {onStartSpeech != null && (
             <>
               <Separator />
               <MenuItem
                 icon={<Play className="w-4 h-4" />}
-                label="開始朗読"
+                label="読み上げ開始"
                 shortcut=""
                 onClick={() => onAction("start-speech")}
               />

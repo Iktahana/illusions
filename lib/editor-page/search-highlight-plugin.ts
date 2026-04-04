@@ -14,18 +14,18 @@ export const searchHighlightPlugin = new Plugin<SearchHighlightState>({
       return { decorations: DecorationSet.empty };
     },
     apply(tr, value) {
-      // 檢查是否有搜索裝飾的 meta
+      // 検索ハイライト用 meta を確認する
       const searchDecorations = tr.getMeta("searchDecorations");
 
       if (searchDecorations !== undefined) {
-        // 更新裝飾
+        // デコレーションを更新する
         if (searchDecorations.length === 0) {
           return { decorations: DecorationSet.empty };
         }
         return { decorations: DecorationSet.create(tr.doc, searchDecorations) };
       }
 
-      // 映射現有裝飾到新文檔
+      // 既存のデコレーションを新しいドキュメントにマッピングする
       return { decorations: value.decorations.map(tr.mapping, tr.doc) };
     },
   },

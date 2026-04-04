@@ -17,12 +17,13 @@
  * @property {SessionStatus} status         - Current lifecycle status
  * @property {number|null}   exitCode       - Exit code when status is 'exited'
  * @property {number}        createdAt      - Unix timestamp (ms)
- * @property {string[]}      outputBuffer   - Ring buffer of last OUTPUT_BUFFER_LINES lines
+ * @property {string}        outputBuffer   - Raw concatenated PTY output, capped at OUTPUT_BUFFER_BYTES
  */
 
 const MAX_SESSIONS_PER_WINDOW = 10;
 const MAX_SESSIONS_GLOBAL = 20;
-const OUTPUT_BUFFER_LINES = 1000;
+/** Maximum byte size of the raw output buffer retained per session (~200 KB). */
+const OUTPUT_BUFFER_BYTES = 200 * 1024;
 
 /** @type {Map<string, SessionEntry>} */
 const registry = new Map();
@@ -53,17 +54,19 @@ function countSessionsForWindow(webContentsId) {
 }
 
 /**
- * Append a line to the output ring buffer of a session.
- * Keeps at most OUTPUT_BUFFER_LINES lines.
+ * Append raw PTY data to the output buffer of a session.
+ * Trims the oldest bytes from the front when the buffer exceeds OUTPUT_BUFFER_BYTES.
+ * Trimming is done on byte boundaries to avoid injecting artificial newlines.
  * @param {SessionEntry} entry
- * @param {string} data - Raw PTY data chunk (may contain multiple lines)
+ * @param {string} data - Raw PTY data chunk
  */
 function appendToOutputBuffer(entry, data) {
-  // Split on newlines but preserve partial lines at the end
-  const lines = data.split("\n");
-  entry.outputBuffer.push(...lines);
-  if (entry.outputBuffer.length > OUTPUT_BUFFER_LINES) {
-    entry.outputBuffer.splice(0, entry.outputBuffer.length - OUTPUT_BUFFER_LINES);
+  entry.outputBuffer += data;
+  const byteLength = Buffer.byteLength(entry.outputBuffer, "utf8");
+  if (byteLength > OUTPUT_BUFFER_BYTES) {
+    // Trim from the front by converting to a Buffer and slicing excess bytes
+    const buf = Buffer.from(entry.outputBuffer, "utf8");
+    entry.outputBuffer = buf.slice(byteLength - OUTPUT_BUFFER_BYTES).toString("utf8");
   }
 }
 
@@ -88,7 +91,7 @@ function addSession({ ptyProcess, webContentsId, shell, cwd }) {
     status: "active",
     exitCode: null,
     createdAt: Date.now(),
-    outputBuffer: [],
+    outputBuffer: "",
   };
   registry.set(sessionId, entry);
   return entry;
@@ -155,7 +158,7 @@ function killAllSessions() {
 module.exports = {
   MAX_SESSIONS_PER_WINDOW,
   MAX_SESSIONS_GLOBAL,
-  OUTPUT_BUFFER_LINES,
+  OUTPUT_BUFFER_BYTES,
   registry,
   generateSessionId,
   countSessionsForWindow,

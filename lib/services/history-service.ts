@@ -7,6 +7,7 @@
 
 import { getVFS } from "../vfs";
 import { AsyncMutex } from "../utils/async-mutex";
+import { isElectronRenderer } from "../utils/runtime-env";
 
 import type { VirtualFileSystem, VFSDirectoryHandle } from "../vfs/types";
 
@@ -41,6 +42,9 @@ const HISTORY_INDEX_FILENAME = "index.json";
 /** Name of the bookmarks file */
 const BOOKMARKS_FILENAME = ".history_bookmarks.json";
 
+/** Lock key for the history index — shared across all windows in the same app instance */
+const HISTORY_INDEX_LOCK_KEY = "history-index";
+
 // -----------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------
@@ -59,8 +63,12 @@ export interface SnapshotEntry {
   timestamp: number;
   /** History file name (e.g. "main.mdi.[202602061430].history") */
   filename: string;
-  /** Source file that was snapshotted (e.g. "main.mdi") */
-  sourceFile: string;
+  /** Stable document identity within the project (prefer project-relative path). */
+  sourcePath: string;
+  /** Human-readable file name for UI display. */
+  displayName: string;
+  /** Legacy basename-only identity retained for backward compatibility reads. */
+  sourceFile?: string;
   /** Type of snapshot */
   type: SnapshotType;
   /** User-defined label (primarily for milestones) */
@@ -91,8 +99,10 @@ export interface HistoryIndex {
  * スナップショット作成時のオプション。
  */
 export interface CreateSnapshotOptions {
-  /** Source file name (e.g. "main.mdi") */
-  sourceFile: string;
+  /** Stable document identity within the project (prefer project-relative path). */
+  sourcePath: string;
+  /** Human-readable file name for UI display. */
+  displayName?: string;
   /** Content to snapshot */
   content: string;
   /** Snapshot type (defaults to "auto") */
@@ -119,8 +129,13 @@ export interface RestoreResult {
 // -----------------------------------------------------------------------
 
 /**
- * Format a timestamp as YYYYMMDDHHmm.
- * タイムスタンプを YYYYMMDDHHmm 形式に変換する。
+ * Format a timestamp as YYYYMMDDHHmmss_xxxx.
+ * The 4-digit random suffix prevents filename collisions when multiple
+ * snapshots are created within the same second.
+ *
+ * タイムスタンプを YYYYMMDDHHmmss_xxxx 形式に変換する。
+ * 4桁の乱数サフィックスにより、同一秒内の複数スナップショットでの
+ * ファイル名衝突を防ぐ。
  */
 function formatTimestamp(timestamp: number): string {
   const d = new Date(timestamp);
@@ -129,7 +144,11 @@ function formatTimestamp(timestamp: number): string {
   const day = String(d.getDate()).padStart(2, "0");
   const hours = String(d.getHours()).padStart(2, "0");
   const minutes = String(d.getMinutes()).padStart(2, "0");
-  return `${year}${month}${day}${hours}${minutes}`;
+  const seconds = String(d.getSeconds()).padStart(2, "0");
+  const rand = Math.floor(Math.random() * 10000)
+    .toString()
+    .padStart(4, "0");
+  return `${year}${month}${day}${hours}${minutes}${seconds}_${rand}`;
 }
 
 /**
@@ -161,6 +180,28 @@ function isAutoSnapshotFilename(filename: string): boolean {
   return filename.includes(".__auto__.");
 }
 
+function getSnapshotSourceKey(
+  snapshot: Partial<Pick<SnapshotEntry, "sourcePath" | "sourceFile">>,
+): string {
+  return snapshot.sourcePath || snapshot.sourceFile || "";
+}
+
+function getSnapshotDisplayName(
+  snapshot: Partial<Pick<SnapshotEntry, "displayName" | "sourcePath" | "sourceFile">>,
+): string {
+  if (snapshot.displayName) return snapshot.displayName;
+  const source = getSnapshotSourceKey(snapshot);
+  const normalized = source.replace(/\\/g, "/");
+  const lastSegment = normalized.split("/").pop();
+  return lastSegment || source;
+}
+
+function makeSnapshotStorageLabel(sourcePath: string, displayName: string): string {
+  const normalizedPath = sourcePath.replace(/\\/g, "/");
+  const pathLabel = normalizedPath.replace(/[\\/]/g, "__");
+  return pathLabel || displayName;
+}
+
 /**
  * Create a default (empty) history index.
  * デフォルトの空の履歴インデックスを作成する。
@@ -187,6 +228,26 @@ function createDefaultHistoryIndex(): HistoryIndex {
 export class HistoryService {
   private vfs: VirtualFileSystem;
   private readonly indexMutex = new AsyncMutex();
+  private readonly bookmarkMutex = new AsyncMutex();
+  private readonly snapshotListeners = new Set<() => void>();
+
+  /** Register a listener that fires whenever a snapshot is created. */
+  onSnapshotCreated(listener: () => void): () => void {
+    this.snapshotListeners.add(listener);
+    return () => {
+      this.snapshotListeners.delete(listener);
+    };
+  }
+
+  private notifySnapshotCreated(): void {
+    for (const listener of this.snapshotListeners) {
+      try {
+        listener();
+      } catch (err) {
+        console.error("Snapshot listener error / スナップショットリスナーエラー:", err);
+      }
+    }
+  }
 
   constructor() {
     this.vfs = getVFS();
@@ -203,13 +264,15 @@ export class HistoryService {
    * @returns The created SnapshotEntry
    */
   async createSnapshot(options: CreateSnapshotOptions): Promise<SnapshotEntry> {
-    const { sourceFile, content, type = "auto", label } = options;
+    const { sourcePath, displayName: displayNameOption, content, type = "auto", label } = options;
 
     try {
       const timestamp = Date.now();
       const formattedTime = formatTimestamp(timestamp);
       const autoMarker = type === "auto" ? ".__auto__" : "";
-      const filename = `${sourceFile}.[${formattedTime}]${autoMarker}.history`;
+      const displayName = displayNameOption ?? getSnapshotDisplayName({ sourcePath });
+      const storageLabel = makeSnapshotStorageLabel(sourcePath, displayName);
+      const filename = `${storageLabel}.[${formattedTime}]${autoMarker}.history`;
       const checksum = await calculateChecksum(content);
       const fileSize = calculateByteSize(content);
       const characterCount = content.length;
@@ -218,7 +281,8 @@ export class HistoryService {
         id: crypto.randomUUID(),
         timestamp,
         filename,
-        sourceFile,
+        sourcePath,
+        displayName,
         type,
         characterCount,
         fileSize,
@@ -238,20 +302,19 @@ export class HistoryService {
       });
       await snapshotFileHandle.write(content);
 
-      // Update the index (serialized via mutex to prevent TOCTOU race)
-      const releaseLock = await this.indexMutex.acquire();
-      try {
+      // Update the index (serialized via mutex + IPC lock to prevent TOCTOU race
+      // both within the same renderer and across multiple Electron windows)
+      await this.withIndexLock(async () => {
         const index = await this.readHistoryIndex();
         index.snapshots.unshift(entry);
         await this.writeHistoryIndex(index);
 
         // Auto-prune old snapshots (global and per-file, within same lock)
         await this.pruneOldSnapshotsUnsafe();
-        await this.pruneSnapshotsPerFileUnsafe(sourceFile);
-      } finally {
-        releaseLock();
-      }
+        await this.pruneSnapshotsPerFileUnsafe(sourcePath);
+      });
 
+      this.notifySnapshotCreated();
       return entry;
     } catch (error) {
       console.error("Failed to create snapshot / スナップショットの作成に失敗しました:", error);
@@ -323,12 +386,9 @@ export class HistoryService {
    * - retentionDays を超えるスナップショットを削除
    */
   async pruneOldSnapshots(): Promise<void> {
-    const releaseLock = await this.indexMutex.acquire();
-    try {
+    await this.withIndexLock(async () => {
       await this.pruneOldSnapshotsUnsafe();
-    } finally {
-      releaseLock();
-    }
+    });
   }
 
   /**
@@ -405,15 +465,12 @@ export class HistoryService {
    * 特定ソースファイルのスナップショットがファイルあたりの上限を超えた場合に削除する。
    * 削除対象は自動スナップショットのみ。マイルストーンと手動スナップショットは保持する。
    *
-   * @param sourceFile - The source file name to prune snapshots for
+   * @param sourcePath - The source file path to prune snapshots for
    */
-  async pruneSnapshotsPerFile(sourceFile: string): Promise<void> {
-    const releaseLock = await this.indexMutex.acquire();
-    try {
-      await this.pruneSnapshotsPerFileUnsafe(sourceFile);
-    } finally {
-      releaseLock();
-    }
+  async pruneSnapshotsPerFile(sourcePath: string): Promise<void> {
+    await this.withIndexLock(async () => {
+      await this.pruneSnapshotsPerFileUnsafe(sourcePath);
+    });
   }
 
   /**
@@ -423,14 +480,14 @@ export class HistoryService {
    * ロックを取得しないファイルごとの内部削減ロジック。
    * 呼び出し元は事前に indexMutex を保持していなければならない。
    *
-   * @param sourceFile - The source file name to prune snapshots for
+   * @param sourcePath - The source file path to prune snapshots for
    */
-  private async pruneSnapshotsPerFileUnsafe(sourceFile: string): Promise<void> {
+  private async pruneSnapshotsPerFileUnsafe(sourcePath: string): Promise<void> {
     try {
       const index = await this.readHistoryIndex();
 
       // Get all snapshots for this file
-      const fileSnapshots = index.snapshots.filter((s) => s.sourceFile === sourceFile);
+      const fileSnapshots = index.snapshots.filter((s) => getSnapshotSourceKey(s) === sourcePath);
 
       const autoCount = fileSnapshots.filter((s) => s.type === "auto").length;
       if (autoCount <= MAX_SNAPSHOTS_PER_FILE) {
@@ -505,15 +562,15 @@ export class HistoryService {
    * 新しい自動スナップショットを作成すべきか判定する。
    * 最後のスナップショットが最小間隔内に作成されていた場合は false を返す。
    *
-   * @param sourceFile - The source file name to check against
+   * @param sourcePath - The source file path to check against
    * @returns true if a new snapshot should be created
    */
-  async shouldCreateSnapshot(sourceFile: string): Promise<boolean> {
+  async shouldCreateSnapshot(sourcePath: string): Promise<boolean> {
     try {
       const index = await this.readHistoryIndex();
 
       // Find the most recent snapshot for this source file
-      const lastSnapshot = index.snapshots.find((s) => s.sourceFile === sourceFile);
+      const lastSnapshot = index.snapshots.find((s) => getSnapshotSourceKey(s) === sourcePath);
 
       if (!lastSnapshot) {
         return true;
@@ -536,23 +593,29 @@ export class HistoryService {
    * タイムスタンプ降順（新しい順）でソートされる。
    * メタデータが不足している場合、ファイル名から型を検出する。
    *
-   * @param sourceFile - Optional source file filter
+   * @param sourcePath - Optional source file filter
    * @returns Array of snapshot entries
    */
-  async getSnapshots(sourceFile?: string): Promise<SnapshotEntry[]> {
+  async getSnapshots(sourcePath?: string): Promise<SnapshotEntry[]> {
     try {
       const index = await this.readHistoryIndex();
 
       let { snapshots } = index;
 
-      if (sourceFile !== undefined) {
-        snapshots = snapshots.filter((s) => s.sourceFile === sourceFile);
+      if (sourcePath !== undefined) {
+        snapshots = snapshots.filter((s) => getSnapshotSourceKey(s) === sourcePath);
       }
 
-      // Add type fallback for entries missing type metadata
+      // Add fallbacks for older entries missing newer metadata.
       for (const entry of snapshots) {
         if (!entry.type) {
           entry.type = isAutoSnapshotFilename(entry.filename) ? "auto" : "manual";
+        }
+        if (!entry.sourcePath) {
+          entry.sourcePath = entry.sourceFile ?? "";
+        }
+        if (!entry.displayName) {
+          entry.displayName = getSnapshotDisplayName(entry);
         }
       }
 
@@ -575,8 +638,7 @@ export class HistoryService {
    * @param snapshotId - The ID of the snapshot to delete
    */
   async deleteSnapshot(snapshotId: string): Promise<void> {
-    const releaseLock = await this.indexMutex.acquire();
-    try {
+    await this.withIndexLock(async () => {
       const index = await this.readHistoryIndex();
       const entryIndex = index.snapshots.findIndex((s) => s.id === snapshotId);
 
@@ -597,9 +659,7 @@ export class HistoryService {
       // Remove from index
       index.snapshots.splice(entryIndex, 1);
       await this.writeHistoryIndex(index);
-    } finally {
-      releaseLock();
-    }
+    });
   }
 
   // -----------------------------------------------------------------------
@@ -611,15 +671,20 @@ export class HistoryService {
    * ブックマーク済みのスナップショットIDセットを取得する。
    */
   async getBookmarks(): Promise<Set<string>> {
+    let content: string;
     try {
       const historyDir = await this.getHistoryDirectory();
       const handle = await historyDir.getFileHandle(BOOKMARKS_FILENAME);
-      const content = await handle.read();
-      const ids = JSON.parse(content) as string[];
-      return new Set(ids);
+      content = await handle.read();
     } catch {
+      // Bookmarks file doesn't exist yet; return empty set
       return new Set();
     }
+
+    // Parse separately so JSON corruption throws and propagates to toggleBookmark,
+    // preventing a corrupt file from silently clearing all bookmarks.
+    const ids = JSON.parse(content) as string[];
+    return new Set(ids);
   }
 
   /**
@@ -630,27 +695,81 @@ export class HistoryService {
    * 新しいブックマーク状態を返す。
    */
   async toggleBookmark(snapshotId: string): Promise<boolean> {
-    const bookmarks = await this.getBookmarks();
-    const isBookmarked = bookmarks.has(snapshotId);
+    const releaseLock = await this.bookmarkMutex.acquire();
+    try {
+      const bookmarks = await this.getBookmarks();
+      const isBookmarked = bookmarks.has(snapshotId);
 
-    if (isBookmarked) {
-      bookmarks.delete(snapshotId);
-    } else {
-      bookmarks.add(snapshotId);
+      if (isBookmarked) {
+        bookmarks.delete(snapshotId);
+      } else {
+        bookmarks.add(snapshotId);
+      }
+
+      const historyDir = await this.ensureHistoryDirectory();
+      const handle = await historyDir.getFileHandle(BOOKMARKS_FILENAME, {
+        create: true,
+      });
+      await handle.write(JSON.stringify([...bookmarks], null, 2));
+
+      return !isBookmarked;
+    } finally {
+      releaseLock();
     }
-
-    const historyDir = await this.ensureHistoryDirectory();
-    const handle = await historyDir.getFileHandle(BOOKMARKS_FILENAME, {
-      create: true,
-    });
-    await handle.write(JSON.stringify([...bookmarks], null, 2));
-
-    return !isBookmarked;
   }
 
   // -----------------------------------------------------------------------
   // Private helpers
   // -----------------------------------------------------------------------
+
+  /**
+   * Execute a callback while holding the history index lock.
+   *
+   * In Electron, uses an IPC-based lock registry in the main process. Because
+   * the main-process event loop is single-threaded, Map operations there are
+   * inherently atomic — no TOCTOU race is possible. Locks are automatically
+   * released by the main process when a window closes.
+   *
+   * In the web build, only the in-process AsyncMutex is used. A single-page
+   * web app has exactly one renderer, so the mutex is sufficient.
+   *
+   * Electron では IPC を使ってメインプロセス内のロックレジストリで排他制御する。
+   * Web ビルドでは AsyncMutex のみを使用する（レンダラは常に 1 つのため）。
+   *
+   * @param fn - Async callback to run under the lock
+   * @returns The value returned by fn
+   */
+  private async withIndexLock<T>(fn: () => Promise<T>): Promise<T> {
+    // Acquire the in-process mutex to serialize calls within this renderer
+    const releaseMutex = await this.indexMutex.acquire();
+
+    if (isElectronRenderer()) {
+      // Acquire the cross-window IPC lock in the main process
+      const vfs = window.electronAPI?.vfs;
+      if (!vfs) {
+        // vfs bridge is unexpectedly absent — fall back to mutex-only
+        try {
+          return await fn();
+        } finally {
+          releaseMutex();
+        }
+      }
+      await vfs.indexLockAcquire(HISTORY_INDEX_LOCK_KEY);
+      try {
+        return await fn();
+      } finally {
+        await vfs.indexLockRelease(HISTORY_INDEX_LOCK_KEY);
+        releaseMutex();
+      }
+    } else {
+      // Web build: in-process mutex is sufficient
+      try {
+        return await fn();
+      } finally {
+        releaseMutex();
+      }
+    }
+  }
 
   /**
    * Read the history index from .illusions/history/index.json.
@@ -660,15 +779,19 @@ export class HistoryService {
    * ファイルが存在しない場合はデフォルトのインデックスを作成する。
    */
   private async readHistoryIndex(): Promise<HistoryIndex> {
+    let content: string;
     try {
       const historyDir = await this.getHistoryDirectory();
       const indexHandle = await historyDir.getFileHandle(HISTORY_INDEX_FILENAME);
-      const content = await indexHandle.read();
-      return JSON.parse(content) as HistoryIndex;
+      content = await indexHandle.read();
     } catch {
-      // Index file doesn't exist or is invalid; return defaults
+      // Index file doesn't exist (e.g. ENOENT on first run); return defaults
       return createDefaultHistoryIndex();
     }
+
+    // Parse separately so JSON corruption throws and propagates to caller
+    // rather than silently returning an empty index that would overwrite data.
+    return JSON.parse(content) as HistoryIndex;
   }
 
   /**

@@ -29,6 +29,15 @@ export interface UseFileWatchIntegrationParams extends TabManagerCore {
     remoteContent: string,
     remoteTimestamp: number,
   ) => void;
+  /**
+   * Callback to trigger an editor remount (increment editorKey).
+   * Called after applying external content so the Milkdown instance
+   * re-initializes with the updated content.
+   *
+   * エディタの再マウントをトリガーするコールバック（editorKey をインクリメント）。
+   * 外部コンテンツ適用後に呼び出し、Milkdown インスタンスを再初期化する。
+   */
+  onEditorRemountNeeded?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -47,6 +56,7 @@ function buildOnChanged(
   setTabs: TabManagerCore["setTabs"],
   tabsRef: TabManagerCore["tabsRef"],
   openDiffTab: UseFileWatchIntegrationParams["openDiffTab"],
+  onEditorRemountNeeded?: () => void,
 ): (diskContent: string, lastModified: number) => void {
   return (diskContent: string, lastModified: number) => {
     const currentTabs = tabsRef.current;
@@ -70,6 +80,7 @@ function buildOnChanged(
           } satisfies EditorTabState;
         }),
       );
+      onEditorRemountNeeded?.();
       notificationManager.info(`「${fileName}」が更新されました`, 3000);
     } else if (tab.fileSyncStatus === "dirty") {
       // Dirty tab: do NOT touch buffer; enter conflicted state
@@ -114,6 +125,7 @@ function buildOnChanged(
                   } satisfies EditorTabState;
                 }),
               );
+              onEditorRemountNeeded?.();
             },
           },
           {
@@ -160,7 +172,8 @@ function buildOnChanged(
  * CPU 節約のため一時停止する。タブを閉じるとウォッチャーも停止する。
  */
 export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): void {
-  const { tabs, setTabs, activeTabId, tabsRef, isElectron, openDiffTab } = params;
+  const { tabs, setTabs, activeTabId, tabsRef, isElectron, openDiffTab, onEditorRemountNeeded } =
+    params;
 
   /**
    * Map from tabId to its FileWatcher instance.
@@ -170,6 +183,15 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
    * 再レンダリングを引き起こさずにレンダー間で保持する。
    */
   const watchersRef = useRef<Map<TabId, FileWatcher>>(new Map());
+
+  /**
+   * Map from tabId to the file path that the current watcher was created for.
+   * Used to detect path changes after Save As operations.
+   *
+   * tabId から現在のウォッチャーが生成された file path へのマップ。
+   * Save As 後の path 変更を検出するために使用する。
+   */
+  const watcherPathsRef = useRef<Map<TabId, string>>(new Map());
 
   // ---------------------------------------------------------------------------
   // Sync watchers when tabs change
@@ -182,11 +204,14 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
     const watchers = watchersRef.current;
     const currentTabIds = new Set(tabs.map((t) => t.id));
 
+    const watcherPaths = watcherPathsRef.current;
+
     // Stop and remove watchers for tabs that no longer exist
     for (const [tabId, watcher] of watchers) {
       if (!currentTabIds.has(tabId)) {
         watcher.stop();
         watchers.delete(tabId);
+        watcherPaths.delete(tabId);
       }
     }
 
@@ -199,9 +224,24 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
       const isActiveTab = tab.id === activeTabId;
       const existing = watchers.get(tab.id);
 
-      if (!existing) {
+      // If the file path changed (e.g. after Save As), stop the old watcher
+      // so it no longer monitors the previous path.
+      // path が変わった場合（Save As 後など）は古いウォッチャーを停止して再生成する。
+      if (existing && watcherPaths.get(tab.id) !== filePath) {
+        existing.stop();
+        watchers.delete(tab.id);
+        watcherPaths.delete(tab.id);
+      }
+
+      if (!watchers.has(tab.id)) {
         // Create a new watcher for this tab
-        const onChanged = buildOnChanged(tab.id, setTabs, tabsRef, openDiffTab);
+        const onChanged = buildOnChanged(
+          tab.id,
+          setTabs,
+          tabsRef,
+          openDiffTab,
+          onEditorRemountNeeded,
+        );
         const watcher = createFileWatcher({ path: filePath, onChanged });
 
         if (isActiveTab) {
@@ -209,9 +249,10 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
         }
         // Background tabs are not started yet (started when becoming active)
         watchers.set(tab.id, watcher);
+        watcherPaths.set(tab.id, filePath);
       }
     }
-  }, [tabs, activeTabId, isElectron, setTabs, tabsRef, openDiffTab]);
+  }, [tabs, activeTabId, isElectron, setTabs, tabsRef, openDiffTab, onEditorRemountNeeded]);
 
   // ---------------------------------------------------------------------------
   // Pause/resume watchers based on active tab
@@ -249,6 +290,7 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
         watcher.stop();
       }
       watchersRef.current.clear();
+      watcherPathsRef.current.clear();
     };
   }, []);
 }

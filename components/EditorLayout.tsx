@@ -10,6 +10,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
 import ResizablePanel from "@/components/ResizablePanel";
+import PdfExportDialog from "@/components/PdfExportDialog";
 import RubyDialog from "@/components/RubyDialog";
 import SettingsModal from "@/components/SettingsModal";
 import SidebarPanel from "@/components/SidebarPanel";
@@ -41,10 +42,10 @@ import type { MdiFileDescriptor } from "@/lib/project/mdi-file";
 import { isEditorTab, type EditorTabState, type TabState } from "@/lib/tab-manager/tab-types";
 import type { ContextMenuState } from "@/lib/hooks/use-context-menu";
 import type { LintIssue } from "@/lib/linting/types";
+import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
+import type { ExportMetadata } from "@/lib/export/types";
 import type { RuleRunner } from "@/lib/linting/rule-runner";
 import { DockviewReact } from "dockview-react";
-import type { EditorView } from "@milkdown/prose/view";
-
 type SidebarPanelSharedProps = Omit<React.ComponentProps<typeof SidebarPanel>, "view">;
 
 interface ConfirmRemoveRecentState {
@@ -94,6 +95,11 @@ interface EditorLayoutProps {
     setShowRubyDialog: (show: boolean) => void;
     rubySelectedText: string;
     handleApplyRuby: React.ComponentProps<typeof RubyDialog>["onApply"];
+    showPdfExportDialog: boolean;
+    setShowPdfExportDialog: (show: boolean) => void;
+    handlePdfExportConfirm: (settings: PdfExportSettings) => void;
+    pdfExportContent: string;
+    pdfExportMetadata: ExportMetadata;
   };
   recovery: {
     wasAutoRecovered?: boolean;
@@ -141,7 +147,6 @@ interface EditorLayoutProps {
     setEditorViewInstance: NonNullable<
       React.ComponentProps<typeof NovelEditor>["onEditorViewReady"]
     >;
-    programmaticScrollRef: MutableRefObject<boolean>;
     handleShowAllSearchResults: NonNullable<
       React.ComponentProps<typeof NovelEditor>["onShowAllSearchResults"]
     >;
@@ -156,6 +161,7 @@ interface EditorLayoutProps {
       React.ComponentProps<typeof NovelEditor>["onIgnoreCorrection"]
     >;
     switchTab: (tabId: string) => void;
+    updateTab: (tabId: string, updates: Partial<EditorTabState>) => void;
   };
   inspector: {
     isRightPanelCollapsed: boolean;
@@ -182,7 +188,7 @@ export default function EditorLayout({
       <TerminalTabContext.Provider value={providers.terminalTabContextValue}>
         <EditorSettingsProvider settings={providers.settings} handlers={providers.settingsHandlers}>
           <div className="h-screen flex flex-col overflow-hidden relative">
-            <TitleUpdater currentFile={chrome.currentFile} isDirty={chrome.isDirty} />
+            <TitleUpdater editorMode={upgrade.editorMode} isDirty={chrome.isDirty} />
 
             {!chrome.isElectron && (
               <WebMenuBar
@@ -255,6 +261,14 @@ export default function EditorLayout({
               onClose={() => dialogs.setShowRubyDialog(false)}
               selectedText={dialogs.rubySelectedText}
               onApply={dialogs.handleApplyRuby}
+            />
+
+            <PdfExportDialog
+              isOpen={dialogs.showPdfExportDialog}
+              onClose={() => dialogs.setShowPdfExportDialog(false)}
+              onExport={dialogs.handlePdfExportConfirm}
+              content={dialogs.pdfExportContent}
+              metadata={dialogs.pdfExportMetadata}
             />
 
             {!chrome.isElectron && recovery.wasAutoRecovered && !recovery.dismissedRecovery && (
@@ -355,7 +369,7 @@ export default function EditorLayout({
                   </div>
                 )}
 
-                {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                {}
                 <div
                   className="flex-1 flex flex-col overflow-hidden"
                   onContextMenu={mainArea.handleTabBarContextMenu}
@@ -369,6 +383,10 @@ export default function EditorLayout({
                         const panelFileType = (panelParams?.fileType ?? ".mdi") as string;
                         const panelEditorKey = panelParams?.editorKey ?? 0;
                         const panelActiveTabId = panelParams?.activeTabId ?? "";
+                        const panelSearchOpenTrigger = panelParams?.searchOpenTrigger ?? 0;
+                        const panelSearchInitialTerm = panelParams?.searchInitialTerm as
+                          | string
+                          | undefined;
                         const isActivePanel = panelBufferId === panelActiveTabId;
                         const panelMdiEnabled = panelFileType === ".mdi";
                         const panelGfmEnabled = panelFileType !== ".txt";
@@ -379,6 +397,8 @@ export default function EditorLayout({
                         const liveEditorTab = liveTab && isEditorTab(liveTab) ? liveTab : undefined;
                         const panelContent = liveEditorTab?.content ?? "";
                         const panelLastSavedContent = liveEditorTab?.lastSavedContent ?? "";
+                        const panelPendingExternalContent =
+                          liveEditorTab?.pendingExternalContent ?? null;
 
                         if (mainArea.editorDiff && isActivePanel) {
                           return (
@@ -404,14 +424,17 @@ export default function EditorLayout({
                                   onChange={mainArea.handleChange}
                                   onInsertText={mainArea.handleInsertText}
                                   onSelectionChange={mainArea.setSelectedCharCount}
-                                  searchOpenTrigger={mainArea.searchOpenTrigger}
-                                  searchInitialTerm={mainArea.searchInitialTerm}
+                                  searchOpenTrigger={panelSearchOpenTrigger}
+                                  searchInitialTerm={panelSearchInitialTerm}
                                   onEditorViewReady={mainArea.setEditorViewInstance}
-                                  programmaticScrollRef={mainArea.programmaticScrollRef}
                                   onShowAllSearchResults={mainArea.handleShowAllSearchResults}
                                   lintingRuleRunner={mainArea.ruleRunner}
                                   onLintIssuesUpdated={mainArea.handleLintIssuesUpdated}
                                   onNlpError={mainArea.handleNlpError}
+                                  onOpenSpeechSettings={() => {
+                                    dialogs.setSettingsInitialCategory("speech");
+                                    dialogs.setShowSettingsModal(true);
+                                  }}
                                   onOpenRubyDialog={mainArea.handleOpenRubyDialog}
                                   onToggleTcy={mainArea.handleToggleTcy}
                                   onOpenDictionary={mainArea.handleOpenDictionary}
@@ -419,6 +442,12 @@ export default function EditorLayout({
                                   onIgnoreCorrection={mainArea.handleIgnoreCorrection}
                                   mdiExtensionsEnabled={panelMdiEnabled}
                                   gfmEnabled={panelGfmEnabled}
+                                  externalContent={panelPendingExternalContent}
+                                  onExternalContentApplied={() => {
+                                    mainArea.updateTab(panelBufferId, {
+                                      pendingExternalContent: null,
+                                    });
+                                  }}
                                 />
                               </div>
                             </ErrorBoundary>

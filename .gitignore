@@ -50,6 +50,9 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# local
+*.local.*
+
 # vercel
 .vercel
 
@@ -64,10 +67,17 @@ public/swe-worker*
 # WebStorm
 .idea
 
-# Obsidian workspace-local files
-docs/.obsidian/workspace.json
-docs/.obsidian/workspace-mobile.json
-docs/.obsidian/cache/
+# Obsidian (local vault config)
+docs/.obsidian/
+
+# Git worktrees
+.worktrees/
+
+# Review loop artifacts
+reviews/
+.claude/review-loop.log
+.claude/*.local.md
+.claude/settings.local.json
 
 # auto-generated files
 /generated/
