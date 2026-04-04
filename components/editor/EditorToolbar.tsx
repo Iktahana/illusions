@@ -78,7 +78,7 @@ export default function EditorToolbar({
           <button
             onClick={onSpeakToggle}
             className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
-            title={speechState.isPlaying ? "朗読を一時停止" : "朗読"}
+            title={speechState.isPlaying ? "読み上げを一時停止" : "読み上げ"}
           >
             {speechState.isPlaying ? (
               <Pause className="w-4 h-4" />

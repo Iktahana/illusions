@@ -208,7 +208,7 @@ export default function EditorContextMenu({
             />
           )}
 
-          {/* 朗読: hide when speech feature is not available */}
+          {/* 読み上げ: hide when speech feature is not available */}
           {onStartSpeech != null && (
             <>
               <Separator />

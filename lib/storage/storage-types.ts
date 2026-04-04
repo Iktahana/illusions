@@ -132,7 +132,7 @@ export interface AppState {
     llmEnabled?: boolean;
   } | null;
 
-  // 朗読（TTS）設定
+  // 読み上げ（TTS）設定
   speechVoiceURI?: string;
   speechRate?: number;
   speechPitch?: number;
