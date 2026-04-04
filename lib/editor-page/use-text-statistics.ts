@@ -5,6 +5,7 @@ import {
   analyzeCharacterTypes,
   calculateCharacterUsageRates,
   calculateReadabilityScore,
+  cleanMarkdown,
 } from "@/lib/utils";
 
 import type { CharacterTypeAnalysis, CharacterUsageRates, ReadabilityAnalysis } from "@/lib/utils";
@@ -41,7 +42,8 @@ export function useTextStatistics(content: string): TextStatisticsResult {
     () => calculateCharacterUsageRates(charTypeAnalysis),
     [charTypeAnalysis],
   );
-  const readabilityAnalysis = useMemo(() => calculateReadabilityScore(content), [content]);
+  const cleanedContent = useMemo(() => cleanMarkdown(content), [content]);
+  const readabilityAnalysis = useMemo(() => calculateReadabilityScore(cleanedContent), [cleanedContent]);
 
   return {
     ...manuscriptStats,

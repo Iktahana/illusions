@@ -33,6 +33,12 @@ interface StatsPanelProps {
     level: string;
     avgSentenceLength: number;
     avgPunctuationSpacing: number;
+    subScores?: {
+      sentenceLoad: number;
+      vocabulary: number;
+      syntaxComplexity: number;
+      paragraphDensity: number;
+    };
   };
   previousDayStats?: PreviousDayStats | null;
 }
@@ -213,7 +219,7 @@ export default function StatsPanel({
             <div className="flex justify-between items-baseline gap-2">
               <div className="flex items-center gap-1 min-w-0">
                 <InfoTooltip
-                  content={`80点以上：やさしい\n50-79点：普通\n50点未満：難しい`}
+                  content={`75点以上：やさしい\n50〜74点：普通\n50点未満：難しい`}
                   className="text-sm text-foreground-secondary whitespace-nowrap"
                 >
                   難易度
@@ -251,6 +257,48 @@ export default function StatsPanel({
                 </span>
               </div>
             </div>
+            {/* サブスコア詳細 */}
+            {readabilityAnalysis.subScores && (
+              <div className="pt-2 border-t border-border space-y-1.5">
+                <p className="text-[10px] text-foreground-tertiary font-medium uppercase tracking-wide">
+                  詳細スコア
+                </p>
+                {(
+                  [
+                    ["文の負荷", readabilityAnalysis.subScores.sentenceLoad, "文長・句読点・括弧の配置から評価"],
+                    ["語彙の難しさ", readabilityAnalysis.subScores.vocabulary, "漢字・カタカナ・専門語の密度から評価"],
+                    ["構文の複雑さ", readabilityAnalysis.subScores.syntaxComplexity, "接続詞・二重否定・受け身構文の頻度から評価"],
+                    ["段落の密度", readabilityAnalysis.subScores.paragraphDensity, "段落の長さと分布から評価"],
+                  ] as [string, number, string][]
+                ).map(([label, value, tooltip]) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <InfoTooltip
+                      content={tooltip}
+                      className="text-[10px] text-foreground-tertiary whitespace-nowrap w-20 flex-shrink-0"
+                    >
+                      {label}
+                    </InfoTooltip>
+                    <div className="flex-1 h-1.5 bg-background rounded-full overflow-hidden border border-border-secondary">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${value}%`,
+                          backgroundColor:
+                            value >= 75
+                              ? "var(--color-success)"
+                              : value >= 50
+                                ? "var(--color-warning, #f59e0b)"
+                                : "var(--color-error)",
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-foreground-tertiary w-6 text-right flex-shrink-0">
+                      {value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
