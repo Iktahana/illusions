@@ -1012,7 +1012,7 @@ describe("enrichReadabilityWithMorphology", () => {
       makeToken("配置", "名詞", { pos_detail_1: "サ変接続" }),
       makeToken("基準", "名詞", { pos_detail_1: "一般" }),
       makeToken("策定", "名詞", { pos_detail_1: "サ変接続" }),
-      makeToken("は", "助詞" ),
+      makeToken("は", "助詞"),
     ];
     const result = enrichReadabilityWithMorphology(base, nounChain);
     expect(result.subScores.vocabulary).toBeLessThanOrEqual(base.subScores.vocabulary);
@@ -1029,9 +1029,7 @@ describe("enrichReadabilityWithMorphology", () => {
     ];
     const result = enrichReadabilityWithMorphology(base, passiveTokens);
     // 受け身率80%なのでsyntaxComplexityが下がるはず
-    expect(result.subScores.syntaxComplexity).toBeLessThanOrEqual(
-      base.subScores.syntaxComplexity,
-    );
+    expect(result.subScores.syntaxComplexity).toBeLessThanOrEqual(base.subScores.syntaxComplexity);
   });
 
   it("should set properNounRate when proper noun tokens are present", () => {
@@ -1039,7 +1037,7 @@ describe("enrichReadabilityWithMorphology", () => {
       makeToken("東京", "名詞", { pos_detail_1: "固有名詞" }),
       makeToken("大阪", "名詞", { pos_detail_1: "固有名詞" }),
       makeToken("日本", "名詞", { pos_detail_1: "固有名詞" }),
-      makeToken("は", "助詞" ),
+      makeToken("は", "助詞"),
     ];
     const result = enrichReadabilityWithMorphology(base, tokens);
     expect(result.detail.vocabulary.properNounRate).toBeDefined();

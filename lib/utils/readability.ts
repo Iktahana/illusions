@@ -182,7 +182,8 @@ function calcVocabularyScore(m: VocabularyMetrics): number {
   }
   // kuromoji: TTR（語彙多様性）
   if (m.ttr !== undefined) {
-    if (m.ttr < 0.3) score -= 8; // 語彙が単調
+    if (m.ttr < 0.3)
+      score -= 8; // 語彙が単調
     else if (m.ttr > 0.85) score -= 5; // 専門語過多
   }
 
@@ -311,9 +312,7 @@ export function analyzeReadability(rawText: string): EnhancedReadabilityAnalysis
     (n, p) => n + (text.match(p)?.length ?? 0),
     0,
   );
-  const conjunctionMatchCount = sentences.filter((s) =>
-    CONJUNCTION_RE.test(s.trim()),
-  ).length;
+  const conjunctionMatchCount = sentences.filter((s) => CONJUNCTION_RE.test(s.trim())).length;
 
   const syntaxMetrics: SyntaxMetrics = {
     maxBracketDepth: calcMaxBracketDepth(text),
@@ -372,9 +371,7 @@ export function enrichReadabilityWithMorphology(
 ): EnhancedReadabilityAnalysis {
   const nouns = tokens.filter((t) => t.pos === "名詞");
   const verbs = tokens.filter((t) => t.pos === "動詞");
-  const contentWords = tokens.filter((t) =>
-    ["名詞", "動詞", "形容詞", "副詞"].includes(t.pos),
-  );
+  const contentWords = tokens.filter((t) => ["名詞", "動詞", "形容詞", "副詞"].includes(t.pos));
 
   // 名詞連接（3個以上の連続名詞 token）
   let nounChainCount = 0;

@@ -9,7 +9,11 @@ import {
   enrichReadabilityWithMorphology,
 } from "@/lib/utils";
 
-import type { CharacterTypeAnalysis, CharacterUsageRates, EnhancedReadabilityAnalysis } from "@/lib/utils";
+import type {
+  CharacterTypeAnalysis,
+  CharacterUsageRates,
+  EnhancedReadabilityAnalysis,
+} from "@/lib/utils";
 
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { computeTextStatistics } from "./text-statistics";

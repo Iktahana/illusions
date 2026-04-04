@@ -269,10 +269,26 @@ export default function StatsPanel({
                 </p>
                 {(
                   [
-                    ["文の負荷", readabilityAnalysis.subScores.sentenceLoad, "文長・句読点・括弧の配置から評価"],
-                    ["語彙の難しさ", readabilityAnalysis.subScores.vocabulary, "漢字・カタカナ・専門語の密度から評価"],
-                    ["構文の複雑さ", readabilityAnalysis.subScores.syntaxComplexity, "接続詞・二重否定・受け身構文の頻度から評価"],
-                    ["段落の密度", readabilityAnalysis.subScores.paragraphDensity, "段落の長さと分布から評価"],
+                    [
+                      "文の負荷",
+                      readabilityAnalysis.subScores.sentenceLoad,
+                      "文長・句読点・括弧の配置から評価",
+                    ],
+                    [
+                      "語彙の難しさ",
+                      readabilityAnalysis.subScores.vocabulary,
+                      "漢字・カタカナ・専門語の密度から評価",
+                    ],
+                    [
+                      "構文の複雑さ",
+                      readabilityAnalysis.subScores.syntaxComplexity,
+                      "接続詞・二重否定・受け身構文の頻度から評価",
+                    ],
+                    [
+                      "段落の密度",
+                      readabilityAnalysis.subScores.paragraphDensity,
+                      "段落の長さと分布から評価",
+                    ],
                   ] as [string, number, string][]
                 ).map(([label, value, tooltip]) => (
                   <div key={label} className="flex items-center gap-2">
