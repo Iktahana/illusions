@@ -101,11 +101,10 @@ vi.mock("dexie", () => {
       });
     }
     version() {
-      return {
-        stores: () => ({
-          version: () => ({ stores: () => ({}) }),
-        }),
-      };
+      const versionObj: Record<string, unknown> = {};
+      versionObj.stores = () => versionObj;
+      versionObj.upgrade = () => versionObj;
+      return versionObj;
     }
   }
   return { default: FakeDexie };
