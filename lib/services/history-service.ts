@@ -229,6 +229,21 @@ export class HistoryService {
   private vfs: VirtualFileSystem;
   private readonly indexMutex = new AsyncMutex();
   private readonly bookmarkMutex = new AsyncMutex();
+  private readonly snapshotListeners = new Set<() => void>();
+
+  /** Register a listener that fires whenever a snapshot is created. */
+  onSnapshotCreated(listener: () => void): () => void {
+    this.snapshotListeners.add(listener);
+    return () => {
+      this.snapshotListeners.delete(listener);
+    };
+  }
+
+  private notifySnapshotCreated(): void {
+    for (const listener of this.snapshotListeners) {
+      listener();
+    }
+  }
 
   constructor() {
     this.vfs = getVFS();
@@ -295,6 +310,7 @@ export class HistoryService {
         await this.pruneSnapshotsPerFileUnsafe(sourcePath);
       });
 
+      this.notifySnapshotCreated();
       return entry;
     } catch (error) {
       console.error("Failed to create snapshot / スナップショットの作成に失敗しました:", error);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
+import { stripHtmlForDiff } from "@/lib/services/diff-service";
 
 // -----------------------------------------------------------------------
 // Types
@@ -26,12 +27,14 @@ export interface DiffStats {
  * 共通の接頭辞と接尾辞を照合して文字レベルの追加・削除数を近似計算する。
  */
 export function computeDiffStats(oldText: string, newText: string): DiffStats {
-  const oldLen = oldText.length;
-  const newLen = newText.length;
+  const oldNorm = stripHtmlForDiff(oldText);
+  const newNorm = stripHtmlForDiff(newText);
+  const oldLen = oldNorm.length;
+  const newLen = newNorm.length;
   const minLen = Math.min(oldLen, newLen);
 
   let prefixLen = 0;
-  while (prefixLen < minLen && oldText[prefixLen] === newText[prefixLen]) {
+  while (prefixLen < minLen && oldNorm[prefixLen] === newNorm[prefixLen]) {
     prefixLen++;
   }
 
@@ -39,7 +42,7 @@ export function computeDiffStats(oldText: string, newText: string): DiffStats {
   const maxSuffix = minLen - prefixLen;
   while (
     suffixLen < maxSuffix &&
-    oldText[oldLen - 1 - suffixLen] === newText[newLen - 1 - suffixLen]
+    oldNorm[oldLen - 1 - suffixLen] === newNorm[newLen - 1 - suffixLen]
   ) {
     suffixLen++;
   }
@@ -49,8 +52,8 @@ export function computeDiffStats(oldText: string, newText: string): DiffStats {
   const addedStart = prefixLen;
   const addedEnd = newLen - suffixLen;
 
-  const removedText = oldText.slice(removedStart, removedEnd);
-  const addedText = newText.slice(addedStart, addedEnd);
+  const removedText = oldNorm.slice(removedStart, removedEnd);
+  const addedText = newNorm.slice(addedStart, addedEnd);
 
   return {
     added: addedText.length,
