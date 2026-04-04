@@ -473,7 +473,7 @@ export default function MilkdownEditor({
 
       if (charsPerLine > 0 && charWidth > 0) {
         if (isVertical) {
-          const targetHeight = charWidth * Math.max(charsPerLine - 1, 1);
+          const targetHeight = charWidth * charsPerLine;
           measureBox.style.height = `${targetHeight}px`;
           measureBox.style.maxHeight = `${targetHeight}px`;
           measureBox.style.minHeight = `${targetHeight}px`;
@@ -841,6 +841,7 @@ export default function MilkdownEditor({
         div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p) {
           text-indent: ${textIndent}em;
           margin-left: ${paragraphSpacing}em;
+          margin-bottom: 0;
           ${showParagraphNumbers ? "counter-increment: paragraph;" : ""}
           ${showParagraphNumbers ? "position: relative;" : ""}
         }
