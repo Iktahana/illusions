@@ -38,15 +38,15 @@ Post a comment on the triggering issue using this format:
 
 ### Broken Links
 
-| File | Link | Status | Root Cause |
-|------|------|--------|------------|
+| File                                  | Link                        | Status  | Root Cause                                                |
+| ------------------------------------- | --------------------------- | ------- | --------------------------------------------------------- |
 | `docs/architecture/storage-system.md` | `../lib/storage-service.ts` | Missing | File moved to `lib/storage/storage-service.ts` in PR #604 |
 
 ### Missing Anchor Files
 
-| Doc File | Referenced File | Status | Root Cause |
-|----------|----------------|--------|------------|
-| `docs/guides/linting-rules.md` | `lib/linting/types.ts` | OK | File exists |
+| Doc File                       | Referenced File        | Status | Root Cause  |
+| ------------------------------ | ---------------------- | ------ | ----------- |
+| `docs/guides/linting-rules.md` | `lib/linting/types.ts` | OK     | File exists |
 
 ### Summary
 
@@ -64,6 +64,7 @@ For each finding that requires a fix, create a new issue:
 - **Body**: Include the specific file, the broken reference, and the correct path.
 
 Example:
+
 ```
 ## Task
 
@@ -92,6 +93,7 @@ Follow `.github/agents/docs-updater.agent.md`:
 A relative link `](../path/to/file)` or `](./path/to/file)` in a `docs/**/*.md` file where the resolved path does not exist on disk.
 
 Exclude:
+
 - External URLs (starting with `http://` or `https://`)
 - `docs/archive/` — historical records, not maintained
 - Anchor-only links (e.g., `](#section-name)`)

@@ -170,4 +170,3 @@ jobs:
             --title "CI Failure: $WORKFLOW_NAME (Run #$WORKFLOW_ID)" \
             --label "ci-failure" \
             --body "$BODY"
-

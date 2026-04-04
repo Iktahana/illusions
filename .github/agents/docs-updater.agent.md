@@ -39,19 +39,19 @@ When triggered via an issue from the daily docs-maintenance workflow, analyse th
 
 ### Specific Triggers
 
-| Code change area | Target docs |
-|---|---|
-| `lib/storage/` | `docs/architecture/storage-system.md` |
-| `lib/vfs/` | `docs/architecture/vfs.md` |
-| `lib/linting/` | `docs/guides/linting-rules.md` |
-| `electron/nlp-service/` or `lib/nlp-client/` | `docs/architecture/nlp-backend-architecture.md` |
-| `lib/services/history-service.ts` | `docs/architecture/history-service.md` |
-| `lib/services/file-watcher.ts` | `docs/architecture/file-watcher.md` |
-| `lib/services/notification-manager.ts` | `docs/architecture/notification-system.md` |
-| `lib/tab-manager/` or `lib/hooks/use-tab-manager.ts` | `docs/architecture/tab-manager.md` |
-| `lib/project/` | `docs/architecture/project-lifecycle.md` |
-| `components/` or `app/` (export features) | `docs/architecture/export-system.md` |
-| `packages/milkdown-plugin-japanese-novel/` | `docs/guides/milkdown-plugin.md` |
+| Code change area                                     | Target docs                                     |
+| ---------------------------------------------------- | ----------------------------------------------- |
+| `lib/storage/`                                       | `docs/architecture/storage-system.md`           |
+| `lib/vfs/`                                           | `docs/architecture/vfs.md`                      |
+| `lib/linting/`                                       | `docs/guides/linting-rules.md`                  |
+| `electron/nlp-service/` or `lib/nlp-client/`         | `docs/architecture/nlp-backend-architecture.md` |
+| `lib/services/history-service.ts`                    | `docs/architecture/history-service.md`          |
+| `lib/services/file-watcher.ts`                       | `docs/architecture/file-watcher.md`             |
+| `lib/services/notification-manager.ts`               | `docs/architecture/notification-system.md`      |
+| `lib/tab-manager/` or `lib/hooks/use-tab-manager.ts` | `docs/architecture/tab-manager.md`              |
+| `lib/project/`                                       | `docs/architecture/project-lifecycle.md`        |
+| `components/` or `app/` (export features)            | `docs/architecture/export-system.md`            |
+| `packages/milkdown-plugin-japanese-novel/`           | `docs/guides/milkdown-plugin.md`                |
 
 ## What NOT to Do
 
@@ -87,6 +87,7 @@ docs: update <filename> to reflect <brief description>
 ```
 
 Example:
+
 ```
 docs: update storage-system.md to reflect StorageService API changes
 ```
