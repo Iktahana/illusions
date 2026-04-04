@@ -2,6 +2,10 @@
  * illusions エディタ用のユーティリティ
  */
 
+import { analyzeReadability, cleanMarkdown } from "./readability";
+export type { EnhancedReadabilityAnalysis, ReadabilitySubScores } from "./readability-types";
+export { analyzeReadability, enrichReadabilityWithMorphology, cleanMarkdown } from "./readability";
+
 /**
  * 文字数から原稿用紙枚数を算出する
  * 原稿用紙: 400字/枚
@@ -105,32 +109,6 @@ export function validateTitle(title: string): { valid: boolean; error?: string }
 }
 
 /**
- * 文字数カウント用にMarkdownを整形する
- */
-export function cleanMarkdown(markdown: string): string {
-  return (
-    markdown
-      // コードブロックを除去
-      .replace(/```[\s\S]*?```/g, "")
-      // インラインコードを除去
-      .replace(/`[^`]+`/g, "")
-      // リンクはテキストだけ残す
-      .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
-      // 画像を除去
-      .replace(/!\[([^\]]*)\]\([^\)]+\)/g, "")
-      // 見出し記号を除去
-      .replace(/^#{1,6}\s+/gm, "")
-      // 強調記号を除去
-      .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, "$1")
-      // 引用記号を除去
-      .replace(/^>\s+/gm, "")
-      // 罫線を除去
-      .replace(/^[-*_]{3,}$/gm, "")
-      .trim()
-  );
-}
-
-/**
  * 文字種別の分析結果
  */
 export interface CharacterTypeAnalysis {
@@ -152,12 +130,20 @@ export interface CharacterUsageRates {
 
 /**
  * 読みやすさ分析の結果
+ * `EnhancedReadabilityAnalysis`（readability-types.ts）の後方互換インターフェース。
  */
 export interface ReadabilityAnalysis {
   score: number; // スコア（0-100）
   level: string; // レベル（easy/normal/difficult）
   avgSentenceLength: number; // 平均文長
   avgPunctuationSpacing: number; // 平均句読点間隔
+  /** 4つのサブスコア（詳細表示・デバッグ用）*/
+  subScores?: {
+    sentenceLoad: number;
+    vocabulary: number;
+    syntaxComplexity: number;
+    paragraphDensity: number;
+  };
 }
 
 /**
@@ -349,83 +335,20 @@ export function calculateAveragePunctuationSpacing(text: string): number {
 }
 
 /**
- * 読みやすさスコアを算出する
- * 文の長さ、文字種別、句読点の使い方などから推定する
- * 0〜100点（高いほど読みやすい）
+ * 読みやすさスコアを算出する。
+ * 内部では `analyzeReadability()` を呼び出す薄いラッパー。
+ * 既存コードとの後方互換を維持するため、`ReadabilityAnalysis` 型で返す。
+ *
+ * @param text - 前処理済みのプレーンテキスト（`cleanMarkdown()` 済み推奨）
  */
 export function calculateReadabilityScore(text: string): ReadabilityAnalysis {
-  const sentenceCount = countSentences(text);
-  const charAnalysis = analyzeCharacterTypes(text);
-  const totalChars = charAnalysis.total || 1;
-
-  // 平均文長を計算
-  const avgSentenceLength =
-    sentenceCount > 0 ? Math.round((totalChars / sentenceCount) * 10) / 10 : 0;
-
-  // 平均句読点間隔を計算
-  const avgPunctuationSpacing = calculateAveragePunctuationSpacing(text);
-
-  // スコア計算（複数の要因に基づく）
-  let score = 100;
-
-  // 1. 平均文長に基づく減点（長い文は読みにくい）
-  // 理想的な文長：15-20字
-  if (avgSentenceLength > 30) {
-    score -= 20;
-  } else if (avgSentenceLength > 25) {
-    score -= 10;
-  } else if (avgSentenceLength > 15 && avgSentenceLength <= 25) {
-    score += 5; // ボーナス
-  }
-
-  // 2. 句読点間隔に基づく減点（間隔が長すぎると読みにくい）
-  // 理想的な間隔：8-12字
-  if (avgPunctuationSpacing > 20) {
-    score -= 15;
-  } else if (avgPunctuationSpacing > 15) {
-    score -= 8;
-  } else if (avgPunctuationSpacing >= 8 && avgPunctuationSpacing <= 12) {
-    score += 5; // ボーナス
-  }
-
-  // 3. 漢字使用率に基づくスコア調整
-  // 30-40%が理想的
-  const kanjiRate = (charAnalysis.kanji / totalChars) * 100;
-  if (kanjiRate < 20 || kanjiRate > 50) {
-    score -= 10;
-  } else if (kanjiRate >= 30 && kanjiRate <= 40) {
-    score += 5; // ボーナス
-  }
-
-  // 4. ひらがなとカタカナのバランス
-  const hiraganaRate = (charAnalysis.hiragana / totalChars) * 100;
-  const katakanaRate = (charAnalysis.katakana / totalChars) * 100;
-
-  // ひらがなが多いほど読みやすい
-  if (hiraganaRate < 30) {
-    score -= 5;
-  } else if (hiraganaRate > 60) {
-    score -= 8; // 漢字が少なすぎる
-  }
-
-  // スコアを0-100の範囲に正規化
-  score = Math.max(0, Math.min(100, score));
-
-  // レベルを決定
-  let level: string;
-  if (score >= 70) {
-    level = "easy"; // 読みやすい
-  } else if (score >= 40) {
-    level = "normal"; // 普通
-  } else {
-    level = "difficult"; // 読みにくい
-  }
-
+  const result = analyzeReadability(text);
   return {
-    score: Math.round(score),
-    level,
-    avgSentenceLength,
-    avgPunctuationSpacing,
+    score: result.score,
+    level: result.level,
+    avgSentenceLength: result.avgSentenceLength,
+    avgPunctuationSpacing: result.avgPunctuationSpacing,
+    subScores: result.subScores,
   };
 }
 
