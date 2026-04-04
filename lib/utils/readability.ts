@@ -395,19 +395,20 @@ export function enrichReadabilityWithMorphology(
 
   // TTR（type-token ratio）
   const uniqueLemmas = new Set(contentWords.map((t) => t.basic_form ?? t.surface));
-  const ttr = contentWords.length > 0 ? uniqueLemmas.size / contentWords.length : 0;
+  // コンテンツ語がない場合は undefined（スコアリングをスキップ）
+  const ttr = contentWords.length > 0 ? uniqueLemmas.size / contentWords.length : undefined;
 
   // 受け身動詞（〜れる/〜られる の表層形）
   const passiveTokens = verbs.filter(
     (t) => t.surface.endsWith("れる") || t.surface.endsWith("られる"),
   ).length;
-  const passiveRate = verbs.length > 0 ? passiveTokens / verbs.length : 0;
+  const passiveRate = verbs.length > 0 ? passiveTokens / verbs.length : undefined;
 
   // 使役動詞（〜せる/〜させる の表層形）
   const causativeTokens = verbs.filter(
     (t) => t.surface.endsWith("せる") || t.surface.endsWith("させる"),
   ).length;
-  const causativeRate = verbs.length > 0 ? causativeTokens / verbs.length : 0;
+  const causativeRate = verbs.length > 0 ? causativeTokens / verbs.length : undefined;
 
   const enrichedVocab: VocabularyMetrics = {
     ...base.detail.vocabulary,

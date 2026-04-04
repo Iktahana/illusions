@@ -39,6 +39,7 @@ interface StatsPanelProps {
       syntaxComplexity: number;
       paragraphDensity: number;
     };
+    hasMorphologicalAnalysis?: boolean;
   };
   previousDayStats?: PreviousDayStats | null;
 }
@@ -260,8 +261,11 @@ export default function StatsPanel({
             {/* サブスコア詳細 */}
             {readabilityAnalysis.subScores && (
               <div className="pt-2 border-t border-border space-y-1.5">
-                <p className="text-[10px] text-foreground-tertiary font-medium uppercase tracking-wide">
+                <p className="text-[10px] text-foreground-tertiary font-medium uppercase tracking-wide flex items-center gap-1">
                   詳細スコア
+                  {readabilityAnalysis.hasMorphologicalAnalysis === false && (
+                    <span className="opacity-50 normal-case font-normal">(基本分析)</span>
+                  )}
                 </p>
                 {(
                   [

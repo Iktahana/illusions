@@ -66,6 +66,13 @@ export interface InspectorProps {
     level: string;
     avgSentenceLength: number;
     avgPunctuationSpacing: number;
+    subScores?: {
+      sentenceLoad: number;
+      vocabulary: number;
+      syntaxComplexity: number;
+      paragraphDensity: number;
+    };
+    hasMorphologicalAnalysis?: boolean;
   };
   onOpenPosHighlightSettings?: () => void;
   onHistoryRestore?: (content: string) => void;
