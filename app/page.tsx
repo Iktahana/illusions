@@ -508,6 +508,7 @@ export default function EditorPage() {
         metadata: pdfExportMetadataRef.current,
         verticalWriting: settings.verticalWriting,
         pageSize: settings.pageSize,
+        landscape: settings.landscape,
         margins: settings.margins,
         charsPerLine: settings.charsPerLine,
         linesPerPage: settings.linesPerPage,

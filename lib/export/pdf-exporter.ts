@@ -52,6 +52,7 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
           options.charsPerLine!,
           options.linesPerPage!,
           options.verticalWriting ?? false,
+          options.landscape ?? false,
         );
         return {
           fontFamily: options.fontFamily,

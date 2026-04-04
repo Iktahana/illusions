@@ -93,7 +93,12 @@ export default function PdfExportDialog({
 }: PdfExportDialogProps) {
   if (!isOpen) return null;
   return (
-    <PdfExportDialogInner onClose={onClose} onExport={onExport} content={content} metadata={metadata} />
+    <PdfExportDialogInner
+      onClose={onClose}
+      onExport={onExport}
+      content={content}
+      metadata={metadata}
+    />
   );
 }
 
@@ -106,6 +111,8 @@ function PdfExportDialogInner({
   const [settings, setSettings] = useState<PdfExportSettings>(() => loadPdfExportSettings());
   // Page content chunks (split by estimated chars per page)
   const [pageChunks, setPageChunks] = useState<string[]>([]);
+  // Whether the initial debounce has completed (to distinguish "loading" from "no content")
+  const [ready, setReady] = useState(false);
   // How many pages are currently rendered in the preview
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGES);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -145,13 +152,18 @@ function PdfExportDialogInner({
       const chunks = splitContentIntoPages(content, charsPerPage);
       setPageChunks(chunks);
       setVisibleCount(INITIAL_PAGES);
+      setReady(true);
     }, 300);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [settings, content]);
 
-  // IntersectionObserver: load more pages when sentinel scrolls into view
+  const hasMore = visibleCount < pageChunks.length;
+
+  // IntersectionObserver: load more pages when sentinel scrolls into view.
+  // Depends on hasMore so it re-registers whenever the sentinel element
+  // appears (false→true) or disappears (true→false) in the DOM.
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
@@ -166,7 +178,7 @@ function PdfExportDialogInner({
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, []);
+  }, [hasMore]);
 
   // Memoize typesetting options from current settings
   const typesettingOptions = useMemo(() => {
@@ -176,6 +188,7 @@ function PdfExportDialogInner({
       settings.charsPerLine,
       settings.linesPerPage,
       settings.verticalWriting,
+      settings.landscape,
     );
     return {
       metadata,
@@ -196,16 +209,18 @@ function PdfExportDialogInner({
     return pageChunks.slice(0, limit).map((chunk) => mdiToHtml(chunk, typesettingOptions));
   }, [pageChunks, visibleCount, typesettingOptions]);
 
-  // Page thumbnail dimensions
+  // Page thumbnail dimensions (swap width/height when landscape)
   const { pageWidthPx, pageHeightPx, scale, dims } = useMemo(() => {
-    const d = PAGE_DIMENSIONS[settings.pageSize] ?? PAGE_DIMENSIONS["A5"];
+    const base = PAGE_DIMENSIONS[settings.pageSize] ?? PAGE_DIMENSIONS["A5"];
+    const d = settings.landscape
+      ? { width: base.height, height: base.width }
+      : base;
     const w = d.width * MM_TO_PX;
     const h = d.height * MM_TO_PX;
     return { pageWidthPx: w, pageHeightPx: h, scale: PREVIEW_PAGE_WIDTH / w, dims: d };
-  }, [settings.pageSize]);
+  }, [settings.pageSize, settings.landscape]);
 
   const scaledHeight = Math.round(pageHeightPx * scale);
-  const hasMore = visibleCount < pageChunks.length;
   const isEmpty = pageChunks.length === 0;
 
   return (
@@ -237,6 +252,37 @@ function PdfExportDialogInner({
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Page orientation */}
+            <div>
+              <label className={labelClass}>用紙の向き</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className={clsx(
+                    "flex-1 px-3 py-2 rounded-lg border text-sm transition-colors",
+                    !settings.landscape
+                      ? "bg-accent text-accent-foreground border-accent"
+                      : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
+                  )}
+                  onClick={() => updateField("landscape", false)}
+                >
+                  縦置き
+                </button>
+                <button
+                  type="button"
+                  className={clsx(
+                    "flex-1 px-3 py-2 rounded-lg border text-sm transition-colors",
+                    settings.landscape
+                      ? "bg-accent text-accent-foreground border-accent"
+                      : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
+                  )}
+                  onClick={() => updateField("landscape", true)}
+                >
+                  横置き
+                </button>
+              </div>
             </div>
 
             {/* Writing direction */}
@@ -398,15 +444,20 @@ function PdfExportDialogInner({
           <div className="px-4 py-3 border-b border-border flex items-center justify-between flex-shrink-0">
             <span className="text-sm font-medium text-foreground">プレビュー</span>
             <span className="text-xs text-foreground-tertiary">
-              {settings.pageSize} · {settings.verticalWriting ? "縦書き" : "横書き"}
+              {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
+              {settings.verticalWriting ? "縦書き" : "横書き"}
               {pageChunks.length > 0 && ` · 全${pageChunks.length}ページ`}
             </span>
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {isEmpty ? (
+            {!ready ? (
               <div className="flex items-center justify-center h-full text-foreground-tertiary text-sm">
                 生成中...
+              </div>
+            ) : isEmpty ? (
+              <div className="flex items-center justify-center h-full text-foreground-tertiary text-sm">
+                コンテンツがありません
               </div>
             ) : (
               <div className="flex flex-col items-center gap-4 p-6">

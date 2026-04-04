@@ -7,6 +7,7 @@
 
 export interface PdfExportSettings {
   pageSize: "A4" | "A5" | "B5" | "B6";
+  landscape: boolean;
   verticalWriting: boolean;
   charsPerLine: number;
   linesPerPage: number;
@@ -18,6 +19,7 @@ export interface PdfExportSettings {
 
 export const DEFAULT_PDF_SETTINGS: PdfExportSettings = {
   pageSize: "A5",
+  landscape: false,
   verticalWriting: true,
   charsPerLine: 30,
   linesPerPage: 17,
@@ -65,6 +67,7 @@ export function savePdfExportSettings(settings: PdfExportSettings): void {
  *
  * For horizontal writing, chars flow left-to-right → font size derived from page width.
  * For vertical writing, chars flow top-to-bottom → font size derived from page height.
+ * For landscape orientation, the page width and height are swapped before calculation.
  */
 export function calculateTypesetting(
   pageSize: string,
@@ -72,8 +75,11 @@ export function calculateTypesetting(
   charsPerLine: number,
   linesPerPage: number,
   verticalWriting: boolean,
+  landscape: boolean = false,
 ): { fontSizeMm: number; lineHeightRatio: number } {
-  const dims = PAGE_DIMENSIONS[pageSize] ?? PAGE_DIMENSIONS["A5"];
+  const base = PAGE_DIMENSIONS[pageSize] ?? PAGE_DIMENSIONS["A5"];
+  // Swap width/height when landscape
+  const dims = landscape ? { width: base.height, height: base.width } : base;
 
   let primarySpan: number;
   let crossSpan: number;
