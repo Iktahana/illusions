@@ -96,13 +96,28 @@ class WebStorageDatabase extends Dexie {
     // v4: Change projectHandles primary key to composite handleKey (projectId:rootDirName)
     // to prevent PRIMARY KEY collision when duplicate project directories share the same projectId.
     // 複製されたプロジェクトディレクトリが同一 projectId を持つ場合の衝突修正 (#1070)。
-    this.version(4).stores({
-      appState: "id",
-      recentFiles: "id, path",
-      editorBuffer: "id",
-      projectHandles: "handleKey, projectId, lastAccessedAt",
-      kvStore: "key",
-    });
+    this.version(4)
+      .stores({
+        appState: "id",
+        recentFiles: "id, path",
+        editorBuffer: "id",
+        projectHandles: "handleKey, projectId, lastAccessedAt",
+        kvStore: "key",
+      })
+      .upgrade((tx) => {
+        // Backfill handleKey for existing records that only have projectId as PK.
+        // 既存レコードに handleKey がない場合は projectId をフォールバックとして使用。
+        return tx
+          .table("projectHandles")
+          .toCollection()
+          .modify((record: Record<string, unknown>) => {
+            if (!record.handleKey) {
+              const pid = (record.projectId as string) || "unknown";
+              const dirName = (record.rootDirName as string) || pid;
+              record.handleKey = `${pid}:${dirName}`;
+            }
+          });
+      });
   }
 }
 

@@ -71,7 +71,14 @@ export async function persistWindowState(
     await storage.initialize();
     const key = `window_state:${windowKey}`;
     const existing = await storage.getItem(key);
-    const parsed: WindowState = existing ? (JSON.parse(existing) as WindowState) : {};
+    let parsed: WindowState = {};
+    if (existing) {
+      try {
+        parsed = JSON.parse(existing) as WindowState;
+      } catch {
+        // Corrupted data — overwrite with fresh state
+      }
+    }
     const merged: WindowState = { ...parsed, ...updates };
     await storage.setItem(key, JSON.stringify(merged));
   } finally {

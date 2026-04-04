@@ -338,21 +338,31 @@ function registerVFSHandlers() {
   // single-threaded. Each entry maps a lock key to the webContents id that
   // holds it. A queue of { resolve } entries handles waiters.
   const indexLockOwner = new Map(); // key -> webContentsId
-  const indexLockQueue = new Map(); // key -> Array<{ resolve: () => void }>
+  const indexLockQueue = new Map(); // key -> Array<{ resolve: () => void, senderId: number }>
 
   /**
    * Dequeue the next waiter for a lock key, if any.
+   * Skips waiters whose webContents have been destroyed to prevent stuck locks.
    * The dequeued entry's resolve() will set the owner itself.
    * @param {string} key
    */
   function processIndexLockQueue(key) {
     const queue = indexLockQueue.get(key) || [];
-    if (queue.length > 0 && !indexLockOwner.has(key)) {
+    while (queue.length > 0 && !indexLockOwner.has(key)) {
       const next = queue.shift();
       if (queue.length === 0) {
         indexLockQueue.delete(key);
       }
+      // Skip waiters whose webContents have been destroyed
+      const wc = require("electron").webContents.fromId(next.senderId);
+      if (!wc || wc.isDestroyed()) {
+        continue;
+      }
       next.resolve();
+      return;
+    }
+    if (queue.length === 0) {
+      indexLockQueue.delete(key);
     }
   }
 
@@ -368,7 +378,7 @@ function registerVFSHandlers() {
     // Lock is held — enqueue this waiter and suspend until released
     await new Promise((resolve) => {
       const queue = indexLockQueue.get(key) || [];
-      queue.push({ resolve });
+      queue.push({ resolve, senderId });
       indexLockQueue.set(key, queue);
     });
 

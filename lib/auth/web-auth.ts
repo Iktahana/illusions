@@ -84,5 +84,5 @@ export function getPendingAuth(): { state: string; codeVerifier: string } | null
 
 /** Remove the pending auth data after a successful token exchange. */
 export function clearPendingAuth(): void {
-  sessionStorage.removeItem(PENDING_AUTH_KEY);
+  safeSessionStorageRemove(PENDING_AUTH_KEY);
 }
