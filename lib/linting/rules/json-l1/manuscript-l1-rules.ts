@@ -345,23 +345,13 @@ class HorizontalNumbersRule extends AbstractL1Rule {
 }
 
 class UnitSymbolsRule extends AbstractL1Rule {
-  private readonly katakanaUnits = new Map([
-    ["km", "キロメートル"],
-    ["m", "メートル"],
-    ["cm", "センチメートル"],
-    ["mm", "ミリメートル"],
-    ["kg", "キログラム"],
-    ["g", "グラム"],
-    ["L", "リットル"],
-  ]);
-
   constructor() {
     super(findRuleMeta("rule_ME2_13_unit_symbols"), {
       id: "me2-13-unit-symbols",
       name: "Unit symbols",
       nameJa: "単位記号",
-      description: "Detects unit notation issues for manuscript layout",
-      descriptionJa: "単位表記と数字の組み方の崩れを検出します。",
+      description: "Detects missing spacing between numbers and unit symbols",
+      descriptionJa: "数値と欧字単位記号の間にスペースがない箇所を検出します。",
       defaultConfig: { enabled: true, severity: "warning" },
     });
   }
@@ -396,29 +386,6 @@ class UnitSymbolsRule extends AbstractL1Rule {
           "原稿編集 第2版に基づき、欧字の単位記号を使う場合は数値との間を密着させずに組みます。",
         ),
       );
-    }
-
-    for (const [unit, katakana] of this.katakanaUnits) {
-      const pattern = new RegExp(`\\d+(?:\\.\\d+)? ${escapeRegex(unit)}\\b`, "g");
-      for (const match of text.matchAll(pattern)) {
-        if (match.index === undefined) {
-          continue;
-        }
-
-        const from = match.index + match[0].length - unit.length;
-        issues.push(
-          createIssue(
-            this,
-            config,
-            from,
-            match.index + match[0].length,
-            unit,
-            katakana,
-            "Use katakana unit names for vertical layout",
-            "原稿編集 第2版に基づき、縦組では単位を片仮名で表すのが原則です。",
-          ),
-        );
-      }
     }
 
     return issues;

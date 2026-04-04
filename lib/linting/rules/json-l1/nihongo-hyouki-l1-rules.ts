@@ -115,8 +115,6 @@ function issue(
 
 class UnitsRule extends AbstractL1Rule {
   private readonly unitCaseFixes: ReadonlyArray<[RegExp, string]> = [
-    [/[Ａ-Ｚａ-ｚ]+/g, ""],
-    [/\d\s+(kg|g|mg|m|cm|mm|km|s|ms|Hz|kHz|MHz|GHz|MB|GB|TB|°C)\b/g, ""],
     [/\d+(?:\.\d+)?Kg\b/g, "kg"],
     [/\d+(?:\.\d+)?KG\b/g, "kg"],
     [/\d+(?:\.\d+)?Mm\b/g, "mm"],
@@ -131,8 +129,8 @@ class UnitsRule extends AbstractL1Rule {
       id: "nh-10-units",
       name: "Units",
       nameJa: "単位",
-      description: "Detects unit notation issues",
-      descriptionJa: "単位の英字表記や数字との間隔の問題を検出します。",
+      description: "Detects unit casing and spacing issues",
+      descriptionJa: "単位記号の大文字・小文字と数字との間隔の問題を検出します。",
       defaultConfig: { enabled: true, severity: "warning" },
     });
   }
@@ -143,28 +141,6 @@ class UnitsRule extends AbstractL1Rule {
     }
 
     const issues: LintIssue[] = [];
-
-    for (const match of text.matchAll(/[Ａ-Ｚａ-ｚ]+/g)) {
-      if (match.index === undefined) {
-        continue;
-      }
-
-      const replacement = match[0].replace(/[Ａ-Ｚａ-ｚ]/g, (char) =>
-        String.fromCharCode(char.charCodeAt(0) - 0xfee0),
-      );
-      issues.push(
-        issue(
-          this,
-          config,
-          match.index,
-          match.index + match[0].length,
-          match[0],
-          replacement,
-          "Use half-width Latin letters for unit symbols",
-          "日本語表記ルールブック 第2版に基づき、単位記号は半角英字で表記します。",
-        ),
-      );
-    }
 
     for (const match of text.matchAll(
       /\d\s+(kg|g|mg|m|cm|mm|km|s|ms|Hz|kHz|MHz|GHz|MB|GB|TB|°C)\b/g,
@@ -188,7 +164,7 @@ class UnitsRule extends AbstractL1Rule {
       );
     }
 
-    for (const [pattern, replacement] of this.unitCaseFixes.slice(2)) {
+    for (const [pattern, replacement] of this.unitCaseFixes) {
       for (const match of text.matchAll(pattern)) {
         if (match.index === undefined) {
           continue;
@@ -295,8 +271,16 @@ class SymbolsRule extends AbstractL1Rule {
       );
     }
 
-    for (const match of text.matchAll(/--|(?<!-)-(?!-)/g)) {
+    // Only match dashes in Japanese context (preceded or followed by CJK/kana)
+    const jaContext = /[\u3041-\u3096\u30A1-\u30F6\u4E00-\u9FFF\u3400-\u4DBF]/;
+    for (const match of text.matchAll(/--?/g)) {
       if (match.index === undefined) {
+        continue;
+      }
+
+      const before = match.index > 0 ? text[match.index - 1] : "";
+      const after = text[match.index + match[0].length] ?? "";
+      if (!jaContext.test(before) && !jaContext.test(after)) {
         continue;
       }
 
