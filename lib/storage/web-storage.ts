@@ -106,14 +106,28 @@ class WebStorageDatabase extends Dexie {
       })
       .upgrade((tx) => {
         // Backfill handleKey for existing records that only have projectId as PK.
-        // 既存レコードに handleKey がない場合は projectId をフォールバックとして使用。
+        // rootDirName が欠けている場合は、永続化済み rootHandle.name から復元して
+        // 通常保存時と同じ handleKey 形式を維持する。
         return tx
           .table("projectHandles")
           .toCollection()
           .modify((record: Record<string, unknown>) => {
             if (!record.handleKey) {
               const pid = (record.projectId as string) || "unknown";
-              const dirName = (record.rootDirName as string) || pid;
+              // Prefer stored rootDirName, then derive from rootHandle.name
+              const storedDirName =
+                typeof record.rootDirName === "string" && record.rootDirName.length > 0
+                  ? (record.rootDirName as string)
+                  : undefined;
+              let derivedDirName: string | undefined;
+              if (!storedDirName) {
+                const rh = record.rootHandle as { name?: string } | null | undefined;
+                if (rh && typeof rh.name === "string" && rh.name.length > 0) {
+                  derivedDirName = rh.name;
+                  record.rootDirName = derivedDirName;
+                }
+              }
+              const dirName = storedDirName ?? derivedDirName ?? pid;
               record.handleKey = `${pid}:${dirName}`;
             }
           });

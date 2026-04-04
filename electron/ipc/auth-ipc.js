@@ -116,13 +116,21 @@ function registerAuthHandlers() {
   });
 
   // Clean up pending auth entries when a window is closed
-  app.on("browser-window-created", (_, win) => {
+  function attachAuthCleanup(win) {
     win.on("closed", () => {
       const winId = win.id;
       for (const [state, entry] of pendingAuthByState) {
         if (entry.windowId === winId) pendingAuthByState.delete(state);
       }
     });
+  }
+  // Register for windows that already exist (e.g. main window created before this call)
+  for (const win of BrowserWindow.getAllWindows()) {
+    attachAuthCleanup(win);
+  }
+  // Register for future windows
+  app.on("browser-window-created", (_, win) => {
+    attachAuthCleanup(win);
   });
 }
 

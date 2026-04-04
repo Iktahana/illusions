@@ -4,7 +4,7 @@
  * Provides file system operations for the renderer process
  */
 
-const { ipcMain, dialog, app, BrowserWindow } = require("electron");
+const { ipcMain, dialog, app, BrowserWindow, webContents } = require("electron");
 const fs = require("fs/promises");
 const path = require("path");
 const os = require("os");
@@ -354,7 +354,7 @@ function registerVFSHandlers() {
         indexLockQueue.delete(key);
       }
       // Skip waiters whose webContents have been destroyed
-      const wc = require("electron").webContents.fromId(next.senderId);
+      const wc = webContents.fromId(next.senderId);
       if (!wc || wc.isDestroyed()) {
         continue;
       }
