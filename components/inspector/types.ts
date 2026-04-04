@@ -80,8 +80,8 @@ export interface InspectorProps {
   isLinting?: boolean;
   activeLintIssueIndex?: number | null;
   onOpenLintingSettings?: () => void;
-  onApplyLintPreset?: (presetId: string) => void;
-  activeLintPresetId?: string;
+  correctionMode?: import("@/lib/linting/correction-config").CorrectionModeId;
+  onCorrectionModeChange?: (modeId: import("@/lib/linting/correction-config").CorrectionModeId) => void;
   /** Monotonically increasing trigger to switch to the corrections tab from outside */
   switchToCorrectionsTrigger?: number;
   /** Previous day's stats for comparison display */

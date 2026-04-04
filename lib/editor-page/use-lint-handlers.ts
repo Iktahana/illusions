@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { notificationManager } from "@/lib/services/notification-manager";
-import { LINT_PRESETS, LINT_RULES_META, LINT_DEFAULT_CONFIGS } from "@/lib/linting/lint-presets";
 import type { EditorView } from "@milkdown/prose/view";
-import type { LintIssue, LintRuleConfig } from "@/lib/linting/types";
+import type { LintIssue } from "@/lib/linting/types";
 import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
 
 interface UseLintHandlersOptions {
   editorViewInstance: EditorView | null;
   lintIssues: LintIssue[];
-  lintingRuleConfigs: Record<string, LintRuleConfig>;
-  handleLintingRuleConfigsBatchChange: (configs: Record<string, LintRuleConfig>) => void;
   ignoreCorrection: (ruleId: string, text: string, paragraphText?: string) => void;
   triggerSwitchToCorrections: () => void;
 }
@@ -17,8 +14,6 @@ interface UseLintHandlersOptions {
 export function useLintHandlers({
   editorViewInstance,
   lintIssues,
-  lintingRuleConfigs,
-  handleLintingRuleConfigsBatchChange,
   ignoreCorrection,
   triggerSwitchToCorrections,
 }: UseLintHandlersOptions) {
@@ -145,32 +140,6 @@ export function useLintHandlers({
     [editorViewInstance],
   );
 
-  /** Apply a lint preset from the Inspector dropdown */
-  const handleApplyLintPreset = useCallback(
-    (presetId: string) => {
-      const preset = LINT_PRESETS[presetId];
-      if (preset) {
-        handleLintingRuleConfigsBatchChange({ ...preset.configs });
-      }
-    },
-    [handleLintingRuleConfigsBatchChange],
-  );
-
-  /** Detect which preset matches the current linting config */
-  const activeLintPresetId = useMemo(() => {
-    for (const [id, preset] of Object.entries(LINT_PRESETS)) {
-      const allMatch = LINT_RULES_META.every((rule) => {
-        const current = lintingRuleConfigs[rule.id] ??
-          LINT_DEFAULT_CONFIGS[rule.id] ?? { enabled: true, severity: "warning" };
-        const presetCfg = preset.configs[rule.id];
-        if (!presetCfg) return false;
-        return current.enabled === presetCfg.enabled && current.severity === presetCfg.severity;
-      });
-      if (allMatch) return id;
-    }
-    return "";
-  }, [lintingRuleConfigs]);
-
   return {
     enrichedLintIssues,
     activeLintIssueIndex,
@@ -178,7 +147,5 @@ export function useLintHandlers({
     handleShowLintHint,
     handleIgnoreCorrection,
     handleApplyFix,
-    handleApplyLintPreset,
-    activeLintPresetId,
   };
 }

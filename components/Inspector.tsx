@@ -59,8 +59,8 @@ export default function Inspector({
   isLinting = false,
   activeLintIssueIndex,
   onOpenLintingSettings,
-  onApplyLintPreset,
-  activeLintPresetId,
+  correctionMode,
+  onCorrectionModeChange,
   switchToCorrectionsTrigger = 0,
   previousDayStats,
 }: InspectorProps) {
@@ -367,8 +367,8 @@ export default function Inspector({
             isLinting={isLinting}
             activeLintIssueIndex={activeLintIssueIndex}
             onOpenLintingSettings={onOpenLintingSettings}
-            onApplyLintPreset={onApplyLintPreset}
-            activeLintPresetId={activeLintPresetId}
+            correctionMode={correctionMode}
+            onCorrectionModeChange={onCorrectionModeChange}
           />
         )}
         {activeTab === "stats" && (

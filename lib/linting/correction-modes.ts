@@ -21,12 +21,7 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     nameJa: "小説",
     toneJa: "感性・具象・張力",
     descriptionJa: "小説・フィクション向けの校正モード。文体の個性を尊重します。",
-    defaultGuidelines: [
-      "novel-manuscript",
-      "gendai-kanazukai-1986",
-      "editors-rulebook",
-      "joyo-kanji-2010",
-    ],
+    defaultGuidelines: ["editors-rulebook", "gendai-kanazukai-1986"],
     ruleOverrides: {},
   },
   official: {
@@ -34,15 +29,7 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     nameJa: "公用文",
     toneJa: "厳粛・対等・標準化",
     descriptionJa: "官公庁・公的機関の文書向けモード。内閣告示の各種基準に準拠します。",
-    defaultGuidelines: [
-      "jtf-style-3",
-      "editors-rulebook",
-      "gendai-kanazukai-1986",
-      "koyo-bun-2022",
-      "joyo-kanji-2010",
-      "okurigana-1973",
-      "gairai-1991",
-    ],
+    defaultGuidelines: ["jtf-style-3", "gendai-kanazukai-1986"],
     ruleOverrides: {},
   },
   blog: {
@@ -50,12 +37,7 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     nameJa: "ブログ",
     toneJa: "親切・共有感・半正式",
     descriptionJa: "ウェブ記事・ブログ向けモード。読みやすさを重視します。",
-    defaultGuidelines: [
-      "jtf-style-3",
-      "gendai-kanazukai-1986",
-      "editors-rulebook",
-      "joyo-kanji-2010",
-    ],
+    defaultGuidelines: ["editors-rulebook"],
     ruleOverrides: {},
   },
   academic: {
@@ -63,14 +45,7 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     nameJa: "学術",
     toneJa: "冷静・客観・構造化",
     descriptionJa: "論文・学術文書向けモード。客観性と構造的な記述を重視します。",
-    defaultGuidelines: [
-      "jtf-style-3",
-      "editors-rulebook",
-      "gendai-kanazukai-1986",
-      "joyo-kanji-2010",
-      "okurigana-1973",
-      "jis-x-4051",
-    ],
+    defaultGuidelines: ["jtf-style-3", "gendai-kanazukai-1986"],
     ruleOverrides: {},
   },
   sns: {
@@ -78,7 +53,7 @@ export const CORRECTION_MODES: Record<CorrectionModeId, CorrectionMode> = {
     nameJa: "SNS",
     toneJa: "簡潔・インパクト",
     descriptionJa: "SNS・短文投稿向けモード。最も寛容な設定です。",
-    defaultGuidelines: ["gendai-kanazukai-1986", "joyo-kanji-2010"],
+    defaultGuidelines: ["gendai-kanazukai-1986"],
     ruleOverrides: {},
   },
 };
@@ -100,3 +75,15 @@ export const CORRECTION_MODE_IDS: CorrectionModeId[] = [
   "academic",
   "sns",
 ];
+
+/**
+ * Maps each correction mode to the corresponding LINT_PRESETS key.
+ * Used when switching modes to apply the appropriate rule configuration.
+ */
+export const MODE_TO_PRESET: Record<CorrectionModeId, string> = {
+  novel: "novel",
+  official: "strict",
+  blog: "standard",
+  academic: "strict",
+  sns: "relaxed",
+};

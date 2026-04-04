@@ -36,6 +36,9 @@ import { useEditorLifecycle } from "@/lib/editor-page/use-editor-lifecycle";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
 import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
+import { CORRECTION_MODES, MODE_TO_PRESET } from "@/lib/linting/correction-modes";
+import { LINT_PRESETS } from "@/lib/linting/lint-presets";
+import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
@@ -681,13 +684,9 @@ export default function EditorPage() {
     handleShowLintHint,
     handleIgnoreCorrection,
     handleApplyFix,
-    handleApplyLintPreset,
-    activeLintPresetId,
   } = useLintHandlers({
     editorViewInstance,
     lintIssues,
-    lintingRuleConfigs,
-    handleLintingRuleConfigsBatchChange,
     ignoreCorrection,
     triggerSwitchToCorrections,
   });
@@ -867,8 +866,13 @@ export default function EditorPage() {
     isLinting,
     activeLintIssueIndex,
     onOpenLintingSettings: handleOpenLintingSettings,
-    onApplyLintPreset: handleApplyLintPreset,
-    activeLintPresetId,
+    correctionMode: correctionConfig.mode,
+    onCorrectionModeChange: (modeId: CorrectionModeId) => {
+      const mode = CORRECTION_MODES[modeId];
+      handleCorrectionConfigChange({ mode: modeId, guidelines: [...mode.defaultGuidelines] });
+      const preset = LINT_PRESETS[MODE_TO_PRESET[modeId]];
+      if (preset) handleLintingRuleConfigsBatchChange({ ...preset.configs });
+    },
     switchToCorrectionsTrigger,
     previousDayStats,
   } as const;
