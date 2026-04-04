@@ -136,7 +136,8 @@ export function countVisibleChars(visibleText: string): number {
  * 原稿用紙マス数を返す（20×20、禁則処理あり）。
  *
  * 仕様:
- * - 1文字 = 1マス、1行 = 20マス、1ページ = 20行 = 400マス
+ * - 基本的には 1文字 = 1マスとして扱う（ただし禁則処理による近似あり、後述）
+ * - 1行 = 20マス（`CHARS_PER_LINE`）、1ページ = 20行 = 400マス（`CELLS_PER_PAGE`）
  * - 明示改行（`\n`）でその行の残りマスをスキップして次行へ
  * - 空行は1行として扱う（20マス消費）
  * - 戻り値は「消費したマス数の合計（空白マスを含む）」
@@ -144,6 +145,9 @@ export function countVisibleChars(visibleText: string): number {
  * 禁則処理:
  * - 行頭禁則文字が行頭に来ようとする場合 → 前行へ押し込む（追い出し）
  * - 行末禁則文字が行末に来た場合（次文字あり）→ 行末禁則文字を次行頭へ追い出す
+ * - この追い出し処理により、1行が CHARS_PER_LINE を超えることがある（ぶら下げ近似）。
+ *   戻り値は lines.length × CHARS_PER_LINE で計算するため枚数計算への影響はないが、
+ *   厳密に「1文字 = 1マス」とはならないケースが存在する
  *
  * @param visibleText - `extractVisibleText` で処理済みのテキスト（改行を含む）
  */

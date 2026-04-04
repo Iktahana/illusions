@@ -86,8 +86,8 @@ export function usePreviousDayStats(
 
         const prevSnapshot = findPreviousDaySnapshot(snapshots);
         if (prevSnapshot) {
-          // Load snapshot content and count with chars() (whitespace-stripped)
-          // to match StatsPanel's charCount calculation
+          // Load snapshot content and compute statistics with computeTextStatistics
+          // to match StatsPanel's charCount and manuscriptPages calculation
           const content = await historyService.getSnapshotContent(prevSnapshot.id);
           if (cancelled) return;
 
