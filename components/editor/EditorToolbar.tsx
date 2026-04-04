@@ -11,12 +11,14 @@ export default function EditorToolbar({
   onSearchClick,
   speechState,
   onSpeakToggle,
+  onOpenSpeechSettings,
 }: {
   isVertical: boolean;
   onToggleVertical: () => void;
   onSearchClick: () => void;
   speechState: SpeechState;
   onSpeakToggle: () => void;
+  onOpenSpeechSettings?: () => void;
 }) {
   const {
     fontScale,
@@ -77,6 +79,10 @@ export default function EditorToolbar({
         {speechState.isSupported && (
           <button
             onClick={onSpeakToggle}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              onOpenSpeechSettings?.();
+            }}
             className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
             title={speechState.isPlaying ? "読み上げを一時停止" : "読み上げ"}
           >
