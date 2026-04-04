@@ -16,8 +16,8 @@ describe("rule-loader", () => {
   describe("getAllJsonRules", () => {
     it("should return all rules from all books", () => {
       const rules = getAllJsonRules();
-      // 6 books with a total of 124 rules
-      expect(rules.length).toBe(124);
+      // 6 books with a total of 121 rules
+      expect(rules.length).toBe(121);
     });
 
     it("should return rules with valid structure", () => {
@@ -38,7 +38,7 @@ describe("rule-loader", () => {
   describe("getJsonRulesByLevel", () => {
     it("should return only L1 rules", () => {
       const l1Rules = getJsonRulesByLevel("L1");
-      expect(l1Rules.length).toBe(61);
+      expect(l1Rules.length).toBe(58);
       expect(l1Rules.every((r) => r.Level === "L1")).toBe(true);
     });
 
@@ -60,7 +60,7 @@ describe("rule-loader", () => {
   describe("getImplementableL1Rules", () => {
     it("should return L1 rules without TODO patterns", () => {
       const rules = getImplementableL1Rules();
-      expect(rules.length).toBe(38);
+      expect(rules.length).toBe(35);
       for (const rule of rules) {
         expect(rule.Level).toBe("L1");
         expect(rule["Pattern/Logic"].startsWith("TODO")).toBe(false);
@@ -117,7 +117,7 @@ describe("rule-loader", () => {
 
     it("should return gendai-kanazukai rules by book title", () => {
       const rules = getJsonRulesByBook("現代仮名遣い");
-      expect(rules.length).toBe(6);
+      expect(rules.length).toBe(3);
     });
 
     it("should return empty array for unknown book", () => {

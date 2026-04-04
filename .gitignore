@@ -70,10 +70,14 @@ public/swe-worker*
 # Obsidian (local vault config)
 docs/.obsidian/
 
+# Git worktrees
+.worktrees/
+
 # Review loop artifacts
 reviews/
 .claude/review-loop.log
 .claude/*.local.md
+.claude/settings.local.json
 
 # auto-generated files
 /generated/

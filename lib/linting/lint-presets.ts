@@ -205,28 +205,6 @@ export const LINT_RULES_META: LintRuleMeta[] = [
   },
 
   // ---------------------------------------------------------------------------
-  // 現代仮名遣い (3 rules)
-  // ---------------------------------------------------------------------------
-  {
-    id: "gk-2-1-particle-o",
-    nameJa: "助詞「を」の表記",
-    descriptionJa: "助詞の「を」を「お」と書いている箇所を検出します",
-    guidelineId: "gendai-kanazukai-1986",
-  },
-  {
-    id: "gk-2-2-particle-ha",
-    nameJa: "助詞「は」の表記",
-    descriptionJa: "助詞の「は」を「わ」と書いている箇所を検出します",
-    guidelineId: "gendai-kanazukai-1986",
-  },
-  {
-    id: "gk-2-3-particle-he",
-    nameJa: "助詞「へ」の表記",
-    descriptionJa: "助詞の「へ」を「え」と書いている箇所を検出します",
-    guidelineId: "gendai-kanazukai-1986",
-  },
-
-  // ---------------------------------------------------------------------------
   // 日本語表記ルールブック (5 rules)
   // ---------------------------------------------------------------------------
   {
@@ -312,11 +290,6 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
     ],
   },
   {
-    id: "gendai-kanazukai",
-    nameJa: "現代仮名遣い",
-    rules: ["gk-2-1-particle-o", "gk-2-2-particle-ha", "gk-2-3-particle-he"],
-  },
-  {
     id: "nihongo-hyouki",
     nameJa: "日本語表記ルールブック",
     rules: [
@@ -370,10 +343,6 @@ export const LINT_DEFAULT_CONFIGS: Record<string, LintRulePresetConfig> = {
   "me2-14-pre-post-symbols": { enabled: true, severity: "warning" },
   "me2-15-punctuation": { enabled: true, severity: "warning" },
   "me2-17-repetition-symbols": { enabled: true, severity: "info" },
-  // --- 現代仮名遣い ---
-  "gk-2-1-particle-o": { enabled: true, severity: "error" },
-  "gk-2-2-particle-ha": { enabled: true, severity: "error" },
-  "gk-2-3-particle-he": { enabled: true, severity: "error" },
   // --- 日本語表記ルールブック ---
   "nh-6-ji-zu-di-du-exceptions": { enabled: true, severity: "error" },
   "nh-7-compound-nouns-no-okurigana": { enabled: true, severity: "warning" },
@@ -422,9 +391,6 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "me2-14-pre-post-symbols": { enabled: false, severity: "info" },
       "me2-15-punctuation": { enabled: false, severity: "info" },
       "me2-17-repetition-symbols": { enabled: false, severity: "info" },
-      "gk-2-1-particle-o": { enabled: true, severity: "warning" },
-      "gk-2-2-particle-ha": { enabled: true, severity: "warning" },
-      "gk-2-3-particle-he": { enabled: true, severity: "warning" },
       "nh-6-ji-zu-di-du-exceptions": { enabled: true, severity: "info" },
       "nh-7-compound-nouns-no-okurigana": { enabled: false, severity: "info" },
       "nh-9-numbers": { enabled: false, severity: "info" },
@@ -469,9 +435,6 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "me2-14-pre-post-symbols": { enabled: true, severity: "error" },
       "me2-15-punctuation": { enabled: true, severity: "error" },
       "me2-17-repetition-symbols": { enabled: true, severity: "warning" },
-      "gk-2-1-particle-o": { enabled: true, severity: "error" },
-      "gk-2-2-particle-ha": { enabled: true, severity: "error" },
-      "gk-2-3-particle-he": { enabled: true, severity: "error" },
       "nh-6-ji-zu-di-du-exceptions": { enabled: true, severity: "error" },
       "nh-7-compound-nouns-no-okurigana": { enabled: true, severity: "warning" },
       "nh-9-numbers": { enabled: true, severity: "error" },
@@ -512,9 +475,6 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "me2-14-pre-post-symbols": { enabled: false, severity: "info" },
       "me2-15-punctuation": { enabled: true, severity: "warning" },
       "me2-17-repetition-symbols": { enabled: true, severity: "info" },
-      "gk-2-1-particle-o": { enabled: true, severity: "error" },
-      "gk-2-2-particle-ha": { enabled: true, severity: "error" },
-      "gk-2-3-particle-he": { enabled: true, severity: "error" },
       "nh-6-ji-zu-di-du-exceptions": { enabled: true, severity: "error" },
       "nh-7-compound-nouns-no-okurigana": { enabled: false, severity: "info" },
       "nh-9-numbers": { enabled: false, severity: "info" },
