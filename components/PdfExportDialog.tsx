@@ -212,9 +212,7 @@ function PdfExportDialogInner({
   // Page thumbnail dimensions (swap width/height when landscape)
   const { pageWidthPx, pageHeightPx, scale, dims } = useMemo(() => {
     const base = PAGE_DIMENSIONS[settings.pageSize] ?? PAGE_DIMENSIONS["A5"];
-    const d = settings.landscape
-      ? { width: base.height, height: base.width }
-      : base;
+    const d = settings.landscape ? { width: base.height, height: base.width } : base;
     const w = d.width * MM_TO_PX;
     const h = d.height * MM_TO_PX;
     return { pageWidthPx: w, pageHeightPx: h, scale: PREVIEW_PAGE_WIDTH / w, dims: d };
