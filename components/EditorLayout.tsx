@@ -419,7 +419,7 @@ export default function EditorLayout({
                                 className="h-full"
                               >
                                 <NovelEditor
-                                  key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}-${panelParams?.pendingExternalContent ?? ""}`}
+                                  key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}`}
                                   initialContent={panelContent}
                                   onChange={mainArea.handleChange}
                                   onInsertText={mainArea.handleInsertText}
