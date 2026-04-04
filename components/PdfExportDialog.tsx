@@ -363,7 +363,7 @@ function PdfExportDialogInner({
             {/* Indent + Page numbers */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelClass}>字下げ（em）</label>
+                <label className={labelClass}>字下げ（文字）</label>
                 <input
                   type="number"
                   className={numberInputClass + " w-full"}
