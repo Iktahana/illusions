@@ -18,12 +18,12 @@ export interface PdfExportSettings {
 }
 
 export const DEFAULT_PDF_SETTINGS: PdfExportSettings = {
-  pageSize: "A5",
-  landscape: false,
+  pageSize: "A4",
+  landscape: true,
   verticalWriting: true,
-  charsPerLine: 30,
-  linesPerPage: 17,
-  margins: { top: 20, bottom: 20, left: 15, right: 15 },
+  charsPerLine: 40,
+  linesPerPage: 30,
+  margins: { top: 35, bottom: 30, left: 30, right: 40 },
   fontFamily: "serif",
   showPageNumbers: true,
   textIndent: 1,
