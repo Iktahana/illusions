@@ -37,6 +37,8 @@ interface EditorProps {
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
   onNlpError?: (error: Error) => void;
+  // 音声設定を開くコールバック
+  onOpenSpeechSettings?: () => void;
   // 書式コールバック
   onOpenRubyDialog?: () => void;
   onToggleTcy?: () => void;
@@ -68,6 +70,7 @@ export default function NovelEditor({
   lintingRuleRunner,
   onLintIssuesUpdated,
   onNlpError,
+  onOpenSpeechSettings,
   onOpenRubyDialog,
   onToggleTcy,
   onOpenDictionary,
@@ -428,6 +431,7 @@ export default function NovelEditor({
         onSearchClick={handleSearchToggle}
         speechState={speechState}
         onSpeakToggle={handleSpeakToggle}
+        onOpenSpeechSettings={onOpenSpeechSettings}
       />
 
       {/* エディタ領域 */}

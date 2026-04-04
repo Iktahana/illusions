@@ -431,6 +431,10 @@ export default function EditorLayout({
                                   lintingRuleRunner={mainArea.ruleRunner}
                                   onLintIssuesUpdated={mainArea.handleLintIssuesUpdated}
                                   onNlpError={mainArea.handleNlpError}
+                                  onOpenSpeechSettings={() => {
+                                    dialogs.setSettingsInitialCategory("speech");
+                                    dialogs.setShowSettingsModal(true);
+                                  }}
                                   onOpenRubyDialog={mainArea.handleOpenRubyDialog}
                                   onToggleTcy={mainArea.handleToggleTcy}
                                   onOpenDictionary={mainArea.handleOpenDictionary}
