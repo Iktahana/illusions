@@ -43,6 +43,7 @@ import { isEditorTab, type EditorTabState, type TabState } from "@/lib/tab-manag
 import type { ContextMenuState } from "@/lib/hooks/use-context-menu";
 import type { LintIssue } from "@/lib/linting/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
+import type { ExportMetadata } from "@/lib/export/types";
 import type { RuleRunner } from "@/lib/linting/rule-runner";
 import { DockviewReact } from "dockview-react";
 type SidebarPanelSharedProps = Omit<React.ComponentProps<typeof SidebarPanel>, "view">;
@@ -97,6 +98,8 @@ interface EditorLayoutProps {
     showPdfExportDialog: boolean;
     setShowPdfExportDialog: (show: boolean) => void;
     handlePdfExportConfirm: (settings: PdfExportSettings) => void;
+    pdfExportContent: string;
+    pdfExportMetadata: ExportMetadata;
   };
   recovery: {
     wasAutoRecovered?: boolean;
@@ -264,6 +267,8 @@ export default function EditorLayout({
               isOpen={dialogs.showPdfExportDialog}
               onClose={() => dialogs.setShowPdfExportDialog(false)}
               onExport={dialogs.handlePdfExportConfirm}
+              content={dialogs.pdfExportContent}
+              metadata={dialogs.pdfExportMetadata}
             />
 
             {!chrome.isElectron && recovery.wasAutoRecovered && !recovery.dismissedRecovery && (

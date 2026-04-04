@@ -6,7 +6,7 @@
  */
 
 import type { ExportMetadata } from "./types";
-import { PAGE_DIMENSIONS } from "./pdf-export-settings";
+import { calculateTypesetting, PAGE_DIMENSIONS } from "./pdf-export-settings";
 
 export interface PdfExportOptions {
   metadata: ExportMetadata;
@@ -23,42 +23,6 @@ export interface PdfExportOptions {
   showPageNumbers?: boolean;
   /** First-line indent in em units */
   textIndent?: number;
-}
-
-/**
- * Calculate font size and line height from page layout parameters.
- *
- * For horizontal writing, chars flow left-to-right → font size derived from page width.
- * For vertical writing, chars flow top-to-bottom → font size derived from page height.
- */
-function calculateTypesetting(
-  pageSize: string,
-  margins: { top: number; bottom: number; left: number; right: number },
-  charsPerLine: number,
-  linesPerPage: number,
-  verticalWriting: boolean,
-): { fontSizeMm: number; lineHeightRatio: number } {
-  const dims = PAGE_DIMENSIONS[pageSize] ?? PAGE_DIMENSIONS["A5"];
-
-  // Primary axis: direction characters flow along
-  // Cross axis: direction lines stack along
-  let primarySpan: number;
-  let crossSpan: number;
-
-  if (verticalWriting) {
-    // Vertical: chars flow top→bottom, lines stack right→left
-    primarySpan = dims.height - margins.top - margins.bottom;
-    crossSpan = dims.width - margins.left - margins.right;
-  } else {
-    // Horizontal: chars flow left→right, lines stack top→bottom
-    primarySpan = dims.width - margins.left - margins.right;
-    crossSpan = dims.height - margins.top - margins.bottom;
-  }
-
-  const fontSizeMm = primarySpan / charsPerLine;
-  const lineHeightRatio = crossSpan / linesPerPage / fontSizeMm;
-
-  return { fontSizeMm, lineHeightRatio };
 }
 
 /**
