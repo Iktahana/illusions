@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { EditorView } from "@milkdown/prose/view";
 
+import { extractVisibleText, countVisibleChars } from "@/lib/editor-page/text-statistics";
+
 export interface ViewportRect {
   top: number;
   left: number;
@@ -136,7 +138,8 @@ export function useSelectionTracking({
 
     if (!selection.empty && belongsToEditor) {
       const selectedText = state.doc.textBetween(selection.from, selection.to);
-      const selectionCount = selectedText.replace(/\s/g, "").length;
+      // MDI 記法を含む可能性があるため extractVisibleText で記法を剥がしてからカウント
+      const selectionCount = countVisibleChars(extractVisibleText(selectedText));
       const range =
         domSelection && domSelection.rangeCount > 0
           ? domSelection.getRangeAt(0).getBoundingClientRect()
