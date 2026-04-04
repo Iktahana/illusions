@@ -478,12 +478,16 @@ export default function EditorPage() {
 
   // PDF export dialog state
   const [showPdfExportDialog, setShowPdfExportDialog] = useState(false);
+  const [pdfExportContent, setPdfExportContent] = useState("");
+  const [pdfExportMetadata, setPdfExportMetadata] = useState<ExportMetadata>({ title: "" });
   const pdfExportContentRef = useRef("");
   const pdfExportMetadataRef = useRef<ExportMetadata>({ title: "" });
 
   const handlePdfExportRequest = useCallback((pdfContent: string, metadata: ExportMetadata) => {
     pdfExportContentRef.current = pdfContent;
     pdfExportMetadataRef.current = metadata;
+    setPdfExportContent(pdfContent);
+    setPdfExportMetadata(metadata);
     setShowPdfExportDialog(true);
   }, []);
 
@@ -504,6 +508,7 @@ export default function EditorPage() {
         metadata: pdfExportMetadataRef.current,
         verticalWriting: settings.verticalWriting,
         pageSize: settings.pageSize,
+        landscape: settings.landscape,
         margins: settings.margins,
         charsPerLine: settings.charsPerLine,
         linesPerPage: settings.linesPerPage,
@@ -907,6 +912,8 @@ export default function EditorPage() {
         showPdfExportDialog,
         setShowPdfExportDialog,
         handlePdfExportConfirm,
+        pdfExportContent,
+        pdfExportMetadata,
       }}
       recovery={{
         wasAutoRecovered,

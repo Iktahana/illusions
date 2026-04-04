@@ -7,6 +7,7 @@
 
 export interface PdfExportSettings {
   pageSize: "A4" | "A5" | "B5" | "B6";
+  landscape: boolean;
   verticalWriting: boolean;
   charsPerLine: number;
   linesPerPage: number;
@@ -17,11 +18,12 @@ export interface PdfExportSettings {
 }
 
 export const DEFAULT_PDF_SETTINGS: PdfExportSettings = {
-  pageSize: "A5",
+  pageSize: "A4",
+  landscape: true,
   verticalWriting: true,
-  charsPerLine: 30,
-  linesPerPage: 17,
-  margins: { top: 20, bottom: 20, left: 15, right: 15 },
+  charsPerLine: 40,
+  linesPerPage: 30,
+  margins: { top: 35, bottom: 30, left: 30, right: 40 },
   fontFamily: "serif",
   showPageNumbers: true,
   textIndent: 1,
@@ -58,4 +60,40 @@ export function savePdfExportSettings(settings: PdfExportSettings): void {
   } catch {
     // localStorage quota exceeded — silently ignore
   }
+}
+
+/**
+ * Calculate font size and line height from page layout parameters.
+ *
+ * For horizontal writing, chars flow left-to-right → font size derived from page width.
+ * For vertical writing, chars flow top-to-bottom → font size derived from page height.
+ * For landscape orientation, the page width and height are swapped before calculation.
+ */
+export function calculateTypesetting(
+  pageSize: string,
+  margins: { top: number; bottom: number; left: number; right: number },
+  charsPerLine: number,
+  linesPerPage: number,
+  verticalWriting: boolean,
+  landscape: boolean = false,
+): { fontSizeMm: number; lineHeightRatio: number } {
+  const base = PAGE_DIMENSIONS[pageSize] ?? PAGE_DIMENSIONS["A5"];
+  // Swap width/height when landscape
+  const dims = landscape ? { width: base.height, height: base.width } : base;
+
+  let primarySpan: number;
+  let crossSpan: number;
+
+  if (verticalWriting) {
+    primarySpan = dims.height - margins.top - margins.bottom;
+    crossSpan = dims.width - margins.left - margins.right;
+  } else {
+    primarySpan = dims.width - margins.left - margins.right;
+    crossSpan = dims.height - margins.top - margins.bottom;
+  }
+
+  const fontSizeMm = primarySpan / charsPerLine;
+  const lineHeightRatio = crossSpan / linesPerPage / fontSizeMm;
+
+  return { fontSizeMm, lineHeightRatio };
 }
