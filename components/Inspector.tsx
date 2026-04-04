@@ -35,6 +35,8 @@ export default function Inspector({
   charCount = 0,
   selectedCharCount = 0,
   paragraphCount = 0,
+  manuscriptCellCount,
+  manuscriptPages: manuscriptPagesProp,
   fileName = "無題",
   isDirty = false,
   isSaving = false,
@@ -170,8 +172,9 @@ export default function Inspector({
     setIsEditingFileName(false);
   }, [baseName]);
 
-  // 原稿用紙換算（400字/枚）
-  const manuscriptPages = Math.ceil(charCount / 400);
+  // 原稿用紙換算枚数：app/page.tsx から常に渡される。
+  // undefined になるのは Inspector を直接使うテスト等のレアケースのみ。
+  const manuscriptPages = manuscriptPagesProp ?? 0;
 
   return (
     <aside

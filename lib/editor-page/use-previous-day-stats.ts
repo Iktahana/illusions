@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getHistoryService } from "@/lib/services/history-service";
-import { chars } from "@/lib/editor-page/types";
+import { computeTextStatistics } from "@/lib/editor-page/text-statistics";
 
 import type { SnapshotEntry } from "@/lib/services/history-service";
 
@@ -11,8 +11,13 @@ import type { SnapshotEntry } from "@/lib/services/history-service";
  * 前日比較データ。
  */
 export interface PreviousDayStats {
-  /** Character count from the last snapshot of the previous day */
+  /**
+   * 可視本文文字数（空白・改行・記法を除く）。
+   * computeTextStatistics と同じ基準で計算。
+   */
   charCount: number;
+  /** 原稿用紙換算枚数 */
+  manuscriptPages: number;
   /** Timestamp of the reference snapshot */
   timestamp: number;
 }
@@ -81,14 +86,16 @@ export function usePreviousDayStats(
 
         const prevSnapshot = findPreviousDaySnapshot(snapshots);
         if (prevSnapshot) {
-          // Load snapshot content and count with chars() (whitespace-stripped)
-          // to match StatsPanel's charCount calculation
+          // Load snapshot content and compute statistics with computeTextStatistics
+          // to match StatsPanel's charCount and manuscriptPages calculation
           const content = await historyService.getSnapshotContent(prevSnapshot.id);
           if (cancelled) return;
 
           if (content !== null) {
+            const stats = computeTextStatistics(content);
             setStats({
-              charCount: chars(content),
+              charCount: stats.visibleTextCharCount,
+              manuscriptPages: stats.manuscriptPages,
               timestamp: prevSnapshot.timestamp,
             });
           } else {

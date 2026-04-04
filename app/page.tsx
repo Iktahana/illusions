@@ -632,13 +632,18 @@ export default function EditorPage() {
 
   // --- Text statistics hook ---
   const {
-    charCount,
+    visibleTextCharCount,
+    manuscriptCellCount,
+    manuscriptPages,
     paragraphCount,
     sentenceCount,
     charTypeAnalysis,
     charUsageRates,
     readabilityAnalysis,
   } = useTextStatistics(content);
+
+  // charCount は旧インターフェース互換用エイリアス（可視本文文字数）
+  const charCount = visibleTextCharCount;
 
   // --- Previous day comparison ---
   const previousDayStats = usePreviousDayStats(currentFile?.name, isProjectMode(editorMode));
@@ -826,6 +831,8 @@ export default function EditorPage() {
     charCount,
     selectedCharCount,
     paragraphCount,
+    manuscriptCellCount,
+    manuscriptPages,
     fileName,
     isDirty,
     isSaving,

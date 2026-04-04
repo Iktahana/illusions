@@ -34,9 +34,14 @@ export interface EnrichedLintIssue extends LintIssue {
 export interface InspectorProps {
   className?: string;
   compactMode?: boolean;
+  /** 可視本文文字数（空白・改行・記法を除く） */
   charCount?: number;
   selectedCharCount?: number;
   paragraphCount?: number;
+  /** 原稿用紙マス数（20×20、禁則処理あり） */
+  manuscriptCellCount?: number;
+  /** 原稿用紙換算枚数（切り上げ） */
+  manuscriptPages?: number;
   fileName?: string;
   isDirty?: boolean;
   isSaving?: boolean;

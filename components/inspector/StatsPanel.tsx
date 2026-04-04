@@ -1,15 +1,20 @@
 "use client";
 
 import InfoTooltip from "./InfoTooltip";
-import { calculateManuscriptPages } from "@/lib/utils";
 
 import type { PreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
 
 interface StatsPanelProps {
+  /** 可視本文文字数（空白・改行・記法を除く） */
   charCount: number;
+  /** 選択中の可視本文文字数 */
   selectedCharCount: number;
+  /** 段落数 */
   paragraphCount: number;
+  /** 原稿用紙換算枚数 */
   manuscriptPages: number;
+  /** 原稿用紙マス数（20×20） */
+  manuscriptCellCount?: number;
   sentenceCount?: number;
   charTypeAnalysis?: {
     kanji: number;
@@ -45,6 +50,7 @@ export default function StatsPanel({
   selectedCharCount,
   paragraphCount,
   manuscriptPages,
+  manuscriptCellCount,
   sentenceCount = 0,
   charTypeAnalysis,
   charUsageRates,
@@ -54,11 +60,12 @@ export default function StatsPanel({
   const isSelection = selectedCharCount > 0;
   const activeCharCount = isSelection ? selectedCharCount : charCount;
 
-  // Previous day comparison
+  // Previous day comparison（可視本文文字数ベースで比較）
   const prevDayCharDiff = previousDayStats ? charCount - previousDayStats.charCount : null;
-  const prevDayPageDiff = previousDayStats
-    ? manuscriptPages - calculateManuscriptPages(previousDayStats.charCount)
-    : null;
+  const prevDayPageDiff =
+    previousDayStats && previousDayStats.manuscriptPages !== undefined
+      ? manuscriptPages - previousDayStats.manuscriptPages
+      : null;
 
   // Approximate punctuation estimation
   const estimatedPunctuation = Math.floor(activeCharCount * 0.12);
@@ -137,9 +144,16 @@ export default function StatsPanel({
         <div className="bg-background-secondary rounded-lg p-3 border border-border flex items-center justify-between">
           <div>
             <p className="text-xs text-foreground-tertiary font-medium mb-1 flex items-center">
-              <InfoTooltip content="400字詰め原稿用紙に換算した枚数">原稿用紙</InfoTooltip>
+              <InfoTooltip content="400字詰め原稿用紙（20×20）に換算した枚数。明示改行で行送り、禁則処理あり。端数切り上げ。">
+                原稿用紙
+              </InfoTooltip>
             </p>
-            <p className="text-xs text-foreground-tertiary">400字詰原稿用紙</p>
+            <p className="text-xs text-foreground-tertiary">
+              400字詰原稿用紙
+              {manuscriptCellCount !== undefined && (
+                <span className="ml-1 opacity-70">({manuscriptCellCount}マス)</span>
+              )}
+            </p>
           </div>
           <div className="text-right">
             <span className="text-sm font-bold text-foreground">{manuscriptPages}枚</span>
@@ -250,7 +264,7 @@ export default function StatsPanel({
           <div className="flex justify-between items-center gap-2">
             <div className="flex items-center gap-1 min-w-0">
               <InfoTooltip
-                content="空白・改行を含むすべての文字数（原稿用紙換算の基準）"
+                content="記法を除いた可視本文の文字数（空白・改行は含まない）"
                 className="text-sm text-foreground-secondary whitespace-nowrap"
               >
                 総字数
