@@ -62,12 +62,17 @@ jobs:
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
 
           # Diff stat for changed code files
-          DIFF_STAT=$(git diff --stat "HEAD@{24 hours ago}" HEAD \
-            -- \
-            '*.ts' '*.tsx' '*.js' '*.mjs' \
-            'components/**' 'lib/**' 'electron/**' 'app/**' \
-            'contexts/**' 'packages/**' \
-            2>/dev/null || echo "Diff not available")
+          BASE_COMMIT=$(git rev-list -1 --before="24 hours ago" HEAD || true)
+          if [ -n "$BASE_COMMIT" ]; then
+            DIFF_STAT=$(git diff --stat "$BASE_COMMIT" HEAD \
+              -- \
+              '*.ts' '*.tsx' '*.js' '*.mjs' \
+              'components/**' 'lib/**' 'electron/**' 'app/**' \
+              'contexts/**' 'packages/**' \
+              2>/dev/null || echo "Diff not available")
+          else
+            DIFF_STAT="Diff not available (no commits older than 24h)"
+          fi
 
           {
             echo "commits<<COMMITS_EOF"
@@ -186,12 +191,17 @@ jobs:
 
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
 
-          DIFF_STAT=$(git diff --stat "HEAD@{24 hours ago}" HEAD \
-            -- \
-            '*.ts' '*.tsx' '*.js' '*.mjs' \
-            'components/**' 'lib/**' 'electron/**' 'app/**' \
-            'contexts/**' 'packages/**' 'package.json' \
-            2>/dev/null || echo "Diff not available")
+          BASE_COMMIT=$(git rev-list -1 --before="24 hours ago" HEAD || true)
+          if [ -n "$BASE_COMMIT" ]; then
+            DIFF_STAT=$(git diff --stat "$BASE_COMMIT" HEAD \
+              -- \
+              '*.ts' '*.tsx' '*.js' '*.mjs' \
+              'components/**' 'lib/**' 'electron/**' 'app/**' \
+              'contexts/**' 'packages/**' 'package.json' \
+              2>/dev/null || echo "Diff not available")
+          else
+            DIFF_STAT="Diff not available (no commits older than 24h)"
+          fi
 
           {
             echo "commits<<COMMITS_EOF"
@@ -309,8 +319,8 @@ jobs:
                 continue
               fi
 
-              # Resolve relative path from the doc's directory
-              resolved=$(realpath --relative-to="." "$doc_dir/$path" 2>/dev/null || echo "")
+              # Resolve relative path from the doc's directory (-m allows missing targets)
+              resolved=$(realpath -m --relative-to="." "$doc_dir/$path" 2>/dev/null || echo "")
 
               if [ -n "$resolved" ] && [ ! -e "$resolved" ]; then
                 FINDINGS="${FINDINGS}\n- **Broken link** in \`$md_file\`: \`$path\` → resolved to \`$resolved\` (not found)"
