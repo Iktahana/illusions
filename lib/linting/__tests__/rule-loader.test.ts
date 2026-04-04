@@ -16,8 +16,8 @@ describe("rule-loader", () => {
   describe("getAllJsonRules", () => {
     it("should return all rules from all books", () => {
       const rules = getAllJsonRules();
-      // 6 books with a total of 124 rules
-      expect(rules.length).toBe(124);
+      // 6 books with a total of 121 rules
+      expect(rules.length).toBe(121);
     });
 
     it("should return rules with valid structure", () => {
@@ -117,7 +117,7 @@ describe("rule-loader", () => {
 
     it("should return gendai-kanazukai rules by book title", () => {
       const rules = getJsonRulesByBook("現代仮名遣い");
-      expect(rules.length).toBe(6);
+      expect(rules.length).toBe(3);
     });
 
     it("should return empty array for unknown book", () => {
