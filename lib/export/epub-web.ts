@@ -24,10 +24,7 @@ export type { EpubExportOptions };
  * @param options - EPUB export options
  * @returns EPUB data as a Blob
  */
-export async function generateEpubBlob(
-  content: string,
-  options: EpubExportOptions,
-): Promise<Blob> {
+export async function generateEpubBlob(content: string, options: EpubExportOptions): Promise<Blob> {
   const fileMap = buildEpubFiles(content, options);
 
   // Build fflate input as Record<path, [Uint8Array, per-file options]>

@@ -20,10 +20,7 @@ export interface EpubExportOptions {
  *
  * @returns Map<zip-path, string-content>
  */
-export function buildEpubFiles(
-  content: string,
-  options: EpubExportOptions,
-): Map<string, string> {
+export function buildEpubFiles(content: string, options: EpubExportOptions): Map<string, string> {
   const { metadata } = options;
   const title = metadata.title || "Untitled";
   const author = metadata.author || "";
@@ -155,11 +152,7 @@ ${tocItems}
 </html>`;
 }
 
-function generateChapterXhtml(
-  title: string,
-  htmlContent: string,
-  language: string,
-): string {
+function generateChapterXhtml(title: string, htmlContent: string, language: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="${language}" lang="${language}">
