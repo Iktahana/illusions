@@ -37,7 +37,9 @@ interface UseExportParams {
  * @param suggestedName - Default file name shown in the save dialog
  * @param accept - MIME type → extensions map for the file picker
  * @param isElectron - True when running inside Electron renderer
- * @param electronExt - File extension for Electron save dialog (e.g. ".txt")
+ * @param electronExt - File extension for Electron save dialog. Currently only
+ *   ".txt" is routed through Electron IPC here; DOCX/EPUB/PDF use dedicated
+ *   IPC export handlers and never reach this function in Electron mode.
  */
 async function saveBlobFile(
   blob: Blob,
@@ -286,14 +288,31 @@ async function exportAsWeb(
       "印刷ダイアログからPDFとして保存できます（縦書き・詳細設定はデスクトップ版のみ対応）",
     );
 
+    // Show a loading indicator while the dynamic import runs.
+    // The window is already open (sync), so the user sees immediate feedback.
+    printWindow.document.write(
+      '<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#666"><p>読み込み中…</p></body></html>',
+    );
+
     try {
       const { mdiToHtml } = await import("./mdi-to-html");
       const html = mdiToHtml(content, { bodyOnly: false });
+      printWindow.document.open();
       printWindow.document.write(html);
       printWindow.document.close();
       printWindow.focus();
-      // Close the popup after printing (or when the user cancels the dialog)
-      printWindow.addEventListener("afterprint", () => printWindow.close());
+      // Close the popup after printing (or when the user cancels the dialog).
+      // Safari < 17 does not fire "afterprint", so add a fallback close via
+      // the "focus" event on the opener window (fires when print dialog closes).
+      let closed = false;
+      const closeOnce = (): void => {
+        if (!closed) {
+          closed = true;
+          printWindow.close();
+        }
+      };
+      printWindow.addEventListener("afterprint", closeOnce);
+      window.addEventListener("focus", closeOnce, { once: true });
       printWindow.print();
     } catch (error) {
       printWindow.close();

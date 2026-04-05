@@ -73,7 +73,7 @@ export function buildEpubFiles(
 
 // --- Template generators ---
 
-export function generateContainerXml(): string {
+function generateContainerXml(): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
   <rootfiles>
@@ -82,7 +82,7 @@ export function generateContainerXml(): string {
 </container>`;
 }
 
-export function generateContentOpf(params: {
+function generateContentOpf(params: {
   title: string;
   author: string;
   language: string;
@@ -125,7 +125,7 @@ ${spineItems.join("\n")}
 </package>`;
 }
 
-export function generateTocXhtml(
+function generateTocXhtml(
   title: string,
   chapters: Array<{ title: string; level: number }>,
 ): string {
@@ -155,7 +155,7 @@ ${tocItems}
 </html>`;
 }
 
-export function generateChapterXhtml(
+function generateChapterXhtml(
   title: string,
   htmlContent: string,
   language: string,
@@ -174,7 +174,7 @@ export function generateChapterXhtml(
 </html>`;
 }
 
-export function generateEpubStylesheet(mdiCss: string): string {
+function generateEpubStylesheet(mdiCss: string): string {
   return `/* EPUB base styles */
 body {
   font-family: serif;
@@ -205,7 +205,7 @@ ${mdiCss}`;
 /**
  * Escape a string for safe inclusion in XML content
  */
-export function escapeXml(str: string): string {
+function escapeXml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

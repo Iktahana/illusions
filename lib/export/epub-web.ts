@@ -34,15 +34,10 @@ export async function generateEpubBlob(
   // Preserving Map insertion order ensures "mimetype" is the first entry.
   const zipInput: Record<string, [Uint8Array, ZipOptions]> = {};
 
-  // Use Buffer.from in Node.js (Electron) or TextEncoder in browsers.
-  // Explicitly construct Uint8Array to ensure instanceof checks inside fflate pass.
-  const encode =
-    typeof Buffer !== "undefined"
-      ? (s: string) => {
-          const b = Buffer.from(s, "utf8");
-          return new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
-        }
-      : (s: string) => new Uint8Array(new TextEncoder().encode(s));
+  // Explicitly construct Uint8Array via TextEncoder to ensure fflate's internal
+  // instanceof checks pass. (fflate's strToU8 uses a cached TextEncoder whose
+  // output may fail instanceof in jsdom/vitest environments.)
+  const encode = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));
 
   for (const [path, strContent] of fileMap) {
     // mimetype must be stored uncompressed (level: 0) per EPUB spec
