@@ -175,6 +175,16 @@ export interface AppState {
 
   // キーマップオーバーライド
   keymapOverrides?: Record<string, { modifiers: string[]; key: string } | null>;
+
+  // 辞典設定
+  /** 起動時に辞典データの更新を確認する（デフォルト: true） */
+  dictAutoCheckUpdates?: boolean;
+  /** 更新が見つかった場合に自動ダウンロードする（デフォルト: false） */
+  dictAutoDownload?: boolean;
+  /** インストール済み辞典データのバージョンタグ */
+  dictInstalledVersion?: string;
+  /** 最後に更新確認した ISO タイムスタンプ */
+  dictLastCheckedAt?: string;
 }
 
 /**

@@ -11,12 +11,16 @@ import {
   Search,
   Globe,
   ExternalLink,
+  Download,
+  Loader2,
 } from "lucide-react";
 import type { UserDictionaryEntry } from "@/lib/project/project-types";
 import type { EditorMode } from "@/lib/project/project-types";
 import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
 import { getUserDictionaryService } from "@/lib/services/user-dictionary-service";
 import DictionaryEntryDialog from "./Dictionary/DictionaryEntryDialog";
+import { getDictService } from "@/lib/dict/dict-service";
+import type { DictEntry, DictDownloadStatus } from "@/lib/dict/dict-types";
 
 // Web dictionary sources
 interface WebDictionarySource {
@@ -76,6 +80,12 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   const [activeSearchQuery, setActiveSearchQuery] = useState("");
 
+  // Master dict state
+  const [masterResults, setMasterResults] = useState<DictEntry[]>([]);
+  const [masterLoading, setMasterLoading] = useState(false);
+  const [masterStatus, setMasterStatus] = useState<DictDownloadStatus>("not-installed");
+  const [expandedMasterId, setExpandedMasterId] = useState<string | null>(null);
+
   // Persistence
   const dictService = getUserDictionaryService();
 
@@ -113,6 +123,14 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
     void loadEntries();
   }, [loadEntries]);
 
+  // Check master dict status on mount
+  useEffect(() => {
+    getDictService()
+      .getDownloadState("illusions-dict")
+      .then((state) => setMasterStatus(state.status))
+      .catch(() => {});
+  }, []);
+
   // Update search when initialSearchTerm changes
   useEffect(() => {
     if (initialSearchTerm && searchTriggerId) {
@@ -120,6 +138,26 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
       setActiveSearchQuery(initialSearchTerm);
     }
   }, [initialSearchTerm, searchTriggerId]);
+
+  // Query master dict when search changes
+  useEffect(() => {
+    if (!activeSearchQuery.trim()) {
+      setMasterResults([]);
+      return;
+    }
+
+    setMasterLoading(true);
+    getDictService()
+      .query(activeSearchQuery.trim())
+      .then((result) => {
+        setMasterResults(result.entries);
+        if (result.providerUnavailable && !result.webApiPending) {
+          setMasterStatus("not-installed");
+        }
+      })
+      .catch(() => setMasterResults([]))
+      .finally(() => setMasterLoading(false));
+  }, [activeSearchQuery]);
 
   // --- Modal handlers ---
 
@@ -152,7 +190,6 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
     if (!formData.word?.trim()) return;
 
     if (editingEntry) {
-      // Update existing
       const updated = userEntries.map((e) =>
         e.id === editingEntry.id
           ? {
@@ -169,7 +206,6 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
       setUserEntries(updated);
       await persistEntries(updated);
     } else {
-      // Add new
       const entry: UserDictionaryEntry = {
         id: Date.now().toString(),
         word: formData.word.trim(),
@@ -201,7 +237,10 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
     setExpandedId((prev) => (prev === id ? null : id));
   }, []);
 
-  // Filtered entries — memoized to avoid re-filtering on unrelated renders
+  const toggleExpandMaster = useCallback((id: string) => {
+    setExpandedMasterId((prev) => (prev === id ? null : id));
+  }, []);
+
   const filteredEntries = useMemo(
     () =>
       userEntries.filter(
@@ -212,6 +251,20 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
       ),
     [userEntries, activeSearchQuery],
   );
+
+  const handleDownloadDict = useCallback(() => {
+    const api = (
+      window as Window & {
+        electronAPI?: { dict?: { download: () => Promise<{ success?: boolean; error?: string }> } };
+      }
+    ).electronAPI?.dict;
+    if (!api) return;
+
+    setMasterStatus("downloading");
+    void api.download().then((result) => {
+      setMasterStatus(result.success ? "installed" : "error");
+    });
+  }, []);
 
   return (
     <div className="h-full bg-background-secondary border-r border-border flex flex-col">
@@ -382,7 +435,6 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                             </p>
                           </div>
                         )}
-
                         {entry.examples && (
                           <div>
                             <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
@@ -393,7 +445,6 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                             </p>
                           </div>
                         )}
-
                         {entry.notes && (
                           <div>
                             <h4 className="text-xs font-semibold text-foreground-secondary mb-1">
@@ -404,7 +455,6 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                             </p>
                           </div>
                         )}
-
                         {!entry.definition && !entry.examples && !entry.notes && (
                           <p className="text-sm text-foreground-tertiary">詳細情報はありません</p>
                         )}
@@ -428,52 +478,123 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
             )}
           </div>
         ) : (
-          /* Web dictionary tab */
+          /* Web dictionary tab — master dict results at top, web links below */
           <div className="flex flex-col h-full">
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {!activeSearchQuery ? (
-                <div className="text-center py-8 text-foreground-secondary text-sm">
+            <div className="flex-1 overflow-y-auto">
+              {activeSearchQuery ? (
+                <div className="p-4 space-y-3">
+                  {/* Loading indicator */}
+                  {masterLoading && (
+                    <div className="flex items-center gap-2 text-sm text-foreground-secondary">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      辞典を検索中...
+                    </div>
+                  )}
+
+                  {/* Not installed banner (Electron only) */}
+                  {!masterLoading &&
+                    masterStatus === "not-installed" &&
+                    isElectron() && (
+                      <div className="bg-background-elevated border border-border rounded-lg p-3 flex items-center justify-between gap-3">
+                        <span className="text-sm text-foreground-secondary">
+                          辞典データ未インストール
+                        </span>
+                        <button
+                          onClick={handleDownloadDict}
+                          className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors flex-shrink-0"
+                        >
+                          <Download className="w-3 h-3" />
+                          ダウンロード
+                        </button>
+                      </div>
+                    )}
+
+                  {/* Downloading indicator */}
+                  {masterStatus === "downloading" && (
+                    <div className="flex items-center gap-2 text-sm text-foreground-secondary">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      ダウンロード中...
+                    </div>
+                  )}
+
+                  {/* Master dict results */}
+                  {!masterLoading && masterResults.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs font-semibold text-foreground-tertiary">
+                        illusions辞典 ({masterResults.length} 件)
+                      </div>
+                      {masterResults.map((entry) => (
+                        <MasterDictCard
+                          key={`${entry.source}:${entry.id}`}
+                          entry={entry}
+                          isExpanded={expandedMasterId === entry.id}
+                          onToggle={() => toggleExpandMaster(entry.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* No results */}
+                  {!masterLoading &&
+                    masterResults.length === 0 &&
+                    masterStatus === "installed" && (
+                      <p className="text-sm text-foreground-secondary">
+                        「{activeSearchQuery}」の辞典結果なし
+                      </p>
+                    )}
+
+                  {/* Divider */}
+                  <div className="border-t border-border pt-1">
+                    <div className="text-xs font-semibold text-foreground-tertiary mb-2">
+                      Web辞書
+                    </div>
+                  </div>
+
+                  {/* Web links */}
+                  <div className="space-y-2">
+                    {WEB_DICTIONARIES.map((dict) => {
+                      const searchUrl = dict.urlTemplate.replace(
+                        "{query}",
+                        encodeURIComponent(activeSearchQuery),
+                      );
+                      const handleOpenDictionary = () => {
+                        if (isElectron() && window.electronAPI?.openDictionaryPopup) {
+                          window.electronAPI.openDictionaryPopup(
+                            searchUrl,
+                            `${dict.name} - ${activeSearchQuery}`,
+                          );
+                        } else {
+                          window.open(searchUrl, "_blank", "noopener,noreferrer");
+                        }
+                      };
+                      return (
+                        <button
+                          key={dict.id}
+                          onClick={handleOpenDictionary}
+                          className="w-full bg-background-elevated border border-border rounded-lg p-3 hover:bg-hover transition-colors text-left flex items-center gap-3"
+                        >
+                          <Globe className="w-4 h-4 text-foreground-secondary flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-foreground">{dict.name}</div>
+                            <div className="text-xs text-foreground-tertiary truncate mt-0.5">
+                              {searchUrl}
+                            </div>
+                          </div>
+                          <ExternalLink className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                /* Empty state */
+                <div className="p-4 text-center py-8 text-foreground-secondary text-sm">
                   <Globe className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p>検索語を入力してWeb辞書を検索</p>
                   <p className="mt-1 text-xs">
                     {WEB_DICTIONARIES.map((d) => d.name).join("、")}で検索します
                   </p>
                 </div>
-              ) : (
-                WEB_DICTIONARIES.map((dict) => {
-                  const searchUrl = dict.urlTemplate.replace(
-                    "{query}",
-                    encodeURIComponent(activeSearchQuery),
-                  );
-
-                  const handleOpenDictionary = () => {
-                    if (isElectron() && window.electronAPI?.openDictionaryPopup) {
-                      window.electronAPI.openDictionaryPopup(
-                        searchUrl,
-                        `${dict.name} - ${activeSearchQuery}`,
-                      );
-                    } else {
-                      window.open(searchUrl, "_blank", "noopener,noreferrer");
-                    }
-                  };
-
-                  return (
-                    <button
-                      key={dict.id}
-                      onClick={handleOpenDictionary}
-                      className="w-full bg-background-elevated border border-border rounded-lg p-4 hover:bg-hover transition-colors text-left flex items-center gap-3"
-                    >
-                      <Globe className="w-5 h-5 text-foreground-secondary flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-foreground">{dict.name}</div>
-                        <div className="text-xs text-foreground-tertiary truncate mt-0.5">
-                          {searchUrl}
-                        </div>
-                      </div>
-                      <ExternalLink className="w-4 h-4 text-foreground-tertiary flex-shrink-0" />
-                    </button>
-                  );
-                })
               )}
             </div>
           </div>
@@ -492,5 +613,126 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Master dict entry card
+// ---------------------------------------------------------------------------
+
+interface MasterDictCardProps {
+  entry: DictEntry;
+  isExpanded: boolean;
+  onToggle: () => void;
+}
+
+const MasterDictCard = memo(function MasterDictCard({
+  entry,
+  isExpanded,
+  onToggle,
+}: MasterDictCardProps) {
+  const firstDef = entry.definitions[0];
+  const hasSynonyms = entry.relationships.synonyms.length > 0;
+  const hasHomophones = entry.relationships.homophones.length > 0;
+  const hasAntonyms = entry.relationships.antonyms.length > 0;
+
+  return (
+    <div className="bg-background-elevated border border-border rounded-lg overflow-hidden">
+      <div
+        className="p-3 cursor-pointer hover:bg-hover transition-colors"
+        onClick={onToggle}
+      >
+        <div className="flex items-start gap-2">
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-foreground-secondary flex-shrink-0 mt-0.5" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-foreground-secondary flex-shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="font-semibold text-foreground">{entry.entry}</span>
+              {entry.reading.primary && (
+                <span className="text-sm text-foreground-tertiary">{entry.reading.primary}</span>
+              )}
+              {entry.partOfSpeech && (
+                <span className="text-xs px-1.5 py-0.5 bg-background rounded text-foreground-tertiary">
+                  {entry.partOfSpeech}
+                </span>
+              )}
+            </div>
+            {firstDef && (
+              <p className="text-sm text-foreground-secondary mt-1 line-clamp-1">
+                {firstDef.gloss}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div className="border-t border-border p-3 bg-background space-y-2">
+          {entry.definitions.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-foreground-secondary mb-1">意味</h4>
+              <ol className="space-y-1">
+                {entry.definitions.map((def, i) => (
+                  <li key={i} className="text-sm text-foreground">
+                    {entry.definitions.length > 1 && (
+                      <span className="text-foreground-tertiary mr-1">{i + 1}.</span>
+                    )}
+                    {def.gloss}
+                    {def.register && (
+                      <span className="ml-1 text-xs text-foreground-tertiary">
+                        ({def.register})
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {(hasSynonyms || hasHomophones || hasAntonyms) && (
+            <div className="space-y-1">
+              {hasSynonyms && (
+                <div>
+                  <span className="text-xs font-semibold text-foreground-secondary">類義語: </span>
+                  <span className="text-xs text-foreground">
+                    {entry.relationships.synonyms.slice(0, 8).join("・")}
+                  </span>
+                </div>
+              )}
+              {hasHomophones && (
+                <div>
+                  <span className="text-xs font-semibold text-foreground-secondary">
+                    同音異義語:{" "}
+                  </span>
+                  <span className="text-xs text-foreground">
+                    {entry.relationships.homophones.slice(0, 8).join("・")}
+                  </span>
+                </div>
+              )}
+              {hasAntonyms && (
+                <div>
+                  <span className="text-xs font-semibold text-foreground-secondary">対義語: </span>
+                  <span className="text-xs text-foreground">
+                    {entry.relationships.antonyms.slice(0, 8).join("・")}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {entry.reading.alternatives.length > 0 && (
+            <div>
+              <span className="text-xs font-semibold text-foreground-secondary">別読み: </span>
+              <span className="text-xs text-foreground">
+                {entry.reading.alternatives.join("、")}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
 
 export default memo(Dictionary);

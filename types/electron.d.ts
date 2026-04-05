@@ -9,6 +9,7 @@ import type {
 import type { Token, WordEntry, TokenizeProgress } from "@/lib/nlp-client/types";
 import type { VFSWatchEvent } from "@/lib/vfs/types";
 import type { KeymapOverrides } from "@/lib/keymap/keymap-types";
+import type { DictEntry, DictDownloadStatus } from "@/lib/dict/dict-types";
 
 export {};
 
@@ -249,6 +250,31 @@ declare global {
       onBufferClose: (callback: (bufferId: string) => void) => () => void;
       /** Remove all editor sync listeners */
       removeAllListeners: () => void;
+    };
+    /** Master dictionary IPC (illusionsDict and future providers) */
+    dict?: {
+      /** Query entries by headword (exact or prefix match) */
+      query: (term: string, limit?: number) => Promise<DictEntry[]>;
+      /** Query entries by kana reading (homophone lookup) */
+      queryByReading: (reading: string, limit?: number) => Promise<DictEntry[]>;
+      /** Get current installation status */
+      getStatus: () => Promise<{
+        status: DictDownloadStatus;
+        installedVersion?: string;
+      }>;
+      /** Check GitHub Releases for the latest version */
+      checkUpdate: () => Promise<{
+        latestVersion?: string;
+        installedVersion?: string;
+        updateAvailable?: boolean;
+        error?: string;
+      }>;
+      /** Download and install the latest database */
+      download: () => Promise<{ success: boolean; version?: string; error?: string }>;
+      /** Subscribe to download progress events (0–100). Returns cleanup function. */
+      onDownloadProgress: (callback: (data: { progress: number }) => void) => () => void;
+      /** Subscribe to update-available notifications pushed from main process. */
+      onUpdateAvailable: (callback: (data: { latestVersion: string; updateAvailable: boolean }) => void) => () => void;
     };
     /** PTY session management */
     pty?: {
