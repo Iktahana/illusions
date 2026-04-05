@@ -25,6 +25,7 @@ import {
   emToTwips,
   ptToHalfPoints,
   lineSpacingToTwips,
+  sanitizeSettings,
 } from "./docx-export-settings";
 
 import type { DocxExportSettings, DocxFontConfig } from "./docx-export-settings";
@@ -40,7 +41,7 @@ export interface DocxExportOptions {
  */
 function buildDocxDocument(content: string, options: DocxExportOptions): Document {
   const { metadata } = options;
-  const settings = options.settings ?? DEFAULT_DOCX_SETTINGS;
+  const settings = options.settings ? sanitizeSettings(options.settings) : DEFAULT_DOCX_SETTINGS;
   const fontConfig = toDocxFont(settings.fontFamily);
   const paragraphs = parseMarkdownToDocxParagraphs(content, settings, fontConfig);
 

@@ -208,6 +208,7 @@ function DocxExportDialogInner({ onClose, onExport }: Omit<DocxExportDialogProps
               <button
                 type="button"
                 role="switch"
+                aria-label="ページ番号"
                 aria-checked={settings.showPageNumbers}
                 onClick={() => updateField("showPageNumbers", !settings.showPageNumbers)}
                 className={clsx(
