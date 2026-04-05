@@ -51,7 +51,6 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
         ],
       },
       { type: "separator" },
-      { type: "separator" },
       { label: "新しいタブ", accelerator: "Ctrl+T", action: "new-tab" },
       { label: "タブを閉じる", accelerator: "Ctrl+W", action: "close-tab" },
     ],
