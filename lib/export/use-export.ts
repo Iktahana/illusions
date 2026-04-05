@@ -15,11 +15,16 @@ interface UseExportParams {
    *  Export operations no-op when false (e.g. terminal or diff tab is active). */
   getIsEditorTabActive: () => boolean;
   /**
-   * When provided, PDF export opens a settings dialog instead of exporting directly.
-   * The callback receives the content and metadata so the parent can show the dialog
+   * When provided, export formats with settings dialogs (PDF, DOCX) open the
+   * dialog instead of exporting directly. The callback receives the format,
+   * content and metadata so the parent can show the appropriate dialog
    * and later call the IPC with user-configured options.
    */
-  onPdfExportRequest?: (content: string, metadata: ExportMetadata) => void;
+  onExportDialogRequest?: (
+    format: "pdf" | "docx",
+    content: string,
+    metadata: ExportMetadata,
+  ) => void;
 }
 
 /**
@@ -95,7 +100,7 @@ export function useExport({
   getContent,
   getTitle,
   getIsEditorTabActive,
-  onPdfExportRequest,
+  onExportDialogRequest,
 }: UseExportParams): {
   exportAs: (format: ExportFormat) => Promise<void>;
 } {
@@ -151,9 +156,13 @@ export function useExport({
         return;
       }
 
-      // PDF export: delegate to settings dialog when callback is provided
-      if (format === "pdf" && onPdfExportRequest && isElectronRenderer()) {
-        onPdfExportRequest(content, metadata);
+      // PDF/DOCX export: delegate to settings dialog when callback is provided
+      if (
+        (format === "pdf" || format === "docx") &&
+        onExportDialogRequest &&
+        isElectronRenderer()
+      ) {
+        onExportDialogRequest(format, content, metadata);
         return;
       }
 
@@ -206,7 +215,7 @@ export function useExport({
         notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
       }
     },
-    [getContent, getTitle, getIsEditorTabActive, isElectron, onPdfExportRequest],
+    [getContent, getTitle, getIsEditorTabActive, isElectron, onExportDialogRequest],
   );
 
   // Register Electron menu event handlers
