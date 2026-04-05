@@ -542,7 +542,7 @@ export default function EditorPage() {
       notificationManager.success("PDFをエクスポートしました");
     } catch (error) {
       notificationManager.dismiss(progressId);
-      const message = error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : "不明なエラー";
       notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
     }
   }, []);
@@ -582,7 +582,7 @@ export default function EditorPage() {
       notificationManager.success("DOCXをエクスポートしました");
     } catch (error) {
       notificationManager.dismiss(progressId);
-      const message = error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : "不明なエラー";
       notificationManager.error(`DOCXのエクスポートに失敗しました: ${message}`);
     }
   }, []);
