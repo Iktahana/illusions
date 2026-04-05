@@ -19,6 +19,19 @@ function isElectron(): boolean {
   );
 }
 
+interface DictAPI {
+  getStatus: () => Promise<{ status: DictDownloadStatus; installedVersion?: string }>;
+  checkUpdate: () => Promise<UpdateInfo>;
+  download: () => Promise<{ success: boolean; version?: string; error?: string }>;
+  onDownloadProgress: (cb: (data: { progress: number }) => void) => () => void;
+}
+
+function getDict(): DictAPI | null {
+  return (
+    (window as Window & { electronAPI?: { dict?: DictAPI } }).electronAPI?.dict ?? null
+  );
+}
+
 export default function DictSettingsTab() {
   const {
     dictAutoCheckUpdates,
@@ -38,27 +51,9 @@ export default function DictSettingsTab() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const electronDict = isElectron()
-    ? (window as Window & { electronAPI?: { dict?: unknown } }).electronAPI?.dict
-    : null;
-
-  const getDict = () =>
-    (
-      window as Window & {
-        electronAPI?: {
-          dict?: {
-            getStatus: () => Promise<{ status: DictDownloadStatus; installedVersion?: string }>;
-            checkUpdate: () => Promise<UpdateInfo>;
-            download: () => Promise<{ success: boolean; version?: string; error?: string }>;
-            onDownloadProgress: (cb: (data: { progress: number }) => void) => () => void;
-          };
-        };
-      }
-    ).electronAPI?.dict ?? null;
-
   // Load status on mount
   useEffect(() => {
-    if (!electronDict) return;
+    if (!isElectron()) return;
 
     const dict = getDict();
     if (!dict) return;

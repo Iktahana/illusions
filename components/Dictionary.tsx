@@ -261,9 +261,14 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
     if (!api) return;
 
     setMasterStatus("downloading");
-    void api.download().then((result) => {
-      setMasterStatus(result.success ? "installed" : "error");
-    });
+    void api
+      .download()
+      .then((result) => {
+        setMasterStatus(result.success ? "installed" : "error");
+      })
+      .catch(() => {
+        setMasterStatus("error");
+      });
   }, []);
 
   return (

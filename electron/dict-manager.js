@@ -65,6 +65,13 @@ class DictManager {
     this._dbPath = null;
     this._versionPath = null;
     this._downloadMutex = new Mutex();
+    this._latestAssetUrl = null;
+    this._latestVersion = null;
+  }
+
+  /** Escape LIKE wildcards so user input cannot inject patterns. */
+  _escapeLike(str) {
+    return str.replace(/[%_\\]/g, "\\$&");
   }
 
   _getDictDir() {
@@ -102,19 +109,12 @@ class DictManager {
     const dbPath = this._getDbPath();
     if (!fs.existsSync(dbPath)) return null;
 
+    // Ensure indexes exist before opening readonly — uses a separate writable connection
+    this._ensureIndexes(dbPath);
+
     try {
-      // Use better-sqlite3 (already a dependency for storage)
       const Database = require("better-sqlite3");
       const db = new Database(dbPath, { readonly: true });
-
-      // Enable WAL mode for better concurrent read performance
-      db.pragma("journal_mode = WAL");
-      db.pragma("query_only = ON");
-
-      // Ensure indexes exist for fast prefix search
-      // (The build script should already create these, but we add them defensively)
-      this._ensureIndexes(db);
-
       this._db = db;
       console.log("[DictManager] Database opened:", dbPath);
       return db;
@@ -124,10 +124,19 @@ class DictManager {
     }
   }
 
-  _ensureIndexes(db) {
+  /**
+   * Check and create indexes if missing. Uses a short-lived writable connection
+   * so the main readonly handle is never leaked.
+   * @param {string} dbPath
+   */
+  _ensureIndexes(dbPath) {
+    let rwDb = null;
     try {
+      const Database = require("better-sqlite3");
+      rwDb = new Database(dbPath);
+
       // Check if the entries table exists at all
-      const tableCheck = db
+      const tableCheck = rwDb
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='entries'")
         .get();
       if (!tableCheck) {
@@ -135,30 +144,32 @@ class DictManager {
         return;
       }
 
-      // Add index on entry column if not present
-      const indexCheck = db
+      // Enable WAL mode (only effective on a writable connection)
+      rwDb.pragma("journal_mode = WAL");
+
+      // Add indexes if not present
+      const indexCheck = rwDb
         .prepare(
           "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_dict_entry_text'",
         )
         .get();
       if (!indexCheck) {
-        console.log("[DictManager] Creating index on entries.entry...");
-        // Use a writable connection just for index creation
-        const Database = require("better-sqlite3");
-        const dbPath = this._getDbPath();
-        const rwDb = new Database(dbPath);
+        console.log("[DictManager] Creating indexes...");
         rwDb.exec(
           "CREATE INDEX IF NOT EXISTS idx_dict_entry_text ON entries(entry);" +
             "CREATE INDEX IF NOT EXISTS idx_dict_definitions_entry_id ON definitions(entry_id);",
         );
-        rwDb.close();
         console.log("[DictManager] Indexes created");
-        // Re-open as readonly
-        this._db = null;
       }
     } catch (err) {
       // Index creation is best-effort; don't fail the whole open
       console.warn("[DictManager] Index check/create failed:", err);
+    } finally {
+      if (rwDb) {
+        try {
+          rwDb.close();
+        } catch {}
+      }
     }
   }
 
@@ -177,15 +188,17 @@ class DictManager {
     if (!db) return [];
 
     try {
-      // Exact match first, then prefix matches
+      // Exact match first, then prefix matches; escape LIKE wildcards
+      const escaped = this._escapeLike(term);
       const rows = db
         .prepare(
           `SELECT e.id, e.entry, e.reading, e.part_of_speech, e.inflections, e.relations
            FROM entries e
-           WHERE e.entry = ? OR e.entry LIKE ?
+           WHERE e.entry = ? OR e.entry LIKE ? ESCAPE '\\'
+           ORDER BY (e.entry = ?) DESC, e.entry
            LIMIT ?`,
         )
-        .all(term, `${term}%`, limit);
+        .all(term, `${escaped}%`, term, limit);
 
       return rows.map((row) => this._rowToEntry(row, db));
     } catch (err) {
@@ -205,15 +218,17 @@ class DictManager {
     if (!db) return [];
 
     try {
+      const escaped = this._escapeLike(reading);
       const rows = db
         .prepare(
           `SELECT e.id, e.entry, e.reading, e.part_of_speech, e.inflections, e.relations
            FROM entries e
            WHERE json_extract(e.reading, '$.primary') = ?
-              OR json_extract(e.reading, '$.primary') LIKE ?
+              OR json_extract(e.reading, '$.primary') LIKE ? ESCAPE '\\'
+           ORDER BY (json_extract(e.reading, '$.primary') = ?) DESC, e.entry
            LIMIT ?`,
         )
-        .all(reading, `${reading}%`, limit);
+        .all(reading, `${escaped}%`, reading, limit);
 
       return rows.map((row) => this._rowToEntry(row, db));
     } catch (err) {
@@ -330,6 +345,11 @@ class DictManager {
           },
         },
         (res) => {
+          if (res.statusCode !== 200) {
+            res.resume();
+            reject(new Error(`GitHub API returned HTTP ${res.statusCode}`));
+            return;
+          }
           let data = "";
           res.on("data", (chunk) => (data += chunk));
           res.on("end", () => {
@@ -436,8 +456,14 @@ class DictManager {
       }
 
       onProgress?.(100);
-      console.log("[DictManager] Download complete:", this._latestVersion);
-      return { success: true, version: this._latestVersion };
+      const version = this._latestVersion;
+      console.log("[DictManager] Download complete:", version);
+
+      // Clear cached release info so next download fetches fresh data
+      this._latestAssetUrl = null;
+      this._latestVersion = null;
+
+      return { success: true, version };
     } catch (err) {
       console.error("[DictManager] Download failed:", err);
       // Clean up partial files

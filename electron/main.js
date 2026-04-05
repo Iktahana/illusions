@@ -25,7 +25,7 @@ if (app.isPackaged) {
 }
 
 const { registerNlpHandlers } = require("./ipc/nlp-ipc");
-const { registerStorageHandlers } = require("./ipc/storage-ipc");
+const { registerStorageHandlers, getStorageManager } = require("./ipc/storage-ipc");
 const { registerVFSHandlers } = require("./ipc/vfs-ipc");
 const { setupAutoUpdater, checkForUpdates } = require("./auto-updater");
 const { createMainWindow, broadcastPowerState } = require("./window-manager");
@@ -181,9 +181,7 @@ app.whenReady().then(async () => {
   // 辞典データ更新確認（AppState の dictAutoCheckUpdates が true の場合のみ）
   setTimeout(async () => {
     try {
-      const { ElectronStorageManager } = require("../lib/storage/electron-storage-manager");
-      const storageManager = new ElectronStorageManager();
-      const appState = await storageManager.loadAppState();
+      const appState = await getStorageManager().loadAppState();
       // Default to checking if not explicitly disabled
       const shouldCheck = appState?.dictAutoCheckUpdates !== false;
       if (shouldCheck) {
