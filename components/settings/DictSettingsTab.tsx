@@ -120,7 +120,7 @@ export default function DictSettingsTab() {
   const formatDate = (iso: string | undefined) => {
     if (!iso) return null;
     try {
-      return new Date(iso).toLocaleDateString("ja-JP", {
+      return new Date(iso).toLocaleString("ja-JP", {
         year: "numeric",
         month: "long",
         day: "numeric",

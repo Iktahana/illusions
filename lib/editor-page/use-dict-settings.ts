@@ -48,25 +48,33 @@ export function useDictSettings(): UseDictSettingsResult {
 
   const handleDictAutoCheckUpdatesChange = useCallback((value: boolean) => {
     setDictAutoCheckUpdates(value);
-    void persistAppState({ dictAutoCheckUpdates: value });
+    void persistAppState({ dictAutoCheckUpdates: value }).catch((e: unknown) =>
+      console.error("辞書設定の保存に失敗しました", e),
+    );
   }, []);
 
   const handleDictAutoDownloadChange = useCallback((value: boolean) => {
     setDictAutoDownload(value);
-    void persistAppState({ dictAutoDownload: value });
+    void persistAppState({ dictAutoDownload: value }).catch((e: unknown) =>
+      console.error("辞書設定の保存に失敗しました", e),
+    );
   }, []);
 
   const handleDictInstalledVersionChange = useCallback((version: string | undefined) => {
     setDictInstalledVersion(version);
     if (version !== undefined) {
-      void persistAppState({ dictInstalledVersion: version });
+      void persistAppState({ dictInstalledVersion: version }).catch((e: unknown) =>
+        console.error("辞書設定の保存に失敗しました", e),
+      );
     }
   }, []);
 
   const handleDictLastCheckedAtChange = useCallback((timestamp: string | undefined) => {
     setDictLastCheckedAt(timestamp);
     if (timestamp !== undefined) {
-      void persistAppState({ dictLastCheckedAt: timestamp });
+      void persistAppState({ dictLastCheckedAt: timestamp }).catch((e: unknown) =>
+        console.error("辞書設定の保存に失敗しました", e),
+      );
     }
   }, []);
 

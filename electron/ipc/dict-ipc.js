@@ -10,10 +10,17 @@ const { getDictManager } = require("../dict-manager");
 function registerDictHandlers() {
   const mgr = getDictManager();
 
+  // Validate and clamp limit to a safe range (1–100)
+  const clampLimit = (raw) => {
+    const n = Number(raw ?? 20);
+    if (!Number.isFinite(n)) return 20;
+    return Math.max(1, Math.min(100, Math.floor(n)));
+  };
+
   // Query by headword
   ipcMain.handle("dict:query", async (_event, { term, limit }) => {
     try {
-      return mgr.query(String(term ?? ""), Number(limit ?? 20));
+      return mgr.query(String(term ?? ""), clampLimit(limit));
     } catch (err) {
       console.error("[Dict IPC] dict:query failed:", err);
       return [];
@@ -23,7 +30,7 @@ function registerDictHandlers() {
   // Query by kana reading (homophone lookup)
   ipcMain.handle("dict:query-reading", async (_event, { reading, limit }) => {
     try {
-      return mgr.queryByReading(String(reading ?? ""), Number(limit ?? 20));
+      return mgr.queryByReading(String(reading ?? ""), clampLimit(limit));
     } catch (err) {
       console.error("[Dict IPC] dict:query-reading failed:", err);
       return [];

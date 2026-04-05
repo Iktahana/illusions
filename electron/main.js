@@ -191,11 +191,10 @@ app.whenReady().then(async () => {
           const updateInfo = await mgr.checkUpdate().catch(() => null);
           if (updateInfo?.updateAvailable) {
             console.log("[Dict] Update available:", updateInfo.latestVersion);
-            // Notify the focused window
-            const { getMainWindow } = require("./window-manager");
-            const mainWin = getMainWindow();
-            if (mainWin && !mainWin.isDestroyed()) {
-              mainWin.webContents.send("dict:update-available", updateInfo);
+            // Notify the focused window (if any)
+            const focusedWin = BrowserWindow.getFocusedWindow();
+            if (focusedWin && !focusedWin.isDestroyed()) {
+              focusedWin.webContents.send("dict:update-available", updateInfo);
             }
           }
         }

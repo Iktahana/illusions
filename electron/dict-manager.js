@@ -109,8 +109,14 @@ class DictManager {
     const dbPath = this._getDbPath();
     if (!fs.existsSync(dbPath)) return null;
 
-    // Ensure indexes exist before opening readonly — uses a separate writable connection
-    this._ensureIndexes(dbPath);
+    // Only attempt index creation / WAL if the file is writable
+    try {
+      fs.accessSync(dbPath, fs.constants.W_OK);
+      this._ensureIndexes(dbPath);
+    } catch {
+      // File is read-only on disk — skip index/WAL setup
+      console.warn("[DictManager] DB file is not writable; skipping index/WAL setup");
+    }
 
     try {
       const Database = require("better-sqlite3");
@@ -182,6 +188,8 @@ class DictManager {
    * @returns {import("../lib/dict/dict-types").DictEntry[]}
    */
   query(term, limit = 20) {
+    // Avoid opening the DB while a download/rename is in progress
+    if (this._downloadMutex.locked) return [];
     const db = this._openDb();
     if (!db) return [];
 
@@ -212,6 +220,8 @@ class DictManager {
    * @returns {import("../lib/dict/dict-types").DictEntry[]}
    */
   queryByReading(reading, limit = 20) {
+    // Avoid opening the DB while a download/rename is in progress
+    if (this._downloadMutex.locked) return [];
     const db = this._openDb();
     if (!db) return [];
 
@@ -524,7 +534,7 @@ class DictManager {
               }
             });
             res.pipe(fileStream);
-            fileStream.on("finish", resolve);
+            fileStream.on("close", resolve);
             fileStream.on("error", reject);
             res.on("error", reject);
           })
@@ -548,7 +558,7 @@ class DictManager {
       src.on("error", reject);
       gunzip.on("error", reject);
       dest.on("error", reject);
-      dest.on("finish", resolve);
+      dest.on("close", resolve);
 
       src.pipe(gunzip).pipe(dest);
     });

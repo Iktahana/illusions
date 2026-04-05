@@ -120,7 +120,7 @@ class DictService {
       const raw = await electronAPI.dict.getStatus();
       return { providerId, ...raw };
     } catch {
-      return { providerId, status: "error", error: "Failed to get status" };
+      return { providerId, status: "error", error: "状態の取得に失敗しました" };
     }
   }
 }

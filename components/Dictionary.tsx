@@ -637,7 +637,18 @@ const MasterDictCard = memo(function MasterDictCard({
 
   return (
     <div className="bg-background-elevated border border-border rounded-lg overflow-hidden">
-      <div className="p-3 cursor-pointer hover:bg-hover transition-colors" onClick={onToggle}>
+      <div
+        className="p-3 cursor-pointer hover:bg-hover transition-colors"
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+      >
         <div className="flex items-start gap-2">
           {isExpanded ? (
             <ChevronDown className="w-4 h-4 text-foreground-secondary flex-shrink-0 mt-0.5" />
