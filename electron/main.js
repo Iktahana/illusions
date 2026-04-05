@@ -25,7 +25,7 @@ if (app.isPackaged) {
 }
 
 const { registerNlpHandlers } = require("./ipc/nlp-ipc");
-const { registerStorageHandlers } = require("./ipc/storage-ipc");
+const { registerStorageHandlers, getStorageManager } = require("./ipc/storage-ipc");
 const { registerVFSHandlers } = require("./ipc/vfs-ipc");
 const { setupAutoUpdater, checkForUpdates } = require("./auto-updater");
 const { createMainWindow, broadcastPowerState } = require("./window-manager");
@@ -42,6 +42,8 @@ const { registerPtyHandlers } = require("./ipc/pty-ipc");
 const { killAllSessions, killSessionsForWindow } = require("./ipc/terminal-session-registry");
 const { registerAuthHandlers, handleAuthCallback } = require("./ipc/auth-ipc");
 const { registerEditorHandlers } = require("./ipc/editor-ipc");
+const { registerDictHandlers } = require("./ipc/dict-ipc");
+const { getDictManager } = require("./dict-manager");
 
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
@@ -162,6 +164,7 @@ app.whenReady().then(async () => {
   registerPtyHandlers();
   registerAuthHandlers();
   registerEditorHandlers();
+  registerDictHandlers();
 
   // Power state monitoring
   powerMonitor.on("on-ac", () => broadcastPowerState("ac"));
@@ -174,6 +177,32 @@ app.whenReady().then(async () => {
   setTimeout(() => {
     checkForUpdates(false);
   }, 3000);
+
+  // 辞典データ更新確認（AppState の dictAutoCheckUpdates が true の場合のみ）
+  setTimeout(async () => {
+    try {
+      const appState = await getStorageManager().loadAppState();
+      // Default to checking if not explicitly disabled
+      const shouldCheck = appState?.dictAutoCheckUpdates !== false;
+      if (shouldCheck) {
+        const mgr = getDictManager();
+        const status = mgr.getStatus();
+        if (status.status === "installed") {
+          const updateInfo = await mgr.checkUpdate().catch(() => null);
+          if (updateInfo?.updateAvailable) {
+            console.log("[Dict] Update available:", updateInfo.latestVersion);
+            // Notify the focused window (if any)
+            const focusedWin = BrowserWindow.getFocusedWindow();
+            if (focusedWin && !focusedWin.isDestroyed()) {
+              focusedWin.webContents.send("dict:update-available", updateInfo);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Dict] Auto update check failed:", err);
+    }
+  }, 5000);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) void createMainWindow();

@@ -10,16 +10,20 @@ import { useDisplaySettings } from "./use-display-settings";
 import type { DisplaySettings, DisplaySettingsHandlers } from "./use-display-settings";
 import { useAiSettings } from "./use-ai-settings";
 import type { AiSettings, AiSettingsHandlers } from "./use-ai-settings";
+import { useDictSettings } from "./use-dict-settings";
+import type { DictSettings, DictSettingsHandlers } from "./use-dict-settings";
 
 export type { DisplaySettings, DisplaySettingsHandlers } from "./use-display-settings";
 export type { AiSettings, AiSettingsHandlers } from "./use-ai-settings";
+export type { DictSettings, DictSettingsHandlers } from "./use-dict-settings";
 
-/** Combined editor settings from display and AI sub-hooks */
-export type EditorSettings = DisplaySettings & AiSettings;
+/** Combined editor settings from display, AI, and dictionary sub-hooks */
+export type EditorSettings = DisplaySettings & AiSettings & DictSettings;
 
-/** Combined handlers from display and AI sub-hooks */
+/** Combined handlers from display, AI, and dictionary sub-hooks */
 export type EditorSettingsHandlers = Omit<DisplaySettingsHandlers, "setShowSettingsModal"> &
-  Omit<AiSettingsHandlers, "setLintingEnabled" | "setLintingRuleConfigs" | "setLlmEnabled"> & {
+  Omit<AiSettingsHandlers, "setLintingEnabled" | "setLintingRuleConfigs" | "setLlmEnabled"> &
+  DictSettingsHandlers & {
     setShowSettingsModal: (value: boolean) => void;
     handleLintingEnabledChange: (value: boolean) => void;
     handleLintingRuleConfigChange: (
@@ -60,6 +64,7 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
     useDisplaySettings(incrementEditorKey);
 
   const { aiSettings, aiHandlers, applyPersistedAiSettings } = useAiSettings();
+  const { dictSettings, dictHandlers, applyPersistedDictSettings } = useDictSettings();
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -72,6 +77,7 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
 
         applyPersistedDisplaySettings(appState as Record<string, unknown>);
         applyPersistedAiSettings(appState as Record<string, unknown>);
+        applyPersistedDictSettings(appState as Record<string, unknown>);
 
         // Force editor rebuild to apply restored settings (e.g. custom font)
         incrementEditorKey();
@@ -90,6 +96,7 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
   const settings: EditorSettings = {
     ...displaySettings,
     ...aiSettings,
+    ...dictSettings,
   };
 
   const handlers: EditorSettingsHandlers = {
@@ -106,6 +113,10 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
     handlePowerSaveModeChange: aiHandlers.handlePowerSaveModeChange,
     handleAutoPowerSaveOnBatteryChange: aiHandlers.handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange: aiHandlers.handleCorrectionConfigChange,
+    handleDictAutoCheckUpdatesChange: dictHandlers.handleDictAutoCheckUpdatesChange,
+    handleDictAutoDownloadChange: dictHandlers.handleDictAutoDownloadChange,
+    handleDictInstalledVersionChange: dictHandlers.handleDictInstalledVersionChange,
+    handleDictLastCheckedAtChange: dictHandlers.handleDictLastCheckedAtChange,
   };
 
   return {
