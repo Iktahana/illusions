@@ -91,7 +91,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function sanitizeSettings(raw: Partial<DocxExportSettings>): DocxExportSettings {
+export function sanitizeSettings(raw: Partial<DocxExportSettings>): DocxExportSettings {
   const d = DEFAULT_DOCX_SETTINGS;
   const validPageSizes: DocxPageSize[] = ["A4", "A5", "B5", "B6"];
   const pageSize = validPageSizes.includes(raw.pageSize as DocxPageSize)
