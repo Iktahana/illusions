@@ -85,6 +85,9 @@ const mockDb = {
 // The WebStorageDatabase extends Dexie, so we need to replace the
 // Dexie constructor and the version().stores() chain.
 // -----------------------------------------------------------------------
+/** Captured upgrade callbacks keyed by version number */
+const capturedUpgrades: Map<number, (tx: any) => any> = new Map();
+
 vi.mock("dexie", () => {
   class FakeDexie {
     constructor() {
@@ -100,12 +103,14 @@ vi.mock("dexie", () => {
         kvStore: mockDb.kvStore,
       });
     }
-    version() {
-      return {
-        stores: () => ({
-          version: () => ({ stores: () => ({}) }),
-        }),
+    version(num: number) {
+      const versionObj: Record<string, unknown> = {};
+      versionObj.stores = () => versionObj;
+      versionObj.upgrade = (cb: (tx: any) => any) => {
+        capturedUpgrades.set(num, cb);
+        return versionObj;
       };
+      return versionObj;
     }
   }
   return { default: FakeDexie };
@@ -390,6 +395,61 @@ describe("WebStorageProvider", () => {
       expect(await provider.loadAppState()).toBeNull();
       expect(await provider.getRecentFiles()).toEqual([]);
       expect(await provider.loadEditorBuffer()).toBeNull();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Dexie v4 migration: backfill handleKey
+  // -----------------------------------------------------------------------
+  describe("v4 migration (handleKey backfill)", () => {
+    /** Helper to run the captured v4 upgrade callback against simulated records */
+    function runV4Migration(records: Record<string, unknown>[]) {
+      const upgradeFn = capturedUpgrades.get(4);
+      expect(upgradeFn).toBeDefined();
+
+      // Simulate Dexie tx.table().toCollection().modify()
+      const fakeTx = {
+        table: () => ({
+          toCollection: () => ({
+            modify: (cb: (record: Record<string, unknown>) => void) => {
+              for (const rec of records) cb(rec);
+            },
+          }),
+        }),
+      };
+      upgradeFn!(fakeTx);
+    }
+
+    it("generates handleKey from projectId and rootDirName", () => {
+      const record = { projectId: "proj-1", rootDirName: "my-novel" };
+      runV4Migration([record]);
+      expect(record).toHaveProperty("handleKey", "proj-1:my-novel");
+    });
+
+    it("derives rootDirName from rootHandle.name when missing", () => {
+      const record: Record<string, unknown> = {
+        projectId: "proj-2",
+        rootHandle: { name: "derived-dir" },
+      };
+      runV4Migration([record]);
+      expect(record.handleKey).toBe("proj-2:derived-dir");
+      expect(record.rootDirName).toBe("derived-dir");
+    });
+
+    it("falls back to projectId when rootDirName and rootHandle.name are both missing", () => {
+      const record: Record<string, unknown> = { projectId: "proj-3" };
+      runV4Migration([record]);
+      expect(record.handleKey).toBe("proj-3:proj-3");
+    });
+
+    it("skips records that already have handleKey", () => {
+      const record = {
+        handleKey: "existing:key",
+        projectId: "proj-4",
+        rootDirName: "dir",
+      };
+      runV4Migration([record]);
+      expect(record.handleKey).toBe("existing:key");
     });
   });
 });
