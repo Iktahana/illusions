@@ -52,7 +52,7 @@ async function saveBlobFile(
   // other formats use dedicated IPC export handlers)
   if (isElectron && window.electronAPI && electronExt === ".txt") {
     const text = await blob.text();
-    const result = await window.electronAPI.saveFile(null, text, ".txt");
+    const result = await window.electronAPI.saveFile(null, text, electronExt);
     if (result === null) return false;
     if (typeof result === "object" && "success" in result && !result.success) {
       throw new Error(result.error);
@@ -60,7 +60,11 @@ async function saveBlobFile(
     return true;
   }
 
-  // Web: try File System Access API (Chromium browsers)
+  // Web: try File System Access API (Chromium browsers).
+  // Note: showSaveFilePicker requires an active user gesture. When called after
+  // async work (dynamic import + blob generation), the gesture may have expired,
+  // causing an AbortError. This is caught below and falls through to the Blob
+  // URL download fallback, which always works without a gesture.
   if (hasShowSaveFilePicker(window)) {
     try {
       const handle = await window.showSaveFilePicker({
@@ -159,7 +163,7 @@ export function useExport({
           }
         } catch (error) {
           notificationManager.dismiss(progressId);
-          const message = error instanceof Error ? error.message : "Unknown error";
+          const message = error instanceof Error ? error.message : "不明なエラー";
           notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
         }
         return;
@@ -216,7 +220,7 @@ export function useExport({
         notificationManager.success(`${label}をエクスポートしました`);
       } catch (error) {
         notificationManager.dismiss(progressId);
-        const message = error instanceof Error ? error.message : "Unknown error";
+        const message = error instanceof Error ? error.message : "不明なエラー";
         notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
       }
     },
@@ -296,7 +300,7 @@ async function exportAsWeb(
 
     try {
       const { mdiToHtml } = await import("./mdi-to-html");
-      const html = mdiToHtml(content, { bodyOnly: false });
+      const html = mdiToHtml(content, { metadata, bodyOnly: false });
       printWindow.document.open();
       printWindow.document.write(html);
       printWindow.document.close();
@@ -316,7 +320,7 @@ async function exportAsWeb(
       printWindow.print();
     } catch (error) {
       printWindow.close();
-      const message = error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : "不明なエラー";
       notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
     }
     return;
@@ -361,7 +365,7 @@ async function exportAsWeb(
     }
   } catch (error) {
     notificationManager.dismiss(progressId);
-    const message = error instanceof Error ? error.message : "Unknown error";
+    const message = error instanceof Error ? error.message : "不明なエラー";
     notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
   }
 }

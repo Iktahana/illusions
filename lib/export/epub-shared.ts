@@ -51,7 +51,7 @@ export function buildEpubFiles(content: string, options: EpubExportOptions): Map
   );
 
   // 4. OEBPS/toc.xhtml
-  files.set("OEBPS/toc.xhtml", generateTocXhtml(title, chapters));
+  files.set("OEBPS/toc.xhtml", generateTocXhtml(title, chapters, language));
 
   // 5. OEBPS/style.css
   files.set("OEBPS/style.css", generateEpubStylesheet(stylesheet));
@@ -125,6 +125,7 @@ ${spineItems.join("\n")}
 function generateTocXhtml(
   title: string,
   chapters: Array<{ title: string; level: number }>,
+  language: string,
 ): string {
   const tocItems = chapters
     .map(
@@ -135,7 +136,7 @@ function generateTocXhtml(
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ja" lang="ja">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="${language}" lang="${language}">
 <head>
   <meta charset="UTF-8"/>
   <title>${escapeXml(title)}</title>
