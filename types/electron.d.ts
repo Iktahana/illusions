@@ -90,7 +90,19 @@ declare global {
     ) => Promise<string | { success: false; error: string } | null>;
     exportDOCX?: (
       content: string,
-      options: { metadata: { title: string; author?: string; date?: string; language?: string } },
+      options: {
+        metadata: { title: string; author?: string; date?: string; language?: string };
+        settings?: {
+          pageSize?: string;
+          landscape?: boolean;
+          fontFamily?: string;
+          fontSize?: number;
+          lineSpacing?: number;
+          margins?: { top: number; bottom: number; left: number; right: number };
+          textIndent?: number;
+          showPageNumbers?: boolean;
+        };
+      },
     ) => Promise<string | { success: false; error: string } | null>;
     onMenuExportTxt?: (callback: () => void) => (() => void) | void;
     onMenuExportTxtRuby?: (callback: () => void) => (() => void) | void;

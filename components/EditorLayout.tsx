@@ -11,6 +11,7 @@ import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
 import ResizablePanel from "@/components/ResizablePanel";
 import PdfExportDialog from "@/components/PdfExportDialog";
+import DocxExportDialog from "@/components/DocxExportDialog";
 import RubyDialog from "@/components/RubyDialog";
 import SettingsModal from "@/components/SettingsModal";
 import SidebarPanel from "@/components/SidebarPanel";
@@ -43,6 +44,7 @@ import { isEditorTab, type EditorTabState, type TabState } from "@/lib/tab-manag
 import type { ContextMenuState } from "@/lib/hooks/use-context-menu";
 import type { LintIssue } from "@/lib/linting/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
+import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { RuleRunner } from "@/lib/linting/rule-runner";
 import { DockviewReact } from "dockview-react";
@@ -95,11 +97,14 @@ interface EditorLayoutProps {
     setShowRubyDialog: (show: boolean) => void;
     rubySelectedText: string;
     handleApplyRuby: React.ComponentProps<typeof RubyDialog>["onApply"];
-    showPdfExportDialog: boolean;
-    setShowPdfExportDialog: (show: boolean) => void;
-    handlePdfExportConfirm: (settings: PdfExportSettings) => void;
-    pdfExportContent: string;
-    pdfExportMetadata: ExportMetadata;
+    exportDialog: {
+      state: { format: "pdf" | "docx"; content: string; metadata: ExportMetadata } | null;
+      onClose: () => void;
+      onPdfExport: (settings: PdfExportSettings) => void;
+      onDocxExport: (settings: DocxExportSettings) => void;
+      content: string;
+      metadata: ExportMetadata;
+    };
   };
   recovery: {
     wasAutoRecovered?: boolean;
@@ -264,11 +269,17 @@ export default function EditorLayout({
             />
 
             <PdfExportDialog
-              isOpen={dialogs.showPdfExportDialog}
-              onClose={() => dialogs.setShowPdfExportDialog(false)}
-              onExport={dialogs.handlePdfExportConfirm}
-              content={dialogs.pdfExportContent}
-              metadata={dialogs.pdfExportMetadata}
+              isOpen={dialogs.exportDialog.state?.format === "pdf"}
+              onClose={dialogs.exportDialog.onClose}
+              onExport={dialogs.exportDialog.onPdfExport}
+              content={dialogs.exportDialog.content}
+              metadata={dialogs.exportDialog.metadata}
+            />
+
+            <DocxExportDialog
+              isOpen={dialogs.exportDialog.state?.format === "docx"}
+              onClose={dialogs.exportDialog.onClose}
+              onExport={dialogs.exportDialog.onDocxExport}
             />
 
             {!chrome.isElectron && recovery.wasAutoRecovered && !recovery.dismissedRecovery && (
