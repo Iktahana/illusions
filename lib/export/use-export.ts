@@ -23,29 +23,35 @@ interface UseExportParams {
 }
 
 /**
- * Save text content to a file.
+ * Save a Blob to a file.
  *
  * In Electron, uses the native save dialog via the existing `saveFile` IPC
  * channel (filePath = null triggers dialog.showSaveDialog in the main process).
  * This avoids the user-gesture requirement of showSaveFilePicker, which causes
  * a DOMException when the export is triggered from the application menu over IPC.
  *
- * In web browsers, falls back to the File System Access API when available,
- * and finally to a Blob URL download.
+ * In web browsers, uses the File System Access API when available (Chromium),
+ * and falls back to a Blob URL download for other browsers.
  *
- * @param text - UTF-8 text content to write
+ * @param blob - Blob content to write
  * @param suggestedName - Default file name shown in the save dialog
+ * @param accept - MIME type → extensions map for the file picker
  * @param isElectron - True when running inside Electron renderer
+ * @param electronExt - File extension for Electron save dialog (e.g. ".txt")
  */
-async function saveTxtFile(
-  text: string,
+async function saveBlobFile(
+  blob: Blob,
   suggestedName: string,
+  accept: Record<string, string[]>,
   isElectron: boolean,
+  electronExt?: string,
 ): Promise<boolean> {
-  // Electron: delegate to main-process IPC — works regardless of user gesture
-  if (isElectron && window.electronAPI) {
+  // Electron: delegate to main-process IPC (currently only TXT is routed here;
+  // other formats use dedicated IPC export handlers)
+  if (isElectron && window.electronAPI && electronExt === ".txt") {
+    const text = await blob.text();
     const result = await window.electronAPI.saveFile(null, text, ".txt");
-    if (result === null) return false; // User cancelled the dialog
+    if (result === null) return false;
     if (typeof result === "object" && "success" in result && !result.success) {
       throw new Error(result.error);
     }
@@ -59,13 +65,13 @@ async function saveTxtFile(
         suggestedName,
         types: [
           {
-            description: "テキストファイル",
-            accept: { "text/plain": [".txt"] },
+            description: suggestedName.split(".").pop()?.toUpperCase() ?? "ファイル",
+            accept,
           },
         ],
       });
       const writable = await handle.createWritable();
-      await writable.write(text);
+      await writable.write(blob);
       await writable.close();
       return true;
     } catch (error) {
@@ -75,7 +81,6 @@ async function saveTxtFile(
   }
 
   // Fallback: trigger download via Blob URL
-  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -137,7 +142,14 @@ export function useExport({
           const suffix = format === "txt-ruby" ? "_ruby" : "";
           const suggestedName = `${baseName}${suffix}.txt`;
 
-          const saved = await saveTxtFile(converted, suggestedName, isElectron);
+          const blob = new Blob([converted], { type: "text/plain;charset=utf-8" });
+          const saved = await saveBlobFile(
+            blob,
+            suggestedName,
+            { "text/plain": [".txt"] },
+            isElectron,
+            ".txt",
+          );
           notificationManager.dismiss(progressId);
 
           if (saved) {
@@ -151,12 +163,19 @@ export function useExport({
         return;
       }
 
-      // PDF export: delegate to settings dialog when callback is provided
+      // PDF export: delegate to settings dialog when callback is provided (Electron only)
       if (format === "pdf" && onPdfExportRequest && isElectronRenderer()) {
         onPdfExportRequest(content, metadata);
         return;
       }
 
+      // --- Web mode: browser-side export ---
+      if (!isElectron || !window.electronAPI) {
+        await exportAsWeb(format, content, title, metadata, label);
+        return;
+      }
+
+      // --- Electron mode: IPC-based export ---
       const progressId = notificationManager.showProgress(`${label}をエクスポート中...`, {
         type: "info",
       });
@@ -164,27 +183,20 @@ export function useExport({
       try {
         let result: string | { success: false; error: string } | null | undefined;
 
-        if (isElectron && window.electronAPI) {
-          switch (format) {
-            case "pdf":
-              result = await window.electronAPI.exportPDF?.(content, {
-                metadata,
-                verticalWriting: false,
-                pageSize: "A5",
-              });
-              break;
-            case "epub":
-              result = await window.electronAPI.exportEPUB?.(content, { metadata });
-              break;
-            case "docx":
-              result = await window.electronAPI.exportDOCX?.(content, { metadata });
-              break;
-          }
-        } else {
-          // Web mode: not supported yet
-          notificationManager.dismiss(progressId);
-          notificationManager.warning("エクスポート機能はデスクトップ版でのみ利用可能です");
-          return;
+        switch (format) {
+          case "pdf":
+            result = await window.electronAPI.exportPDF?.(content, {
+              metadata,
+              verticalWriting: false,
+              pageSize: "A5",
+            });
+            break;
+          case "epub":
+            result = await window.electronAPI.exportEPUB?.(content, { metadata });
+            break;
+          case "docx":
+            result = await window.electronAPI.exportDOCX?.(content, { metadata });
+            break;
         }
 
         notificationManager.dismiss(progressId);
@@ -239,6 +251,100 @@ export function useExport({
   }, [isElectron, exportAs]);
 
   return { exportAs };
+}
+
+/**
+ * Browser-side export for PDF, EPUB, DOCX.
+ *
+ * PDF: Opens a print dialog. window.open() is called synchronously within the
+ * user gesture to avoid popup blocker. The popup closes automatically on afterprint.
+ *
+ * DOCX/EPUB: Uses dynamic imports to load the browser-compatible exporters,
+ * then triggers a file download via saveBlobFile().
+ */
+async function exportAsWeb(
+  format: ExportFormat,
+  content: string,
+  title: string,
+  metadata: ExportMetadata,
+  label: string,
+): Promise<void> {
+  const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
+
+  if (format === "pdf") {
+    // window.open() must be called synchronously within the user gesture
+    // to avoid popup blocker. Open an empty window now, then populate it.
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      notificationManager.warning(
+        "ポップアップがブロックされました。ブラウザの設定を確認してください。",
+      );
+      return;
+    }
+
+    notificationManager.info(
+      "印刷ダイアログからPDFとして保存できます（縦書き・詳細設定はデスクトップ版のみ対応）",
+    );
+
+    try {
+      const { mdiToHtml } = await import("./mdi-to-html");
+      const html = mdiToHtml(content, { bodyOnly: false });
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      // Close the popup after printing (or when the user cancels the dialog)
+      printWindow.addEventListener("afterprint", () => printWindow.close());
+      printWindow.print();
+    } catch (error) {
+      printWindow.close();
+      const message = error instanceof Error ? error.message : "Unknown error";
+      notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
+    }
+    return;
+  }
+
+  const progressId = notificationManager.showProgress(`${label}をエクスポート中...`, {
+    type: "info",
+  });
+
+  try {
+    let blob: Blob;
+    let suggestedName: string;
+    let accept: Record<string, string[]>;
+
+    switch (format) {
+      case "docx": {
+        const { generateDocxBlob } = await import("./docx-exporter");
+        blob = await generateDocxBlob(content, { metadata });
+        suggestedName = `${baseName}.docx`;
+        accept = {
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+        };
+        break;
+      }
+      case "epub": {
+        const { generateEpubBlob } = await import("./epub-web");
+        blob = await generateEpubBlob(content, { metadata });
+        suggestedName = `${baseName}.epub`;
+        accept = { "application/epub+zip": [".epub"] };
+        break;
+      }
+      default:
+        notificationManager.dismiss(progressId);
+        return;
+    }
+
+    const saved = await saveBlobFile(blob, suggestedName, accept, false);
+    notificationManager.dismiss(progressId);
+
+    if (saved) {
+      notificationManager.success(`${label}をエクスポートしました`);
+    }
+  } catch (error) {
+    notificationManager.dismiss(progressId);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
+  }
 }
 
 /**
