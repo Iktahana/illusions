@@ -35,13 +35,10 @@ export interface DocxExportOptions {
 }
 
 /**
- * Generate a DOCX buffer from MDI markdown content.
- *
- * @param content - MDI markdown content
- * @param options - DOCX export options
- * @returns DOCX data as a Buffer
+ * Build a DOCX Document object from MDI markdown content.
+ * Shared between generateDocx() and generateDocxBlob().
  */
-export async function generateDocx(content: string, options: DocxExportOptions): Promise<Buffer> {
+function buildDocxDocument(content: string, options: DocxExportOptions): Document {
   const { metadata } = options;
   const settings = options.settings ?? DEFAULT_DOCX_SETTINGS;
   const fontConfig = toDocxFont(settings.fontFamily);
@@ -72,7 +69,7 @@ export async function generateDocx(content: string, options: DocxExportOptions):
       }
     : undefined;
 
-  const doc = new Document({
+  return new Document({
     creator: metadata.author || "",
     title: metadata.title || "",
     description: "",
@@ -111,9 +108,31 @@ export async function generateDocx(content: string, options: DocxExportOptions):
       },
     ],
   });
+}
 
+/**
+ * Generate a DOCX buffer from MDI markdown content (Node.js / Electron).
+ *
+ * @param content - MDI markdown content
+ * @param options - DOCX export options
+ * @returns DOCX data as a Buffer
+ */
+export async function generateDocx(content: string, options: DocxExportOptions): Promise<Buffer> {
+  const doc = buildDocxDocument(content, options);
   const buffer = await Packer.toBuffer(doc);
   return Buffer.from(buffer);
+}
+
+/**
+ * Generate a DOCX Blob from MDI markdown content (browser).
+ *
+ * @param content - MDI markdown content
+ * @param options - DOCX export options
+ * @returns DOCX data as a Blob
+ */
+export async function generateDocxBlob(content: string, options: DocxExportOptions): Promise<Blob> {
+  const doc = buildDocxDocument(content, options);
+  return Packer.toBlob(doc);
 }
 
 // --- Markdown parser ---

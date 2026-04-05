@@ -25,7 +25,8 @@ import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugi
 import clsx from "clsx";
 import { EditorView } from "@milkdown/prose/view";
 import { AllSelection, Plugin, PluginKey } from "@milkdown/prose/state";
-import { $prose, replaceAll } from "@milkdown/utils";
+import { $prose, $remark, replaceAll } from "@milkdown/utils";
+import { remarkPlainTextPlugin } from "@/packages/milkdown-plugin-japanese-novel/syntax/remark-plain-text";
 import BubbleMenu, { type FormatType } from "../BubbleMenu";
 import { searchHighlightPlugin } from "@/lib/editor-page/search-highlight-plugin";
 import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin";
@@ -177,6 +178,12 @@ export default function MilkdownEditor({
     [],
   );
 
+  // Derive plain-text mode: fileType ".txt" has both GFM and MDI disabled.
+  // This value is captured at editor mount time, which is safe because each
+  // tab has its own editor instance (keyed by bufferId+editorKey) and a tab's
+  // file type never changes during its lifetime.
+  const isPlainText = !gfmEnabled && !mdiExtensionsEnabled;
+
   const { get } = useEditor(
     (root) => {
       const value = initialContentRef.current;
@@ -189,15 +196,34 @@ export default function MilkdownEditor({
         // listenerCtx 参照より先に listener を読み込む
         .use(listener)
         .config((ctx) => {
-          ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
-            onChangeRef.current?.(markdown);
-          });
+          // Plain-text (.txt) mode: extract raw text directly from ProseMirror
+          // nodes so that tab.content stays as plain text without any markdown
+          // escaping. Non-plain-text mode uses the standard markdown serializer.
+          if (isPlainText) {
+            ctx.get(listenerCtx).updated((_ctx, doc) => {
+              const lines: string[] = [];
+              doc.forEach((node) => {
+                lines.push(node.textContent);
+              });
+              onChangeRef.current?.(lines.join("\n"));
+            });
+          } else {
+            ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
+              onChangeRef.current?.(markdown);
+            });
+          }
         })
         .use(commonmark);
 
       // GFM: conditionally loaded
       if (gfmEnabled) {
         editor = editor.use(gfm);
+      }
+
+      // Plain-text mode: remark plugin converts raw lines to paragraphs,
+      // bypassing all CommonMark syntax interpretation.
+      if (isPlainText) {
+        editor = editor.use($remark("plainText", () => remarkPlainTextPlugin));
       }
 
       // MDI extensions: conditionally loaded
