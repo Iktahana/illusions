@@ -117,6 +117,9 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
     handleDictAutoDownloadChange: dictHandlers.handleDictAutoDownloadChange,
     handleDictInstalledVersionChange: dictHandlers.handleDictInstalledVersionChange,
     handleDictLastCheckedAtChange: dictHandlers.handleDictLastCheckedAtChange,
+    handleAiApiKeyChange: aiHandlers.handleAiApiKeyChange,
+    handleAiBaseUrlChange: aiHandlers.handleAiBaseUrlChange,
+    handleAiModelIdChange: aiHandlers.handleAiModelIdChange,
   };
 
   return {

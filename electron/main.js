@@ -118,6 +118,30 @@ app.whenReady().then(async () => {
   // Content Security Policy
   const { session } = require("electron");
   const { isDev } = require("./app-constants");
+  // Read persisted aiBaseUrl so the custom AI Gateway origin can be added to CSP.
+  // We read directly via storage manager (synchronous SQLite) before setting up the header filter.
+  let extraAiConnectSrc = "";
+  try {
+    const { getStorageManager } = require("./ipc/storage-ipc");
+    const appState = getStorageManager().loadAppState();
+    const aiBaseUrl = appState?.aiBaseUrl;
+    if (aiBaseUrl) {
+      const origin = new URL(aiBaseUrl).origin;
+      // Only add if it is not already covered by the static list
+      const staticHosts = [
+        "https://my.illusions.app",
+        "https://api.openai.com",
+        "https://api.anthropic.com",
+        "https://generativelanguage.googleapis.com",
+      ];
+      if (!staticHosts.includes(origin)) {
+        extraAiConnectSrc = ` ${origin}`;
+      }
+    }
+  } catch (e) {
+    console.warn("[CSP] Failed to read aiBaseUrl for dynamic CSP:", e);
+  }
+
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -133,7 +157,7 @@ app.whenReady().then(async () => {
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: blob: https:",
             "font-src 'self' data: https://fonts.gstatic.com",
-            "connect-src 'self' https://my.illusions.app https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com ws://localhost:*",
+            `connect-src 'self' https://my.illusions.app https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com${extraAiConnectSrc} ws://localhost:*`,
             "worker-src 'self' blob:",
             "frame-src 'none'",
           ].join("; "),
