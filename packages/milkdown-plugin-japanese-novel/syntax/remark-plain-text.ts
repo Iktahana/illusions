@@ -1,4 +1,4 @@
-import type { Root } from "mdast";
+import type { Paragraph, Root, Text } from "mdast";
 import type { VFile } from "vfile";
 
 /**
@@ -25,11 +25,9 @@ export function remarkPlainTextPlugin() {
     // Replace the entire parsed mdast with one paragraph per line.
     // An empty line produces an empty paragraph (no children), which
     // ProseMirror renders as a blank line and textContent returns "".
-    (tree as unknown as { children: unknown[] }).children = lines.map(
-      (line) => ({
-        type: "paragraph",
-        children: line.length > 0 ? [{ type: "text", value: line }] : [],
-      }),
-    );
+    tree.children = lines.map((line): Paragraph => ({
+      type: "paragraph",
+      children: line.length > 0 ? [{ type: "text", value: line } as Text] : [],
+    }));
   };
 }
