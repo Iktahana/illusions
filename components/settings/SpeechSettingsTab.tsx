@@ -79,7 +79,7 @@ export default function SpeechSettingsTab(): React.ReactElement {
         {/* Superwhisper card */}
         <div className="flex items-center gap-4 px-4 py-3 border border-border rounded-xl bg-background-secondary">
           <img
-            src="/image/superwhisper_logo.png"
+            src="./image/superwhisper_logo.png"
             alt="Superwhisper"
             className="w-12 h-12 rounded-xl object-contain flex-shrink-0"
           />
