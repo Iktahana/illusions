@@ -71,7 +71,17 @@ export async function persistWindowState(
     await storage.initialize();
     const key = `window_state:${windowKey}`;
     const existing = await storage.getItem(key);
-    const parsed: WindowState = existing ? (JSON.parse(existing) as WindowState) : {};
+    let parsed: WindowState = {};
+    if (existing) {
+      try {
+        const raw: unknown = JSON.parse(existing);
+        if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
+          parsed = raw as WindowState;
+        }
+      } catch {
+        // Corrupted data — overwrite with fresh state
+      }
+    }
     const merged: WindowState = { ...parsed, ...updates };
     await storage.setItem(key, JSON.stringify(merged));
   } finally {
@@ -98,7 +108,14 @@ export async function fetchWindowState(windowKey: string): Promise<WindowState |
   const key = `window_state:${windowKey}`;
   const data = await storage.getItem(key);
   if (data) {
-    return JSON.parse(data) as WindowState;
+    try {
+      const raw: unknown = JSON.parse(data);
+      if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
+        return raw as WindowState;
+      }
+    } catch {
+      // Corrupted or non-object data — fall through to migration fallback
+    }
   }
   // Migration fallback: existing sessions stored tabs/layout in global AppState.
   const appState = await storage.loadAppState();

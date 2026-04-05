@@ -96,13 +96,42 @@ class WebStorageDatabase extends Dexie {
     // v4: Change projectHandles primary key to composite handleKey (projectId:rootDirName)
     // to prevent PRIMARY KEY collision when duplicate project directories share the same projectId.
     // 複製されたプロジェクトディレクトリが同一 projectId を持つ場合の衝突修正 (#1070)。
-    this.version(4).stores({
-      appState: "id",
-      recentFiles: "id, path",
-      editorBuffer: "id",
-      projectHandles: "handleKey, projectId, lastAccessedAt",
-      kvStore: "key",
-    });
+    this.version(4)
+      .stores({
+        appState: "id",
+        recentFiles: "id, path",
+        editorBuffer: "id",
+        projectHandles: "handleKey, projectId, lastAccessedAt",
+        kvStore: "key",
+      })
+      .upgrade((tx) => {
+        // Backfill handleKey for existing records that only have projectId as PK.
+        // rootDirName が欠けている場合は、永続化済み rootHandle.name から復元して
+        // 通常保存時と同じ handleKey 形式を維持する。
+        return tx
+          .table("projectHandles")
+          .toCollection()
+          .modify((record: Record<string, unknown>) => {
+            if (!record.handleKey) {
+              const pid = (record.projectId as string) || "unknown";
+              // Prefer stored rootDirName, then derive from rootHandle.name
+              const storedDirName =
+                typeof record.rootDirName === "string" && record.rootDirName.length > 0
+                  ? (record.rootDirName as string)
+                  : undefined;
+              let derivedDirName: string | undefined;
+              if (!storedDirName) {
+                const rh = record.rootHandle as { name?: string } | null | undefined;
+                if (rh && typeof rh.name === "string" && rh.name.length > 0) {
+                  derivedDirName = rh.name;
+                  record.rootDirName = derivedDirName;
+                }
+              }
+              const dirName = storedDirName ?? derivedDirName ?? pid;
+              record.handleKey = `${pid}:${dirName}`;
+            }
+          });
+      });
   }
 }
 
