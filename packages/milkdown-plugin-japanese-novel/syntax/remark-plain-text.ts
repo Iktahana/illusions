@@ -16,18 +16,18 @@ import type { VFile } from "vfile";
 export function remarkPlainTextPlugin() {
   return function transformer(tree: Root, file: VFile): void {
     // Normalize line endings before splitting
-    const source = String(file.value)
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n");
+    const source = String(file.value).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 
     const lines = source.split("\n");
 
     // Replace the entire parsed mdast with one paragraph per line.
     // An empty line produces an empty paragraph (no children), which
     // ProseMirror renders as a blank line and textContent returns "".
-    tree.children = lines.map((line): Paragraph => ({
-      type: "paragraph",
-      children: line.length > 0 ? [{ type: "text", value: line } as Text] : [],
-    }));
+    tree.children = lines.map(
+      (line): Paragraph => ({
+        type: "paragraph",
+        children: line.length > 0 ? [{ type: "text", value: line } as Text] : [],
+      }),
+    );
   };
 }
