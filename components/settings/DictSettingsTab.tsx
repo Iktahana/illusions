@@ -14,8 +14,7 @@ interface UpdateInfo {
 
 function isElectron(): boolean {
   return (
-    typeof window !== "undefined" &&
-    !!(window as Window & { electronAPI?: unknown }).electronAPI
+    typeof window !== "undefined" && !!(window as Window & { electronAPI?: unknown }).electronAPI
   );
 }
 
@@ -27,9 +26,7 @@ interface DictAPI {
 }
 
 function getDict(): DictAPI | null {
-  return (
-    (window as Window & { electronAPI?: { dict?: DictAPI } }).electronAPI?.dict ?? null
-  );
+  return (window as Window & { electronAPI?: { dict?: DictAPI } }).electronAPI?.dict ?? null;
 }
 
 export default function DictSettingsTab() {
@@ -172,9 +169,7 @@ export default function DictSettingsTab() {
         {checkResult?.latestVersion && (
           <div className="text-xs text-foreground-secondary">
             最新バージョン: {checkResult.latestVersion}
-            {updateAvailable && (
-              <span className="ml-2 text-warning font-medium">更新あり</span>
-            )}
+            {updateAvailable && <span className="ml-2 text-warning font-medium">更新あり</span>}
             {!updateAvailable && isInstalled && (
               <span className="ml-2 text-success">最新版です</span>
             )}
@@ -189,9 +184,7 @@ export default function DictSettingsTab() {
         )}
 
         {/* Error */}
-        {error && (
-          <div className="text-xs text-danger">{error}</div>
-        )}
+        {error && <div className="text-xs text-danger">{error}</div>}
 
         {/* Download progress */}
         {isDownloading && downloadProgress !== null && (

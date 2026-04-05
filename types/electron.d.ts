@@ -274,7 +274,9 @@ declare global {
       /** Subscribe to download progress events (0–100). Returns cleanup function. */
       onDownloadProgress: (callback: (data: { progress: number }) => void) => () => void;
       /** Subscribe to update-available notifications pushed from main process. */
-      onUpdateAvailable: (callback: (data: { latestVersion: string; updateAvailable: boolean }) => void) => () => void;
+      onUpdateAvailable: (
+        callback: (data: { latestVersion: string; updateAvailable: boolean }) => void,
+      ) => () => void;
     };
     /** PTY session management */
     pty?: {

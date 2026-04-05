@@ -149,9 +149,7 @@ class DictManager {
 
       // Add indexes if not present
       const indexCheck = rwDb
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_dict_entry_text'",
-        )
+        .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_dict_entry_text'")
         .get();
       if (!indexCheck) {
         console.log("[DictManager] Creating indexes...");
@@ -366,9 +364,7 @@ class DictManager {
                 !!latestVersion && (!installedVersion || installedVersion !== latestVersion);
 
               // Cache asset download URL for later use
-              const asset = (json.assets ?? []).find(
-                (a) => a.name && a.name.endsWith(".db.gz"),
-              );
+              const asset = (json.assets ?? []).find((a) => a.name && a.name.endsWith(".db.gz"));
               this._latestAssetUrl = asset?.browser_download_url ?? null;
               this._latestVersion = latestVersion;
 

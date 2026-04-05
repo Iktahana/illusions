@@ -497,22 +497,20 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                   )}
 
                   {/* Not installed banner (Electron only) */}
-                  {!masterLoading &&
-                    masterStatus === "not-installed" &&
-                    isElectron() && (
-                      <div className="bg-background-elevated border border-border rounded-lg p-3 flex items-center justify-between gap-3">
-                        <span className="text-sm text-foreground-secondary">
-                          辞典データ未インストール
-                        </span>
-                        <button
-                          onClick={handleDownloadDict}
-                          className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors flex-shrink-0"
-                        >
-                          <Download className="w-3 h-3" />
-                          ダウンロード
-                        </button>
-                      </div>
-                    )}
+                  {!masterLoading && masterStatus === "not-installed" && isElectron() && (
+                    <div className="bg-background-elevated border border-border rounded-lg p-3 flex items-center justify-between gap-3">
+                      <span className="text-sm text-foreground-secondary">
+                        辞典データ未インストール
+                      </span>
+                      <button
+                        onClick={handleDownloadDict}
+                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors flex-shrink-0"
+                      >
+                        <Download className="w-3 h-3" />
+                        ダウンロード
+                      </button>
+                    </div>
+                  )}
 
                   {/* Downloading indicator */}
                   {masterStatus === "downloading" && (
@@ -540,13 +538,11 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                   )}
 
                   {/* No results */}
-                  {!masterLoading &&
-                    masterResults.length === 0 &&
-                    masterStatus === "installed" && (
-                      <p className="text-sm text-foreground-secondary">
-                        「{activeSearchQuery}」の辞典結果なし
-                      </p>
-                    )}
+                  {!masterLoading && masterResults.length === 0 && masterStatus === "installed" && (
+                    <p className="text-sm text-foreground-secondary">
+                      「{activeSearchQuery}」の辞典結果なし
+                    </p>
+                  )}
 
                   {/* Divider */}
                   <div className="border-t border-border pt-1">
@@ -641,10 +637,7 @@ const MasterDictCard = memo(function MasterDictCard({
 
   return (
     <div className="bg-background-elevated border border-border rounded-lg overflow-hidden">
-      <div
-        className="p-3 cursor-pointer hover:bg-hover transition-colors"
-        onClick={onToggle}
-      >
+      <div className="p-3 cursor-pointer hover:bg-hover transition-colors" onClick={onToggle}>
         <div className="flex items-start gap-2">
           {isExpanded ? (
             <ChevronDown className="w-4 h-4 text-foreground-secondary flex-shrink-0 mt-0.5" />
