@@ -23,7 +23,7 @@ tags:
 - ユーザー機能または独立したサブシステムとして既に成立している
 - 現在の `docs/` に同等の正式ページがない
 
-## 優先度 A: 次に棚卸しするもの
+## 優先度 B: 次に棚卸しするもの
 
 ### Characters / extraction / per-project persistence
 
