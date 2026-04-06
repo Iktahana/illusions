@@ -124,7 +124,6 @@ class UnconfiguredAiClient implements IAiClient {
     );
   }
 
-   
   async *streamChat(): AsyncIterable<string> {
     throw new Error("AI client is not configured. Please set an API key in Settings > AI API.");
   }
