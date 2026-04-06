@@ -137,7 +137,11 @@ export function useTabManager(options?: {
 
   // --- Tab persistence (save/restore to AppState) -------------------------
 
-  const { wasAutoRecovered, flushTabState: _flushTabState } = useTabPersistence({
+  const {
+    wasAutoRecovered,
+    flushTabState: _flushTabState,
+    restoreProjectTabs,
+  } = useTabPersistence({
     tabs: tabState.tabs,
     setTabs: tabState.setTabs,
     activeTabId: tabState.activeTabId,
@@ -211,5 +215,8 @@ export function useTabManager(options?: {
 
     // Persistence flush
     flushTabState: _flushTabState,
+
+    // Project tab restore
+    restoreProjectTabs,
   };
 }

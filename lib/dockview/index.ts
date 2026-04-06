@@ -40,5 +40,8 @@ export {
   type UseDockviewAdapterReturn,
 } from "./use-dockview-adapter";
 
+// Stable key utility
+export { stableKeyForTab } from "./stable-key";
+
 // Persistence
 export { useDockviewPersistence, loadDockviewLayout } from "./use-dockview-persistence";

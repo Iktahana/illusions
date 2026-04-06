@@ -6,7 +6,7 @@ import { getDefaultWorkspaceState } from "@/lib/project/project-types";
 import { getVFS } from "@/lib/vfs";
 import { notificationManager } from "@/lib/services/notification-manager";
 
-import type { ProjectMode, StandaloneMode } from "@/lib/project/project-types";
+import type { ProjectMode, StandaloneMode, WorkspaceTab } from "@/lib/project/project-types";
 import { ensureProjectJson, readProjectJson, readFileHandle } from "./project-file-utils";
 
 interface UseFileOpeningParams {
@@ -28,6 +28,11 @@ interface UseFileOpeningParams {
   tabLoadSystemFile: (path: string, content: string) => void;
   /** Increment editor key to force editor remount */
   incrementEditorKey: () => void;
+  /** Restore tabs from workspace.json data loaded during project open */
+  restoreProjectTabs: (
+    savedTabs: { tabs: WorkspaceTab[]; activeIndex: number } | undefined,
+    rootPath: string | null,
+  ) => Promise<boolean>;
 }
 
 export interface UseFileOpeningResult {
@@ -59,13 +64,22 @@ export function useFileOpening({
   openRestoredProject,
   tabLoadSystemFile,
   incrementEditorKey,
+  restoreProjectTabs,
 }: UseFileOpeningParams): UseFileOpeningResult {
   const handleOpenProject = useCallback(async () => {
     try {
       const projectService = getProjectService();
       const project = await projectService.openProject();
       setProjectMode(project);
-      await loadProjectContent(project);
+
+      // Restore tabs from workspace.json; fall back to loading main file
+      const restored = await restoreProjectTabs(
+        project.workspaceState.openTabs,
+        project.rootPath ?? null,
+      );
+      if (!restored) {
+        await loadProjectContent(project);
+      }
 
       if (isElectron && project.rootPath) {
         const storage = getStorageService();
@@ -81,7 +95,7 @@ export function useFileOpening({
       if (error instanceof Error && error.message.includes("cancelled")) return;
       console.error("Failed to open project:", error);
     }
-  }, [setProjectMode, isElectron, loadProjectContent]);
+  }, [setProjectMode, isElectron, loadProjectContent, restoreProjectTabs]);
 
   const handleOpenStandaloneFile = useCallback(async () => {
     try {
@@ -123,7 +137,9 @@ export function useFileOpening({
                 project.rootPath,
               );
             }
-            signalVfsReady();
+            // NOTE: signalVfsReady() is deferred to AFTER tab restore so that the
+            // mount-time standalone restore (use-tab-persistence.ts) does not race
+            // with the explicit project tab restore.
             const rootDirHandle = await vfs.getDirectoryHandle("");
             const projectJsonResult = await readProjectJson(rootDirHandle);
             if (!projectJsonResult) {
@@ -168,12 +184,19 @@ export function useFileOpening({
             };
 
             setProjectMode(restoredProject);
-            // Skip loading main file during auto-restore on Electron — tab persistence
-            // will restore the previously open tabs (or empty state).
-            // On Web, always load so the main file is available.
-            if (!isAutoRestoringRef.current || !isElectron) {
+
+            // Restore tabs from workspace.json; fall back to loading main file
+            const restored = await restoreProjectTabs(
+              restoredProject.workspaceState.openTabs,
+              restoredProject.rootPath ?? null,
+            );
+            if (!restored) {
               await loadProjectContent(restoredProject);
             }
+
+            // Signal VFS ready AFTER tab restore — this ensures the standalone
+            // mount-time restore sees projectTabsRestoredRef=true and skips.
+            signalVfsReady();
             return true;
           } catch (error) {
             signalVfsReady();
@@ -248,6 +271,7 @@ export function useFileOpening({
       setConfirmRemoveRecent,
       setPermissionPromptData,
       setShowPermissionPrompt,
+      restoreProjectTabs,
     ],
   );
 
@@ -287,7 +311,15 @@ export function useFileOpening({
         };
 
         setProjectMode(project);
-        await loadProjectContent(project);
+
+        // Restore tabs from workspace.json; fall back to loading main file
+        const restored = await restoreProjectTabs(
+          project.workspaceState.openTabs,
+          project.rootPath ?? null,
+        );
+        if (!restored) {
+          await loadProjectContent(project);
+        }
 
         const storage = getStorageService();
         await storage.addRecentProject({
@@ -303,7 +335,7 @@ export function useFileOpening({
         );
       }
     },
-    [setProjectMode, loadProjectContent],
+    [setProjectMode, loadProjectContent, restoreProjectTabs],
   );
 
   return {

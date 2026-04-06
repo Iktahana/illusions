@@ -44,6 +44,26 @@ export interface ProjectConfig {
   editorSettings: EditorSettings;
 }
 
+/** Serialized tab entry stored in workspace.json with project-relative paths. */
+export interface WorkspaceTab {
+  /** Path relative to project root (null for unsaved tabs) */
+  relativePath: string | null;
+  fileName: string;
+  isPreview?: boolean;
+  fileType?: SupportedFileExtension;
+}
+
+/** Simplified, ID-independent dockview layout for workspace.json persistence. */
+export interface WorkspaceDockviewLayout {
+  groups: Array<{
+    /** Stable keys: relative file paths, with `#N` suffix for same-file clones */
+    tabPaths: (string | null)[];
+    activeTabPath: string | null;
+  }>;
+  orientation: "HORIZONTAL" | "VERTICAL";
+  sizes: number[];
+}
+
 /**
  * Workspace state stored in .illusions/workspace.json.
  * エディタのカーソル位置やパネル状態など、作業状態を保持する。
@@ -62,6 +82,13 @@ export interface WorkspaceState {
     isLeftPanelCollapsed: boolean;
     isRightPanelCollapsed: boolean;
   };
+  /** Open editor tabs persisted for session restore. */
+  openTabs?: {
+    tabs: WorkspaceTab[];
+    activeIndex: number;
+  };
+  /** Dockview split layout (simplified, ID-independent). */
+  dockviewLayout?: WorkspaceDockviewLayout;
 }
 
 /**

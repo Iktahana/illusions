@@ -331,11 +331,14 @@ export class ProjectService {
     };
     await projectJsonHandle.write(JSON.stringify(updatedMetadata, null, 2));
 
-    // Update workspace.json (create: true to handle legacy projects without workspace.json)
-    const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json", {
-      create: true,
+    // Update workspace.json via merge writer (preserves openTabs/dockviewLayout
+    // written by tab persistence — see workspace-persistence.ts).
+    const { persistWorkspaceJson } = await import("./workspace-persistence");
+    await persistWorkspaceJson({
+      editorState: project.workspaceState.editorState,
+      lastOpenedAt: project.workspaceState.lastOpenedAt,
+      viewState: project.workspaceState.viewState,
     });
-    await workspaceJsonHandle.write(JSON.stringify(project.workspaceState, null, 2));
   }
 
   /**

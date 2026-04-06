@@ -2,7 +2,7 @@
 
 import type { MutableRefObject, Dispatch, SetStateAction } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
-import type { SupportedFileExtension } from "../project/project-types";
+import type { SupportedFileExtension, WorkspaceTab } from "../project/project-types";
 import type { TabId, TabState, EditorTabState, TerminalTabState } from "./tab-types";
 
 // ---------------------------------------------------------------------------
@@ -79,6 +79,15 @@ export interface UseTabManagerReturn {
   // Persistence flush (for save-before-close)
   /** Immediately flush pending tab state to storage. */
   flushTabState: () => Promise<void>;
+
+  /**
+   * Restore tabs from workspace.json data (already loaded during project open).
+   * Returns true if any tabs were restored.
+   */
+  restoreProjectTabs: (
+    savedTabs: { tabs: WorkspaceTab[]; activeIndex: number } | undefined,
+    rootPath: string | null,
+  ) => Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
