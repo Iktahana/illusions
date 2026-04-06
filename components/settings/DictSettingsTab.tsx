@@ -237,7 +237,8 @@ export default function DictSettingsTab() {
 
         {!isElectron() && (
           <p className="text-xs text-foreground-tertiary">
-            辞典データはデスクトップ版でのみ利用できます。
+            Web版ではオンライン辞典（Genji API）を使用しています。
+            ローカル辞典のダウンロードはデスクトップ版でのみ利用できます。
           </p>
         )}
       </div>

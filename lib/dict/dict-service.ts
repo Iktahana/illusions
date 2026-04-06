@@ -46,29 +46,20 @@ class DictService {
       this.providers.map(async (p) => {
         const available = await p.isAvailable();
         if (!available) {
-          const isWeb =
-            typeof window !== "undefined" &&
-            !(window as Window & { electronAPI?: unknown }).electronAPI;
-          return {
-            entries: [] as DictEntry[],
-            available: false,
-            webApiPending: isWeb,
-          };
+          return { entries: [] as DictEntry[], available: false };
         }
         const entries = await p.query(term, limit);
-        return { entries, available: true, webApiPending: false };
+        return { entries, available: true };
       }),
     );
 
     const allEntries = dedup(results.flatMap((r) => r.entries));
     const anyAvailable = results.some((r) => r.available);
-    const webApiPending = results.some((r) => r.webApiPending);
 
     return {
       entries: allEntries,
       noResults: anyAvailable && allEntries.length === 0,
       providerUnavailable: !anyAvailable,
-      webApiPending: webApiPending || undefined,
     };
   }
 
