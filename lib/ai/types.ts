@@ -116,8 +116,5 @@ export interface IAiClient {
    * Send a streaming chat completion.
    * Returns an async iterable of content deltas.
    */
-  streamChat(
-    messages: AiChatMessage[],
-    signal?: AbortSignal,
-  ): AsyncIterable<string>;
+  streamChat(messages: AiChatMessage[], signal?: AbortSignal): AsyncIterable<string>;
 }

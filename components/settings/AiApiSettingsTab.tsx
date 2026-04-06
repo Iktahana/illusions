@@ -11,13 +11,8 @@ import { isElectronRenderer } from "@/lib/utils/runtime-env";
 type TestStatus = "idle" | "testing" | "success" | "error";
 
 export default function AiApiSettingsTab() {
-  const {
-    aiBaseUrl,
-    aiModelId,
-    onAiApiKeyChange,
-    onAiBaseUrlChange,
-    onAiModelIdChange,
-  } = useAiApiSettings();
+  const { aiBaseUrl, aiModelId, onAiApiKeyChange, onAiBaseUrlChange, onAiModelIdChange } =
+    useAiApiSettings();
 
   // API key is managed in local state only — not exposed through context.
   // Loaded from AppState on mount; changes are persisted via the handler.
@@ -69,9 +64,7 @@ export default function AiApiSettingsTab() {
       setTestMessage(`接続成功 — ${count}個のモデルが利用可能です。`);
     } catch (e) {
       setTestStatus("error");
-      setTestMessage(
-        e instanceof Error ? `接続失敗: ${e.message}` : "接続失敗: 不明なエラー",
-      );
+      setTestMessage(e instanceof Error ? `接続失敗: ${e.message}` : "接続失敗: 不明なエラー");
     }
   }, [apiKey, aiBaseUrl, aiModelId]);
 
@@ -87,7 +80,8 @@ export default function AiApiSettingsTab() {
       {!isElectron && (
         <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
           <p className="text-sm text-yellow-600 dark:text-yellow-400">
-            Web版ではAPIキーがブラウザに公開されるため、AI API機能はデスクトップ版のみご利用いただけます。
+            Web版ではAPIキーがブラウザに公開されるため、AI
+            API機能はデスクトップ版のみご利用いただけます。
           </p>
         </div>
       )}
@@ -95,10 +89,7 @@ export default function AiApiSettingsTab() {
       <div className="space-y-4">
         {/* API Endpoint */}
         <div>
-          <label
-            htmlFor="ai-base-url"
-            className="block text-sm font-medium text-foreground"
-          >
+          <label htmlFor="ai-base-url" className="block text-sm font-medium text-foreground">
             APIエンドポイント
           </label>
           <input
@@ -117,10 +108,7 @@ export default function AiApiSettingsTab() {
 
         {/* API Key */}
         <div>
-          <label
-            htmlFor="ai-api-key"
-            className="block text-sm font-medium text-foreground"
-          >
+          <label htmlFor="ai-api-key" className="block text-sm font-medium text-foreground">
             APIキー
           </label>
           <div className="relative mt-1">
@@ -139,21 +127,14 @@ export default function AiApiSettingsTab() {
               className="absolute inset-y-0 right-0 flex items-center pr-3 text-foreground-tertiary hover:text-foreground-secondary"
               aria-label={showKey ? "APIキーを非表示" : "APIキーを表示"}
             >
-              {showKey ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
+              {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
         </div>
 
         {/* Model ID */}
         <div>
-          <label
-            htmlFor="ai-model-id"
-            className="block text-sm font-medium text-foreground"
-          >
+          <label htmlFor="ai-model-id" className="block text-sm font-medium text-foreground">
             モデルID
           </label>
           <input
@@ -178,9 +159,7 @@ export default function AiApiSettingsTab() {
             disabled={!isElectron || !apiKey || testStatus === "testing"}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {testStatus === "testing" && (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            )}
+            {testStatus === "testing" && <Loader2 className="h-4 w-4 animate-spin" />}
             接続テスト
           </button>
 

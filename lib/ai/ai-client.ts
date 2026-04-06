@@ -107,18 +107,24 @@ class UnconfiguredAiClient implements IAiClient {
   }
 
   validateLintIssues(): Promise<LintValidationResult[]> {
-    return Promise.reject(new Error("AI client is not configured. Please set an API key in Settings > AI API."));
+    return Promise.reject(
+      new Error("AI client is not configured. Please set an API key in Settings > AI API."),
+    );
   }
 
   suggestRewrite(): Promise<RewriteSuggestion> {
-    return Promise.reject(new Error("AI client is not configured. Please set an API key in Settings > AI API."));
+    return Promise.reject(
+      new Error("AI client is not configured. Please set an API key in Settings > AI API."),
+    );
   }
 
   extractCharacters(): Promise<ExtractedCharacter[]> {
-    return Promise.reject(new Error("AI client is not configured. Please set an API key in Settings > AI API."));
+    return Promise.reject(
+      new Error("AI client is not configured. Please set an API key in Settings > AI API."),
+    );
   }
 
-  // eslint-disable-next-line require-yield
+   
   async *streamChat(): AsyncIterable<string> {
     throw new Error("AI client is not configured. Please set an API key in Settings > AI API.");
   }
@@ -167,7 +173,7 @@ class AiClient implements IAiClient {
             content: [
               "You are a Japanese text proofreading assistant.",
               "Given the original text and a list of detected lint issues, determine whether each issue is genuine or a false positive.",
-              "Respond with a JSON object: { \"results\": [{ \"index\": number, \"isGenuine\": boolean, \"reasoning\": string }] }",
+              'Respond with a JSON object: { "results": [{ "index": number, "isGenuine": boolean, "reasoning": string }] }',
               "Consider context, literary style, and intentional stylistic choices when evaluating.",
             ].join("\n"),
           },
@@ -272,10 +278,7 @@ class AiClient implements IAiClient {
     return parsed.characters;
   }
 
-  async *streamChat(
-    messages: AiChatMessage[],
-    signal?: AbortSignal,
-  ): AsyncIterable<string> {
+  async *streamChat(messages: AiChatMessage[], signal?: AbortSignal): AsyncIterable<string> {
     const stream = await this.openai.chat.completions.create(
       {
         model: this.modelId,
