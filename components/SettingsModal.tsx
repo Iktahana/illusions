@@ -12,6 +12,7 @@ import {
   Keyboard,
   Terminal,
   UserCircle,
+  BookOpen,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -26,6 +27,7 @@ import KeymapSettingsTab from "./settings/KeymapSettingsTab";
 import PowerSettingsTab from "./settings/PowerSettingsTab";
 import TerminalSettingsTab from "./settings/TerminalSettingsTab";
 import AccountSettingsTab from "./settings/AccountSettingsTab";
+import DictSettingsTab from "./settings/DictSettingsTab";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -44,6 +46,7 @@ export type SettingsCategory =
   | "keymap"
   | "terminal"
   | "power"
+  | "dictionary"
   | "about";
 
 export default function SettingsModal({ isOpen, onClose, initialCategory }: SettingsModalProps) {
@@ -230,6 +233,18 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
                   省電力
                 </button>
               )}
+              <button
+                onClick={() => setActiveCategory("dictionary")}
+                className={clsx(
+                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
+                  activeCategory === "dictionary"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
+                )}
+              >
+                <BookOpen className="w-4 h-4" />
+                辞典
+              </button>
               <div className="my-2 border-t border-border" />
               <button
                 onClick={() => setActiveCategory("about")}
@@ -261,6 +276,7 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
             {activeCategory === "keymap" && <KeymapSettingsTab />}
             {activeCategory === "terminal" && <TerminalSettingsTab />}
             {activeCategory === "power" && <PowerSettingsTab />}
+            {activeCategory === "dictionary" && <DictSettingsTab />}
             {activeCategory === "about" && <AboutSection />}
           </div>
         </div>

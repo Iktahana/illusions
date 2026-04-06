@@ -4,7 +4,12 @@ import { getStorageService } from "@/lib/storage/storage-service";
 import { getProjectUpgradeService } from "@/lib/project/project-upgrade";
 import { isStandaloneMode } from "@/lib/project/project-types";
 
-import type { EditorMode, ProjectMode, StandaloneMode } from "@/lib/project/project-types";
+import type {
+  EditorMode,
+  ProjectMode,
+  StandaloneMode,
+  WorkspaceTab,
+} from "@/lib/project/project-types";
 import { useUpgradeBanner } from "./use-upgrade-banner";
 import { useRecentProjects } from "./use-recent-projects";
 import { useAutoRestore } from "./use-auto-restore";
@@ -31,6 +36,11 @@ interface UseProjectLifecycleParams {
   lastSavedTime: number | null;
   /** Called once after the VFS root has been set (or when no project to restore) */
   onVfsReady?: () => void;
+  /** Restore tabs from workspace.json data loaded during project open */
+  restoreProjectTabs: (
+    savedTabs: { tabs: WorkspaceTab[]; activeIndex: number } | undefined,
+    rootPath: string | null,
+  ) => Promise<boolean>;
 }
 
 export interface ProjectLifecycleState {
@@ -94,6 +104,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     skipAutoRestore,
     lastSavedTime,
     onVfsReady,
+    restoreProjectTabs,
   } = params;
 
   // UI state
@@ -143,6 +154,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     tabLoadSystemFile,
     incrementEditorKey,
     setProjectMode,
+    restoreProjectTabs,
   });
 
   // Permission prompt state and handlers
@@ -174,6 +186,7 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     openRestoredProject,
     tabLoadSystemFile,
     incrementEditorKey,
+    restoreProjectTabs,
   });
 
   // Auto-restore the last opened project on startup

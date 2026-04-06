@@ -248,6 +248,24 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeAllListeners("editor:buffer-close-broadcast");
     },
   },
+  dict: {
+    query: (term, limit) => ipcRenderer.invoke("dict:query", { term, limit }),
+    queryByReading: (reading, limit) =>
+      ipcRenderer.invoke("dict:query-reading", { reading, limit }),
+    getStatus: () => ipcRenderer.invoke("dict:get-status"),
+    checkUpdate: () => ipcRenderer.invoke("dict:check-update"),
+    download: () => ipcRenderer.invoke("dict:download"),
+    onDownloadProgress: (callback) => {
+      const handler = (_event, data) => callback(data);
+      ipcRenderer.on("dict:download-progress", handler);
+      return () => ipcRenderer.removeListener("dict:download-progress", handler);
+    },
+    onUpdateAvailable: (callback) => {
+      const handler = (_event, data) => callback(data);
+      ipcRenderer.on("dict:update-available", handler);
+      return () => ipcRenderer.removeListener("dict:update-available", handler);
+    },
+  },
   pty: {
     /** Spawn a new PTY session. Returns { sessionId } or { error }. */
     spawn: (options) => ipcRenderer.invoke("pty:spawn", options),

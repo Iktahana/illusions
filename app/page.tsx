@@ -20,6 +20,7 @@ import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
+import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
 import { useGlobalShortcuts } from "@/lib/hooks/use-global-shortcuts";
@@ -258,6 +259,7 @@ export default function EditorPage() {
     handleCloseTabDiscard,
     handleCloseTabCancel,
     flushTabState,
+    restoreProjectTabs,
   } = tabManager;
 
   // Keep a live tabs ref for dockview panel renderers captured by stale closures.
@@ -294,6 +296,11 @@ export default function EditorPage() {
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
   const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
 
+  // Derive project dockview layout from workspace state (already loaded at project open)
+  const projectDockviewLayout = isProjectMode(editorMode)
+    ? editorMode.workspaceState.dockviewLayout
+    : null;
+
   // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
   const { handleDockviewReady, dockviewApi, splitEditor } = useDockviewAdapter({
     tabManager: tabManagerWithPtyCleanup,
@@ -301,11 +308,13 @@ export default function EditorPage() {
     searchOpenTrigger,
     searchInitialTerm,
     windowKey,
+    projectLayout: projectDockviewLayout,
   });
   const { flushLayoutState } = useDockviewPersistence({
     dockviewApi,
     tabs: tabManagerWithPtyCleanup.tabs,
     windowKey,
+    isProject: isProjectMode(editorMode),
   });
   flushLayoutStateRef.current = flushLayoutState;
 
@@ -373,6 +382,7 @@ export default function EditorPage() {
     skipAutoRestore,
     lastSavedTime,
     onVfsReady: vfsGate.resolve,
+    restoreProjectTabs,
   });
   const {
     state: {
@@ -480,36 +490,42 @@ export default function EditorPage() {
     return name.replace(/\.[^.]+$/, "");
   }, [tabs, activeTabId]);
 
-  // PDF export dialog state
-  const [showPdfExportDialog, setShowPdfExportDialog] = useState(false);
-  const [pdfExportContent, setPdfExportContent] = useState("");
-  const [pdfExportMetadata, setPdfExportMetadata] = useState<ExportMetadata>({ title: "" });
-  const pdfExportContentRef = useRef("");
-  const pdfExportMetadataRef = useRef<ExportMetadata>({ title: "" });
+  // Export dialog state (PDF / DOCX share a single state slot)
+  interface ExportDialogState {
+    format: "pdf" | "docx";
+    content: string;
+    metadata: ExportMetadata;
+  }
+  const [exportDialogState, setExportDialogState] = useState<ExportDialogState | null>(null);
+  const exportDialogStateRef = useRef<ExportDialogState | null>(null);
 
-  const handlePdfExportRequest = useCallback((pdfContent: string, metadata: ExportMetadata) => {
-    pdfExportContentRef.current = pdfContent;
-    pdfExportMetadataRef.current = metadata;
-    setPdfExportContent(pdfContent);
-    setPdfExportMetadata(metadata);
-    setShowPdfExportDialog(true);
-  }, []);
+  const handleExportDialogRequest = useCallback(
+    (format: "pdf" | "docx", content: string, metadata: ExportMetadata) => {
+      const state: ExportDialogState = { format, content, metadata };
+      exportDialogStateRef.current = state;
+      setExportDialogState(state);
+    },
+    [],
+  );
 
   const handlePdfExportConfirm = useCallback(async (settings: PdfExportSettings) => {
-    setShowPdfExportDialog(false);
+    setExportDialogState(null);
 
     if (!window.electronAPI?.exportPDF) {
       notificationManager.error("PDFエクスポートはデスクトップアプリでのみ利用可能です");
       return;
     }
 
+    const dialogState = exportDialogStateRef.current;
+    if (!dialogState) return;
+
     const progressId = notificationManager.showProgress("PDFをエクスポート中...", {
       type: "info",
     });
 
     try {
-      const result = await window.electronAPI.exportPDF(pdfExportContentRef.current, {
-        metadata: pdfExportMetadataRef.current,
+      const result = await window.electronAPI.exportPDF(dialogState.content, {
+        metadata: dialogState.metadata,
         verticalWriting: settings.verticalWriting,
         pageSize: settings.pageSize,
         landscape: settings.landscape,
@@ -535,8 +551,48 @@ export default function EditorPage() {
       notificationManager.success("PDFをエクスポートしました");
     } catch (error) {
       notificationManager.dismiss(progressId);
-      const message = error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : "不明なエラー";
       notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
+    }
+  }, []);
+
+  const handleDocxExportConfirm = useCallback(async (settings: DocxExportSettings) => {
+    setExportDialogState(null);
+
+    if (!window.electronAPI?.exportDOCX) {
+      notificationManager.error("DOCXエクスポートはデスクトップアプリでのみ利用可能です");
+      return;
+    }
+
+    const dialogState = exportDialogStateRef.current;
+    if (!dialogState) return;
+
+    const progressId = notificationManager.showProgress("DOCXをエクスポート中...", {
+      type: "info",
+    });
+
+    try {
+      const result = await window.electronAPI.exportDOCX(dialogState.content, {
+        metadata: dialogState.metadata,
+        settings,
+      });
+
+      notificationManager.dismiss(progressId);
+
+      if (result === null || result === undefined) return;
+
+      if (typeof result === "object" && "success" in result && !result.success) {
+        notificationManager.error(
+          `DOCXのエクスポートに失敗しました: ${(result as { error: string }).error}`,
+        );
+        return;
+      }
+
+      notificationManager.success("DOCXをエクスポートしました");
+    } catch (error) {
+      notificationManager.dismiss(progressId);
+      const message = error instanceof Error ? error.message : "不明なエラー";
+      notificationManager.error(`DOCXのエクスポートに失敗しました: ${message}`);
     }
   }, []);
 
@@ -544,7 +600,7 @@ export default function EditorPage() {
     getContent: getExportContent,
     getTitle: getExportTitle,
     getIsEditorTabActive: useCallback(() => isEditorTabActiveRef.current, []),
-    onPdfExportRequest: handlePdfExportRequest,
+    onExportDialogRequest: handleExportDialogRequest,
   });
 
   // System file open: tab manager handles loading; we just update editor key
@@ -921,11 +977,14 @@ export default function EditorPage() {
         setShowRubyDialog,
         rubySelectedText,
         handleApplyRuby,
-        showPdfExportDialog,
-        setShowPdfExportDialog,
-        handlePdfExportConfirm,
-        pdfExportContent,
-        pdfExportMetadata,
+        exportDialog: {
+          state: exportDialogState,
+          onClose: () => setExportDialogState(null),
+          onPdfExport: handlePdfExportConfirm,
+          onDocxExport: handleDocxExportConfirm,
+          content: exportDialogState?.content ?? "",
+          metadata: exportDialogState?.metadata ?? { title: "" },
+        },
       }}
       recovery={{
         wasAutoRecovered,

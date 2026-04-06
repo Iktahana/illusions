@@ -222,3 +222,21 @@ export function useTerminalSettings() {
     [settings, handlers],
   );
 }
+
+/** Dictionary settings */
+export function useDictSettingsContext() {
+  const { settings, handlers } = useEditorSettingsContext();
+  return useMemo(
+    () => ({
+      dictAutoCheckUpdates: settings.dictAutoCheckUpdates,
+      dictAutoDownload: settings.dictAutoDownload,
+      dictInstalledVersion: settings.dictInstalledVersion,
+      dictLastCheckedAt: settings.dictLastCheckedAt,
+      onDictAutoCheckUpdatesChange: handlers.handleDictAutoCheckUpdatesChange,
+      onDictAutoDownloadChange: handlers.handleDictAutoDownloadChange,
+      onDictInstalledVersionChange: handlers.handleDictInstalledVersionChange,
+      onDictLastCheckedAtChange: handlers.handleDictLastCheckedAtChange,
+    }),
+    [settings, handlers],
+  );
+}
