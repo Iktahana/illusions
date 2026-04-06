@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DockviewApi, IDockviewPanel } from "dockview-react";
 import type { TabId, TabState } from "@/lib/tab-manager/tab-types";
 import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
+import { stableKeyForTab } from "./stable-key";
 import type { UseTabManagerReturn } from "@/lib/tab-manager/types";
 import type {
   EditorPanelParams,
@@ -106,31 +107,6 @@ function buildTerminalPanelPosition(
 // ---------------------------------------------------------------------------
 // Layout restoration helper
 // ---------------------------------------------------------------------------
-
-/**
- * Build the stable key for a tab to match against saved layout keys.
- *
- * Must mirror the logic in use-dockview-persistence.ts:stableKeyForTab().
- * Uses occurrence tracking for same-file clone disambiguation (#N suffix).
- */
-function stableKeyForTab(tab: TabState, occurrences?: Map<string, number>): string | null {
-  if (isEditorTab(tab)) {
-    const basePath = tab.file?.path ?? `unsaved:${tab.id}`;
-    if (occurrences) {
-      const count = occurrences.get(basePath) ?? 0;
-      occurrences.set(basePath, count + 1);
-      return count === 0 ? basePath : `${basePath}#${count}`;
-    }
-    return basePath;
-  }
-  if (isTerminalTab(tab)) {
-    return `terminal:${tab.sessionId}`;
-  }
-  if (isDiffTab(tab)) {
-    return `diff:${tab.sourceTabId}`;
-  }
-  return null;
-}
 
 /**
  * Apply a saved simplified layout to the current dockview state.
