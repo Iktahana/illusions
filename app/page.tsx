@@ -259,6 +259,7 @@ export default function EditorPage() {
     handleCloseTabDiscard,
     handleCloseTabCancel,
     flushTabState,
+    restoreProjectTabs,
   } = tabManager;
 
   // Keep a live tabs ref for dockview panel renderers captured by stale closures.
@@ -295,6 +296,11 @@ export default function EditorPage() {
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
   const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
 
+  // Derive project dockview layout from workspace state (already loaded at project open)
+  const projectDockviewLayout = isProjectMode(editorMode)
+    ? editorMode.workspaceState.dockviewLayout
+    : null;
+
   // --- Dockview adapter (bridges useTabManager ↔ dockview layout) ---
   const { handleDockviewReady, dockviewApi, splitEditor } = useDockviewAdapter({
     tabManager: tabManagerWithPtyCleanup,
@@ -302,11 +308,13 @@ export default function EditorPage() {
     searchOpenTrigger,
     searchInitialTerm,
     windowKey,
+    projectLayout: projectDockviewLayout,
   });
   const { flushLayoutState } = useDockviewPersistence({
     dockviewApi,
     tabs: tabManagerWithPtyCleanup.tabs,
     windowKey,
+    isProject: isProjectMode(editorMode),
   });
   flushLayoutStateRef.current = flushLayoutState;
 
@@ -374,6 +382,7 @@ export default function EditorPage() {
     skipAutoRestore,
     lastSavedTime,
     onVfsReady: vfsGate.resolve,
+    restoreProjectTabs,
   });
   const {
     state: {

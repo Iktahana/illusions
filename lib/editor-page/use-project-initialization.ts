@@ -4,7 +4,7 @@ import { getProjectService } from "@/lib/project/project-service";
 import { getDefaultWorkspaceState } from "@/lib/project/project-types";
 import { notificationManager } from "@/lib/services/notification-manager";
 
-import type { ProjectMode } from "@/lib/project/project-types";
+import type { ProjectMode, WorkspaceTab } from "@/lib/project/project-types";
 import { readProjectJson, readFileHandle } from "./project-file-utils";
 
 interface UseProjectInitializationParams {
@@ -15,6 +15,11 @@ interface UseProjectInitializationParams {
   /** Increment editor key to force editor remount */
   incrementEditorKey: () => void;
   setProjectMode: (project: ProjectMode) => void;
+  /** Restore tabs from workspace.json data loaded during project open */
+  restoreProjectTabs: (
+    savedTabs: { tabs: WorkspaceTab[]; activeIndex: number } | undefined,
+    rootPath: string | null,
+  ) => Promise<boolean>;
 }
 
 export interface UseProjectInitializationResult {
@@ -38,6 +43,7 @@ export function useProjectInitialization({
   tabLoadSystemFile,
   incrementEditorKey,
   setProjectMode,
+  restoreProjectTabs,
 }: UseProjectInitializationParams): UseProjectInitializationResult {
   /** Load a project's main file content into the editor */
   const loadProjectContent = useCallback(
@@ -103,10 +109,13 @@ export function useProjectInitialization({
         };
 
         setProjectMode(project);
-        // Skip loading main file during auto-restore on Electron — tab persistence
-        // will restore the previously open tabs (or empty state).
-        // On Web, always load so the main file is available.
-        if (!isAutoRestoringRef.current || !isElectron) {
+
+        // Restore tabs from workspace.json; fall back to loading main file
+        const restored = await restoreProjectTabs(
+          project.workspaceState.openTabs,
+          project.rootPath ?? null,
+        );
+        if (!restored) {
           await loadProjectContent(project);
         }
       } catch (error) {
@@ -114,7 +123,7 @@ export function useProjectInitialization({
         notificationManager.error("プロジェクトを開けませんでした。");
       }
     },
-    [setProjectMode, loadProjectContent, isElectron, isAutoRestoringRef],
+    [setProjectMode, loadProjectContent, isElectron, isAutoRestoringRef, restoreProjectTabs],
   );
 
   return { loadProjectContent, openRestoredProject };

@@ -9,6 +9,12 @@ import { isEditorTab } from "./tab-types";
 import type { TabManagerCore } from "./types";
 import { TAB_PERSIST_DEBOUNCE, createNewTab, generateTabId, inferFileType } from "./types";
 import { getVFS } from "../vfs";
+import type { WorkspaceTab } from "../project/project-types";
+import {
+  persistWorkspaceJson,
+  toRelativePath,
+  toAbsolutePath,
+} from "../project/workspace-persistence";
 
 // ---------------------------------------------------------------------------
 // Params
@@ -47,6 +53,21 @@ export interface UseTabPersistenceReturn {
   wasAutoRecovered: boolean;
   /** Immediately flush pending tab state to storage (cancels debounce). */
   flushTabState: () => Promise<void>;
+  /**
+   * Restore tabs from workspace.json data that was already loaded during project open.
+   * Called explicitly by project-open handlers — replaces the mount-time restore for
+   * project mode. Returns true if any tabs were restored.
+   *
+   * プロジェクトオープン時に読み込み済みの workspace.json データからタブを復元する。
+   * プロジェクトモードではマウント時復元の代わりにこの関数を明示的に呼ぶ。
+   *
+   * @param savedTabs - The openTabs data from WorkspaceState (may be undefined)
+   * @param rootPath  - Project root path for converting relative → absolute paths (null for Web)
+   */
+  restoreProjectTabs: (
+    savedTabs: { tabs: WorkspaceTab[]; activeIndex: number } | undefined,
+    rootPath: string | null,
+  ) => Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,12 +76,13 @@ export interface UseTabPersistenceReturn {
 
 /**
  * Handles two responsibilities:
- * 1. Persist open tabs to AppState (debounced, Electron only).
- * 2. Restore tabs from AppState / storage on mount.
+ * 1. Persist open tabs to workspace.json (project mode) or AppState (standalone).
+ * 2. Restore tabs from workspace.json (explicit, via restoreProjectTabs) or
+ *    AppState/storage on mount (standalone mode only).
  *
- * Coordinates with useTabState which starts with an empty tabs array.
- * This hook is responsible for populating the first tab after determining
- * the correct initial state (saved tabs, Web buffer restore, or a blank default).
+ * In project mode, the mount-time Electron restore is REPLACED by explicit
+ * restoreProjectTabs() calls from project-open handlers. This eliminates
+ * the race condition where windowKey was null during mount-time restore.
  */
 export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersistenceReturn {
   const {
@@ -70,6 +92,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     setActiveTabId,
     tabsRef,
     activeTabIdRef,
+    isProjectRef,
     isElectron,
     skipAutoRestore,
     vfsReadyPromise,
@@ -89,7 +112,11 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
   // before the async restore path (which may wait on vfsReadyPromise) runs.
   const storageInitializedRef = useRef(false);
 
-  // --- Persist open tabs to AppState (debounced) --------------------------
+  // Tracks whether restoreProjectTabs was called (prevents mount-time
+  // restore from running redundantly when a project is being auto-restored).
+  const projectTabsRestoredRef = useRef(false);
+
+  // --- Persist open tabs (debounced) -------------------------------------
 
   const tabPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -98,13 +125,33 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     const currentTabs = tabsRef.current;
     const currentActiveId = activeTabIdRef.current;
     const editorTabs = currentTabs.filter(isEditorTab);
+    const activeEditorIndex = editorTabs.findIndex((t) => t.id === currentActiveId);
+
+    // --- Project mode: write to workspace.json ---
+    if (isProjectRef.current) {
+      const rootPath = windowKeyRef.current; // rootPath for Electron, null for Web
+      const workspaceTabs: WorkspaceTab[] = editorTabs.map((t) => ({
+        relativePath: t.file?.path ? toRelativePath(t.file.path, rootPath) : null,
+        fileName: t.file?.name ?? "新規ファイル",
+        isPreview: t.isPreview || undefined,
+        fileType: t.fileType,
+      }));
+      await persistWorkspaceJson({
+        openTabs: {
+          tabs: workspaceTabs,
+          activeIndex: Math.max(0, activeEditorIndex),
+        },
+      });
+      return;
+    }
+
+    // --- Standalone mode: write to SQLite / global AppState ---
     const serializedTabs: SerializedTab[] = editorTabs.map((t) => ({
       filePath: t.file?.path ?? null,
       fileName: t.file?.name ?? "新規ファイル",
       isPreview: t.isPreview || undefined,
       fileType: t.fileType,
     }));
-    const activeEditorIndex = editorTabs.findIndex((t) => t.id === currentActiveId);
     const state: TabPersistenceState = {
       tabs: serializedTabs,
       activeIndex: Math.max(0, activeEditorIndex),
@@ -112,19 +159,11 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     const key = windowKeyRef.current;
     if (key) {
       await persistWindowState(key, { openTabs: state });
-    }
-    // Always also write to global AppState as a single-window fallback and for
-    // tools (e.g. crash-recovery) that still read from there.
-    // NOTE: We intentionally do NOT import/call persistAppState here to avoid a
-    // circular-import risk; the global write is handled by the dockview persistence
-    // path which also writes the combined state. For the tab-only path, we just
-    // use the per-window store when a key is available, and still write global when
-    // no key is set (legacy / web mode).
-    if (!key) {
+    } else {
       const { persistAppState } = await import("../storage/app-state-manager");
       await persistAppState({ openTabs: state });
     }
-  }, [tabsRef, activeTabIdRef]);
+  }, [tabsRef, activeTabIdRef, isProjectRef]);
 
   /** Flush pending tab state: cancel debounce and persist immediately. */
   const flushTabState = useCallback(async () => {
@@ -137,9 +176,6 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
   useEffect(() => {
     // Skip persisting empty state until after storage has been initialized.
-    // This prevents a race on Electron where the 1s debounce fires before
-    // restoreTabs finishes awaiting vfsReadyPromise (up to 5s), which would
-    // overwrite the saved tabs with [] and cause a blank editor on next open.
     if (!storageInitializedRef.current && tabs.length === 0) return;
 
     if (tabPersistTimerRef.current) {
@@ -167,11 +203,74 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     };
   }, [flushTabState]);
 
+  // --- restoreProjectTabs (explicit, called by project-open handlers) ----
+
+  const restoreProjectTabs = useCallback(
+    async (
+      savedTabs: { tabs: WorkspaceTab[]; activeIndex: number } | undefined,
+      rootPath: string | null,
+    ): Promise<boolean> => {
+      projectTabsRestoredRef.current = true;
+
+      if (!savedTabs || savedTabs.tabs.length === 0) return false;
+
+      const restoredTabs: EditorTabState[] = [];
+      for (const saved of savedTabs.tabs) {
+        if (!saved.relativePath) {
+          // Unsaved tab — restore as blank
+          restoredTabs.push(createNewTab(undefined, saved.fileType ?? ".mdi"));
+          continue;
+        }
+        try {
+          const absolutePath = toAbsolutePath(saved.relativePath, rootPath);
+          const vfs = getVFS();
+          const fileContent = await vfs.readFile(absolutePath);
+          restoredTabs.push({
+            tabKind: "editor",
+            id: generateTabId(),
+            file: {
+              path: absolutePath,
+              handle: null,
+              name: saved.fileName,
+            },
+            content: fileContent,
+            lastSavedContent: fileContent,
+            isDirty: false,
+            lastSavedTime: Date.now(),
+            lastSaveWasAuto: false,
+            isSaving: false,
+            isPreview: saved.isPreview ?? false,
+            fileType: saved.fileType ?? inferFileType(saved.fileName),
+            fileSyncStatus: "clean",
+            conflictDiskContent: null,
+          });
+        } catch (error) {
+          console.warn(`タブの復元に失敗しました (${saved.relativePath}):`, error);
+        }
+      }
+
+      if (restoredTabs.length > 0) {
+        setTabs(restoredTabs);
+        const activeIdx = Math.min(savedTabs.activeIndex, restoredTabs.length - 1);
+        setActiveTabId(restoredTabs[Math.max(0, activeIdx)].id);
+        storageInitializedRef.current = true;
+        return true;
+      }
+
+      // All file-backed tabs failed to restore
+      const hadFileBacked = savedTabs.tabs.some((t) => Boolean(t.relativePath));
+      if (hadFileBacked) {
+        setRestoreError?.(
+          "前回開いていたファイルを復元できませんでした。ファイルが移動または削除された可能性があります。",
+        );
+      }
+      storageInitializedRef.current = true;
+      return false;
+    },
+    [setTabs, setActiveTabId, setRestoreError],
+  );
+
   // --- Storage initialization & Web file restore --------------------------
-  //
-  // This effect always ensures at least one tab exists after storage loads.
-  // For Electron, restoreTabs (below) may override the tab set here when
-  // file-backed saved tabs are found.
 
   useEffect(() => {
     const initializeStorage = async () => {
@@ -179,26 +278,16 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         const storage = getStorageService();
         await storage.initialize();
 
-        // Use per-window storage when a key is available.
-        // For Web, the key may not yet be set on first mount; fall back to global.
         const key = windowKeyRef.current;
         const windowState = key ? await fetchWindowState(key) : null;
         const appState = windowState ? null : await storage.loadAppState();
 
-        // Check if we have previously saved tab state
         const savedOpenTabs = windowState?.openTabs ?? appState?.openTabs;
-
-        // If saved state explicitly has 0 tabs, restore empty state — no tab needed.
         const savedEmpty = savedOpenTabs && savedOpenTabs.tabs.length === 0;
 
-        // Determine the initial tab using a local variable to make the
-        // fallback logic explicit and avoid multiple setTabs calls.
         let initialTab: EditorTabState | null = null;
 
         if (!skipAutoRestore && !isElectron && !savedEmpty) {
-          // Web: restore file handle from editor buffer.
-          // Look up the file key this tab last saved with to avoid loading
-          // another tab's buffer (cross-tab collision fix for #1064).
           const lastFileKey = await storage.getItem("last_editor_buffer_key");
           const buffer = await storage.loadEditorBuffer(lastFileKey ?? undefined);
           if (buffer?.fileHandle) {
@@ -228,31 +317,21 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
           }
         }
 
-        // Fallback: create a default blank tab when no restore path fired.
-        // Skip if saved state was explicitly empty (user closed all tabs).
-        // For Electron (non-skipAutoRestore), restoreTabs handles the case where
-        // file-backed tabs were previously saved; skip creating a fallback here
-        // to avoid a visible flash before restoreTabs completes.
         if (!initialTab && !savedEmpty && (!isElectron || skipAutoRestore)) {
           initialTab = createNewTab();
         }
 
         if (initialTab) {
           const tab = initialTab;
-          // Use functional updates so a concurrently-running restoreTabs (Electron)
-          // that already set tabs is not overridden.
           setTabs((prev) => (prev.length > 0 ? prev : [tab]));
           setActiveTabId((prev) => (prev === "" ? tab.id : prev));
         }
       } catch (error) {
         console.error("ストレージの初期化に失敗しました:", error);
-        // Ensure at least one tab even on storage error
         const errorTab = createNewTab();
         setTabs((prev) => (prev.length > 0 ? prev : [errorTab]));
         setActiveTabId((prev) => (prev === "" ? errorTab.id : prev));
       } finally {
-        // For Web (and Electron with skipAutoRestore), restore is complete here.
-        // Electron's restoreTabs sets this flag after vfsReadyPromise resolves.
         if (!isElectron || skipAutoRestore) {
           storageInitializedRef.current = true;
         }
@@ -262,9 +341,10 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     void initializeStorage();
   }, [isElectron, skipAutoRestore, setTabs, setActiveTabId]);
 
-  // --- Restore tabs from AppState on mount (Electron only) ----------------
-  // Wait for VFS root to be set so that the main process has a registered
-  // allowed root before we attempt vfs:read-file IPC calls.
+  // --- Standalone-mode restore from AppState (Electron only) -------------
+  // This ONLY handles standalone mode (no project). In project mode,
+  // restoreProjectTabs() is called explicitly by the project-open handler,
+  // replacing the old mount-time restore that had a race condition with windowKey.
 
   useEffect(() => {
     if (!isElectron || skipAutoRestore) return;
@@ -272,26 +352,27 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
     const restoreTabs = async () => {
       try {
-        // Wait for VFS root to be set before reading files (prevents race condition)
         if (vfsReadyPromise) {
           await Promise.race([vfsReadyPromise, new Promise<void>((r) => setTimeout(r, 5000))]);
         }
 
-        // Use per-window storage when a key is available; fall back to global
-        // AppState for legacy sessions (migration handled inside fetchWindowState).
+        // If project tabs were explicitly restored (via restoreProjectTabs),
+        // this mount-time path is redundant — skip to prevent double-restore.
+        if (projectTabsRestoredRef.current) {
+          storageInitializedRef.current = true;
+          return;
+        }
+
+        // Standalone mode: restore from global AppState / per-window SQLite
         const key = windowKeyRef.current;
         const windowState = await fetchWindowState(key ?? "__global__");
         const openTabs = windowState?.openTabs;
-        // No saved state at all: first use — initializeStorage handles default tab.
         if (!openTabs) return;
-
-        // Saved state is explicitly empty (user closed all tabs last session).
         if (openTabs.tabs.length === 0) return;
 
         const restoredTabs: EditorTabState[] = [];
         for (const serialized of openTabs.tabs) {
           if (!serialized.filePath) {
-            // Restore unsaved (new) tabs as blank tabs so they are not silently dropped.
             restoredTabs.push(createNewTab(undefined, serialized.fileType ?? ".mdi"));
             continue;
           }
@@ -327,19 +408,13 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
           const activeIdx = Math.min(openTabs.activeIndex, restoredTabs.length - 1);
           setActiveTabId(restoredTabs[activeIdx].id);
         } else {
-          // Check whether any of the saved tabs had a file path.
           const hadFileBacked = openTabs.tabs.some((t) => Boolean(t.filePath));
           if (hadFileBacked) {
-            // All file-backed tabs failed to restore — do NOT create a blank
-            // default tab, as that would overwrite the saved session on the
-            // next debounced persist. Surface an error instead so the UI can
-            // inform the user.
             setRestoreError?.(
               "前回開いていたファイルを復元できませんでした。ファイルが移動または削除された可能性があります。",
             );
             return;
           }
-          // Saved tabs were all untitled (no file path) — create a default tab.
           const defaultTab = createNewTab();
           setTabs((prev) => (prev.length > 0 ? prev : [defaultTab]));
           setActiveTabId((prev) => (prev === "" ? defaultTab.id : prev));
@@ -347,7 +422,6 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
       } catch (error) {
         console.error("タブの復元に失敗しました:", error);
       } finally {
-        // Allow tab persistence after Electron restore completes (or errors).
         storageInitializedRef.current = true;
       }
     };
@@ -355,5 +429,5 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     void restoreTabs();
   }, [isElectron, skipAutoRestore, setTabs, setActiveTabId, vfsReadyPromise, setRestoreError]);
 
-  return { wasAutoRecovered, flushTabState };
+  return { wasAutoRecovered, flushTabState, restoreProjectTabs };
 }

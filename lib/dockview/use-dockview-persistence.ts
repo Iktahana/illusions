@@ -19,6 +19,8 @@ import {
   fetchWindowState,
 } from "@/lib/storage/app-state-manager";
 import { getStorageService } from "@/lib/storage/storage-service";
+import { persistWorkspaceJson, toRelativePath } from "@/lib/project/workspace-persistence";
+import type { WorkspaceDockviewLayout } from "@/lib/project/project-types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -32,15 +34,28 @@ const LAYOUT_PERSIST_DEBOUNCE = 2000;
 
 /**
  * Build a stable, ID-independent key for a tab that survives session restarts.
+ * Supports same-file clones via `#N` suffix (e.g. "chapter1.mdi", "chapter1.mdi#1").
  *
- * - Editor tab with saved file: the file path (e.g. "/home/user/novel.mdi")
- * - Editor tab without file (unsaved): "unsaved:<tabId>"
- * - Terminal tab: "terminal:<sessionId>"
- * - Diff tab: "diff:<sourceTabId>"
+ * Key formats:
+ *   - First editor tab for a file: file path
+ *   - Subsequent clones of same file: "filePath#1", "filePath#2", etc.
+ *   - Unsaved editor tab: "unsaved:<tabId>"
+ *   - Terminal tab: "terminal:<sessionId>"
+ *   - Diff tab: "diff:<sourceTabId>"
+ *
+ * @param tab - The tab to generate a key for
+ * @param occurrences - Mutable map tracking how many times each base path has been seen.
+ *   Pass the same map across all tabs in a single serialization pass for correct indexing.
  */
-function stableKeyForTab(tab: TabState): string | null {
+function stableKeyForTab(tab: TabState, occurrences?: Map<string, number>): string | null {
   if (isEditorTab(tab)) {
-    return tab.file?.path ?? `unsaved:${tab.id}`;
+    const basePath = tab.file?.path ?? `unsaved:${tab.id}`;
+    if (occurrences) {
+      const count = occurrences.get(basePath) ?? 0;
+      occurrences.set(basePath, count + 1);
+      return count === 0 ? basePath : `${basePath}#${count}`;
+    }
+    return basePath;
   }
   if (isTerminalTab(tab)) {
     return `terminal:${tab.sessionId}`;
@@ -54,12 +69,7 @@ function stableKeyForTab(tab: TabState): string | null {
 /**
  * Extract a simplified, ID-independent layout from the current dockview state.
  * Uses stable keys so the layout survives tab ID regeneration.
- *
- * Stable key formats:
- *   - Saved editor tab: file path
- *   - Unsaved editor tab: "unsaved:<tabId>"
- *   - Terminal tab: "terminal:<sessionId>"
- *   - Diff tab: "diff:<sourceTabId>"
+ * Same-file clones are disambiguated with `#N` suffix.
  */
 function extractSimplifiedLayout(
   api: DockviewApi,
@@ -69,9 +79,11 @@ function extractSimplifiedLayout(
   if (groups.length <= 1) return undefined; // Single group = default layout, no need to save
 
   // Build panelId → stable key lookup (covers all tab kinds)
+  // Use occurrence tracking for same-file clone disambiguation
+  const occurrences = new Map<string, number>();
   const pathByPanelId = new Map<string, string | null>();
   for (const tab of tabs) {
-    pathByPanelId.set(tab.id, stableKeyForTab(tab));
+    pathByPanelId.set(tab.id, stableKeyForTab(tab, occurrences));
   }
 
   // Extract orientation from serialized JSON (the API doesn't expose it directly)
@@ -125,6 +137,8 @@ export interface UseDockviewPersistenceOptions {
    * 互いの状態を上書きしないようにする。
    */
   windowKey?: string | null;
+  /** Whether the app is currently in project mode. */
+  isProject?: boolean;
 }
 
 export interface UseDockviewPersistenceReturn {
@@ -137,6 +151,7 @@ export function useDockviewPersistence({
   tabs = [],
   enabled = true,
   windowKey,
+  isProject = false,
 }: UseDockviewPersistenceOptions): UseDockviewPersistenceReturn {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const apiRef = useRef<DockviewApi | null>(null);
@@ -145,14 +160,40 @@ export function useDockviewPersistence({
   tabsRef.current = tabs;
   const windowKeyRef = useRef(windowKey ?? null);
   windowKeyRef.current = windowKey ?? null;
+  const isProjectRef = useRef(isProject);
+  isProjectRef.current = isProject;
 
   /** Serialize and persist the current layout immediately. */
   const persistLayoutNow = useCallback(async () => {
     const api = apiRef.current;
     if (!api) return;
     try {
-      const layoutJson = api.toJSON();
       const simplified = extractSimplifiedLayout(api, tabsRef.current);
+
+      // --- Project mode: write to workspace.json ---
+      if (isProjectRef.current && simplified) {
+        const rootPath = windowKeyRef.current;
+        // Convert absolute paths → relative for workspace.json storage.
+        // Filter out terminal/diff keys (ephemeral, not restored).
+        const workspaceLayout: WorkspaceDockviewLayout = {
+          groups: simplified.groups.map((g) => ({
+            tabPaths: g.tabPaths.map((p) => {
+              if (!p || p.startsWith("terminal:") || p.startsWith("diff:")) return null;
+              return toRelativePath(p, rootPath) ?? p;
+            }),
+            activeTabPath: g.activeTabPath
+              ? (toRelativePath(g.activeTabPath, rootPath) ?? g.activeTabPath)
+              : null,
+          })),
+          orientation: simplified.orientation,
+          sizes: simplified.sizes,
+        };
+        await persistWorkspaceJson({ dockviewLayout: workspaceLayout });
+        return;
+      }
+
+      // --- Standalone mode: write to SQLite ---
+      const layoutJson = api.toJSON();
       const layoutState: DockviewLayoutState = {
         dockviewJson: layoutJson,
         buffers: [],
@@ -162,7 +203,6 @@ export function useDockviewPersistence({
       if (key) {
         await persistWindowState(key, { dockviewLayout: layoutState });
       } else {
-        // Fallback: no per-window key yet — write to global AppState.
         await persistAppState({ dockviewLayout: layoutState });
       }
     } catch (err) {

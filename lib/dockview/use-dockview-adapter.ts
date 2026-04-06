@@ -22,6 +22,8 @@ import type {
   DiffPanelParams,
   SimplifiedGroupLayout,
 } from "./types";
+import type { WorkspaceDockviewLayout } from "@/lib/project/project-types";
+import { toAbsolutePath } from "@/lib/project/workspace-persistence";
 import { loadDockviewLayout } from "./use-dockview-persistence";
 
 // ---------------------------------------------------------------------------
@@ -41,6 +43,12 @@ export interface UseDockviewAdapterOptions {
    * multiple windows with different projects do not share the same layout record.
    */
   windowKey?: string | null;
+  /**
+   * Dockview layout from workspace.json (project mode).
+   * When provided, this is used instead of loading from SQLite.
+   * Paths are relative to project root and will be converted to absolute.
+   */
+  projectLayout?: WorkspaceDockviewLayout | null;
 }
 
 export interface UseDockviewAdapterReturn {
@@ -103,10 +111,17 @@ function buildTerminalPanelPosition(
  * Build the stable key for a tab to match against saved layout keys.
  *
  * Must mirror the logic in use-dockview-persistence.ts:stableKeyForTab().
+ * Uses occurrence tracking for same-file clone disambiguation (#N suffix).
  */
-function stableKeyForTab(tab: TabState): string | null {
+function stableKeyForTab(tab: TabState, occurrences?: Map<string, number>): string | null {
   if (isEditorTab(tab)) {
-    return tab.file?.path ?? `unsaved:${tab.id}`;
+    const basePath = tab.file?.path ?? `unsaved:${tab.id}`;
+    if (occurrences) {
+      const count = occurrences.get(basePath) ?? 0;
+      occurrences.set(basePath, count + 1);
+      return count === 0 ? basePath : `${basePath}#${count}`;
+    }
+    return basePath;
   }
   if (isTerminalTab(tab)) {
     return `terminal:${tab.sessionId}`;
@@ -134,9 +149,11 @@ function applySimplifiedLayout(
   tabs: TabState[],
 ): void {
   // Build stable-key → panelId lookup from current tabs (all tab kinds)
+  // Uses occurrence tracking to match same-file clones via #N suffix.
+  const occurrences = new Map<string, number>();
   const panelIdByKey = new Map<string, string>();
   for (const tab of tabs) {
-    const key = stableKeyForTab(tab);
+    const key = stableKeyForTab(tab, occurrences);
     if (key) {
       panelIdByKey.set(key, tab.id);
     }
@@ -230,6 +247,22 @@ function applySimplifiedLayout(
       }
     }
   }
+
+  // Restore active tab per group
+  for (let i = 0; i < layout.groups.length; i++) {
+    const savedGroup = layout.groups[i];
+    if (!savedGroup.activeTabPath) continue;
+    const activePanelId = panelIdByKey.get(savedGroup.activeTabPath);
+    if (!activePanelId) continue;
+    const panel = api.getPanel(activePanelId);
+    if (panel) {
+      try {
+        panel.api.setActive();
+      } catch {
+        // Panel may not be in this group anymore
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +275,7 @@ export function useDockviewAdapter({
   searchOpenTrigger,
   searchInitialTerm,
   windowKey,
+  projectLayout,
 }: UseDockviewAdapterOptions): UseDockviewAdapterReturn {
   const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
   const apiRef = useRef<DockviewApi | null>(null);
@@ -337,13 +371,41 @@ export function useDockviewAdapter({
     [],
   );
 
+  // -- Reset layout state on project change ----------------------------------
+  const prevWindowKeyRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const newKey = windowKey ?? null;
+    if (prevWindowKeyRef.current !== undefined && prevWindowKeyRef.current !== newKey) {
+      layoutAppliedRef.current = false;
+      savedLayoutRef.current = null;
+    }
+    prevWindowKeyRef.current = newKey;
+  }, [windowKey]);
+
   // -- Pre-load saved layout for restoration --------------------------------
-  // Re-runs when windowKey changes from null to a real value (project loaded).
-  // layoutAppliedRef ensures the layout is only applied once even if this
-  // effect fires multiple times.
+  // In project mode, uses the projectLayout prop (from workspace.json, already
+  // loaded). In standalone mode, loads from SQLite via loadDockviewLayout().
 
   useEffect(() => {
-    if (layoutAppliedRef.current) return; // Already applied; do not override
+    if (layoutAppliedRef.current) return;
+
+    // Project mode: use workspace.json layout (convert relative → absolute paths)
+    if (projectLayout && projectLayout.groups.length > 1) {
+      const rootPath = windowKey ?? null;
+      const absoluteLayout: SimplifiedGroupLayout = {
+        groups: projectLayout.groups.map((g) => ({
+          tabPaths: g.tabPaths.map((p) => (p ? toAbsolutePath(p, rootPath) : null)),
+          activeTabPath: g.activeTabPath ? toAbsolutePath(g.activeTabPath, rootPath) : null,
+        })),
+        orientation: projectLayout.orientation,
+        sizes: projectLayout.sizes,
+      };
+      savedLayoutRef.current = absoluteLayout;
+      setLayoutReadyTick((t) => t + 1);
+      return;
+    }
+
+    // Standalone mode: load from SQLite
     let cancelled = false;
     void loadDockviewLayout(windowKey).then((state) => {
       if (cancelled) return;
@@ -355,7 +417,7 @@ export function useDockviewAdapter({
     return () => {
       cancelled = true;
     };
-  }, [windowKey]);
+  }, [windowKey, projectLayout]);
 
   // -- Pending split tracking -----------------------------------------------
 
