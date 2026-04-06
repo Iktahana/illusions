@@ -7,7 +7,7 @@
  *   const results = await getDictService().query("雪");
  */
 import type { IDictProvider, DictEntry, DictQueryResult, DictDownloadState } from "./dict-types";
-import { IllusionsDictProvider } from "./providers/illusions-dict-provider";
+import { GenjiProvider } from "./providers/genji-provider";
 
 // Deduplication key: (entry, reading.primary) — preserves homonyms that share
 // a surface form but differ in reading.
@@ -134,8 +134,8 @@ let _instance: DictService | null = null;
 export function getDictService(): DictService {
   if (!_instance) {
     _instance = new DictService();
-    // Auto-register the built-in illusionsDict provider
-    _instance.registerProvider(new IllusionsDictProvider());
+    // Auto-register the built-in Genji provider
+    _instance.registerProvider(new GenjiProvider());
   }
   return _instance;
 }

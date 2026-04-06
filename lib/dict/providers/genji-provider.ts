@@ -1,13 +1,13 @@
 /**
- * IllusionsDictProvider
+ * GenjiProvider
  *
  * Electron: delegates queries to the main process via IPC (window.electronAPI.dict).
  * Web: returns stub results with webApiPending flag until a real API is available.
  */
 import type { IDictProvider, DictEntry } from "../dict-types";
 
-const PROVIDER_ID = "illusions-dict";
-const DISPLAY_NAME = "illusions辞典";
+const PROVIDER_ID = "genji";
+const DISPLAY_NAME = "幻辞";
 const DEFAULT_LIMIT = 20;
 
 function isElectronDict(): boolean {
@@ -33,7 +33,7 @@ function getElectronDictAPI() {
   return api;
 }
 
-export class IllusionsDictProvider implements IDictProvider {
+export class GenjiProvider implements IDictProvider {
   readonly id = PROVIDER_ID;
   readonly displayName = DISPLAY_NAME;
 
@@ -52,7 +52,7 @@ export class IllusionsDictProvider implements IDictProvider {
     try {
       return await getElectronDictAPI().query(term, limit);
     } catch (err) {
-      console.error(`[IllusionsDictProvider] query failed:`, err);
+      console.error(`[GenjiProvider] query failed:`, err);
       return [];
     }
   }
@@ -62,7 +62,7 @@ export class IllusionsDictProvider implements IDictProvider {
     try {
       return await getElectronDictAPI().queryByReading(reading, limit);
     } catch (err) {
-      console.error(`[IllusionsDictProvider] queryByReading failed:`, err);
+      console.error(`[GenjiProvider] queryByReading failed:`, err);
       return [];
     }
   }

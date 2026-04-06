@@ -3,7 +3,7 @@
  * DictManager — Electron main process dictionary manager.
  *
  * Responsibilities:
- *  - Open and cache the illusionsDict SQLite database
+ *  - Open and cache the Genji SQLite database
  *  - Ensure indexes exist for fast prefix search
  *  - Query entries and definitions
  *  - Check for updates via GitHub Releases API
@@ -17,12 +17,12 @@ const https = require("https");
 const zlib = require("zlib");
 const { app } = require("electron");
 
-const PROVIDER_ID = "illusions-dict";
+const PROVIDER_ID = "genji";
 const GITHUB_OWNER = "Iktahana";
-const GITHUB_REPO = "illusionsDict-Word-Database";
-const DB_FILENAME = "illusions_dict.db";
-const DB_TEMP_FILENAME = "illusions_dict.db.tmp";
-const VERSION_FILENAME = "illusions_dict_version.txt";
+const GITHUB_REPO = "Genji";
+const DB_FILENAME = "genji.db";
+const DB_TEMP_FILENAME = "genji.db.tmp";
+const VERSION_FILENAME = "genji_version.txt";
 
 // ---------------------------------------------------------------------------
 // Simple promise-chain mutex (main-process, no module import needed)

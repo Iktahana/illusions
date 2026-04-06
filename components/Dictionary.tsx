@@ -126,7 +126,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
   // Check master dict status on mount
   useEffect(() => {
     getDictService()
-      .getDownloadState("illusions-dict")
+      .getDownloadState("genji")
       .then((state) => setMasterStatus(state.status))
       .catch(() => {});
   }, []);

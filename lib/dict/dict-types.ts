@@ -1,6 +1,6 @@
 /**
  * Master dictionary types — provider-agnostic interfaces.
- * All dictionary providers (illusionsDict, future sources) must conform to these types.
+ * All dictionary providers (Genji, future sources) must conform to these types.
  */
 
 // ---------------------------------------------------------------------------
@@ -46,7 +46,7 @@ export interface DictEntry {
 // ---------------------------------------------------------------------------
 
 export interface IDictProvider {
-  /** Stable identifier used to tag results (e.g. "illusions-dict") */
+  /** Stable identifier used to tag results (e.g. "genji") */
   readonly id: string;
   /** Human-readable name shown in UI */
   readonly displayName: string;
