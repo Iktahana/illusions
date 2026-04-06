@@ -1,64 +1,58 @@
 ---
-title: ドキュメントホーム
-slug: docs-home
+title: Home
+slug: home
 type: moc
 status: active
-updated: 2026-04-03
+updated: 2026-04-06
 tags:
   - docs
-  - obsidian
+  - index
 ---
 
-# ドキュメントホーム
+# illusions ドキュメント (Obsidian 向け)
 
-この vault は、illusions の実装メモ・設計文書・仕様書をまとめるための作業用ドキュメント空間です。  
-GitHub 向けの入口は [[README]]、Obsidian 向けの入口はこのページです。
+illusions の実装・設計・仕様を整理したドキュメントです。
 
-## 主要な入口
+## 読み始める場所
 
-- [[MDI/README|MDI]]
-- [[architecture/storage-system|ストレージシステム]]
-- [[architecture/tab-manager|タブ管理]]
-- [[architecture/documentation-gap-map|文書化ギャップマップ]]
-- [[architecture/export-system|エクスポートシステム]]
-- [[guides/milkdown-plugin|Milkdown プラグイン開発]]
-- [[guides/linting-rules|Lint ルール作成]]
-- [[setup/CLAUDE_REVIEW_SETUP|Claude Code Review 設定]]
+- [[MDI/README|MDI ドキュメント]]
+- [[README|GitHub 向けドキュメント一覧]]
 
-## 読み方
+## 主要ドキュメント
 
-### 仕様から入る
+### MDI
 
 - [[MDI/README|MDI 概要]]
 - [[MDI/spec|MDI 構文仕様]]
-- [[MDI/implementation|MDI 実装ノート]]
 
-### システム設計から入る
+### アーキテクチャ
 
-- [[architecture/storage-system|ストレージ]]
-- [[architecture/vfs|VFS]]
+- [[architecture/storage-system|ストレージシステム]]
+- [[architecture/vfs|Virtual File System]]
 - [[architecture/tab-manager|タブ管理]]
+- [[architecture/dockview-layout|Dockview レイアウトシステム]]
+- [[architecture/terminal-system|ターミナルサブシステム]]
+- [[architecture/keymap-system|キーマップシステム]]
+- [[architecture/project-upgrade-and-permissions|プロジェクトのアップグレードと権限]]
+- [[architecture/dictionary-and-ignored-corrections|辞書と校正の無視設定]]
+- [[architecture/export-system|エクスポートシステム]]
+- [[architecture/file-watcher|ファイル監視]]
+- [[architecture/history-service|履歴サービス]]
 - [[architecture/project-lifecycle|プロジェクトライフサイクル]]
-- [[architecture/documentation-gap-map|未整備ドキュメントの地図]]
+- [[architecture/readability-scoring|可読性スコアリング]]
+- [[architecture/text-statistics|テキスト統計]]
+- [[architecture/documentation-gap-map|文書化ギャップマップ]]
 
-## 次に書くべきもの
+### ガイド
+
+- [[guides/milkdown-plugin|Milkdown プラグイン開発]]
+- [[guides/linting-rules|Lint ルール作成]]
+- [[guides/keyboard-shortcuts|キーボードショートカット]]
+- [[guides/theme-colors|テーマカラー]]
+- [[guides/terminal|ターミナルの使い方]]
+- [[guides/dictionary|校正の無視と辞書設定]]
+- [[guides/onboarding-and-welcome-flow|オンボーディングとウェルカムフロー]]
+
+## 管理
 
 - [[architecture/documentation-gap-map|文書化ギャップマップ]]
-- `dockview / pane layout`
-- `terminal subsystem`
-- `dictionary / ignored corrections`
-- `project upgrade / permissions`
-- `keymap system`
-- `onboarding / welcome flow`
-
-### 開発作業から入る
-
-- [[guides/milkdown-plugin|Milkdown]]
-- [[guides/linting-rules|Linting]]
-- [[guides/theme-colors|テーマカラー]]
-- [[guides/keyboard-shortcuts|キーボードショートカット]]
-
-## 補助ノート
-
-- [[references/README|リファレンス]]
-- [[archive/bug-verification-2026-02-15|アーカイブ例]]
