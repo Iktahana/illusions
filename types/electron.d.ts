@@ -263,7 +263,7 @@ declare global {
       /** Remove all editor sync listeners */
       removeAllListeners: () => void;
     };
-    /** Master dictionary IPC (illusionsDict and future providers) */
+    /** Master dictionary IPC (Genji and future providers) */
     dict?: {
       /** Query entries by headword (exact or prefix match) */
       query: (term: string, limit?: number) => Promise<DictEntry[]>;
