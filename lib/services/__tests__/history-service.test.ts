@@ -287,7 +287,7 @@ describe("HistoryService", () => {
 
     it("should sanitize all Windows-invalid characters in filename", async () => {
       const entry = await service.createSnapshot({
-        sourcePath: 'C:\\docs\\path<with>special|chars.mdi',
+        sourcePath: "C:\\docs\\path<with>special|chars.mdi",
         content: "Special chars test",
       });
 
