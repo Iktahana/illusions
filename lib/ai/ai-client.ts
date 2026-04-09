@@ -108,24 +108,24 @@ class UnconfiguredAiClient implements IAiClient {
 
   validateLintIssues(): Promise<LintValidationResult[]> {
     return Promise.reject(
-      new Error("AI client is not configured. Please set an API key in Settings > AI API."),
+      new Error("AIクライアントが未設定です。設定 > AI API でAPIキーを設定してください。"),
     );
   }
 
   suggestRewrite(): Promise<RewriteSuggestion> {
     return Promise.reject(
-      new Error("AI client is not configured. Please set an API key in Settings > AI API."),
+      new Error("AIクライアントが未設定です。設定 > AI API でAPIキーを設定してください。"),
     );
   }
 
   extractCharacters(): Promise<ExtractedCharacter[]> {
     return Promise.reject(
-      new Error("AI client is not configured. Please set an API key in Settings > AI API."),
+      new Error("AIクライアントが未設定です。設定 > AI API でAPIキーを設定してください。"),
     );
   }
 
   async *streamChat(): AsyncIterable<string> {
-    throw new Error("AI client is not configured. Please set an API key in Settings > AI API.");
+    throw new Error("AIクライアントが未設定です。設定 > AI API でAPIキーを設定してください。");
   }
 }
 
@@ -190,15 +190,34 @@ class AiClient implements IAiClient {
       return [];
     }
 
-    const parsed = JSON.parse(content) as {
-      results: Array<{ index: number; isGenuine: boolean; reasoning: string }>;
-    };
+    let parsed: { results?: unknown[] };
+    try {
+      parsed = JSON.parse(content) as { results?: unknown[] };
+    } catch {
+      return [];
+    }
 
-    return parsed.results.map((r) => ({
-      issueRuleId: issues[r.index - 1]?.ruleId ?? "unknown",
-      isGenuine: r.isGenuine,
-      reasoning: r.reasoning,
-    }));
+    if (!Array.isArray(parsed.results)) {
+      return [];
+    }
+
+    return parsed.results
+      .filter(
+        (r): r is { index: number; isGenuine: boolean; reasoning: string } =>
+          typeof r === "object" &&
+          r !== null &&
+          "index" in r &&
+          typeof (r as Record<string, unknown>).index === "number" &&
+          "isGenuine" in r &&
+          typeof (r as Record<string, unknown>).isGenuine === "boolean" &&
+          "reasoning" in r &&
+          typeof (r as Record<string, unknown>).reasoning === "string",
+      )
+      .map((r) => ({
+        issueRuleId: issues[r.index - 1]?.ruleId ?? "unknown",
+        isGenuine: r.isGenuine,
+        reasoning: r.reasoning,
+      }));
   }
 
   async suggestRewrite(
@@ -233,7 +252,11 @@ class AiClient implements IAiClient {
       return { original: text, suggestion: text, explanation: "" };
     }
 
-    return JSON.parse(content) as RewriteSuggestion;
+    try {
+      return JSON.parse(content) as RewriteSuggestion;
+    } catch {
+      return { original: text, suggestion: text, explanation: "" };
+    }
   }
 
   async extractCharacters(
@@ -273,8 +296,12 @@ class AiClient implements IAiClient {
       return [];
     }
 
-    const parsed = JSON.parse(content) as { characters: ExtractedCharacter[] };
-    return parsed.characters;
+    try {
+      const parsed = JSON.parse(content) as { characters?: ExtractedCharacter[] };
+      return Array.isArray(parsed.characters) ? parsed.characters : [];
+    } catch {
+      return [];
+    }
   }
 
   async *streamChat(messages: AiChatMessage[], signal?: AbortSignal): AsyncIterable<string> {
