@@ -13,6 +13,7 @@ import {
   Terminal,
   UserCircle,
   BookOpen,
+  Bot,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -28,6 +29,7 @@ import PowerSettingsTab from "./settings/PowerSettingsTab";
 import TerminalSettingsTab from "./settings/TerminalSettingsTab";
 import AccountSettingsTab from "./settings/AccountSettingsTab";
 import DictSettingsTab from "./settings/DictSettingsTab";
+import AiApiSettingsTab from "./settings/AiApiSettingsTab";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -38,6 +40,7 @@ interface SettingsModalProps {
 
 export type SettingsCategory =
   | "account"
+  | "ai-api"
   | "editor"
   | "vertical"
   | "pos-highlight"
@@ -131,6 +134,18 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
               >
                 <UserCircle className="w-4 h-4" />
                 アカウント
+              </button>
+              <button
+                onClick={() => setActiveCategory("ai-api")}
+                className={clsx(
+                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
+                  activeCategory === "ai-api"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
+                )}
+              >
+                <Bot className="w-4 h-4" />
+                AI API
               </button>
               <div className="my-2 border-t border-border" />
               <button
@@ -268,6 +283,7 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
             )}
           >
             {activeCategory === "account" && <AccountSettingsTab />}
+            {activeCategory === "ai-api" && <AiApiSettingsTab />}
             {activeCategory === "editor" && <TypographySettingsTab />}
             {activeCategory === "vertical" && <VerticalSettingsTab />}
             {activeCategory === "pos-highlight" && <PosHighlightSettingsTab />}

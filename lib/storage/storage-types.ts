@@ -83,10 +83,15 @@ export interface AppState {
     { enabled: boolean; severity: Severity; skipDialogue?: boolean }
   >;
 
-  // LLM設定
+  // LLM設定（ローカルモデル用）
   llmEnabled?: boolean;
   llmModelId?: string;
   llmIdlingStop?: boolean;
+
+  // オンラインAI API設定
+  aiApiKey?: string;
+  aiBaseUrl?: string;
+  aiModelId?: string;
 
   // Character extraction settings
   characterExtractionBatchSize?: number;

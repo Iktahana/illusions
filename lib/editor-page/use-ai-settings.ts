@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { fetchAppState, persistAppState } from "@/lib/storage/app-state-manager";
+import { configureAiClient, resetAiClient } from "@/lib/ai/ai-client";
 import type { Severity } from "@/lib/linting/types";
 import type {
   CorrectionConfig,
@@ -21,6 +22,12 @@ export interface AiSettings {
   powerSaveMode: boolean;
   autoPowerSaveOnBattery: boolean;
   correctionConfig: CorrectionConfig;
+  // Note: aiApiKey is intentionally NOT included here to limit exposure in
+  // EditorSettings context. AiApiSettingsTab reads it directly from AppState.
+  /** Custom base URL for AI API (e.g. self-hosted LiteLLM Gateway) */
+  aiBaseUrl: string;
+  /** Model ID for online AI API — separate from llmModelId (local model) */
+  aiModelId: string;
 }
 
 export interface AiSettingsHandlers {
@@ -40,6 +47,9 @@ export interface AiSettingsHandlers {
   handlePowerSaveModeChange: (enabled: boolean) => Promise<void>;
   handleAutoPowerSaveOnBatteryChange: (enabled: boolean) => void;
   handleCorrectionConfigChange: (partial: Partial<CorrectionConfig>) => void;
+  handleAiApiKeyChange: (apiKey: string) => void;
+  handleAiBaseUrlChange: (baseUrl: string) => void;
+  handleAiModelIdChange: (modelId: string) => void;
   /** Expose setters so power-save restore can update linting/LLM state */
   setLintingEnabled: (value: boolean) => void;
   setLintingRuleConfigs: (
@@ -71,6 +81,9 @@ export function useAiSettings(): UseAiSettingsResult {
   const [characterExtractionConcurrency, setCharacterExtractionConcurrency] = useState(4);
   const [powerSaveMode, setPowerSaveMode] = useState(false);
   const [autoPowerSaveOnBattery, setAutoPowerSaveOnBattery] = useState(true);
+  const [aiApiKey, setAiApiKey] = useState("");
+  const [aiBaseUrl, setAiBaseUrl] = useState("");
+  const [aiModelId, setAiModelId] = useState("gpt-4o-mini");
   const [correctionMode, setCorrectionMode] = useState<CorrectionModeId>("novel");
   const [correctionGuidelines, setCorrectionGuidelines] = useState<GuidelineId[]>(
     DEFAULT_CORRECTION_CONFIG.guidelines,
@@ -130,6 +143,11 @@ export function useAiSettings(): UseAiSettingsResult {
       }
     }
 
+    // Online AI API settings
+    if (typeof appState.aiApiKey === "string") setAiApiKey(appState.aiApiKey);
+    if (typeof appState.aiBaseUrl === "string") setAiBaseUrl(appState.aiBaseUrl);
+    if (typeof appState.aiModelId === "string") setAiModelId(appState.aiModelId);
+
     if (typeof appState.characterExtractionBatchSize === "number") {
       setCharacterExtractionBatchSize(
         Math.min(Math.max(appState.characterExtractionBatchSize, 1), 10),
@@ -185,6 +203,40 @@ export function useAiSettings(): UseAiSettingsResult {
       console.error("Failed to persist characterExtractionConcurrency:", e),
     );
   }, []);
+
+  const handleAiApiKeyChange = useCallback((apiKey: string) => {
+    setAiApiKey(apiKey);
+    void persistAppState({ aiApiKey: apiKey }).catch((e) =>
+      console.error("Failed to persist aiApiKey:", e),
+    );
+  }, []);
+
+  const handleAiBaseUrlChange = useCallback((baseUrl: string) => {
+    setAiBaseUrl(baseUrl);
+    void persistAppState({ aiBaseUrl: baseUrl }).catch((e) =>
+      console.error("Failed to persist aiBaseUrl:", e),
+    );
+  }, []);
+
+  const handleAiModelIdChange = useCallback((modelId: string) => {
+    setAiModelId(modelId);
+    void persistAppState({ aiModelId: modelId }).catch((e) =>
+      console.error("Failed to persist aiModelId:", e),
+    );
+  }, []);
+
+  // Sync AI client configuration whenever relevant settings change
+  useEffect(() => {
+    if (aiApiKey) {
+      configureAiClient({
+        apiKey: aiApiKey,
+        baseUrl: aiBaseUrl || undefined,
+        modelId: aiModelId,
+      });
+    } else {
+      resetAiClient();
+    }
+  }, [aiApiKey, aiBaseUrl, aiModelId]);
 
   const handleLintingRuleConfigChange = useCallback(
     (ruleId: string, config: { enabled: boolean; severity: Severity }) => {
@@ -291,6 +343,8 @@ export function useAiSettings(): UseAiSettingsResult {
           validationEnabled: llmEnabled,
         },
       },
+      aiBaseUrl,
+      aiModelId,
     },
     aiHandlers: {
       handleLintingEnabledChange,
@@ -304,6 +358,9 @@ export function useAiSettings(): UseAiSettingsResult {
       handlePowerSaveModeChange,
       handleAutoPowerSaveOnBatteryChange,
       handleCorrectionConfigChange,
+      handleAiApiKeyChange,
+      handleAiBaseUrlChange,
+      handleAiModelIdChange,
       setLintingEnabled,
       setLintingRuleConfigs,
       setLlmEnabled,
