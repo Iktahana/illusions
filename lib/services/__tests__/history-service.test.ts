@@ -270,6 +270,30 @@ describe("HistoryService", () => {
       // UTF-8 byte size for Japanese characters is larger than char count
       expect(entry.fileSize).toBeGreaterThan(entry.characterCount);
     });
+
+    it("should sanitize Windows drive letter colon in filename", async () => {
+      // Any drive letter (C:, D:, etc.) must be sanitized
+      for (const drive of ["C", "D", "E"]) {
+        const entry = await service.createSnapshot({
+          sourcePath: `${drive}:\\Users\\test\\Documents\\novel.mdi`,
+          content: `Drive ${drive} test`,
+        });
+
+        // The colon from drive letter must not appear in the filename
+        expect(entry.filename).not.toContain(":");
+        expect(entry.filename).toContain(".history");
+      }
+    });
+
+    it("should sanitize all Windows-invalid characters in filename", async () => {
+      const entry = await service.createSnapshot({
+        sourcePath: "C:\\docs\\path<with>special|chars.mdi",
+        content: "Special chars test",
+      });
+
+      expect(entry.filename).not.toMatch(/[:\\/<>"|?*]/);
+      expect(entry.filename).toContain(".history");
+    });
   });
 
   // -----------------------------------------------------------------------
