@@ -496,4 +496,4 @@ messageJa: "ダッシュの使い方が間違っています"; // DO NOT do this
 
 - [Milkdown Plugin Development Guide](./milkdown-plugin.md) -- Plugin architecture and linting integration
 - [Keyboard Shortcuts Reference](./keyboard-shortcuts.md) -- Editor shortcuts and menu structure
-- [Storage Architecture](../architecture/storage-architecture.md) -- How linting settings are persisted
+- [Storage Architecture](../architecture/storage-system.md) -- How linting settings are persisted
