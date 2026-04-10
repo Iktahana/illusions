@@ -101,6 +101,4 @@ export interface DictQueryResult {
   noResults: boolean;
   /** True when the provider is not installed / not available */
   providerUnavailable: boolean;
-  /** True when running in web environment where the API is not yet available */
-  webApiPending?: boolean;
 }
