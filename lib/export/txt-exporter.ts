@@ -8,6 +8,9 @@
 
 import { stripMdiInlineSyntax, replaceMdiWithRubyText } from "./mdi-parser";
 
+/** Sentinel to distinguish scene breaks from paragraph-separation blank lines */
+const SCENE_BREAK_MARKER = "\x00SCENE_BREAK\x00";
+
 /**
  * Convert MDI markdown to plain text without ruby annotations.
  * Strips all MDI syntax and markdown formatting.
@@ -20,6 +23,7 @@ export function mdiToPlainText(content: string): string {
 
   // Strip markdown formatting
   result = stripMarkdown(result);
+  result = collapseBlankLines(result);
 
   return result;
 }
@@ -36,6 +40,7 @@ export function mdiToRubyText(content: string): string {
 
   // Strip markdown formatting
   result = stripMarkdown(result);
+  result = collapseBlankLines(result);
 
   return result;
 }
@@ -56,7 +61,7 @@ export function stripMarkdown(text: string): string {
 
     // Horizontal rules: --- / *** / ___ → empty line
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(processed.trim())) {
-      result.push("");
+      result.push(SCENE_BREAK_MARKER);
       continue;
     }
 
@@ -73,6 +78,30 @@ export function stripMarkdown(text: string): string {
     processed = processed.replace(/\\([{^[\]])/g, "$1");
 
     result.push(processed);
+  }
+
+  return result.join("\n");
+}
+
+/**
+ * Remove blank lines between paragraphs for Japanese typesetting (組版).
+ * Scene breaks are preserved as a single blank line separator.
+ */
+function collapseBlankLines(text: string): string {
+  const lines = text.split("\n");
+  const result: string[] = [];
+
+  for (const line of lines) {
+    if (line === SCENE_BREAK_MARKER) {
+      result.push("");
+      continue;
+    }
+
+    if (line.trim() === "") {
+      continue;
+    }
+
+    result.push(line);
   }
 
   return result.join("\n");
