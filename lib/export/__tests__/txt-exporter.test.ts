@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import {
-  mdiToPlainText,
-  mdiToRubyText,
-  stripMarkdown,
-} from "../txt-exporter";
+import { mdiToPlainText, mdiToRubyText, stripMarkdown } from "../txt-exporter";
 
 // ---------------------------------------------------------------------------
 // stripMarkdown
@@ -101,13 +97,9 @@ describe("mdiToPlainText", () => {
       "Next section.",
     ].join("\n");
 
-    const expected = [
-      "Chapter One",
-      "漢字のテスト。",
-      "「台詞だ」",
-      "",
-      "Next section.",
-    ].join("\n");
+    const expected = ["Chapter One", "漢字のテスト。", "「台詞だ」", "", "Next section."].join(
+      "\n",
+    );
 
     expect(mdiToPlainText(input)).toBe(expected);
   });
@@ -119,16 +111,9 @@ describe("mdiToPlainText", () => {
 
 describe("mdiToRubyText", () => {
   it("should render ruby in parentheses and collapse blank lines", () => {
-    const input = [
-      "{漢字|かんじ}のテスト。",
-      "",
-      "「{台詞|せりふ}だ」",
-    ].join("\n");
+    const input = ["{漢字|かんじ}のテスト。", "", "「{台詞|せりふ}だ」"].join("\n");
 
-    const expected = [
-      "漢字（かんじ）のテスト。",
-      "「台詞（せりふ）だ」",
-    ].join("\n");
+    const expected = ["漢字（かんじ）のテスト。", "「台詞（せりふ）だ」"].join("\n");
 
     expect(mdiToRubyText(input)).toBe(expected);
   });
