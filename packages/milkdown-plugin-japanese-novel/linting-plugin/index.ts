@@ -78,6 +78,10 @@ export function updateLintingSettings(
   if (reason !== undefined) {
     meta.changeReason = reason;
   }
-  const tr = view.state.tr.setMeta(lintingKey, meta);
-  view.dispatch(tr);
+  try {
+    const tr = view.state.tr.setMeta(lintingKey, meta);
+    view.dispatch(tr);
+  } catch {
+    // Editor may be destroyed or Milkdown context not yet initialized — safe to ignore
+  }
 }
