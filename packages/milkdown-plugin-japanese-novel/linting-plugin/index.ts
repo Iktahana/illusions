@@ -81,7 +81,10 @@ export function updateLintingSettings(
   try {
     const tr = view.state.tr.setMeta(lintingKey, meta);
     view.dispatch(tr);
-  } catch {
-    // Editor may be destroyed or Milkdown context not yet initialized — safe to ignore
+  } catch (err: unknown) {
+    // Milkdown throws "Context ... not found" when the editor is destroyed or not yet initialized.
+    // Only suppress that specific error; let unexpected failures propagate.
+    const msg = err instanceof Error ? err.message : "";
+    if (!msg.includes("not found")) throw err;
   }
 }
