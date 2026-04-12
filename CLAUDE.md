@@ -71,7 +71,11 @@ const storage = getStorageService();
 - **Next.js**: `"use client"` for browser APIs/hooks, default to server components, dynamic imports for splitting
 - **Milkdown**: Follow patterns in `packages/milkdown-plugin-japanese-novel/`, type ProseMirror schemas, use kuromoji for tokenization, follow `MDI.md` for `.mdi` syntax
 
-## 8. Commits
+## 8. Code Review
+
+- When Codex (or other agents) provide code reviews, you have the right to disagree with their suggestions. Evaluate each item independently — accept what makes sense, skip what doesn't, and briefly explain your reasoning for items you reject.
+
+## 9. Commits
 
 ```
 <type>(<scope>): <subject>

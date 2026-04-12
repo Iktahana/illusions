@@ -1,26 +1,26 @@
 import { describe, it, expect } from "vitest";
 
-import { mdiToPlainText, mdiToRubyText, stripMarkdown } from "../txt-exporter";
+import { mdiToPlainText, mdiToRubyText } from "../txt-exporter";
 
 // ---------------------------------------------------------------------------
-// stripMarkdown
+// Markdown stripping (tested via mdiToPlainText)
 // ---------------------------------------------------------------------------
 
-describe("stripMarkdown", () => {
+describe("markdown stripping", () => {
   it("should strip heading markers", () => {
-    expect(stripMarkdown("# Title")).toBe("Title");
-    expect(stripMarkdown("## Subtitle")).toBe("Subtitle");
+    expect(mdiToPlainText("# Title")).toBe("Title");
+    expect(mdiToPlainText("## Subtitle")).toBe("Subtitle");
   });
 
   it("should strip bold and italic markers", () => {
-    expect(stripMarkdown("**bold** and *italic*")).toBe("bold and italic");
-    expect(stripMarkdown("***both***")).toBe("both");
+    expect(mdiToPlainText("**bold** and *italic*")).toBe("bold and italic");
+    expect(mdiToPlainText("***both***")).toBe("both");
   });
 
-  it("should convert horizontal rules to scene break markers", () => {
-    const result = stripMarkdown("before\n\n---\n\nafter");
-    // Scene break marker is internal; verify it does not appear as literal "---"
+  it("should convert horizontal rules to blank line separators", () => {
+    const result = mdiToPlainText("before\n\n---\n\nafter");
     expect(result).not.toContain("---");
+    expect(result).toBe("before\n\nafter");
   });
 });
 
@@ -34,9 +34,10 @@ describe("blank line collapsing", () => {
     expect(mdiToPlainText(input)).toBe("first paragraph\nsecond paragraph");
   });
 
-  it("should collapse multiple consecutive blank lines", () => {
+  it("should collapse multiple consecutive blank lines (preserving author-intentional)", () => {
     const input = "first\n\n\n\nsecond";
-    expect(mdiToPlainText(input)).toBe("first\nsecond");
+    // 3 blank lines: 1 structural (removed) + 2 author-intentional (kept)
+    expect(mdiToPlainText(input)).toBe("first\n\n\nsecond");
   });
 
   it("should preserve scene break as a single blank line", () => {
@@ -63,6 +64,24 @@ describe("blank line collapsing", () => {
     expect(mdiToPlainText(input)).toBe("part one\n\npart two\n\npart three");
   });
 
+  it("should preserve author-intentional blank lines (2 consecutive)", () => {
+    // 2 blank lines: 1 structural (removed) + 1 author-intentional (kept)
+    const input = "para1\n\n\npara2";
+    expect(mdiToPlainText(input)).toBe("para1\n\npara2");
+  });
+
+  it("should preserve multiple author-intentional blank lines", () => {
+    // 4 blank lines: 1 structural (removed) + 3 author-intentional (kept)
+    const input = "para1\n\n\n\n\npara2";
+    expect(mdiToPlainText(input)).toBe("para1\n\n\n\npara2");
+  });
+
+  it("should apply N-1 rule to blank lines around scene breaks from hand-edited files", () => {
+    // Extra blank lines around scene break are treated as author-intentional
+    const input = "before\n\n\n---\n\n\nafter";
+    expect(mdiToPlainText(input)).toBe("before\n\n\n\nafter");
+  });
+
   it("should handle heading followed by paragraph without extra blank lines", () => {
     const input = "# Chapter\n\nFirst paragraph.\n\nSecond paragraph.";
     expect(mdiToPlainText(input)).toBe("Chapter\nFirst paragraph.\nSecond paragraph.");
@@ -73,9 +92,10 @@ describe("blank line collapsing", () => {
     expect(mdiToPlainText(input)).toBe("before\n\n\nafter");
   });
 
-  it("should handle scene break at start and end of content", () => {
+  it("should handle scene break at start and end of content (boundary trim)", () => {
+    // Boundary blank lines are trimmed — no content to separate at edges
     const input = "---\n\nonly paragraph\n\n---";
-    expect(mdiToPlainText(input)).toBe("\nonly paragraph\n");
+    expect(mdiToPlainText(input)).toBe("only paragraph");
   });
 });
 
@@ -116,5 +136,11 @@ describe("mdiToRubyText", () => {
     const expected = ["漢字（かんじ）のテスト。", "「台詞（せりふ）だ」"].join("\n");
 
     expect(mdiToRubyText(input)).toBe(expected);
+  });
+
+  it("should preserve author-intentional blank lines in ruby mode", () => {
+    // 2 blank lines: 1 structural (removed) + 1 author-intentional (kept)
+    const input = "{漢字|かんじ}\n\n\n{台詞|せりふ}";
+    expect(mdiToRubyText(input)).toBe("漢字（かんじ）\n\n台詞（せりふ）");
   });
 });
