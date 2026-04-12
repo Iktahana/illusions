@@ -9,6 +9,7 @@
  */
 
 import { calculateTypesetting, PAGE_DIMENSIONS } from "./pdf-export-settings";
+import { ALL_JAPANESE_FONTS } from "@/lib/utils/fonts";
 
 import type { PdfExportSettings } from "./pdf-export-settings";
 import type { DocxExportSettings } from "./docx-export-settings";
@@ -19,6 +20,15 @@ import type { DocxExportSettings } from "./docx-export-settings";
 
 export type ExportPageSize = "A4" | "A5" | "B5" | "B6";
 
+export type PageNumberFormat = "simple" | "dash" | "fraction";
+export type PageNumberPosition =
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right"
+  | "top-left"
+  | "top-center"
+  | "top-right";
+
 export interface UnifiedExportSettings {
   pageSize: ExportPageSize;
   landscape: boolean;
@@ -26,8 +36,10 @@ export interface UnifiedExportSettings {
   charsPerLine: number;
   linesPerPage: number;
   margins: { top: number; bottom: number; left: number; right: number };
-  fontFamily: string; // canonical key, e.g. "serif", "yu-mincho"
+  fontFamily: string; // font family name or legacy canonical key
   showPageNumbers: boolean;
+  pageNumberFormat: PageNumberFormat;
+  pageNumberPosition: PageNumberPosition;
   textIndent: number;
 }
 
@@ -40,6 +52,8 @@ export const DEFAULT_EXPORT_SETTINGS: UnifiedExportSettings = {
   margins: { top: 34, bottom: 28, left: 28, right: 45 },
   fontFamily: "serif",
   showPageNumbers: true,
+  pageNumberFormat: "simple",
+  pageNumberPosition: "bottom-center",
   textIndent: 1,
 };
 
@@ -105,16 +119,31 @@ export function docxToFontKey(name: string): string {
   return match?.key ?? "serif";
 }
 
-/** Canonical key → CSS font-family string. */
+/**
+ * Font family → CSS font-family string.
+ * Supports both legacy canonical keys (e.g. "serif", "yu-mincho")
+ * and direct font family names (e.g. "Noto Serif JP", "Shippori Mincho").
+ */
 export function fontKeyToCss(key: string): string {
+  // Check legacy canonical keys first
   const match = FONT_OPTIONS.find((o) => o.key === key);
-  return match?.css ?? "serif";
+  if (match) return match.css;
+  // Direct font family name — wrap in quotes with generic fallback
+  if (key && key !== "serif" && key !== "sans-serif") {
+    return `"${key}", serif`;
+  }
+  return key || "serif";
 }
 
-/** Canonical key → DOCX font name. */
+/**
+ * Font family → DOCX font name.
+ * Supports both legacy canonical keys and direct font family names.
+ */
 export function fontKeyToDocx(key: string): string {
   const match = FONT_OPTIONS.find((o) => o.key === key);
-  return match?.docx ?? "Yu Mincho";
+  if (match) return match.docx;
+  // Direct font family name — use as-is
+  return key || "Yu Mincho";
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +151,9 @@ export function fontKeyToDocx(key: string): string {
 // ---------------------------------------------------------------------------
 
 export function toPdfExportSettings(s: UnifiedExportSettings): PdfExportSettings {
+  // Determine if the font is a Google Font (for <link> injection in export HTML)
+  const isGoogleFont = ALL_JAPANESE_FONTS.some((f) => f.family === s.fontFamily);
+
   return {
     pageSize: s.pageSize,
     landscape: s.landscape,
@@ -131,7 +163,10 @@ export function toPdfExportSettings(s: UnifiedExportSettings): PdfExportSettings
     margins: { ...s.margins },
     fontFamily: fontKeyToCss(s.fontFamily),
     showPageNumbers: s.showPageNumbers,
+    pageNumberFormat: s.pageNumberFormat,
+    pageNumberPosition: s.pageNumberPosition,
     textIndent: s.textIndent,
+    googleFontFamily: isGoogleFont ? s.fontFamily : undefined,
   };
 }
 
@@ -149,12 +184,15 @@ export function toDocxExportSettings(s: UnifiedExportSettings): DocxExportSettin
   return {
     pageSize: s.pageSize,
     landscape: s.landscape,
+    verticalWriting: s.verticalWriting,
     fontFamily: fontKeyToDocx(s.fontFamily),
     fontSize: Math.round(fontSizePt * 2) / 2, // nearest 0.5pt
     lineSpacing: Math.round(lineHeightRatio * 10) / 10,
     margins: { ...s.margins },
     textIndent: s.textIndent,
     showPageNumbers: s.showPageNumbers,
+    pageNumberFormat: s.pageNumberFormat,
+    pageNumberPosition: s.pageNumberPosition,
   };
 }
 
@@ -167,6 +205,15 @@ const LEGACY_PDF_KEY = "illusions:pdf-export-settings";
 const LEGACY_DOCX_KEY = "illusions:docx-export-settings";
 
 const VALID_PAGE_SIZES: ExportPageSize[] = ["A4", "A5", "B5", "B6"];
+const VALID_PAGE_NUMBER_FORMATS: PageNumberFormat[] = ["simple", "dash", "fraction"];
+const VALID_PAGE_NUMBER_POSITIONS: PageNumberPosition[] = [
+  "bottom-left",
+  "bottom-center",
+  "bottom-right",
+  "top-left",
+  "top-center",
+  "top-right",
+];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -181,11 +228,9 @@ function sanitize(raw: Partial<UnifiedExportSettings>): UnifiedExportSettings {
   const rawMargins = raw.margins;
   const hasMargins = typeof rawMargins === "object" && rawMargins !== null;
 
-  // Validate fontFamily is a known key
-  const fontKey =
-    typeof raw.fontFamily === "string" && FONT_OPTIONS.some((o) => o.key === raw.fontFamily)
-      ? raw.fontFamily
-      : d.fontFamily;
+  // Accept any non-empty string for fontFamily (supports both legacy keys and direct names)
+  const fontFamily =
+    typeof raw.fontFamily === "string" && raw.fontFamily.length > 0 ? raw.fontFamily : d.fontFamily;
 
   return {
     pageSize,
@@ -214,9 +259,17 @@ function sanitize(raw: Partial<UnifiedExportSettings>): UnifiedExportSettings {
           ? clamp(rawMargins.right, 0, 50)
           : d.margins.right,
     },
-    fontFamily: fontKey,
+    fontFamily,
     showPageNumbers:
       typeof raw.showPageNumbers === "boolean" ? raw.showPageNumbers : d.showPageNumbers,
+    pageNumberFormat: VALID_PAGE_NUMBER_FORMATS.includes(raw.pageNumberFormat as PageNumberFormat)
+      ? (raw.pageNumberFormat as PageNumberFormat)
+      : d.pageNumberFormat,
+    pageNumberPosition: VALID_PAGE_NUMBER_POSITIONS.includes(
+      raw.pageNumberPosition as PageNumberPosition,
+    )
+      ? (raw.pageNumberPosition as PageNumberPosition)
+      : d.pageNumberPosition,
     textIndent: typeof raw.textIndent === "number" ? clamp(raw.textIndent, 0, 4) : d.textIndent,
   };
 }

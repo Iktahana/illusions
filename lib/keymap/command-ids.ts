@@ -7,6 +7,7 @@ export type CommandId =
   | "file.save"
   | "file.saveAs"
   | "file.open"
+  | "file.print"
   | "file.newWindow"
   | "file.newTab"
   | "file.closeTab"
@@ -48,6 +49,7 @@ export const ALL_COMMAND_IDS: CommandId[] = [
   "file.save",
   "file.saveAs",
   "file.open",
+  "file.print",
   "file.newWindow",
   "file.newTab",
   "file.closeTab",

@@ -143,6 +143,16 @@ app.whenReady().then(async () => {
   }
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    // Skip CSP rewriting for Chromium internal URLs (PDF viewer extension, etc.)
+    const url = details.url;
+    if (
+      url.startsWith("chrome-extension://") ||
+      url.startsWith("chrome://") ||
+      url.startsWith("blob:")
+    ) {
+      callback({ cancel: false });
+      return;
+    }
     callback({
       responseHeaders: {
         ...details.responseHeaders,
@@ -159,7 +169,8 @@ app.whenReady().then(async () => {
             "font-src 'self' data: https://fonts.gstatic.com",
             `connect-src 'self' https://my.illusions.app https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com${extraAiConnectSrc} ws://localhost:*`,
             "worker-src 'self' blob:",
-            "frame-src 'none'",
+            "object-src blob:",
+            "frame-src blob:",
           ].join("; "),
         ],
       },
@@ -248,12 +259,13 @@ app.on("browser-window-focus", (_event, win) => {
 // Kill PTY sessions for a window when it is closed
 app.on("browser-window-created", (_event, win) => {
   const wcId = win.webContents.id;
+  const winId = win.id;
 
   win.on("closed", () => {
     killSessionsForWindow(wcId);
     // Remove per-window menu state to prevent memory leak
     const { removeWindowState } = require("./menu");
-    removeWindowState(win.id);
+    removeWindowState(winId);
   });
 
   // Kill orphaned PTYs if the renderer crashes

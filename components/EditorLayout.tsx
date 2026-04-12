@@ -104,6 +104,13 @@ interface EditorLayoutProps {
       content: string;
       metadata: ExportMetadata;
     };
+    printDialog: {
+      state: { content: string; metadata: ExportMetadata } | null;
+      onClose: () => void;
+      onPrint: (settings: PdfExportSettings) => void;
+      content: string;
+      metadata: ExportMetadata;
+    };
   };
   recovery: {
     wasAutoRecovered?: boolean;
@@ -275,6 +282,17 @@ export default function EditorLayout({
               onExportDocx={dialogs.exportDialog.onDocxExport}
               content={dialogs.exportDialog.content}
               metadata={dialogs.exportDialog.metadata}
+            />
+
+            <ExportDialog
+              isOpen={dialogs.printDialog.state != null}
+              mode="print"
+              initialFormat="pdf"
+              onClose={dialogs.printDialog.onClose}
+              onExportPdf={dialogs.printDialog.onPrint}
+              onExportDocx={() => {}}
+              content={dialogs.printDialog.content}
+              metadata={dialogs.printDialog.metadata}
             />
 
             {!chrome.isElectron && recovery.wasAutoRecovered && !recovery.dismissedRecovery && (
