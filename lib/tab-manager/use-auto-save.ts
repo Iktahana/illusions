@@ -19,7 +19,12 @@ export interface UseAutoSaveParams extends TabManagerCore {
   /** Ref holding the latest saveFile function (for active tab). */
   saveFileRef: React.MutableRefObject<(isAutoSave?: boolean) => Promise<void>>;
   /** Create an auto-snapshot if conditions are met (project mode only). */
-  tryAutoSnapshot: (sourcePath: string, displayName: string, savedContent: string) => Promise<void>;
+  tryAutoSnapshot: (
+    sourcePath: string,
+    displayName: string,
+    savedContent: string,
+    forceSnapshot?: boolean,
+  ) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

@@ -44,6 +44,7 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
     sourcePath: string,
     displayName: string,
     savedContent: string,
+    forceSnapshot?: boolean,
   ) => Promise<void>;
 }
 
@@ -163,7 +164,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
             const vfs = getVFS();
             suppressFileWatch(tab.file.path);
             await vfs.writeFile(tab.file.path, sanitized);
-            await tryAutoSnapshotRef.current?.(tab.file.path, tab.file.name, sanitized);
+            await tryAutoSnapshotRef.current?.(tab.file.path, tab.file.name, sanitized, true);
           } else {
             await saveMdiFile({
               descriptor: tab.file,
@@ -173,6 +174,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
               tab.file.path ?? tab.file.name,
               tab.file.name,
               sanitized,
+              true,
             );
           }
         } catch (error) {
