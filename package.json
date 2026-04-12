@@ -21,7 +21,7 @@
     "bundle:electron": "node scripts/bundle-electron.mjs",
     "electron:dev": "npm run bundle:electron && concurrently \"next dev -p 3020\" \"wait-on http://localhost:3020 && cross-env ELECTRON_DEV=1 electron .\"",
     "electron:build": "npm run type-check && npm run generate:credits && cross-env ELECTRON_BUILD=1 next build && npm run bundle:electron && electron-builder",
-    "build:quicklook": "bash scripts/build-quicklook.sh",
+    "build:quicklook": "node -e \"if(process.platform==='darwin'){const {execSync}=require('child_process');execSync('bash scripts/build-quicklook.sh',{stdio:'inherit'});}else{console.log('build:quicklook skipped (macOS only)');}\" ",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
