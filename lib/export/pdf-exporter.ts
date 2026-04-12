@@ -19,8 +19,18 @@ export interface PdfExportOptions {
   linesPerPage?: number;
   fontFamily?: string;
   showPageNumbers?: boolean;
+  pageNumberFormat?: "simple" | "dash" | "fraction";
+  pageNumberPosition?:
+    | "bottom-left"
+    | "bottom-center"
+    | "bottom-right"
+    | "top-left"
+    | "top-center"
+    | "top-right";
   /** First-line indent in em units */
   textIndent?: number;
+  /** Google Font family name — triggers <link> injection and CSP relaxation */
+  googleFontFamily?: string;
 }
 
 /**
@@ -72,6 +82,7 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
       landscape: options.landscape ?? false,
       margins: options.margins,
     },
+    googleFontFamily: options.googleFontFamily,
   });
 
   // Use a unique in-memory partition (no "persist:" prefix) per export so
@@ -97,12 +108,18 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
   // and the CSP meta tag in the HTML document.
   // The hook is registered on the isolated per-export partition session,
   // so it never leaks into the shared default session (#1034).
+  // When a Google Font is requested, relax CSP to allow external stylesheet and font sources.
+  const hasGoogleFont = !!options.googleFontFamily;
+  const exportStyleSrc = hasGoogleFont
+    ? "style-src 'unsafe-inline' https://fonts.googleapis.com"
+    : "style-src 'unsafe-inline'";
+  const exportFontSrc = hasGoogleFont ? " font-src https://fonts.gstatic.com;" : "";
   hiddenWin.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         "Content-Security-Policy": [
-          "default-src 'none'; style-src 'unsafe-inline'; img-src 'self';",
+          `default-src 'none'; ${exportStyleSrc}; img-src 'self';${exportFontSrc}`,
         ],
       },
     });
@@ -123,8 +140,10 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
     // Wait for did-finish-load to fire (guaranteed since listener was registered first)
     await loadPromise;
 
-    // Brief delay to allow CSS paint to complete
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait for CSS paint (and Google Font loading if applicable) to complete.
+    // Google Fonts need additional time to fetch the stylesheet + font files.
+    const paintDelay = hasGoogleFont ? 2000 : 100;
+    await new Promise((resolve) => setTimeout(resolve, paintDelay));
 
     // Convert page dimensions from mm to inches (printToPDF expects inches)
     const dims = PAGE_DIMENSIONS[options.pageSize ?? "A5"] ?? PAGE_DIMENSIONS["A5"];
@@ -147,12 +166,45 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
 
     // Page numbers via Electron's header/footer template
     if (options.showPageNumbers) {
-      printOptions.displayHeaderFooter = true;
-      printOptions.headerTemplate = "<span></span>";
-      printOptions.footerTemplate =
-        '<div style="font-size:8px; text-align:center; width:100%; color:#666;">' +
-        '<span class="pageNumber"></span> / <span class="totalPages"></span>' +
+      const format = options.pageNumberFormat ?? "simple";
+      const position = options.pageNumberPosition ?? "bottom-center";
+
+      // Build page number content based on format
+      let pageContent: string;
+      switch (format) {
+        case "dash":
+          pageContent = '- <span class="pageNumber"></span> -';
+          break;
+        case "fraction":
+          pageContent = '<span class="pageNumber"></span> / <span class="totalPages"></span>';
+          break;
+        default:
+          pageContent = '<span class="pageNumber"></span>';
+          break;
+      }
+
+      // Determine alignment from position
+      const align = position.endsWith("-left")
+        ? "left"
+        : position.endsWith("-right")
+          ? "right"
+          : "center";
+      const padding =
+        align === "left" ? "padding-left:10mm;" : align === "right" ? "padding-right:10mm;" : "";
+      const template =
+        `<div style="font-size:8px; text-align:${align}; width:100%; color:#666; ${padding}">` +
+        pageContent +
         "</div>";
+      const emptyTemplate = "<span></span>";
+
+      printOptions.displayHeaderFooter = true;
+      if (position.startsWith("top-")) {
+        printOptions.headerTemplate = template;
+        printOptions.footerTemplate = emptyTemplate;
+      } else {
+        printOptions.headerTemplate = emptyTemplate;
+        printOptions.footerTemplate = template;
+      }
     }
 
     const pdfBuffer = await hiddenWin.webContents.printToPDF(printOptions);

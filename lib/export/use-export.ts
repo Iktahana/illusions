@@ -28,6 +28,7 @@ interface UseExportParams {
     content: string,
     metadata: ExportMetadata,
   ) => void;
+  onPrintDialogRequest?: (content: string, metadata: ExportMetadata) => void;
 }
 
 /**
@@ -39,8 +40,10 @@ export function useExport({
   getTitle,
   getIsEditorTabActive,
   onExportDialogRequest,
+  onPrintDialogRequest,
 }: UseExportParams): {
   exportAs: (format: ExportFormat) => Promise<void>;
+  printDocument: () => void;
 } {
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
 
@@ -159,6 +162,18 @@ export function useExport({
     [getContent, getTitle, getIsEditorTabActive, isElectron, onExportDialogRequest],
   );
 
+  const printDocument = useCallback(() => {
+    if (!getIsEditorTabActive()) return;
+    const content = getContent();
+    if (!content.trim()) {
+      notificationManager.warning("印刷するコンテンツがありません");
+      return;
+    }
+    const title = getTitle();
+    const metadata = { title, language: "ja" };
+    onPrintDialogRequest?.(content, metadata);
+  }, [getContent, getTitle, getIsEditorTabActive, onPrintDialogRequest]);
+
   // Register Electron menu event handlers
   useEffect(() => {
     if (!isElectron || !window.electronAPI) return;
@@ -180,15 +195,18 @@ export function useExport({
     if (window.electronAPI.onMenuExportDOCX) {
       cleanups.push(window.electronAPI.onMenuExportDOCX(() => void exportAs("docx")));
     }
+    if (window.electronAPI.onMenuPrint) {
+      cleanups.push(window.electronAPI.onMenuPrint(() => printDocument()));
+    }
 
     return () => {
       for (const cleanup of cleanups) {
         cleanup?.();
       }
     };
-  }, [isElectron, exportAs]);
+  }, [isElectron, exportAs, printDocument]);
 
-  return { exportAs };
+  return { exportAs, printDocument };
 }
 
 /**

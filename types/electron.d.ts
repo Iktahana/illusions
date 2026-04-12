@@ -98,6 +98,11 @@ declare global {
         };
       },
     ) => Promise<string | { success: false; error: string } | null>;
+    printDocument?: (
+      content: string,
+      options: PdfGenerationOptions,
+    ) => Promise<{ success: boolean; error?: string }>;
+    onMenuPrint?: (callback: () => void) => (() => void) | void;
     onMenuExportTxt?: (callback: () => void) => (() => void) | void;
     onMenuExportTxtRuby?: (callback: () => void) => (() => void) | void;
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;

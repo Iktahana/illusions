@@ -217,6 +217,11 @@ function buildApplicationMenu(recentProjects = []) {
       },
       { type: "separator" },
       {
+        label: "印刷...",
+        accelerator: resolveAccelerator("file.print"),
+        click: () => sendToFocused("menu-print"),
+      },
+      {
         label: "エクスポート",
         submenu: [
           {

@@ -14,7 +14,17 @@ export interface PdfExportSettings {
   margins: { top: number; bottom: number; left: number; right: number };
   fontFamily: string;
   showPageNumbers: boolean;
+  pageNumberFormat: "simple" | "dash" | "fraction";
+  pageNumberPosition:
+    | "bottom-left"
+    | "bottom-center"
+    | "bottom-right"
+    | "top-left"
+    | "top-center"
+    | "top-right";
   textIndent: number;
+  /** Google Font family name for PDF export (triggers <link> injection) */
+  googleFontFamily?: string;
 }
 
 export const DEFAULT_PDF_SETTINGS: PdfExportSettings = {
@@ -26,6 +36,8 @@ export const DEFAULT_PDF_SETTINGS: PdfExportSettings = {
   margins: { top: 35, bottom: 30, left: 30, right: 40 },
   fontFamily: "serif",
   showPageNumbers: true,
+  pageNumberFormat: "simple",
+  pageNumberPosition: "bottom-center",
   textIndent: 1,
 };
 

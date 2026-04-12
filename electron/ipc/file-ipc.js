@@ -415,6 +415,121 @@ function registerFileHandlers() {
     }
   });
 
+  ipcMain.handle("print-document", async (_event, content, options) => {
+    if (typeof content !== "string") {
+      return { success: false, error: "Invalid content" };
+    }
+    try {
+      const { BrowserWindow } = require("electron");
+      const { mdiToHtml } = require("../../lib/export/mdi-to-html");
+      const {
+        calculateTypesetting,
+        PAGE_DIMENSIONS,
+      } = require("../../lib/export/pdf-export-settings");
+
+      const opts = options || {};
+      const pageSize = opts.pageSize ?? "A5";
+      const margins = opts.margins ?? { top: 20, bottom: 20, left: 15, right: 15 };
+      const verticalWriting = opts.verticalWriting ?? false;
+      const landscape = opts.landscape ?? false;
+
+      // Build typesetting when chars/lines specified
+      let typesetting;
+      if (opts.charsPerLine != null && opts.linesPerPage != null) {
+        const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
+          pageSize,
+          margins,
+          opts.charsPerLine,
+          opts.linesPerPage,
+          verticalWriting,
+          landscape,
+        );
+        typesetting = {
+          fontFamily: opts.fontFamily,
+          fontSizeMm,
+          lineHeightRatio,
+          textIndentEm: opts.textIndent,
+          margins,
+          pageSize,
+          landscape,
+        };
+      } else {
+        typesetting = { pageSize, landscape, margins };
+      }
+
+      const html = mdiToHtml(content, {
+        metadata: opts.metadata,
+        verticalWriting,
+        typesetting,
+        googleFontFamily: opts.googleFontFamily,
+      });
+
+      const partition = `print-${Date.now()}`;
+      const printWin = new BrowserWindow({
+        show: false,
+        width: 800,
+        height: 600,
+        webPreferences: {
+          offscreen: false,
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: true,
+          partition,
+        },
+      });
+
+      // CSP for print window (allow Google Fonts if needed)
+      const hasGoogleFont = !!opts.googleFontFamily;
+      const styleSrc = hasGoogleFont
+        ? "style-src 'unsafe-inline' https://fonts.googleapis.com"
+        : "style-src 'unsafe-inline'";
+      const fontSrc = hasGoogleFont ? " font-src https://fonts.gstatic.com;" : "";
+      printWin.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+        callback({
+          responseHeaders: {
+            ...details.responseHeaders,
+            "Content-Security-Policy": [
+              `default-src 'none'; ${styleSrc}; img-src 'self';${fontSrc}`,
+            ],
+          },
+        });
+      });
+
+      const loadPromise = new Promise((resolve) => {
+        printWin.webContents.once("did-finish-load", () => resolve());
+      });
+
+      await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+      await loadPromise;
+
+      // Wait for fonts to load
+      const delay = hasGoogleFont ? 2000 : 100;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+
+      // Open system print dialog
+      await new Promise((resolve, reject) => {
+        printWin.webContents.print({ silent: false }, (success, failureReason) => {
+          if (success) {
+            resolve();
+          } else {
+            // User cancelled is not an error
+            if (failureReason === "cancelled") {
+              resolve();
+            } else {
+              reject(new Error(failureReason || "Print failed"));
+            }
+          }
+        });
+      });
+
+      printWin.destroy();
+      return { success: true };
+    } catch (error) {
+      log.error("Print failed:", error);
+      return { success: false, error: error.message || "Print failed" };
+    }
+  });
+
   ipcMain.handle("export-epub", async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };

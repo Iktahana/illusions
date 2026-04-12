@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, type KeyboardEvent } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import clsx from "clsx";
 import GlassDialog from "./GlassDialog";
 import {
@@ -8,13 +8,17 @@ import {
   saveExportSettings,
   toPdfExportSettings,
   toDocxExportSettings,
-  FONT_OPTIONS,
-  PAGE_DIMENSIONS,
 } from "@/lib/export/export-settings";
+import { FontSelector } from "@/components/explorer/FontSelector";
 import { openWebPrintPreview } from "@/lib/export/web-print-preview";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
-import type { UnifiedExportSettings, ExportPageSize } from "@/lib/export/export-settings";
+import type {
+  UnifiedExportSettings,
+  ExportPageSize,
+  PageNumberFormat,
+  PageNumberPosition,
+} from "@/lib/export/export-settings";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import type { ExportMetadata } from "@/lib/export/types";
@@ -25,6 +29,7 @@ import type { ExportMetadata } from "@/lib/export/types";
 
 interface ExportDialogProps {
   isOpen: boolean;
+  mode?: "export" | "print";
   initialFormat: "pdf" | "docx";
   onClose: () => void;
   onExportPdf: (settings: PdfExportSettings) => void;
@@ -42,6 +47,21 @@ const PAGE_SIZE_OPTIONS: { value: ExportPageSize; label: string }[] = [
   { value: "A5", label: "A5 (148×210mm)" },
   { value: "B5", label: "B5 (176×250mm)" },
   { value: "B6", label: "B6 (125×176mm)" },
+];
+
+const PAGE_NUMBER_FORMAT_OPTIONS: { value: PageNumberFormat; label: string }[] = [
+  { value: "simple", label: "1" },
+  { value: "dash", label: "- 1 -" },
+  { value: "fraction", label: "1/1" },
+];
+
+const PAGE_NUMBER_POSITION_OPTIONS: { value: PageNumberPosition; label: string }[] = [
+  { value: "bottom-left", label: "左下" },
+  { value: "bottom-center", label: "中央下" },
+  { value: "bottom-right", label: "右下" },
+  { value: "top-left", label: "左上" },
+  { value: "top-center", label: "中央上" },
+  { value: "top-right", label: "右上" },
 ];
 
 const inputClass =
@@ -76,6 +96,7 @@ function clampFloat(raw: string, min: number, max: number): number {
  */
 export default function ExportDialog({
   isOpen,
+  mode = "export",
   initialFormat,
   onClose,
   onExportPdf,
@@ -86,6 +107,7 @@ export default function ExportDialog({
   if (!isOpen) return null;
   return (
     <ExportDialogInner
+      mode={mode}
       initialFormat={initialFormat}
       onClose={onClose}
       onExportPdf={onExportPdf}
@@ -97,6 +119,7 @@ export default function ExportDialog({
 }
 
 function ExportDialogInner({
+  mode = "export",
   initialFormat,
   onClose,
   onExportPdf,
@@ -118,7 +141,6 @@ function ExportDialogInner({
   const generationIdRef = useRef(0);
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showDocxVerticalHint = selectedFormat === "docx" && settings.verticalWriting;
   const showWebPageNumberHint = !isElectron && selectedFormat === "pdf" && settings.showPageNumbers;
 
   const updateField = useCallback(
@@ -137,19 +159,12 @@ function ExportDialogInner({
 
   const handleExport = useCallback(() => {
     saveExportSettings(settings);
-    if (selectedFormat === "pdf") {
+    if (mode === "print" || selectedFormat === "pdf") {
       onExportPdf(toPdfExportSettings(settings));
     } else {
       onExportDocx(toDocxExportSettings(settings));
     }
-  }, [settings, selectedFormat, onExportPdf, onExportDocx]);
-
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    },
-    [onClose],
-  );
+  }, [settings, selectedFormat, mode, onExportPdf, onExportDocx]);
 
   // --- Electron: debounced PDF preview generation ---
   useEffect(() => {
@@ -162,23 +177,24 @@ function ExportDialogInner({
       setPreviewLoading(true);
       setPreviewError(null);
 
-      // DOCX preview: generate PDF with horizontal writing
-      const previewVertical = selectedFormat === "pdf" ? settings.verticalWriting : false;
-
-      const fontCss = FONT_OPTIONS.find((o) => o.key === settings.fontFamily)?.css ?? "serif";
+      // Use toPdfExportSettings to get properly resolved font CSS + googleFontFamily
+      const previewSettings = toPdfExportSettings(settings);
 
       try {
         const result = await window.electronAPI!.generatePdfPreview!(content, {
           metadata,
-          verticalWriting: previewVertical,
-          pageSize: settings.pageSize,
-          landscape: settings.landscape,
-          margins: settings.margins,
-          charsPerLine: settings.charsPerLine,
-          linesPerPage: settings.linesPerPage,
-          fontFamily: fontCss,
-          showPageNumbers: settings.showPageNumbers,
-          textIndent: settings.textIndent,
+          verticalWriting: settings.verticalWriting,
+          pageSize: previewSettings.pageSize,
+          landscape: previewSettings.landscape,
+          margins: previewSettings.margins,
+          charsPerLine: previewSettings.charsPerLine,
+          linesPerPage: previewSettings.linesPerPage,
+          fontFamily: previewSettings.fontFamily,
+          showPageNumbers: previewSettings.showPageNumbers,
+          pageNumberFormat: previewSettings.pageNumberFormat,
+          pageNumberPosition: previewSettings.pageNumberPosition,
+          textIndent: previewSettings.textIndent,
+          googleFontFamily: previewSettings.googleFontFamily,
         });
 
         // Discard stale result
@@ -237,44 +253,50 @@ function ExportDialogInner({
     <GlassDialog
       isOpen
       onBackdropClick={onClose}
-      ariaLabel="エクスポート設定"
-      panelClassName="mx-4 w-full max-w-5xl p-0 overflow-hidden"
+      ariaLabel={mode === "print" ? "印刷設定" : "エクスポート設定"}
+      panelClassName="mx-4 w-full max-w-7xl p-0 overflow-hidden"
     >
-      <div onKeyDown={handleKeyDown} className="flex max-h-[85vh]">
+      <div className="flex max-h-[85vh]">
         {/* Left: Settings panel */}
         <div className="w-80 flex-shrink-0 flex flex-col border-r border-border">
           <div className="px-6 pt-6 pb-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground mb-3">エクスポート設定</h2>
-            {/* Format toggle */}
-            <div className="flex gap-1 p-1 bg-background-secondary rounded-lg">
-              <button
-                type="button"
-                className={clsx(
-                  "flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                  selectedFormat === "pdf"
-                    ? "bg-accent text-accent-foreground shadow-sm"
-                    : "text-foreground-secondary hover:text-foreground",
-                )}
-                onClick={() => setSelectedFormat("pdf")}
-              >
-                PDF
-              </button>
-              <button
-                type="button"
-                className={clsx(
-                  "flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                  selectedFormat === "docx"
-                    ? "bg-accent text-accent-foreground shadow-sm"
-                    : "text-foreground-secondary hover:text-foreground",
-                )}
-                onClick={() => setSelectedFormat("docx")}
-              >
-                DOCX
-              </button>
-            </div>
+            <h2 className="text-lg font-semibold text-foreground mb-3">
+              {mode === "print" ? "印刷設定" : "エクスポート設定"}
+            </h2>
+            {/* Format toggle (hidden in print mode) */}
+            {mode !== "print" && (
+              <div className="flex gap-1 p-1 bg-background-secondary rounded-lg">
+                <button
+                  type="button"
+                  className={clsx(
+                    "flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                    selectedFormat === "pdf"
+                      ? "bg-accent text-accent-foreground shadow-sm"
+                      : "text-foreground-secondary hover:text-foreground",
+                  )}
+                  onClick={() => setSelectedFormat("pdf")}
+                >
+                  PDF
+                </button>
+                <button
+                  type="button"
+                  className={clsx(
+                    "flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                    selectedFormat === "docx"
+                      ? "bg-accent text-accent-foreground shadow-sm"
+                      : "text-foreground-secondary hover:text-foreground",
+                  )}
+                  onClick={() => setSelectedFormat("docx")}
+                >
+                  DOCX
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {/* ── Page layout section ── */}
+
             {/* Paper size */}
             <div>
               <label className={labelClass}>用紙サイズ</label>
@@ -353,6 +375,10 @@ function ExportDialogInner({
               </div>
             </div>
 
+            <hr className="border-border" />
+
+            {/* ── Typography section ── */}
+
             {/* Chars per line + Lines per page */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -384,61 +410,99 @@ function ExportDialogInner({
             {/* Font */}
             <div>
               <label className={labelClass}>フォント</label>
-              <select
-                className={inputClass}
+              <FontSelector
                 value={settings.fontFamily}
-                onChange={(e) => updateField("fontFamily", e.target.value)}
-              >
-                {FONT_OPTIONS.map((opt) => (
-                  <option key={opt.key} value={opt.key}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(font) => updateField("fontFamily", font)}
+              />
             </div>
 
-            {/* Indent + Page numbers */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass}>字下げ（em）</label>
-                <input
-                  type="number"
-                  className={numberInputClass + " w-full"}
-                  min={0}
-                  max={4}
-                  step={0.5}
-                  value={settings.textIndent}
-                  onChange={(e) => updateField("textIndent", clampFloat(e.target.value, 0, 4))}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>ページ番号</label>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={settings.showPageNumbers}
-                  onClick={() => updateField("showPageNumbers", !settings.showPageNumbers)}
-                  className={clsx(
-                    "relative inline-flex h-9 w-16 shrink-0 items-center rounded-full transition-colors mt-0.5",
-                    settings.showPageNumbers ? "bg-accent" : "bg-border-secondary",
-                  )}
-                >
-                  <span
-                    className={clsx(
-                      "inline-block h-5 w-5 transform rounded-full bg-background transition-transform",
-                      settings.showPageNumbers ? "translate-x-9" : "translate-x-2",
-                    )}
-                  />
-                </button>
-                {showWebPageNumberHint && (
-                  <p className="text-xs text-foreground-tertiary mt-1">
-                    Web版ではこの設定は適用されません。必要な場合はブラウザの印刷設定でヘッダー/フッターを有効にしてください。
-                  </p>
+            {/* Indent */}
+            <div>
+              <label className={labelClass}>字下げ（em）</label>
+              <input
+                type="number"
+                className={numberInputClass + " w-full"}
+                min={0}
+                max={4}
+                step={0.5}
+                value={settings.textIndent}
+                onChange={(e) => updateField("textIndent", clampFloat(e.target.value, 0, 4))}
+              />
+            </div>
+
+            <hr className="border-border" />
+
+            {/* ── Page number section ── */}
+
+            {/* Page numbers toggle */}
+            <div className="flex items-center justify-between">
+              <label className={labelClass + " mb-0"}>ページ番号</label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.showPageNumbers}
+                onClick={() => updateField("showPageNumbers", !settings.showPageNumbers)}
+                className={clsx(
+                  "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors",
+                  settings.showPageNumbers ? "bg-accent" : "bg-border-secondary",
                 )}
-              </div>
+              >
+                <span
+                  className={clsx(
+                    "inline-block h-5 w-5 transform rounded-full bg-background transition-transform",
+                    settings.showPageNumbers ? "translate-x-6" : "translate-x-1",
+                  )}
+                />
+              </button>
             </div>
+            {showWebPageNumberHint && (
+              <p className="text-xs text-foreground-tertiary -mt-2">
+                Web版ではこの設定は適用されません。必要な場合はブラウザの印刷設定でヘッダー/フッターを有効にしてください。
+              </p>
+            )}
 
-            {/* Margins */}
+            {/* Page number format and position (shown when page numbers enabled) */}
+            {settings.showPageNumbers && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>形式</label>
+                  <select
+                    className={inputClass}
+                    value={settings.pageNumberFormat}
+                    onChange={(e) =>
+                      updateField("pageNumberFormat", e.target.value as PageNumberFormat)
+                    }
+                  >
+                    {PAGE_NUMBER_FORMAT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>位置</label>
+                  <select
+                    className={inputClass}
+                    value={settings.pageNumberPosition}
+                    onChange={(e) =>
+                      updateField("pageNumberPosition", e.target.value as PageNumberPosition)
+                    }
+                  >
+                    {PAGE_NUMBER_POSITION_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <hr className="border-border" />
+
+            {/* ── Margins section ── */}
+
             <div>
               <label className={labelClass}>余白（mm）</label>
               <div className="grid grid-cols-4 gap-2">
@@ -463,20 +527,24 @@ function ExportDialogInner({
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 px-6 py-4 border-t border-border flex-shrink-0">
+          <div className="flex flex-col gap-2 px-6 py-4 border-t border-border flex-shrink-0">
             <button
               type="button"
-              className="px-4 py-2 rounded-lg text-sm text-foreground-secondary hover:bg-hover transition-colors"
-              onClick={onClose}
+              className="w-full px-4 py-2 rounded-lg text-sm bg-accent text-accent-foreground hover:bg-accent-hover transition-colors"
+              onClick={handleExport}
             >
-              キャンセル
+              {mode === "print"
+                ? "印刷"
+                : selectedFormat === "pdf"
+                  ? "PDFとしてエクスポート"
+                  : "DOCXとしてエクスポート"}
             </button>
             <button
               type="button"
-              className="px-4 py-2 rounded-lg text-sm bg-accent text-accent-foreground hover:bg-accent-hover transition-colors"
-              onClick={handleExport}
+              className="w-full px-4 py-2 rounded-lg text-sm text-foreground-secondary hover:bg-hover transition-colors"
+              onClick={onClose}
             >
-              {selectedFormat === "pdf" ? "PDFとしてエクスポート" : "DOCXとしてエクスポート"}
+              キャンセル
             </button>
           </div>
         </div>
@@ -487,18 +555,9 @@ function ExportDialogInner({
             <span className="text-sm font-medium text-foreground">プレビュー</span>
             <span className="text-xs text-foreground-tertiary">
               {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
-              {selectedFormat === "pdf" && settings.verticalWriting ? "縦書き" : "横書き"}
+              {settings.verticalWriting ? "縦書き" : "横書き"}
             </span>
           </div>
-
-          {/* DOCX vertical writing hint */}
-          {showDocxVerticalHint && (
-            <div className="px-4 py-2 bg-warning/10 border-b border-warning/20 flex-shrink-0">
-              <p className="text-xs text-warning-foreground">
-                DOCXは縦書きに対応していないため、横書きでプレビューしています
-              </p>
-            </div>
-          )}
 
           <div className="flex-1 overflow-hidden">
             {hasPreviewApi ? (
@@ -522,9 +581,7 @@ function ExportDialogInner({
                   </p>
                   <p className="text-xs text-foreground-tertiary">
                     {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
-                    {settings.verticalWriting ? "縦書き" : "横書き"} ·{" "}
-                    {FONT_OPTIONS.find((o) => o.key === settings.fontFamily)?.label ??
-                      settings.fontFamily}
+                    {settings.verticalWriting ? "縦書き" : "横書き"} · {settings.fontFamily}
                   </p>
                 </div>
                 <button

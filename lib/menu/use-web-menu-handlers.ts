@@ -13,6 +13,7 @@ interface UseWebMenuHandlersProps {
   onCloseWindow?: () => void;
   onToggleCompactMode?: () => void;
   onExport?: (format: "pdf" | "epub" | "docx" | "txt" | "txt-ruby") => void;
+  onPrint?: () => void;
   editorView?: EditorView | null;
   fontScale?: number;
   onFontScaleChange?: (scale: number) => void;
@@ -39,6 +40,7 @@ export function useWebMenuHandlers({
   onCloseWindow,
   onToggleCompactMode,
   onExport,
+  onPrint,
   editorView,
   fontScale = 100,
   onFontScaleChange,
@@ -79,6 +81,11 @@ export function useWebMenuHandlers({
           break;
         case "close-tab":
           onCloseTab?.();
+          break;
+
+        // Print
+        case "print":
+          if (isEditorTabActive) onPrint?.();
           break;
 
         // Export — disabled when non-editor tab is active
@@ -254,6 +261,7 @@ export function useWebMenuHandlers({
       onCloseWindow,
       onToggleCompactMode,
       onExport,
+      onPrint,
       editorView,
       fontScale,
       onFontScaleChange,

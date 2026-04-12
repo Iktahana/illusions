@@ -40,6 +40,11 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = [
       { label: "別名で保存...", accelerator: "Shift+Ctrl+S", action: "save-as" },
       { type: "separator" },
       {
+        label: "印刷...",
+        accelerator: isMacOS() ? "Cmd+P" : "Ctrl+P",
+        action: "print",
+      },
+      {
         label: "エクスポート",
         submenu: [
           { label: "テキスト（プレーン）としてエクスポート...", action: "export-txt" },

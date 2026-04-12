@@ -500,6 +500,17 @@ export default function EditorPage() {
   const [exportDialogState, setExportDialogState] = useState<ExportDialogState | null>(null);
   const exportDialogStateRef = useRef<ExportDialogState | null>(null);
 
+  // Print dialog state
+  interface PrintDialogState {
+    content: string;
+    metadata: ExportMetadata;
+  }
+  const [printDialogState, setPrintDialogState] = useState<PrintDialogState | null>(null);
+
+  const handlePrintDialogRequest = useCallback((content: string, metadata: ExportMetadata) => {
+    setPrintDialogState({ content, metadata });
+  }, []);
+
   const handleExportDialogRequest = useCallback(
     (format: "pdf" | "docx", content: string, metadata: ExportMetadata) => {
       const state: ExportDialogState = { format, content, metadata };
@@ -532,7 +543,10 @@ export default function EditorPage() {
           linesPerPage: settings.linesPerPage,
           fontFamily: settings.fontFamily,
           showPageNumbers: settings.showPageNumbers,
+          pageNumberFormat: settings.pageNumberFormat,
+          pageNumberPosition: settings.pageNumberPosition,
           textIndent: settings.textIndent,
+          googleFontFamily: settings.googleFontFamily,
         });
 
         notificationManager.dismiss(progressId);
@@ -571,6 +585,58 @@ export default function EditorPage() {
       notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
     }
   }, []);
+
+  const handlePrintConfirm = useCallback(
+    async (settings: PdfExportSettings) => {
+      if (!printDialogState) return;
+
+      // Electron path: use IPC
+      if (window.electronAPI?.printDocument) {
+        setPrintDialogState(null);
+        try {
+          await window.electronAPI.printDocument(printDialogState.content, {
+            metadata: printDialogState.metadata,
+            verticalWriting: settings.verticalWriting,
+            pageSize: settings.pageSize,
+            landscape: settings.landscape,
+            margins: settings.margins,
+            charsPerLine: settings.charsPerLine,
+            linesPerPage: settings.linesPerPage,
+            fontFamily: settings.fontFamily,
+            showPageNumbers: settings.showPageNumbers,
+            pageNumberFormat: settings.pageNumberFormat,
+            pageNumberPosition: settings.pageNumberPosition,
+            textIndent: settings.textIndent,
+            googleFontFamily: settings.googleFontFamily,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "不明なエラー";
+          notificationManager.error(`印刷に失敗しました: ${message}`);
+        }
+        return;
+      }
+
+      // Web path: browser print preview
+      try {
+        const opened = await openWebPrintPreview(
+          printDialogState.content,
+          printDialogState.metadata,
+          settings,
+        );
+        if (!opened) {
+          notificationManager.warning(
+            "ポップアップがブロックされました。ブラウザの設定を確認してください。",
+          );
+          return;
+        }
+        setPrintDialogState(null);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        notificationManager.error(`印刷に失敗しました: ${message}`);
+      }
+    },
+    [printDialogState],
+  );
 
   const handleDocxExportConfirm = useCallback(async (settings: DocxExportSettings) => {
     const dialogState = exportDialogStateRef.current;
@@ -646,11 +712,12 @@ export default function EditorPage() {
     }
   }, []);
 
-  const { exportAs } = useExport({
+  const { exportAs, printDocument } = useExport({
     getContent: getExportContent,
     getTitle: getExportTitle,
     getIsEditorTabActive: useCallback(() => isEditorTabActiveRef.current, []),
     onExportDialogRequest: handleExportDialogRequest,
+    onPrintDialogRequest: handlePrintDialogRequest,
   });
 
   // System file open: tab manager handles loading; we just update editor key
@@ -677,6 +744,7 @@ export default function EditorPage() {
     onCloseWindow: () => window.close(),
     onToggleCompactMode: () => toggleCompactModeRef.current(),
     onExport: (format) => void exportAs(format),
+    onPrint: () => printDocument(),
     editorView: editorViewInstance,
     fontScale,
     onFontScaleChange: (scale: number) => fontScaleChangeRef.current(scale),
@@ -1034,6 +1102,13 @@ export default function EditorPage() {
           onDocxExport: handleDocxExportConfirm,
           content: exportDialogState?.content ?? "",
           metadata: exportDialogState?.metadata ?? { title: "" },
+        },
+        printDialog: {
+          state: printDialogState,
+          onClose: () => setPrintDialogState(null),
+          onPrint: handlePrintConfirm,
+          content: printDialogState?.content ?? "",
+          metadata: printDialogState?.metadata ?? { title: "" },
         },
       }}
       recovery={{

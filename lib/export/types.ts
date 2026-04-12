@@ -26,7 +26,17 @@ export interface PdfGenerationOptions {
   linesPerPage?: number;
   fontFamily?: string;
   showPageNumbers?: boolean;
+  pageNumberFormat?: "simple" | "dash" | "fraction";
+  pageNumberPosition?:
+    | "bottom-left"
+    | "bottom-center"
+    | "bottom-right"
+    | "top-left"
+    | "top-center"
+    | "top-right";
   textIndent?: number;
+  /** Google Font family name for PDF export (triggers <link> injection and CSP relaxation) */
+  googleFontFamily?: string;
 }
 
 export type ExportFormat = "pdf" | "epub" | "docx" | "txt" | "txt-ruby";
