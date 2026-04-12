@@ -90,18 +90,35 @@ export function stripMarkdown(text: string): string {
 function collapseBlankLines(text: string): string {
   const lines = text.split("\n");
   const result: string[] = [];
+  let consecutiveBlankCount = 0;
 
   for (const line of lines) {
     if (line === SCENE_BREAK_MARKER) {
+      consecutiveBlankCount = 0;
       result.push("");
       continue;
     }
 
     if (line.trim() === "") {
+      consecutiveBlankCount++;
+      // First blank line is structural (Markdown paragraph separator) — skip it.
+      // Additional blank lines are author-intentional — preserve them.
+      if (consecutiveBlankCount > 1) {
+        result.push("");
+      }
       continue;
     }
 
+    consecutiveBlankCount = 0;
     result.push(line);
+  }
+
+  // Trim leading/trailing blank lines — no content to separate at boundaries
+  while (result.length > 0 && result[0] === "") {
+    result.shift();
+  }
+  while (result.length > 0 && result[result.length - 1] === "") {
+    result.pop();
   }
 
   return result.join("\n");
