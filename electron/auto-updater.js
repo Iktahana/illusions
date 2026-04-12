@@ -34,6 +34,9 @@ function setupAutoUpdater() {
     return;
   }
 
+  // ユーザー確認後に手動でダウンロードを開始するため自動ダウンロードを無効化
+  autoUpdater.autoDownload = false;
+
   // イベント: アップデートあり
   autoUpdater.on("update-available", (info) => {
     log.info("アップデートが見つかりました:", info);
