@@ -4,40 +4,44 @@ import { useState, useCallback, useEffect, useRef, useMemo, type KeyboardEvent }
 import clsx from "clsx";
 import GlassDialog from "./GlassDialog";
 import {
-  loadPdfExportSettings,
-  savePdfExportSettings,
-  calculateTypesetting,
+  loadExportSettings,
+  saveExportSettings,
+  toPdfExportSettings,
+  toDocxExportSettings,
+  FONT_OPTIONS,
   PAGE_DIMENSIONS,
-} from "@/lib/export/pdf-export-settings";
+} from "@/lib/export/export-settings";
+import { calculateTypesetting } from "@/lib/export/pdf-export-settings";
 import { mdiToHtml } from "@/lib/export/mdi-to-html";
 
+import type { UnifiedExportSettings, ExportPageSize } from "@/lib/export/export-settings";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
+import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import type { ExportMetadata } from "@/lib/export/types";
 
-interface PdfExportDialogProps {
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+interface ExportDialogProps {
   isOpen: boolean;
+  initialFormat: "pdf" | "docx";
   onClose: () => void;
-  onExport: (settings: PdfExportSettings) => void;
+  onExportPdf: (settings: PdfExportSettings) => void;
+  onExportDocx: (settings: DocxExportSettings) => void;
   content: string;
   metadata: ExportMetadata;
 }
 
-type PageSize = PdfExportSettings["pageSize"];
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
-const PAGE_SIZE_OPTIONS: { value: PageSize; label: string }[] = [
+const PAGE_SIZE_OPTIONS: { value: ExportPageSize; label: string }[] = [
   { value: "A4", label: "A4 (210×297mm)" },
   { value: "A5", label: "A5 (148×210mm)" },
   { value: "B5", label: "B5 (176×250mm)" },
   { value: "B6", label: "B6 (125×176mm)" },
-];
-
-const FONT_OPTIONS: { value: string; label: string }[] = [
-  { value: "serif", label: "明朝体（既定）" },
-  { value: '"游明朝", "Yu Mincho", serif', label: "游明朝" },
-  { value: '"ヒラギノ明朝 ProN", "Hiragino Mincho ProN", serif', label: "ヒラギノ明朝" },
-  { value: '"Noto Serif JP", serif', label: "Noto Serif JP" },
-  { value: "sans-serif", label: "ゴシック体" },
-  { value: '"游ゴシック", "Yu Gothic", sans-serif', label: "游ゴシック" },
 ];
 
 const inputClass =
@@ -54,6 +58,10 @@ const PREVIEW_PAGE_WIDTH = 300;
 const INITIAL_PAGES = 5;
 // Additional pages loaded per scroll batch
 const PAGES_PER_BATCH = 3;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 /**
  * Split MDI content into page-sized chunks based on estimated chars per page.
@@ -80,48 +88,68 @@ function splitContentIntoPages(content: string, charsPerPage: number): string[] 
   return pages.length > 0 ? pages : [trimmed];
 }
 
+function clampInt(raw: string, min: number, max: number): number {
+  const n = parseInt(raw, 10);
+  if (isNaN(n)) return min;
+  return Math.min(max, Math.max(min, n));
+}
+
+function clampFloat(raw: string, min: number, max: number): number {
+  const n = parseFloat(raw);
+  if (isNaN(n)) return min;
+  return Math.min(max, Math.max(min, n));
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 /**
  * Wrapper that unmounts the inner form when closed,
  * so useState initializer reloads settings each time the dialog opens.
  */
-export default function PdfExportDialog({
+export default function ExportDialog({
   isOpen,
+  initialFormat,
   onClose,
-  onExport,
+  onExportPdf,
+  onExportDocx,
   content,
   metadata,
-}: PdfExportDialogProps) {
+}: ExportDialogProps): React.ReactNode {
   if (!isOpen) return null;
   return (
-    <PdfExportDialogInner
+    <ExportDialogInner
+      initialFormat={initialFormat}
       onClose={onClose}
-      onExport={onExport}
+      onExportPdf={onExportPdf}
+      onExportDocx={onExportDocx}
       content={content}
       metadata={metadata}
     />
   );
 }
 
-function PdfExportDialogInner({
+function ExportDialogInner({
+  initialFormat,
   onClose,
-  onExport,
+  onExportPdf,
+  onExportDocx,
   content,
   metadata,
-}: Omit<PdfExportDialogProps, "isOpen">) {
-  const [settings, setSettings] = useState<PdfExportSettings>(() => loadPdfExportSettings());
-  // Debounced copy of settings used for preview rendering (updated every 300ms)
-  const [previewSettings, setPreviewSettings] = useState<PdfExportSettings>(settings);
-  // Page content chunks (split by estimated chars per page)
+}: Omit<ExportDialogProps, "isOpen">) {
+  const [selectedFormat, setSelectedFormat] = useState<"pdf" | "docx">(initialFormat);
+  const [settings, setSettings] = useState<UnifiedExportSettings>(() => loadExportSettings());
+  const [previewSettings, setPreviewSettings] = useState<UnifiedExportSettings>(settings);
+  const [previewFormat, setPreviewFormat] = useState<"pdf" | "docx">(initialFormat);
   const [pageChunks, setPageChunks] = useState<string[]>([]);
-  // Whether the initial debounce has completed (to distinguish "loading" from "no content")
   const [ready, setReady] = useState(false);
-  // How many pages are currently rendered in the preview
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGES);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const updateField = useCallback(
-    <K extends keyof PdfExportSettings>(key: K, value: PdfExportSettings[K]) => {
+    <K extends keyof UnifiedExportSettings>(key: K, value: UnifiedExportSettings[K]) => {
       setSettings((prev) => ({ ...prev, [key]: value }));
     },
     [],
@@ -135,9 +163,13 @@ function PdfExportDialogInner({
   }, []);
 
   const handleExport = useCallback(() => {
-    savePdfExportSettings(settings);
-    onExport(settings);
-  }, [settings, onExport]);
+    saveExportSettings(settings);
+    if (selectedFormat === "pdf") {
+      onExportPdf(toPdfExportSettings(settings));
+    } else {
+      onExportDocx(toDocxExportSettings(settings));
+    }
+  }, [settings, selectedFormat, onExportPdf, onExportDocx]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -146,11 +178,12 @@ function PdfExportDialogInner({
     [onClose],
   );
 
-  // Debounced re-split when settings or content change
+  // Debounced re-split when settings, content, or format change
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setPreviewSettings(settings);
+      setPreviewFormat(selectedFormat);
       const charsPerPage = settings.charsPerLine * settings.linesPerPage;
       const chunks = splitContentIntoPages(content, charsPerPage);
       setPageChunks(chunks);
@@ -160,13 +193,11 @@ function PdfExportDialogInner({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [settings, content]);
+  }, [settings, content, selectedFormat]);
 
   const hasMore = visibleCount < pageChunks.length;
 
-  // IntersectionObserver: load more pages when sentinel scrolls into view.
-  // Depends on hasMore so it re-registers whenever the sentinel element
-  // appears (false→true) or disappears (true→false) in the DOM.
+  // IntersectionObserver: load more pages when sentinel scrolls into view
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
@@ -183,28 +214,32 @@ function PdfExportDialogInner({
     return () => observer.disconnect();
   }, [hasMore]);
 
-  // Memoize typesetting options from debounced settings so preview updates at most every 300ms
+  // DOCX does not support vertical writing — preview forces horizontal
+  const previewVertical = previewFormat === "pdf" ? previewSettings.verticalWriting : false;
+  const showDocxVerticalHint = selectedFormat === "docx" && settings.verticalWriting;
+
+  // Memoize typesetting options from debounced settings
   const typesettingOptions = useMemo(() => {
     const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
       previewSettings.pageSize,
       previewSettings.margins,
       previewSettings.charsPerLine,
       previewSettings.linesPerPage,
-      previewSettings.verticalWriting,
+      previewVertical,
       previewSettings.landscape,
     );
     return {
       metadata,
-      verticalWriting: previewSettings.verticalWriting,
+      verticalWriting: previewVertical,
       typesetting: {
-        fontFamily: previewSettings.fontFamily,
+        fontFamily: FONT_OPTIONS.find((o) => o.key === previewSettings.fontFamily)?.css ?? "serif",
         fontSizeMm,
         lineHeightRatio,
         textIndentEm: previewSettings.textIndent,
         margins: previewSettings.margins,
       },
     };
-  }, [previewSettings, metadata]);
+  }, [previewSettings, previewVertical, metadata]);
 
   // Generate HTML only for currently visible pages
   const visiblePageHtml = useMemo(() => {
@@ -214,7 +249,7 @@ function PdfExportDialogInner({
 
   // Page thumbnail dimensions (swap width/height when landscape) — uses debounced settings
   const { pageWidthPx, pageHeightPx, scale, dims } = useMemo(() => {
-    const base = PAGE_DIMENSIONS[previewSettings.pageSize] ?? PAGE_DIMENSIONS["A5"];
+    const base = PAGE_DIMENSIONS[previewSettings.pageSize] ?? PAGE_DIMENSIONS["A4"];
     const d = previewSettings.landscape ? { width: base.height, height: base.width } : base;
     const w = d.width * MM_TO_PX;
     const h = d.height * MM_TO_PX;
@@ -228,14 +263,41 @@ function PdfExportDialogInner({
     <GlassDialog
       isOpen
       onBackdropClick={onClose}
-      ariaLabel="PDFエクスポート設定"
+      ariaLabel="エクスポート設定"
       panelClassName="mx-4 w-full max-w-5xl p-0 overflow-hidden"
     >
       <div onKeyDown={handleKeyDown} className="flex max-h-[85vh]">
         {/* Left: Settings panel */}
         <div className="w-80 flex-shrink-0 flex flex-col border-r border-border">
           <div className="px-6 pt-6 pb-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">PDFエクスポート設定</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">エクスポート設定</h2>
+            {/* Format toggle */}
+            <div className="flex gap-1 p-1 bg-background-secondary rounded-lg">
+              <button
+                type="button"
+                className={clsx(
+                  "flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                  selectedFormat === "pdf"
+                    ? "bg-accent text-accent-foreground shadow-sm"
+                    : "text-foreground-secondary hover:text-foreground",
+                )}
+                onClick={() => setSelectedFormat("pdf")}
+              >
+                PDF
+              </button>
+              <button
+                type="button"
+                className={clsx(
+                  "flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                  selectedFormat === "docx"
+                    ? "bg-accent text-accent-foreground shadow-sm"
+                    : "text-foreground-secondary hover:text-foreground",
+                )}
+                onClick={() => setSelectedFormat("docx")}
+              >
+                DOCX
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
@@ -245,7 +307,7 @@ function PdfExportDialogInner({
               <select
                 className={inputClass}
                 value={settings.pageSize}
-                onChange={(e) => updateField("pageSize", e.target.value as PageSize)}
+                onChange={(e) => updateField("pageSize", e.target.value as ExportPageSize)}
               >
                 {PAGE_SIZE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -354,7 +416,7 @@ function PdfExportDialogInner({
                 onChange={(e) => updateField("fontFamily", e.target.value)}
               >
                 {FONT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
+                  <option key={opt.key} value={opt.key}>
                     {opt.label}
                   </option>
                 ))}
@@ -435,7 +497,7 @@ function PdfExportDialogInner({
               className="px-4 py-2 rounded-lg text-sm bg-accent text-accent-foreground hover:bg-accent-hover transition-colors"
               onClick={handleExport}
             >
-              エクスポート
+              {selectedFormat === "pdf" ? "PDFとしてエクスポート" : "DOCXとしてエクスポート"}
             </button>
           </div>
         </div>
@@ -446,10 +508,19 @@ function PdfExportDialogInner({
             <span className="text-sm font-medium text-foreground">プレビュー</span>
             <span className="text-xs text-foreground-tertiary">
               {previewSettings.pageSize} · {previewSettings.landscape ? "横置き" : "縦置き"} ·{" "}
-              {previewSettings.verticalWriting ? "縦書き" : "横書き"}
+              {previewVertical ? "縦書き" : "横書き"}
               {pageChunks.length > 0 && ` · 全${pageChunks.length}ページ`}
             </span>
           </div>
+
+          {/* DOCX vertical writing hint */}
+          {showDocxVerticalHint && (
+            <div className="px-4 py-2 bg-warning/10 border-b border-warning/20 flex-shrink-0">
+              <p className="text-xs text-warning-foreground">
+                DOCXは縦書きに対応していないため、横書きでプレビューしています
+              </p>
+            </div>
+          )}
 
           <div className="flex-1 overflow-y-auto">
             {!ready ? (
@@ -496,6 +567,10 @@ function PdfExportDialogInner({
   );
 }
 
+// ---------------------------------------------------------------------------
+// PageThumbnail
+// ---------------------------------------------------------------------------
+
 interface PageThumbnailProps {
   html: string;
   pageNumber: number;
@@ -540,16 +615,4 @@ function PageThumbnail({
       </span>
     </div>
   );
-}
-
-function clampInt(raw: string, min: number, max: number): number {
-  const n = parseInt(raw, 10);
-  if (isNaN(n)) return min;
-  return Math.min(max, Math.max(min, n));
-}
-
-function clampFloat(raw: string, min: number, max: number): number {
-  const n = parseFloat(raw);
-  if (isNaN(n)) return min;
-  return Math.min(max, Math.max(min, n));
 }
