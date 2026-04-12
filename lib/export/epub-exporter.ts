@@ -37,14 +37,17 @@ export async function generateEpub(content: string, options: EpubExportOptions):
     archive.append(stringContent, { name: path, store });
   }
 
-  // Finalize the archive
-  await archive.finalize();
-
-  // Wait for all data to be flushed through the stream
-  await new Promise<void>((resolve, reject) => {
+  // Attach completion listeners BEFORE finalize to avoid race condition.
+  // archiver may emit "end" synchronously during finalize(), so the
+  // listener must already be in place.
+  const done = new Promise<void>((resolve, reject) => {
     passThrough.on("end", resolve);
     passThrough.on("error", reject);
+    archive.on("error", reject);
   });
+
+  await archive.finalize();
+  await done;
 
   return Buffer.concat(buffers);
 }
