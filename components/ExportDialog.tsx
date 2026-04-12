@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo, type KeyboardEvent } from "react";
+import { useState, useCallback, useEffect, useRef, type KeyboardEvent } from "react";
 import clsx from "clsx";
 import GlassDialog from "./GlassDialog";
 import {
@@ -8,11 +8,10 @@ import {
   saveExportSettings,
   toPdfExportSettings,
   toDocxExportSettings,
+  fontKeyToCss,
   FONT_OPTIONS,
-  PAGE_DIMENSIONS,
 } from "@/lib/export/export-settings";
-import { calculateTypesetting } from "@/lib/export/pdf-export-settings";
-import { mdiToHtml } from "@/lib/export/mdi-to-html";
+import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
 import type { UnifiedExportSettings, ExportPageSize } from "@/lib/export/export-settings";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
@@ -50,43 +49,12 @@ const numberInputClass =
   "w-24 px-3 py-2 border border-border-secondary rounded-lg bg-background text-foreground text-sm text-center focus:outline-none focus:ring-2 focus:ring-accent";
 const labelClass = "block text-sm font-medium text-foreground mb-1";
 
-// 96dpi: 1mm = 96/25.4 px
-const MM_TO_PX = 96 / 25.4;
-// Fixed width of each page thumbnail in px
-const PREVIEW_PAGE_WIDTH = 300;
-// Pages shown initially before lazy loading
-const INITIAL_PAGES = 5;
-// Additional pages loaded per scroll batch
-const PAGES_PER_BATCH = 3;
+// Debounce delay for PDF regeneration (ms)
+const PREVIEW_DEBOUNCE_MS = 800;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Split MDI content into page-sized chunks based on estimated chars per page.
- * Splits on paragraph boundaries (double newlines) to avoid breaking mid-paragraph.
- */
-function splitContentIntoPages(content: string, charsPerPage: number): string[] {
-  const trimmed = content.trim();
-  if (!trimmed) return [];
-
-  const paragraphs = trimmed.split(/\n{2,}/);
-  const pages: string[] = [];
-  let current = "";
-
-  for (const para of paragraphs) {
-    if (current.length > 0 && current.length + para.length > charsPerPage) {
-      pages.push(current);
-      current = para;
-    } else {
-      current = current ? current + "\n\n" + para : para;
-    }
-  }
-  if (current.trim()) pages.push(current);
-
-  return pages.length > 0 ? pages : [trimmed];
-}
 
 function clampInt(raw: string, min: number, max: number): number {
   const n = parseInt(raw, 10);
@@ -98,6 +66,30 @@ function clampFloat(raw: string, min: number, max: number): number {
   const n = parseFloat(raw);
   if (isNaN(n)) return min;
   return Math.min(max, Math.max(min, n));
+}
+
+/**
+ * Build PDF export options for the preview IPC call.
+ * When DOCX is selected, forces horizontal writing since DOCX does not support vertical.
+ */
+function buildPreviewOptions(
+  settings: UnifiedExportSettings,
+  format: "pdf" | "docx",
+  metadata: ExportMetadata,
+): Record<string, unknown> {
+  const verticalWriting = format === "pdf" ? settings.verticalWriting : false;
+  return {
+    metadata,
+    verticalWriting,
+    pageSize: settings.pageSize,
+    landscape: settings.landscape,
+    margins: settings.margins,
+    charsPerLine: settings.charsPerLine,
+    linesPerPage: settings.linesPerPage,
+    fontFamily: fontKeyToCss(settings.fontFamily),
+    showPageNumbers: settings.showPageNumbers,
+    textIndent: settings.textIndent,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -140,13 +132,20 @@ function ExportDialogInner({
 }: Omit<ExportDialogProps, "isOpen">) {
   const [selectedFormat, setSelectedFormat] = useState<"pdf" | "docx">(initialFormat);
   const [settings, setSettings] = useState<UnifiedExportSettings>(() => loadExportSettings());
-  const [previewSettings, setPreviewSettings] = useState<UnifiedExportSettings>(settings);
-  const [previewFormat, setPreviewFormat] = useState<"pdf" | "docx">(initialFormat);
-  const [pageChunks, setPageChunks] = useState<string[]>([]);
-  const [ready, setReady] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(INITIAL_PAGES);
+
+  const isElectron = typeof window !== "undefined" && isElectronRenderer();
+  const hasPreviewApi = isElectron && !!window.electronAPI?.generatePdfPreview;
+
+  // PDF preview state
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(hasPreviewApi && !!content.trim());
+  const [previewError, setPreviewError] = useState<string | null>(
+    !hasPreviewApi ? "プレビューはデスクトップ版でのみ利用可能です" : null,
+  );
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  // Track the latest generation request to discard stale results
+  const generationIdRef = useRef(0);
 
   const updateField = useCallback(
     <K extends keyof UnifiedExportSettings>(key: K, value: UnifiedExportSettings[K]) => {
@@ -178,86 +177,81 @@ function ExportDialogInner({
     [onClose],
   );
 
-  // Debounced re-split when settings, content, or format change
+  // Generate PDF preview via Electron IPC (debounced)
   useEffect(() => {
+    if (!hasPreviewApi) return;
+
+    if (!content.trim()) {
+      setPdfUrl(null);
+      return;
+    }
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
+
     debounceRef.current = setTimeout(() => {
-      setPreviewSettings(settings);
-      setPreviewFormat(selectedFormat);
-      const charsPerPage = settings.charsPerLine * settings.linesPerPage;
-      const chunks = splitContentIntoPages(content, charsPerPage);
-      setPageChunks(chunks);
-      setVisibleCount(INITIAL_PAGES);
-      setReady(true);
-    }, 300);
+      const currentId = ++generationIdRef.current;
+      const options = buildPreviewOptions(settings, selectedFormat, metadata);
+
+      setPreviewLoading(true);
+      setPreviewError(null);
+
+      const api = window.electronAPI!;
+      api.generatePdfPreview!(
+        content,
+        options as Parameters<NonNullable<typeof api.generatePdfPreview>>[1],
+      )
+        .then((result) => {
+          // Discard if a newer request has been made
+          if (currentId !== generationIdRef.current) return;
+
+          if (result.success) {
+            // Revoke previous blob URL to avoid memory leaks
+            setPdfUrl((prev) => {
+              if (prev) URL.revokeObjectURL(prev);
+              return null;
+            });
+
+            const binary = atob(result.data);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+              bytes[i] = binary.charCodeAt(i);
+            }
+            const blob = new Blob([bytes], { type: "application/pdf" });
+            const url = URL.createObjectURL(blob);
+            setPdfUrl(url);
+            setPreviewLoading(false);
+          } else {
+            setPreviewError(result.error);
+            setPreviewLoading(false);
+          }
+        })
+        .catch((err: unknown) => {
+          if (currentId !== generationIdRef.current) return;
+          setPreviewError(err instanceof Error ? err.message : "プレビュー生成に失敗しました");
+          setPreviewLoading(false);
+        });
+    }, PREVIEW_DEBOUNCE_MS);
+
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [settings, content, selectedFormat]);
+  }, [settings, selectedFormat, content, metadata, hasPreviewApi]);
 
-  const hasMore = visibleCount < pageChunks.length;
-
-  // IntersectionObserver: load more pages when sentinel scrolls into view
+  // Cleanup blob URL on unmount
   useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
+    return () => {
+      setPdfUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, []);
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleCount((prev) => prev + PAGES_PER_BATCH);
-        }
-      },
-      { threshold: 0 },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore]);
-
-  // DOCX does not support vertical writing — preview forces horizontal
-  const previewVertical = previewFormat === "pdf" ? previewSettings.verticalWriting : false;
+  // DOCX does not support vertical writing — show hint
   const showDocxVerticalHint = selectedFormat === "docx" && settings.verticalWriting;
 
-  // Memoize typesetting options from debounced settings
-  const typesettingOptions = useMemo(() => {
-    const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
-      previewSettings.pageSize,
-      previewSettings.margins,
-      previewSettings.charsPerLine,
-      previewSettings.linesPerPage,
-      previewVertical,
-      previewSettings.landscape,
-    );
-    return {
-      metadata,
-      verticalWriting: previewVertical,
-      typesetting: {
-        fontFamily: FONT_OPTIONS.find((o) => o.key === previewSettings.fontFamily)?.css ?? "serif",
-        fontSizeMm,
-        lineHeightRatio,
-        textIndentEm: previewSettings.textIndent,
-        margins: previewSettings.margins,
-      },
-    };
-  }, [previewSettings, previewVertical, metadata]);
-
-  // Generate HTML only for currently visible pages
-  const visiblePageHtml = useMemo(() => {
-    const limit = Math.min(visibleCount, pageChunks.length);
-    return pageChunks.slice(0, limit).map((chunk) => mdiToHtml(chunk, typesettingOptions));
-  }, [pageChunks, visibleCount, typesettingOptions]);
-
-  // Page thumbnail dimensions (swap width/height when landscape) — uses debounced settings
-  const { pageWidthPx, pageHeightPx, scale, dims } = useMemo(() => {
-    const base = PAGE_DIMENSIONS[previewSettings.pageSize] ?? PAGE_DIMENSIONS["A4"];
-    const d = previewSettings.landscape ? { width: base.height, height: base.width } : base;
-    const w = d.width * MM_TO_PX;
-    const h = d.height * MM_TO_PX;
-    return { pageWidthPx: w, pageHeightPx: h, scale: PREVIEW_PAGE_WIDTH / w, dims: d };
-  }, [previewSettings.pageSize, previewSettings.landscape]);
-
-  const scaledHeight = Math.round(pageHeightPx * scale);
-  const isEmpty = pageChunks.length === 0;
+  // Preview description for info bar
+  const previewVertical = selectedFormat === "pdf" ? settings.verticalWriting : false;
 
   return (
     <GlassDialog
@@ -507,9 +501,8 @@ function ExportDialogInner({
           <div className="px-4 py-3 border-b border-border flex items-center justify-between flex-shrink-0">
             <span className="text-sm font-medium text-foreground">プレビュー</span>
             <span className="text-xs text-foreground-tertiary">
-              {previewSettings.pageSize} · {previewSettings.landscape ? "横置き" : "縦置き"} ·{" "}
+              {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
               {previewVertical ? "縦書き" : "横書き"}
-              {pageChunks.length > 0 && ` · 全${pageChunks.length}ページ`}
             </span>
           </div>
 
@@ -522,97 +515,30 @@ function ExportDialogInner({
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto">
-            {!ready ? (
+          <div className="flex-1 overflow-hidden">
+            {previewLoading ? (
               <div className="flex items-center justify-center h-full text-foreground-tertiary text-sm">
-                生成中...
+                プレビューを生成中...
               </div>
-            ) : isEmpty ? (
+            ) : previewError ? (
+              <div className="flex items-center justify-center h-full text-foreground-tertiary text-sm px-4 text-center">
+                {previewError}
+              </div>
+            ) : !content.trim() ? (
               <div className="flex items-center justify-center h-full text-foreground-tertiary text-sm">
                 コンテンツがありません
               </div>
-            ) : (
-              <div className="flex flex-col items-center gap-4 p-6">
-                {visiblePageHtml.map((html, i) => (
-                  <PageThumbnail
-                    key={i}
-                    html={html}
-                    pageNumber={i + 1}
-                    pageWidthPx={pageWidthPx}
-                    pageHeightPx={pageHeightPx}
-                    scale={scale}
-                    scaledHeight={scaledHeight}
-                    dims={dims}
-                  />
-                ))}
-
-                {/* Sentinel: triggers loading more pages when scrolled into view */}
-                {hasMore && (
-                  <div ref={sentinelRef} className="w-full flex justify-center py-2">
-                    <span className="text-xs text-foreground-tertiary">読み込み中...</span>
-                  </div>
-                )}
-
-                {!hasMore && pageChunks.length > 0 && (
-                  <p className="text-xs text-foreground-tertiary py-2">
-                    全{pageChunks.length}ページ表示済み
-                  </p>
-                )}
-              </div>
-            )}
+            ) : pdfUrl ? (
+              <embed
+                src={pdfUrl}
+                type="application/pdf"
+                className="w-full h-full"
+                title="エクスポートプレビュー"
+              />
+            ) : null}
           </div>
         </div>
       </div>
     </GlassDialog>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// PageThumbnail
-// ---------------------------------------------------------------------------
-
-interface PageThumbnailProps {
-  html: string;
-  pageNumber: number;
-  pageWidthPx: number;
-  pageHeightPx: number;
-  scale: number;
-  scaledHeight: number;
-  dims: { width: number; height: number };
-}
-
-function PageThumbnail({
-  html,
-  pageNumber,
-  pageWidthPx,
-  pageHeightPx,
-  scale,
-  scaledHeight,
-  dims,
-}: PageThumbnailProps) {
-  return (
-    <div className="flex flex-col items-center gap-1 flex-shrink-0">
-      <div
-        className="shadow-lg bg-white"
-        style={{ width: PREVIEW_PAGE_WIDTH, height: scaledHeight, overflow: "hidden" }}
-      >
-        <iframe
-          srcDoc={html}
-          sandbox="allow-same-origin"
-          title={`ページ ${pageNumber}`}
-          style={{
-            width: pageWidthPx,
-            height: pageHeightPx,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
-            border: "none",
-            display: "block",
-          }}
-        />
-      </div>
-      <span className="text-xs text-foreground-tertiary">
-        {pageNumber} / {dims.width}×{dims.height}mm
-      </span>
-    </div>
   );
 }
