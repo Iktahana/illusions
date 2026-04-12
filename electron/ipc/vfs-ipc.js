@@ -8,6 +8,7 @@ const { ipcMain, dialog, app, BrowserWindow, webContents } = require("electron")
 const fs = require("fs/promises");
 const path = require("path");
 const os = require("os");
+const { toForwardSlash, assertPathInsideRoot } = require("../lib/path-utils");
 
 function registerVFSHandlers() {
   // Track the opened root directory per window for path validation
@@ -56,22 +57,12 @@ function registerVFSHandlers() {
     if (!allowedRoot) {
       throw new Error("ディレクトリが開かれていません");
     }
-    // Normalize the incoming path to use forward slashes to avoid issues with
-    // mixed path separators on Windows (which can cause path.resolve to misbehave)
-    const normalizedInput = requestedPath.replace(/\\/g, "/");
-    const resolved = path.resolve(normalizedInput);
-
-    // Normalize paths for consistent comparison across platforms
-    const normalizedResolved = normalizePath(resolved);
+    // Normalize the incoming path to forward slashes, resolving any traversal segments
+    const normalizedResolved = toForwardSlash(requestedPath);
     const normalizedRoot = normalizePath(allowedRoot);
 
-    if (
-      normalizedResolved !== normalizedRoot &&
-      !normalizedResolved.startsWith(normalizedRoot + "/")
-    ) {
-      throw new Error("プロジェクトディレクトリの外部へのアクセスは許可されていません");
-    }
-    return resolved;
+    assertPathInsideRoot(normalizedResolved, normalizedRoot);
+    return normalizedResolved;
   }
 
   // Open directory picker
