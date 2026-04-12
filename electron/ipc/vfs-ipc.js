@@ -210,6 +210,24 @@ function registerVFSHandlers() {
   });
 
   /**
+   * Return Windows system directory deny prefixes based on the actual system drive.
+   * Uses the SystemRoot environment variable so the correct drive letter is detected
+   * even on non-C: installations.
+   * @returns {string[]}
+   */
+  function getWindowsDenyPrefixes() {
+    if (process.platform !== "win32") return [];
+    const sysRoot = (process.env.SystemRoot ?? "C:\\Windows").replace(/\\/g, "/");
+    const sysDrive = sysRoot.split("/")[0];
+    return [
+      `${sysDrive}/Windows`,
+      `${sysDrive}/Program Files`,
+      `${sysDrive}/Program Files (x86)`,
+      `${sysDrive}/ProgramData`,
+    ];
+  }
+
+  /**
    * Check if a path is in the system-sensitive denylist.
    * Prevents access to critical system directories and credential stores.
    *
@@ -239,7 +257,7 @@ function registerVFSHandlers() {
     const driveLetterMatch = normalizedPath.match(/^([a-zA-Z]):?\/?$/);
     if (driveLetterMatch) return true; // Bare drive root (C:/ or C:)
 
-    const windowsDenyPrefixes = ["C:/Windows", "C:/Program Files", "C:/Program Files (x86)"];
+    const windowsDenyPrefixes = getWindowsDenyPrefixes();
 
     // Sensitive directories within home
     const homeSensitiveSuffixes = [
@@ -250,6 +268,10 @@ function registerVFSHandlers() {
       "/.docker",
       "/.config/gcloud",
       "/Library/Keychains",
+      // Windows (forward-slash normalized)
+      "/AppData/Roaming/Microsoft/Credentials",
+      "/AppData/Roaming/Microsoft/Protect",
+      "/AppData/Local/Microsoft/Credentials",
     ];
 
     // Treat denied roots as prefixes — block any nested path under them
