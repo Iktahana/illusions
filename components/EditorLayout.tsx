@@ -10,8 +10,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
 import ResizablePanel from "@/components/ResizablePanel";
-import PdfExportDialog from "@/components/PdfExportDialog";
-import DocxExportDialog from "@/components/DocxExportDialog";
+import ExportDialog from "@/components/ExportDialog";
 import RubyDialog from "@/components/RubyDialog";
 import SettingsModal from "@/components/SettingsModal";
 import SidebarPanel from "@/components/SidebarPanel";
@@ -268,18 +267,14 @@ export default function EditorLayout({
               onApply={dialogs.handleApplyRuby}
             />
 
-            <PdfExportDialog
-              isOpen={dialogs.exportDialog.state?.format === "pdf"}
+            <ExportDialog
+              isOpen={dialogs.exportDialog.state != null}
+              initialFormat={dialogs.exportDialog.state?.format ?? "pdf"}
               onClose={dialogs.exportDialog.onClose}
-              onExport={dialogs.exportDialog.onPdfExport}
+              onExportPdf={dialogs.exportDialog.onPdfExport}
+              onExportDocx={dialogs.exportDialog.onDocxExport}
               content={dialogs.exportDialog.content}
               metadata={dialogs.exportDialog.metadata}
-            />
-
-            <DocxExportDialog
-              isOpen={dialogs.exportDialog.state?.format === "docx"}
-              onClose={dialogs.exportDialog.onClose}
-              onExport={dialogs.exportDialog.onDocxExport}
             />
 
             {!chrome.isElectron && recovery.wasAutoRecovered && !recovery.dismissedRecovery && (

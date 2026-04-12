@@ -45,8 +45,8 @@ describe("blank line collapsing", () => {
   });
 
   it("should preserve dialogue lines unchanged", () => {
-    const input = "narration\n\n\u300Cdialogue\u300D\n\nnext";
-    expect(mdiToPlainText(input)).toBe("narration\n\u300Cdialogue\u300D\nnext");
+    const input = "narration\n\n「dialogue」\n\nnext";
+    expect(mdiToPlainText(input)).toBe("narration\n「dialogue」\nnext");
   });
 
   it("should handle content with no blank lines", () => {
