@@ -38,7 +38,8 @@ export function useRecentProjects(
             projectId: p.id,
             name: p.name,
             lastAccessedAt: Date.now(),
-            rootDirName: p.rootPath.split(/[/\\]/).filter(Boolean).pop(),
+            rootDirName:
+              p.rootPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? p.rootPath,
           }));
           setRecentProjects(entries);
 
@@ -91,7 +92,8 @@ export function useRecentProjects(
             projectId: p.id,
             name: p.name,
             lastAccessedAt: Date.now(),
-            rootDirName: p.rootPath.split(/[/\\]/).filter(Boolean).pop(),
+            rootDirName:
+              p.rootPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? p.rootPath,
           }));
           setRecentProjects(entries);
           void window.electronAPI?.rebuildMenu?.();
