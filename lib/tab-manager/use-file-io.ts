@@ -46,7 +46,12 @@ export interface UseFileIOReturn {
   /** Ref holding the latest saveAsFile function. */
   saveAsFileRef: React.MutableRefObject<() => Promise<void>>;
   /** Create an auto-snapshot if conditions are met (project mode only). */
-  tryAutoSnapshot: (sourcePath: string, displayName: string, savedContent: string) => Promise<void>;
+  tryAutoSnapshot: (
+    sourcePath: string,
+    displayName: string,
+    savedContent: string,
+    forceSnapshot?: boolean,
+  ) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,20 +117,26 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   // --- Auto-snapshot (project mode) ---------------------------------------
 
   const tryAutoSnapshot = useCallback(
-    async (sourcePath: string, displayName: string, savedContent: string) => {
+    async (
+      sourcePath: string,
+      displayName: string,
+      savedContent: string,
+      forceSnapshot: boolean = false,
+    ) => {
       if (!isProjectRef.current) return;
       if (!getVFS().isRootOpen()) return;
       try {
         const historyService = getHistoryService();
-        const shouldCreate = await historyService.shouldCreateSnapshot(sourcePath);
-        if (shouldCreate) {
-          await historyService.createSnapshot({
-            sourcePath,
-            displayName,
-            content: savedContent,
-            type: "auto",
-          });
+        if (!forceSnapshot) {
+          const shouldCreate = await historyService.shouldCreateSnapshot(sourcePath);
+          if (!shouldCreate) return;
         }
+        await historyService.createSnapshot({
+          sourcePath,
+          displayName,
+          content: savedContent,
+          type: "auto",
+        });
       } catch (error) {
         console.warn("自動スナップショットの作成に失敗しました:", error);
       }
@@ -265,7 +276,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
               };
             }),
           );
-          await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized);
+          await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized, !isAutoSave);
           return;
         }
 
@@ -297,7 +308,12 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
             notificationManager.warning(PERSIST_FAILURE_WARNING);
           }
           if (result.descriptor.path) {
-            await tryAutoSnapshot(result.descriptor.path, result.descriptor.name, sanitized);
+            await tryAutoSnapshot(
+              result.descriptor.path,
+              result.descriptor.name,
+              sanitized,
+              !isAutoSave,
+            );
           }
         } else {
           updateTab(tabId, { isSaving: false });
@@ -370,7 +386,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           notificationManager.warning(PERSIST_FAILURE_WARNING);
         }
         if (result.descriptor.path) {
-          await tryAutoSnapshot(result.descriptor.path, result.descriptor.name, sanitized);
+          await tryAutoSnapshot(result.descriptor.path, result.descriptor.name, sanitized, true);
         }
       } else {
         updateTab(tabId, { isSaving: false });
