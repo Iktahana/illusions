@@ -10,6 +10,7 @@ import type { Token, WordEntry, TokenizeProgress } from "@/lib/nlp-client/types"
 import type { VFSWatchEvent } from "@/lib/vfs/types";
 import type { KeymapOverrides } from "@/lib/keymap/keymap-types";
 import type { DictEntry, DictDownloadStatus } from "@/lib/dict/dict-types";
+import type { PdfGenerationOptions } from "@/lib/export/types";
 
 export {};
 
@@ -69,20 +70,13 @@ declare global {
     onFormatChange?: (callback: (setting: string, action: string) => void) => (() => void) | void;
     onThemeChange?: (callback: (mode: "auto" | "light" | "dark") => void) => (() => void) | void;
     // Export
+    generatePdfPreview?: (
+      content: string,
+      options: PdfGenerationOptions,
+    ) => Promise<{ success: true; data: string } | { success: false; error: string }>;
     exportPDF?: (
       content: string,
-      options: {
-        metadata: { title: string; author?: string; date?: string; language?: string };
-        verticalWriting?: boolean;
-        pageSize?: "A4" | "A5" | "B5" | "B6";
-        landscape?: boolean;
-        margins?: { top: number; bottom: number; left: number; right: number };
-        charsPerLine?: number;
-        linesPerPage?: number;
-        fontFamily?: string;
-        showPageNumbers?: boolean;
-        textIndent?: number;
-      },
+      options: PdfGenerationOptions,
     ) => Promise<string | { success: false; error: string } | null>;
     exportEPUB?: (
       content: string,

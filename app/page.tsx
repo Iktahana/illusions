@@ -18,6 +18,7 @@ import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence"
 import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
+import { openWebPrintPreview } from "@/lib/export/web-print-preview";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
@@ -554,65 +555,18 @@ export default function EditorPage() {
       return;
     }
 
-    // Web path: open print window (sync first to avoid popup blocker)
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      notificationManager.warning(
-        "ポップアップがブロックされました。ブラウザの設定を確認してください。",
-      );
-      return;
-    }
-    printWindow.document.write(
-      '<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#666"><p>読み込み中…</p></body></html>',
-    );
-
+    // Web path: browser print preview (static import — no await before window.open)
     try {
-      const { mdiToHtml } = await import("@/lib/export/mdi-to-html");
-      const { calculateTypesetting } = await import("@/lib/export/pdf-export-settings");
-      const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
-        settings.pageSize,
-        settings.margins,
-        settings.charsPerLine,
-        settings.linesPerPage,
-        settings.verticalWriting,
-        settings.landscape,
-      );
-      const html = mdiToHtml(dialogState.content, {
-        metadata: dialogState.metadata,
-        verticalWriting: settings.verticalWriting,
-        typesetting: {
-          fontFamily: settings.fontFamily,
-          fontSizeMm,
-          lineHeightRatio,
-          textIndentEm: settings.textIndent,
-          margins: settings.margins,
-          pageSize: settings.pageSize,
-          landscape: settings.landscape,
-        },
-      });
-
-      printWindow.document.open();
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.focus();
-
-      // Close export dialog — "success" = print window opened and print() called.
-      // Browser print gives no save/cancel result, so no success toast.
+      const opened = await openWebPrintPreview(dialogState.content, dialogState.metadata, settings);
+      if (!opened) {
+        notificationManager.warning(
+          "ポップアップがブロックされました。ブラウザの設定を確認してください。",
+        );
+        return;
+      }
+      // Close dialog — print preview is open. No success toast (browser print gives no result).
       setExportDialogState(null);
-
-      // Clean up: close popup after print/cancel
-      let closed = false;
-      const closeOnce = (): void => {
-        if (!closed) {
-          closed = true;
-          printWindow.close();
-        }
-      };
-      printWindow.addEventListener("afterprint", closeOnce);
-      window.addEventListener("focus", closeOnce, { once: true });
-      printWindow.print();
     } catch (error) {
-      printWindow.close();
       const message = error instanceof Error ? error.message : "不明なエラー";
       notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
     }

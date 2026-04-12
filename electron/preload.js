@@ -108,6 +108,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("menu-theme", handler);
   },
   // Export
+  generatePdfPreview: (content, options) =>
+    ipcRenderer.invoke("generate-pdf-preview", content, options),
   exportPDF: (content, options) => ipcRenderer.invoke("export-pdf", content, options),
   exportEPUB: (content, options) => ipcRenderer.invoke("export-epub", content, options),
   exportDOCX: (content, options) => ipcRenderer.invoke("export-docx", content, options),

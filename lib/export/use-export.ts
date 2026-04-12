@@ -5,6 +5,8 @@ import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { saveBlobFile } from "./save-blob-file";
 import { mdiToPlainText, mdiToRubyText } from "./txt-exporter";
+import { openWebPrintPreview } from "./web-print-preview";
+import { loadExportSettings, toPdfExportSettings } from "./export-settings";
 import type { ExportFormat, ExportMetadata } from "./types";
 
 interface UseExportParams {
@@ -208,48 +210,16 @@ async function exportAsWeb(
   const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
 
   if (format === "pdf") {
-    // window.open() must be called synchronously within the user gesture
-    // to avoid popup blocker. Open an empty window now, then populate it.
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
+    // Defensive fallback: normally PDF goes through dialog (line 103),
+    // but if no dialog callback is wired, use default export settings.
+    const defaults = toPdfExportSettings(loadExportSettings());
+    const opened = await openWebPrintPreview(content, metadata, defaults);
+    if (!opened) {
       notificationManager.warning(
         "ポップアップがブロックされました。ブラウザの設定を確認してください。",
       );
-      return;
-    }
-
-    notificationManager.info("印刷ダイアログからPDFとして保存できます");
-
-    // Show a loading indicator while the dynamic import runs.
-    // The window is already open (sync), so the user sees immediate feedback.
-    printWindow.document.write(
-      '<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#666"><p>読み込み中…</p></body></html>',
-    );
-
-    try {
-      const { mdiToHtml } = await import("./mdi-to-html");
-      const html = mdiToHtml(content, { metadata, bodyOnly: false });
-      printWindow.document.open();
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.focus();
-      // Close the popup after printing (or when the user cancels the dialog).
-      // Safari < 17 does not fire "afterprint", so add a fallback close via
-      // the "focus" event on the opener window (fires when print dialog closes).
-      let closed = false;
-      const closeOnce = (): void => {
-        if (!closed) {
-          closed = true;
-          printWindow.close();
-        }
-      };
-      printWindow.addEventListener("afterprint", closeOnce);
-      window.addEventListener("focus", closeOnce, { once: true });
-      printWindow.print();
-    } catch (error) {
-      printWindow.close();
-      const message = error instanceof Error ? error.message : "不明なエラー";
-      notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
+    } else {
+      notificationManager.info("印刷ダイアログからPDFとして保存できます");
     }
     return;
   }
