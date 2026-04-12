@@ -1,26 +1,26 @@
 import { describe, it, expect } from "vitest";
 
-import { mdiToPlainText, mdiToRubyText, stripMarkdown } from "../txt-exporter";
+import { mdiToPlainText, mdiToRubyText } from "../txt-exporter";
 
 // ---------------------------------------------------------------------------
-// stripMarkdown
+// Markdown stripping (tested via mdiToPlainText)
 // ---------------------------------------------------------------------------
 
-describe("stripMarkdown", () => {
+describe("markdown stripping", () => {
   it("should strip heading markers", () => {
-    expect(stripMarkdown("# Title")).toBe("Title");
-    expect(stripMarkdown("## Subtitle")).toBe("Subtitle");
+    expect(mdiToPlainText("# Title")).toBe("Title");
+    expect(mdiToPlainText("## Subtitle")).toBe("Subtitle");
   });
 
   it("should strip bold and italic markers", () => {
-    expect(stripMarkdown("**bold** and *italic*")).toBe("bold and italic");
-    expect(stripMarkdown("***both***")).toBe("both");
+    expect(mdiToPlainText("**bold** and *italic*")).toBe("bold and italic");
+    expect(mdiToPlainText("***both***")).toBe("both");
   });
 
-  it("should convert horizontal rules to scene break markers", () => {
-    const result = stripMarkdown("before\n\n---\n\nafter");
-    // Scene break marker is internal; verify it does not appear as literal "---"
+  it("should convert horizontal rules to blank line separators", () => {
+    const result = mdiToPlainText("before\n\n---\n\nafter");
     expect(result).not.toContain("---");
+    expect(result).toBe("before\n\nafter");
   });
 });
 

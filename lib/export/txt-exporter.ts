@@ -49,7 +49,7 @@ export function mdiToRubyText(content: string): string {
  * Strip markdown formatting while preserving text structure.
  * Handles headings, bold, italic, horizontal rules, etc.
  */
-export function stripMarkdown(text: string): string {
+function stripMarkdown(text: string): string {
   const lines = text.split("\n");
   const result: string[] = [];
 
