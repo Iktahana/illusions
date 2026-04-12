@@ -8,6 +8,9 @@
 
 import MarkdownIt from "markdown-it";
 
+import { PAGE_DIMENSIONS } from "./pdf-export-settings";
+
+import type { ExportPageSize } from "./export-settings";
 import type { ExportMetadata, Chapter } from "./types";
 import {
   MDI_RUBY_RE,
@@ -173,6 +176,10 @@ export interface MdiStylesheetOptions {
   textIndentEm?: number;
   /** Page margins in mm */
   margins?: { top: number; bottom: number; left: number; right: number };
+  /** Page size for @page CSS rule (drives browser print dialog paper selection) */
+  pageSize?: ExportPageSize;
+  /** Landscape orientation for @page CSS rule */
+  landscape?: boolean;
 }
 
 /**
@@ -218,10 +225,20 @@ export function getMdiStylesheet(options?: MdiStylesheetOptions): string {
     rules.push(`p { text-indent: ${options.textIndentEm}em; }`);
   }
 
-  // @page margins for printToPDF
+  // @page rule: margins + page size (combined into one rule to avoid browser merge issues)
+  const pageDecls: string[] = [];
   if (options?.margins) {
     const { top, bottom, left, right } = options.margins;
-    rules.push(`@page { margin: ${top}mm ${right}mm ${bottom}mm ${left}mm; }`);
+    pageDecls.push(`margin: ${top}mm ${right}mm ${bottom}mm ${left}mm`);
+  }
+  if (options?.pageSize) {
+    const dims = PAGE_DIMENSIONS[options.pageSize] ?? PAGE_DIMENSIONS["A4"];
+    const w = options.landscape ? dims.height : dims.width;
+    const h = options.landscape ? dims.width : dims.height;
+    pageDecls.push(`size: ${w}mm ${h}mm`);
+  }
+  if (pageDecls.length > 0) {
+    rules.push(`@page { ${pageDecls.join("; ")}; }`);
   }
 
   return rules.join("\n");

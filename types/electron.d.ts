@@ -69,21 +69,6 @@ declare global {
     onFormatChange?: (callback: (setting: string, action: string) => void) => (() => void) | void;
     onThemeChange?: (callback: (mode: "auto" | "light" | "dark") => void) => (() => void) | void;
     // Export
-    generatePdfPreview?: (
-      content: string,
-      options: {
-        metadata: { title: string; author?: string; date?: string; language?: string };
-        verticalWriting?: boolean;
-        pageSize?: "A4" | "A5" | "B5" | "B6";
-        landscape?: boolean;
-        margins?: { top: number; bottom: number; left: number; right: number };
-        charsPerLine?: number;
-        linesPerPage?: number;
-        fontFamily?: string;
-        showPageNumbers?: boolean;
-        textIndent?: number;
-      },
-    ) => Promise<{ success: true; data: string } | { success: false; error: string }>;
     exportPDF?: (
       content: string,
       options: {

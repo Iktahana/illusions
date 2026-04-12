@@ -509,86 +509,182 @@ export default function EditorPage() {
   );
 
   const handlePdfExportConfirm = useCallback(async (settings: PdfExportSettings) => {
-    setExportDialogState(null);
-
-    if (!window.electronAPI?.exportPDF) {
-      notificationManager.error("PDFエクスポートはデスクトップアプリでのみ利用可能です");
-      return;
-    }
-
     const dialogState = exportDialogStateRef.current;
     if (!dialogState) return;
 
-    const progressId = notificationManager.showProgress("PDFをエクスポート中...", {
-      type: "info",
-    });
+    // Electron path: use IPC
+    if (window.electronAPI?.exportPDF) {
+      setExportDialogState(null);
 
-    try {
-      const result = await window.electronAPI.exportPDF(dialogState.content, {
-        metadata: dialogState.metadata,
-        verticalWriting: settings.verticalWriting,
-        pageSize: settings.pageSize,
-        landscape: settings.landscape,
-        margins: settings.margins,
-        charsPerLine: settings.charsPerLine,
-        linesPerPage: settings.linesPerPage,
-        fontFamily: settings.fontFamily,
-        showPageNumbers: settings.showPageNumbers,
-        textIndent: settings.textIndent,
+      const progressId = notificationManager.showProgress("PDFをエクスポート中...", {
+        type: "info",
       });
 
-      notificationManager.dismiss(progressId);
+      try {
+        const result = await window.electronAPI.exportPDF(dialogState.content, {
+          metadata: dialogState.metadata,
+          verticalWriting: settings.verticalWriting,
+          pageSize: settings.pageSize,
+          landscape: settings.landscape,
+          margins: settings.margins,
+          charsPerLine: settings.charsPerLine,
+          linesPerPage: settings.linesPerPage,
+          fontFamily: settings.fontFamily,
+          showPageNumbers: settings.showPageNumbers,
+          textIndent: settings.textIndent,
+        });
 
-      if (result === null || result === undefined) return;
+        notificationManager.dismiss(progressId);
 
-      if (typeof result === "object" && "success" in result && !result.success) {
-        notificationManager.error(
-          `PDFのエクスポートに失敗しました: ${(result as { error: string }).error}`,
-        );
-        return;
+        if (result === null || result === undefined) return;
+
+        if (typeof result === "object" && "success" in result && !result.success) {
+          notificationManager.error(
+            `PDFのエクスポートに失敗しました: ${(result as { error: string }).error}`,
+          );
+          return;
+        }
+
+        notificationManager.success("PDFをエクスポートしました");
+      } catch (error) {
+        notificationManager.dismiss(progressId);
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
       }
+      return;
+    }
 
-      notificationManager.success("PDFをエクスポートしました");
+    // Web path: open print window (sync first to avoid popup blocker)
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      notificationManager.warning(
+        "ポップアップがブロックされました。ブラウザの設定を確認してください。",
+      );
+      return;
+    }
+    printWindow.document.write(
+      '<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#666"><p>読み込み中…</p></body></html>',
+    );
+
+    try {
+      const { mdiToHtml } = await import("@/lib/export/mdi-to-html");
+      const { calculateTypesetting } = await import("@/lib/export/pdf-export-settings");
+      const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
+        settings.pageSize,
+        settings.margins,
+        settings.charsPerLine,
+        settings.linesPerPage,
+        settings.verticalWriting,
+        settings.landscape,
+      );
+      const html = mdiToHtml(dialogState.content, {
+        metadata: dialogState.metadata,
+        verticalWriting: settings.verticalWriting,
+        typesetting: {
+          fontFamily: settings.fontFamily,
+          fontSizeMm,
+          lineHeightRatio,
+          textIndentEm: settings.textIndent,
+          margins: settings.margins,
+          pageSize: settings.pageSize,
+          landscape: settings.landscape,
+        },
+      });
+
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+
+      // Close export dialog — "success" = print window opened and print() called.
+      // Browser print gives no save/cancel result, so no success toast.
+      setExportDialogState(null);
+
+      // Clean up: close popup after print/cancel
+      let closed = false;
+      const closeOnce = (): void => {
+        if (!closed) {
+          closed = true;
+          printWindow.close();
+        }
+      };
+      printWindow.addEventListener("afterprint", closeOnce);
+      window.addEventListener("focus", closeOnce, { once: true });
+      printWindow.print();
     } catch (error) {
-      notificationManager.dismiss(progressId);
+      printWindow.close();
       const message = error instanceof Error ? error.message : "不明なエラー";
       notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
     }
   }, []);
 
   const handleDocxExportConfirm = useCallback(async (settings: DocxExportSettings) => {
-    setExportDialogState(null);
-
-    if (!window.electronAPI?.exportDOCX) {
-      notificationManager.error("DOCXエクスポートはデスクトップアプリでのみ利用可能です");
-      return;
-    }
-
     const dialogState = exportDialogStateRef.current;
     if (!dialogState) return;
 
+    // Electron path: use IPC
+    if (window.electronAPI?.exportDOCX) {
+      setExportDialogState(null);
+
+      const progressId = notificationManager.showProgress("DOCXをエクスポート中...", {
+        type: "info",
+      });
+
+      try {
+        const result = await window.electronAPI.exportDOCX(dialogState.content, {
+          metadata: dialogState.metadata,
+          settings,
+        });
+
+        notificationManager.dismiss(progressId);
+
+        if (result === null || result === undefined) return;
+
+        if (typeof result === "object" && "success" in result && !result.success) {
+          notificationManager.error(
+            `DOCXのエクスポートに失敗しました: ${(result as { error: string }).error}`,
+          );
+          return;
+        }
+
+        notificationManager.success("DOCXをエクスポートしました");
+      } catch (error) {
+        notificationManager.dismiss(progressId);
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        notificationManager.error(`DOCXのエクスポートに失敗しました: ${message}`);
+      }
+      return;
+    }
+
+    // Web path: generate DOCX blob and download
     const progressId = notificationManager.showProgress("DOCXをエクスポート中...", {
       type: "info",
     });
 
     try {
-      const result = await window.electronAPI.exportDOCX(dialogState.content, {
+      const { generateDocxBlob } = await import("@/lib/export/docx-exporter");
+      const blob = await generateDocxBlob(dialogState.content, {
         metadata: dialogState.metadata,
         settings,
       });
+      const baseName = (dialogState.metadata.title || "untitled").replace(/\.[^.]+$/, "");
+      const { saveBlobFile } = await import("@/lib/export/save-blob-file");
+      const saved = await saveBlobFile(
+        blob,
+        `${baseName}.docx`,
+        {
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+        },
+        false,
+      );
 
       notificationManager.dismiss(progressId);
 
-      if (result === null || result === undefined) return;
-
-      if (typeof result === "object" && "success" in result && !result.success) {
-        notificationManager.error(
-          `DOCXのエクスポートに失敗しました: ${(result as { error: string }).error}`,
-        );
-        return;
+      if (saved) {
+        setExportDialogState(null);
+        notificationManager.success("DOCXをエクスポートしました");
       }
-
-      notificationManager.success("DOCXをエクスポートしました");
+      // saved === false means user cancelled — keep dialog open
     } catch (error) {
       notificationManager.dismiss(progressId);
       const message = error instanceof Error ? error.message : "不明なエラー";

@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from "react";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { notificationManager } from "@/lib/services/notification-manager";
+import { saveBlobFile } from "./save-blob-file";
 import { mdiToPlainText, mdiToRubyText } from "./txt-exporter";
 import type { ExportFormat, ExportMetadata } from "./types";
 
@@ -25,82 +26,6 @@ interface UseExportParams {
     content: string,
     metadata: ExportMetadata,
   ) => void;
-}
-
-/**
- * Save a Blob to a file.
- *
- * In Electron, uses the native save dialog via the existing `saveFile` IPC
- * channel (filePath = null triggers dialog.showSaveDialog in the main process).
- * This avoids the user-gesture requirement of showSaveFilePicker, which causes
- * a DOMException when the export is triggered from the application menu over IPC.
- *
- * In web browsers, uses the File System Access API when available (Chromium),
- * and falls back to a Blob URL download for other browsers.
- *
- * @param blob - Blob content to write
- * @param suggestedName - Default file name shown in the save dialog
- * @param accept - MIME type → extensions map for the file picker
- * @param isElectron - True when running inside Electron renderer
- * @param electronExt - File extension for Electron save dialog. Currently only
- *   ".txt" is routed through Electron IPC here; DOCX/EPUB/PDF use dedicated
- *   IPC export handlers and never reach this function in Electron mode.
- */
-async function saveBlobFile(
-  blob: Blob,
-  suggestedName: string,
-  accept: Record<string, string[]>,
-  isElectron: boolean,
-  electronExt?: string,
-): Promise<boolean> {
-  // Electron: delegate to main-process IPC (currently only TXT is routed here;
-  // other formats use dedicated IPC export handlers)
-  if (isElectron && window.electronAPI && electronExt === ".txt") {
-    const text = await blob.text();
-    const result = await window.electronAPI.saveFile(null, text, electronExt);
-    if (result === null) return false;
-    if (typeof result === "object" && "success" in result && !result.success) {
-      throw new Error(result.error);
-    }
-    return true;
-  }
-
-  // Web: try File System Access API (Chromium browsers).
-  // Note: showSaveFilePicker requires an active user gesture. When called after
-  // async work (dynamic import + blob generation), the gesture may have expired,
-  // causing an AbortError. This is caught below and falls through to the Blob
-  // URL download fallback, which always works without a gesture.
-  if (hasShowSaveFilePicker(window)) {
-    try {
-      const handle = await window.showSaveFilePicker({
-        suggestedName,
-        types: [
-          {
-            description: suggestedName.split(".").pop()?.toUpperCase() ?? "ファイル",
-            accept,
-          },
-        ],
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return true;
-    } catch (error) {
-      if ((error as { name?: string }).name === "AbortError") return false;
-      throw error;
-    }
-  }
-
-  // Fallback: trigger download via Blob URL
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = suggestedName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  return true;
 }
 
 /**
@@ -174,12 +99,8 @@ export function useExport({
         return;
       }
 
-      // PDF/DOCX export: delegate to settings dialog when callback is provided (Electron only)
-      if (
-        (format === "pdf" || format === "docx") &&
-        onExportDialogRequest &&
-        isElectronRenderer()
-      ) {
+      // PDF/DOCX export: delegate to settings dialog when callback is provided
+      if ((format === "pdf" || format === "docx") && onExportDialogRequest) {
         onExportDialogRequest(format, content, metadata);
         return;
       }
@@ -297,9 +218,7 @@ async function exportAsWeb(
       return;
     }
 
-    notificationManager.info(
-      "印刷ダイアログからPDFとして保存できます（縦書き・詳細設定はデスクトップ版のみ対応）",
-    );
+    notificationManager.info("印刷ダイアログからPDFとして保存できます");
 
     // Show a loading indicator while the dynamic import runs.
     // The window is already open (sync), so the user sees immediate feedback.
@@ -377,13 +296,4 @@ async function exportAsWeb(
     const message = error instanceof Error ? error.message : "不明なエラー";
     notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
   }
-}
-
-/**
- * Type guard: checks whether window has the File System Access API showSaveFilePicker method.
- */
-function hasShowSaveFilePicker(w: Window): w is Window & {
-  showSaveFilePicker: (options?: object) => Promise<FileSystemFileHandle>;
-} {
-  return "showSaveFilePicker" in w;
 }
