@@ -15,7 +15,7 @@ import type {
   VFSWatcher,
   VirtualFileSystem,
 } from "./types";
-import { basename, dirname, isAbsolutePath, joinPath } from "./path-utils";
+import { basename, dirname, joinPath } from "./path-utils";
 
 // -----------------------------------------------------------------------
 // Type declarations for the Electron VFS IPC bridge
@@ -402,22 +402,25 @@ export class ElectronVFS implements VirtualFileSystem {
 
   /**
    * Resolve a path to an absolute path.
-   * If the path is already absolute (starts with "/"), return it as-is.
-   * Otherwise, join it with the root path.
+   * Handles POSIX absolute ("/"), Windows drive-letter ("C:/", "C:\"),
+   * and UNC ("\\\\server\\share") paths without joining them to rootPath.
+   * Backslashes in absolute paths are normalized to forward slashes for
+   * consistent IPC communication.
    * @throws Error if no root path is available and path is relative
    */
-  private resolvePath(path: string): string {
-    // Absolute path - use as-is (Unix "/" or Windows "C:\", "D:/", etc.)
-    if (isAbsolutePath(path)) {
-      return path;
+  private resolvePath(inputPath: string): string {
+    // Check for POSIX absolute, Windows drive-letter (C:/ or C:\), or UNC (\\server)
+    const isAbsolute =
+      inputPath.startsWith("/") ||
+      /^[a-zA-Z]:[/\\]/.test(inputPath) ||
+      inputPath.startsWith("\\\\");
+    if (isAbsolute) {
+      // Normalize backslashes to forward slashes for consistent IPC
+      return inputPath.replace(/\\/g, "/");
     }
-    // Relative path - join with root
     if (!this.rootPath) {
-      throw new Error(
-        "Cannot resolve relative path: no root directory has been opened. " +
-          "Call openDirectory() first or use an absolute path.",
-      );
+      throw new Error("Cannot resolve relative path without an open directory");
     }
-    return joinPath(this.rootPath, path);
+    return joinPath(this.rootPath, inputPath);
   }
 }
