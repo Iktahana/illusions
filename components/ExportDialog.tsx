@@ -190,7 +190,7 @@ function ExportDialogInner({
 
           const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
           const blob = new Blob([bytes], { type: "application/pdf" });
-          setPdfUrl(URL.createObjectURL(blob));
+          setPdfUrl(URL.createObjectURL(blob) + "#view=FitH");
         } else {
           setPreviewError(result.error);
         }
@@ -503,13 +503,16 @@ function ExportDialogInner({
           <div className="flex-1 overflow-hidden">
             {hasPreviewApi ? (
               /* Electron: real PDF preview via <embed> */
-              <div className="w-full h-full flex items-center justify-center">
-                {previewLoading && !pdfUrl && (
-                  <span className="text-sm text-foreground-tertiary">プレビューを生成中...</span>
-                )}
-                {previewError && <span className="text-sm text-danger">{previewError}</span>}
-                {pdfUrl && <embed src={pdfUrl} type="application/pdf" className="w-full h-full" />}
-              </div>
+              pdfUrl ? (
+                <embed src={pdfUrl} type="application/pdf" className="w-full h-full" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  {previewLoading && (
+                    <span className="text-sm text-foreground-tertiary">プレビューを生成中...</span>
+                  )}
+                  {previewError && <span className="text-sm text-danger">{previewError}</span>}
+                </div>
+              )
             ) : selectedFormat === "pdf" ? (
               /* Web + PDF: info panel with print preview button */
               <div className="flex flex-col items-center justify-center h-full gap-4 px-6">

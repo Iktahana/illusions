@@ -505,9 +505,10 @@ function registerFileHandlers() {
   // cannot accumulate in the dialogApprovedPaths map.
   const { app } = require("electron");
   app.on("web-contents-created", (_event, webContents) => {
+    const wcId = webContents.id;
     webContents.on("destroyed", () => {
-      revokeWindowApprovedPaths(webContents.id);
-      log.debug(`Revoked approved paths for destroyed webContents id=${webContents.id}`);
+      revokeWindowApprovedPaths(wcId);
+      log.debug(`Revoked approved paths for destroyed webContents id=${wcId}`);
     });
   });
 }

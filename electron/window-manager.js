@@ -44,6 +44,7 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      plugins: true,
     },
   });
 

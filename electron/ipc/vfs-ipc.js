@@ -409,8 +409,9 @@ function registerVFSHandlers() {
 
   // Release index locks automatically when a window is destroyed
   app.on("browser-window-created", (_, win) => {
+    const wcId = win.webContents.id;
     win.webContents.on("destroyed", () => {
-      releaseLocksForWindow(win.webContents.id);
+      releaseLocksForWindow(wcId);
     });
   });
 }
