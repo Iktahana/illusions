@@ -377,6 +377,21 @@ function registerFileHandlers() {
 
   // --- Export handlers ---
 
+  ipcMain.handle("generate-pdf-preview", async (_event, content, options) => {
+    if (typeof content !== "string") {
+      return { success: false, error: "Invalid content" };
+    }
+    try {
+      const { generatePdf } = require("../../lib/export/pdf-exporter");
+      const pdfBuffer = await generatePdf(content, options || {});
+      // Return base64-encoded PDF for renderer-side preview
+      return { success: true, data: pdfBuffer.toString("base64") };
+    } catch (error) {
+      log.error("PDF preview generation failed:", error);
+      return { success: false, error: error.message || "PDF preview generation failed" };
+    }
+  });
+
   ipcMain.handle("export-pdf", async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
