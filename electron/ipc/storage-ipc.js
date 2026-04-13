@@ -21,6 +21,9 @@ function registerStorageHandlers() {
 
   // セッション保存
   ipcMain.handle("storage:save-session", async (_event, session) => {
+    if (typeof session !== "object" || session === null) {
+      throw new Error("Invalid session: expected object");
+    }
     try {
       await manager.saveSession(session);
     } catch (error) {
@@ -41,6 +44,9 @@ function registerStorageHandlers() {
 
   // AppState 保存
   ipcMain.handle("storage:save-app-state", async (_event, appState) => {
+    if (typeof appState !== "object" || appState === null) {
+      throw new Error("Invalid appState: expected object");
+    }
     try {
       await manager.saveAppState(appState);
     } catch (error) {
@@ -61,6 +67,14 @@ function registerStorageHandlers() {
 
   // Recent Files 追加
   ipcMain.handle("storage:add-to-recent", async (_event, file) => {
+    if (
+      typeof file !== "object" ||
+      file === null ||
+      typeof file.name !== "string" ||
+      typeof file.path !== "string"
+    ) {
+      throw new Error("Invalid file: expected { name: string, path: string, ... }");
+    }
     try {
       await manager.addToRecent(file);
     } catch (error) {
@@ -81,6 +95,9 @@ function registerStorageHandlers() {
 
   // Recent Files から削除
   ipcMain.handle("storage:remove-from-recent", async (_event, path) => {
+    if (typeof path !== "string") {
+      throw new Error("Invalid path: expected string");
+    }
     try {
       await manager.removeFromRecent(path);
     } catch (error) {
@@ -101,6 +118,9 @@ function registerStorageHandlers() {
 
   // Editor Buffer 保存
   ipcMain.handle("storage:save-editor-buffer", async (_event, buffer) => {
+    if (typeof buffer !== "object" || buffer === null) {
+      throw new Error("Invalid buffer: expected object");
+    }
     try {
       await manager.saveEditorBuffer(buffer);
     } catch (error) {
@@ -141,6 +161,9 @@ function registerStorageHandlers() {
 
   // Recent Projects 追加
   ipcMain.handle("storage:add-recent-project", async (_event, project) => {
+    if (typeof project !== "object" || project === null) {
+      throw new Error("Invalid project: expected object");
+    }
     try {
       await manager.addRecentProject(project);
     } catch (error) {
@@ -161,6 +184,9 @@ function registerStorageHandlers() {
 
   // Recent Projects 削除
   ipcMain.handle("storage:remove-recent-project", async (_event, projectId) => {
+    if (typeof projectId !== "string") {
+      throw new Error("Invalid projectId: expected string");
+    }
     try {
       await manager.removeRecentProject(projectId);
     } catch (error) {
@@ -171,6 +197,9 @@ function registerStorageHandlers() {
 
   // KV Store: set
   ipcMain.handle("storage:set-item", async (_event, key, value) => {
+    if (typeof key !== "string") {
+      throw new Error("Invalid key: expected string");
+    }
     try {
       manager.setItem(key, value);
     } catch (error) {
@@ -181,6 +210,9 @@ function registerStorageHandlers() {
 
   // KV Store: get
   ipcMain.handle("storage:get-item", async (_event, key) => {
+    if (typeof key !== "string") {
+      throw new Error("Invalid key: expected string");
+    }
     try {
       return manager.getItem(key);
     } catch (error) {
@@ -191,6 +223,9 @@ function registerStorageHandlers() {
 
   // KV Store: remove
   ipcMain.handle("storage:remove-item", async (_event, key) => {
+    if (typeof key !== "string") {
+      throw new Error("Invalid key: expected string");
+    }
     try {
       manager.removeItem(key);
     } catch (error) {

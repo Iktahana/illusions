@@ -118,6 +118,9 @@ function isSavePathDenied(normalizedPath) {
 
 const VALID_SAVE_FILE_TYPES = [".mdi", ".md", ".txt"];
 
+/** Maximum allowed content size in bytes (50 MB) */
+const MAX_CONTENT_BYTES = 50 * 1024 * 1024;
+
 /**
  * Validate a file path provided by the renderer for the save-file IPC handler.
  * Returns an error object if validation fails, or null if the path is valid.
@@ -297,6 +300,13 @@ function registerFileHandlers() {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content", code: "INVALID_INPUT" };
     }
+    if (content.length > MAX_CONTENT_BYTES) {
+      return {
+        success: false,
+        error: "ファイルサイズが上限を超えています（50 MB）",
+        code: "CONTENT_TOO_LARGE",
+      };
+    }
     if (fileType != null && !VALID_SAVE_FILE_TYPES.includes(fileType)) {
       return { success: false, error: `Invalid file type: ${fileType}`, code: "INVALID_INPUT" };
     }
@@ -394,6 +404,13 @@ function registerFileHandlers() {
   ipcMain.handle("export-pdf", async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
+    }
+    if (content.length > MAX_CONTENT_BYTES) {
+      return {
+        success: false,
+        error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
+        code: "CONTENT_TOO_LARGE",
+      };
     }
     try {
       const { generatePdf } = require("../../lib/export/pdf-exporter");
@@ -534,6 +551,13 @@ function registerFileHandlers() {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
+    if (content.length > MAX_CONTENT_BYTES) {
+      return {
+        success: false,
+        error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
+        code: "CONTENT_TOO_LARGE",
+      };
+    }
     try {
       const { generateEpub } = require("../../lib/export/epub-exporter");
       const epubBuffer = await generateEpub(content, options || {});
@@ -557,6 +581,13 @@ function registerFileHandlers() {
   ipcMain.handle("export-docx", async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
+    }
+    if (content.length > MAX_CONTENT_BYTES) {
+      return {
+        success: false,
+        error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
+        code: "CONTENT_TOO_LARGE",
+      };
     }
     try {
       const { generateDocx } = require("../../lib/export/docx-exporter");
