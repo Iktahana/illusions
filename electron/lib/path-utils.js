@@ -9,8 +9,8 @@ const path = require("path");
  */
 function toForwardSlash(p) {
   let resolved = path.resolve(p).replace(/\\/g, "/");
-  // Strip Windows extended-path prefixes like //?/ or //./
-  resolved = resolved.replace(/^\/\/[?.]\//, "/");
+  // Strip Windows extended-path prefixes like //?/ or //./  without changing drive/UNC semantics
+  resolved = resolved.replace(/^\/\/[?.]\//, "");
   return resolved;
 }
 
@@ -24,7 +24,7 @@ function toForwardSlash(p) {
  */
 function assertPathInsideRoot(resolvedPath, rootPath) {
   if (resolvedPath.includes("\\")) {
-    throw new Error("Path normalization invariant failed: backslashes remain after normalization");
+    throw new Error("パス正規化エラー: バックスラッシュが残っています");
   }
   if (resolvedPath !== rootPath && !resolvedPath.startsWith(rootPath + "/")) {
     throw new Error("プロジェクトディレクトリの外部へのアクセスは許可されていません");

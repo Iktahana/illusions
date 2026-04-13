@@ -47,7 +47,7 @@ const config: Config = {
           "'YuMincho'",
           "'MS Mincho'",
           "'MS 明朝'",
-          "'serif'",
+          "serif",
         ],
       },
     },

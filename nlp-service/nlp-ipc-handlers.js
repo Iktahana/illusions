@@ -63,7 +63,7 @@ function registerNlpHandlers() {
       return { success: true };
     } catch (error) {
       console.error("[NLP IPC] Init error:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
 
@@ -93,7 +93,7 @@ function registerNlpHandlers() {
    */
   ipcMain.handle("nlp:tokenize-document", async (event, request) => {
     try {
-      const { paragraphs } = request;
+      const { paragraphs, requestId } = request;
 
       if (!Array.isArray(paragraphs) || paragraphs.length > 10_000) {
         throw new Error("Invalid paragraphs parameter");
@@ -118,6 +118,7 @@ function registerNlpHandlers() {
         // Send progress event every 10 paragraphs
         if ((i + 1) % 10 === 0 || i === total - 1) {
           event.sender.send("nlp:tokenize-progress", {
+            requestId,
             completed: i + 1,
             total: total,
             percentage: Math.round(((i + 1) / total) * 100),
