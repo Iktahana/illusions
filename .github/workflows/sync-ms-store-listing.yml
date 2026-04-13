@@ -47,6 +47,7 @@ jobs:
     name: Submit to Microsoft Store (${{ inputs.mode }})
     runs-on: windows-latest
     environment: MicrosoftStore
+    timeout-minutes: 90
     env:
       MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
       MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
@@ -123,6 +124,25 @@ jobs:
           $appxFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
 
       - name: Submit to Microsoft Store
+        shell: bash
         env:
           MSIX_DIR: msix-packages
-        run: node scripts/submit-store.mjs
+        run: |
+          MAX_ATTEMPTS=3
+          RETRY_DELAY=120  # 2 minutes between retries
+
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "=== Attempt $attempt / $MAX_ATTEMPTS ==="
+            if node scripts/submit-store.mjs; then
+              echo "Submission succeeded on attempt $attempt."
+              exit 0
+            fi
+            EXIT_CODE=$?
+            if [ $attempt -lt $MAX_ATTEMPTS ]; then
+              echo "Attempt $attempt failed (exit $EXIT_CODE). Retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+            fi
+          done
+
+          echo "::error::All $MAX_ATTEMPTS submission attempts failed."
+          exit 1
