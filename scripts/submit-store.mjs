@@ -44,7 +44,7 @@ const CLIENT_ID = process.env.MSSTORE_CLIENT_ID;
 const CLIENT_SECRET = process.env.MSSTORE_CLIENT_SECRET;
 const APP_ID = process.env.STORE_PRODUCT_ID;
 const MSIX_DIR = resolve(process.env.MSIX_DIR ?? "msix-packages");
-const POLL_TIMEOUT_MS = Number(process.env.POLL_TIMEOUT_MS ?? 600_000);
+const POLL_TIMEOUT_MS = Number(process.env.POLL_TIMEOUT_MS ?? 1_200_000);
 
 const API_BASE = "https://manage.devcenter.microsoft.com/v1.0/my";
 const STORE_METADATA_DIR = resolve(__dirname, "..", "store", "microsoft", "ja-JP");
@@ -317,7 +317,7 @@ async function uploadPackageToSas(sasUrl, zipPath) {
  */
 async function pollSubmissionStatus(token, submissionId) {
   const start = Date.now();
-  const intervalMs = 15_000;
+  const intervalMs = 30_000;
 
   while (Date.now() - start < POLL_TIMEOUT_MS) {
     const sub = await apiGet(token, `/applications/${APP_ID}/submissions/${submissionId}`);
