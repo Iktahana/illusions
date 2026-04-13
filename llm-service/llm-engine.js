@@ -1,33 +1,33 @@
 // @ts-check
-'use strict';
+"use strict";
 
-const path = require('path');
-const fs = require('fs/promises');
-const { createWriteStream, createReadStream } = require('fs');
-const crypto = require('crypto');
+const path = require("path");
+const fs = require("fs/promises");
+const { createWriteStream, createReadStream } = require("fs");
+const crypto = require("crypto");
 
 // Model registry data (duplicated from TS for CJS compatibility)
 const MODEL_REGISTRY = [
   {
-    id: 'qwen3-0.6b-q8',
-    fileName: 'Qwen3-0.6B-Q8_0.gguf',
-    url: 'https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf',
+    id: "qwen3-0.6b-q8",
+    fileName: "Qwen3-0.6B-Q8_0.gguf",
+    url: "https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf",
     size: 639_446_688,
-    sha256: '9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031',
+    sha256: "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
   },
   {
-    id: 'qwen3-1.7b-q8',
-    fileName: 'Qwen3-1.7B-Q8_0.gguf',
-    url: 'https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf',
+    id: "qwen3-1.7b-q8",
+    fileName: "Qwen3-1.7B-Q8_0.gguf",
+    url: "https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf",
     size: 1_834_426_016,
-    sha256: '061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a',
+    sha256: "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
   },
   {
-    id: 'qwen3-4b-q4km',
-    fileName: 'Qwen3-4B-Q4_K_M.gguf',
-    url: 'https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
+    id: "qwen3-4b-q4km",
+    fileName: "Qwen3-4B-Q4_K_M.gguf",
+    url: "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
     size: 2_497_280_256,
-    sha256: '7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5',
+    sha256: "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
   },
 ];
 
@@ -59,15 +59,15 @@ class LlmEngine {
 
   async init() {
     if (this.#initialized) return;
-    const { app } = require('electron');
-    this.#modelsDir = path.join(app.getPath('userData'), 'models');
+    const { app } = require("electron");
+    this.#modelsDir = path.join(app.getPath("userData"), "models");
     await fs.mkdir(this.#modelsDir, { recursive: true });
     this.#initialized = true;
   }
 
   #ensureInit() {
     if (!this.#initialized || !this.#modelsDir) {
-      throw new Error('LlmEngine not initialized. Call init() first.');
+      throw new Error("LlmEngine not initialized. Call init() first.");
     }
   }
 
@@ -85,30 +85,30 @@ class LlmEngine {
     const results = [];
     for (const entry of MODEL_REGISTRY) {
       const filePath = path.join(this.#modelsDir, entry.fileName);
-      let status = 'not-downloaded';
+      let status = "not-downloaded";
       try {
         const stat = await fs.stat(filePath);
         // Check if file size roughly matches (within 1% tolerance for metadata)
         if (stat.size > 0) {
-          status = 'ready';
+          status = "ready";
         }
       } catch {
         // Check for partial download
         try {
-          await fs.stat(filePath + '.tmp');
-          status = 'downloading';
+          await fs.stat(filePath + ".tmp");
+          status = "downloading";
         } catch {
           // not downloaded
         }
       }
       // Override if currently loaded
       if (this.#modelId === entry.id && this.#model) {
-        status = 'loaded';
+        status = "loaded";
       }
       results.push({
         id: entry.id,
         status,
-        filePath: status === 'ready' || status === 'loaded' ? filePath : undefined,
+        filePath: status === "ready" || status === "loaded" ? filePath : undefined,
       });
     }
     return results;
@@ -123,7 +123,7 @@ class LlmEngine {
     this.#ensureInit();
     const entry = this.#getEntry(modelId);
     const targetPath = path.join(this.#modelsDir, entry.fileName);
-    const tmpPath = targetPath + '.tmp';
+    const tmpPath = targetPath + ".tmp";
 
     // Check if already downloaded
     try {
@@ -144,7 +144,7 @@ class LlmEngine {
 
     const headers = {};
     if (startByte > 0) {
-      headers['Range'] = `bytes=${startByte}-`;
+      headers["Range"] = `bytes=${startByte}-`;
     }
 
     // Download using native fetch (available in Node 18+)
@@ -153,11 +153,11 @@ class LlmEngine {
       throw new Error(`Download failed: HTTP ${response.status}`);
     }
 
-    const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+    const contentLength = parseInt(response.headers.get("content-length") || "0", 10);
     const totalSize = startByte + contentLength;
     let downloaded = startByte;
 
-    const fileStream = createWriteStream(tmpPath, { flags: startByte > 0 ? 'a' : 'w' });
+    const fileStream = createWriteStream(tmpPath, { flags: startByte > 0 ? "a" : "w" });
 
     const reader = response.body.getReader();
     try {
@@ -168,7 +168,7 @@ class LlmEngine {
         const buf = Buffer.from(value);
         if (!fileStream.write(buf)) {
           // Backpressure: wait for drain before reading more
-          await new Promise((resolve) => fileStream.once('drain', resolve));
+          await new Promise((resolve) => fileStream.once("drain", resolve));
         }
         downloaded += value.byteLength;
 
@@ -181,7 +181,7 @@ class LlmEngine {
       }
     } finally {
       fileStream.end();
-      await new Promise((resolve) => fileStream.on('finish', resolve));
+      await new Promise((resolve) => fileStream.on("finish", resolve));
     }
 
     // SHA256 integrity verification — reject empty hashes as a security measure
@@ -189,22 +189,21 @@ class LlmEngine {
       await fs.unlink(tmpPath);
       throw new Error(
         `SHA-256 hash is missing for ${entry.fileName}. ` +
-        'Refusing to accept an unverified model file.'
+          "Refusing to accept an unverified model file.",
       );
     }
-    const hash = crypto.createHash('sha256');
+    const hash = crypto.createHash("sha256");
     await new Promise((resolve, reject) => {
       const stream = createReadStream(tmpPath);
-      stream.on('data', (chunk) => hash.update(chunk));
-      stream.on('end', resolve);
-      stream.on('error', reject);
+      stream.on("data", (chunk) => hash.update(chunk));
+      stream.on("end", resolve);
+      stream.on("error", reject);
     });
-    const digest = hash.digest('hex');
+    const digest = hash.digest("hex");
     if (digest !== entry.sha256) {
       await fs.unlink(tmpPath);
       throw new Error(
-        `SHA-256 mismatch for ${entry.fileName}: ` +
-        `expected ${entry.sha256}, got ${digest}`
+        `SHA-256 mismatch for ${entry.fileName}: ` + `expected ${entry.sha256}, got ${digest}`,
       );
     }
 
@@ -230,7 +229,7 @@ class LlmEngine {
     }
     // Also clean up partial downloads
     try {
-      await fs.unlink(filePath + '.tmp');
+      await fs.unlink(filePath + ".tmp");
     } catch {
       // no partial file
     }
@@ -258,7 +257,7 @@ class LlmEngine {
       }
 
       // Dynamic import for ESM module
-      const { getLlama } = await import('node-llama-cpp');
+      const { getLlama } = await import("node-llama-cpp");
       const llama = await getLlama();
       this.#model = await llama.loadModel({ modelPath });
       this.#context = await this.#model.createContext();
@@ -273,7 +272,7 @@ class LlmEngine {
    */
   async unloadModel() {
     if (this.#inferring > 0 || this.#pendingInfers > 0) {
-      console.log('[LlmEngine] Skipping unload — inference in progress or queued');
+      console.log("[LlmEngine] Skipping unload — inference in progress or queued");
       return;
     }
     if (this.#idleTimer) {
@@ -310,7 +309,7 @@ class LlmEngine {
    */
   async infer(prompt, options = {}) {
     if (!this.#model || !this.#context) {
-      throw new Error('Model not loaded. Call loadModel() first.');
+      throw new Error("Model not loaded. Call loadModel() first.");
     }
 
     this.#pendingInfers++; // synchronous increment before queue entry
@@ -320,7 +319,7 @@ class LlmEngine {
       this.#pendingInfers--; // starting: transfer from pending to active
       // Guard: context may have been disposed between queue entry and execution
       if (!this.#context) {
-        throw new Error('Model was unloaded before inference could start.');
+        throw new Error("Model was unloaded before inference could start.");
       }
 
       this.#inferring++;
@@ -330,7 +329,7 @@ class LlmEngine {
         this.#idleTimer = null;
       }
 
-      const { LlamaChatSession } = await import('node-llama-cpp');
+      const { LlamaChatSession } = await import("node-llama-cpp");
       const sequence = this.#context.getSequence();
       const session = new LlamaChatSession({
         contextSequence: sequence,
@@ -342,7 +341,9 @@ class LlmEngine {
       try {
         const text = await session.prompt(prompt, {
           maxTokens,
-          onToken: () => { tokenCount++; },
+          onToken: () => {
+            tokenCount++;
+          },
         });
         return { text, tokenCount };
       } finally {
@@ -404,7 +405,7 @@ class LlmEngine {
     this.#idleTimer = setTimeout(async () => {
       this.#idleTimer = null;
       if (this.isLoaded()) {
-        console.log('[LlmEngine] Idle timeout — unloading model');
+        console.log("[LlmEngine] Idle timeout — unloading model");
         await this.unloadModel();
       }
     }, this.#IDLE_TIMEOUT_MS);
