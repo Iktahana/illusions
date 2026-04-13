@@ -92,7 +92,8 @@ export default function TerminalSettingsTab(): React.ReactElement {
             className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent placeholder:text-foreground-muted"
           />
           <p className="text-xs text-foreground-tertiary mt-1">
-            絶対パス（例: C:\Windows\System32\cmd.exe）またはShell名（例: powershell、pwsh、cmd、bash、zsh）を入力できます。空欄の場合はシステムのデフォルトShellを使用します。
+            絶対パス（例: C:\Windows\System32\cmd.exe）またはShell名（例:
+            powershell、pwsh、cmd、bash、zsh）を入力できます。空欄の場合はシステムのデフォルトShellを使用します。
           </p>
         </div>
 

@@ -260,10 +260,13 @@ function registerPtyHandlers() {
     // Resolve shell: bare names (e.g. "powershell.exe") are resolved to absolute paths
     let shell;
     try {
-      const rawShell = (typeof options.shell === "string" && options.shell) || resolveDefaultShell();
+      const rawShell =
+        (typeof options.shell === "string" && options.shell) || resolveDefaultShell();
       shell = resolveShellPath(rawShell);
     } catch (err) {
-      return { error: err instanceof Error ? err.message : `Shellが見つかりません: ${options.shell}` };
+      return {
+        error: err instanceof Error ? err.message : `Shellが見つかりません: ${options.shell}`,
+      };
     }
     if (!shellExists(shell)) {
       return { error: `Shellが見つかりません: ${shell}` };
