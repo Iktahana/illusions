@@ -133,11 +133,12 @@ jobs:
 
           for attempt in $(seq 1 $MAX_ATTEMPTS); do
             echo "=== Attempt $attempt / $MAX_ATTEMPTS ==="
-            if node scripts/submit-store.mjs; then
+            node scripts/submit-store.mjs
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -eq 0 ]; then
               echo "Submission succeeded on attempt $attempt."
               exit 0
             fi
-            EXIT_CODE=$?
             if [ $attempt -lt $MAX_ATTEMPTS ]; then
               echo "Attempt $attempt failed (exit $EXIT_CODE). Retrying in ${RETRY_DELAY}s..."
               sleep $RETRY_DELAY
