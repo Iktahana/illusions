@@ -78,6 +78,7 @@ reviews/
 .claude/review-loop.log
 .claude/*.local.md
 .claude/settings.local.json
+.claude/*.lock
 
 # auto-generated files
 /generated/

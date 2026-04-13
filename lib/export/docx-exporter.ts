@@ -13,7 +13,9 @@ import {
   HeadingLevel,
   AlignmentType,
   Footer,
+  Header,
   PageNumber,
+  TextDirection,
 } from "docx";
 import type { ExportMetadata } from "./types";
 import { replaceMdiWithRubyText } from "./mdi-parser";
@@ -50,25 +52,60 @@ function buildDocxDocument(content: string, options: DocxExportOptions): Documen
   const pageWidth = settings.landscape ? baseDims.height : baseDims.width;
   const pageHeight = settings.landscape ? baseDims.width : baseDims.height;
 
-  // Footer with centered page number
-  const footers = settings.showPageNumbers
-    ? {
-        default: new Footer({
-          children: [
-            new Paragraph({
-              alignment: AlignmentType.CENTER,
-              children: [
-                new TextRun({
-                  children: [PageNumber.CURRENT],
-                  font: fontConfig,
-                  size: ptToHalfPoints(settings.fontSize - 2),
-                }),
-              ],
-            }),
-          ],
-        }),
-      }
-    : undefined;
+  // Page number header/footer
+  let headers: { default: Header } | undefined;
+  let footers: { default: Footer } | undefined;
+
+  if (settings.showPageNumbers) {
+    const format = settings.pageNumberFormat ?? "simple";
+    const position = settings.pageNumberPosition ?? "bottom-center";
+
+    // Determine alignment
+    const alignMap: Record<string, (typeof AlignmentType)[keyof typeof AlignmentType]> = {
+      left: AlignmentType.LEFT,
+      center: AlignmentType.CENTER,
+      right: AlignmentType.RIGHT,
+    };
+    const alignKey = position.endsWith("-left")
+      ? "left"
+      : position.endsWith("-right")
+        ? "right"
+        : "center";
+    const alignment = alignMap[alignKey];
+
+    // Build page number content based on format
+    const runSize = ptToHalfPoints(settings.fontSize - 2);
+    const children: TextRun[] = [];
+    switch (format) {
+      case "dash":
+        children.push(
+          new TextRun({ text: "- ", font: fontConfig, size: runSize }),
+          new TextRun({ children: [PageNumber.CURRENT], font: fontConfig, size: runSize }),
+          new TextRun({ text: " -", font: fontConfig, size: runSize }),
+        );
+        break;
+      case "fraction":
+        children.push(
+          new TextRun({ children: [PageNumber.CURRENT], font: fontConfig, size: runSize }),
+          new TextRun({ text: " / ", font: fontConfig, size: runSize }),
+          new TextRun({ children: [PageNumber.TOTAL_PAGES], font: fontConfig, size: runSize }),
+        );
+        break;
+      default:
+        children.push(
+          new TextRun({ children: [PageNumber.CURRENT], font: fontConfig, size: runSize }),
+        );
+        break;
+    }
+
+    const paragraph = new Paragraph({ alignment, children });
+
+    if (position.startsWith("top-")) {
+      headers = { default: new Header({ children: [paragraph] }) };
+    } else {
+      footers = { default: new Footer({ children: [paragraph] }) };
+    }
+  }
 
   return new Document({
     creator: metadata.author || "",
@@ -89,6 +126,7 @@ function buildDocxDocument(content: string, options: DocxExportOptions): Documen
     },
     sections: [
       {
+        ...(headers ? { headers } : {}),
         ...(footers ? { footers } : {}),
         properties: {
           page: {
@@ -103,6 +141,9 @@ function buildDocxDocument(content: string, options: DocxExportOptions): Documen
               right: mmToTwips(settings.margins.right),
             },
             ...(settings.showPageNumbers ? { pageNumbers: { start: 1 } } : {}),
+            ...(settings.verticalWriting
+              ? { textDirection: TextDirection.TOP_TO_BOTTOM_RIGHT_TO_LEFT }
+              : {}),
           },
         },
         children: paragraphs,

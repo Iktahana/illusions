@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode, MouseEvent } from "react";
+import { useEffect, type ReactNode, type MouseEvent } from "react";
 
 interface GlassDialogProps {
   isOpen: boolean;
@@ -23,6 +23,7 @@ const DEFAULT_PANEL = "mx-4 w-full max-w-md p-6";
 /**
  * Reusable frosted-glass modal dialog.
  * Provides a blurred backdrop overlay and a glassmorphism panel.
+ * Pressing Escape closes the dialog (when onBackdropClick is provided).
  */
 export default function GlassDialog({
   isOpen,
@@ -31,6 +32,15 @@ export default function GlassDialog({
   panelClassName,
   children,
 }: GlassDialogProps) {
+  useEffect(() => {
+    if (!isOpen || !onBackdropClick) return;
+    function handleEscape(e: KeyboardEvent): void {
+      if (e.key === "Escape") onBackdropClick!();
+    }
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isOpen, onBackdropClick]);
+
   if (!isOpen) return null;
 
   function handleBackdropClick(e: MouseEvent<HTMLDivElement>): void {

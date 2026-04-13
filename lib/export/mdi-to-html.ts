@@ -8,6 +8,9 @@
 
 import MarkdownIt from "markdown-it";
 
+import { PAGE_DIMENSIONS } from "./pdf-export-settings";
+
+import type { ExportPageSize } from "./export-settings";
 import type { ExportMetadata, Chapter } from "./types";
 import {
   MDI_RUBY_RE,
@@ -173,6 +176,10 @@ export interface MdiStylesheetOptions {
   textIndentEm?: number;
   /** Page margins in mm */
   margins?: { top: number; bottom: number; left: number; right: number };
+  /** Page size for @page CSS rule (drives browser print dialog paper selection) */
+  pageSize?: ExportPageSize;
+  /** Landscape orientation for @page CSS rule */
+  landscape?: boolean;
 }
 
 /**
@@ -218,10 +225,20 @@ export function getMdiStylesheet(options?: MdiStylesheetOptions): string {
     rules.push(`p { text-indent: ${options.textIndentEm}em; }`);
   }
 
-  // @page margins for printToPDF
+  // @page rule: margins + page size (combined into one rule to avoid browser merge issues)
+  const pageDecls: string[] = [];
   if (options?.margins) {
     const { top, bottom, left, right } = options.margins;
-    rules.push(`@page { margin: ${top}mm ${right}mm ${bottom}mm ${left}mm; }`);
+    pageDecls.push(`margin: ${top}mm ${right}mm ${bottom}mm ${left}mm`);
+  }
+  if (options?.pageSize) {
+    const dims = PAGE_DIMENSIONS[options.pageSize] ?? PAGE_DIMENSIONS["A4"];
+    const w = options.landscape ? dims.height : dims.width;
+    const h = options.landscape ? dims.width : dims.height;
+    pageDecls.push(`size: ${w}mm ${h}mm`);
+  }
+  if (pageDecls.length > 0) {
+    rules.push(`@page { ${pageDecls.join("; ")}; }`);
   }
 
   return rules.join("\n");
@@ -244,6 +261,8 @@ export function mdiToHtml(
     verticalWriting?: boolean;
     bodyOnly?: boolean;
     typesetting?: Omit<MdiStylesheetOptions, "verticalWriting">;
+    /** Google Font family name to inject as <link> tag (e.g. "Noto Serif JP") */
+    googleFontFamily?: string;
   },
 ): string {
   const md = createMarkdownIt();
@@ -266,11 +285,17 @@ export function mdiToHtml(
   });
 
   // Build <meta> tags for optional metadata
-  // Include a strict CSP to block script execution in export output
+  // Include a strict CSP to block script execution in export output.
+  // When a Google Font is requested, allow external stylesheet and font sources.
+  const hasGoogleFont = !!options?.googleFontFamily;
+  const styleSrc = hasGoogleFont
+    ? "style-src 'unsafe-inline' https://fonts.googleapis.com"
+    : "style-src 'unsafe-inline'";
+  const fontSrc = hasGoogleFont ? " font-src https://fonts.gstatic.com;" : "";
   const metaTags: string[] = [
     '<meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self';">`,
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; ${styleSrc}; img-src 'self';${fontSrc}">`,
   ];
 
   if (options?.metadata?.author) {
@@ -281,12 +306,18 @@ export function mdiToHtml(
     metaTags.push(`<meta name="date" content="${escapeHtmlAttr(options.metadata.date)}">`);
   }
 
+  // Google Font <link> tag
+  const googleFontLink = hasGoogleFont
+    ? `  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(options!.googleFontFamily!)}&display=swap">`
+    : "";
+
   return [
     "<!DOCTYPE html>",
     `<html lang="${escapeHtmlAttr(lang)}">`,
     "<head>",
     ...metaTags.map((tag) => `  ${tag}`),
     `  <title>${escapeHtml(title)}</title>`,
+    ...(googleFontLink ? [googleFontLink] : []),
     "  <style>",
     `    ${stylesheet.split("\n").join("\n    ")}`,
     "  </style>",
@@ -356,22 +387,21 @@ export function splitIntoChapters(markdown: string): Chapter[] {
   return chapters;
 }
 
-/** Known safe font-family values. Used to validate user-selected fonts. */
-const ALLOWED_FONT_FAMILIES = new Set([
-  "serif",
-  "sans-serif",
-  '"游明朝", "Yu Mincho", serif',
-  '"ヒラギノ明朝 ProN", "Hiragino Mincho ProN", serif',
-  '"Noto Serif JP", serif',
-  '"游ゴシック", "Yu Gothic", sans-serif',
-]);
-
 /**
  * Sanitize a font-family CSS value.
- * Returns the value only if it matches a known safe font, otherwise falls back to "serif".
+ *
+ * Accepts generic families, quoted font names (e.g. `"Noto Serif JP", serif`),
+ * and bare font family names. Rejects values containing dangerous CSS characters.
+ * Falls back to "serif" for truly unknown/malicious values.
  */
 function sanitizeFontFamily(value: string): string {
-  return ALLOWED_FONT_FAMILIES.has(value) ? value : "serif";
+  if (!value) return "serif";
+  // Allow generic CSS families
+  if (value === "serif" || value === "sans-serif" || value === "monospace") return value;
+  // Reject values with dangerous CSS characters (semicolons, braces, url(), etc.)
+  if (/[;{}()]|url\s*\(/i.test(value)) return "serif";
+  // Accept any quoted font name or comma-separated list
+  return value;
 }
 
 /**

@@ -198,7 +198,9 @@ function getSnapshotDisplayName(
 
 function makeSnapshotStorageLabel(sourcePath: string, displayName: string): string {
   const normalizedPath = sourcePath.replace(/\\/g, "/");
-  const pathLabel = normalizedPath.replace(/[\\/]/g, "__");
+  // Replace all characters that are invalid in Windows filenames:
+  // \ / : * ? " < > |
+  const pathLabel = normalizedPath.replace(/[\\/:<>"|?*]/g, "__");
   return pathLabel || displayName;
 }
 

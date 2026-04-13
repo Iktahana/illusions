@@ -13,23 +13,35 @@ export type DocxPageSize = "A4" | "A5" | "B5" | "B6";
 export interface DocxExportSettings {
   pageSize: DocxPageSize;
   landscape: boolean;
+  verticalWriting: boolean;
   fontFamily: string;
   fontSize: number;
   lineSpacing: number;
   margins: { top: number; bottom: number; left: number; right: number };
   textIndent: number;
   showPageNumbers: boolean;
+  pageNumberFormat: "simple" | "dash" | "fraction";
+  pageNumberPosition:
+    | "bottom-left"
+    | "bottom-center"
+    | "bottom-right"
+    | "top-left"
+    | "top-center"
+    | "top-right";
 }
 
 export const DEFAULT_DOCX_SETTINGS: DocxExportSettings = {
   pageSize: "A5",
   landscape: false,
+  verticalWriting: false,
   fontFamily: "Yu Mincho",
   fontSize: 12,
   lineSpacing: 1.5,
   margins: { top: 20, bottom: 20, left: 20, right: 20 },
   textIndent: 1,
   showPageNumbers: false,
+  pageNumberFormat: "simple",
+  pageNumberPosition: "bottom-center",
 };
 
 /** Office font descriptor for docx library's run font property */
@@ -104,6 +116,8 @@ export function sanitizeSettings(raw: Partial<DocxExportSettings>): DocxExportSe
   return {
     pageSize,
     landscape: typeof raw.landscape === "boolean" ? raw.landscape : d.landscape,
+    verticalWriting:
+      typeof raw.verticalWriting === "boolean" ? raw.verticalWriting : d.verticalWriting,
     fontFamily:
       typeof raw.fontFamily === "string" && raw.fontFamily ? raw.fontFamily : d.fontFamily,
     fontSize: typeof raw.fontSize === "number" ? clamp(raw.fontSize, 8, 20) : d.fontSize,
@@ -130,6 +144,23 @@ export function sanitizeSettings(raw: Partial<DocxExportSettings>): DocxExportSe
     textIndent: typeof raw.textIndent === "number" ? clamp(raw.textIndent, 0, 4) : d.textIndent,
     showPageNumbers:
       typeof raw.showPageNumbers === "boolean" ? raw.showPageNumbers : d.showPageNumbers,
+    pageNumberFormat: (["simple", "dash", "fraction"] as const).includes(
+      raw.pageNumberFormat as "simple" | "dash" | "fraction",
+    )
+      ? (raw.pageNumberFormat as "simple" | "dash" | "fraction")
+      : d.pageNumberFormat,
+    pageNumberPosition: (
+      [
+        "bottom-left",
+        "bottom-center",
+        "bottom-right",
+        "top-left",
+        "top-center",
+        "top-right",
+      ] as const
+    ).includes(raw.pageNumberPosition as DocxExportSettings["pageNumberPosition"])
+      ? (raw.pageNumberPosition as DocxExportSettings["pageNumberPosition"])
+      : d.pageNumberPosition,
   };
 }
 

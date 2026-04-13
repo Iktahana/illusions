@@ -137,15 +137,15 @@ export function FontSelector({ value, onChange }: FontSelectorProps) {
 
           {/* Font list */}
           <div className="overflow-y-auto">
-            {/* System fonts (Electron only) */}
-            {systemFiltered.length > 0 && (
+            {/* Featured */}
+            {featuredFiltered.length > 0 && (
               <>
                 {!searchTerm && (
                   <div className="px-3 py-1 text-xs font-semibold text-foreground-tertiary bg-background-secondary sticky top-0">
-                    ローカル
+                    おすすめ
                   </div>
                 )}
-                {systemFiltered.map((font) => (
+                {featuredFiltered.map((font) => (
                   <button
                     key={font.family}
                     type="button"
@@ -163,13 +163,15 @@ export function FontSelector({ value, onChange }: FontSelectorProps) {
               </>
             )}
 
-            {/* Featured */}
-            {featuredFiltered.length > 0 && (
+            {/* System fonts (Electron only) */}
+            {systemFiltered.length > 0 && (
               <>
-                <div className="px-3 py-1 text-xs font-semibold text-foreground-tertiary bg-background-secondary sticky top-0">
-                  おすすめ
-                </div>
-                {featuredFiltered.map((font) => (
+                {!searchTerm && (
+                  <div className="px-3 py-1 text-xs font-semibold text-foreground-tertiary bg-background-secondary sticky top-0">
+                    ローカル
+                  </div>
+                )}
+                {systemFiltered.map((font) => (
                   <button
                     key={font.family}
                     type="button"

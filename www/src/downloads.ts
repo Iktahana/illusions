@@ -94,6 +94,20 @@ function formatDate(isoDate: string): string {
   });
 }
 
+/** Async Windows architecture detection using User-Agent Client Hints (Chromium 93+) */
+async function detectWindowsArch(): Promise<"x64" | "arm64" | "unknown"> {
+  try {
+    if (typeof navigator !== "undefined" && navigator.userAgentData) {
+      const ua = await navigator.userAgentData.getHighEntropyValues(["architecture"]);
+      if (ua.architecture === "arm") return "arm64";
+      if (ua.architecture === "x86") return "x64";
+    }
+  } catch {
+    // Client Hints unavailable or permission denied — fall through
+  }
+  return "unknown";
+}
+
 /** Determine platform label for a given asset filename */
 function classifyAsset(name: string): { platform: string; label: string } | null {
   const lower = name.toLowerCase();
@@ -112,15 +126,27 @@ function classifyAsset(name: string): { platform: string; label: string } | null
     return { platform: "macos", label: "macOS (Intel / .zip)" };
   }
 
-  // Windows
+  // Windows – distinguish ARM64 vs x64 installers
   if (lower.endsWith(".exe")) {
+    const isArm64 = /arm64/i.test(name);
     if (lower.includes("setup") || lower.includes("install")) {
-      return { platform: "windows", label: "Windows (インストーラー / .exe)" };
+      return {
+        platform: "windows",
+        label: isArm64
+          ? "Windows ARM64 (インストーラー / .exe)"
+          : "Windows x64 (インストーラー / .exe)",
+      };
     }
-    return { platform: "windows", label: "Windows (.exe)" };
+    return {
+      platform: "windows",
+      label: isArm64 ? "Windows ARM64 (.exe)" : "Windows x64 (.exe)",
+    };
   }
   if (lower.endsWith(".msi")) {
-    return { platform: "windows", label: "Windows (.msi)" };
+    return {
+      platform: "windows",
+      label: /arm64/i.test(name) ? "Windows ARM64 (.msi)" : "Windows x64 (.msi)",
+    };
   }
   if (lower.endsWith(".msix")) {
     return { platform: "windows", label: "Windows (.msix)" };
@@ -237,8 +263,13 @@ function detectArch(): "arm64" | "x64" | "unknown" {
   return "unknown";
 }
 
-/** Pick the single best download asset for the user's detected platform + arch */
-function findBestAsset(platforms: Map<string, PlatformInfo>): DownloadAsset | null {
+/** Pick the single best download asset for the user's detected platform + arch.
+ *  @param windowsArch - Pre-detected Windows architecture; only used when os === "windows".
+ */
+function findBestAsset(
+  platforms: Map<string, PlatformInfo>,
+  windowsArch: "x64" | "arm64" | "unknown" = "unknown",
+): DownloadAsset | null {
   const os = detectOS();
   const platform = platforms.get(os);
   if (!platform || platform.assets.length === 0) return null;
@@ -261,17 +292,48 @@ function findBestAsset(platforms: Map<string, PlatformInfo>): DownloadAsset | nu
   }
 
   if (os === "windows") {
-    // Prefer Setup.exe installer, then any .exe, then .msi
-    const setupExe = platform.assets.find((a) => {
+    const isArm64Asset = (a: DownloadAsset): boolean => /arm64/i.test(a.name);
+
+    // Gather installer candidates by arch
+    const arm64Installers = platform.assets.filter((a) => {
       const lower = a.name.toLowerCase();
-      return lower.endsWith(".exe") && (lower.includes("setup") || lower.includes("install"));
+      return (
+        isArm64Asset(a) &&
+        lower.endsWith(".exe") &&
+        (lower.includes("setup") || lower.includes("install"))
+      );
     });
-    if (setupExe) return setupExe;
-    const exe = platform.assets.find((a) => a.name.toLowerCase().endsWith(".exe"));
-    if (exe) return exe;
-    const msi = platform.assets.find((a) => a.name.toLowerCase().endsWith(".msi"));
-    if (msi) return msi;
-    return platform.assets[0];
+    const x64Installers = platform.assets.filter((a) => {
+      const lower = a.name.toLowerCase();
+      return (
+        !isArm64Asset(a) &&
+        lower.endsWith(".exe") &&
+        (lower.includes("setup") || lower.includes("install"))
+      );
+    });
+    const arm64Exes = platform.assets.filter(
+      (a) => isArm64Asset(a) && a.name.toLowerCase().endsWith(".exe"),
+    );
+    const x64Exes = platform.assets.filter(
+      (a) => !isArm64Asset(a) && a.name.toLowerCase().endsWith(".exe"),
+    );
+
+    if (windowsArch === "arm64") {
+      // ARM64 device: prefer ARM64 installer, fall back to x64 (runs via emulation)
+      return (
+        arm64Installers[0] ?? arm64Exes[0] ?? x64Installers[0] ?? x64Exes[0] ?? platform.assets[0]
+      );
+    }
+
+    // x64 or unknown: prefer x64 installer, fall back to arm64 if none exist
+    return (
+      x64Installers[0] ??
+      x64Exes[0] ??
+      arm64Installers[0] ??
+      arm64Exes[0] ??
+      platform.assets.find((a) => a.name.toLowerCase().endsWith(".msi")) ??
+      platform.assets[0]
+    );
   }
 
   if (os === "linux") {
@@ -287,7 +349,10 @@ function findBestAsset(platforms: Map<string, PlatformInfo>): DownloadAsset | nu
 }
 
 /** Icon SVG + label for the hero button */
-function heroButtonInfo(asset: DownloadAsset): { icon: string; label: string } {
+function heroButtonInfo(
+  asset: DownloadAsset,
+  windowsArch: "x64" | "arm64" | "unknown" = "unknown",
+): { icon: string; label: string } {
   const os = detectOS();
   if (os === "macos") {
     const arch = detectArch();
@@ -295,13 +360,16 @@ function heroButtonInfo(asset: DownloadAsset): { icon: string; label: string } {
     const label = chipLabel ? `macOS (${chipLabel}) 版をダウンロード` : "macOS 版をダウンロード";
     return { icon: iconApple, label };
   }
-  if (os === "windows") return { icon: iconWindows, label: "Windows 版をダウンロード" };
+  if (os === "windows") {
+    const archLabel = windowsArch === "arm64" ? " ARM64" : windowsArch === "x64" ? " x64" : "";
+    return { icon: iconWindows, label: `Windows${archLabel} 版をダウンロード` };
+  }
   if (os === "linux") return { icon: iconLinux, label: "Linux 版をダウンロード" };
   return { icon: "", label: asset.label };
 }
 
 /** Render the downloads page */
-function renderPage(release: GitHubRelease | null, error: string | null): void {
+async function renderPage(release: GitHubRelease | null, error: string | null): Promise<void> {
   const app = document.querySelector<HTMLDivElement>("#app")!;
 
   if (error) {
@@ -312,7 +380,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
         <h1 class="page-title">ダウンロード</h1>
         <div class="error-card">
           <p>リリース情報の取得に失敗しました。</p>
-          <p class="error-detail">${error}</p>
+          <p class="error-detail">${esc(error)}</p>
           <a href="https://github.com/${REPO}/releases" class="btn btn-secondary" target="_blank" rel="noopener">
             GitHubで直接確認する →
           </a>
@@ -339,7 +407,8 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
 
   const platforms = groupByPlatform(release.assets);
   const currentOS = detectOS();
-  const bestAsset = findBestAsset(platforms);
+  const windowsArch = currentOS === "windows" ? await detectWindowsArch() : "unknown";
+  const bestAsset = findBestAsset(platforms, windowsArch);
 
   // Sort: current OS first
   const sortOrder = ["macos", "windows", "linux"];
@@ -376,7 +445,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
           (asset) => `
         <a href="${safeUrl(asset.url)}" class="download-item" data-platform="${key}" data-filename="${esc(asset.name)}" download>
           <div class="download-item-info">
-            <span class="download-item-label">${asset.label}</span>
+            <span class="download-item-label">${esc(asset.label)}</span>
             <span class="download-item-filename">${esc(asset.name)}</span>
           </div>
           <div class="download-item-meta">
@@ -423,7 +492,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
       };
     }
     if (!bestAsset) return null;
-    const { icon, label } = heroButtonInfo(bestAsset);
+    const { icon, label } = heroButtonInfo(bestAsset, windowsArch);
     return {
       href: bestAsset.url,
       label,
@@ -438,7 +507,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
       <div class="hero-download">
         <a href="${safeUrl(heroCta.href)}" class="btn-hero-download" data-platform="${currentOS}" data-filename="${heroCta.isExternal ? "Microsoft Store" : esc(bestAsset?.name || "unknown")}" ${heroCta.isExternal ? 'target="_blank" rel="noopener noreferrer"' : "download"}>
           <span class="btn-hero-download-icon">${heroCta.icon}</span>
-          <span class="btn-hero-download-label">${heroCta.label}</span>
+          <span class="btn-hero-download-label">${esc(heroCta.label)}</span>
           ${heroCta.meta ? `<span class="btn-hero-download-meta">${esc(heroCta.meta)}</span>` : ""}
         </a>
         <p class="hero-download-hint">他のプラットフォームは下記をご覧ください</p>
@@ -549,7 +618,7 @@ function saveCache(data: GitHubRelease): void {
 
 // Stale-while-revalidate: render cached data immediately, then refresh in background
 const cached = loadCache();
-renderPage(cached, null);
+void renderPage(cached, null);
 
 fetch(API_URL, { headers: { Accept: "application/vnd.github.v3+json" } })
   .then(async (res) => {
@@ -564,10 +633,10 @@ fetch(API_URL, { headers: { Accept: "application/vnd.github.v3+json" } })
     }
     const data = (await res.json()) as GitHubRelease;
     saveCache(data);
-    renderPage(data, null);
+    await renderPage(data, null);
   })
-  .catch((err: Error) => {
+  .catch(async (err: Error) => {
     if (!cached) {
-      renderPage(null, err.message);
+      await renderPage(null, err.message);
     }
   });

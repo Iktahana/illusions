@@ -8,6 +8,7 @@ const { ipcMain, dialog, app, BrowserWindow, webContents } = require("electron")
 const fs = require("fs/promises");
 const path = require("path");
 const os = require("os");
+const { toForwardSlash, assertPathInsideRoot } = require("../lib/path-utils");
 
 function registerVFSHandlers() {
   // Track the opened root directory per window for path validation
@@ -56,22 +57,12 @@ function registerVFSHandlers() {
     if (!allowedRoot) {
       throw new Error("ディレクトリが開かれていません");
     }
-    // Normalize the incoming path to use forward slashes to avoid issues with
-    // mixed path separators on Windows (which can cause path.resolve to misbehave)
-    const normalizedInput = requestedPath.replace(/\\/g, "/");
-    const resolved = path.resolve(normalizedInput);
-
-    // Normalize paths for consistent comparison across platforms
-    const normalizedResolved = normalizePath(resolved);
+    // Normalize the incoming path to forward slashes, resolving any traversal segments
+    const normalizedResolved = toForwardSlash(requestedPath);
     const normalizedRoot = normalizePath(allowedRoot);
 
-    if (
-      normalizedResolved !== normalizedRoot &&
-      !normalizedResolved.startsWith(normalizedRoot + "/")
-    ) {
-      throw new Error("プロジェクトディレクトリの外部へのアクセスは許可されていません");
-    }
-    return resolved;
+    assertPathInsideRoot(normalizedResolved, normalizedRoot);
+    return normalizedResolved;
   }
 
   // Open directory picker
@@ -210,6 +201,24 @@ function registerVFSHandlers() {
   });
 
   /**
+   * Return Windows system directory deny prefixes based on the actual system drive.
+   * Uses the SystemRoot environment variable so the correct drive letter is detected
+   * even on non-C: installations.
+   * @returns {string[]}
+   */
+  function getWindowsDenyPrefixes() {
+    if (process.platform !== "win32") return [];
+    const sysRoot = (process.env.SystemRoot ?? "C:\\Windows").replace(/\\/g, "/");
+    const sysDrive = sysRoot.split("/")[0];
+    return [
+      `${sysDrive}/Windows`,
+      `${sysDrive}/Program Files`,
+      `${sysDrive}/Program Files (x86)`,
+      `${sysDrive}/ProgramData`,
+    ];
+  }
+
+  /**
    * Check if a path is in the system-sensitive denylist.
    * Prevents access to critical system directories and credential stores.
    *
@@ -239,7 +248,7 @@ function registerVFSHandlers() {
     const driveLetterMatch = normalizedPath.match(/^([a-zA-Z]):?\/?$/);
     if (driveLetterMatch) return true; // Bare drive root (C:/ or C:)
 
-    const windowsDenyPrefixes = ["C:/Windows", "C:/Program Files", "C:/Program Files (x86)"];
+    const windowsDenyPrefixes = getWindowsDenyPrefixes();
 
     // Sensitive directories within home
     const homeSensitiveSuffixes = [
@@ -250,6 +259,10 @@ function registerVFSHandlers() {
       "/.docker",
       "/.config/gcloud",
       "/Library/Keychains",
+      // Windows (forward-slash normalized)
+      "/AppData/Roaming/Microsoft/Credentials",
+      "/AppData/Roaming/Microsoft/Protect",
+      "/AppData/Local/Microsoft/Credentials",
     ];
 
     // Treat denied roots as prefixes — block any nested path under them
@@ -409,8 +422,9 @@ function registerVFSHandlers() {
 
   // Release index locks automatically when a window is destroyed
   app.on("browser-window-created", (_, win) => {
+    const wcId = win.webContents.id;
     win.webContents.on("destroyed", () => {
-      releaseLocksForWindow(win.webContents.id);
+      releaseLocksForWindow(wcId);
     });
   });
 }

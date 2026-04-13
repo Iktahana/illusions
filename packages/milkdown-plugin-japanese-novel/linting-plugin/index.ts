@@ -78,6 +78,13 @@ export function updateLintingSettings(
   if (reason !== undefined) {
     meta.changeReason = reason;
   }
-  const tr = view.state.tr.setMeta(lintingKey, meta);
-  view.dispatch(tr);
+  try {
+    const tr = view.state.tr.setMeta(lintingKey, meta);
+    view.dispatch(tr);
+  } catch (err: unknown) {
+    // Milkdown throws "Context ... not found" when the editor is destroyed or not yet initialized.
+    // Only suppress that specific error; let unexpected failures propagate.
+    const msg = err instanceof Error ? err.message : "";
+    if (!msg.includes("not found")) throw err;
+  }
 }

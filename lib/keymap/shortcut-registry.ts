@@ -28,6 +28,13 @@ export const SHORTCUT_REGISTRY: Record<CommandId, ShortcutEntry> = {
     defaultBinding: { modifiers: ["CmdOrCtrl"], key: "o" },
     scope: "all",
   },
+  "file.print": {
+    id: "file.print",
+    label: "印刷",
+    category: "file",
+    defaultBinding: { modifiers: ["CmdOrCtrl"], key: "p" },
+    scope: "all",
+  },
   "file.newWindow": {
     id: "file.newWindow",
     label: "新規ウィンドウ",

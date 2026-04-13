@@ -18,6 +18,7 @@ import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence"
 import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
+import { openWebPrintPreview } from "@/lib/export/web-print-preview";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
@@ -499,6 +500,17 @@ export default function EditorPage() {
   const [exportDialogState, setExportDialogState] = useState<ExportDialogState | null>(null);
   const exportDialogStateRef = useRef<ExportDialogState | null>(null);
 
+  // Print dialog state
+  interface PrintDialogState {
+    content: string;
+    metadata: ExportMetadata;
+  }
+  const [printDialogState, setPrintDialogState] = useState<PrintDialogState | null>(null);
+
+  const handlePrintDialogRequest = useCallback((content: string, metadata: ExportMetadata) => {
+    setPrintDialogState({ content, metadata });
+  }, []);
+
   const handleExportDialogRequest = useCallback(
     (format: "pdf" | "docx", content: string, metadata: ExportMetadata) => {
       const state: ExportDialogState = { format, content, metadata };
@@ -509,86 +521,190 @@ export default function EditorPage() {
   );
 
   const handlePdfExportConfirm = useCallback(async (settings: PdfExportSettings) => {
-    setExportDialogState(null);
-
-    if (!window.electronAPI?.exportPDF) {
-      notificationManager.error("PDFエクスポートはデスクトップアプリでのみ利用可能です");
-      return;
-    }
-
     const dialogState = exportDialogStateRef.current;
     if (!dialogState) return;
 
-    const progressId = notificationManager.showProgress("PDFをエクスポート中...", {
-      type: "info",
-    });
+    // Electron path: use IPC
+    if (window.electronAPI?.exportPDF) {
+      setExportDialogState(null);
 
-    try {
-      const result = await window.electronAPI.exportPDF(dialogState.content, {
-        metadata: dialogState.metadata,
-        verticalWriting: settings.verticalWriting,
-        pageSize: settings.pageSize,
-        landscape: settings.landscape,
-        margins: settings.margins,
-        charsPerLine: settings.charsPerLine,
-        linesPerPage: settings.linesPerPage,
-        fontFamily: settings.fontFamily,
-        showPageNumbers: settings.showPageNumbers,
-        textIndent: settings.textIndent,
+      const progressId = notificationManager.showProgress("PDFをエクスポート中...", {
+        type: "info",
       });
 
-      notificationManager.dismiss(progressId);
+      try {
+        const result = await window.electronAPI.exportPDF(dialogState.content, {
+          metadata: dialogState.metadata,
+          verticalWriting: settings.verticalWriting,
+          pageSize: settings.pageSize,
+          landscape: settings.landscape,
+          margins: settings.margins,
+          charsPerLine: settings.charsPerLine,
+          linesPerPage: settings.linesPerPage,
+          fontFamily: settings.fontFamily,
+          showPageNumbers: settings.showPageNumbers,
+          pageNumberFormat: settings.pageNumberFormat,
+          pageNumberPosition: settings.pageNumberPosition,
+          textIndent: settings.textIndent,
+          googleFontFamily: settings.googleFontFamily,
+        });
 
-      if (result === null || result === undefined) return;
+        notificationManager.dismiss(progressId);
 
-      if (typeof result === "object" && "success" in result && !result.success) {
-        notificationManager.error(
-          `PDFのエクスポートに失敗しました: ${(result as { error: string }).error}`,
+        if (result === null || result === undefined) return;
+
+        if (typeof result === "object" && "success" in result && !result.success) {
+          notificationManager.error(
+            `PDFのエクスポートに失敗しました: ${(result as { error: string }).error}`,
+          );
+          return;
+        }
+
+        notificationManager.success("PDFをエクスポートしました");
+      } catch (error) {
+        notificationManager.dismiss(progressId);
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
+      }
+      return;
+    }
+
+    // Web path: browser print preview (static import — no await before window.open)
+    try {
+      const opened = await openWebPrintPreview(dialogState.content, dialogState.metadata, settings);
+      if (!opened) {
+        notificationManager.warning(
+          "ポップアップがブロックされました。ブラウザの設定を確認してください。",
         );
         return;
       }
-
-      notificationManager.success("PDFをエクスポートしました");
+      // Close dialog — print preview is open. No success toast (browser print gives no result).
+      setExportDialogState(null);
     } catch (error) {
-      notificationManager.dismiss(progressId);
       const message = error instanceof Error ? error.message : "不明なエラー";
       notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
     }
   }, []);
 
+  const handlePrintConfirm = useCallback(
+    async (settings: PdfExportSettings) => {
+      if (!printDialogState) return;
+
+      // Electron path: use IPC
+      if (window.electronAPI?.printDocument) {
+        setPrintDialogState(null);
+        try {
+          await window.electronAPI.printDocument(printDialogState.content, {
+            metadata: printDialogState.metadata,
+            verticalWriting: settings.verticalWriting,
+            pageSize: settings.pageSize,
+            landscape: settings.landscape,
+            margins: settings.margins,
+            charsPerLine: settings.charsPerLine,
+            linesPerPage: settings.linesPerPage,
+            fontFamily: settings.fontFamily,
+            showPageNumbers: settings.showPageNumbers,
+            pageNumberFormat: settings.pageNumberFormat,
+            pageNumberPosition: settings.pageNumberPosition,
+            textIndent: settings.textIndent,
+            googleFontFamily: settings.googleFontFamily,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "不明なエラー";
+          notificationManager.error(`印刷に失敗しました: ${message}`);
+        }
+        return;
+      }
+
+      // Web path: browser print preview
+      try {
+        const opened = await openWebPrintPreview(
+          printDialogState.content,
+          printDialogState.metadata,
+          settings,
+        );
+        if (!opened) {
+          notificationManager.warning(
+            "ポップアップがブロックされました。ブラウザの設定を確認してください。",
+          );
+          return;
+        }
+        setPrintDialogState(null);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        notificationManager.error(`印刷に失敗しました: ${message}`);
+      }
+    },
+    [printDialogState],
+  );
+
   const handleDocxExportConfirm = useCallback(async (settings: DocxExportSettings) => {
-    setExportDialogState(null);
-
-    if (!window.electronAPI?.exportDOCX) {
-      notificationManager.error("DOCXエクスポートはデスクトップアプリでのみ利用可能です");
-      return;
-    }
-
     const dialogState = exportDialogStateRef.current;
     if (!dialogState) return;
 
+    // Electron path: use IPC
+    if (window.electronAPI?.exportDOCX) {
+      setExportDialogState(null);
+
+      const progressId = notificationManager.showProgress("DOCXをエクスポート中...", {
+        type: "info",
+      });
+
+      try {
+        const result = await window.electronAPI.exportDOCX(dialogState.content, {
+          metadata: dialogState.metadata,
+          settings,
+        });
+
+        notificationManager.dismiss(progressId);
+
+        if (result === null || result === undefined) return;
+
+        if (typeof result === "object" && "success" in result && !result.success) {
+          notificationManager.error(
+            `DOCXのエクスポートに失敗しました: ${(result as { error: string }).error}`,
+          );
+          return;
+        }
+
+        notificationManager.success("DOCXをエクスポートしました");
+      } catch (error) {
+        notificationManager.dismiss(progressId);
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        notificationManager.error(`DOCXのエクスポートに失敗しました: ${message}`);
+      }
+      return;
+    }
+
+    // Web path: generate DOCX blob and download
     const progressId = notificationManager.showProgress("DOCXをエクスポート中...", {
       type: "info",
     });
 
     try {
-      const result = await window.electronAPI.exportDOCX(dialogState.content, {
+      const { generateDocxBlob } = await import("@/lib/export/docx-exporter");
+      const blob = await generateDocxBlob(dialogState.content, {
         metadata: dialogState.metadata,
         settings,
       });
+      const baseName = (dialogState.metadata.title || "untitled").replace(/\.[^.]+$/, "");
+      const { saveBlobFile } = await import("@/lib/export/save-blob-file");
+      const saved = await saveBlobFile(
+        blob,
+        `${baseName}.docx`,
+        {
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+        },
+        false,
+      );
 
       notificationManager.dismiss(progressId);
 
-      if (result === null || result === undefined) return;
-
-      if (typeof result === "object" && "success" in result && !result.success) {
-        notificationManager.error(
-          `DOCXのエクスポートに失敗しました: ${(result as { error: string }).error}`,
-        );
-        return;
+      if (saved) {
+        setExportDialogState(null);
+        notificationManager.success("DOCXをエクスポートしました");
       }
-
-      notificationManager.success("DOCXをエクスポートしました");
+      // saved === false means user cancelled — keep dialog open
     } catch (error) {
       notificationManager.dismiss(progressId);
       const message = error instanceof Error ? error.message : "不明なエラー";
@@ -596,11 +712,12 @@ export default function EditorPage() {
     }
   }, []);
 
-  const { exportAs } = useExport({
+  const { exportAs, printDocument } = useExport({
     getContent: getExportContent,
     getTitle: getExportTitle,
     getIsEditorTabActive: useCallback(() => isEditorTabActiveRef.current, []),
     onExportDialogRequest: handleExportDialogRequest,
+    onPrintDialogRequest: handlePrintDialogRequest,
   });
 
   // System file open: tab manager handles loading; we just update editor key
@@ -627,6 +744,7 @@ export default function EditorPage() {
     onCloseWindow: () => window.close(),
     onToggleCompactMode: () => toggleCompactModeRef.current(),
     onExport: (format) => void exportAs(format),
+    onPrint: () => printDocument(),
     editorView: editorViewInstance,
     fontScale,
     onFontScaleChange: (scale: number) => fontScaleChangeRef.current(scale),
@@ -984,6 +1102,13 @@ export default function EditorPage() {
           onDocxExport: handleDocxExportConfirm,
           content: exportDialogState?.content ?? "",
           metadata: exportDialogState?.metadata ?? { title: "" },
+        },
+        printDialog: {
+          state: printDialogState,
+          onClose: () => setPrintDialogState(null),
+          onPrint: handlePrintConfirm,
+          content: printDialogState?.content ?? "",
+          metadata: printDialogState?.metadata ?? { title: "" },
         },
       }}
       recovery={{

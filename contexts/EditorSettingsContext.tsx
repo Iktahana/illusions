@@ -110,6 +110,22 @@ export function useCharacterExtractionSettings() {
   );
 }
 
+/** Online AI API configuration */
+export function useAiApiSettings() {
+  const { settings, handlers } = useEditorSettingsContext();
+  return useMemo(
+    () => ({
+      // aiApiKey is intentionally omitted — read AppState directly in the settings tab
+      aiBaseUrl: settings.aiBaseUrl,
+      aiModelId: settings.aiModelId,
+      onAiApiKeyChange: handlers.handleAiApiKeyChange,
+      onAiBaseUrlChange: handlers.handleAiBaseUrlChange,
+      onAiModelIdChange: handlers.handleAiModelIdChange,
+    }),
+    [settings, handlers],
+  );
+}
+
 /** POS highlight configuration */
 export function usePosHighlightSettings() {
   const { settings, handlers } = useEditorSettingsContext();

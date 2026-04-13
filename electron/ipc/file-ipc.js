@@ -118,6 +118,9 @@ function isSavePathDenied(normalizedPath) {
 
 const VALID_SAVE_FILE_TYPES = [".mdi", ".md", ".txt"];
 
+/** Maximum allowed content size in bytes (50 MB) */
+const MAX_CONTENT_BYTES = 50 * 1024 * 1024;
+
 /**
  * Validate a file path provided by the renderer for the save-file IPC handler.
  * Returns an error object if validation fails, or null if the path is valid.
@@ -297,6 +300,13 @@ function registerFileHandlers() {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content", code: "INVALID_INPUT" };
     }
+    if (content.length > MAX_CONTENT_BYTES) {
+      return {
+        success: false,
+        error: "ファイルサイズが上限を超えています（50 MB）",
+        code: "CONTENT_TOO_LARGE",
+      };
+    }
     if (fileType != null && !VALID_SAVE_FILE_TYPES.includes(fileType)) {
       return { success: false, error: `Invalid file type: ${fileType}`, code: "INVALID_INPUT" };
     }
@@ -377,9 +387,30 @@ function registerFileHandlers() {
 
   // --- Export handlers ---
 
+  ipcMain.handle("generate-pdf-preview", async (_event, content, options) => {
+    if (typeof content !== "string") {
+      return { success: false, error: "Invalid content" };
+    }
+    try {
+      const { generatePdf } = require("../../lib/export/pdf-exporter");
+      const pdfBuffer = await generatePdf(content, options || {});
+      return { success: true, data: pdfBuffer.toString("base64") };
+    } catch (error) {
+      log.error("PDF preview generation failed:", error);
+      return { success: false, error: error.message || "PDF preview generation failed" };
+    }
+  });
+
   ipcMain.handle("export-pdf", async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
+    }
+    if (content.length > MAX_CONTENT_BYTES) {
+      return {
+        success: false,
+        error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
+        code: "CONTENT_TOO_LARGE",
+      };
     }
     try {
       const { generatePdf } = require("../../lib/export/pdf-exporter");
@@ -401,9 +432,131 @@ function registerFileHandlers() {
     }
   });
 
+  ipcMain.handle("print-document", async (_event, content, options) => {
+    if (typeof content !== "string") {
+      return { success: false, error: "Invalid content" };
+    }
+    try {
+      const { BrowserWindow } = require("electron");
+      const { mdiToHtml } = require("../../lib/export/mdi-to-html");
+      const {
+        calculateTypesetting,
+        PAGE_DIMENSIONS,
+      } = require("../../lib/export/pdf-export-settings");
+
+      const opts = options || {};
+      const pageSize = opts.pageSize ?? "A5";
+      const margins = opts.margins ?? { top: 20, bottom: 20, left: 15, right: 15 };
+      const verticalWriting = opts.verticalWriting ?? false;
+      const landscape = opts.landscape ?? false;
+
+      // Build typesetting when chars/lines specified
+      let typesetting;
+      if (opts.charsPerLine != null && opts.linesPerPage != null) {
+        const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
+          pageSize,
+          margins,
+          opts.charsPerLine,
+          opts.linesPerPage,
+          verticalWriting,
+          landscape,
+        );
+        typesetting = {
+          fontFamily: opts.fontFamily,
+          fontSizeMm,
+          lineHeightRatio,
+          textIndentEm: opts.textIndent,
+          margins,
+          pageSize,
+          landscape,
+        };
+      } else {
+        typesetting = { pageSize, landscape, margins };
+      }
+
+      const html = mdiToHtml(content, {
+        metadata: opts.metadata,
+        verticalWriting,
+        typesetting,
+        googleFontFamily: opts.googleFontFamily,
+      });
+
+      const partition = `print-${Date.now()}`;
+      const printWin = new BrowserWindow({
+        show: false,
+        width: 800,
+        height: 600,
+        webPreferences: {
+          offscreen: false,
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: true,
+          partition,
+        },
+      });
+
+      // CSP for print window (allow Google Fonts if needed)
+      const hasGoogleFont = !!opts.googleFontFamily;
+      const styleSrc = hasGoogleFont
+        ? "style-src 'unsafe-inline' https://fonts.googleapis.com"
+        : "style-src 'unsafe-inline'";
+      const fontSrc = hasGoogleFont ? " font-src https://fonts.gstatic.com;" : "";
+      printWin.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+        callback({
+          responseHeaders: {
+            ...details.responseHeaders,
+            "Content-Security-Policy": [
+              `default-src 'none'; ${styleSrc}; img-src 'self';${fontSrc}`,
+            ],
+          },
+        });
+      });
+
+      const loadPromise = new Promise((resolve) => {
+        printWin.webContents.once("did-finish-load", () => resolve());
+      });
+
+      await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+      await loadPromise;
+
+      // Wait for fonts to load
+      const delay = hasGoogleFont ? 2000 : 100;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+
+      // Open system print dialog
+      await new Promise((resolve, reject) => {
+        printWin.webContents.print({ silent: false }, (success, failureReason) => {
+          if (success) {
+            resolve();
+          } else {
+            // User cancelled is not an error
+            if (failureReason === "cancelled") {
+              resolve();
+            } else {
+              reject(new Error(failureReason || "Print failed"));
+            }
+          }
+        });
+      });
+
+      printWin.destroy();
+      return { success: true };
+    } catch (error) {
+      log.error("Print failed:", error);
+      return { success: false, error: error.message || "Print failed" };
+    }
+  });
+
   ipcMain.handle("export-epub", async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
+    }
+    if (content.length > MAX_CONTENT_BYTES) {
+      return {
+        success: false,
+        error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
+        code: "CONTENT_TOO_LARGE",
+      };
     }
     try {
       const { generateEpub } = require("../../lib/export/epub-exporter");
@@ -428,6 +581,13 @@ function registerFileHandlers() {
   ipcMain.handle("export-docx", async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
+    }
+    if (content.length > MAX_CONTENT_BYTES) {
+      return {
+        success: false,
+        error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
+        code: "CONTENT_TOO_LARGE",
+      };
     }
     try {
       const { generateDocx } = require("../../lib/export/docx-exporter");
@@ -491,9 +651,10 @@ function registerFileHandlers() {
   // cannot accumulate in the dialogApprovedPaths map.
   const { app } = require("electron");
   app.on("web-contents-created", (_event, webContents) => {
+    const wcId = webContents.id;
     webContents.on("destroyed", () => {
-      revokeWindowApprovedPaths(webContents.id);
-      log.debug(`Revoked approved paths for destroyed webContents id=${webContents.id}`);
+      revokeWindowApprovedPaths(wcId);
+      log.debug(`Revoked approved paths for destroyed webContents id=${wcId}`);
     });
   });
 }

@@ -20,7 +20,7 @@ import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
 import { getUserDictionaryService } from "@/lib/services/user-dictionary-service";
 import DictionaryEntryDialog from "./Dictionary/DictionaryEntryDialog";
 import { getDictService } from "@/lib/dict/dict-service";
-import type { DictEntry, DictDownloadStatus } from "@/lib/dict/dict-types";
+import type { DictEntry } from "@/lib/dict/dict-types";
 
 // Web dictionary sources
 interface WebDictionarySource {
@@ -83,7 +83,9 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
   // Master dict state
   const [masterResults, setMasterResults] = useState<DictEntry[]>([]);
   const [masterLoading, setMasterLoading] = useState(false);
-  const [masterStatus, setMasterStatus] = useState<DictDownloadStatus>("not-installed");
+  const [localInstallStatus, setLocalInstallStatus] = useState<
+    "not-installed" | "downloading" | "installing" | "installed" | "error"
+  >("not-installed");
   const [expandedMasterId, setExpandedMasterId] = useState<string | null>(null);
 
   // Persistence
@@ -123,11 +125,12 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
     void loadEntries();
   }, [loadEntries]);
 
-  // Check master dict status on mount
+  // Check local install status on mount (Electron only)
   useEffect(() => {
+    if (!isElectron()) return;
     getDictService()
       .getDownloadState("genji")
-      .then((state) => setMasterStatus(state.status))
+      .then((state) => setLocalInstallStatus(state.status))
       .catch(() => {});
   }, []);
 
@@ -151,9 +154,6 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
       .query(activeSearchQuery.trim())
       .then((result) => {
         setMasterResults(result.entries);
-        if (result.providerUnavailable && !result.webApiPending) {
-          setMasterStatus("not-installed");
-        }
       })
       .catch(() => setMasterResults([]))
       .finally(() => setMasterLoading(false));
@@ -260,14 +260,14 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
     ).electronAPI?.dict;
     if (!api) return;
 
-    setMasterStatus("downloading");
+    setLocalInstallStatus("downloading");
     void api
       .download()
       .then((result) => {
-        setMasterStatus(result.success ? "installed" : "error");
+        setLocalInstallStatus(result.success ? "installed" : "error");
       })
       .catch(() => {
-        setMasterStatus("error");
+        setLocalInstallStatus("error");
       });
   }, []);
 
@@ -497,7 +497,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                   )}
 
                   {/* Not installed banner (Electron only) */}
-                  {!masterLoading && masterStatus === "not-installed" && isElectron() && (
+                  {!masterLoading && localInstallStatus === "not-installed" && isElectron() && (
                     <div className="bg-background-elevated border border-border rounded-lg p-3 flex items-center justify-between gap-3">
                       <span className="text-sm text-foreground-secondary">
                         辞典データ未インストール
@@ -513,7 +513,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                   )}
 
                   {/* Downloading indicator */}
-                  {masterStatus === "downloading" && (
+                  {localInstallStatus === "downloading" && (
                     <div className="flex items-center gap-2 text-sm text-foreground-secondary">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       ダウンロード中...
@@ -524,7 +524,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                   {!masterLoading && masterResults.length > 0 && (
                     <div className="space-y-2">
                       <div className="text-xs font-semibold text-foreground-tertiary">
-                        illusions辞典 ({masterResults.length} 件)
+                        幻辞 ({masterResults.length} 件)
                       </div>
                       {masterResults.map((entry) => (
                         <MasterDictCard
@@ -538,7 +538,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                   )}
 
                   {/* No results */}
-                  {!masterLoading && masterResults.length === 0 && masterStatus === "installed" && (
+                  {!masterLoading && masterResults.length === 0 && activeSearchQuery.trim() && (
                     <p className="text-sm text-foreground-secondary">
                       「{activeSearchQuery}」の辞典結果なし
                     </p>

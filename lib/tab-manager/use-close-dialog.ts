@@ -27,7 +27,12 @@ export interface UseCloseDialogParams extends TabManagerCore {
    * Attempt to create a history snapshot after saving (project mode only).
    * Provided by useFileIO.
    */
-  tryAutoSnapshot: (sourcePath: string, displayName: string, savedContent: string) => Promise<void>;
+  tryAutoSnapshot: (
+    sourcePath: string,
+    displayName: string,
+    savedContent: string,
+    forceSnapshot?: boolean,
+  ) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +88,7 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
         const vfs = getVFS();
         suppressFileWatch(tab.file.path);
         await vfs.writeFile(tab.file.path, sanitized);
-        await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized);
+        await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized, true);
       } else {
         const result = await saveMdiFile({
           descriptor: tab.file,
@@ -106,6 +111,7 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
           result.descriptor.path ?? result.descriptor.name,
           result.descriptor.name,
           sanitized,
+          true,
         );
       }
     } catch (error) {

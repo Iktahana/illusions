@@ -43,11 +43,18 @@ tags:
 - [ストレージシステム](architecture/storage-system.md)
 - [Virtual File System](architecture/vfs.md)
 - [タブ管理](architecture/tab-manager.md)
+- [Dockview レイアウトシステム](architecture/dockview-layout.md)
+- [ターミナルサブシステム](architecture/terminal-system.md)
+- [キーマップシステム](architecture/keymap-system.md)
+- [プロジェクトのアップグレードと権限](architecture/project-upgrade-and-permissions.md)
+- [ユーザー辞書と校正の無視設定](architecture/dictionary-and-ignored-corrections.md)
 - [文書化ギャップマップ](architecture/documentation-gap-map.md)
 - [エクスポートシステム](architecture/export-system.md)
 - [ファイル監視](architecture/file-watcher.md)
 - [履歴サービス](architecture/history-service.md)
 - [プロジェクトライフサイクル](architecture/project-lifecycle.md)
+- [可読性スコアリング](architecture/readability-scoring.md)
+- [テキスト統計](architecture/text-statistics.md)
 - [NLP バックエンド](architecture/nlp-backend-architecture.md)
 - [通知システム](architecture/notification-system.md)
 - [校正・AI 校正システム](architecture/correction-ai-system.ja.md)
@@ -58,6 +65,9 @@ tags:
 - [Lint ルール作成](guides/linting-rules.md)
 - [キーボードショートカット](guides/keyboard-shortcuts.md)
 - [テーマカラー](guides/theme-colors.md)
+- [ターミナルの使い方](guides/terminal.md)
+- [ユーザー辞書の使い方](guides/dictionary.md)
+- [オンボーディングとウェルカムフロー](guides/onboarding-and-welcome-flow.md)
 
 ## これから補う文書
 
@@ -65,12 +75,7 @@ tags:
   現在の実装に対して、まだ正式ページがないサブシステムを整理した一覧です。
 
 - 今の優先対象
-  - dockview / pane layout
-  - terminal subsystem
-  - user dictionary / ignored corrections
-  - project upgrade / permissions
-  - keymap system
-  - onboarding / welcome flow
+  - (特になし。ギャップマップを参照してください)
 
 ### セットアップ
 
