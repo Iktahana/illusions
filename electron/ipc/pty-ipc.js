@@ -12,7 +12,7 @@ const { ipcMain, BrowserWindow } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { execSync } = require("child_process");
+const { execSync, execFileSync } = require("child_process");
 
 const {
   MAX_SESSIONS_PER_WINDOW,
@@ -60,6 +60,55 @@ function resolveWindowsShellByName(name) {
     // `where` exited non-zero — executable not on PATH
   }
   return null;
+}
+
+/**
+ * Resolve a user-supplied shell string to an absolute executable path.
+ *
+ * Resolution order:
+ *   1. Already an absolute path — return as-is (caller will verify existence).
+ *   2. Bare name (e.g. "powershell.exe", "bash") — PATH lookup via `where` (Windows)
+ *      or `which` (Unix).
+ *   3. Windows-only: well-known fallback paths for common shells when PATH lookup fails.
+ *
+ * @param {string} shell - shell value provided by the user (absolute path or bare name)
+ * @returns {string} absolute path to the shell executable
+ * @throws {Error} if the shell cannot be resolved to an absolute path
+ */
+function resolveShellPath(shell) {
+  if (!shell) return shell;
+
+  // Already an absolute path — use directly (existence is checked separately)
+  if (path.isAbsolute(shell)) return shell;
+
+  // PATH lookup: `where` on Windows, `which` on Unix
+  try {
+    const cmd = process.platform === "win32" ? "where" : "which";
+    const result = execFileSync(cmd, [shell], { encoding: "utf8", timeout: 3000 });
+    const resolved = result.trim().split(/\r?\n/)[0].trim();
+    if (resolved && path.isAbsolute(resolved)) return resolved;
+  } catch {
+    // Not found via PATH — fall through to well-known fallbacks
+  }
+
+  // Windows-only fallback for common shells
+  if (process.platform === "win32") {
+    const sysRoot = process.env.SystemRoot || process.env.WINDIR || "C:\\Windows";
+    const progFiles = process.env.ProgramFiles || "C:\\Program Files";
+    /** @type {Record<string, string>} */
+    const wellKnown = {
+      "powershell.exe": `${sysRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`,
+      powershell: `${sysRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`,
+      "pwsh.exe": `${progFiles}\\PowerShell\\7\\pwsh.exe`,
+      pwsh: `${progFiles}\\PowerShell\\7\\pwsh.exe`,
+      "cmd.exe": `${sysRoot}\\System32\\cmd.exe`,
+      cmd: `${sysRoot}\\System32\\cmd.exe`,
+    };
+    const known = wellKnown[shell.toLowerCase()];
+    if (known) return known;
+  }
+
+  throw new Error(`シェルが見つかりません: ${shell}`);
 }
 
 /**
@@ -208,8 +257,17 @@ function registerPtyHandlers() {
       return { error: `グローバルの最大セッション数(${MAX_SESSIONS_GLOBAL})に達しました` };
     }
 
-    // Resolve shell
-    const shell = (typeof options.shell === "string" && options.shell) || resolveDefaultShell();
+    // Resolve shell: bare names (e.g. "powershell.exe") are resolved to absolute paths
+    let shell;
+    try {
+      const rawShell =
+        (typeof options.shell === "string" && options.shell) || resolveDefaultShell();
+      shell = resolveShellPath(rawShell);
+    } catch (err) {
+      return {
+        error: err instanceof Error ? err.message : `Shellが見つかりません: ${options.shell}`,
+      };
+    }
     if (!shellExists(shell)) {
       return { error: `Shellが見つかりません: ${shell}` };
     }
