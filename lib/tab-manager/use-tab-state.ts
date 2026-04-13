@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, TabState, EditorTabState, TerminalTabState, DiffTabState } from "./tab-types";
@@ -125,7 +125,9 @@ export function useTabState(): UseTabStateReturn {
   const lastSaveWasAuto = editorActiveTab?.lastSaveWasAuto ?? false;
 
   const contentRef = useRef(content);
-  contentRef.current = content;
+  useEffect(() => {
+    contentRef.current = content;
+  });
 
   // --- Helpers ------------------------------------------------------------
 
