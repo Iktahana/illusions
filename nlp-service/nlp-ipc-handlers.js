@@ -11,9 +11,11 @@
  * - nlp:analyze-word-frequency - Word frequency analysis
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { ipcMain } = require("electron");
 const path = require("path");
 const { nlpProcessor } = require("../lib/nlp-backend/nlp-processor");
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 /**
  * Get default dictionary path for Electron environment.

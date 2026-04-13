@@ -367,7 +367,7 @@ describe("ElectronVFS", () => {
       const vfs = new ElectronVFS();
 
       await expect(vfs.readFile("relative/path.txt")).rejects.toThrow(
-        "no root directory has been opened",
+        "Cannot resolve relative path without an open directory",
       );
     });
 
