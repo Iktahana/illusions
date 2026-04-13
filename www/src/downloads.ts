@@ -312,7 +312,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
         <h1 class="page-title">ダウンロード</h1>
         <div class="error-card">
           <p>リリース情報の取得に失敗しました。</p>
-          <p class="error-detail">${error}</p>
+          <p class="error-detail">${esc(error)}</p>
           <a href="https://github.com/${REPO}/releases" class="btn btn-secondary" target="_blank" rel="noopener">
             GitHubで直接確認する →
           </a>
@@ -376,7 +376,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
           (asset) => `
         <a href="${safeUrl(asset.url)}" class="download-item" data-platform="${key}" data-filename="${esc(asset.name)}" download>
           <div class="download-item-info">
-            <span class="download-item-label">${asset.label}</span>
+            <span class="download-item-label">${esc(asset.label)}</span>
             <span class="download-item-filename">${esc(asset.name)}</span>
           </div>
           <div class="download-item-meta">
@@ -438,7 +438,7 @@ function renderPage(release: GitHubRelease | null, error: string | null): void {
       <div class="hero-download">
         <a href="${safeUrl(heroCta.href)}" class="btn-hero-download" data-platform="${currentOS}" data-filename="${heroCta.isExternal ? "Microsoft Store" : esc(bestAsset?.name || "unknown")}" ${heroCta.isExternal ? 'target="_blank" rel="noopener noreferrer"' : "download"}>
           <span class="btn-hero-download-icon">${heroCta.icon}</span>
-          <span class="btn-hero-download-label">${heroCta.label}</span>
+          <span class="btn-hero-download-label">${esc(heroCta.label)}</span>
           ${heroCta.meta ? `<span class="btn-hero-download-meta">${esc(heroCta.meta)}</span>` : ""}
         </a>
         <p class="hero-download-hint">他のプラットフォームは下記をご覧ください</p>
