@@ -40,7 +40,15 @@ const config: Config = {
         info: "rgb(var(--info) / <alpha-value>)",
       },
       fontFamily: {
-        ja: ["'Noto Serif JP'", "'Hiragino Mincho ProN'", "'Yu Mincho'", "'YuMincho'", "'serif'"],
+        ja: [
+          "'Noto Serif JP'",
+          "'Hiragino Mincho ProN'",
+          "'Yu Mincho'",
+          "'YuMincho'",
+          "'MS Mincho'",
+          "'MS 明朝'",
+          "serif",
+        ],
       },
     },
   },

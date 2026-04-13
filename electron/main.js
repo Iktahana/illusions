@@ -84,7 +84,9 @@ if (!gotTheLock) {
       return;
     }
     // Extract .mdi path from argv (Windows/Linux pass file path as CLI argument)
-    const mdiArg = commandLine.find((a) => a.endsWith(".mdi") && !a.startsWith("-"));
+    const mdiArg = commandLine.find(
+      (a) => path.extname(a).toLowerCase() === ".mdi" && !a.startsWith("-"),
+    );
     if (mdiArg) {
       const resolvedPath = path.resolve(mdiArg);
       void handleMdiFileOpen(resolvedPath);
@@ -179,7 +181,9 @@ app.whenReady().then(async () => {
 
   // Windows/Linux: check process.argv for .mdi file association
   if (process.platform !== "darwin" && !getPendingFilePath()) {
-    const mdiArg = process.argv.find((a) => a.endsWith(".mdi") && !a.startsWith("-"));
+    const mdiArg = process.argv.find(
+      (a) => path.extname(a).toLowerCase() === ".mdi" && !a.startsWith("-"),
+    );
     if (mdiArg) setPendingFilePath(path.resolve(mdiArg));
   }
 

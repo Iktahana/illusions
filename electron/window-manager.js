@@ -149,7 +149,7 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
   } else {
     // Next.js の静的出力 — app.getAppPath() はパッケージのルートを返す
     const filePath = path.join(app.getAppPath(), "out", "index.html");
-    const fileUrl = `file://${filePath}${query}`;
+    const fileUrl = require("url").pathToFileURL(filePath).href + (query ?? "");
     newWindow.loadURL(fileUrl);
   }
 

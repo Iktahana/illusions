@@ -367,7 +367,7 @@ describe("ElectronVFS", () => {
       const vfs = new ElectronVFS();
 
       await expect(vfs.readFile("relative/path.txt")).rejects.toThrow(
-        "no root directory has been opened",
+        "Cannot resolve relative path without an open directory",
       );
     });
 
@@ -382,14 +382,15 @@ describe("ElectronVFS", () => {
       expect(mockBridge.writeFile).toHaveBeenCalledWith("/absolute/path/file.txt", "content");
     });
 
-    it("should recognize Windows absolute paths with backslashes", async () => {
+    it("should recognize Windows absolute paths with backslashes and normalize to forward slashes", async () => {
       mockBridge.readFile.mockResolvedValue("win content");
 
       const vfs = new ElectronVFS();
       const content = await vfs.readFile("C:\\Users\\test\\file.txt");
 
       expect(content).toBe("win content");
-      expect(mockBridge.readFile).toHaveBeenCalledWith("C:\\Users\\test\\file.txt");
+      // Backslashes are normalized to forward slashes for consistent IPC
+      expect(mockBridge.readFile).toHaveBeenCalledWith("C:/Users/test/file.txt");
     });
 
     it("should recognize Windows absolute paths with forward slashes", async () => {
@@ -414,28 +415,29 @@ describe("ElectronVFS", () => {
       await vfs.openDirectory();
       await vfs.writeFile("C:\\Users\\test\\project\\file.mdi", "content");
 
-      // Should NOT prepend rootPath to an already-absolute Windows path
+      // Should NOT prepend rootPath to an already-absolute Windows path;
+      // backslashes are normalized to forward slashes
       expect(mockBridge.writeFile).toHaveBeenCalledWith(
-        "C:\\Users\\test\\project\\file.mdi",
+        "C:/Users/test/project/file.mdi",
         "content",
       );
     });
 
-    it("should handle Windows paths with mixed separators", async () => {
+    it("should handle Windows paths with mixed separators by normalizing to forward slashes", async () => {
       mockBridge.mkdir.mockResolvedValue(undefined);
       mockBridge.writeFile.mockResolvedValue(undefined);
 
       const vfs = new ElectronVFS();
       await vfs.writeFile("G:\\マイドライブ\\原稿\\幻/幻.mdi", "content");
 
-      // Should be treated as absolute (not joined with root)
+      // Should be treated as absolute (not joined with root) and backslashes normalized
       expect(mockBridge.writeFile).toHaveBeenCalledWith(
-        "G:\\マイドライブ\\原稿\\幻/幻.mdi",
+        "G:/マイドライブ/原稿/幻/幻.mdi",
         "content",
       );
     });
 
-    it("should recognize Windows UNC paths as absolute", async () => {
+    it("should recognize Windows UNC paths as absolute and normalize backslashes", async () => {
       mockBridge.openDirectory.mockResolvedValue({
         path: "C:\\Users\\test\\project",
         name: "project",
@@ -447,7 +449,8 @@ describe("ElectronVFS", () => {
       const content = await vfs.readFile("\\\\server\\share\\file.txt");
 
       expect(content).toBe("unc content");
-      expect(mockBridge.readFile).toHaveBeenCalledWith("\\\\server\\share\\file.txt");
+      // UNC path backslashes are normalized to forward slashes
+      expect(mockBridge.readFile).toHaveBeenCalledWith("//server/share/file.txt");
     });
   });
 
