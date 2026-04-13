@@ -3,7 +3,8 @@ name: Weekly Release
 on:
   schedule:
     - cron: "0 0 * * 1" # Monday 00:00 UTC = 09:00 JST
-    - cron: "0 1 * * 1" # Monday 01:00 UTC = 10:00 JST (fallback if 00:00 run delayed)
+    - cron: "0 1 * * 1" # Monday 01:00 UTC = 10:00 JST (retry 1)
+    - cron: "0 2 * * 1" # Monday 02:00 UTC = 11:00 JST (retry 2)
   workflow_dispatch: # Manual trigger
 
 permissions:
