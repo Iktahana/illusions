@@ -133,6 +133,7 @@ linting は [`linting-plugin/`](../../packages/milkdown-plugin-japanese-novel/li
 - viewport-aware な段落処理と cache を持つ
 - document-level rule があれば全文脈の処理も走る
 - `updateLintingSettings()` で change reason 付きの動的更新ができる
+- `onNlpError` コールバックで NLP トークナイズ失敗を通知する（失敗エピソードにつき 1 回のみ呼ばれる）
 
 ## 開発時の見方
 
