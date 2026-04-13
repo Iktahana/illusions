@@ -94,11 +94,18 @@ function formatDate(isoDate: string): string {
   });
 }
 
+type NavigatorWithUAData = Navigator & {
+  userAgentData?: {
+    getHighEntropyValues(hints: string[]): Promise<{ architecture?: string }>;
+  };
+};
+
 /** Async Windows architecture detection using User-Agent Client Hints (Chromium 93+) */
 async function detectWindowsArch(): Promise<"x64" | "arm64" | "unknown"> {
   try {
-    if (typeof navigator !== "undefined" && navigator.userAgentData) {
-      const ua = await navigator.userAgentData.getHighEntropyValues(["architecture"]);
+    const nav = navigator as NavigatorWithUAData;
+    if (typeof navigator !== "undefined" && nav.userAgentData) {
+      const ua = await nav.userAgentData.getHighEntropyValues(["architecture"]);
       if (ua.architecture === "arm") return "arm64";
       if (ua.architecture === "x86") return "x64";
     }
