@@ -2,9 +2,8 @@
  * save-blob-file unit tests
  *
  * Tests for the shared file-save helper covering:
- * - Blob URL download fallback (core Web DOCX path)
- * - User cancel handling (AbortError from showSaveFilePicker)
- * - Gesture expiry degradation (NotAllowedError/SecurityError → Blob URL fallback)
+ * - Blob URL download (core Web path — always fires, no cancel signal)
+ * - Electron TXT save via IPC (cancel returns false, error throws)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -16,7 +15,6 @@ const mockRevokeObjectURL = vi.fn();
 const mockClick = vi.fn();
 
 beforeEach(() => {
-  // Clear call history on standalone vi.fn() mocks (vi.restoreAllMocks only clears spies)
   mockCreateObjectURL.mockClear();
   mockRevokeObjectURL.mockClear();
   mockClick.mockClear();
@@ -26,7 +24,6 @@ beforeEach(() => {
     revokeObjectURL: mockRevokeObjectURL,
   });
 
-  // Mock document.createElement to return a controllable <a> element
   const mockAnchor = {
     href: "",
     download: "",
@@ -39,20 +36,16 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // Clean up showSaveFilePicker from window if set by a test
-  delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe("saveBlobFile", () => {
   const blob = new Blob(["test content"], { type: "text/plain" });
-  const accept = { "text/plain": [".txt"] };
 
-  describe("Blob URL download fallback", () => {
-    it("downloads via Blob URL when File System Access API is absent", async () => {
-      // No showSaveFilePicker on window
-      const result = await saveBlobFile(blob, "test.txt", accept, false);
+  describe("Web: Blob URL download", () => {
+    it("downloads via Blob URL and returns true", async () => {
+      const result = await saveBlobFile(blob, "test.txt", false);
 
       expect(result).toBe(true);
       expect(mockCreateObjectURL).toHaveBeenCalledWith(blob);
@@ -61,55 +54,39 @@ describe("saveBlobFile", () => {
     });
   });
 
-  describe("File System Access API", () => {
-    it("returns false on user cancel (AbortError)", async () => {
-      const error = new DOMException("User cancelled", "AbortError");
-      // Assign directly to window so `"showSaveFilePicker" in window` works in jsdom
-      (window as unknown as Record<string, unknown>).showSaveFilePicker = vi
-        .fn()
-        .mockRejectedValue(error);
+  describe("Electron: TXT save via IPC", () => {
+    const mockSaveFile = vi.fn();
 
-      const result = await saveBlobFile(blob, "test.txt", accept, false);
+    beforeEach(() => {
+      vi.stubGlobal("window", {
+        ...window,
+        electronAPI: { saveFile: mockSaveFile },
+      });
+    });
+
+    it("returns false when user cancels the save dialog", async () => {
+      mockSaveFile.mockResolvedValue(null);
+
+      const result = await saveBlobFile(blob, "test.txt", true, ".txt");
 
       expect(result).toBe(false);
-      // Should NOT fall through to download
+      expect(mockSaveFile).toHaveBeenCalledWith(null, "test content", ".txt");
       expect(mockClick).not.toHaveBeenCalled();
     });
 
-    it("falls through to Blob URL on NotAllowedError (gesture expired)", async () => {
-      const error = new DOMException("Gesture required", "NotAllowedError");
-      (window as unknown as Record<string, unknown>).showSaveFilePicker = vi
-        .fn()
-        .mockRejectedValue(error);
+    it("returns true on successful save", async () => {
+      mockSaveFile.mockResolvedValue("/path/to/test.txt");
 
-      const result = await saveBlobFile(blob, "test.txt", accept, false);
+      const result = await saveBlobFile(blob, "test.txt", true, ".txt");
 
       expect(result).toBe(true);
-      expect(mockCreateObjectURL).toHaveBeenCalledWith(blob);
-      expect(mockClick).toHaveBeenCalled();
+      expect(mockClick).not.toHaveBeenCalled();
     });
 
-    it("falls through to Blob URL on SecurityError (permission denied)", async () => {
-      const error = new DOMException("Permission denied", "SecurityError");
-      (window as unknown as Record<string, unknown>).showSaveFilePicker = vi
-        .fn()
-        .mockRejectedValue(error);
+    it("throws on IPC error result", async () => {
+      mockSaveFile.mockResolvedValue({ success: false, error: "disk full" });
 
-      const result = await saveBlobFile(blob, "test.txt", accept, false);
-
-      expect(result).toBe(true);
-      expect(mockClick).toHaveBeenCalled();
-    });
-
-    it("re-throws unexpected errors", async () => {
-      const error = new TypeError("Unexpected error");
-      (window as unknown as Record<string, unknown>).showSaveFilePicker = vi
-        .fn()
-        .mockRejectedValue(error);
-
-      await expect(saveBlobFile(blob, "test.txt", accept, false)).rejects.toThrow(
-        "Unexpected error",
-      );
+      await expect(saveBlobFile(blob, "test.txt", true, ".txt")).rejects.toThrow("disk full");
     });
   });
 });

@@ -690,14 +690,7 @@ export default function EditorPage() {
       });
       const baseName = (dialogState.metadata.title || "untitled").replace(/\.[^.]+$/, "");
       const { saveBlobFile } = await import("@/lib/export/save-blob-file");
-      const saved = await saveBlobFile(
-        blob,
-        `${baseName}.docx`,
-        {
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
-        },
-        false,
-      );
+      const saved = await saveBlobFile(blob, `${baseName}.docx`, false);
 
       notificationManager.dismiss(progressId);
 
@@ -705,7 +698,6 @@ export default function EditorPage() {
         setExportDialogState(null);
         notificationManager.success("DOCXをエクスポートしました");
       }
-      // saved === false means user cancelled — keep dialog open
     } catch (error) {
       notificationManager.dismiss(progressId);
       const message = error instanceof Error ? error.message : "不明なエラー";
@@ -761,12 +753,7 @@ export default function EditorPage() {
         .replace(/[<>:"/\\|?*]/g, "_")
         .replace(/\.[^.]+$/, "");
       const { saveBlobFile } = await import("@/lib/export/save-blob-file");
-      const saved = await saveBlobFile(
-        blob,
-        `${baseName}.epub`,
-        { "application/epub+zip": [".epub"] },
-        false,
-      );
+      const saved = await saveBlobFile(blob, `${baseName}.epub`, false);
 
       notificationManager.dismiss(progressId);
 
