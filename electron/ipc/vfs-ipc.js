@@ -88,10 +88,17 @@ function registerVFSHandlers() {
     };
   });
 
+  // Maximum file size allowed for VFS read (50 MB, same as file-ipc.js)
+  const MAX_READ_BYTES = 50 * 1024 * 1024;
+
   // Read file content
   ipcMain.handle("vfs:read-file", async (event, filePath) => {
     try {
       const resolved = validateVFSPath(event, filePath);
+      const stats = await fs.stat(resolved);
+      if (stats.size > MAX_READ_BYTES) {
+        throw new Error("ファイルサイズが上限を超えています");
+      }
       return await fs.readFile(resolved, "utf-8");
     } catch (error) {
       // ENOENT is expected for optional config files — skip noisy logging
