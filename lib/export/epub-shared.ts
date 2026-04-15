@@ -73,10 +73,18 @@ export function buildEpubFiles(
   const verticalWriting = options.verticalWriting ?? false;
   const fontFamily = sanitizeFontFamily(options.fontFamily || "serif");
   const textIndent = options.textIndent ?? 1;
-  const hasCover = options.coverImage && options.coverImage.length > 0;
-  const coverExt = coverExtension(options.coverMediaType);
+  // Normalize coverMediaType to JPEG/PNG only; ignore cover if unsupported
+  const validCoverType =
+    options.coverMediaType === "image/png" || options.coverMediaType === "image/jpeg"
+      ? options.coverMediaType
+      : "image/jpeg";
+  const hasCover =
+    options.coverImage &&
+    options.coverImage.length > 0 &&
+    (options.coverMediaType === "image/png" || options.coverMediaType === "image/jpeg");
+  const coverExt = coverExtension(validCoverType);
   const coverFileName = hasCover ? `cover.${coverExt}` : undefined;
-  const coverMediaType = options.coverMediaType || "image/jpeg";
+  const coverMediaType = validCoverType;
 
   const splitLevel = splitLevelToNumber(options.chapterSplitLevel);
   const chapters = splitIntoChapters(content, splitLevel);

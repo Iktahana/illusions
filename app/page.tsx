@@ -757,7 +757,9 @@ export default function EditorPage() {
     try {
       const { generateEpubBlob } = await import("@/lib/export/epub-web");
       const blob = await generateEpubBlob(dialogState.content, options);
-      const baseName = (options.metadata.title || "untitled").replace(/\.[^.]+$/, "");
+      const baseName = (options.metadata.title || "untitled")
+        .replace(/[<>:"/\\|?*]/g, "_")
+        .replace(/\.[^.]+$/, "");
       const { saveBlobFile } = await import("@/lib/export/save-blob-file");
       const saved = await saveBlobFile(
         blob,

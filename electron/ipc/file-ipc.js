@@ -571,6 +571,15 @@ function registerFileHandlers() {
         }
       }
 
+      // Normalize coverMediaType to JPEG/PNG only; drop cover if unsupported
+      if (epubOptions.coverImage && epubOptions.coverMediaType) {
+        const validTypes = ["image/jpeg", "image/png"];
+        if (!validTypes.includes(epubOptions.coverMediaType)) {
+          epubOptions.coverImage = undefined;
+          epubOptions.coverMediaType = undefined;
+        }
+      }
+
       const { generateEpub } = require("../../lib/export/epub-exporter");
       const epubBuffer = await generateEpub(content, epubOptions);
 
