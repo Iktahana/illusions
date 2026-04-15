@@ -10,6 +10,10 @@ permissions:
   contents: read
   actions: write
 
+concurrency:
+  group: "ms-store-submission"
+  cancel-in-progress: false
+
 jobs:
   submit:
     name: Submit to Microsoft Store

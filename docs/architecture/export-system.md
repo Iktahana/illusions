@@ -255,11 +255,13 @@ const docxConfig = {
 #### TXT and TXT+Ruby Export
 
 ```typescript
-// TXT: Strip all MDI syntax and markdown formatting
+// TXT: Strip all MDI syntax and markdown formatting.
+// Blank lines between paragraphs are removed from the output.
 // Input:  "{漢字|かんじ}を使った^12^月の文章"
 // Output: "漢字を使った12月の文章"
 
-// TXT+Ruby: Keep ruby annotations in parentheses
+// TXT+Ruby: Keep ruby annotations in parentheses.
+// Blank lines between paragraphs are removed from the output.
 // Input:  "{漢字|かんじ}を使った^12^月の文章"
 // Output: "漢字（かんじ）を使った12月の文章"
 ```
@@ -284,5 +286,5 @@ All IPC handlers call `dialog.showSaveDialog` in the main process to let the use
 
 ---
 
-**Last Updated**: 2026-02-25
+**Last Updated**: 2026-04-03
 **Version**: 1.0.0
