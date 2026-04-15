@@ -559,10 +559,16 @@ function registerFileHandlers() {
       };
     }
     try {
-      // Convert ArrayBuffer cover image back to Uint8Array if present
+      // Defensive: ensure coverImage is Uint8Array regardless of IPC serialization quirks.
+      // Structured clone normally preserves Uint8Array, but guard against edge cases.
       const epubOptions = { ...options };
-      if (epubOptions.coverImage && epubOptions.coverImage instanceof ArrayBuffer) {
-        epubOptions.coverImage = new Uint8Array(epubOptions.coverImage);
+      if (epubOptions.coverImage && !(epubOptions.coverImage instanceof Uint8Array)) {
+        if (epubOptions.coverImage instanceof ArrayBuffer) {
+          epubOptions.coverImage = new Uint8Array(epubOptions.coverImage);
+        } else if (ArrayBuffer.isView(epubOptions.coverImage)) {
+          const view = epubOptions.coverImage;
+          epubOptions.coverImage = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+        }
       }
 
       const { generateEpub } = require("../../lib/export/epub-exporter");

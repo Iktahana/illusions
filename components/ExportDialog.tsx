@@ -14,7 +14,7 @@ import { FontSelector } from "@/components/explorer/FontSelector";
 import { PageSizeSelector } from "@/components/PageSizeSelector";
 import { openWebPrintPreview } from "@/lib/export/web-print-preview";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuthSafe } from "@/contexts/AuthContext";
 
 import type {
   UnifiedExportSettings,
@@ -148,13 +148,8 @@ function ExportDialogInner({
   const hasPreviewApi = isElectron && !!window.electronAPI?.generatePdfPreview;
 
   // --- Author auto-fill from auth context ---
-  let authUserName: string | undefined;
-  try {
-    const { user } = useAuth();
-    authUserName = user?.name ?? undefined;
-  } catch {
-    // AuthProvider not available — ignore
-  }
+  const authContext = useAuthSafe();
+  const authUserName = authContext?.user?.name ?? undefined;
 
   // --- EPUB metadata state ---
   const [epubTitle, setEpubTitle] = useState(metadata.title || "");
@@ -172,6 +167,10 @@ function ExportDialogInner({
   const [coverMediaType, setCoverMediaType] = useState<string | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Blob URL refs for cleanup (state captures stale values in [] effects) ---
+  const pdfUrlRef = useRef<string | null>(null);
+  const coverPreviewUrlRef = useRef<string | null>(null);
 
   // --- Electron PDF preview state ---
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -205,22 +204,27 @@ function ExportDialogInner({
       const buf = new Uint8Array(reader.result as ArrayBuffer);
       setCoverImage(buf);
       setCoverMediaType(file.type);
-      // Create preview URL
-      if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
       const blob = new Blob([buf], { type: file.type });
-      setCoverPreviewUrl(URL.createObjectURL(blob));
+      const newUrl = URL.createObjectURL(blob);
+      coverPreviewUrlRef.current = newUrl;
+      setCoverPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return newUrl;
+      });
     };
     reader.readAsArrayBuffer(file);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCoverRemove = useCallback(() => {
     setCoverImage(null);
     setCoverMediaType(null);
-    if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
-    setCoverPreviewUrl(null);
+    setCoverPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    coverPreviewUrlRef.current = null;
     if (coverInputRef.current) coverInputRef.current.value = "";
-  }, [coverPreviewUrl]);
+  }, []);
 
   const handleCoverDrop = useCallback(
     (e: React.DragEvent) => {
@@ -307,7 +311,9 @@ function ExportDialogInner({
 
           const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
           const blob = new Blob([bytes], { type: "application/pdf" });
-          setPdfUrl(URL.createObjectURL(blob) + "#view=FitH");
+          const newPdfUrl = URL.createObjectURL(blob) + "#view=FitH";
+          pdfUrlRef.current = newPdfUrl;
+          setPdfUrl(newPdfUrl);
         } else {
           setPreviewError(result.error);
         }
@@ -327,14 +333,13 @@ function ExportDialogInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPreviewApi, settings, selectedFormat, content, metadata]);
 
-  // Cleanup blob URLs on unmount
+  // Cleanup blob URLs on unmount (refs always hold the latest values)
   useEffect(() => {
     return () => {
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-      if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
+      if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+      if (coverPreviewUrlRef.current) URL.revokeObjectURL(coverPreviewUrlRef.current);
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- Web: print preview button handler ---
