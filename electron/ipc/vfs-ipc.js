@@ -10,6 +10,9 @@ const path = require("path");
 const os = require("os");
 const { toForwardSlash, assertPathInsideRoot } = require("../lib/path-utils");
 
+/** Maximum content size accepted by write-file (same limit as file-ipc.js) */
+const MAX_CONTENT_BYTES = 50 * 1024 * 1024; // 50 MB
+
 function registerVFSHandlers() {
   // Track the opened root directory per window for path validation
   const allowedRoots = new Map();
@@ -104,6 +107,13 @@ function registerVFSHandlers() {
 
   // Write file content
   ipcMain.handle("vfs:write-file", async (event, filePath, content) => {
+    // Validate content type and size before touching disk
+    if (typeof content !== "string") {
+      throw new Error("Invalid content: expected string");
+    }
+    if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
+      throw new Error("ファイルサイズが上限を超えています（50 MB）");
+    }
     try {
       const resolved = validateVFSPath(event, filePath);
       // Use open -> write -> sync -> close pattern for better compatibility with virtual file systems (e.g., Google Drive on Windows)
