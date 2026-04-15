@@ -31,4 +31,22 @@ function assertPathInsideRoot(resolvedPath, rootPath) {
   }
 }
 
-module.exports = { toForwardSlash, assertPathInsideRoot };
+/**
+ * Return Windows system directory deny prefixes based on the actual system drive.
+ * Uses the SystemRoot environment variable so the correct drive letter is detected
+ * even on non-C: installations.
+ * @returns {string[]}
+ */
+function getWindowsDenyPrefixes() {
+  if (process.platform !== "win32") return [];
+  const sysRoot = (process.env.SystemRoot ?? "C:\\Windows").replace(/\\/g, "/");
+  const sysDrive = sysRoot.split("/")[0];
+  return [
+    `${sysDrive}/Windows`,
+    `${sysDrive}/Program Files`,
+    `${sysDrive}/Program Files (x86)`,
+    `${sysDrive}/ProgramData`,
+  ];
+}
+
+module.exports = { toForwardSlash, assertPathInsideRoot, getWindowsDenyPrefixes };

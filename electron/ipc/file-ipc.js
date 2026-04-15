@@ -6,6 +6,7 @@ const path = require("path");
 const fs = require("fs/promises");
 const os = require("os");
 const log = require("electron-log");
+const { getWindowsDenyPrefixes } = require("../lib/path-utils");
 
 // --- save-file path security validation ---
 // Tracks file paths that have been approved via native dialog or system file association,
@@ -83,7 +84,7 @@ function isSavePathDenied(normalizedPath) {
   const driveLetterMatch = normalizedPath.match(/^([a-zA-Z]):?\/?$/);
   if (driveLetterMatch) return true;
 
-  const windowsDenyPrefixes = ["C:/Windows", "C:/Program Files", "C:/Program Files (x86)"];
+  const windowsDenyPrefixes = getWindowsDenyPrefixes();
 
   // Sensitive directories within home
   const homeSensitiveSuffixes = [

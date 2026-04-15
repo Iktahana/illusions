@@ -8,7 +8,11 @@ const { ipcMain, dialog, app, BrowserWindow, webContents } = require("electron")
 const fs = require("fs/promises");
 const path = require("path");
 const os = require("os");
-const { toForwardSlash, assertPathInsideRoot } = require("../lib/path-utils");
+const {
+  toForwardSlash,
+  assertPathInsideRoot,
+  getWindowsDenyPrefixes,
+} = require("../lib/path-utils");
 
 /** Maximum content size accepted by write-file (same limit as file-ipc.js) */
 const MAX_CONTENT_BYTES = 50 * 1024 * 1024; // 50 MB
@@ -216,24 +220,6 @@ function registerVFSHandlers() {
       throw error;
     }
   });
-
-  /**
-   * Return Windows system directory deny prefixes based on the actual system drive.
-   * Uses the SystemRoot environment variable so the correct drive letter is detected
-   * even on non-C: installations.
-   * @returns {string[]}
-   */
-  function getWindowsDenyPrefixes() {
-    if (process.platform !== "win32") return [];
-    const sysRoot = (process.env.SystemRoot ?? "C:\\Windows").replace(/\\/g, "/");
-    const sysDrive = sysRoot.split("/")[0];
-    return [
-      `${sysDrive}/Windows`,
-      `${sysDrive}/Program Files`,
-      `${sysDrive}/Program Files (x86)`,
-      `${sysDrive}/ProgramData`,
-    ];
-  }
 
   /**
    * Check if a path is in the system-sensitive denylist.
