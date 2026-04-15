@@ -181,8 +181,7 @@ function Characters({ content }: CharactersProps) {
     }
   }, [content, characters]);
 
-  /** LLM-based extraction with batch decoding */
-  /** Auto-extract: use NLP-based extraction (LLM extraction will be available via online API in the future) */
+  /** Auto-extract: use NLP-based extraction (AI extraction will be available via online API in the future) */
   const handleAutoExtract = useCallback(async () => {
     if (!content) return;
     await handleNlpExtract();
