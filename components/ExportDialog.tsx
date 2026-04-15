@@ -160,6 +160,13 @@ function ExportDialogInner({
   const [epubTitle, setEpubTitle] = useState(metadata.title || "");
   const [epubAuthor, setEpubAuthor] = useState(metadata.author || authUserName || "");
 
+  // Update author when auth finishes loading asynchronously
+  useEffect(() => {
+    if (authUserName && !epubAuthor) {
+      setEpubAuthor(authUserName);
+    }
+  }, [authUserName]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // --- Cover image state ---
   const [coverImage, setCoverImage] = useState<Uint8Array | null>(null);
   const [coverMediaType, setCoverMediaType] = useState<string | null>(null);

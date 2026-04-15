@@ -27,8 +27,8 @@ export const PAGE_SIZE_CATEGORIES: PageSizeCategory[] = [
     sizes: [
       { key: "A4", label: "A4", width: 210, height: 297 },
       { key: "A5", label: "A5", width: 148, height: 210 },
-      { key: "B5", label: "B5 (JIS)", width: 182, height: 257 },
-      { key: "B6", label: "B6 (JIS)", width: 128, height: 182 },
+      { key: "JIS-B5", label: "B5 (JIS)", width: 182, height: 257 },
+      { key: "JIS-B6", label: "B6 (JIS)", width: 128, height: 182 },
       { key: "Bunko", label: "文庫判", width: 105, height: 148 },
       { key: "Shinsho", label: "新書判", width: 103, height: 182 },
       { key: "Shirokuban", label: "四六判", width: 127, height: 188 },
@@ -54,17 +54,17 @@ export const PAGE_SIZE_CATEGORIES: PageSizeCategory[] = [
   {
     name: "JIS B",
     sizes: [
-      { key: "B0", label: "B0 (JIS)", width: 1030, height: 1456 },
-      { key: "B1", label: "B1 (JIS)", width: 728, height: 1030 },
-      { key: "B2", label: "B2 (JIS)", width: 515, height: 728 },
-      { key: "B3", label: "B3 (JIS)", width: 364, height: 515 },
-      { key: "B4", label: "B4 (JIS)", width: 257, height: 364 },
-      { key: "B5", label: "B5 (JIS)", width: 182, height: 257 },
-      { key: "B6", label: "B6 (JIS)", width: 128, height: 182 },
-      { key: "B7", label: "B7 (JIS)", width: 91, height: 128 },
-      { key: "B8", label: "B8 (JIS)", width: 64, height: 91 },
-      { key: "B9", label: "B9 (JIS)", width: 45, height: 64 },
-      { key: "B10", label: "B10 (JIS)", width: 32, height: 45 },
+      { key: "JIS-B0", label: "B0 (JIS)", width: 1030, height: 1456 },
+      { key: "JIS-B1", label: "B1 (JIS)", width: 728, height: 1030 },
+      { key: "JIS-B2", label: "B2 (JIS)", width: 515, height: 728 },
+      { key: "JIS-B3", label: "B3 (JIS)", width: 364, height: 515 },
+      { key: "JIS-B4", label: "B4 (JIS)", width: 257, height: 364 },
+      { key: "JIS-B5", label: "B5 (JIS)", width: 182, height: 257 },
+      { key: "JIS-B6", label: "B6 (JIS)", width: 128, height: 182 },
+      { key: "JIS-B7", label: "B7 (JIS)", width: 91, height: 128 },
+      { key: "JIS-B8", label: "B8 (JIS)", width: 64, height: 91 },
+      { key: "JIS-B9", label: "B9 (JIS)", width: 45, height: 64 },
+      { key: "JIS-B10", label: "B10 (JIS)", width: 32, height: 45 },
     ],
   },
   {
@@ -155,6 +155,13 @@ for (const cat of PAGE_SIZE_CATEGORIES) {
     ALL_PAGE_SIZE_KEYS.add(s.key);
   }
 }
+
+// Legacy aliases: "B5"/"B6" historically meant ISO dimensions in pdf-export-settings.
+// Preserve these so existing saved settings resolve correctly after upgrade.
+PAGE_DIMENSIONS["B5"] ??= PAGE_DIMENSIONS["ISO-B5"];
+PAGE_DIMENSIONS["B6"] ??= PAGE_DIMENSIONS["ISO-B6"];
+ALL_PAGE_SIZE_KEYS.add("B5");
+ALL_PAGE_SIZE_KEYS.add("B6");
 
 /** Format dimensions as "W×H mm" for display */
 export function formatDimensions(key: string): string {
