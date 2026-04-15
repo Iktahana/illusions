@@ -165,7 +165,9 @@ async function apiDelete(token, path) {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    throw new Error(`DELETE ${path} → ${res.status}: ${await res.text()}`);
+    const err = new Error(`DELETE ${path} → ${res.status}: ${await res.text()}`);
+    err.status = res.status;
+    throw err;
   }
 }
 
@@ -407,19 +409,24 @@ async function main() {
     // In full-submission mode, always delete the pending submission and create
     // a fresh one. A pending submission in PreProcessing or validation state
     // cannot be updated (409 InvalidState), so reusing it would fail.
-    // Retry with exponential backoff because a recently-committed submission
+    // Retry with linear backoff because a recently-committed submission
     // may still be in a transient state that rejects DELETE (409 Conflict).
+    // Only transient 409 errors are retried; other failures surface immediately.
     const DELETE_MAX_ATTEMPTS = 5;
     const DELETE_BASE_DELAY_MS = 30_000; // 30 seconds
     for (let attempt = 1; attempt <= DELETE_MAX_ATTEMPTS; attempt++) {
       try {
-        console.log(`  Deleting existing pending submission: ${pendingId} (attempt ${attempt}/${DELETE_MAX_ATTEMPTS})`);
+        console.log(
+          `  Deleting existing pending submission: ${pendingId} (attempt ${attempt}/${DELETE_MAX_ATTEMPTS})`,
+        );
         await apiDelete(token, `/applications/${APP_ID}/submissions/${pendingId}`);
         break;
       } catch (deleteErr) {
-        if (attempt === DELETE_MAX_ATTEMPTS) throw deleteErr;
+        if (deleteErr.status !== 409 || attempt === DELETE_MAX_ATTEMPTS) {
+          throw deleteErr;
+        }
         const delay = DELETE_BASE_DELAY_MS * attempt;
-        console.log(`  DELETE failed: ${deleteErr.message}`);
+        console.log(`  DELETE failed with transient 409: ${deleteErr.message}`);
         console.log(`  Retrying in ${delay / 1000}s...`);
         await new Promise((r) => setTimeout(r, delay));
       }
