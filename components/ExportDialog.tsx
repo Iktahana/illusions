@@ -12,7 +12,6 @@ import {
 } from "@/lib/export/export-settings";
 import { FontSelector } from "@/components/explorer/FontSelector";
 import { PageSizeSelector } from "@/components/PageSizeSelector";
-import { openWebPrintPreview } from "@/lib/export/web-print-preview";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { useAuthSafe } from "@/contexts/AuthContext";
 
@@ -176,7 +175,6 @@ function ExportDialogInner({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [popupBlocked, setPopupBlocked] = useState(false);
   const generationIdRef = useRef(0);
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -341,20 +339,6 @@ function ExportDialogInner({
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
     };
   }, []);
-
-  // --- Web: print preview button handler ---
-  const handleWebPrintPreview = useCallback(async () => {
-    setPopupBlocked(false);
-    try {
-      const pdfSettings = toPdfExportSettings(settings);
-      const opened = await openWebPrintPreview(content, metadata, pdfSettings);
-      if (!opened) {
-        setPopupBlocked(true);
-      }
-    } catch {
-      setPreviewError("印刷プレビューの生成に失敗しました");
-    }
-  }, [settings, content, metadata]);
 
   // --- Action button label ---
   const actionLabel =
@@ -821,25 +805,14 @@ function ExportDialogInner({
                 <div className="flex flex-col items-center justify-center h-full gap-4 px-6">
                   <div className="text-center space-y-2">
                     <p className="text-sm text-foreground-secondary">
-                      ブラウザの印刷プレビューで確認できます
+                      エクスポートボタンをクリックすると印刷ダイアログが開きます。
+                      「PDFとして保存」を選択してください。
                     </p>
                     <p className="text-xs text-foreground-tertiary">
                       {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
                       {settings.verticalWriting ? "縦書き" : "横書き"} · {settings.fontFamily}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className="px-4 py-2 rounded-lg text-sm bg-accent text-accent-foreground hover:bg-accent-hover transition-colors"
-                    onClick={handleWebPrintPreview}
-                  >
-                    印刷プレビューを開く
-                  </button>
-                  {popupBlocked && (
-                    <p className="text-xs text-danger">
-                      ポップアップがブロックされました。ブラウザの設定を確認してください。
-                    </p>
-                  )}
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full">

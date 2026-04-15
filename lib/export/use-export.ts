@@ -84,13 +84,7 @@ export function useExport({
           const suggestedName = `${baseName}${suffix}.txt`;
 
           const blob = new Blob([converted], { type: "text/plain;charset=utf-8" });
-          const saved = await saveBlobFile(
-            blob,
-            suggestedName,
-            { "text/plain": [".txt"] },
-            isElectron,
-            ".txt",
-          );
+          const saved = await saveBlobFile(blob, suggestedName, isElectron, ".txt");
           notificationManager.dismiss(progressId);
 
           if (saved) {
@@ -249,23 +243,18 @@ async function exportAsWeb(
   try {
     let blob: Blob;
     let suggestedName: string;
-    let accept: Record<string, string[]>;
 
     switch (format) {
       case "docx": {
         const { generateDocxBlob } = await import("./docx-exporter");
         blob = await generateDocxBlob(content, { metadata });
         suggestedName = `${baseName}.docx`;
-        accept = {
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
-        };
         break;
       }
       case "epub": {
         const { generateEpubBlob } = await import("./epub-web");
         blob = await generateEpubBlob(content, { metadata });
         suggestedName = `${baseName}.epub`;
-        accept = { "application/epub+zip": [".epub"] };
         break;
       }
       default:
@@ -273,7 +262,7 @@ async function exportAsWeb(
         return;
     }
 
-    const saved = await saveBlobFile(blob, suggestedName, accept, false);
+    const saved = await saveBlobFile(blob, suggestedName, false);
     notificationManager.dismiss(progressId);
 
     if (saved) {
