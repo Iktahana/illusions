@@ -6,7 +6,7 @@
  */
 
 export interface PdfExportSettings {
-  pageSize: "A4" | "A5" | "B5" | "B6";
+  pageSize: string;
   landscape: boolean;
   verticalWriting: boolean;
   charsPerLine: number;
@@ -41,13 +41,9 @@ export const DEFAULT_PDF_SETTINGS: PdfExportSettings = {
   textIndent: 1,
 };
 
-/** Page dimensions in mm */
-export const PAGE_DIMENSIONS: Record<string, { width: number; height: number }> = {
-  A4: { width: 210, height: 297 },
-  A5: { width: 148, height: 210 },
-  B5: { width: 176, height: 250 },
-  B6: { width: 125, height: 176 },
-};
+// Import and re-export comprehensive page dimensions from page-sizes module
+import { PAGE_DIMENSIONS } from "./page-sizes";
+export { PAGE_DIMENSIONS };
 
 const STORAGE_KEY = "illusions:pdf-export-settings";
 

@@ -80,7 +80,7 @@ declare global {
     ) => Promise<string | { success: false; error: string } | null>;
     exportEPUB?: (
       content: string,
-      options: { metadata: { title: string; author?: string; date?: string; language?: string } },
+      options: import("@/lib/export/epub-shared").EpubExportOptions,
     ) => Promise<string | { success: false; error: string } | null>;
     exportDOCX?: (
       content: string,

@@ -559,12 +559,22 @@ function registerFileHandlers() {
       };
     }
     try {
+      // Convert ArrayBuffer cover image back to Uint8Array if present
+      const epubOptions = { ...options };
+      if (epubOptions.coverImage && epubOptions.coverImage instanceof ArrayBuffer) {
+        epubOptions.coverImage = new Uint8Array(epubOptions.coverImage);
+      }
+
       const { generateEpub } = require("../../lib/export/epub-exporter");
-      const epubBuffer = await generateEpub(content, options || {});
+      const epubBuffer = await generateEpub(content, epubOptions);
+
+      // Sanitize filename: remove characters invalid on Windows
+      const rawTitle = epubOptions?.metadata?.title || "untitled";
+      const safeTitle = rawTitle.replace(/[<>:"/\\|?*]/g, "_");
 
       const { filePath } = await dialog.showSaveDialog({
         title: "EPUBとしてエクスポート",
-        defaultPath: `${options?.metadata?.title || "untitled"}.epub`,
+        defaultPath: `${safeTitle}.epub`,
         filters: [{ name: "EPUB", extensions: ["epub"] }],
       });
 

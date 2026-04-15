@@ -6,12 +6,10 @@
  * for proper Japanese font rendering in Word.
  */
 
-import { PAGE_DIMENSIONS } from "./pdf-export-settings";
-
-export type DocxPageSize = "A4" | "A5" | "B5" | "B6";
+import { PAGE_DIMENSIONS, ALL_PAGE_SIZE_KEYS } from "./page-sizes";
 
 export interface DocxExportSettings {
-  pageSize: DocxPageSize;
+  pageSize: string;
   landscape: boolean;
   verticalWriting: boolean;
   fontFamily: string;
@@ -105,10 +103,10 @@ function clamp(value: number, min: number, max: number): number {
 
 export function sanitizeSettings(raw: Partial<DocxExportSettings>): DocxExportSettings {
   const d = DEFAULT_DOCX_SETTINGS;
-  const validPageSizes: DocxPageSize[] = ["A4", "A5", "B5", "B6"];
-  const pageSize = validPageSizes.includes(raw.pageSize as DocxPageSize)
-    ? (raw.pageSize as DocxPageSize)
-    : d.pageSize;
+  const pageSize =
+    typeof raw.pageSize === "string" && ALL_PAGE_SIZE_KEYS.has(raw.pageSize)
+      ? raw.pageSize
+      : d.pageSize;
 
   const rawMargins = raw.margins;
   const hasMargins = typeof rawMargins === "object" && rawMargins !== null;

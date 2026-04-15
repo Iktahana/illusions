@@ -330,15 +330,22 @@ export function mdiToHtml(
 }
 
 /**
- * Split MDI markdown into chapters by top-level headings (# ).
+ * Split MDI markdown into chapters by headings.
  *
  * Content before the first heading becomes a chapter with an empty title.
  * Each chapter's htmlContent is generated with bodyOnly mode.
  *
  * @param markdown - Full MDI markdown document
+ * @param splitLevel - Max heading level to split on (1=H1, 2=H1+H2, 3=H1+H2+H3, 0=no split)
  * @returns Array of Chapter objects
  */
-export function splitIntoChapters(markdown: string): Chapter[] {
+export function splitIntoChapters(markdown: string, splitLevel: number = 1): Chapter[] {
+  // No splitting — entire document is one chapter
+  if (splitLevel <= 0) {
+    const html = mdiToHtml(markdown, { bodyOnly: true });
+    return [{ title: "", htmlContent: html, level: 1 }];
+  }
+
   const chapters: Chapter[] = [];
   const lines = markdown.split("\n");
 
@@ -348,10 +355,9 @@ export function splitIntoChapters(markdown: string): Chapter[] {
   let hasStarted = false;
 
   for (const line of lines) {
-    // Match top-level headings: "# Title"
     const headingMatch = /^(#{1,6})\s+(.+)$/.exec(line);
 
-    if (headingMatch && headingMatch[1] === "#") {
+    if (headingMatch && headingMatch[1].length <= splitLevel) {
       // Flush previous chapter
       if (hasStarted || currentLines.length > 0) {
         const content = currentLines.join("\n").trim();
@@ -363,7 +369,7 @@ export function splitIntoChapters(markdown: string): Chapter[] {
       }
 
       currentTitle = headingMatch[2].trim();
-      currentLevel = 1;
+      currentLevel = headingMatch[1].length;
       currentLines = [];
       hasStarted = true;
     } else {

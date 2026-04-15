@@ -19,7 +19,7 @@ export interface ExportOptions {
 export interface PdfGenerationOptions {
   metadata: ExportMetadata;
   verticalWriting?: boolean;
-  pageSize?: "A4" | "A5" | "B5" | "B6";
+  pageSize?: string;
   landscape?: boolean;
   margins?: { top: number; bottom: number; left: number; right: number };
   charsPerLine?: number;
