@@ -42,6 +42,10 @@ permissions:
   pull-requests: read
   models: read
 
+concurrency:
+  group: "ms-store-submission"
+  cancel-in-progress: true
+
 jobs:
   submit:
     name: Submit to Microsoft Store (${{ inputs.mode }})

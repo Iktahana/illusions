@@ -27,7 +27,7 @@
     "test:coverage": "vitest run --coverage",
     "generate:credits": "npx tsx scripts/generate-credits.ts",
     "generate:store-assets": "node scripts/generate-store-assets.mjs",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "node -e \"if(!process.env.VERCEL){require('child_process').execSync('electron-builder install-app-deps',{stdio:'inherit'})}\""
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
