@@ -1,5 +1,5 @@
 /**
- * Unified export settings for PDF and DOCX.
+ * Unified export settings for PDF, DOCX, and EPUB.
  *
  * Uses charsPerLine / linesPerPage as the canonical typesetting model
  * (more expressive than raw fontSize + lineSpacing). DOCX-specific values
@@ -8,17 +8,21 @@
  * Migrates from legacy per-format localStorage keys on first load.
  */
 
-import { calculateTypesetting, PAGE_DIMENSIONS } from "./pdf-export-settings";
+import { calculateTypesetting } from "./pdf-export-settings";
+import { PAGE_DIMENSIONS, ALL_PAGE_SIZE_KEYS } from "./page-sizes";
 import { ALL_JAPANESE_FONTS } from "@/lib/utils/fonts";
 
 import type { PdfExportSettings } from "./pdf-export-settings";
 import type { DocxExportSettings } from "./docx-export-settings";
+import type { ChapterSplitLevel, EpubExportOptions } from "./epub-shared";
+import type { ExportMetadata } from "./types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type ExportPageSize = "A4" | "A5" | "B5" | "B6";
+/** Page size key — any key in PAGE_DIMENSIONS (e.g. "A4", "Bunko", "Letter") */
+export type ExportPageSize = string;
 
 export type PageNumberFormat = "simple" | "dash" | "fraction";
 export type PageNumberPosition =
@@ -41,6 +45,10 @@ export interface UnifiedExportSettings {
   pageNumberFormat: PageNumberFormat;
   pageNumberPosition: PageNumberPosition;
   textIndent: number;
+  // EPUB-specific
+  epubPublisher: string;
+  epubIdentifier: string;
+  epubChapterSplitLevel: ChapterSplitLevel;
 }
 
 export const DEFAULT_EXPORT_SETTINGS: UnifiedExportSettings = {
@@ -55,6 +63,9 @@ export const DEFAULT_EXPORT_SETTINGS: UnifiedExportSettings = {
   pageNumberFormat: "simple",
   pageNumberPosition: "bottom-center",
   textIndent: 1,
+  epubPublisher: "",
+  epubIdentifier: "",
+  epubChapterSplitLevel: "h1",
 };
 
 // ---------------------------------------------------------------------------
@@ -196,6 +207,27 @@ export function toDocxExportSettings(s: UnifiedExportSettings): DocxExportSettin
   };
 }
 
+export function toEpubExportOptions(
+  s: UnifiedExportSettings,
+  metadata: ExportMetadata,
+  coverImage?: Uint8Array,
+  coverMediaType?: string,
+): EpubExportOptions {
+  return {
+    metadata: {
+      ...metadata,
+      publisher: s.epubPublisher || undefined,
+      identifier: s.epubIdentifier || undefined,
+    },
+    verticalWriting: s.verticalWriting,
+    fontFamily: fontKeyToCss(s.fontFamily),
+    textIndent: s.textIndent,
+    chapterSplitLevel: s.epubChapterSplitLevel,
+    coverImage,
+    coverMediaType,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Persistence & migration
 // ---------------------------------------------------------------------------
@@ -204,7 +236,6 @@ const STORAGE_KEY = "illusions:export-settings";
 const LEGACY_PDF_KEY = "illusions:pdf-export-settings";
 const LEGACY_DOCX_KEY = "illusions:docx-export-settings";
 
-const VALID_PAGE_SIZES: ExportPageSize[] = ["A4", "A5", "B5", "B6"];
 const VALID_PAGE_NUMBER_FORMATS: PageNumberFormat[] = ["simple", "dash", "fraction"];
 const VALID_PAGE_NUMBER_POSITIONS: PageNumberPosition[] = [
   "bottom-left",
@@ -214,6 +245,7 @@ const VALID_PAGE_NUMBER_POSITIONS: PageNumberPosition[] = [
   "top-center",
   "top-right",
 ];
+const VALID_CHAPTER_SPLIT_LEVELS: ChapterSplitLevel[] = ["h1", "h2", "h3", "none"];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -221,9 +253,10 @@ function clamp(value: number, min: number, max: number): number {
 
 function sanitize(raw: Partial<UnifiedExportSettings>): UnifiedExportSettings {
   const d = DEFAULT_EXPORT_SETTINGS;
-  const pageSize = VALID_PAGE_SIZES.includes(raw.pageSize as ExportPageSize)
-    ? (raw.pageSize as ExportPageSize)
-    : d.pageSize;
+  const pageSize =
+    typeof raw.pageSize === "string" && ALL_PAGE_SIZE_KEYS.has(raw.pageSize)
+      ? raw.pageSize
+      : d.pageSize;
 
   const rawMargins = raw.margins;
   const hasMargins = typeof rawMargins === "object" && rawMargins !== null;
@@ -271,6 +304,13 @@ function sanitize(raw: Partial<UnifiedExportSettings>): UnifiedExportSettings {
       ? (raw.pageNumberPosition as PageNumberPosition)
       : d.pageNumberPosition,
     textIndent: typeof raw.textIndent === "number" ? clamp(raw.textIndent, 0, 4) : d.textIndent,
+    epubPublisher: typeof raw.epubPublisher === "string" ? raw.epubPublisher : d.epubPublisher,
+    epubIdentifier: typeof raw.epubIdentifier === "string" ? raw.epubIdentifier : d.epubIdentifier,
+    epubChapterSplitLevel: VALID_CHAPTER_SPLIT_LEVELS.includes(
+      raw.epubChapterSplitLevel as ChapterSplitLevel,
+    )
+      ? (raw.epubChapterSplitLevel as ChapterSplitLevel)
+      : d.epubChapterSplitLevel,
   };
 }
 
@@ -351,3 +391,4 @@ export function saveExportSettings(settings: UnifiedExportSettings): void {
 }
 
 export { PAGE_DIMENSIONS };
+export type { ChapterSplitLevel, EpubExportOptions };

@@ -35,6 +35,14 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
+/**
+ * Safe variant that returns null when called outside an AuthProvider.
+ * Use in components that may render without auth context (e.g. export dialogs).
+ */
+export function useAuthSafe(): AuthContextValue | null {
+  return useContext(AuthContext);
+}
+
 // ---------------------------------------------------------------------------
 // Electron-only token persistence (safeStorage / IPC)
 // ---------------------------------------------------------------------------

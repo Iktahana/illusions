@@ -24,7 +24,7 @@ interface UseExportParams {
    * and later call the IPC with user-configured options.
    */
   onExportDialogRequest?: (
-    format: "pdf" | "docx",
+    format: "pdf" | "docx" | "epub",
     content: string,
     metadata: ExportMetadata,
   ) => void;
@@ -104,8 +104,8 @@ export function useExport({
         return;
       }
 
-      // PDF/DOCX export: delegate to settings dialog when callback is provided
-      if ((format === "pdf" || format === "docx") && onExportDialogRequest) {
+      // PDF/DOCX/EPUB export: delegate to settings dialog when callback is provided
+      if ((format === "pdf" || format === "docx" || format === "epub") && onExportDialogRequest) {
         onExportDialogRequest(format, content, metadata);
         return;
       }
