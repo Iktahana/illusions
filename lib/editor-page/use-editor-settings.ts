@@ -22,7 +22,7 @@ export type EditorSettings = DisplaySettings & AiSettings & DictSettings;
 
 /** Combined handlers from display, AI, and dictionary sub-hooks */
 export type EditorSettingsHandlers = Omit<DisplaySettingsHandlers, "setShowSettingsModal"> &
-  Omit<AiSettingsHandlers, "setLintingEnabled" | "setLintingRuleConfigs" | "setLlmEnabled"> &
+  Omit<AiSettingsHandlers, "setLintingEnabled" | "setLintingRuleConfigs"> &
   DictSettingsHandlers & {
     setShowSettingsModal: (value: boolean) => void;
     handleLintingEnabledChange: (value: boolean) => void;
@@ -104,9 +104,6 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
     handleLintingEnabledChange: aiHandlers.handleLintingEnabledChange,
     handleLintingRuleConfigChange: aiHandlers.handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange: aiHandlers.handleLintingRuleConfigsBatchChange,
-    handleLlmEnabledChange: aiHandlers.handleLlmEnabledChange,
-    handleLlmModelIdChange: aiHandlers.handleLlmModelIdChange,
-    handleLlmIdlingStopChange: aiHandlers.handleLlmIdlingStopChange,
     handleCharacterExtractionBatchSizeChange: aiHandlers.handleCharacterExtractionBatchSizeChange,
     handleCharacterExtractionConcurrencyChange:
       aiHandlers.handleCharacterExtractionConcurrencyChange,

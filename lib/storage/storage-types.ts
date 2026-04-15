@@ -83,11 +83,6 @@ export interface AppState {
     { enabled: boolean; severity: Severity; skipDialogue?: boolean }
   >;
 
-  // LLM設定（ローカルモデル用）
-  llmEnabled?: boolean;
-  llmModelId?: string;
-  llmIdlingStop?: boolean;
-
   // オンラインAI API設定
   aiApiKey?: string;
   aiBaseUrl?: string;
@@ -134,7 +129,6 @@ export interface AppState {
   prePowerSaveState?: {
     lintingEnabled: boolean;
     lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
-    llmEnabled?: boolean;
   } | null;
 
   // 読み上げ（TTS）設定
