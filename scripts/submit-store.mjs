@@ -422,11 +422,23 @@ async function main() {
         await apiDelete(token, `/applications/${APP_ID}/submissions/${pendingId}`);
         break;
       } catch (deleteErr) {
-        if (deleteErr.status !== 409 || attempt === DELETE_MAX_ATTEMPTS) {
+        if (deleteErr.status !== 409) {
+          throw deleteErr;
+        }
+        if (attempt === DELETE_MAX_ATTEMPTS) {
+          console.error(
+            `\n  *** Persistent 409: submission ${pendingId} cannot be deleted after ${DELETE_MAX_ATTEMPTS} attempts. ***\n` +
+              `  This usually means the submission is stuck in a non-deletable state\n` +
+              `  (e.g., InProgress, PreProcessing, or under certification review).\n` +
+              `  Action required: go to https://partner.microsoft.com/dashboard\n` +
+              `  and manually cancel or wait for submission ${pendingId} to complete.`,
+          );
           throw deleteErr;
         }
         const delay = DELETE_BASE_DELAY_MS * attempt;
-        console.log(`  DELETE failed with transient 409: ${deleteErr.message}`);
+        console.log(
+          `  [DELETE retry ${attempt}/${DELETE_MAX_ATTEMPTS}] 409 for submission ${pendingId}: ${deleteErr.message}`,
+        );
         console.log(`  Retrying in ${delay / 1000}s...`);
         await new Promise((r) => setTimeout(r, delay));
       }
