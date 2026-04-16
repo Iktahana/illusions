@@ -93,7 +93,7 @@
     "cross-env": "^10.1.0",
     "dexie": "^4.2.1",
     "diff": "^8.0.3",
-    "electron": "^32.3.3",
+    "electron": "^39.8.5",
     "electron-builder": "^26.4.0",
     "esbuild": "^0.27.3",
     "eslint": "^9.18.0",
