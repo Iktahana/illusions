@@ -72,6 +72,7 @@ docs/.obsidian/
 
 # Git worktrees
 .worktrees/
+.claude/worktrees/
 
 # Review loop artifacts
 reviews/
