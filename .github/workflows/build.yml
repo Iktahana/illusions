@@ -404,7 +404,7 @@ jobs:
           retention-days: 1
 
   package-windows-nsis:
-    name: Build (Windows NSIS)
+    name: Build (Windows NSIS ${{ matrix.arch }})
     needs: [detect-changes, compute-version, build-windows-core]
     # Allow PRs to run (build-windows-core runs in type-check-only mode on PRs; compute-version is skipped),
     # but require successful compute-version and build-windows-core for non-PR events before packaging.
@@ -418,6 +418,9 @@ jobs:
       &&
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
+    strategy:
+      matrix:
+        arch: [x64, arm64]
     env:
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
@@ -440,9 +443,9 @@ jobs:
           path: |
             ${{ env.ELECTRON_CACHE }}
             ${{ env.ELECTRON_BUILDER_CACHE }}
-          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+          key: electron-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            electron-${{ runner.os }}-${{ runner.arch }}-
+            electron-${{ runner.os }}-${{ matrix.arch }}-
 
       - name: Install dependencies
         shell: bash
@@ -470,19 +473,58 @@ jobs:
         with:
           name: windows-build-output
 
+      - name: Rebuild native modules for target arch
+        if: github.event_name != 'pull_request'
+        run: npm run bundle:electron -- --target-arch ${{ matrix.arch }}
+
+      - name: Verify native module architecture
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $expectedArch = "${{ matrix.arch }}"
+
+          # Check better-sqlite3.node PE header
+          $bsql = "dist-main/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+          if (Test-Path $bsql) {
+            $bytes = [System.IO.File]::ReadAllBytes($bsql)
+            $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+            $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+            # 0x8664 = AMD64 (x64), 0xAA64 = ARM64
+            $expectedMachine = if ($expectedArch -eq "x64") { 0x8664 } else { 0xAA64 }
+            if ($machine -ne $expectedMachine) {
+              Write-Error "better_sqlite3.node architecture mismatch: expected $expectedArch (0x$($expectedMachine.ToString('X4'))) but got 0x$($machine.ToString('X4'))"
+              exit 1
+            }
+          }
+
+          # Verify node-pty build/ was removed for cross-arch (should use prebuilds/)
+          if ($expectedArch -ne "x64" -and (Test-Path "dist-main/node_modules/node-pty/build/Release")) {
+            Write-Error "node-pty/build/Release still exists — ARM64 would load wrong binary"
+            exit 1
+          }
+
+          # Verify prebuilds for target arch exist
+          $prebuildsDir = "dist-main/node_modules/node-pty/prebuilds/win32-$expectedArch"
+          if (-not (Test-Path $prebuildsDir)) {
+            Write-Error "node-pty prebuilds for win32-$expectedArch not found"
+            exit 1
+          }
+
+          Write-Host "✅ Native modules verified for $expectedArch"
+
       - name: Build NSIS installer
         if: github.event_name != 'pull_request'
-        run: npx electron-builder --win nsis --x64 --arm64 --publish never
+        run: npx electron-builder --win nsis --${{ matrix.arch }} --publish never
 
       - name: Upload NSIS artifacts
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
-          name: illusions-windows-${{ needs.compute-version.outputs.full }}
+          name: illusions-windows-${{ matrix.arch }}-${{ needs.compute-version.outputs.full }}
           path: dist-electron/**
 
   package-windows-msix:
-    name: Build (Windows Store)
+    name: Build (Windows Store ${{ matrix.arch }})
     needs: [detect-changes, compute-version, build-windows-core]
     # Allow PRs to run: build-windows-core runs on PRs (type-check-only mode; compute-version is skipped).
     # For non-PR events, require successful compute-version and build-windows-core before packaging.
@@ -496,6 +538,9 @@ jobs:
       &&
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
+    strategy:
+      matrix:
+        arch: [x64, arm64]
     outputs:
       version: ${{ needs.compute-version.outputs.full }}
     env:
@@ -520,9 +565,9 @@ jobs:
           path: |
             ${{ env.ELECTRON_CACHE }}
             ${{ env.ELECTRON_BUILDER_CACHE }}
-          key: electron-${{ runner.os }}-msix-${{ hashFiles('package-lock.json') }}
+          key: electron-${{ runner.os }}-msix-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            electron-${{ runner.os }}-msix-
+            electron-${{ runner.os }}-msix-${{ matrix.arch }}-
 
       - name: Install dependencies
         shell: bash
@@ -550,15 +595,51 @@ jobs:
         with:
           name: windows-build-output
 
+      - name: Rebuild native modules for target arch
+        if: github.event_name != 'pull_request'
+        run: npm run bundle:electron -- --target-arch ${{ matrix.arch }}
+
+      - name: Verify native module architecture
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $expectedArch = "${{ matrix.arch }}"
+
+          # Check better-sqlite3.node PE header
+          $bsql = "dist-main/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+          if (Test-Path $bsql) {
+            $bytes = [System.IO.File]::ReadAllBytes($bsql)
+            $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+            $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+            $expectedMachine = if ($expectedArch -eq "x64") { 0x8664 } else { 0xAA64 }
+            if ($machine -ne $expectedMachine) {
+              Write-Error "better_sqlite3.node architecture mismatch: expected $expectedArch (0x$($expectedMachine.ToString('X4'))) but got 0x$($machine.ToString('X4'))"
+              exit 1
+            }
+          }
+
+          if ($expectedArch -ne "x64" -and (Test-Path "dist-main/node_modules/node-pty/build/Release")) {
+            Write-Error "node-pty/build/Release still exists — ARM64 would load wrong binary"
+            exit 1
+          }
+
+          $prebuildsDir = "dist-main/node_modules/node-pty/prebuilds/win32-$expectedArch"
+          if (-not (Test-Path $prebuildsDir)) {
+            Write-Error "node-pty prebuilds for win32-$expectedArch not found"
+            exit 1
+          }
+
+          Write-Host "✅ Native modules verified for $expectedArch"
+
       - name: Build MSIX package
         if: github.event_name != 'pull_request'
-        run: npx electron-builder --win appx --x64 --arm64 --publish never
+        run: npx electron-builder --win appx --${{ matrix.arch }} --publish never
 
       - name: Upload MSIX artifacts
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
-          name: illusions-windows-msix-${{ needs.compute-version.outputs.full }}
+          name: illusions-windows-msix-${{ matrix.arch }}-${{ needs.compute-version.outputs.full }}
           path: |
             dist-electron/*.appx
             dist-electron/*.appx.blockmap

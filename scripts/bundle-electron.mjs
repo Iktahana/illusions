@@ -14,6 +14,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, "..");
 
+const targetArchIndex = process.argv.indexOf("--target-arch");
+const targetArch = targetArchIndex !== -1 ? process.argv[targetArchIndex + 1] : process.arch;
+console.log(`🏗️  Target architecture: ${targetArch}`);
+
 const outDir = join(projectRoot, "dist-main");
 
 // Ensure output directory exists
@@ -70,9 +74,12 @@ console.log("✅ Preload script bundled to dist-main/preload.js");
 console.log("📦 Copying runtime dependencies for external modules...");
 
 const nodeModulesDest = join(outDir, "node_modules");
-if (!fs.existsSync(nodeModulesDest)) {
-  fs.mkdirSync(nodeModulesDest, { recursive: true });
+
+// Clean destination to prevent stale binaries from a previous arch
+if (fs.existsSync(nodeModulesDest)) {
+  fs.rmSync(nodeModulesDest, { recursive: true });
 }
+fs.mkdirSync(nodeModulesDest, { recursive: true });
 
 /**
  * Collect a package and all its production dependencies (transitive).
@@ -162,6 +169,41 @@ function resolvePackageDir(dep) {
   if (fs.existsSync(hoisted)) return hoisted;
   return null;
 }
+
+// When cross-compiling for a different architecture, swap native binaries
+// so the packaged app contains the correct arch-specific modules.
+async function prepareNativeModulesForArch(arch) {
+  if (arch === process.arch) return;
+
+  const { execSync } = await import("child_process");
+
+  // --- better-sqlite3: download correct prebuild for target arch ---
+  const bsqlDir = resolvePackageDir("better-sqlite3");
+  if (bsqlDir) {
+    const electronPkgPath = join(projectRoot, "node_modules", "electron", "package.json");
+    const electronPkg = JSON.parse(fs.readFileSync(electronPkgPath, "utf-8"));
+    console.log(`  📥 Downloading better-sqlite3 prebuild for win32-${arch}...`);
+    execSync(
+      `npx prebuild-install --arch ${arch} --platform win32 --runtime electron --target ${electronPkg.version}`,
+      { cwd: bsqlDir, stdio: "inherit" },
+    );
+    console.log(`  ✅ better-sqlite3 prebuild ready for ${arch}`);
+  }
+
+  // --- node-pty: remove build/Release so runtime uses prebuilds/win32-<arch> ---
+  // node-pty's loadNativeModule() resolves build/Release BEFORE prebuilds/.
+  // By removing build/, the runtime falls through to the correct prebuilds/win32-<arch>/.
+  const ptyDir = resolvePackageDir("node-pty");
+  if (ptyDir) {
+    const buildDir = join(ptyDir, "build");
+    if (fs.existsSync(buildDir)) {
+      fs.rmSync(buildDir, { recursive: true });
+      console.log(`  🗑️  Removed node-pty/build/ (will use prebuilds/win32-${arch}/)`);
+    }
+  }
+}
+
+await prepareNativeModulesForArch(targetArch);
 
 for (const dep of runtimeDeps) {
   const src = resolvePackageDir(dep);
