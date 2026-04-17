@@ -3,7 +3,7 @@ title: Virtual File System
 slug: vfs
 type: architecture
 status: active
-updated: 2026-06-10
+updated: 2026-04-17
 tags:
   - architecture
   - file-system

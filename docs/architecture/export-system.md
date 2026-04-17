@@ -3,7 +3,7 @@ title: エクスポートシステム
 slug: export-system
 type: architecture
 status: active
-updated: 2026-06-10
+updated: 2026-04-17
 tags:
   - architecture
   - mdi
@@ -296,5 +296,5 @@ In web browser mode, EPUB and DOCX are exported entirely client-side: the export
 
 ---
 
-**Last Updated**: 2026-06-10
+**Last Updated**: 2026-04-17
 **Version**: 1.1.0
