@@ -22,28 +22,28 @@ The export system converts MDI (Markdown for Illusions) content into multiple ou
 
 ### Supported Formats
 
-| Format   | Engine                        | Environment            | Description                                             |
-| -------- | ----------------------------- | ---------------------- | ------------------------------------------------------- |
-| PDF      | Electron `printToPDF`         | Electron only          | Hidden BrowserWindow rendering                          |
-| EPUB 3   | `archiver` / `fflate`         | Electron + Web browser | Electron: IPC save dialog; Web: blob download           |
-| DOCX     | `docx` library                | Electron + Web browser | Electron: IPC save dialog; Web: blob download           |
-| TXT      | Built-in                      | Client + Electron      | Plain text, all MDI syntax stripped                     |
-| TXT+Ruby | Built-in                      | Client + Electron      | Plain text with ruby in parentheses                     |
+| Format   | Engine                | Environment            | Description                                   |
+| -------- | --------------------- | ---------------------- | --------------------------------------------- |
+| PDF      | Electron `printToPDF` | Electron only          | Hidden BrowserWindow rendering                |
+| EPUB 3   | `archiver` / `fflate` | Electron + Web browser | Electron: IPC save dialog; Web: blob download |
+| DOCX     | `docx` library        | Electron + Web browser | Electron: IPC save dialog; Web: blob download |
+| TXT      | Built-in              | Client + Electron      | Plain text, all MDI syntax stripped           |
+| TXT+Ruby | Built-in              | Client + Electron      | Plain text with ruby in parentheses           |
 
 ### Key Files
 
-| File                          | Purpose                                                                     |
-| ----------------------------- | --------------------------------------------------------------------------- |
-| `lib/export/types.ts`         | Type definitions for the export system                                      |
-| `lib/export/use-export.ts`    | React hook providing the `exportAs` API                                     |
-| `lib/export/mdi-to-html.ts`   | MDI-to-HTML conversion pipeline                                             |
-| `lib/export/pdf-exporter.ts`  | PDF export via hidden BrowserWindow (Electron)                              |
-| `lib/export/epub-exporter.ts` | EPUB 3.0 archive generation (Electron, uses `archiver`)                     |
-| `lib/export/epub-web.ts`      | EPUB 3.0 export for browser environments (uses `fflate` ZIP library)        |
-| `lib/export/epub-shared.ts`   | Shared EPUB template generators (Node.js + browser compatible)              |
-| `lib/export/docx-exporter.ts` | DOCX document generation (Electron + Web)                                   |
-| `lib/export/txt-exporter.ts`  | TXT and TXT+Ruby export                                                     |
-| `lib/export/save-blob-file.ts`| Blob save helper: tries File System Access API, falls back to blob download |
+| File                           | Purpose                                                                     |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| `lib/export/types.ts`          | Type definitions for the export system                                      |
+| `lib/export/use-export.ts`     | React hook providing the `exportAs` API                                     |
+| `lib/export/mdi-to-html.ts`    | MDI-to-HTML conversion pipeline                                             |
+| `lib/export/pdf-exporter.ts`   | PDF export via hidden BrowserWindow (Electron)                              |
+| `lib/export/epub-exporter.ts`  | EPUB 3.0 archive generation (Electron, uses `archiver`)                     |
+| `lib/export/epub-web.ts`       | EPUB 3.0 export for browser environments (uses `fflate` ZIP library)        |
+| `lib/export/epub-shared.ts`    | Shared EPUB template generators (Node.js + browser compatible)              |
+| `lib/export/docx-exporter.ts`  | DOCX document generation (Electron + Web)                                   |
+| `lib/export/txt-exporter.ts`   | TXT and TXT+Ruby export                                                     |
+| `lib/export/save-blob-file.ts` | Blob save helper: tries File System Access API, falls back to blob download |
 
 ---
 
