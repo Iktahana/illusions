@@ -6,6 +6,7 @@ const path = require("path");
 const fs = require("fs/promises");
 const os = require("os");
 const log = require("electron-log");
+const { getWindowsDenyPrefixes } = require("../lib/path-utils");
 
 // --- save-file path security validation ---
 // Tracks file paths that have been approved via native dialog or system file association,
@@ -83,7 +84,7 @@ function isSavePathDenied(normalizedPath) {
   const driveLetterMatch = normalizedPath.match(/^([a-zA-Z]):?\/?$/);
   if (driveLetterMatch) return true;
 
-  const windowsDenyPrefixes = ["C:/Windows", "C:/Program Files", "C:/Program Files (x86)"];
+  const windowsDenyPrefixes = getWindowsDenyPrefixes();
 
   // Sensitive directories within home
   const homeSensitiveSuffixes = [
@@ -559,12 +560,37 @@ function registerFileHandlers() {
       };
     }
     try {
+      // Defensive: ensure coverImage is Uint8Array regardless of IPC serialization quirks.
+      // Structured clone normally preserves Uint8Array, but guard against edge cases.
+      const epubOptions = { ...options };
+      if (epubOptions.coverImage && !(epubOptions.coverImage instanceof Uint8Array)) {
+        if (epubOptions.coverImage instanceof ArrayBuffer) {
+          epubOptions.coverImage = new Uint8Array(epubOptions.coverImage);
+        } else if (ArrayBuffer.isView(epubOptions.coverImage)) {
+          const view = epubOptions.coverImage;
+          epubOptions.coverImage = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+        }
+      }
+
+      // Normalize coverMediaType to JPEG/PNG only; drop cover if unsupported
+      if (epubOptions.coverImage && epubOptions.coverMediaType) {
+        const validTypes = ["image/jpeg", "image/png"];
+        if (!validTypes.includes(epubOptions.coverMediaType)) {
+          epubOptions.coverImage = undefined;
+          epubOptions.coverMediaType = undefined;
+        }
+      }
+
       const { generateEpub } = require("../../lib/export/epub-exporter");
-      const epubBuffer = await generateEpub(content, options || {});
+      const epubBuffer = await generateEpub(content, epubOptions);
+
+      // Sanitize filename: remove characters invalid on Windows
+      const rawTitle = epubOptions?.metadata?.title || "untitled";
+      const safeTitle = rawTitle.replace(/[<>:"/\\|?*]/g, "_");
 
       const { filePath } = await dialog.showSaveDialog({
         title: "EPUBとしてエクスポート",
-        defaultPath: `${options?.metadata?.title || "untitled"}.epub`,
+        defaultPath: `${safeTitle}.epub`,
         filters: [{ name: "EPUB", extensions: ["epub"] }],
       });
 

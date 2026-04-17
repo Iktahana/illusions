@@ -36,10 +36,11 @@ export async function generateEpubBlob(content: string, options: EpubExportOptio
   // output may fail instanceof in jsdom/vitest environments.)
   const encode = (s: string): Uint8Array => new Uint8Array(new TextEncoder().encode(s));
 
-  for (const [path, strContent] of fileMap) {
+  for (const [path, fileContent] of fileMap) {
     // mimetype must be stored uncompressed (level: 0) per EPUB spec
     const isMimetype = path === "mimetype";
-    zipInput[path] = [encode(strContent), { level: isMimetype ? 0 : 9 }];
+    const data = fileContent instanceof Uint8Array ? fileContent : encode(fileContent);
+    zipInput[path] = [data, { level: isMimetype ? 0 : 9 }];
   }
 
   const zipped = zipSync(zipInput);

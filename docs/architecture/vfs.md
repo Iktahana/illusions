@@ -3,7 +3,7 @@ title: Virtual File System
 slug: vfs
 type: architecture
 status: active
-updated: 2026-04-03
+updated: 2026-04-17
 tags:
   - architecture
   - file-system
@@ -251,7 +251,7 @@ Certain sensitive system paths are always blocked, regardless of root:
 
 - `/etc`, `/var`
 - `~/.ssh`, `~/.gnupg`, `~/.aws`
-- `C:\Windows`, `C:\Program Files`
+- Windows system directories: dynamically detected via `getWindowsDenyPrefixes()`, which reads the system drive from the `SystemRoot` environment variable (e.g. `D:\Windows` on non-`C:` installs). Falls back to `C:` when `SystemRoot` is unset.
 - Other OS-specific protected directories
 
 ### Dialog-Approved Paths

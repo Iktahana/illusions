@@ -42,11 +42,6 @@ export interface CorrectionConfig {
   guidelines: GuidelineId[];
   ruleOverrides: Record<string, Partial<LintRuleConfig>>;
   ignoredCorrections: IgnoredCorrection[];
-  /** LLM-based validation settings */
-  llm?: {
-    validationEnabled: boolean;
-    modelId: string;
-  };
 }
 
 /** Default CorrectionConfig values */

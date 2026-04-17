@@ -31,10 +31,14 @@ export async function generateEpub(content: string, options: EpubExportOptions):
   passThrough.on("data", (chunk: Buffer) => buffers.push(chunk));
   archive.pipe(passThrough);
 
-  for (const [path, stringContent] of files) {
+  for (const [path, fileContent] of files) {
     // mimetype must be stored uncompressed per EPUB spec
     const store = path === "mimetype";
-    archive.append(stringContent, { name: path, store });
+    if (fileContent instanceof Uint8Array) {
+      archive.append(Buffer.from(fileContent), { name: path, store });
+    } else {
+      archive.append(fileContent, { name: path, store });
+    }
   }
 
   // Attach completion listeners BEFORE finalize to avoid race condition.

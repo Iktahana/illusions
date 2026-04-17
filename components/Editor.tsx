@@ -35,7 +35,7 @@ interface EditorProps {
   onShowAllSearchResults?: (matches: SearchMatch[], searchTerm: string) => void;
   // リンティング設定
   lintingRuleRunner?: RuleRunner | null;
-  onLintIssuesUpdated?: (issues: LintIssue[], options?: { llmPending?: boolean }) => void;
+  onLintIssuesUpdated?: (issues: LintIssue[]) => void;
   onNlpError?: (error: Error) => void;
   // 音声設定を開くコールバック
   onOpenSpeechSettings?: () => void;

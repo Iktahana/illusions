@@ -14,9 +14,6 @@ import { CORRECTION_MODES } from "@/lib/linting/correction-modes";
 export interface AiSettings {
   lintingEnabled: boolean;
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
-  llmEnabled: boolean;
-  llmModelId: string;
-  llmIdlingStop: boolean;
   characterExtractionBatchSize: number;
   characterExtractionConcurrency: number;
   powerSaveMode: boolean;
@@ -26,7 +23,7 @@ export interface AiSettings {
   // EditorSettings context. AiApiSettingsTab reads it directly from AppState.
   /** Custom base URL for AI API (e.g. self-hosted LiteLLM Gateway) */
   aiBaseUrl: string;
-  /** Model ID for online AI API — separate from llmModelId (local model) */
+  /** Model ID for online AI API */
   aiModelId: string;
 }
 
@@ -39,9 +36,6 @@ export interface AiSettingsHandlers {
   handleLintingRuleConfigsBatchChange: (
     configs: Record<string, { enabled: boolean; severity: Severity }>,
   ) => void;
-  handleLlmEnabledChange: (value: boolean) => void;
-  handleLlmModelIdChange: (modelId: string) => void;
-  handleLlmIdlingStopChange: (value: boolean) => void;
   handleCharacterExtractionBatchSizeChange: (value: number) => void;
   handleCharacterExtractionConcurrencyChange: (value: number) => void;
   handlePowerSaveModeChange: (enabled: boolean) => Promise<void>;
@@ -50,12 +44,11 @@ export interface AiSettingsHandlers {
   handleAiApiKeyChange: (apiKey: string) => void;
   handleAiBaseUrlChange: (baseUrl: string) => void;
   handleAiModelIdChange: (modelId: string) => void;
-  /** Expose setters so power-save restore can update linting/LLM state */
+  /** Expose setters so power-save restore can update linting state */
   setLintingEnabled: (value: boolean) => void;
   setLintingRuleConfigs: (
     configs: Record<string, { enabled: boolean; severity: Severity }>,
   ) => void;
-  setLlmEnabled: (value: boolean) => void;
 }
 
 export interface UseAiSettingsResult {
@@ -66,17 +59,14 @@ export interface UseAiSettingsResult {
 }
 
 /**
- * Manages AI-related editor settings: linting rules, LLM model selection,
- * correction config, and power-save mode (which coordinates linting + LLM state).
+ * Manages AI-related editor settings: linting rules,
+ * correction config, and power-save mode (which coordinates linting state).
  */
 export function useAiSettings(): UseAiSettingsResult {
   const [lintingEnabled, setLintingEnabled] = useState(true);
   const [lintingRuleConfigs, setLintingRuleConfigs] = useState<
     Record<string, { enabled: boolean; severity: Severity }>
   >({});
-  const [llmEnabled, setLlmEnabled] = useState(false);
-  const [llmModelId, setLlmModelId] = useState("qwen3-1.7b-q8");
-  const [llmIdlingStop, setLlmIdlingStop] = useState(true);
   const [characterExtractionBatchSize, setCharacterExtractionBatchSize] = useState(3);
   const [characterExtractionConcurrency, setCharacterExtractionConcurrency] = useState(4);
   const [powerSaveMode, setPowerSaveMode] = useState(false);
@@ -91,9 +81,6 @@ export function useAiSettings(): UseAiSettingsResult {
 
   const applyPersistedAiSettings = useCallback((appState: Record<string, unknown>) => {
     if (typeof appState.lintingEnabled === "boolean") setLintingEnabled(appState.lintingEnabled);
-    if (typeof appState.llmEnabled === "boolean") setLlmEnabled(appState.llmEnabled);
-    if (typeof appState.llmModelId === "string") setLlmModelId(appState.llmModelId);
-    if (typeof appState.llmIdlingStop === "boolean") setLlmIdlingStop(appState.llmIdlingStop);
 
     if (appState.lintingRuleConfigs && typeof appState.lintingRuleConfigs === "object") {
       const isSeverity = (v: unknown): v is Severity =>
@@ -164,27 +151,6 @@ export function useAiSettings(): UseAiSettingsResult {
     setLintingEnabled(value);
     void persistAppState({ lintingEnabled: value }).catch((e) =>
       console.error("Failed to persist lintingEnabled:", e),
-    );
-  }, []);
-
-  const handleLlmEnabledChange = useCallback((value: boolean) => {
-    setLlmEnabled(value);
-    void persistAppState({ llmEnabled: value }).catch((e) =>
-      console.error("Failed to persist llmEnabled:", e),
-    );
-  }, []);
-
-  const handleLlmModelIdChange = useCallback((modelId: string) => {
-    setLlmModelId(modelId);
-    void persistAppState({ llmModelId: modelId }).catch((e) =>
-      console.error("Failed to persist llmModelId:", e),
-    );
-  }, []);
-
-  const handleLlmIdlingStopChange = useCallback((value: boolean) => {
-    setLlmIdlingStop(value);
-    void persistAppState({ llmIdlingStop: value }).catch((e) =>
-      console.error("Failed to persist llmIdlingStop:", e),
     );
   }, []);
 
@@ -264,33 +230,25 @@ export function useAiSettings(): UseAiSettingsResult {
   const handlePowerSaveModeChange = useCallback(
     async (enabled: boolean) => {
       if (enabled) {
-        const snapshot = { lintingEnabled, lintingRuleConfigs, llmEnabled };
+        const snapshot = { lintingEnabled, lintingRuleConfigs };
         await persistAppState({
           powerSaveMode: true,
           prePowerSaveState: snapshot,
           lintingEnabled: false,
-          llmEnabled: false,
         });
         setPowerSaveMode(true);
         setLintingEnabled(false);
-        setLlmEnabled(false);
       } else {
         const stored = await fetchAppState();
         const prev = stored?.prePowerSaveState;
         if (prev) {
-          // Default llmEnabled to current value for older stored snapshots that
-          // predate the field (persisted before this field was added).
-          const nextLlmEnabled =
-            typeof prev.llmEnabled === "boolean" ? prev.llmEnabled : llmEnabled;
           setLintingEnabled(prev.lintingEnabled);
           setLintingRuleConfigs(prev.lintingRuleConfigs);
-          setLlmEnabled(nextLlmEnabled);
           await persistAppState({
             powerSaveMode: false,
             prePowerSaveState: null,
             lintingEnabled: prev.lintingEnabled,
             lintingRuleConfigs: prev.lintingRuleConfigs,
-            llmEnabled: nextLlmEnabled,
           });
         } else {
           await persistAppState({ powerSaveMode: false, prePowerSaveState: null });
@@ -298,7 +256,7 @@ export function useAiSettings(): UseAiSettingsResult {
         setPowerSaveMode(false);
       }
     },
-    [lintingEnabled, lintingRuleConfigs, llmEnabled],
+    [lintingEnabled, lintingRuleConfigs],
   );
 
   const handleAutoPowerSaveOnBatteryChange = useCallback((enabled: boolean) => {
@@ -324,9 +282,6 @@ export function useAiSettings(): UseAiSettingsResult {
     aiSettings: {
       lintingEnabled,
       lintingRuleConfigs,
-      llmEnabled,
-      llmModelId,
-      llmIdlingStop,
       characterExtractionBatchSize,
       characterExtractionConcurrency,
       powerSaveMode,
@@ -337,11 +292,6 @@ export function useAiSettings(): UseAiSettingsResult {
         mode: correctionMode,
         guidelines: correctionGuidelines,
         ruleOverrides: lintingRuleConfigs,
-        llm: {
-          ...(DEFAULT_CORRECTION_CONFIG.llm ?? {}),
-          modelId: llmModelId,
-          validationEnabled: llmEnabled,
-        },
       },
       aiBaseUrl,
       aiModelId,
@@ -350,9 +300,6 @@ export function useAiSettings(): UseAiSettingsResult {
       handleLintingEnabledChange,
       handleLintingRuleConfigChange,
       handleLintingRuleConfigsBatchChange,
-      handleLlmEnabledChange,
-      handleLlmModelIdChange,
-      handleLlmIdlingStopChange,
       handleCharacterExtractionBatchSizeChange,
       handleCharacterExtractionConcurrencyChange,
       handlePowerSaveModeChange,
@@ -363,7 +310,6 @@ export function useAiSettings(): UseAiSettingsResult {
       handleAiModelIdChange,
       setLintingEnabled,
       setLintingRuleConfigs,
-      setLlmEnabled,
     },
     applyPersistedAiSettings,
   };

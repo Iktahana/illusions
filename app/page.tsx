@@ -22,6 +22,7 @@ import { openWebPrintPreview } from "@/lib/export/web-print-preview";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
+import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
 import { useGlobalShortcuts } from "@/lib/hooks/use-global-shortcuts";
@@ -493,7 +494,7 @@ export default function EditorPage() {
 
   // Export dialog state (PDF / DOCX share a single state slot)
   interface ExportDialogState {
-    format: "pdf" | "docx";
+    format: "pdf" | "docx" | "epub";
     content: string;
     metadata: ExportMetadata;
   }
@@ -512,7 +513,7 @@ export default function EditorPage() {
   }, []);
 
   const handleExportDialogRequest = useCallback(
-    (format: "pdf" | "docx", content: string, metadata: ExportMetadata) => {
+    (format: "pdf" | "docx" | "epub", content: string, metadata: ExportMetadata) => {
       const state: ExportDialogState = { format, content, metadata };
       exportDialogStateRef.current = state;
       setExportDialogState(state);
@@ -689,14 +690,7 @@ export default function EditorPage() {
       });
       const baseName = (dialogState.metadata.title || "untitled").replace(/\.[^.]+$/, "");
       const { saveBlobFile } = await import("@/lib/export/save-blob-file");
-      const saved = await saveBlobFile(
-        blob,
-        `${baseName}.docx`,
-        {
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
-        },
-        false,
-      );
+      const saved = await saveBlobFile(blob, `${baseName}.docx`, false);
 
       notificationManager.dismiss(progressId);
 
@@ -704,11 +698,73 @@ export default function EditorPage() {
         setExportDialogState(null);
         notificationManager.success("DOCXをエクスポートしました");
       }
-      // saved === false means user cancelled — keep dialog open
     } catch (error) {
       notificationManager.dismiss(progressId);
       const message = error instanceof Error ? error.message : "不明なエラー";
       notificationManager.error(`DOCXのエクスポートに失敗しました: ${message}`);
+    }
+  }, []);
+
+  const handleEpubExportConfirm = useCallback(async (options: EpubExportOptions) => {
+    const dialogState = exportDialogStateRef.current;
+    if (!dialogState) return;
+
+    // Electron path: use IPC
+    if (window.electronAPI?.exportEPUB) {
+      setExportDialogState(null);
+
+      const progressId = notificationManager.showProgress("EPUBをエクスポート中...", {
+        type: "info",
+      });
+
+      try {
+        // Electron IPC serializes Uint8Array automatically
+        const result = await window.electronAPI.exportEPUB(dialogState.content, options);
+
+        notificationManager.dismiss(progressId);
+
+        if (result === null || result === undefined) return;
+
+        if (typeof result === "object" && "success" in result && !result.success) {
+          notificationManager.error(
+            `EPUBのエクスポートに失敗しました: ${(result as { error: string }).error}`,
+          );
+          return;
+        }
+
+        notificationManager.success("EPUBをエクスポートしました");
+      } catch (error) {
+        notificationManager.dismiss(progressId);
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        notificationManager.error(`EPUBのエクスポートに失敗しました: ${message}`);
+      }
+      return;
+    }
+
+    // Web path: generate EPUB blob and download
+    const progressId = notificationManager.showProgress("EPUBをエクスポート中...", {
+      type: "info",
+    });
+
+    try {
+      const { generateEpubBlob } = await import("@/lib/export/epub-web");
+      const blob = await generateEpubBlob(dialogState.content, options);
+      const baseName = (options.metadata.title || "untitled")
+        .replace(/[<>:"/\\|?*]/g, "_")
+        .replace(/\.[^.]+$/, "");
+      const { saveBlobFile } = await import("@/lib/export/save-blob-file");
+      const saved = await saveBlobFile(blob, `${baseName}.epub`, false);
+
+      notificationManager.dismiss(progressId);
+
+      if (saved) {
+        setExportDialogState(null);
+        notificationManager.success("EPUBをエクスポートしました");
+      }
+    } catch (error) {
+      notificationManager.dismiss(progressId);
+      const message = error instanceof Error ? error.message : "不明なエラー";
+      notificationManager.error(`EPUBのエクスポートに失敗しました: ${message}`);
     }
   }, []);
 
@@ -1100,6 +1156,7 @@ export default function EditorPage() {
           onClose: () => setExportDialogState(null),
           onPdfExport: handlePdfExportConfirm,
           onDocxExport: handleDocxExportConfirm,
+          onEpubExport: handleEpubExportConfirm,
           content: exportDialogState?.content ?? "",
           metadata: exportDialogState?.metadata ?? { title: "" },
         },

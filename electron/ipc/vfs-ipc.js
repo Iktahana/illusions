@@ -8,31 +8,54 @@ const { ipcMain, dialog, app, BrowserWindow, webContents } = require("electron")
 const fs = require("fs/promises");
 const path = require("path");
 const os = require("os");
-const { toForwardSlash, assertPathInsideRoot } = require("../lib/path-utils");
+const {
+  toForwardSlash,
+  assertPathInsideRoot,
+  getWindowsDenyPrefixes,
+} = require("../lib/path-utils");
+
+/** Maximum content size accepted by write-file (same limit as file-ipc.js) */
+const MAX_CONTENT_BYTES = 50 * 1024 * 1024; // 50 MB
 
 function registerVFSHandlers() {
   // Track the opened root directory per window for path validation
   const allowedRoots = new Map();
 
   // Track paths that were selected via the native file dialog.
-  // Uses a bounded LRU map to prevent unbounded memory growth in long sessions.
+  // Uses a bounded LRU map per window to prevent unbounded memory growth
+  // and to avoid cross-window path reuse (consistent with file-ipc.js).
   const MAX_APPROVED_PATHS = 200;
+  /** @type {Map<number, Map<string, true>>} webContentsId -> (path -> true) LRU map */
   const dialogApprovedPaths = new Map();
 
   /**
-   * Add a path to the dialog-approved set with LRU eviction.
-   * When the map exceeds MAX_APPROVED_PATHS, the least recently added entry is evicted.
+   * Get or create the per-window LRU path map for a given webContentsId.
+   * @param {number} webContentsId - The webContents ID of the BrowserWindow
+   * @returns {Map<string, true>}
+   */
+  function getWindowApprovedPaths(webContentsId) {
+    if (!dialogApprovedPaths.has(webContentsId)) {
+      dialogApprovedPaths.set(webContentsId, new Map());
+    }
+    return dialogApprovedPaths.get(webContentsId);
+  }
+
+  /**
+   * Add a path to the dialog-approved set for a specific window, with LRU eviction.
+   * When the per-window set exceeds MAX_APPROVED_PATHS, the oldest entry is evicted.
+   * @param {number} senderId - The webContents ID of the approving window
    * @param {string} p - The path to approve
    */
-  function approveDialogPath(p) {
+  function approveDialogPath(senderId, p) {
+    const windowPaths = getWindowApprovedPaths(senderId);
     // Delete first so re-insertion moves it to the end (most recent)
-    dialogApprovedPaths.delete(p);
-    dialogApprovedPaths.set(p, true);
+    windowPaths.delete(p);
+    windowPaths.set(p, true);
     // Evict oldest entry if over capacity
-    if (dialogApprovedPaths.size > MAX_APPROVED_PATHS) {
-      const oldest = dialogApprovedPaths.keys().next().value;
+    if (windowPaths.size > MAX_APPROVED_PATHS) {
+      const oldest = windowPaths.keys().next().value;
       if (oldest !== undefined) {
-        dialogApprovedPaths.delete(oldest);
+        windowPaths.delete(oldest);
       }
     }
   }
@@ -80,7 +103,7 @@ function registerVFSHandlers() {
 
     // Update the allowed root for this window
     allowedRoots.set(event.sender.id, dirPath);
-    approveDialogPath(dirPath);
+    approveDialogPath(event.sender.id, dirPath);
 
     return {
       path: dirPath,
@@ -88,10 +111,17 @@ function registerVFSHandlers() {
     };
   });
 
+  // Maximum file size allowed for VFS read (50 MB, same as file-ipc.js)
+  const MAX_READ_BYTES = 50 * 1024 * 1024;
+
   // Read file content
   ipcMain.handle("vfs:read-file", async (event, filePath) => {
     try {
       const resolved = validateVFSPath(event, filePath);
+      const stats = await fs.stat(resolved);
+      if (stats.size > MAX_READ_BYTES) {
+        throw new Error("ファイルサイズが上限を超えています");
+      }
       return await fs.readFile(resolved, "utf-8");
     } catch (error) {
       // ENOENT is expected for optional config files — skip noisy logging
@@ -104,6 +134,13 @@ function registerVFSHandlers() {
 
   // Write file content
   ipcMain.handle("vfs:write-file", async (event, filePath, content) => {
+    // Validate content type and size before touching disk
+    if (typeof content !== "string") {
+      throw new Error("Invalid content: expected string");
+    }
+    if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
+      throw new Error("ファイルサイズが上限を超えています（50 MB）");
+    }
     try {
       const resolved = validateVFSPath(event, filePath);
       // Use open -> write -> sync -> close pattern for better compatibility with virtual file systems (e.g., Google Drive on Windows)
@@ -201,24 +238,6 @@ function registerVFSHandlers() {
   });
 
   /**
-   * Return Windows system directory deny prefixes based on the actual system drive.
-   * Uses the SystemRoot environment variable so the correct drive letter is detected
-   * even on non-C: installations.
-   * @returns {string[]}
-   */
-  function getWindowsDenyPrefixes() {
-    if (process.platform !== "win32") return [];
-    const sysRoot = (process.env.SystemRoot ?? "C:\\Windows").replace(/\\/g, "/");
-    const sysDrive = sysRoot.split("/")[0];
-    return [
-      `${sysDrive}/Windows`,
-      `${sysDrive}/Program Files`,
-      `${sysDrive}/Program Files (x86)`,
-      `${sysDrive}/ProgramData`,
-    ];
-  }
-
-  /**
    * Check if a path is in the system-sensitive denylist.
    * Prevents access to critical system directories and credential stores.
    *
@@ -311,7 +330,7 @@ function registerVFSHandlers() {
     //    prompt the user with a native directory dialog for confirmation.
     //    This prevents a compromised renderer from escalating an arbitrary
     //    path to an allowed root (fixes security issue #1043).
-    if (!dialogApprovedPaths.has(resolved)) {
+    if (!dialogApprovedPaths.get(event.sender.id)?.has(resolved)) {
       const win = BrowserWindow.fromWebContents(event.sender);
       const result = await dialog.showOpenDialog(win ?? undefined, {
         title: "プロジェクトフォルダへのアクセスを許可",
@@ -330,17 +349,18 @@ function registerVFSHandlers() {
         throw new Error("選択されたディレクトリが要求されたパスと一致しません");
       }
 
-      approveDialogPath(confirmedPath);
+      approveDialogPath(event.sender.id, confirmedPath);
     }
 
     allowedRoots.set(event.sender.id, resolved);
     return { path: resolved, name: path.basename(resolved) };
   });
 
-  // Clean up allowedRoots when a window is destroyed to prevent memory leaks
+  // Clean up allowedRoots and dialogApprovedPaths when a window is destroyed to prevent memory leaks
   app.on("web-contents-created", (_, contents) => {
     contents.on("destroyed", () => {
       allowedRoots.delete(contents.id);
+      dialogApprovedPaths.delete(contents.id);
     });
   });
 
