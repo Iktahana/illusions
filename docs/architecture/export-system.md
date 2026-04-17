@@ -3,7 +3,7 @@ title: エクスポートシステム
 slug: export-system
 type: architecture
 status: active
-updated: 2026-04-03
+updated: 2026-04-17
 tags:
   - architecture
   - mdi
@@ -12,35 +12,38 @@ tags:
 
 # Export System Documentation
 
-Modular MDI export pipeline supporting 5 output formats with secure HTML rendering and Electron IPC integration.
+Modular MDI export pipeline supporting 5 output formats with secure HTML rendering, Electron IPC integration, and browser-native download fallback.
 
 ---
 
 ## Overview
 
-The export system converts MDI (Markdown for Illusions) content into multiple output formats. It provides a unified React hook API (`useExport`) that handles both client-side exports (TXT, TXT+Ruby) and Electron IPC-based exports (PDF, EPUB, DOCX).
+The export system converts MDI (Markdown for Illusions) content into multiple output formats. It provides a unified React hook API (`useExport`) that handles client-side exports (TXT, TXT+Ruby), browser-native exports (EPUB, DOCX via blob download), and Electron IPC-based exports (PDF, EPUB, DOCX).
 
 ### Supported Formats
 
-| Format   | Engine                | Environment       | Description                         |
-| -------- | --------------------- | ----------------- | ----------------------------------- |
-| PDF      | Electron `printToPDF` | Electron only     | Hidden BrowserWindow rendering      |
-| EPUB 3   | `archiver`            | Electron only     | Standards-compliant EPUB 3.0        |
-| DOCX     | `docx` library        | Electron only     | Microsoft Word format               |
-| TXT      | Built-in              | Client + Electron | Plain text, all MDI syntax stripped |
-| TXT+Ruby | Built-in              | Client + Electron | Plain text with ruby in parentheses |
+| Format   | Engine                | Environment            | Description                                   |
+| -------- | --------------------- | ---------------------- | --------------------------------------------- |
+| PDF      | Electron `printToPDF` | Electron only          | Hidden BrowserWindow rendering                |
+| EPUB 3   | `archiver` / `fflate` | Electron + Web browser | Electron: IPC save dialog; Web: blob download |
+| DOCX     | `docx` library        | Electron + Web browser | Electron: IPC save dialog; Web: blob download |
+| TXT      | Built-in              | Client + Electron      | Plain text, all MDI syntax stripped           |
+| TXT+Ruby | Built-in              | Client + Electron      | Plain text with ruby in parentheses           |
 
 ### Key Files
 
-| File                          | Purpose                                 |
-| ----------------------------- | --------------------------------------- |
-| `lib/export/types.ts`         | Type definitions for the export system  |
-| `lib/export/use-export.ts`    | React hook providing the `exportAs` API |
-| `lib/export/mdi-to-html.ts`   | MDI-to-HTML conversion pipeline         |
-| `lib/export/pdf-exporter.ts`  | PDF export via hidden BrowserWindow     |
-| `lib/export/epub-exporter.ts` | EPUB 3.0 archive generation             |
-| `lib/export/docx-exporter.ts` | DOCX document generation                |
-| `lib/export/txt-exporter.ts`  | TXT and TXT+Ruby export                 |
+| File                           | Purpose                                                                     |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| `lib/export/types.ts`          | Type definitions for the export system                                      |
+| `lib/export/use-export.ts`     | React hook providing the `exportAs` API                                     |
+| `lib/export/mdi-to-html.ts`    | MDI-to-HTML conversion pipeline                                             |
+| `lib/export/pdf-exporter.ts`   | PDF export via hidden BrowserWindow (Electron)                              |
+| `lib/export/epub-exporter.ts`  | EPUB 3.0 archive generation (Electron, uses `archiver`)                     |
+| `lib/export/epub-web.ts`       | EPUB 3.0 export for browser environments (uses `fflate` ZIP library)        |
+| `lib/export/epub-shared.ts`    | Shared EPUB template generators (Node.js + browser compatible)              |
+| `lib/export/docx-exporter.ts`  | DOCX document generation (Electron + Web)                                   |
+| `lib/export/txt-exporter.ts`   | TXT and TXT+Ruby export                                                     |
+| `lib/export/save-blob-file.ts` | Blob save helper: tries File System Access API, falls back to blob download |
 
 ---
 
@@ -55,34 +58,36 @@ The export system converts MDI (Markdown for Illusions) content into multiple ou
 │              └── exportAs(format)                            │
 └────────────────────┬────────────────────────────────────────┘
                      │
-          ┌──────────┴──────────┐
-          │                     │
-     Client-side           Electron IPC
-     (TXT, TXT+Ruby)      (PDF, EPUB, DOCX)
-          │                     │
-          ▼                     ▼
-   ┌──────────────┐   ┌──────────────────────────────────────┐
-   │ txt-exporter │   │ Electron Main Process                │
-   │              │   │                                      │
-   │ Strip MDI    │   │  ┌────────────────────────────────┐  │
-   │ syntax       │   │  │ mdi-to-html.ts                 │  │
-   │ + optional   │   │  │ MDI → PUA placeholders         │  │
-   │ ruby in ()   │   │  │ → markdown-it (html:false)     │  │
-   │              │   │  │ → restore safe HTML             │  │
-   └──────────────┘   │  └──────────┬─────────────────────┘  │
-                      │             │                         │
-                      │    ┌────────┴────────┐               │
-                      │    │                 │               │
-                      │    ▼                 ▼               │
-                      │  ┌──────────┐  ┌──────────────┐     │
-                      │  │ PDF      │  │ EPUB / DOCX  │     │
-                      │  │ Hidden   │  │ archiver /   │     │
-                      │  │ Browser  │  │ docx lib     │     │
-                      │  │ Window   │  │              │     │
-                      │  └──────────┘  └──────────────┘     │
-                      │                                      │
-                      │  dialog.showSaveDialog → write file  │
-                      └──────────────────────────────────────┘
+          ┌──────────┴───────────────────┐
+          │                              │
+     Client-side           ┌─────────────┴────────────┐
+     (TXT, TXT+Ruby)       │                          │
+          │            Web browser             Electron IPC
+          ▼          (EPUB, DOCX via         (PDF, EPUB, DOCX)
+   ┌──────────────┐    blob download)               │
+   │ txt-exporter │         │                        ▼
+   │              │         ▼            ┌──────────────────────────────────────┐
+   │ Strip MDI    │  ┌──────────────┐    │ Electron Main Process                │
+   │ syntax       │  │ epub-web.ts  │    │                                      │
+   │ + optional   │  │ (fflate ZIP) │    │  ┌────────────────────────────────┐  │
+   │ ruby in ()   │  │              │    │  │ mdi-to-html.ts                 │  │
+   │              │  │ docx-        │    │  │ MDI → PUA placeholders         │  │
+   └──────────────┘  │ exporter.ts  │    │  │ → markdown-it (html:false)     │  │
+                     └──────┬───────┘    │  │ → restore safe HTML             │  │
+                            │            │  └──────────┬─────────────────────┘  │
+                     saveBlobFile()      │             │                         │
+                     (File System        │    ┌────────┴────────┐               │
+                     Access API or       │    │                 │               │
+                     blob download)      │    ▼                 ▼               │
+                                         │  ┌──────────┐  ┌──────────────┐     │
+                                         │  │ PDF      │  │ EPUB / DOCX  │     │
+                                         │  │ Hidden   │  │ archiver /   │     │
+                                         │  │ Browser  │  │ docx lib     │     │
+                                         │  │ Window   │  │              │     │
+                                         │  └──────────┘  └──────────────┘     │
+                                         │                                      │
+                                         │  dialog.showSaveDialog → write file  │
+                                         └──────────────────────────────────────┘
 ```
 
 ### MDI-to-HTML Pipeline (`mdi-to-html.ts`)
@@ -231,6 +236,9 @@ output.epub (ZIP archive)
 
 Content is split into chapters at `#` heading boundaries.
 
+- **Electron**: `epub-exporter.ts` uses the `archiver` library; the archive is written to the path chosen via `dialog.showSaveDialog`.
+- **Web browser**: `epub-web.ts` uses the `fflate` library to produce a `Blob`, which is saved via `saveBlobFile()` (File System Access API → Blob URL download fallback).
+
 #### DOCX Export
 
 ```typescript
@@ -274,7 +282,9 @@ const docxConfig = {
 | `export-epub` | Renderer → Main | Trigger EPUB export with content and metadata |
 | `export-docx` | Renderer → Main | Trigger DOCX export with content and metadata |
 
-All IPC handlers call `dialog.showSaveDialog` in the main process to let the user choose the output path.
+In Electron mode, all IPC handlers call `dialog.showSaveDialog` in the main process to let the user choose the output path.
+
+In web browser mode, EPUB and DOCX are exported entirely client-side: the exporter generates a `Blob`, which `saveBlobFile()` saves via the File System Access API (`showSaveFilePicker`) when available, or falls back to a Blob URL `<a download>` trigger for unsupported browsers or when the user gesture has expired.
 
 ---
 
@@ -286,5 +296,5 @@ All IPC handlers call `dialog.showSaveDialog` in the main process to let the use
 
 ---
 
-**Last Updated**: 2026-04-03
-**Version**: 1.0.0
+**Last Updated**: 2026-04-17
+**Version**: 1.1.0
