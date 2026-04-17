@@ -485,16 +485,18 @@ jobs:
 
           # Check better-sqlite3.node PE header
           $bsql = "dist-main/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
-          if (Test-Path $bsql) {
-            $bytes = [System.IO.File]::ReadAllBytes($bsql)
-            $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
-            $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
-            # 0x8664 = AMD64 (x64), 0xAA64 = ARM64
-            $expectedMachine = if ($expectedArch -eq "x64") { 0x8664 } else { 0xAA64 }
-            if ($machine -ne $expectedMachine) {
-              Write-Error "better_sqlite3.node architecture mismatch: expected $expectedArch (0x$($expectedMachine.ToString('X4'))) but got 0x$($machine.ToString('X4'))"
-              exit 1
-            }
+          if (-not (Test-Path $bsql)) {
+            Write-Error "better_sqlite3.node not found at $bsql — native module build may have failed"
+            exit 1
+          }
+          $bytes = [System.IO.File]::ReadAllBytes($bsql)
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+          $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+          # 0x8664 = AMD64 (x64), 0xAA64 = ARM64
+          $expectedMachine = if ($expectedArch -eq "x64") { 0x8664 } else { 0xAA64 }
+          if ($machine -ne $expectedMachine) {
+            Write-Error "better_sqlite3.node architecture mismatch: expected $expectedArch (0x$($expectedMachine.ToString('X4'))) but got 0x$($machine.ToString('X4'))"
+            exit 1
           }
 
           # Verify node-pty build/ was removed for cross-arch (should use prebuilds/)
@@ -607,15 +609,17 @@ jobs:
 
           # Check better-sqlite3.node PE header
           $bsql = "dist-main/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
-          if (Test-Path $bsql) {
-            $bytes = [System.IO.File]::ReadAllBytes($bsql)
-            $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
-            $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
-            $expectedMachine = if ($expectedArch -eq "x64") { 0x8664 } else { 0xAA64 }
-            if ($machine -ne $expectedMachine) {
-              Write-Error "better_sqlite3.node architecture mismatch: expected $expectedArch (0x$($expectedMachine.ToString('X4'))) but got 0x$($machine.ToString('X4'))"
-              exit 1
-            }
+          if (-not (Test-Path $bsql)) {
+            Write-Error "better_sqlite3.node not found at $bsql — native module build may have failed"
+            exit 1
+          }
+          $bytes = [System.IO.File]::ReadAllBytes($bsql)
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+          $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+          $expectedMachine = if ($expectedArch -eq "x64") { 0x8664 } else { 0xAA64 }
+          if ($machine -ne $expectedMachine) {
+            Write-Error "better_sqlite3.node architecture mismatch: expected $expectedArch (0x$($expectedMachine.ToString('X4'))) but got 0x$($machine.ToString('X4'))"
+            exit 1
           }
 
           if ($expectedArch -ne "x64" -and (Test-Path "dist-main/node_modules/node-pty/build/Release")) {
