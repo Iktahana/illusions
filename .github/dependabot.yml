@@ -26,6 +26,46 @@ updates:
         patterns:
           - "*"
 
+  - package-ecosystem: "npm"
+    directory: "/www"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "www"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      www_npm:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/packages/milkdown-plugin-japanese-novel"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "milkdown-plugin"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      milkdown_plugin_npm:
+        patterns:
+          - "*"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     target-branch: "dev"
