@@ -305,10 +305,10 @@ export default function StatsPanel({
                           width: `${value}%`,
                           backgroundColor:
                             value >= 75
-                              ? "var(--color-success)"
+                              ? "rgb(var(--success))"
                               : value >= 50
-                                ? "var(--color-warning, #f59e0b)"
-                                : "var(--color-error)",
+                                ? "rgb(var(--warning))"
+                                : "rgb(var(--error))",
                         }}
                       />
                     </div>
