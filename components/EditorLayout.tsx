@@ -44,6 +44,7 @@ import type { ContextMenuState } from "@/lib/hooks/use-context-menu";
 import type { LintIssue } from "@/lib/linting/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
+import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { RuleRunner } from "@/lib/linting/rule-runner";
 import { DockviewReact } from "dockview-react";
@@ -97,10 +98,11 @@ interface EditorLayoutProps {
     rubySelectedText: string;
     handleApplyRuby: React.ComponentProps<typeof RubyDialog>["onApply"];
     exportDialog: {
-      state: { format: "pdf" | "docx"; content: string; metadata: ExportMetadata } | null;
+      state: { format: "pdf" | "docx" | "epub"; content: string; metadata: ExportMetadata } | null;
       onClose: () => void;
       onPdfExport: (settings: PdfExportSettings) => void;
       onDocxExport: (settings: DocxExportSettings) => void;
+      onEpubExport: (options: EpubExportOptions) => void;
       content: string;
       metadata: ExportMetadata;
     };
@@ -280,6 +282,7 @@ export default function EditorLayout({
               onClose={dialogs.exportDialog.onClose}
               onExportPdf={dialogs.exportDialog.onPdfExport}
               onExportDocx={dialogs.exportDialog.onDocxExport}
+              onExportEpub={dialogs.exportDialog.onEpubExport}
               content={dialogs.exportDialog.content}
               metadata={dialogs.exportDialog.metadata}
             />

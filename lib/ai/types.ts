@@ -15,7 +15,7 @@ import type { LintIssue } from "@/lib/linting/types";
 /**
  * Transport-level configuration for the AI client.
  *
- * Does NOT include feature flags (e.g. llmEnabled). Feature flags
+ * Does NOT include feature flags. Feature flags
  * gate at their own call sites, not at the transport layer.
  */
 export interface AiClientConfig {
@@ -23,7 +23,7 @@ export interface AiClientConfig {
   apiKey: string;
   /** Base URL — defaults to `https://api.openai.com/v1` */
   baseUrl?: string;
-  /** Model ID for online AI — separate from llmModelId (local model) */
+  /** Model ID for online AI */
   modelId: string;
 }
 

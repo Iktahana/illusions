@@ -196,12 +196,51 @@ function getSnapshotDisplayName(
   return lastSegment || source;
 }
 
+/**
+ * Maximum byte length for the storage label portion of a snapshot filename.
+ * Windows MAX_PATH is 260 chars. The label is followed by a timestamp + markers
+ * (~30 chars) and lives inside .illusions/history/ (~20 chars of path prefix),
+ * so 100 chars leaves ample safety margin on all cloud-sync drives.
+ *
+ * スナップショットファイル名のラベル部分の最大文字数。
+ * Windows MAX_PATH (260文字) 制限に対して十分な余裕を確保する。
+ */
+const MAX_STORAGE_LABEL_LENGTH = 100;
+
+/**
+ * Number of trailing path segments to use when constructing the storage label.
+ * Using only the last 2 segments (parent dir + filename) keeps labels short
+ * while remaining human-readable.
+ *
+ * ストレージラベル生成時に使用するパスの末尾セグメント数。
+ */
+const STORAGE_LABEL_PATH_SEGMENTS = 2;
+
 function makeSnapshotStorageLabel(sourcePath: string, displayName: string): string {
-  const normalizedPath = sourcePath.replace(/\\/g, "/");
-  // Replace all characters that are invalid in Windows filenames:
-  // \ / : * ? " < > |
-  const pathLabel = normalizedPath.replace(/[\\/:<>"|?*]/g, "__");
-  return pathLabel || displayName;
+  // Normalize backslashes and strip Windows drive letter (e.g. "G:" or "C:")
+  const normalizedPath = sourcePath.replace(/\\/g, "/").replace(/^[A-Za-z]:/, "");
+
+  // Use only the last N path segments to keep filenames short
+  const segments = normalizedPath.split("/").filter((s) => s.length > 0);
+  const shortSegments = segments.slice(-STORAGE_LABEL_PATH_SEGMENTS);
+  const shortPath = shortSegments.join("__");
+
+  // Replace remaining characters that are invalid in Windows filenames: / : * ? " < > |
+  const sanitized = shortPath.replace(/[/:<>"|?*]/g, "__") || displayName;
+
+  if (sanitized.length <= MAX_STORAGE_LABEL_LENGTH) {
+    return sanitized;
+  }
+
+  // Truncate and append a short hash of the full original path for uniqueness
+  // フルパスの短いハッシュを付加して一意性を確保しながら切り詰める
+  const hashInput = sourcePath;
+  let hash = 0;
+  for (let i = 0; i < hashInput.length; i++) {
+    hash = (Math.imul(31, hash) + hashInput.charCodeAt(i)) | 0;
+  }
+  const hashSuffix = (hash >>> 0).toString(16).padStart(8, "0");
+  return `${sanitized.slice(0, MAX_STORAGE_LABEL_LENGTH - 9)}_${hashSuffix}`;
 }
 
 /**

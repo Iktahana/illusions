@@ -46,6 +46,6 @@ export function usePowerSaving({
     };
     // Re-run when autoPowerSaveOnBattery changes or when the callback identity
     // changes (i.e. when the caller's useCallback deps — lintingEnabled,
-    // lintingRuleConfigs, llmEnabled — are updated).
+    // lintingRuleConfigs — are updated).
   }, [autoPowerSaveOnBattery, onPowerSaveModeChange]);
 }

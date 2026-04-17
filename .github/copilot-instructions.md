@@ -1,5 +1,16 @@
 # Illusions Project - GitHub Copilot Instructions
 
+> **⚠️ CRITICAL — READ BEFORE OPENING ANY PULL REQUEST ⚠️**
+>
+> **All PRs MUST target the `dev` branch. NEVER target `main`.**
+>
+> - Default repository branch is `main` for historical reasons, but **do not use it as the PR base**.
+> - `main` only receives merges via the weekly release PR (`dev → main`, every Monday).
+> - When opening a PR via `gh pr create`, always pass `--base dev` explicitly.
+> - If you open a PR against `main`, it will be rebased onto `dev` or closed.
+>
+> Full rules in the [Branch Strategy](#branch-strategy-critical) section below.
+
 ## Project Overview
 
 **Illusions** is a Japanese novel writing application with advanced typesetting support.
@@ -153,9 +164,15 @@ hotfix/<name>   →  main  (emergency only, then cherry-pick to dev)
 
 When creating a PR:
 
-- Base branch: `dev` (default)
+- Base branch: **always** `dev` (the repo default branch is `main`, but that is NOT the PR target)
+- Use `gh pr create --base dev ...` — never rely on the default
 - Only use `main` as base for emergency hotfixes
 - Include `Closes #<issue>` in PR body for auto-closing
+
+Enforcement:
+
+- Dependabot is configured via `.github/dependabot.yml` with `target-branch: dev`
+- PRs opened against `main` by Copilot/agents will be rebased to `dev` during the patrol sweep
 
 ## Build & Development
 

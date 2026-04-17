@@ -42,6 +42,10 @@ permissions:
   pull-requests: read
   models: read
 
+concurrency:
+  group: "ms-store-submission"
+  cancel-in-progress: false
+
 jobs:
   submit:
     name: Submit to Microsoft Store (${{ inputs.mode }})
@@ -132,18 +136,21 @@ jobs:
           RETRY_DELAY=120  # 2 minutes between retries
 
           for attempt in $(seq 1 $MAX_ATTEMPTS); do
-            echo "=== Attempt $attempt / $MAX_ATTEMPTS ==="
+            echo "=== Workflow attempt $attempt / $MAX_ATTEMPTS ==="
+            set +e
             node scripts/submit-store.mjs
             EXIT_CODE=$?
+            set -e
             if [ $EXIT_CODE -eq 0 ]; then
-              echo "Submission succeeded on attempt $attempt."
+              echo "Submission succeeded on workflow attempt $attempt."
               exit 0
             fi
+            echo "::warning::Workflow attempt $attempt failed (exit code $EXIT_CODE)."
             if [ $attempt -lt $MAX_ATTEMPTS ]; then
-              echo "Attempt $attempt failed (exit $EXIT_CODE). Retrying in ${RETRY_DELAY}s..."
+              echo "Retrying in ${RETRY_DELAY}s..."
               sleep $RETRY_DELAY
             fi
           done
 
-          echo "::error::All $MAX_ATTEMPTS submission attempts failed."
+          echo "::error::All $MAX_ATTEMPTS workflow-level submission attempts failed."
           exit 1

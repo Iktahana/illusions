@@ -16,9 +16,8 @@ on:
         options:
           - ci-failure-handler
       run_id:
-        description: "Workflow Run ID for ci-failure-handler (blank = latest failure)"
-        required: false
-        default: ""
+        description: "Workflow Run ID for ci-failure-handler"
+        required: true
 
 permissions:
   contents: read
@@ -66,13 +65,21 @@ jobs:
           )"
 
   # ---------------------------------------------------------------------------
-  # CI Failure Handler — creates an issue when the build workflow fails
+  # CI Failure Handler — triages build failures, auto-retries transient errors,
+  # and creates P0 issues for persistent failures.
   # ---------------------------------------------------------------------------
   ci-failure-handler:
     if: |
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.agent == 'ci-failure-handler')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: write
+    concurrency:
+      group: ci-triage-${{ github.event.workflow_run.id || github.event.inputs.run_id }}
+      cancel-in-progress: false
     steps:
       - name: Determine Workflow Run ID
         id: info
@@ -80,14 +87,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            INPUT_ID="${{ github.event.inputs.run_id }}"
-            if [ -z "$INPUT_ID" ]; then
-              RUN_ID=$(gh run list --repo "${{ github.repository }}" --status failure --limit 1 --json databaseId --jq '.[0].databaseId')
-            else
-              RUN_ID=$INPUT_ID
-            fi
+            RUN_ID="${{ github.event.inputs.run_id }}"
           else
             RUN_ID=${{ github.event.workflow_run.id }}
+          fi
+
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::run_id is required but was empty"
+            exit 1
           fi
           echo "RUN_ID=$RUN_ID" >> "$GITHUB_OUTPUT"
 
@@ -106,39 +113,128 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Analyze logs and create issue
+      - name: Fetch logs and classify failure
+        id: classify
         if: steps.dedup.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           WORKFLOW_ID: ${{ steps.info.outputs.RUN_ID }}
           REPO: ${{ github.repository }}
         run: |
-          echo "Fetching logs for workflow run: $WORKFLOW_ID"
+          # Metadata
+          ATTEMPT=$(gh run view "$WORKFLOW_ID" --repo "$REPO" --json attempt --jq '.attempt')
+          EVENT=$(gh run view "$WORKFLOW_ID" --repo "$REPO" --json event --jq '.event')
+          echo "ATTEMPT=$ATTEMPT" >> "$GITHUB_OUTPUT"
 
-          gh run view "$WORKFLOW_ID" --repo "$REPO" --log-failed > failure_log.txt 2>&1 || true
-
-          if [ ! -s failure_log.txt ]; then
-            echo "ログが空のため、Issue の作成をスキップします。"
+          # PR builds → SKIP
+          if [ "$EVENT" = "pull_request" ]; then
+            echo "CLASSIFICATION=SKIP" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Extract error lines and surrounding context
+          # Fetch failed logs
+          gh run view "$WORKFLOW_ID" --repo "$REPO" --log-failed > failure_log.txt 2>&1 || true
+          if [ ! -s failure_log.txt ]; then
+            echo "CLASSIFICATION=SKIP" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Extract error lines and log tail
           ERROR_LINES=$(grep -A 3 "##\[error\]" failure_log.txt | head -n 40 || true)
           LOG_TAIL=$(tail -n 60 failure_log.txt | head -n 50)
 
-          # Get workflow metadata
-          WORKFLOW_NAME=$(gh run view "$WORKFLOW_ID" --repo "$REPO" --json name --jq '.name' 2>/dev/null || echo "Unknown")
-          COMMIT_MSG="${{ github.event.workflow_run.head_commit.message }}"
+          # Failed job names (scoped to this attempt)
+          FAILED_JOBS=$(gh run view "$WORKFLOW_ID" --repo "$REPO" --attempt "$ATTEMPT" --json jobs \
+            --jq '[.jobs[] | select(.conclusion=="failure") | .name] | join(", ")' 2>/dev/null || echo "unknown")
 
-          # Ensure labels exist (create if missing)
+          # Workflow name (for issue title)
+          WORKFLOW_NAME=$(gh run view "$WORKFLOW_ID" --repo "$REPO" --json name --jq '.name' 2>/dev/null || echo "Desktop Build and Release")
+
+          # Run reference (branch + short SHA)
+          RUN_REF=$(gh run view "$WORKFLOW_ID" --repo "$REPO" --json headBranch,headSha \
+            --jq '"\(.headBranch) (\(.headSha[0:7]))"' 2>/dev/null || echo "unknown")
+
+          # Write multiline outputs with randomized delimiters to avoid collision
+          DELIM="EOF_$(date +%s%N)"
+          echo "ERROR_LINES<<$DELIM" >> "$GITHUB_OUTPUT"
+          echo "$ERROR_LINES" >> "$GITHUB_OUTPUT"
+          echo "$DELIM" >> "$GITHUB_OUTPUT"
+          DELIM2="EOF_$(date +%s%N)_2"
+          echo "LOG_TAIL<<$DELIM2" >> "$GITHUB_OUTPUT"
+          echo "$LOG_TAIL" >> "$GITHUB_OUTPUT"
+          echo "$DELIM2" >> "$GITHUB_OUTPUT"
+          echo "FAILED_JOBS=$FAILED_JOBS" >> "$GITHUB_OUTPUT"
+          echo "WORKFLOW_NAME=$WORKFLOW_NAME" >> "$GITHUB_OUTPUT"
+          echo "RUN_REF=$RUN_REF" >> "$GITHUB_OUTPUT"
+
+          # Classification: only ##[error] lines are considered
+          ERROR_ONLY=$(grep "##\[error\]" failure_log.txt || true)
+          if [ -z "$ERROR_ONLY" ]; then
+            # No ##[error] lines = warnings or auxiliary messages only
+            echo "CLASSIFICATION=SKIP" >> "$GITHUB_OUTPUT"
+          elif echo "$ERROR_ONLY" | grep -q "403" && echo "$ERROR_ONLY" | grep -qi "agreement"; then
+            echo "CLASSIFICATION=TRANSIENT" >> "$GITHUB_OUTPUT"
+          else
+            echo "CLASSIFICATION=DEFAULT" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Auto-retry transient failure
+        if: |
+          steps.dedup.outputs.skip != 'true' &&
+          steps.classify.outputs.CLASSIFICATION == 'TRANSIENT' &&
+          steps.classify.outputs.ATTEMPT == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_ID: ${{ steps.info.outputs.RUN_ID }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh run rerun "$WORKFLOW_ID" --repo "$REPO" --failed
+          echo "::notice::Transient failure detected. Re-running failed jobs for Run #$WORKFLOW_ID."
+
+      - name: Create issue
+        if: |
+          steps.dedup.outputs.skip != 'true' &&
+          steps.classify.outputs.CLASSIFICATION != 'SKIP' &&
+          !(steps.classify.outputs.CLASSIFICATION == 'TRANSIENT' && steps.classify.outputs.ATTEMPT == '1')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_ID: ${{ steps.info.outputs.RUN_ID }}
+          REPO: ${{ github.repository }}
+          CLASSIFICATION: ${{ steps.classify.outputs.CLASSIFICATION }}
+          ATTEMPT: ${{ steps.classify.outputs.ATTEMPT }}
+          ERROR_LINES: ${{ steps.classify.outputs.ERROR_LINES }}
+          LOG_TAIL: ${{ steps.classify.outputs.LOG_TAIL }}
+          FAILED_JOBS: ${{ steps.classify.outputs.FAILED_JOBS }}
+          RUN_REF: ${{ steps.classify.outputs.RUN_REF }}
+          WORKFLOW_NAME: ${{ steps.classify.outputs.WORKFLOW_NAME }}
+        run: |
+          # Ensure labels exist
           gh label create "ci-failure" --repo "$REPO" --color "D73A49" --description "CI/CD failure" 2>/dev/null || true
+          gh label create "P0" --repo "$REPO" --color "B60205" --description "Critical priority" 2>/dev/null || true
+
+          # Determine severity
+          if [ "$CLASSIFICATION" = "TRANSIENT" ]; then
+            # Retry exhausted (attempt >= 2)
+            LABELS="ci-failure,P0"
+            TITLE_PREFIX="CI Failure (Retry Exhausted)"
+            SEVERITY_NOTE="⚠️ **一時的なエラーが再試行後も解消されませんでした**（試行回数: $ATTEMPT）"
+          else
+            # DEFAULT
+            LABELS="ci-failure"
+            TITLE_PREFIX="CI Failure"
+            SEVERITY_NOTE=""
+          fi
 
           BODY=$(cat <<BODY_EOF
           ## CI ビルドが失敗しました
 
+          ${SEVERITY_NOTE}
+
           **Workflow**: \`$WORKFLOW_NAME\`
           **Run ID**: [#$WORKFLOW_ID](https://github.com/$REPO/actions/runs/$WORKFLOW_ID)
-          **Commit**: $COMMIT_MSG
+          **Ref**: $RUN_REF
+          **Attempt**: $ATTEMPT
+          **Failed Jobs**: $FAILED_JOBS
 
           ---
 
@@ -162,11 +258,19 @@ jobs:
           ---
 
           *この Issue は CI Failure Handler により自動作成されました。*
+          *分類: $CLASSIFICATION | 試行回数: $ATTEMPT*
           BODY_EOF
           )
 
+          # Split labels for --label flags
+          LABEL_ARGS=""
+          IFS=',' read -ra LABEL_ARRAY <<< "$LABELS"
+          for label in "${LABEL_ARRAY[@]}"; do
+            LABEL_ARGS="$LABEL_ARGS --label $label"
+          done
+
           gh issue create \
             --repo "$REPO" \
-            --title "CI Failure: $WORKFLOW_NAME (Run #$WORKFLOW_ID)" \
-            --label "ci-failure" \
+            --title "$TITLE_PREFIX: $WORKFLOW_NAME (Run #$WORKFLOW_ID)" \
+            $LABEL_ARGS \
             --body "$BODY"
