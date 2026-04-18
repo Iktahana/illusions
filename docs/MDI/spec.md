@@ -175,12 +175,21 @@ Output (example):
 }
 ```
 
-## 6. Explicit Line Break (改行)
+## 6. Line & Paragraph Breaks (改行 & 換段)
+
+MDI は段落内の「改行」（line break）と、段落を分ける「換段」（paragraph break）を明確に区別します。
+
+- **改行 (line break)** — 同じ段落のまま、視覚的な行を折り返す。縦書では同じ「段」の中で改行される。
+- **換段 (paragraph break)** — 段落を区切る。出力側では新しい `<p>` / 段落要素になる。縦書では段間のアキが入る。
+
+改行は MDI 独自の `[[br]]` と CommonMark hardbreak の両方をサポートします。換段は CommonMark の空行に準拠し、MDI 独自マーカーは用意しません（§6.2 参照）。
+
+### 6.1 Explicit Line Break (`[[br]]`)
 
 段落内に強制改行を挿入するための MDI 独自の構文です。
 CommonMark の hardbreak（行末 2 スペース + `\n`、または `Shift+Enter` で挿入）に依存しない、明示的な改行マーカーを提供します。
 
-### 6.1 Syntax
+**Syntax**
 
 `[[br]]`
 
@@ -188,7 +197,7 @@ CommonMark の hardbreak（行末 2 スペース + `\n`、または `Shift+Enter
 - 段落の途中、文字列の途中、どこにでも挿入できます。
 - `.mdi` 固有の構文です。`.md` ファイルでは通常のリテラル文字列として扱われます。
 
-### 6.2 Examples
+**Examples**
 
 ```markdown
 春は曙。[[br]]
@@ -197,7 +206,7 @@ CommonMark の hardbreak（行末 2 スペース + `\n`、または `Shift+Enter
 [[br]][[br]]は連続した 2 回の改行として扱う。
 ```
 
-### 6.3 Semantics
+**Semantics**
 
 - `.mdi` 固有の構文。`.md` には適用しない。
 - 段落（inline context）内でのみ有効。ブロックレベルでは無視される。
@@ -208,7 +217,7 @@ CommonMark の hardbreak（行末 2 スペース + `\n`、または `Shift+Enter
 - **エクスポート経路（`mdi-to-html.ts`）との差異**：現状のエクスポートは文字列置換ベース（ruby/tcy/nobr/kern と同じ前処理パイプライン）のため、コードブロック・インラインコードの除外は `remark` 経路と同等には保証されない。本件は `[[br]]` 固有ではなく MDI inline 構文全般に共通する既知のギャップで、別 Issue でトークン/AST レベル置換への移行を追跡する。
 - **エスケープ `\[[br]]`**：エクスポート経路（`mdi-to-html.ts`）のみでリテラル化される。エディタの `remark` 経路ではエスケープ未対応（既存の bracket macro 全般の既知の差で、`docs/MDI/roadmap.md` の escape handling 項目で追跡中）。
 
-### 6.4 HTML Conversion (Recommended)
+**HTML Conversion (Recommended)**
 
 Input:
 
@@ -222,7 +231,7 @@ Output (example):
 春は曙。<br class="mdi-break" />やうやう白くなりゆく山ぎは。
 ```
 
-### 6.5 CSS Example
+**CSS Example**
 
 - エディタ内部の表示では既存の `.mdi-hardbreak-indent` クラスがインデント用スペーサーを挿入する（`<br>` 直後に `display: inline-block; width: <text-indent>em;` の空 span をデコレーションとして付加する）。
 - エクスポート経路では専用の CSS ルールを追加する：
@@ -233,6 +242,62 @@ br.mdi-break {
   /* 追加のマージンや特殊処理は不要。将来的なカスタム余地として明示的なルールを置く。 */
 }
 ```
+
+### 6.2 Paragraph Break (換段)
+
+段落を区切る場合は **CommonMark に準拠し、空行（`\n\n`）で表現** します。MDI 独自の換段マーカー（例：`[[pr]]`）は **意図的に導入しません**。
+
+**Syntax**
+
+```markdown
+春は曙。やうやう白くなりゆく山ぎは。
+
+夏は夜。月のころはさらなり。
+```
+
+- 連続する 2 つの改行（間に空行）を境に、前後が別々の段落として扱われる。
+- 3 つ以上の連続空行は 1 つの段落境界として縮約される（CommonMark の標準挙動）。
+
+**Semantics**
+
+- ブロックレベルの区切り。remark / ProseMirror では別々の `paragraph` ノードになる。
+- エクスポート経路では `<p>...</p>` と `<p>...</p>` のペアとして出力される。
+- 縦書時は段落間のアキ（`margin-block`）が入り、横書時は段落インデントが `text-indent` で表現される。
+
+**Why no MDI-native paragraph marker**
+
+`[[br]]`（改行）と対になる `[[pr]]`（換段）を導入しない理由：
+
+1. **CommonMark の空行で既に表現できる** — 空行は既存の全 Markdown エディタ・レンダラ・ツール（Pandoc, GitHub, Obsidian 等）で段落境界として解釈される。独自マーカーは重複になる。
+2. **Inline / Block の非対称性** — `[[br]]` は inline 構文（段落の中に埋め込む）、換段は block 構文（段落を切り替える）。同じ bracket macro 形式で両者を表現すると、パーサ側で文脈依存の判定が必要になり、remark / ProseMirror のノード階層とも整合しない。
+3. **Round-trip の曖昧さ** — `A\n\n[[pr]]\n\nB` のように両方が書かれた場合、段落境界が 1 つか 2 つか不明瞭になる。空行のみを正とすれば一意に決まる。
+
+**Escape / edge cases**
+
+- 段落の途中で `\n` 1 つだけ（空行なし）は CommonMark の soft break。`.mdi` ではデフォルトでは改行にならず、単なる空白として扱われる（段落内の文字の続き）。
+- 明示的に段落内改行したい場合は `[[br]]` または CommonMark hardbreak (`  \n`) を使う（§6.1）。
+
+### 6.3 Editor UX Rules
+
+エディタ上でのキー操作と MDI 構文の対応：
+
+| キー / 操作   | 挙動                           | Markdown 表現 | ProseMirror ノード |
+| ------------- | ------------------------------ | ------------- | ------------------ |
+| `Enter`       | 新しい段落（換段）             | 空行 (`\n\n`) | `paragraph`（別）  |
+| `Shift+Enter` | CommonMark hardbreak（段落内） | `  \n`        | `hardbreak`        |
+| `[[br]]` 入力 | MDI 改行マーカー（段落内）     | `[[br]]`      | `mdibreak`         |
+
+**推奨運用**
+
+- **通常の段落分け**：`Enter` を押す。CommonMark 空行として保存される。
+- **同一段落内での視覚的改行**：`[[br]]` をテキストとして入力する（`.mdi` のみ）。round-trip で確実に保持される。
+- **`Shift+Enter`**：CommonMark 準拠が必要なとき、または `.md` ファイルでの改行。`.mdi` では `[[br]]` を推奨。
+
+**なぜ `[[br]]` を手入力するのか**
+
+- 作者が「段落内改行」を意図した箇所が、保存 → 再オープン後に確実に保たれることが目的。
+- `Shift+Enter` は CommonMark では末尾 2 スペースに依存し、エディタによっては保持されない。
+- `[[br]]` は MDI パーサで独立したノード (`mdibreak`) になるため、round-trip が確実。
 
 ## 7. Kerning / Letter-spacing (字間調整)
 
