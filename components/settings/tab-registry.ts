@@ -13,7 +13,7 @@ import TerminalSettingsTab from "./TerminalSettingsTab";
 import TypographySettingsTab from "./TypographySettingsTab";
 import VerticalSettingsTab from "./VerticalSettingsTab";
 
-import type { ResolvedSettingsCategory } from "./settings-category";
+import type { SettingsCategory } from "./settings-category";
 
 export interface TabRegistryEntry {
   component: ComponentType;
@@ -29,7 +29,7 @@ export interface TabRegistryEntry {
  * tabs (`terminal`, `power`) may be absent in the Web build; callers must
  * normalize unavailable categories via `resolveLegacyCategory`.
  */
-export type SettingsTabRegistry = Partial<Record<ResolvedSettingsCategory, TabRegistryEntry>>;
+export type SettingsTabRegistry = Partial<Record<SettingsCategory, TabRegistryEntry>>;
 
 export function buildSettingsTabRegistry(options: { isElectron: boolean }): SettingsTabRegistry {
   const base: SettingsTabRegistry = {

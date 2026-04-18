@@ -16,7 +16,7 @@ import {
 import type { SettingsNavGroup } from "@/components/settings/primitives";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
-import type { ResolvedSettingsCategory } from "./settings-category";
+import type { SettingsCategory } from "./settings-category";
 
 /**
  * Build the grouped navigation configuration for the settings modal.
@@ -25,9 +25,7 @@ import type { ResolvedSettingsCategory } from "./settings-category";
  * The runtime check must happen at call-time (not at module load) because
  * `isElectronRenderer` depends on `window`.
  */
-export function buildSettingsNavConfig(): ReadonlyArray<
-  SettingsNavGroup<ResolvedSettingsCategory>
-> {
+export function buildSettingsNavConfig(): ReadonlyArray<SettingsNavGroup<SettingsCategory>> {
   const isElectron = isElectronRenderer();
   return [
     {

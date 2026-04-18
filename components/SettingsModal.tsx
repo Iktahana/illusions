@@ -10,7 +10,6 @@ import { buildSettingsNavConfig } from "./settings/nav-config";
 import { buildSettingsTabRegistry } from "./settings/tab-registry";
 import {
   resolveLegacyCategory,
-  type ResolvedSettingsCategory,
   type SettingsCategory,
 } from "./settings/settings-category";
 
@@ -32,7 +31,7 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
     [isElectron],
   );
 
-  const [activeCategory, setActiveCategory] = useState<ResolvedSettingsCategory>(() =>
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>(() =>
     resolveLegacyCategory(initialCategory, { isElectron }),
   );
   const modalRef = useRef<HTMLDivElement>(null);
