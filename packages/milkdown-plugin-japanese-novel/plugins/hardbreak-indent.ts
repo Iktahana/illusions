@@ -21,10 +21,10 @@ export function createHardbreakIndentPlugin(): Plugin {
         state.doc.descendants((node: Node, pos: number) => {
           if (node.type.name !== "paragraph") return;
 
-          // Scan children for hardbreak nodes
+          // Scan children for hardbreak / mdibreak nodes
           node.forEach((child, offset) => {
-            if (child.type.name === "hardbreak") {
-              // Insert spacer widget right after the hardbreak node
+            if (child.type.name === "hardbreak" || child.type.name === "mdibreak") {
+              // Insert spacer widget right after the break node
               const afterPos = pos + 1 + offset + child.nodeSize;
               const widget = Decoration.widget(
                 afterPos,

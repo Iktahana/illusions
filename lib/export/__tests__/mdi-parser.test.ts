@@ -8,6 +8,7 @@ import {
   MDI_NOBR_RE,
   MDI_KERN_RE,
   MDI_KERN_AMOUNT_RE,
+  MDI_BREAK_RE,
 } from "../mdi-parser";
 
 // ---------------------------------------------------------------------------
@@ -45,6 +46,22 @@ describe("MDI regex patterns", () => {
   describe("MDI_KERN_RE", () => {
     it("should match [[kern:amount:text]]", () => {
       expect("a [[kern:0.5em:text]] b").toMatch(MDI_KERN_RE);
+    });
+  });
+
+  describe("MDI_BREAK_RE", () => {
+    it("should match [[br]]", () => {
+      expect("line1[[br]]line2").toMatch(MDI_BREAK_RE);
+    });
+
+    it("should match consecutive [[br]][[br]]", () => {
+      const input = "a[[br]][[br]]b";
+      const matches = input.match(MDI_BREAK_RE);
+      expect(matches).toHaveLength(2);
+    });
+
+    it("should not match partial [[br", () => {
+      expect("a[[br").not.toMatch(MDI_BREAK_RE);
     });
   });
 
@@ -94,6 +111,14 @@ describe("stripMdiInlineSyntax", () => {
   it("should pass through plain text unchanged", () => {
     expect(stripMdiInlineSyntax("普通のテキスト")).toBe("普通のテキスト");
   });
+
+  it("should convert [[br]] to newline", () => {
+    expect(stripMdiInlineSyntax("春は曙。[[br]]やうやう")).toBe("春は曙。\nやうやう");
+  });
+
+  it("should convert consecutive [[br]][[br]] to two newlines", () => {
+    expect(stripMdiInlineSyntax("a[[br]][[br]]b")).toBe("a\n\nb");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -125,5 +150,9 @@ describe("replaceMdiWithRubyText", () => {
     const input = "{東京|とうきょう}の^12^月";
     const expected = "東京（とうきょう）の12月";
     expect(replaceMdiWithRubyText(input)).toBe(expected);
+  });
+
+  it("should convert [[br]] to newline", () => {
+    expect(replaceMdiWithRubyText("春は曙。[[br]]やうやう")).toBe("春は曙。\nやうやう");
   });
 });

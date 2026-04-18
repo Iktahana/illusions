@@ -19,12 +19,16 @@ const NO_BREAK_RE = /\[\[no-break:([^\]]+)\]\]/g;
 const KERN_RE = /\[\[kern:([+-]?\d+(?:\.\d+)?em):([^\]]+)\]\]/g;
 const KERN_AMOUNT_VALID_RE = /^[+-]?\d+(\.\d+)?em$/;
 
+/** MDI 明示改行: [[br]] */
+const MDI_BREAK_RE = /\[\[br\]\]/g;
+
 type TextNode = { type: "text"; value: string };
 type RubyNode = { type: "ruby"; base: string; text: string };
 type TcyNode = { type: "tcy"; value: string };
 type NoBreakNode = { type: "nobreak"; text: string };
 type KernNode = { type: "kern"; amount: string; text: string };
-type InlineNode = TextNode | RubyNode | TcyNode | NoBreakNode | KernNode;
+type MdiBreakNode = { type: "mdibreak" };
+type InlineNode = TextNode | RubyNode | TcyNode | NoBreakNode | KernNode | MdiBreakNode;
 
 type HeadingNode = {
   type: "heading";
@@ -183,6 +187,43 @@ export const remarkKernPlugin: Plugin<[RemarkKernOptions | undefined], Root> = (
       const value = (node as TextNode).value;
       if (!/\[\[kern:/.test(value)) return;
       const segments = splitKern(value);
+      if (segments.length === 0 || (segments.length === 1 && segments[0]!.type === "text")) return;
+      const children = (parent as { children: unknown[] }).children;
+      children.splice(index, 1, ...segments);
+    });
+  };
+};
+
+function splitMdiBreak(text: string): InlineNode[] {
+  const segments: InlineNode[] = [];
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  MDI_BREAK_RE.lastIndex = 0;
+  while ((m = MDI_BREAK_RE.exec(text)) !== null) {
+    if (m.index > lastIndex) {
+      segments.push({ type: "text", value: text.slice(lastIndex, m.index) });
+    }
+    segments.push({ type: "mdibreak" });
+    lastIndex = m.index + m[0].length;
+  }
+  if (lastIndex < text.length) {
+    segments.push({ type: "text", value: text.slice(lastIndex) });
+  }
+  return segments;
+}
+
+export interface RemarkMdiBreakOptions {
+  enable?: boolean;
+}
+
+export const remarkMdiBreakPlugin: Plugin<[RemarkMdiBreakOptions | undefined], Root> = (opts) => {
+  const enable = opts?.enable !== false;
+  return (tree) => {
+    visit(tree, "text", (node, index, parent) => {
+      if (!parent || typeof index !== "number" || !enable) return;
+      const value = (node as TextNode).value;
+      if (!value.includes("[[br]]")) return;
+      const segments = splitMdiBreak(value);
       if (segments.length === 0 || (segments.length === 1 && segments[0]!.type === "text")) return;
       const children = (parent as { children: unknown[] }).children;
       children.splice(index, 1, ...segments);

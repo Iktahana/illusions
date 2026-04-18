@@ -3,7 +3,7 @@ title: MDI ロードマップ
 slug: mdi-roadmap
 type: spec
 status: draft
-updated: 2026-04-03
+updated: 2026-04-18
 tags:
   - mdi
   - roadmap
@@ -19,6 +19,7 @@ tags:
 - 縦中横: `^...^`
 - no-break: `[[no-break:...]]`
 - kern: `[[kern:<量>:<文字列>]]`
+- explicit line break: `[[br]]`（Issue #1235）
 - `.mdi` ファイル拡張子
 - HTML / TXT / PDF / EPUB / DOCX への出力経路
 
