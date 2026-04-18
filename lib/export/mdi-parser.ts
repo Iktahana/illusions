@@ -9,6 +9,7 @@
  * - Tate-chu-yoko: ^text^
  * - No-break:      [[no-break:text]]
  * - Kerning:       [[kern:amount:text]]
+ * - Line break:    [[br]]
  * - Escaped:       \{  \^  \[
  */
 
@@ -27,6 +28,9 @@ export const MDI_NOBR_RE = /\[\[no-break:([^\]]+)\]\]/g;
 
 /** Kerning: [[kern:amount:text]] */
 export const MDI_KERN_RE = /\[\[kern:([^:\]]+):([^\]]+)\]\]/g;
+
+/** MDI explicit line break: [[br]] */
+export const MDI_BREAK_RE = /\[\[br\]\]/g;
 
 /** Escaped MDI opening brace: \{ */
 export const MDI_ESC_BRACE_RE = /\\(\{)/g;
@@ -63,6 +67,9 @@ export function stripMdiInlineSyntax(text: string): string {
   // Kerning: keep text
   result = result.replace(MDI_KERN_RE, "$2");
 
+  // Explicit line break: newline
+  result = result.replace(MDI_BREAK_RE, "\n");
+
   return result;
 }
 
@@ -92,6 +99,9 @@ export function replaceMdiWithRubyText(text: string): string {
 
   // Kerning: keep text
   result = result.replace(MDI_KERN_RE, "$2");
+
+  // Explicit line break: newline
+  result = result.replace(MDI_BREAK_RE, "\n");
 
   return result;
 }

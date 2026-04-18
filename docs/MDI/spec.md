@@ -3,7 +3,7 @@ title: MDI 構文仕様
 slug: mdi-spec
 type: spec
 status: draft
-updated: 2026-04-03
+updated: 2026-04-18
 tags:
   - mdi
   - syntax
@@ -17,7 +17,7 @@ tags:
 ## Original Draft (English)
 
 MDI files are Markdown documents with illusions-specific extensions for Japanese typography.
-This specification defines _inline_ syntaxes that are difficult to express in standard Markdown (ruby, tate-chu-yoko, no-break, kerning).
+This specification defines _inline_ syntaxes that are difficult to express in standard Markdown (ruby, tate-chu-yoko, no-break, kerning, explicit line break).
 
 ## 1. Purpose & Assumptions
 
@@ -37,7 +37,7 @@ A recommended order is:
 1. Handle escapes (see 3.2)
 2. Ruby: `{base|ruby}`
 3. Tate-chu-yoko: `^...^`
-4. Bracket macros: `[[no-break:...]]`, `[[kern:...:...]]`
+4. Bracket macros: `[[br]]`, `[[no-break:...]]`, `[[kern:...:...]]`
 
 ### 2.2 Escapes (Recommended)
 
@@ -175,23 +175,82 @@ Output (example):
 }
 ```
 
-## 6. Kerning / Letter-spacing (字間調整)
+## 6. Explicit Line Break (改行)
+
+段落内に強制改行を挿入するための MDI 独自の構文です。
+CommonMark の hardbreak（行末 2 スペース + `\n`、または `Shift+Enter` で挿入）に依存しない、明示的な改行マーカーを提供します。
 
 ### 6.1 Syntax
+
+`[[br]]`
+
+- 引数を取らない bracket macro です。
+- 段落の途中、文字列の途中、どこにでも挿入できます。
+- `.mdi` 固有の構文です。`.md` ファイルでは通常のリテラル文字列として扱われます。
+
+### 6.2 Examples
+
+```markdown
+春は曙。[[br]]
+やうやう白くなりゆく山ぎは。
+
+[[br]][[br]]は連続した 2 回の改行として扱う。
+```
+
+### 6.3 Semantics
+
+- `.mdi` 固有の構文。`.md` には適用しない。
+- 段落（inline context）内でのみ有効。ブロックレベルでは無視される。
+- CommonMark の hardbreak（`  \n` or `Shift+Enter`）とは独立しており、同一文書内での共存が可能。
+- 連続した `[[br]][[br]]` は複数回の改行として扱う。
+- **ルビ構文内（`{base[[br]]|ruby}` など）では `[[br]]` はリテラル文字として扱われる**。ルビの正規表現 `{[^|]+\|[^}]+}` はブラケット文字を属性値として取り込むため、`remark` 変換は発火しない。
+- **コードブロック・インラインコード内では無効（エディタ / `remark` 経路）**。`remark` が先に code node として隔離するため、その経路では `[[br]]` はリテラル文字として保持される。
+- **エクスポート経路（`mdi-to-html.ts`）との差異**：現状のエクスポートは文字列置換ベース（ruby/tcy/nobr/kern と同じ前処理パイプライン）のため、コードブロック・インラインコードの除外は `remark` 経路と同等には保証されない。本件は `[[br]]` 固有ではなく MDI inline 構文全般に共通する既知のギャップで、別 Issue でトークン/AST レベル置換への移行を追跡する。
+- **エスケープ `\[[br]]`**：エクスポート経路（`mdi-to-html.ts`）のみでリテラル化される。エディタの `remark` 経路ではエスケープ未対応（既存の bracket macro 全般の既知の差で、`docs/MDI/roadmap.md` の escape handling 項目で追跡中）。
+
+### 6.4 HTML Conversion (Recommended)
+
+Input:
+
+```markdown
+春は曙。[[br]]やうやう白くなりゆく山ぎは。
+```
+
+Output (example):
+
+```html
+春は曙。<br class="mdi-break" />やうやう白くなりゆく山ぎは。
+```
+
+### 6.5 CSS Example
+
+- エディタ内部の表示では既存の `.mdi-hardbreak-indent` クラスがインデント用スペーサーを挿入する（`<br>` 直後に `display: inline-block; width: <text-indent>em;` の空 span をデコレーションとして付加する）。
+- エクスポート経路では専用の CSS ルールを追加する：
+
+```css
+br.mdi-break {
+  /* 横書・縦書とも、ブラウザ既定の <br> 改行挙動を踏襲する。 */
+  /* 追加のマージンや特殊処理は不要。将来的なカスタム余地として明示的なルールを置く。 */
+}
+```
+
+## 7. Kerning / Letter-spacing (字間調整)
+
+### 7.1 Syntax
 
 `[[kern:<量>:<文字列>]]`
 
 - `<量>` is typically an `em` value, e.g. `-0.1em`, `+0.2em`, `0em`.
 - `<文字列>` is the affected text.
 
-### 6.2 Examples
+### 7.2 Examples
 
 ```markdown
 彼は[[kern:-0.1em:確実]]にそう言った。
 [[kern:+0.3em:沈黙]]が落ちた。
 ```
 
-### 6.3 HTML Conversion (Recommended)
+### 7.3 HTML Conversion (Recommended)
 
 To reduce CSS/HTML injection risk, using a CSS custom property is recommended.
 
@@ -207,7 +266,7 @@ Output (example):
 <span class="mdi-kern" style="--mdi-kern:-0.1em;">言葉</span>
 ```
 
-### 6.4 CSS Example
+### 7.4 CSS Example
 
 ```css
 .mdi-kern {
@@ -215,7 +274,7 @@ Output (example):
 }
 ```
 
-### 6.5 Validation (Recommended)
+### 7.5 Validation (Recommended)
 
 Implementations should validate `<量>`.
 A conservative rule is:
@@ -223,19 +282,20 @@ A conservative rule is:
 - Accept only `^[+-]?\d+(\.\d+)?em$`
 - If invalid, treat the whole macro as plain text (recommended) or fallback to `0em`.
 
-## 7. Design Notes
+## 8. Design Notes
 
 - MDI chooses delimiter forms that avoid common Markdown collisions.
 - Markup should remain human-readable: the meaning should be guessable from the text.
 - The final appearance is controlled by HTML + CSS; MDI provides semantics.
 
-## 8. Minimal Implementation Set
+## 9. Minimal Implementation Set
 
 At minimum, implementing the following significantly improves Japanese prose readability:
 
 - Ruby: `{漢字|かん.じ}`
 - Tate-chu-yoko: `^12^`
 - No-break: `[[no-break:文字列]]`
+- Explicit line break: `[[br]]`
 
 (Optionally) add kerning:
 

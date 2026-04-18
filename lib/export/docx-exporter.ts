@@ -18,7 +18,7 @@ import {
   TextDirection,
 } from "docx";
 import type { ExportMetadata } from "./types";
-import { replaceMdiWithRubyText } from "./mdi-parser";
+import { replaceMdiWithRubyText, MDI_BREAK_RE } from "./mdi-parser";
 import {
   DEFAULT_DOCX_SETTINGS,
   PAGE_DIMENSIONS,
@@ -280,15 +280,50 @@ function createParagraph(
 }
 
 /**
+ * Sentinel used to preserve `[[br]]` through replaceMdiWithRubyText without
+ * colliding with CommonMark softbreak newlines that originate from paragraph
+ * line-wrapping. Uses U+E001 (Unicode Private Use Area) which will not appear
+ * in user content and survives the generic MDI text transform.
+ */
+const DOCX_MDI_BREAK_SENTINEL = "\uE001";
+
+/**
+ * Push a text span as TextRuns, splitting on the MDI break sentinel and
+ * inserting `TextRun({ break: 1 })` at each boundary. Empty segments are
+ * skipped. CommonMark softbreaks (literal `\n`) are preserved as text and
+ * are NOT treated as explicit breaks.
+ */
+function pushRunWithBreaks(
+  runs: TextRun[],
+  text: string,
+  props: { bold?: boolean; italics?: boolean; font: DocxFontConfig },
+): void {
+  const parts = text.split(DOCX_MDI_BREAK_SENTINEL);
+  parts.forEach((part, i) => {
+    if (i > 0) {
+      runs.push(new TextRun({ break: 1, font: props.font }));
+    }
+    if (part) {
+      runs.push(new TextRun({ text: part, ...props }));
+    }
+  });
+}
+
+/**
  * Parse inline markdown/MDI formatting into TextRun objects
  *
- * Handles: **bold**, *italic*, {ruby|text}, ^tcy^, [[no-break:text]], [[kern:val:text]]
+ * Handles: **bold**, *italic*, {ruby|text}, ^tcy^, [[no-break:text]],
+ * [[kern:val:text]], [[br]] (as `<w:br/>`)
  */
 function parseInlineFormatting(text: string, fontConfig: DocxFontConfig): TextRun[] {
   const runs: TextRun[] = [];
 
-  // Process all MDI inline syntax via shared parser (ruby → fullwidth parens)
-  const processed = replaceMdiWithRubyText(text);
+  // Reserve `[[br]]` with a sentinel before the shared parser so that it is
+  // distinguishable from CommonMark softbreak newlines. replaceMdiWithRubyText
+  // otherwise converts `[[br]]` to `\n`, which would be indistinguishable from
+  // paragraph line-wrap newlines for the purpose of emitting `<w:br/>`.
+  const reserved = text.replace(MDI_BREAK_RE, DOCX_MDI_BREAK_SENTINEL);
+  const processed = replaceMdiWithRubyText(reserved);
 
   // Now parse bold/italic markdown
   // Split by bold-italic (***text***), bold (**text**), and italic (*text*) markers
@@ -298,37 +333,31 @@ function parseInlineFormatting(text: string, fontConfig: DocxFontConfig): TextRu
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(processed)) !== null) {
-    // Add text before this match
     if (match.index > lastIndex) {
       const before = processed.slice(lastIndex, match.index);
       if (before) {
-        runs.push(new TextRun({ text: before, font: fontConfig }));
+        pushRunWithBreaks(runs, before, { font: fontConfig });
       }
     }
 
     if (match[2]) {
-      // Bold italic: ***text***
-      runs.push(new TextRun({ text: match[2], bold: true, italics: true, font: fontConfig }));
+      pushRunWithBreaks(runs, match[2], { bold: true, italics: true, font: fontConfig });
     } else if (match[3]) {
-      // Bold: **text**
-      runs.push(new TextRun({ text: match[3], bold: true, font: fontConfig }));
+      pushRunWithBreaks(runs, match[3], { bold: true, font: fontConfig });
     } else if (match[4]) {
-      // Italic: *text*
-      runs.push(new TextRun({ text: match[4], italics: true, font: fontConfig }));
+      pushRunWithBreaks(runs, match[4], { italics: true, font: fontConfig });
     }
 
     lastIndex = match.index + match[0].length;
   }
 
-  // Add remaining text
   if (lastIndex < processed.length) {
     const remaining = processed.slice(lastIndex);
     if (remaining) {
-      runs.push(new TextRun({ text: remaining, font: fontConfig }));
+      pushRunWithBreaks(runs, remaining, { font: fontConfig });
     }
   }
 
-  // If no runs were created, add the full text
   if (runs.length === 0) {
     runs.push(new TextRun({ text: processed, font: fontConfig }));
   }
