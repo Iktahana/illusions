@@ -261,8 +261,8 @@ br.mdi-break {
 **Semantics**
 
 - ブロックレベルの区切り。remark / ProseMirror では別々の `paragraph` ノードになる。
-- エクスポート経路では `<p>...</p>` と `<p>...</p>` のペアとして出力される。
-- 縦書時は段落間のアキ（`margin-block`）が入り、横書時は段落インデントが `text-indent` で表現される。
+- HTML / EPUB エクスポート経路では `<p>...</p>` のペアとして出力される。DOCX / TXT はそれぞれの形式で独自の段落区切り（DOCX は `<w:p>`、TXT は空行）に変換される。
+- 段落間の視覚表現（縦書のアキ、横書の `text-indent` など）は出力側の CSS / スタイル設定に委ねられる。MDI spec 自体は具体的な CSS プロパティを規定しない。
 
 **Why no MDI-native paragraph marker**
 
@@ -296,8 +296,8 @@ br.mdi-break {
 **なぜ `[[br]]` を手入力するのか**
 
 - 作者が「段落内改行」を意図した箇所が、保存 → 再オープン後に確実に保たれることが目的。
-- `Shift+Enter` は CommonMark では末尾 2 スペースに依存し、エディタによっては保持されない。
-- `[[br]]` は MDI パーサで独立したノード (`mdibreak`) になるため、round-trip が確実。
+- CommonMark hardbreak の末尾 2 スペース形式は、外部ツール（GitHub の diff 表示・一部の整形ツール・コピペ経路など）で trim されやすい。本エディタ内では `hardbreak` ノードとして保持されるが、外部経由の round-trip には脆弱。
+- `[[br]]` は MDI パーサで独立したノード (`mdibreak`) になるため、テキストとしての見た目も含めて round-trip が確実。
 
 ## 7. Kerning / Letter-spacing (字間調整)
 
