@@ -218,7 +218,7 @@ Input:
 Output (example):
 
 ```html
-春は曙。<br class="mdi-break">やうやう白くなりゆく山ぎは。
+春は曙。<br class="mdi-break" />やうやう白くなりゆく山ぎは。
 ```
 
 ### 6.5 CSS Example

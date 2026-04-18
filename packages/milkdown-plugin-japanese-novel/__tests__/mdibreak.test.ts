@@ -20,9 +20,9 @@ function makeTree(paragraphText: string): Root {
 }
 
 function runPlugin(tree: Root, options?: { enable?: boolean }): Root {
-  const factory = remarkMdiBreakPlugin as unknown as (
-    opts?: { enable?: boolean },
-  ) => (t: Root) => void;
+  const factory = remarkMdiBreakPlugin as unknown as (opts?: {
+    enable?: boolean;
+  }) => (t: Root) => void;
   factory(options)(tree);
   return tree;
 }
