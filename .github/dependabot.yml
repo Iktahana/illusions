@@ -21,6 +21,11 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+    ignore:
+      # ESLint 10 breaks eslint-plugin-react (peer: ^9.7 as of 7.37.5).
+      # Revisit once the React ESLint ecosystem catches up.
+      - dependency-name: "eslint"
+        versions: ["10.x"]
     groups:
       npm_and_yarn:
         patterns:
