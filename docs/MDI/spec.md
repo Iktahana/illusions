@@ -204,7 +204,8 @@ CommonMark の hardbreak（行末 2 スペース + `\n`、または `Shift+Enter
 - CommonMark の hardbreak（`  \n` or `Shift+Enter`）とは独立しており、同一文書内での共存が可能。
 - 連続した `[[br]][[br]]` は複数回の改行として扱う。
 - **ルビ構文内（`{base[[br]]|ruby}` など）では `[[br]]` はリテラル文字として扱われる**。ルビの正規表現 `{[^|]+\|[^}]+}` はブラケット文字を属性値として取り込むため、`remark` 変換は発火しない。
-- **コードブロック・インラインコード内では無効**。`remark` が先に code node として隔離するため、`[[br]]` はリテラル文字として保持される。
+- **コードブロック・インラインコード内では無効（エディタ / `remark` 経路）**。`remark` が先に code node として隔離するため、その経路では `[[br]]` はリテラル文字として保持される。
+- **エクスポート経路（`mdi-to-html.ts`）との差異**：現状のエクスポートは文字列置換ベース（ruby/tcy/nobr/kern と同じ前処理パイプライン）のため、コードブロック・インラインコードの除外は `remark` 経路と同等には保証されない。本件は `[[br]]` 固有ではなく MDI inline 構文全般に共通する既知のギャップで、別 Issue でトークン/AST レベル置換への移行を追跡する。
 - **エスケープ `\[[br]]`**：エクスポート経路（`mdi-to-html.ts`）のみでリテラル化される。エディタの `remark` 経路ではエスケープ未対応（既存の bracket macro 全般の既知の差で、`docs/MDI/roadmap.md` の escape handling 項目で追跡中）。
 
 ### 6.4 HTML Conversion (Recommended)
