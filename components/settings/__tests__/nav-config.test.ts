@@ -11,17 +11,32 @@ vi.mock("@/lib/utils/runtime-env", () => ({
 const { buildSettingsNavConfig } = await import("../nav-config");
 
 describe("buildSettingsNavConfig — structure", () => {
-  it("returns six labelled groups", () => {
+  it("returns seven labelled groups", () => {
     const groups = buildSettingsNavConfig();
-    expect(groups).toHaveLength(6);
+    expect(groups).toHaveLength(7);
     expect(groups.map((g) => g.label)).toEqual([
+      "AI/LLM",
       "アカウント",
-      "AI とオンライン機能",
+      "校正と文体・辞書",
       "エディタと表示",
       "入出力",
       "システム",
       "ヘルプ",
     ]);
+  });
+
+  it("marks top of features section and help with separators", () => {
+    const groups = buildSettingsNavConfig();
+    const separated = groups.filter((g) => g.separator).map((g) => g.label);
+    expect(separated).toEqual(["校正と文体・辞書", "ヘルプ"]);
+  });
+
+  it("places terminal inside エディタと表示 (not 入出力)", () => {
+    const groups = buildSettingsNavConfig();
+    const editor = groups.find((g) => g.label === "エディタと表示");
+    const io = groups.find((g) => g.label === "入出力");
+    expect(editor?.items.map((i) => i.id)).toContain("terminal");
+    expect(io?.items.map((i) => i.id)).not.toContain("terminal");
   });
 
   it("all items have ids and labels", () => {
