@@ -33,6 +33,3 @@ Electron main-process code, preload bridge, IPC handlers, native integrations, a
 
 `packages/`
 Standalone internal packages such as Milkdown extensions and supporting editor-specific modules that can evolve independently from app wiring.
-
-`www/`
-Static marketing or web-facing assets that are published separately from the desktop runtime.

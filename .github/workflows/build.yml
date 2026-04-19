@@ -10,15 +10,11 @@ on:
     tags:
       - "v*"
     paths-ignore:
-      - "www/**"
       - "store/**"
-      - ".github/workflows/deploy-www.yml"
       - ".github/workflows/sync-ms-store-listing.yml"
   pull_request:
     paths-ignore:
-      - "www/**"
       - "store/**"
-      - ".github/workflows/deploy-www.yml"
       - ".github/workflows/sync-ms-store-listing.yml"
 
 permissions:
@@ -26,8 +22,8 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Detect which areas changed — used to avoid bumping desktop version when
-  # only www/ assets are touched
+  # Detect which areas changed — used to avoid running desktop builds when
+  # only store/ changes are touched
   # ---------------------------------------------------------------------------
 
   detect-changes:
@@ -48,18 +44,16 @@ jobs:
           filters: |
             desktop_changed:
               - '**'
-              - '!www/**' # Exclude www/ from desktop change detection
               - '!store/**' # Store listing changes should not trigger desktop builds
               - '!docs/**'
               - '!README.md'
               - '!TERMS.md'
               - '!MDI.md'
-              - '!.github/workflows/deploy-www.yml' # Web CD changes should not gate desktop builds
               - '!.github/workflows/sync-ms-store-listing.yml'
               # Keep build.yml included so workflow edits validate desktop builds
 
   # NOTE: All desktop jobs run only when desktop_changed=true.
-  # PRs that touch only www/ or documentation are intentionally skipped.
+  # PRs that touch only store/ or documentation are intentionally skipped.
 
   # ---------------------------------------------------------------------------
   # Compute version — single source of truth for all build jobs (non-PR only)
