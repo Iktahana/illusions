@@ -22,11 +22,7 @@ export default function PowerSettingsTab(): React.ReactElement {
       title="省電力モード"
       description="省電力モードを有効にすると、校正機能と AI 関連機能が一時的に無効になり、バッテリー消費を抑えます。"
     >
-      <SettingsField
-        label="省電力モードを有効にする"
-        htmlFor="power-save-mode"
-        inline
-      >
+      <SettingsField label="省電力モードを有効にする" htmlFor="power-save-mode" inline>
         <SettingsToggle
           id="power-save-mode"
           checked={powerSaveMode ?? false}

@@ -27,12 +27,7 @@ export default function SettingsLayout({
   return (
     <div className="flex flex-1 overflow-hidden">
       {nav}
-      <div
-        className={clsx(
-          "flex-1 p-6",
-          wideContent ? "overflow-hidden" : "overflow-y-auto",
-        )}
-      >
+      <div className={clsx("flex-1 p-6", wideContent ? "overflow-hidden" : "overflow-y-auto")}>
         {children}
       </div>
     </div>

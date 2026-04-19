@@ -5,12 +5,7 @@ import clsx from "clsx";
 
 import { FEATURED_JAPANESE_FONTS } from "@/lib/utils/fonts";
 import { useTypographySettings, useUISettings } from "@/contexts/EditorSettingsContext";
-import {
-  SettingsField,
-  SettingsSection,
-  SettingsToggle,
-  SliderField,
-} from "./primitives";
+import { SettingsField, SettingsSection, SettingsToggle, SliderField } from "./primitives";
 
 /**
  * Settings tab for typography (editor) and UI settings.

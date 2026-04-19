@@ -65,9 +65,7 @@ export default function SelectField<T extends string>({
                 />
                 <span className="text-sm font-medium text-foreground">{opt.label}</span>
                 {opt.description && (
-                  <span className="mt-0.5 text-xs text-foreground-tertiary">
-                    {opt.description}
-                  </span>
+                  <span className="mt-0.5 text-xs text-foreground-tertiary">{opt.description}</span>
                 )}
               </label>
             );

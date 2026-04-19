@@ -29,15 +29,10 @@ export default function SettingsField({
     return (
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <label
-            htmlFor={htmlFor}
-            className="block text-sm font-medium text-foreground"
-          >
+          <label htmlFor={htmlFor} className="block text-sm font-medium text-foreground">
             {label}
           </label>
-          {description && (
-            <p className="mt-0.5 text-xs text-foreground-tertiary">{description}</p>
-          )}
+          {description && <p className="mt-0.5 text-xs text-foreground-tertiary">{description}</p>}
         </div>
         <div className="flex-shrink-0">{children}</div>
       </div>
@@ -52,9 +47,7 @@ export default function SettingsField({
       >
         {label}
       </label>
-      {description && (
-        <p className="mb-2 text-xs text-foreground-tertiary">{description}</p>
-      )}
+      {description && <p className="mb-2 text-xs text-foreground-tertiary">{description}</p>}
       {children}
     </div>
   );

@@ -8,10 +8,7 @@ import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { SettingsNav } from "./settings/primitives";
 import { buildSettingsNavConfig } from "./settings/nav-config";
 import { buildSettingsTabRegistry } from "./settings/tab-registry";
-import {
-  resolveLegacyCategory,
-  type SettingsCategory,
-} from "./settings/settings-category";
+import { resolveLegacyCategory, type SettingsCategory } from "./settings/settings-category";
 
 export type { SettingsCategory } from "./settings/settings-category";
 
@@ -26,10 +23,7 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
   const isElectron = isElectronRenderer();
 
   const navGroups = useMemo(() => buildSettingsNavConfig(), []);
-  const tabRegistry = useMemo(
-    () => buildSettingsTabRegistry({ isElectron }),
-    [isElectron],
-  );
+  const tabRegistry = useMemo(() => buildSettingsTabRegistry({ isElectron }), [isElectron]);
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(() =>
     resolveLegacyCategory(initialCategory, { isElectron }),
@@ -104,9 +98,7 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
             aria-label="設定カテゴリ"
           />
 
-          <div
-            className={clsx("flex-1 p-6", isWide ? "overflow-hidden" : "overflow-y-auto")}
-          >
+          <div className={clsx("flex-1 p-6", isWide ? "overflow-hidden" : "overflow-y-auto")}>
             {ActiveTab ? <ActiveTab /> : null}
           </div>
         </div>

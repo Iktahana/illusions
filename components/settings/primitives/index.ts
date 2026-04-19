@@ -2,11 +2,7 @@ export { default as SettingsLayout } from "./SettingsLayout";
 export type { SettingsLayoutProps } from "./SettingsLayout";
 
 export { default as SettingsNav } from "./SettingsNav";
-export type {
-  SettingsNavGroup,
-  SettingsNavItem,
-  SettingsNavProps,
-} from "./SettingsNav";
+export type { SettingsNavGroup, SettingsNavItem, SettingsNavProps } from "./SettingsNav";
 
 export { default as SettingsSection } from "./SettingsSection";
 export type { SettingsSectionProps } from "./SettingsSection";

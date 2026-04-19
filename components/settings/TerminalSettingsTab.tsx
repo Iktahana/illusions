@@ -4,12 +4,7 @@ import type React from "react";
 import clsx from "clsx";
 
 import { useTerminalSettings } from "@/contexts/EditorSettingsContext";
-import {
-  SettingsField,
-  SettingsSection,
-  SettingsToggle,
-  SliderField,
-} from "./primitives";
+import { SettingsField, SettingsSection, SettingsToggle, SliderField } from "./primitives";
 import TerminalAnsiColorGrid from "./terminal/TerminalAnsiColorGrid";
 
 const FONT_OPTIONS = [
@@ -180,11 +175,7 @@ export default function TerminalSettingsTab(): React.ReactElement {
           </div>
         </SettingsField>
 
-        <SettingsField
-          label="カーソルを点滅させる"
-          htmlFor="terminal-cursor-blink"
-          inline
-        >
+        <SettingsField label="カーソルを点滅させる" htmlFor="terminal-cursor-blink" inline>
           <SettingsToggle
             id="terminal-cursor-blink"
             checked={terminalCursorBlink}

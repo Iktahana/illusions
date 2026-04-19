@@ -22,9 +22,7 @@ export default function SettingsSection({
       {(title || description) && (
         <header>
           {title && <h3 className="text-sm font-semibold text-foreground">{title}</h3>}
-          {description && (
-            <p className="mt-0.5 text-xs text-foreground-tertiary">{description}</p>
-          )}
+          {description && <p className="mt-0.5 text-xs text-foreground-tertiary">{description}</p>}
         </header>
       )}
       {children}
