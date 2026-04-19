@@ -137,8 +137,7 @@
     "files": [
       "dist-main/**/*",
       "out/**/*",
-      "!node_modules/**/*",
-      "!www/**/*"
+      "!node_modules/**/*"
     ],
     "asarUnpack": [
       "dist-main/node_modules/**"

@@ -83,7 +83,3 @@ reviews/
 
 # auto-generated files
 /generated/
-
-# www build output
-/www/dist
-/www/node_modules
