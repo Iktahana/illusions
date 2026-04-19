@@ -159,10 +159,7 @@ class DictManager {
         .get();
       if (!indexCheck) {
         console.log("[DictManager] Creating indexes...");
-        rwDb.exec(
-          "CREATE INDEX IF NOT EXISTS idx_dict_entry_text ON entries(entry);" +
-            "CREATE INDEX IF NOT EXISTS idx_dict_definitions_entry_id ON definitions(entry_id);",
-        );
+        rwDb.exec("CREATE INDEX IF NOT EXISTS idx_dict_entry_text ON entries(entry);");
         console.log("[DictManager] Indexes created");
       }
     } catch (err) {
@@ -198,15 +195,14 @@ class DictManager {
       const escaped = this._escapeLike(term);
       const rows = db
         .prepare(
-          `SELECT e.id, e.entry, e.reading, e.part_of_speech, e.inflections, e.relations
-           FROM entries e
-           WHERE e.entry = ? OR e.entry LIKE ? ESCAPE '\\'
-           ORDER BY (e.entry = ?) DESC, e.entry
+          `SELECT raw_json FROM entries
+           WHERE entry = ? OR entry LIKE ? ESCAPE '\\'
+           ORDER BY (entry = ?) DESC, length(entry)
            LIMIT ?`,
         )
         .all(term, `${escaped}%`, term, limit);
 
-      return rows.map((row) => this._rowToEntry(row, db));
+      return rows.map((row) => this._rawJsonToEntry(row.raw_json)).filter(Boolean);
     } catch (err) {
       console.error("[DictManager] query error:", err);
       return [];
@@ -226,19 +222,16 @@ class DictManager {
     if (!db) return [];
 
     try {
-      const escaped = this._escapeLike(reading);
       const rows = db
         .prepare(
-          `SELECT e.id, e.entry, e.reading, e.part_of_speech, e.inflections, e.relations
-           FROM entries e
-           WHERE json_extract(e.reading, '$.primary') = ?
-              OR json_extract(e.reading, '$.primary') LIKE ? ESCAPE '\\'
-           ORDER BY (json_extract(e.reading, '$.primary') = ?) DESC, e.entry
+          `SELECT raw_json FROM entries
+           WHERE reading_primary = ?
+           ORDER BY length(entry)
            LIMIT ?`,
         )
-        .all(reading, `${escaped}%`, reading, limit);
+        .all(reading, limit);
 
-      return rows.map((row) => this._rowToEntry(row, db));
+      return rows.map((row) => this._rawJsonToEntry(row.raw_json)).filter(Boolean);
     } catch (err) {
       console.error("[DictManager] queryByReading error:", err);
       return [];
@@ -246,72 +239,62 @@ class DictManager {
   }
 
   /**
-   * Map a DB row to a DictEntry. Fetches definitions via a separate query.
+   * Parse a raw_json string from the entries table and map it to a DictEntry.
+   * Mirrors mapRawJsonToDictEntry() in lib/dict/providers/genji-api-backend.ts.
    * @private
    */
-  _rowToEntry(row, db) {
-    let reading = { primary: "", alternatives: [] };
-    let relationships = { homophones: [], synonyms: [], antonyms: [], related: [] };
-    let inflections = [];
+  _rawJsonToEntry(rawJson) {
+    if (!rawJson) return null;
+    let raw;
+    try {
+      raw = typeof rawJson === "string" ? JSON.parse(rawJson) : rawJson;
+    } catch {
+      return null;
+    }
 
-    try {
-      reading = JSON.parse(row.reading ?? "{}");
-    } catch {}
-    try {
-      const rel = JSON.parse(row.relations ?? "{}");
-      relationships = {
-        homophones: rel.homophones ?? [],
-        synonyms: rel.synonyms ?? [],
-        antonyms: rel.antonyms ?? [],
-        related: rel.related ?? [],
-      };
-    } catch {}
-    try {
-      inflections = JSON.parse(row.inflections ?? "[]");
-    } catch {}
+    const reading = {
+      primary: raw.reading?.primary ?? "",
+      alternatives: raw.reading?.alternatives ?? [],
+    };
 
-    // Fetch definitions (limited to 5 per entry to keep response size small)
-    let definitions = [];
-    try {
-      const defRows = db
-        .prepare(
-          `SELECT gloss, register, nuance, examples, collocations
-           FROM definitions
-           WHERE entry_id = ?
-           LIMIT 5`,
-        )
-        .all(row.id);
-
-      definitions = defRows.map((d) => ({
+    const definitions = (raw.definitions ?? []).map((d) => {
+      const examples = [];
+      if (d.examples?.standard) {
+        for (const ex of d.examples.standard) {
+          if (ex.text) examples.push({ text: ex.text, source: ex.source, citation: ex.citation });
+        }
+      }
+      if (d.examples?.literary) {
+        for (const ex of d.examples.literary) {
+          if (ex.text) examples.push({ text: ex.text, source: ex.source, citation: ex.citation });
+        }
+      }
+      return {
         gloss: d.gloss ?? "",
         register: d.register || undefined,
         nuance: d.nuance || undefined,
-        examples: this._parseJsonArray(d.examples),
-        collocations: this._parseJsonArray(d.collocations),
-      }));
-    } catch {}
+        collocations: d.collocations?.length ? d.collocations : undefined,
+        examples: examples.length > 0 ? examples : undefined,
+      };
+    });
+
+    const relationships = {
+      homophones: raw.relations?.homophones ?? [],
+      synonyms: raw.relations?.synonyms ?? [],
+      antonyms: raw.relations?.antonyms ?? [],
+      related: raw.relations?.related ?? [],
+    };
 
     return {
-      id: row.id,
-      entry: row.entry,
+      id: raw.uuid ?? raw.entry,
+      entry: raw.entry,
       reading,
-      partOfSpeech: row.part_of_speech || undefined,
-      inflections: inflections.length > 0 ? inflections : undefined,
+      partOfSpeech: raw.grammar?.pos?.join("・") || undefined,
+      inflections: raw.grammar?.inflections ?? undefined,
       definitions,
       relationships,
       source: PROVIDER_ID,
     };
-  }
-
-  /** @private */
-  _parseJsonArray(value) {
-    if (!value) return undefined;
-    try {
-      const arr = JSON.parse(value);
-      return Array.isArray(arr) && arr.length > 0 ? arr : undefined;
-    } catch {
-      return undefined;
-    }
   }
 
   // ---------------------------------------------------------------------------

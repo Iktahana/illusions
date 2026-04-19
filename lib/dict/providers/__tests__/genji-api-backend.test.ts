@@ -81,11 +81,18 @@ describe("mapRawJsonToDictEntry", () => {
   it("flattens examples from standard + literary", () => {
     const entry = mapRawJsonToDictEntry(SAMPLE_RAW);
 
-    expect(entry.definitions[0].examples).toEqual([
+    const examples = entry.definitions[0].examples ?? [];
+    expect(examples.map((e) => e.text)).toEqual([
       "雪が降る。",
       "雪の日。",
       "記憶は雪のふるやうなもの",
     ]);
+    expect(examples[0]?.source).toBe("幻辞");
+    expect(examples[2]?.citation).toEqual({
+      source: "記憶",
+      author: "萩原朔太郎",
+      note: "青空文庫",
+    });
   });
 
   it("maps multiple definitions", () => {

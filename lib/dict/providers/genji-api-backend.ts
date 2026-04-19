@@ -5,7 +5,13 @@
  * `entries` table.  Used as a fallback backend inside GenjiProvider when
  * the local Electron IPC backend is unavailable.
  */
-import type { DictEntry, DictDefinition, DictRelationships, DictReading } from "../dict-types";
+import type {
+  DictEntry,
+  DictDefinition,
+  DictExample,
+  DictRelationships,
+  DictReading,
+} from "../dict-types";
 
 const GENJI_API_BASE = "https://api.dict.illusions.app";
 const FETCH_TIMEOUT_MS = 5000;
@@ -64,16 +70,16 @@ interface RawJson {
 // Mapping
 // ---------------------------------------------------------------------------
 
-function flattenExamples(def: RawDefinition): string[] {
-  const out: string[] = [];
+function flattenExamples(def: RawDefinition): DictExample[] {
+  const out: DictExample[] = [];
   if (def.examples?.standard) {
     for (const ex of def.examples.standard) {
-      if (ex.text) out.push(ex.text);
+      if (ex.text) out.push({ text: ex.text, source: ex.source, citation: ex.citation });
     }
   }
   if (def.examples?.literary) {
     for (const ex of def.examples.literary) {
-      if (ex.text) out.push(ex.text);
+      if (ex.text) out.push({ text: ex.text, source: ex.source, citation: ex.citation });
     }
   }
   return out;
