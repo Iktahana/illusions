@@ -67,6 +67,7 @@ class DictManager {
     this._downloadMutex = new Mutex();
     this._latestAssetUrl = null;
     this._latestVersion = null;
+    this._cachedNouns = null;
   }
 
   /** Escape LIKE wildcards so user input cannot inject patterns. */
@@ -236,6 +237,53 @@ class DictManager {
       console.error("[DictManager] queryByReading error:", err);
       return [];
     }
+  }
+
+  /**
+   * Enumerate noun headwords from the installed database.
+   *
+   * Reads raw_json for every entry and keeps only those whose
+   * grammar.pos contains "名詞". The result is cached until the DB
+   * is replaced (via invalidateNounCache).
+   *
+   * @returns {Array<{ entry: string, reading: string, pos: string[] }>}
+   */
+  listNouns() {
+    if (this._downloadMutex.locked) return [];
+    if (this._cachedNouns) return this._cachedNouns;
+
+    const db = this._openDb();
+    if (!db) return [];
+
+    try {
+      const rows = db.prepare("SELECT entry, reading_primary, raw_json FROM entries").all();
+      const out = [];
+      for (const row of rows) {
+        try {
+          const raw = JSON.parse(row.raw_json);
+          const pos = raw.grammar?.pos ?? [];
+          if (Array.isArray(pos) && pos.includes("名詞")) {
+            out.push({
+              entry: row.entry,
+              reading: row.reading_primary ?? raw.reading?.primary ?? "",
+              pos,
+            });
+          }
+        } catch {
+          // Skip malformed rows
+        }
+      }
+      this._cachedNouns = out;
+      return out;
+    } catch (err) {
+      console.error("[DictManager] listNouns error:", err);
+      return [];
+    }
+  }
+
+  /** Clear the cached noun list. Called after DB replacement. */
+  invalidateNounCache() {
+    this._cachedNouns = null;
   }
 
   /**
@@ -438,6 +486,9 @@ class DictManager {
 
       // Atomically replace the database file
       fs.renameSync(finalPath + ".decompressing", finalPath);
+
+      // DB contents changed — drop any cached derivations
+      this.invalidateNounCache();
 
       // Save version
       if (this._latestVersion) {
