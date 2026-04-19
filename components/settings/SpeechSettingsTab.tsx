@@ -2,7 +2,9 @@
 
 import type React from "react";
 import { useState, useEffect, useCallback } from "react";
+
 import { useSpeechSettings } from "@/contexts/EditorSettingsContext";
+import { SettingsField, SettingsSection, SliderField } from "./primitives";
 
 /**
  * Settings tab for text-to-speech (読み上げ) and speech recognition (音声入力).
@@ -64,19 +66,17 @@ export default function SpeechSettingsTab(): React.ReactElement {
     window.speechSynthesis.speak(utterance);
   }, [isSpeaking, speechVoiceURI, speechRate, speechPitch, speechVolume]);
 
-  return (
-    <div className="space-y-8 p-6">
-      {/* 音声入力 section */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">音声入力</h3>
-          <p className="text-sm text-foreground-tertiary">
-            Illusionsには独自の音声入力機能はありませんが外部ツールの Superwhisper
-            とは非常に相性が良いです。ぜひ併用を検討してみてください。
-          </p>
-        </div>
+  const currentVoiceName = availableVoices.find((v) => v.voiceURI === speechVoiceURI);
+  const previewName = currentVoiceName
+    ? currentVoiceName.name.replace(/\s*\([^)]*\([^)]*\)\)$/, "").trim()
+    : "illusions";
 
-        {/* Superwhisper card */}
+  return (
+    <div className="space-y-8">
+      <SettingsSection
+        title="音声入力"
+        description="Illusions には独自の音声入力機能はありませんが外部ツールの Superwhisper とは非常に相性が良いです。ぜひ併用を検討してみてください。"
+      >
         <div className="flex items-center gap-4 px-4 py-3 border border-border rounded-xl bg-background-secondary">
           <img
             src="./image/superwhisper_logo.png"
@@ -85,7 +85,7 @@ export default function SpeechSettingsTab(): React.ReactElement {
           />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground">Superwhisper</p>
-            <p className="text-xs text-foreground-tertiary">macOS/Windows向け音声入力ツール</p>
+            <p className="text-xs text-foreground-tertiary">macOS/Windows 向け音声入力ツール</p>
           </div>
           <a
             href="https://superwhisper.com"
@@ -96,24 +96,18 @@ export default function SpeechSettingsTab(): React.ReactElement {
             ダウンロード
           </a>
         </div>
-      </div>
+      </SettingsSection>
 
       <div className="border-t border-border" />
 
-      {/* 読み上げ section */}
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">読み上げ</h3>
-          <p className="text-sm text-foreground-secondary mb-4">
-            テキストの読み上げ（Text-to-Speech）の設定を調整します。
-          </p>
-        </div>
-
-        {/* Voice selection + preview */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-foreground">音声</label>
+      <SettingsSection
+        title="読み上げ"
+        description="テキストの読み上げ（Text-to-Speech）の設定を調整します。"
+      >
+        <SettingsField label="音声" htmlFor="speech-voice">
           <div className="flex items-center gap-2">
             <select
+              id="speech-voice"
               value={speechVoiceURI}
               onChange={(e) => onSpeechVoiceURIChange(e.target.value)}
               className="flex-1 px-3 py-2 border border-border-secondary rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
@@ -154,88 +148,46 @@ export default function SpeechSettingsTab(): React.ReactElement {
               {isSpeaking ? "停止" : "試聴"}
             </button>
           </div>
-          <p className="text-xs text-foreground-tertiary">
-            「こんにちは、私は
-            {availableVoices.find((v) => v.voiceURI === speechVoiceURI)
-              ? availableVoices
-                  .find((v) => v.voiceURI === speechVoiceURI)!
-                  .name.replace(/\s*\([^)]*\([^)]*\)\)$/, "")
-                  .trim()
-              : "illusions"}
-            です。」
+          <p className="mt-1 text-xs text-foreground-tertiary">
+            「こんにちは、私は{previewName}です。」
           </p>
           {availableVoices.length === 0 && (
-            <p className="text-xs text-foreground-tertiary">
-              日本語の音声が見つかりません。OSの音声設定をご確認ください。
+            <p className="mt-1 text-xs text-foreground-tertiary">
+              日本語の音声が見つかりません。OS の音声設定をご確認ください。
             </p>
           )}
-        </div>
+        </SettingsField>
 
-        {/* Rate slider */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            速度{" "}
-            <span className="text-foreground-tertiary font-normal">({speechRate.toFixed(1)}x)</span>
-          </label>
-          <input
-            type="range"
-            min={0.5}
-            max={2.0}
-            step={0.1}
-            value={speechRate}
-            onChange={(e) => onSpeechRateChange(parseFloat(e.target.value))}
-            className="w-full accent-accent"
-          />
-          <div className="flex justify-between text-xs text-foreground-tertiary mt-1">
-            <span>0.5x（遅い）</span>
-            <span>2.0x（速い）</span>
-          </div>
-        </div>
+        <SliderField
+          label="速度"
+          value={speechRate}
+          min={0.5}
+          max={2.0}
+          step={0.1}
+          formatValue={(v) => `${v.toFixed(1)}x`}
+          onChange={onSpeechRateChange}
+        />
 
-        {/* Pitch slider */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            ピッチ{" "}
-            <span className="text-foreground-tertiary font-normal">({speechPitch.toFixed(1)})</span>
-          </label>
-          <input
-            type="range"
-            min={0.5}
-            max={2.0}
-            step={0.1}
-            value={speechPitch}
-            onChange={(e) => onSpeechPitchChange(parseFloat(e.target.value))}
-            className="w-full accent-accent"
-          />
-          <div className="flex justify-between text-xs text-foreground-tertiary mt-1">
-            <span>0.5（低い）</span>
-            <span>2.0（高い）</span>
-          </div>
-        </div>
+        <SliderField
+          label="ピッチ"
+          value={speechPitch}
+          min={0.5}
+          max={2.0}
+          step={0.1}
+          formatValue={(v) => v.toFixed(1)}
+          onChange={onSpeechPitchChange}
+        />
 
-        {/* Volume slider */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            音量{" "}
-            <span className="text-foreground-tertiary font-normal">
-              ({Math.round(speechVolume * 100)}%)
-            </span>
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.1}
-            value={speechVolume}
-            onChange={(e) => onSpeechVolumeChange(parseFloat(e.target.value))}
-            className="w-full accent-accent"
-          />
-          <div className="flex justify-between text-xs text-foreground-tertiary mt-1">
-            <span>0%</span>
-            <span>100%</span>
-          </div>
-        </div>
-      </div>
+        <SliderField
+          label="音量"
+          value={speechVolume}
+          min={0}
+          max={1}
+          step={0.1}
+          formatValue={(v) => `${Math.round(v * 100)}%`}
+          onChange={onSpeechVolumeChange}
+        />
+      </SettingsSection>
     </div>
   );
 }

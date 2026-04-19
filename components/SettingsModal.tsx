@@ -1,71 +1,41 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import {
-  X,
-  Settings,
-  Columns2,
-  Highlighter,
-  SpellCheck,
-  BatteryMedium,
-  AudioLines,
-  Keyboard,
-  Terminal,
-  UserCircle,
-  BookOpen,
-  Bot,
-} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import clsx from "clsx";
 
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
-import AboutSection from "./settings/AboutSection";
-import TypographySettingsTab from "./settings/TypographySettingsTab";
-import VerticalSettingsTab from "./settings/VerticalSettingsTab";
-import PosHighlightSettingsTab from "./settings/PosHighlightSettingsTab";
-import LintingSettingsTab from "./settings/LintingSettingsTab";
-import SpeechSettingsTab from "./settings/SpeechSettingsTab";
-import KeymapSettingsTab from "./settings/KeymapSettingsTab";
-import PowerSettingsTab from "./settings/PowerSettingsTab";
-import TerminalSettingsTab from "./settings/TerminalSettingsTab";
-import AccountSettingsTab from "./settings/AccountSettingsTab";
-import DictSettingsTab from "./settings/DictSettingsTab";
-import AiApiSettingsTab from "./settings/AiApiSettingsTab";
+import { SettingsNav } from "./settings/primitives";
+import { buildSettingsNavConfig } from "./settings/nav-config";
+import { buildSettingsTabRegistry } from "./settings/tab-registry";
+import { resolveLegacyCategory, type SettingsCategory } from "./settings/settings-category";
+
+export type { SettingsCategory } from "./settings/settings-category";
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Open modal on a specific tab */
+  /** Open modal on a specific tab. Legacy category values are normalized. */
   initialCategory?: SettingsCategory;
 }
 
-export type SettingsCategory =
-  | "account"
-  | "ai-api"
-  | "editor"
-  | "vertical"
-  | "pos-highlight"
-  | "linting"
-  | "speech"
-  | "keymap"
-  | "terminal"
-  | "power"
-  | "dictionary"
-  | "about";
-
 export default function SettingsModal({ isOpen, onClose, initialCategory }: SettingsModalProps) {
-  const [activeCategory, setActiveCategory] = useState<SettingsCategory>(
-    initialCategory ?? "editor",
+  const isElectron = isElectronRenderer();
+
+  const navGroups = useMemo(() => buildSettingsNavConfig(), []);
+  const tabRegistry = useMemo(() => buildSettingsTabRegistry({ isElectron }), [isElectron]);
+
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>(() =>
+    resolveLegacyCategory(initialCategory, { isElectron }),
   );
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Sync initialCategory when modal opens
   useEffect(() => {
     if (isOpen && initialCategory) {
-      setActiveCategory(initialCategory);
+      setActiveCategory(resolveLegacyCategory(initialCategory, { isElectron }));
     }
-  }, [isOpen, initialCategory]);
+  }, [isOpen, initialCategory, isElectron]);
 
-  // Body scroll lock
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -75,7 +45,6 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
     }
   }, [isOpen]);
 
-  // Escape key handler
   useEffect(() => {
     function handleEscape(e: KeyboardEvent): void {
       if (e.key === "Escape" && isOpen) {
@@ -87,6 +56,10 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
+
+  const entry = tabRegistry[activeCategory] ?? tabRegistry.account;
+  const ActiveTab = entry?.component;
+  const isWide = entry?.wide ?? false;
 
   function handleOverlayClick(e: React.MouseEvent<HTMLDivElement>): void {
     if (e.target === e.currentTarget) {
@@ -103,10 +76,9 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
         ref={modalRef}
         className={clsx(
           "relative w-full h-[80vh] mx-4 rounded-xl bg-background-elevated shadow-xl border border-border flex flex-col transition-[max-width] duration-200",
-          activeCategory === "pos-highlight" ? "max-w-6xl" : "max-w-4xl",
+          isWide ? "max-w-6xl" : "max-w-4xl",
         )}
       >
-        {/* Header */}
         <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 className="text-lg font-medium text-foreground">設定</h2>
           <button
@@ -118,182 +90,16 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
           </button>
         </div>
 
-        {/* 2-column layout */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Left navigation */}
-          <div className="w-48 flex-shrink-0 border-r border-border bg-background-secondary p-2">
-            <nav className="space-y-1">
-              <button
-                onClick={() => setActiveCategory("account")}
-                className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                  activeCategory === "account"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
-                )}
-              >
-                <UserCircle className="w-4 h-4" />
-                アカウント
-              </button>
-              <button
-                onClick={() => setActiveCategory("ai-api")}
-                className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                  activeCategory === "ai-api"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
-                )}
-              >
-                <Bot className="w-4 h-4" />
-                AI API
-              </button>
-              <div className="my-2 border-t border-border" />
-              <button
-                onClick={() => setActiveCategory("editor")}
-                className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                  activeCategory === "editor"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
-                )}
-              >
-                <Settings className="w-4 h-4" />
-                エディタ
-              </button>
-              <button
-                onClick={() => setActiveCategory("vertical")}
-                className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                  activeCategory === "vertical"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
-                )}
-              >
-                <Columns2 className="w-4 h-4" />
-                縦書き
-              </button>
-              <button
-                onClick={() => setActiveCategory("pos-highlight")}
-                className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                  activeCategory === "pos-highlight"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
-                )}
-              >
-                <Highlighter className="w-4 h-4" />
-                品詞ハイライト
-              </button>
-              <button
-                onClick={() => setActiveCategory("linting")}
-                className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                  activeCategory === "linting"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
-                )}
-              >
-                <SpellCheck className="w-4 h-4" />
-                校正
-              </button>
-              <button
-                onClick={() => setActiveCategory("speech")}
-                className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                  activeCategory === "speech"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
-                )}
-              >
-                <AudioLines className="w-4 h-4" />
-                音声入力/読み上げ
-              </button>
-              <button
-                onClick={() => setActiveCategory("keymap")}
-                className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                  activeCategory === "keymap"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
-                )}
-              >
-                <Keyboard className="w-4 h-4" />
-                キーマップ
-              </button>
-              {isElectronRenderer() && (
-                <button
-                  onClick={() => setActiveCategory("terminal")}
-                  className={clsx(
-                    "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                    activeCategory === "terminal"
-                      ? "bg-accent text-accent-foreground"
-                      : "text-foreground-secondary hover:bg-hover hover:text-foreground",
-                  )}
-                >
-                  <Terminal className="w-4 h-4" />
-                  ターミナル
-                </button>
-              )}
-              {isElectronRenderer() && (
-                <button
-                  onClick={() => setActiveCategory("power")}
-                  className={clsx(
-                    "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                    activeCategory === "power"
-                      ? "bg-accent text-accent-foreground"
-                      : "text-foreground-secondary hover:bg-hover hover:text-foreground",
-                  )}
-                >
-                  <BatteryMedium className="w-4 h-4" />
-                  省電力
-                </button>
-              )}
-              <button
-                onClick={() => setActiveCategory("dictionary")}
-                className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                  activeCategory === "dictionary"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
-                )}
-              >
-                <BookOpen className="w-4 h-4" />
-                辞典
-              </button>
-              <div className="my-2 border-t border-border" />
-              <button
-                onClick={() => setActiveCategory("about")}
-                className={clsx(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  activeCategory === "about"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground-secondary hover:bg-hover hover:text-foreground",
-                )}
-              >
-                illusionsについて
-              </button>
-            </nav>
-          </div>
+          <SettingsNav
+            groups={navGroups}
+            active={activeCategory}
+            onSelect={setActiveCategory}
+            aria-label="設定カテゴリ"
+          />
 
-          {/* Right content */}
-          <div
-            className={clsx(
-              "flex-1 p-6",
-              activeCategory === "pos-highlight" ? "overflow-hidden" : "overflow-y-auto",
-            )}
-          >
-            {activeCategory === "account" && <AccountSettingsTab />}
-            {activeCategory === "ai-api" && <AiApiSettingsTab />}
-            {activeCategory === "editor" && <TypographySettingsTab />}
-            {activeCategory === "vertical" && <VerticalSettingsTab />}
-            {activeCategory === "pos-highlight" && <PosHighlightSettingsTab />}
-            {activeCategory === "linting" && <LintingSettingsTab />}
-            {activeCategory === "speech" && <SpeechSettingsTab />}
-            {activeCategory === "keymap" && <KeymapSettingsTab />}
-            {activeCategory === "terminal" && <TerminalSettingsTab />}
-            {activeCategory === "power" && <PowerSettingsTab />}
-            {activeCategory === "dictionary" && <DictSettingsTab />}
-            {activeCategory === "about" && <AboutSection />}
+          <div className={clsx("flex-1 p-6", isWide ? "overflow-hidden" : "overflow-y-auto")}>
+            {ActiveTab ? <ActiveTab /> : null}
           </div>
         </div>
       </div>

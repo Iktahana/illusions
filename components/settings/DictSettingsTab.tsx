@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Download, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { useDictSettingsContext } from "@/contexts/EditorSettingsContext";
 import type { DictDownloadStatus } from "@/lib/dict/dict-types";
+import { SettingsField, SettingsSection, SettingsToggle } from "./primitives";
 
 interface UpdateInfo {
   latestVersion?: string;
@@ -136,14 +137,10 @@ export default function DictSettingsTab() {
   const updateAvailable = checkResult?.updateAvailable ?? false;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-base font-semibold text-foreground mb-1">辞典データ</h3>
-        <p className="text-sm text-foreground-secondary">
-          illusions辞典データベース（日本語語彙・読み・品詞・類義語）
-        </p>
-      </div>
-
+    <SettingsSection
+      title="辞典データ"
+      description="illusions 辞典データベース（日本語語彙・読み・品詞・類義語）"
+    >
       {/* Status card */}
       <div className="bg-background-elevated border border-border rounded-lg p-4 space-y-3">
         {/* Install state */}
@@ -243,41 +240,33 @@ export default function DictSettingsTab() {
         )}
       </div>
 
-      {/* Update settings */}
-      <div>
-        <h3 className="text-sm font-semibold text-foreground mb-3">アップデート設定</h3>
-        <div className="space-y-3">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={dictAutoCheckUpdates}
-              onChange={(e) => onDictAutoCheckUpdatesChange(e.target.checked)}
-              className="w-4 h-4 rounded accent-accent"
-            />
-            <div>
-              <div className="text-sm text-foreground">起動時に更新を確認する</div>
-              <div className="text-xs text-foreground-secondary">
-                アプリ起動時に自動で新バージョンを確認します
-              </div>
-            </div>
-          </label>
-
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={dictAutoDownload}
-              onChange={(e) => onDictAutoDownloadChange(e.target.checked)}
-              className="w-4 h-4 rounded accent-accent"
-            />
-            <div>
-              <div className="text-sm text-foreground">自動ダウンロード</div>
-              <div className="text-xs text-foreground-secondary">
-                新バージョンが見つかった場合に自動でダウンロードします（約 526 MB）
-              </div>
-            </div>
-          </label>
-        </div>
+      <div className="space-y-3 pt-2">
+        <h4 className="text-sm font-semibold text-foreground">アップデート設定</h4>
+        <SettingsField
+          label="起動時に更新を確認する"
+          description="アプリ起動時に自動で新バージョンを確認します"
+          htmlFor="dict-auto-check"
+          inline
+        >
+          <SettingsToggle
+            id="dict-auto-check"
+            checked={dictAutoCheckUpdates}
+            onChange={onDictAutoCheckUpdatesChange}
+          />
+        </SettingsField>
+        <SettingsField
+          label="自動ダウンロード"
+          description="新バージョンが見つかった場合に自動でダウンロードします（約 526 MB）"
+          htmlFor="dict-auto-download"
+          inline
+        >
+          <SettingsToggle
+            id="dict-auto-download"
+            checked={dictAutoDownload}
+            onChange={onDictAutoDownloadChange}
+          />
+        </SettingsField>
       </div>
-    </div>
+    </SettingsSection>
   );
 }
