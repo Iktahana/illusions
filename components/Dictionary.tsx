@@ -20,7 +20,8 @@ import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
 import { getUserDictionaryService } from "@/lib/services/user-dictionary-service";
 import DictionaryEntryDialog from "./Dictionary/DictionaryEntryDialog";
 import { getDictService } from "@/lib/dict/dict-service";
-import type { DictEntry } from "@/lib/dict/dict-types";
+import type { DictEntry, DictExample } from "@/lib/dict/dict-types";
+import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
 // Web dictionary sources
 interface WebDictionarySource {
@@ -41,14 +42,6 @@ const WEB_DICTIONARIES: WebDictionarySource[] = [
     urlTemplate: "https://kotobank.jp/word/{query}",
   },
 ];
-
-const isElectron = (): boolean => {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.process !== "undefined" &&
-    window.process?.type === "renderer"
-  );
-};
 
 const EMPTY_FORM: Partial<UserDictionaryEntry> = {
   word: "",
@@ -86,6 +79,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
   const [localInstallStatus, setLocalInstallStatus] = useState<
     "not-installed" | "downloading" | "installing" | "installed" | "error"
   >("not-installed");
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [expandedMasterId, setExpandedMasterId] = useState<string | null>(null);
 
   // Persistence
@@ -127,7 +121,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
 
   // Check local install status on mount (Electron only)
   useEffect(() => {
-    if (!isElectron()) return;
+    if (!isElectronRenderer()) return;
     getDictService()
       .getDownloadState("genji")
       .then((state) => setLocalInstallStatus(state.status))
@@ -255,12 +249,23 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
   const handleDownloadDict = useCallback(() => {
     const api = (
       window as Window & {
-        electronAPI?: { dict?: { download: () => Promise<{ success?: boolean; error?: string }> } };
+        electronAPI?: {
+          dict?: {
+            download: () => Promise<{ success?: boolean; error?: string }>;
+            onDownloadProgress?: (cb: (data: { progress: number }) => void) => () => void;
+          };
+        };
       }
     ).electronAPI?.dict;
     if (!api) return;
 
     setLocalInstallStatus("downloading");
+    setDownloadProgress(0);
+
+    const cleanup = api.onDownloadProgress?.(({ progress }) => {
+      setDownloadProgress(progress);
+    });
+
     void api
       .download()
       .then((result) => {
@@ -268,6 +273,10 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
       })
       .catch(() => {
         setLocalInstallStatus("error");
+      })
+      .finally(() => {
+        cleanup?.();
+        setDownloadProgress(null);
       });
   }, []);
 
@@ -497,32 +506,20 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                   )}
 
                   {/* Not installed banner (Electron only) */}
-                  {!masterLoading && localInstallStatus === "not-installed" && isElectron() && (
-                    <div className="bg-background-elevated border border-border rounded-lg p-3 flex items-center justify-between gap-3">
-                      <span className="text-sm text-foreground-secondary">
-                        辞典データ未インストール
-                      </span>
-                      <button
-                        onClick={handleDownloadDict}
-                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors flex-shrink-0"
-                      >
-                        <Download className="w-3 h-3" />
-                        ダウンロード
-                      </button>
-                    </div>
-                  )}
+                  {!masterLoading &&
+                    localInstallStatus === "not-installed" &&
+                    isElectronRenderer() && (
+                      <NotInstalledCard compact onDownload={handleDownloadDict} />
+                    )}
 
                   {/* Downloading indicator */}
                   {localInstallStatus === "downloading" && (
-                    <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      ダウンロード中...
-                    </div>
+                    <DownloadingCard progress={downloadProgress} />
                   )}
 
                   {/* Master dict results */}
                   {!masterLoading && masterResults.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <div className="text-xs font-semibold text-foreground-tertiary">
                         幻辞 ({masterResults.length} 件)
                       </div>
@@ -530,6 +527,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                         <MasterDictCard
                           key={`${entry.source}:${entry.id}`}
                           entry={entry}
+                          searchTerm={activeSearchQuery}
                           isExpanded={expandedMasterId === entry.id}
                           onToggle={() => toggleExpandMaster(entry.id)}
                         />
@@ -559,7 +557,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                         encodeURIComponent(activeSearchQuery),
                       );
                       const handleOpenDictionary = () => {
-                        if (isElectron() && window.electronAPI?.openDictionaryPopup) {
+                        if (isElectronRenderer() && window.electronAPI?.openDictionaryPopup) {
                           window.electronAPI.openDictionaryPopup(
                             searchUrl,
                             `${dict.name} - ${activeSearchQuery}`,
@@ -589,12 +587,20 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                 </div>
               ) : (
                 /* Empty state */
-                <div className="p-4 text-center py-8 text-foreground-secondary text-sm">
-                  <Globe className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>検索語を入力してWeb辞書を検索</p>
-                  <p className="mt-1 text-xs">
-                    {WEB_DICTIONARIES.map((d) => d.name).join("、")}で検索します
-                  </p>
+                <div className="p-4 space-y-4">
+                  {isElectronRenderer() && localInstallStatus === "not-installed" && (
+                    <NotInstalledCard onDownload={handleDownloadDict} />
+                  )}
+                  {localInstallStatus === "downloading" && (
+                    <DownloadingCard progress={downloadProgress} />
+                  )}
+                  <div className="text-center py-8 text-foreground-secondary text-sm">
+                    <Globe className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>検索語を入力してWeb辞書を検索</p>
+                    <p className="mt-1 text-xs">
+                      {WEB_DICTIONARIES.map((d) => d.name).join("、")}で検索します
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -621,12 +627,86 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
 
 interface MasterDictCardProps {
   entry: DictEntry;
+  searchTerm: string;
   isExpanded: boolean;
   onToggle: () => void;
 }
 
+const EXAMPLES_COLLAPSED_COUNT = 3;
+
+function formatCitation(ex: DictExample): string | null {
+  const parts: string[] = [];
+  const source = ex.citation?.source ?? ex.source;
+  if (source) parts.push(source);
+  if (ex.citation?.author) parts.push(ex.citation.author);
+  if (ex.citation?.note) parts.push(ex.citation.note);
+  return parts.length > 0 ? parts.join("・") : null;
+}
+
+interface ExampleListProps {
+  examples: DictExample[];
+  searchTerm: string;
+}
+
+const ExampleList = memo(function ExampleList({ examples, searchTerm }: ExampleListProps) {
+  const [showAll, setShowAll] = useState(false);
+  const hasMore = examples.length > EXAMPLES_COLLAPSED_COUNT;
+  const visible = showAll ? examples : examples.slice(0, EXAMPLES_COLLAPSED_COUNT);
+  const hiddenCount = examples.length - EXAMPLES_COLLAPSED_COUNT;
+
+  return (
+    <div className="mt-0.5 pl-3 space-y-px">
+      <ul className="space-y-px text-foreground-secondary">
+        {visible.map((ex, j) => {
+          const citation = formatCitation(ex);
+          return (
+            <li
+              key={j}
+              className="before:content-['・'] before:text-foreground-tertiary leading-snug"
+            >
+              {highlightTerm(ex.text, searchTerm)}
+              {citation && <span className="ml-1 text-foreground-tertiary">（{citation}）</span>}
+            </li>
+          );
+        })}
+      </ul>
+      {hasMore && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowAll((v) => !v);
+          }}
+          className="text-foreground-tertiary hover:text-foreground underline-offset-2 hover:underline"
+        >
+          {showAll ? "折りたたむ" : `さらに ${hiddenCount} 件表示`}
+        </button>
+      )}
+    </div>
+  );
+});
+
+function highlightTerm(text: string, term: string): React.ReactNode {
+  if (!term.trim()) return text;
+  const parts = text.split(term);
+  if (parts.length === 1) return text;
+  const out: React.ReactNode[] = [];
+  parts.forEach((part, i) => {
+    if (i > 0) {
+      out.push(
+        <strong key={`h${i}`} className="font-bold text-foreground">
+          {term}
+        </strong>,
+      );
+    }
+    if (part) out.push(part);
+  });
+  return <>{out}</>;
+}
+
 const MasterDictCard = memo(function MasterDictCard({
   entry,
+  searchTerm,
   isExpanded,
   onToggle,
 }: MasterDictCardProps) {
@@ -634,11 +714,14 @@ const MasterDictCard = memo(function MasterDictCard({
   const hasSynonyms = entry.relationships.synonyms.length > 0;
   const hasHomophones = entry.relationships.homophones.length > 0;
   const hasAntonyms = entry.relationships.antonyms.length > 0;
+  const hasRelated = entry.relationships.related.length > 0;
+  const hasInflections = entry.inflections && entry.inflections.length > 0;
+  const hasAlternatives = entry.reading.alternatives.length > 0;
 
   return (
-    <div className="bg-background-elevated border border-border rounded-lg overflow-hidden">
+    <div className="bg-background-elevated border border-border rounded-md overflow-hidden">
       <div
-        className="p-3 cursor-pointer hover:bg-hover transition-colors"
+        className="px-2 py-1.5 cursor-pointer hover:bg-hover transition-colors"
         role="button"
         tabIndex={0}
         onClick={onToggle}
@@ -649,27 +732,27 @@ const MasterDictCard = memo(function MasterDictCard({
           }
         }}
       >
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-1.5">
           {isExpanded ? (
-            <ChevronDown className="w-4 h-4 text-foreground-secondary flex-shrink-0 mt-0.5" />
+            <ChevronDown className="w-3.5 h-3.5 text-foreground-secondary flex-shrink-0 mt-1" />
           ) : (
-            <ChevronRight className="w-4 h-4 text-foreground-secondary flex-shrink-0 mt-0.5" />
+            <ChevronRight className="w-3.5 h-3.5 text-foreground-secondary flex-shrink-0 mt-1" />
           )}
           <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="font-semibold text-foreground">{entry.entry}</span>
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+              <span className="font-semibold text-foreground text-sm">{entry.entry}</span>
               {entry.reading.primary && (
-                <span className="text-sm text-foreground-tertiary">{entry.reading.primary}</span>
+                <span className="text-xs text-foreground-tertiary">{entry.reading.primary}</span>
               )}
               {entry.partOfSpeech && (
-                <span className="text-xs px-1.5 py-0.5 bg-background rounded text-foreground-tertiary">
+                <span className="text-[10px] px-1 py-px bg-background rounded text-foreground-tertiary leading-tight">
                   {entry.partOfSpeech}
                 </span>
               )}
             </div>
-            {firstDef && (
-              <p className="text-sm text-foreground-secondary mt-1 line-clamp-1">
-                {firstDef.gloss}
+            {firstDef && !isExpanded && (
+              <p className="text-xs text-foreground-secondary mt-0.5 line-clamp-1">
+                {highlightTerm(firstDef.gloss, searchTerm)}
               </p>
             )}
           </div>
@@ -677,21 +760,36 @@ const MasterDictCard = memo(function MasterDictCard({
       </div>
 
       {isExpanded && (
-        <div className="border-t border-border p-3 bg-background space-y-2">
+        <div className="border-t border-border px-2 py-1.5 bg-background space-y-1.5 text-xs">
           {entry.definitions.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold text-foreground-secondary mb-1">意味</h4>
+              <h4 className="font-semibold text-foreground-secondary mb-0.5">意味</h4>
               <ol className="space-y-1">
                 {entry.definitions.map((def, i) => (
-                  <li key={i} className="text-sm text-foreground">
-                    {entry.definitions.length > 1 && (
-                      <span className="text-foreground-tertiary mr-1">{i + 1}.</span>
+                  <li key={i} className="text-foreground leading-snug">
+                    <div>
+                      {entry.definitions.length > 1 && (
+                        <span className="text-foreground-tertiary mr-1">{i + 1}.</span>
+                      )}
+                      {highlightTerm(def.gloss, searchTerm)}
+                      {def.register && (
+                        <span className="ml-1 text-foreground-tertiary">({def.register})</span>
+                      )}
+                    </div>
+                    {def.nuance && (
+                      <div className="text-foreground-secondary mt-0.5 pl-3">
+                        <span className="text-foreground-tertiary">ニュアンス: </span>
+                        {def.nuance}
+                      </div>
                     )}
-                    {def.gloss}
-                    {def.register && (
-                      <span className="ml-1 text-xs text-foreground-tertiary">
-                        ({def.register})
-                      </span>
+                    {def.examples && def.examples.length > 0 && (
+                      <ExampleList examples={def.examples} searchTerm={searchTerm} />
+                    )}
+                    {def.collocations && def.collocations.length > 0 && (
+                      <div className="mt-0.5 pl-3 text-foreground-secondary">
+                        <span className="text-foreground-tertiary">連語: </span>
+                        {def.collocations.join("・")}
+                      </div>
                     )}
                   </li>
                 ))}
@@ -699,45 +797,127 @@ const MasterDictCard = memo(function MasterDictCard({
             </div>
           )}
 
-          {(hasSynonyms || hasHomophones || hasAntonyms) && (
-            <div className="space-y-1">
+          {(hasSynonyms || hasHomophones || hasAntonyms || hasRelated) && (
+            <div className="space-y-0.5">
               {hasSynonyms && (
-                <div>
-                  <span className="text-xs font-semibold text-foreground-secondary">類義語: </span>
-                  <span className="text-xs text-foreground">
-                    {entry.relationships.synonyms.slice(0, 8).join("・")}
-                  </span>
+                <div className="leading-snug">
+                  <span className="font-semibold text-foreground-secondary">類義語: </span>
+                  <span className="text-foreground">{entry.relationships.synonyms.join("・")}</span>
                 </div>
               )}
               {hasHomophones && (
-                <div>
-                  <span className="text-xs font-semibold text-foreground-secondary">
-                    同音異義語:{" "}
-                  </span>
-                  <span className="text-xs text-foreground">
-                    {entry.relationships.homophones.slice(0, 8).join("・")}
+                <div className="leading-snug">
+                  <span className="font-semibold text-foreground-secondary">同音異義語: </span>
+                  <span className="text-foreground">
+                    {entry.relationships.homophones.join("・")}
                   </span>
                 </div>
               )}
               {hasAntonyms && (
-                <div>
-                  <span className="text-xs font-semibold text-foreground-secondary">対義語: </span>
-                  <span className="text-xs text-foreground">
-                    {entry.relationships.antonyms.slice(0, 8).join("・")}
-                  </span>
+                <div className="leading-snug">
+                  <span className="font-semibold text-foreground-secondary">対義語: </span>
+                  <span className="text-foreground">{entry.relationships.antonyms.join("・")}</span>
+                </div>
+              )}
+              {hasRelated && (
+                <div className="leading-snug">
+                  <span className="font-semibold text-foreground-secondary">関連語: </span>
+                  <span className="text-foreground">{entry.relationships.related.join("・")}</span>
                 </div>
               )}
             </div>
           )}
 
-          {entry.reading.alternatives.length > 0 && (
-            <div>
-              <span className="text-xs font-semibold text-foreground-secondary">別読み: </span>
-              <span className="text-xs text-foreground">
-                {entry.reading.alternatives.join("、")}
-              </span>
+          {hasInflections && (
+            <div className="leading-snug">
+              <span className="font-semibold text-foreground-secondary">活用: </span>
+              <span className="text-foreground">{entry.inflections!.join("・")}</span>
             </div>
           )}
+
+          {hasAlternatives && (
+            <div className="leading-snug">
+              <span className="font-semibold text-foreground-secondary">別読み: </span>
+              <span className="text-foreground">{entry.reading.alternatives.join("、")}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Not-installed / Downloading cards
+// ---------------------------------------------------------------------------
+
+interface NotInstalledCardProps {
+  onDownload: () => void;
+  compact?: boolean;
+}
+
+const NotInstalledCard = memo(function NotInstalledCard({
+  onDownload,
+  compact = false,
+}: NotInstalledCardProps) {
+  if (compact) {
+    return (
+      <div className="bg-background-elevated border border-border rounded-lg p-3 flex items-center justify-between gap-3">
+        <span className="text-sm text-foreground-secondary">辞典データ未インストール</span>
+        <button
+          onClick={onDownload}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors flex-shrink-0"
+        >
+          <Download className="w-3 h-3" />
+          ダウンロード
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-background-elevated border border-border rounded-lg p-4 space-y-3">
+      <div className="flex items-start gap-3">
+        <BookOpen className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-foreground">辞典データをダウンロード</h3>
+          <p className="text-xs text-foreground-secondary mt-1 leading-relaxed">
+            幻辞データベースが未インストールです。日本語語彙・読み・類義語の検索に必要です（約 526
+            MB）。
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={onDownload}
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors font-medium"
+      >
+        <Download className="w-4 h-4" />
+        辞典をダウンロード
+      </button>
+    </div>
+  );
+});
+
+interface DownloadingCardProps {
+  progress: number | null;
+}
+
+const DownloadingCard = memo(function DownloadingCard({ progress }: DownloadingCardProps) {
+  return (
+    <div className="bg-background-elevated border border-border rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2 text-sm text-foreground-secondary">
+        <span className="flex items-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          {progress !== null && progress >= 95 ? "展開中..." : "ダウンロード中..."}
+        </span>
+        {progress !== null && <span className="text-xs">{progress}%</span>}
+      </div>
+      {progress !== null && (
+        <div className="w-full bg-background rounded-full h-1.5">
+          <div
+            className="bg-accent h-1.5 rounded-full transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
         </div>
       )}
     </div>

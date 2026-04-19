@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useState } from "react";
 
 import type { ActivityBarView } from "@/components/ActivityBar";
+import { isBottomView } from "@/components/ActivityBar";
 import type { SettingsCategory } from "@/components/SettingsModal";
 
 export interface PanelState {
@@ -73,7 +74,18 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
     if (searchTerm) {
       setDictionarySearchTrigger((prev) => ({ term: searchTerm, id: prev.id + 1 }));
     }
-    setTopView("dictionary");
+    // Dictionary belongs to the bottom activity group. If it's already open in
+    // either slot, just (re)trigger the search — don't spawn a second panel.
+    setTopView((top) => {
+      if (top === "dictionary") return top;
+      if (isBottomView("dictionary")) return top;
+      return "dictionary";
+    });
+    setBottomView((bottom) => {
+      if (bottom === "dictionary") return bottom;
+      if (isBottomView("dictionary")) return "dictionary";
+      return bottom;
+    });
   }, []);
 
   const handleShowAllSearchResults = useCallback(

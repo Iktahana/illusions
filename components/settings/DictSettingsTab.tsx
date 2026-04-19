@@ -140,7 +140,7 @@ export default function DictSettingsTab() {
       <div>
         <h3 className="text-base font-semibold text-foreground mb-1">辞典データ</h3>
         <p className="text-sm text-foreground-secondary">
-          illusions辞典データベース（日本語語彙・読み・品詞・類義語）
+          『幻辞.com』データベース（日本語語彙・読み・品詞・類義語）
         </p>
       </div>
 

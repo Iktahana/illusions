@@ -12,11 +12,21 @@ export interface DictReading {
   alternatives: string[];
 }
 
+export interface DictExample {
+  text: string;
+  source?: string;
+  citation?: {
+    source?: string;
+    author?: string;
+    note?: string;
+  };
+}
+
 export interface DictDefinition {
   gloss: string;
   register?: string;
   nuance?: string;
-  examples?: string[];
+  examples?: DictExample[];
   collocations?: string[];
 }
 
