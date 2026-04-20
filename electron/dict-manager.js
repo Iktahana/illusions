@@ -374,7 +374,7 @@ class DictManager {
     return new Promise((resolve, reject) => {
       const doRequest = (requestUrl, redirectCount = 0) => {
         if (redirectCount > 5) {
-          reject(new Error("GitHub API redirected too many times"));
+          reject(new Error("GitHub API exceeded maximum of 5 redirects"));
           return;
         }
 
@@ -405,7 +405,7 @@ class DictManager {
             }
 
             let data = "";
-            res.setEncoding?.("utf8");
+            res.setEncoding("utf8");
             res.on("data", (chunk) => (data += chunk));
             res.on("end", () => {
               try {
