@@ -374,7 +374,7 @@ class DictManager {
     return new Promise((resolve, reject) => {
       const doRequest = (requestUrl, redirectCount = 0) => {
         if (redirectCount > 5) {
-          reject(new Error("GitHub API exceeded maximum of 5 redirects"));
+          reject(new Error("GitHub API のリダイレクトが最大回数（5回）を超えました"));
           return;
         }
 
@@ -400,7 +400,7 @@ class DictManager {
 
             if (res.statusCode !== 200) {
               res.resume();
-              reject(new Error(`GitHub API returned HTTP ${res.statusCode}`));
+              reject(new Error(`GitHub API が HTTP ${res.statusCode} を返しました`));
               return;
             }
 
@@ -419,7 +419,7 @@ class DictManager {
 
         req.on("error", reject);
         req.setTimeout(10000, () => {
-          req.destroy(new Error("GitHub API request timed out"));
+          req.destroy(new Error("GitHub API リクエストがタイムアウトしました"));
         });
       };
 
