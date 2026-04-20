@@ -378,9 +378,7 @@ class DictManager {
           return;
         }
 
-        const parsedUrl = new URL(requestUrl);
-        const lib = parsedUrl.protocol === "https:" ? https : require("http");
-        const req = lib.get(
+        const req = https.get(
           requestUrl,
           {
             headers: {

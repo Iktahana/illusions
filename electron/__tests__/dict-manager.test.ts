@@ -2,10 +2,17 @@ import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface MockResponseConfig {
+  type?: "response";
   statusCode: number;
   headers?: Record<string, string>;
   body?: string;
 }
+
+interface MockTimeoutConfig {
+  type: "timeout";
+}
+
+type MockRequestStep = MockResponseConfig | MockTimeoutConfig;
 
 const { appGetPathMock } = vi.hoisted(() => ({
   appGetPathMock: vi.fn(() => "/tmp/illusions-dict-test"),
@@ -43,7 +50,7 @@ class MockResponse extends EventEmitter {
   }
 }
 
-function mockHttpsSequence(responses: MockResponseConfig[]): void {
+function mockHttpsSequence(steps: MockRequestStep[]): void {
   const https = require("https") as typeof import("https");
 
   vi.spyOn(https, "get").mockImplementation(((
@@ -52,7 +59,7 @@ function mockHttpsSequence(responses: MockResponseConfig[]): void {
     callback?: (response: MockResponse) => void,
   ) => {
     const requestUrlString = String(requestUrl);
-    const next = responses.shift();
+    const next = steps.shift();
     if (!next) {
       throw new Error(`Unexpected request for ${requestUrlString}`);
     }
@@ -62,10 +69,18 @@ function mockHttpsSequence(responses: MockResponseConfig[]): void {
       destroy: (err: Error) => void;
     };
 
-    req.setTimeout = (_timeout, _cb) => {};
     req.destroy = (err) => {
       req.emit("error", err);
     };
+
+    if (next.type === "timeout") {
+      req.setTimeout = (_timeout, timeoutCallback) => {
+        queueMicrotask(timeoutCallback);
+      };
+      return req as never;
+    }
+
+    req.setTimeout = (_timeout, _cb) => {};
 
     queueMicrotask(() => {
       const response = new MockResponse(next);
@@ -144,6 +159,16 @@ describe("DictManager.checkUpdate", () => {
     expect(getMock).toHaveBeenCalledTimes(2);
     expect(String(getMock.mock.calls[1]?.[0])).toBe(
       "https://api.github.com/repos/illusions-lab/Genji/releases/latest?redirected=1",
+    );
+  });
+
+  it("surfaces a Japanese timeout error when the GitHub API request takes too long", async () => {
+    mockHttpsSequence([{ type: "timeout" }]);
+
+    const { getDictManager } = await import("../dict-manager.js");
+
+    await expect(getDictManager().checkUpdate()).rejects.toThrow(
+      "GitHub API リクエストがタイムアウトしました",
     );
   });
 });
