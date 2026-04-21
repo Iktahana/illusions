@@ -183,4 +183,19 @@ function registerNlpHandlers() {
   });
 }
 
-module.exports = { registerNlpHandlers };
+/**
+ * Fire-and-forget kuromoji pre-warm. Kicks off initialization immediately
+ * after window creation so the first tokenize IPC call doesn't have to wait.
+ * The async arrow has an explicit try/catch — no unhandled rejection risk.
+ */
+function warmupNlp() {
+  setImmediate(async () => {
+    try {
+      await ensureInitialized();
+    } catch (err) {
+      console.warn("[NLP] Background warmup failed:", err.message);
+    }
+  });
+}
+
+module.exports = { registerNlpHandlers, warmupNlp };
