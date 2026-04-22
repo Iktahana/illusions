@@ -139,7 +139,7 @@ export default function DictSettingsTab() {
   return (
     <SettingsSection
       title="辞典データ"
-      description="illusions 辞典データベース（日本語語彙・読み・品詞・類義語）"
+      description="『幻辞.com』データベース（日本語語彙・読み・品詞・類義語）"
     >
       {/* Status card */}
       <div className="bg-background-elevated border border-border rounded-lg p-4 space-y-3">
