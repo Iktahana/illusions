@@ -83,8 +83,10 @@ function registerAuthHandlers() {
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       const error = new Error(err.error_description || "Token refresh failed");
-      // Attach HTTP status so the renderer can distinguish permanent vs transient errors
+      // Attach HTTP status and OAuth error code so the renderer can distinguish
+      // permanent (e.g. invalid_grant) vs transient (5xx / network) failures.
       error.status = response.status;
+      if (err.error) error.oauthError = err.error;
       throw error;
     }
     return response.json();
