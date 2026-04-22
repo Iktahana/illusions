@@ -18,7 +18,7 @@ const zlib = require("zlib");
 const { app } = require("electron");
 
 const PROVIDER_ID = "genji";
-const GITHUB_OWNER = "Iktahana";
+const GITHUB_OWNER = "illusions-lab";
 const GITHUB_REPO = "Genji";
 const DB_FILENAME = "genji.db";
 const DB_TEMP_FILENAME = "genji.db.tmp";
@@ -342,53 +342,86 @@ class DictManager {
    * @returns {Promise<{ latestVersion: string, installedVersion?: string, updateAvailable: boolean }>}
    */
   checkUpdate() {
+    const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
+
+    return this._fetchJson(url).then((json) => {
+      const latestVersion = json.tag_name ?? "";
+
+      let installedVersion;
+      try {
+        installedVersion = fs.readFileSync(this._getVersionPath(), "utf8").trim();
+      } catch {}
+
+      const updateAvailable =
+        !!latestVersion && (!installedVersion || installedVersion !== latestVersion);
+
+      // Cache asset download URL for later use
+      const asset = (json.assets ?? []).find((a) => a.name && a.name.endsWith(".db.gz"));
+      this._latestAssetUrl = asset?.browser_download_url ?? null;
+      this._latestVersion = latestVersion;
+
+      return { latestVersion, installedVersion, updateAvailable };
+    });
+  }
+
+  /**
+   * Fetch JSON from GitHub API while following redirects.
+   * @private
+   * @param {string} url
+   * @returns {Promise<any>}
+   */
+  _fetchJson(url) {
     return new Promise((resolve, reject) => {
-      const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
-      const req = https.get(
-        url,
-        {
-          headers: {
-            "User-Agent": "illusions-app",
-            Accept: "application/vnd.github.v3+json",
+      const doRequest = (requestUrl, redirectCount = 0) => {
+        if (redirectCount > 5) {
+          reject(new Error("GitHub API のリダイレクトが最大回数（5回）を超えました"));
+          return;
+        }
+
+        const req = https.get(
+          requestUrl,
+          {
+            headers: {
+              "User-Agent": "illusions-app",
+              Accept: "application/vnd.github.v3+json",
+            },
           },
-        },
-        (res) => {
-          if (res.statusCode !== 200) {
-            res.resume();
-            reject(new Error(`GitHub API returned HTTP ${res.statusCode}`));
-            return;
-          }
-          let data = "";
-          res.on("data", (chunk) => (data += chunk));
-          res.on("end", () => {
-            try {
-              const json = JSON.parse(data);
-              const latestVersion = json.tag_name ?? "";
-
-              let installedVersion;
-              try {
-                installedVersion = fs.readFileSync(this._getVersionPath(), "utf8").trim();
-              } catch {}
-
-              const updateAvailable =
-                !!latestVersion && (!installedVersion || installedVersion !== latestVersion);
-
-              // Cache asset download URL for later use
-              const asset = (json.assets ?? []).find((a) => a.name && a.name.endsWith(".db.gz"));
-              this._latestAssetUrl = asset?.browser_download_url ?? null;
-              this._latestVersion = latestVersion;
-
-              resolve({ latestVersion, installedVersion, updateAvailable });
-            } catch (err) {
-              reject(err);
+          (res) => {
+            if ([301, 302, 303, 307, 308].includes(res.statusCode ?? 0)) {
+              const location = res.headers.location;
+              if (location) {
+                res.resume();
+                doRequest(new URL(location, requestUrl).toString(), redirectCount + 1);
+                return;
+              }
             }
-          });
-        },
-      );
-      req.on("error", reject);
-      req.setTimeout(10000, () => {
-        req.destroy(new Error("GitHub API request timed out"));
-      });
+
+            if (res.statusCode !== 200) {
+              res.resume();
+              reject(new Error(`GitHub API が HTTP ${res.statusCode} を返しました`));
+              return;
+            }
+
+            let data = "";
+            res.setEncoding("utf8");
+            res.on("data", (chunk) => (data += chunk));
+            res.on("end", () => {
+              try {
+                resolve(JSON.parse(data));
+              } catch (err) {
+                reject(err);
+              }
+            });
+          },
+        );
+
+        req.on("error", reject);
+        req.setTimeout(10000, () => {
+          req.destroy(new Error("GitHub API リクエストがタイムアウトしました"));
+        });
+      };
+
+      doRequest(url);
     });
   }
 
