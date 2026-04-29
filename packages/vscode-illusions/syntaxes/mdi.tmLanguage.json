@@ -1,0 +1,219 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "MDI (illusions)",
+  "scopeName": "text.mdi",
+  "fileTypes": ["mdi"],
+  "patterns": [
+    { "include": "#frontmatter" },
+    { "include": "#mdi-ruby" },
+    { "include": "#mdi-tcy" },
+    { "include": "#mdi-nobreak" },
+    { "include": "#mdi-kern" },
+    { "include": "#heading" },
+    { "include": "#blockquote" },
+    { "include": "#fenced-code-block" },
+    { "include": "#inline-code" },
+    { "include": "#bold-italic" },
+    { "include": "#bold" },
+    { "include": "#italic" },
+    { "include": "#strikethrough" },
+    { "include": "#link" },
+    { "include": "#image" },
+    { "include": "#html-comment" },
+    { "include": "#horizontal-rule" }
+  ],
+  "repository": {
+    "frontmatter": {
+      "name": "meta.frontmatter.mdi",
+      "begin": "\\A---\\s*$",
+      "end": "^---\\s*$",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.frontmatter.begin.mdi" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.frontmatter.end.mdi" }
+      },
+      "patterns": [
+        {
+          "match": "^([\\w-]+)\\s*(:)\\s*(.*)$",
+          "captures": {
+            "1": { "name": "entity.name.tag.yaml" },
+            "2": { "name": "punctuation.separator.key-value.yaml" },
+            "3": { "name": "string.unquoted.yaml" }
+          }
+        }
+      ]
+    },
+
+    "mdi-ruby": {
+      "name": "markup.ruby.mdi",
+      "match": "\\{([^|{}]+)\\|([^}]+)\\}",
+      "captures": {
+        "0": { "name": "meta.ruby.mdi" },
+        "1": { "name": "entity.name.ruby.base.mdi" },
+        "2": { "name": "string.other.ruby.reading.mdi" }
+      }
+    },
+
+    "mdi-tcy": {
+      "name": "markup.tcy.mdi",
+      "match": "\\^([^^]+)\\^",
+      "captures": {
+        "0": { "name": "meta.tcy.mdi" },
+        "1": { "name": "constant.numeric.tcy.mdi" }
+      }
+    },
+
+    "mdi-nobreak": {
+      "name": "markup.nobreak.mdi",
+      "match": "(\\[\\[no-break:)([^\\]]+)(\\]\\])",
+      "captures": {
+        "1": { "name": "keyword.control.nobreak.begin.mdi" },
+        "2": { "name": "string.other.nobreak.content.mdi" },
+        "3": { "name": "keyword.control.nobreak.end.mdi" }
+      }
+    },
+
+    "mdi-kern": {
+      "name": "markup.kern.mdi",
+      "match": "(\\[\\[kern:)([^:]+)(:)([^\\]]+)(\\]\\])",
+      "captures": {
+        "1": { "name": "keyword.control.kern.begin.mdi" },
+        "2": { "name": "constant.numeric.kern.value.mdi" },
+        "3": { "name": "punctuation.separator.kern.mdi" },
+        "4": { "name": "string.other.kern.content.mdi" },
+        "5": { "name": "keyword.control.kern.end.mdi" }
+      }
+    },
+
+    "heading": {
+      "name": "markup.heading.mdi",
+      "match": "^(#{1,6})\\s+(.+)$",
+      "captures": {
+        "1": { "name": "punctuation.definition.heading.mdi" },
+        "2": { "name": "entity.name.section.mdi" }
+      }
+    },
+
+    "blockquote": {
+      "name": "markup.quote.mdi",
+      "begin": "^(>)\\s*",
+      "end": "$",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.quote.begin.mdi" }
+      },
+      "patterns": [
+        { "include": "#mdi-ruby" },
+        { "include": "#mdi-tcy" },
+        { "include": "#bold-italic" },
+        { "include": "#bold" },
+        { "include": "#italic" }
+      ]
+    },
+
+    "fenced-code-block": {
+      "name": "markup.fenced_code.block.mdi",
+      "begin": "^(`{3,}|~{3,})\\s*(\\w+)?",
+      "end": "^\\1",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.raw.begin.mdi" },
+        "2": { "name": "fenced_code.block.language" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.raw.end.mdi" }
+      }
+    },
+
+    "inline-code": {
+      "name": "markup.inline.raw.string.mdi",
+      "match": "(`+)([^`]+)\\1",
+      "captures": {
+        "1": { "name": "punctuation.definition.raw.mdi" },
+        "2": { "name": "markup.raw.inline.content.mdi" }
+      }
+    },
+
+    "bold-italic": {
+      "name": "markup.bold.italic.mdi",
+      "match": "(\\*{3}|_{3})([^*_]+)\\1",
+      "captures": {
+        "1": { "name": "punctuation.definition.bold.italic.mdi" },
+        "2": { "name": "markup.bold.italic.content.mdi" }
+      }
+    },
+
+    "bold": {
+      "name": "markup.bold.mdi",
+      "match": "(\\*{2}|_{2})([^*_]+)\\1",
+      "captures": {
+        "1": { "name": "punctuation.definition.bold.mdi" },
+        "2": { "name": "markup.bold.content.mdi" }
+      }
+    },
+
+    "italic": {
+      "name": "markup.italic.mdi",
+      "match": "(\\*|_)([^*_]+)\\1",
+      "captures": {
+        "1": { "name": "punctuation.definition.italic.mdi" },
+        "2": { "name": "markup.italic.content.mdi" }
+      }
+    },
+
+    "strikethrough": {
+      "name": "markup.strikethrough.mdi",
+      "match": "(~~)([^~]+)\\1",
+      "captures": {
+        "1": { "name": "punctuation.definition.strikethrough.mdi" },
+        "2": { "name": "markup.strikethrough.content.mdi" }
+      }
+    },
+
+    "link": {
+      "name": "meta.link.inline.mdi",
+      "match": "(\\[)([^\\]]*)(\\])(\\()([^)]*)(\\))",
+      "captures": {
+        "1": { "name": "punctuation.definition.link.begin.mdi" },
+        "2": { "name": "string.other.link.title.mdi" },
+        "3": { "name": "punctuation.definition.link.end.mdi" },
+        "4": { "name": "punctuation.definition.metadata.mdi" },
+        "5": { "name": "markup.underline.link.mdi" },
+        "6": { "name": "punctuation.definition.metadata.mdi" }
+      }
+    },
+
+    "image": {
+      "name": "meta.image.inline.mdi",
+      "match": "(!)(\\[)([^\\]]*)(\\])(\\()([^)]*)(\\))",
+      "captures": {
+        "1": { "name": "punctuation.definition.image.mdi" },
+        "2": { "name": "punctuation.definition.link.begin.mdi" },
+        "3": { "name": "string.other.link.description.mdi" },
+        "4": { "name": "punctuation.definition.link.end.mdi" },
+        "5": { "name": "punctuation.definition.metadata.mdi" },
+        "6": { "name": "markup.underline.link.image.mdi" },
+        "7": { "name": "punctuation.definition.metadata.mdi" }
+      }
+    },
+
+    "html-comment": {
+      "name": "comment.block.html.mdi",
+      "begin": "<!--",
+      "end": "-->",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.comment.begin.mdi" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.comment.end.mdi" }
+      }
+    },
+
+    "horizontal-rule": {
+      "name": "meta.separator.mdi",
+      "match": "^([-*_])(\\s*\\1){2,}\\s*$",
+      "captures": {
+        "0": { "name": "punctuation.definition.thematic-break.mdi" }
+      }
+    }
+  }
+}

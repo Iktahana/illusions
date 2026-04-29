@@ -1,0 +1,131 @@
+{
+  "name": "vscode-illusions",
+  "displayName": "illusions",
+  "description": "illusions 日本語小説エディタとの連携拡張機能 — .mdi 構文ハイライト、字数カウント、VS Code から illusions で開く",
+  "version": "0.1.0",
+  "publisher": "iktahana",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "japanese",
+    "novel",
+    "mdi",
+    "illusions",
+    "markdown"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iktahana/illusions"
+  },
+  "license": "MIT",
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:mdi",
+    "onLanguage:markdown"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "mdi",
+        "aliases": [
+          "MDI (illusions)",
+          "mdi"
+        ],
+        "extensions": [
+          ".mdi"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mdi",
+        "scopeName": "text.mdi",
+        "path": "./syntaxes/mdi.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.javascript": "javascript",
+          "meta.embedded.block.typescript": "typescript",
+          "meta.embedded.block.python": "python",
+          "meta.embedded.block.css": "css",
+          "meta.embedded.block.html": "html",
+          "meta.embedded.block.json": "json",
+          "meta.embedded.block.yaml": "yaml",
+          "meta.embedded.block.shell": "shellscript"
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "illusions.openInIllusions",
+        "title": "illusions で開く",
+        "category": "illusions",
+        "icon": "$(book)"
+      },
+      {
+        "command": "illusions.openProjectInIllusions",
+        "title": "プロジェクトを illusions で開く",
+        "category": "illusions",
+        "icon": "$(folder-opened)"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "illusions.openInIllusions",
+          "when": "resourceExtname == .mdi",
+          "group": "navigation@1"
+        },
+        {
+          "command": "illusions.openProjectInIllusions",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation@2"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "illusions.openInIllusions",
+          "when": "resourceExtname == .mdi",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "illusions.openInIllusions",
+          "when": "resourceExtname == .mdi",
+          "group": "navigation@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "illusions",
+      "properties": {
+        "illusions.showWordCount": {
+          "type": "boolean",
+          "default": true,
+          "description": "ステータスバーに字数カウントを表示する"
+        },
+        "illusions.wordCountTarget": {
+          "type": "number",
+          "default": 0,
+          "description": "目標字数 (0 = 無効)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}

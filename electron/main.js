@@ -58,9 +58,22 @@ process.on("unhandledRejection", (reason) => {
 // In dev mode, skip the lock so dev and production can run side-by-side.
 const { isDev } = require("./app-constants");
 
-// Register custom protocol for OAuth callbacks
+// Register custom protocol for OAuth callbacks and VS Code companion integration
 if (!isDev) {
   app.setAsDefaultProtocolClient("illusions");
+}
+
+// Parse illusions://open?path=... URLs from the VS Code companion extension
+function parseIllusionsOpenUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === "open" && parsed.searchParams.has("path")) {
+      return decodeURIComponent(parsed.searchParams.get("path"));
+    }
+  } catch {
+    // ignore malformed URLs
+  }
+  return null;
 }
 
 const gotTheLock = isDev || app.requestSingleInstanceLock();
@@ -81,6 +94,13 @@ if (!gotTheLock) {
     const authUrl = commandLine.find((a) => a.startsWith("illusions://auth/"));
     if (authUrl) {
       handleAuthCallback(authUrl);
+      return;
+    }
+    // Check for VS Code companion "Open in illusions" protocol URL
+    const openUrl = commandLine.find((a) => a.startsWith("illusions://open"));
+    if (openUrl) {
+      const openPath = parseIllusionsOpenUrl(openUrl);
+      if (openPath) void handleMdiFileOpen(openPath);
       return;
     }
     // Extract .mdi path from argv (Windows/Linux pass file path as CLI argument)
@@ -106,11 +126,22 @@ app.on("open-file", async (event, filePath) => {
   }
 });
 
-// Handle OAuth callback via custom URL scheme (macOS)
+// Handle custom URL scheme (macOS): OAuth callbacks + VS Code companion integration
 app.on("open-url", (event, url) => {
   event.preventDefault();
   if (url.startsWith("illusions://auth/")) {
     handleAuthCallback(url);
+    return;
+  }
+  const openPath = parseIllusionsOpenUrl(url);
+  if (openPath) {
+    const { getMainWindow } = require("./window-manager");
+    const mainWindow = getMainWindow();
+    if (mainWindow && mainWindow.webContents) {
+      void handleMdiFileOpen(openPath);
+    } else {
+      setPendingFilePath(openPath);
+    }
   }
 });
 
@@ -179,12 +210,18 @@ app.whenReady().then(async () => {
     });
   });
 
-  // Windows/Linux: check process.argv for .mdi file association
+  // Windows/Linux: check process.argv for .mdi file association or illusions://open URL
   if (process.platform !== "darwin" && !getPendingFilePath()) {
-    const mdiArg = process.argv.find(
-      (a) => path.extname(a).toLowerCase() === ".mdi" && !a.startsWith("-"),
-    );
-    if (mdiArg) setPendingFilePath(path.resolve(mdiArg));
+    const openUrl = process.argv.find((a) => a.startsWith("illusions://open"));
+    if (openUrl) {
+      const openPath = parseIllusionsOpenUrl(openUrl);
+      if (openPath) setPendingFilePath(openPath);
+    } else {
+      const mdiArg = process.argv.find(
+        (a) => path.extname(a).toLowerCase() === ".mdi" && !a.startsWith("-"),
+      );
+      if (mdiArg) setPendingFilePath(path.resolve(mdiArg));
+    }
   }
 
   console.log("[DEBUG] Calling createMainWindow...");
