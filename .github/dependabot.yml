@@ -26,6 +26,11 @@ updates:
       # Revisit once the React ESLint ecosystem catches up.
       - dependency-name: "eslint"
         versions: ["10.x"]
+      # Tailwind 4 requires migrating postcss.config.mjs to @tailwindcss/postcss
+      # and replacing @tailwind directives in app/globals.css with @import.
+      # Revisit once the Tailwind v4 migration is scheduled.
+      - dependency-name: "tailwindcss"
+        versions: ["4.x"]
     groups:
       npm_and_yarn:
         patterns:
