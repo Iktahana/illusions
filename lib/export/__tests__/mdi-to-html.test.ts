@@ -37,9 +37,9 @@ describe("mdiToHtml", () => {
     );
 
     expect(html).toContain(
-      "<pre><code class=\"language-text\">{東京|とうきょう}\n[[br]]\n^12^\n[[no-break:ABC]]\n[[kern:0.5em:wide]]\n</code></pre>",
+      '<pre><code class="language-text">{東京|とうきょう}\n[[br]]\n^12^\n[[no-break:ABC]]\n[[kern:0.5em:wide]]\n</code></pre>',
     );
-    expect(html).toContain("外では<br class=\"mdi-break\">変換する");
+    expect(html).toContain('外では<br class="mdi-break">変換する');
   });
 
   it("preserves escaped MDI syntax as literal text", () => {
