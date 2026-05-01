@@ -31,7 +31,7 @@ export function useCharWidth({
   fontScale: number;
   lineHeight: number;
   isVertical: boolean;
-}): { measureRef: RefObject<HTMLSpanElement>; charWidth: number } {
+}): { measureRef: RefObject<HTMLSpanElement | null>; charWidth: number } {
   const measureRef = useRef<HTMLSpanElement>(null);
   const [charWidth, setCharWidth] = useState(0);
 
