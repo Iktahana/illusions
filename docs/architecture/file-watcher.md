@@ -21,9 +21,9 @@ The file watcher monitors external changes to files currently open in the editor
 
 ### Key File
 
-| File                  | Lines | Purpose                              |
-| --------------------- | ----- | ------------------------------------ |
-| `lib/file-watcher.ts` | ~423  | Complete file watcher implementation |
+| File                           | Lines | Purpose                              |
+| ------------------------------ | ----- | ------------------------------------ |
+| `lib/services/file-watcher.ts` | ~605  | Complete file watcher implementation |
 
 ### Features
 
@@ -31,6 +31,7 @@ The file watcher monitors external changes to files currently open in the editor
 - Automatic save suppression to ignore self-triggered changes
 - Configurable poll interval with failure tolerance
 - Global suppression map with periodic cleanup
+- Content-hash comparison to suppress false positives from cloud-sync metadata updates (Electron)
 
 ---
 
@@ -86,6 +87,8 @@ The file watcher monitors external changes to files currently open in the editor
 - **Mechanism**: Uses native VFS `watchFile()` for filesystem event monitoring
 - **Fallback**: Falls back to the polling strategy if native watching is unavailable or unreliable
 - **Environment**: Used in the Electron main/renderer process
+- **Content-hash deduplication**: When a filesystem event fires, the watcher computes a fast djb2 hash of the new content and compares it against `lastKnownContentHash`. If the hash is unchanged (e.g. a cloud-sync service such as iCloud Drive or Dropbox touched the file metadata without altering content), the change callback is **not** invoked.
+- **Same-second change detection**: Records `pausedAt` when `stop()` is called; on `start()` it checks whether the file's mtime equals the last-known mtime but the watcher was paused after that mtime — in this case it falls back to content-hash comparison to catch edits that occurred within the same filesystem-clock second (e.g. HFS+ has 1-second mtime granularity).
 
 ### Save Suppression System
 
@@ -115,7 +118,7 @@ suppressFileWatch(path) called before write
 
 ```typescript
 /** Callback invoked when an external change is detected */
-type FileChangeCallback = (content: string) => void;
+type FileChangeCallback = (content: string, lastModified: number) => void;
 
 /** Configuration for creating a file watcher */
 interface FileWatcherOptions {
