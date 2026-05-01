@@ -15,6 +15,8 @@ export interface JapaneseNovelOptions {
   enableNoBreak?: boolean;
   /** カーニング指定を有効化する（[[kern:amount:text]] 記法） */
   enableKern?: boolean;
+  /** 明示改行を有効化する（[[br]] 記法） */
+  enableMdiBreak?: boolean;
 }
 
 export const defaultJapaneseNovelOptions: Required<JapaneseNovelOptions> = {
@@ -24,4 +26,5 @@ export const defaultJapaneseNovelOptions: Required<JapaneseNovelOptions> = {
   enableRuby: true,
   enableNoBreak: true,
   enableKern: true,
+  enableMdiBreak: true,
 };

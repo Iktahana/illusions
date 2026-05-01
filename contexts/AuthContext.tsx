@@ -154,12 +154,32 @@ async function fetchMe(): Promise<MeResponse> {
  * Returns whether an error thrown by the Electron auth IPC represents a
  * permanent auth failure (token invalid/revoked) vs a transient error
  * (server unavailable, network issue).
- * The IPC handlers attach `error.status` with the upstream HTTP status code.
+ *
+ * The IPC handlers attach `error.status` (HTTP status) and, for the OAuth
+ * token endpoint, `error.oauthError` (e.g. `invalid_grant`).
+ *
+ * Per RFC 6749 §5.2, the token endpoint returns HTTP 400 for client errors
+ * such as `invalid_grant` (refresh token expired/revoked). Retrying these
+ * cannot succeed, so any 4xx from the auth endpoints must be treated as
+ * permanent — otherwise the renderer falls into a tight refresh loop on
+ * a revoked token.
  */
 function isElectronAuthErrorPermanent(err: unknown): boolean {
-  if (err instanceof Error && "status" in err) {
+  if (!(err instanceof Error)) return false;
+
+  const oauthError = (err as Error & { oauthError?: unknown }).oauthError;
+  if (
+    oauthError === "invalid_grant" ||
+    oauthError === "invalid_client" ||
+    oauthError === "unauthorized_client" ||
+    oauthError === "unsupported_grant_type"
+  ) {
+    return true;
+  }
+
+  if ("status" in err) {
     const status = (err as Error & { status: unknown }).status;
-    return status === 401 || status === 403;
+    if (typeof status === "number" && status >= 400 && status < 500) return true;
   }
   // No status attached (network/IPC error) — treat as transient
   return false;
@@ -187,7 +207,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (expiresAt: number, refreshToken: string) => {
       clearRefreshTimer();
 
-      const refreshIn = Math.max(expiresAt - Date.now() - 5 * 60 * 1000, 0);
+      // Floor of 60s prevents a tight retry loop when the upstream token has
+      // already expired (refreshIn would otherwise compute to 0 and the
+      // transient-error branch would re-schedule immediately).
+      const TRANSIENT_RETRY_MIN_MS = 60 * 1000;
+      const refreshIn = Math.max(expiresAt - Date.now() - 5 * 60 * 1000, TRANSIENT_RETRY_MIN_MS);
       refreshTimerRef.current = setTimeout(async () => {
         const api = window.electronAPI;
         if (!api?.auth) return;
@@ -213,11 +237,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           scheduleElectronRefresh(newExpiresAt, tokenResponse.refresh_token);
         } catch (err) {
           if (isElectronAuthErrorPermanent(err)) {
-            // Permanent failure (401/403): token is invalid — log out
+            // Permanent failure (4xx / invalid_grant): token is invalid — log out
             setUser(null);
             await clearTokens();
           } else {
-            // Transient failure (5xx / network): keep session, retry at next scheduled interval
+            // Transient failure (5xx / network): keep session, retry after the floor delay
             scheduleElectronRefresh(expiresAt, refreshToken);
           }
         }
@@ -231,7 +255,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (expiresAt: number) => {
       clearRefreshTimer();
 
-      const refreshIn = Math.max(expiresAt - Date.now() - 5 * 60 * 1000, 0);
+      // 60s floor protects against tight retry loops on transient errors when
+      // the session has already expired (refreshIn would otherwise be 0).
+      const TRANSIENT_RETRY_MIN_MS = 60 * 1000;
+      const refreshIn = Math.max(expiresAt - Date.now() - 5 * 60 * 1000, TRANSIENT_RETRY_MIN_MS);
       refreshTimerRef.current = setTimeout(async () => {
         const me = await fetchMe();
         if (me.authenticated && me.user) {
@@ -241,7 +268,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Permanent failure (401/403): token is invalid — log out
           setUser(null);
         } else {
-          // Transient failure (5xx / network): keep session, retry at next scheduled interval
+          // Transient failure (5xx / network): keep session, retry after the floor delay
           scheduleWebRefresh(expiresAt);
         }
       }, refreshIn);

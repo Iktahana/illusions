@@ -98,4 +98,4 @@ Types: `feat`, `fix`, `refactor`, `docs`, `style`, `test`, `chore`
 | `lib/vfs/`                            | Filesystem abstraction              |
 | `electron/preload.js`                 | IPC security boundary               |
 
-Key references: `docs/architecture/storage-system.md`, `MDI.md`, `types/electron.d.ts`
+Key references: `docs/architecture/storage-system.md`, `docs/MDI/spec.md`, `MDI.md`, `types/electron.d.ts`

@@ -36,7 +36,7 @@ jobs:
       - name: Check for existing weekly release PR
         id: check-existing
         if: steps.check-diff.outputs.ahead != '0'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const { data: prs } = await github.rest.pulls.list({
@@ -58,7 +58,7 @@ jobs:
       - name: Check latest dev CI status
         id: check-ci
         if: steps.check-diff.outputs.ahead != '0' && steps.check-existing.outputs.exists != 'true'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const runs = await github.rest.actions.listWorkflowRunsForRepo({
@@ -79,7 +79,7 @@ jobs:
 
       - name: Close old weekly release PRs
         if: steps.check-diff.outputs.ahead != '0' && steps.check-existing.outputs.exists != 'true' && steps.check-ci.outputs.green == 'true'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const { data: prs } = await github.rest.pulls.list({
@@ -103,7 +103,7 @@ jobs:
 
       - name: Create weekly release PR
         if: steps.check-diff.outputs.ahead != '0' && steps.check-existing.outputs.exists != 'true' && steps.check-ci.outputs.green == 'true'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const today = new Date().toISOString().slice(0, 10);
@@ -158,7 +158,7 @@ jobs:
 
       - name: Create issue on CI failure
         if: steps.check-diff.outputs.ahead != '0' && steps.check-existing.outputs.exists != 'true' && steps.check-ci.outputs.green != 'true'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const today = new Date().toISOString().slice(0, 10);

@@ -57,6 +57,7 @@ function buildOnChangedForTest(
     const fileName = tab.file?.name ?? "ファイル";
 
     if (tab.fileSyncStatus === "clean") {
+      // Clean tab: auto-reload via pendingExternalContent (preserves scroll position)
       setTabs((prev) =>
         prev.map((t) => {
           if (t.id !== tabId || !isEditorTab(t)) return t;
@@ -71,7 +72,6 @@ function buildOnChangedForTest(
           } as EditorTabState;
         }),
       );
-      onEditorRemountNeeded?.();
       notifications.push({
         message: `「${fileName}」が更新されました`,
         type: "info",
@@ -217,13 +217,13 @@ describe("file-watch: clean tab receives external change", () => {
     expect(getTab().pendingExternalContent).toBe("new disk content");
   });
 
-  it("calls onEditorRemountNeeded after auto-reload", () => {
+  it("does NOT call onEditorRemountNeeded (uses pendingExternalContent for scroll preservation)", () => {
     const tab = makeEditorTab({ fileSyncStatus: "clean", content: "old", lastSavedContent: "old" });
     const { onChanged, onEditorRemountNeeded } = buildContext(tab);
 
     onChanged("new disk content", Date.now());
 
-    expect(onEditorRemountNeeded).toHaveBeenCalledTimes(1);
+    expect(onEditorRemountNeeded).not.toHaveBeenCalled();
   });
 
   it("emits an info notification", () => {

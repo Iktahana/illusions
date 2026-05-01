@@ -10,6 +10,7 @@ import { rubySchema } from "./nodes/ruby";
 import { tcySchema } from "./nodes/tcy";
 import { nobreakSchema } from "./nodes/nobreak";
 import { kernSchema } from "./nodes/kern";
+import { mdibreakSchema } from "./nodes/mdibreak";
 import { headingAnchorSchema } from "./nodes/heading-anchor";
 import {
   remarkHeadingAnchorPlugin,
@@ -17,6 +18,7 @@ import {
   remarkTcyPlugin,
   remarkNoBreakPlugin,
   remarkKernPlugin,
+  remarkMdiBreakPlugin,
 } from "./syntax";
 import { createHeadingIdFixerPlugin } from "./plugins/heading-id-fixer";
 import { createHardbreakIndentPlugin } from "./plugins/hardbreak-indent";
@@ -30,7 +32,15 @@ export { calculateManuscriptPages, countCharacters } from "./utils";
  */
 export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugin[] {
   const opts = { ...defaultJapaneseNovelOptions, ...options };
-  const { isVertical, showManuscriptLine, enableRuby, enableTcy, enableNoBreak, enableKern } = opts;
+  const {
+    isVertical,
+    showManuscriptLine,
+    enableRuby,
+    enableTcy,
+    enableNoBreak,
+    enableKern,
+    enableMdiBreak,
+  } = opts;
 
   const classes: string[] = ["milkdown-japanese-base"];
   if (isVertical) {
@@ -59,6 +69,11 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     "japaneseNovelKern",
     () => remarkKernPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
     { enable: enableKern },
+  );
+  const remarkMdiBreak = $remark(
+    "japaneseNovelMdiBreak",
+    () => remarkMdiBreakPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
+    { enable: enableMdiBreak },
   );
   const remarkHeadingAnchor = $remark(
     "japaneseNovelHeadingAnchor",
@@ -92,6 +107,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
   const plugins: MilkdownPlugin[] = [
     ...(enableRuby ? [remarkRuby, rubySchema] : []),
     ...(enableTcy ? [remarkTcy, tcySchema] : []),
+    ...(enableMdiBreak ? [remarkMdiBreak, mdibreakSchema] : []),
     ...(enableNoBreak ? [remarkNoBreak, nobreakSchema] : []),
     ...(enableKern ? [remarkKern, kernSchema] : []),
     remarkHeadingAnchor,

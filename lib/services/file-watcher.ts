@@ -555,8 +555,13 @@ class ElectronFileWatcher implements FileWatcher {
         this.vfs.readFile(this.path),
         this.vfs.getFileMetadata(this.path),
       ]);
+      const newHash = hashContent(content);
       this.lastKnownModified = metadata.lastModified;
-      this.lastKnownContentHash = hashContent(content);
+      // Skip notification if content hasn't changed (e.g. cloud sync metadata update)
+      if (newHash === this.lastKnownContentHash) {
+        return;
+      }
+      this.lastKnownContentHash = newHash;
       this.onChanged(content, metadata.lastModified);
     } catch (error) {
       // Check for permission-related errors (DOMException with NotAllowedError)

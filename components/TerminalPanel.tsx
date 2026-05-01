@@ -9,11 +9,14 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import * as ContextMenu from "@radix-ui/react-context-menu";
+import { Copy, ClipboardPaste, CheckSquare, Eraser } from "lucide-react";
 import type { Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
 
 import type { TerminalStatus } from "@/lib/tab-manager/tab-types";
 import { useTerminalSettings } from "@/contexts/EditorSettingsContext";
+import { isMacOS } from "@/lib/utils/runtime-env";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -93,6 +96,44 @@ export default function TerminalPanel({
   const cleanupExitRef = useRef<(() => void) | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
+  const [hasSelection, setHasSelection] = useState(false);
+
+  const isMac = isMacOS();
+  const copyShortcut = isMac ? "⌘C" : "Ctrl+C";
+  const pasteShortcut = isMac ? "⌘V" : "Ctrl+V";
+
+  // Copy the current xterm selection to the system clipboard. No-op when empty.
+  const copySelection = useCallback(async (): Promise<void> => {
+    const term = terminalRef.current;
+    if (!term) return;
+    const text = term.getSelection();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Clipboard unavailable (focus/permission) — silently ignore
+    }
+  }, []);
+
+  // Paste clipboard text into the terminal; xterm routes it through onData → PTY.
+  const pasteFromClipboard = useCallback(async (): Promise<void> => {
+    const term = terminalRef.current;
+    if (!term) return;
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) term.paste(text);
+    } catch {
+      // Clipboard unavailable — silently ignore
+    }
+  }, []);
+
+  const selectAll = useCallback((): void => {
+    terminalRef.current?.selectAll();
+  }, []);
+
+  const clearBuffer = useCallback((): void => {
+    terminalRef.current?.clear();
+  }, []);
 
   // User terminal settings
   const {
@@ -158,15 +199,54 @@ export default function TerminalPanel({
     terminal.open(containerRef.current);
     fitAddon.fit();
 
-    // Copy-on-select: copy selected text to clipboard when selection changes
-    if (terminalCopyOnSelect) {
-      terminal.onSelectionChange(() => {
-        const selection = terminal.getSelection();
-        if (selection) {
-          void navigator.clipboard.writeText(selection).catch(() => {
-            // Clipboard write failed (e.g. no focus)
-          });
+    // Reset carry-over state from a previously-disposed terminal instance
+    setHasSelection(false);
+
+    // Track selection for context-menu enablement; optionally auto-copy.
+    terminal.onSelectionChange(() => {
+      const selection = terminal.getSelection();
+      setHasSelection(selection.length > 0);
+      if (terminalCopyOnSelect && selection) {
+        void navigator.clipboard.writeText(selection).catch(() => {
+          // Clipboard write failed (e.g. no focus)
+        });
+      }
+    });
+
+    // Windows/Linux copy/paste shortcuts. macOS keeps the native Cmd+C/V path
+    // handled by the browser clipboard pipeline.
+    if (!isMac) {
+      terminal.attachCustomKeyEventHandler((event) => {
+        if (event.type !== "keydown" || !event.ctrlKey || event.altKey || event.metaKey) {
+          return true;
         }
+        // event.code is layout-independent (e.g. Cyrillic "с" still reports "KeyC");
+        // fall back to event.key for environments that don't set code (very old browsers).
+        const isC = event.code === "KeyC" || event.key.toLowerCase() === "c";
+        const isV = event.code === "KeyV" || event.key.toLowerCase() === "v";
+        // Ctrl+Shift+C / Ctrl+Shift+V always copy/paste
+        if (event.shiftKey && isC) {
+          void copySelection();
+          return false;
+        }
+        if (event.shiftKey && isV) {
+          void pasteFromClipboard();
+          return false;
+        }
+        // Ctrl+C: copy when there is a selection; otherwise pass through (SIGINT)
+        if (!event.shiftKey && isC) {
+          if (terminal.hasSelection()) {
+            void copySelection();
+            return false;
+          }
+          return true;
+        }
+        // Ctrl+V: paste from clipboard
+        if (!event.shiftKey && isV) {
+          void pasteFromClipboard();
+          return false;
+        }
+        return true;
       });
     }
 
@@ -333,13 +413,87 @@ export default function TerminalPanel({
     );
   }
 
-  // Running state: render xterm container
+  // Running state: xterm container wrapped with a right-click context menu
   return (
-    <div
-      ref={containerRef}
-      className="h-full w-full overflow-hidden terminal-panel-container"
-      data-session-id={sessionId}
-      style={{ padding: "4px", backgroundColor: "#000000" }}
-    />
+    <ContextMenu.Root>
+      <ContextMenu.Trigger asChild>
+        <div
+          ref={containerRef}
+          className="h-full w-full overflow-hidden terminal-panel-container"
+          data-session-id={sessionId}
+          style={{ padding: "4px", backgroundColor: "#000000" }}
+        />
+      </ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Content className="min-w-[200px] bg-background/95 backdrop-blur-xl border border-border rounded-lg shadow-2xl p-1.5 z-50">
+          <TerminalMenuItem
+            icon={<Copy className="w-4 h-4" />}
+            label="コピー"
+            shortcut={copyShortcut}
+            onClick={() => void copySelection()}
+            disabled={!hasSelection}
+          />
+          <TerminalMenuItem
+            icon={<ClipboardPaste className="w-4 h-4" />}
+            label="貼り付け"
+            shortcut={pasteShortcut}
+            onClick={() => void pasteFromClipboard()}
+          />
+          <ContextMenu.Separator className="h-px bg-border my-1" />
+          <TerminalMenuItem
+            icon={<CheckSquare className="w-4 h-4" />}
+            label="すべて選択"
+            shortcut=""
+            onClick={selectAll}
+          />
+          <TerminalMenuItem
+            icon={<Eraser className="w-4 h-4" />}
+            label="画面をクリア"
+            shortcut=""
+            onClick={clearBuffer}
+          />
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Menu item — styled identically to EditorContextMenu for visual consistency
+// ---------------------------------------------------------------------------
+
+interface TerminalMenuItemProps {
+  icon: React.ReactNode;
+  label: string;
+  shortcut: string;
+  onClick: () => void;
+  disabled?: boolean;
+}
+
+function TerminalMenuItem({
+  icon,
+  label,
+  shortcut,
+  onClick,
+  disabled = false,
+}: TerminalMenuItemProps): React.JSX.Element {
+  return (
+    <ContextMenu.Item
+      className="group relative flex items-center gap-3 px-3 py-2 text-sm outline-none cursor-pointer select-none data-[disabled]:opacity-50 data-[disabled]:pointer-events-none data-[highlighted]:bg-white/5 rounded"
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <span className="w-4 h-4 flex items-center justify-center text-foreground-tertiary group-data-[highlighted]:text-foreground-secondary">
+        {icon}
+      </span>
+      <span className="flex-1 text-foreground-secondary group-data-[highlighted]:text-foreground">
+        {label}
+      </span>
+      {shortcut && (
+        <span className="text-xs text-foreground-tertiary group-data-[highlighted]:text-foreground-secondary">
+          {shortcut}
+        </span>
+      )}
+    </ContextMenu.Item>
   );
 }

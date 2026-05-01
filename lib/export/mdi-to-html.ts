@@ -17,6 +17,7 @@ import {
   MDI_TCY_RE,
   MDI_NOBR_RE,
   MDI_KERN_RE,
+  MDI_BREAK_RE,
   MDI_ESC_BRACE_RE,
   MDI_ESC_CARET_RE,
   MDI_ESC_BRACKET_RE,
@@ -83,6 +84,7 @@ interface MdiPreProcessResult {
  * 3. Tate-chu-yoko: ^text^ -> <span class="mdi-tcy">text</span>
  * 4. No-break: [[no-break:text]] -> <span class="mdi-nobr">text</span>
  * 5. Kerning: [[kern:amount:text]] -> <span class="mdi-kern" style="--mdi-kern:amount;">text</span>
+ * 6. Line break: [[br]] -> <br class="mdi-break">
  */
 function preProcessMdiSyntax(markdown: string): MdiPreProcessResult {
   // Store replacements to avoid double-processing
@@ -130,6 +132,9 @@ function preProcessMdiSyntax(markdown: string): MdiPreProcessResult {
       `<span class="mdi-kern" style="--mdi-kern:${amount};">${escapeHtml(text)}</span>`,
     );
   });
+
+  // 6. Explicit line break: [[br]]
+  result = result.replace(MDI_BREAK_RE, () => addPlaceholder(`<br class="mdi-break">`));
 
   return { text: result, placeholders };
 }
@@ -193,6 +198,7 @@ export function getMdiStylesheet(options?: MdiStylesheetOptions): string {
     ".mdi-tcy { text-combine-upright: all; }",
     ".mdi-nobr { white-space: nowrap; word-break: keep-all; }",
     ".mdi-kern { letter-spacing: var(--mdi-kern, 0em); }",
+    "br.mdi-break { /* inherits writing-mode; explicit rule for future customization */ }",
     "ruby rt { font-size: 0.5em; }",
   ];
 
