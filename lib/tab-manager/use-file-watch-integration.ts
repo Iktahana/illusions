@@ -66,7 +66,8 @@ function buildOnChanged(
     const fileName = tab.file?.name ?? "ファイル";
 
     if (tab.fileSyncStatus === "clean") {
-      // Clean tab: auto-reload with disk content
+      // Clean tab: auto-reload with disk content via pendingExternalContent
+      // (preserves scroll position instead of remounting the editor)
       setTabs((prev) =>
         prev.map((t) => {
           if (t.id !== tabId || !isEditorTab(t)) return t;
@@ -77,10 +78,10 @@ function buildOnChanged(
             isDirty: false,
             fileSyncStatus: "clean",
             conflictDiskContent: null,
+            pendingExternalContent: diskContent,
           } satisfies EditorTabState;
         }),
       );
-      onEditorRemountNeeded?.();
       notificationManager.info(`「${fileName}」が更新されました`, 3000);
     } else if (tab.fileSyncStatus === "dirty") {
       // Dirty tab: do NOT touch buffer; enter conflicted state

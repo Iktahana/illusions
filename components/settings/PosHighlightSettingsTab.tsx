@@ -1,11 +1,11 @@
 "use client";
 
 import type React from "react";
-import clsx from "clsx";
 import dynamic from "next/dynamic";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import { usePosHighlightSettings } from "@/contexts/EditorSettingsContext";
 import ColorPicker from "@/components/ColorPicker";
+import { SettingsField, SettingsToggle } from "./primitives";
 
 const PosHighlightPreview = dynamic(() => import("@/components/PosHighlightPreview"), {
   ssr: false,
@@ -50,27 +50,18 @@ export default function PosHighlightSettingsTab(): React.ReactElement {
     <div className="flex gap-6 h-full">
       {/* Left: controls */}
       <div className="w-2/5 overflow-y-auto space-y-6 pr-2">
-        {/* Toggle */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-medium text-foreground">品詞ハイライトを有効化</h3>
-            <p className="text-xs text-foreground-tertiary mt-0.5">動詞・助詞などを色分け表示</p>
-          </div>
-          <button
-            onClick={() => onPosHighlightEnabledChange(!posHighlightEnabled)}
-            className={clsx(
-              "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
-              posHighlightEnabled ? "bg-accent" : "bg-border-secondary",
-            )}
-          >
-            <span
-              className={clsx(
-                "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
-                posHighlightEnabled ? "translate-x-6" : "translate-x-1",
-              )}
-            />
-          </button>
-        </div>
+        <SettingsField
+          label="品詞ハイライトを有効化"
+          description="動詞・助詞などを色分け表示"
+          htmlFor="pos-highlight-enabled"
+          inline
+        >
+          <SettingsToggle
+            id="pos-highlight-enabled"
+            checked={posHighlightEnabled}
+            onChange={onPosHighlightEnabledChange}
+          />
+        </SettingsField>
 
         {/* Color pickers */}
         <div className="space-y-4 pt-4 border-t border-border">

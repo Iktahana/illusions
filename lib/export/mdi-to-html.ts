@@ -2,7 +2,7 @@
  * MDI-to-HTML converter
  *
  * Converts MDI (Markdown for Illusions) syntax to HTML.
- * Uses markdown-it as the base markdown parser with pre-processing
+ * Uses markdown-it as the base markdown parser with inline token rules
  * for MDI-specific extensions: ruby, tate-chu-yoko, no-break, kerning.
  */
 
@@ -18,17 +18,14 @@ import {
   MDI_NOBR_RE,
   MDI_KERN_RE,
   MDI_BREAK_RE,
-  MDI_ESC_BRACE_RE,
-  MDI_ESC_CARET_RE,
-  MDI_ESC_BRACKET_RE,
   MDI_KERN_AMOUNT_RE,
 } from "./mdi-parser";
 
-// Placeholder prefix/suffix using Unicode Private Use Area (U+E000).
-// PUA characters survive markdown-it rendering (unlike \u0000 which is replaced
-// with U+FFFD) and will not appear in normal Japanese text content.
-const PLACEHOLDER_PREFIX = "\uE000MDI_PLACEHOLDER_";
-const PLACEHOLDER_SUFFIX = "\uE000";
+const MDI_RUBY_AT_START_RE = new RegExp(`^${MDI_RUBY_RE.source}`);
+const MDI_TCY_AT_START_RE = new RegExp(`^${MDI_TCY_RE.source}`);
+const MDI_NOBR_AT_START_RE = new RegExp(`^${MDI_NOBR_RE.source}`);
+const MDI_KERN_AT_START_RE = new RegExp(`^${MDI_KERN_RE.source}`);
+const MDI_BREAK_AT_START_RE = new RegExp(`^${MDI_BREAK_RE.source}`);
 
 /**
  * Validate that a kern amount matches the expected pattern (e.g. "0.5em", "-1em", "+0.25em")
@@ -63,110 +60,88 @@ function buildRubyHtml(base: string, ruby: string): string {
   return `<ruby>${escapeHtml(base)}<rt>${escapeHtml(ruby)}</rt></ruby>`;
 }
 
-/** Result of MDI syntax pre-processing before markdown-it rendering */
-interface MdiPreProcessResult {
-  /** Markdown text with MDI syntax replaced by placeholders */
-  text: string;
-  /** Map of placeholder keys to their HTML replacements */
-  placeholders: Map<string, string>;
-}
+function matchMdiInlineSyntax(
+  markdown: string,
+  position: number,
+): { length: number; html: string } | null {
+  const remaining = markdown.slice(position);
 
-/**
- * Pre-process MDI inline syntax, replacing MDI constructs with placeholders.
- *
- * Placeholders are restored AFTER markdown-it rendering via restorePlaceholders().
- * This allows markdown-it to run with html:false (blocking user-authored HTML)
- * while preserving the safe HTML generated from MDI syntax.
- *
- * Processes (in order):
- * 1. Escaped MDI syntax (backslash-prefixed) - preserved as literal text
- * 2. Ruby: {base|ruby} -> <ruby>...</ruby>
- * 3. Tate-chu-yoko: ^text^ -> <span class="mdi-tcy">text</span>
- * 4. No-break: [[no-break:text]] -> <span class="mdi-nobr">text</span>
- * 5. Kerning: [[kern:amount:text]] -> <span class="mdi-kern" style="--mdi-kern:amount;">text</span>
- * 6. Line break: [[br]] -> <br class="mdi-break">
- */
-function preProcessMdiSyntax(markdown: string): MdiPreProcessResult {
-  // Store replacements to avoid double-processing
-  const placeholders: Map<string, string> = new Map();
-  let placeholderIndex = 0;
-
-  function addPlaceholder(html: string): string {
-    const key = `${PLACEHOLDER_PREFIX}${placeholderIndex}${PLACEHOLDER_SUFFIX}`;
-    placeholderIndex++;
-    placeholders.set(key, html);
-    return key;
+  const rubyMatch = remaining.match(MDI_RUBY_AT_START_RE);
+  if (rubyMatch) {
+    return {
+      length: rubyMatch[0].length,
+      html: buildRubyHtml(rubyMatch[1], rubyMatch[2]),
+    };
   }
 
-  let result = markdown;
+  const tcyMatch = remaining.match(MDI_TCY_AT_START_RE);
+  if (tcyMatch) {
+    return {
+      length: tcyMatch[0].length,
+      html: `<span class="mdi-tcy">${escapeHtml(tcyMatch[1])}</span>`,
+    };
+  }
 
-  // 1. Handle escaped MDI syntax (backslash before special chars)
-  // Escape sequences: \{, \^, \[
-  result = result.replace(MDI_ESC_BRACE_RE, (_match, char) => addPlaceholder(char as string));
-  result = result.replace(MDI_ESC_CARET_RE, (_match, char) => addPlaceholder(char as string));
-  result = result.replace(MDI_ESC_BRACKET_RE, (_match, char) => addPlaceholder(char as string));
+  const nobrMatch = remaining.match(MDI_NOBR_AT_START_RE);
+  if (nobrMatch) {
+    return {
+      length: nobrMatch[0].length,
+      html: `<span class="mdi-nobr">${escapeHtml(nobrMatch[1])}</span>`,
+    };
+  }
 
-  // 2. Ruby: {base|ruby}
-  result = result.replace(MDI_RUBY_RE, (_match, base: string, ruby: string) =>
-    addPlaceholder(buildRubyHtml(base, ruby)),
-  );
+  const kernMatch = remaining.match(MDI_KERN_AT_START_RE);
+  if (kernMatch && isValidKernAmount(kernMatch[1])) {
+    return {
+      length: kernMatch[0].length,
+      html: `<span class="mdi-kern" style="--mdi-kern:${kernMatch[1]};">${escapeHtml(kernMatch[2])}</span>`,
+    };
+  }
 
-  // 3. Tate-chu-yoko: ^text^
-  result = result.replace(MDI_TCY_RE, (_match, text: string) =>
-    addPlaceholder(`<span class="mdi-tcy">${escapeHtml(text)}</span>`),
-  );
+  const breakMatch = remaining.match(MDI_BREAK_AT_START_RE);
+  if (breakMatch) {
+    return {
+      length: breakMatch[0].length,
+      html: '<br class="mdi-break">',
+    };
+  }
 
-  // 4. No-break: [[no-break:text]]
-  result = result.replace(MDI_NOBR_RE, (_match, text: string) =>
-    addPlaceholder(`<span class="mdi-nobr">${escapeHtml(text)}</span>`),
-  );
+  return null;
+}
 
-  // 5. Kerning: [[kern:amount:text]]
-  // amount is validated against MDI_KERN_AMOUNT_RE (digits, dots, +/-, em only) before use.
-  result = result.replace(MDI_KERN_RE, (_match, amount: string, text: string) => {
-    if (!isValidKernAmount(amount)) {
-      // Invalid kern amount: return the original text unmodified
-      return _match;
+function installMdiInlinePlugin(md: MarkdownIt): void {
+  md.inline.ruler.after("escape", "mdi-inline", (state, silent) => {
+    const match = matchMdiInlineSyntax(state.src, state.pos);
+    if (!match) {
+      return false;
     }
-    return addPlaceholder(
-      `<span class="mdi-kern" style="--mdi-kern:${amount};">${escapeHtml(text)}</span>`,
-    );
+
+    if (!silent) {
+      const token = state.push("html_inline", "", 0);
+      token.content = match.html;
+    }
+
+    state.pos += match.length;
+    return true;
   });
-
-  // 6. Explicit line break: [[br]]
-  result = result.replace(MDI_BREAK_RE, () => addPlaceholder(`<br class="mdi-break">`));
-
-  return { text: result, placeholders };
-}
-
-/**
- * Restore MDI placeholders in rendered HTML with their actual HTML content.
- *
- * Called after markdown-it rendering to inject the safe MDI HTML elements
- * (ruby, tcy, nobr, kern) that were protected during markdown-it processing.
- * Because markdown-it may HTML-escape the null-byte placeholder characters,
- * we also check for the escaped form.
- */
-function restorePlaceholders(html: string, placeholders: Map<string, string>): string {
-  let result = html;
-  for (const [key, value] of placeholders) {
-    result = result.split(key).join(value);
-  }
-  return result;
 }
 
 /**
  * Create a configured markdown-it instance.
  *
  * html is disabled to prevent user-authored HTML (e.g. <script>, <img onerror>)
- * from being passed through. Safe MDI-generated HTML (ruby, span) is protected
- * via placeholders and restored after rendering.
+ * from being passed through. Safe MDI-generated HTML (ruby, span, br) is emitted
+ * only from the custom MDI inline tokenizer.
  */
 function createMarkdownIt(): MarkdownIt {
-  return new MarkdownIt({
+  const md = new MarkdownIt({
     html: false,
     breaks: true,
   });
+
+  installMdiInlinePlugin(md);
+
+  return md;
 }
 
 /** Options for PDF typesetting CSS generation */
@@ -272,12 +247,7 @@ export function mdiToHtml(
   },
 ): string {
   const md = createMarkdownIt();
-
-  // Pre-process MDI syntax into placeholders, render with markdown-it
-  // (html:false blocks user-authored HTML), then restore safe MDI HTML
-  const { text: preprocessed, placeholders } = preProcessMdiSyntax(markdown);
-  const rawHtml = md.render(preprocessed);
-  const bodyHtml = restorePlaceholders(rawHtml, placeholders);
+  const bodyHtml = md.render(markdown);
 
   if (options?.bodyOnly) {
     return bodyHtml;

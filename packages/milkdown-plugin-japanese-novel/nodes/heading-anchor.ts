@@ -1,5 +1,4 @@
 import type { Node } from "@milkdown/prose/model";
-import type { SerializerState } from "@milkdown/transformer";
 import { Fragment } from "@milkdown/prose/model";
 import { headingAttr } from "@milkdown/preset-commonmark";
 import { $nodeSchema } from "@milkdown/utils";
@@ -19,7 +18,7 @@ const headingIndex = Array(6)
   .fill(0)
   .map((_, i) => i + 1);
 
-function serializeText(state: SerializerState, node: Node) {
+function serializeText(state: { next: (content: Fragment) => void }, node: Node) {
   const lastIsHardBreak = node.childCount >= 1 && node.lastChild?.type.name === "hardbreak";
   if (!lastIsHardBreak) {
     state.next(node.content);

@@ -9,7 +9,7 @@ interface MenuDropdownProps {
   isOpen: boolean;
   onClose: () => void;
   onAction: (action: string) => void;
-  anchorRef: React.RefObject<HTMLElement>;
+  anchorRef: React.RefObject<HTMLElement | null>;
 }
 
 export function MenuDropdown({ section, isOpen, onClose, onAction, anchorRef }: MenuDropdownProps) {

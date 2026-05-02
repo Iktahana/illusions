@@ -52,7 +52,7 @@ interface MilkdownEditorProps {
   onInsertText?: (text: string) => void;
   selectionState: EditorSelectionState;
   isVertical: boolean;
-  scrollContainerRef: RefObject<HTMLDivElement>;
+  scrollContainerRef: RefObject<HTMLDivElement | null>;
   onEditorViewReady?: (view: EditorView) => void;
   lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[]) => void;
