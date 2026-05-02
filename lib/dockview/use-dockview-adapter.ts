@@ -260,6 +260,8 @@ export function useDockviewAdapter({
   const isSyncingRef = useRef(false);
   // Track previous tab state for diffing
   const prevTabsRef = useRef<TabState[]>([]);
+  // Always-current tabs ref for use inside stable closures (e.g. onDidRemovePanel)
+  const currentTabsRef = useRef<TabState[]>([]);
   const prevActiveTabRef = useRef<TabId>("");
 
   // Layout restoration state
@@ -271,6 +273,7 @@ export function useDockviewAdapter({
   const [layoutReadyTick, setLayoutReadyTick] = useState(0);
 
   const { tabs, activeTabId, switchTab, closeTab, cloneTab, updateTab } = tabManager;
+  currentTabsRef.current = tabs;
 
   // -- onReady callback -----------------------------------------------------
 
@@ -335,10 +338,14 @@ export function useDockviewAdapter({
         }
       });
 
-      // Listen for dockview panel close → close tab
+      // Listen for dockview panel close → kill PTY session (if terminal) then close tab
       api.onDidRemovePanel((e) => {
         if (isSyncingRef.current) return;
         isSyncingRef.current = true;
+        const removedTab = currentTabsRef.current.find((t) => t.id === e.id);
+        if (removedTab && isTerminalTab(removedTab) && removedTab.sessionId) {
+          void window.electronAPI?.pty?.kill(removedTab.sessionId);
+        }
         closeTab(e.id);
         isSyncingRef.current = false;
       });

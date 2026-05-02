@@ -161,13 +161,17 @@ export function useTabState(): UseTabStateReturn {
     setActiveTabId(tab.id);
   }, []);
 
+  const terminalCounterRef = useRef(0);
+
   const newTerminalTab = useCallback((pendingId?: string) => {
+    terminalCounterRef.current += 1;
+    const label = `ターミナル ${terminalCounterRef.current}`;
     const tab: TerminalTabState = {
       tabKind: "terminal",
       id: generateTabId(),
       sessionId: "",
       pendingId: pendingId ?? null,
-      label: "ターミナル",
+      label,
       cwd: "",
       shell: "",
       status: "connecting",
