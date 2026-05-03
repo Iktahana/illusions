@@ -32,6 +32,17 @@ export const MDI_KERN_RE = /\[\[kern:([^:\]]+):([^\]]+)\]\]/g;
 /** MDI explicit line break: [[br]] */
 export const MDI_BREAK_RE = /\[\[br\]\]/g;
 
+/** MDI blank paragraph marker (internal representation, written by sanitizeMdiContent) */
+export const MDI_BLANK_RE = /^\[\[blank\]\][ \t]*\r?$/gm;
+
+/**
+ * Strip [[blank]] markers for plain-text analysis consumers (NLP, word count, etc.).
+ * Replaces the marker line with empty string; surrounding blank lines remain.
+ */
+export function stripMdiBlankMarkers(content: string): string {
+  return content.replace(MDI_BLANK_RE, "");
+}
+
 /** Escaped MDI opening brace: \{ */
 export const MDI_ESC_BRACE_RE = /\\(\{)/g;
 
