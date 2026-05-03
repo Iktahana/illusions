@@ -17,6 +17,7 @@ interface UseKeyboardShortcutsParams {
   handleToggleTcy: () => void;
   setShowSettingsModal: (value: boolean) => void;
   setSearchOpenTrigger: Dispatch<SetStateAction<number>>;
+  printDocument?: () => void;
   incrementEditorKey: () => void;
   // Tab operations
   nextTab: () => void;
@@ -55,6 +56,7 @@ export function useKeyboardShortcuts({
   handleToggleTcy,
   setShowSettingsModal,
   setSearchOpenTrigger,
+  printDocument,
   incrementEditorKey,
   nextTab,
   prevTab,
@@ -148,6 +150,7 @@ export function useKeyboardShortcuts({
 
     return {
       "file.save": () => void saveFile(),
+      "file.print": isEditorTabActive ? printDocument : undefined,
       // Editor-only commands: no-op when a terminal or diff tab is active
       "edit.pasteAsPlaintext": isEditorTabActive ? () => void handlePasteAsPlaintext() : undefined,
       "view.compactMode": handleToggleCompactMode,
@@ -188,6 +191,7 @@ export function useKeyboardShortcuts({
     handleToggleTcy,
     setShowSettingsModal,
     setSearchOpenTrigger,
+    printDocument,
     incrementEditorKey,
     nextTab,
     prevTab,

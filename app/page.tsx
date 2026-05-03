@@ -944,6 +944,7 @@ export default function EditorPage() {
     handleToggleTcy,
     setShowSettingsModal,
     setSearchOpenTrigger,
+    printDocument: () => printDocument(),
     incrementEditorKey,
     nextTab,
     prevTab,
