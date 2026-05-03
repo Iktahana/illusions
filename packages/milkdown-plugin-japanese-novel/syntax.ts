@@ -2,7 +2,7 @@
  * 日本語小説向けの記法（ルビ/縦中横など）を扱う Remark プラグイン
  */
 
-import type { Root } from "mdast";
+import type { Paragraph, Root, Text } from "mdast";
 import type { Plugin } from "unified";
 import { visit } from "unist-util-visit";
 
@@ -237,3 +237,17 @@ export const remarkHeadingAnchorPlugin: Plugin<[], Root> = () => {
     // ID は見出しの内容から直接生成される
   };
 };
+
+export function remarkMdiBlankPlugin() {
+  return function transformer(tree: Root): void {
+    visit(tree, "paragraph", (node: Paragraph) => {
+      if (
+        node.children.length === 1 &&
+        node.children[0].type === "text" &&
+        (node.children[0] as Text).value.trim() === "[[blank]]"
+      ) {
+        (node as { children: unknown[] }).children = [];
+      }
+    });
+  };
+}
