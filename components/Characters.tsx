@@ -9,6 +9,7 @@ import { useCharacterExtractionSettings } from "@/contexts/EditorSettingsContext
 import CharacterCard from "./Characters/CharacterCard";
 import NewCharacterForm from "./Characters/NewCharacterForm";
 import type { Character } from "./Characters/types";
+import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
 
 interface CharactersProps {
   content?: string;
@@ -145,7 +146,7 @@ function Characters({ content }: CharactersProps) {
 
     try {
       const nlpClient = getNlpClient();
-      const tokens = await nlpClient.tokenizeParagraph(content);
+      const tokens = await nlpClient.tokenizeParagraph(stripMdiBlankMarkers(content));
 
       const properNouns = new Map<string, boolean>();
 

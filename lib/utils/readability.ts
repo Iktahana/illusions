@@ -21,10 +21,11 @@ import type {
   SyntaxMetrics,
   VocabularyMetrics,
 } from "./readability-types";
+import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
 
 /** 文字数カウント用にMarkdownを整形する */
 export function cleanMarkdown(markdown: string): string {
-  return markdown
+  return stripMdiBlankMarkers(markdown)
     .replace(/```[\s\S]*?```/g, "")
     .replace(/`[^`]+`/g, "")
     .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
