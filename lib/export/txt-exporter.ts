@@ -8,6 +8,9 @@
 
 import { stripMdiInlineSyntax, replaceMdiWithRubyText } from "./mdi-parser";
 
+/** Inline regex for [[blank]] paragraph marker */
+const BLANK_PARA_RE = /^\[\[blank\]\]$/;
+
 /** Sentinel to distinguish scene breaks from paragraph-separation blank lines */
 const SCENE_BREAK_MARKER = "\x00SCENE_BREAK\x00";
 
@@ -58,6 +61,12 @@ function stripMarkdown(text: string): string {
 
     // Headings: # Title → Title
     processed = processed.replace(/^#{1,6}\s+/, "");
+
+    // [[blank]] paragraph marker → forced blank line
+    if (BLANK_PARA_RE.test(processed.trim())) {
+      result.push(SCENE_BREAK_MARKER);
+      continue;
+    }
 
     // Horizontal rules: --- / *** / ___ → empty line
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(processed.trim())) {
