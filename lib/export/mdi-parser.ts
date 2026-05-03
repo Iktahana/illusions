@@ -38,6 +38,7 @@ export const MDI_BLANK_RE = /^\[\[blank\]\][ \t]*\r?$/gm;
 /**
  * Strip [[blank]] markers for plain-text analysis consumers (NLP, word count, etc.).
  * Replaces the marker line with empty string; surrounding blank lines remain.
+ * CRLF note: on CRLF files a preceding \r may remain; normalize line endings before passing if required.
  */
 export function stripMdiBlankMarkers(content: string): string {
   return content.replace(MDI_BLANK_RE, "");
