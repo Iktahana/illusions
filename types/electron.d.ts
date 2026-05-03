@@ -63,6 +63,7 @@ declare global {
     updateKeymapOverrides?: (overrides: KeymapOverrides) => Promise<boolean>;
     showInFileManager?: (dirPath: string) => Promise<boolean>;
     revealInFileManager?: (filePath: string) => Promise<boolean>;
+    openWithDefaultApp?: (filePath: string) => Promise<boolean>;
     openExternal?: (url: string) => Promise<boolean>;
     onMenuShowInFileManager?: (callback: () => void) => (() => void) | void;
     onPasteAsPlaintext?: (callback: () => void) => (() => void) | void;

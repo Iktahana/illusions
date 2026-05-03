@@ -491,6 +491,41 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       }
       openingPathsRef.current.set(vfsPath, preview);
 
+      // Check extension before reading; unsupported types open with system default app
+      const fileExt = (vfsPath.split("/").pop() ?? "").includes(".")
+        ? "." + (vfsPath.split("/").pop() ?? "").split(".").pop()!.toLowerCase()
+        : "";
+      const EDITABLE_EXTENSIONS = [".mdi", ".md", ".txt"];
+      if (
+        fileExt &&
+        !EDITABLE_EXTENSIONS.includes(fileExt) &&
+        window.electronAPI?.openWithDefaultApp
+      ) {
+        // Resolve VFS path to native absolute path
+        const vfs = getVFS();
+        const rootPath = vfs.getRootPath?.() ?? null;
+        const nativePath =
+          vfsPath.startsWith("/") || /^[a-zA-Z]:[/\\]/.test(vfsPath)
+            ? vfsPath
+            : rootPath
+              ? rootPath + "/" + vfsPath
+              : null;
+        if (nativePath) {
+          const opened = await window.electronAPI.openWithDefaultApp(nativePath);
+          if (opened) {
+            notificationManager.info(
+              `${vfsPath.split("/").pop()} をシステムのデフォルトアプリで開きます`,
+            );
+          } else {
+            notificationManager.error(
+              `ファイルを開けませんでした: ${vfsPath.split("/").pop() ?? vfsPath}`,
+            );
+          }
+          openingPathsRef.current.delete(vfsPath);
+          return;
+        }
+      }
+
       try {
         // Read file from VFS
         let fileContent: string;
