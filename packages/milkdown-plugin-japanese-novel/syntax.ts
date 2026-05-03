@@ -238,16 +238,18 @@ export const remarkHeadingAnchorPlugin: Plugin<[], Root> = () => {
   };
 };
 
-export function remarkMdiBlankPlugin() {
-  return function transformer(tree: Root): void {
+export const remarkMdiBlankPlugin: Plugin<[{ enable?: boolean } | undefined], Root> = (opts) => {
+  const enable = opts?.enable !== false;
+  return (tree) => {
+    if (!enable) return;
     visit(tree, "paragraph", (node: Paragraph) => {
       if (
         node.children.length === 1 &&
         node.children[0].type === "text" &&
         (node.children[0] as Text).value.trim() === "[[blank]]"
       ) {
-        (node as { children: unknown[] }).children = [];
+        node.children.length = 0;
       }
     });
   };
-}
+};
