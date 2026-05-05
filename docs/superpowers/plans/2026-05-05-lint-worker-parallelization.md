@@ -232,17 +232,17 @@ RuleRunner | null` — switch to `RuleRunnerLike | null`).
 - [ ] Create `worker/protocol.ts`.
 - [ ] Define `RuleRunnerLike`:
       `ts
-    interface RuleRunnerLike {
-      setConfig(id: string, cfg: LintRuleConfig): void;
-      setActiveGuidelines(g: string[] | null): void;
-      setGuidelineMap(m: Map<string, string | undefined>): void;
-      hasMorphologicalRules(): boolean;
-      hasDocumentRules(): boolean;
-      runBatch(req: RunBatchRequest): Promise<RunBatchResponse>;
-      cancelInFlight(): void;
-      dispose(): void;
-    }
-    `
+interface RuleRunnerLike {
+  setConfig(id: string, cfg: LintRuleConfig): void;
+  setActiveGuidelines(g: string[] | null): void;
+  setGuidelineMap(m: Map<string, string | undefined>): void;
+  hasMorphologicalRules(): boolean;
+  hasDocumentRules(): boolean;
+  runBatch(req: RunBatchRequest): Promise<RunBatchResponse>;
+  cancelInFlight(): void;
+  dispose(): void;
+}
+`
 - [ ] Define the message protocol as **two** discriminated unions: - `WorkerRequest` (main → worker): all variants carry
       `correlationId: number`. Variants: `SET_GUIDELINE_MAP`,
       `SET_ACTIVE_GUIDELINES`, `SET_CONFIG`, `RUN_BATCH` (also carries
@@ -262,7 +262,7 @@ RuleRunner | null` — switch to `RuleRunnerLike | null`).
       register `getAllRules()` + `createJsonDrivenRules()`, call
       `setGuidelineMap(RULE_GUIDELINE_MAP)`.
 - [ ] Wire `self.onmessage = (e) => { ...switch on e.data.type ...
-    self.postMessage({ type: "RESPONSE", correlationId, payload }); }`.
+self.postMessage({ type: "RESPONSE", correlationId, payload }); }`.
       Catch any rule-execution error per request and post
       `{ type: "ERROR", correlationId, error: { name, message } }`
       instead. An uncaught top-level throw becomes
@@ -310,15 +310,15 @@ RuleRunner | null` — switch to `RuleRunnerLike | null`).
 
 - [ ] Replace the synchronous lazy `RuleRunner` construction with:
       `ts
-    const [ruleRunner, setRuleRunner] = useState<RuleRunnerLike | null>(null);
-    useEffect(() => {
-      if (typeof window === "undefined") return;
-      const proxy = new RuleRunnerProxy();
-      proxy.setGuidelineMap(RULE_GUIDELINE_MAP);
-      setRuleRunner(proxy);
-      return () => proxy.dispose();
-    }, []);
-    `
+const [ruleRunner, setRuleRunner] = useState<RuleRunnerLike | null>(null);
+useEffect(() => {
+  if (typeof window === "undefined") return;
+  const proxy = new RuleRunnerProxy();
+  proxy.setGuidelineMap(RULE_GUIDELINE_MAP);
+  setRuleRunner(proxy);
+  return () => proxy.dispose();
+}, []);
+`
 - [ ] Keep the existing `lintingRuleConfigs` sync `useEffect` and the
       `correctionGuidelines` sync `useEffect` — they call sync setters
       that the proxy forwards as fire-and-forget messages.
@@ -330,11 +330,11 @@ RuleRunner | null` — switch to `RuleRunnerLike | null`).
 - [ ] Change `currentRuleRunner` type to `RuleRunnerLike | null`.
 - [ ] Replace L242–273 (per-paragraph loop) with a **single**
       `await runner.runBatch({ paragraphs: uncached, mode: "per-paragraph",
-    version })` call. Result populates `issueCache` for each
+version })` call. Result populates `issueCache` for each
       paragraph text.
 - [ ] Replace L281–322 (document rules block) with a single
       `await runner.runBatch({ paragraphs: allParagraphs, mode: "document",
-    version })` call when `runner.hasDocumentRules()` is true.
+version })` call when `runner.hasDocumentRules()` is true.
       (Preserve token shape: paragraphs carry `tokens?` only when
       `runner.hasMorphologicalRules() && nlp` — current registry has none,
       so this branch is dead in practice but kept for forward-compat.)
