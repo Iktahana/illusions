@@ -304,6 +304,11 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
           // Build the per-paragraph batch (uncached only). The runner
           // will route through the worker for L1 + main thread for L2
           // morph; results merge transparently.
+          //
+          // On a real (non-cancellation) error we log and fall through
+          // rather than `return`-ing — otherwise the failure leaves
+          // `isLinting` stuck because `onIssuesUpdated` is never called
+          // and the "全文を再検査" control sticks in its loading state.
           if (uncachedParagraphs.length > 0) {
             const perParaInputs = uncachedParagraphs.map((p) => ({
               text: p.text,
@@ -317,18 +322,14 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
                 version,
               });
               if (version !== processingVersion) return;
-              // Map index → text so we can populate issueCache by text.
-              const indexToText = new Map<number, string>();
-              for (const p of uncachedParagraphs) indexToText.set(p.index, p.text);
               for (const p of uncachedParagraphs) {
-                const text = p.text;
                 const issues = resp.perParagraph.get(p.index) ?? [];
-                issueCache.set(text, issues);
+                issueCache.set(p.text, issues);
               }
             } catch (err) {
               if (isSilentCancelError(err)) return;
               console.error("[Linting] per-paragraph runBatch failed:", err);
-              return;
+              // Fall through with cached results so isLinting clears.
             }
           }
 
@@ -353,7 +354,7 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
             } catch (err) {
               if (isSilentCancelError(err)) return;
               console.error("[Linting] document runBatch failed:", err);
-              return;
+              // Fall through with documentIssueCache=null so isLinting clears.
             }
           }
 
