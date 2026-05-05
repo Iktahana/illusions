@@ -140,6 +140,10 @@ export class RuleRunnerProxy implements RuleRunnerLike {
     return this.workerHasDocumentRules || this.mainRunner.hasDocumentRules();
   }
 
+  hasMorphologicalDocumentRules(): boolean {
+    return this.mainRunner.hasMorphologicalDocumentRules();
+  }
+
   // ----------------------------------------------------------------
   // RuleRunnerLike — async batch execution
   // ----------------------------------------------------------------

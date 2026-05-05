@@ -259,7 +259,10 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
           const tokensByText = new Map<string, ReadonlyArray<Token>>();
 
           async function tokenizeIfNeeded(text: string): Promise<ReadonlyArray<Token> | undefined> {
-            if (!useTokens) return undefined;
+            // Re-check `nlpErrorFired` on every call so the first failure
+            // in a batch short-circuits the rest — otherwise a long doc
+            // with a broken NLP backend incurs one failed IPC per paragraph.
+            if (!useTokens || nlpErrorFired) return undefined;
             const cached = tokenCache.get(text);
             if (cached) return cached;
             try {
@@ -280,12 +283,16 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
           // Find paragraphs that need fresh per-paragraph rule execution.
           const uncachedParagraphs = targetParagraphs.filter((p) => !issueCache.has(p.text));
 
-          // Pre-tokenize all paragraphs we'll send to the runner. Doing
-          // this in a single pass means tokenCache hits dominate after
-          // the first run.
+          // Per-paragraph morph rules need tokens for uncached paragraphs only
+          // (cached results are reused). Document-level morph rules need tokens
+          // for the full document. Pre-tokenize the union — the second case is
+          // skipped when no document-level morph rule is enabled, avoiding a
+          // full-document NLP sweep on every keystroke.
           const allTokenTexts = new Set<string>();
           for (const p of uncachedParagraphs) allTokenTexts.add(p.text);
-          for (const p of allParagraphs) allTokenTexts.add(p.text);
+          if (currentRuleRunner.hasMorphologicalDocumentRules()) {
+            for (const p of allParagraphs) allTokenTexts.add(p.text);
+          }
           for (const text of allTokenTexts) {
             if (version !== processingVersion) return;
             const tokens = await tokenizeIfNeeded(text);

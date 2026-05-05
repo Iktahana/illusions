@@ -26,6 +26,12 @@ export interface RuleRunnerLike {
   setGuidelineMap(map: Map<string, string | undefined>): void;
   hasMorphologicalRules(): boolean;
   hasDocumentRules(): boolean;
+  /**
+   * True iff at least one enabled document-level rule needs morphological
+   * tokens. Callers use this to decide whether to tokenize cached
+   * paragraphs in addition to the uncached set.
+   */
+  hasMorphologicalDocumentRules(): boolean;
   /** Execute one batched lint pass. */
   runBatch(req: RunBatchRequest): Promise<RunBatchResponse>;
   /**
