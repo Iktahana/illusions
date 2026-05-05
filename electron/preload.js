@@ -264,6 +264,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     getStatus: () => ipcRenderer.invoke("dict:get-status"),
     checkUpdate: () => ipcRenderer.invoke("dict:check-update"),
     download: () => ipcRenderer.invoke("dict:download"),
+    listNounHeadwords: () => ipcRenderer.invoke("dict:list-noun-headwords"),
     onDownloadProgress: (callback) => {
       const handler = (_event, data) => callback(data);
       ipcRenderer.on("dict:download-progress", handler);
@@ -273,6 +274,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
       const handler = (_event, data) => callback(data);
       ipcRenderer.on("dict:update-available", handler);
       return () => ipcRenderer.removeListener("dict:update-available", handler);
+    },
+    onInstalled: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on("dict:installed", handler);
+      return () => ipcRenderer.removeListener("dict:installed", handler);
     },
   },
   pty: {

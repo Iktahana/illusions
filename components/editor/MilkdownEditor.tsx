@@ -196,7 +196,7 @@ export default function MilkdownEditor({
 
   const { get } = useEditor(
     (root) => {
-      const value = initialContentRef.current;
+      const value = initialContentRef.current ?? "";
       let editor = Editor.make()
         .config(nord)
         .config((ctx) => {
