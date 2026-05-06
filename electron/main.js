@@ -24,7 +24,7 @@ if (app.isPackaged) {
   require("module").Module._initPaths();
 }
 
-const { registerNlpHandlers } = require("./ipc/nlp-ipc");
+const { registerNlpHandlers, warmupNlp } = require("./ipc/nlp-ipc");
 const { registerStorageHandlers, getStorageManager } = require("./ipc/storage-ipc");
 const { registerVFSHandlers } = require("./ipc/vfs-ipc");
 const { setupAutoUpdater, checkForUpdates } = require("./auto-updater");
@@ -42,7 +42,8 @@ const { registerPtyHandlers } = require("./ipc/pty-ipc");
 const { killAllSessions, killSessionsForWindow } = require("./ipc/terminal-session-registry");
 const { registerAuthHandlers, handleAuthCallback } = require("./ipc/auth-ipc");
 const { registerEditorHandlers } = require("./ipc/editor-ipc");
-const { registerDictHandlers } = require("./ipc/dict-ipc");
+const { registerDictHandlers, broadcastDictInstalled } = require("./ipc/dict-ipc");
+const { isMeteredConnection } = require("./utils/network-utils");
 const { getDictManager } = require("./dict-manager");
 
 process.on("uncaughtException", (err) => {
@@ -195,6 +196,9 @@ app.whenReady().then(async () => {
 
   // Register IPC handlers
   registerNlpHandlers();
+  // Fire-and-forget kuromoji pre-warm so first tokenize IPC doesn't block.
+  // warmupNlp() catches internally — safe to call without await.
+  warmupNlp();
   registerStorageHandlers();
   registerVFSHandlers();
   registerFileHandlers();
@@ -217,29 +221,47 @@ app.whenReady().then(async () => {
     checkForUpdates(false);
   }, 3000);
 
-  // 辞典データ更新確認（AppState の dictAutoCheckUpdates が true の場合のみ）
+  // 辞典データ更新確認 + 自動ダウンロード（計費ネットワーク時はスキップ）
   setTimeout(async () => {
     try {
       const appState = await getStorageManager().loadAppState();
-      // Default to checking if not explicitly disabled
       const shouldCheck = appState?.dictAutoCheckUpdates !== false;
-      if (shouldCheck) {
-        const mgr = getDictManager();
-        const status = mgr.getStatus();
-        if (status.status === "installed") {
-          const updateInfo = await mgr.checkUpdate().catch(() => null);
-          if (updateInfo?.updateAvailable) {
-            console.log("[Dict] Update available:", updateInfo.latestVersion);
-            // Notify the focused window (if any)
-            const focusedWin = BrowserWindow.getFocusedWindow();
-            if (focusedWin && !focusedWin.isDestroyed()) {
-              focusedWin.webContents.send("dict:update-available", updateInfo);
-            }
-          }
-        }
+      if (!shouldCheck) return;
+
+      const mgr = getDictManager();
+      const status = mgr.getStatus();
+      if (status.status !== "installed") return;
+
+      const updateInfo = await mgr.checkUpdate().catch(() => null);
+      if (!updateInfo?.updateAvailable) return;
+
+      console.log("[Dict] Update available:", updateInfo.latestVersion);
+
+      // Notify all windows of the available update
+      const win =
+        BrowserWindow.getFocusedWindow() ??
+        BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+      win?.webContents.send("dict:update-available", updateInfo);
+
+      // Auto-download only when the user has opted in and is not on a metered connection
+      if (appState?.dictAutoDownload !== true) return;
+
+      if (await isMeteredConnection()) {
+        console.log("[Dict] Skipping auto-download: metered connection detected");
+        return;
       }
+
+      console.log("[Dict] Starting auto-download...");
+      await mgr.download((progress) => {
+        win?.webContents.send("dict:download-progress", { progress });
+      });
+
+      // Mirror the post-install broadcast from dict-ipc.js so that the NLP
+      // builtin dictionary and renderer-side GenjiVocab both refresh.
+      broadcastDictInstalled();
+      console.log("[Dict] Auto-download complete");
     } catch (err) {
-      console.error("[Dict] Auto update check failed:", err);
+      console.error("[Dict] Startup dict check/auto-download failed:", err);
     }
   }, 5000);
 

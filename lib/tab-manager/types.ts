@@ -250,7 +250,12 @@ const VOID_TAG_PATTERN = new RegExp(`<(${VOID_HTML_TAGS.join("|")})(\\s[^>]*)?\\
  */
 export function sanitizeMdiContent(content: string): string {
   let result = content;
-  // Step 1: Convert <br> tags to newlines
+  // Step 1a: standalone <br /> on its own line → [[blank]] (blank paragraph marker)
+  // CRLF-safe: allows optional \r before end-of-line
+  // Note: user-authored standalone <br /> is also treated as blank paragraph
+  //   (same known limitation as other bracket macros)
+  result = result.replace(/^<br\s*\/?>[ \t]*\r?$/gm, "[[blank]]");
+  // Step 1b: remaining inline <br> tags → newline
   result = result.replace(/<br\s*\/?>/gi, "\n");
   // Step 2: Remove properly paired known HTML tags, keeping inner content.
   // Only matched pairs (e.g. <div>...</div>) are stripped; an orphaned

@@ -4,8 +4,22 @@
  * Follows the same pattern as nlp-ipc.js and storage-ipc.js.
  */
 
-const { ipcMain } = require("electron");
+const { ipcMain, BrowserWindow } = require("electron");
 const { getDictManager } = require("../dict-manager");
+
+/**
+ * Broadcast a dictionary install/replace event to all renderer windows
+ * and fire a main-process-internal event so main-side listeners
+ * (e.g. the NLP builtin refresher) can react without importing this module.
+ */
+function broadcastDictInstalled() {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send("dict:installed");
+    }
+  }
+  ipcMain.emit("dict:installed-internal");
+}
 
 function registerDictHandlers() {
   const mgr = getDictManager();
@@ -60,16 +74,31 @@ function registerDictHandlers() {
   // Download and install the latest database, streaming progress back to the renderer
   ipcMain.handle("dict:download", async (event) => {
     try {
-      return await mgr.download((progress) => {
+      const result = await mgr.download((progress) => {
         if (!event.sender.isDestroyed()) {
           event.sender.send("dict:download-progress", { progress });
         }
       });
+      if (result?.success) {
+        broadcastDictInstalled();
+      }
+      return result;
     } catch (err) {
       console.error("[Dict IPC] dict:download failed:", err);
       return { success: false, error: String(err?.message ?? err) };
     }
   });
+
+  // Return just the headword strings for noun entries.
+  // Keeps renderer payload small — no readings or POS.
+  ipcMain.handle("dict:list-noun-headwords", async () => {
+    try {
+      return mgr.listNouns().map((n) => n.entry);
+    } catch (err) {
+      console.error("[Dict IPC] dict:list-noun-headwords failed:", err);
+      return [];
+    }
+  });
 }
 
-module.exports = { registerDictHandlers };
+module.exports = { registerDictHandlers, broadcastDictInstalled };

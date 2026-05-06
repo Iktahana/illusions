@@ -37,30 +37,74 @@ interface CleanResult {
   positionMap: number[];
 }
 
+type MergedDictEntry = UserDictionaryEntry & { __priority: 0 | 1 };
+
 class NlpProcessor {
   private tokenizer: kuromoji.Tokenizer<kuromoji.IpadicFeatures> | null = null;
   private initPromise: Promise<void> | null = null;
   private isReady = false;
   private cache = new NlpCache();
   private userDictionary: UserDictionaryEntry[] = [];
+  private builtinDictionary: UserDictionaryEntry[] = [];
+  private mergedDictionary: MergedDictEntry[] = [];
+  // Index merged entries by first character of `word` for O(1) candidate lookup.
+  // Without this, mergeUserDictionaryTokens scans all ~30k Genji entries per token
+  // and stalls tokenization (and therefore the lint pipeline) noticeably.
+  private mergedByFirstChar: Map<string, MergedDictEntry[]> = new Map();
 
   /**
    * Set user dictionary entries for token merging.
-   * Entries are sorted by word length (longest first) for greedy matching.
+   * User entries take priority over builtin entries on duplicates.
    * Clears cache since tokenization results may change.
    */
   setUserDictionary(entries: UserDictionaryEntry[]): void {
-    this.userDictionary = [...entries].sort((a, b) => b.word.length - a.word.length);
+    this.userDictionary = [...entries];
+    this.rebuildMergedDictionary();
     this.cache.clear();
   }
 
   /**
-   * Merge consecutive tokens that match user dictionary words.
+   * Set builtin dictionary entries (e.g. Genji noun list) for token merging.
+   * User dictionary always wins on duplicates.
+   * Clears cache since tokenization results may change.
+   */
+  setBuiltinDictionary(entries: UserDictionaryEntry[]): void {
+    this.builtinDictionary = [...entries];
+    this.rebuildMergedDictionary();
+    this.cache.clear();
+  }
+
+  /**
+   * Merge user + builtin into a single prioritized list.
+   *
+   * Priority: 0 = user (preferred), 1 = builtin. On duplicate `word`,
+   * the user entry wins. The list is sorted by length descending (for
+   * greedy longest-match) and by priority ascending as a tiebreaker.
+   */
+  private rebuildMergedDictionary(): void {
+    const seen = new Set<string>();
+    const tagged: MergedDictEntry[] = [];
+    for (const e of this.userDictionary) {
+      if (seen.has(e.word)) continue;
+      seen.add(e.word);
+      tagged.push({ ...e, __priority: 0 });
+    }
+    for (const e of this.builtinDictionary) {
+      if (seen.has(e.word)) continue;
+      seen.add(e.word);
+      tagged.push({ ...e, __priority: 1 });
+    }
+    tagged.sort((a, b) => b.word.length - a.word.length || a.__priority - b.__priority);
+    this.mergedDictionary = tagged;
+  }
+
+  /**
+   * Merge consecutive tokens that match a dictionary word (user or builtin).
    * Scans the token stream for sequences whose combined surface forms
-   * match a user-defined word, then replaces them with a single token.
+   * match a dictionary entry, then replaces them with a single token.
    */
   private mergeUserDictionaryTokens(tokens: Token[]): Token[] {
-    if (this.userDictionary.length === 0) return tokens;
+    if (this.mergedDictionary.length === 0) return tokens;
 
     const result: Token[] = [];
     let i = 0;
@@ -68,7 +112,7 @@ class NlpProcessor {
     while (i < tokens.length) {
       let matched = false;
 
-      for (const dictEntry of this.userDictionary) {
+      for (const dictEntry of this.mergedDictionary) {
         const word = dictEntry.word;
         // Try to match starting from token i
         let combined = "";

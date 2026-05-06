@@ -14,6 +14,7 @@
 const { ipcMain } = require("electron");
 const path = require("path");
 const { nlpProcessor } = require("../../lib/nlp-backend/nlp-processor");
+const { getDictManager } = require("../dict-manager");
 
 /**
  * Get default dictionary path for Electron environment.
@@ -36,11 +37,33 @@ function getDefaultDicPath() {
 }
 
 /**
+ * Feed Genji noun headwords into the kuromoji post-processor
+ * so multi-kuromoji-token compounds (e.g. 光君) become single tokens.
+ *
+ * Safe to call before a dictionary is installed — listNouns() returns [].
+ */
+function refreshBuiltinDictionary() {
+  try {
+    const nouns = getDictManager().listNouns();
+    nlpProcessor.setBuiltinDictionary(
+      nouns.map((n) => ({
+        word: n.entry,
+        reading: n.reading,
+        partOfSpeech: Array.isArray(n.pos) && n.pos.length > 0 ? n.pos.join("・") : "名詞",
+      })),
+    );
+  } catch (err) {
+    console.error("[NLP IPC] refreshBuiltinDictionary failed:", err);
+  }
+}
+
+/**
  * Ensure the NLP processor is initialized (auto-init with Electron dict path)
  */
 async function ensureInitialized() {
   if (!nlpProcessor.isInitialized()) {
     await nlpProcessor.init(getDefaultDicPath());
+    refreshBuiltinDictionary();
   }
 }
 
@@ -48,6 +71,14 @@ async function ensureInitialized() {
  * Register all NLP-related IPC handlers
  */
 function registerNlpHandlers() {
+  // Refresh the builtin dictionary whenever the installed DB changes.
+  // broadcastDictInstalled() in dict-ipc.js fires this event.
+  ipcMain.on("dict:installed-internal", () => {
+    if (nlpProcessor.isInitialized()) {
+      refreshBuiltinDictionary();
+    }
+  });
+
   /**
    * Initialize NLP service
    * Handler: nlp:init
@@ -56,6 +87,7 @@ function registerNlpHandlers() {
     try {
       const resolvedPath = getDefaultDicPath();
       await nlpProcessor.init(resolvedPath);
+      refreshBuiltinDictionary();
       return { success: true };
     } catch (error) {
       console.error("[NLP IPC] Init error:", error);
@@ -151,4 +183,19 @@ function registerNlpHandlers() {
   });
 }
 
-module.exports = { registerNlpHandlers };
+/**
+ * Fire-and-forget kuromoji pre-warm. Kicks off initialization immediately
+ * after window creation so the first tokenize IPC call doesn't have to wait.
+ * The async arrow has an explicit try/catch — no unhandled rejection risk.
+ */
+function warmupNlp() {
+  setImmediate(async () => {
+    try {
+      await ensureInitialized();
+    } catch (err) {
+      console.warn("[NLP] Background warmup failed:", err.message);
+    }
+  });
+}
+
+module.exports = { registerNlpHandlers, warmupNlp };

@@ -16,7 +16,9 @@ import type { VFile } from "vfile";
 export function remarkPlainTextPlugin() {
   return function transformer(tree: Root, file: VFile): void {
     // Normalize line endings before splitting
-    const source = String(file.value).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const source = String(file.value ?? "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n");
 
     const lines = source.split("\n");
 

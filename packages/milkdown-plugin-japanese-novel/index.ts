@@ -14,6 +14,7 @@ import { mdibreakSchema } from "./nodes/mdibreak";
 import { headingAnchorSchema } from "./nodes/heading-anchor";
 import {
   remarkHeadingAnchorPlugin,
+  remarkMdiBlankPlugin,
   remarkRubyPlugin,
   remarkTcyPlugin,
   remarkNoBreakPlugin,
@@ -75,6 +76,11 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     () => remarkMdiBreakPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
     { enable: enableMdiBreak },
   );
+  const remarkMdiBlank = $remark(
+    "japaneseNovelMdiBlank",
+    () => remarkMdiBlankPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
+    { enable: enableMdiBreak },
+  );
   const remarkHeadingAnchor = $remark(
     "japaneseNovelHeadingAnchor",
     () => remarkHeadingAnchorPlugin,
@@ -107,7 +113,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
   const plugins: MilkdownPlugin[] = [
     ...(enableRuby ? [remarkRuby, rubySchema] : []),
     ...(enableTcy ? [remarkTcy, tcySchema] : []),
-    ...(enableMdiBreak ? [remarkMdiBreak, mdibreakSchema] : []),
+    ...(enableMdiBreak ? [remarkMdiBreak, remarkMdiBlank, mdibreakSchema] : []),
     ...(enableNoBreak ? [remarkNoBreak, nobreakSchema] : []),
     ...(enableKern ? [remarkKern, kernSchema] : []),
     remarkHeadingAnchor,

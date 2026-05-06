@@ -122,6 +122,7 @@ export interface AppState {
   // 校正モード設定
   correctionMode?: CorrectionModeId;
   correctionGuidelines?: GuidelineId[];
+  genjiGuidelineMigrated?: boolean;
 
   // 省電力モード
   powerSaveMode?: boolean;

@@ -1,10 +1,13 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Search, X, ChevronUp, ChevronDown, List } from "lucide-react";
 import { EditorView, Decoration } from "@milkdown/prose/view";
 import { TextSelection } from "@milkdown/prose/state";
 import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
+
+const DIALOG_WIDTH = 320; // w-80
 
 interface SearchDialogProps {
   editorView: EditorView | null;
@@ -12,6 +15,10 @@ interface SearchDialogProps {
   onClose: () => void;
   onShowAllResults?: (matches: SearchMatch[], searchTerm: string) => void;
   initialSearchTerm?: string;
+  /** エディタ領域の ref。ダイアログ初期位置計算に使用する。
+   *  dockview の CSS transform が position:fixed の containing block を破壊するため、
+   *  portal + getBoundingClientRect() でエディタ基準の座標を求める。 */
+  anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 export interface SearchMatch {
@@ -25,6 +32,7 @@ export default function SearchDialog({
   onClose,
   onShowAllResults,
   initialSearchTerm,
+  anchorRef,
 }: SearchDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [matches, setMatches] = useState<SearchMatch[]>([]);
@@ -33,7 +41,7 @@ export default function SearchDialog({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // Drag state (session-only, resets on refresh)
+  // Drag state (session-only, resets on close)
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
   const isDragging = useRef(false);
   const dragStart = useRef<{ mouseX: number; mouseY: number; elX: number; elY: number }>({
@@ -42,6 +50,9 @@ export default function SearchDialog({
     elX: 0,
     elY: 0,
   });
+
+  // アンカー基準の初期位置（エディタ領域の右上）
+  const [anchorPos, setAnchorPos] = useState<{ top: number; right: number } | null>(null);
 
   const handleDragMouseDown = useCallback((e: React.MouseEvent) => {
     // Don't initiate drag from interactive elements
@@ -77,11 +88,36 @@ export default function SearchDialog({
     }
   }, [initialSearchTerm]);
 
-  // ダイアログ表示時に検索入力へフォーカスする
+  // ダイアログ表示時に検索入力へフォーカスする（focus と position は独立した関心事なので別 effect）
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
       searchInputRef.current.focus();
       searchInputRef.current.select();
+    }
+  }, [isOpen]);
+
+  // アンカー要素の getBoundingClientRect() からダイアログ初期位置を計算する。
+  // portal により document.body 直下に render されるため座標は viewport 基準になる。
+  // close 時は dragOffset と anchorPos をリセットし、次回 open で再計算する。
+  useEffect(() => {
+    if (isOpen && anchorRef?.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      const rawRight = window.innerWidth - rect.right + 16;
+      const clampedRight = Math.max(16, Math.min(window.innerWidth - DIALOG_WIDTH - 16, rawRight));
+      setAnchorPos({ top: rect.top + 8, right: clampedRight });
+    }
+    if (!isOpen) {
+      setAnchorPos(null);
+      setDragOffset(null);
+    }
+  }, [isOpen, anchorRef]);
+
+  // close 時にドラッグ中フラグを落とす。
+  // isDragging.current = false により mousemove ハンドラが early-return し
+  // stale なポインタイベントが position 更新を起こさなくなる。
+  useEffect(() => {
+    if (!isOpen) {
+      isDragging.current = false;
     }
   }, [isOpen]);
 
@@ -178,15 +214,17 @@ export default function SearchDialog({
 
   if (!isOpen) return null;
 
-  return (
+  const posStyle = dragOffset
+    ? { left: dragOffset.x, top: dragOffset.y, right: "auto" }
+    : anchorPos
+      ? { top: anchorPos.top, right: anchorPos.right }
+      : { top: 64, right: 16 }; // anchorRef なし時のフォールバック
+
+  return createPortal(
     <div
       ref={dialogRef}
-      className="fixed z-50 bg-background-elevated/80 backdrop-blur-xl rounded-lg shadow-lg border border-border/50 p-4 w-80 cursor-grab active:cursor-grabbing"
-      style={
-        dragOffset
-          ? { left: dragOffset.x, top: dragOffset.y, right: "auto" }
-          : { top: 64, right: 16 }
-      }
+      className="fixed z-[9999] bg-background-elevated/80 backdrop-blur-xl rounded-lg shadow-lg border border-border/50 p-4 w-80 cursor-grab active:cursor-grabbing"
+      style={posStyle}
       onKeyDown={handleKeyDown}
       onMouseDown={handleDragMouseDown}
     >
@@ -265,6 +303,7 @@ export default function SearchDialog({
       <div className="mt-3 pt-2 border-t border-border text-xs text-foreground-tertiary">
         <div>Enter: 次へ / Shift+Enter: 前へ / Esc: 閉じる</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

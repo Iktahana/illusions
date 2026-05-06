@@ -8,6 +8,8 @@ import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
 import { getAllRules, createJsonDrivenRules } from "@/lib/linting/rule-registry";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import { notificationManager } from "@/lib/services/notification-manager";
+import { genjiVocab } from "@/lib/dict/genji-vocab";
+import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
 export interface UseLintingResult {
   ruleRunner: RuleRunner;
@@ -136,6 +138,32 @@ export function useLinting(
         setIsLinting(false);
       });
   }, [editorViewInstance, lintingEnabled]);
+
+  // Bootstrap the Genji noun vocabulary (renderer-side) — Electron only.
+  // Fires `refreshLinting` whenever vocab becomes ready or gets reloaded
+  // after a dictionary install so the genji-unknown-noun rule picks it up.
+  useEffect(() => {
+    if (!isElectronRenderer()) return;
+
+    genjiVocab.initialize().catch((err) => {
+      console.error("[useLinting] genjiVocab.initialize failed:", err);
+    });
+
+    const unsubscribe = genjiVocab.subscribe(() => {
+      refreshLinting();
+    });
+
+    const offInstalled = window.electronAPI?.dict?.onInstalled?.(() => {
+      genjiVocab.reload().catch((err) => {
+        console.error("[useLinting] genjiVocab.reload failed:", err);
+      });
+    });
+
+    return () => {
+      unsubscribe();
+      offInstalled?.();
+    };
+  }, [refreshLinting]);
 
   return {
     ruleRunner,
