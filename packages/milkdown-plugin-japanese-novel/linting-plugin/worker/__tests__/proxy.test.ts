@@ -227,6 +227,26 @@ describe("RuleRunnerProxy", () => {
     proxy.dispose();
   });
 
+  it("uncorrelated ERROR before READY rejects readyPromise so subsequent runBatch fails fast instead of hanging", async () => {
+    const proxy = makeProxy();
+    // Do NOT emit READY. Send an uncorrelated ERROR (worker startup
+    // failed before posting READY).
+    fakeWorker.emit({
+      type: "ERROR",
+      error: { name: "WorkerError", message: "init failed" },
+    });
+
+    // The proxy is now in a poisoned state. Any new runBatch must
+    // reject promptly via the rejected readyPromise rather than hang.
+    const next = await proxy
+      .runBatch({ paragraphs: [], mode: "per-paragraph", version: 1 })
+      .catch((e) => e);
+    expect(next).toBeInstanceOf(Error);
+    expect((next as Error).message).toBe("init failed");
+
+    proxy.dispose();
+  });
+
   it("propagates worker ERROR with correlationId to the matching pending request", async () => {
     const proxy = makeProxy();
     emitReady();

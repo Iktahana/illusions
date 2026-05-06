@@ -320,6 +320,13 @@ export class RuleRunnerProxy implements RuleRunnerLike {
             entry.reject(err);
           }
           this.pending.clear();
+          // If the worker errored before posting READY, reject the
+          // readyPromise too. Otherwise any future `runBatch()` call
+          // would hang forever awaiting a worker that is never coming
+          // up.
+          if (!this.ready) {
+            this.rejectReady(err);
+          }
         }
         return;
       }
