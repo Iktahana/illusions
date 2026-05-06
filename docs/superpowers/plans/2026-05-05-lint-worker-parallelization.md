@@ -232,24 +232,31 @@ RuleRunner | null` — switch to `RuleRunnerLike | null`).
 
 - [ ] Create `worker/protocol.ts`.
 - [ ] Define `RuleRunnerLike`:
-      `ts
-interface RuleRunnerLike {
-  setConfig(id: string, cfg: LintRuleConfig): void;
-  setActiveGuidelines(g: string[] | null): void;
-  setGuidelineMap(m: Map<string, string | undefined>): void;
-  hasMorphologicalRules(): boolean;
-  hasDocumentRules(): boolean;
-  runBatch(req: RunBatchRequest): Promise<RunBatchResponse>;
-  cancelInFlight(): void;
-  dispose(): void;
-}
-`
-- [ ] Define the message protocol as **two** discriminated unions: - `WorkerRequest` (main → worker): all variants carry
-      `correlationId: number`. Variants: `SET_GUIDELINE_MAP`,
-      `SET_ACTIVE_GUIDELINES`, `SET_CONFIG`, `RUN_BATCH` (also carries
-      `version: number`). - `WorkerEvent` (worker → main) is a tagged union of: - `{ type: "READY" }` — out-of-band, no `correlationId`. - `{ type: "RESPONSE", correlationId, payload }` — reply to a
+
+  ```ts
+  interface RuleRunnerLike {
+    setConfig(id: string, cfg: LintRuleConfig): void;
+    setActiveGuidelines(g: string[] | null): void;
+    setGuidelineMap(m: Map<string, string | undefined>): void;
+    hasMorphologicalRules(): boolean;
+    hasDocumentRules(): boolean;
+    runBatch(req: RunBatchRequest): Promise<RunBatchResponse>;
+    cancelInFlight(): void;
+    dispose(): void;
+  }
+  ```
+
+- [ ] Define the message protocol as **two** discriminated unions:
+  - `WorkerRequest` (main → worker): all variants carry
+    `correlationId: number`. Variants: `SET_GUIDELINE_MAP`,
+    `SET_ACTIVE_GUIDELINES`, `SET_CONFIG`, `RUN_BATCH` (also carries
+    `version: number`).
+  - `WorkerEvent` (worker → main) is a tagged union of:
+    - `{ type: "READY" }` — out-of-band, no `correlationId`.
+    - `{ type: "RESPONSE", correlationId, payload }` — reply to a
       specific request. `RUN_BATCH` responses carry `version` so the
-      proxy can apply stale-by-version filtering before resolving. - `{ type: "ERROR", correlationId?, error: { name, message } }`
+      proxy can apply stale-by-version filtering before resolving.
+    - `{ type: "ERROR", correlationId?, error: { name, message } }`
       — `correlationId` is optional because uncaught worker errors
       may not be associated with a specific request.
 - [ ] Define `WorkerDisposedError extends Error` and
@@ -280,13 +287,16 @@ self.postMessage({ type: "RESPONSE", correlationId, payload }); }`.
       Capability flags `hasMorphologicalRules()` / `hasDocumentRules()`
       read from this metadata cache (no async needed).
 - [ ] **Readiness**: hold a private `readyPromise: Promise<void>` that
-      resolves when the worker posts `{ type: "READY" }`. Until READY: - `setConfig` / `setActiveGuidelines` / `setGuidelineMap` calls
-      enqueue messages in a private buffer; the buffer flushes (in
-      FIFO order) immediately after `readyPromise` resolves. - `runBatch` calls `await readyPromise` first, then post. - If `dispose()` is called before READY: terminate the worker,
-      clear the buffer, reject any pending `runBatch` promises with
-      `WorkerDisposedError`. The `readyPromise` itself rejects with
-      `WorkerDisposedError` so any concurrent `runBatch` awaiting it
-      unwinds cleanly.
+      resolves when the worker posts `{ type: "READY" }`. Until READY:
+  - `setConfig` / `setActiveGuidelines` / `setGuidelineMap` calls
+    enqueue messages in a private buffer; the buffer flushes (in
+    FIFO order) immediately after `readyPromise` resolves.
+  - `runBatch` calls `await readyPromise` first, then post.
+  - If `dispose()` is called before READY: terminate the worker,
+    clear the buffer, reject any pending `runBatch` promises with
+    `WorkerDisposedError`. The `readyPromise` itself rejects with
+    `WorkerDisposedError` so any concurrent `runBatch` awaiting it
+    unwinds cleanly.
 - [ ] `runBatch`: increments correlation ID, captures the current
       `version` from the request, posts the message, returns a Promise
       tracked in a `pendingRequests` map.
@@ -312,16 +322,18 @@ self.postMessage({ type: "RESPONSE", correlationId, payload }); }`.
 ### Task 4 — Wire useLinting
 
 - [ ] Replace the synchronous lazy `RuleRunner` construction with:
-      `ts
-const [ruleRunner, setRuleRunner] = useState<RuleRunnerLike | null>(null);
-useEffect(() => {
-  if (typeof window === "undefined") return;
-  const proxy = new RuleRunnerProxy();
-  proxy.setGuidelineMap(RULE_GUIDELINE_MAP);
-  setRuleRunner(proxy);
-  return () => proxy.dispose();
-}, []);
-`
+
+  ```ts
+  const [ruleRunner, setRuleRunner] = useState<RuleRunnerLike | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const proxy = new RuleRunnerProxy();
+    proxy.setGuidelineMap(RULE_GUIDELINE_MAP);
+    setRuleRunner(proxy);
+    return () => proxy.dispose();
+  }, []);
+  ```
+
 - [ ] Keep the existing `lintingRuleConfigs` sync `useEffect` and the
       `correctionGuidelines` sync `useEffect` — they call sync setters
       that the proxy forwards as fire-and-forget messages.

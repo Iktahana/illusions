@@ -36,9 +36,11 @@ export function useLinting(
     { enabled: boolean; severity: Severity; skipDialogue?: boolean }
   >,
   editorViewInstance: EditorView | null,
-  powerSaveMode: boolean = false,
+  // Reserved for future throttling / mode-aware logic; kept in the
+  // signature so callers don't have to be reworked when wired up.
+  _powerSaveMode: boolean = false,
   correctionGuidelines?: GuidelineId[],
-  correctionMode?: CorrectionModeId,
+  _correctionMode?: CorrectionModeId,
 ): UseLintingResult {
   const [ruleRunner, setRuleRunner] = useState<RuleRunnerLike | null>(null);
   const [lintIssues, setLintIssues] = useState<LintIssue[]>([]);
