@@ -55,8 +55,12 @@ export function useLinting(
     proxy.setGuidelineMap(RULE_GUIDELINE_MAP);
     setRuleRunner(proxy);
     return () => {
+      // Don't `setRuleRunner(null)` here — StrictMode's mount → cleanup
+      // → mount cycle would briefly nullify the runner between the two
+      // mounts, causing dependent effects to re-run with `null` for no
+      // reason. On real unmount the component is going away, so the
+      // state write is wasted either way.
       proxy.dispose();
-      setRuleRunner(null);
     };
   }, []);
 
