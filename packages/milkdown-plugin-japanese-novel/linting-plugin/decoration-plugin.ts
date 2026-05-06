@@ -186,6 +186,11 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
             issueCache.clear();
             tokenCache.clear();
             documentIssueCache = null;
+            // Bump the version so any in-flight async tokenization /
+            // runBatch awaits bail at their next `version !==
+            // processingVersion` check, preventing decorations from
+            // being repopulated after the user disabled linting.
+            processingVersion++;
           }
           const updated: LintingPluginState = {
             decorations: pluginState.decorations,

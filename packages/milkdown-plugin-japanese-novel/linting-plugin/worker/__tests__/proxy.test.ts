@@ -196,6 +196,37 @@ describe("RuleRunnerProxy", () => {
     expect(fakeWorker.terminated).toBe(true);
   });
 
+  it("cancelInFlight while runBatch is awaiting READY rejects the batch and never posts to the worker", async () => {
+    const proxy = makeProxy();
+    // Do NOT emit READY — runBatch should park its pending entry while
+    // awaiting the readyPromise.
+    const promise = proxy
+      .runBatch({
+        paragraphs: [{ text: "x", index: 0 }],
+        mode: "per-paragraph",
+        version: 1,
+      })
+      .catch((e) => e);
+
+    // Cancel before the worker is ready. The pending entry must already
+    // exist — otherwise cancelInFlight has nothing to reject.
+    proxy.cancelInFlight();
+
+    // Now flush READY. The proxy must NOT post the cancelled batch to
+    // the worker.
+    emitReady();
+    // Yield once so any post-await microtasks settle.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const result = await promise;
+    expect(result).toBeInstanceOf(WorkerStaleError);
+    const sentBatches = fakeWorker.received.filter((m) => m.type === "RUN_BATCH");
+    expect(sentBatches).toHaveLength(0);
+
+    proxy.dispose();
+  });
+
   it("propagates worker ERROR with correlationId to the matching pending request", async () => {
     const proxy = makeProxy();
     emitReady();

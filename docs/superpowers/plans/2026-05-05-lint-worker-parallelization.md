@@ -170,8 +170,10 @@ useLinting / decoration-plugin
   — typed request/response message contracts; `RuleRunnerLike` interface.
 - `packages/milkdown-plugin-japanese-novel/linting-plugin/worker/linting.worker.ts`
   — Worker entry point. Constructs a private `RuleRunner`, registers
-  `getAllRules()` + `createJsonDrivenRules()`, calls
-  `setGuidelineMap(RULE_GUIDELINE_MAP)`. Posts a `READY` message on init.
+  `createJsonDrivenRules()` only (handwritten morphological rules stay on
+  the main thread because their `genjiVocab` dependency uses Electron
+  IPC), and calls `setGuidelineMap(RULE_GUIDELINE_MAP)`. Posts a `READY`
+  message on init.
 - `packages/milkdown-plugin-japanese-novel/linting-plugin/worker/rule-runner-proxy.ts`
   — main-thread `RuleRunnerLike` implementation. Owns the `Worker` instance,
   correlation IDs, pending-request map, capability flags, version-aware
@@ -203,8 +205,9 @@ uncached, mode: "per-paragraph", version })` call and merge results into
   `issueCache`. Replace the document-rules block (L281–322) with the same
   call carrying `mode: "both"` (or a separate call with `mode: "document"`)
   to halve the round-trips. Wrap each `await` in a `try/catch` that drops
-  `WorkerDisposedError` silently and surfaces other errors via
-  `notificationManager.warning(...)`.
+  `WorkerDisposedError` / `WorkerStaleError` silently and logs other
+  errors via `console.error` (decorations are simply not updated for
+  this pass; no user-facing notification fires).
 - `components/EditorLayout.tsx` — `mainArea.ruleRunner` type changes from
   `RuleRunner` to `RuleRunnerLike | null`; the `<Editor>` prop forwarding
   is null-safe already (`Editor.tsx` declares `lintingRuleRunner?:
@@ -214,8 +217,6 @@ RuleRunner | null` — switch to `RuleRunnerLike | null`).
 - `components/editor/MilkdownEditor.tsx` — same prop type update; the
   forwarding into `updateLintingSettings({ ruleRunner: lintingRuleRunner })`
   is unchanged in shape.
-- `app/page.tsx` — destructure consumes `ruleRunner: RuleRunnerLike | null`;
-  type widens automatically.
 
 ### Reused (do not modify)
 
@@ -259,8 +260,10 @@ interface RuleRunnerLike {
 ### Task 2 — Worker entry point
 
 - [ ] Create `worker/linting.worker.ts`. Top-level: build a `RuleRunner`,
-      register `getAllRules()` + `createJsonDrivenRules()`, call
-      `setGuidelineMap(RULE_GUIDELINE_MAP)`.
+      register `createJsonDrivenRules()` only — handwritten morphological
+      rules deliberately stay on the main thread (`genjiVocab` uses
+      Electron IPC), so `getAllRules()` is **not** called here. Then
+      call `setGuidelineMap(RULE_GUIDELINE_MAP)`.
 - [ ] Wire `self.onmessage = (e) => { ...switch on e.data.type ...
 self.postMessage({ type: "RESPONSE", correlationId, payload }); }`.
       Catch any rule-execution error per request and post

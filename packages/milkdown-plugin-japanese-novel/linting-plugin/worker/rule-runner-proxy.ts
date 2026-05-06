@@ -175,21 +175,11 @@ export class RuleRunnerProxy implements RuleRunnerLike {
       return { perParagraph: mainPerParagraph, document: mainDocument };
     }
 
-    // Wait for worker startup if it hasn't readied yet. If `dispose()`
-    // beats READY, this rejects with `WorkerDisposedError`.
-    if (!this.ready) {
-      try {
-        await this.readyPromise;
-      } catch (err) {
-        if (err instanceof WorkerDisposedError) throw err;
-        throw err;
-      }
-    }
-
-    if (this.disposed) {
-      throw new WorkerDisposedError();
-    }
-
+    // Register the pending entry BEFORE awaiting `readyPromise`, so
+    // `cancelInFlight()` and the stale-by-version sweep can see batches
+    // that are still waiting on worker startup. Without this, a toggle
+    // before READY would leave the batch unreachable and it would fire
+    // anyway once the worker came up.
     const correlationId = this.nextId();
     const workerResponse = new Promise<RunBatchResponse>((resolve, reject) => {
       this.pending.set(correlationId, {
@@ -200,6 +190,34 @@ export class RuleRunnerProxy implements RuleRunnerLike {
         mainDocument,
       });
     });
+
+    // Wait for worker startup if it hasn't readied yet. If `dispose()`
+    // beats READY, this rejects with `WorkerDisposedError`.
+    if (!this.ready) {
+      try {
+        await this.readyPromise;
+      } catch (err) {
+        // If we were already cancelled while waiting, drop silently —
+        // the rejection has already been handed to the caller via the
+        // pending entry.
+        if (!this.pending.has(correlationId)) return workerResponse;
+        this.pending.delete(correlationId);
+        if (err instanceof WorkerDisposedError) throw err;
+        throw err;
+      }
+    }
+
+    // The pending entry may have been cancelled (cancelInFlight or
+    // stale-version sweep) during the await. If so, the promise has
+    // already rejected — just return it.
+    if (!this.pending.has(correlationId)) {
+      return workerResponse;
+    }
+
+    if (this.disposed) {
+      this.pending.delete(correlationId);
+      throw new WorkerDisposedError();
+    }
 
     this.send({
       type: "RUN_BATCH",
@@ -384,7 +402,16 @@ function mergeIssueMaps(
   const out = new Map<number, LintIssue[]>(a);
   for (const [idx, issues] of b) {
     const existing = out.get(idx);
-    out.set(idx, existing ? [...existing, ...issues] : issues);
+    if (existing) {
+      // Preserve the global-by-`from` ordering that callers (corrections
+      // list, navigation) depend on when both worker L1 and main-thread
+      // morph rules contribute issues to the same paragraph.
+      const merged = [...existing, ...issues];
+      merged.sort((x, y) => x.from - y.from);
+      out.set(idx, merged);
+    } else {
+      out.set(idx, issues);
+    }
   }
   return out;
 }
