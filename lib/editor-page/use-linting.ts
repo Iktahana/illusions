@@ -107,10 +107,14 @@ export function useLinting(
     }
   }, [ruleRunner, correctionGuidelines, editorViewInstance, lintingEnabled]);
 
-  // Clear issues when linting is disabled
+  // Clear issues + spinner when linting is disabled. `isLinting` must be
+  // reset here because `handleLintIssuesUpdated` short-circuits while
+  // disabled, so a refresh that was in flight when the user toggled
+  // linting off would otherwise leave the loading state stuck on.
   useEffect(() => {
     if (!lintingEnabled) {
       setLintIssues([]);
+      setIsLinting(false);
     }
   }, [lintingEnabled]);
 

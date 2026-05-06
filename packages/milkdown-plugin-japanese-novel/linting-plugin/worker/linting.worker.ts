@@ -38,9 +38,12 @@ function post(msg: WorkerEvent): void {
 }
 
 function serialize(map: Map<number, LintIssue[]>): SerializedIssueMap {
+  // Drop empty entries — the main thread treats missing keys as "no
+  // issues", and skipping them keeps the structured-clone payload small
+  // for long documents.
   const entries: SerializedIssueMap = [];
   map.forEach((issues, idx) => {
-    entries.push([idx, issues]);
+    if (issues.length > 0) entries.push([idx, issues]);
   });
   return entries;
 }
@@ -66,7 +69,8 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
 
         if (runPer) {
           for (const p of paragraphs) {
-            perParagraph.set(p.index, runner.runAll(p.text));
+            const issues = runner.runAll(p.text);
+            if (issues.length > 0) perParagraph.set(p.index, issues);
           }
         }
         const documentMap: Map<number, LintIssue[]> =
