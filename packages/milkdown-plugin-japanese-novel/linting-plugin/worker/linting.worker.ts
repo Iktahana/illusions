@@ -74,9 +74,7 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
           }
         }
         const documentMap: Map<number, LintIssue[]> =
-          runDoc && runner.hasDocumentRules()
-            ? runner.runDocument(paragraphs.map((p) => ({ text: p.text, index: p.index })))
-            : new Map();
+          runDoc && runner.hasDocumentRules() ? runner.runDocument(paragraphs) : new Map();
 
         post({
           type: "RESPONSE",
