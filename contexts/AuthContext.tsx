@@ -185,6 +185,12 @@ function isElectronAuthErrorPermanent(err: unknown): boolean {
   return false;
 }
 
+// Guards against repeat refresh attempts within the same renderer session
+// after a permanent failure. Module-scoped so it survives React StrictMode
+// remounts and any duplicate AuthProvider lifecycles in dev.
+// Reset on successful login (OAuth callback) and on logout.
+let refreshPermanentlyFailedSession = false;
+
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
@@ -215,6 +221,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshTimerRef.current = setTimeout(async () => {
         const api = window.electronAPI;
         if (!api?.auth) return;
+        if (refreshPermanentlyFailedSession) return;
 
         try {
           const tokenResponse = await api.auth.refreshToken(refreshToken);
@@ -238,6 +245,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (err) {
           if (isElectronAuthErrorPermanent(err)) {
             // Permanent failure (4xx / invalid_grant): token is invalid — log out
+            refreshPermanentlyFailedSession = true;
             setUser(null);
             await clearTokens();
           } else {
@@ -299,6 +307,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setIsLoading(false);
               return;
             }
+            if (refreshPermanentlyFailedSession) {
+              await clearTokens();
+              setIsLoading(false);
+              return;
+            }
 
             try {
               const tokenResponse = await api.auth.refreshToken(refreshToken);
@@ -321,6 +334,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } catch (err) {
               // Only clear tokens on permanent failures (401/403); ignore transient errors on startup
               if (isElectronAuthErrorPermanent(err)) {
+                refreshPermanentlyFailedSession = true;
                 await clearTokens();
               }
             }
@@ -341,6 +355,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               });
               scheduleElectronRefresh(expiresAt, refreshToken);
             } catch {
+              if (refreshPermanentlyFailedSession) {
+                await clearTokens();
+                setIsLoading(false);
+                return;
+              }
               try {
                 const tokenResponse = await api.auth.refreshToken(refreshToken);
                 const newExpiresAt = Date.now() + tokenResponse.expires_in * 1000;
@@ -362,6 +381,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               } catch (err) {
                 // Only clear tokens on permanent failures (401/403); ignore transient errors on startup
                 if (isElectronAuthErrorPermanent(err)) {
+                  refreshPermanentlyFailedSession = true;
                   await clearTokens();
                 }
               }
@@ -437,6 +457,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           plan: userInfo.plan,
         });
 
+        // Fresh tokens — clear the permanent-failure guard so future
+        // refreshes can run.
+        refreshPermanentlyFailedSession = false;
         scheduleElectronRefresh(expiresAt, tokenResponse.refresh_token);
       } catch (err) {
         console.error("[auth] Token exchange failed:", err);
@@ -462,6 +485,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // --- Logout ---
   const logout = useCallback(async () => {
     clearRefreshTimer();
+    refreshPermanentlyFailedSession = false;
 
     if (isElectron.current) {
       const api = window.electronAPI;
