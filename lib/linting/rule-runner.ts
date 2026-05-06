@@ -199,6 +199,18 @@ export class RuleRunner {
     return false;
   }
 
+  /** Check if any enabled rule is a document-level morphological rule. */
+  hasMorphologicalDocumentRules(): boolean {
+    for (const rule of this.rules.values()) {
+      const config = this.configs.get(rule.id);
+      if (!config?.enabled) continue;
+      if (isMorphologicalDocumentLintRule(rule)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Returns all rules for the given engine type.
    * Engine field acts as implementation metadata, not architectural boundary.
