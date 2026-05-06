@@ -247,6 +247,43 @@ describe("RuleRunnerProxy", () => {
     proxy.dispose();
   });
 
+  it("uncorrelated ERROR after READY poisons the proxy so subsequent runBatch fails fast", async () => {
+    const proxy = makeProxy();
+    emitReady();
+
+    fakeWorker.emit({
+      type: "ERROR",
+      error: { name: "WorkerError", message: "post-ready boom" },
+    });
+
+    const next = await proxy
+      .runBatch({ paragraphs: [], mode: "per-paragraph", version: 1 })
+      .catch((e) => e);
+    expect(next).toBeInstanceOf(Error);
+    expect((next as Error).message).toBe("post-ready boom");
+    // poison() terminates the worker.
+    expect(fakeWorker.terminated).toBe(true);
+
+    proxy.dispose();
+  });
+
+  it("worker.onerror poisons the proxy so subsequent runBatch fails fast", async () => {
+    const proxy = makeProxy();
+    emitReady();
+
+    // Simulate the underlying Worker emitting an `error` event.
+    fakeWorker.onerror?.(new ErrorEvent("error", { message: "worker crashed" }));
+
+    const next = await proxy
+      .runBatch({ paragraphs: [], mode: "per-paragraph", version: 1 })
+      .catch((e) => e);
+    expect(next).toBeInstanceOf(Error);
+    expect((next as Error).message).toBe("worker crashed");
+    expect(fakeWorker.terminated).toBe(true);
+
+    proxy.dispose();
+  });
+
   it("propagates worker ERROR with correlationId to the matching pending request", async () => {
     const proxy = makeProxy();
     emitReady();

@@ -62,6 +62,14 @@ export class RuleRunnerProxy implements RuleRunnerLike {
 
   private ready = false;
   private disposed = false;
+  /**
+   * Non-null once the worker has hit a fatal failure (uncorrelated
+   * ERROR, `onerror`, `messageerror`). Set on either the pre-READY or
+   * post-READY path. Once set, the proxy is poisoned: `runBatch` and
+   * other API calls fail fast with this error instead of attempting
+   * to talk to a dead worker.
+   */
+  private fatalError: Error | null = null;
 
   /** Promise that resolves once the worker has posted READY. */
   readonly readyPromise: Promise<void>;
@@ -95,6 +103,11 @@ export class RuleRunnerProxy implements RuleRunnerLike {
       this.resolveReady = resolve;
       this.rejectReady = reject;
     });
+    // Absorb the rejection so a fatal startup failure doesn't surface
+    // as an unhandled rejection when nothing is awaiting `readyPromise`
+    // yet. Real consumers inside `runBatch` chain their own `await`,
+    // which gets its own rejection.
+    this.readyPromise.catch(() => {});
   }
 
   // ----------------------------------------------------------------
@@ -149,6 +162,9 @@ export class RuleRunnerProxy implements RuleRunnerLike {
   // ----------------------------------------------------------------
 
   async runBatch(req: RunBatchRequest): Promise<RunBatchResponse> {
+    if (this.fatalError) {
+      throw this.fatalError;
+    }
     if (this.disposed) {
       throw new WorkerDisposedError();
     }
@@ -314,19 +330,11 @@ export class RuleRunnerProxy implements RuleRunnerLike {
             entry.reject(err);
           }
         } else {
-          // No correlation — propagate to all pending so callers learn
-          // the worker failed.
-          for (const entry of this.pending.values()) {
-            entry.reject(err);
-          }
-          this.pending.clear();
-          // If the worker errored before posting READY, reject the
-          // readyPromise too. Otherwise any future `runBatch()` call
-          // would hang forever awaiting a worker that is never coming
-          // up.
-          if (!this.ready) {
-            this.rejectReady(err);
-          }
+          // Uncorrelated worker failure — treat as fatal. Reject every
+          // pending request, reject readyPromise if startup hadn't
+          // completed, and poison the proxy so future `runBatch()`
+          // calls fail fast instead of posting into a dead worker.
+          this.poison(err);
         }
         return;
       }
@@ -339,12 +347,29 @@ export class RuleRunnerProxy implements RuleRunnerLike {
 
   private handleWorkerError(e: ErrorEvent | Error): void {
     const err = e instanceof Error ? e : new Error(e.message ?? String(e));
+    this.poison(err);
+  }
+
+  /**
+   * Mark the proxy as fatally broken: reject every pending request and
+   * `readyPromise` (if startup hadn't completed), terminate the worker,
+   * and remember the error so subsequent API calls fail fast instead
+   * of hanging.
+   */
+  private poison(err: Error): void {
+    if (this.fatalError) return;
+    this.fatalError = err;
     for (const entry of this.pending.values()) {
       entry.reject(err);
     }
     this.pending.clear();
+    this.preReadyBuffer.length = 0;
     if (!this.ready) {
       this.rejectReady(err);
+    }
+    if (!this.disposed) {
+      this.disposed = true;
+      this.worker.terminate();
     }
   }
 
