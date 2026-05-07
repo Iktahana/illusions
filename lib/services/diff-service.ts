@@ -8,6 +8,7 @@
 import { diffChars } from "diff";
 
 import type { Change } from "diff";
+import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
 
 /**
  * Normalize text for diff comparison by stripping HTML tags.
@@ -18,7 +19,13 @@ import type { Change } from "diff";
  * その他のHTMLタグは削除する。
  */
 export function stripHtmlForDiff(text: string): string {
-  return text.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "");
+  let result = stripMdiBlankMarkers(text).replace(/<br\s*\/?>/gi, "\n");
+  let prev: string;
+  do {
+    prev = result;
+    result = result.replace(/<[^<>]*>/g, "");
+  } while (result !== prev);
+  return result;
 }
 
 /** A single diff chunk with type and value */

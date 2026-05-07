@@ -13,6 +13,7 @@ const ALL_GUIDELINE_IDS: GuidelineId[] = [
   "gendai-kanazukai-1986",
   "jtf-style-3",
   "editors-rulebook",
+  "genji-dict",
 ];
 
 interface GuidelineListProps {

@@ -32,6 +32,10 @@ export interface TextStatisticsResult extends TextStatistics {
   readabilityAnalysis: EnhancedReadabilityAnalysis;
 }
 
+interface UseTextStatisticsOptions {
+  enableMorphologicalAnalysis?: boolean;
+}
+
 /**
  * Compute text statistics from editor content.
  * All values are memoized and only recomputed when content changes.
@@ -42,7 +46,11 @@ export interface TextStatisticsResult extends TextStatistics {
  *   Phase 2 (async): morphological enrichment via enrichReadabilityWithMorphology()
  *                    using kuromoji through INlpClient
  */
-export function useTextStatistics(content: string): TextStatisticsResult {
+export function useTextStatistics(
+  content: string,
+  options: UseTextStatisticsOptions = {},
+): TextStatisticsResult {
+  const { enableMorphologicalAnalysis = true } = options;
   const manuscriptStats = useMemo(() => computeTextStatistics(content), [content]);
 
   const cleanedContent = useMemo(() => cleanMarkdown(content), [content]);
@@ -58,22 +66,24 @@ export function useTextStatistics(content: string): TextStatisticsResult {
   const surfaceAnalysis = useMemo(() => analyzeReadability(cleanedContent), [cleanedContent]);
 
   // Phase 2: async morphological enrichment（NLP完了後に更新）
-  const [readabilityAnalysis, setReadabilityAnalysis] =
-    useState<EnhancedReadabilityAnalysis>(surfaceAnalysis);
+  const [enrichedAnalysis, setEnrichedAnalysis] = useState<{
+    content: string;
+    analysis: EnhancedReadabilityAnalysis;
+  } | null>(null);
 
   useEffect(() => {
-    // content変化時はまず表層結果を即時表示
-    setReadabilityAnalysis(surfaceAnalysis);
-
-    // 短すぎる文章はNLPをスキップ（形態素解析のコストに見合わない）
-    if (cleanedContent.length < 50) return;
+    // 短すぎる文章や省電力時は NLP をスキップし、表層分析のみ返す。
+    if (!enableMorphologicalAnalysis || cleanedContent.length < 50) return;
 
     let cancelled = false;
     getNlpClient()
       .tokenizeParagraph(cleanedContent)
       .then((tokens) => {
         if (cancelled) return;
-        setReadabilityAnalysis(enrichReadabilityWithMorphology(surfaceAnalysis, tokens));
+        setEnrichedAnalysis({
+          content: cleanedContent,
+          analysis: enrichReadabilityWithMorphology(surfaceAnalysis, tokens),
+        });
       })
       .catch(() => {
         // NLP失敗時は表層結果のまま維持（silent fallback）
@@ -82,7 +92,10 @@ export function useTextStatistics(content: string): TextStatisticsResult {
     return () => {
       cancelled = true;
     };
-  }, [cleanedContent, surfaceAnalysis]);
+  }, [cleanedContent, surfaceAnalysis, enableMorphologicalAnalysis]);
+
+  const readabilityAnalysis =
+    enrichedAnalysis?.content === cleanedContent ? enrichedAnalysis.analysis : surfaceAnalysis;
 
   return {
     ...manuscriptStats,
