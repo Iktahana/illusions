@@ -19,9 +19,13 @@ import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
  * その他のHTMLタグは削除する。
  */
 export function stripHtmlForDiff(text: string): string {
-  return stripMdiBlankMarkers(text)
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "");
+  let result = stripMdiBlankMarkers(text).replace(/<br\s*\/?>/gi, "\n");
+  let prev: string;
+  do {
+    prev = result;
+    result = result.replace(/<[^<>]*>/g, "");
+  } while (result !== prev);
+  return result;
 }
 
 /** A single diff chunk with type and value */
