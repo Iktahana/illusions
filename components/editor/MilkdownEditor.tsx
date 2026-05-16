@@ -279,7 +279,7 @@ export default function MilkdownEditor({
 
       return editor;
     },
-    [verticalScrollPlugin, mdiExtensionsEnabled, gfmEnabled],
+    [isVertical, verticalScrollPlugin, mdiExtensionsEnabled, gfmEnabled],
   );
 
   // EditorView インスタンスを取得する

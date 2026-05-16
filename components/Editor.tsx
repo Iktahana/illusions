@@ -472,7 +472,6 @@ export default function NovelEditor({
         <MilkdownProvider>
           <ProsemirrorAdapterProvider>
             <MilkdownEditor
-              key={isVertical ? "vertical" : "horizontal"}
               initialContent={initialContent}
               onChange={onChange}
               onInsertText={onInsertText}
