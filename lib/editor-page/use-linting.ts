@@ -151,8 +151,13 @@ export function useLinting(
   // Bootstrap the Genji noun vocabulary (renderer-side) — Electron only.
   // Fires `refreshLinting` whenever vocab becomes ready or gets reloaded
   // after a dictionary install so the genji-unknown-noun rule picks it up.
+  //
+  // Gated on the genji-unknown-noun rule being enabled. Otherwise startup
+  // would always initialize the vocabulary AND fire a full-document re-lint
+  // via subscribe(), causing the open-time freeze observed in #1457.
   useEffect(() => {
     if (!isElectronRenderer()) return;
+    if (!lintingRuleConfigs["genji-unknown-noun"]?.enabled) return;
 
     genjiVocab.initialize().catch((err) => {
       console.error("[useLinting] genjiVocab.initialize failed:", err);
@@ -172,7 +177,7 @@ export function useLinting(
       unsubscribe();
       offInstalled?.();
     };
-  }, [refreshLinting]);
+  }, [refreshLinting, lintingRuleConfigs]);
 
   return {
     ruleRunner,
