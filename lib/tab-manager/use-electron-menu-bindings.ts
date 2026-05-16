@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
-import { suppressFileWatch } from "../services/file-watcher";
+import { suppressFileWatch, hashContent } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, EditorTabState } from "./tab-types";
@@ -162,7 +162,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
         try {
           if (isProjectRef.current && tab.file.path) {
             const vfs = getVFS();
-            suppressFileWatch(tab.file.path);
+            suppressFileWatch(tab.file.path, undefined, hashContent(sanitized));
             await vfs.writeFile(tab.file.path, sanitized);
             await tryAutoSnapshotRef.current?.(tab.file.path, tab.file.name, sanitized, true);
           } else {

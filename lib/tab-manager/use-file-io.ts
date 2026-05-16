@@ -11,7 +11,7 @@ import { getStorageService } from "../storage/storage-service";
 import { persistAppState } from "../storage/app-state-manager";
 import { getHistoryService } from "../services/history-service";
 import { getVFS } from "../vfs";
-import { suppressFileWatch } from "../services/file-watcher";
+import { suppressFileWatch, hashContent } from "../services/file-watcher";
 import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import { generateTabId, inferFileType, sanitizeMdiContent, getErrorMessage } from "./types";
@@ -244,7 +244,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         // Project mode: VFS direct write
         if (isProjectRef.current && tab.file?.path) {
           const vfs = getVFS();
-          suppressFileWatch(tab.file.path);
+          suppressFileWatch(tab.file.path, undefined, hashContent(sanitized));
           await vfs.writeFile(tab.file.path, sanitized);
 
           // Update project.json lastModified so workspace metadata stays in sync.

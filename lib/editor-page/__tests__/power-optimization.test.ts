@@ -54,6 +54,21 @@ describe("power optimization policy", () => {
     expect(shouldPauseFileWatchers(makeState({ isDocumentVisible: false }))).toBe(true);
   });
 
+  it("does not pause file watchers on focus blur alone (Cmd+Tab)", () => {
+    // Patch 1 (#1457): focus loss must NOT pause file watchers; only visibility loss does.
+    // Previously isBackgroundWindow() gated this, causing catch-up false positives.
+    expect(
+      shouldPauseFileWatchers(makeState({ isWindowFocused: false, isDocumentVisible: true })),
+    ).toBe(false);
+  });
+
+  it("pauses file watchers when document is hidden even if window is focused", () => {
+    // Background tab / minimised window: visibility drives the pause, not focus.
+    expect(
+      shouldPauseFileWatchers(makeState({ isDocumentVisible: false, isWindowFocused: true })),
+    ).toBe(true);
+  });
+
   it("keeps the normal auto-save interval while fully active", () => {
     expect(getAutoSaveIntervalMs(makeState(), 5_000)).toBe(5_000);
   });

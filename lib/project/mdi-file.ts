@@ -1,6 +1,7 @@
 // クロスプラットフォームな .mdi ファイルの開閉/保存
 
 import { getRuntimeEnvironment, isBrowser } from "../utils/runtime-env";
+import { suppressFileWatch, hashContent } from "../services/file-watcher";
 import type { SupportedFileExtension } from "./project-types";
 
 export interface MdiFileDescriptor {
@@ -139,6 +140,11 @@ export async function saveMdiFile(params: SaveMdiParams): Promise<OpenMdiResult 
   if (env === "electron-renderer" && window.electronAPI) {
     const existingPath = descriptor?.path ?? null;
     try {
+      // suppress before write so that the native watcher does not treat the
+      // coming change event as an external modification (#1457 Patch 2)
+      if (existingPath) {
+        suppressFileWatch(existingPath, undefined, hashContent(content));
+      }
       const result = await window.electronAPI.saveFile(existingPath, content, fileType);
       if (!result) {
         // User cancelled the save dialog
@@ -150,6 +156,12 @@ export async function saveMdiFile(params: SaveMdiParams): Promise<OpenMdiResult 
       }
       const savedPath = result as string;
       const name = basename(savedPath);
+      // For newly-created files (existingPath was null), register suppression
+      // now that we have the path. The watcher will be set up later so there
+      // is no race here, but registering keeps behaviour consistent.
+      if (!existingPath) {
+        suppressFileWatch(savedPath, undefined, hashContent(content));
+      }
       return {
         descriptor: {
           path: savedPath,

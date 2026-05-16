@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
-import { suppressFileWatch } from "../services/file-watcher";
+import { suppressFileWatch, hashContent } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
 import type { TabId, TabState, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
@@ -86,7 +86,7 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
 
       if (isProjectRef.current && tab.file?.path) {
         const vfs = getVFS();
-        suppressFileWatch(tab.file.path);
+        suppressFileWatch(tab.file.path, undefined, hashContent(sanitized));
         await vfs.writeFile(tab.file.path, sanitized);
         await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized, true);
       } else {

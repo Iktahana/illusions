@@ -38,7 +38,10 @@ export function shouldEnablePosHighlight(
 }
 
 export function shouldPauseFileWatchers(state: RuntimeActivityState): boolean {
-  return isBackgroundWindow(state);
+  // ファイル監視は visibility 喪失時のみ停止する。focus blur (Cmd+Tab など) では継続する。
+  // Reason: focus blur 後の resume で catch-up logic が auto-save 直後の mtime 進行を
+  // 誤って外部変更として扱い、replaceAll() で編集不能になる (#1457 / #1445)
+  return !state.isDocumentVisible;
 }
 
 export function getAutoSaveIntervalMs(

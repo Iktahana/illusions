@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
-import { suppressFileWatch } from "../services/file-watcher";
+import { suppressFileWatch, hashContent } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
 import { isEditorTab } from "./tab-types";
 import type { TabManagerCore } from "./types";
@@ -94,7 +94,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
             const sanitized = sanitizeMdiContent(tab.content);
             if (isProjectRef.current && tab.file?.path) {
               const vfs = getVFS();
-              suppressFileWatch(tab.file.path);
+              suppressFileWatch(tab.file.path, undefined, hashContent(sanitized));
               await vfs.writeFile(tab.file.path, sanitized);
               if (!mountedRef.current) return;
               setTabs((prev) =>

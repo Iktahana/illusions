@@ -38,17 +38,30 @@ const MAX_CONSECUTIVE_FAILURES = 5;
  * Tracks paths that were recently saved by the application,
  * so watchers can ignore self-triggered change events.
  *
+ * Each entry carries an optional expected content hash. When present, the
+ * suppression only applies when the observed file hash matches — so genuine
+ * external changes within the TTL window still fire onChanged.
+ *
  * A periodic cleanup timer evicts expired entries every 5 minutes
  * to prevent unbounded memory growth in long-running sessions.
  *
  * アプリケーション自身による保存を追跡し、
  * ウォッチャーが自身のトリガーによる変更イベントを無視できるようにする。
+ * expectedHash が付いている場合は hash 一致時のみ抑制し、本物の外部変更は通知する。
  * 5分ごとに期限切れエントリを削除し、長時間セッションでのメモリ増大を防止する。
  */
-const saveSuppression = new Map<string, number>();
+interface SuppressionEntry {
+  until: number;
+  /** hash 付き = self-save 識別用。未指定 = 旧式 time-only */
+  expectedHash?: string;
+}
+const saveSuppression = new Map<string, SuppressionEntry>();
 
-/** Default suppression duration in milliseconds */
+/** Default suppression duration in milliseconds (legacy time-only) */
 const SAVE_SUPPRESSION_MS = 3000;
+
+/** hash 付き suppression の保持期間 (長め、メモリ上限のため終わりはある) */
+const SAVE_SUPPRESSION_WITH_HASH_MS = 5 * 60_000;
 
 /** Interval for periodic cleanup of expired suppression entries (5 minutes) */
 const SUPPRESSION_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
@@ -62,8 +75,8 @@ const SUPPRESSION_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
  */
 function cleanupExpiredSuppressions(): void {
   const now = Date.now();
-  for (const [filePath, until] of saveSuppression) {
-    if (now >= until) {
+  for (const [filePath, entry] of saveSuppression) {
+    if (now >= entry.until) {
       saveSuppression.delete(filePath);
     }
   }
@@ -83,26 +96,80 @@ if (typeof suppressionCleanupTimer === "object" && "unref" in suppressionCleanup
  * Call this before saving a file to prevent the watcher
  * from treating the save as an external change.
  *
+ * When expectedHash is provided, the suppression entry is kept for
+ * SAVE_SUPPRESSION_WITH_HASH_MS and only suppresses notifications when
+ * the observed file hash matches. This allows genuine external changes
+ * within the window to still fire onChanged.
+ *
  * 指定パスのファイル監視通知を一時的に抑制する。
- * ファイル保存前に呼び出し、ウォッチャーが自身の保存を
- * 外部変更として扱うのを防ぐ。
+ * ファイル保存前に呼び出し、ウォッチャーが自身の保存を外部変更として扱うのを防ぐ。
+ * expectedHash を渡した場合は hash 一致時のみ抑制し、TTL 内でも本物の外部変更は通知する。
  *
  * @param filePath - The file path to suppress notifications for
- * @param durationMs - How long to suppress (default 3000ms)
+ * @param durationMs - How long to suppress (default: 3000ms without hash, 5min with hash)
+ * @param expectedHash - Expected content hash of the self-save (enables hash-aware suppression)
  */
 export function suppressFileWatch(
   filePath: string,
-  durationMs: number = SAVE_SUPPRESSION_MS,
+  durationMs?: number,
+  expectedHash?: string,
 ): void {
-  saveSuppression.set(filePath, Date.now() + durationMs);
+  const ttl = durationMs ?? (expectedHash ? SAVE_SUPPRESSION_WITH_HASH_MS : SAVE_SUPPRESSION_MS);
+  saveSuppression.set(filePath, { until: Date.now() + ttl, expectedHash });
 }
 
-function isFileSuppressed(filePath: string): boolean {
-  const until = saveSuppression.get(filePath);
-  if (!until) return false;
-  if (Date.now() < until) return true;
-  saveSuppression.delete(filePath);
-  return false;
+/**
+ * Internal: retrieve the active suppression entry with expiry guard.
+ * Returns undefined if no entry exists or the entry has expired.
+ *
+ * 内部用：保留中の suppression entry を期限切れガード付きで取得する。
+ */
+function getActiveSuppression(filePath: string): SuppressionEntry | undefined {
+  const entry = saveSuppression.get(filePath);
+  if (!entry) return undefined;
+  if (Date.now() >= entry.until) {
+    saveSuppression.delete(filePath);
+    return undefined;
+  }
+  return entry;
+}
+
+/**
+ * Determine whether an external-change notification should be suppressed.
+ *
+ * - Hash-bearing entry: suppress only when contentHash === expectedHash.
+ *   A hash mismatch means a genuine external change — notify even within TTL
+ *   (R8: do not silently hide real external changes).
+ * - Hash-less entry (legacy time-only): suppress whenever within TTL.
+ *
+ * Note: hash-bearing entries are NOT consumed on match (filesystem can fire
+ * duplicate events for one save). Cleanup is handled by the periodic timer
+ * and the expiry guard in getActiveSuppression().
+ *
+ * 外部変更通知を抑制すべきか判定する。
+ * hash 付き entry: hash 一致時のみ suppress（不一致は本物の外部変更）
+ * hash 無し entry (legacy): TTL 内なら常に suppress
+ */
+export function shouldSuppressNotification(filePath: string, contentHash: string): boolean {
+  const entry = getActiveSuppression(filePath);
+  if (!entry) return false;
+  if (entry.expectedHash !== undefined) {
+    return entry.expectedHash === contentHash;
+  }
+  return true; // legacy time-only
+}
+
+/**
+ * Legacy time-only suppression check (for code paths that have not yet
+ * computed a content hash). Returns false for hash-bearing entries so that
+ * we never silently suppress without actually comparing hashes.
+ *
+ * hash 付き entry に対しては false を返す設計（hash 比較なしに抑制しない安全側）。
+ */
+function isFileSuppressedTimeOnly(filePath: string): boolean {
+  const entry = getActiveSuppression(filePath);
+  if (!entry) return false;
+  return entry.expectedHash === undefined;
 }
 
 // -----------------------------------------------------------------------
@@ -128,7 +195,7 @@ function isFileSuppressed(filePath: string): boolean {
  * @param content - File content string to hash
  * @returns A string representation of the hash
  */
-function hashContent(content: string): string {
+export function hashContent(content: string): string {
   let hash = 5381;
   for (let i = 0; i < content.length; i++) {
     // djb2: hash = hash * 33 ^ charCode
@@ -234,7 +301,7 @@ class WebFileWatcher implements FileWatcher {
 
         // Catch-up check: detect changes that occurred while the watcher was paused
         if (previousModified > 0 && this.lastModified > previousModified) {
-          if (!isFileSuppressed(this.path)) {
+          if (!isFileSuppressedTimeOnly(this.path)) {
             try {
               const content = await this.vfs.readFile(this.path);
               if (this._isActive) {
@@ -288,7 +355,7 @@ class WebFileWatcher implements FileWatcher {
    * MAX_CONSECUTIVE_FAILURES 回連続で失敗した場合、監視を自動停止する。
    */
   private async checkForChanges(): Promise<void> {
-    const suppressed = isFileSuppressed(this.path);
+    const suppressed = isFileSuppressedTimeOnly(this.path);
 
     try {
       const metadata = await this.vfs.getFileMetadata(this.path);
@@ -430,22 +497,29 @@ class ElectronFileWatcher implements FileWatcher {
           this.pausedAt > previousModified &&
           metadata.lastModified === previousModified;
 
-        if (
-          this._isActive &&
-          (mtimeAdvanced || possibleSameSecondChange) &&
-          !isFileSuppressed(this.path)
-        ) {
-          const content = await this.vfs.readFile(this.path);
-          if (this._isActive) {
+        if (this._isActive && (mtimeAdvanced || possibleSameSecondChange)) {
+          try {
+            const content = await this.vfs.readFile(this.path);
+            if (!this._isActive) return;
             const contentHash = hashContent(content);
-            const contentChanged = contentHash !== this.lastKnownContentHash;
 
+            // baseline は無条件で更新する (R1)
             this.lastKnownModified = metadata.lastModified;
+            const previousHash = this.lastKnownContentHash;
+            this.lastKnownContentHash = contentHash;
 
-            if (mtimeAdvanced || contentChanged) {
-              this.lastKnownContentHash = contentHash;
-              this.onChanged(content, metadata.lastModified);
+            // R8: hash 一致なら self-save と判定して通知スキップ。
+            // hash 不一致は本物の外部変更なので通知する (entry は keep)。
+            if (shouldSuppressNotification(this.path, contentHash)) {
+              // self-save confirmed — baseline 更新済み、何もしない
+            } else {
+              const contentChanged = contentHash !== previousHash;
+              if (mtimeAdvanced || contentChanged) {
+                this.onChanged(content, metadata.lastModified);
+              }
             }
+          } catch {
+            this.lastKnownModified = metadata.lastModified;
           }
         } else {
           // Update baseline even when no change detected
@@ -545,22 +619,31 @@ class ElectronFileWatcher implements FileWatcher {
    * 権限の取り消しやその他のエラーを適切に処理する。
    */
   private async readAndNotify(): Promise<void> {
-    // Skip if this path was recently saved by the application
-    if (isFileSuppressed(this.path)) {
-      return;
-    }
-
     try {
       const [content, metadata] = await Promise.all([
         this.vfs.readFile(this.path),
         this.vfs.getFileMetadata(this.path),
       ]);
+
+      // R3: async read 完了までに stop() が呼ばれていれば通知しない
+      if (!this._isActive) return;
+
       const newHash = hashContent(content);
+
+      // baseline は無条件で更新する (R1)
       this.lastKnownModified = metadata.lastModified;
-      // Skip notification if content hasn't changed (e.g. cloud sync metadata update)
+
+      // hash-aware 判定 (R8): hash 付き entry でも一致しなければ通知する
+      if (shouldSuppressNotification(this.path, newHash)) {
+        this.lastKnownContentHash = newHash;
+        return;
+      }
+
+      // 内容変化なしの場合は通知スキップ (既存ロジック)
       if (newHash === this.lastKnownContentHash) {
         return;
       }
+
       this.lastKnownContentHash = newHash;
       this.onChanged(content, metadata.lastModified);
     } catch (error) {
