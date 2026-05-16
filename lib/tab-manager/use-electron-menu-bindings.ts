@@ -3,7 +3,11 @@
 import { useEffect, useRef } from "react";
 import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
-import { suppressFileWatch, hashContent } from "../services/file-watcher";
+import {
+  suppressFileWatch,
+  hashContent,
+  shouldSuppressNotification,
+} from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, EditorTabState } from "./tab-types";
@@ -219,6 +223,9 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
   }, [isElectron, loadSystemFile, systemFileOpenHandlerRef]);
 
   // Reload non-dirty tabs when window regains visibility (#98)
+  // Skip the app's own recent saves (hash-aware suppression) to avoid #1457:
+  // auto-save → visibility regain → self-save reloaded as "external change"
+  // → replaceAll() → editor loses focus and becomes uneditable.
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.hidden) return;
@@ -233,18 +240,22 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
         if (tab.isDirty) continue;
         try {
           const diskContent = await vfs.readFile(tab.file.path);
-          if (diskContent !== tab.lastSavedContent) {
-            updateTab(tab.id, {
-              content: diskContent,
-              lastSavedContent: diskContent,
-              isDirty: false,
-              lastSavedTime: Date.now(),
-              // Signal the active Milkdown editor to reload with the new content.
-              // Background tabs will naturally use the updated content on remount;
-              // the active editor needs this field in its React key to force remount.
-              pendingExternalContent: diskContent,
-            });
+          if (diskContent === tab.lastSavedContent) continue;
+          // Hash-aware self-save suppression: if the disk content matches a
+          // recently recorded self-save hash, this is not an external change.
+          if (shouldSuppressNotification(tab.file.path, hashContent(diskContent))) {
+            continue;
           }
+          updateTab(tab.id, {
+            content: diskContent,
+            lastSavedContent: diskContent,
+            isDirty: false,
+            lastSavedTime: Date.now(),
+            // Signal the active Milkdown editor to reload with the new content.
+            // Background tabs will naturally use the updated content on remount;
+            // the active editor needs this field in its React key to force remount.
+            pendingExternalContent: diskContent,
+          });
         } catch {
           // File may have been deleted; skip
         }
