@@ -545,6 +545,17 @@ export default function MilkdownEditor({
     isFirstRenderRef.current = false;
 
     const applyStyles = () => {
+      const containerBefore = scrollContainerRef.current;
+      const scrollTopBefore = containerBefore?.scrollTop ?? -1;
+      const scrollLeftBefore = containerBefore?.scrollLeft ?? -1;
+      console.warn(
+        "[MilkdownEditor] applyStyles START",
+        `styleChanged=${styleChanged}`,
+        `shouldAnimate=${shouldAnimate}`,
+        `scrollTop=${scrollTopBefore}`,
+        `scrollLeft=${scrollLeftBefore}`,
+      );
+
       editorDom.classList.remove("milkdown-japanese-vertical", "milkdown-japanese-horizontal");
       editorDom.classList.add(
         isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal",
@@ -590,6 +601,13 @@ export default function MilkdownEditor({
           measureBox.style.maxWidth = `${targetWidth}px`;
         }
       }
+
+      const containerAfter = scrollContainerRef.current;
+      console.warn(
+        "[MilkdownEditor] applyStyles END",
+        `scrollTop=${containerAfter?.scrollTop ?? -1}`,
+        `scrollLeft=${containerAfter?.scrollLeft ?? -1}`,
+      );
     };
 
     if (shouldAnimate) {
