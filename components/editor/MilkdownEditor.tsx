@@ -331,7 +331,33 @@ export default function MilkdownEditor({
               "[MilkdownEditor] EditorView ready",
               `attempts=${attempts}`,
               `viewId=${tagged.__illusionsViewId}`,
+              `editable=${view.editable}`,
+              `domEditable=${view.dom.contentEditable}`,
+              `domTag=${view.dom.tagName}`,
+              `selFrom=${view.state.selection.from}`,
             );
+            // Click-target trace: confirm clicks actually reach the
+            // contenteditable element (#1457). Attach once per view instance.
+            const taggedForClick = view as unknown as {
+              __illusionsClickHooked?: boolean;
+            };
+            if (!taggedForClick.__illusionsClickHooked) {
+              taggedForClick.__illusionsClickHooked = true;
+              view.dom.addEventListener("mousedown", (e) => {
+                console.warn(
+                  "[ProseMirror] mousedown on .ProseMirror",
+                  `target=${(e.target as Element)?.tagName ?? "n/a"}`,
+                  `defaultPrevented=${e.defaultPrevented}`,
+                );
+              });
+              view.dom.addEventListener("click", (e) => {
+                console.warn(
+                  "[ProseMirror] click on .ProseMirror",
+                  `target=${(e.target as Element)?.tagName ?? "n/a"}`,
+                  `defaultPrevented=${e.defaultPrevented}`,
+                );
+              });
+            }
             setEditorViewInstance(view);
             onEditorViewReady?.(view);
             return;
