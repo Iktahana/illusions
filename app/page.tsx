@@ -51,12 +51,6 @@ import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
 import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import { usePreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
-import { useWindowActivityState } from "@/lib/hooks/use-window-activity";
-import {
-  getAutoSaveIntervalMs,
-  shouldPauseFileWatchers,
-  shouldRunReadabilityMorphology,
-} from "@/lib/editor-page/power-optimization";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
@@ -178,12 +172,6 @@ export default function EditorPage() {
   } = settingsHandlers;
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
-  const windowActivity = useWindowActivityState();
-  const runtimeActivity = {
-    powerSaveMode,
-    isDocumentVisible: windowActivity.isDocumentVisible,
-    isWindowFocused: windowActivity.isWindowFocused,
-  };
 
   // Derive a stable per-window key from the project root path (Electron project mode).
   // This key scopes tabs and dockview layout so multiple windows with different projects
@@ -231,8 +219,6 @@ export default function EditorPage() {
   const tabManager = useTabManager({
     skipAutoRestore,
     autoSave,
-    autoSaveIntervalMs: getAutoSaveIntervalMs(runtimeActivity, 5000),
-    pauseFileWatchers: shouldPauseFileWatchers(runtimeActivity),
     vfsReadyPromise: vfsGate.promise,
     flushLayoutState: stableFlushLayoutState,
     windowKey,
@@ -885,9 +871,7 @@ export default function EditorPage() {
     charTypeAnalysis,
     charUsageRates,
     readabilityAnalysis,
-  } = useTextStatistics(content, {
-    enableMorphologicalAnalysis: shouldRunReadabilityMorphology(runtimeActivity),
-  });
+  } = useTextStatistics(content);
 
   // charCount は旧インターフェース互換用エイリアス（可視本文文字数）
   const charCount = visibleTextCharCount;
@@ -960,7 +944,6 @@ export default function EditorPage() {
     handleToggleTcy,
     setShowSettingsModal,
     setSearchOpenTrigger,
-    printDocument: () => printDocument(),
     incrementEditorKey,
     nextTab,
     prevTab,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import type { UseTabManagerReturn } from "./types";
 import { useTabState } from "./use-tab-state";
 import { useFileIO } from "./use-file-io";
@@ -24,8 +24,6 @@ export type { UseTabManagerReturn } from "./types";
 export function useTabManager(options?: {
   skipAutoRestore?: boolean;
   autoSave?: boolean;
-  autoSaveIntervalMs?: number;
-  pauseFileWatchers?: boolean;
   vfsReadyPromise?: Promise<void>;
   /** External flush callback for dockview layout persistence. */
   flushLayoutState?: () => Promise<void>;
@@ -89,7 +87,6 @@ export function useTabManager(options?: {
     isProjectRef: tabState.isProjectRef,
     isElectron: tabState.isElectron,
     autoSaveEnabled,
-    intervalMs: options?.autoSaveIntervalMs,
     saveFileRef: fileIO.saveFileRef,
     tryAutoSnapshot: fileIO.tryAutoSnapshot,
   });
@@ -101,9 +98,6 @@ export function useTabManager(options?: {
   // flushTabState is provided by useTabPersistence below; use a ref so the
   // menu bindings can call it in the async onSaveBeforeClose handler.
   const flushTabStateRef = useRef<(() => Promise<void>) | undefined>(undefined);
-  const stableFlushTabState = useCallback(async () => {
-    await flushTabStateRef.current?.();
-  }, []);
 
   useElectronMenuBindings({
     tabs: tabState.tabs,
@@ -121,7 +115,7 @@ export function useTabManager(options?: {
     loadSystemFile: fileIO.loadSystemFile,
     updateTab: tabState.updateTab,
     systemFileOpenHandlerRef,
-    flushTabState: stableFlushTabState,
+    flushTabState: flushTabStateRef.current,
     flushLayoutState: options?.flushLayoutState,
     tryAutoSnapshot: fileIO.tryAutoSnapshot,
   });
@@ -137,7 +131,6 @@ export function useTabManager(options?: {
     activeTabIdRef: tabState.activeTabIdRef,
     isProjectRef: tabState.isProjectRef,
     isElectron: tabState.isElectron,
-    pauseFileWatchers: options?.pauseFileWatchers ?? false,
     openDiffTab: tabState.openDiffTab,
     onEditorRemountNeeded: options?.onEditorRemountNeeded,
   });
@@ -163,9 +156,7 @@ export function useTabManager(options?: {
   });
 
   // Update the ref so useElectronMenuBindings can access flushTabState
-  useEffect(() => {
-    flushTabStateRef.current = _flushTabState;
-  }, [_flushTabState]);
+  flushTabStateRef.current = _flushTabState;
 
   // --- Backward compat alias: newFile === newTab --------------------------
   const newFile = tabState.newTab;

@@ -7,14 +7,9 @@ import { createJtfL1Rules } from "@/lib/linting/rules/json-l1/jtf-l1-rules";
 import { createManuscriptL1Rules } from "@/lib/linting/rules/json-l1/manuscript-l1-rules";
 import { createNihongoHyoukiL1Rules } from "@/lib/linting/rules/json-l1";
 
-// ---------------------------------------------------------------------------
-// Hand-written L2 rules
-// ---------------------------------------------------------------------------
-import { GenjiUnknownNounRule } from "@/lib/linting/rules/l2/genji-unknown-noun";
-
-/** Return all hand-written rules. */
+/** Return all hand-written rules (currently none — all moved to JSON-driven). */
 export function getAllRules(): LintRule[] {
-  return [new GenjiUnknownNounRule()];
+  return [];
 }
 
 /** Return all JSON-driven L1 rules from the style-sheet factories. */

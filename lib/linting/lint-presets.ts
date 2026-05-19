@@ -237,18 +237,6 @@ export const LINT_RULES_META: LintRuleMeta[] = [
     descriptionJa: "日本語文中の引用符・省略記号・ダッシュの誤用を検出します",
     guidelineId: "editors-rulebook",
   },
-
-  // ---------------------------------------------------------------------------
-  // 辞書・語彙 (1 rule, Electron only)
-  // ---------------------------------------------------------------------------
-  {
-    id: "genji-unknown-noun",
-    nameJa: "辞典外名詞の警告（Genji 辞典）",
-    descriptionJa:
-      "Genji 辞典に登録されていない名詞を警告します（Electron 環境限定、初期値: 無効）",
-    supportsSkipDialogue: true,
-    guidelineId: "genji-dict",
-  },
 ];
 
 /** Category grouping for rule display */
@@ -312,11 +300,6 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
       "nh-11-symbols",
     ],
   },
-  {
-    id: "vocabulary",
-    nameJa: "辞書・語彙",
-    rules: ["genji-unknown-noun"],
-  },
 ];
 
 /** Per-rule config shape used in presets and settings */
@@ -366,8 +349,6 @@ export const LINT_DEFAULT_CONFIGS: Record<string, LintRulePresetConfig> = {
   "nh-9-numbers": { enabled: true, severity: "warning" },
   "nh-10-units": { enabled: true, severity: "warning" },
   "nh-11-symbols": { enabled: true, severity: "warning" },
-  // --- 辞書・語彙 (Electron only, opt-in) ---
-  "genji-unknown-noun": { enabled: false, severity: "warning" },
 };
 
 /** Preset configuration for one-shot application */

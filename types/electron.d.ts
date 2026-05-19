@@ -63,7 +63,6 @@ declare global {
     updateKeymapOverrides?: (overrides: KeymapOverrides) => Promise<boolean>;
     showInFileManager?: (dirPath: string) => Promise<boolean>;
     revealInFileManager?: (filePath: string) => Promise<boolean>;
-    openWithDefaultApp?: (filePath: string) => Promise<boolean>;
     openExternal?: (url: string) => Promise<boolean>;
     onMenuShowInFileManager?: (callback: () => void) => (() => void) | void;
     onPasteAsPlaintext?: (callback: () => void) => (() => void) | void;
@@ -283,16 +282,12 @@ declare global {
       }>;
       /** Download and install the latest database */
       download: () => Promise<{ success: boolean; version?: string; error?: string }>;
-      /** Return headword strings for all noun entries. Empty array if DB is not installed. */
-      listNounHeadwords: () => Promise<string[]>;
       /** Subscribe to download progress events (0–100). Returns cleanup function. */
       onDownloadProgress: (callback: (data: { progress: number }) => void) => () => void;
       /** Subscribe to update-available notifications pushed from main process. */
       onUpdateAvailable: (
         callback: (data: { latestVersion: string; updateAvailable: boolean }) => void,
       ) => () => void;
-      /** Subscribe to dictionary install/replace events. Returns cleanup function. */
-      onInstalled: (callback: () => void) => () => void;
     };
     /** PTY session management */
     pty?: {

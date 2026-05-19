@@ -5,8 +5,6 @@
  * and in plain Node.js / test environments.
  */
 
-import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -68,7 +66,7 @@ const LINE_END_PROHIBITED = new Set("（〔［｛〈《「『【".split(""));
  * 12. バックスラッシュエスケープ (`\X`) → バックスラッシュのみ除去
  */
 export function extractVisibleText(rawContent: string): string {
-  let text = stripMdiBlankMarkers(rawContent);
+  let text = rawContent;
 
   // 1. コードブロック（```...```、フェンス含む）
   text = text.replace(/```[\s\S]*?```/g, "");

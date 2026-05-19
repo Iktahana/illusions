@@ -16,8 +16,6 @@ import { AUTO_SAVE_INTERVAL, sanitizeMdiContent } from "./types";
 export interface UseAutoSaveParams extends TabManagerCore {
   /** Whether auto-save is enabled. */
   autoSaveEnabled: boolean;
-  /** Effective auto-save interval. Can be increased in background/power-save mode. */
-  intervalMs?: number;
   /** Ref holding the latest saveFile function (for active tab). */
   saveFileRef: React.MutableRefObject<(isAutoSave?: boolean) => Promise<void>>;
   /** Create an auto-snapshot if conditions are met (project mode only). */
@@ -44,7 +42,6 @@ export function useAutoSave(params: UseAutoSaveParams): void {
     activeTabIdRef,
     isProjectRef,
     autoSaveEnabled,
-    intervalMs = AUTO_SAVE_INTERVAL,
     saveFileRef,
     tryAutoSnapshot,
   } = params;
@@ -154,7 +151,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
           }
         })();
       }
-    }, intervalMs);
+    }, AUTO_SAVE_INTERVAL);
 
     return () => {
       if (autoSaveTimerRef.current) {
@@ -169,6 +166,5 @@ export function useAutoSave(params: UseAutoSaveParams): void {
     isProjectRef,
     saveFileRef,
     tryAutoSnapshot,
-    intervalMs,
   ]);
 }

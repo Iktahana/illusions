@@ -9,7 +9,6 @@ import type { WordEntry } from "@/lib/nlp-client/types";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import ContextMenu from "@/components/ContextMenu";
 import { getVFS } from "@/lib/vfs";
-import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
 
 /** Cache file schema for word frequency results */
 interface WordFrequencyCache {
@@ -170,7 +169,7 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
 
       // Run NLP analysis
       const nlpClient = getNlpClient();
-      const wordEntries = await nlpClient.analyzeWordFrequency(stripMdiBlankMarkers(content));
+      const wordEntries = await nlpClient.analyzeWordFrequency(content);
 
       // Discard stale result if a newer analysis was started (#1078)
       if (genRef.current !== myGen) return;

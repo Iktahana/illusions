@@ -9,20 +9,14 @@
 import { Plugin, PluginKey } from "@milkdown/prose/state";
 import { Decoration, DecorationSet } from "@milkdown/prose/view";
 import type { EditorView } from "@milkdown/prose/view";
-import type { LintIssue, Severity } from "@/lib/linting";
+import type { RuleRunner, LintIssue, Severity } from "@/lib/linting";
 import type { INlpClient } from "@/lib/nlp-client/types";
 import type { Token } from "@/lib/nlp-client/types";
 import type { IgnoredCorrection } from "@/lib/project/project-types";
 import { LRUCache } from "@/lib/utils/lru-cache";
 import { hashString } from "@/lib/utils/hash-string";
 import { getAtomOffset, collectParagraphs } from "../shared/paragraph-helpers";
-import type {
-  LintingPluginState,
-  LintingPluginOptions,
-  LintingSettingsUpdate,
-  RuleRunnerLike,
-} from "./types";
-import { isSilentCancelError } from "./worker/protocol";
+import type { LintingPluginState, LintingPluginOptions, LintingSettingsUpdate } from "./types";
 
 export const lintingKey = new PluginKey<LintingPluginState>("linting");
 
@@ -66,7 +60,7 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
   let processingVersion = 0;
 
   // Current ruleRunner reference (updated dynamically via setMeta)
-  let currentRuleRunner: RuleRunnerLike | null = ruleRunner;
+  let currentRuleRunner: RuleRunner | null = ruleRunner;
 
   // Current NLP client reference (updated dynamically via setMeta)
   let currentNlpClient: INlpClient | null = nlpClient ?? null;
@@ -153,8 +147,6 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
                 tokenCache.clear();
                 documentIssueCache = null;
                 pendingFullScan = true;
-                // Drop any in-flight worker batch — its results would be stale.
-                currentRuleRunner?.cancelInFlight();
                 break;
               case "rule-config-change":
               case "guideline-change":
@@ -162,7 +154,6 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
                 issueCache.clear();
                 documentIssueCache = null;
                 pendingFullScan = true;
-                currentRuleRunner?.cancelInFlight();
                 break;
               case "text-edit":
                 // Re-run affected paragraphs only (handled via normal doc-changed path)
@@ -175,7 +166,6 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
             tokenCache.clear();
             documentIssueCache = null;
             pendingFullScan = true;
-            currentRuleRunner?.cancelInFlight();
           }
           // Update ignoredCorrections list if provided
           if ("ignoredCorrections" in meta) {
@@ -186,11 +176,6 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
             issueCache.clear();
             tokenCache.clear();
             documentIssueCache = null;
-            // Bump the version so any in-flight async tokenization /
-            // runBatch awaits bail at their next `version !==
-            // processingVersion` check, preventing decorations from
-            // being repopulated after the user disabled linting.
-            processingVersion++;
           }
           const updated: LintingPluginState = {
             decorations: pluginState.decorations,
@@ -199,8 +184,6 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
           // Clear decorations when disabled
           if (meta.enabled === false) {
             updated.decorations = DecorationSet.empty;
-            // Stop any in-flight worker batch — we no longer want its results.
-            currentRuleRunner?.cancelInFlight();
           }
           return updated;
         }
@@ -252,114 +235,89 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
           const hasMorphRules = currentRuleRunner.hasMorphologicalRules();
           const nlp = currentNlpClient;
 
-          // Tokenize the paragraphs that morphological rules need.
-          // Tokenization stays on the main thread because the NLP client
-          // depends on `window.electronAPI.nlp.*` (Worker-unreachable).
-          //
-          // We tokenize uncached paragraphs eagerly. For paragraphs that
-          // are cached for per-paragraph rules but still needed for
-          // document-level morph rules, we look up tokenCache and
-          // tokenize the misses.
-          const useTokens = hasMorphRules && nlp && !nlpErrorFired;
-          const tokensByText = new Map<string, ReadonlyArray<Token>>();
-
-          async function tokenizeIfNeeded(text: string): Promise<ReadonlyArray<Token> | undefined> {
-            // Re-check `nlpErrorFired` on every call so the first failure
-            // in a batch short-circuits the rest — otherwise a long doc
-            // with a broken NLP backend incurs one failed IPC per paragraph.
-            if (!useTokens || nlpErrorFired) return undefined;
-            const cached = tokenCache.get(text);
-            if (cached) return cached;
-            try {
-              const fresh = await nlp!.tokenizeParagraph(text);
-              tokenCache.set(text, fresh);
-              return fresh;
-            } catch (err) {
-              const error = err instanceof Error ? err : new Error(String(err));
-              console.error("[Linting] NLP tokenization failed — L2 rules disabled:", error);
-              if (!nlpErrorFired) {
-                nlpErrorFired = true;
-                onNlpError?.(error);
-              }
-              return undefined;
-            }
-          }
-
-          // Find paragraphs that need fresh per-paragraph rule execution.
+          // Process uncached paragraphs (per-paragraph rules)
           const uncachedParagraphs = targetParagraphs.filter((p) => !issueCache.has(p.text));
 
-          // Per-paragraph morph rules need tokens for uncached paragraphs only
-          // (cached results are reused). Document-level morph rules need tokens
-          // for the full document. Pre-tokenize the union — the second case is
-          // skipped when no document-level morph rule is enabled, avoiding a
-          // full-document NLP sweep on every keystroke.
-          const allTokenTexts = new Set<string>();
-          for (const p of uncachedParagraphs) allTokenTexts.add(p.text);
-          if (currentRuleRunner.hasMorphologicalDocumentRules()) {
-            for (const p of allParagraphs) allTokenTexts.add(p.text);
-          }
-          for (const text of allTokenTexts) {
-            if (version !== processingVersion) return;
-            const tokens = await tokenizeIfNeeded(text);
-            if (tokens) tokensByText.set(text, tokens);
-          }
-
-          if (version !== processingVersion) return;
-
-          // Build the per-paragraph batch (uncached only). The runner
-          // will route through the worker for L1 + main thread for L2
-          // morph; results merge transparently.
-          //
-          // On a real (non-cancellation) error we log and fall through
-          // rather than `return`-ing — otherwise the failure leaves
-          // `isLinting` stuck because `onIssuesUpdated` is never called
-          // and the "全文を再検査" control sticks in its loading state.
           if (uncachedParagraphs.length > 0) {
-            const perParaInputs = uncachedParagraphs.map((p) => ({
-              text: p.text,
-              index: p.index,
-              tokens: tokensByText.get(p.text),
-            }));
-            try {
-              const resp = await currentRuleRunner.runBatch({
-                paragraphs: perParaInputs,
-                mode: "per-paragraph",
-                version,
-              });
+            for (const paragraph of uncachedParagraphs) {
               if (version !== processingVersion) return;
-              for (const p of uncachedParagraphs) {
-                const issues = resp.perParagraph.get(p.index) ?? [];
-                issueCache.set(p.text, issues);
+
+              let issues: LintIssue[];
+              if (hasMorphRules && nlp && !nlpErrorFired) {
+                // Get or compute tokens for L2 rules
+                let tokens = tokenCache.get(paragraph.text);
+                if (!tokens) {
+                  try {
+                    tokens = await nlp.tokenizeParagraph(paragraph.text);
+                    tokenCache.set(paragraph.text, tokens);
+                  } catch (err) {
+                    const error = err instanceof Error ? err : new Error(String(err));
+                    console.error("[Linting] NLP tokenization failed — L2 rules disabled:", error);
+                    // Fire the error callback once per failure episode
+                    if (!nlpErrorFired) {
+                      nlpErrorFired = true;
+                      onNlpError?.(error);
+                    }
+                    // Fall back to L1-only rules (no tokens)
+                    issues = currentRuleRunner.runAll(paragraph.text);
+                    issueCache.set(paragraph.text, issues);
+                    continue;
+                  }
+                }
+                issues = currentRuleRunner.runAllWithTokens(paragraph.text, tokens);
+              } else {
+                // No NLP available or NLP has failed — run L1 rules only
+                issues = currentRuleRunner.runAll(paragraph.text);
               }
-            } catch (err) {
-              if (isSilentCancelError(err)) return;
-              console.error("[Linting] per-paragraph runBatch failed:", err);
-              // Fall through with cached results so isLinting clears.
+              issueCache.set(paragraph.text, issues);
             }
           }
 
           if (version !== processingVersion) return;
 
-          // Document-level rules always re-run against all paragraphs.
+          // Run document-level rules on all paragraphs (always recompute)
+          // Document-level rules are fast (L1/L2) so recomputing is acceptable
           documentIssueCache = null;
           if (currentRuleRunner.hasDocumentRules()) {
-            const docInputs = allParagraphs.map((p) => ({
-              text: p.text,
-              index: p.index,
-              tokens: tokensByText.get(p.text),
-            }));
-            try {
-              const resp = await currentRuleRunner.runBatch({
-                paragraphs: docInputs,
-                mode: "document",
-                version,
-              });
-              if (version !== processingVersion) return;
-              documentIssueCache = resp.document;
-            } catch (err) {
-              if (isSilentCancelError(err)) return;
-              console.error("[Linting] document runBatch failed:", err);
-              // Fall through with documentIssueCache=null so isLinting clears.
+            if (hasMorphRules && nlp && !nlpErrorFired) {
+              // Tokenize all paragraphs for morphological document rules (use cache where possible)
+              const paragraphsWithTokens = [];
+              let docNlpFailed = false;
+              for (const p of allParagraphs) {
+                if (version !== processingVersion) return;
+                let tokens = tokenCache.get(p.text);
+                if (!tokens) {
+                  try {
+                    tokens = await nlp.tokenizeParagraph(p.text);
+                    tokenCache.set(p.text, tokens);
+                  } catch (err) {
+                    const error = err instanceof Error ? err : new Error(String(err));
+                    console.error(
+                      "[Linting] NLP tokenization failed during document rules — L2 rules disabled:",
+                      error,
+                    );
+                    if (!nlpErrorFired) {
+                      nlpErrorFired = true;
+                      onNlpError?.(error);
+                    }
+                    docNlpFailed = true;
+                    break;
+                  }
+                }
+                paragraphsWithTokens.push({ text: p.text, index: p.index, tokens });
+              }
+              if (!docNlpFailed) {
+                documentIssueCache = currentRuleRunner.runDocumentWithTokens(paragraphsWithTokens);
+              } else {
+                // Fall back to L1-only document rules
+                documentIssueCache = currentRuleRunner.runDocument(
+                  allParagraphs.map((p) => ({ text: p.text, index: p.index })),
+                );
+              }
+            } else {
+              documentIssueCache = currentRuleRunner.runDocument(
+                allParagraphs.map((p) => ({ text: p.text, index: p.index })),
+              );
             }
           }
 
