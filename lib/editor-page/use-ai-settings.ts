@@ -118,7 +118,6 @@ export function useAiSettings(): UseAiSettingsResult {
         "jtf-style-3",
         "editors-rulebook",
         "gendai-kanazukai-1986",
-        "genji-dict",
       ];
       const hasAnyRuleBearing = stored.some((g) => RULE_BEARING.includes(g));
       if (!hasAnyRuleBearing) {
@@ -129,20 +128,6 @@ export function useAiSettings(): UseAiSettingsResult {
       } else {
         setCorrectionGuidelines(stored);
       }
-    }
-
-    // One-shot migration: inject "genji-dict" for existing users who don't have it yet.
-    if (!appState.genjiGuidelineMigrated) {
-      setCorrectionGuidelines((prev) => {
-        const next: GuidelineId[] = prev.includes("genji-dict")
-          ? prev
-          : [...prev, "genji-dict" as GuidelineId];
-        void persistAppState({
-          correctionGuidelines: next,
-          genjiGuidelineMigrated: true,
-        }).catch((e) => console.error("Failed to persist genji migration:", e));
-        return next;
-      });
     }
 
     // Online AI API settings

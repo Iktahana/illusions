@@ -105,14 +105,6 @@ export const GUIDELINES: Record<GuidelineId, Guideline> = {
     license: "Public",
     descriptionJa: "小説・フィクション向けの慣用的な原稿作法",
   },
-  "genji-dict": {
-    id: "genji-dict",
-    nameJa: "幻辭辞典（Genji 辞典）",
-    publisherJa: "illusions プロジェクト",
-    year: null,
-    license: "Public",
-    descriptionJa: "Genji 辞典に登録された名詞を参照して未登録名詞を警告します（Electron 限定）",
-  },
 };
 
 /**

@@ -30,16 +30,6 @@ function registerShellHandlers() {
     return true;
   });
 
-  ipcMain.handle("open-with-default-app", async (_event, filePath) => {
-    if (!filePath || typeof filePath !== "string") return false;
-    if (!path.isAbsolute(filePath) || filePath.includes("..")) {
-      console.warn("[Security] Invalid path in open-with-default-app:", filePath);
-      return false;
-    }
-    const result = await shell.openPath(path.normalize(filePath));
-    return result === ""; // empty string = success on macOS/Windows
-  });
-
   ipcMain.handle("open-external", async (_event, url) => {
     if (typeof url !== "string") return false;
     // Only allow http/https URLs

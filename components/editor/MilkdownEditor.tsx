@@ -38,17 +38,13 @@ import {
   getScrollProgress,
   setScrollProgress,
 } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
-import type { LintIssue } from "@/lib/linting";
-import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import type { RuleRunner, LintIssue } from "@/lib/linting";
 import {
   useTypographySettings,
   useLintingSettings,
   usePosHighlightSettings,
-  usePowerSettings,
   useScrollSettings,
 } from "@/contexts/EditorSettingsContext";
-import { useWindowActivityState } from "@/lib/hooks/use-window-activity";
-import { shouldEnablePosHighlight } from "@/lib/editor-page/power-optimization";
 
 interface MilkdownEditorProps {
   initialContent: string;
@@ -58,7 +54,7 @@ interface MilkdownEditorProps {
   isVertical: boolean;
   scrollContainerRef: RefObject<HTMLDivElement | null>;
   onEditorViewReady?: (view: EditorView) => void;
-  lintingRuleRunner?: RuleRunnerLike | null;
+  lintingRuleRunner?: RuleRunner | null;
   onLintIssuesUpdated?: (issues: LintIssue[]) => void;
   onNlpError?: (error: Error) => void;
   onOpenRubyDialog?: () => void;
@@ -119,9 +115,7 @@ export default function MilkdownEditor({
   const { lintingEnabled } = useLintingSettings();
   const { posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes } =
     usePosHighlightSettings();
-  const { powerSaveMode } = usePowerSettings();
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
-  const windowActivity = useWindowActivityState();
   const { measureRef: charMeasureRef, charWidth } = useCharWidth({
     fontFamily,
     fontScale,
@@ -189,15 +183,10 @@ export default function MilkdownEditor({
   // tab has its own editor instance (keyed by bufferId+editorKey) and a tab's
   // file type never changes during its lifetime.
   const isPlainText = !gfmEnabled && !mdiExtensionsEnabled;
-  const effectivePosHighlightEnabled = shouldEnablePosHighlight(posHighlightEnabled, {
-    powerSaveMode,
-    isDocumentVisible: windowActivity.isDocumentVisible,
-    isWindowFocused: windowActivity.isWindowFocused,
-  });
 
   const { get } = useEditor(
     (root) => {
-      const value = initialContentRef.current ?? "";
+      const value = initialContentRef.current;
       let editor = Editor.make()
         .config(nord)
         .config((ctx) => {
@@ -355,7 +344,7 @@ export default function MilkdownEditor({
     import("@/packages/milkdown-plugin-japanese-novel/pos-highlight")
       .then(({ updatePosHighlightSettings }) => {
         updatePosHighlightSettings(editorViewInstance, {
-          enabled: effectivePosHighlightEnabled,
+          enabled: posHighlightEnabled,
           colors: posHighlightColors,
           disabledTypes: posHighlightDisabledTypes,
         });
@@ -363,12 +352,7 @@ export default function MilkdownEditor({
       .catch((err) => {
         console.error("[Editor] Failed to update POS highlight settings:", err);
       });
-  }, [
-    editorViewInstance,
-    effectivePosHighlightEnabled,
-    posHighlightColors,
-    posHighlightDisabledTypes,
-  ]);
+  }, [editorViewInstance, posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes]);
 
   // linting 設定を動的に更新（Editor を再作成せずに）
   useEffect(() => {

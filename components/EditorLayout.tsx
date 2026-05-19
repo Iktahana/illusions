@@ -46,7 +46,7 @@ import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import type { ExportMetadata } from "@/lib/export/types";
-import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import type { RuleRunner } from "@/lib/linting/rule-runner";
 import { DockviewReact } from "dockview-react";
 type SidebarPanelSharedProps = Omit<React.ComponentProps<typeof SidebarPanel>, "view">;
 
@@ -163,7 +163,7 @@ interface EditorLayoutProps {
     handleShowAllSearchResults: NonNullable<
       React.ComponentProps<typeof NovelEditor>["onShowAllSearchResults"]
     >;
-    ruleRunner: RuleRunnerLike | null;
+    ruleRunner: RuleRunner;
     handleLintIssuesUpdated: (issues: LintIssue[]) => void;
     handleNlpError: (error: Error) => void;
     handleOpenRubyDialog: () => void;
@@ -444,9 +444,6 @@ export default function EditorLayout({
                               <div
                                 ref={mainArea.editorDomRef as React.RefObject<HTMLDivElement>}
                                 className="h-full"
-                                // NOTE: onFocus は子孫（Milkdown contenteditable）からの bubble を利用。
-                                // tabIndex は不要。パネルへのフォーカスを dockview に伝え activeTabId を最新化する。
-                                onFocus={() => panelApi.setActive()}
                               >
                                 <NovelEditor
                                   key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}`}

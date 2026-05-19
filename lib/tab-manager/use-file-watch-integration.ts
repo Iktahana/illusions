@@ -5,7 +5,7 @@ import { createFileWatcher } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
 import { isEditorTab } from "./tab-types";
 import type { FileWatcher } from "../services/file-watcher";
-import type { TabId, EditorTabState } from "./tab-types";
+import type { TabId, TabState, EditorTabState, DiffTabState } from "./tab-types";
 import type { TabManagerCore } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -13,8 +13,6 @@ import type { TabManagerCore } from "./types";
 // ---------------------------------------------------------------------------
 
 export interface UseFileWatchIntegrationParams extends TabManagerCore {
-  /** Pause all watchers while the window is backgrounded. */
-  pauseFileWatchers?: boolean;
   /**
    * Callback to open a diff tab for conflict visualization.
    * Called when the user clicks "差分を表示".
@@ -175,16 +173,8 @@ function buildOnChanged(
  * CPU 節約のため一時停止する。タブを閉じるとウォッチャーも停止する。
  */
 export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): void {
-  const {
-    tabs,
-    setTabs,
-    activeTabId,
-    tabsRef,
-    isElectron,
-    pauseFileWatchers = false,
-    openDiffTab,
-    onEditorRemountNeeded,
-  } = params;
+  const { tabs, setTabs, activeTabId, tabsRef, isElectron, openDiffTab, onEditorRemountNeeded } =
+    params;
 
   /**
    * Map from tabId to its FileWatcher instance.
@@ -255,7 +245,7 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
         );
         const watcher = createFileWatcher({ path: filePath, onChanged });
 
-        if (isActiveTab && !pauseFileWatchers) {
+        if (isActiveTab) {
           watcher.start();
         }
         // Background tabs are not started yet (started when becoming active)
@@ -263,16 +253,7 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
         watcherPaths.set(tab.id, filePath);
       }
     }
-  }, [
-    tabs,
-    activeTabId,
-    isElectron,
-    pauseFileWatchers,
-    setTabs,
-    tabsRef,
-    openDiffTab,
-    onEditorRemountNeeded,
-  ]);
+  }, [tabs, activeTabId, isElectron, setTabs, tabsRef, openDiffTab, onEditorRemountNeeded]);
 
   // ---------------------------------------------------------------------------
   // Pause/resume watchers based on active tab
@@ -286,13 +267,6 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
       const tab = tabsRef.current.find((t) => t.id === tabId);
       if (!tab || !isEditorTab(tab) || !tab.file?.path) continue;
 
-      if (pauseFileWatchers) {
-        if (watcher.isActive) {
-          watcher.stop();
-        }
-        continue;
-      }
-
       if (tabId === activeTabId) {
         // Resume active tab watcher
         if (!watcher.isActive) {
@@ -305,22 +279,19 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
         }
       }
     }
-  }, [activeTabId, isElectron, pauseFileWatchers, tabsRef]);
+  }, [activeTabId, isElectron, tabsRef]);
 
   // ---------------------------------------------------------------------------
   // Cleanup all watchers on unmount
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    const watchers = watchersRef.current;
-    const watcherPaths = watcherPathsRef.current;
-
     return () => {
-      for (const watcher of watchers.values()) {
+      for (const watcher of watchersRef.current.values()) {
         watcher.stop();
       }
-      watchers.clear();
-      watcherPaths.clear();
+      watchersRef.current.clear();
+      watcherPathsRef.current.clear();
     };
   }, []);
 }

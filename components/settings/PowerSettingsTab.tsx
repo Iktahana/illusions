@@ -20,7 +20,7 @@ export default function PowerSettingsTab(): React.ReactElement {
   return (
     <SettingsSection
       title="省電力モード"
-      description="省電力モードを有効にすると、校正・可読性解析・品詞ハイライトなどの非必須処理を抑制し、バックグラウンド時の wake-up を減らします。"
+      description="省電力モードを有効にすると、校正機能と AI 関連機能が一時的に無効になり、バッテリー消費を抑えます。"
     >
       <SettingsField label="省電力モードを有効にする" htmlFor="power-save-mode" inline>
         <SettingsToggle
@@ -45,7 +45,6 @@ export default function PowerSettingsTab(): React.ReactElement {
       <div className="text-xs text-foreground-secondary space-y-1">
         <p>・AC 電源接続時に自動的に省電力モードを解除します</p>
         <p>・省電力モードを解除すると、以前の校正・AI 設定が復元されます</p>
-        <p>・autosave / recovery は停止せず、安全性を保ったまま低頻度化します</p>
       </div>
     </SettingsSection>
   );

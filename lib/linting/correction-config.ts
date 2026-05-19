@@ -33,8 +33,7 @@ export type GuidelineId =
   | "jtf-style-3"
   | "jtca-style-3"
   | "editors-rulebook"
-  | "novel-manuscript"
-  | "genji-dict";
+  | "novel-manuscript";
 
 /** Single source of truth for all correction settings */
 export interface CorrectionConfig {
@@ -49,13 +48,7 @@ export interface CorrectionConfig {
 export const DEFAULT_CORRECTION_CONFIG: CorrectionConfig = {
   enabled: true,
   mode: "novel",
-  guidelines: [
-    "novel-manuscript",
-    "gendai-kanazukai-1986",
-    "editors-rulebook",
-    "joyo-kanji-2010",
-    "genji-dict",
-  ],
+  guidelines: ["novel-manuscript", "gendai-kanazukai-1986", "editors-rulebook", "joyo-kanji-2010"],
   ruleOverrides: {},
   ignoredCorrections: [],
 };

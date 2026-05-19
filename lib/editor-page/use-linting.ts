@@ -1,21 +1,16 @@
 import type { EditorView } from "@milkdown/prose/view";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { RuleRunner } from "@/lib/linting/rule-runner";
 import type { LintIssue, Severity } from "@/lib/linting/types";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
+import { getAllRules, createJsonDrivenRules } from "@/lib/linting/rule-registry";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import { notificationManager } from "@/lib/services/notification-manager";
-import { genjiVocab } from "@/lib/dict/genji-vocab";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
-import {
-  RuleRunnerProxy,
-  type RuleRunnerLike,
-} from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 
 export interface UseLintingResult {
-  /** May be `null` until the worker has been spun up after mount. */
-  ruleRunner: RuleRunnerLike | null;
+  ruleRunner: RuleRunner;
   lintIssues: LintIssue[];
   isLinting: boolean;
   handleLintIssuesUpdated: (issues: LintIssue[]) => void;
@@ -36,35 +31,29 @@ export function useLinting(
     { enabled: boolean; severity: Severity; skipDialogue?: boolean }
   >,
   editorViewInstance: EditorView | null,
-  // Reserved for future throttling / mode-aware logic; kept in the
-  // signature so callers don't have to be reworked when wired up.
-  _powerSaveMode: boolean = false,
+  powerSaveMode: boolean = false,
   correctionGuidelines?: GuidelineId[],
-  _correctionMode?: CorrectionModeId,
+  correctionMode?: CorrectionModeId,
 ): UseLintingResult {
-  const [ruleRunner, setRuleRunner] = useState<RuleRunnerLike | null>(null);
+  const ruleRunnerRef = useRef<RuleRunner | null>(null);
   const [lintIssues, setLintIssues] = useState<LintIssue[]>([]);
   const [isLinting, setIsLinting] = useState(false);
 
-  // Build the proxy in an effect so the Worker constructor is never invoked
-  // during SSR. The proxy is held in state so its `null → ready` transition
-  // triggers a rerender that propagates the ruleRunner into the editor.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const proxy = new RuleRunnerProxy();
-    proxy.setGuidelineMap(RULE_GUIDELINE_MAP);
-    setRuleRunner(proxy);
-    return () => {
-      // Don't `setRuleRunner(null)` here — StrictMode's mount → cleanup
-      // → mount cycle would briefly nullify the runner between the two
-      // mounts, causing dependent effects to re-run with `null` for no
-      // reason. On real unmount the component is going away, so the
-      // state write is wasted either way.
-      proxy.dispose();
-    };
-  }, []);
+  // Lazily create and register all rules once
+  if (!ruleRunnerRef.current) {
+    const runner = new RuleRunner();
+    for (const rule of getAllRules()) runner.registerRule(rule);
+    for (const rule of createJsonDrivenRules()) runner.registerRule(rule);
 
-  // Sync rule configs from settings to the runner
+    runner.setGuidelineMap(RULE_GUIDELINE_MAP);
+
+    ruleRunnerRef.current = runner;
+  }
+
+  // Guaranteed non-null after the lazy initialization block above
+  const ruleRunner = ruleRunnerRef.current!;
+
+  // Sync rule configs from settings to RuleRunner
   useEffect(() => {
     if (!ruleRunner) return;
 
@@ -105,7 +94,11 @@ export function useLinting(
     if (editorViewInstance && lintingEnabled) {
       import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
         .then(({ updateLintingSettings }) => {
-          updateLintingSettings(editorViewInstance, { ruleRunner }, "guideline-change");
+          updateLintingSettings(
+            editorViewInstance,
+            { ruleRunner: ruleRunnerRef.current },
+            "guideline-change",
+          );
         })
         .catch((err) => {
           console.error("[useLinting] Failed to sync guidelines:", err);
@@ -113,30 +106,26 @@ export function useLinting(
     }
   }, [ruleRunner, correctionGuidelines, editorViewInstance, lintingEnabled]);
 
-  // Clear issues + spinner when linting is disabled. `isLinting` must be
-  // reset here because `handleLintIssuesUpdated` short-circuits while
-  // disabled, so a refresh that was in flight when the user toggled
-  // linting off would otherwise leave the loading state stuck on.
+  // Clear issues when linting is disabled
   useEffect(() => {
     if (!lintingEnabled) {
       setLintIssues([]);
-      setIsLinting(false);
     }
   }, [lintingEnabled]);
 
   // Force re-run linting on the full document (not just visible paragraphs)
   const refreshLinting = useCallback(() => {
-    if (!editorViewInstance || !lintingEnabled || !ruleRunner) return;
+    if (!editorViewInstance || !lintingEnabled) return;
 
     setIsLinting(true);
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
       .then(({ updateLintingSettings }) => {
-        const nlpClient = ruleRunner.hasMorphologicalRules() ? getNlpClient() : null;
+        const nlpClient = ruleRunnerRef.current?.hasMorphologicalRules() ? getNlpClient() : null;
 
         updateLintingSettings(
           editorViewInstance,
           {
-            ruleRunner,
+            ruleRunner: ruleRunnerRef.current,
             nlpClient,
           },
           "manual-refresh",
@@ -146,33 +135,7 @@ export function useLinting(
         console.error("[useLinting] Failed to refresh linting:", err);
         setIsLinting(false);
       });
-  }, [editorViewInstance, lintingEnabled, ruleRunner]);
-
-  // Bootstrap the Genji noun vocabulary (renderer-side) — Electron only.
-  // Fires `refreshLinting` whenever vocab becomes ready or gets reloaded
-  // after a dictionary install so the genji-unknown-noun rule picks it up.
-  useEffect(() => {
-    if (!isElectronRenderer()) return;
-
-    genjiVocab.initialize().catch((err) => {
-      console.error("[useLinting] genjiVocab.initialize failed:", err);
-    });
-
-    const unsubscribe = genjiVocab.subscribe(() => {
-      refreshLinting();
-    });
-
-    const offInstalled = window.electronAPI?.dict?.onInstalled?.(() => {
-      genjiVocab.reload().catch((err) => {
-        console.error("[useLinting] genjiVocab.reload failed:", err);
-      });
-    });
-
-    return () => {
-      unsubscribe();
-      offInstalled?.();
-    };
-  }, [refreshLinting]);
+  }, [editorViewInstance, lintingEnabled]);
 
   return {
     ruleRunner,
