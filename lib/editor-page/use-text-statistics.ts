@@ -76,21 +76,29 @@ export function useTextStatistics(
     if (!enableMorphologicalAnalysis || cleanedContent.length < 50) return;
 
     let cancelled = false;
-    getNlpClient()
-      .tokenizeParagraph(cleanedContent)
-      .then((tokens) => {
-        if (cancelled) return;
-        setEnrichedAnalysis({
-          content: cleanedContent,
-          analysis: enrichReadabilityWithMorphology(surfaceAnalysis, tokens),
+    // Debounce the full-document tokenization so it doesn't fire on the
+    // mount-time content commit alongside the linting plugin's initial
+    // scan. 600 ms is short enough that statistics stay responsive while
+    // typing but long enough to let the first paint settle (#1457).
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      getNlpClient()
+        .tokenizeParagraph(cleanedContent)
+        .then((tokens) => {
+          if (cancelled) return;
+          setEnrichedAnalysis({
+            content: cleanedContent,
+            analysis: enrichReadabilityWithMorphology(surfaceAnalysis, tokens),
+          });
+        })
+        .catch(() => {
+          // NLP失敗時は表層結果のまま維持（silent fallback）
         });
-      })
-      .catch(() => {
-        // NLP失敗時は表層結果のまま維持（silent fallback）
-      });
+    }, 600);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [cleanedContent, surfaceAnalysis, enableMorphologicalAnalysis]);
 

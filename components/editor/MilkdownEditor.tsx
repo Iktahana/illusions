@@ -323,6 +323,14 @@ export default function MilkdownEditor({
     const editor = get();
     if (!editor) return;
 
+    // Diagnostic: surface unexpected externalContent applications that
+    // could explain the uneditable-from-start regression in #1457.
+    // Remove once the root cause is confirmed not to be here.
+    console.warn(
+      "[MilkdownEditor] applying externalContent (replaceAll)",
+      `length=${externalContent.length}`,
+    );
+
     // Save scroll progress before replacing content
     const container = scrollContainerRef.current;
     let savedProgress: number | null = null;
@@ -371,23 +379,46 @@ export default function MilkdownEditor({
   ]);
 
   // linting 設定を動的に更新（Editor を再作成せずに）
+  //
+  // Defer the first call until idle so the initial paint can finish before
+  // the linting plugin schedules a full-document scan. Without this, opening
+  // a large project document keeps the renderer busy long enough that the
+  // contenteditable feels frozen (#1457).
   useEffect(() => {
     if (!editorViewInstance) return;
 
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
-      .then(({ updateLintingSettings }) => {
-        updateLintingSettings(
-          editorViewInstance,
-          {
-            enabled: lintingEnabled,
-            ruleRunner: lintingRuleRunner,
-          },
-          "rule-config-change",
-        );
-      })
-      .catch((err) => {
-        console.error("[Editor] Failed to update linting settings:", err);
-      });
+    const run = () => {
+      import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
+        .then(({ updateLintingSettings }) => {
+          updateLintingSettings(
+            editorViewInstance,
+            {
+              enabled: lintingEnabled,
+              ruleRunner: lintingRuleRunner,
+            },
+            "rule-config-change",
+          );
+        })
+        .catch((err) => {
+          console.error("[Editor] Failed to update linting settings:", err);
+        });
+    };
+
+    const ric = (
+      window as Window & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      }
+    ).requestIdleCallback;
+    if (typeof ric === "function") {
+      const handle = ric(run, { timeout: 1500 });
+      return () => {
+        const cic = (window as Window & { cancelIdleCallback?: (id: number) => void })
+          .cancelIdleCallback;
+        cic?.(handle);
+      };
+    }
+    const timer = window.setTimeout(run, 100);
+    return () => window.clearTimeout(timer);
   }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
 
   // 縦書き時: マウスホイールの縦スクロールを横スクロールへ変換する

@@ -915,9 +915,19 @@ export default function EditorPage() {
   // --- Ignored corrections hook ---
   const { ignoredCorrections, ignoreCorrection } = useIgnoredCorrections(editorMode);
 
-  // Sync ignoredCorrections to ProseMirror plugin
+  // Sync ignoredCorrections to ProseMirror plugin.
+  //
+  // Skip the call when the list is empty on first sync — the plugin defaults
+  // to no ignored corrections, so an empty-array notification forces a full
+  // document rescan for zero behavioral change. This is the dominant
+  // mount-time blocker for project mode (#1457).
+  const prevIgnoredCorrectionsRef = useRef<typeof ignoredCorrections | null>(null);
   useEffect(() => {
     if (!editorViewInstance) return;
+    const prev = prevIgnoredCorrectionsRef.current;
+    const bothEmpty = (prev == null || prev.length === 0) && ignoredCorrections.length === 0;
+    prevIgnoredCorrectionsRef.current = ignoredCorrections;
+    if (bothEmpty) return;
 
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
       .then(({ updateLintingSettings }) => {
