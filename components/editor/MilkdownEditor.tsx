@@ -179,6 +179,21 @@ export default function MilkdownEditor({
                 return false;
               },
             },
+            // Diagnostic: log every transaction so we can identify what
+            // dispatches a selection reset to doc start on click (#1457).
+            appendTransaction(transactions, oldState, newState) {
+              const oldSel = oldState.selection;
+              const newSel = newState.selection;
+              if (oldSel.from !== newSel.from || oldSel.to !== newSel.to) {
+                console.warn(
+                  "[ProseMirror] selection change",
+                  `${oldSel.from}-${oldSel.to} → ${newSel.from}-${newSel.to}`,
+                  `docChanged=${transactions.some((t) => t.docChanged)}`,
+                  `metas=${transactions.map((t) => Object.keys((t as unknown as { meta: Record<string, unknown> }).meta || {}).join(",")).join("|")}`,
+                );
+              }
+              return null;
+            },
           }),
       ),
     [],
