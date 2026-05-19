@@ -329,8 +329,14 @@ export function useDockviewAdapter({
 
       // Listen for dockview panel activation → update tab manager
       api.onDidActivePanelChange((e) => {
-        if (isSyncingRef.current) return;
         const panelId = e?.id;
+        console.warn(
+          "[dockview] onDidActivePanelChange",
+          `panelId=${panelId}`,
+          `currentActive=${tabManager.activeTabId}`,
+          `isSyncing=${isSyncingRef.current}`,
+        );
+        if (isSyncingRef.current) return;
         if (panelId && panelId !== tabManager.activeTabId) {
           isSyncingRef.current = true;
           switchTab(panelId);

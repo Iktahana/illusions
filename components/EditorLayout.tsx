@@ -446,7 +446,14 @@ export default function EditorLayout({
                                 className="h-full"
                                 // NOTE: onFocus は子孫（Milkdown contenteditable）からの bubble を利用。
                                 // tabIndex は不要。パネルへのフォーカスを dockview に伝え activeTabId を最新化する。
-                                onFocus={() => panelApi.setActive()}
+                                onFocus={() => {
+                                  console.warn(
+                                    "[EditorLayout] onFocus → panelApi.setActive",
+                                    `panelId=${panelBufferId}`,
+                                    `activeTabId=${panelActiveTabId}`,
+                                  );
+                                  panelApi.setActive();
+                                }}
                               >
                                 <NovelEditor
                                   key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}`}

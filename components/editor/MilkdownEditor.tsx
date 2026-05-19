@@ -295,6 +295,11 @@ export default function MilkdownEditor({
         if (editor && editor.ctx) {
           const view = editor.ctx.get(editorViewCtx);
           if (view) {
+            console.warn(
+              "[MilkdownEditor] EditorView ready",
+              `attempts=${attempts}`,
+              `instance=${(view as unknown as { dom?: { id?: string } })?.dom?.id ?? "n/a"}`,
+            );
             setEditorViewInstance(view);
             onEditorViewReady?.(view);
             return;
