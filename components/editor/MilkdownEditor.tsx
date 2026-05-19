@@ -197,6 +197,14 @@ export default function MilkdownEditor({
 
   const { get } = useEditor(
     (root) => {
+      // Diagnostic: trace every Editor.make() invocation to detect whether
+      // useEditor is re-running on click (deps unstable) for #1457 / #1445.
+      console.warn(
+        "[MilkdownEditor] useEditor factory invoked",
+        `isVertical=${isVertical}`,
+        `mdi=${mdiExtensionsEnabled}`,
+        `gfm=${gfmEnabled}`,
+      );
       const value = initialContentRef.current ?? "";
       let editor = Editor.make()
         .config(nord)
@@ -295,10 +303,19 @@ export default function MilkdownEditor({
         if (editor && editor.ctx) {
           const view = editor.ctx.get(editorViewCtx);
           if (view) {
+            // Tag the view with a unique id so we can tell whether subsequent
+            // "ready" log entries refer to the same editor or a newly created
+            // instance (diagnosing #1457 / #1445 click-recreation hypothesis).
+            const tagged = view as unknown as { __illusionsViewId?: string };
+            if (!tagged.__illusionsViewId) {
+              tagged.__illusionsViewId = `v${Date.now().toString(36)}${Math.random()
+                .toString(36)
+                .slice(2, 6)}`;
+            }
             console.warn(
               "[MilkdownEditor] EditorView ready",
               `attempts=${attempts}`,
-              `instance=${(view as unknown as { dom?: { id?: string } })?.dom?.id ?? "n/a"}`,
+              `viewId=${tagged.__illusionsViewId}`,
             );
             setEditorViewInstance(view);
             onEditorViewReady?.(view);
