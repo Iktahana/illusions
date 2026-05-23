@@ -7,7 +7,7 @@ import clsx from "clsx";
 import dynamic from "next/dynamic";
 
 import type { Severity } from "@/lib/linting/types";
-import type { CorrectionConfig, GuidelineId } from "@/lib/linting/correction-config";
+import type { CorrectionConfig } from "@/lib/linting/correction-config";
 import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import {
   LINT_RULES_META,
@@ -142,16 +142,6 @@ export default function LintingSettings({
 
   // Memoized map to avoid recreation on every render (LINT_RULES_META is a module-level constant)
   const ruleMetaMap = useMemo(() => new Map(LINT_RULES_META.map((r) => [r.id, r])), []);
-
-  /** Active guideline IDs — undefined correctionConfig means "treat all as active". */
-  const activeGuidelines = useMemo<Set<GuidelineId> | null>(
-    () => (correctionConfig ? new Set(correctionConfig.guidelines) : null),
-    [correctionConfig],
-  );
-
-  /** Returns true when the rule's guideline is active (or the rule has no guideline). */
-  const isGuidelineActive = (guidelineId: GuidelineId | undefined): boolean =>
-    activeGuidelines === null || guidelineId === undefined || activeGuidelines.has(guidelineId);
 
   /** Handle correction mode change: update mode, guidelines, and apply corresponding preset */
   const handleModeChange = useCallback(
@@ -297,19 +287,11 @@ export default function LintingSettings({
           const isCollapsed = collapsedGroups.has(category.id);
           const enabledCount = categoryEnabledCount(category.rules);
           const allEnabled = isCategoryAllEnabled(category.rules);
-          const allCategoryGuidelinesInactive = category.rules.every(
-            (id) => !isGuidelineActive(ruleMetaMap.get(id)?.guidelineId),
-          );
 
           return (
             <div key={category.id} className="border border-border rounded-lg overflow-hidden">
               {/* Category header */}
-              <div
-                className={clsx(
-                  "flex items-center gap-2 px-3 py-2.5 bg-background-tertiary/50",
-                  allCategoryGuidelinesInactive && "opacity-50 pointer-events-none",
-                )}
-              >
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-background-tertiary/50">
                 <button
                   onClick={() => toggleGroup(category.id)}
                   className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
@@ -350,20 +332,12 @@ export default function LintingSettings({
                     if (!meta) return null;
                     const config = getConfig(ruleId, lintingRuleConfigs);
                     const showDialogueToggle = SKIP_DIALOGUE_SUPPORT.get(ruleId) ?? false;
-                    const guidelineActive = isGuidelineActive(meta.guidelineId);
 
                     return (
                       <div
                         key={ruleId}
-                        className={clsx(
-                          "flex items-center gap-2 px-3 py-2",
-                          !guidelineActive && "opacity-50 pointer-events-none",
-                        )}
-                        title={
-                          !guidelineActive
-                            ? `「${meta.nameJa}」はガイドラインが無効のため実行されません`
-                            : undefined
-                        }
+                        className={clsx("flex items-center gap-2 px-3 py-2")}
+                        title={undefined}
                       >
                         {/* Rule name */}
                         <div className="flex-1 min-w-0">

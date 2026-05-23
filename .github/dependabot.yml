@@ -1,18 +1,9 @@
 version: 2
 
 # ----------------------------------------------------------------------------
-# Base branch policy (see CLAUDE.md § Branch Strategy):
-#   - Regular Dependabot version updates target `dev` (via `target-branch`).
-#   - Dependabot security updates ALWAYS target the default branch (`main`)
-#     and ignore `target-branch` by design. Policy: merge security PRs to
-#     `main` promptly, then back-merge `main` → `dev` so dev tracks the fix.
-#   - `main` otherwise receives merges only via the weekly release PR.
-#
-# Group strategy:
-#   Minor/patch updates are bundled (low risk, batch reviewable). Major
-#   updates are split out so a single breaking change cannot redden CI for
-#   the entire bundle (see PR #1454 retro: archiver 7→8 + electron 41→42 +
-#   lint-staged 16→17 collectively failed every check).
+# Base branch policy (see .github/copilot-instructions.md § Branch Strategy):
+#   All bot-generated PRs MUST target `dev`, never `main`.
+#   `main` receives merges only via the weekly release PR.
 # ----------------------------------------------------------------------------
 
 updates:
@@ -41,20 +32,9 @@ updates:
       - dependency-name: "tailwindcss"
         versions: ["4.x"]
     groups:
-      npm-minor-patch:
+      npm_and_yarn:
         patterns:
           - "*"
-        update-types:
-          - "minor"
-          - "patch"
-      npm-major-production:
-        dependency-type: "production"
-        update-types:
-          - "major"
-      npm-major-development:
-        dependency-type: "development"
-        update-types:
-          - "major"
 
   - package-ecosystem: "npm"
     directory: "/packages/milkdown-plugin-japanese-novel"
@@ -72,17 +52,9 @@ updates:
       prefix: "chore"
       include: "scope"
     groups:
-      milkdown-plugin-minor-patch:
+      milkdown_plugin_npm:
         patterns:
           - "*"
-        update-types:
-          - "minor"
-          - "patch"
-      milkdown-plugin-major:
-        patterns:
-          - "*"
-        update-types:
-          - "major"
 
   - package-ecosystem: "github-actions"
     directory: "/"

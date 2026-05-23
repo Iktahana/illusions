@@ -23,23 +23,6 @@ const IGNORED_CORRECTIONS_FILENAME = "ignored-corrections.json";
 const STANDALONE_STORAGE_PREFIX = "illusions-ignored-corrections:";
 
 // -----------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------
-
-/**
- * Returns true if the error indicates a missing file or directory.
- * Checks `.code` (native Node.js throw) and `.message` (Electron IPC strips `.code`
- * when serialising errors across the process boundary; Node.js ENOENT messages
- * always contain the literal string "ENOENT: no such file or directory").
- */
-function isNotFoundError(err: unknown): boolean {
-  if ((err as NodeJS.ErrnoException).code === "ENOENT") return true;
-  if (err instanceof Error && err.message.includes("ENOENT: no such file or directory"))
-    return true;
-  return false;
-}
-
-// -----------------------------------------------------------------------
 // Service
 // -----------------------------------------------------------------------
 
@@ -66,14 +49,14 @@ class IgnoredCorrectionsService {
   async loadIgnoredCorrections(): Promise<IgnoredCorrection[]> {
     try {
       const rootDir = await this.vfs.getDirectoryHandle("");
-      const illusionsDir = await rootDir.getDirectoryHandle(".illusions");
+      const illusionsDir = await rootDir.getDirectoryHandle(".illusions", { create: true });
       const fileHandle = await illusionsDir.getFileHandle(IGNORED_CORRECTIONS_FILENAME);
       const raw = await fileHandle.read();
       const data: IgnoredCorrectionsFile = JSON.parse(raw);
       return data.ignoredCorrections ?? [];
     } catch (err) {
       // File doesn't exist yet — that's fine
-      if (isNotFoundError(err)) return [];
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
       // JSON corruption or permission error — re-throw to prevent overwriting existing data
       throw err;
     }

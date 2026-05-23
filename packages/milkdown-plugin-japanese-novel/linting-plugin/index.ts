@@ -5,24 +5,21 @@
 
 import type { EditorView } from "@milkdown/prose/view";
 import { $prose } from "@milkdown/utils";
-import type { LintIssue } from "@/lib/linting";
+import type { RuleRunner, LintIssue } from "@/lib/linting";
 import type { INlpClient } from "@/lib/nlp-client/types";
 import type { IgnoredCorrection } from "@/lib/project/project-types";
 import type { ConfigChangeReason } from "@/lib/linting/correction-config";
-import type { LintingSettingsUpdate, RuleRunnerLike } from "./types";
+import type { LintingSettingsUpdate } from "./types";
 import { createLintingPlugin, lintingKey } from "./decoration-plugin";
 
 // Export the plugin key for external use
 export { lintingKey } from "./decoration-plugin";
-export type { RuleRunnerLike } from "./types";
-export { RuleRunnerProxy } from "./worker/rule-runner-proxy";
-export { WorkerStaleError, WorkerDisposedError, isSilentCancelError } from "./worker/protocol";
 
 export interface LintingOptions {
   /** Enable/disable linting - 有効/無効 */
   enabled?: boolean;
-  /** RuleRunner-like instance (typically `RuleRunnerProxy`) for executing lint rules. */
-  ruleRunner?: RuleRunnerLike | null;
+  /** RuleRunner instance for executing lint rules */
+  ruleRunner?: RuleRunner | null;
   /** NLP client for morphological analysis (L2 rules) */
   nlpClient?: INlpClient | null;
   /** Ignored corrections to filter out from decorations */
