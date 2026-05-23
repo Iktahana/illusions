@@ -18,20 +18,20 @@ declare global {
   interface ElectronAPI {
     isElectron: boolean;
     openFile: () => Promise<{ path: string; content: string } | null>;
-    saveFile: (
-      filePath: string | null,
-      content: string,
-      fileType?: string,
-    ) => Promise<string | { success: false; error: string } | null>;
+    // saveFile 削除 (Phase 2)。Phase 8 で再導入する。
     getChromeVersion: () => Promise<number>;
     setDirty: (dirty: boolean) => Promise<void>;
+    /**
+     * Close-handshake terminator. Name is historical (originally tied to save).
+     * Phase 2: 保存経路を削除した後も flush 完了後の window destroy トリガとして利用。
+     */
     saveDoneAndClose?: () => Promise<void>;
     newWindow?: () => Promise<void>;
     openDictionaryPopup?: (url: string, title: string) => Promise<boolean>;
     showContextMenu?: (
       items: Array<{ type?: string; label?: string; action?: string; accelerator?: string }>,
     ) => Promise<string | null>;
-    onSaveBeforeClose?: (callback: () => void) => (() => void) | void;
+    // onSaveBeforeClose 削除 (Phase 2)。close handshake は onFlushStateBeforeClose のみ。
     onFlushStateBeforeClose?: (callback: () => void) => (() => void) | void;
     onOpenFileFromSystem?: (
       callback: (payload: { path: string; content: string }) => void,
@@ -47,8 +47,7 @@ declare global {
     >;
     onMenuNew?: (callback: () => void) => (() => void) | void;
     onMenuOpen?: (callback: () => void) => (() => void) | void;
-    onMenuSave?: (callback: () => void) => (() => void) | void;
-    onMenuSaveAs?: (callback: () => void) => (() => void) | void;
+    // onMenuSave / onMenuSaveAs 削除 (Phase 2)。Phase 8 で再導入する。
     onMenuCloseTab?: (callback: () => void) => (() => void) | void;
     onMenuNewTab?: (callback: () => void) => (() => void) | void;
     onMenuOpenProject?: (callback: () => void) => (() => void) | void;

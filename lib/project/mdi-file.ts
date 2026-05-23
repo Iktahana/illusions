@@ -129,114 +129,14 @@ export async function openMdiFile(): Promise<OpenMdiResult | null> {
 }
 
 /**
- * .illusions MDI Documentを保存する（可能なら既存ディスクリプタを再利用）
- * 新規の場合は「名前を付けて保存」相当のダイアログを出す
+ * .illusions MDI Document を保存する。
+ *
+ * Phase 2 shim: 保存経路を削除済み。production caller はすべて no-op shim 経由のため
+ * この関数は実質呼ばれない。テスト互換性のため signature を維持し、常に null を返す。
+ * Phase 8 で 2026-05-06 計画に従って再構築する。
  */
-export async function saveMdiFile(params: SaveMdiParams): Promise<OpenMdiResult | null> {
-  const env = getRuntimeEnvironment();
-  const { descriptor, content, fileType = ".mdi" } = params;
-
-  if (env === "electron-renderer" && window.electronAPI) {
-    const existingPath = descriptor?.path ?? null;
-    try {
-      const result = await window.electronAPI.saveFile(existingPath, content, fileType);
-      if (!result) {
-        // User cancelled the save dialog
-        return null;
-      }
-      // Check for structured error response from main process
-      if (typeof result === "object" && "success" in result && !result.success) {
-        throw new Error((result as { error?: string }).error ?? "ファイルの保存に失敗しました");
-      }
-      const savedPath = result as string;
-      const name = basename(savedPath);
-      return {
-        descriptor: {
-          path: savedPath,
-          handle: null,
-          name,
-        },
-        content,
-      };
-    } catch (error) {
-      console.error("Electron IPC 経由で .mdi を保存できませんでした:", error);
-      throw error;
-    }
-  }
-
-  if (!isBrowser()) {
-    console.warn("ブラウザ/Electron レンダラ以外では .mdi を保存できません。");
-    return null;
-  }
-
-  if (!descriptor?.handle && !hasShowSaveFilePicker(window)) {
-    console.warn("この環境では File System Access API による .mdi 保存ができません。");
-    return null;
-  }
-
-  try {
-    let handle = descriptor?.handle ?? null;
-
-    if (!handle && hasShowSaveFilePicker(window)) {
-      const defaultName = descriptor?.name ?? getDefaultFileName(fileType);
-      const suggestedName = ensureExtension(defaultName, fileType);
-      // window is narrowed by hasShowSaveFilePicker to include showSaveFilePicker
-      handle = await window.showSaveFilePicker({
-        suggestedName,
-        types: getSaveFilters(fileType),
-      });
-    }
-
-    if (!handle) {
-      return null;
-    }
-
-    // 永続化されたハンドルの場合、必要なら権限確認/要求を行う
-    if (descriptor?.handle && "queryPermission" in handle) {
-      try {
-        // queryPermission / requestPermission are File System Access API extensions
-        // not yet in standard TS lib types; cast through unknown to avoid any.
-        const permHandle = handle as unknown as {
-          queryPermission(d: { mode: string }): Promise<string>;
-          requestPermission(d: { mode: string }): Promise<string>;
-        };
-        const permission = await permHandle.queryPermission({ mode: "readwrite" });
-        if (permission !== "granted") {
-          const requestResult = await permHandle.requestPermission({ mode: "readwrite" });
-          if (requestResult !== "granted") {
-            console.warn("ファイルハンドルの書き込み権限が許可されませんでした");
-            return null;
-          }
-        }
-      } catch (err) {
-        console.warn("権限確認に失敗しました（可能ならそのまま書き込みを試みます）:", err);
-      }
-    }
-
-    // createWritable is a File System Access API extension not yet in standard TS lib types
-    const writableHandle = handle as unknown as {
-      createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>;
-    };
-    const writable = await writableHandle.createWritable();
-    await writable.write(content);
-    await writable.close();
-
-    const file = await handle.getFile();
-
-    return {
-      descriptor: {
-        path: null,
-        handle,
-        name: file.name,
-      },
-      content,
-    };
-  } catch (error) {
-    if ((error as { name?: string }).name !== "AbortError") {
-      console.error("File System Access API 経由で .mdi を保存できませんでした:", error);
-    }
-    return null;
-  }
+export async function saveMdiFile(_params: SaveMdiParams): Promise<OpenMdiResult | null> {
+  return null;
 }
 
 function basename(p: string): string {

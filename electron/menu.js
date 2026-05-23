@@ -201,20 +201,7 @@ function buildApplicationMenu(recentProjects = []) {
           sendToFocused("menu-open-triggered");
         },
       },
-      {
-        label: "保存",
-        accelerator: resolveAccelerator("file.save"),
-        click: () => {
-          sendToFocused("menu-save-triggered");
-        },
-      },
-      {
-        label: "別名で保存...",
-        accelerator: resolveAccelerator("file.saveAs"),
-        click: () => {
-          sendToFocused("menu-save-as-triggered");
-        },
-      },
+      // 保存 / 別名で保存 削除 (Phase 2)。Phase 8 で再導入する。
       { type: "separator" },
       {
         label: "印刷...",

@@ -6,10 +6,11 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   isElectron: true,
   openFile: () => ipcRenderer.invoke("open-file"),
-  saveFile: (filePath, content, fileType) =>
-    ipcRenderer.invoke("save-file", filePath, content, fileType),
+  // saveFile 削除 (Phase 2)。Phase 8 で再導入する。
   getChromeVersion: () => ipcRenderer.invoke("get-chrome-version"),
   setDirty: (dirty) => ipcRenderer.invoke("set-dirty", dirty),
+  // 歴史的命名: flush 完了後にウィンドウを実際に閉じるためのシグナル。
+  // Phase 2 で save 経路は消滅したが、close handshake の終端トリガとして引き続き利用する。
   saveDoneAndClose: () => ipcRenderer.invoke("save-before-close-done"),
   newWindow: () => ipcRenderer.invoke("new-window"),
   openDictionaryPopup: (url, title) => ipcRenderer.invoke("open-dictionary-popup", url, title),
@@ -24,16 +25,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("menu-open-triggered", handler);
     return () => ipcRenderer.removeListener("menu-open-triggered", handler);
   },
-  onMenuSave: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-save-triggered", handler);
-    return () => ipcRenderer.removeListener("menu-save-triggered", handler);
-  },
-  onMenuSaveAs: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-save-as-triggered", handler);
-    return () => ipcRenderer.removeListener("menu-save-as-triggered", handler);
-  },
+  // onMenuSave / onMenuSaveAs 削除 (Phase 2)。Phase 8 で再導入する。
   onMenuCloseTab: (callback) => {
     const handler = () => callback();
     ipcRenderer.on("menu-close-tab", handler);
@@ -44,11 +36,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("menu-new-tab", handler);
     return () => ipcRenderer.removeListener("menu-new-tab", handler);
   },
-  onSaveBeforeClose: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("electron-request-save-before-close", handler);
-    return () => ipcRenderer.removeListener("electron-request-save-before-close", handler);
-  },
+  // onSaveBeforeClose 削除 (Phase 2)。close handshake は onFlushStateBeforeClose のみ。
   onFlushStateBeforeClose: (callback) => {
     const handler = () => callback();
     ipcRenderer.on("electron-request-flush-state-before-close", handler);
