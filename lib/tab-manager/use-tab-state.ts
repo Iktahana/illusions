@@ -7,6 +7,7 @@ import type { TabId, TabState, EditorTabState, TerminalTabState, DiffTabState } 
 import { isEditorTab } from "./tab-types";
 import { createNewTab, generateTabId } from "./types";
 import type { TabManagerCore } from "./types";
+import { nextTerminalLabel } from "./terminal-label";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import { isElectronRenderer } from "../utils/runtime-env";
 
@@ -161,13 +162,16 @@ export function useTabState(): UseTabStateReturn {
     setActiveTabId(tab.id);
   }, []);
 
+  const terminalCounterRef = useRef(0);
+
   const newTerminalTab = useCallback((pendingId?: string) => {
+    const label = nextTerminalLabel(terminalCounterRef);
     const tab: TerminalTabState = {
       tabKind: "terminal",
       id: generateTabId(),
       sessionId: "",
       pendingId: pendingId ?? null,
-      label: "ターミナル",
+      label,
       cwd: "",
       shell: "",
       status: "connecting",
