@@ -18,6 +18,15 @@ describe("html exporter — [[blank]] paragraph handling", () => {
     const count = (html.match(/<p><\/p>/g) ?? []).length;
     expect(count).toBe(2);
   });
+
+  it("fenced code block 内の [[blank]] でも U+E000 sentinel はリークしない", () => {
+    // markdown-it は fenced code を <pre><code>…</code></pre> として描画する。
+    // pre-process で行頭 [[blank]] → U+E000 に置換した結果、コードブロック内に sentinel が
+    // 残るため、最終 sweep で除去されることを確認する (Copilot review #1483 round 2)。
+    const html = mdiToHtml("文章\n\n```\n[[blank]]\n```\n\n続き", { bodyOnly: true });
+    expect(html).not.toContain("");
+    expect(html).not.toContain("[[blank]]");
+  });
 });
 
 describe("txt exporter — [[blank]] paragraph handling", () => {

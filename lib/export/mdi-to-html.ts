@@ -253,8 +253,12 @@ export function mdiToHtml(
   const BLANK_SENTINEL = "";
   const preprocessed = markdown.replace(new RegExp(MDI_BLANK_RE.source, "gm"), BLANK_SENTINEL);
   const rawHtml = md.render(preprocessed);
-  // Replace the sentinel paragraph with a true empty paragraph.
-  const bodyHtml = rawHtml.replace(new RegExp(`<p>${BLANK_SENTINEL}\\s*</p>`, "g"), "<p></p>");
+  // Replace the sentinel paragraph with a true empty paragraph. Then final-sweep any
+  // remaining sentinel that escaped the <p>…</p> wrap (e.g. inside fenced code blocks
+  // where markdown-it emits <pre><code>…</code></pre> instead of <p>).
+  const bodyHtml = rawHtml
+    .replace(new RegExp(`<p>${BLANK_SENTINEL}\\s*</p>`, "g"), "<p></p>")
+    .replace(new RegExp(BLANK_SENTINEL, "g"), "");
 
   if (options?.bodyOnly) {
     return bodyHtml;
