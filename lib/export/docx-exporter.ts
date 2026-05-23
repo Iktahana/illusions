@@ -209,13 +209,6 @@ function parseMarkdownToDocxParagraphs(
       continue;
     }
 
-    // [[blank]] marker → empty DOCX paragraph
-    if (/^\[\[blank\]\]$/.test(trimmed)) {
-      flushParagraph();
-      paragraphs.push(new Paragraph({ spacing: { before: 0, after: 120 } }));
-      continue;
-    }
-
     // Heading detection
     const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
     if (headingMatch) {

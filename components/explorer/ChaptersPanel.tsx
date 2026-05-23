@@ -3,9 +3,6 @@
 import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useChapters } from "@/lib/editor-page";
-import { usePowerSettings } from "@/contexts/EditorSettingsContext";
-import { useWindowActivityState } from "@/lib/hooks/use-window-activity";
-import { shouldSuspendNonCriticalProcessing } from "@/lib/editor-page/power-optimization";
 import { ChapterItem } from "./ChapterItem";
 import { MarkdownSyntaxPanel } from "./MarkdownSyntaxPanel";
 
@@ -17,15 +14,7 @@ interface ChaptersPanelProps {
 
 /** Table of contents panel showing heading-based chapter navigation */
 export function ChaptersPanel({ content, onChapterClick, onInsertText }: ChaptersPanelProps) {
-  const { powerSaveMode } = usePowerSettings();
-  const windowActivity = useWindowActivityState();
-  const { chapters, refresh } = useChapters(content, {
-    autoRefreshEnabled: !shouldSuspendNonCriticalProcessing({
-      powerSaveMode,
-      isDocumentVisible: windowActivity.isDocumentVisible,
-      isWindowFocused: windowActivity.isWindowFocused,
-    }),
-  });
+  const { chapters, refresh } = useChapters(content);
   const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
 
   return (

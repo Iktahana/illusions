@@ -13,23 +13,11 @@ const {
   assertPathInsideRoot,
   getWindowsDenyPrefixes,
 } = require("../lib/path-utils");
-const {
-  loadApprovedPaths,
-  getApprovedPaths,
-  addApprovedPath,
-  flushApprovedPaths,
-} = require("../lib/approved-vfs-paths");
 
 /** Maximum content size accepted by write-file (same limit as file-ipc.js) */
 const MAX_CONTENT_BYTES = 50 * 1024 * 1024; // 50 MB
 
 function registerVFSHandlers() {
-  // Load persisted approved paths before any IPC handlers can fire.
-  loadApprovedPaths();
-
-  // Flush debounced writes on clean shutdown.
-  app.once("before-quit", flushApprovedPaths);
-
   // Track the opened root directory per window for path validation
   const allowedRoots = new Map();
 
@@ -116,7 +104,6 @@ function registerVFSHandlers() {
     // Update the allowed root for this window
     allowedRoots.set(event.sender.id, dirPath);
     approveDialogPath(event.sender.id, dirPath);
-    addApprovedPath(toForwardSlash(dirPath));
 
     return {
       path: dirPath,
@@ -363,30 +350,14 @@ function registerVFSHandlers() {
       }
 
       approveDialogPath(event.sender.id, confirmedPath);
-      addApprovedPath(toForwardSlash(confirmedPath));
     }
 
     allowedRoots.set(event.sender.id, resolved);
     return { path: resolved, name: path.basename(resolved) };
   });
 
-  // Seed helper — reused for existing and future windows
-  function seedWindowFromPersistedApprovals(webContentsId) {
-    const windowApproved = getWindowApprovedPaths(webContentsId);
-    for (const approvedPath of getApprovedPaths()) {
-      windowApproved.set(approvedPath, true);
-    }
-  }
-
-  // Seed all windows already open when registerVFSHandlers() runs.
-  // (The main window is created before registerVFSHandlers fires.)
-  for (const contents of webContents.getAllWebContents()) {
-    seedWindowFromPersistedApprovals(contents.id);
-  }
-
-  // Seed future windows (e.g. second windows, devtools, etc.)
+  // Clean up allowedRoots and dialogApprovedPaths when a window is destroyed to prevent memory leaks
   app.on("web-contents-created", (_, contents) => {
-    seedWindowFromPersistedApprovals(contents.id);
     contents.on("destroyed", () => {
       allowedRoots.delete(contents.id);
       dialogApprovedPaths.delete(contents.id);

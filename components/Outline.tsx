@@ -5,9 +5,6 @@ import { RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import type { Chapter } from "@/lib/utils";
 import { useChapters } from "@/lib/editor-page";
-import { usePowerSettings } from "@/contexts/EditorSettingsContext";
-import { useWindowActivityState } from "@/lib/hooks/use-window-activity";
-import { shouldSuspendNonCriticalProcessing } from "@/lib/editor-page/power-optimization";
 
 interface OutlineProps {
   className?: string;
@@ -21,15 +18,7 @@ export default function Outline({
   onHeadingClick,
 }: OutlineProps): React.ReactElement {
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
-  const { powerSaveMode } = usePowerSettings();
-  const windowActivity = useWindowActivityState();
-  const { chapters: headings, refresh } = useChapters(content, {
-    autoRefreshEnabled: !shouldSuspendNonCriticalProcessing({
-      powerSaveMode,
-      isDocumentVisible: windowActivity.isDocumentVisible,
-      isWindowFocused: windowActivity.isWindowFocused,
-    }),
-  });
+  const { chapters: headings, refresh } = useChapters(content);
 
   // スクロールイベントで現在のセクションを追跡
   useEffect(() => {

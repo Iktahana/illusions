@@ -66,8 +66,6 @@ illusions は、日本語で小説を書くためのエディタです。
 
 - [ドキュメント入口](docs/README.md)
 - [MDI ドキュメント](docs/MDI/README.md)
-- [Deep Wiki](https://deepwiki.com/Iktahana/illusions)
-- [Code Wiki](https://codewiki.google/github.com/Iktahana/illusions)
 
 ## 開発者向け
 
