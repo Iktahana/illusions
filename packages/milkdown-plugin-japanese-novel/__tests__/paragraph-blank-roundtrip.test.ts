@@ -44,10 +44,12 @@ describe("MDI blank paragraph — save → load composition round-trip", () => {
     expect(root.children[0].children).toHaveLength(0);
   });
 
-  it("(known limitation) ProseMirror 空段落 → markdown serializer is intentionally NOT round-tripped via [[blank]]", () => {
-    // ProseMirror の空段落は serializer が blank line に折り畳むため、保存ファイルには
-    // [[blank]] が現れない。[[blank]] の生成元は paste / import / 外部書き込みのみ。
-    // この制約は docs/MDI/spec.md にも明記する (Task 9)。
-    expect(true).toBe(true);
+  it("(known limitation) ProseMirror 由来の連続空行 → sanitize は [[blank]] を生成しない", () => {
+    // ProseMirror の空段落は markdown serializer が連続空行に折り畳むため、保存ファイルには
+    // [[blank]] が現れない（[[blank]] の生成元は paste / import / 外部書き込み (<br />) のみ）。
+    // この制約は docs/MDI/spec.md §6.2 にも明記する。
+    const serializedEmptyParagraphs = "A\n\n\n\nB"; // 3+ newlines = 空段落を含む serializer 出力
+    const sanitized = sanitizeMdiContent(serializedEmptyParagraphs, { fileType: ".mdi" });
+    expect(sanitized).not.toContain("[[blank]]");
   });
 });

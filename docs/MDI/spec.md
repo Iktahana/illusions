@@ -294,7 +294,7 @@ br.mdi-break {
 - 生成元は **paste / import / 外部書き込み のみ**。ProseMirror エディタでの Enter 連打で作った空段落は CommonMark serializer により blank line へ collapse されるため `[[blank]]` は emit されない
 - エクスポート時: TXT → 空行、HTML → `<p></p>`、DOCX → 空段落
 - ユーザーが `[[blank]]` をリテラル文字列として入力した場合は空白段落として解釈される（bracket macro 全般の既知 escape 制限と同様）
-- **既知の限界**: fenced code block (` ``` `) 内や引用ブロック内の単独 `[[blank]]` も exporter (txt/html/docx) では空段落に変換される。これは既存 `[[br]]` の exporter ハンドリング (§6.1) と同じクラスの制約
+- **既知の限界**: fenced code block (` ``` `) 内の単独 `[[blank]]` は exporter (txt/html/docx) で空段落に変換される。引用ブロック (`> ...`) 内の `[[blank]]` は行頭マッチ条件 (`/^\[\[blank\]\][ \t]*\r?$/m`) を満たさないためリテラル文字列として保持される。これは既存 `[[br]]` の exporter ハンドリング (§6.1) と同じクラスの制約
 
 ### 6.3 Editor UX Rules
 
