@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback } from "react";
+import { saveMdiFile } from "../project/mdi-file";
+import { getVFS } from "../vfs";
+import { suppressFileWatch } from "../services/file-watcher";
+import { notificationManager } from "../services/notification-manager";
+import type { SnapshotType } from "../services/history-policy";
 import type { TabId, EditorTabState } from "./tab-types";
+import { isEditorTab } from "./tab-types";
+import { sanitizeMdiContent, getErrorMessage } from "./types";
 import type { TabManagerCore } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -18,14 +25,14 @@ export interface UseCloseDialogParams extends TabManagerCore {
   /** Force-close a tab without dirty check. */
   forceCloseTab: (tabId: TabId) => void;
   /**
-   * Attempt to create a history snapshot after saving (project mode only).
-   * Phase 2 shim: not used until Phase 8 re-introduces save + snapshot.
+   * Create a history snapshot with the given type (project mode only).
+   * B1 fix: caller supplies correct SnapshotType.
    */
-  tryAutoSnapshot: (
+  tryCreateSnapshot: (
+    type: SnapshotType,
     sourcePath: string,
     displayName: string,
     savedContent: string,
-    forceSnapshot?: boolean,
   ) => Promise<void>;
 }
 
@@ -46,22 +53,89 @@ export interface UseCloseDialogReturn {
 
 /**
  * Handles the save/discard actions for the close-with-unsaved-changes dialog.
- *
- * Phase 2 shim: save path is a no-op (just discards). Re-implemented in Phase 8.
- * Signature is preserved so callers in lib/tab-manager/index.ts continue to
- * type-check without modification.
  */
 export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogReturn {
-  const { pendingCloseTabId, setPendingCloseTabId, forceCloseTab } = params;
+  const {
+    tabsRef,
+    isProjectRef,
+    pendingCloseTabId,
+    setPendingCloseTabId,
+    updateTab,
+    forceCloseTab,
+    tryCreateSnapshot,
+  } = params;
 
-  // Phase 2 stub: save logic removed. Treat "save & close" as plain "discard & close".
-  // The dialog should eventually be simplified to a single button in Phase 8.
   const handleCloseTabSave = useCallback(async () => {
-    if (pendingCloseTabId) {
-      forceCloseTab(pendingCloseTabId);
+    if (!pendingCloseTabId) return;
+    const rawTab = tabsRef.current.find((t) => t.id === pendingCloseTabId);
+    if (!rawTab) return;
+    // pendingCloseTabId is only set for editor tabs (see closeTab guard in useTabState)
+    if (!isEditorTab(rawTab)) return;
+    const tab = rawTab;
+
+    // Block save if the file has an unresolved conflict.
+    // The in-editor content may be stale compared to the newer disk version,
+    // so writing it would silently discard the disk changes.
+    if (tab.fileSyncStatus === "conflicted") {
+      notificationManager.error("競合状態のため保存できません。まず競合を解決してください。");
       setPendingCloseTabId(null);
+      return;
     }
-  }, [pendingCloseTabId, forceCloseTab, setPendingCloseTabId]);
+
+    try {
+      const sanitized = sanitizeMdiContent(tab.content);
+
+      if (isProjectRef.current && tab.file?.path) {
+        const vfs = getVFS();
+        suppressFileWatch(tab.file.path);
+        await vfs.writeFile(tab.file.path, sanitized);
+        // B1 fix: tab close → "pre-close" snapshot type
+        await tryCreateSnapshot("pre-close", tab.file.path, tab.file.name, sanitized);
+      } else {
+        const result = await saveMdiFile({
+          descriptor: tab.file,
+          content: sanitized,
+          fileType: tab.fileType,
+        });
+        if (!result) {
+          // User cancelled save dialog → keep tab open
+          setPendingCloseTabId(null);
+          return;
+        }
+        updateTab(pendingCloseTabId, {
+          file: result.descriptor,
+          lastSavedContent: sanitized,
+          isDirty: false,
+          fileSyncStatus: "clean",
+          conflictDiskContent: null,
+        });
+        // B1 fix: tab close → "pre-close" snapshot type
+        await tryCreateSnapshot(
+          "pre-close",
+          result.descriptor.path ?? result.descriptor.name,
+          result.descriptor.name,
+          sanitized,
+        );
+      }
+    } catch (error) {
+      console.error("保存に失敗しました:", error);
+      const message = getErrorMessage(error);
+      notificationManager.error(`保存に失敗しました: ${message}`);
+      setPendingCloseTabId(null);
+      return;
+    }
+
+    forceCloseTab(pendingCloseTabId);
+    setPendingCloseTabId(null);
+  }, [
+    pendingCloseTabId,
+    updateTab,
+    forceCloseTab,
+    tabsRef,
+    isProjectRef,
+    setPendingCloseTabId,
+    tryCreateSnapshot,
+  ]);
 
   const handleCloseTabDiscard = useCallback(() => {
     if (pendingCloseTabId) {

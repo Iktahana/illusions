@@ -100,24 +100,25 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
     isHandlingClose = true;
 
     if (newWindow.isDocumentEdited()) {
-      // 編集中タブがある場合の確認ダイアログ。
-      // Phase 2: 保存経路を削除したため「閉じる / キャンセル」の 2 択。
-      // Phase 8 で保存機能を再導入する際に「保存」を復活させる。
+      // 未保存の変更がある場合は確認ダイアログを表示（3 ボタン）
       dialog
         .showMessageBox(newWindow, {
           type: "question",
-          buttons: ["閉じる", "キャンセル"],
+          buttons: ["保存", "保存しない", "キャンセル"],
           defaultId: 0,
-          cancelId: 1,
-          message: "編集中のタブがあります",
-          detail: "閉じると変更は失われます。",
+          cancelId: 2,
+          message: "変更が保存されていません",
+          detail: "保存しない場合、変更は失われます。",
         })
         .then(({ response }) => {
           if (response === 0) {
-            // 閉じる: タブ・レイアウト状態をフラッシュしてから閉じる
+            // "保存": flush state + save dirty files, then close
+            newWindow.webContents.send("electron-request-save-before-close");
+          } else if (response === 1) {
+            // "保存しない": flush state only (preserve tab/layout), then close
             newWindow.webContents.send("electron-request-flush-state-before-close");
           } else {
-            // キャンセル: ウィンドウを開いたまま
+            // "キャンセル": ウィンドウを開いたまま
             isHandlingClose = false;
           }
         })

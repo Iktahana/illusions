@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { saveMdiFile } from "../project/mdi-file";
 import { getVFS } from "../vfs";
+import { suppressFileWatch } from "../services/file-watcher";
+import { notificationManager } from "../services/notification-manager";
+import type { SnapshotType } from "../services/history-policy";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
+import { sanitizeMdiContent } from "./types";
 import type { TabManagerCore } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -33,14 +38,14 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
   /** Immediately flush pending dockview layout to storage. */
   flushLayoutState?: () => Promise<void>;
   /**
-   * Attempt to create a history snapshot after saving (project mode only).
-   * Provided by useFileIO.
+   * Create a history snapshot with the given type (project mode only).
+   * B1 fix: caller supplies the correct SnapshotType.
    */
-  tryAutoSnapshot?: (
+  tryCreateSnapshot?: (
+    type: SnapshotType,
     sourcePath: string,
     displayName: string,
     savedContent: string,
-    forceSnapshot?: boolean,
   ) => Promise<void>;
 }
 
@@ -51,7 +56,7 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
 /**
  * Registers Electron IPC event listeners for menu commands:
  * - Save, Save As, Close Tab, New Tab, Open File From System
- * - Save before window close
+ * - Save before window close (pre-close snapshot)
  * - Dirty state → Electron title dot
  * - Web beforeunload warning
  * - Visibility change reload for project mode
@@ -63,6 +68,8 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     activeTabIdRef,
     isProjectRef,
     isElectron,
+    saveFileRef,
+    saveAsFileRef,
     closeTab,
     newTab,
     loadSystemFile,
@@ -70,6 +77,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     systemFileOpenHandlerRef,
     flushTabState,
     flushLayoutState,
+    tryCreateSnapshot,
   } = params;
 
   // Stable refs for callbacks that change frequently
@@ -94,10 +102,106 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
   const flushLayoutStateRef = useRef(flushLayoutState);
   // eslint-disable-next-line react-hooks/refs
   flushLayoutStateRef.current = flushLayoutState;
-  // Flush tab/layout state before close (without saving dirty files).
-  // Phase 2: save-before-close branch removed entirely; only flush-state remains.
-  // saveDoneAndClose IPC is now used purely as the close-handshake terminator
-  // (its name is historical).
+  const tryCreateSnapshotRef = useRef(tryCreateSnapshot);
+  tryCreateSnapshotRef.current = tryCreateSnapshot;
+
+  // Save all dirty tabs before Electron window close (3-button dialog "保存" path)
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI?.onSaveBeforeClose) return;
+
+    const cleanup = window.electronAPI.onSaveBeforeClose(async () => {
+      // Flush debounced persistence state before saving files
+      await Promise.all([flushTabStateRef.current?.(), flushLayoutStateRef.current?.()]);
+
+      let anyFailed = false;
+
+      for (const tab of tabsRef.current) {
+        if (!isEditorTab(tab)) continue;
+        if (!tab.isDirty) continue;
+        // Block save if tab has unresolved external conflict
+        if (tab.fileSyncStatus === "conflicted") {
+          notificationManager.warning(
+            `「${tab.file?.name ?? "無題"}」のファイルが外部で変更されています。コンフリクトを解決してから保存してください。`,
+          );
+          anyFailed = true;
+          continue;
+        }
+
+        const sanitized = sanitizeMdiContent(tab.content);
+
+        if (!tab.file) {
+          // New unsaved document: show Save As dialog so the user can give it a path.
+          // If the user cancels or the save fails, abort the window close.
+          try {
+            const result = await saveMdiFile({
+              descriptor: null,
+              content: sanitized,
+              fileType: tab.fileType,
+            });
+            if (!result) {
+              // User cancelled the Save As dialog — abort close
+              anyFailed = true;
+            } else {
+              // Write the newly-assigned file descriptor back to the tab so that
+              // the subsequent flushTabState call persists the saved path.
+              updateTab(tab.id, {
+                file: result.descriptor,
+                isDirty: false,
+                lastSavedContent: sanitized,
+                lastSavedTime: Date.now(),
+              });
+              // Re-flush so the persisted session reflects the new file path.
+              await flushTabStateRef.current?.();
+            }
+          } catch (error) {
+            console.error("名前を付けて保存に失敗しました:", error);
+            anyFailed = true;
+          }
+          continue;
+        }
+
+        try {
+          if (isProjectRef.current && tab.file.path) {
+            const vfs = getVFS();
+            suppressFileWatch(tab.file.path);
+            await vfs.writeFile(tab.file.path, sanitized);
+            // B1 fix: window close "保存" → "pre-close" snapshot type
+            await tryCreateSnapshotRef.current?.(
+              "pre-close",
+              tab.file.path,
+              tab.file.name,
+              sanitized,
+            );
+          } else {
+            await saveMdiFile({
+              descriptor: tab.file,
+              content: sanitized,
+            });
+            // B1 fix: window close "保存" → "pre-close" snapshot type
+            await tryCreateSnapshotRef.current?.(
+              "pre-close",
+              tab.file.path ?? tab.file.name,
+              tab.file.name,
+              sanitized,
+            );
+          }
+        } catch (error) {
+          console.error(`保存に失敗しました (${tab.file.name}):`, error);
+          anyFailed = true;
+        }
+      }
+
+      // Only close if every save succeeded; otherwise leave the window open.
+      if (!anyFailed) {
+        await window.electronAPI?.saveDoneAndClose?.();
+      }
+    });
+
+    return cleanup;
+  }, [isElectron, tabsRef, isProjectRef, updateTab]);
+
+  // Flush tab/layout state before close (without saving dirty files)
+  // This handles: clean close, and "Don't Save" in dirty dialog
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onFlushStateBeforeClose) return;
 
@@ -109,7 +213,18 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     return cleanup;
   }, [isElectron]);
 
-  // Phase 3: onOpenFileFromSystem 経路を削除。Phase 8 で再導入する。
+  // System file open (Electron: double-click .mdi etc.)
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI?.onOpenFileFromSystem) return;
+
+    const cleanup = window.electronAPI.onOpenFileFromSystem(({ path, content: fileContent }) => {
+      loadSystemFile(path, fileContent);
+      // Notify page.tsx for editor key update
+      systemFileOpenHandlerRef.current?.(path, fileContent);
+    });
+
+    return cleanup;
+  }, [isElectron, loadSystemFile, systemFileOpenHandlerRef]);
 
   // Reload non-dirty tabs when window regains visibility (#98)
   useEffect(() => {
@@ -147,7 +262,23 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [updateTab, tabsRef, isProjectRef]);
 
-  // Menu: Save / Save As — removed in Phase 2. Re-implemented in Phase 8.
+  // Menu: Save (Cmd+S)
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI?.onMenuSave) return;
+    const cleanup = window.electronAPI.onMenuSave(async () => {
+      await saveFileRef.current();
+    });
+    return cleanup;
+  }, [isElectron, saveFileRef]);
+
+  // Menu: Save As (Cmd+Shift+S)
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI?.onMenuSaveAs) return;
+    const cleanup = window.electronAPI.onMenuSaveAs(async () => {
+      await saveAsFileRef.current();
+    });
+    return cleanup;
+  }, [isElectron, saveAsFileRef]);
 
   // Menu: Close Tab (Cmd+W from Electron menu)
   useEffect(() => {

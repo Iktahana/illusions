@@ -94,6 +94,7 @@ export interface UseTabManagerReturn {
 // Constants
 // ---------------------------------------------------------------------------
 
+export const AUTO_SAVE_INTERVAL = 5000;
 export const TAB_PERSIST_DEBOUNCE = 1000;
 
 // ---------------------------------------------------------------------------

@@ -4,15 +4,18 @@
 const PERSIST_FAILURE_WARNING = "ファイル参照の保存に失敗しました";
 
 import { useCallback, useRef } from "react";
-import { openMdiFile } from "../project/mdi-file";
+import { openMdiFile, saveMdiFile } from "../project/mdi-file";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import { notificationManager } from "../services/notification-manager";
 import { getStorageService } from "../storage/storage-service";
 import { persistAppState } from "../storage/app-state-manager";
+import { getHistoryService } from "../services/history-service";
+import type { SnapshotType } from "../services/history-policy";
 import { getVFS } from "../vfs";
+import { suppressFileWatch } from "../services/file-watcher";
 import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
-import { generateTabId, inferFileType } from "./types";
+import { generateTabId, inferFileType, sanitizeMdiContent, getErrorMessage } from "./types";
 import type { TabManagerCore } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -43,7 +46,20 @@ export interface UseFileIOReturn {
   saveFileRef: React.MutableRefObject<(isAutoSave?: boolean) => Promise<void>>;
   /** Ref holding the latest saveAsFile function. */
   saveAsFileRef: React.MutableRefObject<() => Promise<void>>;
-  /** Create an auto-snapshot if conditions are met (project mode only). */
+  /**
+   * Create a history snapshot with the given type (project mode only).
+   * B1 fix: caller supplies the correct SnapshotType instead of hardcoding "auto".
+   */
+  tryCreateSnapshot: (
+    type: SnapshotType,
+    sourcePath: string,
+    displayName: string,
+    savedContent: string,
+  ) => Promise<void>;
+  /**
+   * @deprecated Use tryCreateSnapshot instead.
+   * Kept for backward-compat callers that haven't been updated yet.
+   */
   tryAutoSnapshot: (
     sourcePath: string,
     displayName: string,
@@ -68,6 +84,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     findTabByPath,
   } = params;
 
+  const isSavingRef = useRef(false);
   const openingPathsRef = useRef(new Map<string, boolean>());
 
   // --- Persist helpers ----------------------------------------------------
@@ -111,37 +128,325 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     [isElectron, persistLastOpenedPath],
   );
 
-  // --- Auto-snapshot (project mode) ---------------------------------------
-  // NOTE: Phase 2 no-op shim. Will be re-implemented in Phase 8.
+  // --- Snapshot (project mode) — B1 fix ----------------------------------
 
+  /**
+   * Create a snapshot with the caller-supplied type (B1 fix).
+   *
+   * - For "auto": respects throttle via historyService.shouldCreateSnapshot().
+   * - For all other types (manual, pre-close, …): always creates a snapshot.
+   *
+   * Requires project mode and an open VFS root; silently no-ops otherwise.
+   */
+  const tryCreateSnapshot = useCallback(
+    async (type: SnapshotType, sourcePath: string, displayName: string, savedContent: string) => {
+      if (!isProjectRef.current) return;
+      if (!getVFS().isRootOpen()) return;
+      try {
+        const historyService = getHistoryService();
+        // Only "auto" is throttled; all other types always create a snapshot.
+        if (type === "auto") {
+          const shouldCreate = await historyService.shouldCreateSnapshot(sourcePath);
+          if (!shouldCreate) return;
+        }
+        await historyService.createSnapshot({
+          sourcePath,
+          displayName,
+          content: savedContent,
+          type, // ← caller-supplied, not hardcoded (B1 fix)
+        });
+      } catch (error) {
+        console.warn("スナップショットの作成に失敗しました:", error);
+      }
+    },
+    [isProjectRef],
+  );
+
+  /**
+   * @deprecated Backward-compat shim — delegates to tryCreateSnapshot.
+   * Callers that still use the old forceSnapshot=true/false convention:
+   *   forceSnapshot=true  → type "manual"
+   *   forceSnapshot=false → type "auto"
+   */
   const tryAutoSnapshot = useCallback(
     async (
-      _sourcePath: string,
-      _displayName: string,
-      _savedContent: string,
-      _forceSnapshot: boolean = false,
+      sourcePath: string,
+      displayName: string,
+      savedContent: string,
+      forceSnapshot: boolean = false,
     ) => {
-      // no-op: Phase 8 will re-implement snapshot logic
+      const type: SnapshotType = forceSnapshot ? "manual" : "auto";
+      await tryCreateSnapshot(type, sourcePath, displayName, savedContent);
     },
-    [],
+    [tryCreateSnapshot],
   );
 
   // --- File operations ----------------------------------------------------
 
-  /** Open a file — Phase 3 no-op shim. Will be re-implemented in Phase 7-8. */
+  /** Open a file via system dialog → new tab (or reuse untitled clean tab) */
   const openFile = useCallback(async () => {
-    // no-op: Phase 7-8 で新 IO 抽象経由で再実装する
-  }, []);
+    const result = await openMdiFile();
+    if (!result) return;
 
-  /** Save the active tab — Phase 2 no-op shim. Will be re-implemented in Phase 8. */
-  const saveFile = useCallback(async (_isAutoSave: boolean = false) => {
-    // no-op: Phase 8 will re-implement save logic
-  }, []);
+    const { descriptor, content: fileContent } = result;
 
-  /** Save As (always shows dialog) — Phase 2 no-op shim. Will be re-implemented in Phase 8. */
+    // Deduplicate: if the same path is already open, reload from disk and activate
+    if (descriptor.path) {
+      const existing = findTabByPath(descriptor.path);
+      if (existing) {
+        // Force-refresh tab content so stale in-memory state is replaced with the
+        // latest content that was just read from disk by openMdiFile().
+        updateTab(existing.id, {
+          content: fileContent,
+          lastSavedContent: fileContent,
+          isDirty: false,
+        });
+        setActiveTabId(existing.id);
+        return;
+      }
+    }
+
+    const detectedFileType = inferFileType(descriptor.name);
+
+    // Reuse current tab if untitled and clean
+    const cur = tabsRef.current.find((t) => t.id === activeTabIdRef.current);
+    if (cur && isEditorTab(cur) && !cur.file && !cur.isDirty) {
+      updateTab(cur.id, {
+        file: descriptor,
+        content: fileContent,
+        lastSavedContent: fileContent,
+        isDirty: false,
+        lastSavedTime: Date.now(),
+        fileType: detectedFileType,
+      });
+    } else {
+      const tab: EditorTabState = {
+        tabKind: "editor",
+        id: generateTabId(),
+        file: descriptor,
+        content: fileContent,
+        lastSavedContent: fileContent,
+        isDirty: false,
+        lastSavedTime: Date.now(),
+        lastSaveWasAuto: false,
+        isSaving: false,
+        isPreview: false,
+        fileType: detectedFileType,
+        fileSyncStatus: "clean",
+        conflictDiskContent: null,
+      };
+      setTabs((prev) => [...prev, tab]);
+      setActiveTabId(tab.id);
+    }
+
+    void (async () => {
+      const ok = await persistFileReference(descriptor, fileContent);
+      if (!ok) notificationManager.warning(PERSIST_FAILURE_WARNING);
+    })();
+  }, [
+    findTabByPath,
+    updateTab,
+    persistFileReference,
+    setTabs,
+    setActiveTabId,
+    tabsRef,
+    activeTabIdRef,
+  ]);
+
+  /** Save the active tab */
+  const saveFile = useCallback(
+    async (isAutoSave: boolean = false) => {
+      if (isSavingRef.current) return;
+
+      const tabId = activeTabIdRef.current;
+      const tab = tabsRef.current.find((t) => t.id === tabId);
+      if (!tab) return;
+      // Only editor tabs can be saved
+      if (!isEditorTab(tab)) return;
+
+      // Block save if tab has unresolved external conflict
+      if (tab.fileSyncStatus === "conflicted") {
+        notificationManager.warning(
+          "ファイルが外部で変更されています。保存する前にコンフリクトを解決してください。",
+        );
+        return;
+      }
+
+      isSavingRef.current = true;
+      updateTab(tabId, { isSaving: true });
+
+      try {
+        const sanitized = sanitizeMdiContent(tab.content);
+
+        // Project mode: VFS direct write
+        if (isProjectRef.current && tab.file?.path) {
+          const vfs = getVFS();
+          suppressFileWatch(tab.file.path);
+          await vfs.writeFile(tab.file.path, sanitized);
+
+          // Update project.json lastModified so workspace metadata stays in sync.
+          // This mirrors what ProjectService.saveProject() does for the full save path.
+          try {
+            const projectJsonPath = ".illusions/project.json";
+            const projectJsonText = await vfs.readFile(projectJsonPath);
+            const projectJson = JSON.parse(projectJsonText) as Record<string, unknown>;
+            projectJson["lastModified"] = Date.now();
+            await vfs.writeFile(projectJsonPath, JSON.stringify(projectJson, null, 2));
+          } catch {
+            // Non-fatal: project.json update failure should not block the save
+            console.warn("project.json の lastModified 更新に失敗しました");
+          }
+
+          setTabs((prev) =>
+            prev.map((t) => {
+              if (t.id !== tabId || !isEditorTab(t)) return t;
+              const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+              return {
+                ...t,
+                lastSavedContent: sanitized,
+                isDirty: newIsDirty,
+                lastSavedTime: Date.now(),
+                lastSaveWasAuto: isAutoSave,
+                isSaving: false,
+                fileSyncStatus: newIsDirty ? "dirty" : "clean",
+                conflictDiskContent: null,
+              };
+            }),
+          );
+          // B1 fix: Cmd+S / menu → "manual"; auto-save timer → "auto"
+          const snapshotType: SnapshotType = isAutoSave ? "auto" : "manual";
+          await tryCreateSnapshot(snapshotType, tab.file.path, tab.file.name, sanitized);
+          return;
+        }
+
+        const result = await saveMdiFile({
+          descriptor: tab.file,
+          content: sanitized,
+          fileType: tab.fileType,
+        });
+
+        if (result) {
+          setTabs((prev) =>
+            prev.map((t) => {
+              if (t.id !== tabId || !isEditorTab(t)) return t;
+              const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+              return {
+                ...t,
+                file: result.descriptor,
+                lastSavedContent: sanitized,
+                isDirty: newIsDirty,
+                lastSavedTime: Date.now(),
+                lastSaveWasAuto: isAutoSave,
+                isSaving: false,
+                fileSyncStatus: newIsDirty ? "dirty" : "clean",
+                conflictDiskContent: null,
+              };
+            }),
+          );
+          if (!(await persistFileReference(result.descriptor, sanitized))) {
+            notificationManager.warning(PERSIST_FAILURE_WARNING);
+          }
+          if (result.descriptor.path) {
+            // B1 fix: Cmd+S / menu → "manual"; auto-save timer → "auto"
+            const snapshotType: SnapshotType = isAutoSave ? "auto" : "manual";
+            await tryCreateSnapshot(
+              snapshotType,
+              result.descriptor.path,
+              result.descriptor.name,
+              sanitized,
+            );
+          }
+        } else {
+          updateTab(tabId, { isSaving: false });
+        }
+      } catch (error) {
+        console.error("保存に失敗しました:", error);
+        updateTab(tabId, { isSaving: false });
+        const message = getErrorMessage(error);
+        notificationManager.error(`保存に失敗しました: ${message}`);
+      } finally {
+        isSavingRef.current = false;
+      }
+    },
+    [
+      updateTab,
+      persistFileReference,
+      tryCreateSnapshot,
+      setTabs,
+      tabsRef,
+      activeTabIdRef,
+      isProjectRef,
+    ],
+  );
+
+  /** Save As (always shows dialog) */
   const saveAsFile = useCallback(async () => {
-    // no-op: Phase 8 will re-implement save-as logic
-  }, []);
+    if (isSavingRef.current) return;
+
+    const tabId = activeTabIdRef.current;
+    const tab = tabsRef.current.find((t) => t.id === tabId);
+    if (!tab) return;
+    // Only editor tabs can be saved
+    if (!isEditorTab(tab)) return;
+
+    isSavingRef.current = true;
+    updateTab(tabId, { isSaving: true });
+
+    try {
+      const sanitized = sanitizeMdiContent(tab.content);
+      const descriptor: MdiFileDescriptor | null = tab.file
+        ? { path: null, handle: null, name: tab.file.name }
+        : null;
+
+      const result = await saveMdiFile({ descriptor, content: sanitized, fileType: tab.fileType });
+
+      if (result) {
+        // Use functional updater to compare against the latest tab content at
+        // completion time, not at dialog-open time. Edits made while the async
+        // Save As dialog was open must not be silently marked as saved.
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === tabId && isEditorTab(t)
+              ? (() => {
+                  const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+                  return {
+                    ...t,
+                    file: result.descriptor,
+                    lastSavedContent: sanitized,
+                    isDirty: newIsDirty,
+                    fileSyncStatus: newIsDirty ? "dirty" : "clean",
+                    lastSavedTime: Date.now(),
+                    isSaving: false,
+                    conflictDiskContent: null,
+                  };
+                })()
+              : t,
+          ),
+        );
+        if (!(await persistFileReference(result.descriptor, sanitized))) {
+          notificationManager.warning(PERSIST_FAILURE_WARNING);
+        }
+        if (result.descriptor.path) {
+          // B1 fix: Save As is always a manual user action
+          await tryCreateSnapshot(
+            "manual",
+            result.descriptor.path,
+            result.descriptor.name,
+            sanitized,
+          );
+        }
+      } else {
+        updateTab(tabId, { isSaving: false });
+      }
+    } catch (error) {
+      console.error("名前を付けて保存に失敗しました:", error);
+      updateTab(tabId, { isSaving: false });
+      const message = getErrorMessage(error);
+      notificationManager.error(`名前を付けて保存に失敗しました: ${message}`);
+    } finally {
+      isSavingRef.current = false;
+    }
+  }, [updateTab, setTabs, persistFileReference, tryCreateSnapshot, tabsRef, activeTabIdRef]);
 
   /** Load a file by path + content into a new tab (or reuse/deduplicate) */
   const loadSystemFile = useCallback(
@@ -206,12 +511,118 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     [findTabByPath, updateTab, setTabs, setActiveTabId, tabsRef, activeTabIdRef],
   );
 
-  /** Open a file from the project VFS — Phase 3 no-op shim. Will be re-implemented in Phase 7-9. */
+  /** Open a file from the project VFS into a tab */
   const openProjectFile = useCallback(
-    async (_vfsPath: string, _options?: { preview?: boolean }) => {
-      // no-op: Phase 7-9 で新 IO 抽象経由で再実装する
+    async (vfsPath: string, options?: { preview?: boolean }) => {
+      const preview = options?.preview ?? false;
+
+      // Deduplicate: if already open, switch to it
+      const existing = tabsRef.current.find((t) => isEditorTab(t) && t.file?.path === vfsPath);
+      if (existing && isEditorTab(existing)) {
+        setActiveTabId(existing.id);
+        // If double-click on existing preview tab, pin it
+        if (!preview && existing.isPreview) {
+          updateTab(existing.id, { isPreview: false });
+        }
+        return;
+      }
+
+      // Prevent concurrent opens of the same path (race between click → double-click).
+      // Use Map to track preview intent: if a non-preview open arrives while a
+      // preview open is in-flight, the AND logic ensures the tab is pinned.
+      const existingIntent = openingPathsRef.current.get(vfsPath);
+      if (existingIntent !== undefined) {
+        // Merge intent: non-preview (false) wins via AND
+        openingPathsRef.current.set(vfsPath, existingIntent && preview);
+        return;
+      }
+      openingPathsRef.current.set(vfsPath, preview);
+
+      try {
+        // Read file from VFS
+        let fileContent: string;
+        try {
+          const vfs = getVFS();
+          fileContent = await vfs.readFile(vfsPath);
+        } catch (error) {
+          console.error("ファイルの読み込みに失敗しました:", error);
+          notificationManager.error(
+            `ファイルを開けませんでした: ${vfsPath.split("/").pop() || vfsPath}`,
+          );
+          return;
+        }
+
+        const fileName = vfsPath.split("/").pop() || "無題";
+        const vfsFileType = inferFileType(fileName);
+        const effectivePreview = openingPathsRef.current.get(vfsPath) ?? preview;
+
+        if (effectivePreview) {
+          // Replace existing preview tab, or create new preview tab
+          const existingPreview = tabsRef.current.find((t) => isEditorTab(t) && t.isPreview);
+          if (existingPreview && isEditorTab(existingPreview)) {
+            updateTab(existingPreview.id, {
+              file: { path: vfsPath, handle: null, name: fileName },
+              content: fileContent,
+              lastSavedContent: fileContent,
+              isDirty: false,
+              lastSavedTime: Date.now(),
+              isPreview: true,
+              fileType: vfsFileType,
+            });
+            setActiveTabId(existingPreview.id);
+            return;
+          }
+        }
+
+        // Reuse current tab if untitled and clean
+        const cur = tabsRef.current.find((t) => t.id === activeTabIdRef.current);
+        if (cur && isEditorTab(cur) && !cur.file && !cur.isDirty) {
+          updateTab(cur.id, {
+            file: { path: vfsPath, handle: null, name: fileName },
+            content: fileContent,
+            lastSavedContent: fileContent,
+            isDirty: false,
+            lastSavedTime: Date.now(),
+            isPreview: effectivePreview,
+            fileType: vfsFileType,
+          });
+          return;
+        }
+
+        // New tab — with atomic dedup guard inside the updater
+        const tab: EditorTabState = {
+          tabKind: "editor",
+          id: generateTabId(),
+          file: { path: vfsPath, handle: null, name: fileName },
+          content: fileContent,
+          lastSavedContent: fileContent,
+          isDirty: false,
+          lastSavedTime: Date.now(),
+          lastSaveWasAuto: false,
+          isSaving: false,
+          isPreview: effectivePreview,
+          fileType: vfsFileType,
+          fileSyncStatus: "clean",
+          conflictDiskContent: null,
+        };
+        let existingTabId: TabId | null = null;
+        setTabs((prev) => {
+          const dup = prev.find((t) => isEditorTab(t) && t.file?.path === vfsPath);
+          if (dup && isEditorTab(dup)) {
+            existingTabId = dup.id;
+            if (!preview && dup.isPreview) {
+              return prev.map((t) => (t.id === dup.id ? { ...t, isPreview: false } : t));
+            }
+            return prev;
+          }
+          return [...prev, tab];
+        });
+        setActiveTabId(existingTabId ?? tab.id);
+      } finally {
+        openingPathsRef.current.delete(vfsPath);
+      }
     },
-    [],
+    [updateTab, setTabs, setActiveTabId, tabsRef, activeTabIdRef],
   );
 
   // --- Refs for stable references in effects ------------------------------
@@ -230,6 +641,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     openProjectFile,
     saveFileRef,
     saveAsFileRef,
+    tryCreateSnapshot,
     tryAutoSnapshot,
   };
 }

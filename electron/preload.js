@@ -6,6 +6,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   isElectron: true,
   openFile: () => ipcRenderer.invoke("open-file"),
+  saveFile: (filePath, content, fileType) =>
+    ipcRenderer.invoke("save-file", filePath, content, fileType),
   getChromeVersion: () => ipcRenderer.invoke("get-chrome-version"),
   setDirty: (dirty) => ipcRenderer.invoke("set-dirty", dirty),
   // 歴史的命名: flush 完了後にウィンドウを実際に閉じるためのシグナル。

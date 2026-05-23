@@ -201,7 +201,20 @@ function buildApplicationMenu(recentProjects = []) {
           sendToFocused("menu-open-triggered");
         },
       },
-      // 保存 / 別名で保存 削除 (Phase 2)。Phase 8 (Commit 3) で再導入する。
+      {
+        label: "保存",
+        accelerator: resolveAccelerator("file.save"),
+        click: () => {
+          sendToFocused("menu-save-triggered");
+        },
+      },
+      {
+        label: "別名で保存...",
+        accelerator: resolveAccelerator("file.saveAs"),
+        click: () => {
+          sendToFocused("menu-save-as-triggered");
+        },
+      },
       { type: "separator" },
       {
         label: "印刷...",

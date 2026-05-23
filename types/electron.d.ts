@@ -18,6 +18,11 @@ declare global {
   interface ElectronAPI {
     isElectron: boolean;
     openFile: () => Promise<{ path: string; content: string } | null>;
+    saveFile: (
+      filePath: string | null,
+      content: string,
+      fileType?: string,
+    ) => Promise<string | null | { success: false; error?: string; code?: string }>;
     getChromeVersion: () => Promise<number>;
     setDirty: (dirty: boolean) => Promise<void>;
     /**
