@@ -46,10 +46,14 @@ function makeDirtyEditorTab(overrides: Partial<EditorTabState> = {}): EditorTabS
 }
 
 describe("G2: pre-external-reload snapshot", () => {
-  let setTabs: ReturnType<typeof vi.fn>;
-  let openDiffTab: ReturnType<typeof vi.fn>;
-  let onEditorRemountNeeded: ReturnType<typeof vi.fn>;
-  let tryCreateSnapshot: ReturnType<typeof vi.fn>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let setTabs: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let openDiffTab: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let onEditorRemountNeeded: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let tryCreateSnapshot: any;
   let tab: EditorTabState;
   let tabsRef: { current: TabState[] };
 

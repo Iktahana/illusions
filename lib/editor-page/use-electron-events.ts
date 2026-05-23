@@ -213,6 +213,36 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
     };
   }, [isElectron]);
 
-  // Phase 3: onMenuOpenProject / onMenuOpenRecentProject / onOpenAsProject 経路を削除。
-  // Phase 8 で再導入する。
+  // Open project from menu IPC listener
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onMenuOpenProject?.(() => {
+      void confirmBeforeAction(() => handleOpenProject());
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [isElectron, confirmBeforeAction, handleOpenProject]);
+
+  // Open recent project from menu IPC listener
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onMenuOpenRecentProject?.((projectId: string) => {
+      void confirmBeforeAction(() => void handleOpenRecentProject(projectId));
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [isElectron, confirmBeforeAction, handleOpenRecentProject]);
+
+  // Open as project (system-triggered, e.g., double-clicked .mdi in project dir)
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onOpenAsProject?.(({ projectPath, initialFile }) => {
+      void confirmBeforeAction(() => handleOpenAsProject(projectPath, initialFile));
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [isElectron, confirmBeforeAction, handleOpenAsProject]);
 }
