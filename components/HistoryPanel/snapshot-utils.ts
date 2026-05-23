@@ -27,6 +27,12 @@ export function getSnapshotTypeLabel(type: SnapshotType): string {
       return "手動";
     case "milestone":
       return "ﾏｲﾙｽﾄｰﾝ";
+    case "pre-close":
+      return "閉じる前";
+    case "pre-external-reload":
+      return "外部更新前";
+    case "restore-point":
+      return "復元前";
   }
 }
 
@@ -50,5 +56,11 @@ export function getSnapshotTypeBadgeClass(type: SnapshotType): string {
       return "bg-blue-200 text-blue-700 dark:bg-blue-700 dark:text-blue-200";
     case "milestone":
       return "bg-amber-200 text-amber-700 dark:bg-amber-700 dark:text-amber-200";
+    case "pre-close":
+      return "bg-orange-200 text-orange-700 dark:bg-orange-700 dark:text-orange-200";
+    case "pre-external-reload":
+      return "bg-purple-200 text-purple-700 dark:bg-purple-700 dark:text-purple-200";
+    case "restore-point":
+      return "bg-green-200 text-green-700 dark:bg-green-700 dark:text-green-200";
   }
 }
