@@ -4,10 +4,11 @@ import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { RefreshCw, LoaderCircle } from "lucide-react";
 import clsx from "clsx";
 
+import ContextMenu from "@/components/ContextMenu";
+import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
+import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import type { WordEntry } from "@/lib/nlp-client/types";
-import { useContextMenu } from "@/lib/hooks/use-context-menu";
-import ContextMenu from "@/components/ContextMenu";
 import { getProjectFileService } from "@/lib/services/project-file-service";
 
 /** Cache file schema for word frequency results */
@@ -169,7 +170,7 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
 
       // Run NLP analysis
       const nlpClient = getNlpClient();
-      const wordEntries = await nlpClient.analyzeWordFrequency(content);
+      const wordEntries = await nlpClient.analyzeWordFrequency(stripMdiBlankMarkers(content));
 
       // Discard stale result if a newer analysis was started (#1078)
       if (genRef.current !== myGen) return;

@@ -11,6 +11,9 @@ import { stripMdiInlineSyntax, replaceMdiWithRubyText } from "./mdi-parser";
 /** Sentinel to distinguish scene breaks from paragraph-separation blank lines */
 const SCENE_BREAK_MARKER = "\x00SCENE_BREAK\x00";
 
+/** Inline regex for [[blank]] paragraph marker (whole line) */
+const BLANK_PARA_RE = /^\[\[blank\]\]$/;
+
 /**
  * Convert MDI markdown to plain text without ruby annotations.
  * Strips all MDI syntax and markdown formatting.
@@ -55,6 +58,12 @@ function stripMarkdown(text: string): string {
 
   for (const line of lines) {
     let processed = line;
+
+    // [[blank]] paragraph marker → forced blank line (via SCENE_BREAK_MARKER)
+    if (BLANK_PARA_RE.test(processed.trim())) {
+      result.push(SCENE_BREAK_MARKER);
+      continue;
+    }
 
     // Headings: # Title → Title
     processed = processed.replace(/^#{1,6}\s+/, "");

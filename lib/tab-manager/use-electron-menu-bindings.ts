@@ -127,7 +127,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
           continue;
         }
 
-        const sanitized = sanitizeMdiContent(tab.content);
+        const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
 
         if (!tab.file) {
           // New unsaved document: show Save As dialog so the user can give it a path.

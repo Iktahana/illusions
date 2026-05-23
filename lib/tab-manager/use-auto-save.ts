@@ -92,7 +92,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
         setTabs((prev) => prev.map((t) => (t.id === tab.id ? { ...t, isSaving: true } : t)));
         void (async () => {
           try {
-            const sanitized = sanitizeMdiContent(tab.content);
+            const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
             if (isProjectRef.current && tab.file?.path) {
               const vfs = getProjectFileService();
               suppressFileWatch(tab.file.path);
@@ -101,7 +101,8 @@ export function useAutoSave(params: UseAutoSaveParams): void {
               setTabs((prev) =>
                 prev.map((t) => {
                   if (t.id !== tab.id || !isEditorTab(t)) return t;
-                  const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+                  const newIsDirty =
+                    sanitizeMdiContent(t.content, { fileType: t.fileType }) !== sanitized;
                   return {
                     ...t,
                     lastSavedContent: sanitized,
@@ -126,7 +127,8 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                 setTabs((prev) =>
                   prev.map((t) => {
                     if (t.id !== tab.id || !isEditorTab(t)) return t;
-                    const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+                    const newIsDirty =
+                      sanitizeMdiContent(t.content, { fileType: t.fileType }) !== sanitized;
                     return {
                       ...t,
                       file: result.descriptor,

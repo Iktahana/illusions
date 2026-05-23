@@ -12,6 +12,7 @@
  *   const enhanced = enrichReadabilityWithMorphology(base, tokens);
  */
 
+import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
 import type { Token } from "@/lib/nlp-client/types";
 import type {
   EnhancedReadabilityAnalysis,
@@ -24,7 +25,7 @@ import type {
 
 /** 文字数カウント用にMarkdownを整形する */
 export function cleanMarkdown(markdown: string): string {
-  return markdown
+  return stripMdiBlankMarkers(markdown)
     .replace(/```[\s\S]*?```/g, "")
     .replace(/`[^`]+`/g, "")
     .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
