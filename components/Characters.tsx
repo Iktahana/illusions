@@ -3,9 +3,10 @@
 import { useState, useRef, useCallback, useEffect, memo } from "react";
 import { Plus, X, Sparkles, Loader2 } from "lucide-react";
 
+import { useCharacterExtractionSettings } from "@/contexts/EditorSettingsContext";
+import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { fetchAppState, persistAppState } from "@/lib/storage/app-state-manager";
-import { useCharacterExtractionSettings } from "@/contexts/EditorSettingsContext";
 import CharacterCard from "./Characters/CharacterCard";
 import NewCharacterForm from "./Characters/NewCharacterForm";
 import type { Character } from "./Characters/types";
@@ -145,7 +146,7 @@ function Characters({ content }: CharactersProps) {
 
     try {
       const nlpClient = getNlpClient();
-      const tokens = await nlpClient.tokenizeParagraph(content);
+      const tokens = await nlpClient.tokenizeParagraph(stripMdiBlankMarkers(content));
 
       const properNouns = new Map<string, boolean>();
 
