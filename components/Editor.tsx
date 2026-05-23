@@ -511,8 +511,9 @@ export default function NovelEditor({
         />
       )}
 
-      {/* 検索ダイアログ */}
+      {/* 検索ダイアログ（portal で document.body 直下に render。anchorRef でエディタ位置を計算）*/}
       <SearchDialog
+        anchorRef={scrollContainerRef}
         editorView={editorViewInstance}
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
