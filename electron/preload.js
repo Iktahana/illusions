@@ -155,21 +155,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     getItem: (key) => ipcRenderer.invoke("storage:get-item", key),
     removeItem: (key) => ipcRenderer.invoke("storage:remove-item", key),
   },
-  vfs: {
-    openDirectory: () => ipcRenderer.invoke("vfs:open-directory"),
-    setRoot: (rootPath) => ipcRenderer.invoke("vfs:set-root", rootPath),
-    readFile: (filePath) => ipcRenderer.invoke("vfs:read-file", filePath),
-    writeFile: (filePath, content) => ipcRenderer.invoke("vfs:write-file", filePath, content),
-    readDirectory: (dirPath) => ipcRenderer.invoke("vfs:read-directory", dirPath),
-    stat: (filePath) => ipcRenderer.invoke("vfs:stat", filePath),
-    mkdir: (dirPath) => ipcRenderer.invoke("vfs:mkdir", dirPath),
-    delete: (targetPath, options) => ipcRenderer.invoke("vfs:delete", targetPath, options),
-    rename: (oldPath, newPath) => ipcRenderer.invoke("vfs:rename", oldPath, newPath),
-    /** Acquire the cross-window history index lock for the given key */
-    indexLockAcquire: (key) => ipcRenderer.invoke("vfs:index-lock:acquire", key),
-    /** Release the cross-window history index lock for the given key */
-    indexLockRelease: (key) => ipcRenderer.invoke("vfs:index-lock:release", key),
-  },
+  // Phase 4-5: vfs.* API（openDirectory / setRoot / readFile / writeFile / etc /
+  // indexLockAcquire / indexLockRelease）すべて削除。Phase 7-8 で新 IO 抽象として再導入する。
   auth: {
     startLogin: () => ipcRenderer.invoke("auth:start-login"),
     exchangeCode: (params) => ipcRenderer.invoke("auth:exchange-code", params),

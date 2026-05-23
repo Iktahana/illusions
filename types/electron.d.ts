@@ -7,7 +7,7 @@ import type {
   EditorBuffer,
 } from "@/lib/storage/storage-types";
 import type { Token, WordEntry, TokenizeProgress } from "@/lib/nlp-client/types";
-import type { VFSWatchEvent } from "@/lib/vfs/types";
+// Phase 4-5: VFSWatchEvent type import 削除（vfs block と一緒に Phase 7-8 で再導入）。
 import type { KeymapOverrides } from "@/lib/keymap/keymap-types";
 import type { DictEntry, DictDownloadStatus } from "@/lib/dict/dict-types";
 import type { PdfGenerationOptions } from "@/lib/export/types";
@@ -92,39 +92,9 @@ declare global {
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;
-    /** Virtual File System IPC bridge */
-    vfs?: {
-      /** Open a native directory picker dialog */
-      openDirectory: () => Promise<{ path: string; name: string } | null>;
-      /** Set the root directory without opening a dialog (for recent project restore) */
-      setRoot: (rootPath: string) => Promise<{ path: string; name: string }>;
-      /** Read file content as UTF-8 text */
-      readFile: (filePath: string) => Promise<string>;
-      /** Write UTF-8 text content to a file */
-      writeFile: (filePath: string, content: string) => Promise<void>;
-      /** Read directory entries */
-      readDirectory: (
-        dirPath: string,
-      ) => Promise<Array<{ name: string; kind: "file" | "directory" }>>;
-      /** Get file stats */
-      stat: (filePath: string) => Promise<{ size: number; lastModified: number; type: string }>;
-      /** Create a directory (recursive) */
-      mkdir: (dirPath: string) => Promise<void>;
-      /** Delete a file or directory */
-      delete: (targetPath: string, options?: { recursive?: boolean }) => Promise<void>;
-      /** Watch a file for changes (optional) */
-      watch?: (filePath: string, callback: (event: VFSWatchEvent) => void) => { stop: () => void };
-      /**
-       * Acquire the cross-window history index lock for the given key.
-       * Suspends until the lock is available (main-process queue-based, atomic).
-       */
-      indexLockAcquire: (key: string) => Promise<void>;
-      /**
-       * Release the cross-window history index lock for the given key.
-       * Must be called from the window that acquired it.
-       */
-      indexLockRelease: (key: string) => Promise<void>;
-    };
+    // Phase 4-5: vfs IPC bridge 削除（openDirectory / setRoot / readFile / writeFile /
+    // readDirectory / stat / mkdir / delete / watch / indexLockAcquire / indexLockRelease）。
+    // Phase 7-8 で新 IO 抽象として再導入する。
     storage?: {
       saveSession: (session: StorageSession) => Promise<void>;
       loadSession: () => Promise<StorageSession | null>;

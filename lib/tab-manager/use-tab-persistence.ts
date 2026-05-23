@@ -348,7 +348,10 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
   useEffect(() => {
     if (!isElectron || skipAutoRestore) return;
-    if (!window.electronAPI?.vfs?.readFile) return;
+    // Phase 4-5: electronAPI.vfs は削除済み。Phase 9 で新 IO 抽象に再配線するまで
+    // 自動復元を停止する。
+    return;
+     
 
     const restoreTabs = async () => {
       try {

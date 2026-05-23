@@ -1,88 +1,54 @@
+/**
+ * Snapshot UI utilities.
+ *
+ * Phase 5 shim: history backend が削除されたため、UI で使われる
+ * フォーマット関数のみを最小限残置する。Phase 8 で履歴 UI を再構築する際に
+ * 必要なら本実装に戻す。
+ */
+
 import type { SnapshotType } from "@/lib/services/history-service";
 
-/** Day-of-week names in Japanese (日〜土) */
-const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"] as const;
-
-/**
- * Extract a YYYY-MM-DD date key from a timestamp for grouping.
- * タイムスタンプからグルーピング用の日付キー (YYYY-MM-DD) を抽出する。
- */
-export function getDateKey(timestamp: number): string {
-  const d = new Date(timestamp);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/**
- * Format a date key into a Japanese group label.
- * 日付キーを日本語のグループラベルにフォーマットする。
- * - 今日 / 昨日 for recent dates
- * - M月D日（曜日） for current year
- * - YYYY年M月D日（曜日） for older years
- */
-export function formatDateGroupLabel(dateKey: string): string {
-  const today = new Date();
-  const todayKey = getDateKey(today.getTime());
-
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayKey = getDateKey(yesterday.getTime());
-
-  if (dateKey === todayKey) return "今日";
-  if (dateKey === yesterdayKey) return "昨日";
-
-  const [yearStr, monthStr, dayStr] = dateKey.split("-");
-  const year = Number(yearStr);
-  const month = Number(monthStr);
-  const day = Number(dayStr);
-  const d = new Date(year, month - 1, day);
-  const dow = DAY_NAMES[d.getDay()];
-
-  if (year === today.getFullYear()) {
-    return `${month}月${day}日（${dow}）`;
-  }
-  return `${year}年${month}月${day}日（${dow}）`;
-}
-
-/**
- * Format a timestamp as time only, respecting the user's locale and
- * 12/24-hour preference from the browser.
- */
 export function formatTimeJa(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  if (!timestamp) return "";
+  const d = new Date(timestamp);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}/${mm}/${dd} ${hh}:${mi}`;
 }
 
-/**
- * Get the Japanese label for a snapshot type.
- * スナップショットタイプの日本語ラベルを取得する。
- */
 export function getSnapshotTypeLabel(type: SnapshotType): string {
   switch (type) {
     case "auto":
-      return "自動保存";
+      return "自動";
     case "manual":
-      return "手動保存";
+      return "手動";
     case "milestone":
-      return "マイルストーン";
+      return "ﾏｲﾙｽﾄｰﾝ";
   }
 }
 
-/**
- * Get the CSS classes for a snapshot type badge.
- * スナップショットタイプのバッジ用CSSクラスを取得する。
- */
+export function getDateKey(timestamp: number): string {
+  const d = new Date(timestamp);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export function formatDateGroupLabel(dateKey: string): string {
+  return dateKey;
+}
+
 export function getSnapshotTypeBadgeClass(type: SnapshotType): string {
   switch (type) {
     case "auto":
-      return "bg-foreground-muted/20 text-foreground-secondary";
+      return "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200";
     case "manual":
-      return "bg-info/20 text-info";
+      return "bg-blue-200 text-blue-700 dark:bg-blue-700 dark:text-blue-200";
     case "milestone":
-      return "bg-accent/20 text-accent";
+      return "bg-amber-200 text-amber-700 dark:bg-amber-700 dark:text-amber-200";
   }
 }
