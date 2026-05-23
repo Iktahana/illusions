@@ -258,13 +258,14 @@ export function sanitizeMdiContent(
 ): string {
   let result = content;
   // Step 1a (MDI only): standalone <br /> on its own line → [[blank]] marker.
+  // Intentionally case-sensitive (lowercase only) — <BR /> falls through to Step 1b.
   // CRLF-safe: allows optional \r before end-of-line.
   // Known limitation: user-authored standalone <br /> in .mdi is treated as a blank paragraph
   // (same class of escape gap as other bracket macros).
   if (options?.fileType === ".mdi") {
     result = result.replace(/^<br\s*\/?>[ \t]*\r?$/gm, "[[blank]]");
   }
-  // Step 1b: remaining inline <br> tags → newline
+  // Step 1b: remaining inline <br> tags → newline (case-insensitive)
   result = result.replace(/<br\s*\/?>/gi, "\n");
   // Step 2: Remove properly paired known HTML tags, keeping inner content.
   // Only matched pairs (e.g. <div>...</div>) are stripped; an orphaned
