@@ -7,7 +7,7 @@ import type {
   EditorBuffer,
 } from "@/lib/storage/storage-types";
 import type { Token, WordEntry, TokenizeProgress } from "@/lib/nlp-client/types";
-// Phase 4-5: VFSWatchEvent type import 削除（vfs block と一緒に Phase 7-8 で再導入）。
+import type { VFSWatchEvent } from "@/lib/vfs/types";
 import type { KeymapOverrides } from "@/lib/keymap/keymap-types";
 import type { DictEntry, DictDownloadStatus } from "@/lib/dict/dict-types";
 import type { PdfGenerationOptions } from "@/lib/export/types";
@@ -17,7 +17,7 @@ export {};
 declare global {
   interface ElectronAPI {
     isElectron: boolean;
-    // openFile / saveFile 削除 (Phase 2-3)。Phase 8 で再導入する。
+    openFile: () => Promise<{ path: string; content: string } | null>;
     getChromeVersion: () => Promise<number>;
     setDirty: (dirty: boolean) => Promise<void>;
     /**
@@ -30,13 +30,28 @@ declare global {
     showContextMenu?: (
       items: Array<{ type?: string; label?: string; action?: string; accelerator?: string }>,
     ) => Promise<string | null>;
-    // onSaveBeforeClose 削除 (Phase 2)。close handshake は onFlushStateBeforeClose のみ。
+    onSaveBeforeClose?: (callback: () => void) => (() => void) | void;
     onFlushStateBeforeClose?: (callback: () => void) => (() => void) | void;
-    // onOpenFileFromSystem / onOpenAsProject / getPendingFile 削除 (Phase 3)。Phase 8 で再導入する。
+    onOpenFileFromSystem?: (
+      callback: (payload: { path: string; content: string }) => void,
+    ) => (() => void) | void;
+    onOpenAsProject?: (
+      callback: (payload: { projectPath: string; initialFile: string }) => void,
+    ) => (() => void) | void;
+    getPendingFile?: () => Promise<
+      Array<
+        | { type: "project"; projectPath: string; initialFile: string }
+        | { type: "standalone"; path: string; content: string }
+      >
+    >;
     onMenuNew?: (callback: () => void) => (() => void) | void;
-    // onMenuOpen / onMenuSave / onMenuSaveAs / onMenuOpenProject / onMenuOpenRecentProject 削除 (Phase 2-3)。
+    onMenuOpen?: (callback: () => void) => (() => void) | void;
+    onMenuSave?: (callback: () => void) => (() => void) | void;
+    onMenuSaveAs?: (callback: () => void) => (() => void) | void;
     onMenuCloseTab?: (callback: () => void) => (() => void) | void;
     onMenuNewTab?: (callback: () => void) => (() => void) | void;
+    onMenuOpenProject?: (callback: () => void) => (() => void) | void;
+    onMenuOpenRecentProject?: (callback: (projectId: string) => void) => (() => void) | void;
     rebuildMenu?: () => Promise<boolean>;
     syncMenuUiState?: (state: {
       compactMode?: boolean;
@@ -92,9 +107,41 @@ declare global {
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;
-    // Phase 4-5: vfs IPC bridge 削除（openDirectory / setRoot / readFile / writeFile /
-    // readDirectory / stat / mkdir / delete / watch / indexLockAcquire / indexLockRelease）。
-    // Phase 7-8 で新 IO 抽象として再導入する。
+    /** Virtual File System IPC bridge */
+    vfs?: {
+      /** Open a native directory picker dialog */
+      openDirectory: () => Promise<{ path: string; name: string } | null>;
+      /** Set the root directory without opening a dialog (for recent project restore) */
+      setRoot: (rootPath: string) => Promise<{ path: string; name: string }>;
+      /** Read file content as UTF-8 text */
+      readFile: (filePath: string) => Promise<string>;
+      /** Write UTF-8 text content to a file */
+      writeFile: (filePath: string, content: string) => Promise<void>;
+      /** Read directory entries */
+      readDirectory: (
+        dirPath: string,
+      ) => Promise<Array<{ name: string; kind: "file" | "directory" }>>;
+      /** Get file stats */
+      stat: (filePath: string) => Promise<{ size: number; lastModified: number; type: string }>;
+      /** Create a directory (recursive) */
+      mkdir: (dirPath: string) => Promise<void>;
+      /** Delete a file or directory */
+      delete: (targetPath: string, options?: { recursive?: boolean }) => Promise<void>;
+      /** Rename (move) a file or directory */
+      rename: (oldPath: string, newPath: string) => Promise<void>;
+      /** Watch a file for changes (optional) */
+      watch?: (filePath: string, callback: (event: VFSWatchEvent) => void) => { stop: () => void };
+      /**
+       * Acquire the cross-window history index lock for the given key.
+       * Suspends until the lock is available (main-process queue-based, atomic).
+       */
+      indexLockAcquire: (key: string) => Promise<void>;
+      /**
+       * Release the cross-window history index lock for the given key.
+       * Must be called from the window that acquired it.
+       */
+      indexLockRelease: (key: string) => Promise<void>;
+    };
     storage?: {
       saveSession: (session: StorageSession) => Promise<void>;
       loadSession: () => Promise<StorageSession | null>;

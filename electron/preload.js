@@ -5,7 +5,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
   isElectron: true,
-  // openFile / saveFile 削除 (Phase 2-3)。Phase 8 で再導入する。
+  openFile: () => ipcRenderer.invoke("open-file"),
   getChromeVersion: () => ipcRenderer.invoke("get-chrome-version"),
   setDirty: (dirty) => ipcRenderer.invoke("set-dirty", dirty),
   // 歴史的命名: flush 完了後にウィンドウを実際に閉じるためのシグナル。
@@ -19,7 +19,21 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("menu-new-triggered", handler);
     return () => ipcRenderer.removeListener("menu-new-triggered", handler);
   },
-  // onMenuOpen 削除 (Phase 3)。onMenuSave / onMenuSaveAs 削除 (Phase 2)。Phase 8 で再導入する。
+  onMenuOpen: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu-open-triggered", handler);
+    return () => ipcRenderer.removeListener("menu-open-triggered", handler);
+  },
+  onMenuSave: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu-save-triggered", handler);
+    return () => ipcRenderer.removeListener("menu-save-triggered", handler);
+  },
+  onMenuSaveAs: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu-save-as-triggered", handler);
+    return () => ipcRenderer.removeListener("menu-save-as-triggered", handler);
+  },
   onMenuCloseTab: (callback) => {
     const handler = () => callback();
     ipcRenderer.on("menu-close-tab", handler);
@@ -30,13 +44,27 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("menu-new-tab", handler);
     return () => ipcRenderer.removeListener("menu-new-tab", handler);
   },
-  // onSaveBeforeClose 削除 (Phase 2)。close handshake は onFlushStateBeforeClose のみ。
+  onSaveBeforeClose: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("electron-request-save-before-close", handler);
+    return () => ipcRenderer.removeListener("electron-request-save-before-close", handler);
+  },
   onFlushStateBeforeClose: (callback) => {
     const handler = () => callback();
     ipcRenderer.on("electron-request-flush-state-before-close", handler);
     return () => ipcRenderer.removeListener("electron-request-flush-state-before-close", handler);
   },
-  // onOpenFileFromSystem / onOpenAsProject / getPendingFile 削除 (Phase 3)。Phase 8 で再導入する。
+  onOpenFileFromSystem: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("open-file-from-system", handler);
+    return () => ipcRenderer.removeListener("open-file-from-system", handler);
+  },
+  onOpenAsProject: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("open-as-project", handler);
+    return () => ipcRenderer.removeListener("open-as-project", handler);
+  },
+  getPendingFile: () => ipcRenderer.invoke("get-pending-file"),
   onPasteAsPlaintext: (callback) => {
     const handler = () => callback();
     ipcRenderer.on("menu-paste-as-plaintext", handler);
@@ -45,7 +73,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
   showInFileManager: (dirPath) => ipcRenderer.invoke("show-in-file-manager", dirPath),
   revealInFileManager: (filePath) => ipcRenderer.invoke("reveal-in-file-manager", filePath),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
-  // onMenuOpenProject / onMenuOpenRecentProject 削除 (Phase 3)。Phase 8 で再導入する。
+  onMenuOpenProject: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("menu-open-project", handler);
+    return () => ipcRenderer.removeListener("menu-open-project", handler);
+  },
+  onMenuOpenRecentProject: (callback) => {
+    const handler = (_event, projectId) => callback(projectId);
+    ipcRenderer.on("menu-open-recent-project", handler);
+    return () => ipcRenderer.removeListener("menu-open-recent-project", handler);
+  },
   rebuildMenu: () => ipcRenderer.invoke("menu:rebuild"),
   syncMenuUiState: (state) => ipcRenderer.invoke("menu:sync-ui-state", state),
   updateKeymapOverrides: (overrides) =>
@@ -155,8 +192,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
     getItem: (key) => ipcRenderer.invoke("storage:get-item", key),
     removeItem: (key) => ipcRenderer.invoke("storage:remove-item", key),
   },
-  // Phase 4-5: vfs.* API（openDirectory / setRoot / readFile / writeFile / etc /
-  // indexLockAcquire / indexLockRelease）すべて削除。Phase 7-8 で新 IO 抽象として再導入する。
+  vfs: {
+    openDirectory: () => ipcRenderer.invoke("vfs:open-directory"),
+    setRoot: (rootPath) => ipcRenderer.invoke("vfs:set-root", rootPath),
+    readFile: (filePath) => ipcRenderer.invoke("vfs:read-file", filePath),
+    writeFile: (filePath, content) => ipcRenderer.invoke("vfs:write-file", filePath, content),
+    readDirectory: (dirPath) => ipcRenderer.invoke("vfs:read-directory", dirPath),
+    stat: (filePath) => ipcRenderer.invoke("vfs:stat", filePath),
+    mkdir: (dirPath) => ipcRenderer.invoke("vfs:mkdir", dirPath),
+    delete: (targetPath, options) => ipcRenderer.invoke("vfs:delete", targetPath, options),
+    rename: (oldPath, newPath) => ipcRenderer.invoke("vfs:rename", oldPath, newPath),
+    indexLockAcquire: (key) => ipcRenderer.invoke("vfs:index-lock:acquire", key),
+    indexLockRelease: (key) => ipcRenderer.invoke("vfs:index-lock:release", key),
+  },
   auth: {
     startLogin: () => ipcRenderer.invoke("auth:start-login"),
     exchangeCode: (params) => ipcRenderer.invoke("auth:exchange-code", params),

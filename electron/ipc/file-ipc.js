@@ -273,7 +273,60 @@ function setPendingFilePath(p) {
 }
 
 function registerFileHandlers() {
-  // open-file IPC handler 削除 (Phase 3)。save-file 削除 (Phase 2)。Phase 8 で再導入する。
+  ipcMain.handle("open-file", async (event) => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ["openFile"],
+      filters: [
+        { name: "illusions MDI Document", extensions: ["mdi"] },
+        { name: "Markdown", extensions: ["md"] },
+        { name: "すべてのファイル", extensions: ["*"] },
+      ],
+    });
+    if (canceled || !filePaths[0]) return null;
+    const filePath = filePaths[0];
+    // Approve opened file path so it can be saved back without a new dialog.
+    // Scoped to the requesting window to prevent cross-window reuse.
+    approveDialogPath(event.sender.id, path.resolve(filePath));
+    const content = await fs.readFile(filePath, "utf-8");
+    return { path: filePath, content };
+  });
+
+  ipcMain.handle("get-pending-file", async (event) => {
+    if (pendingFilePaths.length === 0) return [];
+
+    // Drain the queue and resolve each path
+    const paths = pendingFilePaths.slice();
+    pendingFilePaths = [];
+
+    const results = [];
+    for (const filePath of paths) {
+      try {
+        const dirPath = path.dirname(filePath);
+        const projectRoot = await findProjectRoot(dirPath);
+
+        if (projectRoot) {
+          const relativePath = path.relative(projectRoot, filePath);
+          results.push({
+            type: "project",
+            projectPath: projectRoot,
+            initialFile: relativePath,
+          });
+        } else {
+          // Standalone file: approve path for future saves, scoped to the requesting window
+          approveDialogPath(event.sender.id, path.resolve(filePath));
+          const content = await fs.readFile(filePath, "utf-8");
+          results.push({
+            type: "standalone",
+            path: filePath,
+            content,
+          });
+        }
+      } catch (err) {
+        log.error("get-pending-file failed:", err);
+      }
+    }
+    return results;
+  });
 
   // --- Export handlers ---
 
@@ -523,8 +576,6 @@ function registerFileHandlers() {
       return { success: false, error: error.message || "DOCX export failed" };
     }
   });
-
-  // get-pending-file IPC handler 削除 (Phase 3)。Phase 8 で再導入する。
 
   // Clean up per-window approved paths when a BrowserWindow is closed/destroyed.
   // This prevents memory leaks and ensures stale approvals from destroyed windows
