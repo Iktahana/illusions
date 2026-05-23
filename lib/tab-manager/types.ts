@@ -247,10 +247,24 @@ const VOID_TAG_PATTERN = new RegExp(`<(${VOID_HTML_TAGS.join("|")})(\\s[^>]*)?\\
  * Sanitize MDI content before saving.
  * Strips known HTML tags that should not appear in .mdi files,
  * while preserving arbitrary angle-bracket content (e.g. `A<B>C`).
+ *
+ * @param options.fileType - When ".mdi", Step 1a converts standalone `<br />` lines
+ *   to `[[blank]]` markers before Step 1b handles remaining inline `<br>` tags.
+ *   For all other file types (or when omitted), Step 1a is skipped.
  */
-export function sanitizeMdiContent(content: string): string {
+export function sanitizeMdiContent(
+  content: string,
+  options?: { fileType?: SupportedFileExtension },
+): string {
   let result = content;
-  // Step 1: Convert <br> tags to newlines
+  // Step 1a (MDI only): standalone <br /> on its own line → [[blank]] marker.
+  // CRLF-safe: allows optional \r before end-of-line.
+  // Known limitation: user-authored standalone <br /> in .mdi is treated as a blank paragraph
+  // (same class of escape gap as other bracket macros).
+  if (options?.fileType === ".mdi") {
+    result = result.replace(/^<br\s*\/?>[ \t]*\r?$/gm, "[[blank]]");
+  }
+  // Step 1b: remaining inline <br> tags → newline
   result = result.replace(/<br\s*\/?>/gi, "\n");
   // Step 2: Remove properly paired known HTML tags, keeping inner content.
   // Only matched pairs (e.g. <div>...</div>) are stripped; an orphaned
