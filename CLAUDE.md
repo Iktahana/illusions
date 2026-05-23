@@ -63,7 +63,7 @@ const storage = getStorageService();
 
 - Electron: SQLite at `~/Library/Application Support/illusions/illusions-storage.db`
 - Web: IndexedDB via Dexie
-- Auto-save editor buffer every 30 seconds
+- Auto-save editor buffer every 5 seconds (foreground) / 20 seconds (background, when power-aware throttling is enabled). See `AUTO_SAVE_INTERVAL` in `lib/tab-manager/types.ts`
 
 ## 7. Framework Rules
 
