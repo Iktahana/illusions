@@ -10,7 +10,7 @@
  * Note: Browser/Electron APIs are fully mocked; no real filesystem access.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -67,144 +67,11 @@ function createMockFileHandle(name: string, content: string): FileSystemFileHand
 // openMdiFile Tests
 // -----------------------------------------------------------------------
 
-describe("openMdiFile", () => {
-  beforeEach(() => {
-    mockGetRuntimeEnvironment.mockReset();
-    mockIsBrowser.mockReset();
-    delete (window as any).electronAPI;
-    delete (window as any).showOpenFilePicker;
-  });
-
-  afterEach(() => {
-    delete (window as any).electronAPI;
-    delete (window as any).showOpenFilePicker;
-  });
-
-  describe("Electron environment", () => {
-    it("should return parsed result from Electron IPC", async () => {
-      mockGetRuntimeEnvironment.mockReturnValue("electron-renderer");
-      (window as any).electronAPI = {
-        openFile: vi.fn().mockResolvedValue({
-          path: "/Users/test/novel/chapter1.mdi",
-          content: "# Chapter 1\n\nHello world",
-        }),
-      };
-
-      const result = await openMdiFile();
-
-      expect(result).not.toBeNull();
-      expect(result!.descriptor.path).toBe("/Users/test/novel/chapter1.mdi");
-      expect(result!.descriptor.name).toBe("chapter1.mdi");
-      expect(result!.descriptor.handle).toBeNull();
-      expect(result!.content).toBe("# Chapter 1\n\nHello world");
-    });
-
-    it("should return null when user cancels the Electron dialog", async () => {
-      mockGetRuntimeEnvironment.mockReturnValue("electron-renderer");
-      (window as any).electronAPI = {
-        openFile: vi.fn().mockResolvedValue(null),
-      };
-
-      const result = await openMdiFile();
-      expect(result).toBeNull();
-    });
-
-    it("should return null when Electron IPC throws an error", async () => {
-      mockGetRuntimeEnvironment.mockReturnValue("electron-renderer");
-      (window as any).electronAPI = {
-        openFile: vi.fn().mockRejectedValue(new Error("IPC error")),
-      };
-
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      const result = await openMdiFile();
-
-      expect(result).toBeNull();
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-
-    it("should extract basename correctly from Windows-style paths", async () => {
-      mockGetRuntimeEnvironment.mockReturnValue("electron-renderer");
-      (window as any).electronAPI = {
-        openFile: vi.fn().mockResolvedValue({
-          path: "C:\\Users\\test\\novel\\chapter1.mdi",
-          content: "content",
-        }),
-      };
-
-      const result = await openMdiFile();
-
-      expect(result).not.toBeNull();
-      expect(result!.descriptor.name).toBe("chapter1.mdi");
-    });
-  });
-
-  describe("Browser environment (File System Access API)", () => {
-    it("should return null if not in a browser environment", async () => {
-      mockGetRuntimeEnvironment.mockReturnValue("unknown");
-      mockIsBrowser.mockReturnValue(false);
-
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const result = await openMdiFile();
-
-      expect(result).toBeNull();
-      consoleSpy.mockRestore();
-    });
-
-    it("should return null if showOpenFilePicker is not supported", async () => {
-      mockGetRuntimeEnvironment.mockReturnValue("browser");
-      mockIsBrowser.mockReturnValue(true);
-      // showOpenFilePicker is not defined on window
-
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const result = await openMdiFile();
-
-      expect(result).toBeNull();
-      consoleSpy.mockRestore();
-    });
-
-    it("should open a file via showOpenFilePicker", async () => {
-      mockGetRuntimeEnvironment.mockReturnValue("browser");
-      mockIsBrowser.mockReturnValue(true);
-
-      const fileHandle = createMockFileHandle("novel.mdi", "MDI content here");
-      (window as any).showOpenFilePicker = vi.fn().mockResolvedValue([fileHandle]);
-
-      const result = await openMdiFile();
-
-      expect(result).not.toBeNull();
-      expect(result!.descriptor.path).toBeNull();
-      expect(result!.descriptor.handle).toBe(fileHandle);
-      expect(result!.descriptor.name).toBe("novel.mdi");
-      expect(result!.content).toBe("MDI content here");
-    });
-
-    it("should return null when user cancels the file picker (AbortError)", async () => {
-      mockGetRuntimeEnvironment.mockReturnValue("browser");
-      mockIsBrowser.mockReturnValue(true);
-
-      const abortError = new DOMException("User cancelled", "AbortError");
-      (window as any).showOpenFilePicker = vi.fn().mockRejectedValue(abortError);
-
-      const result = await openMdiFile();
-      expect(result).toBeNull();
-    });
-
-    it("should return null and log error for non-AbortError exceptions", async () => {
-      mockGetRuntimeEnvironment.mockReturnValue("browser");
-      mockIsBrowser.mockReturnValue(true);
-
-      (window as any).showOpenFilePicker = vi
-        .fn()
-        .mockRejectedValue(new Error("Permission denied"));
-
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      const result = await openMdiFile();
-
-      expect(result).toBeNull();
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
+// Phase 3: openMdiFile は no-op shim 化済み。詳細テストは削除し、shim 挙動のみ確認。
+describe("openMdiFile (Phase 3 shim)", () => {
+  it("always returns null while load logic is removed", async () => {
+    const result = await openMdiFile();
+    expect(result).toBeNull();
   });
 });
 
