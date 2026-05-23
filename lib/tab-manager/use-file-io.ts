@@ -239,7 +239,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       updateTab(tabId, { isSaving: true });
 
       try {
-        const sanitized = sanitizeMdiContent(tab.content);
+        const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
 
         // Project mode: VFS direct write
         if (isProjectRef.current && tab.file?.path) {
@@ -263,7 +263,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           setTabs((prev) =>
             prev.map((t) => {
               if (t.id !== tabId || !isEditorTab(t)) return t;
-              const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+              const newIsDirty =
+                sanitizeMdiContent(t.content, { fileType: t.fileType }) !== sanitized;
               return {
                 ...t,
                 lastSavedContent: sanitized,
@@ -290,7 +291,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           setTabs((prev) =>
             prev.map((t) => {
               if (t.id !== tabId || !isEditorTab(t)) return t;
-              const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+              const newIsDirty =
+                sanitizeMdiContent(t.content, { fileType: t.fileType }) !== sanitized;
               return {
                 ...t,
                 file: result.descriptor,
@@ -352,7 +354,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     updateTab(tabId, { isSaving: true });
 
     try {
-      const sanitized = sanitizeMdiContent(tab.content);
+      const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
       const descriptor: MdiFileDescriptor | null = tab.file
         ? { path: null, handle: null, name: tab.file.name }
         : null;
@@ -367,7 +369,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           prev.map((t) =>
             t.id === tabId && isEditorTab(t)
               ? (() => {
-                  const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+                  const newIsDirty =
+                    sanitizeMdiContent(t.content, { fileType: t.fileType }) !== sanitized;
                   return {
                     ...t,
                     file: result.descriptor,

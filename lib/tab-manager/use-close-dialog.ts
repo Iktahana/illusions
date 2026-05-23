@@ -82,7 +82,7 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
     }
 
     try {
-      const sanitized = sanitizeMdiContent(tab.content);
+      const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
 
       if (isProjectRef.current && tab.file?.path) {
         const vfs = getVFS();
