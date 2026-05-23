@@ -22,14 +22,7 @@ export function useElectronMenuHandlers(onMenuNew: () => void, onMenuOpen: () =>
     return cleanup;
   }, [isElectron, onMenuNew]);
 
-  // メニューの「開く」
-  useEffect(() => {
-    if (!isElectron || !window.electronAPI?.onMenuOpen) return;
-
-    const cleanup = window.electronAPI.onMenuOpen(async () => {
-      await onMenuOpen();
-    });
-
-    return cleanup;
-  }, [isElectron, onMenuOpen]);
+  // Phase 3: onMenuOpen listener 削除。Phase 8 で再導入する。
+  // onMenuOpen 引数は signature 維持のため残置。
+  void onMenuOpen;
 }

@@ -365,57 +365,8 @@ export class ProjectService {
    * @throws Error if file picker is not supported
    */
   async openStandaloneFile(): Promise<StandaloneMode> {
-    // For Electron, delegate to the Electron file dialog via electronAPI
-    if (isElectronRenderer() && window.electronAPI) {
-      const result = await window.electronAPI.openFile();
-      if (!result) {
-        throw new Error("ファイル選択がキャンセルされました。");
-      }
-
-      const fileName = result.path.split(/[/\\]/).pop() ?? result.path;
-      const fileExtension = this.getFileExtension(fileName);
-
-      // Electron does not have FileSystemFileHandle, so we create a minimal shim.
-      // The caller should use VFS readFile/writeFile for actual I/O in Electron.
-      // Here we return a dummy handle since ProjectMode/StandaloneMode require it.
-      return {
-        type: "standalone",
-        fileHandle: null,
-        fileName,
-        fileExtension,
-        editorSettings: getDefaultEditorSettings(fileExtension),
-        filePath: result.path,
-      };
-    }
-
-    // Web: use File System Access API showOpenFilePicker
-    if (typeof window !== "undefined" && hasShowOpenFilePicker(window)) {
-      const [fileHandle] = await window.showOpenFilePicker({
-        types: [
-          {
-            description: "テキストファイル",
-            accept: {
-              "text/plain": [".txt"],
-              "text/markdown": [".md"],
-              "text/x-mdi": [".mdi"],
-            },
-          },
-        ],
-        multiple: false,
-      });
-
-      const fileExtension = this.getFileExtension(fileHandle.name);
-
-      return {
-        type: "standalone",
-        fileHandle,
-        fileName: fileHandle.name,
-        fileExtension,
-        editorSettings: getDefaultEditorSettings(fileExtension),
-      };
-    }
-
-    throw new Error("ファイル選択ダイアログはこの環境でサポートされていません。");
+    // Phase 3: load 経路を削除済み。Phase 8 で新 IO 抽象経由で再構築する。
+    throw new Error("Phase 3 shim: openStandaloneFile is not available");
   }
 
   /**

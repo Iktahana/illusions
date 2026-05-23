@@ -109,18 +109,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     return cleanup;
   }, [isElectron]);
 
-  // System file open (Electron: double-click .mdi etc.)
-  useEffect(() => {
-    if (!isElectron || !window.electronAPI?.onOpenFileFromSystem) return;
-
-    const cleanup = window.electronAPI.onOpenFileFromSystem(({ path, content: fileContent }) => {
-      loadSystemFile(path, fileContent);
-      // Notify page.tsx for editor key update
-      systemFileOpenHandlerRef.current?.(path, fileContent);
-    });
-
-    return cleanup;
-  }, [isElectron, loadSystemFile, systemFileOpenHandlerRef]);
+  // Phase 3: onOpenFileFromSystem 経路を削除。Phase 8 で再導入する。
 
   // Reload non-dirty tabs when window regains visibility (#98)
   useEffect(() => {

@@ -59,73 +59,12 @@ function getSaveFilters(
 }
 
 /**
- * .illusions MDI Documentを開く（Electron IPC / File System Access API）
+ * .illusions MDI Document を開く。
+ *
+ * Phase 3 shim: load 経路を削除済み。Phase 7-8 で新 IO 抽象経由で再構築する。
  */
 export async function openMdiFile(): Promise<OpenMdiResult | null> {
-  const env = getRuntimeEnvironment();
-
-  if (env === "electron-renderer" && window.electronAPI) {
-    try {
-      const result = await window.electronAPI.openFile();
-      if (!result) return null;
-      const { path, content } = result;
-      const name = basename(path);
-      return {
-        descriptor: {
-          path,
-          handle: null,
-          name,
-        },
-        content,
-      };
-    } catch (error) {
-      console.error("Electron IPC 経由で .mdi を開けませんでした:", error);
-      return null;
-    }
-  }
-
-  if (!isBrowser() || !hasShowOpenFilePicker(window)) {
-    console.warn("この環境では File System Access API を利用できません。");
-    return null;
-  }
-
-  try {
-    const [handle] = await window.showOpenFilePicker({
-      types: [
-        {
-          description: "illusions MDI Document",
-          accept: {
-            "text/plain": [".mdi"],
-          },
-        },
-        {
-          description: "すべてのファイル",
-          accept: {
-            "*/*": [],
-          },
-        },
-      ],
-      multiple: false,
-      excludeAcceptAllOption: false,
-    });
-
-    const file = await handle.getFile();
-    const text = await file.text();
-
-    return {
-      descriptor: {
-        path: null,
-        handle,
-        name: file.name,
-      },
-      content: text,
-    };
-  } catch (error) {
-    if ((error as { name?: string }).name !== "AbortError") {
-      console.error("File System Access API 経由で .mdi を開けませんでした:", error);
-    }
-    return null;
-  }
+  return null;
 }
 
 /**

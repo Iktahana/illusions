@@ -5,8 +5,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
   isElectron: true,
-  openFile: () => ipcRenderer.invoke("open-file"),
-  // saveFile 削除 (Phase 2)。Phase 8 で再導入する。
+  // openFile / saveFile 削除 (Phase 2-3)。Phase 8 で再導入する。
   getChromeVersion: () => ipcRenderer.invoke("get-chrome-version"),
   setDirty: (dirty) => ipcRenderer.invoke("set-dirty", dirty),
   // 歴史的命名: flush 完了後にウィンドウを実際に閉じるためのシグナル。
@@ -20,12 +19,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("menu-new-triggered", handler);
     return () => ipcRenderer.removeListener("menu-new-triggered", handler);
   },
-  onMenuOpen: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-open-triggered", handler);
-    return () => ipcRenderer.removeListener("menu-open-triggered", handler);
-  },
-  // onMenuSave / onMenuSaveAs 削除 (Phase 2)。Phase 8 で再導入する。
+  // onMenuOpen 削除 (Phase 3)。onMenuSave / onMenuSaveAs 削除 (Phase 2)。Phase 8 で再導入する。
   onMenuCloseTab: (callback) => {
     const handler = () => callback();
     ipcRenderer.on("menu-close-tab", handler);
@@ -42,17 +36,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("electron-request-flush-state-before-close", handler);
     return () => ipcRenderer.removeListener("electron-request-flush-state-before-close", handler);
   },
-  onOpenFileFromSystem: (callback) => {
-    const handler = (_event, payload) => callback(payload);
-    ipcRenderer.on("open-file-from-system", handler);
-    return () => ipcRenderer.removeListener("open-file-from-system", handler);
-  },
-  onOpenAsProject: (callback) => {
-    const handler = (_event, payload) => callback(payload);
-    ipcRenderer.on("open-as-project", handler);
-    return () => ipcRenderer.removeListener("open-as-project", handler);
-  },
-  getPendingFile: () => ipcRenderer.invoke("get-pending-file"),
+  // onOpenFileFromSystem / onOpenAsProject / getPendingFile 削除 (Phase 3)。Phase 8 で再導入する。
   onPasteAsPlaintext: (callback) => {
     const handler = () => callback();
     ipcRenderer.on("menu-paste-as-plaintext", handler);
@@ -61,16 +45,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   showInFileManager: (dirPath) => ipcRenderer.invoke("show-in-file-manager", dirPath),
   revealInFileManager: (filePath) => ipcRenderer.invoke("reveal-in-file-manager", filePath),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
-  onMenuOpenProject: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-open-project", handler);
-    return () => ipcRenderer.removeListener("menu-open-project", handler);
-  },
-  onMenuOpenRecentProject: (callback) => {
-    const handler = (_event, projectId) => callback(projectId);
-    ipcRenderer.on("menu-open-recent-project", handler);
-    return () => ipcRenderer.removeListener("menu-open-recent-project", handler);
-  },
+  // onMenuOpenProject / onMenuOpenRecentProject 削除 (Phase 3)。Phase 8 で再導入する。
   rebuildMenu: () => ipcRenderer.invoke("menu:rebuild"),
   syncMenuUiState: (state) => ipcRenderer.invoke("menu:sync-ui-state", state),
   updateKeymapOverrides: (overrides) =>

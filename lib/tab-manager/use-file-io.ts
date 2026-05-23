@@ -128,75 +128,10 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
   // --- File operations ----------------------------------------------------
 
-  /** Open a file via system dialog → new tab (or reuse untitled clean tab) */
+  /** Open a file — Phase 3 no-op shim. Will be re-implemented in Phase 7-8. */
   const openFile = useCallback(async () => {
-    const result = await openMdiFile();
-    if (!result) return;
-
-    const { descriptor, content: fileContent } = result;
-
-    // Deduplicate: if the same path is already open, reload from disk and activate
-    if (descriptor.path) {
-      const existing = findTabByPath(descriptor.path);
-      if (existing) {
-        // Force-refresh tab content so stale in-memory state is replaced with the
-        // latest content that was just read from disk by openMdiFile().
-        updateTab(existing.id, {
-          content: fileContent,
-          lastSavedContent: fileContent,
-          isDirty: false,
-        });
-        setActiveTabId(existing.id);
-        return;
-      }
-    }
-
-    const detectedFileType = inferFileType(descriptor.name);
-
-    // Reuse current tab if untitled and clean
-    const cur = tabsRef.current.find((t) => t.id === activeTabIdRef.current);
-    if (cur && isEditorTab(cur) && !cur.file && !cur.isDirty) {
-      updateTab(cur.id, {
-        file: descriptor,
-        content: fileContent,
-        lastSavedContent: fileContent,
-        isDirty: false,
-        lastSavedTime: Date.now(),
-        fileType: detectedFileType,
-      });
-    } else {
-      const tab: EditorTabState = {
-        tabKind: "editor",
-        id: generateTabId(),
-        file: descriptor,
-        content: fileContent,
-        lastSavedContent: fileContent,
-        isDirty: false,
-        lastSavedTime: Date.now(),
-        lastSaveWasAuto: false,
-        isSaving: false,
-        isPreview: false,
-        fileType: detectedFileType,
-        fileSyncStatus: "clean",
-        conflictDiskContent: null,
-      };
-      setTabs((prev) => [...prev, tab]);
-      setActiveTabId(tab.id);
-    }
-
-    void (async () => {
-      const ok = await persistFileReference(descriptor, fileContent);
-      if (!ok) notificationManager.warning(PERSIST_FAILURE_WARNING);
-    })();
-  }, [
-    findTabByPath,
-    updateTab,
-    persistFileReference,
-    setTabs,
-    setActiveTabId,
-    tabsRef,
-    activeTabIdRef,
-  ]);
+    // no-op: Phase 7-8 で新 IO 抽象経由で再実装する
+  }, []);
 
   /** Save the active tab — Phase 2 no-op shim. Will be re-implemented in Phase 8. */
   const saveFile = useCallback(async (_isAutoSave: boolean = false) => {
@@ -271,118 +206,12 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     [findTabByPath, updateTab, setTabs, setActiveTabId, tabsRef, activeTabIdRef],
   );
 
-  /** Open a file from the project VFS into a tab */
+  /** Open a file from the project VFS — Phase 3 no-op shim. Will be re-implemented in Phase 7-9. */
   const openProjectFile = useCallback(
-    async (vfsPath: string, options?: { preview?: boolean }) => {
-      const preview = options?.preview ?? false;
-
-      // Deduplicate: if already open, switch to it
-      const existing = tabsRef.current.find((t) => isEditorTab(t) && t.file?.path === vfsPath);
-      if (existing && isEditorTab(existing)) {
-        setActiveTabId(existing.id);
-        // If double-click on existing preview tab, pin it
-        if (!preview && existing.isPreview) {
-          updateTab(existing.id, { isPreview: false });
-        }
-        return;
-      }
-
-      // Prevent concurrent opens of the same path (race between click → double-click).
-      // Use Map to track preview intent: if a non-preview open arrives while a
-      // preview open is in-flight, the AND logic ensures the tab is pinned.
-      const existingIntent = openingPathsRef.current.get(vfsPath);
-      if (existingIntent !== undefined) {
-        // Merge intent: non-preview (false) wins via AND
-        openingPathsRef.current.set(vfsPath, existingIntent && preview);
-        return;
-      }
-      openingPathsRef.current.set(vfsPath, preview);
-
-      try {
-        // Read file from VFS
-        let fileContent: string;
-        try {
-          const vfs = getVFS();
-          fileContent = await vfs.readFile(vfsPath);
-        } catch (error) {
-          console.error("ファイルの読み込みに失敗しました:", error);
-          notificationManager.error(
-            `ファイルを開けませんでした: ${vfsPath.split("/").pop() || vfsPath}`,
-          );
-          return;
-        }
-
-        const fileName = vfsPath.split("/").pop() || "無題";
-        const vfsFileType = inferFileType(fileName);
-        const effectivePreview = openingPathsRef.current.get(vfsPath) ?? preview;
-
-        if (effectivePreview) {
-          // Replace existing preview tab, or create new preview tab
-          const existingPreview = tabsRef.current.find((t) => isEditorTab(t) && t.isPreview);
-          if (existingPreview && isEditorTab(existingPreview)) {
-            updateTab(existingPreview.id, {
-              file: { path: vfsPath, handle: null, name: fileName },
-              content: fileContent,
-              lastSavedContent: fileContent,
-              isDirty: false,
-              lastSavedTime: Date.now(),
-              isPreview: true,
-              fileType: vfsFileType,
-            });
-            setActiveTabId(existingPreview.id);
-            return;
-          }
-        }
-
-        // Reuse current tab if untitled and clean
-        const cur = tabsRef.current.find((t) => t.id === activeTabIdRef.current);
-        if (cur && isEditorTab(cur) && !cur.file && !cur.isDirty) {
-          updateTab(cur.id, {
-            file: { path: vfsPath, handle: null, name: fileName },
-            content: fileContent,
-            lastSavedContent: fileContent,
-            isDirty: false,
-            lastSavedTime: Date.now(),
-            isPreview: effectivePreview,
-            fileType: vfsFileType,
-          });
-          return;
-        }
-
-        // New tab — with atomic dedup guard inside the updater
-        const tab: EditorTabState = {
-          tabKind: "editor",
-          id: generateTabId(),
-          file: { path: vfsPath, handle: null, name: fileName },
-          content: fileContent,
-          lastSavedContent: fileContent,
-          isDirty: false,
-          lastSavedTime: Date.now(),
-          lastSaveWasAuto: false,
-          isSaving: false,
-          isPreview: effectivePreview,
-          fileType: vfsFileType,
-          fileSyncStatus: "clean",
-          conflictDiskContent: null,
-        };
-        let existingTabId: TabId | null = null;
-        setTabs((prev) => {
-          const dup = prev.find((t) => isEditorTab(t) && t.file?.path === vfsPath);
-          if (dup && isEditorTab(dup)) {
-            existingTabId = dup.id;
-            if (!preview && dup.isPreview) {
-              return prev.map((t) => (t.id === dup.id ? { ...t, isPreview: false } : t));
-            }
-            return prev;
-          }
-          return [...prev, tab];
-        });
-        setActiveTabId(existingTabId ?? tab.id);
-      } finally {
-        openingPathsRef.current.delete(vfsPath);
-      }
+    async (_vfsPath: string, _options?: { preview?: boolean }) => {
+      // no-op: Phase 7-9 で新 IO 抽象経由で再実装する
     },
-    [updateTab, setTabs, setActiveTabId, tabsRef, activeTabIdRef],
+    [],
   );
 
   // --- Refs for stable references in effects ------------------------------

@@ -175,33 +175,8 @@ function buildApplicationMenu(recentProjects = []) {
           createWindow({ showWelcome: true });
         },
       },
-      {
-        label: "最近のプロジェクトを開く",
-        submenu:
-          recentProjects.length > 0
-            ? recentProjects.map((project) => ({
-                label: project.name,
-                click: () => {
-                  sendToFocused("menu-open-recent-project", project.id);
-                },
-              }))
-            : [{ label: "項目なし", enabled: false }],
-      },
-      {
-        label: "プロジェクトを開く",
-        click: () => {
-          sendToFocused("menu-open-project");
-        },
-      },
-      { type: "separator" },
-      {
-        label: "ファイルを開く...",
-        accelerator: resolveAccelerator("file.open"),
-        click: () => {
-          sendToFocused("menu-open-triggered");
-        },
-      },
-      // 保存 / 別名で保存 削除 (Phase 2)。Phase 8 で再導入する。
+      // 最近のプロジェクトを開く / プロジェクトを開く / ファイルを開く 削除 (Phase 3)。
+      // 保存 / 別名で保存 削除 (Phase 2)。すべて Phase 8 で再導入する。
       { type: "separator" },
       {
         label: "印刷...",

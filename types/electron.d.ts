@@ -17,8 +17,7 @@ export {};
 declare global {
   interface ElectronAPI {
     isElectron: boolean;
-    openFile: () => Promise<{ path: string; content: string } | null>;
-    // saveFile 削除 (Phase 2)。Phase 8 で再導入する。
+    // openFile / saveFile 削除 (Phase 2-3)。Phase 8 で再導入する。
     getChromeVersion: () => Promise<number>;
     setDirty: (dirty: boolean) => Promise<void>;
     /**
@@ -33,25 +32,11 @@ declare global {
     ) => Promise<string | null>;
     // onSaveBeforeClose 削除 (Phase 2)。close handshake は onFlushStateBeforeClose のみ。
     onFlushStateBeforeClose?: (callback: () => void) => (() => void) | void;
-    onOpenFileFromSystem?: (
-      callback: (payload: { path: string; content: string }) => void,
-    ) => (() => void) | void;
-    onOpenAsProject?: (
-      callback: (payload: { projectPath: string; initialFile: string }) => void,
-    ) => (() => void) | void;
-    getPendingFile?: () => Promise<
-      Array<
-        | { type: "project"; projectPath: string; initialFile: string }
-        | { type: "standalone"; path: string; content: string }
-      >
-    >;
+    // onOpenFileFromSystem / onOpenAsProject / getPendingFile 削除 (Phase 3)。Phase 8 で再導入する。
     onMenuNew?: (callback: () => void) => (() => void) | void;
-    onMenuOpen?: (callback: () => void) => (() => void) | void;
-    // onMenuSave / onMenuSaveAs 削除 (Phase 2)。Phase 8 で再導入する。
+    // onMenuOpen / onMenuSave / onMenuSaveAs / onMenuOpenProject / onMenuOpenRecentProject 削除 (Phase 2-3)。
     onMenuCloseTab?: (callback: () => void) => (() => void) | void;
     onMenuNewTab?: (callback: () => void) => (() => void) | void;
-    onMenuOpenProject?: (callback: () => void) => (() => void) | void;
-    onMenuOpenRecentProject?: (callback: (projectId: string) => void) => (() => void) | void;
     rebuildMenu?: () => Promise<boolean>;
     syncMenuUiState?: (state: {
       compactMode?: boolean;
