@@ -133,6 +133,7 @@ export function useTabManager(options?: {
     isElectron: tabState.isElectron,
     openDiffTab: tabState.openDiffTab,
     onEditorRemountNeeded: options?.onEditorRemountNeeded,
+    tryCreateSnapshot: fileIO.tryCreateSnapshot,
   });
 
   // --- Tab persistence (save/restore to AppState) -------------------------
