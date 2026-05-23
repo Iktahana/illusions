@@ -5,7 +5,7 @@
  * プロジェクトの作成・開閉・保存を管理するサービス。
  */
 
-import { getVFS } from "../vfs";
+import { getProjectFileService } from "../services/project-file-service";
 import { getProjectManager } from "./project-manager";
 import { isElectronRenderer } from "../utils/runtime-env";
 import { getDefaultEditorSettings, getDefaultWorkspaceState } from "./project-types";
@@ -98,7 +98,7 @@ export class ProjectService {
   private projectManager: ProjectManager;
 
   constructor() {
-    this.vfs = getVFS();
+    this.vfs = getProjectFileService();
     this.projectManager = getProjectManager();
   }
 
@@ -439,7 +439,7 @@ export class ProjectService {
    */
   async readStandaloneContent(standalone: StandaloneMode): Promise<string> {
     if (isElectronRenderer() && standalone.filePath) {
-      const vfs = getVFS();
+      const vfs = getProjectFileService();
       return vfs.readFile(standalone.filePath);
     }
 

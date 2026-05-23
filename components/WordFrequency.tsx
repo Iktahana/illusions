@@ -8,7 +8,7 @@ import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import type { WordEntry } from "@/lib/nlp-client/types";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import ContextMenu from "@/components/ContextMenu";
-import { getVFS } from "@/lib/vfs";
+import { getProjectFileService } from "@/lib/services/project-file-service";
 
 /** Cache file schema for word frequency results */
 interface WordFrequencyCache {
@@ -142,7 +142,7 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
     setError(null);
 
     try {
-      const vfs = getVFS();
+      const vfs = getProjectFileService();
       const canCache = !!filePath && vfs.isRootOpen();
 
       // Try reading cache

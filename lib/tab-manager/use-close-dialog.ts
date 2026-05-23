@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { saveMdiFile } from "../project/mdi-file";
-import { getVFS } from "../vfs";
+import { getProjectFileService } from "../services/project-file-service";
 import { suppressFileWatch } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
 import type { SnapshotType } from "../services/history-policy";
@@ -86,7 +86,7 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
       const sanitized = sanitizeMdiContent(tab.content);
 
       if (isProjectRef.current && tab.file?.path) {
-        const vfs = getVFS();
+        const vfs = getProjectFileService();
         suppressFileWatch(tab.file.path);
         await vfs.writeFile(tab.file.path, sanitized);
         // B1 fix: tab close → "pre-close" snapshot type

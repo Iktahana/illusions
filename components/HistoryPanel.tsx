@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Plus, Loader2, History, ChevronDown, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 import { getHistoryService } from "@/lib/services/history-service";
-import { getVFS } from "@/lib/vfs";
+import { getProjectFileService } from "@/lib/services/project-file-service";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SnapshotItem from "./HistoryPanel/SnapshotItem";
 import { computeDiffStats } from "./HistoryPanel/DiffIndicator";
@@ -342,7 +342,7 @@ export default function HistoryPanel({
         // G3: 復元前に現在の内容を restore-point スナップショットとして保存する。
         // 「復元 → やっぱり戻したい」を可能にする。
         // tryCreateSnapshot の内部ガードと同じ条件（VFS root open）で保護する。
-        if (currentContent && getVFS().isRootOpen()) {
+        if (currentContent && getProjectFileService().isRootOpen()) {
           try {
             await historyService.createSnapshot({
               sourcePath,

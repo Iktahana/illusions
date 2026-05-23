@@ -11,7 +11,7 @@ import { getStorageService } from "../storage/storage-service";
 import { persistAppState } from "../storage/app-state-manager";
 import { getHistoryService } from "../services/history-service";
 import type { SnapshotType } from "../services/history-policy";
-import { getVFS } from "../vfs";
+import { getProjectFileService } from "../services/project-file-service";
 import { suppressFileWatch } from "../services/file-watcher";
 import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
@@ -141,7 +141,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   const tryCreateSnapshot = useCallback(
     async (type: SnapshotType, sourcePath: string, displayName: string, savedContent: string) => {
       if (!isProjectRef.current) return;
-      if (!getVFS().isRootOpen()) return;
+      if (!getProjectFileService().isRootOpen()) return;
       try {
         const historyService = getHistoryService();
         // Only "auto" is throttled; all other types always create a snapshot.
@@ -280,7 +280,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
         // Project mode: VFS direct write
         if (isProjectRef.current && tab.file?.path) {
-          const vfs = getVFS();
+          const vfs = getProjectFileService();
           suppressFileWatch(tab.file.path);
           await vfs.writeFile(tab.file.path, sanitized);
 
@@ -542,7 +542,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         // Read file from VFS
         let fileContent: string;
         try {
-          const vfs = getVFS();
+          const vfs = getProjectFileService();
           fileContent = await vfs.readFile(vfsPath);
         } catch (error) {
           console.error("ファイルの読み込みに失敗しました:", error);

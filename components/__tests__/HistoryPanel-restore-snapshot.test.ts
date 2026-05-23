@@ -27,12 +27,12 @@ vi.mock("@/lib/services/history-service", async () => {
   };
 });
 
-vi.mock("@/lib/vfs", () => ({
-  getVFS: vi.fn(),
+vi.mock("@/lib/services/project-file-service", () => ({
+  getProjectFileService: vi.fn(),
 }));
 
 import { getHistoryService } from "@/lib/services/history-service";
-import { getVFS } from "@/lib/vfs";
+import { getProjectFileService } from "@/lib/services/project-file-service";
 
 /**
  * Mirror of executeRestore behavior from HistoryPanel.tsx for testing.
@@ -45,7 +45,7 @@ async function executeRestoreLogic(
   displayName: string,
 ): Promise<{ snapshotCreated: boolean; restoreResult: RestoreResult }> {
   const historyService = getHistoryService();
-  const vfs = getVFS();
+  const vfs = getProjectFileService();
   let snapshotCreated = false;
 
   // G3 check: only if there's current content and VFS root is open
@@ -98,9 +98,9 @@ describe("G3: restore-point snapshot", () => {
       restoreSnapshot,
     } as unknown as ReturnType<typeof getHistoryService>);
 
-    vi.mocked(getVFS).mockReturnValue({
+    vi.mocked(getProjectFileService).mockReturnValue({
       isRootOpen,
-    } as unknown as ReturnType<typeof getVFS>);
+    } as unknown as ReturnType<typeof getProjectFileService>);
   });
 
   it("creates restore-point snapshot BEFORE calling restoreSnapshot", async () => {

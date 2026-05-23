@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { saveMdiFile } from "../project/mdi-file";
-import { getVFS } from "../vfs";
+import { getProjectFileService } from "../services/project-file-service";
 import { suppressFileWatch } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
 import type { SnapshotType } from "../services/history-policy";
@@ -162,7 +162,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
 
         try {
           if (isProjectRef.current && tab.file.path) {
-            const vfs = getVFS();
+            const vfs = getProjectFileService();
             suppressFileWatch(tab.file.path);
             await vfs.writeFile(tab.file.path, sanitized);
             // B1 fix: window close "保存" → "pre-close" snapshot type
@@ -232,7 +232,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
       if (document.hidden) return;
       if (!isProjectRef.current) return;
 
-      const vfs = getVFS();
+      const vfs = getProjectFileService();
       if (!vfs.isRootOpen()) return;
 
       for (const tab of tabsRef.current) {

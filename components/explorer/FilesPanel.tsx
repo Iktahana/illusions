@@ -60,8 +60,8 @@ export function FilesPanel({
 
   const loadDirectory = useCallback(
     async (dirPath: string): Promise<FileTreeEntry[]> => {
-      const { getVFS } = await import("@/lib/vfs");
-      const vfs = getVFS();
+      const { getProjectFileService } = await import("@/lib/services/project-file-service");
+      const vfs = getProjectFileService();
       const entries = await vfs.listDirectory(dirPath);
 
       const sorted = [...entries]
@@ -98,8 +98,8 @@ export function FilesPanel({
     let cancelled = false;
     const load = async () => {
       try {
-        const { getVFS } = await import("@/lib/vfs");
-        const vfs = getVFS();
+        const { getProjectFileService } = await import("@/lib/services/project-file-service");
+        const vfs = getProjectFileService();
         if (!vfs.isRootOpen()) {
           setTree(null);
           return;
@@ -176,8 +176,8 @@ export function FilesPanel({
   const executeDelete = useCallback(
     async (fullPath: string, kind: "file" | "directory") => {
       try {
-        const { getVFS } = await import("@/lib/vfs");
-        const vfs = getVFS();
+        const { getProjectFileService } = await import("@/lib/services/project-file-service");
+        const vfs = getProjectFileService();
         if (kind === "directory") {
           const dirHandle = await vfs.getDirectoryHandle(toVFSPath(fullPath));
           // Delete all entries recursively
@@ -214,8 +214,8 @@ export function FilesPanel({
       const newFullPath = parentPath === "/" ? `/${newName}` : `${parentPath}/${newName}`;
 
       try {
-        const { getVFS } = await import("@/lib/vfs");
-        const vfs = getVFS();
+        const { getProjectFileService } = await import("@/lib/services/project-file-service");
+        const vfs = getProjectFileService();
         await vfs.rename(toVFSPath(fullPath), toVFSPath(newFullPath));
         setEditing(null);
         refresh();
@@ -229,8 +229,8 @@ export function FilesPanel({
   const handleDuplicate = useCallback(
     async (fullPath: string) => {
       try {
-        const { getVFS } = await import("@/lib/vfs");
-        const vfs = getVFS();
+        const { getProjectFileService } = await import("@/lib/services/project-file-service");
+        const vfs = getProjectFileService();
         const content = await vfs.readFile(toVFSPath(fullPath));
 
         const name = fullPath.split("/").pop()!;
@@ -252,8 +252,8 @@ export function FilesPanel({
 
   const handleDownload = useCallback(async (fullPath: string) => {
     try {
-      const { getVFS } = await import("@/lib/vfs");
-      const vfs = getVFS();
+      const { getProjectFileService } = await import("@/lib/services/project-file-service");
+      const vfs = getProjectFileService();
       const content = await vfs.readFile(toVFSPath(fullPath));
       const name = fullPath.split("/").pop()!;
 
@@ -282,8 +282,8 @@ export function FilesPanel({
       const finalName = hasExtension ? name : `${name}.mdi`;
       const filePath = parentPath === "/" ? `/${finalName}` : `${parentPath}/${finalName}`;
       try {
-        const { getVFS } = await import("@/lib/vfs");
-        const vfs = getVFS();
+        const { getProjectFileService } = await import("@/lib/services/project-file-service");
+        const vfs = getProjectFileService();
         await vfs.writeFile(toVFSPath(filePath), "");
         setEditing(null);
         refresh();
@@ -302,8 +302,8 @@ export function FilesPanel({
       }
       const dirPath = parentPath === "/" ? `/${name}` : `${parentPath}/${name}`;
       try {
-        const { getVFS } = await import("@/lib/vfs");
-        const vfs = getVFS();
+        const { getProjectFileService } = await import("@/lib/services/project-file-service");
+        const vfs = getProjectFileService();
         const parentHandle = await vfs.getDirectoryHandle(toVFSPath(parentPath));
         await parentHandle.getDirectoryHandle(name, { create: true });
         setEditing(null);
@@ -384,8 +384,8 @@ export function FilesPanel({
 
       const newPath = destDir === "/" ? `/${name}` : `${destDir}/${name}`;
       try {
-        const { getVFS } = await import("@/lib/vfs");
-        const vfs = getVFS();
+        const { getProjectFileService } = await import("@/lib/services/project-file-service");
+        const vfs = getProjectFileService();
         await vfs.rename(toVFSPath(srcPath), toVFSPath(newPath));
         refresh();
       } catch (error) {
@@ -399,8 +399,8 @@ export function FilesPanel({
   const handleExternalFileDrop = useCallback(
     async (files: FileList, destDir: string) => {
       try {
-        const { getVFS } = await import("@/lib/vfs");
-        const vfs = getVFS();
+        const { getProjectFileService } = await import("@/lib/services/project-file-service");
+        const vfs = getProjectFileService();
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
           try {
@@ -556,8 +556,8 @@ export function FilesPanel({
         case "reveal-in-finder":
         case "open-in-finder": {
           try {
-            const { getVFS } = await import("@/lib/vfs");
-            const vfs = getVFS();
+            const { getProjectFileService } = await import("@/lib/services/project-file-service");
+            const vfs = getProjectFileService();
             const rootPath = vfs.getRootPath?.();
             if (rootPath && window.electronAPI?.revealInFileManager) {
               const vfsRelative = toVFSPath(fullPath);

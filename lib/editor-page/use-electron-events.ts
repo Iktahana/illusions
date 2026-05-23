@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useEffect } from "react";
 
 import { persistAppState } from "@/lib/storage/app-state-manager";
-import { getVFS } from "@/lib/vfs";
+import { getProjectFileService } from "@/lib/services/project-file-service";
 
 interface UseElectronEventsParams {
   isElectron: boolean;
@@ -201,7 +201,7 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
     if (!isElectron || typeof window === "undefined") return;
 
     const cleanup = window.electronAPI?.onMenuShowInFileManager?.(() => {
-      const vfs = getVFS();
+      const vfs = getProjectFileService();
       const rootPath = vfs.getRootPath?.();
       if (rootPath) {
         void window.electronAPI?.showInFileManager?.(rootPath);
