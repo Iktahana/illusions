@@ -31,7 +31,10 @@ const {
 
 /** Create a fresh temporary file path for each test (not created yet). */
 function tempFilePath() {
-  return path.join(os.tmpdir(), `vfs-approvals-test-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+  return path.join(
+    os.tmpdir(),
+    `vfs-approvals-test-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
+  );
 }
 
 let tmpFile: string;
@@ -74,8 +77,16 @@ describe("saveApprovals()", () => {
     const seed = {
       version: 1,
       approvals: [
-        { projectId: "proj_A", path: "/Users/alice/projectA", approvedAt: "2026-01-01T00:00:00.000Z" },
-        { projectId: "proj_B", path: "/Users/bob/projectB", approvedAt: "2026-01-01T00:00:00.000Z" },
+        {
+          projectId: "proj_A",
+          path: "/Users/alice/projectA",
+          approvedAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          projectId: "proj_B",
+          path: "/Users/bob/projectB",
+          approvedAt: "2026-01-01T00:00:00.000Z",
+        },
       ],
     };
     fsSync.writeFileSync(tmpFile, JSON.stringify(seed));
@@ -86,8 +97,12 @@ describe("saveApprovals()", () => {
 
     const raw = fsSync.readFileSync(tmpFile, "utf-8");
     const data = JSON.parse(raw);
-    const projBEntry = data.approvals.find((a: { projectId: string; path: string }) => a.projectId === "proj_B");
-    const projAEntry = data.approvals.find((a: { projectId: string; path: string }) => a.projectId === "proj_A");
+    const projBEntry = data.approvals.find(
+      (a: { projectId: string; path: string }) => a.projectId === "proj_B",
+    );
+    const projAEntry = data.approvals.find(
+      (a: { projectId: string; path: string }) => a.projectId === "proj_A",
+    );
 
     // proj_B must remain untouched
     expect(projBEntry).toBeDefined();
@@ -107,8 +122,16 @@ describe("loadApprovals()", () => {
     const data = {
       version: 1,
       approvals: [
-        { projectId: "proj_X", path: "/Users/alice/xProject", approvedAt: "2026-01-01T00:00:00.000Z" },
-        { projectId: "proj_Y", path: "/Users/alice/yProject", approvedAt: "2026-01-01T00:00:00.000Z" },
+        {
+          projectId: "proj_X",
+          path: "/Users/alice/xProject",
+          approvedAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          projectId: "proj_Y",
+          path: "/Users/alice/yProject",
+          approvedAt: "2026-01-01T00:00:00.000Z",
+        },
       ],
     };
     fsSync.writeFileSync(tmpFile, JSON.stringify(data));
@@ -256,7 +279,10 @@ describe("R6 scoping: different projectId gets isolated approval set", () => {
 // -----------------------------------------------------------------------
 describe("in-memory cache (NEW-3)", () => {
   it("returns cached result without re-reading disk after first load", async () => {
-    const data = { version: 1, approvals: [{ projectId: "proj_c", path: "/c/path", approvedAt: "2026-01-01T00:00:00.000Z" }] };
+    const data = {
+      version: 1,
+      approvals: [{ projectId: "proj_c", path: "/c/path", approvedAt: "2026-01-01T00:00:00.000Z" }],
+    };
     fsSync.writeFileSync(tmpFile, JSON.stringify(data));
     clearApprovalsCache();
 
@@ -264,7 +290,12 @@ describe("in-memory cache (NEW-3)", () => {
     await loadApprovals(tmpFile, "proj_c");
 
     // Overwrite file on disk with different content
-    const updated = { version: 1, approvals: [{ projectId: "proj_c", path: "/different/path", approvedAt: "2026-01-02T00:00:00.000Z" }] };
+    const updated = {
+      version: 1,
+      approvals: [
+        { projectId: "proj_c", path: "/different/path", approvedAt: "2026-01-02T00:00:00.000Z" },
+      ],
+    };
     fsSync.writeFileSync(tmpFile, JSON.stringify(updated));
 
     // Should still return cached (original) result

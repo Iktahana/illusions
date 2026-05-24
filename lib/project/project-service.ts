@@ -195,10 +195,9 @@ export class ProjectService {
         projectRootPath = `${parentPath}/${name}`;
         if ("setRootPath" in this.vfs) {
           // #1476: rehydration — pass projectId for project-scoped approval persistence
-          await (this.vfs as { setRootPath: (p: string, projectId?: string) => Promise<void> }).setRootPath(
-            projectRootPath,
-            projectId,
-          );
+          await (
+            this.vfs as { setRootPath: (p: string, projectId?: string) => Promise<void> }
+          ).setRootPath(projectRootPath, projectId);
         }
       }
     }
@@ -481,9 +480,11 @@ export class ProjectService {
     if (standalone.fileExtension === ".txt") {
       if (isElectronRenderer() && standalone.filePath) {
         // Read raw bytes via Electron IPC read-file endpoint
-        const bridge = (window.electronAPI as unknown as {
-          vfs?: { readFileRaw?: (p: string) => Promise<Uint8Array> };
-        })?.vfs;
+        const bridge = (
+          window.electronAPI as unknown as {
+            vfs?: { readFileRaw?: (p: string) => Promise<Uint8Array> };
+          }
+        )?.vfs;
         if (bridge?.readFileRaw) {
           const buf = await bridge.readFileRaw(standalone.filePath);
           const { text, eol } = readTextWithEncoding(new Uint8Array(buf));
@@ -572,10 +573,9 @@ export class ProjectService {
       // Re-set the VFS root using the stored absolute path
       if ("setRootPath" in this.vfs) {
         // #1476: rehydration — pass projectId so the approval is looked up project-scoped
-        await (this.vfs as { setRootPath: (p: string, projectId?: string) => Promise<void> }).setRootPath(
-          project.rootPath,
-          project.projectId,
-        );
+        await (
+          this.vfs as { setRootPath: (p: string, projectId?: string) => Promise<void> }
+        ).setRootPath(project.rootPath, project.projectId);
       }
       return await this.vfs.getDirectoryHandle("");
     }

@@ -38,8 +38,7 @@ export default function SearchResults({
   // pushed by SearchDialog's "すべての検索結果を表示" button. Using render-time
   // detection (vs useEffect) avoids the extra-render flush delay that breaks
   // jsdom tests and trips React 18+ act() expectations.
-  const [lastInitialSearchTerm, setLastInitialSearchTerm] =
-    useState(initialSearchTerm);
+  const [lastInitialSearchTerm, setLastInitialSearchTerm] = useState(initialSearchTerm);
   if (initialSearchTerm !== lastInitialSearchTerm) {
     setLastInitialSearchTerm(initialSearchTerm);
     if (initialSearchTerm !== undefined) {
@@ -47,8 +46,7 @@ export default function SearchResults({
     }
   }
 
-  const [lastInitialMatches, setLastInitialMatches] =
-    useState(initialMatches);
+  const [lastInitialMatches, setLastInitialMatches] = useState(initialMatches);
   if (initialMatches !== lastInitialMatches) {
     setLastInitialMatches(initialMatches);
     if (initialMatches !== undefined) {

@@ -232,7 +232,10 @@ export class ElectronVFS implements VirtualFileSystem {
     return {
       path: result.path,
       name: result.name,
-      buf: result.buf instanceof Uint8Array ? result.buf : new Uint8Array(Object.values(result.buf as Record<string, number>)),
+      buf:
+        result.buf instanceof Uint8Array
+          ? result.buf
+          : new Uint8Array(Object.values(result.buf as Record<string, number>)),
     };
   }
 
