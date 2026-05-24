@@ -12,6 +12,15 @@ interface SearchMatch {
   to: number;
 }
 
+// #1507: After tab switch, the parent's editorViewInstance may still
+// reference a destroyed EditorView for a short window before the new
+// editor's view is ready. ProseMirror sets `docView` to null on destroy.
+// Dispatching on a destroyed view routes through Milkdown plugins whose
+// context has been torn down, throwing "Context editorState not found".
+function isEditorViewAlive(view: EditorView | null): view is EditorView {
+  return view !== null && (view as unknown as { docView: unknown }).docView !== null;
+}
+
 interface SearchResultsProps {
   editorView: EditorView | null;
   matches?: SearchMatch[];
@@ -58,14 +67,19 @@ export default function SearchResults({
   useEffect(() => {
     // #1502: when there's no editor, leave matches as-is so prop-sourced
     // initialMatches survive. Local recompute only runs against a real editor.
-    if (!editorView) {
+    // #1507: also guard against destroyed views during tab switch.
+    if (!isEditorViewAlive(editorView)) {
       return;
     }
     if (!searchTerm) {
       setMatches([]);
-      const { state, dispatch } = editorView;
-      const tr = state.tr.setMeta("searchDecorations", []);
-      dispatch(tr);
+      try {
+        const { state, dispatch } = editorView;
+        const tr = state.tr.setMeta("searchDecorations", []);
+        dispatch(tr);
+      } catch {
+        // Best-effort cleanup — view may have been destroyed mid-dispatch.
+      }
       return;
     }
 
@@ -115,8 +129,12 @@ export default function SearchResults({
         class: "search-result",
       }),
     );
-    const tr = state.tr.setMeta("searchDecorations", decorations);
-    dispatch(tr);
+    try {
+      const tr = state.tr.setMeta("searchDecorations", decorations);
+      dispatch(tr);
+    } catch {
+      // #1507: view torn down mid-search — decorations go with it.
+    }
   }, [searchTerm, caseSensitive, editorView]);
   // Get context text for match
   const getMatchContext = useCallback(
@@ -153,7 +171,7 @@ export default function SearchResults({
   // Jump to specified match and highlight
   const goToMatch = useCallback(
     (match: SearchMatch, index: number) => {
-      if (!editorView) return;
+      if (!isEditorViewAlive(editorView)) return;
 
       const { state, dispatch } = editorView;
 
@@ -183,7 +201,7 @@ export default function SearchResults({
   // Replace single match
   const replaceMatch = useCallback(
     (match: SearchMatch) => {
-      if (!editorView) return;
+      if (!isEditorViewAlive(editorView)) return;
 
       const { state, dispatch } = editorView;
       const tr = state.tr.replaceWith(match.from, match.to, state.schema.text(replaceTerm));
@@ -200,7 +218,7 @@ export default function SearchResults({
 
   // Replace all matches
   const replaceAllMatches = useCallback(() => {
-    if (!editorView || matches.length === 0) return;
+    if (!isEditorViewAlive(editorView) || matches.length === 0) return;
 
     const { state, dispatch } = editorView;
     let tr = state.tr;
