@@ -3,7 +3,7 @@ title: 履歴サービス
 slug: history-service
 type: architecture
 status: active
-updated: 2026-04-03
+updated: 2026-05-24
 tags:
   - architecture
   - history
@@ -21,10 +21,12 @@ The history service provides a local version history system for documents. It cr
 
 ### Key Files
 
-| File                     | Lines | Purpose                                                 |
-| ------------------------ | ----- | ------------------------------------------------------- |
-| `lib/history-service.ts` | ~760  | Snapshot creation, restoration, pruning, and management |
-| `lib/diff-service.ts`    | ~67   | Character-level diff computation and statistics         |
+| File                               | Lines | Purpose                                                       |
+| ---------------------------------- | ----- | ------------------------------------------------------------- |
+| `lib/services/history-service.ts`  | ~120  | Facade — composes HistoryPolicy + HistoryStore, public API    |
+| `lib/services/history-policy.ts`   | ~394  | Stateless decision logic: throttle, pruning, checksum, format |
+| `lib/services/history-store.ts`    | ~271  | IO layer: read/write snapshot files and index.json            |
+| `lib/diff-service.ts`              | ~67   | Character-level diff computation and statistics               |
 
 ### Features
 
@@ -32,8 +34,8 @@ The history service provides a local version history system for documents. It cr
 - SHA-256 checksum verification on restore
 - Character-level diff optimized for Japanese text
 - Automatic pruning by count and age with milestone protection
-- Thread-safe via AsyncMutex for concurrent operations
 - Singleton access via `getHistoryService()`
+- Policy/Store split: `HistoryPolicy` (stateless decisions) + `HistoryStore` (IO) composed by the `HistoryService` facade
 
 ---
 
@@ -57,16 +59,24 @@ The history service provides a local version history system for documents. It cr
                         ▼
 ┌──────────────────────────────────────────────────────────┐
 │  HistoryService (Singleton via getHistoryService())       │
+│  Facade — delegates to Policy + Store                     │
 │                                                           │
-│  ┌─────────────────────────────────────────────────────┐ │
-│  │ AsyncMutex — ensures atomic read/write operations   │ │
-│  └─────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │ HistoryPolicy (history-policy.ts)                  │  │
+│  │ Stateless: throttle, pruning rules, checksum,      │  │
+│  │            filename format, display name           │  │
+│  └────────────────────────────────────────────────────┘  │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │ HistoryStore (history-store.ts)                    │  │
+│  │ IO: read/write snapshot files, index.json          │  │
+│  └────────────────────────────────────────────────────┘  │
 │                                                           │
 │  Methods:                                                │
 │  - createSnapshot     - restoreSnapshot                  │
 │  - getSnapshots       - deleteSnapshot                   │
 │  - pruneOldSnapshots  - pruneSnapshotsPerFile            │
 │  - shouldCreateSnapshot  - toggleBookmark                │
+│  - onSnapshotCreated (event listener)                    │
 └───────────────────────┬──────────────────────────────────┘
                         │
                         ▼
@@ -125,7 +135,7 @@ project-root/
 | Per-file limit       | Auto-snapshots per file > 100 | Delete oldest auto-snapshots for that file |
 | Milestone protection | Snapshot type is "milestone"  | **NEVER deleted** by pruning               |
 
-All pruning operations are atomic via `AsyncMutex`.
+Pruning logic is handled by `HistoryPolicy.getPruneSet()` and executed by `HistoryStore`.
 
 ---
 
@@ -192,7 +202,7 @@ interface DiffStats {
 ### Creating Snapshots
 
 ```typescript
-import { getHistoryService } from "@/lib/history-service";
+import { getHistoryService } from "@/lib/services/history-service";
 
 const historyService = getHistoryService();
 
@@ -285,6 +295,18 @@ async function handleSave(path: string, content: string) {
 }
 ```
 
+### Listening for Snapshot Events
+
+```typescript
+// Register a listener that fires on every new snapshot
+const unsubscribe = historyService.onSnapshotCreated((snapshot) => {
+  console.log("New snapshot:", snapshot.id, snapshot.type);
+});
+
+// Unsubscribe when no longer needed
+unsubscribe();
+```
+
 ---
 
 ## Integrity Verification
@@ -307,5 +329,5 @@ When restoring a snapshot, the history service:
 
 ---
 
-**Last Updated**: 2026-02-25
-**Version**: 1.0.0
+**Last Updated**: 2026-05-24
+**Version**: 2.0.0
