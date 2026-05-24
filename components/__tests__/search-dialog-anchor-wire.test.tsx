@@ -6,8 +6,7 @@
  * editor pane's search button), not the viewport fallback (top: 64, right: 16).
  */
 
-(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import React, { useRef } from "react";
@@ -45,13 +44,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function Wrapper({
-  withAnchor,
-  isOpen,
-}: {
-  withAnchor: boolean;
-  isOpen: boolean;
-}) {
+function Wrapper({ withAnchor, isOpen }: { withAnchor: boolean; isOpen: boolean }) {
   const ref = useRef<HTMLButtonElement | null>(anchorEl);
   return (
     <SearchDialog
@@ -80,13 +73,9 @@ describe("SearchDialog – anchor wiring (#1504)", () => {
     // The outermost dialog wrapper has inline style with top + right.
     // SearchDialog uses Tailwind `fixed` class, not inline position style.
     // The inline `style` contains top + right values from posStyle.
-    const positioned = Array.from(document.body.querySelectorAll("div"))
-      .find(
-        (el) =>
-          el.className.includes("fixed") &&
-          el.style.top !== "" &&
-          el.style.right !== "",
-      );
+    const positioned = Array.from(document.body.querySelectorAll("div")).find(
+      (el) => el.className.includes("fixed") && el.style.top !== "" && el.style.right !== "",
+    );
     expect(positioned).toBeDefined();
 
     // top should match anchor.top; right should be derived from
@@ -108,13 +97,9 @@ describe("SearchDialog – anchor wiring (#1504)", () => {
 
     // SearchDialog uses Tailwind `fixed` class, not inline position style.
     // The inline `style` contains top + right values from posStyle.
-    const positioned = Array.from(document.body.querySelectorAll("div"))
-      .find(
-        (el) =>
-          el.className.includes("fixed") &&
-          el.style.top !== "" &&
-          el.style.right !== "",
-      );
+    const positioned = Array.from(document.body.querySelectorAll("div")).find(
+      (el) => el.className.includes("fixed") && el.style.top !== "" && el.style.right !== "",
+    );
     expect(positioned).toBeDefined();
     // Fallback: SearchDialog.tsx uses { top: 64, right: 16 } when no anchor.
     expect(positioned!.style.top).toBe("64px");

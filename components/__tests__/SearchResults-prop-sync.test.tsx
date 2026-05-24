@@ -10,8 +10,7 @@
  */
 
 // Tell React this is a controlled test environment so act() flushes effects.
-(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import React from "react";
@@ -56,12 +55,7 @@ function Wrapper({
   matches?: { from: number; to: number }[];
 }) {
   return (
-    <SearchResults
-      editorView={null}
-      onClose={() => {}}
-      searchTerm={searchTerm}
-      matches={matches}
-    />
+    <SearchResults editorView={null} onClose={() => {}} searchTerm={searchTerm} matches={matches} />
   );
 }
 
@@ -92,9 +86,7 @@ describe("SearchResults – prop sync (#1502)", () => {
     // After prop sync, placeholder should be gone and input should reflect
     // the new searchTerm.
     expect(container.textContent).not.toContain("検索語を入力してください");
-    const input = container.querySelector(
-      'input[type="text"]',
-    ) as HTMLInputElement | null;
+    const input = container.querySelector('input[type="text"]') as HTMLInputElement | null;
     expect(input).not.toBeNull();
     expect(input!.value).toBe("四月一日");
     expect(container.textContent).toContain("2件見つかりました");
@@ -107,24 +99,15 @@ describe("SearchResults – replace preview (#1502)", () => {
     "value",
   )?.set;
 
-  function findInputByPlaceholder(
-    placeholder: string,
-  ): HTMLInputElement | undefined {
-    return Array.from(
-      container.querySelectorAll('input[type="text"]'),
-    ).find(
+  function findInputByPlaceholder(placeholder: string): HTMLInputElement | undefined {
+    return Array.from(container.querySelectorAll('input[type="text"]')).find(
       (el) => (el as HTMLInputElement).placeholder === placeholder,
     ) as HTMLInputElement | undefined;
   }
 
   it("shows old (strikethrough+red) and new (green) when replaceTerm is set", async () => {
     await act(async () => {
-      root.render(
-        <Wrapper
-          searchTerm="四月一日"
-          matches={[{ from: 5, to: 9 }]}
-        />,
-      );
+      root.render(<Wrapper searchTerm="四月一日" matches={[{ from: 5, to: 9 }]} />);
     });
 
     // Confirm fresh mount worked
@@ -138,12 +121,8 @@ describe("SearchResults – replace preview (#1502)", () => {
       replaceInput!.dispatchEvent(new Event("input", { bubbles: true }));
     });
 
-    const oldNode = container.querySelector(
-      '[data-testid="replace-preview-old"]',
-    );
-    const newNode = container.querySelector(
-      '[data-testid="replace-preview-new"]',
-    );
+    const oldNode = container.querySelector('[data-testid="replace-preview-old"]');
+    const newNode = container.querySelector('[data-testid="replace-preview-new"]');
     expect(oldNode).not.toBeNull();
     expect(newNode).not.toBeNull();
     expect(oldNode!.className).toMatch(/line-through/);
@@ -154,20 +133,11 @@ describe("SearchResults – replace preview (#1502)", () => {
 
   it("falls back to plain highlight when replaceTerm is empty", async () => {
     await act(async () => {
-      root.render(
-        <Wrapper
-          searchTerm="四月一日"
-          matches={[{ from: 5, to: 9 }]}
-        />,
-      );
+      root.render(<Wrapper searchTerm="四月一日" matches={[{ from: 5, to: 9 }]} />);
     });
 
     // No replace preview rendered when replaceTerm is empty
-    expect(
-      container.querySelector('[data-testid="replace-preview-old"]'),
-    ).toBeNull();
-    expect(
-      container.querySelector('[data-testid="replace-preview-new"]'),
-    ).toBeNull();
+    expect(container.querySelector('[data-testid="replace-preview-old"]')).toBeNull();
+    expect(container.querySelector('[data-testid="replace-preview-new"]')).toBeNull();
   });
 });
