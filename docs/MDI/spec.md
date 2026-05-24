@@ -277,15 +277,35 @@ br.mdi-break {
 - 段落の途中で `\n` 1 つだけ（空行なし）は CommonMark の soft break。`.mdi` ではデフォルトでは改行にならず、単なる空白として扱われる（段落内の文字の続き）。
 - 明示的に段落内改行したい場合は `[[br]]` または CommonMark hardbreak (`  \n`) を使う（§6.1）。
 
+#### 意図的な空白段落（内部表現: `[[blank]]`）
+
+外部 HTML や Word から貼り付けた / 取り込んだ単独 `<br />` 行は、`.mdi` ファイルへ保存される際に `[[blank]]` マーカーへ変換される。
+
+```
+春は曙。
+
+[[blank]]
+
+夏は夜。
+```
+
+- 内部表現であり、ユーザーが直接入力するマーカーではない
+- **`.mdi` モードのみ有効**（`.md` ファイルでは Step 1a を無効化し `<br />` は単純に改行へ変換される）
+- 生成元は **paste / import / 外部書き込み のみ**。ProseMirror エディタでの Enter 連打で作った空段落は CommonMark serializer により blank line へ collapse されるため `[[blank]]` は emit されない
+- エクスポート時: TXT → 空行、HTML → `<p></p>`、DOCX → 空段落
+- ユーザーが `[[blank]]` をリテラル文字列として入力した場合は空白段落として解釈される（bracket macro 全般の既知 escape 制限と同様）
+- **既知の限界**: fenced code block (` ``` `) 内の単独 `[[blank]]` は exporter (txt/html/docx) で空段落に変換される。引用ブロック (`> ...`) 内の `[[blank]]` は行頭マッチ条件 (`/^\[\[blank\]\][ \t]*\r?$/m`) を満たさないためリテラル文字列として保持される。これは既存 `[[br]]` の exporter ハンドリング (§6.1) と同じクラスの制約
+
 ### 6.3 Editor UX Rules
 
 エディタ上でのキー操作と MDI 構文の対応：
 
-| キー / 操作   | 挙動                           | Markdown 表現 | ProseMirror ノード |
-| ------------- | ------------------------------ | ------------- | ------------------ |
-| `Enter`       | 新しい段落（換段）             | 空行 (`\n\n`) | `paragraph`（別）  |
-| `Shift+Enter` | CommonMark hardbreak（段落内） | `  \n`        | `hardbreak`        |
-| `[[br]]` 入力 | MDI 改行マーカー（段落内）     | `[[br]]`      | `mdibreak`         |
+| キー / 操作      | 挙動                           | Markdown 表現 | ProseMirror ノード |
+| ---------------- | ------------------------------ | ------------- | ------------------ |
+| `Enter`          | 新しい段落（換段）             | 空行 (`\n\n`) | `paragraph`（別）  |
+| `Shift+Enter`    | CommonMark hardbreak（段落内） | `  \n`        | `hardbreak`        |
+| `[[br]]` 入力    | MDI 改行マーカー（段落内）     | `[[br]]`      | `mdibreak`         |
+| `[[blank]]` 保存 | 意図的な空白段落               | `[[blank]]`   | `paragraph`（空）  |
 
 **推奨運用**
 

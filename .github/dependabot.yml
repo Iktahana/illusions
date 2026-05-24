@@ -15,7 +15,7 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Asia/Tokyo"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 8
     labels:
       - "dependencies"
     commit-message:
@@ -32,9 +32,15 @@ updates:
       - dependency-name: "tailwindcss"
         versions: ["4.x"]
     groups:
-      npm_and_yarn:
+      # Minor / patch updates are bundled into a single PR (low risk, batch review).
+      # Major updates are intentionally excluded so each ships as an individual PR
+      # for breaking-change review. See PR #1461 / #1477 for prior mega-PR incidents.
+      npm_minor_patch:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "npm"
     directory: "/packages/milkdown-plugin-japanese-novel"
@@ -44,7 +50,7 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Asia/Tokyo"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "milkdown-plugin"
@@ -52,9 +58,13 @@ updates:
       prefix: "chore"
       include: "scope"
     groups:
-      milkdown_plugin_npm:
+      # Minor / patch only; major bumps ship as individual PRs.
+      milkdown_plugin_minor_patch:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "github-actions"
     directory: "/"

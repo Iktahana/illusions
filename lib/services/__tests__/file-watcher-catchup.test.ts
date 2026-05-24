@@ -23,8 +23,8 @@ const mockGetFileMetadata = vi.fn(async () => ({
 }));
 const mockReadFile = vi.fn(async () => mockFileContent);
 
-vi.mock("@/lib/vfs", () => ({
-  getVFS: () => ({
+vi.mock("@/lib/services/project-file-service", () => ({
+  getProjectFileService: () => ({
     getFileMetadata: mockGetFileMetadata,
     readFile: mockReadFile,
   }),

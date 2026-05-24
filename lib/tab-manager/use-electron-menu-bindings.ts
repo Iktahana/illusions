@@ -2,9 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { saveMdiFile } from "../project/mdi-file";
-import { getVFS } from "../vfs";
+import { getProjectFileService } from "../services/project-file-service";
 import { suppressFileWatch } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
+import type { SnapshotType } from "../services/history-policy";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
@@ -37,14 +38,14 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
   /** Immediately flush pending dockview layout to storage. */
   flushLayoutState?: () => Promise<void>;
   /**
-   * Attempt to create a history snapshot after saving (project mode only).
-   * Provided by useFileIO.
+   * Create a history snapshot with the given type (project mode only).
+   * B1 fix: caller supplies the correct SnapshotType.
    */
-  tryAutoSnapshot?: (
+  tryCreateSnapshot?: (
+    type: SnapshotType,
     sourcePath: string,
     displayName: string,
     savedContent: string,
-    forceSnapshot?: boolean,
   ) => Promise<void>;
 }
 
@@ -55,7 +56,7 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
 /**
  * Registers Electron IPC event listeners for menu commands:
  * - Save, Save As, Close Tab, New Tab, Open File From System
- * - Save before window close
+ * - Save before window close (pre-close snapshot)
  * - Dirty state → Electron title dot
  * - Web beforeunload warning
  * - Visibility change reload for project mode
@@ -76,7 +77,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     systemFileOpenHandlerRef,
     flushTabState,
     flushLayoutState,
-    tryAutoSnapshot,
+    tryCreateSnapshot,
   } = params;
 
   // Stable refs for callbacks that change frequently
@@ -101,10 +102,10 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
   const flushLayoutStateRef = useRef(flushLayoutState);
   // eslint-disable-next-line react-hooks/refs
   flushLayoutStateRef.current = flushLayoutState;
-  const tryAutoSnapshotRef = useRef(tryAutoSnapshot);
-  tryAutoSnapshotRef.current = tryAutoSnapshot;
+  const tryCreateSnapshotRef = useRef(tryCreateSnapshot);
+  tryCreateSnapshotRef.current = tryCreateSnapshot;
 
-  // Save all dirty tabs before Electron window close
+  // Save all dirty tabs before Electron window close (3-button dialog "保存" path)
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onSaveBeforeClose) return;
 
@@ -126,7 +127,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
           continue;
         }
 
-        const sanitized = sanitizeMdiContent(tab.content);
+        const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
 
         if (!tab.file) {
           // New unsaved document: show Save As dialog so the user can give it a path.
@@ -161,20 +162,27 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
 
         try {
           if (isProjectRef.current && tab.file.path) {
-            const vfs = getVFS();
+            const vfs = getProjectFileService();
             suppressFileWatch(tab.file.path);
             await vfs.writeFile(tab.file.path, sanitized);
-            await tryAutoSnapshotRef.current?.(tab.file.path, tab.file.name, sanitized, true);
+            // B1 fix: window close "保存" → "pre-close" snapshot type
+            await tryCreateSnapshotRef.current?.(
+              "pre-close",
+              tab.file.path,
+              tab.file.name,
+              sanitized,
+            );
           } else {
             await saveMdiFile({
               descriptor: tab.file,
               content: sanitized,
             });
-            await tryAutoSnapshotRef.current?.(
+            // B1 fix: window close "保存" → "pre-close" snapshot type
+            await tryCreateSnapshotRef.current?.(
+              "pre-close",
               tab.file.path ?? tab.file.name,
               tab.file.name,
               sanitized,
-              true,
             );
           }
         } catch (error) {
@@ -190,7 +198,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     });
 
     return cleanup;
-  }, [isElectron, tabsRef, isProjectRef]);
+  }, [isElectron, tabsRef, isProjectRef, updateTab]);
 
   // Flush tab/layout state before close (without saving dirty files)
   // This handles: clean close, and "Don't Save" in dirty dialog
@@ -224,7 +232,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
       if (document.hidden) return;
       if (!isProjectRef.current) return;
 
-      const vfs = getVFS();
+      const vfs = getProjectFileService();
       if (!vfs.isRootOpen()) return;
 
       for (const tab of tabsRef.current) {
@@ -254,7 +262,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [updateTab, tabsRef, isProjectRef]);
 
-  // Menu: Save
+  // Menu: Save (Cmd+S)
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onMenuSave) return;
     const cleanup = window.electronAPI.onMenuSave(async () => {
@@ -263,7 +271,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     return cleanup;
   }, [isElectron, saveFileRef]);
 
-  // Menu: Save As
+  // Menu: Save As (Cmd+Shift+S)
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onMenuSaveAs) return;
     const cleanup = window.electronAPI.onMenuSaveAs(async () => {

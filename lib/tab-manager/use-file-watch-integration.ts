@@ -7,6 +7,7 @@ import { isEditorTab } from "./tab-types";
 import type { FileWatcher } from "../services/file-watcher";
 import type { TabId, TabState, EditorTabState, DiffTabState } from "./tab-types";
 import type { TabManagerCore } from "./types";
+import type { SnapshotType } from "../services/history-policy";
 
 // ---------------------------------------------------------------------------
 // Params
@@ -38,6 +39,21 @@ export interface UseFileWatchIntegrationParams extends TabManagerCore {
    * 外部コンテンツ適用後に呼び出し、Milkdown インスタンスを再初期化する。
    */
   onEditorRemountNeeded?: () => void;
+  /**
+   * G2: Create a history snapshot before applying external disk changes.
+   * Called only when the tab is dirty (has unsaved edits) and the user
+   * confirms replacing the in-memory content with the disk version.
+   *
+   * G2: 外部ディスク変更を適用する前に履歴スナップショットを作成する。
+   * タブが dirty（未保存の編集あり）でユーザーがディスク内容で上書きを
+   * 確認した場合のみ呼び出す。
+   */
+  tryCreateSnapshot?: (
+    type: SnapshotType,
+    sourcePath: string,
+    displayName: string,
+    savedContent: string,
+  ) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,13 +66,16 @@ export interface UseFileWatchIntegrationParams extends TabManagerCore {
  *
  * エディタタブの onChanged コールバックを生成する。
  * issue #825 で定義された状態遷移ロジックを実装する。
+ *
+ * Exported for testing only. Callers should use useFileWatchIntegration.
  */
-function buildOnChanged(
+export function buildOnChanged(
   tabId: TabId,
   setTabs: TabManagerCore["setTabs"],
   tabsRef: TabManagerCore["tabsRef"],
   openDiffTab: UseFileWatchIntegrationParams["openDiffTab"],
   onEditorRemountNeeded?: () => void,
+  tryCreateSnapshot?: UseFileWatchIntegrationParams["tryCreateSnapshot"],
 ): (diskContent: string, lastModified: number) => void {
   return (diskContent: string, lastModified: number) => {
     const currentTabs = tabsRef.current;
@@ -113,6 +132,23 @@ function buildOnChanged(
           {
             label: "ディスクの内容を採用",
             onClick: () => {
+              // G2: snapshot the current in-memory content before overwriting
+              // with the external disk version (pre-external-reload).
+              // Only snapshot when the tab is dirty (has edits worth preserving).
+              // G2: 外部ディスク内容で上書きする前に、メモリ上の現在の
+              // 内容を pre-external-reload スナップショットとして記録する。
+              const currentTab = tabsRef.current.find((t) => t.id === tabId);
+              if (currentTab && isEditorTab(currentTab) && currentTab.isDirty) {
+                const filePath = currentTab.file?.path ?? "";
+                const displayName = currentTab.file?.name ?? fileName;
+                void tryCreateSnapshot?.(
+                  "pre-external-reload",
+                  filePath,
+                  displayName,
+                  localContent,
+                );
+              }
+
               setTabs((prev) =>
                 prev.map((t) => {
                   if (t.id !== tabId || !isEditorTab(t)) return t;
@@ -173,8 +209,16 @@ function buildOnChanged(
  * CPU 節約のため一時停止する。タブを閉じるとウォッチャーも停止する。
  */
 export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): void {
-  const { tabs, setTabs, activeTabId, tabsRef, isElectron, openDiffTab, onEditorRemountNeeded } =
-    params;
+  const {
+    tabs,
+    setTabs,
+    activeTabId,
+    tabsRef,
+    isElectron,
+    openDiffTab,
+    onEditorRemountNeeded,
+    tryCreateSnapshot,
+  } = params;
 
   /**
    * Map from tabId to its FileWatcher instance.
@@ -242,6 +286,7 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
           tabsRef,
           openDiffTab,
           onEditorRemountNeeded,
+          tryCreateSnapshot,
         );
         const watcher = createFileWatcher({ path: filePath, onChanged });
 
@@ -253,7 +298,16 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
         watcherPaths.set(tab.id, filePath);
       }
     }
-  }, [tabs, activeTabId, isElectron, setTabs, tabsRef, openDiffTab, onEditorRemountNeeded]);
+  }, [
+    tabs,
+    activeTabId,
+    isElectron,
+    setTabs,
+    tabsRef,
+    openDiffTab,
+    onEditorRemountNeeded,
+    tryCreateSnapshot,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Pause/resume watchers based on active tab

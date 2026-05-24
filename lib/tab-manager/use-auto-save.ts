@@ -2,9 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { saveMdiFile } from "../project/mdi-file";
-import { getVFS } from "../vfs";
+import { getProjectFileService } from "../services/project-file-service";
 import { suppressFileWatch } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
+import type { SnapshotType } from "../services/history-policy";
 import { isEditorTab } from "./tab-types";
 import type { TabManagerCore } from "./types";
 import { AUTO_SAVE_INTERVAL, sanitizeMdiContent } from "./types";
@@ -18,12 +19,15 @@ export interface UseAutoSaveParams extends TabManagerCore {
   autoSaveEnabled: boolean;
   /** Ref holding the latest saveFile function (for active tab). */
   saveFileRef: React.MutableRefObject<(isAutoSave?: boolean) => Promise<void>>;
-  /** Create an auto-snapshot if conditions are met (project mode only). */
-  tryAutoSnapshot: (
+  /**
+   * Create a history snapshot with the given type (project mode only).
+   * B1 fix: caller supplies the correct SnapshotType.
+   */
+  tryCreateSnapshot: (
+    type: SnapshotType,
     sourcePath: string,
     displayName: string,
     savedContent: string,
-    forceSnapshot?: boolean,
   ) => Promise<void>;
 }
 
@@ -43,7 +47,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
     isProjectRef,
     autoSaveEnabled,
     saveFileRef,
-    tryAutoSnapshot,
+    tryCreateSnapshot,
   } = params;
 
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -74,7 +78,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
         if (tab.fileSyncStatus === "conflicted") continue;
         if (!tab.isDirty || !tab.file || tab.isSaving) continue;
 
-        // Active tab: use the normal saveFile path
+        // Active tab: use the normal saveFile path (isAutoSave=true → "auto" snapshot)
         if (tab.id === activeTabIdRef.current) {
           void saveFileRef.current(true);
           continue;
@@ -88,16 +92,17 @@ export function useAutoSave(params: UseAutoSaveParams): void {
         setTabs((prev) => prev.map((t) => (t.id === tab.id ? { ...t, isSaving: true } : t)));
         void (async () => {
           try {
-            const sanitized = sanitizeMdiContent(tab.content);
+            const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
             if (isProjectRef.current && tab.file?.path) {
-              const vfs = getVFS();
+              const vfs = getProjectFileService();
               suppressFileWatch(tab.file.path);
               await vfs.writeFile(tab.file.path, sanitized);
               if (!mountedRef.current) return;
               setTabs((prev) =>
                 prev.map((t) => {
                   if (t.id !== tab.id || !isEditorTab(t)) return t;
-                  const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+                  const newIsDirty =
+                    sanitizeMdiContent(t.content, { fileType: t.fileType }) !== sanitized;
                   return {
                     ...t,
                     lastSavedContent: sanitized,
@@ -109,7 +114,8 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                   };
                 }),
               );
-              await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized);
+              // B1 fix: auto-save interval → "auto" snapshot type
+              await tryCreateSnapshot("auto", tab.file.path, tab.file.name, sanitized);
             } else if (tab.file?.path || tab.file?.handle) {
               const result = await saveMdiFile({
                 descriptor: tab.file,
@@ -121,7 +127,8 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                 setTabs((prev) =>
                   prev.map((t) => {
                     if (t.id !== tab.id || !isEditorTab(t)) return t;
-                    const newIsDirty = sanitizeMdiContent(t.content) !== sanitized;
+                    const newIsDirty =
+                      sanitizeMdiContent(t.content, { fileType: t.fileType }) !== sanitized;
                     return {
                       ...t,
                       file: result.descriptor,
@@ -135,7 +142,13 @@ export function useAutoSave(params: UseAutoSaveParams): void {
                   }),
                 );
                 if (result.descriptor.path) {
-                  await tryAutoSnapshot(result.descriptor.path, result.descriptor.name, sanitized);
+                  // B1 fix: auto-save interval → "auto" snapshot type
+                  await tryCreateSnapshot(
+                    "auto",
+                    result.descriptor.path,
+                    result.descriptor.name,
+                    sanitized,
+                  );
                 }
               }
             }
@@ -165,6 +178,6 @@ export function useAutoSave(params: UseAutoSaveParams): void {
     activeTabIdRef,
     isProjectRef,
     saveFileRef,
-    tryAutoSnapshot,
+    tryCreateSnapshot,
   ]);
 }

@@ -72,7 +72,7 @@ export function useTabManager(options?: {
     setPendingCloseTabId: tabState.setPendingCloseTabId,
     updateTab: tabState.updateTab,
     forceCloseTab: tabState.forceCloseTab,
-    tryAutoSnapshot: fileIO.tryAutoSnapshot,
+    tryCreateSnapshot: fileIO.tryCreateSnapshot,
   });
 
   // --- Auto-save ----------------------------------------------------------
@@ -88,7 +88,7 @@ export function useTabManager(options?: {
     isElectron: tabState.isElectron,
     autoSaveEnabled,
     saveFileRef: fileIO.saveFileRef,
-    tryAutoSnapshot: fileIO.tryAutoSnapshot,
+    tryCreateSnapshot: fileIO.tryCreateSnapshot,
   });
 
   // --- Electron IPC bindings & browser event listeners --------------------
@@ -117,7 +117,7 @@ export function useTabManager(options?: {
     systemFileOpenHandlerRef,
     flushTabState: flushTabStateRef.current,
     flushLayoutState: options?.flushLayoutState,
-    tryAutoSnapshot: fileIO.tryAutoSnapshot,
+    tryCreateSnapshot: fileIO.tryCreateSnapshot,
   });
 
   // --- File watch integration (external change detection) -----------------
@@ -133,6 +133,7 @@ export function useTabManager(options?: {
     isElectron: tabState.isElectron,
     openDiffTab: tabState.openDiffTab,
     onEditorRemountNeeded: options?.onEditorRemountNeeded,
+    tryCreateSnapshot: fileIO.tryCreateSnapshot,
   });
 
   // --- Tab persistence (save/restore to AppState) -------------------------

@@ -2,10 +2,11 @@
 
 import { useCallback } from "react";
 import { saveMdiFile } from "../project/mdi-file";
-import { getVFS } from "../vfs";
+import { getProjectFileService } from "../services/project-file-service";
 import { suppressFileWatch } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
-import type { TabId, TabState, EditorTabState } from "./tab-types";
+import type { SnapshotType } from "../services/history-policy";
+import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import { sanitizeMdiContent, getErrorMessage } from "./types";
 import type { TabManagerCore } from "./types";
@@ -24,14 +25,14 @@ export interface UseCloseDialogParams extends TabManagerCore {
   /** Force-close a tab without dirty check. */
   forceCloseTab: (tabId: TabId) => void;
   /**
-   * Attempt to create a history snapshot after saving (project mode only).
-   * Provided by useFileIO.
+   * Create a history snapshot with the given type (project mode only).
+   * B1 fix: caller supplies correct SnapshotType.
    */
-  tryAutoSnapshot: (
+  tryCreateSnapshot: (
+    type: SnapshotType,
     sourcePath: string,
     displayName: string,
     savedContent: string,
-    forceSnapshot?: boolean,
   ) => Promise<void>;
 }
 
@@ -61,7 +62,7 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
     setPendingCloseTabId,
     updateTab,
     forceCloseTab,
-    tryAutoSnapshot,
+    tryCreateSnapshot,
   } = params;
 
   const handleCloseTabSave = useCallback(async () => {
@@ -82,13 +83,14 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
     }
 
     try {
-      const sanitized = sanitizeMdiContent(tab.content);
+      const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
 
       if (isProjectRef.current && tab.file?.path) {
-        const vfs = getVFS();
+        const vfs = getProjectFileService();
         suppressFileWatch(tab.file.path);
         await vfs.writeFile(tab.file.path, sanitized);
-        await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized, true);
+        // B1 fix: tab close → "pre-close" snapshot type
+        await tryCreateSnapshot("pre-close", tab.file.path, tab.file.name, sanitized);
       } else {
         const result = await saveMdiFile({
           descriptor: tab.file,
@@ -107,11 +109,12 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
           fileSyncStatus: "clean",
           conflictDiskContent: null,
         });
-        await tryAutoSnapshot(
+        // B1 fix: tab close → "pre-close" snapshot type
+        await tryCreateSnapshot(
+          "pre-close",
           result.descriptor.path ?? result.descriptor.name,
           result.descriptor.name,
           sanitized,
-          true,
         );
       }
     } catch (error) {
@@ -131,7 +134,7 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
     tabsRef,
     isProjectRef,
     setPendingCloseTabId,
-    tryAutoSnapshot,
+    tryCreateSnapshot,
   ]);
 
   const handleCloseTabDiscard = useCallback(() => {
