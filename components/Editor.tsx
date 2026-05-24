@@ -110,6 +110,9 @@ export default function NovelEditor({
   const speechMapRef = useRef<{ text: string; positions: number[] } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isVerticalRef = useRef(false);
+  // #1504: ref to the toolbar 検索 button — SearchDialog uses this to anchor
+  // its floating position to the clicked pane instead of the viewport corner.
+  const searchButtonRef = useRef<HTMLButtonElement | null>(null);
   const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null);
   /** Doc position to resume TTS from after the current chunk ends. null = no continuation. */
   const speechContinuationPosRef = useRef<number | null>(null);
@@ -429,6 +432,7 @@ export default function NovelEditor({
         isVertical={isVertical}
         onToggleVertical={handleToggleVertical}
         onSearchClick={handleSearchToggle}
+        searchButtonRef={searchButtonRef}
         speechState={speechState}
         onSpeakToggle={handleSpeakToggle}
         onOpenSpeechSettings={onOpenSpeechSettings}
@@ -518,6 +522,7 @@ export default function NovelEditor({
         onClose={() => setIsSearchOpen(false)}
         onShowAllResults={onShowAllSearchResults}
         initialSearchTerm={contextMenuSearchTerm ?? searchInitialTerm}
+        anchorRef={searchButtonRef}
       />
     </div>
   );

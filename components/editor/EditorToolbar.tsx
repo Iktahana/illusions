@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { Type, AlignLeft, Search, BookAudio, Pause } from "lucide-react";
 import { useTypographySettings } from "@/contexts/EditorSettingsContext";
 import type { SpeechState } from "@/lib/hooks/use-speech";
@@ -9,6 +10,7 @@ export default function EditorToolbar({
   isVertical,
   onToggleVertical,
   onSearchClick,
+  searchButtonRef,
   speechState,
   onSpeakToggle,
   onOpenSpeechSettings,
@@ -16,6 +18,9 @@ export default function EditorToolbar({
   isVertical: boolean;
   onToggleVertical: () => void;
   onSearchClick: () => void;
+  // #1504: anchor for SearchDialog. Forwarded to the 検索 button so the dialog
+  // is positioned relative to the clicked editor pane, not the viewport.
+  searchButtonRef?: React.Ref<HTMLButtonElement>;
   speechState: SpeechState;
   onSpeakToggle: () => void;
   onOpenSpeechSettings?: () => void;
@@ -96,6 +101,7 @@ export default function EditorToolbar({
 
         {/* 検索 */}
         <button
+          ref={searchButtonRef}
           onClick={onSearchClick}
           className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
           title="検索 (⌘F)"
