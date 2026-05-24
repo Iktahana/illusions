@@ -364,6 +364,26 @@ function registerVFSHandlers() {
     });
   });
 
+  // Open a single file via native file dialog
+  // Returns { path, name, buf } where buf is the raw file bytes (Buffer).
+  // The caller is responsible for decoding (e.g., via text-codec.ts).
+  ipcMain.handle("vfs:open-file", async (event, opts) => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openFile"],
+      filters: opts?.filters ?? [{ name: "テキスト", extensions: ["txt"] }],
+    });
+
+    if (result.canceled || !result.filePaths[0]) {
+      return null;
+    }
+
+    const filePath = result.filePaths[0];
+    // R2: approveDialogPath requires 2-arg (senderId, path) signature
+    approveDialogPath(event.sender.id, filePath);
+    const buf = await fs.readFile(filePath);
+    return { path: filePath, name: path.basename(filePath), buf };
+  });
+
   // ---------------------------------------------------------------------------
   // Cross-window history index lock (HistoryService)
   // ---------------------------------------------------------------------------

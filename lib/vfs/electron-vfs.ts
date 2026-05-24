@@ -28,6 +28,10 @@ import { basename, dirname, joinPath } from "./path-utils";
 interface ElectronVFSBridge {
   /** Open a native directory picker dialog */
   openDirectory: () => Promise<{ path: string; name: string } | null>;
+  /** Open a native file picker dialog; returns path, name, and raw bytes */
+  openFile: (opts?: {
+    filters?: Array<{ name: string; extensions: string[] }>;
+  }) => Promise<{ path: string; name: string; buf: Uint8Array } | null>;
   /** Read file content as UTF-8 text */
   readFile: (filePath: string) => Promise<string>;
   /** Write UTF-8 text content to a file */
@@ -202,6 +206,35 @@ class ElectronVFSDirectoryHandle implements VFSDirectoryHandle {
  */
 export class ElectronVFS implements VirtualFileSystem {
   private rootPath: string | null = null;
+
+  /**
+   * Open a native file picker dialog for a single file.
+   * Returns the file path, name, and raw bytes so the caller can decode.
+   * Use text-codec.ts readTextWithEncoding() to handle BOM and EOL detection.
+   *
+   * @param opts - Optional dialog options including file type filters
+   * @returns Object with path, name, and raw byte buffer, or null if cancelled
+   * @throws Error if the Electron VFS API is not available
+   */
+  async openFile(opts?: {
+    fileTypes?: string[];
+  }): Promise<{ path: string; name: string; buf: Uint8Array } | null> {
+    const bridge = getVFSBridge();
+    const filters =
+      opts?.fileTypes && opts.fileTypes.length > 0
+        ? [{ name: "テキスト", extensions: opts.fileTypes }]
+        : [{ name: "テキスト", extensions: ["txt"] }];
+
+    const result = await bridge.openFile({ filters });
+    if (!result) return null;
+
+    // Bridge may return a plain object from IPC serialization; ensure Uint8Array
+    return {
+      path: result.path,
+      name: result.name,
+      buf: result.buf instanceof Uint8Array ? result.buf : new Uint8Array(Object.values(result.buf as Record<string, number>)),
+    };
+  }
 
   /**
    * Open a native directory picker dialog.
