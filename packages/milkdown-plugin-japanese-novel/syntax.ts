@@ -252,7 +252,12 @@ export const remarkMdiBlankPlugin: Plugin<[RemarkMdiBlankOptions | undefined], R
         node.children[0].type === "text" &&
         (node.children[0] as Text).value.trim() === "[[blank]]"
       ) {
-        node.children.length = 0;
+        // Convert to a custom block node so the schema can round-trip `[[blank]]`.
+        // Just clearing children would serialize back as a regular blank line and
+        // lose the marker; the matching `blankParagraphSchema` renders an empty
+        // `<p>` in the editor and re-emits `[[blank]]` on save.
+        (node as unknown as { type: string }).type = "blankParagraph";
+        (node as unknown as { children: unknown[] }).children = [];
       }
     });
   };

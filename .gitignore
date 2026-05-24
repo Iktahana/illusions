@@ -83,3 +83,6 @@ reviews/
 
 # auto-generated files
 /generated/
+
+# claude-mem auto-generated memory context
+AGENTS.md

@@ -11,15 +11,16 @@ import { tcySchema } from "./nodes/tcy";
 import { nobreakSchema } from "./nodes/nobreak";
 import { kernSchema } from "./nodes/kern";
 import { mdibreakSchema } from "./nodes/mdibreak";
+import { blankParagraphSchema } from "./nodes/blank-paragraph";
 import { headingAnchorSchema } from "./nodes/heading-anchor";
 import {
   remarkHeadingAnchorPlugin,
-  remarkMdiBlankPlugin,
   remarkRubyPlugin,
   remarkTcyPlugin,
   remarkNoBreakPlugin,
   remarkKernPlugin,
   remarkMdiBreakPlugin,
+  remarkMdiBlankPlugin,
 } from "./syntax";
 import { createHeadingIdFixerPlugin } from "./plugins/heading-id-fixer";
 import { createHardbreakIndentPlugin } from "./plugins/hardbreak-indent";
@@ -79,7 +80,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
   const remarkMdiBlank = $remark(
     "japaneseNovelMdiBlank",
     () => remarkMdiBlankPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
-    { enable: enableMdiBreak },
+    { enable: true },
   );
   const remarkHeadingAnchor = $remark(
     "japaneseNovelHeadingAnchor",
@@ -113,9 +114,11 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
   const plugins: MilkdownPlugin[] = [
     ...(enableRuby ? [remarkRuby, rubySchema] : []),
     ...(enableTcy ? [remarkTcy, tcySchema] : []),
-    ...(enableMdiBreak ? [remarkMdiBreak, remarkMdiBlank, mdibreakSchema] : []),
+    ...(enableMdiBreak ? [remarkMdiBreak, mdibreakSchema] : []),
     ...(enableNoBreak ? [remarkNoBreak, nobreakSchema] : []),
     ...(enableKern ? [remarkKern, kernSchema] : []),
+    remarkMdiBlank,
+    blankParagraphSchema,
     remarkHeadingAnchor,
     headingAnchorSchema,
     headingIdFixerPlugin,
