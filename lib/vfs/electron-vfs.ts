@@ -404,14 +404,19 @@ export class ElectronVFS implements VirtualFileSystem {
    * Used for recovering VFS root after page reload (Electron).
    * Also updates the main process allowed root for path validation.
    * @param rootPath - Absolute path to the project root directory
+   * @param projectId - Optional project ID for project-scoped approval persistence (#1476)
    */
-  async setRootPath(rootPath: string): Promise<void> {
+  async setRootPath(rootPath: string, projectId?: string): Promise<void> {
     // Await the main process root update before updating local state,
     // so this.rootPath is never set to a value the main process rejected.
     try {
       const bridge = getVFSBridge();
       if ("setRoot" in bridge) {
-        await (bridge as { setRoot: (p: string) => Promise<unknown> }).setRoot(rootPath);
+        // #1476: rehydration — pass projectId for project-scoped persistence
+        await (bridge as { setRoot: (p: string, projectId?: string) => Promise<unknown> }).setRoot(
+          rootPath,
+          projectId,
+        );
       }
     } catch (error: unknown) {
       // Bridge may not be available during early initialization — that's expected.
