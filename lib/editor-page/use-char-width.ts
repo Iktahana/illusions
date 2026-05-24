@@ -32,7 +32,7 @@ export function useCharWidth({
   lineHeight: number;
   isVertical: boolean;
 }): { measureRef: RefObject<HTMLSpanElement | null>; charWidth: number } {
-  const measureRef = useRef<HTMLSpanElement>(null);
+  const measureRef = useRef<HTMLSpanElement | null>(null);
   const [charWidth, setCharWidth] = useState(0);
 
   // Synchronous measurement + ResizeObserver in a single effect.

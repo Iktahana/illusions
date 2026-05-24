@@ -10,7 +10,8 @@ import { notificationManager } from "../services/notification-manager";
 import { getStorageService } from "../storage/storage-service";
 import { persistAppState } from "../storage/app-state-manager";
 import { getHistoryService } from "../services/history-service";
-import { getVFS } from "../vfs";
+import type { SnapshotType } from "../services/history-policy";
+import { getProjectFileService } from "../services/project-file-service";
 import { suppressFileWatch } from "../services/file-watcher";
 import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
@@ -45,7 +46,20 @@ export interface UseFileIOReturn {
   saveFileRef: React.MutableRefObject<(isAutoSave?: boolean) => Promise<void>>;
   /** Ref holding the latest saveAsFile function. */
   saveAsFileRef: React.MutableRefObject<() => Promise<void>>;
-  /** Create an auto-snapshot if conditions are met (project mode only). */
+  /**
+   * Create a history snapshot with the given type (project mode only).
+   * B1 fix: caller supplies the correct SnapshotType instead of hardcoding "auto".
+   */
+  tryCreateSnapshot: (
+    type: SnapshotType,
+    sourcePath: string,
+    displayName: string,
+    savedContent: string,
+  ) => Promise<void>;
+  /**
+   * @deprecated Use tryCreateSnapshot instead.
+   * Kept for backward-compat callers that haven't been updated yet.
+   */
   tryAutoSnapshot: (
     sourcePath: string,
     displayName: string,
@@ -114,20 +128,24 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     [isElectron, persistLastOpenedPath],
   );
 
-  // --- Auto-snapshot (project mode) ---------------------------------------
+  // --- Snapshot (project mode) — B1 fix ----------------------------------
 
-  const tryAutoSnapshot = useCallback(
-    async (
-      sourcePath: string,
-      displayName: string,
-      savedContent: string,
-      forceSnapshot: boolean = false,
-    ) => {
+  /**
+   * Create a snapshot with the caller-supplied type (B1 fix).
+   *
+   * - For "auto": respects throttle via historyService.shouldCreateSnapshot().
+   * - For all other types (manual, pre-close, …): always creates a snapshot.
+   *
+   * Requires project mode and an open VFS root; silently no-ops otherwise.
+   */
+  const tryCreateSnapshot = useCallback(
+    async (type: SnapshotType, sourcePath: string, displayName: string, savedContent: string) => {
       if (!isProjectRef.current) return;
-      if (!getVFS().isRootOpen()) return;
+      if (!getProjectFileService().isRootOpen()) return;
       try {
         const historyService = getHistoryService();
-        if (!forceSnapshot) {
+        // Only "auto" is throttled; all other types always create a snapshot.
+        if (type === "auto") {
           const shouldCreate = await historyService.shouldCreateSnapshot(sourcePath);
           if (!shouldCreate) return;
         }
@@ -135,13 +153,32 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           sourcePath,
           displayName,
           content: savedContent,
-          type: "auto",
+          type, // ← caller-supplied, not hardcoded (B1 fix)
         });
       } catch (error) {
-        console.warn("自動スナップショットの作成に失敗しました:", error);
+        console.warn("スナップショットの作成に失敗しました:", error);
       }
     },
     [isProjectRef],
+  );
+
+  /**
+   * @deprecated Backward-compat shim — delegates to tryCreateSnapshot.
+   * Callers that still use the old forceSnapshot=true/false convention:
+   *   forceSnapshot=true  → type "manual"
+   *   forceSnapshot=false → type "auto"
+   */
+  const tryAutoSnapshot = useCallback(
+    async (
+      sourcePath: string,
+      displayName: string,
+      savedContent: string,
+      forceSnapshot: boolean = false,
+    ) => {
+      const type: SnapshotType = forceSnapshot ? "manual" : "auto";
+      await tryCreateSnapshot(type, sourcePath, displayName, savedContent);
+    },
+    [tryCreateSnapshot],
   );
 
   // --- File operations ----------------------------------------------------
@@ -243,7 +280,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
         // Project mode: VFS direct write
         if (isProjectRef.current && tab.file?.path) {
-          const vfs = getVFS();
+          const vfs = getProjectFileService();
           suppressFileWatch(tab.file.path);
           await vfs.writeFile(tab.file.path, sanitized);
 
@@ -277,7 +314,9 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
               };
             }),
           );
-          await tryAutoSnapshot(tab.file.path, tab.file.name, sanitized, !isAutoSave);
+          // B1 fix: Cmd+S / menu → "manual"; auto-save timer → "auto"
+          const snapshotType: SnapshotType = isAutoSave ? "auto" : "manual";
+          await tryCreateSnapshot(snapshotType, tab.file.path, tab.file.name, sanitized);
           return;
         }
 
@@ -310,11 +349,13 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
             notificationManager.warning(PERSIST_FAILURE_WARNING);
           }
           if (result.descriptor.path) {
-            await tryAutoSnapshot(
+            // B1 fix: Cmd+S / menu → "manual"; auto-save timer → "auto"
+            const snapshotType: SnapshotType = isAutoSave ? "auto" : "manual";
+            await tryCreateSnapshot(
+              snapshotType,
               result.descriptor.path,
               result.descriptor.name,
               sanitized,
-              !isAutoSave,
             );
           }
         } else {
@@ -332,7 +373,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     [
       updateTab,
       persistFileReference,
-      tryAutoSnapshot,
+      tryCreateSnapshot,
       setTabs,
       tabsRef,
       activeTabIdRef,
@@ -389,7 +430,13 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           notificationManager.warning(PERSIST_FAILURE_WARNING);
         }
         if (result.descriptor.path) {
-          await tryAutoSnapshot(result.descriptor.path, result.descriptor.name, sanitized, true);
+          // B1 fix: Save As is always a manual user action
+          await tryCreateSnapshot(
+            "manual",
+            result.descriptor.path,
+            result.descriptor.name,
+            sanitized,
+          );
         }
       } else {
         updateTab(tabId, { isSaving: false });
@@ -402,7 +449,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     } finally {
       isSavingRef.current = false;
     }
-  }, [updateTab, setTabs, persistFileReference, tryAutoSnapshot, tabsRef, activeTabIdRef]);
+  }, [updateTab, setTabs, persistFileReference, tryCreateSnapshot, tabsRef, activeTabIdRef]);
 
   /** Load a file by path + content into a new tab (or reuse/deduplicate) */
   const loadSystemFile = useCallback(
@@ -498,7 +545,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         // Read file from VFS
         let fileContent: string;
         try {
-          const vfs = getVFS();
+          const vfs = getProjectFileService();
           fileContent = await vfs.readFile(vfsPath);
         } catch (error) {
           console.error("ファイルの読み込みに失敗しました:", error);
@@ -597,6 +644,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     openProjectFile,
     saveFileRef,
     saveAsFileRef,
+    tryCreateSnapshot,
     tryAutoSnapshot,
   };
 }

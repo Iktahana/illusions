@@ -9,7 +9,7 @@
  */
 
 import { AsyncMutex } from "@/lib/utils/async-mutex";
-import { getVFS } from "@/lib/vfs";
+import { getProjectFileService } from "@/lib/services/project-file-service";
 import { isAbsolutePath, joinPath } from "@/lib/vfs/path-utils";
 import type { WorkspaceState } from "./project-types";
 import { getDefaultWorkspaceState } from "./project-types";
@@ -27,7 +27,7 @@ const WORKSPACE_JSON_PATH = ".illusions/workspace.json";
 export async function persistWorkspaceJson(updates: Partial<WorkspaceState>): Promise<void> {
   const release = await workspaceMutex.acquire();
   try {
-    const vfs = getVFS();
+    const vfs = getProjectFileService();
     // Guard: VFS root must be set (project mode)
     if ("isReady" in vfs && typeof vfs.isReady === "function" && !vfs.isReady()) return;
 

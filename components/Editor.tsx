@@ -451,7 +451,7 @@ export default function NovelEditor({
       >
         {/* Hidden character width measurement element for auto chars-per-line calculation */}
         <span
-          ref={autoCharMeasureRef}
+          ref={autoCharMeasureRef as React.RefObject<HTMLSpanElement>}
           aria-hidden="true"
           className={isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal"}
           style={{

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Plus, Loader2, History, ChevronDown, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 import { getHistoryService } from "@/lib/services/history-service";
+import { getProjectFileService } from "@/lib/services/project-file-service";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SnapshotItem from "./HistoryPanel/SnapshotItem";
 import { computeDiffStats } from "./HistoryPanel/DiffIndicator";
@@ -334,6 +335,27 @@ export default function HistoryPanel({
       try {
         setRestoringId(snapshot.id);
         const historyService = getHistoryService();
+
+        // G3: create a restore-point snapshot of the CURRENT content before
+        // overwriting it with the restored snapshot. This lets users undo a restore.
+        // Guard: only in project mode (VFS root open) to match tryCreateSnapshot logic.
+        // G3: 復元前に現在の内容を restore-point スナップショットとして保存する。
+        // 「復元 → やっぱり戻したい」を可能にする。
+        // tryCreateSnapshot の内部ガードと同じ条件（VFS root open）で保護する。
+        if (currentContent && getProjectFileService().isRootOpen()) {
+          try {
+            await historyService.createSnapshot({
+              sourcePath,
+              displayName,
+              content: currentContent,
+              type: "restore-point",
+            });
+          } catch (snapshotErr) {
+            // Non-fatal: log but proceed with restore
+            console.warn("復元前スナップショットの作成に失敗しました:", snapshotErr);
+          }
+        }
+
         const result = await historyService.restoreSnapshot(snapshot.id);
 
         if (result.success && result.content !== undefined) {
@@ -348,7 +370,7 @@ export default function HistoryPanel({
         setRestoringId(null);
       }
     },
-    [onRestore],
+    [onRestore, currentContent, sourcePath, displayName],
   );
 
   /**

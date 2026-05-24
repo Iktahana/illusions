@@ -59,7 +59,7 @@ function getSaveFilters(
 }
 
 /**
- * .illusions MDI Documentを開く（Electron IPC / File System Access API）
+ * .illusions MDI Document を開く（Electron IPC / File System Access API）
  */
 export async function openMdiFile(): Promise<OpenMdiResult | null> {
   const env = getRuntimeEnvironment();
@@ -129,7 +129,7 @@ export async function openMdiFile(): Promise<OpenMdiResult | null> {
 }
 
 /**
- * .illusions MDI Documentを保存する（可能なら既存ディスクリプタを再利用）
+ * .illusions MDI Document を保存する（可能なら既存ディスクリプタを再利用）
  * 新規の場合は「名前を付けて保存」相当のダイアログを出す
  */
 export async function saveMdiFile(params: SaveMdiParams): Promise<OpenMdiResult | null> {

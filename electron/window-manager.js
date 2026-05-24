@@ -100,7 +100,7 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
     isHandlingClose = true;
 
     if (newWindow.isDocumentEdited()) {
-      // 未保存の変更がある場合は確認ダイアログを表示
+      // 未保存の変更がある場合は確認ダイアログを表示（3 ボタン）
       dialog
         .showMessageBox(newWindow, {
           type: "question",
@@ -112,13 +112,13 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
         })
         .then(({ response }) => {
           if (response === 0) {
-            // "Save": flush state + save dirty files, then close
+            // "保存": flush state + save dirty files, then close
             newWindow.webContents.send("electron-request-save-before-close");
           } else if (response === 1) {
-            // "Don't Save": flush state only (preserve tab/layout), then close
+            // "保存しない": flush state only (preserve tab/layout), then close
             newWindow.webContents.send("electron-request-flush-state-before-close");
           } else {
-            // "Cancel": keep window open
+            // "キャンセル": ウィンドウを開いたまま
             isHandlingClose = false;
           }
         })

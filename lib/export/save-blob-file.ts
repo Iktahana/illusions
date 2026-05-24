@@ -1,13 +1,12 @@
 /**
  * Shared file-save helper for browser and Electron.
  *
- * - Electron (TXT only): delegates to the main-process IPC save dialog.
- *   Returns false when the user cancels the save dialog.
- * - Web: always triggers a browser download via a temporary Blob URL.
- *   Returns true unconditionally (browser downloads have no cancel signal).
+ * Phase 2: Electron TXT 分岐は save-file IPC 削除に伴い無効化。両環境とも
+ * Blob URL ダウンロードにフォールバック。Phase 8 で新 IO 抽象が出来たら
+ * Electron のネイティブ Save ダイアログ経路を復活させる。
  *
- * Other Electron formats (PDF, DOCX, EPUB) use dedicated IPC export handlers
- * and never reach this function.
+ * 他の Electron formats (PDF, DOCX, EPUB) は専用 IPC export handler を経由するため
+ * 本関数を通らない。
  */
 
 /**
@@ -15,30 +14,17 @@
  *
  * @param blob - Blob content to write
  * @param suggestedName - Default file name for the download / save dialog
- * @param isElectron - True when running inside Electron renderer
- * @param electronExt - File extension for Electron save dialog. Currently only
- *   ".txt" is routed through Electron IPC here.
- * @returns true if saved/downloaded, false if user cancelled (Electron only)
+ * @param _isElectron - Phase 2 で不使用（互換のため signature 維持）
+ * @param _electronExt - Phase 2 で不使用（互換のため signature 維持）
+ * @returns true（ダウンロードは常に成功とみなす）
  */
 export async function saveBlobFile(
   blob: Blob,
   suggestedName: string,
-  isElectron: boolean,
-  electronExt?: string,
+  _isElectron: boolean,
+  _electronExt?: string,
 ): Promise<boolean> {
-  // Electron: delegate to main-process IPC (currently only TXT is routed here;
-  // other formats use dedicated IPC export handlers)
-  if (isElectron && window.electronAPI && electronExt === ".txt") {
-    const text = await blob.text();
-    const result = await window.electronAPI.saveFile(null, text, electronExt);
-    if (result === null) return false;
-    if (typeof result === "object" && "success" in result && !result.success) {
-      throw new Error(result.error);
-    }
-    return true;
-  }
-
-  // Web: trigger download via Blob URL
+  // Phase 2: 環境問わず Blob URL ダウンロードへ。Phase 8 で Electron ネイティブ復活。
   downloadViaBlob(blob, suggestedName);
   return true;
 }

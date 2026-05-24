@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import { getStorageService } from "@/lib/storage/storage-service";
 import { getProjectService } from "@/lib/project/project-service";
 import { getDefaultWorkspaceState } from "@/lib/project/project-types";
-import { getVFS } from "@/lib/vfs";
+import { getProjectFileService as getVFS } from "@/lib/services/project-file-service";
 import { notificationManager } from "@/lib/services/notification-manager";
 
 import type { ProjectMode, StandaloneMode, WorkspaceTab } from "@/lib/project/project-types";
