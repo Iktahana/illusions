@@ -40,8 +40,6 @@ import type { MdiFileDescriptor, OpenMdiResult, SaveMdiParams } from "@/lib/proj
 
 /** Create a minimal mock FileSystemFileHandle for browser tests. */
 function createMockFileHandle(name: string, content: string): FileSystemFileHandle {
-  const mockFile = new File([content], name, { type: "text/plain" });
-
   let writtenContent = content;
   const mockWritable = {
     write: vi.fn(async (data: string): Promise<void> => {

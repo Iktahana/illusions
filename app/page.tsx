@@ -1085,9 +1085,12 @@ export default function EditorPage() {
       // so that a restored snapshot that differs from disk is not treated as clean.
       if (activeTabId !== null) {
         const currentTab = tabsRef.current.find((t) => t.id === activeTabId);
-        const lastSaved =
-          currentTab && isEditorTab(currentTab) ? (currentTab.lastSavedContent ?? "") : "";
-        const isClean = sanitizeMdiContent(restoredContent) === sanitizeMdiContent(lastSaved);
+        const editorTab = currentTab && isEditorTab(currentTab) ? currentTab : null;
+        const lastSaved = editorTab ? (editorTab.lastSavedContent ?? "") : "";
+        const fileTypeOpts = editorTab ? { fileType: editorTab.fileType } : undefined;
+        const isClean =
+          sanitizeMdiContent(restoredContent, fileTypeOpts) ===
+          sanitizeMdiContent(lastSaved, fileTypeOpts);
         updateTab(activeTabId, {
           fileSyncStatus: isClean ? "clean" : "dirty",
           conflictDiskContent: null,

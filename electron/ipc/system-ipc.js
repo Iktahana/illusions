@@ -19,8 +19,10 @@ function registerSystemHandlers() {
     }
   });
 
+  // Phase 2: save 経路は削除されたが、この IPC は close handshake の終端トリガ
+  // として引き続き使う（renderer は flush 完了後に呼んで window を destroy する）。
+  // 命名は歴史的なため Phase 8 で必要に応じて改名する。
   ipcMain.handle("save-before-close-done", (event) => {
-    // イベントを送信したウィンドウを閉じる
     const webContents = event.sender;
     const win = BrowserWindow.fromWebContents(webContents);
     if (win) {

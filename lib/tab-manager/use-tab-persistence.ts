@@ -8,7 +8,7 @@ import type { TabState, SerializedTab, TabPersistenceState, EditorTabState } fro
 import { isEditorTab } from "./tab-types";
 import type { TabManagerCore } from "./types";
 import { TAB_PERSIST_DEBOUNCE, createNewTab, generateTabId, inferFileType } from "./types";
-import { getVFS } from "../vfs";
+import { getProjectFileService } from "../services/project-file-service";
 import type { WorkspaceTab } from "../project/project-types";
 import {
   persistWorkspaceJson,
@@ -223,7 +223,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         }
         try {
           const absolutePath = toAbsolutePath(saved.relativePath, rootPath);
-          const vfs = getVFS();
+          const vfs = getProjectFileService();
           const fileContent = await vfs.readFile(absolutePath);
           restoredTabs.push({
             tabKind: "editor",
@@ -348,7 +348,9 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
   useEffect(() => {
     if (!isElectron || skipAutoRestore) return;
-    if (!window.electronAPI?.vfs?.readFile) return;
+    // Phase 4-5: electronAPI.vfs は削除済み。Phase 9 で新 IO 抽象に再配線するまで
+    // 自動復元を停止する。
+    return;
 
     const restoreTabs = async () => {
       try {
@@ -377,7 +379,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
             continue;
           }
           try {
-            const vfs = getVFS();
+            const vfs = getProjectFileService();
             const fileContent = await vfs.readFile(serialized.filePath);
             restoredTabs.push({
               tabKind: "editor",

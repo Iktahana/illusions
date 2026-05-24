@@ -841,7 +841,7 @@ export default function MilkdownEditor({
           so the measurement matches the user's actual typography settings.
           Use fixed positioning so the measurement node can never affect any scroll container. */}
       <span
-        ref={charMeasureRef}
+        ref={charMeasureRef as React.RefObject<HTMLSpanElement>}
         aria-hidden="true"
         className={isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal"}
         style={{

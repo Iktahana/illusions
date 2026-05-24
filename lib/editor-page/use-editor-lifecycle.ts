@@ -77,26 +77,7 @@ export function useEditorLifecycle({
     }
   }, [skipAutoRestore]);
 
-  useEffect(() => {
-    if (!isElectron) return;
-
-    const api = window.electronAPI;
-    if (!api?.getPendingFile) return;
-
-    void api.getPendingFile().then((results) => {
-      if (!results || results.length === 0) return;
-
-      for (const result of results) {
-        if (result.type === "project") {
-          void handleOpenAsProject(result.projectPath, result.initialFile);
-        } else {
-          tabLoadSystemFile(result.path, result.content);
-          incrementEditorKey();
-        }
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
-  }, []);
+  // Phase 3: getPendingFile 経路は削除。Phase 8 で再導入する。
 
   useEffect(() => {
     if (wasAutoRecovered && !dismissedRecovery && !recoveryExiting) {

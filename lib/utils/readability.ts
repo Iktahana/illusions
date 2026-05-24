@@ -12,6 +12,7 @@
  *   const enhanced = enrichReadabilityWithMorphology(base, tokens);
  */
 
+import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
 import type { Token } from "@/lib/nlp-client/types";
 import type {
   EnhancedReadabilityAnalysis,

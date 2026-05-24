@@ -8,7 +8,7 @@
  * スタンドアロンモード: StorageService (IndexedDB / SQLite)
  */
 
-import { getVFS } from "../vfs";
+import { getProjectFileService } from "../services/project-file-service";
 import { getStorageService } from "../storage/storage-service";
 import { AsyncMutex } from "../utils/async-mutex";
 import type { VirtualFileSystem } from "../vfs/types";
@@ -33,7 +33,7 @@ class UserDictionaryService {
   private readonly writeMutex = new AsyncMutex();
 
   constructor() {
-    this.vfs = getVFS();
+    this.vfs = getProjectFileService();
     this.storage = getStorageService();
   }
 

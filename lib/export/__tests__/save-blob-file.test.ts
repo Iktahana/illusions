@@ -54,39 +54,5 @@ describe("saveBlobFile", () => {
     });
   });
 
-  describe("Electron: TXT save via IPC", () => {
-    const mockSaveFile = vi.fn();
-
-    beforeEach(() => {
-      vi.stubGlobal("window", {
-        ...window,
-        electronAPI: { saveFile: mockSaveFile },
-      });
-    });
-
-    it("returns false when user cancels the save dialog", async () => {
-      mockSaveFile.mockResolvedValue(null);
-
-      const result = await saveBlobFile(blob, "test.txt", true, ".txt");
-
-      expect(result).toBe(false);
-      expect(mockSaveFile).toHaveBeenCalledWith(null, "test content", ".txt");
-      expect(mockClick).not.toHaveBeenCalled();
-    });
-
-    it("returns true on successful save", async () => {
-      mockSaveFile.mockResolvedValue("/path/to/test.txt");
-
-      const result = await saveBlobFile(blob, "test.txt", true, ".txt");
-
-      expect(result).toBe(true);
-      expect(mockClick).not.toHaveBeenCalled();
-    });
-
-    it("throws on IPC error result", async () => {
-      mockSaveFile.mockResolvedValue({ success: false, error: "disk full" });
-
-      await expect(saveBlobFile(blob, "test.txt", true, ".txt")).rejects.toThrow("disk full");
-    });
-  });
+  // Phase 2: Electron TXT save via IPC は削除済み。Phase 8 で再導入時にテスト復活。
 });

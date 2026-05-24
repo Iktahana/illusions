@@ -19,6 +19,7 @@ import {
   MDI_KERN_RE,
   MDI_BREAK_RE,
   MDI_KERN_AMOUNT_RE,
+  MDI_BLANK_RE,
 } from "./mdi-parser";
 
 const MDI_RUBY_AT_START_RE = new RegExp(`^${MDI_RUBY_RE.source}`);
@@ -247,7 +248,17 @@ export function mdiToHtml(
   },
 ): string {
   const md = createMarkdownIt();
-  const bodyHtml = md.render(markdown);
+  // Pre-process: replace [[blank]] paragraph markers with a U+E000 PUA sentinel.
+  // markdown-it will wrap the sentinel in <p>…</p>; we swap it for an empty <p></p> after rendering.
+  const BLANK_SENTINEL = "";
+  const preprocessed = markdown.replace(new RegExp(MDI_BLANK_RE.source, "gm"), BLANK_SENTINEL);
+  const rawHtml = md.render(preprocessed);
+  // Replace the sentinel paragraph with a true empty paragraph. Then final-sweep any
+  // remaining sentinel that escaped the <p>…</p> wrap (e.g. inside fenced code blocks
+  // where markdown-it emits <pre><code>…</code></pre> instead of <p>).
+  const bodyHtml = rawHtml
+    .replace(new RegExp(`<p>${BLANK_SENTINEL}\\s*</p>`, "g"), "<p></p>")
+    .replace(new RegExp(BLANK_SENTINEL, "g"), "");
 
   if (options?.bodyOnly) {
     return bodyHtml;

@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("save-file", filePath, content, fileType),
   getChromeVersion: () => ipcRenderer.invoke("get-chrome-version"),
   setDirty: (dirty) => ipcRenderer.invoke("set-dirty", dirty),
+  // 歴史的命名: flush 完了後にウィンドウを実際に閉じるためのシグナル。
+  // Phase 2 で save 経路は消滅したが、close handshake の終端トリガとして引き続き利用する。
   saveDoneAndClose: () => ipcRenderer.invoke("save-before-close-done"),
   newWindow: () => ipcRenderer.invoke("new-window"),
   openDictionaryPopup: (url, title) => ipcRenderer.invoke("open-dictionary-popup", url, title),
@@ -202,9 +204,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     mkdir: (dirPath) => ipcRenderer.invoke("vfs:mkdir", dirPath),
     delete: (targetPath, options) => ipcRenderer.invoke("vfs:delete", targetPath, options),
     rename: (oldPath, newPath) => ipcRenderer.invoke("vfs:rename", oldPath, newPath),
-    /** Acquire the cross-window history index lock for the given key */
     indexLockAcquire: (key) => ipcRenderer.invoke("vfs:index-lock:acquire", key),
-    /** Release the cross-window history index lock for the given key */
     indexLockRelease: (key) => ipcRenderer.invoke("vfs:index-lock:release", key),
   },
   auth: {

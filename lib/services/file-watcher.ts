@@ -9,7 +9,7 @@
  */
 
 import { isElectronRenderer } from "../utils/runtime-env";
-import { getVFS } from "../vfs";
+import { getProjectFileService } from "../services/project-file-service";
 
 import type { VirtualFileSystem, VFSWatchEvent } from "../vfs/types";
 
@@ -203,7 +203,7 @@ class WebFileWatcher implements FileWatcher {
   private consecutiveFailures = 0;
 
   constructor(options: FileWatcherOptions) {
-    this.vfs = getVFS();
+    this.vfs = getProjectFileService();
     this.path = options.path;
     this.onChanged = options.onChanged;
     this.pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
@@ -365,7 +365,7 @@ class ElectronFileWatcher implements FileWatcher {
   private lastKnownContentHash: string = "";
 
   constructor(options: FileWatcherOptions) {
-    this.vfs = getVFS();
+    this.vfs = getProjectFileService();
     this.path = options.path;
     this.onChanged = options.onChanged;
     this.pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;

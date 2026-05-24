@@ -22,9 +22,13 @@ declare global {
       filePath: string | null,
       content: string,
       fileType?: string,
-    ) => Promise<string | { success: false; error: string } | null>;
+    ) => Promise<string | null | { success: false; error?: string; code?: string }>;
     getChromeVersion: () => Promise<number>;
     setDirty: (dirty: boolean) => Promise<void>;
+    /**
+     * Close-handshake terminator. Name is historical (originally tied to save).
+     * Phase 2: 保存経路を削除した後も flush 完了後の window destroy トリガとして利用。
+     */
     saveDoneAndClose?: () => Promise<void>;
     newWindow?: () => Promise<void>;
     openDictionaryPopup?: (url: string, title: string) => Promise<boolean>;
@@ -128,6 +132,8 @@ declare global {
       mkdir: (dirPath: string) => Promise<void>;
       /** Delete a file or directory */
       delete: (targetPath: string, options?: { recursive?: boolean }) => Promise<void>;
+      /** Rename (move) a file or directory */
+      rename: (oldPath: string, newPath: string) => Promise<void>;
       /** Watch a file for changes (optional) */
       watch?: (filePath: string, callback: (event: VFSWatchEvent) => void) => { stop: () => void };
       /**

@@ -1,10 +1,15 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Search, X, ChevronUp, ChevronDown, List } from "lucide-react";
 import { EditorView, Decoration } from "@milkdown/prose/view";
 import { TextSelection } from "@milkdown/prose/state";
 import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
+import { computeAnchorPos } from "@/lib/search-dialog/compute-anchor-pos";
+
+const DIALOG_WIDTH = 320; // w-80 と一致させる
+const DIALOG_PADDING = 16; // 8px top offset / 16px right offset の元値と整合
 
 interface SearchDialogProps {
   editorView: EditorView | null;
@@ -12,6 +17,10 @@ interface SearchDialogProps {
   onClose: () => void;
   onShowAllResults?: (matches: SearchMatch[], searchTerm: string) => void;
   initialSearchTerm?: string;
+  /** エディタ領域の ref。ダイアログ初期位置計算に使用する。
+   *  dockview の CSS transform が position:fixed の containing block を破壊するため、
+   *  portal + getBoundingClientRect() でエディタ基準の座標を求める。 */
+  anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 export interface SearchMatch {
@@ -25,6 +34,7 @@ export default function SearchDialog({
   onClose,
   onShowAllResults,
   initialSearchTerm,
+  anchorRef,
 }: SearchDialogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [matches, setMatches] = useState<SearchMatch[]>([]);
@@ -33,7 +43,7 @@ export default function SearchDialog({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // Drag state (session-only, resets on refresh)
+  // Drag state (session-only, resets on close)
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
   const isDragging = useRef(false);
   const dragStart = useRef<{ mouseX: number; mouseY: number; elX: number; elY: number }>({
@@ -42,6 +52,43 @@ export default function SearchDialog({
     elX: 0,
     elY: 0,
   });
+
+  // アンカー基準の初期位置（エディタ領域の右上）
+  const [anchorPos, setAnchorPos] = useState<{ top: number; right: number } | null>(null);
+
+  // アンカー要素の getBoundingClientRect() からダイアログ初期位置を計算する。
+  // portal により document.body 直下に render されるため座標は viewport 基準になる。
+  // close 時は dragOffset と anchorPos をリセットし、次回 open で再計算する。
+  // anchorRef は安定 ref オブジェクトで、依存配列に置いても .current 変更では再実行されない。
+  // 主トリガーは isOpen → true 遷移。exhaustive-deps lint を満たすため明示列挙する。
+  // 冪等: anchorRef.current が同じなら同一値を setAnchorPos するため React 19 Strict Mode の
+  // double-invoke でも問題なし。
+  useEffect(() => {
+    if (isOpen && anchorRef?.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setAnchorPos(
+        computeAnchorPos(
+          { top: rect.top, right: rect.right },
+          window.innerWidth,
+          DIALOG_WIDTH,
+          DIALOG_PADDING,
+        ),
+      );
+    }
+    if (!isOpen) {
+      setAnchorPos(null);
+      setDragOffset(null);
+    }
+  }, [isOpen, anchorRef]);
+
+  // close 時にドラッグ中フラグを落とす。
+  // isDragging.current = false により mousemove ハンドラが early-return し
+  // stale なポインタイベントが position 更新を起こさなくなる。
+  useEffect(() => {
+    if (!isOpen) {
+      isDragging.current = false;
+    }
+  }, [isOpen]);
 
   const handleDragMouseDown = useCallback((e: React.MouseEvent) => {
     // Don't initiate drag from interactive elements
@@ -54,7 +101,15 @@ export default function SearchDialog({
     dragStart.current = { mouseX: e.clientX, mouseY: e.clientY, elX: rect.left, elY: rect.top };
 
     const handleMouseMove = (ev: MouseEvent) => {
-      if (!isDragging.current) return;
+      // close で isDragging が落とされた場合は listener も即時撤去する。
+      // これにより portal unmount 後にも listener が残るリークを防ぐ。
+      // removeEventListener は idempotent な DOM API なので handleMouseUp が後で
+      // 同じ listener を再度 remove しても no-op で安全。
+      if (!isDragging.current) {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+        return;
+      }
       const dx = ev.clientX - dragStart.current.mouseX;
       const dy = ev.clientY - dragStart.current.mouseY;
       setDragOffset({ x: dragStart.current.elX + dx, y: dragStart.current.elY + dy });
@@ -178,15 +233,17 @@ export default function SearchDialog({
 
   if (!isOpen) return null;
 
-  return (
+  const posStyle = dragOffset
+    ? { left: dragOffset.x, top: dragOffset.y, right: "auto" }
+    : anchorPos
+      ? { top: anchorPos.top, right: anchorPos.right }
+      : { top: 64, right: 16 }; // anchorRef なし時のフォールバック (web で使用)
+
+  return createPortal(
     <div
       ref={dialogRef}
-      className="fixed z-50 bg-background-elevated/80 backdrop-blur-xl rounded-lg shadow-lg border border-border/50 p-4 w-80 cursor-grab active:cursor-grabbing"
-      style={
-        dragOffset
-          ? { left: dragOffset.x, top: dragOffset.y, right: "auto" }
-          : { top: 64, right: 16 }
-      }
+      className="fixed z-[9999] bg-background-elevated/80 backdrop-blur-xl rounded-lg shadow-lg border border-border/50 p-4 w-80 cursor-grab active:cursor-grabbing"
+      style={posStyle}
       onKeyDown={handleKeyDown}
       onMouseDown={handleDragMouseDown}
     >
@@ -265,6 +322,7 @@ export default function SearchDialog({
       <div className="mt-3 pt-2 border-t border-border text-xs text-foreground-tertiary">
         <div>Enter: 次へ / Shift+Enter: 前へ / Esc: 閉じる</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
