@@ -85,6 +85,14 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 Types: `feat`, `fix`, `refactor`, `docs`, `style`, `test`, `chore`
 
+## 10. Pull Request Hygiene
+
+- PR を開く前に `gh issue list --state open` で関連 issue を必ず確認し、close 可能な issue があれば PR body に `Closes #<番号>` を全件記載する
+- キーワード grep を併用 (例: `gh issue list --state open --search "ルビ"`) して close 漏れを防ぐ
+- 親 issue (epic / umbrella / verify) も対象。本 PR が parent の条件を満たす場合は parent も `Closes #N` で含める
+- 該当 issue が無い場合のみ body に「関連 issue なし」と明記
+- merge 後、自動 close されなかった関連 issue (verify / 親 epic 等) があれば手動で `gh issue close` し、PR リンクをコメント追記
+
 ## Component Map
 
 | Component / Hook                      | Responsible For                     |
