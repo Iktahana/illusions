@@ -196,6 +196,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   vfs: {
     openDirectory: () => ipcRenderer.invoke("vfs:open-directory"),
+    openFile: (opts) => ipcRenderer.invoke("vfs:open-file", opts),
     setRoot: (rootPath) => ipcRenderer.invoke("vfs:set-root", rootPath),
     readFile: (filePath) => ipcRenderer.invoke("vfs:read-file", filePath),
     writeFile: (filePath, content) => ipcRenderer.invoke("vfs:write-file", filePath, content),
