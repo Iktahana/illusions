@@ -146,7 +146,7 @@ function Characters({ content }: CharactersProps) {
 
     try {
       const nlpClient = getNlpClient();
-      const tokens = await nlpClient.tokenizeParagraph(stripMdiBlankMarkers(content));
+      const tokens = await nlpClient.tokenizeParagraph(content);
 
       const properNouns = new Map<string, boolean>();
 

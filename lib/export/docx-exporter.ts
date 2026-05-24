@@ -209,10 +209,12 @@ function parseMarkdownToDocxParagraphs(
       continue;
     }
 
-    // [[blank]] marker → empty DOCX paragraph
-    if (/^\[\[blank\]\]$/.test(trimmed)) {
+    // [[blank]] paragraph marker → empty <w:p> (forced blank paragraph).
+    // Attach spacing so `docx` emits `<w:pPr>` and never self-closes the `<w:p>` tag,
+    // which keeps `[[blank]]` countable via `<w:p\s>`/`<w:p>` and matches the export tests.
+    if (trimmed === "[[blank]]") {
       flushParagraph();
-      paragraphs.push(new Paragraph({ spacing: { before: 0, after: 120 } }));
+      paragraphs.push(new Paragraph({ spacing: { before: 0, after: 120 }, children: [] }));
       continue;
     }
 

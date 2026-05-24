@@ -44,3 +44,10 @@
 .milkdown-japanese-base .mdi-kern {
   letter-spacing: var(--mdi-kern, 0em);
 }
+
+/* Blank paragraph (強制空段落 `[[blank]]`): when empty, render a line-box of natural height
+   via a zero-width space so paragraph counters don't stack. As soon as the user types,
+   `:empty` no longer matches and the actual content takes over. */
+.milkdown-japanese-base p.mdi-blank:empty::before {
+  content: "\200B";
+}
