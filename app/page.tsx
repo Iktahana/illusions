@@ -363,11 +363,16 @@ export default function EditorPage() {
   const [selectedCharCount, setSelectedCharCount] = useState(0);
   const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
-  const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
+  const [editorViewInstance, setEditorViewInstanceRaw] = useState<EditorView | null>(null);
+  const editorViewRef = useRef<EditorView | null>(null);
+  const setEditorViewInstance = useCallback((view: EditorView | null) => {
+    editorViewRef.current = view; // ref FIRST so sync consumers see fresh value
+    setEditorViewInstanceRaw(view);
+  }, []);
 
   // --- Ruby/TCY hook ---
   const { handleOpenRubyDialog, handleApplyRuby, handleToggleTcy } = useRubyTcy({
-    editorViewInstance,
+    editorViewRef,
     setRubySelectedText: panelHandlers.setRubySelectedText,
     setShowRubyDialog: panelHandlers.setShowRubyDialog,
   });

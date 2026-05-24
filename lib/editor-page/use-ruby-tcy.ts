@@ -1,15 +1,16 @@
 import { useCallback, useRef } from "react";
+import type { MutableRefObject } from "react";
 import { Fragment } from "@milkdown/prose/model";
 import type { EditorView } from "@milkdown/prose/view";
 
 interface UseRubyTcyOptions {
-  editorViewInstance: EditorView | null;
+  editorViewRef: MutableRefObject<EditorView | null>;
   setRubySelectedText: (text: string) => void;
   setShowRubyDialog: (show: boolean) => void;
 }
 
 export function useRubyTcy({
-  editorViewInstance,
+  editorViewRef,
   setRubySelectedText,
   setShowRubyDialog,
 }: UseRubyTcyOptions) {
@@ -17,24 +18,32 @@ export function useRubyTcy({
 
   /** Open the Ruby dialog with current editor selection */
   const handleOpenRubyDialog = useCallback(() => {
-    if (!editorViewInstance) return;
-    const { state } = editorViewInstance;
-    const { from, to } = state.selection;
-    if (from === to) return; // No selection
-    const text = state.doc.textBetween(from, to);
-    if (!text.trim()) return;
-    rubySelectionRef.current = { from, to };
-    setRubySelectedText(text);
-    setShowRubyDialog(true);
-  }, [editorViewInstance, setRubySelectedText, setShowRubyDialog]);
+    const view = editorViewRef.current;
+    if (!view) return;
+    try {
+      const { from, to } = view.state.selection;
+      if (from === to) return; // No selection
+      const text = view.state.doc.textBetween(from, to);
+      if (!text.trim()) return;
+      rubySelectionRef.current = { from, to };
+      setRubySelectedText(text);
+      setShowRubyDialog(true);
+    } catch {
+      // Defensive: view may be torn down during unmount/remount
+      return;
+    }
+    // editorViewRef is a stable ref object; including it here satisfies the React Compiler
+    // without causing extra re-renders (ref identity never changes)
+  }, [editorViewRef, setRubySelectedText, setShowRubyDialog]);
 
   /** Apply Ruby markup by replacing the editor selection with ProseMirror nodes */
   const handleApplyRuby = useCallback(
     (rubyMarkup: string) => {
-      if (!editorViewInstance) return;
+      const view = editorViewRef.current;
+      if (!view) return;
       const sel = rubySelectionRef.current;
       if (!sel) return;
-      const { state, dispatch } = editorViewInstance;
+      const { state, dispatch } = view;
       const rubyNodeType = state.schema.nodes.ruby;
       if (!rubyNodeType) {
         // Fallback: insert as plain text if ruby node type is not available
@@ -63,13 +72,15 @@ export function useRubyTcy({
       dispatch(tr);
       rubySelectionRef.current = null;
     },
-    [editorViewInstance],
+    // editorViewRef is a stable ref object; including it here satisfies the React Compiler
+    [editorViewRef],
   );
 
   /** Wrap selected text with tcy syntax: ^text^ */
   const handleToggleTcy = useCallback(() => {
-    if (!editorViewInstance) return;
-    const { state, dispatch } = editorViewInstance;
+    const view = editorViewRef.current;
+    if (!view) return;
+    const { state, dispatch } = view;
     const { from, to } = state.selection;
     if (from === to) return;
     const text = state.doc.textBetween(from, to);
@@ -83,7 +94,8 @@ export function useRubyTcy({
       const tr = state.tr.insertText(`^${text}^`, from, to);
       dispatch(tr);
     }
-  }, [editorViewInstance]);
+    // editorViewRef is a stable ref object; including it here satisfies the React Compiler
+  }, [editorViewRef]);
 
   return {
     handleOpenRubyDialog,
