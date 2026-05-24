@@ -17,30 +17,28 @@ function saveThenLoad(raw: string) {
 }
 
 describe("MDI blank paragraph — save → load composition round-trip", () => {
-  it("paste-origin <br /> → 保存形 [[blank]] → load で空 paragraph", () => {
+  it("paste-origin <br /> → 保存形 [[blank]] → load で blankParagraph ノード", () => {
     const { sanitized, tree } = saveThenLoad("A段落\n\n<br />\n\nB段落");
     expect(sanitized).toBe("A段落\n\n[[blank]]\n\nB段落");
     const root = tree as { children: { type: string; children: unknown[] }[] };
     const middle = root.children[1];
-    expect(middle.type).toBe("paragraph");
+    expect(middle.type).toBe("blankParagraph");
     expect(middle.children).toHaveLength(0);
   });
 
-  it("連続 <br /> → 連続 [[blank]] → 2 連続の空 paragraph", () => {
+  it("連続 <br /> → 連続 [[blank]] → 2 連続の blankParagraph", () => {
     const { sanitized, tree } = saveThenLoad("A\n\n<br />\n\n<br />\n\nB");
     expect(sanitized).toBe("A\n\n[[blank]]\n\n[[blank]]\n\nB");
     const root = tree as { children: { type: string; children: unknown[] }[] };
-    const emptyParagraphs = root.children.filter(
-      (n) => n.type === "paragraph" && n.children.length === 0,
-    );
-    expect(emptyParagraphs.length).toBe(2);
+    const blankNodes = root.children.filter((n) => n.type === "blankParagraph");
+    expect(blankNodes.length).toBe(2);
   });
 
   it("先頭空段落 → 保持される", () => {
     const { sanitized, tree } = saveThenLoad("<br />\n\nA");
     expect(sanitized).toBe("[[blank]]\n\nA");
     const root = tree as { children: { type: string; children: unknown[] }[] };
-    expect(root.children[0].type).toBe("paragraph");
+    expect(root.children[0].type).toBe("blankParagraph");
     expect(root.children[0].children).toHaveLength(0);
   });
 
