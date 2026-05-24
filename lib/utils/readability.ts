@@ -25,7 +25,7 @@ import type {
 
 /** 文字数カウント用にMarkdownを整形する */
 export function cleanMarkdown(markdown: string): string {
-  return stripMdiBlankMarkers(markdown)
+  return markdown
     .replace(/```[\s\S]*?```/g, "")
     .replace(/`[^`]+`/g, "")
     .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")
