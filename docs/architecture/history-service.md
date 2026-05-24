@@ -21,12 +21,12 @@ The history service provides a local version history system for documents. It cr
 
 ### Key Files
 
-| File                               | Lines | Purpose                                                       |
-| ---------------------------------- | ----- | ------------------------------------------------------------- |
-| `lib/services/history-service.ts`  | ~120  | Facade — composes HistoryPolicy + HistoryStore, public API    |
-| `lib/services/history-policy.ts`   | ~394  | Stateless decision logic: throttle, pruning, checksum, format |
-| `lib/services/history-store.ts`    | ~271  | IO layer: read/write snapshot files and index.json            |
-| `lib/diff-service.ts`              | ~67   | Character-level diff computation and statistics               |
+| File                              | Lines | Purpose                                                       |
+| --------------------------------- | ----- | ------------------------------------------------------------- |
+| `lib/services/history-service.ts` | ~440  | Facade — composes HistoryPolicy + HistoryStore, public API    |
+| `lib/services/history-policy.ts`  | ~394  | Stateless decision logic: throttle, pruning, checksum, format |
+| `lib/services/history-store.ts`   | ~271  | IO layer: read/write snapshot files and index.json            |
+| `lib/diff-service.ts`             | ~67   | Character-level diff computation and statistics               |
 
 ### Features
 
