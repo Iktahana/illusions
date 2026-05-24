@@ -32,16 +32,42 @@ export default function SearchResults({
   const [showReplace, setShowReplace] = useState(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // #1502: Sync incoming props → state during render (React-recommended
+  // "derived state" pattern). useState only reads the initializer on mount,
+  // so without this an already-mounted SearchResults silently ignores props
+  // pushed by SearchDialog's "すべての検索結果を表示" button. Using render-time
+  // detection (vs useEffect) avoids the extra-render flush delay that breaks
+  // jsdom tests and trips React 18+ act() expectations.
+  const [lastInitialSearchTerm, setLastInitialSearchTerm] =
+    useState(initialSearchTerm);
+  if (initialSearchTerm !== lastInitialSearchTerm) {
+    setLastInitialSearchTerm(initialSearchTerm);
+    if (initialSearchTerm !== undefined) {
+      setSearchTerm(initialSearchTerm);
+    }
+  }
+
+  const [lastInitialMatches, setLastInitialMatches] =
+    useState(initialMatches);
+  if (initialMatches !== lastInitialMatches) {
+    setLastInitialMatches(initialMatches);
+    if (initialMatches !== undefined) {
+      setMatches(initialMatches);
+    }
+  }
+
   // 文書内の一致箇所を検索する
   useEffect(() => {
-    if (!editorView || !searchTerm) {
+    // #1502: when there's no editor, leave matches as-is so prop-sourced
+    // initialMatches survive. Local recompute only runs against a real editor.
+    if (!editorView) {
+      return;
+    }
+    if (!searchTerm) {
       setMatches([]);
-      // Clear highlights
-      if (editorView) {
-        const { state, dispatch } = editorView;
-        const tr = state.tr.setMeta("searchDecorations", []);
-        dispatch(tr);
-      }
+      const { state, dispatch } = editorView;
+      const tr = state.tr.setMeta("searchDecorations", []);
+      dispatch(tr);
       return;
     }
 
@@ -311,9 +337,29 @@ export default function SearchResults({
                       <button onClick={() => goToMatch(match, index)} className="w-full text-left">
                         <p className="text-sm text-foreground break-words">
                           <span className="text-foreground-secondary">{context.before}</span>
-                          <span className="bg-accent-light text-accent font-semibold px-1 rounded">
-                            {context.text}
-                          </span>
+                          {showReplace && replaceTerm ? (
+                            // #1502: VSCode-style replace preview (strikethrough + red old,
+                            // green new). Only when replaceTerm is non-empty; preserves the
+                            // plain highlight rendering otherwise.
+                            <>
+                              <span
+                                className="line-through bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-1 rounded"
+                                data-testid="replace-preview-old"
+                              >
+                                {context.text}
+                              </span>
+                              <span
+                                className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-semibold px-1 rounded ml-0.5"
+                                data-testid="replace-preview-new"
+                              >
+                                {replaceTerm}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="bg-accent-light text-accent font-semibold px-1 rounded">
+                              {context.text}
+                            </span>
+                          )}
                           <span className="text-foreground-secondary">{context.after}</span>
                         </p>
                         <p className="text-xs text-foreground-tertiary mt-1">
