@@ -281,7 +281,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         // Project mode: VFS direct write
         if (isProjectRef.current && tab.file?.path) {
           const vfs = getProjectFileService();
-          suppressFileWatch(tab.file.path);
+          suppressFileWatch(tab.file.path, sanitized);
           await vfs.writeFile(tab.file.path, sanitized);
 
           // Update project.json lastModified so workspace metadata stays in sync.

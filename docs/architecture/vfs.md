@@ -3,7 +3,7 @@ title: Virtual File System
 slug: vfs
 type: architecture
 status: active
-updated: 2026-04-17
+updated: 2026-05-31
 tags:
   - architecture
   - file-system
@@ -258,6 +258,22 @@ Certain sensitive system paths are always blocked, regardless of root:
 
 Paths selected through Electron's native file dialog are tracked in an LRU Map (max 200 entries) to allow subsequent operations on those paths without re-prompting the user.
 
+#### Persistence across restart
+
+Approved roots are also persisted to `approved-vfs-paths.json` (in the app's user-data directory), keyed by `projectId`, via `electron/lib/vfs-approvals.js`. On the next launch the `vfs:set-root` handler reloads the approved set for the current project and skips the re-approval dialog for previously accepted roots.
+
+- **Project-scoped**: only paths belonging to the active `projectId` are restored.
+- **No auto-promotion of denied paths**: persisted entries are still validated against the denylist and per-window root checks at access time (TOCTOU-safe; existence is not assumed).
+- **Schema**: `{ "version": 1, "approvals": [{ "projectId", "path", "approvedAt" }] }`.
+
+### Text Encoding (`.txt` / `.md` / `.mdi`)
+
+Text files are read and written through `lib/utils/text-codec.ts`:
+
+- Decoded as UTF-8. Non-UTF-8 BOMs (UTF-16 LE/BE, UTF-32) are rejected with a Japanese error.
+- A UTF-8 BOM (`EF BB BF`) is stripped on read and not restored on write.
+- The original EOL style (CRLF vs LF) is detected and preserved on write; content is normalized to LF in memory.
+
 ---
 
 ## Platform Comparison
@@ -282,5 +298,5 @@ Paths selected through Electron's native file dialog are tracked in an LRU Map (
 
 ---
 
-**Last Updated**: 2026-02-25
+**Last Updated**: 2026-05-31
 **Version**: 1.0.0

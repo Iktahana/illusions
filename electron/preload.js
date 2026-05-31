@@ -196,11 +196,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   vfs: {
     openDirectory: () => ipcRenderer.invoke("vfs:open-directory"),
-    setRoot: (rootPath) => ipcRenderer.invoke("vfs:set-root", rootPath),
+    openFile: (opts) => ipcRenderer.invoke("vfs:open-file", opts),
+    // #1476: rehydration — projectId added for project-scoped approval persistence
+    setRoot: (rootPath, projectId) => ipcRenderer.invoke("vfs:set-root", rootPath, projectId),
     readFile: (filePath) => ipcRenderer.invoke("vfs:read-file", filePath),
     writeFile: (filePath, content) => ipcRenderer.invoke("vfs:write-file", filePath, content),
     readDirectory: (dirPath) => ipcRenderer.invoke("vfs:read-directory", dirPath),
     stat: (filePath) => ipcRenderer.invoke("vfs:stat", filePath),
+    exists: (filePath) => ipcRenderer.invoke("vfs:exists", filePath),
     mkdir: (dirPath) => ipcRenderer.invoke("vfs:mkdir", dirPath),
     delete: (targetPath, options) => ipcRenderer.invoke("vfs:delete", targetPath, options),
     rename: (oldPath, newPath) => ipcRenderer.invoke("vfs:rename", oldPath, newPath),

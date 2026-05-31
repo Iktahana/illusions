@@ -9,6 +9,7 @@ import { getProjectFileService } from "../services/project-file-service";
 import { getProjectManager } from "./project-manager";
 import { isElectronRenderer } from "../utils/runtime-env";
 import { getDefaultEditorSettings, getDefaultWorkspaceState } from "./project-types";
+import { readTextWithEncoding } from "../utils/text-codec";
 
 import type { VirtualFileSystem, VFSDirectoryHandle } from "../vfs/types";
 import type { ProjectManager } from "./project-manager";
@@ -37,31 +38,6 @@ interface HistoryIndex {
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
-}
-
-/**
- * Options for the file open picker dialog (Web).
- */
-interface FilePickerOptions {
-  types: Array<{
-    description: string;
-    accept: Record<string, string[]>;
-  }>;
-  multiple: boolean;
-}
-
-/**
- * Window interface with showOpenFilePicker for type-safe access.
- */
-interface WindowWithFilePicker {
-  showOpenFilePicker: (options: FilePickerOptions) => Promise<FileSystemFileHandle[]>;
-}
-
-/**
- * Type guard for showOpenFilePicker support.
- */
-function hasShowOpenFilePicker(w: Window): w is Window & WindowWithFilePicker {
-  return "showOpenFilePicker" in w;
 }
 
 /**
@@ -96,6 +72,18 @@ export function validateProjectName(name: string): { valid: boolean; error?: str
 export class ProjectService {
   private vfs: VirtualFileSystem;
   private projectManager: ProjectManager;
+  /**
+   * Per-file EOL cache: key is filePath (Electron) or fileName (Web).
+   * Populated by openStandaloneFile; consumed by writeStandaloneTxtContent.
+   */
+  private fileEolCache = new Map<string, "lf" | "crlf">();
+
+  /**
+   * Decoded text cache: populated by openStandaloneFile so readStandaloneContent
+   * can return already-decoded (BOM-stripped, LF-normalized) content.
+   * Cleared after first read to avoid unbounded growth.
+   */
+  private fileContentCache = new Map<string, string>();
 
   constructor() {
     this.vfs = getProjectFileService();
@@ -206,9 +194,10 @@ export class ProjectService {
       if (parentPath) {
         projectRootPath = `${parentPath}/${name}`;
         if ("setRootPath" in this.vfs) {
-          await (this.vfs as { setRootPath: (p: string) => Promise<void> }).setRootPath(
-            projectRootPath,
-          );
+          // #1476: rehydration — pass projectId for project-scoped approval persistence
+          await (
+            this.vfs as { setRootPath: (p: string, projectId?: string) => Promise<void> }
+          ).setRootPath(projectRootPath, projectId);
         }
       }
     }
@@ -365,8 +354,48 @@ export class ProjectService {
    * @throws Error if file picker is not supported
    */
   async openStandaloneFile(): Promise<StandaloneMode> {
-    // Phase 3: load 経路を削除済み。Phase 8 で新 IO 抽象経由で再構築する。
-    throw new Error("Phase 3 shim: openStandaloneFile is not available");
+    const vfsWithOpenFile = this.vfs as unknown as {
+      openFile?: (opts?: { fileTypes?: string[] }) => Promise<{
+        path: string;
+        name: string;
+        buf: Uint8Array;
+      } | null>;
+    };
+
+    if (typeof vfsWithOpenFile.openFile !== "function") {
+      throw new Error("ファイルを開く機能がこの環境でサポートされていません。");
+    }
+
+    const result = await vfsWithOpenFile.openFile({ fileTypes: ["txt"] });
+    if (!result) {
+      // User cancelled
+      throw new Error("ファイルの選択がキャンセルされました。");
+    }
+
+    // Decode bytes: reject non-UTF-8 BOMs, strip UTF-8 BOM, detect EOL
+    const { text, eol } = readTextWithEncoding(new Uint8Array(result.buf));
+
+    // Cache EOL for write-back
+    const cacheKey = result.path ?? result.name;
+    this.fileEolCache.set(cacheKey, eol);
+
+    const fileExtension = this.getFileExtension(result.name);
+    const editorSettings = getDefaultEditorSettings(fileExtension);
+
+    const standalone: StandaloneMode = {
+      type: "standalone",
+      fileHandle: null,
+      fileName: result.name,
+      fileExtension,
+      editorSettings,
+      filePath: result.path !== result.name ? result.path : undefined,
+    };
+
+    // Store decoded text so readStandaloneContent can return it immediately.
+    // We key by cacheKey to avoid re-reading the file.
+    this.fileContentCache.set(cacheKey, text);
+
+    return standalone;
   }
 
   /**
@@ -438,6 +467,44 @@ export class ProjectService {
    * @returns The file content as text
    */
   async readStandaloneContent(standalone: StandaloneMode): Promise<string> {
+    const cacheKey = standalone.filePath ?? standalone.fileName;
+
+    // Return cached decoded content from openStandaloneFile (BOM-stripped, LF-normalized)
+    const cached = this.fileContentCache.get(cacheKey);
+    if (cached !== undefined) {
+      this.fileContentCache.delete(cacheKey);
+      return cached;
+    }
+
+    // .txt files: decode bytes through text-codec for BOM and EOL handling
+    if (standalone.fileExtension === ".txt") {
+      if (isElectronRenderer() && standalone.filePath) {
+        // Read raw bytes via Electron IPC read-file endpoint
+        const bridge = (
+          window.electronAPI as unknown as {
+            vfs?: { readFileRaw?: (p: string) => Promise<Uint8Array> };
+          }
+        )?.vfs;
+        if (bridge?.readFileRaw) {
+          const buf = await bridge.readFileRaw(standalone.filePath);
+          const { text, eol } = readTextWithEncoding(new Uint8Array(buf));
+          this.fileEolCache.set(cacheKey, eol);
+          return text;
+        }
+        // Fallback: use standard readFile (UTF-8 string path, no BOM stripping)
+        const vfs = getProjectFileService();
+        return vfs.readFile(standalone.filePath);
+      }
+
+      if (standalone.fileHandle) {
+        const file = await standalone.fileHandle.getFile();
+        const arrayBuf = await file.arrayBuffer();
+        const { text, eol } = readTextWithEncoding(new Uint8Array(arrayBuf));
+        this.fileEolCache.set(cacheKey, eol);
+        return text;
+      }
+    }
+
     if (isElectronRenderer() && standalone.filePath) {
       const vfs = getProjectFileService();
       return vfs.readFile(standalone.filePath);
@@ -449,6 +516,18 @@ export class ProjectService {
     }
 
     throw new Error("ファイルの内容を読み込めませんでした。");
+  }
+
+  /**
+   * Get the EOL style detected for a standalone .txt file.
+   * Returns "lf" as default if no EOL was recorded.
+   *
+   * @param standalone - The standalone mode object
+   * @returns "lf" or "crlf"
+   */
+  getStandaloneTxtEol(standalone: StandaloneMode): "lf" | "crlf" {
+    const cacheKey = standalone.filePath ?? standalone.fileName;
+    return this.fileEolCache.get(cacheKey) ?? "lf";
   }
 
   /**
@@ -493,9 +572,10 @@ export class ProjectService {
     if (isElectronRenderer() && project.rootPath) {
       // Re-set the VFS root using the stored absolute path
       if ("setRootPath" in this.vfs) {
-        await (this.vfs as { setRootPath: (p: string) => Promise<void> }).setRootPath(
-          project.rootPath,
-        );
+        // #1476: rehydration — pass projectId so the approval is looked up project-scoped
+        await (
+          this.vfs as { setRootPath: (p: string, projectId?: string) => Promise<void> }
+        ).setRootPath(project.rootPath, project.projectId);
       }
       return await this.vfs.getDirectoryHandle("");
     }

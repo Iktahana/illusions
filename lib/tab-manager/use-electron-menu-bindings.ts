@@ -163,7 +163,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
         try {
           if (isProjectRef.current && tab.file.path) {
             const vfs = getProjectFileService();
-            suppressFileWatch(tab.file.path);
+            suppressFileWatch(tab.file.path, sanitized);
             await vfs.writeFile(tab.file.path, sanitized);
             // B1 fix: window close "保存" → "pre-close" snapshot type
             await tryCreateSnapshotRef.current?.(

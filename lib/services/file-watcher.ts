@@ -45,10 +45,38 @@ const MAX_CONSECUTIVE_FAILURES = 5;
  * ウォッチャーが自身のトリガーによる変更イベントを無視できるようにする。
  * 5分ごとに期限切れエントリを削除し、長時間セッションでのメモリ増大を防止する。
  */
-const saveSuppression = new Map<string, number>();
+interface SuppressionEntry {
+  /** Epoch ms after which this suppression entry is considered expired. */
+  until: number;
+  /**
+   * Hash of the content the application wrote, or null when the caller did not
+   * provide content. A null hash falls back to pure time-window suppression.
+   */
+  hash: string | null;
+}
 
-/** Default suppression duration in milliseconds */
-const SAVE_SUPPRESSION_MS = 3000;
+const saveSuppression = new Map<string, SuppressionEntry>();
+
+/**
+ * Default suppression duration in milliseconds.
+ *
+ * Must comfortably exceed DEFAULT_POLL_INTERVAL_MS: in Electron the renderer
+ * has no native fs.watch (the preload bridge exposes no `watch`), so file
+ * watching always falls back to polling. The poll cycle that observes the
+ * app's own save can land up to one full interval after the write, so a window
+ * shorter than the poll interval would expire before the self-save is seen and
+ * surface a spurious "updated" notification on every save. The companion
+ * content-hash check keeps this longer window from masking genuine external
+ * edits (different content is never suppressed).
+ *
+ * 保存抑制のデフォルト持続時間。DEFAULT_POLL_INTERVAL_MS より十分長くする必要が
+ * ある。Electron renderer にはネイティブ fs.watch が無く（preload bridge が
+ * `watch` を公開していない）、ファイル監視は常にポーリングにフォールバックする。
+ * アプリ自身の保存を検知するポーリングは書き込みから最大1間隔遅れて発火しうるため、
+ * ポーリング間隔より短い窓では自己保存検知前に期限切れとなり、毎回の保存で誤通知が出る。
+ * content-hash 照合により、この長い窓でも真の外部変更（内容が異なる）は抑制しない。
+ */
+const SAVE_SUPPRESSION_MS = DEFAULT_POLL_INTERVAL_MS + 3000;
 
 /** Interval for periodic cleanup of expired suppression entries (5 minutes) */
 const SUPPRESSION_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
@@ -62,8 +90,8 @@ const SUPPRESSION_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
  */
 function cleanupExpiredSuppressions(): void {
   const now = Date.now();
-  for (const [filePath, until] of saveSuppression) {
-    if (now >= until) {
+  for (const [filePath, entry] of saveSuppression) {
+    if (now >= entry.until) {
       saveSuppression.delete(filePath);
     }
   }
@@ -83,26 +111,53 @@ if (typeof suppressionCleanupTimer === "object" && "unref" in suppressionCleanup
  * Call this before saving a file to prevent the watcher
  * from treating the save as an external change.
  *
+ * Pass the exact content being written so the watcher can confirm a detected
+ * change is the app's own save by content hash (timing-independent). When
+ * content is omitted, suppression degrades to a pure time window.
+ *
  * 指定パスのファイル監視通知を一時的に抑制する。
  * ファイル保存前に呼び出し、ウォッチャーが自身の保存を
- * 外部変更として扱うのを防ぐ。
+ * 外部変更として扱うのを防ぐ。書き込む内容を渡すと、検知した変更が
+ * 自身の保存かどうかを content hash で（タイミングに依存せず）確認できる。
+ * content を省略した場合は純粋な時間窓による抑制に縮退する。
  *
  * @param filePath - The file path to suppress notifications for
- * @param durationMs - How long to suppress (default 3000ms)
+ * @param content - The content being written (enables content-hash matching)
+ * @param durationMs - How long to suppress (default SAVE_SUPPRESSION_MS)
  */
 export function suppressFileWatch(
   filePath: string,
+  content?: string,
   durationMs: number = SAVE_SUPPRESSION_MS,
 ): void {
-  saveSuppression.set(filePath, Date.now() + durationMs);
+  saveSuppression.set(filePath, {
+    until: Date.now() + durationMs,
+    hash: content === undefined ? null : hashContent(content),
+  });
 }
 
-function isFileSuppressed(filePath: string): boolean {
-  const until = saveSuppression.get(filePath);
-  if (!until) return false;
-  if (Date.now() < until) return true;
-  saveSuppression.delete(filePath);
-  return false;
+/**
+ * Returns true when a detected change should be treated as the application's own
+ * save rather than an external modification.
+ *
+ * A suppression entry matches when it is unexpired AND either it carries no
+ * content hash (legacy time-only suppression) or the observed content hashes to
+ * the same value the app just wrote. A genuine external change (different
+ * content) within the window is NOT suppressed, so concurrent external edits are
+ * still detected even while a self-save window lingers.
+ *
+ * 検知した変更がアプリ自身の保存とみなせる場合に true を返す。期限内であり、
+ * かつ content hash が無い（時間窓のみ）か観測内容のハッシュが保存内容と一致する
+ * 場合にマッチする。窓内でも内容が異なる真の外部変更は抑制しない。
+ */
+function isSelfSave(filePath: string, content: string): boolean {
+  const entry = saveSuppression.get(filePath);
+  if (!entry) return false;
+  if (Date.now() >= entry.until) {
+    saveSuppression.delete(filePath);
+    return false;
+  }
+  return entry.hash === null || entry.hash === hashContent(content);
 }
 
 // -----------------------------------------------------------------------
@@ -234,15 +289,13 @@ class WebFileWatcher implements FileWatcher {
 
         // Catch-up check: detect changes that occurred while the watcher was paused
         if (previousModified > 0 && this.lastModified > previousModified) {
-          if (!isFileSuppressed(this.path)) {
-            try {
-              const content = await this.vfs.readFile(this.path);
-              if (this._isActive) {
-                this.onChanged(content, this.lastModified);
-              }
-            } catch {
-              // File may have been deleted; normal poll cycle will handle it
+          try {
+            const content = await this.vfs.readFile(this.path);
+            if (this._isActive && !isSelfSave(this.path, content)) {
+              this.onChanged(content, this.lastModified);
             }
+          } catch {
+            // File may have been deleted; normal poll cycle will handle it
           }
         }
       })
@@ -288,8 +341,6 @@ class WebFileWatcher implements FileWatcher {
    * MAX_CONSECUTIVE_FAILURES 回連続で失敗した場合、監視を自動停止する。
    */
   private async checkForChanges(): Promise<void> {
-    const suppressed = isFileSuppressed(this.path);
-
     try {
       const metadata = await this.vfs.getFileMetadata(this.path);
 
@@ -299,9 +350,10 @@ class WebFileWatcher implements FileWatcher {
       if (metadata.lastModified > this.lastModified) {
         this.lastModified = metadata.lastModified;
 
-        // Skip callback if suppressed (app's own save), but still update baseline
-        if (!suppressed) {
-          const content = await this.vfs.readFile(this.path);
+        // Read the new content and skip the callback when it is the app's own
+        // save (content-hash match), but still advance the mtime baseline above.
+        const content = await this.vfs.readFile(this.path);
+        if (!isSelfSave(this.path, content)) {
           this.onChanged(content, metadata.lastModified);
         }
       }
@@ -430,20 +482,18 @@ class ElectronFileWatcher implements FileWatcher {
           this.pausedAt > previousModified &&
           metadata.lastModified === previousModified;
 
-        if (
-          this._isActive &&
-          (mtimeAdvanced || possibleSameSecondChange) &&
-          !isFileSuppressed(this.path)
-        ) {
+        if (this._isActive && (mtimeAdvanced || possibleSameSecondChange)) {
           const content = await this.vfs.readFile(this.path);
           if (this._isActive) {
             const contentHash = hashContent(content);
             const contentChanged = contentHash !== this.lastKnownContentHash;
 
             this.lastKnownModified = metadata.lastModified;
+            this.lastKnownContentHash = contentHash;
 
-            if (mtimeAdvanced || contentChanged) {
-              this.lastKnownContentHash = contentHash;
+            // Skip the callback when the change is the app's own save
+            // (content-hash match) but keep the refreshed baseline above.
+            if ((mtimeAdvanced || contentChanged) && !isSelfSave(this.path, content)) {
               this.onChanged(content, metadata.lastModified);
             }
           }
@@ -545,11 +595,6 @@ class ElectronFileWatcher implements FileWatcher {
    * 権限の取り消しやその他のエラーを適切に処理する。
    */
   private async readAndNotify(): Promise<void> {
-    // Skip if this path was recently saved by the application
-    if (isFileSuppressed(this.path)) {
-      return;
-    }
-
     try {
       const [content, metadata] = await Promise.all([
         this.vfs.readFile(this.path),
@@ -557,8 +602,11 @@ class ElectronFileWatcher implements FileWatcher {
       ]);
       const newHash = hashContent(content);
       this.lastKnownModified = metadata.lastModified;
-      // Skip notification if content hasn't changed (e.g. cloud sync metadata update)
-      if (newHash === this.lastKnownContentHash) {
+      // Skip notification when content is unchanged (e.g. cloud sync metadata
+      // touch) or when the change is the application's own save (content-hash
+      // match). Refresh the baseline hash either way.
+      if (newHash === this.lastKnownContentHash || isSelfSave(this.path, content)) {
+        this.lastKnownContentHash = newHash;
         return;
       }
       this.lastKnownContentHash = newHash;

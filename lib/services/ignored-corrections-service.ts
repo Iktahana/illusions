@@ -11,7 +11,7 @@
 import { getProjectFileService } from "../services/project-file-service";
 import { getStorageService } from "../storage/storage-service";
 import { AsyncMutex } from "../utils/async-mutex";
-import type { VirtualFileSystem } from "../vfs/types";
+import type { VirtualFileSystem, VFSFileHandle } from "../vfs/types";
 import type { IStorageService } from "../storage/storage-types";
 import type { IgnoredCorrection, IgnoredCorrectionsFile } from "../project/project-types";
 
@@ -21,6 +21,19 @@ import type { IgnoredCorrection, IgnoredCorrectionsFile } from "../project/proje
 
 const IGNORED_CORRECTIONS_FILENAME = "ignored-corrections.json";
 const STANDALONE_STORAGE_PREFIX = "illusions-ignored-corrections:";
+
+/**
+ * Returns true when an error signals a missing file across either VFS backend:
+ * a Web File System Access API `DOMException` named "NotFoundError", or an
+ * Electron/Node `ENOENT` error code. Used to treat an absent file as "empty"
+ * rather than a hard failure.
+ */
+function isFileNotFoundError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const name = (err as { name?: unknown }).name;
+  const code = (err as { code?: unknown }).code;
+  return name === "NotFoundError" || code === "ENOENT";
+}
 
 // -----------------------------------------------------------------------
 // Service
@@ -47,19 +60,30 @@ class IgnoredCorrectionsService {
    * Re-throws on JSON corruption or permission errors to prevent data loss.
    */
   async loadIgnoredCorrections(): Promise<IgnoredCorrection[]> {
+    const rootDir = await this.vfs.getDirectoryHandle("");
+    const illusionsDir = await rootDir.getDirectoryHandle(".illusions", { create: true });
+
+    let fileHandle: VFSFileHandle;
     try {
-      const rootDir = await this.vfs.getDirectoryHandle("");
-      const illusionsDir = await rootDir.getDirectoryHandle(".illusions", { create: true });
-      const fileHandle = await illusionsDir.getFileHandle(IGNORED_CORRECTIONS_FILENAME);
-      const raw = await fileHandle.read();
-      const data: IgnoredCorrectionsFile = JSON.parse(raw);
-      return data.ignoredCorrections ?? [];
+      fileHandle = await illusionsDir.getFileHandle(IGNORED_CORRECTIONS_FILENAME);
     } catch (err) {
-      // File doesn't exist yet — that's fine
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
-      // JSON corruption or permission error — re-throw to prevent overwriting existing data
+      // Web (File System Access API) throws NotFoundError synchronously from
+      // getFileHandle when the file is absent — before exists() can be consulted.
+      // Electron's VFS only builds a path wrapper here and never throws for a
+      // missing file, so this branch is web-only. Any other error (permission,
+      // etc.) must propagate to avoid masking real failures.
+      if (isFileNotFoundError(err)) return [];
       throw err;
     }
+
+    // Electron path: a missing file only surfaces on access, and the error's
+    // `code` is dropped across the IPC boundary, so a post-read ENOENT check is
+    // unreliable — guard with exists() before reading instead.
+    if (!(await fileHandle.exists())) return [];
+    // JSON corruption or permission errors still propagate to prevent data loss.
+    const raw = await fileHandle.read();
+    const data: IgnoredCorrectionsFile = JSON.parse(raw);
+    return data.ignoredCorrections ?? [];
   }
 
   /**

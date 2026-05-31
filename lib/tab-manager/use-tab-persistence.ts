@@ -229,7 +229,13 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
             tabKind: "editor",
             id: generateTabId(),
             file: {
-              path: absolutePath,
+              // Store the VFS-relative path (same representation the file tree
+              // passes to openProjectFile). Using the absolute path here made a
+              // restored tab's path differ from a tree-opened one for the same
+              // file, so the path-equality dedup missed and the file could be
+              // opened a second time (#1528). Content is still read via the
+              // absolute path above.
+              path: saved.relativePath,
               handle: null,
               name: saved.fileName,
             },

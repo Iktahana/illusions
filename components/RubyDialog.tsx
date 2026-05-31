@@ -76,7 +76,16 @@ export default function RubyDialog({ isOpen, onClose, selectedText, onApply }: R
       setError(null);
 
       try {
-        const nlpClient = getNlpClient();
+        let nlpClient;
+        try {
+          nlpClient = getNlpClient();
+        } catch {
+          if (!cancelled) {
+            setError("日本語解析エンジンの初期化に失敗しました");
+            setIsAnalyzing(false);
+          }
+          return;
+        }
         const tokens = await nlpClient.tokenizeParagraph(selectedText);
 
         if (cancelled) return;
@@ -132,6 +141,14 @@ export default function RubyDialog({ isOpen, onClose, selectedText, onApply }: R
       {error && (
         <div className="bg-error/10 border border-error/30 rounded-lg p-3 mb-4">
           <p className="text-xs text-error">{error}</p>
+          <div className="flex justify-end mt-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-foreground-secondary hover:text-foreground rounded transition-colors"
+            >
+              閉じる
+            </button>
+          </div>
         </div>
       )}
 

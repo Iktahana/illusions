@@ -12,6 +12,15 @@ interface SearchMatch {
   to: number;
 }
 
+// #1507: After tab switch, the parent's editorViewInstance may still
+// reference a destroyed EditorView for a short window before the new
+// editor's view is ready. ProseMirror sets `docView` to null on destroy.
+// Dispatching on a destroyed view routes through Milkdown plugins whose
+// context has been torn down, throwing "Context editorState not found".
+function isEditorViewAlive(view: EditorView | null): view is EditorView {
+  return view !== null && (view as unknown as { docView: unknown }).docView !== null;
+}
+
 interface SearchResultsProps {
   editorView: EditorView | null;
   matches?: SearchMatch[];
@@ -32,15 +41,44 @@ export default function SearchResults({
   const [showReplace, setShowReplace] = useState(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // #1502: Sync incoming props → state during render (React-recommended
+  // "derived state" pattern). useState only reads the initializer on mount,
+  // so without this an already-mounted SearchResults silently ignores props
+  // pushed by SearchDialog's "すべての検索結果を表示" button. Using render-time
+  // detection (vs useEffect) avoids the extra-render flush delay that breaks
+  // jsdom tests and trips React 18+ act() expectations.
+  const [lastInitialSearchTerm, setLastInitialSearchTerm] = useState(initialSearchTerm);
+  if (initialSearchTerm !== lastInitialSearchTerm) {
+    setLastInitialSearchTerm(initialSearchTerm);
+    if (initialSearchTerm !== undefined) {
+      setSearchTerm(initialSearchTerm);
+    }
+  }
+
+  const [lastInitialMatches, setLastInitialMatches] = useState(initialMatches);
+  if (initialMatches !== lastInitialMatches) {
+    setLastInitialMatches(initialMatches);
+    if (initialMatches !== undefined) {
+      setMatches(initialMatches);
+    }
+  }
+
   // 文書内の一致箇所を検索する
   useEffect(() => {
-    if (!editorView || !searchTerm) {
+    // #1502: when there's no editor, leave matches as-is so prop-sourced
+    // initialMatches survive. Local recompute only runs against a real editor.
+    // #1507: also guard against destroyed views during tab switch.
+    if (!isEditorViewAlive(editorView)) {
+      return;
+    }
+    if (!searchTerm) {
       setMatches([]);
-      // Clear highlights
-      if (editorView) {
+      try {
         const { state, dispatch } = editorView;
         const tr = state.tr.setMeta("searchDecorations", []);
         dispatch(tr);
+      } catch {
+        // Best-effort cleanup — view may have been destroyed mid-dispatch.
       }
       return;
     }
@@ -91,8 +129,12 @@ export default function SearchResults({
         class: "search-result",
       }),
     );
-    const tr = state.tr.setMeta("searchDecorations", decorations);
-    dispatch(tr);
+    try {
+      const tr = state.tr.setMeta("searchDecorations", decorations);
+      dispatch(tr);
+    } catch {
+      // #1507: view torn down mid-search — decorations go with it.
+    }
   }, [searchTerm, caseSensitive, editorView]);
   // Get context text for match
   const getMatchContext = useCallback(
@@ -129,7 +171,7 @@ export default function SearchResults({
   // Jump to specified match and highlight
   const goToMatch = useCallback(
     (match: SearchMatch, index: number) => {
-      if (!editorView) return;
+      if (!isEditorViewAlive(editorView)) return;
 
       const { state, dispatch } = editorView;
 
@@ -159,7 +201,7 @@ export default function SearchResults({
   // Replace single match
   const replaceMatch = useCallback(
     (match: SearchMatch) => {
-      if (!editorView) return;
+      if (!isEditorViewAlive(editorView)) return;
 
       const { state, dispatch } = editorView;
       const tr = state.tr.replaceWith(match.from, match.to, state.schema.text(replaceTerm));
@@ -176,7 +218,7 @@ export default function SearchResults({
 
   // Replace all matches
   const replaceAllMatches = useCallback(() => {
-    if (!editorView || matches.length === 0) return;
+    if (!isEditorViewAlive(editorView) || matches.length === 0) return;
 
     const { state, dispatch } = editorView;
     let tr = state.tr;
@@ -311,9 +353,29 @@ export default function SearchResults({
                       <button onClick={() => goToMatch(match, index)} className="w-full text-left">
                         <p className="text-sm text-foreground break-words">
                           <span className="text-foreground-secondary">{context.before}</span>
-                          <span className="bg-accent-light text-accent font-semibold px-1 rounded">
-                            {context.text}
-                          </span>
+                          {showReplace && replaceTerm ? (
+                            // #1502: VSCode-style replace preview (strikethrough + red old,
+                            // green new). Only when replaceTerm is non-empty; preserves the
+                            // plain highlight rendering otherwise.
+                            <>
+                              <span
+                                className="line-through bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-1 rounded"
+                                data-testid="replace-preview-old"
+                              >
+                                {context.text}
+                              </span>
+                              <span
+                                className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 font-semibold px-1 rounded ml-0.5"
+                                data-testid="replace-preview-new"
+                              >
+                                {replaceTerm}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="bg-accent-light text-accent font-semibold px-1 rounded">
+                              {context.text}
+                            </span>
+                          )}
                           <span className="text-foreground-secondary">{context.after}</span>
                         </p>
                         <p className="text-xs text-foreground-tertiary mt-1">

@@ -87,7 +87,7 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
 
       if (isProjectRef.current && tab.file?.path) {
         const vfs = getProjectFileService();
-        suppressFileWatch(tab.file.path);
+        suppressFileWatch(tab.file.path, sanitized);
         await vfs.writeFile(tab.file.path, sanitized);
         // B1 fix: tab close → "pre-close" snapshot type
         await tryCreateSnapshot("pre-close", tab.file.path, tab.file.name, sanitized);

@@ -3,7 +3,7 @@ title: Lint ルール作成ガイド
 slug: linting-rules
 type: guide
 status: active
-updated: 2026-04-03
+updated: 2026-05-24
 tags:
   - guide
   - linting
@@ -13,7 +13,7 @@ tags:
 
 ## Overview
 
-The illusions linting system provides Japanese text quality analysis with 22+ rules across three levels of complexity. Rules detect issues ranging from simple punctuation errors to stylistic inconsistencies that require morphological analysis or LLM inference.
+The illusions linting system provides Japanese text quality analysis with 21+ rules across three levels of complexity. Rules detect issues ranging from simple punctuation errors to stylistic inconsistencies that require morphological analysis or LLM inference.
 
 **Location:** `lib/linting/`
 
@@ -320,7 +320,7 @@ Many rules skip dialogue text because fictional speech intentionally uses inform
 | `dialogue-punctuation`       | per-paragraph  | Checks punctuation inside dialogue brackets               |
 | `comma-frequency`            | per-paragraph  | Flags excessive comma usage in a single sentence          |
 
-### L2 Rules (7 rules)
+### L2 Rules (6 rules)
 
 | Rule ID                   | Scope          | Description                                           |
 | ------------------------- | -------------- | ----------------------------------------------------- |

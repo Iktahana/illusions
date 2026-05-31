@@ -105,6 +105,16 @@ class WebVFSFileHandle implements VFSFileHandle {
     return this.handle.getFile();
   }
 
+  async exists(): Promise<boolean> {
+    try {
+      await this.handle.getFile();
+      return true;
+    } catch {
+      // NotFoundError — the underlying file was removed after the handle was obtained
+      return false;
+    }
+  }
+
   async read(): Promise<string> {
     const file = await this.handle.getFile();
     return file.text();
@@ -210,6 +220,63 @@ class WebVFSDirectoryHandle implements VFSDirectoryHandle {
  */
 export class WebVFS implements VirtualFileSystem {
   private rootHandle: FileSystemDirectoryHandle | null = null;
+
+  /**
+   * Open a native file picker dialog for a single .txt file.
+   * Returns the file path (or name), display name, and raw bytes.
+   * Use text-codec.ts readTextWithEncoding() to handle BOM and EOL detection.
+   *
+   * @param opts - Optional options including fileTypes (e.g. ["txt"])
+   * @returns Object with path, name, and raw byte buffer, or null if cancelled
+   * @throws Error if File System Access API is not supported
+   */
+  async openFile(opts?: {
+    fileTypes?: string[];
+  }): Promise<{ path: string; name: string; buf: Uint8Array } | null> {
+    if (!("showOpenFilePicker" in window)) {
+      throw new Error(
+        "File System Access API は、このブラウザでサポートされていません。Chrome 86 以降をご使用ください。",
+      );
+    }
+
+    const extensions = opts?.fileTypes?.length ? opts.fileTypes.map((e) => `.${e}`) : [".txt"];
+
+    try {
+      const [fileHandle] = await (
+        window as unknown as {
+          showOpenFilePicker: (options: {
+            types: Array<{ description: string; accept: Record<string, string[]> }>;
+            multiple: boolean;
+          }) => Promise<FileSystemFileHandle[]>;
+        }
+      ).showOpenFilePicker({
+        types: [
+          {
+            description: "テキスト",
+            accept: { "text/plain": extensions },
+          },
+        ],
+        multiple: false,
+      });
+
+      const file = await fileHandle.getFile();
+      const arrayBuffer = await file.arrayBuffer();
+      const buf = new Uint8Array(arrayBuffer);
+
+      return {
+        path: file.name,
+        name: file.name,
+        buf,
+      };
+    } catch (error) {
+      if ((error as { name?: string }).name === "AbortError") {
+        return null;
+      }
+      throw new Error(
+        `ファイルを開けませんでした: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 
   /**
    * Open a directory picker dialog and store the root handle.

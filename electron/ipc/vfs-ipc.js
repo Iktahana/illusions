@@ -13,6 +13,9 @@ const {
   assertPathInsideRoot,
   getWindowsDenyPrefixes,
 } = require("../lib/path-utils");
+// #1476: rehydration — begin
+const { loadApprovals, saveApprovals } = require("../lib/vfs-approvals");
+// #1476: rehydration — end
 
 /** Maximum content size accepted by write-file (same limit as file-ipc.js) */
 const MAX_CONTENT_BYTES = 50 * 1024 * 1024; // 50 MB
@@ -27,6 +30,44 @@ function registerVFSHandlers() {
   const MAX_APPROVED_PATHS = 200;
   /** @type {Map<number, Map<string, true>>} webContentsId -> (path -> true) LRU map */
   const dialogApprovedPaths = new Map();
+
+  // #1476: rehydration — begin
+  /**
+   * Path to the persistent approved-vfs-paths.json file stored in userData.
+   * @type {string}
+   */
+  const APPROVED_PATHS_FILE = path.join(app.getPath("userData"), "approved-vfs-paths.json");
+
+  /**
+   * Maps senderId (webContents.id) → projectId.
+   * Populated by the `vfs:set-root` handler so that `approveDialogPath` can
+   * associate approvals with the correct project.
+   * @type {Map<number, string>}
+   */
+  const senderProjectId = new Map();
+
+  /**
+   * Debounce timer for persisting approvals to disk.
+   * Prevents repeated rapid writes during bulk approval.
+   * @type {NodeJS.Timeout | null}
+   */
+  let saveDebounceTimer = null;
+
+  /**
+   * Debounced wrapper for saveApprovals — flushes after 500 ms of inactivity.
+   * @param {string} projectId
+   * @param {Set<string>} paths
+   */
+  function scheduleSaveApprovals(projectId, paths) {
+    if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = setTimeout(() => {
+      saveDebounceTimer = null;
+      saveApprovals(APPROVED_PATHS_FILE, projectId, paths).catch((err) => {
+        console.error("[VFS IPC] Failed to persist approved paths:", err);
+      });
+    }, 500);
+  }
+  // #1476: rehydration — end
 
   /**
    * Get or create the per-window LRU path map for a given webContentsId.
@@ -198,6 +239,24 @@ function registerVFSHandlers() {
     }
   });
 
+  // Check whether a path exists without throwing on ENOENT.
+  // Returns false for missing paths; re-throws genuine errors (e.g. EACCES)
+  // so real problems stay visible. Use this for existence checks instead of
+  // relying on stat/readFile rejections, which Electron logs as handler errors.
+  ipcMain.handle("vfs:exists", async (event, filePath) => {
+    try {
+      const resolved = validateVFSPath(event, filePath);
+      await fs.stat(resolved);
+      return true;
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        return false;
+      }
+      console.error("[VFS IPC] exists failed:", error);
+      throw error;
+    }
+  });
+
   // Create directory (with parents)
   ipcMain.handle("vfs:mkdir", async (event, dirPath) => {
     try {
@@ -302,7 +361,8 @@ function registerVFSHandlers() {
   }
 
   // Set root directory programmatically (for restoring a recent project without dialog)
-  ipcMain.handle("vfs:set-root", async (event, rootPath) => {
+  // #1476: rehydration — extended to accept projectId for project-scoped approval persistence
+  ipcMain.handle("vfs:set-root", async (event, rootPath, projectId) => {
     const resolved = path.resolve(rootPath);
     const normalizedResolved = normalizePath(resolved);
 
@@ -312,10 +372,17 @@ function registerVFSHandlers() {
     }
 
     // 2. Verify the path actually exists and is a directory
+    let resolvedReal;
     try {
       const stats = await fs.stat(resolved);
       if (!stats.isDirectory()) {
         throw new Error("指定されたパスはディレクトリではありません");
+      }
+      // #1476: rehydration — resolve symlinks to mitigate path-traversal via symlink
+      try {
+        resolvedReal = normalizePath(await fs.realpath(resolved));
+      } catch {
+        resolvedReal = normalizedResolved;
       }
     } catch (error) {
       if (error.code === "ENOENT") {
@@ -324,13 +391,33 @@ function registerVFSHandlers() {
       throw error;
     }
 
-    // 3. Require dialog approval — renderer cannot promote arbitrary paths
-    //    to VFS root without prior native dialog consent.
-    //    If the path was not previously approved (e.g. after app restart),
-    //    prompt the user with a native directory dialog for confirmation.
-    //    This prevents a compromised renderer from escalating an arbitrary
-    //    path to an allowed root (fixes security issue #1043).
-    if (!dialogApprovedPaths.get(event.sender.id)?.has(resolved)) {
+    // 3. Register projectId association for this sender
+    // #1476: rehydration — store projectId so approvals can be project-scoped
+    if (typeof projectId === "string" && projectId) {
+      senderProjectId.set(event.sender.id, projectId);
+    }
+    const effectiveProjectId = senderProjectId.get(event.sender.id);
+
+    // 4. Check approval: in-session dialog approval OR persisted project approval
+    // #1476: rehydration — load persisted approvals so re-prompting is skipped on restart
+    const alreadyApprovedInSession = dialogApprovedPaths.get(event.sender.id)?.has(resolved);
+    let alreadyApprovedFromDisk = false;
+    if (!alreadyApprovedInSession && effectiveProjectId) {
+      const persistedSet = await loadApprovals(APPROVED_PATHS_FILE, effectiveProjectId);
+      alreadyApprovedFromDisk = persistedSet.has(resolvedReal) || persistedSet.has(resolved);
+      if (alreadyApprovedFromDisk) {
+        // Restore in-session approval so subsequent calls are fast
+        approveDialogPath(event.sender.id, resolved);
+      }
+    }
+
+    if (!alreadyApprovedInSession && !alreadyApprovedFromDisk) {
+      // 5. Require dialog approval — renderer cannot promote arbitrary paths
+      //    to VFS root without prior native dialog consent.
+      //    If the path was not previously approved (e.g. after app restart),
+      //    prompt the user with a native directory dialog for confirmation.
+      //    This prevents a compromised renderer from escalating an arbitrary
+      //    path to an allowed root (fixes security issue #1043).
       const win = BrowserWindow.fromWebContents(event.sender);
       const result = await dialog.showOpenDialog(win ?? undefined, {
         title: "プロジェクトフォルダへのアクセスを許可",
@@ -350,18 +437,47 @@ function registerVFSHandlers() {
       }
 
       approveDialogPath(event.sender.id, confirmedPath);
+
+      // #1476: rehydration — persist the newly approved path so restart skips the dialog
+      if (effectiveProjectId) {
+        const windowPaths = dialogApprovedPaths.get(event.sender.id);
+        const pathsToSave = new Set(windowPaths ? [...windowPaths.keys()] : [confirmedPath]);
+        scheduleSaveApprovals(effectiveProjectId, pathsToSave);
+      }
     }
 
     allowedRoots.set(event.sender.id, resolved);
     return { path: resolved, name: path.basename(resolved) };
   });
 
-  // Clean up allowedRoots and dialogApprovedPaths when a window is destroyed to prevent memory leaks
+  // Clean up allowedRoots, dialogApprovedPaths, and senderProjectId when a window is destroyed
   app.on("web-contents-created", (_, contents) => {
     contents.on("destroyed", () => {
       allowedRoots.delete(contents.id);
       dialogApprovedPaths.delete(contents.id);
+      // #1476: rehydration — clean up projectId association
+      senderProjectId.delete(contents.id);
     });
+  });
+
+  // Open a single file via native file dialog
+  // Returns { path, name, buf } where buf is the raw file bytes (Buffer).
+  // The caller is responsible for decoding (e.g., via text-codec.ts).
+  ipcMain.handle("vfs:open-file", async (event, opts) => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openFile"],
+      filters: opts?.filters ?? [{ name: "テキスト", extensions: ["txt"] }],
+    });
+
+    if (result.canceled || !result.filePaths[0]) {
+      return null;
+    }
+
+    const filePath = result.filePaths[0];
+    // R2: approveDialogPath requires 2-arg (senderId, path) signature
+    approveDialogPath(event.sender.id, filePath);
+    const buf = await fs.readFile(filePath);
+    return { path: filePath, name: path.basename(filePath), buf };
   });
 
   // ---------------------------------------------------------------------------

@@ -28,6 +28,10 @@ import { basename, dirname, joinPath } from "./path-utils";
 interface ElectronVFSBridge {
   /** Open a native directory picker dialog */
   openDirectory: () => Promise<{ path: string; name: string } | null>;
+  /** Open a native file picker dialog; returns path, name, and raw bytes */
+  openFile: (opts?: {
+    filters?: Array<{ name: string; extensions: string[] }>;
+  }) => Promise<{ path: string; name: string; buf: Uint8Array } | null>;
   /** Read file content as UTF-8 text */
   readFile: (filePath: string) => Promise<string>;
   /** Write UTF-8 text content to a file */
@@ -36,6 +40,8 @@ interface ElectronVFSBridge {
   readDirectory: (dirPath: string) => Promise<Array<{ name: string; kind: "file" | "directory" }>>;
   /** Get file stats */
   stat: (filePath: string) => Promise<{ size: number; lastModified: number; type: string }>;
+  /** Check whether a path exists without throwing on ENOENT */
+  exists: (filePath: string) => Promise<boolean>;
   /** Create a directory (with parents) */
   mkdir: (dirPath: string) => Promise<void>;
   /** Delete a file or directory */
@@ -102,6 +108,11 @@ class ElectronVFSFileHandle implements VFSFileHandle {
     });
   }
 
+  async exists(): Promise<boolean> {
+    const bridge = getVFSBridge();
+    return bridge.exists(this.absolutePath);
+  }
+
   async read(): Promise<string> {
     const bridge = getVFSBridge();
     return bridge.readFile(this.absolutePath);
@@ -137,12 +148,11 @@ class ElectronVFSDirectoryHandle implements VFSDirectoryHandle {
     const relPath = this.path ? joinPath(this.path, name) : name;
 
     if (options?.create) {
-      // Ensure the parent directory exists, then write an empty file if needed
+      // Ensure the parent directory exists, then write an empty file if needed.
+      // Use a non-throwing existence check so Electron does not log the expected
+      // ENOENT as a handler error on first creation.
       const bridge = getVFSBridge();
-      try {
-        await bridge.stat(filePath);
-      } catch {
-        // File does not exist, create it
+      if (!(await bridge.exists(filePath))) {
         await bridge.writeFile(filePath, "");
       }
     }
@@ -202,6 +212,38 @@ class ElectronVFSDirectoryHandle implements VFSDirectoryHandle {
  */
 export class ElectronVFS implements VirtualFileSystem {
   private rootPath: string | null = null;
+
+  /**
+   * Open a native file picker dialog for a single file.
+   * Returns the file path, name, and raw bytes so the caller can decode.
+   * Use text-codec.ts readTextWithEncoding() to handle BOM and EOL detection.
+   *
+   * @param opts - Optional dialog options including file type filters
+   * @returns Object with path, name, and raw byte buffer, or null if cancelled
+   * @throws Error if the Electron VFS API is not available
+   */
+  async openFile(opts?: {
+    fileTypes?: string[];
+  }): Promise<{ path: string; name: string; buf: Uint8Array } | null> {
+    const bridge = getVFSBridge();
+    const filters =
+      opts?.fileTypes && opts.fileTypes.length > 0
+        ? [{ name: "テキスト", extensions: opts.fileTypes }]
+        : [{ name: "テキスト", extensions: ["txt"] }];
+
+    const result = await bridge.openFile({ filters });
+    if (!result) return null;
+
+    // Bridge may return a plain object from IPC serialization; ensure Uint8Array
+    return {
+      path: result.path,
+      name: result.name,
+      buf:
+        result.buf instanceof Uint8Array
+          ? result.buf
+          : new Uint8Array(Object.values(result.buf as Record<string, number>)),
+    };
+  }
 
   /**
    * Open a native directory picker dialog.
@@ -371,14 +413,19 @@ export class ElectronVFS implements VirtualFileSystem {
    * Used for recovering VFS root after page reload (Electron).
    * Also updates the main process allowed root for path validation.
    * @param rootPath - Absolute path to the project root directory
+   * @param projectId - Optional project ID for project-scoped approval persistence (#1476)
    */
-  async setRootPath(rootPath: string): Promise<void> {
+  async setRootPath(rootPath: string, projectId?: string): Promise<void> {
     // Await the main process root update before updating local state,
     // so this.rootPath is never set to a value the main process rejected.
     try {
       const bridge = getVFSBridge();
       if ("setRoot" in bridge) {
-        await (bridge as { setRoot: (p: string) => Promise<unknown> }).setRoot(rootPath);
+        // #1476: rehydration — pass projectId for project-scoped persistence
+        await (bridge as { setRoot: (p: string, projectId?: string) => Promise<unknown> }).setRoot(
+          rootPath,
+          projectId,
+        );
       }
     } catch (error: unknown) {
       // Bridge may not be available during early initialization — that's expected.
