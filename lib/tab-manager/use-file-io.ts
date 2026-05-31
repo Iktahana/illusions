@@ -16,6 +16,7 @@ import { suppressFileWatch } from "../services/file-watcher";
 import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import { generateTabId, inferFileType, sanitizeMdiContent, getErrorMessage } from "./types";
+import { isEditableExtension, resolveNativePath } from "./open-with-default-app";
 import type { TabManagerCore } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -540,6 +541,28 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         return;
       }
       openingPathsRef.current.set(vfsPath, preview);
+
+      // Unsupported extensions open with the OS default app instead of the editor.
+      // The editor only handles .mdi / .md / .txt; anything else (e.g. .docx, .pdf,
+      // .gdoc) is delegated to shell.openPath via the open-with-default-app IPC.
+      const baseName = vfsPath.split("/").pop() || vfsPath;
+      if (!isEditableExtension(vfsPath) && window.electronAPI?.openWithDefaultApp) {
+        const rootPath = getProjectFileService().getRootPath?.() ?? null;
+        const nativePath = resolveNativePath(vfsPath, rootPath);
+        if (nativePath) {
+          try {
+            const opened = await window.electronAPI.openWithDefaultApp(nativePath);
+            if (opened) {
+              notificationManager.info(`${baseName} をシステムのデフォルトアプリで開きます`);
+            } else {
+              notificationManager.error(`ファイルを開けませんでした: ${baseName}`);
+            }
+          } finally {
+            openingPathsRef.current.delete(vfsPath);
+          }
+          return;
+        }
+      }
 
       try {
         // Read file from VFS
