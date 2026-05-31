@@ -24,7 +24,6 @@ import type {
   SimplifiedGroupLayout,
 } from "./types";
 import type { WorkspaceDockviewLayout } from "@/lib/project/project-types";
-import { toAbsolutePath } from "@/lib/project/workspace-persistence";
 import { loadDockviewLayout } from "./use-dockview-persistence";
 
 // ---------------------------------------------------------------------------
@@ -146,50 +145,43 @@ function applySimplifiedLayout(
   // Track a representative panel per created group to apply sizes afterward
   const groupRepresentatives: Array<IDockviewPanel | null> = [null]; // index 0 = original group
 
+  // The original (default) group holds all panels at this point. Capture it as
+  // the stable reference for every split so the new groups are siblings of it.
+  const referenceGroup = api.groups[0];
+
   for (let i = 1; i < layout.groups.length; i++) {
     const savedGroup = layout.groups[i];
-    // In dockview, HORIZONTAL orientation = root axis is horizontal = panels side-by-side
-    // (left-right split); VERTICAL = panels stacked top-bottom. So a saved HORIZONTAL
-    // layout must be reconstructed with direction "right", not "bottom".
-    const direction = layout.orientation === "HORIZONTAL" ? "right" : "bottom";
+    // addGroup() orthogonalizes the root grid for the requested direction, so a
+    // saved HORIZONTAL (side-by-side) layout reliably becomes a left-right split.
+    // A raw moveTo() from the single default group is orientation-ambiguous —
+    // getLocationOrientation([]) returns the *orthogonal* of the root orientation,
+    // which made both "right" and "bottom" collapse to a top-bottom split (#1527).
+    const direction: "right" | "below" = layout.orientation === "HORIZONTAL" ? "right" : "below";
 
-    let firstPanelInGroup: IDockviewPanel | null = null;
-
+    // Resolve this group's panels (already added to the default group by the sync effect).
+    const panels: IDockviewPanel[] = [];
     for (const savedKey of savedGroup.tabPaths) {
       if (!savedKey) continue;
       const panelId = panelIdByKey.get(savedKey);
       if (!panelId) continue;
       const panel = api.getPanel(panelId);
-      if (!panel) continue;
+      if (panel) panels.push(panel);
+    }
+    if (panels.length === 0) {
+      groupRepresentatives.push(null);
+      continue;
+    }
 
-      if (!firstPanelInGroup) {
-        // First panel in this group: split to create a new group
-        try {
-          // Find a reference panel that's still in the default group
-          const refPanel =
-            api.panels.find((p) => p.id !== panelId && p.group !== panel.group) ?? api.panels[0];
-          if (refPanel && refPanel.id !== panelId) {
-            panel.api.moveTo({
-              group: refPanel.group,
-              position: direction,
-            });
-          }
-          firstPanelInGroup = panel;
-        } catch {
-          // Move failed; skip this group
-          break;
-        }
-      } else {
-        // Subsequent panels: move into the same group as the first panel
-        try {
-          panel.api.moveTo({
-            group: firstPanelInGroup.group,
-            position: "center",
-          });
-        } catch {
-          // Move failed; panel stays where it is
-        }
+    let firstPanelInGroup: IDockviewPanel | null = null;
+    try {
+      // Create a new group in the saved direction, then move this group's panels into it.
+      const newGroup = api.addGroup({ direction, referenceGroup });
+      for (const panel of panels) {
+        panel.api.moveTo({ group: newGroup, position: "center" });
       }
+      firstPanelInGroup = panels[0];
+    } catch {
+      // Reconstruction failed; leave panels in the default group.
     }
 
     groupRepresentatives.push(firstPanelInGroup);
@@ -368,18 +360,21 @@ export function useDockviewAdapter({
   useEffect(() => {
     if (layoutAppliedRef.current) return;
 
-    // Project mode: use workspace.json layout (convert relative → absolute paths)
+    // Project mode: use workspace.json layout as-is. Both the saved tabPaths and
+    // a restored tab's file.path are now VFS-relative (#1532), so the layout's
+    // stable keys match the tabs' stable keys WITHOUT converting to absolute.
+    // Converting to absolute here (as before #1532) made the keys mismatch, so no
+    // panels were found and the split layout collapsed to a single group (#1527).
     if (projectLayout && projectLayout.groups.length > 1) {
-      const rootPath = windowKey ?? null;
-      const absoluteLayout: SimplifiedGroupLayout = {
+      const relativeLayout: SimplifiedGroupLayout = {
         groups: projectLayout.groups.map((g) => ({
-          tabPaths: g.tabPaths.map((p) => (p ? toAbsolutePath(p, rootPath) : null)),
-          activeTabPath: g.activeTabPath ? toAbsolutePath(g.activeTabPath, rootPath) : null,
+          tabPaths: g.tabPaths,
+          activeTabPath: g.activeTabPath,
         })),
         orientation: projectLayout.orientation,
         sizes: projectLayout.sizes,
       };
-      savedLayoutRef.current = absoluteLayout;
+      savedLayoutRef.current = relativeLayout;
       setLayoutReadyTick((t) => t + 1);
       return;
     }
