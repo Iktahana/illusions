@@ -47,7 +47,7 @@
     "browserify-zlib": "^0.2.0",
     "buffer": "^6.0.3",
     "dockview-react": "^5.2.0",
-    "docx": "^9.6.1",
+    "docx": "^9.7.0",
     "electron-log": "^5.4.4",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.8.3",
