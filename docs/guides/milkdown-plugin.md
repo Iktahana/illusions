@@ -3,7 +3,7 @@ title: Milkdown プラグイン開発
 slug: milkdown-plugin
 type: guide
 status: active
-updated: 2026-04-03
+updated: 2026-05-31
 tags:
   - guide
   - milkdown
@@ -60,13 +60,14 @@ Editor.make()
 
 現行のカスタム schema / node は次のとおりです。
 
-| ノード           | ファイル                  | 役割                   |
-| ---------------- | ------------------------- | ---------------------- |
-| `ruby`           | `nodes/ruby.ts`           | `{親文字\|ルビ}`       |
-| `tcy`            | `nodes/tcy.ts`            | `^12^` のような縦中横  |
-| `nobreak`        | `nodes/nobreak.ts`        | `[[no-break:...]]`     |
-| `kern`           | `nodes/kern.ts`           | `[[kern:0.2em:...]]`   |
-| `heading-anchor` | `nodes/heading-anchor.ts` | 見出しアンカー用ノード |
+| ノード           | ファイル                   | 役割                                       |
+| ---------------- | -------------------------- | ------------------------------------------ |
+| `ruby`           | `nodes/ruby.ts`            | `{親文字\|ルビ}`                           |
+| `tcy`            | `nodes/tcy.ts`             | `^12^` のような縦中横                      |
+| `nobreak`        | `nodes/nobreak.ts`         | `[[no-break:...]]`                         |
+| `kern`           | `nodes/kern.ts`            | `[[kern:0.2em:...]]`                       |
+| `heading-anchor` | `nodes/heading-anchor.ts`  | 見出しアンカー用ノード                     |
+| `blankParagraph` | `nodes/blank-paragraph.ts` | `[[blank]]`（強制空段落、round-trip 対応） |
 
 ### 構文パーサ
 
@@ -77,6 +78,7 @@ remark 側の構文プラグインは [`syntax.ts`](../../packages/milkdown-plug
 - `remarkNoBreakPlugin`
 - `remarkKernPlugin`
 - `remarkHeadingAnchorPlugin`
+- `remarkMdiBlankPlugin`（`[[blank]]` のみの段落を `blankParagraph` ノードへ変換）
 
 以前の文書で触れていた `paragraph-id-fixer` は、現在の package 構成には存在しません。
 

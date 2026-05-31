@@ -291,7 +291,8 @@ br.mdi-break {
 
 - 内部表現であり、ユーザーが直接入力するマーカーではない
 - **`.mdi` モードのみ有効**（`.md` ファイルでは Step 1a を無効化し `<br />` は単純に改行へ変換される）
-- 生成元は **paste / import / 外部書き込み のみ**。ProseMirror エディタでの Enter 連打で作った空段落は CommonMark serializer により blank line へ collapse されるため `[[blank]]` は emit されない
+- 生成元は **paste / import / 外部書き込み**、および `.mdi` ファイルから読み込んだ既存の `[[blank]]`。ProseMirror エディタでの Enter 連打で作った空段落は CommonMark serializer により blank line へ collapse されるため `[[blank]]` は emit されない
+- エディタ上では専用の `blankParagraph` ノード（`<p class="mdi-blank">`）として描画され、通常の段落と同様に編集できる（クリックして入力するとそのまま本文段落になる）。内容が空のまま保存すると `[[blank]]` マーカーへ round-trip し、文字を入力した場合は通常段落として保存される
 - エクスポート時: TXT → 空行、HTML → `<p></p>`、DOCX → 空段落
 - ユーザーが `[[blank]]` をリテラル文字列として入力した場合は空白段落として解釈される（bracket macro 全般の既知 escape 制限と同様）
 - **既知の限界**: fenced code block (` ``` `) 内の単独 `[[blank]]` は exporter (txt/html/docx) で空段落に変換される。引用ブロック (`> ...`) 内の `[[blank]]` は行頭マッチ条件 (`/^\[\[blank\]\][ \t]*\r?$/m`) を満たさないためリテラル文字列として保持される。これは既存 `[[br]]` の exporter ハンドリング (§6.1) と同じクラスの制約
@@ -305,7 +306,7 @@ br.mdi-break {
 | `Enter`          | 新しい段落（換段）             | 空行 (`\n\n`) | `paragraph`（別）  |
 | `Shift+Enter`    | CommonMark hardbreak（段落内） | `  \n`        | `hardbreak`        |
 | `[[br]]` 入力    | MDI 改行マーカー（段落内）     | `[[br]]`      | `mdibreak`         |
-| `[[blank]]` 保存 | 意図的な空白段落               | `[[blank]]`   | `paragraph`（空）  |
+| `[[blank]]` 保存 | 意図的な空白段落               | `[[blank]]`   | `blankParagraph`   |
 
 **推奨運用**
 
