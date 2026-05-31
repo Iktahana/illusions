@@ -15,8 +15,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 let mockFileRead = vi.fn<() => Promise<string>>();
 let mockFileWrite = vi.fn<(content: string) => Promise<void>>();
+let mockFileExists = vi.fn<() => Promise<boolean>>();
 
 const mockFileHandle = {
+  exists: () => mockFileExists(),
   read: () => mockFileRead(),
   write: (content: string) => mockFileWrite(content),
 };
@@ -69,6 +71,7 @@ import { getIgnoredCorrectionsService } from "@/lib/services/ignored-corrections
 // ---------------------------------------------------------------------------
 
 function setupVFSWithContent(content: string): void {
+  mockFileExists.mockResolvedValue(true);
   mockFileRead.mockResolvedValue(content);
   mockGetFileHandle.mockResolvedValue(mockFileHandle as unknown as typeof mockFileHandle);
   mockGetIllusionsDirHandle.mockResolvedValue({ getFileHandle: mockGetFileHandle });
@@ -76,8 +79,9 @@ function setupVFSWithContent(content: string): void {
 }
 
 function setupVFSWithENOENT(): void {
-  const err = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-  mockGetFileHandle.mockRejectedValue(err);
+  // Missing file is now signalled by exists() === false, not a thrown ENOENT.
+  mockFileExists.mockResolvedValue(false);
+  mockGetFileHandle.mockResolvedValue(mockFileHandle as unknown as typeof mockFileHandle);
   mockGetIllusionsDirHandle.mockResolvedValue({ getFileHandle: mockGetFileHandle });
   mockVFS.getDirectoryHandle.mockResolvedValue(mockRootHandle as unknown as typeof mockRootHandle);
 }
@@ -94,6 +98,7 @@ describe("IgnoredCorrectionsService — project mode (VFS)", () => {
     mockStorageItems = {};
     mockFileRead = vi.fn();
     mockFileWrite = vi.fn<(content: string) => Promise<void>>().mockResolvedValue(undefined);
+    mockFileExists = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
     mockGetFileHandle = vi.fn();
     mockGetIllusionsDirHandle = vi.fn();
     svc = getIgnoredCorrectionsService();

@@ -47,19 +47,17 @@ class IgnoredCorrectionsService {
    * Re-throws on JSON corruption or permission errors to prevent data loss.
    */
   async loadIgnoredCorrections(): Promise<IgnoredCorrection[]> {
-    try {
-      const rootDir = await this.vfs.getDirectoryHandle("");
-      const illusionsDir = await rootDir.getDirectoryHandle(".illusions", { create: true });
-      const fileHandle = await illusionsDir.getFileHandle(IGNORED_CORRECTIONS_FILENAME);
-      const raw = await fileHandle.read();
-      const data: IgnoredCorrectionsFile = JSON.parse(raw);
-      return data.ignoredCorrections ?? [];
-    } catch (err) {
-      // File doesn't exist yet — that's fine
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
-      // JSON corruption or permission error — re-throw to prevent overwriting existing data
-      throw err;
-    }
+    const rootDir = await this.vfs.getDirectoryHandle("");
+    const illusionsDir = await rootDir.getDirectoryHandle(".illusions", { create: true });
+    const fileHandle = await illusionsDir.getFileHandle(IGNORED_CORRECTIONS_FILENAME);
+    // Check existence first so a missing file does not surface as a thrown
+    // ENOENT. The error's `code` is dropped across the Electron IPC boundary,
+    // so a post-read code check is unreliable — guard before reading instead.
+    if (!(await fileHandle.exists())) return [];
+    // JSON corruption or permission errors still propagate to prevent data loss.
+    const raw = await fileHandle.read();
+    const data: IgnoredCorrectionsFile = JSON.parse(raw);
+    return data.ignoredCorrections ?? [];
   }
 
   /**

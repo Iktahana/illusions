@@ -239,6 +239,24 @@ function registerVFSHandlers() {
     }
   });
 
+  // Check whether a path exists without throwing on ENOENT.
+  // Returns false for missing paths; re-throws genuine errors (e.g. EACCES)
+  // so real problems stay visible. Use this for existence checks instead of
+  // relying on stat/readFile rejections, which Electron logs as handler errors.
+  ipcMain.handle("vfs:exists", async (event, filePath) => {
+    try {
+      const resolved = validateVFSPath(event, filePath);
+      await fs.stat(resolved);
+      return true;
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        return false;
+      }
+      console.error("[VFS IPC] exists failed:", error);
+      throw error;
+    }
+  });
+
   // Create directory (with parents)
   ipcMain.handle("vfs:mkdir", async (event, dirPath) => {
     try {
