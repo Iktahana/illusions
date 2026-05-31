@@ -148,8 +148,10 @@ function applySimplifiedLayout(
 
   for (let i = 1; i < layout.groups.length; i++) {
     const savedGroup = layout.groups[i];
-    // In dockview, HORIZONTAL orientation = horizontal split bar = panels stacked top-bottom
-    const direction = layout.orientation === "HORIZONTAL" ? "bottom" : "right";
+    // In dockview, HORIZONTAL orientation = root axis is horizontal = panels side-by-side
+    // (left-right split); VERTICAL = panels stacked top-bottom. So a saved HORIZONTAL
+    // layout must be reconstructed with direction "right", not "bottom".
+    const direction = layout.orientation === "HORIZONTAL" ? "right" : "bottom";
 
     let firstPanelInGroup: IDockviewPanel | null = null;
 
@@ -197,7 +199,8 @@ function applySimplifiedLayout(
   // Use the total container dimension along the split axis to compute absolute pixel sizes.
   if (layout.sizes && layout.sizes.length > 0) {
     const isHorizontal = layout.orientation === "HORIZONTAL";
-    const totalPx = isHorizontal ? api.height : api.width;
+    // HORIZONTAL (side-by-side) groups vary in width along the split axis; VERTICAL in height.
+    const totalPx = isHorizontal ? api.width : api.height;
     if (totalPx > 0) {
       // Find a representative panel for group 0 (the default/first group)
       const firstGroupKey = layout.groups[0]?.tabPaths[0] ?? null;
@@ -216,7 +219,7 @@ function applySimplifiedLayout(
         const rep = groupRepresentatives[i];
         if (!rep) continue;
         try {
-          rep.group.api.setSize(isHorizontal ? { height: targetPx } : { width: targetPx });
+          rep.group.api.setSize(isHorizontal ? { width: targetPx } : { height: targetPx });
         } catch {
           // setSize may fail if the group is already the right size or no longer exists
         }
