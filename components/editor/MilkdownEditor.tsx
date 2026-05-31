@@ -38,7 +38,8 @@ import {
   getScrollProgress,
   setScrollProgress,
 } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
-import type { RuleRunner, LintIssue } from "@/lib/linting";
+import type { LintIssue } from "@/lib/linting";
+import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import {
   useTypographySettings,
   useLintingSettings,
@@ -54,7 +55,7 @@ interface MilkdownEditorProps {
   isVertical: boolean;
   scrollContainerRef: RefObject<HTMLDivElement | null>;
   onEditorViewReady?: (view: EditorView) => void;
-  lintingRuleRunner?: RuleRunner | null;
+  lintingRuleRunner?: RuleRunnerLike | null;
   onLintIssuesUpdated?: (issues: LintIssue[]) => void;
   onNlpError?: (error: Error) => void;
   onOpenRubyDialog?: () => void;

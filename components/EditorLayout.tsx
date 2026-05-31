@@ -46,7 +46,7 @@ import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import type { ExportMetadata } from "@/lib/export/types";
-import type { RuleRunner } from "@/lib/linting/rule-runner";
+import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import { DockviewReact } from "dockview-react";
 type SidebarPanelSharedProps = Omit<React.ComponentProps<typeof SidebarPanel>, "view">;
 
@@ -163,7 +163,7 @@ interface EditorLayoutProps {
     handleShowAllSearchResults: NonNullable<
       React.ComponentProps<typeof NovelEditor>["onShowAllSearchResults"]
     >;
-    ruleRunner: RuleRunner;
+    ruleRunner: RuleRunnerLike | null;
     handleLintIssuesUpdated: (issues: LintIssue[]) => void;
     handleNlpError: (error: Error) => void;
     handleOpenRubyDialog: () => void;

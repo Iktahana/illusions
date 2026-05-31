@@ -5,19 +5,20 @@
 
 import type { DecorationSet } from "@milkdown/prose/view";
 import type { LintIssue } from "@/lib/linting";
-import type { RuleRunner } from "@/lib/linting";
 import type { INlpClient } from "@/lib/nlp-client/types";
 import type { IgnoredCorrection } from "@/lib/project/project-types";
 import type { ConfigChangeReason } from "@/lib/linting/correction-config";
+import type { RuleRunnerLike } from "./worker/protocol";
 
 export type { ConfigChangeReason };
+export type { RuleRunnerLike };
 
 /**
  * Options for the linting ProseMirror plugin
  */
 export interface LintingPluginOptions {
   enabled: boolean;
-  ruleRunner: RuleRunner | null;
+  ruleRunner: RuleRunnerLike | null;
   nlpClient?: INlpClient | null;
   ignoredCorrections?: IgnoredCorrection[];
   onIssuesUpdated?: (issues: LintIssue[]) => void;
@@ -41,7 +42,7 @@ export interface LintingPluginState {
  */
 export interface LintingSettingsUpdate {
   enabled?: boolean;
-  ruleRunner?: RuleRunner | null;
+  ruleRunner?: RuleRunnerLike | null;
   nlpClient?: INlpClient | null;
   /** @deprecated Use changeReason instead */
   forceFullScan?: boolean;
