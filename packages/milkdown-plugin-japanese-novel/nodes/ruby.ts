@@ -2,7 +2,16 @@
  * Ruby (振仮名) node: <ruby><rb>base</rb><rt>ruby</rt></ruby>
  */
 
+import type { Node } from "@milkdown/prose/model";
 import { $nodeSchema } from "@milkdown/utils";
+
+/**
+ * Returns the searchable text for a ruby node (i.e. the base/rb text).
+ * Used by SearchDialog to make ruby base text discoverable.
+ */
+export function getRubySearchText(node: Node): string {
+  return (node.attrs.base as string) ?? "";
+}
 
 export const rubySchema = $nodeSchema("ruby", () => ({
   group: "inline",

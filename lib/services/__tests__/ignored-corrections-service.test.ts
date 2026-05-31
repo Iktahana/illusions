@@ -15,8 +15,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 let mockFileRead = vi.fn<() => Promise<string>>();
 let mockFileWrite = vi.fn<(content: string) => Promise<void>>();
+let mockFileExists = vi.fn<() => Promise<boolean>>();
 
 const mockFileHandle = {
+  exists: () => mockFileExists(),
   read: () => mockFileRead(),
   write: (content: string) => mockFileWrite(content),
 };
@@ -69,6 +71,7 @@ import { getIgnoredCorrectionsService } from "@/lib/services/ignored-corrections
 // ---------------------------------------------------------------------------
 
 function setupVFSWithContent(content: string): void {
+  mockFileExists.mockResolvedValue(true);
   mockFileRead.mockResolvedValue(content);
   mockGetFileHandle.mockResolvedValue(mockFileHandle as unknown as typeof mockFileHandle);
   mockGetIllusionsDirHandle.mockResolvedValue({ getFileHandle: mockGetFileHandle });
@@ -76,8 +79,22 @@ function setupVFSWithContent(content: string): void {
 }
 
 function setupVFSWithENOENT(): void {
-  const err = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-  mockGetFileHandle.mockRejectedValue(err);
+  // Electron path: getFileHandle resolves a path wrapper and a missing file is
+  // signalled by exists() === false, not a thrown ENOENT.
+  mockFileExists.mockResolvedValue(false);
+  mockGetFileHandle.mockResolvedValue(mockFileHandle as unknown as typeof mockFileHandle);
+  mockGetIllusionsDirHandle.mockResolvedValue({ getFileHandle: mockGetFileHandle });
+  mockVFS.getDirectoryHandle.mockResolvedValue(mockRootHandle as unknown as typeof mockRootHandle);
+}
+
+/**
+ * Web (File System Access API) path: getFileHandle itself rejects when the file
+ * is absent, before exists() can be consulted. `error` defaults to a DOMException
+ * named "NotFoundError" — the real shape thrown by the native FSAA API.
+ */
+function setupVFSWithGetFileHandleReject(error?: unknown): void {
+  const rejection = error ?? Object.assign(new Error("file not found"), { name: "NotFoundError" });
+  mockGetFileHandle.mockRejectedValue(rejection);
   mockGetIllusionsDirHandle.mockResolvedValue({ getFileHandle: mockGetFileHandle });
   mockVFS.getDirectoryHandle.mockResolvedValue(mockRootHandle as unknown as typeof mockRootHandle);
 }
@@ -94,6 +111,7 @@ describe("IgnoredCorrectionsService — project mode (VFS)", () => {
     mockStorageItems = {};
     mockFileRead = vi.fn();
     mockFileWrite = vi.fn<(content: string) => Promise<void>>().mockResolvedValue(undefined);
+    mockFileExists = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
     mockGetFileHandle = vi.fn();
     mockGetIllusionsDirHandle = vi.fn();
     svc = getIgnoredCorrectionsService();
@@ -103,6 +121,27 @@ describe("IgnoredCorrectionsService — project mode (VFS)", () => {
     setupVFSWithENOENT();
     const result = await svc.loadIgnoredCorrections();
     expect(result).toEqual([]);
+  });
+
+  it("loadIgnoredCorrections returns empty array when getFileHandle throws NotFoundError (web)", async () => {
+    // Regression: on the web (FSAA) backend, getFileHandle rejects with a
+    // NotFoundError for a missing file before exists() can run. Must not throw.
+    setupVFSWithGetFileHandleReject();
+    const result = await svc.loadIgnoredCorrections();
+    expect(result).toEqual([]);
+  });
+
+  it("loadIgnoredCorrections returns empty array when getFileHandle throws ENOENT", async () => {
+    setupVFSWithGetFileHandleReject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    const result = await svc.loadIgnoredCorrections();
+    expect(result).toEqual([]);
+  });
+
+  it("loadIgnoredCorrections re-throws non-not-found errors from getFileHandle (e.g. permission)", async () => {
+    setupVFSWithGetFileHandleReject(
+      Object.assign(new Error("permission denied"), { name: "NotAllowedError" }),
+    );
+    await expect(svc.loadIgnoredCorrections()).rejects.toThrow("permission denied");
   });
 
   it("loadIgnoredCorrections parses and returns corrections from VFS", async () => {

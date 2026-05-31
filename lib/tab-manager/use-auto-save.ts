@@ -95,7 +95,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
             const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
             if (isProjectRef.current && tab.file?.path) {
               const vfs = getProjectFileService();
-              suppressFileWatch(tab.file.path);
+              suppressFileWatch(tab.file.path, sanitized);
               await vfs.writeFile(tab.file.path, sanitized);
               if (!mountedRef.current) return;
               setTabs((prev) =>

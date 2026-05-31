@@ -133,9 +133,10 @@ export function useFileOpening({
           try {
             const vfs = getVFS();
             if ("setRootPath" in vfs) {
-              await (vfs as { setRootPath: (p: string) => Promise<void> }).setRootPath(
-                project.rootPath,
-              );
+              // #1476: rehydration — pass projectId so the approval is persisted project-scoped
+              await (
+                vfs as { setRootPath: (p: string, projectId?: string) => Promise<void> }
+              ).setRootPath(project.rootPath, projectId);
             }
             // NOTE: signalVfsReady() is deferred to AFTER tab restore so that the
             // mount-time standalone restore (use-tab-persistence.ts) does not race

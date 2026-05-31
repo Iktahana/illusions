@@ -153,7 +153,9 @@ export default function SearchDialog({
     const foundMatches: SearchMatch[] = [];
     const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
 
-    // Search within each text node using correct ProseMirror positions
+    // Search within each text node and ruby atom using correct ProseMirror positions.
+    // ruby nodes have atom:true so doc.descendants does not recurse into them;
+    // we inspect node.attrs.base directly and emit a decoration for the whole atom.
     doc.descendants((node, pos) => {
       if (node.isText && node.text) {
         const nodeText = caseSensitive ? node.text : node.text.toLowerCase();
@@ -167,6 +169,17 @@ export default function SearchDialog({
           });
           searchIndex = matchIndex + 1;
         }
+        return;
+      }
+      if (node.type.name === "ruby") {
+        const baseRaw = (node.attrs.base as string) ?? "";
+        const baseText = caseSensitive ? baseRaw : baseRaw.toLowerCase();
+        let i = 0;
+        while ((i = baseText.indexOf(searchStr, i)) !== -1) {
+          foundMatches.push({ from: pos, to: pos + node.nodeSize });
+          i += searchStr.length; // advance past matched chars to avoid spurious overlapping matches
+        }
+        return false; // atom — do not recurse into ruby internals
       }
     });
     setMatches(foundMatches);

@@ -64,6 +64,8 @@ export interface VFSFileHandle {
   readonly nativeFileHandle?: FileSystemFileHandle;
   /** Get the underlying File object */
   getFile(): Promise<File>;
+  /** Check whether the file exists on disk without throwing */
+  exists(): Promise<boolean>;
   /** Read file content as UTF-8 text */
   read(): Promise<string>;
   /** Write UTF-8 text content to the file */
