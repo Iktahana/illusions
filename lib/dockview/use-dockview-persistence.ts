@@ -52,14 +52,20 @@ function extractSimplifiedLayout(
     pathByPanelId.set(tab.id, stableKeyForTab(tab, occurrences));
   }
 
-  // Extract orientation from serialized JSON (the API doesn't expose it directly)
+  // Determine orientation from ACTUAL group geometry rather than the private
+  // toJSON().grid.orientation field, whose value proved ambiguous across
+  // dockview versions (#1527). For a side-by-side (left-right) split each group
+  // is narrower than the container but full-height; for a stacked (top-bottom)
+  // split each group is full-width but shorter. Compare how much width vs height
+  // the first group gives up relative to the container.
   let orientation: "HORIZONTAL" | "VERTICAL" = "HORIZONTAL";
-  try {
-    const json = api.toJSON();
-    const rawOrientation = String(json.grid.orientation);
-    orientation = rawOrientation === "VERTICAL" ? "VERTICAL" : "HORIZONTAL";
-  } catch {
-    // Fall back to default
+  if (groups.length >= 2) {
+    const containerW = api.width;
+    const containerH = api.height;
+    const g0 = groups[0].api;
+    const widthGiveUp = containerW - g0.width;
+    const heightGiveUp = containerH - g0.height;
+    orientation = widthGiveUp >= heightGiveUp ? "HORIZONTAL" : "VERTICAL";
   }
 
   const simplifiedGroups: SimplifiedGroupLayout["groups"] = [];
