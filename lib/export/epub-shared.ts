@@ -122,6 +122,7 @@ export function buildEpubFiles(
       chapterCount: chapters.length,
       coverFileName,
       coverMediaType,
+      verticalWriting,
     }),
   );
 
@@ -173,6 +174,7 @@ function generateContentOpf(params: {
   chapterCount: number;
   coverFileName?: string;
   coverMediaType?: string;
+  verticalWriting?: boolean;
 }): string {
   const {
     title,
@@ -184,6 +186,7 @@ function generateContentOpf(params: {
     chapterCount,
     coverFileName,
     coverMediaType,
+    verticalWriting,
   } = params;
 
   const manifestItems: string[] = [
@@ -212,6 +215,12 @@ function generateContentOpf(params: {
     spineItems.push(`    <itemref idref="chapter-${i}"/>`);
   }
 
+  // Japanese vertical writing reads right-to-left, so the page-progression
+  // direction must be rtl. Without this, readers default to ltr and pages
+  // turn in the wrong direction. (Per EPUB 3 spec, the spine attribute — not
+  // the body's writing-mode — controls page turn direction.)
+  const spineDirection = verticalWriting ? ' page-progression-direction="rtl"' : "";
+
   const modifiedTimestamp = new Date().toISOString().replace(/\.\d{3}Z/, "Z");
 
   const metadataLines = [
@@ -232,7 +241,7 @@ ${metadataLines.join("\n")}
   <manifest>
 ${manifestItems.join("\n")}
   </manifest>
-  <spine>
+  <spine${spineDirection}>
 ${spineItems.join("\n")}
   </spine>
 </package>`;
