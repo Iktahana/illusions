@@ -128,6 +128,8 @@ declare global {
       ) => Promise<Array<{ name: string; kind: "file" | "directory" }>>;
       /** Get file stats */
       stat: (filePath: string) => Promise<{ size: number; lastModified: number; type: string }>;
+      /** Check whether a path exists without throwing on ENOENT */
+      exists: (filePath: string) => Promise<boolean>;
       /** Create a directory (recursive) */
       mkdir: (dirPath: string) => Promise<void>;
       /** Delete a file or directory */

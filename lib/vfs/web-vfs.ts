@@ -105,6 +105,16 @@ class WebVFSFileHandle implements VFSFileHandle {
     return this.handle.getFile();
   }
 
+  async exists(): Promise<boolean> {
+    try {
+      await this.handle.getFile();
+      return true;
+    } catch {
+      // NotFoundError — the underlying file was removed after the handle was obtained
+      return false;
+    }
+  }
+
   async read(): Promise<string> {
     const file = await this.handle.getFile();
     return file.text();

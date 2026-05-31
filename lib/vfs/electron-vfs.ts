@@ -40,6 +40,8 @@ interface ElectronVFSBridge {
   readDirectory: (dirPath: string) => Promise<Array<{ name: string; kind: "file" | "directory" }>>;
   /** Get file stats */
   stat: (filePath: string) => Promise<{ size: number; lastModified: number; type: string }>;
+  /** Check whether a path exists without throwing on ENOENT */
+  exists: (filePath: string) => Promise<boolean>;
   /** Create a directory (with parents) */
   mkdir: (dirPath: string) => Promise<void>;
   /** Delete a file or directory */
@@ -106,6 +108,11 @@ class ElectronVFSFileHandle implements VFSFileHandle {
     });
   }
 
+  async exists(): Promise<boolean> {
+    const bridge = getVFSBridge();
+    return bridge.exists(this.absolutePath);
+  }
+
   async read(): Promise<string> {
     const bridge = getVFSBridge();
     return bridge.readFile(this.absolutePath);
@@ -141,12 +148,11 @@ class ElectronVFSDirectoryHandle implements VFSDirectoryHandle {
     const relPath = this.path ? joinPath(this.path, name) : name;
 
     if (options?.create) {
-      // Ensure the parent directory exists, then write an empty file if needed
+      // Ensure the parent directory exists, then write an empty file if needed.
+      // Use a non-throwing existence check so Electron does not log the expected
+      // ENOENT as a handler error on first creation.
       const bridge = getVFSBridge();
-      try {
-        await bridge.stat(filePath);
-      } catch {
-        // File does not exist, create it
+      if (!(await bridge.exists(filePath))) {
         await bridge.writeFile(filePath, "");
       }
     }

@@ -203,6 +203,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     writeFile: (filePath, content) => ipcRenderer.invoke("vfs:write-file", filePath, content),
     readDirectory: (dirPath) => ipcRenderer.invoke("vfs:read-directory", dirPath),
     stat: (filePath) => ipcRenderer.invoke("vfs:stat", filePath),
+    exists: (filePath) => ipcRenderer.invoke("vfs:exists", filePath),
     mkdir: (dirPath) => ipcRenderer.invoke("vfs:mkdir", dirPath),
     delete: (targetPath, options) => ipcRenderer.invoke("vfs:delete", targetPath, options),
     rename: (oldPath, newPath) => ipcRenderer.invoke("vfs:rename", oldPath, newPath),
