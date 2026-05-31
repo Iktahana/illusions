@@ -257,6 +257,19 @@ export function sanitizeMdiContent(
   options?: { fileType?: SupportedFileExtension },
 ): string {
   let result = content;
+  // Step 0 (MDI only): the Milkdown markdown serializer escapes the leading `[`
+  // of MDI bracket macros (`[[blank]]`, `[[br]]`, `[[no-break:…]]`, `[[kern:…]]`)
+  // to `\[`, because CommonMark treats `[` as a link/reference opener. The result
+  // is `\[\[blank]]` on disk instead of `[[blank]]`. Strip those backslashes so
+  // the macros round-trip as authored. Backslashes before `]` are optional too,
+  // in case a serializer config also escapes the closing brackets. Idempotent:
+  // already-clean markers pass through unchanged.
+  if (options?.fileType === ".mdi") {
+    result = result.replace(
+      /\\?\[\\?\[(blank|br|no-break:[^\]\n]*|kern:[^\]\n]*)\\?\]\\?\]/g,
+      "[[$1]]",
+    );
+  }
   // Step 1a (MDI only): standalone <br /> on its own line → [[blank]] marker.
   // Intentionally case-sensitive (lowercase only) — <BR /> falls through to Step 1b.
   // CRLF-safe: allows optional \r before end-of-line.
