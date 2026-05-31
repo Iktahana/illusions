@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   showInFileManager: (dirPath) => ipcRenderer.invoke("show-in-file-manager", dirPath),
   revealInFileManager: (filePath) => ipcRenderer.invoke("reveal-in-file-manager", filePath),
+  openWithDefaultApp: (filePath) => ipcRenderer.invoke("open-with-default-app", filePath),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   onMenuOpenProject: (callback) => {
     const handler = () => callback();
