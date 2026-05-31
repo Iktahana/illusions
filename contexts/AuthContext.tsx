@@ -10,6 +10,11 @@ import React, {
   useMemo,
 } from "react";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import {
+  isElectronAuthErrorPermanent,
+  refreshTokenSingleFlight,
+  resetRefreshState,
+} from "@/lib/auth/refresh-single-flight";
 
 export interface AuthUser {
   id: string;
@@ -147,45 +152,6 @@ async function fetchMe(): Promise<MeResponse> {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Returns whether an error thrown by the Electron auth IPC represents a
- * permanent auth failure (token invalid/revoked) vs a transient error
- * (server unavailable, network issue).
- *
- * The IPC handlers attach `error.status` (HTTP status) and, for the OAuth
- * token endpoint, `error.oauthError` (e.g. `invalid_grant`).
- *
- * Per RFC 6749 §5.2, the token endpoint returns HTTP 400 for client errors
- * such as `invalid_grant` (refresh token expired/revoked). Retrying these
- * cannot succeed, so any 4xx from the auth endpoints must be treated as
- * permanent — otherwise the renderer falls into a tight refresh loop on
- * a revoked token.
- */
-function isElectronAuthErrorPermanent(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-
-  const oauthError = (err as Error & { oauthError?: unknown }).oauthError;
-  if (
-    oauthError === "invalid_grant" ||
-    oauthError === "invalid_client" ||
-    oauthError === "unauthorized_client" ||
-    oauthError === "unsupported_grant_type"
-  ) {
-    return true;
-  }
-
-  if ("status" in err) {
-    const status = (err as Error & { status: unknown }).status;
-    if (typeof status === "number" && status >= 400 && status < 500) return true;
-  }
-  // No status attached (network/IPC error) — treat as transient
-  return false;
-}
-
-// ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
 
@@ -217,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!api?.auth) return;
 
         try {
-          const tokenResponse = await api.auth.refreshToken(refreshToken);
+          const tokenResponse = await refreshTokenSingleFlight(api.auth.refreshToken, refreshToken);
           const newExpiresAt = Date.now() + tokenResponse.expires_in * 1000;
           await saveTokens({
             accessToken: tokenResponse.access_token,
@@ -301,7 +267,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             try {
-              const tokenResponse = await api.auth.refreshToken(refreshToken);
+              const tokenResponse = await refreshTokenSingleFlight(
+                api.auth.refreshToken,
+                refreshToken,
+              );
               const newExpiresAt = Date.now() + tokenResponse.expires_in * 1000;
               await saveTokens({
                 accessToken: tokenResponse.access_token,
@@ -342,7 +311,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               scheduleElectronRefresh(expiresAt, refreshToken);
             } catch {
               try {
-                const tokenResponse = await api.auth.refreshToken(refreshToken);
+                const tokenResponse = await refreshTokenSingleFlight(
+                  api.auth.refreshToken,
+                  refreshToken,
+                );
                 const newExpiresAt = Date.now() + tokenResponse.expires_in * 1000;
                 await saveTokens({
                   accessToken: tokenResponse.access_token,
@@ -421,6 +393,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           state: data.state,
         });
 
+        // Fresh tokens from a successful login clear any prior permanent-failure
+        // latch so the new session can refresh normally.
+        resetRefreshState();
+
         const expiresAt = Date.now() + tokenResponse.expires_in * 1000;
         await saveTokens({
           accessToken: tokenResponse.access_token,
@@ -462,6 +438,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // --- Logout ---
   const logout = useCallback(async () => {
     clearRefreshTimer();
+    // Reset single-flight/permanent-failure state so a subsequent login starts clean.
+    resetRefreshState();
 
     if (isElectron.current) {
       const api = window.electronAPI;
