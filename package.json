@@ -92,7 +92,7 @@
     "@vitest/coverage-v8": "^4.1.8",
     "autoprefixer": "^10.5.0",
     "clsx": "^2.1.1",
-    "concurrently": "^9.2.1",
+    "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
     "dexie": "^4.4.3",
     "diff": "^9.0.0",
