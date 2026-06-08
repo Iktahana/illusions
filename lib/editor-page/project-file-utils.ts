@@ -1,10 +1,15 @@
 import { getDefaultEditorSettings, getDefaultWorkspaceState } from "@/lib/project/project-types";
+import { MAX_SNAPSHOTS, RETENTION_DAYS } from "@/lib/services/history-policy";
 
 import type { ProjectConfig, SupportedFileExtension } from "@/lib/project/project-types";
+import type { HistoryIndex } from "@/lib/services/history-policy";
 import type { VFSDirectoryHandle } from "@/lib/vfs/types";
 
 /** A directory handle that works for both VFS and Web File System Access API */
 export type AnyDirectoryHandle = VFSDirectoryHandle | FileSystemDirectoryHandle;
+
+/** Supported main-file extensions, in detection-priority order. */
+const SUPPORTED_MAIN_EXTENSIONS: readonly SupportedFileExtension[] = [".mdi", ".md", ".txt"];
 
 /** Read text from a file handle (VFS or Web) */
 export async function readFileHandle(handle: {
@@ -16,6 +21,69 @@ export async function readFileHandle(handle: {
   }
   const file = await handle.getFile!();
   return file.text();
+}
+
+/** Write text to a file handle (VFS `write` or Web `createWritable`). */
+async function writeHandleText(
+  handle: { write?: (s: string) => Promise<void> } | FileSystemFileHandle,
+  text: string,
+): Promise<void> {
+  if ("write" in handle && typeof (handle as { write: unknown }).write === "function") {
+    await (handle as { write: (s: string) => Promise<void> }).write(text);
+  } else {
+    const writable = await (handle as FileSystemFileHandle).createWritable();
+    await writable.write(text);
+    await writable.close();
+  }
+}
+
+/**
+ * Returns true if the file handle already holds non-empty content.
+ * A freshly created (empty) handle counts as "missing" so callers can
+ * populate it with defaults.
+ */
+async function fileHasContent(handle: Parameters<typeof readFileHandle>[0]): Promise<boolean> {
+  try {
+    const raw = await readFileHandle(handle);
+    return raw.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** List top-level file (non-directory) entry names in a directory handle. */
+async function listFileNames(dir: AnyDirectoryHandle): Promise<string[]> {
+  const names: string[] = [];
+  const iterable = (
+    dir as { entries: () => AsyncIterable<[string, { kind: "file" | "directory" }]> }
+  ).entries();
+  for await (const [name, entry] of iterable) {
+    if (entry.kind === "file") names.push(name);
+  }
+  return names;
+}
+
+/**
+ * Detect the most likely main file among existing files.
+ * Priority: `${dirName}.<ext>` exact match, then any file by extension priority
+ * (.mdi → .md → .txt). Returns undefined when no supported file exists.
+ */
+function detectMainFile(fileNames: string[], dirName: string): string | undefined {
+  const candidates = fileNames.filter((n) =>
+    SUPPORTED_MAIN_EXTENSIONS.some((ext) => n.toLowerCase().endsWith(ext)),
+  );
+  if (candidates.length === 0) return undefined;
+  // Prefer a file named after the project directory.
+  for (const ext of SUPPORTED_MAIN_EXTENSIONS) {
+    const preferred = `${dirName}${ext}`;
+    if (candidates.includes(preferred)) return preferred;
+  }
+  // Otherwise pick the first candidate by extension priority.
+  for (const ext of SUPPORTED_MAIN_EXTENSIONS) {
+    const found = candidates.find((n) => n.toLowerCase().endsWith(ext));
+    if (found) return found;
+  }
+  return candidates[0];
 }
 
 /**
@@ -52,74 +120,88 @@ export async function readProjectJson(
 }
 
 /**
- * Read or auto-create .illusions/project.json.
- * If .illusions/ or project.json doesn't exist, creates them with sensible defaults.
- * Use this only when creating a new project, not when restoring an existing one.
+ * Ensure the full set of project management files exists, auto-repairing any
+ * that are missing or empty: `.illusions/project.json`, `.illusions/workspace.json`
+ * and `.illusions/history/index.json`.
+ *
+ * Unlike {@link readProjectJson} (read-only) and {@link ensureProjectJson}
+ * (project.json + workspace.json only), this restores a project whose metadata
+ * was lost — e.g. a Google Drive folder that still holds the manuscript but lost
+ * its `project.json`. User content (the manuscript files) is never created here;
+ * only the `.illusions/` management files are regenerated.
+ *
+ * @param rootDirHandle - The project root directory handle.
+ * @param options.projectId - Reuse this id when (re)creating project.json so the
+ *   recent-projects entry and persisted VFS approval stay consistent. Ignored
+ *   when a valid project.json already exists.
+ * @param options.mainFile - Known main file name. When omitted, the main file is
+ *   detected by scanning existing files in the root directory.
+ * @returns The project metadata, the `.illusions` dir handle, and `repaired`
+ *   (true when any file had to be created).
  */
-export async function ensureProjectJson(
+export async function ensureProjectFiles(
   rootDirHandle: AnyDirectoryHandle,
-  mainFile?: string,
-): Promise<{ metadata: ProjectConfig; illusionsDir: AnyDirectoryHandle }> {
+  options?: { projectId?: string; mainFile?: string },
+): Promise<{ metadata: ProjectConfig; illusionsDir: AnyDirectoryHandle; repaired: boolean }> {
+  let repaired = false;
   const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
 
-  // Use { create: true } so getFileHandle never throws ENOENT on the IPC layer.
-  // If the file was just created it will be empty → treat as "does not exist".
+  // --- project.json ---
+  // { create: true } so getFileHandle never throws ENOENT on the IPC layer;
+  // an empty (just-created) file is treated as missing.
   const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
-  let metadataText: string | undefined;
-  try {
+  let metadata: ProjectConfig;
+  if (await fileHasContent(projectJsonHandle as Parameters<typeof readFileHandle>[0])) {
     const raw = await readFileHandle(projectJsonHandle as Parameters<typeof readFileHandle>[0]);
-    if (raw.trim()) metadataText = raw;
-  } catch {
-    // read failed — treat as missing
-  }
-
-  if (metadataText) {
-    return { metadata: JSON.parse(metadataText) as ProjectConfig, illusionsDir };
-  }
-
-  // Auto-create project.json with defaults
-  const dirName = rootDirHandle.name || "Untitled";
-  const ext = (mainFile?.match(/\.\w+$/)?.[0] ?? ".mdi") as SupportedFileExtension;
-  const metadata: ProjectConfig = {
-    version: "1.0.0",
-    projectId: crypto.randomUUID(),
-    name: dirName,
-    mainFile: mainFile ?? `${dirName}${ext}`,
-    mainFileExtension: ext,
-    createdAt: Date.now(),
-    lastModified: Date.now(),
-    editorSettings: getDefaultEditorSettings(ext),
-  };
-
-  // projectJsonHandle already exists (created empty above) — write defaults into it
-  if (
-    "write" in projectJsonHandle &&
-    typeof (projectJsonHandle as { write: unknown }).write === "function"
-  ) {
-    await (projectJsonHandle as { write: (s: string) => Promise<void> }).write(
-      JSON.stringify(metadata, null, 2),
-    );
+    metadata = JSON.parse(raw) as ProjectConfig;
   } else {
-    const writable = await (projectJsonHandle as FileSystemFileHandle).createWritable();
-    await writable.write(JSON.stringify(metadata, null, 2));
-    await writable.close();
+    const dirName = rootDirHandle.name || "Untitled";
+    let mainFile = options?.mainFile;
+    if (!mainFile) {
+      const fileNames = await listFileNames(rootDirHandle);
+      mainFile = detectMainFile(fileNames, dirName);
+    }
+    const ext = (mainFile?.match(/\.\w+$/)?.[0] ?? ".mdi") as SupportedFileExtension;
+    metadata = {
+      version: "1.0.0",
+      projectId: options?.projectId ?? crypto.randomUUID(),
+      name: dirName,
+      mainFile: mainFile ?? `${dirName}${ext}`,
+      mainFileExtension: ext,
+      createdAt: Date.now(),
+      lastModified: Date.now(),
+      editorSettings: getDefaultEditorSettings(ext),
+    };
+    await writeHandleText(projectJsonHandle, JSON.stringify(metadata, null, 2));
+    repaired = true;
+    console.info("[Project] Auto-repaired .illusions/project.json for:", dirName);
   }
 
-  // Also create workspace.json
+  // --- workspace.json ---
+  const wsHandle = await illusionsDir.getFileHandle("workspace.json", { create: true });
+  if (!(await fileHasContent(wsHandle as Parameters<typeof readFileHandle>[0]))) {
+    await writeHandleText(wsHandle, JSON.stringify(getDefaultWorkspaceState(), null, 2));
+    repaired = true;
+    console.info("[Project] Auto-repaired .illusions/workspace.json");
+  }
+
+  // --- history/index.json (best-effort) ---
   try {
-    const wsHandle = await illusionsDir.getFileHandle("workspace.json", { create: true });
-    const wsData = JSON.stringify(getDefaultWorkspaceState(), null, 2);
-    if ("write" in wsHandle && typeof (wsHandle as { write: unknown }).write === "function") {
-      await (wsHandle as { write: (s: string) => Promise<void> }).write(wsData);
-    } else {
-      const writable = await (wsHandle as FileSystemFileHandle).createWritable();
-      await writable.write(wsData);
-      await writable.close();
+    const historyDir = await illusionsDir.getDirectoryHandle("history", { create: true });
+    const indexHandle = await historyDir.getFileHandle("index.json", { create: true });
+    if (!(await fileHasContent(indexHandle as Parameters<typeof readFileHandle>[0]))) {
+      const historyIndex: HistoryIndex = {
+        snapshots: [],
+        maxSnapshots: MAX_SNAPSHOTS,
+        retentionDays: RETENTION_DAYS,
+      };
+      await writeHandleText(indexHandle, JSON.stringify(historyIndex, null, 2));
+      repaired = true;
+      console.info("[Project] Auto-repaired .illusions/history/index.json");
     }
   } catch {
-    // workspace.json creation is best-effort
+    // history reconstruction is best-effort — never block opening the project.
   }
 
-  console.info("[Project] Auto-created .illusions/project.json for:", dirName);
-  return { metadata, illusionsDir };
+  return { metadata, illusionsDir, repaired };
 }

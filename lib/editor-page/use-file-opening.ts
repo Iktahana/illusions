@@ -7,7 +7,7 @@ import { getProjectFileService as getVFS } from "@/lib/services/project-file-ser
 import { notificationManager } from "@/lib/services/notification-manager";
 
 import type { ProjectMode, StandaloneMode, WorkspaceTab } from "@/lib/project/project-types";
-import { ensureProjectJson, readProjectJson, readFileHandle } from "./project-file-utils";
+import { ensureProjectFiles, readFileHandle } from "./project-file-utils";
 
 interface UseFileOpeningParams {
   isElectron: boolean;
@@ -142,23 +142,21 @@ export function useFileOpening({
             // mount-time standalone restore (use-tab-persistence.ts) does not race
             // with the explicit project tab restore.
             const rootDirHandle = await vfs.getDirectoryHandle("");
-            const projectJsonResult = await readProjectJson(rootDirHandle);
-            if (!projectJsonResult) {
-              signalVfsReady();
-              console.error(
-                "Failed to load recent project: .illusions/project.json not found at",
-                project.rootPath,
+            // Auto-repair missing/corrupt .illusions metadata so a recoverable
+            // project (folder present, manuscript intact) opens instead of
+            // silently failing. Reuse the recent-entry projectId so the recent
+            // list and persisted VFS approval stay consistent. If the folder is
+            // gone, setRootPath/getDirectoryHandle above already threw into the
+            // outer catch; if no manuscript exists, getFileHandle(mainFile) below
+            // throws there too — both surface the proper "moved/deleted" dialog.
+            const { metadata, illusionsDir, repaired } = await ensureProjectFiles(rootDirHandle, {
+              projectId,
+            });
+            if (repaired) {
+              notificationManager.info(
+                "プロジェクト設定ファイルが見つからなかったため復元しました。",
               );
-              if (!isAutoRestoringRef.current) {
-                setConfirmRemoveRecent({
-                  projectId,
-                  message: `プロジェクトのメタデータが見つかりませんでした。\n\nパス: ${project.rootPath}\n\n最近のプロジェクト一覧から削除しますか?`,
-                });
-              }
-              return false;
             }
-
-            const { metadata, illusionsDir } = projectJsonResult;
 
             let workspaceState: ProjectMode["workspaceState"];
             try {
@@ -285,7 +283,12 @@ export function useFileOpening({
         }
 
         const rootDirHandle = await vfs.getDirectoryHandle("");
-        const { metadata, illusionsDir } = await ensureProjectJson(rootDirHandle, initialFile);
+        const { metadata, illusionsDir, repaired } = await ensureProjectFiles(rootDirHandle, {
+          mainFile: initialFile,
+        });
+        if (repaired) {
+          notificationManager.info("プロジェクト設定ファイルが見つからなかったため復元しました。");
+        }
 
         let workspaceState: ProjectMode["workspaceState"];
         try {
