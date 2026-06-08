@@ -153,7 +153,9 @@ export function useFileOpening({
               projectId,
             });
             if (repaired) {
-              notificationManager.info("プロジェクト設定ファイルが見つからなかったため復元しました。");
+              notificationManager.info(
+                "プロジェクト設定ファイルが見つからなかったため復元しました。",
+              );
             }
 
             let workspaceState: ProjectMode["workspaceState"];
