@@ -10,6 +10,8 @@ import { getProjectManager } from "./project-manager";
 import { isElectronRenderer } from "../utils/runtime-env";
 import { getDefaultEditorSettings, getDefaultWorkspaceState } from "./project-types";
 import { readTextWithEncoding } from "../utils/text-codec";
+import { ensureProjectFiles } from "../editor-page/project-file-utils";
+import { notificationManager } from "../services/notification-manager";
 
 import type { VirtualFileSystem, VFSDirectoryHandle } from "../vfs/types";
 import type { ProjectManager } from "./project-manager";
@@ -224,41 +226,22 @@ export class ProjectService {
   async openProject(): Promise<ProjectMode> {
     const rootDirHandle = await this.vfs.openDirectory();
 
-    // Read .illusions/project.json — do NOT create; fail clearly if not found.
-    let illusionsDir: Awaited<ReturnType<typeof rootDirHandle.getDirectoryHandle>>;
-    try {
-      illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: false });
-    } catch {
-      throw new Error(
-        "選択したフォルダはプロジェクトフォルダではありません。.illusions フォルダが見つかりません。",
-      );
+    // Auto-repair missing/corrupt .illusions metadata so any selected folder
+    // containing a manuscript opens as a project instead of failing. User
+    // content is never created — only the .illusions management files.
+    const { metadata, repaired } = await ensureProjectFiles(rootDirHandle);
+    if (repaired) {
+      notificationManager.info("プロジェクト設定ファイルが見つからなかったため復元しました。");
     }
 
-    let projectJsonHandle: Awaited<ReturnType<typeof illusionsDir.getFileHandle>>;
-    try {
-      projectJsonHandle = await illusionsDir.getFileHandle("project.json");
-    } catch {
-      throw new Error(
-        "プロジェクトの設定ファイル (.illusions/project.json) が見つかりません。プロジェクトが破損している可能性があります。",
-      );
-    }
-
-    const metadataText = await projectJsonHandle.read();
-    if (!metadataText.trim()) {
-      throw new Error(
-        "プロジェクトの設定ファイル (.illusions/project.json) が空です。プロジェクトが破損している可能性があります。",
-      );
-    }
-    const metadata: ProjectConfig = JSON.parse(metadataText) as ProjectConfig;
-
-    // Read workspace.json (create defaults if missing)
+    // Read workspace.json (ensureProjectFiles guarantees it exists; default-safe)
     let workspaceState: WorkspaceState;
     try {
+      const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: false });
       const workspaceJsonHandle = await illusionsDir.getFileHandle("workspace.json");
       const workspaceText = await workspaceJsonHandle.read();
       workspaceState = JSON.parse(workspaceText) as WorkspaceState;
     } catch {
-      // workspace.json may not exist in older projects
       workspaceState = getDefaultWorkspaceState();
     }
 
