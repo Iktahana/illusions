@@ -519,6 +519,26 @@ describe("parseMarkdownChapters", () => {
     const chapters = parseMarkdownChapters("###### Deep");
     expect(chapters[0].level).toBe(6);
   });
+
+  it("should strip MDI ruby syntax from the title (keep base only)", () => {
+    const chapters = parseMarkdownChapters("# {花|か}{様|よう}{年|ねん}{華|か}");
+    expect(chapters).toHaveLength(1);
+    expect(chapters[0].title).toBe("花様年華");
+    expect(chapters[0].anchorId).toBe(encodeURIComponent("花様年華"));
+  });
+
+  it("should strip ruby mixed with plain text in the title", () => {
+    const chapters = parseMarkdownChapters("# 第一章 {序|じょ}");
+    expect(chapters[0].title).toBe("第一章 序");
+  });
+
+  it("should normalize [[br]] in a heading to a single-line title and anchorId", () => {
+    const chapters = parseMarkdownChapters("# 前編[[br]]後編");
+    expect(chapters[0].title).toBe("前編 後編");
+    // anchorId must not contain an encoded newline (%0A)
+    expect(chapters[0].anchorId).not.toContain("%0A");
+    expect(chapters[0].anchorId).toBe(encodeURIComponent("前編 後編"));
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -867,6 +887,28 @@ describe("getChaptersFromDOM", () => {
     const chapters = getChaptersFromDOM();
     expect(chapters).toHaveLength(1);
     expect(chapters[0].title).toBe("");
+
+    // Cleanup
+    document.body.removeChild(container);
+  });
+
+  it("should exclude ruby reading (<rt>) and keep only the base text", () => {
+    const container = document.createElement("div");
+    container.className = "milkdown";
+
+    // Mirrors the editor's rendered ruby heading: <ruby><rb>base</rb><rt>reading</rt></ruby>
+    const h1 = document.createElement("h1");
+    h1.id = "hanayonenka";
+    h1.innerHTML =
+      "<ruby><rb>花</rb><rt>か</rt></ruby><ruby><rb>様</rb><rt>よう</rt></ruby>" +
+      "<ruby><rb>年</rb><rt>ねん</rt></ruby><ruby><rb>華</rb><rt>か</rt></ruby>";
+    container.appendChild(h1);
+
+    document.body.appendChild(container);
+
+    const chapters = getChaptersFromDOM();
+    expect(chapters).toHaveLength(1);
+    expect(chapters[0].title).toBe("花様年華");
 
     // Cleanup
     document.body.removeChild(container);
