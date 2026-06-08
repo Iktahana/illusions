@@ -7,6 +7,7 @@ import { EditorView, Decoration } from "@milkdown/prose/view";
 import { TextSelection } from "@milkdown/prose/state";
 import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
 import { computeAnchorPos } from "@/lib/search-dialog/compute-anchor-pos";
+import { findSearchMatches, type SearchMatch } from "@/lib/editor-page/find-search-matches";
 
 const DIALOG_WIDTH = 320; // w-80 と一致させる
 const DIALOG_PADDING = 16; // 8px top offset / 16px right offset の元値と整合
@@ -23,10 +24,7 @@ interface SearchDialogProps {
   anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
-export interface SearchMatch {
-  from: number;
-  to: number;
-}
+export type { SearchMatch };
 
 export default function SearchDialog({
   editorView,
@@ -150,38 +148,7 @@ export default function SearchDialog({
 
     const { state } = editorView;
     const { doc } = state;
-    const foundMatches: SearchMatch[] = [];
-    const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
-
-    // Search within each text node and ruby atom using correct ProseMirror positions.
-    // ruby nodes have atom:true so doc.descendants does not recurse into them;
-    // we inspect node.attrs.base directly and emit a decoration for the whole atom.
-    doc.descendants((node, pos) => {
-      if (node.isText && node.text) {
-        const nodeText = caseSensitive ? node.text : node.text.toLowerCase();
-        let searchIndex = 0;
-        while (searchIndex < nodeText.length) {
-          const matchIndex = nodeText.indexOf(searchStr, searchIndex);
-          if (matchIndex === -1) break;
-          foundMatches.push({
-            from: pos + matchIndex,
-            to: pos + matchIndex + searchTerm.length,
-          });
-          searchIndex = matchIndex + 1;
-        }
-        return;
-      }
-      if (node.type.name === "ruby") {
-        const baseRaw = (node.attrs.base as string) ?? "";
-        const baseText = caseSensitive ? baseRaw : baseRaw.toLowerCase();
-        let i = 0;
-        while ((i = baseText.indexOf(searchStr, i)) !== -1) {
-          foundMatches.push({ from: pos, to: pos + node.nodeSize });
-          i += searchStr.length; // advance past matched chars to avoid spurious overlapping matches
-        }
-        return false; // atom — do not recurse into ruby internals
-      }
-    });
+    const foundMatches = findSearchMatches(doc, searchTerm, caseSensitive);
     setMatches(foundMatches);
     setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1);
   }, [searchTerm, caseSensitive, editorView]);
