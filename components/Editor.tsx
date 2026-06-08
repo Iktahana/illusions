@@ -19,7 +19,8 @@ import { buildSegments, buildSpeechChunks, buildSpeechMap } from "@/lib/hooks/sp
 import { scrollToSpeechTarget, cancelSpeechScroll } from "@/lib/editor-page/speech-auto-scroll";
 import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
 import { localPreferences } from "@/lib/storage/local-preferences";
-import type { RuleRunner, LintIssue } from "@/lib/linting";
+import type { LintIssue } from "@/lib/linting";
+import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import { useTypographySettings, useSpeechSettings } from "@/contexts/EditorSettingsContext";
 import { useCharWidth, MEASURE_TEXT } from "@/lib/editor-page/use-char-width";
 
@@ -27,14 +28,14 @@ interface EditorProps {
   initialContent?: string;
   onChange?: (content: string) => void;
   onInsertText?: (text: string) => void;
-  onSelectionChange?: (charCount: number) => void;
+  onSelectionChange?: (charCount: number, manuscriptCells: number, manuscriptPages: number) => void;
   className?: string;
   searchOpenTrigger?: number;
   searchInitialTerm?: string;
   onEditorViewReady?: (view: EditorView) => void;
   onShowAllSearchResults?: (matches: SearchMatch[], searchTerm: string) => void;
   // リンティング設定
-  lintingRuleRunner?: RuleRunner | null;
+  lintingRuleRunner?: RuleRunnerLike | null;
   onLintIssuesUpdated?: (issues: LintIssue[]) => void;
   onNlpError?: (error: Error) => void;
   // 音声設定を開くコールバック

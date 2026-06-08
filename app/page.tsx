@@ -361,6 +361,8 @@ export default function EditorPage() {
   const [recoveryExiting, setRecoveryExiting] = useState(false);
   const [newFileTrigger, setNewFileTrigger] = useState(0);
   const [selectedCharCount, setSelectedCharCount] = useState(0);
+  const [selectedManuscriptCells, setSelectedManuscriptCells] = useState(0);
+  const [selectedManuscriptPages, setSelectedManuscriptPages] = useState(0);
   const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstanceRaw] = useState<EditorView | null>(null);
@@ -1066,6 +1068,8 @@ export default function EditorPage() {
     compactMode,
     charCount,
     selectedCharCount,
+    selectedManuscriptCells,
+    selectedManuscriptPages,
     paragraphCount,
     manuscriptCellCount,
     manuscriptPages,
@@ -1216,7 +1220,11 @@ export default function EditorPage() {
         editorDomRef,
         handleChange,
         handleInsertText,
-        setSelectedCharCount,
+        onSelectionChange: (count: number, cells: number, pages: number) => {
+          setSelectedCharCount(count);
+          setSelectedManuscriptCells(cells);
+          setSelectedManuscriptPages(pages);
+        },
         searchOpenTrigger,
         searchInitialTerm,
         setEditorViewInstance,

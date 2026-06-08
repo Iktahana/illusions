@@ -6,11 +6,7 @@ import { EditorView, Decoration } from "@milkdown/prose/view";
 import { TextSelection } from "@milkdown/prose/state";
 import clsx from "clsx";
 import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
-
-interface SearchMatch {
-  from: number;
-  to: number;
-}
+import { findSearchMatches, type SearchMatch } from "@/lib/editor-page/find-search-matches";
 
 // #1507: After tab switch, the parent's editorViewInstance may still
 // reference a destroyed EditorView for a short window before the new
@@ -85,41 +81,11 @@ export default function SearchResults({
 
     const { state, dispatch } = editorView;
     const { doc } = state;
-    const foundMatches: SearchMatch[] = [];
-    const searchStr = caseSensitive ? searchTerm : searchTerm.toLowerCase();
 
-    // Full document text search
-    const fullText = doc.textContent;
-    const searchText = caseSensitive ? fullText : fullText.toLowerCase();
-
-    let searchIndex = 0;
-    while (searchIndex < searchText.length) {
-      const matchIndex = searchText.indexOf(searchStr, searchIndex);
-      if (matchIndex === -1) break;
-
-      // Convert text position to document position
-      let pos = 0;
-      let textOffset = 0;
-
-      doc.descendants((node, nodePos) => {
-        if (pos !== 0) return false; // Found, stop traversal
-
-        if (node.isText && node.text) {
-          const nodeEnd = textOffset + node.text.length;
-          if (matchIndex >= textOffset && matchIndex < nodeEnd) {
-            pos = nodePos + (matchIndex - textOffset);
-            return false;
-          }
-          textOffset = nodeEnd;
-        }
-        return true;
-      });
-
-      if (pos > 0) {
-        foundMatches.push({ from: pos, to: pos + searchTerm.length });
-      }
-      searchIndex = matchIndex + 1;
-    }
+    // Use the shared ProseMirror-position-aware matcher. A previous
+    // textContent-based implementation drifted past hardbreaks (leafText "\n")
+    // and ruby atoms, highlighting the wrong characters.
+    const foundMatches = findSearchMatches(doc, searchTerm, caseSensitive);
 
     setMatches(foundMatches);
 
