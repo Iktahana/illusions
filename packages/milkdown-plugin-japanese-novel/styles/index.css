@@ -29,6 +29,22 @@
   letter-spacing: 0;
 }
 
+/*
+ * Suppress the phantom blank line below a block (e.g. a heading) whose last
+ * inline node is an atom such as ruby. ProseMirror appends a zero-width
+ * `<img class="ProseMirror-separator">` followed by a `<br class="ProseMirror-trailingBreak">`
+ * after a trailing inline leaf so the caret can sit after it. The default
+ * stylesheet leaves that <br> visible, so a ruby-only heading renders an
+ * undeletable empty line underneath. Hiding only the trailing <br> that directly
+ * follows a separator removes the phantom line while keeping the caret position
+ * (handled by the separator <img>). Genuine empty blocks have no separator
+ * sibling, so their trailing break — and intentional `[[blank]]` paragraphs
+ * (handled separately via `p.mdi-blank::before`) — are unaffected.
+ */
+.milkdown-japanese-base img.ProseMirror-separator + br.ProseMirror-trailingBreak {
+  display: none;
+}
+
 /* Tate-chu-yoko: horizontal digits/punctuation */
 .milkdown-japanese-base .tcy {
   text-combine-upright: all;
