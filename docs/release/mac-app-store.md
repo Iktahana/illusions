@@ -16,17 +16,17 @@ illusions は現在 Developer ID 署名 + notarization で DMG/ZIP を GitHub Re
 
 ## ブロッカー / 影響範囲
 
-| 項目 | 現状 | MAS での問題 | 対応 |
-| --- | --- | --- | --- |
-| ターミナル | `electron/ipc/pty-ipc.js` が node-pty で任意シェル spawn | 任意実行ファイル起動は審査却下リスク最大 | MAS ビルドで機能ごと除外 |
-| QuickLook | 実行時に `~/Library/QuickLook/` へ `.qlgenerator` をコピー（`electron/quick-look.js`） | サンドボックスで当該ディレクトリに書込不可 | MAS 版は同梱省略（将来 appex で再実装） |
-| 自動更新 | `electron-updater`（`electron/auto-updater.js`） | MAS では禁止 | `process.mas` 検出でスキップ |
-| entitlements | `allow-unsigned-executable-memory` / `disable-library-validation` 等（`build/entitlements.mac.plist`） | MAS では App Sandbox + 別 entitlements が必要 | MAS 専用 plist を新規作成 |
-| 署名・notarize | Developer ID + `scripts/notarize.js`（afterSign） | MAS は Apple Distribution 証明書 + プロビジョニングプロファイル。notarize 不要 | afterSign を MAS 時スキップ |
-| VFS フォルダ永続 | `approved-vfs-paths.json` に生パス保存（`electron/ipc/vfs-ipc.js`） | サンドボックスで再起動後に生パス再オープン不可 | security-scoped bookmark を実装 |
-| 本番ロード元 | 本番で `http://localhost:3010` から読込 | ローカル listen は要検証 | サンドボックスで起動検証、必要 entitlement 付与 |
-| データ保存先 | `~/Library/Application Support/illusions/` | サンドボックスでコンテナへ自動リダイレクト（透過） | コード変更不要。直販版とデータ非共有を周知 |
-| ネットワーク | OpenAI/Anthropic/Google・GitHub・OAuth | `network.client` entitlement 必要 | entitlement 付与 |
+| 項目             | 現状                                                                                                   | MAS での問題                                                                   | 対応                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ----------------------------------------------- |
+| ターミナル       | `electron/ipc/pty-ipc.js` が node-pty で任意シェル spawn                                               | 任意実行ファイル起動は審査却下リスク最大                                       | MAS ビルドで機能ごと除外                        |
+| QuickLook        | 実行時に `~/Library/QuickLook/` へ `.qlgenerator` をコピー（`electron/quick-look.js`）                 | サンドボックスで当該ディレクトリに書込不可                                     | MAS 版は同梱省略（将来 appex で再実装）         |
+| 自動更新         | `electron-updater`（`electron/auto-updater.js`）                                                       | MAS では禁止                                                                   | `process.mas` 検出でスキップ                    |
+| entitlements     | `allow-unsigned-executable-memory` / `disable-library-validation` 等（`build/entitlements.mac.plist`） | MAS では App Sandbox + 別 entitlements が必要                                  | MAS 専用 plist を新規作成                       |
+| 署名・notarize   | Developer ID + `scripts/notarize.js`（afterSign）                                                      | MAS は Apple Distribution 証明書 + プロビジョニングプロファイル。notarize 不要 | afterSign を MAS 時スキップ                     |
+| VFS フォルダ永続 | `approved-vfs-paths.json` に生パス保存（`electron/ipc/vfs-ipc.js`）                                    | サンドボックスで再起動後に生パス再オープン不可                                 | security-scoped bookmark を実装                 |
+| 本番ロード元     | 本番で `http://localhost:3010` から読込                                                                | ローカル listen は要検証                                                       | サンドボックスで起動検証、必要 entitlement 付与 |
+| データ保存先     | `~/Library/Application Support/illusions/`                                                             | サンドボックスでコンテナへ自動リダイレクト（透過）                             | コード変更不要。直販版とデータ非共有を周知      |
+| ネットワーク     | OpenAI/Anthropic/Google・GitHub・OAuth                                                                 | `network.client` entitlement 必要                                              | entitlement 付与                                |
 
 ## フェーズ
 
@@ -66,12 +66,12 @@ illusions は現在 Developer ID 署名 + notarization で DMG/ZIP を GitHub Re
 
 自動化の範囲:
 
-| 段階 | 自動化 |
-| --- | --- |
-| MAS ビルド（`.pkg` 生成・署名・プロファイル埋め込み） | ✅ 完全自動（electron-builder `mas` ターゲット） |
-| App Store Connect へアップロード | ✅ 完全自動（App Store Connect API キー認証） |
-| 「審査に提出」 | ⚠️ fastlane 等で自動化可だが、誤リリース防止のため手動承認を残すのが一般的 |
-| 審査そのもの | ❌ Apple 側（CI では待てない） |
+| 段階                                                  | 自動化                                                                     |
+| ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| MAS ビルド（`.pkg` 生成・署名・プロファイル埋め込み） | ✅ 完全自動（electron-builder `mas` ターゲット）                           |
+| App Store Connect へアップロード                      | ✅ 完全自動（App Store Connect API キー認証）                              |
+| 「審査に提出」                                        | ⚠️ fastlane 等で自動化可だが、誤リリース防止のため手動承認を残すのが一般的 |
+| 審査そのもの                                          | ❌ Apple 側（CI では待てない）                                             |
 
 追加で必要な GitHub Secrets:
 
