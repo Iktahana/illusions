@@ -107,6 +107,9 @@ export function useSelectionTracking({
   const onSelectionChangeRef = useRef(onSelectionChange);
   const lastPointerYRef = useRef<number | null>(null);
   const lastReportedCountRef = useRef(0);
+  // 原稿用紙マス数も保持する。可視文字数が同じでも禁則処理でマス数は変わり得るため、
+  // 範囲を選び直したときに古い値が残らないよう、マス数の変化でも callback を発火させる。
+  const lastReportedCellsRef = useRef(0);
   const frameRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -119,8 +122,9 @@ export function useSelectionTracking({
 
   const updateSelectionState = useCallback(() => {
     if (!editorViewInstance) {
-      if (lastReportedCountRef.current !== 0) {
+      if (lastReportedCountRef.current !== 0 || lastReportedCellsRef.current !== 0) {
         lastReportedCountRef.current = 0;
+        lastReportedCellsRef.current = 0;
         onSelectionChangeRef.current?.(0, 0, 0);
       }
       setSelectionState((prev) =>
@@ -166,16 +170,21 @@ export function useSelectionTracking({
         pointerClientY: lastPointerYRef.current,
       };
 
-      if (lastReportedCountRef.current !== selectionCount) {
+      if (
+        lastReportedCountRef.current !== selectionCount ||
+        lastReportedCellsRef.current !== selectionManuscriptCells
+      ) {
         lastReportedCountRef.current = selectionCount;
+        lastReportedCellsRef.current = selectionManuscriptCells;
         onSelectionChangeRef.current?.(
           selectionCount,
           selectionManuscriptCells,
           selectionManuscriptPages,
         );
       }
-    } else if (lastReportedCountRef.current !== 0) {
+    } else if (lastReportedCountRef.current !== 0 || lastReportedCellsRef.current !== 0) {
       lastReportedCountRef.current = 0;
+      lastReportedCellsRef.current = 0;
       onSelectionChangeRef.current?.(0, 0, 0);
     }
 
