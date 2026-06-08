@@ -531,6 +531,14 @@ describe("parseMarkdownChapters", () => {
     const chapters = parseMarkdownChapters("# 第一章 {序|じょ}");
     expect(chapters[0].title).toBe("第一章 序");
   });
+
+  it("should normalize [[br]] in a heading to a single-line title and anchorId", () => {
+    const chapters = parseMarkdownChapters("# 前編[[br]]後編");
+    expect(chapters[0].title).toBe("前編 後編");
+    // anchorId must not contain an encoded newline (%0A)
+    expect(chapters[0].anchorId).not.toContain("%0A");
+    expect(chapters[0].anchorId).toBe(encodeURIComponent("前編 後編"));
+  });
 });
 
 // ---------------------------------------------------------------------------

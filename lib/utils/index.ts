@@ -228,7 +228,11 @@ export function parseMarkdownChapters(markdown: string): Chapter[] {
       const level = match[1].length;
       // MDI インライン記法（ルビ {base|ruby} 等）をプレーンテキストに変換する。
       // 目次にはルビ読みを含まない base テキストのみを表示する。
-      const title = stripMdiInlineSyntax(match[2].trim()).trim();
+      // stripMdiInlineSyntax は [[br]] を改行へ変換するため、見出し行に改行が
+      // 混入し anchorId が %0A 化するのを防ぐべく単一行へ正規化する。
+      const title = stripMdiInlineSyntax(match[2].trim())
+        .replace(/[\r\n]+/g, " ")
+        .trim();
       const anchorId = generateHeadingId(title);
 
       chapters.push({

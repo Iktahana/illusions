@@ -12,7 +12,7 @@
  * separator `<img>`. This test verifies the DOM shape the CSS relies on and that
  * the selector targets only the atom case — never a genuine empty paragraph.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { commonmark } from "@milkdown/preset-commonmark";
 import type { Node } from "@milkdown/prose/model";
@@ -21,9 +21,17 @@ import { japaneseNovel } from "../index";
 
 const SELECTOR = "img.ProseMirror-separator + br.ProseMirror-trailingBreak";
 
+// Track mounted roots so each test fully cleans up its DOM, even on failure.
+const mountedRoots: HTMLElement[] = [];
+afterEach(() => {
+  mountedRoots.forEach((r) => r.remove());
+  mountedRoots.length = 0;
+});
+
 async function makeView(markdown: string): Promise<{ editor: Editor; view: EditorView }> {
   const root = document.createElement("div");
   document.body.appendChild(root);
+  mountedRoots.push(root);
   const editor = await Editor.make()
     .config((ctx) => {
       ctx.set(rootCtx, root);
