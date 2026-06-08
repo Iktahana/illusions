@@ -46,7 +46,7 @@ import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import type { ExportMetadata } from "@/lib/export/types";
-import type { RuleRunner } from "@/lib/linting/rule-runner";
+import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import { DockviewReact } from "dockview-react";
 type SidebarPanelSharedProps = Omit<React.ComponentProps<typeof SidebarPanel>, "view">;
 
@@ -154,7 +154,11 @@ interface EditorLayoutProps {
     editorDomRef: RefObject<HTMLDivElement | null>;
     handleChange: NonNullable<React.ComponentProps<typeof NovelEditor>["onChange"]>;
     handleInsertText: NonNullable<React.ComponentProps<typeof NovelEditor>["onInsertText"]>;
-    setSelectedCharCount: Dispatch<SetStateAction<number>>;
+    onSelectionChange: (
+      charCount: number,
+      manuscriptCells: number,
+      manuscriptPages: number,
+    ) => void;
     searchOpenTrigger: number;
     searchInitialTerm?: string;
     setEditorViewInstance: NonNullable<
@@ -163,7 +167,7 @@ interface EditorLayoutProps {
     handleShowAllSearchResults: NonNullable<
       React.ComponentProps<typeof NovelEditor>["onShowAllSearchResults"]
     >;
-    ruleRunner: RuleRunner;
+    ruleRunner: RuleRunnerLike | null;
     handleLintIssuesUpdated: (issues: LintIssue[]) => void;
     handleNlpError: (error: Error) => void;
     handleOpenRubyDialog: () => void;
@@ -460,7 +464,7 @@ export default function EditorLayout({
                                   initialContent={panelContent}
                                   onChange={mainArea.handleChange}
                                   onInsertText={mainArea.handleInsertText}
-                                  onSelectionChange={mainArea.setSelectedCharCount}
+                                  onSelectionChange={mainArea.onSelectionChange}
                                   searchOpenTrigger={panelSearchOpenTrigger}
                                   searchInitialTerm={panelSearchInitialTerm}
                                   onEditorViewReady={mainArea.setEditorViewInstance}

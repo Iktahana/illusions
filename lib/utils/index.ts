@@ -3,6 +3,7 @@
  */
 
 import { analyzeReadability, cleanMarkdown } from "./readability";
+import { stripMdiInlineSyntax } from "@/lib/export/mdi-parser";
 export type { EnhancedReadabilityAnalysis, ReadabilitySubScores } from "./readability-types";
 export { analyzeReadability, enrichReadabilityWithMorphology, cleanMarkdown } from "./readability";
 
@@ -225,7 +226,13 @@ export function parseMarkdownChapters(markdown: string): Chapter[] {
     const match = line.match(/^(#{1,6})\s+(.+)$/);
     if (match) {
       const level = match[1].length;
-      const title = match[2].trim();
+      // MDI インライン記法（ルビ {base|ruby} 等）をプレーンテキストに変換する。
+      // 目次にはルビ読みを含まない base テキストのみを表示する。
+      // stripMdiInlineSyntax は [[br]] を改行へ変換するため、見出し行に改行が
+      // 混入し anchorId が %0A 化するのを防ぐべく単一行へ正規化する。
+      const title = stripMdiInlineSyntax(match[2].trim())
+        .replace(/[\r\n]+/g, " ")
+        .trim();
       const anchorId = generateHeadingId(title);
 
       chapters.push({
@@ -353,6 +360,18 @@ export function calculateReadabilityScore(text: string): ReadabilityAnalysis {
 }
 
 /**
+ * 見出し要素から目次表示用のプレーンテキストを抽出する。
+ * ルビ（<ruby><rb>base</rb><rt>reading</rt></ruby>）の読み（<rt>）を除外し、
+ * base テキストのみを残す。これがないと textContent が "花様年華かようねんか" の
+ * ように base とルビ読みが連結された文字列になってしまう。
+ */
+function extractHeadingPlainText(heading: Element): string {
+  const clone = heading.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll("rt").forEach((rt) => rt.remove());
+  return (clone.textContent || "").trim();
+}
+
+/**
  * エディタのDOMから章情報を抽出する
  * レンダリング後の実IDが取れるため、Markdown解析より確実
  */
@@ -374,7 +393,7 @@ export function getChaptersFromDOM(): Chapter[] {
   headings.forEach((heading, index) => {
     const level = parseInt(heading.tagName[1]);
     const anchorId = heading.id;
-    const title = heading.textContent || "";
+    const title = extractHeadingPlainText(heading);
 
     chapters.push({
       level,

@@ -9,6 +9,10 @@ interface StatsPanelProps {
   charCount: number;
   /** 選択中の可視本文文字数 */
   selectedCharCount: number;
+  /** 選択範囲の原稿用紙マス数（20×20、禁則処理あり） */
+  selectedManuscriptCells?: number;
+  /** 選択範囲の原稿用紙換算枚数（切り上げ） */
+  selectedManuscriptPages?: number;
   /** 段落数 */
   paragraphCount: number;
   /** 原稿用紙換算枚数 */
@@ -55,6 +59,8 @@ function formatDiff(diff: number, unit: string): string {
 export default function StatsPanel({
   charCount,
   selectedCharCount,
+  selectedManuscriptCells = 0,
+  selectedManuscriptPages = 0,
   paragraphCount,
   manuscriptPages,
   manuscriptCellCount,
@@ -165,11 +171,12 @@ export default function StatsPanel({
           <div className="text-right">
             <span className="text-sm font-bold text-foreground">{manuscriptPages}枚</span>
             {prevDayPageDiff !== null && (
-              <p
-                className={`text-xs font-medium ${prevDayPageDiff > 0 ? "text-success" : prevDayPageDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
+              <InfoTooltip
+                content="前日（最後に保存した日）の原稿用紙枚数からの増減です。プラスは増加、マイナスは減少を表します。"
+                className={`block text-xs font-medium ${prevDayPageDiff > 0 ? "text-success" : prevDayPageDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
               >
                 {formatDiff(prevDayPageDiff, "枚")}
-              </p>
+              </InfoTooltip>
             )}
           </div>
         </div>
@@ -184,6 +191,26 @@ export default function StatsPanel({
           </span>
         )}
       </div>
+
+      {/* 選択範囲の原稿用紙（選択時のみ表示） */}
+      {isSelection && selectedManuscriptCells > 0 && (
+        <div className="bg-background-secondary rounded-lg p-3 border border-border flex items-center justify-between">
+          <div>
+            <p className="text-xs text-foreground-tertiary font-medium mb-1 flex items-center">
+              <InfoTooltip content="選択範囲を400字詰め原稿用紙（20×20）に換算した枚数。禁則処理あり・端数切り上げ。">
+                原稿用紙
+              </InfoTooltip>
+            </p>
+            <p className="text-xs text-foreground-tertiary">
+              400字詰原稿用紙
+              <span className="ml-1 opacity-70">({selectedManuscriptCells}マス)</span>
+            </p>
+          </div>
+          <div className="text-right">
+            <span className="text-sm font-bold text-foreground">{selectedManuscriptPages}枚</span>
+          </div>
+        </div>
+      )}
 
       {/* 可読性分析 (Readability) */}
       {readabilityAnalysis && !isSelection && (
@@ -343,11 +370,12 @@ export default function StatsPanel({
                 {activeCharCount.toLocaleString()}
               </span>
               {!isSelection && prevDayCharDiff !== null && (
-                <p
-                  className={`text-xs font-medium ${prevDayCharDiff > 0 ? "text-success" : prevDayCharDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
+                <InfoTooltip
+                  content="前日（最後に保存した日）の総字数からの増減です。プラスは増加、マイナスは減少を表します。"
+                  className={`block text-xs font-medium ${prevDayCharDiff > 0 ? "text-success" : prevDayCharDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
                 >
                   {formatDiff(prevDayCharDiff, "字")}
-                </p>
+                </InfoTooltip>
               )}
             </div>
           </div>

@@ -37,6 +37,10 @@ export interface InspectorProps {
   /** 可視本文文字数（空白・改行・記法を除く） */
   charCount?: number;
   selectedCharCount?: number;
+  /** 選択範囲の原稿用紙マス数（20×20、禁則処理あり） */
+  selectedManuscriptCells?: number;
+  /** 選択範囲の原稿用紙換算枚数（切り上げ） */
+  selectedManuscriptPages?: number;
   paragraphCount?: number;
   /** 原稿用紙マス数（20×20、禁則処理あり） */
   manuscriptCellCount?: number;
