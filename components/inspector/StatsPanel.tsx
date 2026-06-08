@@ -171,11 +171,12 @@ export default function StatsPanel({
           <div className="text-right">
             <span className="text-sm font-bold text-foreground">{manuscriptPages}枚</span>
             {prevDayPageDiff !== null && (
-              <p
-                className={`text-xs font-medium ${prevDayPageDiff > 0 ? "text-success" : prevDayPageDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
+              <InfoTooltip
+                content="前日（最後に保存した日）の原稿用紙枚数からの増減です。プラスは増加、マイナスは減少を表します。"
+                className={`block text-xs font-medium ${prevDayPageDiff > 0 ? "text-success" : prevDayPageDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
               >
                 {formatDiff(prevDayPageDiff, "枚")}
-              </p>
+              </InfoTooltip>
             )}
           </div>
         </div>
@@ -369,11 +370,12 @@ export default function StatsPanel({
                 {activeCharCount.toLocaleString()}
               </span>
               {!isSelection && prevDayCharDiff !== null && (
-                <p
-                  className={`text-xs font-medium ${prevDayCharDiff > 0 ? "text-success" : prevDayCharDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
+                <InfoTooltip
+                  content="前日（最後に保存した日）の総字数からの増減です。プラスは増加、マイナスは減少を表します。"
+                  className={`block text-xs font-medium ${prevDayCharDiff > 0 ? "text-success" : prevDayCharDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
                 >
                   {formatDiff(prevDayCharDiff, "字")}
-                </p>
+                </InfoTooltip>
               )}
             </div>
           </div>
