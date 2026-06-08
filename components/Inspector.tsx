@@ -34,6 +34,8 @@ export default function Inspector({
   compactMode = false,
   charCount = 0,
   selectedCharCount = 0,
+  selectedManuscriptCells = 0,
+  selectedManuscriptPages = 0,
   paragraphCount = 0,
   manuscriptCellCount,
   manuscriptPages: manuscriptPagesProp,
@@ -378,6 +380,8 @@ export default function Inspector({
           <StatsPanel
             charCount={charCount}
             selectedCharCount={selectedCharCount}
+            selectedManuscriptCells={selectedManuscriptCells}
+            selectedManuscriptPages={selectedManuscriptPages}
             paragraphCount={paragraphCount}
             manuscriptPages={manuscriptPages}
             sentenceCount={sentenceCount}

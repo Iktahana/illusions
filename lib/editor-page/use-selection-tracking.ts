@@ -3,7 +3,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { EditorView } from "@milkdown/prose/view";
 
-import { extractVisibleText, countVisibleChars } from "@/lib/editor-page/text-statistics";
+import {
+  extractVisibleText,
+  countVisibleChars,
+  countManuscriptCells,
+  countManuscriptPages,
+} from "@/lib/editor-page/text-statistics";
 
 export interface ViewportRect {
   top: number;
@@ -27,7 +32,7 @@ export interface EditorSelectionState {
 interface UseSelectionTrackingOptions {
   editorViewInstance: EditorView | null;
   scrollContainerRef: RefObject<HTMLDivElement | null>;
-  onSelectionChange?: (charCount: number) => void;
+  onSelectionChange?: (charCount: number, manuscriptCells: number, manuscriptPages: number) => void;
 }
 
 const EMPTY_SELECTION_STATE: EditorSelectionState = {
@@ -102,6 +107,9 @@ export function useSelectionTracking({
   const onSelectionChangeRef = useRef(onSelectionChange);
   const lastPointerYRef = useRef<number | null>(null);
   const lastReportedCountRef = useRef(0);
+  // 原稿用紙マス数も保持する。可視文字数が同じでも禁則処理でマス数は変わり得るため、
+  // 範囲を選び直したときに古い値が残らないよう、マス数の変化でも callback を発火させる。
+  const lastReportedCellsRef = useRef(0);
   const frameRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -114,9 +122,10 @@ export function useSelectionTracking({
 
   const updateSelectionState = useCallback(() => {
     if (!editorViewInstance) {
-      if (lastReportedCountRef.current !== 0) {
+      if (lastReportedCountRef.current !== 0 || lastReportedCellsRef.current !== 0) {
         lastReportedCountRef.current = 0;
-        onSelectionChangeRef.current?.(0);
+        lastReportedCellsRef.current = 0;
+        onSelectionChangeRef.current?.(0, 0, 0);
       }
       setSelectionState((prev) =>
         sameSelectionState(prev, EMPTY_SELECTION_STATE) ? prev : EMPTY_SELECTION_STATE,
@@ -139,7 +148,10 @@ export function useSelectionTracking({
     if (!selection.empty && belongsToEditor) {
       const selectedText = state.doc.textBetween(selection.from, selection.to);
       // MDI 記法を含む可能性があるため extractVisibleText で記法を剥がしてからカウント
-      const selectionCount = countVisibleChars(extractVisibleText(selectedText));
+      const visibleText = extractVisibleText(selectedText);
+      const selectionCount = countVisibleChars(visibleText);
+      const selectionManuscriptCells = countManuscriptCells(visibleText);
+      const selectionManuscriptPages = countManuscriptPages(selectionManuscriptCells);
       const range =
         domSelection && domSelection.rangeCount > 0
           ? domSelection.getRangeAt(0).getBoundingClientRect()
@@ -157,11 +169,23 @@ export function useSelectionTracking({
           range && !(range.width === 0 && range.height === 0) ? toViewportRect(range) : null,
         pointerClientY: lastPointerYRef.current,
       };
-    }
 
-    if (lastReportedCountRef.current !== nextState.selectionCount) {
-      lastReportedCountRef.current = nextState.selectionCount;
-      onSelectionChangeRef.current?.(nextState.selectionCount);
+      if (
+        lastReportedCountRef.current !== selectionCount ||
+        lastReportedCellsRef.current !== selectionManuscriptCells
+      ) {
+        lastReportedCountRef.current = selectionCount;
+        lastReportedCellsRef.current = selectionManuscriptCells;
+        onSelectionChangeRef.current?.(
+          selectionCount,
+          selectionManuscriptCells,
+          selectionManuscriptPages,
+        );
+      }
+    } else if (lastReportedCountRef.current !== 0 || lastReportedCellsRef.current !== 0) {
+      lastReportedCountRef.current = 0;
+      lastReportedCellsRef.current = 0;
+      onSelectionChangeRef.current?.(0, 0, 0);
     }
 
     setSelectionState((prev) => (sameSelectionState(prev, nextState) ? prev : nextState));
