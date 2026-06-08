@@ -154,7 +154,11 @@ interface EditorLayoutProps {
     editorDomRef: RefObject<HTMLDivElement | null>;
     handleChange: NonNullable<React.ComponentProps<typeof NovelEditor>["onChange"]>;
     handleInsertText: NonNullable<React.ComponentProps<typeof NovelEditor>["onInsertText"]>;
-    setSelectedCharCount: Dispatch<SetStateAction<number>>;
+    onSelectionChange: (
+      charCount: number,
+      manuscriptCells: number,
+      manuscriptPages: number,
+    ) => void;
     searchOpenTrigger: number;
     searchInitialTerm?: string;
     setEditorViewInstance: NonNullable<
@@ -460,7 +464,7 @@ export default function EditorLayout({
                                   initialContent={panelContent}
                                   onChange={mainArea.handleChange}
                                   onInsertText={mainArea.handleInsertText}
-                                  onSelectionChange={mainArea.setSelectedCharCount}
+                                  onSelectionChange={mainArea.onSelectionChange}
                                   searchOpenTrigger={panelSearchOpenTrigger}
                                   searchInitialTerm={panelSearchInitialTerm}
                                   onEditorViewReady={mainArea.setEditorViewInstance}

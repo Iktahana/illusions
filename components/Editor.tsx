@@ -28,7 +28,7 @@ interface EditorProps {
   initialContent?: string;
   onChange?: (content: string) => void;
   onInsertText?: (text: string) => void;
-  onSelectionChange?: (charCount: number) => void;
+  onSelectionChange?: (charCount: number, manuscriptCells: number, manuscriptPages: number) => void;
   className?: string;
   searchOpenTrigger?: number;
   searchInitialTerm?: string;
