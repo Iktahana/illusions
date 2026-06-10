@@ -88,7 +88,7 @@ async function resolveFileHandle(
  * Web implementation of VFSFileHandle.
  * Wraps a native FileSystemFileHandle.
  */
-class WebVFSFileHandle implements VFSFileHandle {
+export class WebVFSFileHandle implements VFSFileHandle {
   readonly name: string;
   readonly path: string;
   readonly nativeFileHandle: FileSystemFileHandle;
@@ -109,9 +109,15 @@ class WebVFSFileHandle implements VFSFileHandle {
     try {
       await this.handle.getFile();
       return true;
-    } catch {
-      // NotFoundError — the underlying file was removed after the handle was obtained
-      return false;
+    } catch (err) {
+      // Only an actually-missing file means "does not exist". Any other failure
+      // (permission, transient I/O) must propagate — otherwise callers doing
+      // read-modify-write (e.g. PersistedJsonListStore) would mistake a read
+      // failure for an absent file and overwrite user data with an empty list.
+      if (err instanceof DOMException && err.name === "NotFoundError") {
+        return false;
+      }
+      throw err;
     }
   }
 

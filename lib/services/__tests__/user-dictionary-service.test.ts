@@ -17,8 +17,10 @@ import type { UserDictionaryEntry } from "@/lib/project/project-types";
 
 let mockFileRead = vi.fn<() => Promise<string>>();
 let mockFileWrite = vi.fn<(content: string) => Promise<void>>();
+let mockFileExists = vi.fn<() => Promise<boolean>>();
 
 const mockFileHandle = {
+  exists: () => mockFileExists(),
   read: () => mockFileRead(),
   write: (content: string) => mockFileWrite(content),
 };
@@ -80,6 +82,7 @@ function makeEntry(overrides?: Partial<UserDictionaryEntry>): UserDictionaryEntr
 }
 
 function setupVFSWithContent(content: string): void {
+  mockFileExists.mockResolvedValue(true);
   mockFileRead.mockResolvedValue(content);
   mockGetFileHandle.mockResolvedValue(mockFileHandle as unknown as typeof mockFileHandle);
   mockGetIllusionsDirHandle.mockResolvedValue({
@@ -109,6 +112,7 @@ describe("UserDictionaryService — project mode (VFS)", () => {
     mockStorageItems = {};
     mockFileRead = vi.fn();
     mockFileWrite = vi.fn<(content: string) => Promise<void>>().mockResolvedValue(undefined);
+    mockFileExists = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
     mockGetFileHandle = vi.fn();
     mockGetIllusionsDirHandle = vi.fn();
     // Fresh singleton each test
@@ -119,6 +123,22 @@ describe("UserDictionaryService — project mode (VFS)", () => {
     setupVFSWithENOENT();
     const entries = await svc.loadEntries();
     expect(entries).toEqual([]);
+  });
+
+  it("loadEntries returns empty array when exists() is false (Electron missing file)", async () => {
+    // Regression (#1436 refactor): Electron's VFS never throws from getFileHandle
+    // for a missing file; absence is only detectable via exists(). The shared
+    // PersistedJsonListStore guards with exists() before reading.
+    mockFileExists.mockResolvedValue(false);
+    mockGetFileHandle.mockResolvedValue(mockFileHandle as unknown as typeof mockFileHandle);
+    mockGetIllusionsDirHandle.mockResolvedValue({ getFileHandle: mockGetFileHandle });
+    mockVFS.getDirectoryHandle.mockResolvedValue(
+      mockRootHandle as unknown as typeof mockRootHandle,
+    );
+
+    const entries = await svc.loadEntries();
+    expect(entries).toEqual([]);
+    expect(mockFileRead).not.toHaveBeenCalled();
   });
 
   it("loadEntries returns entries from VFS JSON", async () => {
