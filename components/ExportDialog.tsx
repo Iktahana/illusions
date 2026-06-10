@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import clsx from "clsx";
 import GlassDialog from "./GlassDialog";
 import {
+  DEFAULT_EXPORT_SETTINGS,
   loadExportSettings,
   saveExportSettings,
   toPdfExportSettings,
@@ -140,7 +141,20 @@ function ExportDialogInner({
   metadata,
 }: Omit<ExportDialogProps, "isOpen">) {
   const [selectedFormat, setSelectedFormat] = useState<ExportDialogFormat>(initialFormat);
-  const [settings, setSettings] = useState<UnifiedExportSettings>(() => loadExportSettings());
+  const [settings, setSettings] = useState<UnifiedExportSettings>(() => ({
+    ...DEFAULT_EXPORT_SETTINGS,
+  }));
+
+  // 保存済みのエクスポート設定を StorageService から非同期に読み込む
+  useEffect(() => {
+    let cancelled = false;
+    void loadExportSettings().then((loaded) => {
+      if (!cancelled) setSettings(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isEpub = selectedFormat === "epub";
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
@@ -235,7 +249,7 @@ function ExportDialogInner({
 
   // --- Export handler ---
   const handleExport = useCallback(() => {
-    saveExportSettings(settings);
+    void saveExportSettings(settings);
 
     if (isEpub && onExportEpub) {
       const options = toEpubExportOptions(
