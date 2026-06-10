@@ -244,12 +244,13 @@ declare global {
       isAvailable: () => Promise<boolean>;
     };
     power?: {
-      /** Listen for debounced power state changes from main process */
+      /**
+       * Listen for debounced power state changes from main process.
+       * Returns an unsubscribe function that removes only this listener.
+       */
       onPowerStateChange: (callback: (state: "ac" | "battery") => void) => () => void;
       /** Get current power state */
       getPowerState: () => Promise<"ac" | "battery">;
-      /** Remove all power state change listeners */
-      removeOnPowerStateChange: () => void;
     };
     /** Split editor popout window IPC */
     editor?: {

@@ -4,6 +4,7 @@
 const { app, BrowserWindow, dialog, shell } = require("electron");
 const path = require("path");
 const { isDev } = require("./app-constants");
+const { isSafeExternalUrl } = require("./lib/url-policy");
 
 let mainWindow = null;
 const allWindows = new Set();
@@ -60,9 +61,13 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
 
   // Block new window creation from renderer
   newWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // Allow opening external URLs in the default browser
-    if (url.startsWith("https://") || url.startsWith("http://")) {
+    // Only allow strictly-parsed http(s) URLs in the default browser.
+    // All other schemes (file:, smb:, javascript:, ...) and unparseable
+    // URLs are denied — fail closed (#1567 S3).
+    if (isSafeExternalUrl(url)) {
       shell.openExternal(url);
+    } else {
+      console.warn("[Security] Blocked external open of non-http(s) URL:", url);
     }
     return { action: "deny" };
   });
