@@ -1,0 +1,105 @@
+/**
+ * Power optimization policy (#1448, unit 2 of 4).
+ *
+ * Pure decision functions mapping window-activity signals and user
+ * settings to "what should be paused / throttled". This module has NO
+ * side effects: it never touches watchers, timers, or the editor.
+ * Consumers read a decision and act on it themselves, so the policy
+ * (why) and the mechanism (how) stay independently testable — the
+ * lesson from the rolled-back PR #1427 / regression #1445, where both
+ * lived in one tangled module chain.
+ *
+ * 電源最適化ポリシー（純粋関数のみ・副作用なし）。
+ * window activity 信号と設定から「何を停止/抑制すべきか」の判断だけを返す。
+ *
+ * Wiring status:
+ * - `shouldPauseFileWatchers` — wired in this PR
+ *   (lib/tab-manager/use-file-watch-integration.ts).
+ * - `getAutoSaveIntervalMs` / `shouldEnablePosHighlight` — consumers are
+ *   wired in a follow-up PR (#1466) to keep this change reviewable.
+ */
+
+import { AUTO_SAVE_INTERVAL } from "../tab-manager/types";
+import type { WindowActivityState } from "./window-activity";
+
+// ---------------------------------------------------------------------------
+// Types & constants
+// ---------------------------------------------------------------------------
+
+/** Settings that influence power-policy decisions. */
+export interface PowerPolicySettings {
+  /**
+   * Power-save mode (user setting, or auto-enabled on battery via
+   * use-power-saving.ts).
+   * 省電力モード（ユーザー設定、またはバッテリー駆動時の自動 ON）。
+   */
+  powerSaveMode: boolean;
+}
+
+/**
+ * Auto-save interval while the window is in the background and power-aware
+ * throttling (power-save mode) is enabled. Foreground uses AUTO_SAVE_INTERVAL.
+ *
+ * バックグラウンド時（省電力モード有効）の自動保存間隔。
+ */
+export const BACKGROUND_AUTO_SAVE_INTERVAL_MS = 20_000;
+
+// ---------------------------------------------------------------------------
+// Decisions
+// ---------------------------------------------------------------------------
+
+/** True when the window is effectively in the background. */
+function isBackground(activity: WindowActivityState): boolean {
+  return !activity.isWindowFocused || !activity.isDocumentVisible;
+}
+
+/**
+ * Whether file watchers should be paused to save CPU.
+ *
+ * Pausing is safe because the FileWatcher implementations perform an
+ * mtime / content-hash catch-up comparison on resume and only fire the
+ * external-change flow when the disk content genuinely changed
+ * (see lib/services/file-watcher.ts). A focus round-trip with no disk
+ * change therefore never triggers a reload (#1445 guard).
+ *
+ * バックグラウンド時に file watcher を停止すべきかどうか。
+ * 再開時は watcher 側の mtime / content-hash 照合により、実際に変化が
+ * あった場合のみ外部変更フローが走る（#1445 ガード）。
+ */
+export function shouldPauseFileWatchers(activity: WindowActivityState): boolean {
+  return isBackground(activity);
+}
+
+/**
+ * Auto-save interval decision: throttle to 20s only when the window is in
+ * the background AND power-save mode is enabled; otherwise the normal 5s.
+ *
+ * 自動保存間隔の判断。省電力モード有効かつバックグラウンド時のみ 20 秒に
+ * 間引き、それ以外は通常の 5 秒。
+ */
+export function getAutoSaveIntervalMs(
+  activity: WindowActivityState,
+  settings: PowerPolicySettings,
+): number {
+  if (settings.powerSaveMode && isBackground(activity)) {
+    return BACKGROUND_AUTO_SAVE_INTERVAL_MS;
+  }
+  return AUTO_SAVE_INTERVAL;
+}
+
+/**
+ * Whether part-of-speech highlighting should run.
+ *
+ * Deliberately NOT focus-dependent: toggling editor decorations on every
+ * focus switch is exactly the churn class that produced #1445. The
+ * decision depends only on the user setting and power-save mode.
+ *
+ * 品詞ハイライトを有効にすべきかどうか。フォーカス切替で装飾を
+ * 付け外しする揺れ（#1445 と同種の churn）を避けるため、意図的に
+ * activity には依存させず、設定と省電力モードのみで判断する。
+ */
+export function shouldEnablePosHighlight(
+  settings: PowerPolicySettings & { posHighlightEnabled: boolean },
+): boolean {
+  return settings.posHighlightEnabled && !settings.powerSaveMode;
+}
