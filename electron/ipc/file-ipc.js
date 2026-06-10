@@ -301,7 +301,7 @@ function registerFileHandlers() {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content", code: "INVALID_INPUT" };
     }
-    if (content.length > MAX_CONTENT_BYTES) {
+    if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
       return {
         success: false,
         error: "ファイルサイズが上限を超えています（50 MB）",
@@ -443,7 +443,7 @@ function registerFileHandlers() {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
-    if (content.length > MAX_CONTENT_BYTES) {
+    if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
       return {
         success: false,
         error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
@@ -589,7 +589,7 @@ function registerFileHandlers() {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
-    if (content.length > MAX_CONTENT_BYTES) {
+    if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
       return {
         success: false,
         error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
@@ -645,7 +645,7 @@ function registerFileHandlers() {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
-    if (content.length > MAX_CONTENT_BYTES) {
+    if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
       return {
         success: false,
         error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
