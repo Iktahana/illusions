@@ -18,12 +18,12 @@
  * they are serialized too.
  */
 
+import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import { saveMdiFile } from "../project/mdi-file";
 import { getProjectFileService } from "../services/project-file-service";
 import { suppressFileWatch } from "../services/file-watcher";
 import { acquireSaveLock, releaseSaveLock } from "./save-lock";
 import { isEditorTab } from "./tab-types";
-import { sanitizeMdiContent } from "./types";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SnapshotType } from "../services/history-policy";
@@ -211,7 +211,10 @@ export async function executeTabSave(params: ExecuteTabSaveParams): Promise<Save
 
     setIsSaving(true);
 
-    const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
+    // Single MDI entry API (#1449): normalize editor output, persist raw text.
+    const sanitized = MdiDocument.fromEditorOutput(tab.content, {
+      fileType: tab.fileType,
+    }).toRawText();
 
     /**
      * Apply the post-save tab state. Uses a functional updater comparing
@@ -224,7 +227,9 @@ export async function executeTabSave(params: ExecuteTabSaveParams): Promise<Save
       setTabs((prev) =>
         prev.map((t) => {
           if (t.id !== tab.id || !isEditorTab(t)) return t;
-          const newIsDirty = sanitizeMdiContent(t.content, { fileType: t.fileType }) !== sanitized;
+          const newIsDirty =
+            MdiDocument.fromEditorOutput(t.content, { fileType: t.fileType }).toRawText() !==
+            sanitized;
           return {
             ...t,
             ...(descriptor ? { file: descriptor } : null),

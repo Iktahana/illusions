@@ -4,8 +4,8 @@ import { useState, useRef, useCallback, useEffect, memo } from "react";
 import { Plus, X, Sparkles, Loader2 } from "lucide-react";
 
 import { useCharacterExtractionSettings } from "@/contexts/EditorSettingsContext";
-import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
+import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import { fetchAppState, persistAppState } from "@/lib/storage/app-state-manager";
 import CharacterCard from "./Characters/CharacterCard";
 import NewCharacterForm from "./Characters/NewCharacterForm";
@@ -146,7 +146,12 @@ function Characters({ content }: CharactersProps) {
 
     try {
       const nlpClient = getNlpClient();
-      const tokens = await nlpClient.tokenizeParagraph(content);
+      // #1449: NLP input is always the analysis derivation ([[blank]] markers
+      // removed). Restores the #1483 behavior whose call was dropped in a
+      // later rewrite while the import remained.
+      const tokens = await nlpClient.tokenizeParagraph(
+        MdiDocument.fromRawText(content).toAnalysisText(),
+      );
 
       const properNouns = new Map<string, boolean>();
 
