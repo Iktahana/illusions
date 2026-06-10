@@ -261,6 +261,17 @@ describe("PersistedJsonListStore — mutation semantics", () => {
     expect(await store.loadProject()).toEqual([]);
   });
 
+  it("loadProject propagates a failing exists() check instead of treating it as missing", async () => {
+    // A transient exists() failure must NOT be mistaken for an absent file —
+    // returning [] here would let a subsequent save overwrite user data.
+    setupVFSWritable();
+    mockFileExists.mockRejectedValue(new Error("transient I/O failure"));
+    const store = makeStore();
+
+    await expect(store.loadProject()).rejects.toThrow("transient I/O failure");
+    expect(mockFileRead).not.toHaveBeenCalled();
+  });
+
   it("loadProject re-throws on JSON corruption", async () => {
     setupVFSWritable();
     mockFileRead.mockResolvedValue("{ broken json %%%");
