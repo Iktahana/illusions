@@ -15,6 +15,7 @@ const path = require("path");
 const fs = require("fs");
 const https = require("https");
 const zlib = require("zlib");
+const crypto = require("crypto");
 const { app } = require("electron");
 
 const PROVIDER_ID = "genji";
@@ -23,6 +24,13 @@ const GITHUB_REPO = "Genji";
 const DB_FILENAME = "genji.db";
 const DB_TEMP_FILENAME = "genji.db.tmp";
 const VERSION_FILENAME = "genji_version.txt";
+
+// Security: dictionary assets may only be downloaded over https from these hosts
+const ALLOWED_DOWNLOAD_HOSTS = new Set([
+  "github.com",
+  "objects.githubusercontent.com",
+  "release-assets.githubusercontent.com",
+]);
 
 // ---------------------------------------------------------------------------
 // Simple promise-chain mutex (main-process, no module import needed)
@@ -66,7 +74,23 @@ class DictManager {
     this._versionPath = null;
     this._downloadMutex = new Mutex();
     this._latestAssetUrl = null;
+    this._latestAssetDigest = null;
     this._latestVersion = null;
+  }
+
+  /**
+   * Validate that an asset download URL is https and points to an allowed host.
+   * @private
+   * @param {string} url
+   * @returns {boolean}
+   */
+  _isAllowedAssetUrl(url) {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === "https:" && ALLOWED_DOWNLOAD_HOSTS.has(parsed.hostname);
+    } catch {
+      return false;
+    }
   }
 
   /** Escape LIKE wildcards so user input cannot inject patterns. */
@@ -338,9 +362,14 @@ class DictManager {
       const updateAvailable =
         !!latestVersion && (!installedVersion || installedVersion !== latestVersion);
 
-      // Cache asset download URL for later use
+      // Cache asset download URL for later use (scheme/host allowlist validated)
       const asset = (json.assets ?? []).find((a) => a.name && a.name.endsWith(".db.gz"));
-      this._latestAssetUrl = asset?.browser_download_url ?? null;
+      const assetUrl = asset?.browser_download_url ?? null;
+      if (assetUrl && !this._isAllowedAssetUrl(assetUrl)) {
+        console.warn("[DictManager] Rejected asset URL (scheme/host not allowed):", assetUrl);
+      }
+      this._latestAssetUrl = assetUrl && this._isAllowedAssetUrl(assetUrl) ? assetUrl : null;
+      this._latestAssetDigest = typeof asset?.digest === "string" ? asset.digest : null;
       this._latestVersion = latestVersion;
 
       return { latestVersion, installedVersion, updateAvailable };
@@ -449,8 +478,19 @@ class DictManager {
       const tempPath = path.join(this._getDictDir(), DB_TEMP_FILENAME);
       const finalPath = this._getDbPath();
 
-      // Download the .db.gz file
-      await this._downloadFile(this._latestAssetUrl, tempPath, onProgress);
+      // Download the .db.gz file (resolves with the sha256 hex digest of the payload)
+      const actualDigest = await this._downloadFile(this._latestAssetUrl, tempPath, onProgress);
+
+      // Verify checksum against the GitHub API asset digest before installing
+      const expectedDigest = (this._latestAssetDigest ?? "").replace(/^sha256:/, "").toLowerCase();
+      if (!expectedDigest) {
+        throw new Error(
+          "辞書ファイルのチェックサムが取得できなかったためダウンロードを中止しました",
+        );
+      }
+      if (actualDigest !== expectedDigest) {
+        throw new Error("辞書ファイルのチェックサム検証に失敗しました");
+      }
 
       // Report decompression start
       onProgress?.(95);
@@ -483,6 +523,7 @@ class DictManager {
 
       // Clear cached release info so next download fetches fresh data
       this._latestAssetUrl = null;
+      this._latestAssetDigest = null;
       this._latestVersion = null;
 
       return { success: true, version };
@@ -503,8 +544,10 @@ class DictManager {
 
   /**
    * Download a URL to a local file path, reporting progress.
-   * Follows HTTP redirects (GitHub Releases uses S3 redirects).
+   * Follows HTTP redirects (GitHub Releases uses S3 redirects), but only over https.
+   * Resolves with the sha256 hex digest of the downloaded payload.
    * @private
+   * @returns {Promise<string>}
    */
   _downloadFile(url, destPath, onProgress) {
     return new Promise((resolve, reject) => {
@@ -514,17 +557,28 @@ class DictManager {
           return;
         }
 
-        const parsedUrl = new URL(requestUrl);
-        const lib = parsedUrl.protocol === "https:" ? https : require("http");
+        let parsedUrl;
+        try {
+          parsedUrl = new URL(requestUrl);
+        } catch {
+          reject(new Error("ダウンロードURLの形式が不正です"));
+          return;
+        }
 
-        lib
+        // Security: never follow plaintext http (downgrade attack protection)
+        if (parsedUrl.protocol !== "https:") {
+          reject(new Error("https 以外のダウンロード先は許可されていません"));
+          return;
+        }
+
+        https
           .get(requestUrl, { headers: { "User-Agent": "illusions-app" } }, (res) => {
             // Handle redirects
             if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
               const location = res.headers.location;
               if (location) {
                 res.resume();
-                doRequest(location, redirectCount + 1);
+                doRequest(new URL(location, requestUrl).toString(), redirectCount + 1);
                 return;
               }
             }
@@ -537,9 +591,11 @@ class DictManager {
             const totalBytes = parseInt(res.headers["content-length"] ?? "0", 10);
             let receivedBytes = 0;
             let lastReportedPct = 0;
+            const hash = crypto.createHash("sha256");
 
             const fileStream = fs.createWriteStream(destPath);
             res.on("data", (chunk) => {
+              hash.update(chunk);
               receivedBytes += chunk.length;
               if (totalBytes > 0) {
                 const pct = Math.floor((receivedBytes / totalBytes) * 90); // 0–90%
@@ -550,7 +606,7 @@ class DictManager {
               }
             });
             res.pipe(fileStream);
-            fileStream.on("close", resolve);
+            fileStream.on("close", () => resolve(hash.digest("hex")));
             fileStream.on("error", reject);
             res.on("error", reject);
           })
