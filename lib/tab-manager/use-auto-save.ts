@@ -7,6 +7,7 @@ import { suppressFileWatch } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
 import type { SnapshotType } from "../services/history-policy";
 import { isEditorTab } from "./tab-types";
+import { acquireSaveLock, releaseSaveLock } from "./save-lock";
 import type { TabManagerCore } from "./types";
 import { AUTO_SAVE_INTERVAL, sanitizeMdiContent } from "./types";
 
@@ -85,6 +86,11 @@ export function useAutoSave(params: UseAutoSaveParams): void {
         }
         // Synchronous guard to prevent concurrent saves for the same tab
         if (savingTabIdsRef.current.has(tab.id)) continue;
+        // Fix #1562 (a): unified per-path lock shared with the active-tab
+        // save path (use-file-io.saveFile) so two writes can never target
+        // the same path concurrently.
+        const lockPath = tab.file.path ?? null;
+        if (lockPath && !acquireSaveLock(lockPath)) continue;
         savingTabIdsRef.current.add(tab.id);
 
         // Non-active dirty tabs: save directly
@@ -92,6 +98,14 @@ export function useAutoSave(params: UseAutoSaveParams): void {
         setTabs((prev) => prev.map((t) => (t.id === tab.id ? { ...t, isSaving: true } : t)));
         void (async () => {
           try {
+            // Fix #1562 (b): re-check the latest sync status right before
+            // writing — a file watcher may have flagged a conflict after the
+            // interval snapshot was taken (buildOnChanged mirrors the
+            // conflicted transition into tabsRef synchronously).
+            const latest = tabsRef.current.find((t) => t.id === tab.id);
+            if (!latest || !isEditorTab(latest) || latest.fileSyncStatus === "conflicted") {
+              return;
+            }
             const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
             if (isProjectRef.current && tab.file?.path) {
               const vfs = getProjectFileService();
@@ -159,6 +173,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
             );
           } finally {
             savingTabIdsRef.current.delete(tab.id);
+            if (lockPath) releaseSaveLock(lockPath);
             if (!mountedRef.current) return;
             setTabs((prev) => prev.map((t) => (t.id === tab.id ? { ...t, isSaving: false } : t)));
           }
