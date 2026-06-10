@@ -166,14 +166,19 @@ export async function ensureProjectFiles(
     } catch {
       // project.json exists but is corrupted — back it up and regenerate.
       const backupName = `project.json.corrupt-${Date.now()}`;
+      let backupSucceeded = false;
       try {
         const backupHandle = await illusionsDir.getFileHandle(backupName, { create: true });
         await writeHandleText(backupHandle, raw);
+        backupSucceeded = true;
       } catch {
         // Backup failure is non-fatal; proceed with regeneration.
       }
+      // #1567 item 16: report the backup outcome accurately.
       console.warn(
-        `[Project] project.json が破損しています。${backupName} に退避し、デフォルト設定で再生成します。`,
+        backupSucceeded
+          ? `[Project] project.json が破損しています。${backupName} に退避し、デフォルト設定で再生成します。`
+          : `[Project] project.json が破損しています。バックアップ (${backupName}) の作成に失敗したため、退避せずにデフォルト設定で再生成します。`,
       );
     }
   }

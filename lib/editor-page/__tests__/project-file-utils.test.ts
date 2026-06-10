@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import { MAX_SNAPSHOTS, RETENTION_DAYS } from "@/lib/services/history-policy";
 
@@ -255,6 +255,60 @@ describe("ensureProjectFiles", () => {
       create: false,
     });
     expect(await backupHandle.read()).toBe('{"version":"1.0');
+  });
+
+  it("破損 project.json: バックアップ成功時の warn は退避先を正しく報告する", async () => {
+    const root = makeRoot("CorruptOk", ["CorruptOk.mdi"]);
+    await seedIllusionsFile(root, "project.json", '{"version":"1.0');
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await ensureProjectFiles(asHandle(root), { projectId: "regen-ok" });
+
+      const corruptWarn = warnSpy.mock.calls
+        .map((call) => String(call[0]))
+        .find((message) => message.includes("project.json が破損"));
+      expect(corruptWarn).toBeDefined();
+      expect(corruptWarn).toContain("に退避し、");
+      expect(corruptWarn).not.toContain("失敗");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("破損 project.json: バックアップ作成に失敗 → 退避成功と偽らない warn を出して再生成 (#1567)", async () => {
+    const root = makeRoot("CorruptNoBackup", ["CorruptNoBackup.mdi"]);
+    await seedIllusionsFile(root, "project.json", '{"version":"1.0');
+
+    // Make backup-file creation fail (e.g. read-only / quota error) while
+    // project.json itself stays writable for regeneration.
+    const illusionsDir = await root.getDirectoryHandle(".illusions", { create: false });
+    const originalGetFileHandle = illusionsDir.getFileHandle.bind(illusionsDir);
+    illusionsDir.getFileHandle = async (name, opts): Promise<FakeFile> => {
+      if (name.startsWith("project.json.corrupt-")) {
+        throw Object.assign(new Error("EACCES"), { code: "EACCES" });
+      }
+      return originalGetFileHandle(name, opts);
+    };
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const result = await ensureProjectFiles(asHandle(root), { projectId: "regen-id" });
+
+      // Regeneration still succeeds despite the backup failure.
+      expect(result.repaired).toBe(true);
+      expect(result.metadata.projectId).toBe("regen-id");
+
+      // The warn must NOT claim the backup succeeded (「...に退避し、...」).
+      const corruptWarn = warnSpy.mock.calls
+        .map((call) => String(call[0]))
+        .find((message) => message.includes("project.json が破損"));
+      expect(corruptWarn).toBeDefined();
+      expect(corruptWarn).toContain("失敗");
+      expect(corruptWarn).not.toContain("に退避し、");
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });
 

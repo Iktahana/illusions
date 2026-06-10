@@ -391,12 +391,43 @@ export class ProjectService {
   async validateProjectStructure(rootDirHandle: VFSDirectoryHandle): Promise<ValidationResult> {
     const errors: string[] = [];
 
-    // Check .illusions directory
+    // Check .illusions directory existence by scanning the root entries.
+    // On Electron, getDirectoryHandle(name, { create: false }) never throws for
+    // a missing directory (it just wraps the path — see electron-vfs.ts), so a
+    // real existence check is required to report the error accurately on both
+    // platforms (#1567 item 15).
+    // Electron の getDirectoryHandle は存在しないディレクトリでも throw しない
+    // ため、entries() の走査で .illusions の実在を確認する。
+    let illusionsDirExists = false;
+    let entriesScanFailed = false;
+    try {
+      for await (const [name, entry] of rootDirHandle.entries()) {
+        if (name === ".illusions" && entry.kind === "directory") {
+          illusionsDirExists = true;
+          break;
+        }
+      }
+    } catch {
+      // Root unreadable (permission loss, transient I/O): existence is UNKNOWN.
+      // Do not conclude absence here — fall through to the handle probe so a
+      // read failure is not misreported as a missing directory.
+      entriesScanFailed = true;
+    }
+    if (!illusionsDirExists && !entriesScanFailed) {
+      errors.push(".illusions directory not found");
+      return { valid: false, errors };
+    }
+
+    // Obtain the handle (Web may still throw natively, e.g. permission loss)
     let illusionsDir: VFSDirectoryHandle | null = null;
     try {
       illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: false });
     } catch {
-      errors.push(".illusions directory not found");
+      errors.push(
+        entriesScanFailed
+          ? ".illusions directory is not accessible"
+          : ".illusions directory not found",
+      );
       return { valid: false, errors };
     }
 
