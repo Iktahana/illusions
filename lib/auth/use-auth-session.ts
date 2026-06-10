@@ -13,6 +13,9 @@
  * - The async startup restore and refresh tasks are cancel-guarded: when they
  *   resolve after unmount they neither set state nor schedule a new timer
  *   (the per-mount scheduler is disposed in the effect cleanup).
+ * - Logout is a HARD session boundary (session-epoch.ts): in-flight restore /
+ *   refresh / OAuth work started before logout discards its result — no
+ *   setUser, no re-persisted tokens, no rescheduled timer.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,6 +28,11 @@ import {
 } from "./electron-session";
 import { isElectronAuthErrorPermanent, resetRefreshState } from "./refresh-single-flight";
 import { createRefreshScheduler } from "./refresh-scheduler";
+import {
+  getSessionEpoch,
+  invalidateSessionEpoch,
+  isSessionInvalidatedError,
+} from "./session-epoch";
 import { clearTokens } from "./token-storage";
 import { fetchMe, webLogout } from "./web-session";
 import type { AuthUser } from "./auth-user";
@@ -50,12 +58,16 @@ export function useAuthSession(): AuthSessionState {
       const authApi = getElectronAuthApi();
       if (!authApi) return;
 
+      const epochAtStart = getSessionEpoch();
       try {
-        const session = await refreshElectronSession(authApi, refreshToken);
-        if (!schedulerRef.current) return; // unmounted while refreshing
+        const session = await refreshElectronSession(authApi, refreshToken, epochAtStart);
+        // Unmounted or logged out while refreshing — discard the result.
+        if (!schedulerRef.current || getSessionEpoch() !== epochAtStart) return;
         setUser(session.user);
         scheduleElectronRefresh(session.expiresAt, session.refreshToken);
       } catch (err) {
+        // Logout fenced this refresh — tokens already handled, never retry.
+        if (isSessionInvalidatedError(err) || getSessionEpoch() !== epochAtStart) return;
         if (isElectronAuthErrorPermanent(err)) {
           // Permanent failure (4xx / invalid_grant): token is invalid — log out
           if (schedulerRef.current) setUser(null);
@@ -71,8 +83,10 @@ export function useAuthSession(): AuthSessionState {
   // --- Web refresh cycle ---
   const scheduleWebRefresh = useCallback((expiresAt: number): void => {
     schedulerRef.current?.schedule(expiresAt, async () => {
+      const epochAtStart = getSessionEpoch();
       const me = await fetchMe();
-      if (!schedulerRef.current) return; // unmounted while probing
+      // Unmounted or logged out while probing — discard the result.
+      if (!schedulerRef.current || getSessionEpoch() !== epochAtStart) return;
       if (me.authenticated && me.user) {
         setUser(me.user);
         if (me.expiresAt) scheduleWebRefresh(me.expiresAt);
@@ -96,11 +110,12 @@ export function useAuthSession(): AuthSessionState {
     isElectron.current = electron;
 
     async function restore(): Promise<void> {
+      const epochAtStart = getSessionEpoch();
       try {
         if (electron) {
           // Electron: restore session from safeStorage-backed token storage
-          const session = await restoreElectronSession();
-          if (cancelled) return;
+          const session = await restoreElectronSession(epochAtStart);
+          if (cancelled || getSessionEpoch() !== epochAtStart) return;
           if (session) {
             setUser(session.user);
             scheduleElectronRefresh(session.expiresAt, session.refreshToken);
@@ -108,7 +123,7 @@ export function useAuthSession(): AuthSessionState {
         } else {
           // Web: check session via httpOnly cookies
           const me = await fetchMe();
-          if (cancelled) return;
+          if (cancelled || getSessionEpoch() !== epochAtStart) return;
           if (me.authenticated && me.user) {
             setUser(me.user);
             if (me.expiresAt) scheduleWebRefresh(me.expiresAt);
@@ -149,15 +164,19 @@ export function useAuthSession(): AuthSessionState {
 
       if (!data.code || !data.state) return;
 
+      const epochAtStart = getSessionEpoch();
       try {
-        const session = await completeElectronOAuthCallback(authApi, {
-          code: data.code,
-          state: data.state,
-        });
-        if (!schedulerRef.current) return; // unmounted during the exchange
+        const session = await completeElectronOAuthCallback(
+          authApi,
+          { code: data.code, state: data.state },
+          epochAtStart,
+        );
+        // Unmounted or logged out during the exchange — discard the result.
+        if (!schedulerRef.current || getSessionEpoch() !== epochAtStart) return;
         setUser(session.user);
         scheduleElectronRefresh(session.expiresAt, session.refreshToken);
       } catch (err) {
+        if (isSessionInvalidatedError(err)) return;
         console.error("[auth] Token exchange failed:", err);
       }
     });
@@ -180,6 +199,10 @@ export function useAuthSession(): AuthSessionState {
 
   // --- Logout ---
   const logout = useCallback(async (): Promise<void> => {
+    // Hard session boundary: invalidate ALL in-flight auth work (restore /
+    // refresh / OAuth) so late completions cannot setUser, re-persist rotated
+    // tokens, or reschedule a refresh after this point (Codex review, #1437).
+    invalidateSessionEpoch();
     // Guaranteed cleanup on logout (#1567): cancel the pending refresh timer.
     schedulerRef.current?.clear();
     // Reset single-flight/permanent-failure state so a subsequent login starts clean.

@@ -14,7 +14,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React, { useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { act } from "react";
+import { refreshElectronSession } from "../electron-session";
+import { getSessionEpoch, invalidateSessionEpoch, SessionInvalidatedError } from "../session-epoch";
 import { useAuthSession } from "../use-auth-session";
+import type { ElectronAuthApi } from "../electron-session";
 import type { AuthSessionState } from "../use-auth-session";
 import type { StoredTokens } from "../token-storage";
 
@@ -176,6 +179,98 @@ describe("#1567 — refresh timer lifecycle in useAuthSession", () => {
 
     expect(vi.getTimerCount()).toBe(0);
     expect(sessionRef.current?.user).toBeNull();
+    expect(clearTokensMock).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1437 Codex review — logout must be a HARD session boundary
+// ---------------------------------------------------------------------------
+
+describe("session epoch — logout fences in-flight auth work", () => {
+  it("discards an in-flight refresh that completes after logout", async () => {
+    // Refresh timer fires 5 min before expiry — pick a 6-min token so the
+    // timer fires after ~1 min.
+    const tokens: StoredTokens = {
+      accessToken: "access",
+      refreshToken: "refresh",
+      expiresAt: Date.now() + 6 * 60 * 1000,
+    };
+    loadTokensMock.mockImplementation(async () => tokens);
+
+    let resolveRefresh: (r: {
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+    }) => void = () => undefined;
+    const authApi = (window as unknown as { electronAPI: { auth: ElectronAuthApi } }).electronAPI
+      .auth;
+    vi.mocked(authApi.refreshToken).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+
+    await act(async () => {
+      root.render(<Harness />);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(sessionRef.current?.user?.id).toBe("user-1");
+    expect(vi.getTimerCount()).toBe(1);
+
+    // Fire the refresh timer; the token request stays in flight.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2 * 60 * 1000);
+    });
+    expect(authApi.refreshToken).toHaveBeenCalled();
+
+    // Logout while the refresh is in flight — the hard boundary.
+    await act(async () => {
+      await sessionRef.current?.logout();
+    });
+    saveTokensMock.mockClear();
+
+    // The refresh now completes — after logout.
+    await act(async () => {
+      resolveRefresh({ access_token: "rotated", refresh_token: "rotated-r", expires_in: 3600 });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // Rotated tokens must NOT be re-persisted, user stays logged out,
+    // and no refresh timer is rescheduled.
+    expect(saveTokensMock).not.toHaveBeenCalled();
+    expect(sessionRef.current?.user).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("compensates with clearTokens when logout lands while saveTokens is in flight", async () => {
+    let resolveSave: () => void = () => undefined;
+    saveTokensMock.mockImplementation(
+      () =>
+        new Promise<undefined>((resolve) => {
+          resolveSave = (): void => resolve(undefined);
+        }),
+    );
+    const authApi = (window as unknown as { electronAPI: { auth: ElectronAuthApi } }).electronAPI
+      .auth;
+    vi.mocked(authApi.refreshToken).mockResolvedValue({
+      access_token: "rotated",
+      refresh_token: "rotated-r",
+      expires_in: 3600,
+    });
+
+    const epochAtStart = getSessionEpoch();
+    const pending = refreshElectronSession(authApi, "refresh-2", epochAtStart);
+    await vi.advanceTimersByTimeAsync(0); // reach the in-flight saveTokens
+
+    invalidateSessionEpoch(); // logout lands mid-save
+    resolveSave();
+
+    await expect(pending).rejects.toBeInstanceOf(SessionInvalidatedError);
+    // The compensating clear guarantees rotated tokens never outlive logout.
     expect(clearTokensMock).toHaveBeenCalled();
   });
 });
