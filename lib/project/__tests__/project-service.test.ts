@@ -5,6 +5,7 @@
  * - validateProjectName: all validation rules (pure function, no mocks needed)
  * - getProjectService: singleton returns same instance
  * - readStandaloneContent: Electron IPC path reads from VFS; Web path rejects
+ * - validateProjectStructure: must NOT create .illusions directory (create:false)
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -151,5 +152,61 @@ describe("getProjectService", () => {
     expect(typeof service.validateProjectStructure).toBe("function");
     expect(typeof service.readProjectContent).toBe("function");
     expect(typeof service.readStandaloneContent).toBe("function");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: validateProjectStructure — no side-effect creation
+// ---------------------------------------------------------------------------
+
+describe("validateProjectStructure", () => {
+  it("returns invalid when .illusions directory does not exist (no directory created)", async () => {
+    // Mock a directory handle where .illusions is absent
+    const getDirectoryHandleMock = vi
+      .fn<(name: string, opts?: { create?: boolean }) => Promise<never>>()
+      .mockRejectedValue(new DOMException("Not found", "NotFoundError"));
+
+    const fakeRoot = {
+      getDirectoryHandle: getDirectoryHandleMock,
+    } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
+
+    const result = await getProjectService().validateProjectStructure(fakeRoot);
+
+    // Must report invalid
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(".illusions directory not found");
+
+    // The call must have used create: false (not create: true)
+    expect(getDirectoryHandleMock).toHaveBeenCalledWith(".illusions", { create: false });
+  });
+
+  it("returns invalid when project.json is missing inside .illusions", async () => {
+    const getFileHandleMock = vi
+      .fn<(name: string) => Promise<never>>()
+      .mockRejectedValue(new DOMException("Not found", "NotFoundError"));
+
+    const fakeIllusionsDir = {
+      getFileHandle: getFileHandleMock,
+    } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
+
+    const getDirectoryHandleMock = vi
+      .fn<
+        (
+          name: string,
+          opts?: { create?: boolean },
+        ) => Promise<import("@/lib/vfs/types").VFSDirectoryHandle>
+      >()
+      .mockResolvedValue(fakeIllusionsDir);
+
+    const fakeRoot = {
+      getDirectoryHandle: getDirectoryHandleMock,
+    } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
+
+    const result = await getProjectService().validateProjectStructure(fakeRoot);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes("project.json"))).toBe(true);
+    // Still must not have created the directory
+    expect(getDirectoryHandleMock).toHaveBeenCalledWith(".illusions", { create: false });
   });
 });
