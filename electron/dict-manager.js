@@ -574,7 +574,13 @@ class DictManager {
         https
           .get(requestUrl, { headers: { "User-Agent": "illusions-app" } }, (res) => {
             // Handle redirects
-            if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
+            if (
+              res.statusCode === 301 ||
+              res.statusCode === 302 ||
+              res.statusCode === 303 ||
+              res.statusCode === 307 ||
+              res.statusCode === 308
+            ) {
               const location = res.headers.location;
               if (location) {
                 res.resume();
