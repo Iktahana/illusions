@@ -4,7 +4,7 @@
 const { app, BrowserWindow, dialog, shell } = require("electron");
 const path = require("path");
 const { isDev } = require("./app-constants");
-const { isSafeExternalUrl } = require("./lib/url-policy");
+const { isSafeExternalUrl, normalizeExternalUrl } = require("./lib/url-policy");
 
 let mainWindow = null;
 const allWindows = new Set();
@@ -65,7 +65,12 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
     // All other schemes (file:, smb:, javascript:, ...) and unparseable
     // URLs are denied — fail closed (#1567 S3).
     if (isSafeExternalUrl(url)) {
-      shell.openExternal(url);
+      // Open the normalized form, not the raw renderer string; handle the
+      // returned promise so OS handler failures cannot become unhandled
+      // rejections in the main process.
+      shell.openExternal(normalizeExternalUrl(url)).catch((error) => {
+        console.warn("[Security] shell.openExternal failed:", error);
+      });
     } else {
       console.warn("[Security] Blocked external open of non-http(s) URL:", url);
     }

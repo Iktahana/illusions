@@ -16,6 +16,15 @@ const { isSafeExternalUrl } = require("../../../electron/lib/url-policy") as {
 };
 
 describe("isSafeExternalUrl()", () => {
+  it("normalizes opaque special-scheme forms per WHATWG (http:evil.com is a web URL)", () => {
+    // WHATWG URL force-normalizes special schemes: "http:evil.com" parses as
+    // "http://evil.com/" — a genuine hierarchical web URL, allowed by design.
+    expect(isSafeExternalUrl("http:evil.com")).toBe(true);
+    // Authority-less forms fail to parse at all -> denied (fail closed).
+    expect(isSafeExternalUrl("http://")).toBe(false);
+    expect(isSafeExternalUrl("https:")).toBe(false);
+  });
+
   it("allows a plain https URL", () => {
     expect(isSafeExternalUrl("https://illusions.app/")).toBe(true);
   });

@@ -27,7 +27,22 @@ function isSafeExternalUrl(url) {
     // Fail closed on unparseable URLs
     return false;
   }
-  return ALLOWED_EXTERNAL_PROTOCOLS.includes(parsed.protocol);
+  // Defense in depth: require a hostname. Note WHATWG URL force-normalizes
+  // special schemes ("http:evil.com" parses as "http://evil.com/", hostname
+  // "evil.com"), so for http(s) this is currently always true when parsing
+  // succeeded — the check guards against future relaxations of the allowlist.
+  return ALLOWED_EXTERNAL_PROTOCOLS.includes(parsed.protocol) && parsed.hostname.length > 0;
 }
 
-module.exports = { isSafeExternalUrl, ALLOWED_EXTERNAL_PROTOCOLS };
+/**
+ * Normalized string form of a validated URL. Call only after
+ * isSafeExternalUrl() returned true — opening the normalized form avoids
+ * passing the raw renderer-controlled string to the OS.
+ * @param {string} url
+ * @returns {string}
+ */
+function normalizeExternalUrl(url) {
+  return new URL(url).toString();
+}
+
+module.exports = { isSafeExternalUrl, normalizeExternalUrl, ALLOWED_EXTERNAL_PROTOCOLS };
