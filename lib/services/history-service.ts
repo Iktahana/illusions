@@ -89,12 +89,14 @@ export class HistoryService {
    * Create a history snapshot.
    *
    * Flow:
-   *   a) HistoryPolicy.shouldCreateSnapshot — return null if throttled (auto only)
+   *   a) HistoryPolicy.shouldCreateSnapshot — fast-path: return null if
+   *      obviously throttled (auto only), without taking the lock
    *   b) Build SnapshotEntry (timestamp, filename, checksum, size, type)
-   *   c) withIndexLock → loadIndex → writeSnapshotFile → update index
-   *      (add entry, prune via Policy.getPruneSet) → saveIndex → releaseLock
+   *   c) withIndexLock → loadIndex → re-run throttle check (TOCTOU safety;
+   *      auto only) → writeSnapshotFile → update index (add entry, prune via
+   *      Policy.getPruneSet) → saveIndex → releaseLock
    *   d) Emit onSnapshotCreated listeners
-   *   e) Return new entry
+   *   e) Return new entry (or null if throttled inside the lock)
    *
    * 履歴スナップショットを作成する。
    *
@@ -105,7 +107,9 @@ export class HistoryService {
     const { sourcePath, displayName: displayNameOption, content, type = "auto", label } = options;
 
     try {
-      // a) Throttle check — only "auto" is throttled
+      // a) Throttle fast-path — only "auto" is throttled. This pre-check is a
+      // cheap optimization that avoids taking the lock when obviously
+      // throttled; the authoritative check is re-run inside the lock (step c).
       const index = await this.store.loadIndex();
       const lastEntry = index.snapshots.find((s) => getSnapshotSourceKey(s) === sourcePath);
       const lastSnapshotAt = lastEntry?.timestamp;
@@ -142,12 +146,25 @@ export class HistoryService {
       }
 
       // c) Write file + update index under lock
-      await this.store.withIndexLock(async () => {
-        // Write the snapshot file first
+      const created = await this.store.withIndexLock(async (): Promise<boolean> => {
+        // Re-read index inside lock FIRST (TOCTOU safety): another caller may
+        // have created a snapshot between the fast-path check (a) and
+        // acquiring this lock, so the throttle must be re-checked here.
+        const lockedIndex = await this.store.loadIndex();
+
+        if (type === "auto") {
+          const lockedLastEntry = lockedIndex.snapshots.find(
+            (s) => getSnapshotSourceKey(s) === sourcePath,
+          );
+          if (!policyCheckThrottle(sourcePath, lockedLastEntry?.timestamp, type)) {
+            // Throttled inside the lock — skip the write entirely.
+            return false;
+          }
+        }
+
+        // Write the snapshot file
         await this.store.writeSnapshotFile(sourcePath, filename, content);
 
-        // Re-read index inside lock (TOCTOU safety)
-        const lockedIndex = await this.store.loadIndex();
         lockedIndex.snapshots.unshift(entry);
 
         // Prune according to policy
@@ -161,7 +178,12 @@ export class HistoryService {
         }
 
         await this.store.saveIndex(lockedIndex);
+        return true;
       });
+
+      if (!created) {
+        return null;
+      }
 
       // d) Notify listeners
       this.notifySnapshotCreated(entry);
