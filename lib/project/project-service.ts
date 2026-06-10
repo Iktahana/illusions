@@ -394,7 +394,7 @@ export class ProjectService {
     // Check .illusions directory
     let illusionsDir: VFSDirectoryHandle | null = null;
     try {
-      illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
+      illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: false });
     } catch {
       errors.push(".illusions directory not found");
       return { valid: false, errors };
