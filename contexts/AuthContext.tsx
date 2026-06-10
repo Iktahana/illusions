@@ -15,6 +15,7 @@ import {
   refreshTokenSingleFlight,
   resetRefreshState,
 } from "@/lib/auth/refresh-single-flight";
+import { saveTokens, loadTokens, clearTokens } from "@/lib/auth/token-storage";
 
 export interface AuthUser {
   id: string;
@@ -46,74 +47,6 @@ export function useAuth(): AuthContextValue {
  */
 export function useAuthSafe(): AuthContextValue | null {
   return useContext(AuthContext);
-}
-
-// ---------------------------------------------------------------------------
-// Electron-only token persistence (safeStorage / IPC)
-// ---------------------------------------------------------------------------
-
-interface StoredTokens {
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number;
-}
-
-async function saveTokens(tokens: StoredTokens): Promise<void> {
-  const api = window.electronAPI;
-  if (!api?.safeStorage || !api?.storage) return;
-
-  try {
-    const isAvailable = await api.safeStorage.isAvailable();
-    if (isAvailable) {
-      const json = JSON.stringify(tokens);
-      const encrypted = await api.safeStorage.encrypt(json);
-      if (encrypted) {
-        await api.storage.setItem("auth:tokens", encrypted);
-        return;
-      }
-    }
-  } catch {
-    // safeStorage not available, fall back to plain storage
-  }
-
-  // Fallback: store without encryption (less secure but functional)
-  await api.storage.setItem("auth:tokens", JSON.stringify(tokens));
-}
-
-async function loadTokens(): Promise<StoredTokens | null> {
-  const api = window.electronAPI;
-  if (!api?.storage) return null;
-
-  try {
-    const stored = await api.storage.getItem("auth:tokens");
-    if (!stored) return null;
-
-    // Try to decrypt first (encrypted data)
-    if (api.safeStorage) {
-      try {
-        const isAvailable = await api.safeStorage.isAvailable();
-        if (isAvailable) {
-          const decrypted = await api.safeStorage.decrypt(stored);
-          if (decrypted) {
-            return JSON.parse(decrypted) as StoredTokens;
-          }
-        }
-      } catch {
-        // Not encrypted or decryption failed, try parsing directly
-      }
-    }
-
-    // Fallback: try parsing as plain JSON
-    return JSON.parse(stored) as StoredTokens;
-  } catch {
-    return null;
-  }
-}
-
-async function clearTokens(): Promise<void> {
-  const api = window.electronAPI;
-  if (!api?.storage) return;
-  await api.storage.removeItem("auth:tokens");
 }
 
 // ---------------------------------------------------------------------------
