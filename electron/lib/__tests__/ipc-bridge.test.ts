@@ -38,7 +38,7 @@ const { createIpcBridge } = require("../../../electron/lib/ipc-bridge") as {
   }) => {
     invokeChannel: (
       channel: string,
-      mapArgs?: (...args: unknown[]) => unknown,
+      shape?: ((...args: unknown[]) => unknown) | { arity: number },
     ) => (...args: unknown[]) => Promise<unknown>;
     eventChannel: (channel: string) => (callback: (payload: unknown) => void) => () => void;
   };
@@ -150,12 +150,25 @@ describe("ipc-bridge helpers: behavior parity with the hand-written wrappers", (
     };
   }
 
-  it("invokeChannel forwards all arguments to ipcRenderer.invoke", async () => {
+  it("invokeChannel forwards exactly `arity` arguments and drops extras (least authority)", async () => {
     const renderer = makeFakeRenderer();
     const { invokeChannel } = createIpcBridge(renderer);
-    const setItem = invokeChannel("storage:set-item");
+    const setItem = invokeChannel("storage:set-item", { arity: 2 });
     await expect(setItem("key", { a: 1 })).resolves.toBe("ok");
     expect(renderer.invoke).toHaveBeenCalledWith("storage:set-item", "key", { a: 1 });
+
+    // Extra renderer-supplied arguments never cross the IPC boundary —
+    // matching the legacy fixed-arity hand-written wrappers (Codex review).
+    await setItem("key", { a: 1 }, "unexpected-extra");
+    expect(renderer.invoke).toHaveBeenLastCalledWith("storage:set-item", "key", { a: 1 });
+  });
+
+  it("invokeChannel without arity forwards nothing (zero-arg channels)", async () => {
+    const renderer = makeFakeRenderer();
+    const { invokeChannel } = createIpcBridge(renderer);
+    const loadSession = invokeChannel("storage:load-session", { arity: 0 });
+    await loadSession("stray-argument");
+    expect(renderer.invoke).toHaveBeenCalledWith("storage:load-session");
   });
 
   it("invokeChannel with mapArgs reshapes positional args into the payload object", async () => {

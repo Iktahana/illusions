@@ -27,17 +27,26 @@ const { ipcRenderer } = require("electron");
  */
 function createIpcBridge(renderer) {
   /**
-   * invokeChannel(channel) -> (...args) => Promise
-   * invokeChannel(channel, mapArgs) -> (...args) => invoke(channel, mapArgs(...args))
+   * invokeChannel(channel, { arity }) -> (...args) => invoke(channel, ...args.slice(0, arity))
+   * invokeChannel(channel, mapArgs)   -> (...args) => invoke(channel, mapArgs(...args))
+   *
+   * Least authority (Codex review, #1434): the legacy hand-written wrappers
+   * had FIXED arity and silently dropped unexpected extra renderer arguments.
+   * The declarative form preserves that property — every invoke channel must
+   * declare its arity (or a mapArgs reshaper, which fixes the payload shape
+   * by construction); extra arguments never cross the IPC boundary.
+   *
    * @param {string} channel
-   * @param {(...args: unknown[]) => unknown} [mapArgs] reshape caller args into a single payload
+   * @param {((...args: unknown[]) => unknown) | { arity: number }} shape
+   *   reshaper function, or the exact number of forwarded arguments
    * @returns {(...args: unknown[]) => Promise<unknown>}
    */
-  function invokeChannel(channel, mapArgs) {
-    if (mapArgs) {
-      return (...args) => renderer.invoke(channel, mapArgs(...args));
+  function invokeChannel(channel, shape) {
+    if (typeof shape === "function") {
+      return (...args) => renderer.invoke(channel, shape(...args));
     }
-    return (...args) => renderer.invoke(channel, ...args);
+    const arity = shape?.arity ?? 0;
+    return (...args) => renderer.invoke(channel, ...args.slice(0, arity));
   }
 
   /**
