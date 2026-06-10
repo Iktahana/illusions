@@ -145,7 +145,7 @@ export function buildOnChanged(
                   "pre-external-reload",
                   filePath,
                   displayName,
-                  localContent,
+                  currentTab.content,
                 );
               }
 

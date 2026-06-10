@@ -172,6 +172,46 @@ describe("G2: pre-external-reload snapshot", () => {
     expect(callOrder).toContain("setTabs");
   });
 
+  it("uses the LATEST in-memory content when user edits after conflict is detected", async () => {
+    // Regression test for issue #1561:
+    // localContent is captured at conflict-detection time; if the user types more
+    // between the toast appearing and clicking "ディスクの内容を採用", the snapshot
+    // must record the updated content, not the stale closure value.
+    const onChanged = buildOnChanged(
+      "tab-1",
+      setTabs,
+      tabsRef,
+      openDiffTab,
+      onEditorRemountNeeded,
+      tryCreateSnapshot,
+    );
+
+    // External change detected: tab has draft A at this point
+    onChanged("disk content version", 2_000_000);
+
+    // User continues editing → draft B (simulate by updating tabsRef directly)
+    const updatedTab: EditorTabState = {
+      ...tab,
+      content: "draft B — additional paragraphs written after conflict",
+      isDirty: true,
+      fileSyncStatus: "conflicted",
+      conflictDiskContent: "disk content version",
+    };
+    tabsRef.current = [updatedTab];
+
+    // User now clicks "ディスクの内容を採用"
+    const acceptDisk = getActionCallback("ディスクの内容を採用");
+    acceptDisk();
+
+    // Snapshot must contain draft B, not the stale draft A
+    expect(tryCreateSnapshot).toHaveBeenCalledWith(
+      "pre-external-reload",
+      "/p/main.mdi",
+      "main.mdi",
+      "draft B — additional paragraphs written after conflict",
+    );
+  });
+
   it("uses display name fallback when file.name is missing", () => {
     const tabWithoutName = makeDirtyEditorTab({
       file: { path: "/p/main.mdi", handle: null, name: "" },
