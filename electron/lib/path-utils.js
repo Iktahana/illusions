@@ -3,6 +3,29 @@ const fs = require("fs/promises");
 const path = require("path");
 
 /**
+ * Normalize path separators to forward slashes (no path.resolve, no trailing-slash trim).
+ * Shared primitive used by both file-ipc.js and vfs-ipc.js so separator handling
+ * cannot drift between the two security boundaries (#1435).
+ * @param {string} p
+ * @returns {string}
+ */
+function normalizeSeparators(p) {
+  return p.replace(/\\/g, "/");
+}
+
+/**
+ * Remove trailing slashes ("/foo//" → "/foo").
+ * NOTE: this turns the bare filesystem root "/" into "" — callers that may receive
+ * the bare root must apply deny checks compatible with that representation
+ * (vfs-ipc.js has always done this; file-ipc.js intentionally does NOT trim).
+ * @param {string} p
+ * @returns {string}
+ */
+function trimTrailingSlashes(p) {
+  return p.replace(/\/+$/, "");
+}
+
+/**
  * Resolves a path and normalizes all separators to forward slashes.
  * Also strips Windows extended-path prefix (\\?\, //./), and UNC paths become //server/share/...
  * @param {string} p
@@ -104,6 +127,8 @@ async function resolveRealPath(p) {
 }
 
 module.exports = {
+  normalizeSeparators,
+  trimTrailingSlashes,
   toForwardSlash,
   assertPathInsideRoot,
   getWindowsDenyPrefixes,
