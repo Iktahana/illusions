@@ -229,15 +229,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
     isAvailable: () => ipcRenderer.invoke("safe-storage:is-available"),
   },
   power: {
+    // Returns an unsubscribe function that removes ONLY this wrapper.
+    // (removeOnPowerStateChange was removed in #1567 S3: it used
+    // removeAllListeners, which nuked other components' listeners.)
     onPowerStateChange: (callback) => {
       const handler = (_event, state) => callback(state);
       ipcRenderer.on("power:state-changed", handler);
       return () => ipcRenderer.removeListener("power:state-changed", handler);
     },
     getPowerState: () => ipcRenderer.invoke("power:get-state"),
-    removeOnPowerStateChange: () => {
-      ipcRenderer.removeAllListeners("power:state-changed");
-    },
   },
   editor: {
     popoutPanel: (bufferId, content, fileName, fileType) =>
