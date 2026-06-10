@@ -7,19 +7,18 @@
 const { ipcMain, dialog, app, BrowserWindow, webContents } = require("electron");
 const fs = require("fs/promises");
 const path = require("path");
-const os = require("os");
+const { createApprovedPathRegistry } = require("../lib/approved-paths");
 const {
   toForwardSlash,
   assertPathInsideRoot,
-  getWindowsDenyPrefixes,
+  normalizeSeparators,
+  trimTrailingSlashes,
   resolveRealPath,
 } = require("../lib/path-utils");
+const { isSensitiveSystemPath, MAX_CONTENT_BYTES } = require("../lib/path-policy");
 // #1476: rehydration — begin
 const { loadApprovals, saveApprovals } = require("../lib/vfs-approvals");
 // #1476: rehydration — end
-
-/** Maximum content size accepted by write-file (same limit as file-ipc.js) */
-const MAX_CONTENT_BYTES = 50 * 1024 * 1024; // 50 MB
 
 function registerVFSHandlers() {
   // Track the opened root directory per window for path validation.
@@ -43,11 +42,12 @@ function registerVFSHandlers() {
   }
 
   // Track paths that were selected via the native file dialog.
-  // Uses a bounded LRU map per window to prevent unbounded memory growth
-  // and to avoid cross-window path reuse (consistent with file-ipc.js).
-  const MAX_APPROVED_PATHS = 200;
-  /** @type {Map<number, Map<string, true>>} webContentsId -> (path -> true) LRU map */
-  const dialogApprovedPaths = new Map();
+  // Per-window bounded LRU semantics live in electron/lib/approved-paths.js
+  // (same registry as file-ipc.js — prevents unbounded memory growth and
+  // cross-window path reuse). Intentional difference vs file-ipc.js: this
+  // registry is created per registerVFSHandlers() call and stays encapsulated
+  // inside the VFS handler closure.
+  const dialogApprovedPaths = createApprovedPathRegistry();
 
   // #1476: rehydration — begin
   /**
@@ -88,44 +88,24 @@ function registerVFSHandlers() {
   // #1476: rehydration — end
 
   /**
-   * Get or create the per-window LRU path map for a given webContentsId.
-   * @param {number} webContentsId - The webContents ID of the BrowserWindow
-   * @returns {Map<string, true>}
-   */
-  function getWindowApprovedPaths(webContentsId) {
-    if (!dialogApprovedPaths.has(webContentsId)) {
-      dialogApprovedPaths.set(webContentsId, new Map());
-    }
-    return dialogApprovedPaths.get(webContentsId);
-  }
-
-  /**
    * Add a path to the dialog-approved set for a specific window, with LRU eviction.
-   * When the per-window set exceeds MAX_APPROVED_PATHS, the oldest entry is evicted.
+   * Delegates to the shared per-window registry (electron/lib/approved-paths.js).
    * @param {number} senderId - The webContents ID of the approving window
    * @param {string} p - The path to approve
    */
   function approveDialogPath(senderId, p) {
-    const windowPaths = getWindowApprovedPaths(senderId);
-    // Delete first so re-insertion moves it to the end (most recent)
-    windowPaths.delete(p);
-    windowPaths.set(p, true);
-    // Evict oldest entry if over capacity
-    if (windowPaths.size > MAX_APPROVED_PATHS) {
-      const oldest = windowPaths.keys().next().value;
-      if (oldest !== undefined) {
-        windowPaths.delete(oldest);
-      }
-    }
+    dialogApprovedPaths.approve(senderId, p);
   }
 
   /**
    * Normalize path separators to forward slashes for cross-platform compatibility.
-   * This ensures Windows backslashes (\) and Unix forward slashes (/) are handled consistently.
+   * Intentional difference vs file-ipc.js: trailing slashes are trimmed here
+   * because VFS roots are prefix-matched (`${root}/`) by assertPathInsideRoot.
+   * @param {string} p
+   * @returns {string}
    */
   function normalizePath(p) {
-    // Replace all backslashes with forward slashes and remove trailing slashes
-    return p.replace(/\\/g, "/").replace(/\/+$/, "");
+    return trimTrailingSlashes(normalizeSeparators(p));
   }
 
   /**
@@ -186,8 +166,9 @@ function registerVFSHandlers() {
     };
   });
 
-  // Maximum file size allowed for VFS read (50 MB, same as file-ipc.js)
-  const MAX_READ_BYTES = 50 * 1024 * 1024;
+  // Maximum file size allowed for VFS read — intentionally the same 50 MB limit
+  // as the shared write/save limit (electron/lib/path-policy.js)
+  const MAX_READ_BYTES = MAX_CONTENT_BYTES;
 
   // Read file content
   ipcMain.handle("vfs:read-file", async (event, filePath) => {
@@ -331,67 +312,31 @@ function registerVFSHandlers() {
   });
 
   /**
+   * Extra home-relative deny prefixes specific to the VFS policy (forward-slash
+   * normalized Windows credential stores). Intentional difference vs
+   * file-ipc.js (isSavePathDenied): the VFS exposes read access to a whole
+   * approved tree, so credential stores are denied in addition to the shared
+   * base policy in electron/lib/path-policy.js.
+   * @type {readonly string[]}
+   */
+  const VFS_EXTRA_HOME_SENSITIVE_SUFFIXES = [
+    "/AppData/Roaming/Microsoft/Credentials",
+    "/AppData/Roaming/Microsoft/Protect",
+    "/AppData/Local/Microsoft/Credentials",
+  ];
+
+  /**
    * Check if a path is in the system-sensitive denylist.
    * Prevents access to critical system directories and credential stores.
+   * Delegates to the shared policy plus the VFS-specific extras above.
    *
    * @param {string} normalizedPath - Forward-slash normalized absolute path
    * @returns {boolean} true if the path should be denied
    */
   function isDeniedPath(normalizedPath) {
-    const homedir = normalizePath(os.homedir());
-
-    // System root directories (Unix + macOS + Windows)
-    // Treated as prefixes — block the directory itself AND any nested path
-    const denyPrefixes = [
-      "/",
-      "/etc",
-      "/usr",
-      "/bin",
-      "/sbin",
-      "/var",
-      "/tmp",
-      "/System",
-      "/private",
-      "/private/etc",
-      "/private/var",
-    ];
-
-    // Add Windows drive roots and system directories
-    const driveLetterMatch = normalizedPath.match(/^([a-zA-Z]):?\/?$/);
-    if (driveLetterMatch) return true; // Bare drive root (C:/ or C:)
-
-    const windowsDenyPrefixes = getWindowsDenyPrefixes();
-
-    // Sensitive directories within home
-    const homeSensitiveSuffixes = [
-      "/.ssh",
-      "/.gnupg",
-      "/.aws",
-      "/.kube",
-      "/.docker",
-      "/.config/gcloud",
-      "/Library/Keychains",
-      // Windows (forward-slash normalized)
-      "/AppData/Roaming/Microsoft/Credentials",
-      "/AppData/Roaming/Microsoft/Protect",
-      "/AppData/Local/Microsoft/Credentials",
-    ];
-
-    // Treat denied roots as prefixes — block any nested path under them
-    if (denyPrefixes.some((dir) => normalizedPath === dir || normalizedPath.startsWith(`${dir}/`)))
-      return true;
-    if (normalizedPath === homedir) return true;
-    const normalizedLower = normalizedPath.toLowerCase();
-    if (
-      windowsDenyPrefixes.some((p) => {
-        const pLower = p.toLowerCase();
-        return normalizedLower === pLower || normalizedLower.startsWith(`${pLower}/`);
-      })
-    )
-      return true;
-    if (homeSensitiveSuffixes.some((s) => normalizedPath.startsWith(homedir + s))) return true;
-
-    return false;
+    return isSensitiveSystemPath(normalizedPath, {
+      extraHomeSensitiveSuffixes: VFS_EXTRA_HOME_SENSITIVE_SUFFIXES,
+    });
   }
 
   // Set root directory programmatically (for restoring a recent project without dialog)
@@ -434,7 +379,7 @@ function registerVFSHandlers() {
 
     // 4. Check approval: in-session dialog approval OR persisted project approval
     // #1476: rehydration — load persisted approvals so re-prompting is skipped on restart
-    const alreadyApprovedInSession = dialogApprovedPaths.get(event.sender.id)?.has(resolved);
+    const alreadyApprovedInSession = dialogApprovedPaths.has(event.sender.id, resolved);
     let alreadyApprovedFromDisk = false;
     if (!alreadyApprovedInSession && effectiveProjectId) {
       const persistedSet = await loadApprovals(APPROVED_PATHS_FILE, effectiveProjectId);
@@ -474,8 +419,8 @@ function registerVFSHandlers() {
 
       // #1476: rehydration — persist the newly approved path so restart skips the dialog
       if (effectiveProjectId) {
-        const windowPaths = dialogApprovedPaths.get(event.sender.id);
-        const pathsToSave = new Set(windowPaths ? [...windowPaths.keys()] : [confirmedPath]);
+        const windowPaths = dialogApprovedPaths.listWindowPaths(event.sender.id);
+        const pathsToSave = new Set(windowPaths.length > 0 ? windowPaths : [confirmedPath]);
         scheduleSaveApprovals(effectiveProjectId, pathsToSave);
       }
     }
@@ -490,7 +435,7 @@ function registerVFSHandlers() {
   app.on("web-contents-created", (_, contents) => {
     contents.on("destroyed", () => {
       allowedRoots.delete(contents.id);
-      dialogApprovedPaths.delete(contents.id);
+      dialogApprovedPaths.revokeWindow(contents.id);
       // #1476: rehydration — clean up projectId association
       senderProjectId.delete(contents.id);
     });
