@@ -6,13 +6,13 @@
  * 無視された校正指摘の管理サービス。
  * プロジェクトモード: .illusions/ignored-corrections.json
  * スタンドアロンモード: StorageService (IndexedDB / SQLite)
+ *
+ * Persistence (file/storage access, envelope, mutex) is delegated to the
+ * shared PersistedJsonListStore; domain semantics (identity by
+ * (ruleId, text, context)) live here.
  */
 
-import { getProjectFileService } from "../services/project-file-service";
-import { getStorageService } from "../storage/storage-service";
-import { AsyncMutex } from "../utils/async-mutex";
-import type { VirtualFileSystem, VFSFileHandle } from "../vfs/types";
-import type { IStorageService } from "../storage/storage-types";
+import { PersistedJsonListStore } from "./persisted-json-list";
 import type { IgnoredCorrection, IgnoredCorrectionsFile } from "../project/project-types";
 
 // -----------------------------------------------------------------------
@@ -22,17 +22,48 @@ import type { IgnoredCorrection, IgnoredCorrectionsFile } from "../project/proje
 const IGNORED_CORRECTIONS_FILENAME = "ignored-corrections.json";
 const STANDALONE_STORAGE_PREFIX = "illusions-ignored-corrections:";
 
-/**
- * Returns true when an error signals a missing file across either VFS backend:
- * a Web File System Access API `DOMException` named "NotFoundError", or an
- * Electron/Node `ENOENT` error code. Used to treat an absent file as "empty"
- * rather than a hard failure.
- */
-function isFileNotFoundError(err: unknown): boolean {
-  if (typeof err !== "object" || err === null) return false;
-  const name = (err as { name?: unknown }).name;
-  const code = (err as { code?: unknown }).code;
-  return name === "NotFoundError" || code === "ENOENT";
+// -----------------------------------------------------------------------
+// Domain mutations (identity / dedupe policy)
+// -----------------------------------------------------------------------
+
+/** Identity of an ignored correction is the (ruleId, text, context) triple. */
+function matchesIdentity(
+  correction: IgnoredCorrection,
+  ruleId: string,
+  text: string,
+  context?: string,
+): boolean {
+  return correction.ruleId === ruleId && correction.text === text && correction.context === context;
+}
+
+/** Add a correction, deduplicating by (ruleId, text, context). Returns null when a duplicate exists (skip save). */
+function insertCorrection(
+  corrections: IgnoredCorrection[],
+  ruleId: string,
+  text: string,
+  context?: string,
+): IgnoredCorrection[] | null {
+  const exists = corrections.some((c) => matchesIdentity(c, ruleId, text, context));
+  if (exists) return null;
+
+  const entry: IgnoredCorrection = {
+    ruleId,
+    text,
+    addedAt: Date.now(),
+    ...(context !== undefined ? { context } : {}),
+  };
+  corrections.push(entry);
+  return corrections;
+}
+
+/** Remove the correction matching (ruleId, text, context). */
+function removeByIdentity(
+  corrections: IgnoredCorrection[],
+  ruleId: string,
+  text: string,
+  context?: string,
+): IgnoredCorrection[] {
+  return corrections.filter((c) => !matchesIdentity(c, ruleId, text, context));
 }
 
 // -----------------------------------------------------------------------
@@ -40,14 +71,19 @@ function isFileNotFoundError(err: unknown): boolean {
 // -----------------------------------------------------------------------
 
 class IgnoredCorrectionsService {
-  private vfs: VirtualFileSystem;
-  private storage: IStorageService;
-  /** Serializes all read-modify-write operations to prevent last-writer-wins data loss in multi-window scenarios. */
-  private readonly writeMutex = new AsyncMutex();
+  private readonly store: PersistedJsonListStore<IgnoredCorrection>;
 
   constructor() {
-    this.vfs = getProjectFileService();
-    this.storage = getStorageService();
+    this.store = new PersistedJsonListStore<IgnoredCorrection>({
+      filename: IGNORED_CORRECTIONS_FILENAME,
+      standaloneKeyPrefix: STANDALONE_STORAGE_PREFIX,
+      toEnvelope: (corrections): IgnoredCorrectionsFile => ({
+        version: "1.0.0",
+        ignoredCorrections: corrections,
+      }),
+      fromEnvelope: (envelope): IgnoredCorrection[] =>
+        (envelope as IgnoredCorrectionsFile).ignoredCorrections ?? [],
+    });
   }
 
   // -------------------------------------------------------------------
@@ -56,34 +92,11 @@ class IgnoredCorrectionsService {
 
   /**
    * Load ignored corrections from .illusions/ignored-corrections.json.
-   * Returns empty array if the file does not exist (ENOENT).
+   * Returns empty array if the file does not exist.
    * Re-throws on JSON corruption or permission errors to prevent data loss.
    */
   async loadIgnoredCorrections(): Promise<IgnoredCorrection[]> {
-    const rootDir = await this.vfs.getDirectoryHandle("");
-    const illusionsDir = await rootDir.getDirectoryHandle(".illusions", { create: true });
-
-    let fileHandle: VFSFileHandle;
-    try {
-      fileHandle = await illusionsDir.getFileHandle(IGNORED_CORRECTIONS_FILENAME);
-    } catch (err) {
-      // Web (File System Access API) throws NotFoundError synchronously from
-      // getFileHandle when the file is absent — before exists() can be consulted.
-      // Electron's VFS only builds a path wrapper here and never throws for a
-      // missing file, so this branch is web-only. Any other error (permission,
-      // etc.) must propagate to avoid masking real failures.
-      if (isFileNotFoundError(err)) return [];
-      throw err;
-    }
-
-    // Electron path: a missing file only surfaces on access, and the error's
-    // `code` is dropped across the IPC boundary, so a post-read ENOENT check is
-    // unreliable — guard with exists() before reading instead.
-    if (!(await fileHandle.exists())) return [];
-    // JSON corruption or permission errors still propagate to prevent data loss.
-    const raw = await fileHandle.read();
-    const data: IgnoredCorrectionsFile = JSON.parse(raw);
-    return data.ignoredCorrections ?? [];
+    return this.store.loadProject();
   }
 
   /**
@@ -91,69 +104,35 @@ class IgnoredCorrectionsService {
    * Creates .illusions directory if it does not exist.
    */
   async saveIgnoredCorrections(corrections: IgnoredCorrection[]): Promise<void> {
-    const rootDir = await this.vfs.getDirectoryHandle("");
-    const illusionsDir = await rootDir.getDirectoryHandle(".illusions", { create: true });
-    const fileHandle = await illusionsDir.getFileHandle(IGNORED_CORRECTIONS_FILENAME, {
-      create: true,
-    });
-    const data: IgnoredCorrectionsFile = {
-      version: "1.0.0",
-      ignoredCorrections: corrections,
-    };
-    await fileHandle.write(JSON.stringify(data, null, 2));
+    return this.store.saveProject(corrections);
   }
 
   /**
    * Add an ignored correction. Deduplicates by (ruleId, text, context).
-   * Guarded by writeMutex to prevent concurrent read-modify-write races.
+   * Guarded by the store mutex to prevent concurrent read-modify-write races.
    */
   async addIgnoredCorrection(
     ruleId: string,
     text: string,
     context?: string,
   ): Promise<IgnoredCorrection[]> {
-    const releaseLock = await this.writeMutex.acquire();
-    try {
-      const corrections = await this.loadIgnoredCorrections();
-      const exists = corrections.some(
-        (c) => c.ruleId === ruleId && c.text === text && c.context === context,
-      );
-      if (exists) return corrections;
-
-      const entry: IgnoredCorrection = {
-        ruleId,
-        text,
-        addedAt: Date.now(),
-        ...(context !== undefined ? { context } : {}),
-      };
-      corrections.push(entry);
-      await this.saveIgnoredCorrections(corrections);
-      return corrections;
-    } finally {
-      releaseLock();
-    }
+    return this.store.mutateProject((corrections) =>
+      insertCorrection(corrections, ruleId, text, context),
+    );
   }
 
   /**
    * Remove an ignored correction by (ruleId, text, context).
-   * Guarded by writeMutex to prevent concurrent read-modify-write races.
+   * Guarded by the store mutex to prevent concurrent read-modify-write races.
    */
   async removeIgnoredCorrection(
     ruleId: string,
     text: string,
     context?: string,
   ): Promise<IgnoredCorrection[]> {
-    const releaseLock = await this.writeMutex.acquire();
-    try {
-      const corrections = await this.loadIgnoredCorrections();
-      const filtered = corrections.filter(
-        (c) => !(c.ruleId === ruleId && c.text === text && c.context === context),
-      );
-      await this.saveIgnoredCorrections(filtered);
-      return filtered;
-    } finally {
-      releaseLock();
-    }
+    return this.store.mutateProject((corrections) =>
+      removeByIdentity(corrections, ruleId, text, context),
+    );
   }
 
   // -------------------------------------------------------------------
@@ -161,34 +140,12 @@ class IgnoredCorrectionsService {
   // -------------------------------------------------------------------
 
   /**
-   * Build a storage key from the full file path to avoid basename collisions.
-   * Normalizes path separators so keys are consistent across platforms.
-   */
-  private buildStandaloneKey(filePath: string): string {
-    // Normalize backslashes to forward slashes and strip leading slash
-    // so keys are deterministic regardless of platform separator.
-    const normalized = filePath.replace(/\\/g, "/").replace(/^\//, "");
-    return STANDALONE_STORAGE_PREFIX + normalized;
-  }
-
-  /**
    * Load ignored corrections from StorageService for a specific file.
    * @param filePath - Full path to the file (used as storage key to avoid basename collisions).
    * Returns empty array if no entry exists; re-throws on JSON corruption or storage errors.
    */
   async loadIgnoredCorrectionsStandalone(filePath: string): Promise<IgnoredCorrection[]> {
-    try {
-      const key = this.buildStandaloneKey(filePath);
-      const raw = await this.storage.getItem(key);
-      if (!raw) return [];
-      const data: IgnoredCorrectionsFile = JSON.parse(raw);
-      return data.ignoredCorrections ?? [];
-    } catch (err) {
-      // No stored entry — that's fine
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
-      // JSON corruption or storage error — re-throw to prevent overwriting existing data
-      throw err;
-    }
+    return this.store.loadStandalone(filePath);
   }
 
   /**
@@ -199,17 +156,12 @@ class IgnoredCorrectionsService {
     filePath: string,
     corrections: IgnoredCorrection[],
   ): Promise<void> {
-    const key = this.buildStandaloneKey(filePath);
-    const data: IgnoredCorrectionsFile = {
-      version: "1.0.0",
-      ignoredCorrections: corrections,
-    };
-    await this.storage.setItem(key, JSON.stringify(data));
+    return this.store.saveStandalone(filePath, corrections);
   }
 
   /**
    * Add an ignored correction in standalone mode.
-   * Guarded by writeMutex to prevent concurrent read-modify-write races.
+   * Guarded by the store mutex to prevent concurrent read-modify-write races.
    */
   async addIgnoredCorrectionStandalone(
     fileName: string,
@@ -217,31 +169,14 @@ class IgnoredCorrectionsService {
     text: string,
     context?: string,
   ): Promise<IgnoredCorrection[]> {
-    const releaseLock = await this.writeMutex.acquire();
-    try {
-      const corrections = await this.loadIgnoredCorrectionsStandalone(fileName);
-      const exists = corrections.some(
-        (c) => c.ruleId === ruleId && c.text === text && c.context === context,
-      );
-      if (exists) return corrections;
-
-      const entry: IgnoredCorrection = {
-        ruleId,
-        text,
-        addedAt: Date.now(),
-        ...(context !== undefined ? { context } : {}),
-      };
-      corrections.push(entry);
-      await this.saveIgnoredCorrectionsStandalone(fileName, corrections);
-      return corrections;
-    } finally {
-      releaseLock();
-    }
+    return this.store.mutateStandalone(fileName, (corrections) =>
+      insertCorrection(corrections, ruleId, text, context),
+    );
   }
 
   /**
    * Remove an ignored correction in standalone mode.
-   * Guarded by writeMutex to prevent concurrent read-modify-write races.
+   * Guarded by the store mutex to prevent concurrent read-modify-write races.
    */
   async removeIgnoredCorrectionStandalone(
     fileName: string,
@@ -249,17 +184,9 @@ class IgnoredCorrectionsService {
     text: string,
     context?: string,
   ): Promise<IgnoredCorrection[]> {
-    const releaseLock = await this.writeMutex.acquire();
-    try {
-      const corrections = await this.loadIgnoredCorrectionsStandalone(fileName);
-      const filtered = corrections.filter(
-        (c) => !(c.ruleId === ruleId && c.text === text && c.context === context),
-      );
-      await this.saveIgnoredCorrectionsStandalone(fileName, filtered);
-      return filtered;
-    } finally {
-      releaseLock();
-    }
+    return this.store.mutateStandalone(fileName, (corrections) =>
+      removeByIdentity(corrections, ruleId, text, context),
+    );
   }
 }
 
