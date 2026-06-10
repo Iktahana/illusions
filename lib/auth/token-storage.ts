@@ -86,7 +86,11 @@ export async function loadTokens(): Promise<StoredTokens | null> {
     // A subsequent saveTokens() re-encrypts them when safeStorage is available.
     const legacy = JSON.parse(stored) as StoredTokens;
     inMemoryTokens = legacy;
-    await api.storage.removeItem(TOKEN_STORAGE_KEY);
+    try {
+      await api.storage.removeItem(TOKEN_STORAGE_KEY);
+    } catch {
+      // Best effort — the plaintext copy is purged again on the next save
+    }
     return legacy;
   } catch {
     return null;
@@ -97,7 +101,11 @@ export async function clearTokens(): Promise<void> {
   inMemoryTokens = null;
   const api = window.electronAPI;
   if (!api?.storage) return;
-  await api.storage.removeItem(TOKEN_STORAGE_KEY);
+  try {
+    await api.storage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // Best effort — logout must not throw; in-memory tokens are already cleared
+  }
 }
 
 /** Test-only helper: reset module-level state between test cases. */
