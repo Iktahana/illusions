@@ -156,28 +156,79 @@ describe("getProjectService", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests: validateProjectStructure — no side-effect creation
+// Tests: validateProjectStructure — no side-effect creation, real existence
+// check via entries() (#1567 item 15)
 // ---------------------------------------------------------------------------
+
+type VFSEntryLike = { name: string; kind: "file" | "directory"; path: string };
+
+/** Build an entries() implementation yielding the given [name, entry] pairs. */
+function makeEntries(items: VFSEntryLike[]): () => AsyncIterable<[string, VFSEntryLike]> {
+  return async function* entries(): AsyncGenerator<[string, VFSEntryLike]> {
+    for (const item of items) {
+      yield [item.name, item];
+    }
+  };
+}
 
 describe("validateProjectStructure", () => {
   it("returns invalid when .illusions directory does not exist (no directory created)", async () => {
-    // Mock a directory handle where .illusions is absent
+    // Web-shaped handle: getDirectoryHandle rejects with NotFoundError
     const getDirectoryHandleMock = vi
       .fn<(name: string, opts?: { create?: boolean }) => Promise<never>>()
       .mockRejectedValue(new DOMException("Not found", "NotFoundError"));
 
     const fakeRoot = {
       getDirectoryHandle: getDirectoryHandleMock,
+      entries: makeEntries([{ name: "novel.mdi", kind: "file", path: "novel.mdi" }]),
     } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
 
     const result = await getProjectService().validateProjectStructure(fakeRoot);
 
-    // Must report invalid
+    // Must report invalid with the accurate error
     expect(result.valid).toBe(false);
     expect(result.errors).toContain(".illusions directory not found");
 
-    // The call must have used create: false (not create: true)
-    expect(getDirectoryHandleMock).toHaveBeenCalledWith(".illusions", { create: false });
+    // Must never create the directory as a side effect
+    expect(getDirectoryHandleMock).not.toHaveBeenCalledWith(
+      ".illusions",
+      expect.objectContaining({ create: true }),
+    );
+  });
+
+  it("Electron-shaped handle: getDirectoryHandle resolves for missing dirs — still reports '.illusions directory not found'", async () => {
+    // ElectronVFSDirectoryHandle.getDirectoryHandle({create:false}) NEVER
+    // throws for a missing directory; it just wraps the path. The validator
+    // must therefore detect absence via entries(), not via a thrown error.
+    const getFileHandleMock = vi
+      .fn<(name: string) => Promise<never>>()
+      .mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+
+    const fakeIllusionsDir = {
+      getFileHandle: getFileHandleMock,
+    } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
+
+    const getDirectoryHandleMock = vi
+      .fn<
+        (
+          name: string,
+          opts?: { create?: boolean },
+        ) => Promise<import("@/lib/vfs/types").VFSDirectoryHandle>
+      >()
+      .mockResolvedValue(fakeIllusionsDir);
+
+    const fakeRoot = {
+      getDirectoryHandle: getDirectoryHandleMock,
+      // .illusions is NOT among the entries — directory is missing on disk
+      entries: makeEntries([{ name: "novel.mdi", kind: "file", path: "novel.mdi" }]),
+    } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
+
+    const result = await getProjectService().validateProjectStructure(fakeRoot);
+
+    expect(result.valid).toBe(false);
+    // The accurate error — NOT the misleading project.json error
+    expect(result.errors).toContain(".illusions directory not found");
+    expect(result.errors.some((e) => e.includes("project.json"))).toBe(false);
   });
 
   it("returns invalid when project.json is missing inside .illusions", async () => {
@@ -200,6 +251,7 @@ describe("validateProjectStructure", () => {
 
     const fakeRoot = {
       getDirectoryHandle: getDirectoryHandleMock,
+      entries: makeEntries([{ name: ".illusions", kind: "directory", path: ".illusions" }]),
     } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
 
     const result = await getProjectService().validateProjectStructure(fakeRoot);
@@ -208,5 +260,45 @@ describe("validateProjectStructure", () => {
     expect(result.errors.some((e) => e.includes("project.json"))).toBe(true);
     // Still must not have created the directory
     expect(getDirectoryHandleMock).toHaveBeenCalledWith(".illusions", { create: false });
+  });
+
+  it("returns valid for a complete project structure", async () => {
+    const projectJson = JSON.stringify({
+      version: "1.0.0",
+      projectId: "id-1",
+      name: "Novel",
+      mainFile: "Novel.mdi",
+    });
+
+    const fakeIllusionsDir = {
+      getFileHandle: vi.fn().mockResolvedValue({
+        read: vi.fn().mockResolvedValue(projectJson),
+      }),
+    } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
+
+    const fakeRoot = {
+      getDirectoryHandle: vi.fn().mockResolvedValue(fakeIllusionsDir),
+      entries: makeEntries([
+        { name: "Novel.mdi", kind: "file", path: "Novel.mdi" },
+        { name: ".illusions", kind: "directory", path: ".illusions" },
+      ]),
+    } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
+
+    const result = await getProjectService().validateProjectStructure(fakeRoot);
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("a '.illusions' FILE entry does not count as the metadata directory", async () => {
+    const fakeRoot = {
+      getDirectoryHandle: vi.fn(),
+      entries: makeEntries([{ name: ".illusions", kind: "file", path: ".illusions" }]),
+    } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
+
+    const result = await getProjectService().validateProjectStructure(fakeRoot);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(".illusions directory not found");
   });
 });
