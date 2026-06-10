@@ -60,8 +60,15 @@ export const MDI_BREAK_RE = /\[\[br\]\]/g;
 /** MDI blank paragraph marker literal */
 export const MDI_BLANK_MARKER = "[[blank]]";
 
-/** MDI blank paragraph marker (whole line; written by editor-output normalization) */
-export const MDI_BLANK_RE = /^\[\[blank\]\][ \t]*\r?$/gm;
+/**
+ * MDI blank paragraph marker (whole line; written by editor-output
+ * normalization). Whitespace-tolerant on BOTH sides to match
+ * `isMdiBlankParagraphLine` — the line-based exporters have always trimmed
+ * before matching, so an indented "  [[blank]]" renders as a blank paragraph;
+ * analysis text must strip the same lines (pre-#1449 the strip regex was
+ * line-start-anchored, a marker-handling drift this module exists to end).
+ */
+export const MDI_BLANK_RE = /^[ \t]*\[\[blank\]\][ \t]*\r?$/gm;
 
 /** Escaped MDI opening brace: \{ */
 export const MDI_ESC_BRACE_RE = /\\(\{)/g;

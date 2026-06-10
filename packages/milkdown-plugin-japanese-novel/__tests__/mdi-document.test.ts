@@ -94,6 +94,14 @@ describe("[[blank]] literal typed by the user — defined semantics (#1449)", ()
   it("isMdiBlankParagraphLine: own-line (with surrounding whitespace) only", () => {
     expect(isMdiBlankParagraphLine("[[blank]]")).toBe(true);
     expect(isMdiBlankParagraphLine("  [[blank]]\t")).toBe(true);
+  });
+
+  it("strips whitespace-tolerant marker lines consistently with isMdiBlankParagraphLine", () => {
+    // Copilot review (#1592): exporter (trim) and analysis (regex) semantics
+    // must agree — an indented marker is a blank paragraph in BOTH worlds.
+    const doc = "前\n  [[blank]]\t\n後";
+    expect(stripMdiBlankMarkers(doc)).toBe("前\n\n後");
+    expect(MdiDocument.fromRawText(doc).toAnalysisText()).not.toContain("[[blank]]");
     expect(isMdiBlankParagraphLine("foo [[blank]]")).toBe(false);
   });
 
