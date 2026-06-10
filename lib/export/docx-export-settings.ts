@@ -1,9 +1,11 @@
 /**
- * DOCX export settings persistence.
+ * DOCX export settings types, sanitization, and font/unit mapping.
  *
- * Uses localStorage with deep merge and range sanitization.
  * Font mapping handles Office-style ascii/eastAsia/hAnsi slots
  * for proper Japanese font rendering in Word.
+ * Persistence lives in export-settings.ts (unified settings via StorageService).
+ * The legacy localStorage key "illusions:docx-export-settings" is only read
+ * there for one-time migration.
  */
 
 import { PAGE_DIMENSIONS, ALL_PAGE_SIZE_KEYS } from "./page-sizes";
@@ -93,9 +95,7 @@ export function lineSpacingToTwips(multiplier: number): number {
   return Math.round(multiplier * 240);
 }
 
-// --- Persistence ---
-
-const STORAGE_KEY = "illusions:docx-export-settings";
+// --- Sanitization ---
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -160,29 +160,6 @@ export function sanitizeSettings(raw: Partial<DocxExportSettings>): DocxExportSe
       ? (raw.pageNumberPosition as DocxExportSettings["pageNumberPosition"])
       : d.pageNumberPosition,
   };
-}
-
-export function loadDocxExportSettings(): DocxExportSettings {
-  if (typeof window === "undefined") return { ...DEFAULT_DOCX_SETTINGS };
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_DOCX_SETTINGS };
-    const parsed = JSON.parse(raw) as Partial<DocxExportSettings>;
-    return sanitizeSettings(parsed);
-  } catch {
-    return { ...DEFAULT_DOCX_SETTINGS };
-  }
-}
-
-export function saveDocxExportSettings(settings: DocxExportSettings): void {
-  if (typeof window === "undefined") return;
-
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // localStorage quota exceeded — silently ignore
-  }
 }
 
 export { PAGE_DIMENSIONS };
