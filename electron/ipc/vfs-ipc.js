@@ -12,6 +12,7 @@ const {
   toForwardSlash,
   assertPathInsideRoot,
   getWindowsDenyPrefixes,
+  resolveRealPath,
 } = require("../lib/path-utils");
 // #1476: rehydration — begin
 const { loadApprovals, saveApprovals } = require("../lib/vfs-approvals");
@@ -21,8 +22,25 @@ const { loadApprovals, saveApprovals } = require("../lib/vfs-approvals");
 const MAX_CONTENT_BYTES = 50 * 1024 * 1024; // 50 MB
 
 function registerVFSHandlers() {
-  // Track the opened root directory per window for path validation
+  // Track the opened root directory per window for path validation.
+  // #1559: each entry stores both the lexical root (as seen by the renderer)
+  // and its physical realpath so symlink-collapsed containment can be checked.
+  /** @type {Map<number, { path: string, realPath: string }>} */
   const allowedRoots = new Map();
+
+  /**
+   * Resolve the realpath of a root directory, falling back to the lexical
+   * path when realpath fails (e.g. permission edge cases).
+   * @param {string} rootPath - Absolute root directory path
+   * @returns {Promise<string>}
+   */
+  async function resolveRootRealPath(rootPath) {
+    try {
+      return await fs.realpath(rootPath);
+    } catch {
+      return rootPath;
+    }
+  }
 
   // Track paths that were selected via the native file dialog.
   // Uses a bounded LRU map per window to prevent unbounded memory growth
@@ -113,19 +131,31 @@ function registerVFSHandlers() {
   /**
    * Validate that a requested path is within the allowed root directory.
    * Prevents path traversal attacks from a compromised renderer.
+   *
+   * #1559: in addition to the lexical prefix check, the path is collapsed
+   * via fs.realpath right before I/O so a symlink placed inside the root
+   * cannot redirect reads/writes to a target outside the (real) root.
+   *
    * @param {Electron.IpcMainInvokeEvent} event - The IPC event to identify the sender window
    * @param {string} requestedPath - The path to validate
+   * @returns {Promise<string>} The validated forward-slash path
    */
-  function validateVFSPath(event, requestedPath) {
+  async function validateVFSPath(event, requestedPath) {
     const allowedRoot = allowedRoots.get(event.sender.id);
     if (!allowedRoot) {
       throw new Error("ディレクトリが開かれていません");
     }
     // Normalize the incoming path to forward slashes, resolving any traversal segments
     const normalizedResolved = toForwardSlash(requestedPath);
-    const normalizedRoot = normalizePath(allowedRoot);
+    const normalizedRoot = normalizePath(allowedRoot.path);
 
     assertPathInsideRoot(normalizedResolved, normalizedRoot);
+
+    // #1559: collapse symlinks and re-check containment against the real root
+    const realResolved = toForwardSlash(await resolveRealPath(normalizedResolved));
+    const normalizedRealRoot = normalizePath(allowedRoot.realPath);
+    assertPathInsideRoot(realResolved, normalizedRealRoot);
+
     return normalizedResolved;
   }
 
@@ -143,7 +173,11 @@ function registerVFSHandlers() {
     const name = path.basename(dirPath);
 
     // Update the allowed root for this window
-    allowedRoots.set(event.sender.id, dirPath);
+    // #1559: store the realpath so symlink-collapsed containment can be checked
+    allowedRoots.set(event.sender.id, {
+      path: dirPath,
+      realPath: await resolveRootRealPath(dirPath),
+    });
     approveDialogPath(event.sender.id, dirPath);
 
     return {
@@ -158,7 +192,7 @@ function registerVFSHandlers() {
   // Read file content
   ipcMain.handle("vfs:read-file", async (event, filePath) => {
     try {
-      const resolved = validateVFSPath(event, filePath);
+      const resolved = await validateVFSPath(event, filePath);
       const stats = await fs.stat(resolved);
       if (stats.size > MAX_READ_BYTES) {
         throw new Error("ファイルサイズが上限を超えています");
@@ -183,7 +217,7 @@ function registerVFSHandlers() {
       throw new Error("ファイルサイズが上限を超えています（50 MB）");
     }
     try {
-      const resolved = validateVFSPath(event, filePath);
+      const resolved = await validateVFSPath(event, filePath);
       // Use open -> write -> sync -> close pattern for better compatibility with virtual file systems (e.g., Google Drive on Windows)
       const fileHandle = await fs.open(resolved, "w");
       try {
@@ -208,7 +242,7 @@ function registerVFSHandlers() {
   // Read directory entries
   ipcMain.handle("vfs:read-directory", async (event, dirPath) => {
     try {
-      const resolved = validateVFSPath(event, dirPath);
+      const resolved = await validateVFSPath(event, dirPath);
       const entries = await fs.readdir(resolved, { withFileTypes: true });
       return entries.map((entry) => ({
         name: entry.name,
@@ -223,7 +257,7 @@ function registerVFSHandlers() {
   // Get file stats
   ipcMain.handle("vfs:stat", async (event, filePath) => {
     try {
-      const resolved = validateVFSPath(event, filePath);
+      const resolved = await validateVFSPath(event, filePath);
       const stats = await fs.stat(resolved);
       return {
         size: stats.size,
@@ -245,7 +279,7 @@ function registerVFSHandlers() {
   // relying on stat/readFile rejections, which Electron logs as handler errors.
   ipcMain.handle("vfs:exists", async (event, filePath) => {
     try {
-      const resolved = validateVFSPath(event, filePath);
+      const resolved = await validateVFSPath(event, filePath);
       await fs.stat(resolved);
       return true;
     } catch (error) {
@@ -260,7 +294,7 @@ function registerVFSHandlers() {
   // Create directory (with parents)
   ipcMain.handle("vfs:mkdir", async (event, dirPath) => {
     try {
-      const resolved = validateVFSPath(event, dirPath);
+      const resolved = await validateVFSPath(event, dirPath);
       await fs.mkdir(resolved, { recursive: true });
     } catch (error) {
       console.error("[VFS IPC] mkdir failed:", error);
@@ -271,7 +305,7 @@ function registerVFSHandlers() {
   // Delete file or directory
   ipcMain.handle("vfs:delete", async (event, targetPath, options = {}) => {
     try {
-      const resolved = validateVFSPath(event, targetPath);
+      const resolved = await validateVFSPath(event, targetPath);
       const stats = await fs.stat(resolved);
       if (stats.isDirectory()) {
         await fs.rm(resolved, { recursive: options.recursive || false });
@@ -287,8 +321,8 @@ function registerVFSHandlers() {
   // Rename file or directory
   ipcMain.handle("vfs:rename", async (event, oldPath, newPath) => {
     try {
-      const resolvedOld = validateVFSPath(event, oldPath);
-      const resolvedNew = validateVFSPath(event, newPath);
+      const resolvedOld = await validateVFSPath(event, oldPath);
+      const resolvedNew = await validateVFSPath(event, newPath);
       await fs.rename(resolvedOld, resolvedNew);
     } catch (error) {
       console.error("[VFS IPC] rename failed:", error);
@@ -446,7 +480,9 @@ function registerVFSHandlers() {
       }
     }
 
-    allowedRoots.set(event.sender.id, resolved);
+    // #1559: store the realpath alongside the lexical root so per-I/O
+    // symlink-collapsed containment checks have a trusted physical root
+    allowedRoots.set(event.sender.id, { path: resolved, realPath: resolvedReal });
     return { path: resolved, name: path.basename(resolved) };
   });
 
