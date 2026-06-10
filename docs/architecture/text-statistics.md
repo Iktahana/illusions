@@ -1,8 +1,8 @@
 # Text Statistics — Architecture Design
 
 **対象機能**: 日本語原稿用紙換算統計  
-**ステータス**: 実装中  
-**ブランチ**: `feature/text-statistics-manuscript`
+**ステータス**: 実装済み  
+**ブランチ**: `dev` (merged)
 
 ---
 
@@ -37,13 +37,13 @@ visibleText (可視本文のみ)
 
 ### モジュール構成
 
-| ファイル                                    | 役割                                                            |
-| ------------------------------------------- | --------------------------------------------------------------- |
-| `lib/editor-page/text-statistics.ts`        | Pure functions（副作用ゼロ）。テスト可能。                      |
-| `lib/editor-page/use-text-statistics.ts`    | React hook。`computeTextStatistics` をメモ化して返す。          |
-| `lib/editor-page/use-previous-day-stats.ts` | 前日スナップショット取得。同じ `computeTextStatistics` を使用。 |
-| `lib/editor-page/use-selection-tracking.ts` | 選択文字数。`extractVisibleText` + `countVisibleChars` を使用。 |
-| `components/inspector/StatsPanel.tsx`       | UI 表示のみ。計算は行わない。                                   |
+| ファイル                                    | 役割                                                                                                                 |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `lib/editor-page/text-statistics.ts`        | Pure functions（副作用ゼロ）。テスト可能。                                                                           |
+| `lib/editor-page/use-text-statistics.ts`    | React hook。`computeTextStatistics` をメモ化して返す。                                                               |
+| `lib/editor-page/use-previous-day-stats.ts` | 前日スナップショット取得。同じ `computeTextStatistics` を使用。                                                      |
+| `lib/editor-page/use-selection-tracking.ts` | 選択文字数・原稿用紙マス数・枚数。`extractVisibleText` + `countVisibleChars` + `countManuscriptCells/Pages` を使用。 |
+| `components/inspector/StatsPanel.tsx`       | UI 表示のみ。計算は行わない。                                                                                        |
 
 ---
 
@@ -140,12 +140,13 @@ Math.ceil(cells / 400)
 
 ## UI 文言定義
 
-| 項目     | 表示ラベル | InfoTooltip 内容                                                                         |
-| -------- | ---------- | ---------------------------------------------------------------------------------------- |
-| 総字数   | 総字数     | 記法を除いた可視本文の文字数（空白・改行は含まない）                                     |
-| 原稿用紙 | 原稿用紙   | 400字詰め原稿用紙（20×20）に換算した枚数。明示改行で行送り、禁則処理あり。端数切り上げ。 |
-| 段落数   | 段落数     | 改行で区切られる段落の総数                                                               |
-| 文数     | 文数       | 文末の句点（。）で区切られる文の数                                                       |
+| 項目             | 表示ラベル | 表示条件           | InfoTooltip 内容                                                                         |
+| ---------------- | ---------- | ------------------ | ---------------------------------------------------------------------------------------- |
+| 総字数           | 総字数     | 常時               | 記法を除いた可視本文の文字数（空白・改行は含まない）                                     |
+| 原稿用紙（全体） | 原稿用紙   | 非選択時のみ       | 400字詰め原稿用紙（20×20）に換算した枚数。明示改行で行送り、禁則処理あり。端数切り上げ。 |
+| 原稿用紙（選択） | 原稿用紙   | 選択中かつマス数>0 | 選択範囲を400字詰め原稿用紙（20×20）に換算した枚数。禁則処理あり・端数切り上げ。         |
+| 段落数           | 段落数     | 常時               | 改行で区切られる段落の総数                                                               |
+| 文数             | 文数       | 常時               | 文末の句点（。）で区切られる文の数                                                       |
 
 ---
 
@@ -160,9 +161,9 @@ Math.ceil(cells / 400)
 
 - `lib/editor-page/use-text-statistics.ts` — `computeTextStatistics` を使用
 - `lib/editor-page/use-previous-day-stats.ts` — `computeTextStatistics` を使用、`manuscriptPages` を保存
-- `lib/editor-page/use-selection-tracking.ts` — `extractVisibleText` + `countVisibleChars` を使用
-- `components/inspector/StatsPanel.tsx` — UI 文言修正、`manuscriptCellCount` 追加表示
-- `components/inspector/types.ts` — `manuscriptCellCount`, `visibleTextCharCount` 型定義追加
+- `lib/editor-page/use-selection-tracking.ts` — `extractVisibleText` + `countVisibleChars` + `countManuscriptCells/Pages` を使用。`onSelectionChange` コールバックのシグネチャが `(charCount, manuscriptCells, manuscriptPages)` に拡張。同じ文字数でも禁則処理でマス数が変わる場合に再発火するよう修正。
+- `components/inspector/StatsPanel.tsx` — UI 文言修正、`manuscriptCellCount` 追加表示、選択時の原稿用紙枚数ブロック追加、前日比較値に `InfoTooltip` 追加
+- `components/inspector/types.ts` — `manuscriptCellCount`, `visibleTextCharCount`, `selectedManuscriptCells`, `selectedManuscriptPages` 型定義追加
 - `app/page.tsx` — 新統計 props を Inspector へ渡す
 
 ---
@@ -197,6 +198,8 @@ computeTextStatistics（統合）:
 
 selection tracking:
   MDI 記法を含む選択範囲 → 可視本文ベースでカウント
+  同じ文字数でも禁則処理でマス数が異なる場合 → onSelectionChange 再発火
+  選択解除時 → onSelectionChange(0, 0, 0) を発火
 ```
 
 ---
