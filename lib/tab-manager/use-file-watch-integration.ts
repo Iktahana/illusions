@@ -106,6 +106,20 @@ export function buildOnChanged(
       // Dirty tab: do NOT touch buffer; enter conflicted state
       const localContent = tab.content;
 
+      // Fix #1562 (b): eagerly mirror the conflicted transition into tabsRef.
+      // tabsRef is only reassigned from React state on the next render, so
+      // the synchronous save guards (auto-save interval / saveFile) would
+      // otherwise read a stale non-conflicted snapshot and overwrite the
+      // external change on disk before the setTabs update below commits.
+      tabsRef.current = tabsRef.current.map((t) => {
+        if (t.id !== tabId || !isEditorTab(t)) return t;
+        return {
+          ...t,
+          fileSyncStatus: "conflicted",
+          conflictDiskContent: diskContent,
+        } satisfies EditorTabState;
+      });
+
       setTabs((prev) =>
         prev.map((t) => {
           if (t.id !== tabId || !isEditorTab(t)) return t;

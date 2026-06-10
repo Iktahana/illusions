@@ -13,6 +13,7 @@ import { getHistoryService } from "../services/history-service";
 import type { SnapshotType } from "../services/history-policy";
 import { getProjectFileService } from "../services/project-file-service";
 import { suppressFileWatch } from "../services/file-watcher";
+import { acquireSaveLock, releaseSaveLock } from "./save-lock";
 import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import { generateTabId, inferFileType, sanitizeMdiContent, getErrorMessage } from "./types";
@@ -273,6 +274,12 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         return;
       }
 
+      // Fix #1562 (a): unified per-path lock shared with the background
+      // auto-save path (use-auto-save). Skip if a save for the same path is
+      // already in flight so two writes can never target the same file at once.
+      const lockPath = tab.file?.path ?? null;
+      if (lockPath && !acquireSaveLock(lockPath)) return;
+
       isSavingRef.current = true;
       updateTab(tabId, { isSaving: true });
 
@@ -368,6 +375,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         const message = getErrorMessage(error);
         notificationManager.error(`保存に失敗しました: ${message}`);
       } finally {
+        if (lockPath) releaseSaveLock(lockPath);
         isSavingRef.current = false;
       }
     },
