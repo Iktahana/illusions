@@ -12,7 +12,7 @@
  *   const enhanced = enrichReadabilityWithMorphology(base, tokens);
  */
 
-import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
+import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import type { Token } from "@/lib/nlp-client/types";
 import type {
   EnhancedReadabilityAnalysis,
@@ -23,9 +23,16 @@ import type {
   VocabularyMetrics,
 } from "./readability-types";
 
-/** 文字数カウント用にMarkdownを整形する */
+/**
+ * 文字数カウント用にMarkdownを整形する
+ *
+ * `[[blank]]` マーカー行は `MdiDocument.toAnalysisText()` で除去してから
+ * Markdown 記法を取り除く（#1483 で導入された挙動。#1234 のリライトで
+ * 呼び出しが脱落していたため #1449 で復元）。
+ */
 export function cleanMarkdown(markdown: string): string {
-  return markdown
+  return MdiDocument.fromRawText(markdown)
+    .toAnalysisText()
     .replace(/```[\s\S]*?```/g, "")
     .replace(/`[^`]+`/g, "")
     .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")

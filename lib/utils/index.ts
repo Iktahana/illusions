@@ -2,8 +2,8 @@
  * illusions エディタ用のユーティリティ
  */
 
+import { stripMdiInlineSyntax } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import { analyzeReadability, cleanMarkdown } from "./readability";
-import { stripMdiInlineSyntax } from "@/lib/export/mdi-parser";
 export type { EnhancedReadabilityAnalysis, ReadabilitySubScores } from "./readability-types";
 export { analyzeReadability, enrichReadabilityWithMorphology, cleanMarkdown } from "./readability";
 
