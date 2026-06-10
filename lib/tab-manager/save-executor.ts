@@ -124,6 +124,17 @@ let handleLockKeyCounter = 0;
  *   tabs holding the same handle still serialize (#1579).
  * - Untitled tabs (and Save As, which targets a new file) lock on the tab id.
  */
+/**
+ * Known limitation (#1579 / Codex review): the null-path lock is keyed by
+ * FileSystemFileHandle OBJECT identity. If the platform hands the app two
+ * distinct handle objects for the same underlying file (e.g. the same file
+ * picked twice in the web picker), their saves do not serialize against each
+ * other. Detecting that case requires the async isSameEntry() API, which a
+ * synchronous lock acquisition cannot await — and two tabs editing the same
+ * file is already a last-writer-wins conflict scenario that locking cannot
+ * resolve. Pre-#1579 these saves had no lock at all, so this is strictly an
+ * improvement.
+ */
 export function getSaveLockKey(tab: EditorTabState, options?: { forceDialog?: boolean }): string {
   if (!options?.forceDialog) {
     if (tab.file?.path) return tab.file.path;
