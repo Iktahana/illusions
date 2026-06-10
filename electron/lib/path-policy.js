@@ -85,6 +85,16 @@ const HOME_SENSITIVE_SUFFIXES = Object.freeze([
 function isSensitiveSystemPath(normalizedPath, { extraHomeSensitiveSuffixes = [] } = {}) {
   const homedir = trimTrailingSlashes(normalizeSeparators(os.homedir()));
 
+  // Empty or non-absolute input cannot be meaningfully containment-checked —
+  // deny outright (fail closed). An empty string reaches here if a caller
+  // trimmed a bare root before the shared trim helper preserved "/" (#1435).
+  if (
+    normalizedPath === "" ||
+    (!normalizedPath.startsWith("/") && !/^[a-zA-Z]:/.test(normalizedPath))
+  ) {
+    return true;
+  }
+
   // Bare Windows drive root (C:/ or C:)
   if (/^([a-zA-Z]):?\/?$/.test(normalizedPath)) return true;
 

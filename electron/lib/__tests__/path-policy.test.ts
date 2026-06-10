@@ -140,7 +140,26 @@ describe("normalizeSeparators() / trimTrailingSlashes()", () => {
     expect(trimTrailingSlashes("/foo/bar")).toBe("/foo/bar");
   });
 
-  it("documents the bare-root edge: trimming '/' yields '' (vfs-ipc historical behavior)", () => {
-    expect(trimTrailingSlashes("/")).toBe("");
+  it("preserves the bare filesystem root instead of collapsing it to ''", () => {
+    // Historical vfs-ipc behavior trimmed "/" to "", which made
+    // assertPathInsideRoot accept every absolute path when "/" was approved
+    // as a root (fail-open found in Codex review of #1435). Fail closed.
+    expect(trimTrailingSlashes("/")).toBe("/");
+    expect(trimTrailingSlashes("///")).toBe("/");
+  });
+});
+
+describe("isSensitiveSystemPath() — degenerate inputs (fail closed)", () => {
+  it("denies the empty string", () => {
+    expect(isSensitiveSystemPath("")).toBe(true);
+  });
+
+  it("denies relative / non-absolute inputs", () => {
+    expect(isSensitiveSystemPath("relative/path.mdi")).toBe(true);
+    expect(isSensitiveSystemPath("./x")).toBe(true);
+  });
+
+  it("still denies the bare root now that trimming preserves it", () => {
+    expect(isSensitiveSystemPath(trimTrailingSlashes("/"))).toBe(true);
   });
 });

@@ -22,7 +22,11 @@ function normalizeSeparators(p) {
  * @returns {string}
  */
 function trimTrailingSlashes(p) {
-  return p.replace(/\/+$/, "");
+  const trimmed = p.replace(/\/+$/, "");
+  // Never collapse the filesystem root to an empty string: an empty root would
+  // make prefix-based containment checks (assertPathInsideRoot) accept every
+  // absolute path — fail closed by preserving "/" (#1435 / Codex review).
+  return trimmed === "" && p.startsWith("/") ? "/" : trimmed;
 }
 
 /**
