@@ -44,6 +44,7 @@ const { registerAuthHandlers, handleAuthCallback } = require("./ipc/auth-ipc");
 const { registerEditorHandlers } = require("./ipc/editor-ipc");
 const { registerDictHandlers } = require("./ipc/dict-ipc");
 const { getDictManager } = require("./dict-manager");
+const { DICT_CHANNELS } = require("./lib/ipc-channels");
 
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
@@ -233,7 +234,7 @@ app.whenReady().then(async () => {
             // Notify the focused window (if any)
             const focusedWin = BrowserWindow.getFocusedWindow();
             if (focusedWin && !focusedWin.isDestroyed()) {
-              focusedWin.webContents.send("dict:update-available", updateInfo);
+              focusedWin.webContents.send(DICT_CHANNELS.event.updateAvailable, updateInfo);
             }
           }
         }

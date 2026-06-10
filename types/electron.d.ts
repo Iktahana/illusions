@@ -150,6 +150,10 @@ declare global {
        */
       indexLockRelease: (key: string) => Promise<void>;
     };
+    /**
+     * Storage IPC. Channel names live in electron/lib/ipc-channels.js
+     * (shared by preload and main); wrappers use electron/lib/ipc-bridge.js (#1434).
+     */
     storage?: {
       saveSession: (session: StorageSession) => Promise<void>;
       loadSession: () => Promise<StorageSession | null>;
@@ -272,7 +276,11 @@ declare global {
       /** Remove all editor sync listeners */
       removeAllListeners: () => void;
     };
-    /** Master dictionary IPC (Genji and future providers) */
+    /**
+     * Master dictionary IPC (Genji and future providers).
+     * Channel names live in electron/lib/ipc-channels.js (shared by preload
+     * and main); wrappers use electron/lib/ipc-bridge.js (#1434).
+     */
     dict?: {
       /** Query entries by headword (exact or prefix match) */
       query: (term: string, limit?: number) => Promise<DictEntry[]>;
