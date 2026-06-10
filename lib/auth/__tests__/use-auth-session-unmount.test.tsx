@@ -202,6 +202,8 @@ describe("session epoch — logout fences in-flight auth work", () => {
       access_token: string;
       refresh_token: string;
       expires_in: number;
+      token_type: string;
+      scope: string;
     }) => void = () => undefined;
     const authApi = (window as unknown as { electronAPI: { auth: ElectronAuthApi } }).electronAPI
       .auth;
@@ -235,7 +237,13 @@ describe("session epoch — logout fences in-flight auth work", () => {
 
     // The refresh now completes — after logout.
     await act(async () => {
-      resolveRefresh({ access_token: "rotated", refresh_token: "rotated-r", expires_in: 3600 });
+      resolveRefresh({
+        access_token: "rotated",
+        refresh_token: "rotated-r",
+        expires_in: 3600,
+        token_type: "Bearer",
+        scope: "openid",
+      });
       await vi.advanceTimersByTimeAsync(0);
     });
 
@@ -260,6 +268,8 @@ describe("session epoch — logout fences in-flight auth work", () => {
       access_token: "rotated",
       refresh_token: "rotated-r",
       expires_in: 3600,
+      token_type: "Bearer",
+      scope: "openid",
     });
 
     const epochAtStart = getSessionEpoch();
