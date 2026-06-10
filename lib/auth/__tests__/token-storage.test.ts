@@ -158,6 +158,14 @@ describe("loadTokens", () => {
     await expect(loadTokens()).resolves.toBeNull();
   });
 
+  it("returns restored legacy tokens even when purging the plaintext copy fails", async () => {
+    const api = installMockApi({ safeStorageAvailable: false });
+    api.storage.getItem.mockResolvedValue(JSON.stringify(TOKENS));
+    api.storage.removeItem.mockRejectedValue(new Error("ipc failure"));
+
+    await expect(loadTokens()).resolves.toEqual(TOKENS);
+  });
+
   it("returns null for undecryptable non-JSON data", async () => {
     const api = installMockApi({ safeStorageAvailable: false });
     api.storage.getItem.mockResolvedValue("not-json-ciphertext");
@@ -167,6 +175,17 @@ describe("loadTokens", () => {
 });
 
 describe("clearTokens", () => {
+  it("does not throw when removeItem fails (logout must not break)", async () => {
+    const api = installMockApi({ safeStorageAvailable: false });
+    await saveTokens(TOKENS);
+    api.storage.removeItem.mockRejectedValue(new Error("ipc failure"));
+
+    await expect(clearTokens()).resolves.toBeUndefined();
+    // In-memory copy is cleared regardless
+    api.storage.getItem.mockResolvedValue(null);
+    await expect(loadTokens()).resolves.toBeNull();
+  });
+
   it("clears both persisted and in-memory tokens", async () => {
     const api = installMockApi({ safeStorageAvailable: false });
     await saveTokens(TOKENS);
