@@ -1,15 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { saveMdiFile } from "../project/mdi-file";
 import { getProjectFileService } from "../services/project-file-service";
-import { suppressFileWatch } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
+import { executeTabSave } from "./save-executor";
+import { isEditorTab } from "./tab-types";
 import type { SnapshotType } from "../services/history-policy";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, EditorTabState } from "./tab-types";
-import { isEditorTab } from "./tab-types";
-import { sanitizeMdiContent } from "./types";
 import type { TabManagerCore } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -64,6 +62,7 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
 export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): void {
   const {
     tabs,
+    setTabs,
     tabsRef,
     activeTabIdRef,
     isProjectRef,
@@ -127,68 +126,41 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
           continue;
         }
 
-        const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
+        // New unsaved document: the executor shows the Save As dialog so the
+        // user can give it a path. Cancelling aborts the window close.
+        const isNewDocument = !tab.file;
 
-        if (!tab.file) {
-          // New unsaved document: show Save As dialog so the user can give it a path.
-          // If the user cancels or the save fails, abort the window close.
-          try {
-            const result = await saveMdiFile({
-              descriptor: null,
-              content: sanitized,
-              fileType: tab.fileType,
-            });
-            if (!result) {
-              // User cancelled the Save As dialog — abort close
-              anyFailed = true;
-            } else {
-              // Write the newly-assigned file descriptor back to the tab so that
-              // the subsequent flushTabState call persists the saved path.
-              updateTab(tab.id, {
-                file: result.descriptor,
-                isDirty: false,
-                lastSavedContent: sanitized,
-                lastSavedTime: Date.now(),
-              });
-              // Re-flush so the persisted session reflects the new file path.
-              await flushTabStateRef.current?.();
-            }
-          } catch (error) {
-            console.error("名前を付けて保存に失敗しました:", error);
-            anyFailed = true;
+        const outcome = await executeTabSave({
+          tab,
+          isProject: isProjectRef.current,
+          tabsRef,
+          setTabs,
+          tryCreateSnapshot: tryCreateSnapshotRef.current ?? (async () => {}),
+          // B1 fix: window close "保存" → "pre-close" snapshot type.
+          // New documents get no snapshot (matches pre-refactor behavior).
+          snapshotType: isNewDocument ? undefined : "pre-close",
+          // Pre-close snapshots fall back to the file name when no path exists
+          snapshotPathFallback: "name",
+          // Already-titled tabs get no tab-state update — the window is about
+          // to close. New documents do: the newly-assigned file descriptor
+          // must be written back so flushTabState persists the saved path.
+          updateTabState: isNewDocument,
+        });
+
+        if (outcome.status === "saved") {
+          if (isNewDocument) {
+            // Re-flush so the persisted session reflects the new file path.
+            await flushTabStateRef.current?.();
           }
           continue;
         }
 
-        try {
-          if (isProjectRef.current && tab.file.path) {
-            const vfs = getProjectFileService();
-            suppressFileWatch(tab.file.path, sanitized);
-            await vfs.writeFile(tab.file.path, sanitized);
-            // B1 fix: window close "保存" → "pre-close" snapshot type
-            await tryCreateSnapshotRef.current?.(
-              "pre-close",
-              tab.file.path,
-              tab.file.name,
-              sanitized,
-            );
-          } else {
-            await saveMdiFile({
-              descriptor: tab.file,
-              content: sanitized,
-            });
-            // B1 fix: window close "保存" → "pre-close" snapshot type
-            await tryCreateSnapshotRef.current?.(
-              "pre-close",
-              tab.file.path ?? tab.file.name,
-              tab.file.name,
-              sanitized,
-            );
-          }
-        } catch (error) {
-          console.error(`保存に失敗しました (${tab.file.name}):`, error);
-          anyFailed = true;
+        // "cancelled" / "failed" / "locked" / "conflicted" / "skipped":
+        // the content was not (or may not have been) written — abort close.
+        if (outcome.status === "failed") {
+          console.error(`保存に失敗しました (${tab.file?.name ?? "無題"}):`, outcome.error);
         }
+        anyFailed = true;
       }
 
       // Only close if every save succeeded; otherwise leave the window open.
@@ -198,7 +170,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     });
 
     return cleanup;
-  }, [isElectron, tabsRef, isProjectRef, updateTab]);
+  }, [isElectron, tabsRef, isProjectRef, setTabs]);
 
   // Flush tab/layout state before close (without saving dirty files)
   // This handles: clean close, and "Don't Save" in dirty dialog

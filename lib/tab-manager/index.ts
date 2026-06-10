@@ -70,7 +70,6 @@ export function useTabManager(options?: {
     isElectron: tabState.isElectron,
     pendingCloseTabId: tabState.pendingCloseTabId,
     setPendingCloseTabId: tabState.setPendingCloseTabId,
-    updateTab: tabState.updateTab,
     forceCloseTab: tabState.forceCloseTab,
     tryCreateSnapshot: fileIO.tryCreateSnapshot,
   });

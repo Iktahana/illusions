@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { saveMdiFile } from "../project/mdi-file";
-import { getProjectFileService } from "../services/project-file-service";
-import { suppressFileWatch } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
-import type { SnapshotType } from "../services/history-policy";
+import { executeTabSave } from "./save-executor";
 import { isEditorTab } from "./tab-types";
-import { acquireSaveLock, releaseSaveLock } from "./save-lock";
+import { AUTO_SAVE_INTERVAL } from "./types";
+import type { SnapshotType } from "../services/history-policy";
 import type { TabManagerCore } from "./types";
-import { AUTO_SAVE_INTERVAL, sanitizeMdiContent } from "./types";
 
 // ---------------------------------------------------------------------------
 // Params
@@ -39,6 +36,10 @@ export interface UseAutoSaveParams extends TabManagerCore {
 /**
  * Manages the auto-save timer that periodically saves all dirty tabs
  * that have associated file descriptors.
+ *
+ * Orchestration only: the actual save pipeline (lock, sanitize, VFS vs
+ * standalone write, watch suppression, tab-state update, snapshot) lives in
+ * the shared executor (save-executor.ts, #1432).
  */
 export function useAutoSave(params: UseAutoSaveParams): void {
   const {
@@ -52,7 +53,6 @@ export function useAutoSave(params: UseAutoSaveParams): void {
   } = params;
 
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const savingTabIdsRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
 
   useEffect(
@@ -84,98 +84,32 @@ export function useAutoSave(params: UseAutoSaveParams): void {
           void saveFileRef.current(true);
           continue;
         }
-        // Synchronous guard to prevent concurrent saves for the same tab
-        if (savingTabIdsRef.current.has(tab.id)) continue;
-        // Fix #1562 (a): unified per-path lock shared with the active-tab
-        // save path (use-file-io.saveFile) so two writes can never target
-        // the same path concurrently.
-        const lockPath = tab.file.path ?? null;
-        if (lockPath && !acquireSaveLock(lockPath)) continue;
-        savingTabIdsRef.current.add(tab.id);
 
-        // Non-active dirty tabs: save directly
-        // Set isSaving before starting async operation to prevent concurrent saves
-        setTabs((prev) => prev.map((t) => (t.id === tab.id ? { ...t, isSaving: true } : t)));
+        // Background tabs need a real save target: never show a dialog from
+        // a background auto-save.
+        if (!tab.file.path && !tab.file.handle) continue;
+
+        // Non-active dirty tabs: save via the shared executor. The executor
+        // acquires the unified per-target lock synchronously (#1562 a /
+        // #1579) and re-checks the conflicted transition right before
+        // writing (#1562 b).
         void (async () => {
-          try {
-            // Fix #1562 (b): re-check the latest sync status right before
-            // writing — a file watcher may have flagged a conflict after the
-            // interval snapshot was taken (buildOnChanged mirrors the
-            // conflicted transition into tabsRef synchronously).
-            const latest = tabsRef.current.find((t) => t.id === tab.id);
-            if (!latest || !isEditorTab(latest) || latest.fileSyncStatus === "conflicted") {
-              return;
-            }
-            const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
-            if (isProjectRef.current && tab.file?.path) {
-              const vfs = getProjectFileService();
-              suppressFileWatch(tab.file.path, sanitized);
-              await vfs.writeFile(tab.file.path, sanitized);
-              if (!mountedRef.current) return;
-              setTabs((prev) =>
-                prev.map((t) => {
-                  if (t.id !== tab.id || !isEditorTab(t)) return t;
-                  const newIsDirty =
-                    sanitizeMdiContent(t.content, { fileType: t.fileType }) !== sanitized;
-                  return {
-                    ...t,
-                    lastSavedContent: sanitized,
-                    isDirty: newIsDirty,
-                    fileSyncStatus: newIsDirty ? "dirty" : "clean",
-                    conflictDiskContent: null,
-                    lastSavedTime: Date.now(),
-                    lastSaveWasAuto: true,
-                  };
-                }),
-              );
-              // B1 fix: auto-save interval → "auto" snapshot type
-              await tryCreateSnapshot("auto", tab.file.path, tab.file.name, sanitized);
-            } else if (tab.file?.path || tab.file?.handle) {
-              const result = await saveMdiFile({
-                descriptor: tab.file,
-                content: sanitized,
-                fileType: tab.fileType,
-              });
-              if (result) {
-                if (!mountedRef.current) return;
-                setTabs((prev) =>
-                  prev.map((t) => {
-                    if (t.id !== tab.id || !isEditorTab(t)) return t;
-                    const newIsDirty =
-                      sanitizeMdiContent(t.content, { fileType: t.fileType }) !== sanitized;
-                    return {
-                      ...t,
-                      file: result.descriptor,
-                      lastSavedContent: sanitized,
-                      isDirty: newIsDirty,
-                      fileSyncStatus: newIsDirty ? "dirty" : "clean",
-                      conflictDiskContent: null,
-                      lastSavedTime: Date.now(),
-                      lastSaveWasAuto: true,
-                    };
-                  }),
-                );
-                if (result.descriptor.path) {
-                  // B1 fix: auto-save interval → "auto" snapshot type
-                  await tryCreateSnapshot(
-                    "auto",
-                    result.descriptor.path,
-                    result.descriptor.name,
-                    sanitized,
-                  );
-                }
-              }
-            }
-          } catch (error) {
-            console.error(`自動保存に失敗しました (${tab.file?.name}):`, error);
+          const outcome = await executeTabSave({
+            tab,
+            isProject: isProjectRef.current,
+            tabsRef,
+            setTabs,
+            tryCreateSnapshot,
+            // B1 fix: auto-save interval → "auto" snapshot type
+            snapshotType: "auto",
+            isAutoSave: true,
+            isMounted: () => mountedRef.current,
+          });
+          if (outcome.status === "failed") {
+            console.error(`自動保存に失敗しました (${tab.file?.name}):`, outcome.error);
             notificationManager.warning(
               `自動保存に失敗しました: ${tab.file?.name ?? "不明なファイル"}`,
             );
-          } finally {
-            savingTabIdsRef.current.delete(tab.id);
-            if (lockPath) releaseSaveLock(lockPath);
-            if (!mountedRef.current) return;
-            setTabs((prev) => prev.map((t) => (t.id === tab.id ? { ...t, isSaving: false } : t)));
           }
         })();
       }
