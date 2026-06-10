@@ -20,7 +20,16 @@ import {
   CORRECTION_MODES,
   MODE_TO_PRESET,
 } from "@/lib/linting/correction-modes";
+import { getRuleLevelMap } from "@/lib/linting/rule-registry";
+import type { RuleLevel } from "@/lib/linting/types";
 import GuidelineList from "@/components/GuidelineList";
+
+/** Tooltip text describing each detection level. */
+const RULE_LEVEL_LABELS: Record<RuleLevel, string> = {
+  L1: "L1：正規表現による検出",
+  L2: "L2：形態素解析による検出",
+  L3: "L3：LLM 補助による検出",
+};
 
 /** Map of rule ID -> supportsSkipDialogue from metadata */
 const SKIP_DIALOGUE_SUPPORT = new Map(
@@ -142,6 +151,9 @@ export default function LintingSettings({
 
   // Memoized map to avoid recreation on every render (LINT_RULES_META is a module-level constant)
   const ruleMetaMap = useMemo(() => new Map(LINT_RULES_META.map((r) => [r.id, r])), []);
+
+  // Rule ID -> detection level (L1/L2/L3), derived from the actual rule instances
+  const ruleLevelMap = useMemo(() => getRuleLevelMap(), []);
 
   /** Handle correction mode change: update mode, guidelines, and apply corresponding preset */
   const handleModeChange = useCallback(
@@ -332,6 +344,7 @@ export default function LintingSettings({
                     if (!meta) return null;
                     const config = getConfig(ruleId, lintingRuleConfigs);
                     const showDialogueToggle = SKIP_DIALOGUE_SUPPORT.get(ruleId) ?? false;
+                    const level = ruleLevelMap.get(ruleId);
 
                     return (
                       <div
@@ -339,11 +352,17 @@ export default function LintingSettings({
                         className={clsx("flex items-center gap-2 px-3 py-2")}
                         title={undefined}
                       >
-                        {/* Rule name */}
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm text-foreground truncate block">
-                            {meta.nameJa}
-                          </span>
+                        {/* Rule name + level tag */}
+                        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                          {level && (
+                            <span
+                              className="flex-shrink-0 text-[10px] font-medium leading-none px-1 py-0.5 rounded border border-border-secondary text-foreground-tertiary bg-background-tertiary/50"
+                              title={RULE_LEVEL_LABELS[level]}
+                            >
+                              {level}
+                            </span>
+                          )}
+                          <span className="text-sm text-foreground truncate">{meta.nameJa}</span>
                         </div>
 
                         {/* Skip dialogue toggle */}
