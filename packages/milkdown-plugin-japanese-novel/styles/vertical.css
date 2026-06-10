@@ -19,8 +19,8 @@
   font-size: 1em;
   letter-spacing: 0.05em;
   word-spacing: 0.1em;
-  -webkit-font-feature-settings: "palt" 1;
-  font-feature-settings: "palt" 1;
+  /* No "palt": novel typesetting uses full-width pitch (JIS X 4051 べた組み) */
+  font-feature-settings: normal;
 }
 
 /* Tate-chu-yoko: horizontal digits/punctuation in vertical flow */
@@ -38,20 +38,25 @@
   letter-spacing: 0;
 }
 
-/* List styles in vertical mode */
+/* List styles in vertical mode.
+   Logical properties resolve to the correct physical sides under vertical-rl
+   (block = horizontal, inline = vertical). */
 .milkdown-japanese-vertical ul,
 .milkdown-japanese-vertical ol {
-  margin: 0 0.5em;
-  padding-top: 2em;
+  margin-block: 0.5em;
+  margin-inline: 0;
+  padding-inline-start: 2em;
 }
 
 .milkdown-japanese-vertical li {
-  margin: 0.25em 0;
+  margin-block: 0.25em;
+  margin-inline: 0;
 }
 
 /* Blockquote styles in vertical mode */
 .milkdown-japanese-vertical blockquote {
-  margin: 0 0.5em;
-  padding-top: 1em;
-  border-top: 3px solid rgb(var(--border-secondary));
+  margin-block: 0.5em;
+  margin-inline: 0;
+  padding-inline-start: 1em;
+  border-inline-start: 3px solid rgb(var(--border-secondary));
 }

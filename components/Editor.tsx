@@ -345,6 +345,37 @@ export default function NovelEditor({
     }
   }, [isVertical]);
 
+  // 縦書き: コンテンツ幅の変化（Web フォント読込・行字数再計算など）後も読書位置を維持する。
+  // scrollLeft は数値のまま据え置かれるため、コンテンツが伸びると文書先頭（右端）が
+  // ビューポート外へ隠れてしまう。進捗（0=先頭）ベースで再固定してドリフトを防ぐ。
+  useEffect(() => {
+    if (!isVertical) return;
+    const container = scrollContainerRef.current;
+    const contentDom = editorViewInstance?.dom;
+    if (!container || !contentDom) return;
+
+    let lastProgress = getScrollProgress({ container, isVertical: true });
+    // 自前の再固定スクロールで lastProgress を上書きしないための猶予期限
+    let suppressScrollUntil = 0;
+
+    const handleScroll = () => {
+      if (performance.now() < suppressScrollUntil) return;
+      lastProgress = getScrollProgress({ container, isVertical: true });
+    };
+
+    const observer = new ResizeObserver(() => {
+      suppressScrollUntil = performance.now() + 100;
+      setScrollProgress({ container, isVertical: true }, lastProgress);
+    });
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    observer.observe(contentDom);
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      observer.disconnect();
+    };
+  }, [isVertical, editorViewInstance, scrollContainerRef]);
+
   // Per-pane local state for auto-calculated chars per line (avoids split panes overwriting each other)
   const [localAutoCharsPerLine, setLocalAutoCharsPerLine] = useState<number | null>(null);
   const effectiveCharsPerLine =
@@ -369,7 +400,7 @@ export default function NovelEditor({
     // Skip calculation when container is not visible (e.g., hidden dockview panel)
     if (container.clientWidth <= 0 || container.clientHeight <= 0) return;
 
-    // charWidth is measured by the persistent hidden element (includes letter-spacing, palt, etc.)
+    // charWidth is measured by the persistent hidden element (includes letter-spacing, font features, etc.)
     if (autoCharWidth <= 0) return;
 
     // Get available space (subtract padding)
@@ -451,7 +482,8 @@ export default function NovelEditor({
           overflowAnchor: "none",
           // In vertical-rl, padding on child elements causes Chromium to miscalculate scrollWidth.
           // Move horizontal padding to the scroll container itself, where the browser handles it correctly.
-          ...(isVertical ? { paddingLeft: 64, paddingRight: 64 } : {}),
+          // scrollbar-gutter keeps the bottom line clear of the horizontal scrollbar (non-overlay platforms).
+          ...(isVertical ? { paddingLeft: 64, paddingRight: 64, scrollbarGutter: "stable" } : {}),
         }}
       >
         {/* Hidden character width measurement element for auto chars-per-line calculation */}

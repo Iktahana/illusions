@@ -867,14 +867,19 @@ export default function MilkdownEditor({
         }
         div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p) {
           text-indent: ${textIndent}em;
-          margin-bottom: ${paragraphSpacing}em;
-          ${showParagraphNumbers ? "counter-increment: paragraph;" : ""}
-          ${showParagraphNumbers ? "position: relative;" : ""}
+          margin-block-end: ${paragraphSpacing}em;
         }
         div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p) {
           text-indent: ${textIndent}em;
-          margin-left: ${paragraphSpacing}em;
-          margin-bottom: 0;
+          margin-block-end: ${paragraphSpacing}em;
+        }
+        /* 行頭起こし括弧の段落（会話文など）は字下げしない */
+        div :global(.milkdown .ProseMirror p.mdi-dialogue) {
+          text-indent: 0;
+        }
+        /* 段落番号: 空行 (.mdi-blank) は数えない・表示しない。
+           .mdi-blank の ::before は \\200B 表示（package CSS）に予約されている */
+        div :global(.milkdown .ProseMirror p:not(.mdi-blank)) {
           ${showParagraphNumbers ? "counter-increment: paragraph;" : ""}
           ${showParagraphNumbers ? "position: relative;" : ""}
         }
@@ -883,7 +888,7 @@ export default function MilkdownEditor({
           display: inline-block;
           width: ${textIndent}em;
         }
-        div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p::before) {
+        div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p:not(.mdi-blank)::before) {
           ${showParagraphNumbers
             ? `
               content: counter(paragraph);
@@ -897,7 +902,7 @@ export default function MilkdownEditor({
             `
             : "content: none;"}
         }
-        div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p::before) {
+        div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p:not(.mdi-blank)::before) {
           ${showParagraphNumbers
             ? `
               content: counter(paragraph);
@@ -923,15 +928,6 @@ export default function MilkdownEditor({
         div :global(.milkdown .ProseMirror li),
         div :global(.milkdown .ProseMirror blockquote) {
           text-indent: 0;
-        }
-        /* 見出しも段落としてカウントするが番号は非表示 */
-        div :global(.milkdown .ProseMirror h1),
-        div :global(.milkdown .ProseMirror h2),
-        div :global(.milkdown .ProseMirror h3),
-        div :global(.milkdown .ProseMirror h4),
-        div :global(.milkdown .ProseMirror h5),
-        div :global(.milkdown .ProseMirror h6) {
-          ${showParagraphNumbers ? "counter-increment: paragraph;" : ""}
         }
       `}</style>
       <style jsx global>{`
