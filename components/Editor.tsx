@@ -138,6 +138,16 @@ export default function NovelEditor({
     setScrollContainerElement(node);
   }, []);
 
+  // Stable callback so MilkdownEditor's view-polling effect (which lists
+  // onEditorViewReady in its deps) does not restart on every render (#1567).
+  const handleEditorViewReady = useCallback(
+    (view: EditorView) => {
+      setEditorViewInstance(view);
+      onEditorViewReady?.(view);
+    },
+    [onEditorViewReady],
+  );
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -515,10 +525,7 @@ export default function NovelEditor({
               isVertical={isVertical}
               scrollContainerRef={scrollContainerRef}
               overrideCharsPerLine={effectiveCharsPerLine}
-              onEditorViewReady={(view) => {
-                setEditorViewInstance(view);
-                onEditorViewReady?.(view);
-              }}
+              onEditorViewReady={handleEditorViewReady}
               lintingRuleRunner={lintingRuleRunner}
               onLintIssuesUpdated={onLintIssuesUpdated}
               onNlpError={onNlpError}

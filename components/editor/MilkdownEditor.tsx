@@ -275,10 +275,14 @@ export default function MilkdownEditor({
   // EditorView インスタンスを取得する
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
+    // Unmount/cleanup guard: prevents setState after unmount and stops the
+    // retry chain when the effect is torn down mid-poll (#1567).
+    let cancelled = false;
     let attempts = 0;
     const maxAttempts = 10;
 
     const tryGetEditorView = () => {
+      if (cancelled) return;
       attempts++;
       try {
         const editor = get();
@@ -301,7 +305,10 @@ export default function MilkdownEditor({
 
     timer = setTimeout(tryGetEditorView, 100);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [get, onEditorViewReady]);
 
   // 外部ファイル変更時にスクロール位置を保持したまま内容を更新する

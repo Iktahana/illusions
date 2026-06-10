@@ -114,6 +114,8 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
   // Tracks whether restoreProjectTabs was called (prevents mount-time
   // restore from running redundantly when a project is being auto-restored).
+  // NOTE: currently write-only — the mount-time Electron restore that read it
+  // is disabled until Phase 9 rewires it to the new IO abstraction (see below).
   const projectTabsRestoredRef = useRef(false);
 
   // --- Persist open tabs (debounced) -------------------------------------
@@ -351,91 +353,34 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
   // This ONLY handles standalone mode (no project). In project mode,
   // restoreProjectTabs() is called explicitly by the project-open handler,
   // replacing the old mount-time restore that had a race condition with windowKey.
+  //
+  // Phase 4-5: electronAPI.vfs は削除済みのため、Electron スタンドアロンの
+  // マウント時自動復元は Phase 9 で新 IO 抽象に再配線するまで停止中。
+  // 旧復元ロジック (fetchWindowState → vfs.readFile → setTabs) は git 履歴を参照。
+  //
+  // 復元はスキップするが、永続化ゲート (storageInitializedRef) は旧実装の
+  // finally と同じタイミングで必ず開く。開かないと「全タブを閉じた」等の
+  // 空タブ状態が永続化されず、次回起動時に古いタブ状態が残留する (#1567)。
 
   useEffect(() => {
     if (!isElectron || skipAutoRestore) return;
-    // Phase 4-5: electronAPI.vfs は削除済み。Phase 9 で新 IO 抽象に再配線するまで
-    // 自動復元を停止する。
-    return;
 
-    const restoreTabs = async () => {
-      try {
-        if (vfsReadyPromise) {
-          await Promise.race([vfsReadyPromise, new Promise<void>((r) => setTimeout(r, 5000))]);
-        }
-
-        // If project tabs were explicitly restored (via restoreProjectTabs),
-        // this mount-time path is redundant — skip to prevent double-restore.
-        if (projectTabsRestoredRef.current) {
-          storageInitializedRef.current = true;
-          return;
-        }
-
-        // Standalone mode: restore from global AppState / per-window SQLite
-        const key = windowKeyRef.current;
-        const windowState = await fetchWindowState(key ?? "__global__");
-        const openTabs = windowState?.openTabs;
-        if (!openTabs) return;
-        if (openTabs.tabs.length === 0) return;
-
-        const restoredTabs: EditorTabState[] = [];
-        for (const serialized of openTabs.tabs) {
-          if (!serialized.filePath) {
-            restoredTabs.push(createNewTab(undefined, serialized.fileType ?? ".mdi"));
-            continue;
-          }
-          try {
-            const vfs = getProjectFileService();
-            const fileContent = await vfs.readFile(serialized.filePath);
-            restoredTabs.push({
-              tabKind: "editor",
-              id: generateTabId(),
-              file: {
-                path: serialized.filePath,
-                handle: null,
-                name: serialized.fileName,
-              },
-              content: fileContent,
-              lastSavedContent: fileContent,
-              isDirty: false,
-              lastSavedTime: Date.now(),
-              lastSaveWasAuto: false,
-              isSaving: false,
-              isPreview: serialized.isPreview ?? false,
-              fileType: serialized.fileType ?? inferFileType(serialized.fileName),
-              fileSyncStatus: "clean",
-              conflictDiskContent: null,
-            });
-          } catch (error) {
-            console.warn(`タブの復元に失敗しました (${serialized.filePath}):`, error);
-          }
-        }
-
-        if (restoredTabs.length > 0) {
-          setTabs(restoredTabs);
-          const activeIdx = Math.min(openTabs.activeIndex, restoredTabs.length - 1);
-          setActiveTabId(restoredTabs[activeIdx].id);
-        } else {
-          const hadFileBacked = openTabs.tabs.some((t) => Boolean(t.filePath));
-          if (hadFileBacked) {
-            setRestoreError?.(
-              "前回開いていたファイルを復元できませんでした。ファイルが移動または削除された可能性があります。",
-            );
-            return;
-          }
-          const defaultTab = createNewTab();
-          setTabs((prev) => (prev.length > 0 ? prev : [defaultTab]));
-          setActiveTabId((prev) => (prev === "" ? defaultTab.id : prev));
-        }
-      } catch (error) {
-        console.error("タブの復元に失敗しました:", error);
-      } finally {
-        storageInitializedRef.current = true;
+    let cancelled = false;
+    const openPersistenceGate = async (): Promise<void> => {
+      // 旧実装と同様に VFS 準備 (最大 5 秒) を待ってからゲートを開き、
+      // マウント直後の空タブ状態が保存済みデータを上書きする競合を避ける。
+      if (vfsReadyPromise) {
+        await Promise.race([vfsReadyPromise, new Promise<void>((r) => setTimeout(r, 5000))]);
       }
+      if (cancelled) return;
+      storageInitializedRef.current = true;
     };
 
-    void restoreTabs();
-  }, [isElectron, skipAutoRestore, setTabs, setActiveTabId, vfsReadyPromise, setRestoreError]);
+    void openPersistenceGate();
+    return () => {
+      cancelled = true;
+    };
+  }, [isElectron, skipAutoRestore, vfsReadyPromise]);
 
   return { wasAutoRecovered, flushTabState, restoreProjectTabs };
 }

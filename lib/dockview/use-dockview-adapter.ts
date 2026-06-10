@@ -226,7 +226,9 @@ function applySimplifiedLayout(
     const activePanelId = panelIdByKey.get(savedGroup.activeTabPath);
     if (!activePanelId) continue;
     const panel = api.getPanel(activePanelId);
-    if (panel) {
+    // Guard with isActive: dockview setActive() is NOT idempotent — it
+    // detaches/reattaches the panel DOM and resets scroll (#1457).
+    if (panel && !panel.api.isActive) {
       try {
         panel.api.setActive();
       } catch {
@@ -267,80 +269,103 @@ export function useDockviewAdapter({
 
   const { tabs, activeTabId, switchTab, closeTab, cloneTab, updateTab } = tabManager;
 
+  // Latest-state refs so the mount-only handleDockviewReady closure (and the
+  // dockview event subscriptions it registers) never read stale first-render
+  // values (#1567). The previous useCallback([]) captured the first render's
+  // tabs/activeTabId, so onReady initialized from stale tabs and
+  // onDidActivePanelChange compared against a stale activeTabId forever.
+  const tabsRef = useRef<TabState[]>(tabs);
+  tabsRef.current = tabs;
+  const activeTabIdLiveRef = useRef<TabId>(activeTabId);
+  activeTabIdLiveRef.current = activeTabId;
+  const switchTabRef = useRef(switchTab);
+  switchTabRef.current = switchTab;
+  const closeTabRef = useRef(closeTab);
+  closeTabRef.current = closeTab;
+  const panelParamsRef = useRef({ editorKey, searchOpenTrigger, searchInitialTerm });
+  panelParamsRef.current = { editorKey, searchOpenTrigger, searchInitialTerm };
+
   // -- onReady callback -----------------------------------------------------
 
-  const handleDockviewReady = useCallback(
-    (event: { api: DockviewApi }) => {
-      const api = event.api;
-      apiRef.current = api;
-      setDockviewApi(api);
+  const handleDockviewReady = useCallback((event: { api: DockviewApi }): void => {
+    const api = event.api;
+    apiRef.current = api;
+    setDockviewApi(api);
 
-      // Initialize dockview with current tabs, branching by tabKind
-      for (const tab of tabs) {
-        if (isEditorTab(tab)) {
-          api.addPanel<EditorPanelParams>({
-            id: tab.id,
-            component: "editor",
-            title: tab.file?.name ?? `新規ファイル${tab.fileType}`,
-            params: {
-              bufferId: tab.id,
-              isPreview: tab.isPreview,
-              filePath: tab.file?.path ?? "",
-              fileType: tab.fileType,
-              editorKey,
-              activeTabId,
-              searchOpenTrigger,
-              searchInitialTerm,
-              pendingExternalContent: tab.pendingExternalContent ?? null,
-            },
-          });
-        } else if (isTerminalTab(tab)) {
-          const termPosition = buildTerminalPanelPosition(api, tab.id, tabs);
-          api.addPanel<TerminalPanelParams>({
-            id: tab.id,
-            component: "terminal",
-            title: tab.label,
-            params: { sessionId: tab.sessionId },
-            ...(termPosition ? { position: termPosition } : {}),
-          });
-        } else if (isDiffTab(tab)) {
-          api.addPanel<DiffPanelParams>({
-            id: tab.id,
-            component: "diff",
-            title: tab.sourceFileName,
-            params: { sourceTabId: tab.sourceTabId },
-          });
-        }
+    const currentTabs = tabsRef.current;
+    const currentActiveTabId = activeTabIdLiveRef.current;
+    const { editorKey, searchOpenTrigger, searchInitialTerm } = panelParamsRef.current;
+
+    // Initialize dockview with current tabs, branching by tabKind
+    for (const tab of currentTabs) {
+      if (isEditorTab(tab)) {
+        api.addPanel<EditorPanelParams>({
+          id: tab.id,
+          component: "editor",
+          title: tab.file?.name ?? `新規ファイル${tab.fileType}`,
+          params: {
+            bufferId: tab.id,
+            isPreview: tab.isPreview,
+            filePath: tab.file?.path ?? "",
+            fileType: tab.fileType,
+            editorKey,
+            activeTabId: currentActiveTabId,
+            searchOpenTrigger,
+            searchInitialTerm,
+            pendingExternalContent: tab.pendingExternalContent ?? null,
+          },
+        });
+      } else if (isTerminalTab(tab)) {
+        const termPosition = buildTerminalPanelPosition(api, tab.id, currentTabs);
+        api.addPanel<TerminalPanelParams>({
+          id: tab.id,
+          component: "terminal",
+          title: tab.label,
+          params: { sessionId: tab.sessionId },
+          ...(termPosition ? { position: termPosition } : {}),
+        });
+      } else if (isDiffTab(tab)) {
+        api.addPanel<DiffPanelParams>({
+          id: tab.id,
+          component: "diff",
+          title: tab.sourceFileName,
+          params: { sourceTabId: tab.sourceTabId },
+        });
       }
+    }
 
-      // Set active panel
-      const activePanel = api.getPanel(activeTabId);
-      if (activePanel) {
-        activePanel.api.setActive();
-      }
+    // Record what was just added so the sync effect diffs against it instead
+    // of re-adding every panel (the old code re-added all panels and relied on
+    // an empty catch to swallow the duplicate-addPanel errors).
+    prevTabsRef.current = currentTabs;
+    prevActiveTabRef.current = currentActiveTabId;
 
-      // Listen for dockview panel activation → update tab manager
-      api.onDidActivePanelChange((e) => {
-        if (isSyncingRef.current) return;
-        const panelId = e?.id;
-        if (panelId && panelId !== tabManager.activeTabId) {
-          isSyncingRef.current = true;
-          switchTab(panelId);
-          isSyncingRef.current = false;
-        }
-      });
+    // Set active panel. Guard with isActive: dockview setActive() is NOT
+    // idempotent — it detaches/reattaches the panel DOM and resets scroll (#1457).
+    const activePanel = api.getPanel(currentActiveTabId);
+    if (activePanel && !activePanel.api.isActive) {
+      activePanel.api.setActive();
+    }
 
-      // Listen for dockview panel close → close tab
-      api.onDidRemovePanel((e) => {
-        if (isSyncingRef.current) return;
+    // Listen for dockview panel activation → update tab manager
+    api.onDidActivePanelChange((e) => {
+      if (isSyncingRef.current) return;
+      const panelId = e?.id;
+      if (panelId && panelId !== activeTabIdLiveRef.current) {
         isSyncingRef.current = true;
-        closeTab(e.id);
+        switchTabRef.current(panelId);
         isSyncingRef.current = false;
-      });
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run once on mount
-    [],
-  );
+      }
+    });
+
+    // Listen for dockview panel close → close tab
+    api.onDidRemovePanel((e) => {
+      if (isSyncingRef.current) return;
+      isSyncingRef.current = true;
+      closeTabRef.current(e.id);
+      isSyncingRef.current = false;
+    });
+  }, []);
 
   // -- Reset layout state on project change ----------------------------------
   const prevWindowKeyRef = useRef<string | null | undefined>(undefined);
@@ -458,8 +483,11 @@ export function useDockviewAdapter({
             params: { sourceTabId: tab.sourceTabId },
           });
         }
-      } catch {
-        // Panel may already exist (e.g. from onReady initialization)
+      } catch (err) {
+        // Duplicates are prevented by the prevTabsRef diff (onReady records the
+        // panels it added), so a failure here is unexpected — surface it
+        // instead of silently swallowing (#1567).
+        console.warn(`[dockview-adapter] addPanel failed for tab ${tab.id}:`, err);
       }
     }
 
@@ -547,8 +575,6 @@ export function useDockviewAdapter({
   // Using a dedicated effect prevents savedLayout changes from re-triggering
   // the sync effect, which would cause duplicate addPanel calls and break rendering.
 
-  const tabsRef = useRef<TabState[]>(tabs);
-  tabsRef.current = tabs;
   const hasTabsForLayout = tabs.length > 0;
 
   useEffect(() => {
