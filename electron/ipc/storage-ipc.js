@@ -6,6 +6,7 @@
 
 const { ipcMain } = require("electron");
 const { ElectronStorageManager } = require("../../lib/storage/electron-storage-manager");
+const { STORAGE_CHANNELS } = require("../lib/ipc-channels");
 
 let storageManager = null;
 
@@ -20,7 +21,7 @@ function registerStorageHandlers() {
   const manager = getStorageManager();
 
   // セッション保存
-  ipcMain.handle("storage:save-session", async (_event, session) => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.saveSession, async (_event, session) => {
     if (typeof session !== "object" || session === null) {
       throw new Error("Invalid session: expected object");
     }
@@ -33,7 +34,7 @@ function registerStorageHandlers() {
   });
 
   // セッション読み込み
-  ipcMain.handle("storage:load-session", async () => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.loadSession, async () => {
     try {
       return await manager.loadSession();
     } catch (error) {
@@ -43,7 +44,7 @@ function registerStorageHandlers() {
   });
 
   // AppState 保存
-  ipcMain.handle("storage:save-app-state", async (_event, appState) => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.saveAppState, async (_event, appState) => {
     if (typeof appState !== "object" || appState === null) {
       throw new Error("Invalid appState: expected object");
     }
@@ -56,7 +57,7 @@ function registerStorageHandlers() {
   });
 
   // AppState 読み込み
-  ipcMain.handle("storage:load-app-state", async () => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.loadAppState, async () => {
     try {
       return await manager.loadAppState();
     } catch (error) {
@@ -66,7 +67,7 @@ function registerStorageHandlers() {
   });
 
   // Recent Files 追加
-  ipcMain.handle("storage:add-to-recent", async (_event, file) => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.addToRecent, async (_event, file) => {
     if (
       typeof file !== "object" ||
       file === null ||
@@ -84,7 +85,7 @@ function registerStorageHandlers() {
   });
 
   // Recent Files 取得
-  ipcMain.handle("storage:get-recent-files", async () => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.getRecentFiles, async () => {
     try {
       return manager.getRecentFiles();
     } catch (error) {
@@ -94,7 +95,7 @@ function registerStorageHandlers() {
   });
 
   // Recent Files から削除
-  ipcMain.handle("storage:remove-from-recent", async (_event, path) => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.removeFromRecent, async (_event, path) => {
     if (typeof path !== "string") {
       throw new Error("Invalid path: expected string");
     }
@@ -107,7 +108,7 @@ function registerStorageHandlers() {
   });
 
   // Recent Files クリア
-  ipcMain.handle("storage:clear-recent", async () => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.clearRecent, async () => {
     try {
       await manager.clearRecent();
     } catch (error) {
@@ -117,7 +118,7 @@ function registerStorageHandlers() {
   });
 
   // Editor Buffer 保存
-  ipcMain.handle("storage:save-editor-buffer", async (_event, buffer) => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.saveEditorBuffer, async (_event, buffer) => {
     if (typeof buffer !== "object" || buffer === null) {
       throw new Error("Invalid buffer: expected object");
     }
@@ -130,7 +131,7 @@ function registerStorageHandlers() {
   });
 
   // Editor Buffer 読み込み
-  ipcMain.handle("storage:load-editor-buffer", async () => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.loadEditorBuffer, async () => {
     try {
       return manager.loadEditorBuffer();
     } catch (error) {
@@ -140,7 +141,7 @@ function registerStorageHandlers() {
   });
 
   // Editor Buffer クリア
-  ipcMain.handle("storage:clear-editor-buffer", async () => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.clearEditorBuffer, async () => {
     try {
       await manager.clearEditorBuffer();
     } catch (error) {
@@ -150,7 +151,7 @@ function registerStorageHandlers() {
   });
 
   // すべてクリア
-  ipcMain.handle("storage:clear-all", async () => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.clearAll, async () => {
     try {
       await manager.clearAll();
     } catch (error) {
@@ -160,7 +161,7 @@ function registerStorageHandlers() {
   });
 
   // Recent Projects 追加
-  ipcMain.handle("storage:add-recent-project", async (_event, project) => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.addRecentProject, async (_event, project) => {
     if (typeof project !== "object" || project === null) {
       throw new Error("Invalid project: expected object");
     }
@@ -173,7 +174,7 @@ function registerStorageHandlers() {
   });
 
   // Recent Projects 取得
-  ipcMain.handle("storage:get-recent-projects", async () => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.getRecentProjects, async () => {
     try {
       return await manager.getRecentProjects();
     } catch (error) {
@@ -183,7 +184,7 @@ function registerStorageHandlers() {
   });
 
   // Recent Projects 削除
-  ipcMain.handle("storage:remove-recent-project", async (_event, projectId) => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.removeRecentProject, async (_event, projectId) => {
     if (typeof projectId !== "string") {
       throw new Error("Invalid projectId: expected string");
     }
@@ -196,7 +197,7 @@ function registerStorageHandlers() {
   });
 
   // KV Store: set
-  ipcMain.handle("storage:set-item", async (_event, key, value) => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.setItem, async (_event, key, value) => {
     if (typeof key !== "string") {
       throw new Error("Invalid key: expected string");
     }
@@ -209,7 +210,7 @@ function registerStorageHandlers() {
   });
 
   // KV Store: get
-  ipcMain.handle("storage:get-item", async (_event, key) => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.getItem, async (_event, key) => {
     if (typeof key !== "string") {
       throw new Error("Invalid key: expected string");
     }
@@ -222,7 +223,7 @@ function registerStorageHandlers() {
   });
 
   // KV Store: remove
-  ipcMain.handle("storage:remove-item", async (_event, key) => {
+  ipcMain.handle(STORAGE_CHANNELS.invoke.removeItem, async (_event, key) => {
     if (typeof key !== "string") {
       throw new Error("Invalid key: expected string");
     }

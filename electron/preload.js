@@ -2,6 +2,8 @@
 // レンダラへ最小限かつ安全なAPIだけを公開する
 
 const { contextBridge, ipcRenderer } = require("electron");
+const { invokeChannel, eventChannel } = require("./lib/ipc-bridge");
+const { STORAGE_CHANNELS, DICT_CHANNELS } = require("./lib/ipc-channels");
 
 contextBridge.exposeInMainWorld("electronAPI", {
   isElectron: true,
@@ -174,26 +176,26 @@ contextBridge.exposeInMainWorld("electronAPI", {
     },
     analyzeWordFrequency: (text) => ipcRenderer.invoke("nlp:analyze-word-frequency", text),
   },
+  // #1434: declarative bridge — channel names shared with electron/ipc/storage-ipc.js
   storage: {
-    saveSession: (session) => ipcRenderer.invoke("storage:save-session", session),
-    loadSession: () => ipcRenderer.invoke("storage:load-session"),
-    saveAppState: (appState) => ipcRenderer.invoke("storage:save-app-state", appState),
-    loadAppState: () => ipcRenderer.invoke("storage:load-app-state"),
-    addToRecent: (file) => ipcRenderer.invoke("storage:add-to-recent", file),
-    getRecentFiles: () => ipcRenderer.invoke("storage:get-recent-files"),
-    removeFromRecent: (path) => ipcRenderer.invoke("storage:remove-from-recent", path),
-    clearRecent: () => ipcRenderer.invoke("storage:clear-recent"),
-    saveEditorBuffer: (buffer) => ipcRenderer.invoke("storage:save-editor-buffer", buffer),
-    loadEditorBuffer: () => ipcRenderer.invoke("storage:load-editor-buffer"),
-    clearEditorBuffer: () => ipcRenderer.invoke("storage:clear-editor-buffer"),
-    clearAll: () => ipcRenderer.invoke("storage:clear-all"),
-    addRecentProject: (project) => ipcRenderer.invoke("storage:add-recent-project", project),
-    getRecentProjects: () => ipcRenderer.invoke("storage:get-recent-projects"),
-    removeRecentProject: (projectId) =>
-      ipcRenderer.invoke("storage:remove-recent-project", projectId),
-    setItem: (key, value) => ipcRenderer.invoke("storage:set-item", key, value),
-    getItem: (key) => ipcRenderer.invoke("storage:get-item", key),
-    removeItem: (key) => ipcRenderer.invoke("storage:remove-item", key),
+    saveSession: invokeChannel(STORAGE_CHANNELS.invoke.saveSession, { arity: 1 }),
+    loadSession: invokeChannel(STORAGE_CHANNELS.invoke.loadSession, { arity: 0 }),
+    saveAppState: invokeChannel(STORAGE_CHANNELS.invoke.saveAppState, { arity: 1 }),
+    loadAppState: invokeChannel(STORAGE_CHANNELS.invoke.loadAppState, { arity: 0 }),
+    addToRecent: invokeChannel(STORAGE_CHANNELS.invoke.addToRecent, { arity: 1 }),
+    getRecentFiles: invokeChannel(STORAGE_CHANNELS.invoke.getRecentFiles, { arity: 0 }),
+    removeFromRecent: invokeChannel(STORAGE_CHANNELS.invoke.removeFromRecent, { arity: 1 }),
+    clearRecent: invokeChannel(STORAGE_CHANNELS.invoke.clearRecent, { arity: 0 }),
+    saveEditorBuffer: invokeChannel(STORAGE_CHANNELS.invoke.saveEditorBuffer, { arity: 1 }),
+    loadEditorBuffer: invokeChannel(STORAGE_CHANNELS.invoke.loadEditorBuffer, { arity: 0 }),
+    clearEditorBuffer: invokeChannel(STORAGE_CHANNELS.invoke.clearEditorBuffer, { arity: 0 }),
+    clearAll: invokeChannel(STORAGE_CHANNELS.invoke.clearAll, { arity: 0 }),
+    addRecentProject: invokeChannel(STORAGE_CHANNELS.invoke.addRecentProject, { arity: 1 }),
+    getRecentProjects: invokeChannel(STORAGE_CHANNELS.invoke.getRecentProjects, { arity: 0 }),
+    removeRecentProject: invokeChannel(STORAGE_CHANNELS.invoke.removeRecentProject, { arity: 1 }),
+    setItem: invokeChannel(STORAGE_CHANNELS.invoke.setItem, { arity: 2 }),
+    getItem: invokeChannel(STORAGE_CHANNELS.invoke.getItem, { arity: 1 }),
+    removeItem: invokeChannel(STORAGE_CHANNELS.invoke.removeItem, { arity: 1 }),
   },
   vfs: {
     openDirectory: () => ipcRenderer.invoke("vfs:open-directory"),
@@ -260,23 +262,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeAllListeners("editor:buffer-close-broadcast");
     },
   },
+  // #1434: declarative bridge — channel names shared with electron/ipc/dict-ipc.js
   dict: {
-    query: (term, limit) => ipcRenderer.invoke("dict:query", { term, limit }),
-    queryByReading: (reading, limit) =>
-      ipcRenderer.invoke("dict:query-reading", { reading, limit }),
-    getStatus: () => ipcRenderer.invoke("dict:get-status"),
-    checkUpdate: () => ipcRenderer.invoke("dict:check-update"),
-    download: () => ipcRenderer.invoke("dict:download"),
-    onDownloadProgress: (callback) => {
-      const handler = (_event, data) => callback(data);
-      ipcRenderer.on("dict:download-progress", handler);
-      return () => ipcRenderer.removeListener("dict:download-progress", handler);
-    },
-    onUpdateAvailable: (callback) => {
-      const handler = (_event, data) => callback(data);
-      ipcRenderer.on("dict:update-available", handler);
-      return () => ipcRenderer.removeListener("dict:update-available", handler);
-    },
+    query: invokeChannel(DICT_CHANNELS.invoke.query, (term, limit) => ({ term, limit })),
+    queryByReading: invokeChannel(DICT_CHANNELS.invoke.queryReading, (reading, limit) => ({
+      reading,
+      limit,
+    })),
+    getStatus: invokeChannel(DICT_CHANNELS.invoke.getStatus, { arity: 0 }),
+    checkUpdate: invokeChannel(DICT_CHANNELS.invoke.checkUpdate, { arity: 0 }),
+    download: invokeChannel(DICT_CHANNELS.invoke.download, { arity: 0 }),
+    onDownloadProgress: eventChannel(DICT_CHANNELS.event.downloadProgress),
+    onUpdateAvailable: eventChannel(DICT_CHANNELS.event.updateAvailable),
   },
   pty: {
     /** Spawn a new PTY session. Returns { sessionId } or { error }. */
