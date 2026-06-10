@@ -5,8 +5,10 @@
  * count) rather than String.prototype.length (UTF-16 code unit count).
  *
  * The bug (pre-fix): content.length was compared against MAX_CONTENT_BYTES.
- * CJK characters occupy 3 bytes in UTF-8 but only 1 code unit in .length, so
- * a 150 MB Japanese manuscript was allowed through as if it were 50 MB.
+ * BMP CJK characters (the vast majority of Japanese text, e.g. U+4E00) occupy
+ * 3 bytes in UTF-8 but only 1 code unit in .length — some supplementary-plane
+ * CJK code points even take 4 bytes — so a 150 MB Japanese manuscript was
+ * allowed through as if it were 50 MB. These tests use the 3-byte BMP case.
  *
  * Architecture note: file-ipc.js is a CommonJS Electron main-process module and
  * cannot be imported directly into vitest. These tests validate the invariant that
@@ -14,6 +16,9 @@
  * and serve as a regression guard for the fix applied at lines 304, 446, 592, 648.
  */
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 
 const MAX_CONTENT_BYTES = 50 * 1024 * 1024; // 50 MB, matches file-ipc.js
@@ -90,5 +95,28 @@ describe("content size validation — Buffer.byteLength vs .length", () => {
     const byteLen = Buffer.byteLength(mixed, "utf-8");
     expect(byteLen).toBeLessThanOrEqual(MAX_CONTENT_BYTES);
     expect(isContentTooLarge(mixed)).toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------
+// Source-based regression guard: file-ipc.js cannot be imported in vitest
+// (CommonJS Electron main-process module), so assert on its source text that
+// every MAX_CONTENT_BYTES comparison measures UTF-8 bytes, not code units.
+// -----------------------------------------------------------------------
+describe("file-ipc.js source regression guard", () => {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const source = readFileSync(path.resolve(here, "../file-ipc.js"), "utf-8");
+
+  it("uses Buffer.byteLength for every MAX_CONTENT_BYTES comparison", () => {
+    const comparisons = source.match(/[^\n]*>\s*MAX_CONTENT_BYTES[^\n]*/g) ?? [];
+    // The fix covered 4 call sites; new ones must follow the same pattern
+    expect(comparisons.length).toBeGreaterThanOrEqual(4);
+    for (const line of comparisons) {
+      expect(line).toContain("Buffer.byteLength(");
+    }
+  });
+
+  it("does not compare content.length against MAX_CONTENT_BYTES", () => {
+    expect(source).not.toMatch(/\.length\s*>\s*MAX_CONTENT_BYTES/);
   });
 });
