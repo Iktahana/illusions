@@ -6,7 +6,9 @@ describe("getRuleLevelMap", () => {
   test("covers every rule produced by the factories", () => {
     const rules = createJsonDrivenRules();
     const levels = getRuleLevelMap();
-    expect(levels.size).toBe(rules.length);
+    // The map may grow beyond the JSON-driven factories once hand-written
+    // (e.g. L2 morphological) rules are re-added via getAllRules().
+    expect(levels.size).toBeGreaterThanOrEqual(rules.length);
     for (const rule of rules) {
       expect(levels.get(rule.id)).toBe(rule.level);
     }

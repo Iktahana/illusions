@@ -31,7 +31,7 @@ export function createJsonDrivenRules(): LintRule[] {
   return [...createJtfL1Rules(), ...createManuscriptL1Rules(), ...createNihongoHyoukiL1Rules()];
 }
 
-/** Lazily-built map of rule ID -> detection level, derived from the rule factories. */
+/** Lazily-built map of rule ID -> detection level, covering ALL registered rule instances (hand-written via getAllRules + JSON-driven factories). */
 let ruleLevelMap: ReadonlyMap<string, RuleLevel> | null = null;
 
 /**
