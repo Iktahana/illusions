@@ -399,6 +399,7 @@ export class ProjectService {
     // Electron の getDirectoryHandle は存在しないディレクトリでも throw しない
     // ため、entries() の走査で .illusions の実在を確認する。
     let illusionsDirExists = false;
+    let entriesScanFailed = false;
     try {
       for await (const [name, entry] of rootDirHandle.entries()) {
         if (name === ".illusions" && entry.kind === "directory") {
@@ -407,9 +408,12 @@ export class ProjectService {
         }
       }
     } catch {
-      // Root directory unreadable — treated as .illusions missing below.
+      // Root unreadable (permission loss, transient I/O): existence is UNKNOWN.
+      // Do not conclude absence here — fall through to the handle probe so a
+      // read failure is not misreported as a missing directory.
+      entriesScanFailed = true;
     }
-    if (!illusionsDirExists) {
+    if (!illusionsDirExists && !entriesScanFailed) {
       errors.push(".illusions directory not found");
       return { valid: false, errors };
     }
@@ -419,7 +423,11 @@ export class ProjectService {
     try {
       illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: false });
     } catch {
-      errors.push(".illusions directory not found");
+      errors.push(
+        entriesScanFailed
+          ? ".illusions directory is not accessible"
+          : ".illusions directory not found",
+      );
       return { valid: false, errors };
     }
 

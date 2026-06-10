@@ -301,4 +301,49 @@ describe("validateProjectStructure", () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain(".illusions directory not found");
   });
+
+  it("an unreadable root (entries() throws) is reported as inaccessible, not missing", async () => {
+    // Copilot review: a permission/transient read failure must not be
+    // misreported as ".illusions directory not found".
+    const fakeRoot = {
+      getDirectoryHandle: vi
+        .fn<(name: string, opts?: { create?: boolean }) => Promise<never>>()
+        .mockRejectedValue(new DOMException("denied", "NotAllowedError")),
+      entries: () => {
+        throw new Error("read failure");
+      },
+    } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
+
+    const result = await getProjectService().validateProjectStructure(fakeRoot);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(".illusions directory is not accessible");
+    expect(result.errors).not.toContain(".illusions directory not found");
+  });
+
+  it("entries() failure on Electron still validates via the handle probe", async () => {
+    // Electron-shaped handle: getDirectoryHandle resolves even when the scan
+    // failed — validation proceeds to project.json instead of false-reporting
+    // a missing directory.
+    const projectJson = JSON.stringify({
+      version: "1.0",
+      projectId: "p-1",
+      name: "n",
+      mainFile: "m.mdi",
+    });
+    const fakeIllusionsDir = {
+      getFileHandle: vi.fn().mockResolvedValue({ read: vi.fn().mockResolvedValue(projectJson) }),
+    } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
+    const fakeRoot = {
+      getDirectoryHandle: vi.fn().mockResolvedValue(fakeIllusionsDir),
+      entries: () => {
+        throw new Error("scan failure");
+      },
+    } as unknown as import("@/lib/vfs/types").VFSDirectoryHandle;
+
+    const result = await getProjectService().validateProjectStructure(fakeRoot);
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
 });
