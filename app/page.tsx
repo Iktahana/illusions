@@ -219,6 +219,7 @@ export default function EditorPage() {
   const tabManager = useTabManager({
     skipAutoRestore,
     autoSave,
+    powerSaveMode,
     vfsReadyPromise: vfsGate.promise,
     flushLayoutState: stableFlushLayoutState,
     windowKey,

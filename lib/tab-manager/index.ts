@@ -24,6 +24,11 @@ export type { UseTabManagerReturn } from "./types";
 export function useTabManager(options?: {
   skipAutoRestore?: boolean;
   autoSave?: boolean;
+  /**
+   * Power-save mode; throttles the auto-save interval while the window is
+   * backgrounded (#1466). Defaults to false (no throttling).
+   */
+  powerSaveMode?: boolean;
   vfsReadyPromise?: Promise<void>;
   /** External flush callback for dockview layout persistence. */
   flushLayoutState?: () => Promise<void>;
@@ -86,6 +91,7 @@ export function useTabManager(options?: {
     isProjectRef: tabState.isProjectRef,
     isElectron: tabState.isElectron,
     autoSaveEnabled,
+    powerSaveMode: options?.powerSaveMode ?? false,
     saveFileRef: fileIO.saveFileRef,
     tryCreateSnapshot: fileIO.tryCreateSnapshot,
   });
