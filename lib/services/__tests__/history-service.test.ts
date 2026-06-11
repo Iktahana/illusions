@@ -284,6 +284,68 @@ describe("HistoryService", () => {
       }
     });
 
+    it("re-checks the auto throttle inside the index lock (TOCTOU, #1438)", async () => {
+      // Simulate two concurrent auto createSnapshot calls for the same
+      // sourcePath that BOTH pass the outer (pre-lock) throttle check, and
+      // are then serialized by the index lock. Without the in-lock re-check,
+      // both would write a snapshot; with the fix, exactly one is written.
+      type LockFn = <T>(fn: () => Promise<T>) => Promise<T>;
+      const store = (service as unknown as { store: { withIndexLock: LockFn } }).store;
+      const realWithIndexLock = store.withIndexLock.bind(store) as LockFn;
+
+      interface PendingJob {
+        fn: () => Promise<unknown>;
+        resolve: (value: unknown) => void;
+        reject: (reason: unknown) => void;
+      }
+
+      // Hold every locked callback until both calls have reached the lock
+      // (i.e. both have already passed the outer throttle check), then run
+      // them strictly one after another through the real lock.
+      const pending: PendingJob[] = [];
+      let draining = false;
+      store.withIndexLock = (<T>(fn: () => Promise<T>): Promise<T> => {
+        return new Promise<T>((resolve, reject) => {
+          pending.push({
+            fn: fn as () => Promise<unknown>,
+            resolve: resolve as (value: unknown) => void,
+            reject,
+          });
+          if (pending.length === 2 && !draining) {
+            draining = true;
+            void (async () => {
+              while (pending.length > 0) {
+                const job = pending.shift()!;
+                try {
+                  job.resolve(await realWithIndexLock(job.fn));
+                } catch (err) {
+                  job.reject(err);
+                }
+              }
+            })();
+          }
+        });
+      }) as LockFn;
+
+      const [first, second] = await Promise.all([
+        service.createSnapshot({ sourcePath: "main.mdi", content: "v1" }),
+        service.createSnapshot({ sourcePath: "main.mdi", content: "v2" }),
+      ]);
+
+      // The first serialized call wins; the second must be throttled.
+      expect(first).not.toBeNull();
+      expect(second).toBeNull();
+
+      // Exactly ONE snapshot entry in the index.
+      const indexKey = Array.from(fileStore.keys()).find((k) => k.includes("index.json"))!;
+      const index = JSON.parse(fileStore.get(indexKey)!) as HistoryIndex;
+      expect(index.snapshots).toHaveLength(1);
+
+      // Exactly ONE snapshot file written.
+      const historyFiles = Array.from(fileStore.keys()).filter((k) => k.endsWith(".history"));
+      expect(historyFiles).toHaveLength(1);
+    });
+
     it("emits onSnapshotCreated listener when a snapshot is created", async () => {
       const listener = vi.fn();
       service.onSnapshotCreated(listener);

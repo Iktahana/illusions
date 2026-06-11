@@ -1,5 +1,6 @@
 const { ipcMain, shell, BrowserWindow, app } = require("electron");
 const crypto = require("crypto");
+const { AUTH_CHANNELS } = require("../lib/ipc-channels");
 
 const PROVIDER_URL = "https://my.illusions.app";
 const OAUTH_CLIENT_ID = "illusions";
@@ -17,7 +18,7 @@ function generateCodeChallenge(verifier) {
 }
 
 function registerAuthHandlers() {
-  ipcMain.handle("auth:start-login", async (event) => {
+  ipcMain.handle(AUTH_CHANNELS.invoke.startLogin, async (event) => {
     const state = crypto.randomBytes(16).toString("hex");
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
@@ -41,7 +42,7 @@ function registerAuthHandlers() {
     return { state };
   });
 
-  ipcMain.handle("auth:exchange-code", async (_event, { code, state }) => {
+  ipcMain.handle(AUTH_CHANNELS.invoke.exchangeCode, async (_event, { code, state }) => {
     const entry = pendingAuthByState.get(state);
     if (!entry) {
       throw new Error("Invalid state parameter");
@@ -69,7 +70,7 @@ function registerAuthHandlers() {
     return response.json();
   });
 
-  ipcMain.handle("auth:refresh-token", async (_event, refreshToken) => {
+  ipcMain.handle(AUTH_CHANNELS.invoke.refreshToken, async (_event, refreshToken) => {
     const response = await fetch(`${PROVIDER_URL}/api/oauth/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -92,7 +93,7 @@ function registerAuthHandlers() {
     return response.json();
   });
 
-  ipcMain.handle("auth:get-userinfo", async (_event, accessToken) => {
+  ipcMain.handle(AUTH_CHANNELS.invoke.getUserInfo, async (_event, accessToken) => {
     const response = await fetch(`${PROVIDER_URL}/api/oauth/userinfo`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -106,7 +107,7 @@ function registerAuthHandlers() {
     return response.json();
   });
 
-  ipcMain.handle("auth:logout", async (event) => {
+  ipcMain.handle(AUTH_CHANNELS.invoke.logout, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) {
       const winId = win.id;
@@ -167,7 +168,7 @@ function handleAuthCallback(url) {
     if (targetWindow) {
       if (targetWindow.isMinimized()) targetWindow.restore();
       targetWindow.focus();
-      targetWindow.webContents.send("auth:callback", { code, state, error });
+      targetWindow.webContents.send(AUTH_CHANNELS.event.callback, { code, state, error });
     }
   } catch (err) {
     console.error("[auth] Failed to handle callback URL:", err);

@@ -8,10 +8,6 @@
 
 import MarkdownIt from "markdown-it";
 
-import { PAGE_DIMENSIONS } from "./pdf-export-settings";
-
-import type { ExportPageSize } from "./export-settings";
-import type { ExportMetadata, Chapter } from "./types";
 import {
   MDI_RUBY_RE,
   MDI_TCY_RE,
@@ -20,7 +16,11 @@ import {
   MDI_BREAK_RE,
   MDI_KERN_AMOUNT_RE,
   MDI_BLANK_RE,
-} from "./mdi-parser";
+} from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
+import { PAGE_DIMENSIONS } from "./pdf-export-settings";
+
+import type { ExportPageSize } from "./export-settings";
+import type { ExportMetadata, Chapter } from "./types";
 
 const MDI_RUBY_AT_START_RE = new RegExp(`^${MDI_RUBY_RE.source}`);
 const MDI_TCY_AT_START_RE = new RegExp(`^${MDI_TCY_RE.source}`);

@@ -7,29 +7,49 @@
 const { ipcMain, dialog, app, BrowserWindow, webContents } = require("electron");
 const fs = require("fs/promises");
 const path = require("path");
-const os = require("os");
+const { createApprovedPathRegistry } = require("../lib/approved-paths");
 const {
   toForwardSlash,
   assertPathInsideRoot,
-  getWindowsDenyPrefixes,
+  normalizeSeparators,
+  trimTrailingSlashes,
+  resolveRealPath,
 } = require("../lib/path-utils");
+const { isSensitiveSystemPath, MAX_CONTENT_BYTES } = require("../lib/path-policy");
+const { VFS_CHANNELS } = require("../lib/ipc-channels");
 // #1476: rehydration — begin
 const { loadApprovals, saveApprovals } = require("../lib/vfs-approvals");
+const { createIndexLockManager } = require("../lib/index-lock");
 // #1476: rehydration — end
 
-/** Maximum content size accepted by write-file (same limit as file-ipc.js) */
-const MAX_CONTENT_BYTES = 50 * 1024 * 1024; // 50 MB
-
 function registerVFSHandlers() {
-  // Track the opened root directory per window for path validation
+  // Track the opened root directory per window for path validation.
+  // #1559: each entry stores both the lexical root (as seen by the renderer)
+  // and its physical realpath so symlink-collapsed containment can be checked.
+  /** @type {Map<number, { path: string, realPath: string }>} */
   const allowedRoots = new Map();
 
+  /**
+   * Resolve the realpath of a root directory, falling back to the lexical
+   * path when realpath fails (e.g. permission edge cases).
+   * @param {string} rootPath - Absolute root directory path
+   * @returns {Promise<string>}
+   */
+  async function resolveRootRealPath(rootPath) {
+    try {
+      return await fs.realpath(rootPath);
+    } catch {
+      return rootPath;
+    }
+  }
+
   // Track paths that were selected via the native file dialog.
-  // Uses a bounded LRU map per window to prevent unbounded memory growth
-  // and to avoid cross-window path reuse (consistent with file-ipc.js).
-  const MAX_APPROVED_PATHS = 200;
-  /** @type {Map<number, Map<string, true>>} webContentsId -> (path -> true) LRU map */
-  const dialogApprovedPaths = new Map();
+  // Per-window bounded LRU semantics live in electron/lib/approved-paths.js
+  // (same registry as file-ipc.js — prevents unbounded memory growth and
+  // cross-window path reuse). Intentional difference vs file-ipc.js: this
+  // registry is created per registerVFSHandlers() call and stays encapsulated
+  // inside the VFS handler closure.
+  const dialogApprovedPaths = createApprovedPathRegistry();
 
   // #1476: rehydration — begin
   /**
@@ -70,67 +90,59 @@ function registerVFSHandlers() {
   // #1476: rehydration — end
 
   /**
-   * Get or create the per-window LRU path map for a given webContentsId.
-   * @param {number} webContentsId - The webContents ID of the BrowserWindow
-   * @returns {Map<string, true>}
-   */
-  function getWindowApprovedPaths(webContentsId) {
-    if (!dialogApprovedPaths.has(webContentsId)) {
-      dialogApprovedPaths.set(webContentsId, new Map());
-    }
-    return dialogApprovedPaths.get(webContentsId);
-  }
-
-  /**
    * Add a path to the dialog-approved set for a specific window, with LRU eviction.
-   * When the per-window set exceeds MAX_APPROVED_PATHS, the oldest entry is evicted.
+   * Delegates to the shared per-window registry (electron/lib/approved-paths.js).
    * @param {number} senderId - The webContents ID of the approving window
    * @param {string} p - The path to approve
    */
   function approveDialogPath(senderId, p) {
-    const windowPaths = getWindowApprovedPaths(senderId);
-    // Delete first so re-insertion moves it to the end (most recent)
-    windowPaths.delete(p);
-    windowPaths.set(p, true);
-    // Evict oldest entry if over capacity
-    if (windowPaths.size > MAX_APPROVED_PATHS) {
-      const oldest = windowPaths.keys().next().value;
-      if (oldest !== undefined) {
-        windowPaths.delete(oldest);
-      }
-    }
+    dialogApprovedPaths.approve(senderId, p);
   }
 
   /**
    * Normalize path separators to forward slashes for cross-platform compatibility.
-   * This ensures Windows backslashes (\) and Unix forward slashes (/) are handled consistently.
+   * Intentional difference vs file-ipc.js: trailing slashes are trimmed here
+   * because VFS roots are prefix-matched (`${root}/`) by assertPathInsideRoot.
+   * @param {string} p
+   * @returns {string}
    */
   function normalizePath(p) {
-    // Replace all backslashes with forward slashes and remove trailing slashes
-    return p.replace(/\\/g, "/").replace(/\/+$/, "");
+    return trimTrailingSlashes(normalizeSeparators(p));
   }
 
   /**
    * Validate that a requested path is within the allowed root directory.
    * Prevents path traversal attacks from a compromised renderer.
+   *
+   * #1559: in addition to the lexical prefix check, the path is collapsed
+   * via fs.realpath right before I/O so a symlink placed inside the root
+   * cannot redirect reads/writes to a target outside the (real) root.
+   *
    * @param {Electron.IpcMainInvokeEvent} event - The IPC event to identify the sender window
    * @param {string} requestedPath - The path to validate
+   * @returns {Promise<string>} The validated forward-slash path
    */
-  function validateVFSPath(event, requestedPath) {
+  async function validateVFSPath(event, requestedPath) {
     const allowedRoot = allowedRoots.get(event.sender.id);
     if (!allowedRoot) {
       throw new Error("ディレクトリが開かれていません");
     }
     // Normalize the incoming path to forward slashes, resolving any traversal segments
     const normalizedResolved = toForwardSlash(requestedPath);
-    const normalizedRoot = normalizePath(allowedRoot);
+    const normalizedRoot = normalizePath(allowedRoot.path);
 
     assertPathInsideRoot(normalizedResolved, normalizedRoot);
+
+    // #1559: collapse symlinks and re-check containment against the real root
+    const realResolved = toForwardSlash(await resolveRealPath(normalizedResolved));
+    const normalizedRealRoot = normalizePath(allowedRoot.realPath);
+    assertPathInsideRoot(realResolved, normalizedRealRoot);
+
     return normalizedResolved;
   }
 
   // Open directory picker
-  ipcMain.handle("vfs:open-directory", async (event) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.openDirectory, async (event) => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory", "createDirectory"],
     });
@@ -143,7 +155,11 @@ function registerVFSHandlers() {
     const name = path.basename(dirPath);
 
     // Update the allowed root for this window
-    allowedRoots.set(event.sender.id, dirPath);
+    // #1559: store the realpath so symlink-collapsed containment can be checked
+    allowedRoots.set(event.sender.id, {
+      path: dirPath,
+      realPath: await resolveRootRealPath(dirPath),
+    });
     approveDialogPath(event.sender.id, dirPath);
 
     return {
@@ -152,13 +168,14 @@ function registerVFSHandlers() {
     };
   });
 
-  // Maximum file size allowed for VFS read (50 MB, same as file-ipc.js)
-  const MAX_READ_BYTES = 50 * 1024 * 1024;
+  // Maximum file size allowed for VFS read — intentionally the same 50 MB limit
+  // as the shared write/save limit (electron/lib/path-policy.js)
+  const MAX_READ_BYTES = MAX_CONTENT_BYTES;
 
   // Read file content
-  ipcMain.handle("vfs:read-file", async (event, filePath) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.readFile, async (event, filePath) => {
     try {
-      const resolved = validateVFSPath(event, filePath);
+      const resolved = await validateVFSPath(event, filePath);
       const stats = await fs.stat(resolved);
       if (stats.size > MAX_READ_BYTES) {
         throw new Error("ファイルサイズが上限を超えています");
@@ -174,7 +191,7 @@ function registerVFSHandlers() {
   });
 
   // Write file content
-  ipcMain.handle("vfs:write-file", async (event, filePath, content) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.writeFile, async (event, filePath, content) => {
     // Validate content type and size before touching disk
     if (typeof content !== "string") {
       throw new Error("Invalid content: expected string");
@@ -183,7 +200,7 @@ function registerVFSHandlers() {
       throw new Error("ファイルサイズが上限を超えています（50 MB）");
     }
     try {
-      const resolved = validateVFSPath(event, filePath);
+      const resolved = await validateVFSPath(event, filePath);
       // Use open -> write -> sync -> close pattern for better compatibility with virtual file systems (e.g., Google Drive on Windows)
       const fileHandle = await fs.open(resolved, "w");
       try {
@@ -206,9 +223,9 @@ function registerVFSHandlers() {
   });
 
   // Read directory entries
-  ipcMain.handle("vfs:read-directory", async (event, dirPath) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.readDirectory, async (event, dirPath) => {
     try {
-      const resolved = validateVFSPath(event, dirPath);
+      const resolved = await validateVFSPath(event, dirPath);
       const entries = await fs.readdir(resolved, { withFileTypes: true });
       return entries.map((entry) => ({
         name: entry.name,
@@ -221,9 +238,9 @@ function registerVFSHandlers() {
   });
 
   // Get file stats
-  ipcMain.handle("vfs:stat", async (event, filePath) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.stat, async (event, filePath) => {
     try {
-      const resolved = validateVFSPath(event, filePath);
+      const resolved = await validateVFSPath(event, filePath);
       const stats = await fs.stat(resolved);
       return {
         size: stats.size,
@@ -243,9 +260,9 @@ function registerVFSHandlers() {
   // Returns false for missing paths; re-throws genuine errors (e.g. EACCES)
   // so real problems stay visible. Use this for existence checks instead of
   // relying on stat/readFile rejections, which Electron logs as handler errors.
-  ipcMain.handle("vfs:exists", async (event, filePath) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.exists, async (event, filePath) => {
     try {
-      const resolved = validateVFSPath(event, filePath);
+      const resolved = await validateVFSPath(event, filePath);
       await fs.stat(resolved);
       return true;
     } catch (error) {
@@ -258,9 +275,9 @@ function registerVFSHandlers() {
   });
 
   // Create directory (with parents)
-  ipcMain.handle("vfs:mkdir", async (event, dirPath) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.mkdir, async (event, dirPath) => {
     try {
-      const resolved = validateVFSPath(event, dirPath);
+      const resolved = await validateVFSPath(event, dirPath);
       await fs.mkdir(resolved, { recursive: true });
     } catch (error) {
       console.error("[VFS IPC] mkdir failed:", error);
@@ -269,9 +286,9 @@ function registerVFSHandlers() {
   });
 
   // Delete file or directory
-  ipcMain.handle("vfs:delete", async (event, targetPath, options = {}) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.delete, async (event, targetPath, options = {}) => {
     try {
-      const resolved = validateVFSPath(event, targetPath);
+      const resolved = await validateVFSPath(event, targetPath);
       const stats = await fs.stat(resolved);
       if (stats.isDirectory()) {
         await fs.rm(resolved, { recursive: options.recursive || false });
@@ -285,10 +302,10 @@ function registerVFSHandlers() {
   });
 
   // Rename file or directory
-  ipcMain.handle("vfs:rename", async (event, oldPath, newPath) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.rename, async (event, oldPath, newPath) => {
     try {
-      const resolvedOld = validateVFSPath(event, oldPath);
-      const resolvedNew = validateVFSPath(event, newPath);
+      const resolvedOld = await validateVFSPath(event, oldPath);
+      const resolvedNew = await validateVFSPath(event, newPath);
       await fs.rename(resolvedOld, resolvedNew);
     } catch (error) {
       console.error("[VFS IPC] rename failed:", error);
@@ -297,72 +314,36 @@ function registerVFSHandlers() {
   });
 
   /**
+   * Extra home-relative deny prefixes specific to the VFS policy (forward-slash
+   * normalized Windows credential stores). Intentional difference vs
+   * file-ipc.js (isSavePathDenied): the VFS exposes read access to a whole
+   * approved tree, so credential stores are denied in addition to the shared
+   * base policy in electron/lib/path-policy.js.
+   * @type {readonly string[]}
+   */
+  const VFS_EXTRA_HOME_SENSITIVE_SUFFIXES = [
+    "/AppData/Roaming/Microsoft/Credentials",
+    "/AppData/Roaming/Microsoft/Protect",
+    "/AppData/Local/Microsoft/Credentials",
+  ];
+
+  /**
    * Check if a path is in the system-sensitive denylist.
    * Prevents access to critical system directories and credential stores.
+   * Delegates to the shared policy plus the VFS-specific extras above.
    *
    * @param {string} normalizedPath - Forward-slash normalized absolute path
    * @returns {boolean} true if the path should be denied
    */
   function isDeniedPath(normalizedPath) {
-    const homedir = normalizePath(os.homedir());
-
-    // System root directories (Unix + macOS + Windows)
-    // Treated as prefixes — block the directory itself AND any nested path
-    const denyPrefixes = [
-      "/",
-      "/etc",
-      "/usr",
-      "/bin",
-      "/sbin",
-      "/var",
-      "/tmp",
-      "/System",
-      "/private",
-      "/private/etc",
-      "/private/var",
-    ];
-
-    // Add Windows drive roots and system directories
-    const driveLetterMatch = normalizedPath.match(/^([a-zA-Z]):?\/?$/);
-    if (driveLetterMatch) return true; // Bare drive root (C:/ or C:)
-
-    const windowsDenyPrefixes = getWindowsDenyPrefixes();
-
-    // Sensitive directories within home
-    const homeSensitiveSuffixes = [
-      "/.ssh",
-      "/.gnupg",
-      "/.aws",
-      "/.kube",
-      "/.docker",
-      "/.config/gcloud",
-      "/Library/Keychains",
-      // Windows (forward-slash normalized)
-      "/AppData/Roaming/Microsoft/Credentials",
-      "/AppData/Roaming/Microsoft/Protect",
-      "/AppData/Local/Microsoft/Credentials",
-    ];
-
-    // Treat denied roots as prefixes — block any nested path under them
-    if (denyPrefixes.some((dir) => normalizedPath === dir || normalizedPath.startsWith(`${dir}/`)))
-      return true;
-    if (normalizedPath === homedir) return true;
-    const normalizedLower = normalizedPath.toLowerCase();
-    if (
-      windowsDenyPrefixes.some((p) => {
-        const pLower = p.toLowerCase();
-        return normalizedLower === pLower || normalizedLower.startsWith(`${pLower}/`);
-      })
-    )
-      return true;
-    if (homeSensitiveSuffixes.some((s) => normalizedPath.startsWith(homedir + s))) return true;
-
-    return false;
+    return isSensitiveSystemPath(normalizedPath, {
+      extraHomeSensitiveSuffixes: VFS_EXTRA_HOME_SENSITIVE_SUFFIXES,
+    });
   }
 
   // Set root directory programmatically (for restoring a recent project without dialog)
   // #1476: rehydration — extended to accept projectId for project-scoped approval persistence
-  ipcMain.handle("vfs:set-root", async (event, rootPath, projectId) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.setRoot, async (event, rootPath, projectId) => {
     const resolved = path.resolve(rootPath);
     const normalizedResolved = normalizePath(resolved);
 
@@ -400,7 +381,7 @@ function registerVFSHandlers() {
 
     // 4. Check approval: in-session dialog approval OR persisted project approval
     // #1476: rehydration — load persisted approvals so re-prompting is skipped on restart
-    const alreadyApprovedInSession = dialogApprovedPaths.get(event.sender.id)?.has(resolved);
+    const alreadyApprovedInSession = dialogApprovedPaths.has(event.sender.id, resolved);
     let alreadyApprovedFromDisk = false;
     if (!alreadyApprovedInSession && effectiveProjectId) {
       const persistedSet = await loadApprovals(APPROVED_PATHS_FILE, effectiveProjectId);
@@ -440,13 +421,15 @@ function registerVFSHandlers() {
 
       // #1476: rehydration — persist the newly approved path so restart skips the dialog
       if (effectiveProjectId) {
-        const windowPaths = dialogApprovedPaths.get(event.sender.id);
-        const pathsToSave = new Set(windowPaths ? [...windowPaths.keys()] : [confirmedPath]);
+        const windowPaths = dialogApprovedPaths.listWindowPaths(event.sender.id);
+        const pathsToSave = new Set(windowPaths.length > 0 ? windowPaths : [confirmedPath]);
         scheduleSaveApprovals(effectiveProjectId, pathsToSave);
       }
     }
 
-    allowedRoots.set(event.sender.id, resolved);
+    // #1559: store the realpath alongside the lexical root so per-I/O
+    // symlink-collapsed containment checks have a trusted physical root
+    allowedRoots.set(event.sender.id, { path: resolved, realPath: resolvedReal });
     return { path: resolved, name: path.basename(resolved) };
   });
 
@@ -454,7 +437,7 @@ function registerVFSHandlers() {
   app.on("web-contents-created", (_, contents) => {
     contents.on("destroyed", () => {
       allowedRoots.delete(contents.id);
-      dialogApprovedPaths.delete(contents.id);
+      dialogApprovedPaths.revokeWindow(contents.id);
       // #1476: rehydration — clean up projectId association
       senderProjectId.delete(contents.id);
     });
@@ -463,7 +446,7 @@ function registerVFSHandlers() {
   // Open a single file via native file dialog
   // Returns { path, name, buf } where buf is the raw file bytes (Buffer).
   // The caller is responsible for decoding (e.g., via text-codec.ts).
-  ipcMain.handle("vfs:open-file", async (event, opts) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.openFile, async (event, opts) => {
     const result = await dialog.showOpenDialog({
       properties: ["openFile"],
       filters: opts?.filters ?? [{ name: "テキスト", extensions: ["txt"] }],
@@ -483,84 +466,29 @@ function registerVFSHandlers() {
   // ---------------------------------------------------------------------------
   // Cross-window history index lock (HistoryService)
   // ---------------------------------------------------------------------------
-  // In-memory lock registry — atomic because the main-process event loop is
-  // single-threaded. Each entry maps a lock key to the webContents id that
-  // holds it. A queue of { resolve } entries handles waiters.
-  const indexLockOwner = new Map(); // key -> webContentsId
-  const indexLockQueue = new Map(); // key -> Array<{ resolve: () => void, senderId: number }>
-
-  /**
-   * Dequeue the next waiter for a lock key, if any.
-   * Skips waiters whose webContents have been destroyed to prevent stuck locks.
-   * The dequeued entry's resolve() will set the owner itself.
-   * @param {string} key
-   */
-  function processIndexLockQueue(key) {
-    const queue = indexLockQueue.get(key) || [];
-    while (queue.length > 0 && !indexLockOwner.has(key)) {
-      const next = queue.shift();
-      if (queue.length === 0) {
-        indexLockQueue.delete(key);
-      }
-      // Skip waiters whose webContents have been destroyed
-      const wc = webContents.fromId(next.senderId);
-      if (!wc || wc.isDestroyed()) {
-        continue;
-      }
-      next.resolve();
-      return;
-    }
-    if (queue.length === 0) {
-      indexLockQueue.delete(key);
-    }
-  }
-
-  ipcMain.handle("vfs:index-lock:acquire", async (event, key) => {
-    const senderId = event.sender.id;
-
-    if (!indexLockOwner.has(key)) {
-      // Lock is free — acquire immediately
-      indexLockOwner.set(key, senderId);
-      return;
-    }
-
-    // Lock is held — enqueue this waiter and suspend until released
-    await new Promise((resolve) => {
-      const queue = indexLockQueue.get(key) || [];
-      queue.push({ resolve, senderId });
-      indexLockQueue.set(key, queue);
-    });
-
-    // Now the lock is free for us (processIndexLockQueue verified this before calling resolve)
-    indexLockOwner.set(key, senderId);
+  // Lock logic lives in electron/lib/index-lock.js (#1567 S3 hardening):
+  // renderer-supplied keys are validated and acquire() times out instead of
+  // hanging forever when another window holds the lock.
+  const indexLocks = createIndexLockManager({
+    isSenderAlive: (senderId) => {
+      const wc = webContents.fromId(senderId);
+      return Boolean(wc) && !wc.isDestroyed();
+    },
   });
 
-  ipcMain.handle("vfs:index-lock:release", (event, key) => {
-    const senderId = event.sender.id;
-    if (indexLockOwner.get(key) === senderId) {
-      indexLockOwner.delete(key);
-      processIndexLockQueue(key);
-    }
+  ipcMain.handle(VFS_CHANNELS.invoke.indexLockAcquire, (event, key) => {
+    return indexLocks.acquire(key, event.sender.id);
   });
 
-  /**
-   * Release all locks held by a specific window (called when the window closes).
-   * @param {number} webContentsId
-   */
-  function releaseLocksForWindow(webContentsId) {
-    for (const [key, ownerId] of indexLockOwner) {
-      if (ownerId === webContentsId) {
-        indexLockOwner.delete(key);
-        processIndexLockQueue(key);
-      }
-    }
-  }
+  ipcMain.handle(VFS_CHANNELS.invoke.indexLockRelease, (event, key) => {
+    indexLocks.release(key, event.sender.id);
+  });
 
   // Release index locks automatically when a window is destroyed
   app.on("browser-window-created", (_, win) => {
     const wcId = win.webContents.id;
     win.webContents.on("destroyed", () => {
-      releaseLocksForWindow(wcId);
+      indexLocks.releaseAllForSender(wcId);
     });
   });
 }

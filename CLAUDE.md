@@ -95,15 +95,24 @@ Types: `feat`, `fix`, `refactor`, `docs`, `style`, `test`, `chore`
 
 ## Component Map
 
-| Component / Hook                      | Responsible For                     |
-| ------------------------------------- | ----------------------------------- |
-| `app/page.tsx`                        | Top-level coordinator               |
-| `components/EditorLayout.tsx`         | Layout structure only               |
-| `components/Editor.tsx`               | Milkdown + ProseMirror bridge       |
-| `lib/editor-page/use-linting.ts`      | RuleRunner lifecycle and lint state |
-| `lib/editor-page/use-file-opening.ts` | Open/save dialogs and IPC           |
-| `lib/storage/storage-service.ts`      | Storage singleton                   |
-| `lib/vfs/`                            | Filesystem abstraction              |
-| `electron/preload.js`                 | IPC security boundary               |
+| Component / Hook                                                                     | Responsible For                                                                                                    |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `app/page.tsx`                                                                       | Top-level coordinator                                                                                              |
+| `components/EditorLayout.tsx`                                                        | Layout structure only                                                                                              |
+| `components/Editor.tsx`                                                              | Milkdown + ProseMirror bridge                                                                                      |
+| `lib/editor-page/use-linting.ts`                                                     | RuleRunner lifecycle and lint state                                                                                |
+| `lib/editor-page/use-file-opening.ts`                                                | Open/save dialogs and IPC                                                                                          |
+| `lib/editor-page/window-activity.ts`                                                 | Framework-free focus/visibility signal source (#1448)                                                              |
+| `lib/editor-page/power-policy.ts`                                                    | Pure power decisions: watcher pause / auto-save interval / POS highlight (#1448, #1466)                            |
+| `lib/tab-manager/save-executor.ts`                                                   | Single save pipeline for all save flows + per-path save lock (#1432)                                               |
+| `lib/auth/` (token-storage / \*-session / session-epoch)                             | Auth platform adapters + session control; logout = hard session boundary (#1437)                                   |
+| `lib/services/history-service.ts` (facade: `history-policy.ts` / `history-store.ts`) | Snapshot history facade over policy / persistence layers (#1438)                                                   |
+| `lib/services/persisted-json-list.ts`                                                | Shared persisted-JSON-list base (user dictionary, ignored corrections) (#1436)                                     |
+| `lib/menu/menu-template.js`                                                          | Single source for Web + Electron menus and accelerators (#1433)                                                    |
+| `packages/milkdown-plugin-japanese-novel/mdi-document.ts`                            | MDI single-entry API: raw / analysis / export / editor derivations (#1449)                                         |
+| `lib/storage/storage-service.ts`                                                     | Storage singleton                                                                                                  |
+| `lib/vfs/`                                                                           | Filesystem abstraction                                                                                             |
+| `electron/preload.js`                                                                | IPC security boundary — declarative bridge over `electron/lib/ipc-channels.js` (#1434)                             |
+| `electron/lib/`                                                                      | Main-process shared primitives: path-policy / approved-paths / url-policy / index-lock / ipc-bridge (#1435, #1567) |
 
 Key references: `docs/architecture/storage-system.md`, `docs/MDI/spec.md`, `MDI.md`, `types/electron.d.ts`

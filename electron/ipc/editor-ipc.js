@@ -4,6 +4,7 @@
 const { ipcMain, BrowserWindow, app } = require("electron");
 const path = require("path");
 const { isDev } = require("../app-constants");
+const { EDITOR_CHANNELS } = require("../lib/ipc-channels");
 
 /**
  * Register IPC handlers for editor popout windows and cross-window buffer sync.
@@ -16,7 +17,7 @@ const { isDev } = require("../app-constants");
 function registerEditorHandlers() {
   // Open a new popout editor window for the given buffer
   ipcMain.handle(
-    "editor:popout-panel",
+    EDITOR_CHANNELS.invoke.popoutPanel,
     async (event, { bufferId, content, fileName, fileType }) => {
       // Validate required input
       if (!bufferId || typeof bufferId !== "string") {
@@ -73,7 +74,7 @@ function registerEditorHandlers() {
 
       // Send initial content after page has loaded
       if (content !== undefined && content !== null) {
-        popout.webContents.send("editor:buffer-sync-broadcast", { bufferId, content });
+        popout.webContents.send(EDITOR_CHANNELS.event.bufferSyncBroadcast, { bufferId, content });
       }
 
       return { success: true };
@@ -81,19 +82,19 @@ function registerEditorHandlers() {
   );
 
   // Broadcast buffer content update to all windows except the sender
-  ipcMain.on("editor:buffer-sync", (event, data) => {
+  ipcMain.on(EDITOR_CHANNELS.send.bufferSync, (event, data) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed() && win.webContents !== event.sender) {
-        win.webContents.send("editor:buffer-sync-broadcast", data);
+        win.webContents.send(EDITOR_CHANNELS.event.bufferSyncBroadcast, data);
       }
     }
   });
 
   // Broadcast buffer close notification to all windows except the sender
-  ipcMain.on("editor:buffer-close", (event, bufferId) => {
+  ipcMain.on(EDITOR_CHANNELS.send.bufferClose, (event, bufferId) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed() && win.webContents !== event.sender) {
-        win.webContents.send("editor:buffer-close-broadcast", bufferId);
+        win.webContents.send(EDITOR_CHANNELS.event.bufferCloseBroadcast, bufferId);
       }
     }
   });

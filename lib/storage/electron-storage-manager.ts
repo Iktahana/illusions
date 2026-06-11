@@ -36,6 +36,32 @@ try {
   // 環境によっては better-sqlite3 が存在しない
 }
 
+/**
+ * トランザクション内で fn を実行するヘルパー。
+ *
+ * BEGIN が失敗した場合はその場でエラーを伝播させ（未開始のトランザクションへ
+ * ROLLBACK を発行しない）、fn / COMMIT が失敗した場合のみ ROLLBACK を試みる。
+ * ROLLBACK 自体が失敗しても元のエラーをマスクせず、ログに残して再送出する。
+ */
+export function runInTransaction<T>(db: Pick<DatabaseInstance, "exec">, fn: () => T): T {
+  db.exec("BEGIN TRANSACTION");
+  try {
+    const result = fn();
+    db.exec("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      db.exec("ROLLBACK");
+    } catch (rollbackError) {
+      console.error(
+        "[ElectronStorageManager] ROLLBACK に失敗しました（元のエラーを優先して再送出します）:",
+        rollbackError,
+      );
+    }
+    throw error;
+  }
+}
+
 export class ElectronStorageManager {
   private db: DatabaseInstance | null = null;
   private dbPath: string;
@@ -104,9 +130,7 @@ export class ElectronStorageManager {
     const db = this.ensureInitialized();
     const now = Date.now();
 
-    try {
-      db.exec("BEGIN TRANSACTION");
-
+    runInTransaction(db, () => {
       // appState
       const saveAppState = db.prepare(`
         INSERT OR REPLACE INTO app_state (id, data, updated_at)
@@ -137,12 +161,7 @@ export class ElectronStorageManager {
         const deleteBuffer = db.prepare("DELETE FROM editor_buffer");
         deleteBuffer.run();
       }
-
-      db.exec("COMMIT");
-    } catch (error) {
-      db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   /**
@@ -199,9 +218,7 @@ export class ElectronStorageManager {
   addToRecent(file: RecentFile): void {
     const db = this.ensureInitialized();
 
-    try {
-      db.exec("BEGIN TRANSACTION");
-
+    runInTransaction(db, () => {
       // 既存があれば削除
       const deleteStmt = db.prepare("DELETE FROM recent_files WHERE path = ?");
       deleteStmt.run(file.path);
@@ -227,12 +244,7 @@ export class ElectronStorageManager {
         `);
         trimStmt.run(countResult.count - 10);
       }
-
-      db.exec("COMMIT");
-    } catch (error) {
-      db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   /**
@@ -300,9 +312,7 @@ export class ElectronStorageManager {
   addRecentProject(project: { id: string; rootPath: string; name: string }): void {
     const db = this.ensureInitialized();
 
-    try {
-      db.exec("BEGIN TRANSACTION");
-
+    runInTransaction(db, () => {
       // Remove existing entries for this root path OR this id to prevent PRIMARY KEY collision
       // when a duplicated project directory shares the same projectId with a different path.
       const deleteStmt = db.prepare("DELETE FROM recent_projects WHERE root_path = ? OR id = ?");
@@ -335,12 +345,7 @@ export class ElectronStorageManager {
         `);
         trimStmt.run(countResult.count - 10);
       }
-
-      db.exec("COMMIT");
-    } catch (error) {
-      db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   /**

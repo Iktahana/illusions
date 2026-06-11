@@ -150,6 +150,10 @@ declare global {
        */
       indexLockRelease: (key: string) => Promise<void>;
     };
+    /**
+     * Storage IPC. Channel names live in electron/lib/ipc-channels.js
+     * (shared by preload and main); wrappers use electron/lib/ipc-bridge.js (#1434).
+     */
     storage?: {
       saveSession: (session: StorageSession) => Promise<void>;
       loadSession: () => Promise<StorageSession | null>;
@@ -244,12 +248,13 @@ declare global {
       isAvailable: () => Promise<boolean>;
     };
     power?: {
-      /** Listen for debounced power state changes from main process */
+      /**
+       * Listen for debounced power state changes from main process.
+       * Returns an unsubscribe function that removes only this listener.
+       */
       onPowerStateChange: (callback: (state: "ac" | "battery") => void) => () => void;
       /** Get current power state */
       getPowerState: () => Promise<"ac" | "battery">;
-      /** Remove all power state change listeners */
-      removeOnPowerStateChange: () => void;
     };
     /** Split editor popout window IPC */
     editor?: {
@@ -271,7 +276,11 @@ declare global {
       /** Remove all editor sync listeners */
       removeAllListeners: () => void;
     };
-    /** Master dictionary IPC (Genji and future providers) */
+    /**
+     * Master dictionary IPC (Genji and future providers).
+     * Channel names live in electron/lib/ipc-channels.js (shared by preload
+     * and main); wrappers use electron/lib/ipc-bridge.js (#1434).
+     */
     dict?: {
       /** Query entries by headword (exact or prefix match) */
       query: (term: string, limit?: number) => Promise<DictEntry[]>;

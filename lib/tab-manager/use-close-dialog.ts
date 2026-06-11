@@ -1,14 +1,12 @@
 "use client";
 
 import { useCallback } from "react";
-import { saveMdiFile } from "../project/mdi-file";
-import { getProjectFileService } from "../services/project-file-service";
-import { suppressFileWatch } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
-import type { SnapshotType } from "../services/history-policy";
-import type { TabId, EditorTabState } from "./tab-types";
+import { executeTabSave } from "./save-executor";
 import { isEditorTab } from "./tab-types";
-import { sanitizeMdiContent, getErrorMessage } from "./types";
+import { getErrorMessage } from "./types";
+import type { SnapshotType } from "../services/history-policy";
+import type { TabId } from "./tab-types";
 import type { TabManagerCore } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -20,8 +18,6 @@ export interface UseCloseDialogParams extends TabManagerCore {
   pendingCloseTabId: TabId | null;
   /** Clear the pending close tab id. */
   setPendingCloseTabId: React.Dispatch<React.SetStateAction<TabId | null>>;
-  /** Update a single tab by id. */
-  updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
   /** Force-close a tab without dirty check. */
   forceCloseTab: (tabId: TabId) => void;
   /**
@@ -53,14 +49,18 @@ export interface UseCloseDialogReturn {
 
 /**
  * Handles the save/discard actions for the close-with-unsaved-changes dialog.
+ *
+ * Orchestration only: the actual save pipeline lives in the shared executor
+ * (save-executor.ts, #1432). This hook decides whether the tab may close
+ * afterwards — the tab is closed only when the save fully succeeded.
  */
 export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogReturn {
   const {
     tabsRef,
+    setTabs,
     isProjectRef,
     pendingCloseTabId,
     setPendingCloseTabId,
-    updateTab,
     forceCloseTab,
     tryCreateSnapshot,
   } = params;
@@ -82,45 +82,28 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
       return;
     }
 
-    try {
-      const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
+    const outcome = await executeTabSave({
+      tab,
+      isProject: isProjectRef.current,
+      tabsRef,
+      setTabs,
+      tryCreateSnapshot,
+      // B1 fix: tab close → "pre-close" snapshot type
+      snapshotType: "pre-close",
+      // Pre-close snapshots fall back to the file name when no path exists
+      snapshotPathFallback: "name",
+    });
 
-      if (isProjectRef.current && tab.file?.path) {
-        const vfs = getProjectFileService();
-        suppressFileWatch(tab.file.path, sanitized);
-        await vfs.writeFile(tab.file.path, sanitized);
-        // B1 fix: tab close → "pre-close" snapshot type
-        await tryCreateSnapshot("pre-close", tab.file.path, tab.file.name, sanitized);
-      } else {
-        const result = await saveMdiFile({
-          descriptor: tab.file,
-          content: sanitized,
-          fileType: tab.fileType,
-        });
-        if (!result) {
-          // User cancelled save dialog → keep tab open
-          setPendingCloseTabId(null);
-          return;
-        }
-        updateTab(pendingCloseTabId, {
-          file: result.descriptor,
-          lastSavedContent: sanitized,
-          isDirty: false,
-          fileSyncStatus: "clean",
-          conflictDiskContent: null,
-        });
-        // B1 fix: tab close → "pre-close" snapshot type
-        await tryCreateSnapshot(
-          "pre-close",
-          result.descriptor.path ?? result.descriptor.name,
-          result.descriptor.name,
-          sanitized,
-        );
-      }
-    } catch (error) {
-      console.error("保存に失敗しました:", error);
-      const message = getErrorMessage(error);
-      notificationManager.error(`保存に失敗しました: ${message}`);
+    if (outcome.status === "failed") {
+      console.error("保存に失敗しました:", outcome.error);
+      notificationManager.error(`保存に失敗しました: ${getErrorMessage(outcome.error)}`);
+      setPendingCloseTabId(null);
+      return;
+    }
+    if (outcome.status !== "saved") {
+      // "cancelled" (user cancelled save dialog), "locked", "conflicted",
+      // "skipped" — the content was not written, so keep the tab open
+      // instead of discarding the edits.
       setPendingCloseTabId(null);
       return;
     }
@@ -129,9 +112,9 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
     setPendingCloseTabId(null);
   }, [
     pendingCloseTabId,
-    updateTab,
     forceCloseTab,
     tabsRef,
+    setTabs,
     isProjectRef,
     setPendingCloseTabId,
     tryCreateSnapshot,

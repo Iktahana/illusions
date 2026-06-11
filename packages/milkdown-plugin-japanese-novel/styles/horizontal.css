@@ -15,8 +15,8 @@
   font-size: 1em;
   letter-spacing: 0.05em;
   word-spacing: 0.1em;
-  -webkit-font-feature-settings: "palt" 1;
-  font-feature-settings: "palt" 1;
+  /* No "palt": novel typesetting uses full-width pitch (JIS X 4051 べた組み) */
+  font-feature-settings: normal;
 }
 
 /* Tate-chu-yoko styling in horizontal mode (normally not used, but for completeness) */

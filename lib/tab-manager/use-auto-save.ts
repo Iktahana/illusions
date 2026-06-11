@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { saveMdiFile } from "../project/mdi-file";
-import { getProjectFileService } from "../services/project-file-service";
-import { suppressFileWatch } from "../services/file-watcher";
+import { getAutoSaveIntervalMs } from "../editor-page/power-policy";
+import { getWindowActivitySnapshot, subscribeWindowActivity } from "../editor-page/window-activity";
 import { notificationManager } from "../services/notification-manager";
-import type { SnapshotType } from "../services/history-policy";
+import { executeTabSave } from "./save-executor";
 import { isEditorTab } from "./tab-types";
+import type { WindowActivityState } from "../editor-page/window-activity";
+import type { SnapshotType } from "../services/history-policy";
 import type { TabManagerCore } from "./types";
-import { AUTO_SAVE_INTERVAL, sanitizeMdiContent } from "./types";
 
 // ---------------------------------------------------------------------------
 // Params
@@ -17,6 +17,15 @@ import { AUTO_SAVE_INTERVAL, sanitizeMdiContent } from "./types";
 export interface UseAutoSaveParams extends TabManagerCore {
   /** Whether auto-save is enabled. */
   autoSaveEnabled: boolean;
+  /**
+   * Power-save mode (user setting / battery auto-enable). When true and the
+   * window is backgrounded, the auto-save interval is throttled to 20s by
+   * the power policy (#1466). Foreground behavior is unchanged.
+   *
+   * 省電力モード。有効かつバックグラウンド時のみ自動保存間隔を 20 秒に
+   * 間引く（#1466）。フォアグラウンドの挙動は変わらない。
+   */
+  powerSaveMode?: boolean;
   /** Ref holding the latest saveFile function (for active tab). */
   saveFileRef: React.MutableRefObject<(isAutoSave?: boolean) => Promise<void>>;
   /**
@@ -38,6 +47,22 @@ export interface UseAutoSaveParams extends TabManagerCore {
 /**
  * Manages the auto-save timer that periodically saves all dirty tabs
  * that have associated file descriptors.
+ *
+ * Orchestration only: the actual save pipeline (lock, sanitize, VFS vs
+ * standalone write, watch suppression, tab-state update, snapshot) lives in
+ * the shared executor (save-executor.ts, #1432).
+ *
+ * Power-aware throttling (#1466): the timer interval follows the power
+ * policy (`getAutoSaveIntervalMs`) — 5s in the foreground, 20s while the
+ * window is backgrounded with power-save mode on. Activity transitions
+ * re-arm the interval via a direct subscription to the framework-free
+ * window-activity service, so focus switches never re-render React
+ * (#1427 lesson / #1445 guard).
+ *
+ * 電源対応スロットリング（#1466）：自動保存間隔は power policy に従う
+ * （フォアグラウンド 5 秒 / 省電力モード有効かつバックグラウンド 20 秒）。
+ * activity 変化時はタイマーを張り直す。React state を介さないため
+ * フォーカス切替で再レンダーは発生しない（#1445 ガード）。
  */
 export function useAutoSave(params: UseAutoSaveParams): void {
   const {
@@ -46,12 +71,12 @@ export function useAutoSave(params: UseAutoSaveParams): void {
     activeTabIdRef,
     isProjectRef,
     autoSaveEnabled,
+    powerSaveMode = false,
     saveFileRef,
     tryCreateSnapshot,
   } = params;
 
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const savingTabIdsRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
 
   useEffect(
@@ -70,7 +95,7 @@ export function useAutoSave(params: UseAutoSaveParams): void {
       return;
     }
 
-    autoSaveTimerRef.current = setInterval(() => {
+    const runAutoSave = (): void => {
       const currentTabs = tabsRef.current;
       for (const tab of currentTabs) {
         // Skip non-editor tabs (terminal, diff) and conflicted editor tabs
@@ -83,96 +108,68 @@ export function useAutoSave(params: UseAutoSaveParams): void {
           void saveFileRef.current(true);
           continue;
         }
-        // Synchronous guard to prevent concurrent saves for the same tab
-        if (savingTabIdsRef.current.has(tab.id)) continue;
-        savingTabIdsRef.current.add(tab.id);
 
-        // Non-active dirty tabs: save directly
-        // Set isSaving before starting async operation to prevent concurrent saves
-        setTabs((prev) => prev.map((t) => (t.id === tab.id ? { ...t, isSaving: true } : t)));
+        // Background tabs need a real save target: never show a dialog from
+        // a background auto-save.
+        if (!tab.file.path && !tab.file.handle) continue;
+
+        // Non-active dirty tabs: save via the shared executor. The executor
+        // acquires the unified per-target lock synchronously (#1562 a /
+        // #1579) and re-checks the conflicted transition right before
+        // writing (#1562 b).
         void (async () => {
-          try {
-            const sanitized = sanitizeMdiContent(tab.content, { fileType: tab.fileType });
-            if (isProjectRef.current && tab.file?.path) {
-              const vfs = getProjectFileService();
-              suppressFileWatch(tab.file.path, sanitized);
-              await vfs.writeFile(tab.file.path, sanitized);
-              if (!mountedRef.current) return;
-              setTabs((prev) =>
-                prev.map((t) => {
-                  if (t.id !== tab.id || !isEditorTab(t)) return t;
-                  const newIsDirty =
-                    sanitizeMdiContent(t.content, { fileType: t.fileType }) !== sanitized;
-                  return {
-                    ...t,
-                    lastSavedContent: sanitized,
-                    isDirty: newIsDirty,
-                    fileSyncStatus: newIsDirty ? "dirty" : "clean",
-                    conflictDiskContent: null,
-                    lastSavedTime: Date.now(),
-                    lastSaveWasAuto: true,
-                  };
-                }),
-              );
-              // B1 fix: auto-save interval → "auto" snapshot type
-              await tryCreateSnapshot("auto", tab.file.path, tab.file.name, sanitized);
-            } else if (tab.file?.path || tab.file?.handle) {
-              const result = await saveMdiFile({
-                descriptor: tab.file,
-                content: sanitized,
-                fileType: tab.fileType,
-              });
-              if (result) {
-                if (!mountedRef.current) return;
-                setTabs((prev) =>
-                  prev.map((t) => {
-                    if (t.id !== tab.id || !isEditorTab(t)) return t;
-                    const newIsDirty =
-                      sanitizeMdiContent(t.content, { fileType: t.fileType }) !== sanitized;
-                    return {
-                      ...t,
-                      file: result.descriptor,
-                      lastSavedContent: sanitized,
-                      isDirty: newIsDirty,
-                      fileSyncStatus: newIsDirty ? "dirty" : "clean",
-                      conflictDiskContent: null,
-                      lastSavedTime: Date.now(),
-                      lastSaveWasAuto: true,
-                    };
-                  }),
-                );
-                if (result.descriptor.path) {
-                  // B1 fix: auto-save interval → "auto" snapshot type
-                  await tryCreateSnapshot(
-                    "auto",
-                    result.descriptor.path,
-                    result.descriptor.name,
-                    sanitized,
-                  );
-                }
-              }
-            }
-          } catch (error) {
-            console.error(`自動保存に失敗しました (${tab.file?.name}):`, error);
+          const outcome = await executeTabSave({
+            tab,
+            isProject: isProjectRef.current,
+            tabsRef,
+            setTabs,
+            tryCreateSnapshot,
+            // B1 fix: auto-save interval → "auto" snapshot type
+            snapshotType: "auto",
+            isAutoSave: true,
+            isMounted: () => mountedRef.current,
+          });
+          if (outcome.status === "failed") {
+            console.error(`自動保存に失敗しました (${tab.file?.name}):`, outcome.error);
             notificationManager.warning(
               `自動保存に失敗しました: ${tab.file?.name ?? "不明なファイル"}`,
             );
-          } finally {
-            savingTabIdsRef.current.delete(tab.id);
-            if (!mountedRef.current) return;
-            setTabs((prev) => prev.map((t) => (t.id === tab.id ? { ...t, isSaving: false } : t)));
           }
         })();
       }
-    }, AUTO_SAVE_INTERVAL);
+    };
 
-    return () => {
+    /**
+     * (Re-)arm the timer for the interval the power policy decides for the
+     * given activity state. No-op when the interval is unchanged so repeated
+     * notifications never reset the countdown unnecessarily.
+     */
+    let currentIntervalMs: number | null = null;
+    const arm = (activity: WindowActivityState): void => {
+      const intervalMs = getAutoSaveIntervalMs(activity, { powerSaveMode });
+      if (intervalMs === currentIntervalMs) return;
+      currentIntervalMs = intervalMs;
       if (autoSaveTimerRef.current) {
         clearInterval(autoSaveTimerRef.current);
+      }
+      autoSaveTimerRef.current = setInterval(runAutoSave, intervalMs);
+    };
+
+    // Subscribe directly to the framework-free signal source — no React
+    // state, so focus switches never re-render the page (#1427 lesson).
+    arm(getWindowActivitySnapshot());
+    const unsubscribe = subscribeWindowActivity(arm);
+
+    return () => {
+      unsubscribe();
+      if (autoSaveTimerRef.current) {
+        clearInterval(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
       }
     };
   }, [
     autoSaveEnabled,
+    powerSaveMode,
     setTabs,
     tabsRef,
     activeTabIdRef,

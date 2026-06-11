@@ -5,12 +5,15 @@
  * (more expressive than raw fontSize + lineSpacing). DOCX-specific values
  * are derived at export time via toDocxExportSettings().
  *
- * Migrates from legacy per-format localStorage keys on first load.
+ * Persisted via the unified StorageService (SQLite on Electron, IndexedDB on Web).
+ * Migrates from legacy localStorage keys (unified + per-format) on first load,
+ * then removes them so settings are governed by StorageService.clearAll().
  */
 
+import { getStorageService } from "@/lib/storage/storage-service";
+import { ALL_JAPANESE_FONTS } from "@/lib/utils/fonts";
 import { calculateTypesetting } from "./pdf-export-settings";
 import { PAGE_DIMENSIONS, ALL_PAGE_SIZE_KEYS } from "./page-sizes";
-import { ALL_JAPANESE_FONTS } from "@/lib/utils/fonts";
 
 import type { PdfExportSettings } from "./pdf-export-settings";
 import type { DocxExportSettings } from "./docx-export-settings";
@@ -343,50 +346,74 @@ function migrateLegacyDocx(raw: Record<string, unknown>): Partial<UnifiedExportS
   };
 }
 
-export function loadExportSettings(): UnifiedExportSettings {
-  if (typeof window === "undefined") return { ...DEFAULT_EXPORT_SETTINGS };
-
+/**
+ * Read legacy localStorage keys (one-time migration source).
+ * Priority: unified key > legacy PDF (richer model) > legacy DOCX.
+ */
+function readLegacyLocalStorage(): UnifiedExportSettings | null {
   try {
-    // 1. Try unified key
     const unified = localStorage.getItem(STORAGE_KEY);
     if (unified) {
       return sanitize(JSON.parse(unified) as Partial<UnifiedExportSettings>);
     }
 
-    // 2. Try legacy PDF key (richer model, preferred)
     const legacyPdf = localStorage.getItem(LEGACY_PDF_KEY);
     if (legacyPdf) {
-      const parsed = JSON.parse(legacyPdf) as Record<string, unknown>;
-      const migrated = migrateLegacyPdf(parsed);
-      const settings = sanitize(migrated);
-      // Persist under new key so migration runs only once
-      saveExportSettings(settings);
-      return settings;
+      return sanitize(migrateLegacyPdf(JSON.parse(legacyPdf) as Record<string, unknown>));
     }
 
-    // 3. Try legacy DOCX key
     const legacyDocx = localStorage.getItem(LEGACY_DOCX_KEY);
     if (legacyDocx) {
-      const parsed = JSON.parse(legacyDocx) as Record<string, unknown>;
-      const migrated = migrateLegacyDocx(parsed);
-      const settings = sanitize(migrated);
-      saveExportSettings(settings);
-      return settings;
+      return sanitize(migrateLegacyDocx(JSON.parse(legacyDocx) as Record<string, unknown>));
     }
   } catch {
-    // Corrupted localStorage — fall through to defaults
+    // Corrupted localStorage — treat as absent
+  }
+  return null;
+}
+
+/** Remove all legacy localStorage keys after a successful migration. */
+function removeLegacyLocalStorage(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_PDF_KEY);
+    localStorage.removeItem(LEGACY_DOCX_KEY);
+  } catch {
+    // localStorage が利用できない環境では何もしない
+  }
+}
+
+export async function loadExportSettings(): Promise<UnifiedExportSettings> {
+  if (typeof window === "undefined") return { ...DEFAULT_EXPORT_SETTINGS };
+
+  try {
+    // 1. StorageService (canonical location)
+    const stored = await getStorageService().getItem(STORAGE_KEY);
+    if (stored) {
+      return sanitize(JSON.parse(stored) as Partial<UnifiedExportSettings>);
+    }
+
+    // 2. One-time migration from legacy localStorage keys
+    const migrated = readLegacyLocalStorage();
+    if (migrated) {
+      await saveExportSettings(migrated);
+      removeLegacyLocalStorage();
+      return migrated;
+    }
+  } catch {
+    // Corrupted data or storage failure — fall through to defaults
   }
 
   return { ...DEFAULT_EXPORT_SETTINGS };
 }
 
-export function saveExportSettings(settings: UnifiedExportSettings): void {
+export async function saveExportSettings(settings: UnifiedExportSettings): Promise<void> {
   if (typeof window === "undefined") return;
 
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    await getStorageService().setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch {
-    // localStorage quota exceeded — silently ignore
+    // 保存失敗は致命的ではないため無視する
   }
 }
 

@@ -24,6 +24,7 @@ import {
 } from "./syntax";
 import { createHeadingIdFixerPlugin } from "./plugins/heading-id-fixer";
 import { createHardbreakIndentPlugin } from "./plugins/hardbreak-indent";
+import { createDialogueIndentPlugin } from "./plugins/dialogue-indent";
 import { defaultJapaneseNovelOptions, type JapaneseNovelOptions } from "./config";
 
 export type { JapaneseNovelOptions } from "./config";
@@ -111,6 +112,10 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     return createHardbreakIndentPlugin();
   });
 
+  const dialogueIndentPlugin = $prose(() => {
+    return createDialogueIndentPlugin();
+  });
+
   const plugins: MilkdownPlugin[] = [
     ...(enableRuby ? [remarkRuby, rubySchema] : []),
     ...(enableTcy ? [remarkTcy, tcySchema] : []),
@@ -123,6 +128,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     headingAnchorSchema,
     headingIdFixerPlugin,
     hardbreakIndentPlugin,
+    dialogueIndentPlugin,
     stylePlugin,
   ].flat();
 

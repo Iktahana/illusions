@@ -1,8 +1,9 @@
 /**
- * PDF export settings persistence.
+ * PDF export settings types and typesetting calculation.
  *
- * Uses localStorage for synchronous read on dialog open,
- * following the same pattern as local-preferences.ts.
+ * Persistence lives in export-settings.ts (unified settings via StorageService).
+ * The legacy localStorage key "illusions:pdf-export-settings" is only read
+ * there for one-time migration.
  */
 
 export interface PdfExportSettings {
@@ -44,31 +45,6 @@ export const DEFAULT_PDF_SETTINGS: PdfExportSettings = {
 // Import and re-export comprehensive page dimensions from page-sizes module
 import { PAGE_DIMENSIONS } from "./page-sizes";
 export { PAGE_DIMENSIONS };
-
-const STORAGE_KEY = "illusions:pdf-export-settings";
-
-export function loadPdfExportSettings(): PdfExportSettings {
-  if (typeof window === "undefined") return { ...DEFAULT_PDF_SETTINGS };
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_PDF_SETTINGS };
-    const parsed = JSON.parse(raw) as Partial<PdfExportSettings>;
-    return { ...DEFAULT_PDF_SETTINGS, ...parsed };
-  } catch {
-    return { ...DEFAULT_PDF_SETTINGS };
-  }
-}
-
-export function savePdfExportSettings(settings: PdfExportSettings): void {
-  if (typeof window === "undefined") return;
-
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // localStorage quota exceeded — silently ignore
-  }
-}
 
 /**
  * Calculate font size and line height from page layout parameters.
