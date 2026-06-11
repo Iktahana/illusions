@@ -87,6 +87,16 @@ export function buildOnChanged(
 
     const fileName = tab.file?.name ?? "ファイル";
 
+    // Self-write echo guard (#1448 Codex review): a save performed while the
+    // watchers were paused can outlive the time-boxed suppressFileWatch entry
+    // (~poll interval + 3s). When the watcher resumes and reports a "change"
+    // whose content is exactly what we last saved, it is our own write
+    // echoing back — never a real external change. Reloading it would reset
+    // the cursor (clean tab) or raise a phantom conflict (dirty tab).
+    if (diskContent === tab.lastSavedContent) {
+      return;
+    }
+
     if (tab.fileSyncStatus === "clean") {
       // Clean tab: auto-reload with disk content via pendingExternalContent
       // (preserves scroll position instead of remounting the editor)

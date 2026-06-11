@@ -66,6 +66,15 @@ function isBackground(activity: WindowActivityState): boolean {
  * 再開時は watcher 側の mtime / content-hash 照合により、実際に変化が
  * あった場合のみ外部変更フローが走る（#1445 ガード）。
  */
+/**
+ * Known tradeoff (#1448 Codex review): file watchers live in the MAIN window
+ * renderer; the split-editor popout is a separate BrowserWindow that only
+ * syncs buffer text over IPC and owns no watchers. Blurring the main window
+ * while working in a popout therefore DEFERS external-change detection until
+ * the main window regains focus — changes are not lost (the resume catch-up
+ * and conflict flow pick them up), only detected later. Wiring popout focus
+ * into this policy is part of the #1466 follow-up.
+ */
 export function shouldPauseFileWatchers(activity: WindowActivityState): boolean {
   return isBackground(activity);
 }

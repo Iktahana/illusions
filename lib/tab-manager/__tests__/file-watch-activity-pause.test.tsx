@@ -67,6 +67,7 @@ vi.mock("@/lib/project/mdi-file", () => ({
   saveMdiFile: vi.fn(),
 }));
 
+import { suppressFileWatch } from "@/lib/services/file-watcher";
 import { executeTabSave } from "../save-executor";
 import { isEditorTab } from "../tab-types";
 import { useFileWatchIntegration } from "../use-file-watch-integration";
@@ -323,6 +324,55 @@ describe("#1448 — self-save while paused is not misdetected", () => {
     expect(notificationShowMessage).not.toHaveBeenCalled();
     const after = harness.getTab(tab.id);
     expect(after.fileSyncStatus).toBe("clean");
+    expect(after.pendingExternalContent ?? null).toBeNull();
+  });
+
+  it("ignores the save echo even after the time-boxed suppression expired (Codex review)", async () => {
+    // The suppressFileWatch entry lives only ~poll interval + 3s. A long
+    // background stay outlives it; on resume the watcher reports our own
+    // write (mtime advanced, suppression gone). buildOnChanged's echo guard
+    // (diskContent === lastSavedContent) must absorb it.
+    const tab = makeTab({
+      content: "edited content",
+      isDirty: true,
+      fileSyncStatus: "dirty",
+    });
+    const harness = makeHarness(tab);
+    await mountHook(harness.params);
+
+    await act(async () => {
+      dispatchBlur();
+    });
+    await sleep(20);
+
+    const outcome = await executeTabSave({
+      tab: harness.getTab(tab.id),
+      isProject: true,
+      tabsRef: harness.tabsRef,
+      setTabs: harness.params.setTabs,
+      tryCreateSnapshot: vi.fn(async () => undefined),
+      isAutoSave: true,
+    });
+    expect(outcome.status).toBe("saved");
+
+    // Simulate suppression expiry: register a zero-duration suppression for
+    // the same content, which immediately replaces and expires the entry the
+    // save-executor registered.
+    suppressFileWatch("/test.mdi", mockFileContent, 0);
+    await sleep(5);
+
+    await act(async () => {
+      dispatchFocus();
+    });
+    await sleep(80);
+
+    // The watcher fires onChanged (suppression expired, mtime advanced), but
+    // the echo guard sees diskContent === lastSavedContent and drops it.
+    expect(notificationInfo).not.toHaveBeenCalled();
+    expect(notificationShowMessage).not.toHaveBeenCalled();
+    const after = harness.getTab(tab.id);
+    expect(after.fileSyncStatus).toBe("clean");
+    expect(after.conflictDiskContent ?? null).toBeNull();
     expect(after.pendingExternalContent ?? null).toBeNull();
   });
 });
