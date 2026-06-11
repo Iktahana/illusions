@@ -18,17 +18,20 @@
  * an integration test suite that runs inside Electron (see docs for Electron testing).
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import fsSync from "fs";
+import os from "os";
 import path from "path";
 import { createRequire } from "module";
 
 // Load the CommonJS path-utils module via createRequire so vitest can import it
 const require = createRequire(import.meta.url);
-const { toForwardSlash, assertPathInsideRoot, getWindowsDenyPrefixes } =
+const { toForwardSlash, assertPathInsideRoot, getWindowsDenyPrefixes, resolveRealPath } =
   require("../../../electron/lib/path-utils") as {
     toForwardSlash: (p: string) => string;
     assertPathInsideRoot: (resolvedPath: string, rootPath: string) => void;
     getWindowsDenyPrefixes: () => string[];
+    resolveRealPath: (p: string) => Promise<string>;
   };
 
 // -----------------------------------------------------------------------
@@ -163,5 +166,105 @@ describe("path traversal attack simulation", () => {
   it("valid project file passes validation", () => {
     const validPath = `${allowedRoot}/.illusions/history/snapshot-001.mdi`;
     expect(() => assertPathInsideRoot(validPath, allowedRoot)).not.toThrow();
+  });
+});
+
+// -----------------------------------------------------------------------
+// resolveRealPath — symlink-collapsed path resolution (issue #1559)
+// -----------------------------------------------------------------------
+// These tests reproduce the symlink-escape attack: a symlink placed inside
+// the approved project root pointing to a file outside it. The lexical
+// prefix check (assertPathInsideRoot) alone cannot detect this; only the
+// realpath-collapsed path reveals the escape.
+describe("resolveRealPath()", () => {
+  let baseDir: string; // realpath'd temp base
+  let rootDir: string; // simulated project root (inside baseDir)
+  let outsideDir: string; // directory outside the project root
+
+  beforeEach(() => {
+    // realpathSync the tmpdir first — on macOS /var is itself a symlink
+    const tmpBase = fsSync.realpathSync(os.tmpdir());
+    baseDir = fsSync.mkdtempSync(path.join(tmpBase, "vfs-realpath-test-"));
+    rootDir = path.join(baseDir, "project");
+    outsideDir = path.join(baseDir, "outside");
+    fsSync.mkdirSync(rootDir, { recursive: true });
+    fsSync.mkdirSync(outsideDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fsSync.rmSync(baseDir, { recursive: true, force: true });
+  });
+
+  it("returns the physical path of a regular file inside the root", async () => {
+    const file = path.join(rootDir, "chapter1.mdi");
+    fsSync.writeFileSync(file, "content");
+    const real = await resolveRealPath(file);
+    expect(toForwardSlash(real)).toBe(toForwardSlash(file));
+  });
+
+  it("collapses a symlink pointing OUTSIDE the root so containment check throws", async () => {
+    // Attack from issue #1559: project contains chapter2.mdi -> secret outside root
+    const secret = path.join(outsideDir, "id_rsa");
+    fsSync.writeFileSync(secret, "PRIVATE KEY");
+    const link = path.join(rootDir, "chapter2.mdi");
+    fsSync.symlinkSync(secret, link);
+
+    const real = await resolveRealPath(link);
+    // The collapsed path must reveal the outside target...
+    expect(toForwardSlash(real)).toBe(toForwardSlash(secret));
+    // ...so the realpath containment check rejects it
+    expect(() => assertPathInsideRoot(toForwardSlash(real), toForwardSlash(rootDir))).toThrow(
+      /外部/,
+    );
+  });
+
+  it("collapses a symlinked directory escape (dir symlink + relative file)", async () => {
+    const escapeDir = path.join(rootDir, "notes");
+    fsSync.symlinkSync(outsideDir, escapeDir);
+    fsSync.writeFileSync(path.join(outsideDir, "leak.txt"), "leak");
+
+    const real = await resolveRealPath(path.join(escapeDir, "leak.txt"));
+    expect(toForwardSlash(real)).toBe(toForwardSlash(path.join(outsideDir, "leak.txt")));
+    expect(() => assertPathInsideRoot(toForwardSlash(real), toForwardSlash(rootDir))).toThrow();
+  });
+
+  it("keeps a symlink pointing INSIDE the root acceptable", async () => {
+    const target = path.join(rootDir, "real.mdi");
+    fsSync.writeFileSync(target, "ok");
+    const link = path.join(rootDir, "alias.mdi");
+    fsSync.symlinkSync(target, link);
+
+    const real = await resolveRealPath(link);
+    expect(() => assertPathInsideRoot(toForwardSlash(real), toForwardSlash(rootDir))).not.toThrow();
+  });
+
+  it("tolerates a not-yet-existing file (resolves the existing parent)", async () => {
+    const newFile = path.join(rootDir, "new-chapter.mdi");
+    const real = await resolveRealPath(newFile);
+    expect(toForwardSlash(real)).toBe(toForwardSlash(newFile));
+  });
+
+  it("tolerates nested not-yet-existing directories (mkdir -p case)", async () => {
+    const nested = path.join(rootDir, "a", "b", "c.mdi");
+    const real = await resolveRealPath(nested);
+    expect(toForwardSlash(real)).toBe(toForwardSlash(nested));
+  });
+
+  it("collapses symlinks even when the trailing component does not exist yet", async () => {
+    // notes -> outsideDir, then write to notes/new.txt (creation path)
+    const escapeDir = path.join(rootDir, "notes");
+    fsSync.symlinkSync(outsideDir, escapeDir);
+
+    const real = await resolveRealPath(path.join(escapeDir, "new.txt"));
+    expect(toForwardSlash(real)).toBe(toForwardSlash(path.join(outsideDir, "new.txt")));
+    expect(() => assertPathInsideRoot(toForwardSlash(real), toForwardSlash(rootDir))).toThrow();
+  });
+
+  it("rejects a dangling symlink with an ENOENT-coded error (fail closed)", async () => {
+    // Opening a dangling symlink with "w" would create its outside target
+    const link = path.join(rootDir, "dangling.mdi");
+    fsSync.symlinkSync(path.join(outsideDir, "does-not-exist.txt"), link);
+
+    await expect(resolveRealPath(link)).rejects.toMatchObject({ code: "ENOENT" });
   });
 });

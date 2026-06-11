@@ -224,7 +224,7 @@ async function exportAsWeb(
   if (format === "pdf") {
     // Defensive fallback: normally PDF goes through dialog (line 103),
     // but if no dialog callback is wired, use default export settings.
-    const defaults = toPdfExportSettings(loadExportSettings());
+    const defaults = toPdfExportSettings(await loadExportSettings());
     const opened = await openWebPrintPreview(content, metadata, defaults);
     if (!opened) {
       notificationManager.warning(

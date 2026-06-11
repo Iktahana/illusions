@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import { MAX_SNAPSHOTS, RETENTION_DAYS } from "@/lib/services/history-policy";
 
-import { ensureProjectFiles } from "../project-file-utils";
+import { ensureProjectFiles, readProjectJson } from "../project-file-utils";
 import type { AnyDirectoryHandle } from "../project-file-utils";
 
 // ---------------------------------------------------------------------------
@@ -227,5 +227,122 @@ describe("ensureProjectFiles", () => {
     const result = await ensureProjectFiles(asHandle(root));
     expect(result.repaired).toBe(true);
     expect(result.metadata.mainFile).toBe("Empty.mdi");
+  });
+
+  it("破損 project.json (不完全な JSON) → バックアップに退避してデフォルト再生成", async () => {
+    const root = makeRoot("Corrupt", ["Corrupt.mdi"]);
+    // Simulate a truncated write (the failure scenario from issue #1565).
+    await seedIllusionsFile(root, "project.json", '{"version":"1.0');
+    await seedIllusionsFile(root, "workspace.json", JSON.stringify({ openTabs: [] }));
+
+    const result = await ensureProjectFiles(asHandle(root), { projectId: "new-id" });
+
+    expect(result.repaired).toBe(true);
+    // Fresh metadata was generated with the supplied projectId.
+    expect(result.metadata.projectId).toBe("new-id");
+    expect(result.metadata.mainFile).toBe("Corrupt.mdi");
+
+    // A backup file starting with "project.json.corrupt-" should have been created.
+    const illusionsDir = await root.getDirectoryHandle(".illusions", { create: false });
+    const illusionsFiles: string[] = [];
+    for await (const [name] of (illusionsDir as unknown as FakeDir).entries()) {
+      illusionsFiles.push(name);
+    }
+    const backupFile = illusionsFiles.find((n) => n.startsWith("project.json.corrupt-"));
+    expect(backupFile).toBeDefined();
+    // The backup should contain the original corrupt content.
+    const backupHandle = await (illusionsDir as unknown as FakeDir).getFileHandle(backupFile!, {
+      create: false,
+    });
+    expect(await backupHandle.read()).toBe('{"version":"1.0');
+  });
+
+  it("破損 project.json: バックアップ成功時の warn は退避先を正しく報告する", async () => {
+    const root = makeRoot("CorruptOk", ["CorruptOk.mdi"]);
+    await seedIllusionsFile(root, "project.json", '{"version":"1.0');
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await ensureProjectFiles(asHandle(root), { projectId: "regen-ok" });
+
+      const corruptWarn = warnSpy.mock.calls
+        .map((call) => String(call[0]))
+        .find((message) => message.includes("project.json が破損"));
+      expect(corruptWarn).toBeDefined();
+      expect(corruptWarn).toContain("に退避し、");
+      expect(corruptWarn).not.toContain("失敗");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("破損 project.json: バックアップ作成に失敗 → 退避成功と偽らない warn を出して再生成 (#1567)", async () => {
+    const root = makeRoot("CorruptNoBackup", ["CorruptNoBackup.mdi"]);
+    await seedIllusionsFile(root, "project.json", '{"version":"1.0');
+
+    // Make backup-file creation fail (e.g. read-only / quota error) while
+    // project.json itself stays writable for regeneration.
+    const illusionsDir = await root.getDirectoryHandle(".illusions", { create: false });
+    const originalGetFileHandle = illusionsDir.getFileHandle.bind(illusionsDir);
+    illusionsDir.getFileHandle = async (name, opts): Promise<FakeFile> => {
+      if (name.startsWith("project.json.corrupt-")) {
+        throw Object.assign(new Error("EACCES"), { code: "EACCES" });
+      }
+      return originalGetFileHandle(name, opts);
+    };
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const result = await ensureProjectFiles(asHandle(root), { projectId: "regen-id" });
+
+      // Regeneration still succeeds despite the backup failure.
+      expect(result.repaired).toBe(true);
+      expect(result.metadata.projectId).toBe("regen-id");
+
+      // The warn must NOT claim the backup succeeded (「...に退避し、...」).
+      const corruptWarn = warnSpy.mock.calls
+        .map((call) => String(call[0]))
+        .find((message) => message.includes("project.json が破損"));
+      expect(corruptWarn).toBeDefined();
+      expect(corruptWarn).toContain("失敗");
+      expect(corruptWarn).not.toContain("に退避し、");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// readProjectJson — corrupted file returns null (self-heal via caller)
+// ---------------------------------------------------------------------------
+describe("readProjectJson", () => {
+  it("破損 project.json (不完全な JSON) → null を返して例外を伝播させない", async () => {
+    const root = makeRoot("ReadCorrupt", ["ReadCorrupt.mdi"]);
+    await seedIllusionsFile(root, "project.json", '{"version":"1.0');
+
+    const result = await readProjectJson(asHandle(root));
+
+    // Must not throw; must return null so caller can call ensureProjectFiles.
+    expect(result).toBeNull();
+  });
+
+  it("有効な project.json → metadata を返す", async () => {
+    const root = makeRoot("ReadValid", ["ReadValid.mdi"]);
+    const valid = {
+      version: "1.0.0",
+      projectId: "valid-id",
+      name: "ReadValid",
+      mainFile: "ReadValid.mdi",
+      mainFileExtension: ".mdi",
+      createdAt: 1,
+      lastModified: 2,
+      editorSettings: {},
+    };
+    await seedIllusionsFile(root, "project.json", JSON.stringify(valid));
+
+    const result = await readProjectJson(asHandle(root));
+
+    expect(result).not.toBeNull();
+    expect(result!.metadata.projectId).toBe("valid-id");
   });
 });

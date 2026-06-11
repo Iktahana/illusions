@@ -25,6 +25,7 @@ const {
   removeSession,
   killSession,
 } = require("./terminal-session-registry");
+const { PTY_CHANNELS } = require("../lib/ipc-channels");
 
 // -----------------------------------------------------------------------
 // node-pty availability guard
@@ -211,7 +212,7 @@ function sendPtyData(webContentsId, sessionId, data) {
     .map((w) => w.webContents)
     .find((wc) => wc.id === webContentsId);
   if (wc && !wc.isDestroyed()) {
-    wc.send("pty:data", { sessionId, data });
+    wc.send(PTY_CHANNELS.event.data, { sessionId, data });
   }
 }
 
@@ -226,7 +227,7 @@ function sendPtyExit(webContentsId, sessionId, exitCode) {
     .map((w) => w.webContents)
     .find((wc) => wc.id === webContentsId);
   if (wc && !wc.isDestroyed()) {
-    wc.send("pty:exit", { sessionId, exitCode });
+    wc.send(PTY_CHANNELS.event.exit, { sessionId, exitCode });
   }
 }
 
@@ -240,7 +241,7 @@ function registerPtyHandlers() {
   // Payload: { cwd?, shell?, cols?, rows? }
   // Returns: { sessionId } | { error: string }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:spawn", (event, options = {}) => {
+  ipcMain.handle(PTY_CHANNELS.invoke.spawn, (event, options = {}) => {
     if (!ptyAvailable) {
       return { error: "node-pty is not available on this installation" };
     }
@@ -330,7 +331,7 @@ function registerPtyHandlers() {
   // Payload: sessionId (string)
   // Returns: { status, exitCode, outputBuffer } | { error: string }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:attach", (event, sessionId) => {
+  ipcMain.handle(PTY_CHANNELS.invoke.attach, (event, sessionId) => {
     if (typeof sessionId !== "string") {
       return { error: "sessionId must be a string" };
     }
@@ -362,7 +363,7 @@ function registerPtyHandlers() {
   // Payload: { sessionId, data }
   // Returns: { ok: boolean }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:write", (event, { sessionId, data } = {}) => {
+  ipcMain.handle(PTY_CHANNELS.invoke.write, (event, { sessionId, data } = {}) => {
     if (typeof sessionId !== "string") return { ok: false };
 
     const entry = getSession(sessionId);
@@ -403,7 +404,7 @@ function registerPtyHandlers() {
   // Payload: { sessionId, cols, rows }
   // Returns: { ok: boolean }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:resize", (event, { sessionId, cols, rows } = {}) => {
+  ipcMain.handle(PTY_CHANNELS.invoke.resize, (event, { sessionId, cols, rows } = {}) => {
     if (typeof sessionId !== "string") return { ok: false };
 
     const entry = getSession(sessionId);
@@ -453,7 +454,7 @@ function registerPtyHandlers() {
   // Payload: sessionId (string)
   // Returns: { ok: boolean }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:kill", (event, sessionId) => {
+  ipcMain.handle(PTY_CHANNELS.invoke.kill, (event, sessionId) => {
     if (typeof sessionId !== "string") return { ok: false };
 
     const entry = getSession(sessionId);
@@ -482,7 +483,7 @@ function registerPtyHandlers() {
   // Payload: sessionId (string)
   // Returns: { sessionId, status, exitCode, shell, cwd, createdAt } | { error: string }
   // -------------------------------------------------------------------
-  ipcMain.handle("pty:status", (event, sessionId) => {
+  ipcMain.handle(PTY_CHANNELS.invoke.status, (event, sessionId) => {
     if (typeof sessionId !== "string") {
       return { error: "sessionId must be a string" };
     }

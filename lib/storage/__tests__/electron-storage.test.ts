@@ -48,6 +48,9 @@ function createMockStorageAPI() {
       .fn<() => Promise<Array<{ id: string; rootPath: string; name: string }>>>()
       .mockResolvedValue([]),
     removeRecentProject: vi.fn<(id: string) => Promise<void>>().mockResolvedValue(undefined),
+    setItem: vi.fn<(key: string, value: string) => Promise<void>>().mockResolvedValue(undefined),
+    getItem: vi.fn<(key: string) => Promise<string | null>>().mockResolvedValue(null),
+    removeItem: vi.fn<(key: string) => Promise<void>>().mockResolvedValue(undefined),
   };
 }
 
@@ -276,6 +279,64 @@ describe("ElectronStorageProvider", () => {
       await provider.clearEditorBuffer();
 
       expect(mockStorage.clearEditorBuffer).toHaveBeenCalledOnce();
+    });
+  });
+
+  // =====================================================================
+  // Editor Buffer — fileKey namespacing (#1567)
+  // =====================================================================
+
+  describe("editor buffer with fileKey", () => {
+    it("saves under a namespaced key like the Web implementation", async () => {
+      const provider = new ElectronStorageProvider();
+      const buffer = makeEditorBuffer({ content: "Keyed draft" });
+
+      await provider.saveEditorBuffer(buffer, "novel.mdi");
+
+      expect(mockStorage.setItem).toHaveBeenCalledOnce();
+      expect(mockStorage.setItem).toHaveBeenCalledWith(
+        "editor_buffer:novel.mdi",
+        JSON.stringify(buffer),
+      );
+      // 名前空間付き保存はレガシーの単一バッファを上書きしない
+      expect(mockStorage.saveEditorBuffer).not.toHaveBeenCalled();
+    });
+
+    it("loads from the namespaced key", async () => {
+      const provider = new ElectronStorageProvider();
+      const expected = makeEditorBuffer({ content: "Keyed draft" });
+      mockStorage.getItem.mockResolvedValue(JSON.stringify(expected));
+
+      const result = await provider.loadEditorBuffer("novel.mdi");
+
+      expect(mockStorage.getItem).toHaveBeenCalledWith("editor_buffer:novel.mdi");
+      expect(result).toEqual(expected);
+      expect(mockStorage.loadEditorBuffer).not.toHaveBeenCalled();
+    });
+
+    it("returns null when no namespaced buffer exists", async () => {
+      const provider = new ElectronStorageProvider();
+      mockStorage.getItem.mockResolvedValue(null);
+
+      const result = await provider.loadEditorBuffer("missing.mdi");
+      expect(result).toBeNull();
+    });
+
+    it("returns null for corrupted namespaced data", async () => {
+      const provider = new ElectronStorageProvider();
+      mockStorage.getItem.mockResolvedValue("{not json");
+
+      const result = await provider.loadEditorBuffer("novel.mdi");
+      expect(result).toBeNull();
+    });
+
+    it("clears the namespaced key only", async () => {
+      const provider = new ElectronStorageProvider();
+
+      await provider.clearEditorBuffer("novel.mdi");
+
+      expect(mockStorage.removeItem).toHaveBeenCalledWith("editor_buffer:novel.mdi");
+      expect(mockStorage.clearEditorBuffer).not.toHaveBeenCalled();
     });
   });
 

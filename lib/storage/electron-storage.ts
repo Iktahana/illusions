@@ -96,24 +96,48 @@ export class ElectronStorageProvider implements IStorageService {
     return api.clearRecent();
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async saveEditorBuffer(buffer: EditorBuffer, _fileKey?: string): Promise<void> {
+  /**
+   * fileKey 指定時のストレージキー。
+   * Web 実装（web-storage.ts）と同じ `editor_buffer:${fileKey}` 形式で名前空間化する。
+   * 既存の editor_buffer IPC チャンネルは fileKey を運べないため、
+   * 名前空間付きバッファは汎用 KV ストア（kv_store テーブル、clearAll() で削除される）
+   * に保存する。fileKey なしの呼び出しは従来どおり editor_buffer テーブルを使う。
+   */
+  private editorBufferKvKey(fileKey: string): string {
+    return `editor_buffer:${fileKey}`;
+  }
+
+  async saveEditorBuffer(buffer: EditorBuffer, fileKey?: string): Promise<void> {
     await this.initialize();
     const api = this.getElectronAPI();
+    if (fileKey) {
+      return api.setItem(this.editorBufferKvKey(fileKey), JSON.stringify(buffer));
+    }
     return api.saveEditorBuffer(buffer);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async loadEditorBuffer(_fileKey?: string): Promise<EditorBuffer | null> {
+  async loadEditorBuffer(fileKey?: string): Promise<EditorBuffer | null> {
     await this.initialize();
     const api = this.getElectronAPI();
+    if (fileKey) {
+      const raw = await api.getItem(this.editorBufferKvKey(fileKey));
+      if (raw === null) return null;
+      try {
+        return JSON.parse(raw) as EditorBuffer;
+      } catch {
+        // 破損データは読み捨てる
+        return null;
+      }
+    }
     return api.loadEditorBuffer();
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async clearEditorBuffer(_fileKey?: string): Promise<void> {
+  async clearEditorBuffer(fileKey?: string): Promise<void> {
     await this.initialize();
     const api = this.getElectronAPI();
+    if (fileKey) {
+      return api.removeItem(this.editorBufferKvKey(fileKey));
+    }
     return api.clearEditorBuffer();
   }
 

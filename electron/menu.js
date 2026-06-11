@@ -1,9 +1,19 @@
 /* eslint-disable no-console */
 // Application menu construction and management
+//
+// The menu structure (sections, items, labels, ordering, default
+// accelerators, checkbox-state mappings) is derived from the shared
+// template in lib/menu/menu-template.js (#1433), which is also the source
+// for the Web menu bar. Electron-only entries (macOS app menu, devtools,
+// quit, window roles, update check) are added here.
 
 const { app, BrowserWindow, Menu, shell } = require("electron");
+const {
+  MENU_TEMPLATE,
+  formatVersionLabel,
+  getNativeDefaultAccelerators,
+} = require("../lib/menu/menu-template");
 const { APP_NAME, isDev } = require("./app-constants");
-const { getStorageManager } = require("./ipc/storage-ipc");
 
 // Default UI state for menu checked states
 const DEFAULT_MENU_UI_STATE = {
@@ -25,21 +35,9 @@ let activeWindowId = null;
 
 /**
  * Default Electron accelerator strings keyed by CommandId.
- * Mirrors the defaults in lib/keymap/shortcut-registry.ts.
+ * Derived from the shared menu template (single source with the Web menu).
  */
-const DEFAULT_ACCELERATORS = {
-  "file.save": "CmdOrCtrl+S",
-  "file.saveAs": "CmdOrCtrl+Shift+S",
-  "file.open": "CmdOrCtrl+O",
-  "file.newWindow": "CmdOrCtrl+N",
-  "file.newTab": "CmdOrCtrl+T",
-  "file.closeTab": "CmdOrCtrl+W",
-  "edit.undo": "CmdOrCtrl+Z",
-  "edit.redo": "CmdOrCtrl+Y",
-  "edit.pasteAsPlaintext": "CmdOrCtrl+Shift+V",
-  "edit.selectAll": "CmdOrCtrl+A",
-  "view.compactMode": "CmdOrCtrl+Shift+M",
-};
+const DEFAULT_ACCELERATORS = getNativeDefaultAccelerators();
 
 /**
  * Returns the UI state for the currently active window.
@@ -131,8 +129,188 @@ function resolveAccelerator(commandId) {
   return DEFAULT_ACCELERATORS[commandId];
 }
 
-function buildApplicationMenu(recentProjects = []) {
-  const isMac = process.platform === "darwin";
+/**
+ * Builds the click handler for a shared template item, or undefined for
+ * items without click semantics (separators, containers).
+ * @param {import("../lib/menu/menu-template").MenuTemplateItem} item
+ * @param {(channel: string, ...args: unknown[]) => void} sendToFocused
+ * @returns {(() => void) | undefined}
+ */
+function buildClickHandler(item, sendToFocused) {
+  if (item.electronHandler === "new-window") {
+    return () => {
+      // Defer require to avoid circular dependency with window-manager.js
+      const { createWindow } = require("./window-manager");
+      createWindow({ showWelcome: true });
+    };
+  }
+  if (item.electronOpenExternal) {
+    const url = item.electronOpenExternal;
+    return () => {
+      shell.openExternal(url);
+    };
+  }
+  if (item.electronChannel) {
+    const channel = item.electronChannel;
+    const args = item.electronArgs ?? [];
+    return () => {
+      sendToFocused(channel, ...args);
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Converts a shared template item into an Electron menu template item.
+ * @param {import("../lib/menu/menu-template").MenuTemplateItem} item
+ * @param {{
+ *   sendToFocused: (channel: string, ...args: unknown[]) => void,
+ *   menuUiState: typeof DEFAULT_MENU_UI_STATE,
+ *   recentProjects: Array<{ id: string, name: string }>,
+ * }} ctx
+ * @returns {object}
+ */
+function toNativeMenuItem(item, ctx) {
+  if (item.type === "separator") {
+    return { type: "separator" };
+  }
+
+  const label = item.dynamicLabel === "version" ? formatVersionLabel(app.getVersion()) : item.label;
+
+  // Role-based items delegate behavior to Electron (macOS conventions intact)
+  if (item.electronRole) {
+    return { role: item.electronRole, label };
+  }
+
+  /** @type {Record<string, unknown>} */
+  const native = { label };
+
+  // Dynamic submenu insertion point: recent projects
+  if (item.dynamicSubmenu === "recent-projects") {
+    native.submenu =
+      ctx.recentProjects.length > 0
+        ? ctx.recentProjects.map((project) => ({
+            label: project.name,
+            click: () => {
+              ctx.sendToFocused(item.electronChannel, project.id);
+            },
+          }))
+        : [{ label: "項目なし", enabled: false }];
+    return native;
+  }
+
+  if (item.submenu) {
+    native.submenu = item.submenu.map((child) => toNativeMenuItem(child, ctx));
+    return native;
+  }
+
+  // Accelerator: user keymap override (via commandId) > shared default
+  if (item.commandId) {
+    const accelerator = resolveAccelerator(item.commandId);
+    if (accelerator) native.accelerator = accelerator;
+  } else if (item.nativeAccelerator) {
+    native.accelerator = item.nativeAccelerator;
+  }
+
+  // Checkbox / radio state mapped from the renderer-reported UI state
+  if (item.checkedState) {
+    native.type = item.electronType ?? item.type;
+    const stateValue = ctx.menuUiState[item.checkedState.key];
+    native.checked =
+      item.checkedState.value !== undefined
+        ? stateValue === item.checkedState.value
+        : Boolean(stateValue);
+  }
+
+  if (item.enabledWhenNotState) {
+    native.enabled = !ctx.menuUiState[item.enabledWhenNotState];
+  }
+
+  if (item.enabled === false) {
+    native.enabled = false;
+  }
+
+  const click = buildClickHandler(item, ctx.sendToFocused);
+  if (click) native.click = click;
+
+  return native;
+}
+
+/**
+ * Electron-only menu entries inserted around the shared core items.
+ * @param {"file" | "edit" | "format" | "view" | "window" | "help"} sectionId
+ * @param {boolean} isMac
+ * @returns {{ prepend: object[], append: object[] }}
+ */
+function getElectronSectionExtras(sectionId, isMac) {
+  switch (sectionId) {
+    case "file":
+      return {
+        prepend: [],
+        append: isMac ? [] : [{ type: "separator" }, { role: "quit", label: "終了" }],
+      };
+    case "view":
+      return {
+        prepend: [
+          ...(isDev
+            ? [
+                { role: "reload", label: "再読み込み" },
+                { role: "forceReload", label: "強制再読み込み" },
+                { type: "separator" },
+              ]
+            : []),
+          { role: "toggleDevTools", label: "開発者ツールを切り替え" },
+        ],
+        append: [
+          { type: "separator" },
+          { role: "togglefullscreen", label: "全画面表示を切り替え" },
+        ],
+      };
+    case "window":
+      return {
+        prepend: [],
+        append: [
+          { type: "separator" },
+          ...(isMac
+            ? [
+                { role: "minimize", label: "最小化" },
+                { role: "zoom", label: "拡大/縮小" },
+                { type: "separator" },
+                { role: "front", label: "すべてを手前に移動" },
+                { type: "separator" },
+                { role: "window", label: "ウィンドウ" },
+              ]
+            : [{ role: "minimize", label: "最小化" }]),
+        ],
+      };
+    case "help":
+      return {
+        prepend: [
+          {
+            label: "アップデートを確認",
+            click: () => {
+              // Defer require to avoid circular dependency with auto-updater.js
+              const { checkForUpdates } = require("./auto-updater");
+              checkForUpdates(true);
+            },
+          },
+          { type: "separator" },
+        ],
+        append: [],
+      };
+    default:
+      return { prepend: [], append: [] };
+  }
+}
+
+/**
+ * Builds the full native menu template from the shared menu template.
+ * @param {Array<{ id: string, name: string }>} recentProjects
+ * @param {string} platform - process.platform (injectable for tests)
+ * @returns {object[]}
+ */
+function buildApplicationMenu(recentProjects = [], platform = process.platform) {
+  const isMac = platform === "darwin";
   // Snapshot the active window's UI state once for this build
   const menuUiState = getMenuUiState();
 
@@ -142,9 +320,11 @@ function buildApplicationMenu(recentProjects = []) {
     if (win) win.webContents.send(channel, ...args);
   };
 
+  const ctx = { sendToFocused, menuUiState, recentProjects };
+
   const template = [];
 
-  // アプリ（macOSのみ）
+  // アプリ（macOSのみ・role ベースの実装を維持）
   if (isMac) {
     template.push({
       label: APP_NAME,
@@ -162,314 +342,13 @@ function buildApplicationMenu(recentProjects = []) {
     });
   }
 
-  // ファイル
-  template.push({
-    label: "ファイル",
-    submenu: [
-      {
-        label: "新規ウィンドウ",
-        accelerator: resolveAccelerator("file.newWindow"),
-        click: () => {
-          // Defer require to avoid circular dependency with window-manager.js
-          const { createWindow } = require("./window-manager");
-          createWindow({ showWelcome: true });
-        },
-      },
-      {
-        label: "最近のプロジェクトを開く",
-        submenu:
-          recentProjects.length > 0
-            ? recentProjects.map((project) => ({
-                label: project.name,
-                click: () => {
-                  sendToFocused("menu-open-recent-project", project.id);
-                },
-              }))
-            : [{ label: "項目なし", enabled: false }],
-      },
-      {
-        label: "プロジェクトを開く",
-        click: () => {
-          sendToFocused("menu-open-project");
-        },
-      },
-      { type: "separator" },
-      {
-        label: "ファイルを開く...",
-        accelerator: resolveAccelerator("file.open"),
-        click: () => {
-          sendToFocused("menu-open-triggered");
-        },
-      },
-      {
-        label: "保存",
-        accelerator: resolveAccelerator("file.save"),
-        click: () => {
-          sendToFocused("menu-save-triggered");
-        },
-      },
-      {
-        label: "別名で保存...",
-        accelerator: resolveAccelerator("file.saveAs"),
-        click: () => {
-          sendToFocused("menu-save-as-triggered");
-        },
-      },
-      { type: "separator" },
-      {
-        label: "印刷...",
-        accelerator: resolveAccelerator("file.print"),
-        click: () => sendToFocused("menu-print"),
-      },
-      {
-        label: "エクスポート",
-        submenu: [
-          {
-            label: "テキスト（プレーン）としてエクスポート...",
-            click: () => sendToFocused("menu-export-txt"),
-          },
-          {
-            label: "テキスト（ルビ付き）としてエクスポート...",
-            click: () => sendToFocused("menu-export-txt-ruby"),
-          },
-          { type: "separator" },
-          {
-            label: "PDF としてエクスポート...",
-            click: () => sendToFocused("menu-export-pdf"),
-          },
-          {
-            label: "EPUB としてエクスポート...",
-            click: () => sendToFocused("menu-export-epub"),
-          },
-          {
-            label: "DOCX としてエクスポート...",
-            click: () => sendToFocused("menu-export-docx"),
-          },
-        ],
-      },
-      { type: "separator" },
-      {
-        label: "新しいタブ",
-        accelerator: resolveAccelerator("file.newTab"),
-        click: () => {
-          sendToFocused("menu-new-tab");
-        },
-      },
-      {
-        label: "タブを閉じる",
-        accelerator: resolveAccelerator("file.closeTab"),
-        click: () => {
-          sendToFocused("menu-close-tab");
-        },
-      },
-      ...(isMac ? [] : [{ type: "separator" }]),
-      ...(isMac ? [] : [{ role: "quit", label: "終了" }]),
-    ],
-  });
-
-  // 編集
-  template.push({
-    label: "編集",
-    submenu: [
-      { role: "undo", label: "元に戻す" },
-      { role: "redo", label: "やり直す" },
-      { type: "separator" },
-      { role: "cut", label: "切り取り" },
-      { role: "copy", label: "コピー" },
-      { role: "paste", label: "貼り付け" },
-      {
-        label: "プレーンテキストとして貼り付け",
-        accelerator: resolveAccelerator("edit.pasteAsPlaintext"),
-        click: () => {
-          sendToFocused("menu-paste-as-plaintext");
-        },
-      },
-      { type: "separator" },
-      { role: "selectAll", label: "すべて選択" },
-    ],
-  });
-
-  // 書式
-  template.push({
-    label: "書式",
-    submenu: [
-      {
-        label: "行間",
-        submenu: [
-          {
-            label: "広くする",
-            accelerator: "CmdOrCtrl+]",
-            click: () => sendToFocused("menu-format", "lineHeight", "increase"),
-          },
-          {
-            label: "狭くする",
-            accelerator: "CmdOrCtrl+[",
-            click: () => sendToFocused("menu-format", "lineHeight", "decrease"),
-          },
-        ],
-      },
-      {
-        label: "段落間隔",
-        submenu: [
-          {
-            label: "広くする",
-            click: () => sendToFocused("menu-format", "paragraphSpacing", "increase"),
-          },
-          {
-            label: "狭くする",
-            click: () => sendToFocused("menu-format", "paragraphSpacing", "decrease"),
-          },
-        ],
-      },
-      {
-        label: "字下げ",
-        submenu: [
-          {
-            label: "深くする",
-            click: () => sendToFocused("menu-format", "textIndent", "increase"),
-          },
-          {
-            label: "浅くする",
-            click: () => sendToFocused("menu-format", "textIndent", "decrease"),
-          },
-          { label: "なし", click: () => sendToFocused("menu-format", "textIndent", "none") },
-        ],
-      },
-      { type: "separator" },
-      {
-        label: "1行あたりの文字数",
-        submenu: [
-          {
-            label: "自動",
-            type: "checkbox",
-            checked: menuUiState.autoCharsPerLine,
-            click: () => sendToFocused("menu-format", "charsPerLine", "auto"),
-          },
-          { type: "separator" },
-          {
-            label: "増やす",
-            enabled: !menuUiState.autoCharsPerLine,
-            click: () => sendToFocused("menu-format", "charsPerLine", "increase"),
-          },
-          {
-            label: "減らす",
-            enabled: !menuUiState.autoCharsPerLine,
-            click: () => sendToFocused("menu-format", "charsPerLine", "decrease"),
-          },
-        ],
-      },
-      { type: "separator" },
-      {
-        label: "段落番号を表示",
-        type: "checkbox",
-        checked: menuUiState.showParagraphNumbers,
-        click: () => sendToFocused("menu-format", "paragraphNumbers", "toggle"),
-      },
-    ],
-  });
-
-  // 表示
-  template.push({
-    label: "表示",
-    submenu: [
-      ...(isDev
-        ? [
-            { role: "reload", label: "再読み込み" },
-            { role: "forceReload", label: "強制再読み込み" },
-            { type: "separator" },
-          ]
-        : []),
-      { role: "toggleDevTools", label: "開発者ツールを切り替え" },
-      { role: "resetZoom", label: "実際のサイズ" },
-      { role: "zoomIn", label: "拡大" },
-      { role: "zoomOut", label: "縮小" },
-      { type: "separator" },
-      { role: "togglefullscreen", label: "全画面表示を切り替え" },
-    ],
-  });
-
-  // ウィンドウ
-  template.push({
-    label: "ウィンドウ",
-    submenu: [
-      {
-        label: "コンパクトモード",
-        type: "checkbox",
-        checked: menuUiState.compactMode,
-        accelerator: resolveAccelerator("view.compactMode"),
-        click: () => {
-          sendToFocused("menu-toggle-compact-mode");
-        },
-      },
-      {
-        label: "ダークモード",
-        submenu: [
-          {
-            label: "自動",
-            type: "radio",
-            checked: menuUiState.themeMode === "auto",
-            click: () => sendToFocused("menu-theme", "auto"),
-          },
-          {
-            label: "オフ",
-            type: "radio",
-            checked: menuUiState.themeMode === "light",
-            click: () => sendToFocused("menu-theme", "light"),
-          },
-          {
-            label: "オン",
-            type: "radio",
-            checked: menuUiState.themeMode === "dark",
-            click: () => sendToFocused("menu-theme", "dark"),
-          },
-        ],
-      },
-      { type: "separator" },
-      ...(isMac
-        ? [
-            { role: "minimize", label: "最小化" },
-            { role: "zoom", label: "拡大/縮小" },
-            { type: "separator" },
-            { role: "front", label: "すべてを手前に移動" },
-            { type: "separator" },
-            { role: "window", label: "ウィンドウ" },
-          ]
-        : [{ role: "minimize", label: "最小化" }]),
-    ],
-  });
-
-  // ヘルプ
-  template.push({
-    label: "ヘルプ",
-    submenu: [
-      {
-        label: "アップデートを確認",
-        click: () => {
-          // Defer require to avoid circular dependency with auto-updater.js
-          const { checkForUpdates } = require("./auto-updater");
-          checkForUpdates(true);
-        },
-      },
-      { type: "separator" },
-      {
-        label: `バージョン ${app.getVersion()}`,
-        enabled: false,
-      },
-      { type: "separator" },
-      {
-        label: "公式サイトへ",
-        click: () => {
-          shell.openExternal("https://www.illusions.app/");
-        },
-      },
-      {
-        label: "AI回答の不適切を報告",
-        click: () => {
-          shell.openExternal("https://github.com/Iktahana/illusions/issues/new");
-        },
-      },
-    ],
-  });
+  for (const section of MENU_TEMPLATE) {
+    const { prepend, append } = getElectronSectionExtras(section.id, isMac);
+    template.push({
+      label: section.label,
+      submenu: [...prepend, ...section.items.map((item) => toNativeMenuItem(item, ctx)), ...append],
+    });
+  }
 
   return template;
 }
@@ -477,6 +356,9 @@ function buildApplicationMenu(recentProjects = []) {
 /** Rebuild the application menu with fresh recent projects from SQLite */
 async function rebuildApplicationMenu() {
   try {
+    // Defer require so that menu construction stays importable without the
+    // storage stack (also avoids loading better-sqlite3 in tests)
+    const { getStorageManager } = require("./ipc/storage-ipc");
     const manager = getStorageManager();
     const projects = await manager.getRecentProjects();
     const menu = Menu.buildFromTemplate(buildApplicationMenu(projects));

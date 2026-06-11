@@ -5,11 +5,11 @@ import { RefreshCw, LoaderCircle } from "lucide-react";
 import clsx from "clsx";
 
 import ContextMenu from "@/components/ContextMenu";
-import { stripMdiBlankMarkers } from "@/lib/export/mdi-parser";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
-import type { WordEntry } from "@/lib/nlp-client/types";
 import { getProjectFileService } from "@/lib/services/project-file-service";
+import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
+import type { WordEntry } from "@/lib/nlp-client/types";
 
 /** Cache file schema for word frequency results */
 interface WordFrequencyCache {
@@ -170,7 +170,10 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
 
       // Run NLP analysis
       const nlpClient = getNlpClient();
-      const wordEntries = await nlpClient.analyzeWordFrequency(stripMdiBlankMarkers(content));
+      // #1449: NLP input is always the analysis derivation ([[blank]] markers removed)
+      const wordEntries = await nlpClient.analyzeWordFrequency(
+        MdiDocument.fromRawText(content).toAnalysisText(),
+      );
 
       // Discard stale result if a newer analysis was started (#1078)
       if (genRef.current !== myGen) return;

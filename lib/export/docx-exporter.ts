@@ -17,8 +17,12 @@ import {
   PageNumber,
   TextDirection,
 } from "docx";
+import {
+  replaceMdiWithRubyText,
+  MDI_BREAK_RE,
+  isMdiBlankParagraphLine,
+} from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import type { ExportMetadata } from "./types";
-import { replaceMdiWithRubyText, MDI_BREAK_RE } from "./mdi-parser";
 import {
   DEFAULT_DOCX_SETTINGS,
   PAGE_DIMENSIONS,
@@ -212,7 +216,7 @@ function parseMarkdownToDocxParagraphs(
     // [[blank]] paragraph marker → empty <w:p> (forced blank paragraph).
     // Attach spacing so `docx` emits `<w:pPr>` and never self-closes the `<w:p>` tag,
     // which keeps `[[blank]]` countable via `<w:p\s>`/`<w:p>` and matches the export tests.
-    if (trimmed === "[[blank]]") {
+    if (isMdiBlankParagraphLine(trimmed)) {
       flushParagraph();
       paragraphs.push(new Paragraph({ spacing: { before: 0, after: 120 }, children: [] }));
       continue;

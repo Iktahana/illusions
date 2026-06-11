@@ -44,8 +44,10 @@ import {
   useTypographySettings,
   useLintingSettings,
   usePosHighlightSettings,
+  usePowerSettings,
   useScrollSettings,
 } from "@/contexts/EditorSettingsContext";
+import { usePosHighlightActivation } from "@/lib/editor-page/use-pos-highlight-activation";
 
 interface MilkdownEditorProps {
   initialContent: string;
@@ -116,6 +118,7 @@ export default function MilkdownEditor({
   const { lintingEnabled } = useLintingSettings();
   const { posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes } =
     usePosHighlightSettings();
+  const { powerSaveMode } = usePowerSettings();
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
   const { measureRef: charMeasureRef, charWidth } = useCharWidth({
     fontFamily,
@@ -275,10 +278,14 @@ export default function MilkdownEditor({
   // EditorView インスタンスを取得する
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
+    // Unmount/cleanup guard: prevents setState after unmount and stops the
+    // retry chain when the effect is torn down mid-poll (#1567).
+    let cancelled = false;
     let attempts = 0;
     const maxAttempts = 10;
 
     const tryGetEditorView = () => {
+      if (cancelled) return;
       attempts++;
       try {
         const editor = get();
@@ -301,7 +308,10 @@ export default function MilkdownEditor({
 
     timer = setTimeout(tryGetEditorView, 100);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [get, onEditorViewReady]);
 
   // 外部ファイル変更時にスクロール位置を保持したまま内容を更新する
@@ -337,23 +347,16 @@ export default function MilkdownEditor({
     }
   }, [externalContent, get, isVertical, scrollContainerRef]);
 
-  // posHighlight 設定を動的に更新（Editor を再作成せずに）
-  useEffect(() => {
-    if (!editorViewInstance) return;
-
-    // 動的に設定を更新
-    import("@/packages/milkdown-plugin-japanese-novel/pos-highlight")
-      .then(({ updatePosHighlightSettings }) => {
-        updatePosHighlightSettings(editorViewInstance, {
-          enabled: posHighlightEnabled,
-          colors: posHighlightColors,
-          disabledTypes: posHighlightDisabledTypes,
-        });
-      })
-      .catch((err) => {
-        console.error("[Editor] Failed to update POS highlight settings:", err);
-      });
-  }, [editorViewInstance, posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes]);
+  // posHighlight 設定を動的に更新（Editor を再作成せずに）。
+  // enabled は power policy 由来の実効値（バックグラウンド中は停止、
+  // フォーカス復帰でユーザー設定どおりに復元、#1466）。
+  usePosHighlightActivation({
+    view: editorViewInstance,
+    posHighlightEnabled,
+    powerSaveMode,
+    posHighlightColors,
+    posHighlightDisabledTypes,
+  });
 
   // linting 設定を動的に更新（Editor を再作成せずに）
   useEffect(() => {
@@ -867,14 +870,19 @@ export default function MilkdownEditor({
         }
         div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p) {
           text-indent: ${textIndent}em;
-          margin-bottom: ${paragraphSpacing}em;
-          ${showParagraphNumbers ? "counter-increment: paragraph;" : ""}
-          ${showParagraphNumbers ? "position: relative;" : ""}
+          margin-block-end: ${paragraphSpacing}em;
         }
         div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p) {
           text-indent: ${textIndent}em;
-          margin-left: ${paragraphSpacing}em;
-          margin-bottom: 0;
+          margin-block-end: ${paragraphSpacing}em;
+        }
+        /* 行頭起こし括弧の段落（会話文など）は字下げしない */
+        div :global(.milkdown .ProseMirror p.mdi-dialogue) {
+          text-indent: 0;
+        }
+        /* 段落番号: 空行 (.mdi-blank) は数えない・表示しない。
+           .mdi-blank の ::before は \\200B 表示（package CSS）に予約されている */
+        div :global(.milkdown .ProseMirror p:not(.mdi-blank)) {
           ${showParagraphNumbers ? "counter-increment: paragraph;" : ""}
           ${showParagraphNumbers ? "position: relative;" : ""}
         }
@@ -883,7 +891,7 @@ export default function MilkdownEditor({
           display: inline-block;
           width: ${textIndent}em;
         }
-        div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p::before) {
+        div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p:not(.mdi-blank)::before) {
           ${showParagraphNumbers
             ? `
               content: counter(paragraph);
@@ -897,7 +905,7 @@ export default function MilkdownEditor({
             `
             : "content: none;"}
         }
-        div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p::before) {
+        div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p:not(.mdi-blank)::before) {
           ${showParagraphNumbers
             ? `
               content: counter(paragraph);
@@ -923,15 +931,6 @@ export default function MilkdownEditor({
         div :global(.milkdown .ProseMirror li),
         div :global(.milkdown .ProseMirror blockquote) {
           text-indent: 0;
-        }
-        /* 見出しも段落としてカウントするが番号は非表示 */
-        div :global(.milkdown .ProseMirror h1),
-        div :global(.milkdown .ProseMirror h2),
-        div :global(.milkdown .ProseMirror h3),
-        div :global(.milkdown .ProseMirror h4),
-        div :global(.milkdown .ProseMirror h5),
-        div :global(.milkdown .ProseMirror h6) {
-          ${showParagraphNumbers ? "counter-increment: paragraph;" : ""}
         }
       `}</style>
       <style jsx global>{`

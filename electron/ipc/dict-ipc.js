@@ -6,6 +6,7 @@
 
 const { ipcMain } = require("electron");
 const { getDictManager } = require("../dict-manager");
+const { DICT_CHANNELS } = require("../lib/ipc-channels");
 
 function registerDictHandlers() {
   const mgr = getDictManager();
@@ -18,7 +19,7 @@ function registerDictHandlers() {
   };
 
   // Query by headword
-  ipcMain.handle("dict:query", async (_event, { term, limit }) => {
+  ipcMain.handle(DICT_CHANNELS.invoke.query, async (_event, { term, limit }) => {
     try {
       return mgr.query(String(term ?? ""), clampLimit(limit));
     } catch (err) {
@@ -28,7 +29,7 @@ function registerDictHandlers() {
   });
 
   // Query by kana reading (homophone lookup)
-  ipcMain.handle("dict:query-reading", async (_event, { reading, limit }) => {
+  ipcMain.handle(DICT_CHANNELS.invoke.queryReading, async (_event, { reading, limit }) => {
     try {
       return mgr.queryByReading(String(reading ?? ""), clampLimit(limit));
     } catch (err) {
@@ -38,7 +39,7 @@ function registerDictHandlers() {
   });
 
   // Get installation status and installed version
-  ipcMain.handle("dict:get-status", async () => {
+  ipcMain.handle(DICT_CHANNELS.invoke.getStatus, async () => {
     try {
       return mgr.getStatus();
     } catch (err) {
@@ -48,7 +49,7 @@ function registerDictHandlers() {
   });
 
   // Check GitHub Releases for the latest version
-  ipcMain.handle("dict:check-update", async () => {
+  ipcMain.handle(DICT_CHANNELS.invoke.checkUpdate, async () => {
     try {
       return await mgr.checkUpdate();
     } catch (err) {
@@ -58,11 +59,11 @@ function registerDictHandlers() {
   });
 
   // Download and install the latest database, streaming progress back to the renderer
-  ipcMain.handle("dict:download", async (event) => {
+  ipcMain.handle(DICT_CHANNELS.invoke.download, async (event) => {
     try {
       return await mgr.download((progress) => {
         if (!event.sender.isDestroyed()) {
-          event.sender.send("dict:download-progress", { progress });
+          event.sender.send(DICT_CHANNELS.event.downloadProgress, { progress });
         }
       });
     } catch (err) {

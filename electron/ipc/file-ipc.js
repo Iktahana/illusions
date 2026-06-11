@@ -4,48 +4,27 @@
 const { ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs/promises");
-const os = require("os");
 const log = require("electron-log");
-const { getWindowsDenyPrefixes } = require("../lib/path-utils");
+const { createApprovedPathRegistry } = require("../lib/approved-paths");
+const { normalizeSeparators } = require("../lib/path-utils");
+const { isSensitiveSystemPath, MAX_CONTENT_BYTES } = require("../lib/path-policy");
+const { FILE_CHANNELS, EXPORT_CHANNELS } = require("../lib/ipc-channels");
 
 // --- save-file path security validation ---
 // Tracks file paths that have been approved via native dialog or system file association,
 // scoped per BrowserWindow (webContentsId) to prevent cross-window path reuse.
-// Each window maintains its own bounded LRU set to prevent unbounded memory growth.
-const MAX_APPROVED_PATHS = 200;
-/** @type {Map<number, Map<string, true>>} webContentsId → (path → true) LRU map */
-const dialogApprovedPaths = new Map();
-
-/**
- * Get or create the per-window LRU path map for a given webContentsId.
- * @param {number} webContentsId - The webContents ID of the BrowserWindow
- * @returns {Map<string, true>}
- */
-function getWindowApprovedPaths(webContentsId) {
-  if (!dialogApprovedPaths.has(webContentsId)) {
-    dialogApprovedPaths.set(webContentsId, new Map());
-  }
-  return dialogApprovedPaths.get(webContentsId);
-}
+// LRU semantics (bounded per-window set) live in electron/lib/approved-paths.js.
+// Intentional difference vs vfs-ipc.js: this registry is module-level so save-file
+// approvals persist for the whole app lifetime (until the window is destroyed).
+const dialogApprovedPaths = createApprovedPathRegistry();
 
 /**
  * Add a path to the dialog-approved set for a specific window, with LRU eviction.
- * When the per-window set exceeds MAX_APPROVED_PATHS, the oldest entry is evicted.
  * @param {number} webContentsId - The webContents ID of the approving window
  * @param {string} p - The resolved file path to approve
  */
 function approveDialogPath(webContentsId, p) {
-  const windowPaths = getWindowApprovedPaths(webContentsId);
-  // Delete first so re-insertion moves it to the end (most recent)
-  windowPaths.delete(p);
-  windowPaths.set(p, true);
-  // Evict oldest entry if over capacity
-  if (windowPaths.size > MAX_APPROVED_PATHS) {
-    const oldest = windowPaths.keys().next().value;
-    if (oldest !== undefined) {
-      windowPaths.delete(oldest);
-    }
-  }
+  dialogApprovedPaths.approve(webContentsId, p);
 }
 
 /**
@@ -53,74 +32,26 @@ function approveDialogPath(webContentsId, p) {
  * @param {number} webContentsId - The webContents ID of the destroyed window
  */
 function revokeWindowApprovedPaths(webContentsId) {
-  dialogApprovedPaths.delete(webContentsId);
+  dialogApprovedPaths.revokeWindow(webContentsId);
 }
 
 /**
  * Check whether a normalized path points to a system-sensitive location.
- * Mirrors the deny-list logic in electron-vfs-ipc-handlers.js.
+ * Delegates to the shared policy in electron/lib/path-policy.js.
+ *
+ * Intentional difference vs vfs-ipc.js (isDeniedPath): the save-file policy uses
+ * the base deny list with NO extra home suffixes, because save-file writes are
+ * additionally gated by per-window dialog approval and an extension allowlist.
+ * vfs-ipc.js adds Windows credential-store suffixes on top of the base policy.
+ *
  * @param {string} normalizedPath - Forward-slash normalized absolute path
  * @returns {boolean} true if the path should be denied
  */
 function isSavePathDenied(normalizedPath) {
-  const homedir = os.homedir().split(path.sep).join("/");
-
-  // System root directories (Unix + macOS + Windows)
-  const denyExact = new Set([
-    "/",
-    "/etc",
-    "/usr",
-    "/bin",
-    "/sbin",
-    "/var",
-    "/tmp",
-    "/System",
-    "/private",
-    "/private/etc",
-    "/private/var",
-  ]);
-
-  // Bare Windows drive root (C:/ or C:)
-  const driveLetterMatch = normalizedPath.match(/^([a-zA-Z]):?\/?$/);
-  if (driveLetterMatch) return true;
-
-  const windowsDenyPrefixes = getWindowsDenyPrefixes();
-
-  // Sensitive directories within home
-  const homeSensitiveSuffixes = [
-    "/.ssh",
-    "/.gnupg",
-    "/.aws",
-    "/.kube",
-    "/.docker",
-    "/.config/gcloud",
-    "/Library/Keychains",
-  ];
-
-  // Treat denied roots as prefixes — block any nested path under them
-  if ([...denyExact].some((dir) => normalizedPath === dir || normalizedPath.startsWith(`${dir}/`)))
-    return true;
-  if (normalizedPath === homedir || normalizedPath.startsWith(`${homedir}/`)) {
-    // Allow writes inside home, but block sensitive subdirectories
-    if (normalizedPath === homedir) return true;
-    if (homeSensitiveSuffixes.some((s) => normalizedPath.startsWith(homedir + s))) return true;
-  }
-  const normalizedLower = normalizedPath.toLowerCase();
-  if (
-    windowsDenyPrefixes.some((p) => {
-      const pLower = p.toLowerCase();
-      return normalizedLower === pLower || normalizedLower.startsWith(`${pLower}/`);
-    })
-  )
-    return true;
-
-  return false;
+  return isSensitiveSystemPath(normalizedPath);
 }
 
 const VALID_SAVE_FILE_TYPES = [".mdi", ".md", ".txt"];
-
-/** Maximum allowed content size in bytes (50 MB) */
-const MAX_CONTENT_BYTES = 50 * 1024 * 1024;
 
 /**
  * Validate a file path provided by the renderer for the save-file IPC handler.
@@ -134,7 +65,9 @@ const MAX_CONTENT_BYTES = 50 * 1024 * 1024;
 function validateSaveFilePath(filePath, { skipApproval = false, webContentsId } = {}) {
   // Reject paths containing '..' to prevent directory traversal
   const resolved = path.resolve(filePath);
-  const normalized = resolved.split(path.sep).join("/");
+  // Intentional difference vs vfs-ipc.js: no trailing-slash trim here — the bare
+  // root "/" must stay "/" so the system deny list matches it (fail closed).
+  const normalized = normalizeSeparators(resolved);
   if (filePath.includes("..")) {
     log.warn(`save-file path rejected (directory traversal): ${filePath}`);
     return {
@@ -148,7 +81,7 @@ function validateSaveFilePath(filePath, { skipApproval = false, webContentsId } 
   // Check both the file itself and its parent directory
   if (
     isSavePathDenied(normalized) ||
-    isSavePathDenied(path.dirname(normalized).split(path.sep).join("/"))
+    isSavePathDenied(normalizeSeparators(path.dirname(normalized)))
   ) {
     log.warn(`save-file path rejected (denied location): ${filePath}`);
     return {
@@ -162,8 +95,8 @@ function validateSaveFilePath(filePath, { skipApproval = false, webContentsId } 
   // Approval is scoped to the requesting window to prevent cross-window reuse.
   // Dialog-approved paths bypass the extension check because the user already
   // consented to the file (e.g. they opened a .json or .log file via the open dialog).
-  const windowPaths = webContentsId != null ? dialogApprovedPaths.get(webContentsId) : undefined;
-  const isApproved = skipApproval || (windowPaths != null && windowPaths.has(resolved));
+  const isApproved =
+    skipApproval || (webContentsId != null && dialogApprovedPaths.has(webContentsId, resolved));
 
   // Validate file extension — skip for dialog-approved paths
   if (!isApproved) {
@@ -239,7 +172,7 @@ async function handleMdiFileOpen(filePath) {
       // Open as project with this file as initial file (relative to project root)
       const relativePath = path.relative(projectRoot, filePath);
       log.info("Opening as project:", projectRoot, "Initial file:", relativePath);
-      targetWindow.webContents.send("open-as-project", {
+      targetWindow.webContents.send(FILE_CHANNELS.event.openAsProject, {
         projectPath: projectRoot,
         initialFile: relativePath,
       });
@@ -249,7 +182,10 @@ async function handleMdiFileOpen(filePath) {
       // Approve system-opened file path for future saves, scoped to the target window
       approveDialogPath(targetWindow.webContents.id, path.resolve(filePath));
       const content = await fs.readFile(filePath, "utf-8");
-      targetWindow.webContents.send("open-file-from-system", { path: filePath, content });
+      targetWindow.webContents.send(FILE_CHANNELS.event.openFileFromSystem, {
+        path: filePath,
+        content,
+      });
     }
     return true;
   } catch (err) {
@@ -273,7 +209,7 @@ function setPendingFilePath(p) {
 }
 
 function registerFileHandlers() {
-  ipcMain.handle("open-file", async (event) => {
+  ipcMain.handle(FILE_CHANNELS.invoke.openFile, async (event) => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openFile"],
       filters: [
@@ -291,7 +227,7 @@ function registerFileHandlers() {
     return { path: filePath, content };
   });
 
-  ipcMain.handle("save-file", async (event, filePath, content, fileType) => {
+  ipcMain.handle(FILE_CHANNELS.invoke.saveFile, async (event, filePath, content, fileType) => {
     const senderWebContentsId = event.sender.id;
 
     // Validate inputs
@@ -301,7 +237,7 @@ function registerFileHandlers() {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content", code: "INVALID_INPUT" };
     }
-    if (content.length > MAX_CONTENT_BYTES) {
+    if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
       return {
         success: false,
         error: "ファイルサイズが上限を超えています（50 MB）",
@@ -386,7 +322,7 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle("get-pending-file", async (event) => {
+  ipcMain.handle(FILE_CHANNELS.invoke.getPendingFile, async (event) => {
     if (pendingFilePaths.length === 0) return [];
 
     // Drain the queue and resolve each path
@@ -425,7 +361,7 @@ function registerFileHandlers() {
 
   // --- Export handlers ---
 
-  ipcMain.handle("generate-pdf-preview", async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.generatePdfPreview, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
@@ -439,11 +375,11 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle("export-pdf", async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportPdf, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
-    if (content.length > MAX_CONTENT_BYTES) {
+    if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
       return {
         success: false,
         error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
@@ -470,7 +406,7 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle("print-document", async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.printDocument, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
@@ -585,11 +521,11 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle("export-epub", async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportEpub, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
-    if (content.length > MAX_CONTENT_BYTES) {
+    if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
       return {
         success: false,
         error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
@@ -641,11 +577,11 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle("export-docx", async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportDocx, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
-    if (content.length > MAX_CONTENT_BYTES) {
+    if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
       return {
         success: false,
         error: "コンテンツが大きすぎてエクスポートできません（50 MB）",

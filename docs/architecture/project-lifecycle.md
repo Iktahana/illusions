@@ -3,7 +3,7 @@ title: プロジェクトライフサイクル
 slug: project-lifecycle
 type: architecture
 status: active
-updated: 2026-04-03
+updated: 2026-06-10
 tags:
   - architecture
   - project
@@ -21,11 +21,12 @@ The project lifecycle system manages two distinct editor modes: **Project Mode**
 
 ### Key Files
 
-| File                     | Lines | Purpose                                                      |
-| ------------------------ | ----- | ------------------------------------------------------------ |
-| `lib/project-types.ts`   | ~201  | Type definitions for project and standalone modes            |
-| `lib/project-service.ts` | ~564  | Project creation, opening, saving, validation                |
-| `lib/project-manager.ts` | ~326  | Web-only: FileSystemDirectoryHandle persistence in IndexedDB |
+| File                                    | Lines | Purpose                                                                |
+| --------------------------------------- | ----- | ---------------------------------------------------------------------- |
+| `lib/project/project-types.ts`          | ~201  | Type definitions for project and standalone modes                      |
+| `lib/project/project-service.ts`        | ~564  | Project creation, opening, saving, validation                          |
+| `lib/project/project-manager.ts`        | ~326  | Web-only: FileSystemDirectoryHandle persistence in IndexedDB           |
+| `lib/editor-page/project-file-utils.ts` | ~230  | Low-level `.illusions/` file helpers; `ensureProjectFiles` auto-repair |
 
 ### Features
 
@@ -34,6 +35,7 @@ The project lifecycle system manages two distinct editor modes: **Project Mode**
 - Cross-platform name validation (Windows reserved name checks)
 - Web: persistent directory handles via IndexedDB
 - File extension support: `.mdi`, `.md`, `.txt`
+- Auto-repair: `ensureProjectFiles()` regenerates missing `.illusions/` metadata files without touching user content
 
 ---
 
@@ -268,6 +270,34 @@ if (projectMode) {
 }
 ```
 
+### Auto-Repairing Missing Metadata (`ensureProjectFiles`)
+
+When a project directory is opened and `.illusions/` metadata files are missing or empty (e.g., after a cloud-sync provider such as Google Drive drops `project.json` while leaving the manuscript intact), `ensureProjectFiles()` regenerates only the management files without touching user content.
+
+`ensureProjectFiles` is wired into all open paths — recent projects, auto-restore, Web handle restore, open-as-project, and manual folder open. A Japanese info notification is shown when any repair occurs.
+
+```typescript
+import { ensureProjectFiles } from "@/lib/editor-page/project-file-utils";
+
+const { metadata, illusionsDir, repaired } = await ensureProjectFiles(rootDirHandle, {
+  projectId: existingRecentEntry.projectId, // reuse the stored id to keep recent-projects consistent
+});
+
+if (repaired) {
+  // A toast notification is shown automatically by the calling open path
+}
+```
+
+What is regenerated (only when missing or empty):
+
+| File                            | Regenerated content                                             |
+| ------------------------------- | --------------------------------------------------------------- |
+| `.illusions/project.json`       | `ProjectConfig` with auto-detected main file and directory name |
+| `.illusions/workspace.json`     | Default `WorkspaceState`                                        |
+| `.illusions/history/index.json` | Empty `HistoryIndex` (best-effort; never blocks opening)        |
+
+The function returns `{ metadata, illusionsDir, repaired }`. Callers display a notification when `repaired === true`.
+
 ### Opening a Standalone File
 
 ```typescript
@@ -432,5 +462,5 @@ The `restoreProjectHandle` method:
 
 ---
 
-**Last Updated**: 2026-02-25
-**Version**: 1.0.0
+**Last Updated**: 2026-06-10
+**Version**: 1.1.0
