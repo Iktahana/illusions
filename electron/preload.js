@@ -1,157 +1,88 @@
 // Electron の preload スクリプト
 // レンダラへ最小限かつ安全なAPIだけを公開する
+//
+// #1434: IPC ブリッジは electron/lib/ipc-bridge.js の宣言的ヘルパーで定義する。
+// channel 名は electron/lib/ipc-channels.js で main 側と共有され、契約の drift は
+// electron/lib/__tests__/ipc-bridge.test.ts が防止する。
+// 特殊な wrapper（nlp.tokenizeDocument の requestId フィルタ、
+// editor.removeAllListeners）のみ意図的に手書きのまま残す。
 
 const { contextBridge, ipcRenderer } = require("electron");
-const { invokeChannel, eventChannel } = require("./lib/ipc-bridge");
-const { STORAGE_CHANNELS, DICT_CHANNELS } = require("./lib/ipc-channels");
+const { invokeChannel, sendChannel, eventChannel } = require("./lib/ipc-bridge");
+const {
+  STORAGE_CHANNELS,
+  DICT_CHANNELS,
+  FILE_CHANNELS,
+  EXPORT_CHANNELS,
+  SHELL_CHANNELS,
+  SYSTEM_CHANNELS,
+  MENU_CHANNELS,
+  VFS_CHANNELS,
+  AUTH_CHANNELS,
+  SAFE_STORAGE_CHANNELS,
+  POWER_CHANNELS,
+  EDITOR_CHANNELS,
+  NLP_CHANNELS,
+  PTY_CHANNELS,
+} = require("./lib/ipc-channels");
 
 contextBridge.exposeInMainWorld("electronAPI", {
   isElectron: true,
-  openFile: () => ipcRenderer.invoke("open-file"),
-  saveFile: (filePath, content, fileType) =>
-    ipcRenderer.invoke("save-file", filePath, content, fileType),
-  getChromeVersion: () => ipcRenderer.invoke("get-chrome-version"),
-  setDirty: (dirty) => ipcRenderer.invoke("set-dirty", dirty),
+  openFile: invokeChannel(FILE_CHANNELS.invoke.openFile, { arity: 0 }),
+  saveFile: invokeChannel(FILE_CHANNELS.invoke.saveFile, { arity: 3 }),
+  getChromeVersion: invokeChannel(SYSTEM_CHANNELS.invoke.getChromeVersion, { arity: 0 }),
+  setDirty: invokeChannel(SYSTEM_CHANNELS.invoke.setDirty, { arity: 1 }),
   // 歴史的命名: flush 完了後にウィンドウを実際に閉じるためのシグナル。
   // Phase 2 で save 経路は消滅したが、close handshake の終端トリガとして引き続き利用する。
-  saveDoneAndClose: () => ipcRenderer.invoke("save-before-close-done"),
-  newWindow: () => ipcRenderer.invoke("new-window"),
-  openDictionaryPopup: (url, title) => ipcRenderer.invoke("open-dictionary-popup", url, title),
-  showContextMenu: (items) => ipcRenderer.invoke("show-context-menu", items),
-  onMenuNew: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-new-triggered", handler);
-    return () => ipcRenderer.removeListener("menu-new-triggered", handler);
-  },
-  onMenuOpen: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-open-triggered", handler);
-    return () => ipcRenderer.removeListener("menu-open-triggered", handler);
-  },
-  onMenuSave: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-save-triggered", handler);
-    return () => ipcRenderer.removeListener("menu-save-triggered", handler);
-  },
-  onMenuSaveAs: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-save-as-triggered", handler);
-    return () => ipcRenderer.removeListener("menu-save-as-triggered", handler);
-  },
-  onMenuCloseTab: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-close-tab", handler);
-    return () => ipcRenderer.removeListener("menu-close-tab", handler);
-  },
-  onMenuNewTab: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-new-tab", handler);
-    return () => ipcRenderer.removeListener("menu-new-tab", handler);
-  },
-  onSaveBeforeClose: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("electron-request-save-before-close", handler);
-    return () => ipcRenderer.removeListener("electron-request-save-before-close", handler);
-  },
-  onFlushStateBeforeClose: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("electron-request-flush-state-before-close", handler);
-    return () => ipcRenderer.removeListener("electron-request-flush-state-before-close", handler);
-  },
-  onOpenFileFromSystem: (callback) => {
-    const handler = (_event, payload) => callback(payload);
-    ipcRenderer.on("open-file-from-system", handler);
-    return () => ipcRenderer.removeListener("open-file-from-system", handler);
-  },
-  onOpenAsProject: (callback) => {
-    const handler = (_event, payload) => callback(payload);
-    ipcRenderer.on("open-as-project", handler);
-    return () => ipcRenderer.removeListener("open-as-project", handler);
-  },
-  getPendingFile: () => ipcRenderer.invoke("get-pending-file"),
-  onPasteAsPlaintext: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-paste-as-plaintext", handler);
-    return () => ipcRenderer.removeListener("menu-paste-as-plaintext", handler);
-  },
-  showInFileManager: (dirPath) => ipcRenderer.invoke("show-in-file-manager", dirPath),
-  revealInFileManager: (filePath) => ipcRenderer.invoke("reveal-in-file-manager", filePath),
-  openWithDefaultApp: (filePath) => ipcRenderer.invoke("open-with-default-app", filePath),
-  openExternal: (url) => ipcRenderer.invoke("open-external", url),
-  onMenuOpenProject: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-open-project", handler);
-    return () => ipcRenderer.removeListener("menu-open-project", handler);
-  },
-  onMenuOpenRecentProject: (callback) => {
-    const handler = (_event, projectId) => callback(projectId);
-    ipcRenderer.on("menu-open-recent-project", handler);
-    return () => ipcRenderer.removeListener("menu-open-recent-project", handler);
-  },
-  rebuildMenu: () => ipcRenderer.invoke("menu:rebuild"),
-  syncMenuUiState: (state) => ipcRenderer.invoke("menu:sync-ui-state", state),
-  updateKeymapOverrides: (overrides) =>
-    ipcRenderer.invoke("menu:update-keymap-overrides", overrides),
-  onMenuShowInFileManager: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-show-in-file-manager", handler);
-    return () => ipcRenderer.removeListener("menu-show-in-file-manager", handler);
-  },
-  onToggleCompactMode: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-toggle-compact-mode", handler);
-    return () => ipcRenderer.removeListener("menu-toggle-compact-mode", handler);
-  },
-  onFormatChange: (callback) => {
-    const handler = (_event, setting, action) => callback(setting, action);
-    ipcRenderer.on("menu-format", handler);
-    return () => ipcRenderer.removeListener("menu-format", handler);
-  },
-  onThemeChange: (callback) => {
-    const handler = (_event, mode) => callback(mode);
-    ipcRenderer.on("menu-theme", handler);
-    return () => ipcRenderer.removeListener("menu-theme", handler);
-  },
+  saveDoneAndClose: invokeChannel(SYSTEM_CHANNELS.invoke.saveBeforeCloseDone, { arity: 0 }),
+  newWindow: invokeChannel(SYSTEM_CHANNELS.invoke.newWindow, { arity: 0 }),
+  openDictionaryPopup: invokeChannel(SHELL_CHANNELS.invoke.openDictionaryPopup, { arity: 2 }),
+  showContextMenu: invokeChannel(SHELL_CHANNELS.invoke.showContextMenu, { arity: 1 }),
+  onMenuNew: eventChannel(MENU_CHANNELS.event.newTriggered, { arity: 0 }),
+  onMenuOpen: eventChannel(MENU_CHANNELS.event.openTriggered, { arity: 0 }),
+  onMenuSave: eventChannel(MENU_CHANNELS.event.saveTriggered, { arity: 0 }),
+  onMenuSaveAs: eventChannel(MENU_CHANNELS.event.saveAsTriggered, { arity: 0 }),
+  onMenuCloseTab: eventChannel(MENU_CHANNELS.event.closeTab, { arity: 0 }),
+  onMenuNewTab: eventChannel(MENU_CHANNELS.event.newTab, { arity: 0 }),
+  onSaveBeforeClose: eventChannel(SYSTEM_CHANNELS.event.requestSaveBeforeClose, { arity: 0 }),
+  onFlushStateBeforeClose: eventChannel(SYSTEM_CHANNELS.event.requestFlushStateBeforeClose, {
+    arity: 0,
+  }),
+  onOpenFileFromSystem: eventChannel(FILE_CHANNELS.event.openFileFromSystem),
+  onOpenAsProject: eventChannel(FILE_CHANNELS.event.openAsProject),
+  getPendingFile: invokeChannel(FILE_CHANNELS.invoke.getPendingFile, { arity: 0 }),
+  onPasteAsPlaintext: eventChannel(MENU_CHANNELS.event.pasteAsPlaintext, { arity: 0 }),
+  showInFileManager: invokeChannel(SHELL_CHANNELS.invoke.showInFileManager, { arity: 1 }),
+  revealInFileManager: invokeChannel(SHELL_CHANNELS.invoke.revealInFileManager, { arity: 1 }),
+  openWithDefaultApp: invokeChannel(SHELL_CHANNELS.invoke.openWithDefaultApp, { arity: 1 }),
+  openExternal: invokeChannel(SHELL_CHANNELS.invoke.openExternal, { arity: 1 }),
+  onMenuOpenProject: eventChannel(MENU_CHANNELS.event.openProject, { arity: 0 }),
+  onMenuOpenRecentProject: eventChannel(MENU_CHANNELS.event.openRecentProject),
+  rebuildMenu: invokeChannel(MENU_CHANNELS.invoke.rebuild, { arity: 0 }),
+  syncMenuUiState: invokeChannel(MENU_CHANNELS.invoke.syncUiState, { arity: 1 }),
+  updateKeymapOverrides: invokeChannel(MENU_CHANNELS.invoke.updateKeymapOverrides, { arity: 1 }),
+  onMenuShowInFileManager: eventChannel(MENU_CHANNELS.event.showInFileManager, { arity: 0 }),
+  onToggleCompactMode: eventChannel(MENU_CHANNELS.event.toggleCompactMode, { arity: 0 }),
+  onFormatChange: eventChannel(MENU_CHANNELS.event.format, { arity: 2 }),
+  onThemeChange: eventChannel(MENU_CHANNELS.event.theme),
   // Export
-  generatePdfPreview: (content, options) =>
-    ipcRenderer.invoke("generate-pdf-preview", content, options),
-  exportPDF: (content, options) => ipcRenderer.invoke("export-pdf", content, options),
-  exportEPUB: (content, options) => ipcRenderer.invoke("export-epub", content, options),
-  exportDOCX: (content, options) => ipcRenderer.invoke("export-docx", content, options),
-  printDocument: (content, options) => ipcRenderer.invoke("print-document", content, options),
-  onMenuPrint: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-print", handler);
-    return () => ipcRenderer.removeListener("menu-print", handler);
-  },
-  onMenuExportTxt: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-export-txt", handler);
-    return () => ipcRenderer.removeListener("menu-export-txt", handler);
-  },
-  onMenuExportTxtRuby: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-export-txt-ruby", handler);
-    return () => ipcRenderer.removeListener("menu-export-txt-ruby", handler);
-  },
-  onMenuExportPDF: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-export-pdf", handler);
-    return () => ipcRenderer.removeListener("menu-export-pdf", handler);
-  },
-  onMenuExportEPUB: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-export-epub", handler);
-    return () => ipcRenderer.removeListener("menu-export-epub", handler);
-  },
-  onMenuExportDOCX: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("menu-export-docx", handler);
-    return () => ipcRenderer.removeListener("menu-export-docx", handler);
-  },
+  generatePdfPreview: invokeChannel(EXPORT_CHANNELS.invoke.generatePdfPreview, { arity: 2 }),
+  exportPDF: invokeChannel(EXPORT_CHANNELS.invoke.exportPdf, { arity: 2 }),
+  exportEPUB: invokeChannel(EXPORT_CHANNELS.invoke.exportEpub, { arity: 2 }),
+  exportDOCX: invokeChannel(EXPORT_CHANNELS.invoke.exportDocx, { arity: 2 }),
+  printDocument: invokeChannel(EXPORT_CHANNELS.invoke.printDocument, { arity: 2 }),
+  onMenuPrint: eventChannel(MENU_CHANNELS.event.print, { arity: 0 }),
+  onMenuExportTxt: eventChannel(MENU_CHANNELS.event.exportTxt, { arity: 0 }),
+  onMenuExportTxtRuby: eventChannel(MENU_CHANNELS.event.exportTxtRuby, { arity: 0 }),
+  onMenuExportPDF: eventChannel(MENU_CHANNELS.event.exportPdf, { arity: 0 }),
+  onMenuExportEPUB: eventChannel(MENU_CHANNELS.event.exportEpub, { arity: 0 }),
+  onMenuExportDOCX: eventChannel(MENU_CHANNELS.event.exportDocx, { arity: 0 }),
   nlp: {
-    init: (dicPath) => ipcRenderer.invoke("nlp:init", dicPath),
-    tokenizeParagraph: (text) => ipcRenderer.invoke("nlp:tokenize-paragraph", text),
+    init: invokeChannel(NLP_CHANNELS.invoke.init, { arity: 1 }),
+    tokenizeParagraph: invokeChannel(NLP_CHANNELS.invoke.tokenizeParagraph, { arity: 1 }),
+    // 意図的に手書き (#1434): requestId の生成と progress イベントの
+    // requestId フィルタリング + finally での listener 解除が必要なため、
+    // 宣言的ヘルパーでは表現できない。
     tokenizeDocument: (paragraphs, onProgress) => {
       // Generate a unique requestId so parallel calls don't interfere with each other
       const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -163,20 +94,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
             onProgress(progress);
           }
         };
-        ipcRenderer.on("nlp:tokenize-progress", handler);
+        ipcRenderer.on(NLP_CHANNELS.event.tokenizeProgress, handler);
 
         return ipcRenderer
-          .invoke("nlp:tokenize-document", { paragraphs, requestId })
+          .invoke(NLP_CHANNELS.invoke.tokenizeDocument, { paragraphs, requestId })
           .finally(() => {
-            ipcRenderer.removeListener("nlp:tokenize-progress", handler);
+            ipcRenderer.removeListener(NLP_CHANNELS.event.tokenizeProgress, handler);
           });
       }
 
-      return ipcRenderer.invoke("nlp:tokenize-document", { paragraphs, requestId });
+      return ipcRenderer.invoke(NLP_CHANNELS.invoke.tokenizeDocument, { paragraphs, requestId });
     },
-    analyzeWordFrequency: (text) => ipcRenderer.invoke("nlp:analyze-word-frequency", text),
+    analyzeWordFrequency: invokeChannel(NLP_CHANNELS.invoke.analyzeWordFrequency, { arity: 1 }),
   },
-  // #1434: declarative bridge — channel names shared with electron/ipc/storage-ipc.js
   storage: {
     saveSession: invokeChannel(STORAGE_CHANNELS.invoke.saveSession, { arity: 1 }),
     loadSession: invokeChannel(STORAGE_CHANNELS.invoke.loadSession, { arity: 0 }),
@@ -198,71 +128,60 @@ contextBridge.exposeInMainWorld("electronAPI", {
     removeItem: invokeChannel(STORAGE_CHANNELS.invoke.removeItem, { arity: 1 }),
   },
   vfs: {
-    openDirectory: () => ipcRenderer.invoke("vfs:open-directory"),
-    openFile: (opts) => ipcRenderer.invoke("vfs:open-file", opts),
+    openDirectory: invokeChannel(VFS_CHANNELS.invoke.openDirectory, { arity: 0 }),
+    openFile: invokeChannel(VFS_CHANNELS.invoke.openFile, { arity: 1 }),
     // #1476: rehydration — projectId added for project-scoped approval persistence
-    setRoot: (rootPath, projectId) => ipcRenderer.invoke("vfs:set-root", rootPath, projectId),
-    readFile: (filePath) => ipcRenderer.invoke("vfs:read-file", filePath),
-    writeFile: (filePath, content) => ipcRenderer.invoke("vfs:write-file", filePath, content),
-    readDirectory: (dirPath) => ipcRenderer.invoke("vfs:read-directory", dirPath),
-    stat: (filePath) => ipcRenderer.invoke("vfs:stat", filePath),
-    exists: (filePath) => ipcRenderer.invoke("vfs:exists", filePath),
-    mkdir: (dirPath) => ipcRenderer.invoke("vfs:mkdir", dirPath),
-    delete: (targetPath, options) => ipcRenderer.invoke("vfs:delete", targetPath, options),
-    rename: (oldPath, newPath) => ipcRenderer.invoke("vfs:rename", oldPath, newPath),
-    indexLockAcquire: (key) => ipcRenderer.invoke("vfs:index-lock:acquire", key),
-    indexLockRelease: (key) => ipcRenderer.invoke("vfs:index-lock:release", key),
+    setRoot: invokeChannel(VFS_CHANNELS.invoke.setRoot, { arity: 2 }),
+    readFile: invokeChannel(VFS_CHANNELS.invoke.readFile, { arity: 1 }),
+    writeFile: invokeChannel(VFS_CHANNELS.invoke.writeFile, { arity: 2 }),
+    readDirectory: invokeChannel(VFS_CHANNELS.invoke.readDirectory, { arity: 1 }),
+    stat: invokeChannel(VFS_CHANNELS.invoke.stat, { arity: 1 }),
+    exists: invokeChannel(VFS_CHANNELS.invoke.exists, { arity: 1 }),
+    mkdir: invokeChannel(VFS_CHANNELS.invoke.mkdir, { arity: 1 }),
+    delete: invokeChannel(VFS_CHANNELS.invoke.delete, { arity: 2 }),
+    rename: invokeChannel(VFS_CHANNELS.invoke.rename, { arity: 2 }),
+    indexLockAcquire: invokeChannel(VFS_CHANNELS.invoke.indexLockAcquire, { arity: 1 }),
+    indexLockRelease: invokeChannel(VFS_CHANNELS.invoke.indexLockRelease, { arity: 1 }),
   },
   auth: {
-    startLogin: () => ipcRenderer.invoke("auth:start-login"),
-    exchangeCode: (params) => ipcRenderer.invoke("auth:exchange-code", params),
-    refreshToken: (refreshToken) => ipcRenderer.invoke("auth:refresh-token", refreshToken),
-    getUserInfo: (accessToken) => ipcRenderer.invoke("auth:get-userinfo", accessToken),
-    logout: () => ipcRenderer.invoke("auth:logout"),
-    onCallback: (callback) => {
-      const handler = (_event, data) => callback(data);
-      ipcRenderer.on("auth:callback", handler);
-      return () => ipcRenderer.removeListener("auth:callback", handler);
-    },
+    startLogin: invokeChannel(AUTH_CHANNELS.invoke.startLogin, { arity: 0 }),
+    exchangeCode: invokeChannel(AUTH_CHANNELS.invoke.exchangeCode, { arity: 1 }),
+    refreshToken: invokeChannel(AUTH_CHANNELS.invoke.refreshToken, { arity: 1 }),
+    getUserInfo: invokeChannel(AUTH_CHANNELS.invoke.getUserInfo, { arity: 1 }),
+    logout: invokeChannel(AUTH_CHANNELS.invoke.logout, { arity: 0 }),
+    onCallback: eventChannel(AUTH_CHANNELS.event.callback),
   },
   safeStorage: {
-    encrypt: (plaintext) => ipcRenderer.invoke("safe-storage:encrypt", plaintext),
-    decrypt: (base64Cipher) => ipcRenderer.invoke("safe-storage:decrypt", base64Cipher),
-    isAvailable: () => ipcRenderer.invoke("safe-storage:is-available"),
+    encrypt: invokeChannel(SAFE_STORAGE_CHANNELS.invoke.encrypt, { arity: 1 }),
+    decrypt: invokeChannel(SAFE_STORAGE_CHANNELS.invoke.decrypt, { arity: 1 }),
+    isAvailable: invokeChannel(SAFE_STORAGE_CHANNELS.invoke.isAvailable, { arity: 0 }),
   },
   power: {
     // Returns an unsubscribe function that removes ONLY this wrapper.
     // (removeOnPowerStateChange was removed in #1567 S3: it used
     // removeAllListeners, which nuked other components' listeners.)
-    onPowerStateChange: (callback) => {
-      const handler = (_event, state) => callback(state);
-      ipcRenderer.on("power:state-changed", handler);
-      return () => ipcRenderer.removeListener("power:state-changed", handler);
-    },
-    getPowerState: () => ipcRenderer.invoke("power:get-state"),
+    onPowerStateChange: eventChannel(POWER_CHANNELS.event.stateChanged),
+    getPowerState: invokeChannel(POWER_CHANNELS.invoke.getState, { arity: 0 }),
   },
   editor: {
-    popoutPanel: (bufferId, content, fileName, fileType) =>
-      ipcRenderer.invoke("editor:popout-panel", { bufferId, content, fileName, fileType }),
-    sendBufferSync: (bufferId, content) =>
-      ipcRenderer.send("editor:buffer-sync", { bufferId, content }),
-    onBufferSync: (callback) => {
-      const handler = (_event, data) => callback(data);
-      ipcRenderer.on("editor:buffer-sync-broadcast", handler);
-      return () => ipcRenderer.removeListener("editor:buffer-sync-broadcast", handler);
-    },
-    sendBufferClose: (bufferId) => ipcRenderer.send("editor:buffer-close", bufferId),
-    onBufferClose: (callback) => {
-      const handler = (_event, bufferId) => callback(bufferId);
-      ipcRenderer.on("editor:buffer-close-broadcast", handler);
-      return () => ipcRenderer.removeListener("editor:buffer-close-broadcast", handler);
-    },
+    popoutPanel: invokeChannel(
+      EDITOR_CHANNELS.invoke.popoutPanel,
+      (bufferId, content, fileName, fileType) => ({ bufferId, content, fileName, fileType }),
+    ),
+    sendBufferSync: sendChannel(EDITOR_CHANNELS.send.bufferSync, (bufferId, content) => ({
+      bufferId,
+      content,
+    })),
+    onBufferSync: eventChannel(EDITOR_CHANNELS.event.bufferSyncBroadcast),
+    sendBufferClose: sendChannel(EDITOR_CHANNELS.send.bufferClose, { arity: 1 }),
+    onBufferClose: eventChannel(EDITOR_CHANNELS.event.bufferCloseBroadcast),
+    // 意図的に手書き (#1434): popout ウィンドウ破棄時に broadcast 系 listener を
+    // まとめて全解除する歴史的 API。eventChannel の unsubscribe とは意味が異なる。
     removeAllListeners: () => {
-      ipcRenderer.removeAllListeners("editor:buffer-sync-broadcast");
-      ipcRenderer.removeAllListeners("editor:buffer-close-broadcast");
+      ipcRenderer.removeAllListeners(EDITOR_CHANNELS.event.bufferSyncBroadcast);
+      ipcRenderer.removeAllListeners(EDITOR_CHANNELS.event.bufferCloseBroadcast);
     },
   },
-  // #1434: declarative bridge — channel names shared with electron/ipc/dict-ipc.js
   dict: {
     query: invokeChannel(DICT_CHANNELS.invoke.query, (term, limit) => ({ term, limit })),
     queryByReading: invokeChannel(DICT_CHANNELS.invoke.queryReading, (reading, limit) => ({
@@ -277,38 +196,34 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   pty: {
     /** Spawn a new PTY session. Returns { sessionId } or { error }. */
-    spawn: (options) => ipcRenderer.invoke("pty:spawn", options),
+    spawn: invokeChannel(PTY_CHANNELS.invoke.spawn, { arity: 1 }),
     /** Re-attach to an existing session and retrieve buffered output. */
-    attach: (sessionId) => ipcRenderer.invoke("pty:attach", sessionId),
+    attach: invokeChannel(PTY_CHANNELS.invoke.attach, { arity: 1 }),
     /** Write keystroke data to a PTY session. */
-    write: (sessionId, data) => ipcRenderer.invoke("pty:write", { sessionId, data }),
+    write: invokeChannel(PTY_CHANNELS.invoke.write, (sessionId, data) => ({ sessionId, data })),
     /** Resize the terminal dimensions. */
-    resize: (sessionId, cols, rows) => ipcRenderer.invoke("pty:resize", { sessionId, cols, rows }),
+    resize: invokeChannel(PTY_CHANNELS.invoke.resize, (sessionId, cols, rows) => ({
+      sessionId,
+      cols,
+      rows,
+    })),
     /** Kill a PTY session (idempotent). */
-    kill: (sessionId) => ipcRenderer.invoke("pty:kill", sessionId),
+    kill: invokeChannel(PTY_CHANNELS.invoke.kill, { arity: 1 }),
     /** Query the state of a PTY session. */
-    status: (sessionId) => ipcRenderer.invoke("pty:status", sessionId),
+    status: invokeChannel(PTY_CHANNELS.invoke.status, { arity: 1 }),
     /**
      * Listen for PTY output data pushed from main process.
      * Returns a cleanup function that removes the listener.
      * @param {function({ sessionId: string, data: string }): void} callback
      * @returns {() => void}
      */
-    onData: (callback) => {
-      const handler = (_event, payload) => callback(payload);
-      ipcRenderer.on("pty:data", handler);
-      return () => ipcRenderer.removeListener("pty:data", handler);
-    },
+    onData: eventChannel(PTY_CHANNELS.event.data),
     /**
      * Listen for PTY process exit notification.
      * Returns a cleanup function that removes the listener.
      * @param {function({ sessionId: string, exitCode: number }): void} callback
      * @returns {() => void}
      */
-    onExit: (callback) => {
-      const handler = (_event, payload) => callback(payload);
-      ipcRenderer.on("pty:exit", handler);
-      return () => ipcRenderer.removeListener("pty:exit", handler);
-    },
+    onExit: eventChannel(PTY_CHANNELS.event.exit),
   },
 });

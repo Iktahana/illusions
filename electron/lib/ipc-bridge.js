@@ -23,7 +23,7 @@ const { ipcRenderer } = require("electron");
  * Build the bridge helpers bound to a specific ipcRenderer.
  * The indirection exists so unit tests can inject a fake renderer;
  * production code uses the default-bound exports below.
- * @param {Pick<import("electron").IpcRenderer, "invoke" | "on" | "removeListener">} renderer
+ * @param {Pick<import("electron").IpcRenderer, "invoke" | "send" | "on" | "removeListener">} renderer
  */
 function createIpcBridge(renderer) {
   /**
@@ -50,24 +50,54 @@ function createIpcBridge(renderer) {
   }
 
   /**
-   * eventChannel(channel) -> (callback) => unsubscribe
-   * The callback receives the first IPC payload argument (the `_event` is
-   * stripped), matching the existing hand-written wrappers. The returned
-   * unsubscribe removes only this subscription.
+   * sendChannel(channel, { arity }) -> (...args) => send(channel, ...args.slice(0, arity))
+   * sendChannel(channel, mapArgs)   -> (...args) => send(channel, mapArgs(...args))
+   *
+   * Fire-and-forget variant of invokeChannel for ipcRenderer.send ↔ ipcMain.on
+   * channels. Same least-authority arity rules apply: extra renderer
+   * arguments never cross the IPC boundary.
    * @param {string} channel
-   * @returns {(callback: (payload: unknown) => void) => () => void}
+   * @param {((...args: unknown[]) => unknown) | { arity: number }} shape
+   * @returns {(...args: unknown[]) => void}
    */
-  function eventChannel(channel) {
+  function sendChannel(channel, shape) {
+    if (typeof shape === "function") {
+      return (...args) => renderer.send(channel, shape(...args));
+    }
+    const arity = shape?.arity ?? 0;
+    return (...args) => renderer.send(channel, ...args.slice(0, arity));
+  }
+
+  /**
+   * eventChannel(channel[, { arity }]) -> (callback) => unsubscribe
+   * The callback receives the first `arity` IPC payload arguments (the
+   * `_event` is always stripped), matching the existing hand-written
+   * wrappers:
+   * - arity 0: `() => callback()` (signal-only menu/lifecycle events)
+   * - arity 1 (default): `(_event, payload) => callback(payload)`
+   * - arity 2: `(_event, a, b) => callback(a, b)` (e.g. menu-format)
+   * The returned unsubscribe removes only this subscription.
+   * @param {string} channel
+   * @param {{ arity: number }} [shape]
+   * @returns {(callback: (...payload: unknown[]) => void) => () => void}
+   */
+  function eventChannel(channel, shape) {
+    const arity = shape?.arity ?? 1;
     return (callback) => {
-      const handler = (_event, payload) => callback(payload);
+      const handler = (_event, ...payload) => {
+        // Exactly `arity` args, padded with undefined — identical to the
+        // legacy `(_event, a, b) => callback(a, b)` destructuring wrappers.
+        payload.length = arity;
+        callback(...payload);
+      };
       renderer.on(channel, handler);
       return () => renderer.removeListener(channel, handler);
     };
   }
 
-  return { invokeChannel, eventChannel };
+  return { invokeChannel, sendChannel, eventChannel };
 }
 
-const { invokeChannel, eventChannel } = createIpcBridge(ipcRenderer);
+const { invokeChannel, sendChannel, eventChannel } = createIpcBridge(ipcRenderer);
 
-module.exports = { createIpcBridge, invokeChannel, eventChannel };
+module.exports = { createIpcBridge, invokeChannel, sendChannel, eventChannel };

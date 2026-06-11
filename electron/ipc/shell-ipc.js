@@ -4,9 +4,10 @@
 const { ipcMain, BrowserWindow, Menu, shell } = require("electron");
 const path = require("path");
 const log = require("electron-log");
+const { SHELL_CHANNELS } = require("../lib/ipc-channels");
 
 function registerShellHandlers() {
-  ipcMain.handle("show-in-file-manager", async (_event, dirPath) => {
+  ipcMain.handle(SHELL_CHANNELS.invoke.showInFileManager, async (_event, dirPath) => {
     if (!dirPath || typeof dirPath !== "string") return false;
     // Reject relative paths and paths containing traversal sequences
     if (!path.isAbsolute(dirPath) || dirPath.includes("..")) {
@@ -18,7 +19,7 @@ function registerShellHandlers() {
     return result === ""; // empty string = success
   });
 
-  ipcMain.handle("reveal-in-file-manager", async (_event, filePath) => {
+  ipcMain.handle(SHELL_CHANNELS.invoke.revealInFileManager, async (_event, filePath) => {
     if (!filePath || typeof filePath !== "string") return false;
     // Reject relative paths and paths containing traversal sequences
     if (!path.isAbsolute(filePath) || filePath.includes("..")) {
@@ -30,7 +31,7 @@ function registerShellHandlers() {
     return true;
   });
 
-  ipcMain.handle("open-with-default-app", async (_event, filePath) => {
+  ipcMain.handle(SHELL_CHANNELS.invoke.openWithDefaultApp, async (_event, filePath) => {
     if (!filePath || typeof filePath !== "string") return false;
     if (!path.isAbsolute(filePath) || filePath.includes("..")) {
       console.warn("[Security] Invalid path in open-with-default-app:", filePath);
@@ -40,7 +41,7 @@ function registerShellHandlers() {
     return result === ""; // empty string = success on macOS/Windows
   });
 
-  ipcMain.handle("open-external", async (_event, url) => {
+  ipcMain.handle(SHELL_CHANNELS.invoke.openExternal, async (_event, url) => {
     if (typeof url !== "string") return false;
     // Only allow http/https URLs
     if (!url.startsWith("https://") && !url.startsWith("http://")) return false;
@@ -49,7 +50,7 @@ function registerShellHandlers() {
   });
 
   // 辞書ポップアップウィンドウを開く
-  ipcMain.handle("open-dictionary-popup", (_event, url, title) => {
+  ipcMain.handle(SHELL_CHANNELS.invoke.openDictionaryPopup, (_event, url, title) => {
     // Validate URL: only allow https
     if (typeof url !== "string") return false;
     let parsedUrl;
@@ -105,7 +106,7 @@ function registerShellHandlers() {
   });
 
   // ネイティブコンテキストメニューを表示
-  ipcMain.handle("show-context-menu", (_event, items) => {
+  ipcMain.handle(SHELL_CHANNELS.invoke.showContextMenu, (_event, items) => {
     // Input validation
     if (!Array.isArray(items) || items.length === 0 || items.length > 50) return null;
     for (const item of items) {

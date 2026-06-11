@@ -8,6 +8,7 @@ const log = require("electron-log");
 const { createApprovedPathRegistry } = require("../lib/approved-paths");
 const { normalizeSeparators } = require("../lib/path-utils");
 const { isSensitiveSystemPath, MAX_CONTENT_BYTES } = require("../lib/path-policy");
+const { FILE_CHANNELS, EXPORT_CHANNELS } = require("../lib/ipc-channels");
 
 // --- save-file path security validation ---
 // Tracks file paths that have been approved via native dialog or system file association,
@@ -171,7 +172,7 @@ async function handleMdiFileOpen(filePath) {
       // Open as project with this file as initial file (relative to project root)
       const relativePath = path.relative(projectRoot, filePath);
       log.info("Opening as project:", projectRoot, "Initial file:", relativePath);
-      targetWindow.webContents.send("open-as-project", {
+      targetWindow.webContents.send(FILE_CHANNELS.event.openAsProject, {
         projectPath: projectRoot,
         initialFile: relativePath,
       });
@@ -181,7 +182,10 @@ async function handleMdiFileOpen(filePath) {
       // Approve system-opened file path for future saves, scoped to the target window
       approveDialogPath(targetWindow.webContents.id, path.resolve(filePath));
       const content = await fs.readFile(filePath, "utf-8");
-      targetWindow.webContents.send("open-file-from-system", { path: filePath, content });
+      targetWindow.webContents.send(FILE_CHANNELS.event.openFileFromSystem, {
+        path: filePath,
+        content,
+      });
     }
     return true;
   } catch (err) {
@@ -205,7 +209,7 @@ function setPendingFilePath(p) {
 }
 
 function registerFileHandlers() {
-  ipcMain.handle("open-file", async (event) => {
+  ipcMain.handle(FILE_CHANNELS.invoke.openFile, async (event) => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openFile"],
       filters: [
@@ -223,7 +227,7 @@ function registerFileHandlers() {
     return { path: filePath, content };
   });
 
-  ipcMain.handle("save-file", async (event, filePath, content, fileType) => {
+  ipcMain.handle(FILE_CHANNELS.invoke.saveFile, async (event, filePath, content, fileType) => {
     const senderWebContentsId = event.sender.id;
 
     // Validate inputs
@@ -318,7 +322,7 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle("get-pending-file", async (event) => {
+  ipcMain.handle(FILE_CHANNELS.invoke.getPendingFile, async (event) => {
     if (pendingFilePaths.length === 0) return [];
 
     // Drain the queue and resolve each path
@@ -357,7 +361,7 @@ function registerFileHandlers() {
 
   // --- Export handlers ---
 
-  ipcMain.handle("generate-pdf-preview", async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.generatePdfPreview, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
@@ -371,7 +375,7 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle("export-pdf", async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportPdf, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
@@ -402,7 +406,7 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle("print-document", async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.printDocument, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
@@ -517,7 +521,7 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle("export-epub", async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportEpub, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
@@ -573,7 +577,7 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle("export-docx", async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportDocx, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }

@@ -16,6 +16,7 @@ const {
   resolveRealPath,
 } = require("../lib/path-utils");
 const { isSensitiveSystemPath, MAX_CONTENT_BYTES } = require("../lib/path-policy");
+const { VFS_CHANNELS } = require("../lib/ipc-channels");
 // #1476: rehydration — begin
 const { loadApprovals, saveApprovals } = require("../lib/vfs-approvals");
 const { createIndexLockManager } = require("../lib/index-lock");
@@ -141,7 +142,7 @@ function registerVFSHandlers() {
   }
 
   // Open directory picker
-  ipcMain.handle("vfs:open-directory", async (event) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.openDirectory, async (event) => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory", "createDirectory"],
     });
@@ -172,7 +173,7 @@ function registerVFSHandlers() {
   const MAX_READ_BYTES = MAX_CONTENT_BYTES;
 
   // Read file content
-  ipcMain.handle("vfs:read-file", async (event, filePath) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.readFile, async (event, filePath) => {
     try {
       const resolved = await validateVFSPath(event, filePath);
       const stats = await fs.stat(resolved);
@@ -190,7 +191,7 @@ function registerVFSHandlers() {
   });
 
   // Write file content
-  ipcMain.handle("vfs:write-file", async (event, filePath, content) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.writeFile, async (event, filePath, content) => {
     // Validate content type and size before touching disk
     if (typeof content !== "string") {
       throw new Error("Invalid content: expected string");
@@ -222,7 +223,7 @@ function registerVFSHandlers() {
   });
 
   // Read directory entries
-  ipcMain.handle("vfs:read-directory", async (event, dirPath) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.readDirectory, async (event, dirPath) => {
     try {
       const resolved = await validateVFSPath(event, dirPath);
       const entries = await fs.readdir(resolved, { withFileTypes: true });
@@ -237,7 +238,7 @@ function registerVFSHandlers() {
   });
 
   // Get file stats
-  ipcMain.handle("vfs:stat", async (event, filePath) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.stat, async (event, filePath) => {
     try {
       const resolved = await validateVFSPath(event, filePath);
       const stats = await fs.stat(resolved);
@@ -259,7 +260,7 @@ function registerVFSHandlers() {
   // Returns false for missing paths; re-throws genuine errors (e.g. EACCES)
   // so real problems stay visible. Use this for existence checks instead of
   // relying on stat/readFile rejections, which Electron logs as handler errors.
-  ipcMain.handle("vfs:exists", async (event, filePath) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.exists, async (event, filePath) => {
     try {
       const resolved = await validateVFSPath(event, filePath);
       await fs.stat(resolved);
@@ -274,7 +275,7 @@ function registerVFSHandlers() {
   });
 
   // Create directory (with parents)
-  ipcMain.handle("vfs:mkdir", async (event, dirPath) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.mkdir, async (event, dirPath) => {
     try {
       const resolved = await validateVFSPath(event, dirPath);
       await fs.mkdir(resolved, { recursive: true });
@@ -285,7 +286,7 @@ function registerVFSHandlers() {
   });
 
   // Delete file or directory
-  ipcMain.handle("vfs:delete", async (event, targetPath, options = {}) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.delete, async (event, targetPath, options = {}) => {
     try {
       const resolved = await validateVFSPath(event, targetPath);
       const stats = await fs.stat(resolved);
@@ -301,7 +302,7 @@ function registerVFSHandlers() {
   });
 
   // Rename file or directory
-  ipcMain.handle("vfs:rename", async (event, oldPath, newPath) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.rename, async (event, oldPath, newPath) => {
     try {
       const resolvedOld = await validateVFSPath(event, oldPath);
       const resolvedNew = await validateVFSPath(event, newPath);
@@ -342,7 +343,7 @@ function registerVFSHandlers() {
 
   // Set root directory programmatically (for restoring a recent project without dialog)
   // #1476: rehydration — extended to accept projectId for project-scoped approval persistence
-  ipcMain.handle("vfs:set-root", async (event, rootPath, projectId) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.setRoot, async (event, rootPath, projectId) => {
     const resolved = path.resolve(rootPath);
     const normalizedResolved = normalizePath(resolved);
 
@@ -445,7 +446,7 @@ function registerVFSHandlers() {
   // Open a single file via native file dialog
   // Returns { path, name, buf } where buf is the raw file bytes (Buffer).
   // The caller is responsible for decoding (e.g., via text-codec.ts).
-  ipcMain.handle("vfs:open-file", async (event, opts) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.openFile, async (event, opts) => {
     const result = await dialog.showOpenDialog({
       properties: ["openFile"],
       filters: opts?.filters ?? [{ name: "テキスト", extensions: ["txt"] }],
@@ -475,11 +476,11 @@ function registerVFSHandlers() {
     },
   });
 
-  ipcMain.handle("vfs:index-lock:acquire", (event, key) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.indexLockAcquire, (event, key) => {
     return indexLocks.acquire(key, event.sender.id);
   });
 
-  ipcMain.handle("vfs:index-lock:release", (event, key) => {
+  ipcMain.handle(VFS_CHANNELS.invoke.indexLockRelease, (event, key) => {
     indexLocks.release(key, event.sender.id);
   });
 
