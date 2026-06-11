@@ -44,8 +44,10 @@ import {
   useTypographySettings,
   useLintingSettings,
   usePosHighlightSettings,
+  usePowerSettings,
   useScrollSettings,
 } from "@/contexts/EditorSettingsContext";
+import { usePosHighlightActivation } from "@/lib/editor-page/use-pos-highlight-activation";
 
 interface MilkdownEditorProps {
   initialContent: string;
@@ -116,6 +118,7 @@ export default function MilkdownEditor({
   const { lintingEnabled } = useLintingSettings();
   const { posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes } =
     usePosHighlightSettings();
+  const { powerSaveMode } = usePowerSettings();
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
   const { measureRef: charMeasureRef, charWidth } = useCharWidth({
     fontFamily,
@@ -344,23 +347,16 @@ export default function MilkdownEditor({
     }
   }, [externalContent, get, isVertical, scrollContainerRef]);
 
-  // posHighlight 設定を動的に更新（Editor を再作成せずに）
-  useEffect(() => {
-    if (!editorViewInstance) return;
-
-    // 動的に設定を更新
-    import("@/packages/milkdown-plugin-japanese-novel/pos-highlight")
-      .then(({ updatePosHighlightSettings }) => {
-        updatePosHighlightSettings(editorViewInstance, {
-          enabled: posHighlightEnabled,
-          colors: posHighlightColors,
-          disabledTypes: posHighlightDisabledTypes,
-        });
-      })
-      .catch((err) => {
-        console.error("[Editor] Failed to update POS highlight settings:", err);
-      });
-  }, [editorViewInstance, posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes]);
+  // posHighlight 設定を動的に更新（Editor を再作成せずに）。
+  // enabled は power policy 由来の実効値（バックグラウンド中は停止、
+  // フォーカス復帰でユーザー設定どおりに復元、#1466）。
+  usePosHighlightActivation({
+    view: editorViewInstance,
+    posHighlightEnabled,
+    powerSaveMode,
+    posHighlightColors,
+    posHighlightDisabledTypes,
+  });
 
   // linting 設定を動的に更新（Editor を再作成せずに）
   useEffect(() => {

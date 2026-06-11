@@ -53,18 +53,38 @@ describe("getAutoSaveIntervalMs", () => {
 });
 
 describe("shouldEnablePosHighlight", () => {
-  it("follows the user setting when power-save mode is off", () => {
-    expect(shouldEnablePosHighlight({ posHighlightEnabled: true, powerSaveMode: false })).toBe(
-      true,
-    );
-    expect(shouldEnablePosHighlight({ posHighlightEnabled: false, powerSaveMode: false })).toBe(
-      false,
-    );
+  it("follows the user setting in the foreground when power-save mode is off", () => {
+    expect(
+      shouldEnablePosHighlight(foreground, { posHighlightEnabled: true, powerSaveMode: false }),
+    ).toBe(true);
+    expect(
+      shouldEnablePosHighlight(foreground, { posHighlightEnabled: false, powerSaveMode: false }),
+    ).toBe(false);
   });
 
-  it("disables highlighting in power-save mode", () => {
-    expect(shouldEnablePosHighlight({ posHighlightEnabled: true, powerSaveMode: true })).toBe(
-      false,
-    );
+  it("disables highlighting in power-save mode even in the foreground", () => {
+    expect(
+      shouldEnablePosHighlight(foreground, { posHighlightEnabled: true, powerSaveMode: true }),
+    ).toBe(false);
+  });
+
+  it("disables highlighting while backgrounded even when the user setting is true (#1466)", () => {
+    expect(
+      shouldEnablePosHighlight(blurred, { posHighlightEnabled: true, powerSaveMode: false }),
+    ).toBe(false);
+    expect(
+      shouldEnablePosHighlight(hidden, { posHighlightEnabled: true, powerSaveMode: false }),
+    ).toBe(false);
+    expect(
+      shouldEnablePosHighlight(background, { posHighlightEnabled: true, powerSaveMode: false }),
+    ).toBe(false);
+  });
+
+  it("restores exactly the user's setting on focus (no mutation of the setting)", () => {
+    const settings = { posHighlightEnabled: true, powerSaveMode: false };
+    expect(shouldEnablePosHighlight(blurred, settings)).toBe(false);
+    // The settings object is untouched; the foreground decision returns to it.
+    expect(settings.posHighlightEnabled).toBe(true);
+    expect(shouldEnablePosHighlight(foreground, settings)).toBe(true);
   });
 });

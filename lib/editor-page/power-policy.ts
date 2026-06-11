@@ -13,10 +13,12 @@
  * window activity 信号と設定から「何を停止/抑制すべきか」の判断だけを返す。
  *
  * Wiring status:
- * - `shouldPauseFileWatchers` — wired in this PR
+ * - `shouldPauseFileWatchers` — wired in #1594
  *   (lib/tab-manager/use-file-watch-integration.ts).
- * - `getAutoSaveIntervalMs` / `shouldEnablePosHighlight` — consumers are
- *   wired in a follow-up PR (#1466) to keep this change reviewable.
+ * - `getAutoSaveIntervalMs` — wired in #1466
+ *   (lib/tab-manager/use-auto-save.ts).
+ * - `shouldEnablePosHighlight` — wired in #1466
+ *   (lib/editor-page/use-pos-highlight-activation.ts).
  */
 
 import { AUTO_SAVE_INTERVAL } from "../tab-manager/types";
@@ -99,16 +101,28 @@ export function getAutoSaveIntervalMs(
 /**
  * Whether part-of-speech highlighting should run.
  *
- * Deliberately NOT focus-dependent: toggling editor decorations on every
- * focus switch is exactly the churn class that produced #1445. The
- * decision depends only on the user setting and power-save mode.
+ * Focus-dependent (#1466, restoring the PR #1427 CPU-saving requirement):
+ * the expensive morphological highlighting is suspended while the window
+ * is backgrounded or power-save mode is on, and resumes when the user
+ * setting allows it. This is safe with respect to #1445 because the sole
+ * consumer (use-pos-highlight-activation.ts) subscribes to the
+ * framework-free window-activity service — no React re-render on focus
+ * switches — and applies the decision via `updatePosHighlightSettings`,
+ * which dispatches a meta-only transaction: decorations toggle, the
+ * document, selection, and scroll are never touched.
  *
- * 品詞ハイライトを有効にすべきかどうか。フォーカス切替で装飾を
- * 付け外しする揺れ（#1445 と同種の churn）を避けるため、意図的に
- * activity には依存させず、設定と省電力モードのみで判断する。
+ * The user setting itself is never mutated; this returns an EFFECTIVE
+ * value, so regaining focus restores exactly the user's choice.
+ *
+ * 品詞ハイライトを有効にすべきかどうか（#1466）。バックグラウンド中
+ * または省電力モード中は重い形態素ハイライトを一時停止し、フォーカス
+ * 復帰時にユーザー設定どおりの状態へ戻す。判断の適用は meta 専用
+ * transaction による装飾の付け外しのみで、本文・選択・スクロールには
+ * 一切触れない（#1445 ガード）。ユーザー設定自体は変更しない。
  */
 export function shouldEnablePosHighlight(
+  activity: WindowActivityState,
   settings: PowerPolicySettings & { posHighlightEnabled: boolean },
 ): boolean {
-  return settings.posHighlightEnabled && !settings.powerSaveMode;
+  return settings.posHighlightEnabled && !settings.powerSaveMode && !isBackground(activity);
 }
