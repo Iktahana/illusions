@@ -14,6 +14,7 @@
 const { ipcMain } = require("electron");
 const path = require("path");
 const { nlpProcessor } = require("../../lib/nlp-backend/nlp-processor");
+const { NLP_CHANNELS } = require("../lib/ipc-channels");
 
 /**
  * Get default dictionary path for Electron environment.
@@ -52,7 +53,7 @@ function registerNlpHandlers() {
    * Initialize NLP service
    * Handler: nlp:init
    */
-  ipcMain.handle("nlp:init", async () => {
+  ipcMain.handle(NLP_CHANNELS.invoke.init, async () => {
     try {
       const resolvedPath = getDefaultDicPath();
       await nlpProcessor.init(resolvedPath);
@@ -67,7 +68,7 @@ function registerNlpHandlers() {
    * Tokenize single paragraph
    * Handler: nlp:tokenize-paragraph
    */
-  ipcMain.handle("nlp:tokenize-paragraph", async (event, text) => {
+  ipcMain.handle(NLP_CHANNELS.invoke.tokenizeParagraph, async (event, text) => {
     try {
       if (typeof text !== "string" || text.length === 0 || text.length > 1_000_000) {
         throw new Error("Invalid text parameter");
@@ -87,7 +88,7 @@ function registerNlpHandlers() {
    * Tokenize document in batch
    * Handler: nlp:tokenize-document
    */
-  ipcMain.handle("nlp:tokenize-document", async (event, request) => {
+  ipcMain.handle(NLP_CHANNELS.invoke.tokenizeDocument, async (event, request) => {
     try {
       const { paragraphs } = request;
 
@@ -116,7 +117,7 @@ function registerNlpHandlers() {
 
         // Send progress event every 10 paragraphs
         if ((i + 1) % 10 === 0 || i === total - 1) {
-          event.sender.send("nlp:tokenize-progress", {
+          event.sender.send(NLP_CHANNELS.event.tokenizeProgress, {
             requestId,
             completed: i + 1,
             total: total,
@@ -136,7 +137,7 @@ function registerNlpHandlers() {
    * Analyze word frequency
    * Handler: nlp:analyze-word-frequency
    */
-  ipcMain.handle("nlp:analyze-word-frequency", async (event, text) => {
+  ipcMain.handle(NLP_CHANNELS.invoke.analyzeWordFrequency, async (event, text) => {
     try {
       if (typeof text !== "string" || text.length === 0 || text.length > 10_000_000) {
         throw new Error("Invalid text parameter");

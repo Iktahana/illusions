@@ -5,6 +5,7 @@ const { app, BrowserWindow, dialog, shell } = require("electron");
 const path = require("path");
 const { isDev } = require("./app-constants");
 const { isSafeExternalUrl, normalizeExternalUrl } = require("./lib/url-policy");
+const { SYSTEM_CHANNELS, POWER_CHANNELS } = require("./lib/ipc-channels");
 
 let mainWindow = null;
 const allWindows = new Set();
@@ -17,7 +18,7 @@ const allWindows = new Set();
 function broadcastPowerState(state) {
   for (const win of allWindows) {
     if (!win.isDestroyed()) {
-      win.webContents.send("power:state-changed", state);
+      win.webContents.send(POWER_CHANNELS.event.stateChanged, state);
     }
   }
 }
@@ -123,10 +124,10 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
         .then(({ response }) => {
           if (response === 0) {
             // "保存": flush state + save dirty files, then close
-            newWindow.webContents.send("electron-request-save-before-close");
+            newWindow.webContents.send(SYSTEM_CHANNELS.event.requestSaveBeforeClose);
           } else if (response === 1) {
             // "保存しない": flush state only (preserve tab/layout), then close
-            newWindow.webContents.send("electron-request-flush-state-before-close");
+            newWindow.webContents.send(SYSTEM_CHANNELS.event.requestFlushStateBeforeClose);
           } else {
             // "キャンセル": ウィンドウを開いたまま
             isHandlingClose = false;
@@ -137,7 +138,7 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
         });
     } else {
       // 変更なし: タブ・レイアウト状態をフラッシュしてから閉じる
-      newWindow.webContents.send("electron-request-flush-state-before-close");
+      newWindow.webContents.send(SYSTEM_CHANNELS.event.requestFlushStateBeforeClose);
     }
   });
 
