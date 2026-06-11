@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { shouldPauseFileWatchers } from "../editor-page/power-policy";
+import { getWindowActivitySnapshot, subscribeWindowActivity } from "../editor-page/window-activity";
 import { createFileWatcher } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
 import { isEditorTab } from "./tab-types";
+import type { WindowActivityState } from "../editor-page/window-activity";
 import type { FileWatcher } from "../services/file-watcher";
 import type { TabId, TabState, EditorTabState, DiffTabState } from "./tab-types";
 import type { TabManagerCore } from "./types";
@@ -83,6 +86,16 @@ export function buildOnChanged(
     if (!tab || !isEditorTab(tab)) return;
 
     const fileName = tab.file?.name ?? "ファイル";
+
+    // Self-write echo guard (#1448 Codex review): a save performed while the
+    // watchers were paused can outlive the time-boxed suppressFileWatch entry
+    // (~poll interval + 3s). When the watcher resumes and reports a "change"
+    // whose content is exactly what we last saved, it is our own write
+    // echoing back — never a real external change. Reloading it would reset
+    // the cursor (clean tab) or raise a phantom conflict (dirty tab).
+    if (diskContent === tab.lastSavedContent) {
+      return;
+    }
 
     if (tab.fileSyncStatus === "clean") {
       // Clean tab: auto-reload with disk content via pendingExternalContent
@@ -221,12 +234,29 @@ export function buildOnChanged(
  *
  * アクティブタブのウォッチャーは継続稼働し、バックグラウンドタブは
  * CPU 節約のため一時停止する。タブを閉じるとウォッチャーも停止する。
+ *
+ * Additionally, ALL watchers pause while the window itself is in the
+ * background (blurred or hidden), per the power policy decision
+ * `shouldPauseFileWatchers` (#1448, restoring the PR #1427 CPU-saving
+ * requirement). On resume the FileWatcher's own mtime / content-hash
+ * catch-up runs, so the external-change flow fires only when the disk
+ * genuinely changed — a focus round-trip with no disk change never
+ * reloads or notifies (#1445 guard). Self-saves made while paused are
+ * ignored via the save-executor's suppressFileWatch content-hash match.
+ *
+ * さらに、ウィンドウ自体がバックグラウンド（blur / 非表示）の間は
+ * power policy の判断（shouldPauseFileWatchers）に従い全ウォッチャーを
+ * 停止する（#1448）。再開時は watcher 側の mtime / content-hash 照合に
+ * より、ディスクが実際に変化した場合のみ外部変更フローが走る（#1445
+ * ガード）。停止中の自己保存は suppressFileWatch の content-hash 照合で
+ * 外部変更と誤検知されない。
  */
 export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): void {
   const {
     tabs,
     setTabs,
     activeTabId,
+    activeTabIdRef,
     tabsRef,
     isElectron,
     openDiffTab,
@@ -251,6 +281,18 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
    * Save As 後の path 変更を検出するために使用する。
    */
   const watcherPathsRef = useRef<Map<TabId, string>>(new Map());
+
+  /**
+   * Whether watchers are currently paused by the window-activity policy
+   * (window blurred or document hidden). Consulted by the tab-driven
+   * effects below so they never start a watcher while the window is in
+   * the background.
+   *
+   * window activity ポリシーによりウォッチャーが停止中かどうか。
+   * 以下のタブ駆動の effect が、バックグラウンド中にウォッチャーを
+   * 起動しないよう参照する。
+   */
+  const activityPausedRef = useRef(false);
 
   // ---------------------------------------------------------------------------
   // Sync watchers when tabs change
@@ -304,7 +346,7 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
         );
         const watcher = createFileWatcher({ path: filePath, onChanged });
 
-        if (isActiveTab) {
+        if (isActiveTab && !activityPausedRef.current) {
           watcher.start();
         }
         // Background tabs are not started yet (started when becoming active)
@@ -336,8 +378,8 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
       if (!tab || !isEditorTab(tab) || !tab.file?.path) continue;
 
       if (tabId === activeTabId) {
-        // Resume active tab watcher
-        if (!watcher.isActive) {
+        // Resume active tab watcher (unless the window is in the background)
+        if (!watcher.isActive && !activityPausedRef.current) {
           watcher.start();
         }
       } else {
@@ -348,6 +390,52 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
       }
     }
   }, [activeTabId, isElectron, tabsRef]);
+
+  // ---------------------------------------------------------------------------
+  // Pause/resume watchers based on window activity (#1448)
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!isElectron) return;
+
+    /**
+     * Apply the power-policy decision for the given activity state.
+     * Pausing stops every watcher; resuming starts only the active tab's
+     * watcher (background tabs stay paused, matching the tab policy
+     * above). FileWatcher.start() performs the mtime / content-hash
+     * catch-up, so resuming never fires the external-change flow unless
+     * the disk content actually changed while paused.
+     */
+    const applyActivity = (activity: WindowActivityState): void => {
+      const paused = shouldPauseFileWatchers(activity);
+      if (paused === activityPausedRef.current) return;
+      activityPausedRef.current = paused;
+
+      const watchers = watchersRef.current;
+      if (paused) {
+        for (const watcher of watchers.values()) {
+          if (watcher.isActive) {
+            watcher.stop();
+          }
+        }
+      } else {
+        const activeWatcher = watchers.get(activeTabIdRef.current);
+        if (activeWatcher && !activeWatcher.isActive) {
+          activeWatcher.start();
+        }
+      }
+    };
+
+    // Subscribe directly to the framework-free signal source — no React
+    // state, so focus switches never re-render the page (#1427 lesson).
+    applyActivity(getWindowActivitySnapshot());
+    const unsubscribe = subscribeWindowActivity(applyActivity);
+
+    return () => {
+      unsubscribe();
+      activityPausedRef.current = false;
+    };
+  }, [isElectron, activeTabIdRef]);
 
   // ---------------------------------------------------------------------------
   // Cleanup all watchers on unmount

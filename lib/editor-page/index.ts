@@ -11,6 +11,13 @@ export { useAutoRestore } from "./use-auto-restore";
 export { usePermissions } from "./use-permissions";
 export { useProjectInitialization } from "./use-project-initialization";
 export { useFileOpening } from "./use-file-opening";
+export { getWindowActivitySnapshot, subscribeWindowActivity } from "./window-activity";
+export {
+  shouldPauseFileWatchers,
+  getAutoSaveIntervalMs,
+  shouldEnablePosHighlight,
+  BACKGROUND_AUTO_SAVE_INTERVAL_MS,
+} from "./power-policy";
 
 export type { TextStatisticsResult } from "./use-text-statistics";
 export type {
@@ -36,3 +43,5 @@ export type { UsePermissionsResult } from "./use-permissions";
 export type { UseProjectInitializationResult } from "./use-project-initialization";
 export type { UseFileOpeningResult } from "./use-file-opening";
 export type { RecentProjectEntry, PermissionPromptState } from "./types";
+export type { WindowActivityState, WindowActivityListener } from "./window-activity";
+export type { PowerPolicySettings } from "./power-policy";
