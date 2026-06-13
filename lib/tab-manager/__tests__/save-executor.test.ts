@@ -461,6 +461,32 @@ describe("executeTabSave: conflict re-check", () => {
 // ---------------------------------------------------------------------------
 
 describe("executeTabSave: standalone (saveMdiFile)", () => {
+  it("suppresses the file watcher before saving an existing standalone path", async () => {
+    const tab = makeTab({ content: "<div>本文</div>" });
+    const h = makeHarness([tab]);
+    const descriptor = tab.file as MdiFileDescriptor;
+    saveMdiFileMock.mockResolvedValue({ descriptor, content: "本文" });
+
+    const outcome = await executeTabSave({
+      tab,
+      isProject: false,
+      tabsRef: h.tabsRef,
+      setTabs: h.setTabs,
+      tryCreateSnapshot: vi.fn(),
+    });
+
+    expect(outcome.status).toBe("saved");
+    expect(suppressFileWatchMock).toHaveBeenCalledWith("/p/main.mdi", "本文");
+    expect(saveMdiFileMock).toHaveBeenCalledWith({
+      descriptor,
+      content: "本文",
+      fileType: ".mdi",
+    });
+    expect(suppressFileWatchMock.mock.invocationCallOrder[0]).toBeLessThan(
+      saveMdiFileMock.mock.invocationCallOrder[0],
+    );
+  });
+
   it("returns 'cancelled' and clears isSaving when the dialog is cancelled", async () => {
     const tab = makeTab({ file: null });
     const h = makeHarness([tab]);
