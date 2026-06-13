@@ -18,6 +18,7 @@ import {
   TextDirection,
 } from "docx";
 import {
+  MdiDocument,
   replaceMdiWithRubyText,
   MDI_BREAK_RE,
   isMdiBlankParagraphLine,
@@ -49,7 +50,11 @@ function buildDocxDocument(content: string, options: DocxExportOptions): Documen
   const { metadata } = options;
   const settings = options.settings ? sanitizeSettings(options.settings) : DEFAULT_DOCX_SETTINGS;
   const fontConfig = toDocxFont(settings.fontFamily);
-  const paragraphs = parseMarkdownToDocxParagraphs(content, settings, fontConfig);
+  // Normalize editor serializer output (un-escape `\[\[blank]]` macros and
+  // `<br />`) so blank paragraphs become real empty paragraphs instead of
+  // leaking the literal marker into the .docx. Idempotent on clean raw text.
+  const normalized = MdiDocument.fromEditorOutput(content, { fileType: ".mdi" }).toRawText();
+  const paragraphs = parseMarkdownToDocxParagraphs(normalized, settings, fontConfig);
 
   // Page dimensions (swap for landscape)
   const baseDims = PAGE_DIMENSIONS[settings.pageSize] ?? PAGE_DIMENSIONS["A5"];

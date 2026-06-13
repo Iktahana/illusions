@@ -64,3 +64,38 @@ describe("docx exporter — [[blank]] paragraph handling", () => {
     expect(documentXml).toContain("B");
   });
 });
+
+// Regression for Bug B: the Milkdown serializer escapes MDI bracket macros
+// (`[[blank]]` → `\[\[blank]]`) and may emit standalone `<br />`. Export takes
+// the live serializer output, so it must normalize these before the
+// marker-aware pipeline runs — otherwise they leak into the output verbatim.
+describe("export — serializer-escaped blank markers (Bug B)", () => {
+  it("txt: \\[\\[blank]] (escaped) → forced blank line, no leak", () => {
+    const txt = mdiToPlainText("A段落\n\n\\[\\[blank]]\n\nB段落");
+    expect(txt).not.toContain("[[blank]]");
+    expect(txt).not.toContain("\\[");
+    const lines = txt.split("\n");
+    const aIdx = lines.findIndex((l) => l.includes("A段落"));
+    const bIdx = lines.findIndex((l) => l.includes("B段落"));
+    expect(aIdx).toBeGreaterThanOrEqual(0);
+    expect(bIdx).toBeGreaterThan(aIdx);
+    expect(lines.slice(aIdx + 1, bIdx).some((l) => l.trim() === "")).toBe(true);
+  });
+
+  it("txt: standalone <br /> → blank line, no leak", () => {
+    const txt = mdiToPlainText("A段落\n\n<br />\n\nB段落");
+    expect(txt).not.toContain("<br");
+  });
+
+  it("docx: \\[\\[blank]] (escaped) → empty <w:p>, no leak", async () => {
+    const blob = await generateDocxBlob("A\n\n\\[\\[blank]]\n\nB", {
+      metadata: { title: "テスト", language: "ja" },
+    });
+    const unzipped = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+    const documentXml = strFromU8(unzipped["word/document.xml"]!);
+    expect(documentXml).not.toContain("[[blank]]");
+    expect(documentXml).not.toContain("\\[");
+    expect(documentXml).toContain("A");
+    expect(documentXml).toContain("B");
+  });
+});
