@@ -98,7 +98,7 @@
     "diff": "^9.0.0",
     "electron": "^41.4.0",
     "electron-builder": "^26.15.2",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.7",
     "husky": "^9.1.7",
