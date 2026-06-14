@@ -153,25 +153,72 @@ export function stripMdiInlineSyntax(text: string): string {
  * Example: {漢字|かんじ} → 漢字（かんじ）
  */
 export function replaceMdiWithRubyText(text: string): string {
+  return replaceMdiWithRubyTextGated(text, ALL_MDI_FEATURES_ENABLED);
+}
+
+/**
+ * Per-feature MDI macro flags. Each flag gates exactly one macro family so a
+ * consumer that enables only ruby (for example) still copies literal `^2024^`
+ * and `[[br]]` verbatim. Mirrors the parsing flags passed to
+ * `japaneseNovel(options)` (see `config.ts`).
+ */
+export interface MdiFeatureFlags {
+  /** `{base|ruby}` → `base（ruby）` */
+  enableRuby: boolean;
+  /** `^text^` → `text` */
+  enableTcy: boolean;
+  /** `[[no-break:text]]` → `text` */
+  enableNoBreak: boolean;
+  /** `[[kern:amount:text]]` → `text` */
+  enableKern: boolean;
+  /** `[[br]]` → newline */
+  enableMdiBreak: boolean;
+}
+
+/** All macro families enabled — used by the legacy whole-string export helpers. */
+const ALL_MDI_FEATURES_ENABLED: MdiFeatureFlags = {
+  enableRuby: true,
+  enableTcy: true,
+  enableNoBreak: true,
+  enableKern: true,
+  enableMdiBreak: true,
+};
+
+/**
+ * Replace MDI inline syntax with per-feature gating. A macro family whose flag
+ * is `false` is left as literal text verbatim — only enabled families are
+ * transformed. Ruby renders as fullwidth parentheses (txt-ruby semantics).
+ */
+export function replaceMdiWithRubyTextGated(text: string, flags: MdiFeatureFlags): string {
   let result = text;
 
   // Ruby: base（ruby）  — strip dots from split ruby
-  result = result.replace(MDI_RUBY_RE, (_match, base: string, ruby: string) => {
-    const cleanRuby = ruby.replace(/\./g, "");
-    return `${base}（${cleanRuby}）`;
-  });
+  if (flags.enableRuby) {
+    result = result.replace(MDI_RUBY_RE, (_match, base: string, ruby: string) => {
+      const cleanRuby = ruby.replace(/\./g, "");
+      return `${base}（${cleanRuby}）`;
+    });
+  }
 
   // Tate-chu-yoko: keep text
-  result = result.replace(MDI_TCY_RE, "$1");
+  if (flags.enableTcy) {
+    result = result.replace(MDI_TCY_RE, "$1");
+  }
 
   // No-break: keep text
-  result = result.replace(MDI_NOBR_RE, "$1");
+  if (flags.enableNoBreak) {
+    result = result.replace(MDI_NOBR_RE, "$1");
+  }
 
   // Kerning: keep text
-  result = result.replace(MDI_KERN_RE, "$2");
+  if (flags.enableKern) {
+    result = result.replace(MDI_KERN_RE, "$2");
+  }
 
   // Explicit line break: newline
-  result = result.replace(MDI_BREAK_RE, "\n");
+  if (flags.enableMdiBreak) {
+    result = result.replace(MDI_BREAK_RE, "\n");
+  }
 
   return result;
 }
@@ -182,6 +229,18 @@ export function replaceMdiWithRubyText(text: string): string {
 
 /** Sentinel to distinguish scene breaks from paragraph-separation blank lines */
 const SCENE_BREAK_MARKER = "\x00SCENE_BREAK\x00";
+
+/**
+ * Resolve CommonMark backslash-escapes (`\#` → `#`, `\*` → `*`, `\\` → `\`).
+ * Covers every ASCII punctuation char CommonMark allows to be escaped,
+ * including MDI-specific chars (`\{` `\^` `\[`) as a superset.
+ *
+ * Used inside {@link stripMarkdown} to undo serializer-added escapes after
+ * markup stripping so plain-text export gets verbatim characters.
+ */
+function unescapeCommonMark(text: string): string {
+  return text.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, "$1");
+}
 
 /**
  * Strip markdown formatting while preserving text structure.
@@ -209,6 +268,16 @@ function stripMarkdown(text: string): string {
       continue;
     }
 
+    // List bullets: strip a line-leading list marker (`* `, `- `, `+ `, `N. `)
+    // to its bare text BEFORE emphasis processing. The Milkdown serializer emits
+    // unordered lists as `* item …`; if the leading `* ` reached the italic
+    // regex below it would be consumed as an opening emphasis delimiter, eating
+    // the bullet and leaving a dangling `*` (e.g. `* a *it*` → ` a it*`). A
+    // horizontal-rule line (`***` / `---`) has no space after the marker, so it
+    // is handled above and never matches here. Indentation before the marker is
+    // tolerated for nested lists.
+    processed = processed.replace(/^\s*(?:[*+-]\s+|\d+\.\s+)/, "");
+
     // Bold italic: ***text*** → text
     processed = processed.replace(/\*\*\*(.+?)\*\*\*/g, "$1");
 
@@ -218,8 +287,8 @@ function stripMarkdown(text: string): string {
     // Italic: *text* → text
     processed = processed.replace(/\*(.+?)\*/g, "$1");
 
-    // Escaped characters: \{ \^ \[ → literal
-    processed = processed.replace(/\\([{^[\]])/g, "$1");
+    // CommonMark escapable punctuation: \# \* \_ \- \+ \. \! \\ etc. → literal
+    processed = unescapeCommonMark(processed);
 
     result.push(processed);
   }

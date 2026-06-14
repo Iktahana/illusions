@@ -25,6 +25,7 @@ import {
 import { createHeadingIdFixerPlugin } from "./plugins/heading-id-fixer";
 import { createHardbreakIndentPlugin } from "./plugins/hardbreak-indent";
 import { createDialogueIndentPlugin } from "./plugins/dialogue-indent";
+import { createClipboardSerializerPlugin } from "./plugins/clipboard-serializer";
 import { defaultJapaneseNovelOptions, type JapaneseNovelOptions } from "./config";
 
 export type { JapaneseNovelOptions } from "./config";
@@ -43,6 +44,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     enableNoBreak,
     enableKern,
     enableMdiBreak,
+    plainText,
   } = opts;
 
   const classes: string[] = ["milkdown-japanese-base"];
@@ -116,6 +118,17 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     return createDialogueIndentPlugin();
   });
 
+  // Gate clipboard MDI conversion per feature so each macro family is only
+  // transformed when its own parser is active. A consumer that enables ONLY
+  // ruby still copies literal `^2024^` / `[[br]]` verbatim, and `.md` / `.txt`
+  // documents (no feature enabled) keep `{花|か}` / `^2024^` as literal text.
+  const clipboardSerializerPlugin = $prose((ctx) => {
+    return createClipboardSerializerPlugin(ctx, {
+      features: { enableRuby, enableTcy, enableNoBreak, enableKern, enableMdiBreak },
+      plainText,
+    });
+  });
+
   const plugins: MilkdownPlugin[] = [
     ...(enableRuby ? [remarkRuby, rubySchema] : []),
     ...(enableTcy ? [remarkTcy, tcySchema] : []),
@@ -129,6 +142,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     headingIdFixerPlugin,
     hardbreakIndentPlugin,
     dialogueIndentPlugin,
+    clipboardSerializerPlugin,
     stylePlugin,
   ].flat();
 

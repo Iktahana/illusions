@@ -17,6 +17,13 @@ export interface JapaneseNovelOptions {
   enableKern?: boolean;
   /** 明示改行を有効化する（[[br]] 記法） */
   enableMdiBreak?: boolean;
+  /**
+   * プレーンテキスト（.txt）モード。`MilkdownEditor` が `remarkPlainTextPlugin`
+   * を導入し、`*` `#` `**` 等を Markdown ではなくリテラル文字として扱う場合に
+   * `true`。クリップボード書き出し時は Markdown 除去・MDI 変換を一切行わず、
+   * 選択範囲のテキストをそのままコピーする。
+   */
+  plainText?: boolean;
 }
 
 export const defaultJapaneseNovelOptions: Required<JapaneseNovelOptions> = {
@@ -27,4 +34,5 @@ export const defaultJapaneseNovelOptions: Required<JapaneseNovelOptions> = {
   enableNoBreak: true,
   enableKern: true,
   enableMdiBreak: true,
+  plainText: false,
 };
