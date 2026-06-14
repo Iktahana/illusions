@@ -692,9 +692,16 @@ export default function EditorPage() {
 
     try {
       const { generateDocxBlob } = await import("@/lib/export/docx-exporter");
+      // Derive file type from the document title so macro un-escaping only
+      // applies to ".mdi" documents (DATA-LOSS guard for ".md"/".txt" authors).
+      const docTitle = dialogState.metadata.title ?? "";
+      const docExtMatch = /\.([^.]+)$/.exec(docTitle);
+      const docTitleExt = docExtMatch ? `.${docExtMatch[1].toLowerCase()}` : ".mdi";
+      const docFileType = [".mdi", ".md", ".txt"].includes(docTitleExt) ? docTitleExt : ".mdi";
       const blob = await generateDocxBlob(dialogState.content, {
         metadata: dialogState.metadata,
         settings,
+        fileType: docFileType,
       });
       const baseName = (dialogState.metadata.title || "untitled").replace(/\.[^.]+$/, "");
       const { saveBlobFile } = await import("@/lib/export/save-blob-file");

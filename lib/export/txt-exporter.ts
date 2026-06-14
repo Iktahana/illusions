@@ -22,15 +22,24 @@ import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-docum
  * the macros and normalizes `<br />` before the marker-aware export pipeline
  * runs (otherwise `[[blank]]` / `<br />` leak into the .txt). `fromEditorOutput`
  * is idempotent on already-clean raw text, so on-disk content is unaffected.
+ *
+ * @param content - Milkdown/ProseMirror serializer output
+ * @param fileType - Active document file extension (".mdi" | ".md" | ".txt").
+ *   Defaults to ".mdi". Non-MDI types skip macro un-escaping so that an
+ *   author's intentional literal `\[\[blank]]` is not silently promoted to a
+ *   blank line (DATA-LOSS guard).
  */
-export function mdiToPlainText(content: string): string {
-  return MdiDocument.fromEditorOutput(content, { fileType: ".mdi" }).toExportText("txt");
+export function mdiToPlainText(content: string, fileType: string = ".mdi"): string {
+  return MdiDocument.fromEditorOutput(content, { fileType }).toExportText("txt");
 }
 
 /**
  * Convert MDI markdown to text with ruby in fullwidth parentheses.
  * Example: {漢字|かんじ} → 漢字（かんじ）
+ *
+ * @param content - Milkdown/ProseMirror serializer output
+ * @param fileType - Active document file extension. See {@link mdiToPlainText}.
  */
-export function mdiToRubyText(content: string): string {
-  return MdiDocument.fromEditorOutput(content, { fileType: ".mdi" }).toExportText("txt-ruby");
+export function mdiToRubyText(content: string, fileType: string = ".mdi"): string {
+  return MdiDocument.fromEditorOutput(content, { fileType }).toExportText("txt-ruby");
 }

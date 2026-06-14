@@ -40,6 +40,13 @@ import type { DocxExportSettings, DocxFontConfig } from "./docx-export-settings"
 export interface DocxExportOptions {
   metadata: ExportMetadata;
   settings?: DocxExportSettings;
+  /**
+   * Active document file extension (".mdi" | ".md" | ".txt").
+   * Defaults to ".mdi". Non-MDI types skip macro un-escaping in
+   * `fromEditorOutput` so that an author's intentional literal
+   * `\[\[blank]]` is not silently promoted to a blank line (DATA-LOSS guard).
+   */
+  fileType?: string;
 }
 
 /**
@@ -53,7 +60,12 @@ function buildDocxDocument(content: string, options: DocxExportOptions): Documen
   // Normalize editor serializer output (un-escape `\[\[blank]]` macros and
   // `<br />`) so blank paragraphs become real empty paragraphs instead of
   // leaking the literal marker into the .docx. Idempotent on clean raw text.
-  const normalized = MdiDocument.fromEditorOutput(content, { fileType: ".mdi" }).toRawText();
+  // fileType controls whether macro un-escaping runs: ".mdi" → normalize;
+  // ".md"/".txt" → preserve escaped literals to prevent DATA-LOSS for authors
+  // who literally typed `\[\[blank]]` in a non-MDI document.
+  const normalized = MdiDocument.fromEditorOutput(content, {
+    fileType: options.fileType ?? ".mdi",
+  }).toRawText();
   const paragraphs = parseMarkdownToDocxParagraphs(normalized, settings, fontConfig);
 
   // Page dimensions (swap for landscape)

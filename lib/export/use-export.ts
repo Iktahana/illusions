@@ -61,6 +61,13 @@ export function useExport({
       const title = getTitle();
       const metadata = { title, language: "ja" };
 
+      // Derive the active document's file type from the title extension.
+      // Default to ".mdi" (novel document) when the extension is absent or
+      // unrecognised — this preserves existing behaviour for MDI documents.
+      const extMatch = /\.([^.]+)$/.exec(title);
+      const titleExt = extMatch ? `.${extMatch[1].toLowerCase()}` : ".mdi";
+      const fileType = [".mdi", ".md", ".txt"].includes(titleExt) ? titleExt : ".mdi";
+
       const formatLabels: Record<ExportFormat, string> = {
         pdf: "PDF",
         epub: "EPUB",
@@ -77,7 +84,8 @@ export function useExport({
         });
 
         try {
-          const converted = format === "txt" ? mdiToPlainText(content) : mdiToRubyText(content);
+          const converted =
+            format === "txt" ? mdiToPlainText(content, fileType) : mdiToRubyText(content, fileType);
 
           const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
           const suffix = format === "txt-ruby" ? "_ruby" : "";
@@ -106,7 +114,7 @@ export function useExport({
 
       // --- Web mode: browser-side export ---
       if (!isElectron || !window.electronAPI) {
-        await exportAsWeb(format, content, title, metadata, label);
+        await exportAsWeb(format, content, title, metadata, label, fileType);
         return;
       }
 
@@ -218,6 +226,7 @@ async function exportAsWeb(
   title: string,
   metadata: ExportMetadata,
   label: string,
+  fileType: string = ".mdi",
 ): Promise<void> {
   const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
 
@@ -247,7 +256,7 @@ async function exportAsWeb(
     switch (format) {
       case "docx": {
         const { generateDocxBlob } = await import("./docx-exporter");
-        blob = await generateDocxBlob(content, { metadata });
+        blob = await generateDocxBlob(content, { metadata, fileType });
         suggestedName = `${baseName}.docx`;
         break;
       }
