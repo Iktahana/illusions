@@ -266,6 +266,19 @@ function restoreCodePlaceholders(text: string, segments?: readonly string[]): st
 }
 
 /**
+ * Resolve CommonMark backslash-escapes (`\#` → `#`, `\*` → `*`, `\\` → `\`).
+ * Covers every ASCII punctuation char CommonMark allows to be escaped,
+ * including MDI-specific chars (`\{` `\^` `\[`) as a superset.
+ *
+ * Used both inside {@link stripMarkdown} and by the plain-text clipboard bypass,
+ * where markup stripping must NOT run but serializer-added escapes still need to
+ * be undone so the user gets verbatim characters.
+ */
+function unescapeCommonMark(text: string): string {
+  return text.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, "$1");
+}
+
+/**
  * Strip markdown formatting while preserving text structure.
  * Handles headings, bold, italic, horizontal rules, etc.
  */
@@ -291,6 +304,16 @@ function stripMarkdown(text: string): string {
       continue;
     }
 
+    // List bullets: strip a line-leading list marker (`* `, `- `, `+ `, `N. `)
+    // to its bare text BEFORE emphasis processing. The Milkdown serializer emits
+    // unordered lists as `* item …`; if the leading `* ` reached the italic
+    // regex below it would be consumed as an opening emphasis delimiter, eating
+    // the bullet and leaving a dangling `*` (e.g. `* a *it*` → ` a it*`). A
+    // horizontal-rule line (`***` / `---`) has no space after the marker, so it
+    // is handled above and never matches here. Indentation before the marker is
+    // tolerated for nested lists.
+    processed = processed.replace(/^\s*(?:[*+-]\s+|\d+\.\s+)/, "");
+
     // Bold italic: ***text*** → text
     processed = processed.replace(/\*\*\*(.+?)\*\*\*/g, "$1");
 
@@ -301,9 +324,7 @@ function stripMarkdown(text: string): string {
     processed = processed.replace(/\*(.+?)\*/g, "$1");
 
     // CommonMark escapable punctuation: \# \* \_ \- \+ \. \! \\ etc. → literal
-    // Covers all ASCII punctuation that CommonMark allows backslash-escape,
-    // including MDI-specific chars (\{ \^ \[) as a superset.
-    processed = processed.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, "$1");
+    processed = unescapeCommonMark(processed);
 
     result.push(processed);
   }
@@ -605,12 +626,25 @@ export class MdiDocument {
    * pipeline untouched and are restored verbatim at the end, so `{花|か}`,
    * `^2024^`, `[[br]]` inside code never get transformed or markdown-stripped.
    *
+   * Plain-text mode (`options.plainText === true`, i.e. `.txt` documents where
+   * MilkdownEditor installs `remarkPlainTextPlugin` and `*` / `#` / `**` are
+   * LITERAL characters, not markdown) bypasses both MDI conversion and markdown
+   * stripping entirely: a `.txt` line `**literal**` or `# heading` must copy
+   * verbatim, not as `literal` / `heading`. Only structural paragraph blank
+   * lines are collapsed and serializer-added CommonMark escapes are resolved.
+   *
    * In all modes the result has collapsed blank lines for clean pasting.
    */
   toClipboardText(options: {
     features: MdiFeatureFlags;
     codeSegments?: readonly string[];
+    plainText?: boolean;
   }): string {
+    if (options.plainText) {
+      // No MDI conversion, no markdown stripping — characters are literal.
+      const literal = collapseBlankLines(unescapeCommonMark(this.raw));
+      return restoreCodePlaceholders(literal, options.codeSegments);
+    }
     const converted = replaceMdiWithRubyTextGated(this.raw, options.features);
     const stripped = collapseBlankLines(stripMarkdown(converted));
     return restoreCodePlaceholders(stripped, options.codeSegments);

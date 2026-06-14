@@ -21,6 +21,15 @@ const INLINE_CODE_MARK = "inlineCode";
 export interface ClipboardSerializerOptions {
   /** Per-feature MDI macro flags, forwarded to `toClipboardText`. */
   features: MdiFeatureFlags;
+  /**
+   * Plain-text (`.txt`) mode. When `true`, the editor installs
+   * `remarkPlainTextPlugin` (see `MilkdownEditor.tsx`) so `*`, `#`, `**` are
+   * LITERAL characters, not markdown. The clipboard serializer must then bypass
+   * markdown stripping / MDI conversion entirely and copy the selection's text
+   * verbatim (only undoing serializer-added CommonMark escapes). Defaults to
+   * `false` for `.md` / `.mdi` documents.
+   */
+  plainText?: boolean;
 }
 
 /**
@@ -132,7 +141,7 @@ export function createClipboardSerializerPlugin(
   ctx: Ctx,
   options: ClipboardSerializerOptions,
 ): Plugin {
-  const { features } = options;
+  const { features, plainText = false } = options;
 
   return new Plugin({
     key: new PluginKey("mdiClipboardSerializer"),
@@ -149,11 +158,12 @@ export function createClipboardSerializerPlugin(
 
         // In MDI mode the editor parses `\[\[blank]]` back to `[[blank]]`, so we
         // use `.mdi` normalisation to recover the bracket macros before export.
-        // In non-MDI mode (no macro family enabled) that step is skipped.
+        // In non-MDI / plain-text mode (no macro family enabled) that step is skipped.
         const fileType = anyMdiFeatureEnabled(features) ? ".mdi" : undefined;
         return MdiDocument.fromEditorOutput(markdown, { fileType }).toClipboardText({
           features,
           codeSegments: segments,
+          plainText,
         });
       },
     },

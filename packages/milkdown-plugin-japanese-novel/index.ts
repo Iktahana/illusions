@@ -44,6 +44,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     enableNoBreak,
     enableKern,
     enableMdiBreak,
+    plainText,
   } = opts;
 
   const classes: string[] = ["milkdown-japanese-base"];
@@ -124,6 +125,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
   const clipboardSerializerPlugin = $prose((ctx) => {
     return createClipboardSerializerPlugin(ctx, {
       features: { enableRuby, enableTcy, enableNoBreak, enableKern, enableMdiBreak },
+      plainText,
     });
   });
 

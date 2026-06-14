@@ -6,8 +6,10 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { commonmark } from "@milkdown/preset-commonmark";
 import { clipboard } from "@milkdown/plugin-clipboard";
+import { $remark } from "@milkdown/utils";
 import type { EditorView } from "@milkdown/prose/view";
 import { japaneseNovel } from "../index";
+import { remarkPlainTextPlugin } from "../syntax/remark-plain-text";
 
 const mountedRoots: HTMLElement[] = [];
 afterEach(() => {
@@ -97,6 +99,43 @@ async function makeViewRubyOnly(markdown: string): Promise<{ editor: Editor; vie
         enableNoBreak: false,
         enableKern: false,
         enableMdiBreak: false,
+      }),
+    )
+    .create();
+  let view!: EditorView;
+  editor.action((ctx) => {
+    view = ctx.get(editorViewCtx);
+  });
+  return { editor, view };
+}
+
+/**
+ * Plain-text (.txt) mode: mirrors MilkdownEditor for `.txt` documents — all MDI
+ * features disabled, `remarkPlainTextPlugin` installed so `*` / `#` / `**` are
+ * LITERAL characters, and `plainText: true` so the clipboard serializer bypasses
+ * markdown stripping / MDI conversion entirely (P2-A).
+ */
+async function makeViewPlainText(source: string): Promise<{ editor: Editor; view: EditorView }> {
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  mountedRoots.push(root);
+  const editor = await Editor.make()
+    .config((ctx) => {
+      ctx.set(rootCtx, root);
+      ctx.set(defaultValueCtx, source);
+    })
+    .use(commonmark)
+    .use($remark("plainText", () => remarkPlainTextPlugin))
+    .use(
+      japaneseNovel({
+        isVertical: false,
+        showManuscriptLine: false,
+        enableRuby: false,
+        enableTcy: false,
+        enableNoBreak: false,
+        enableKern: false,
+        enableMdiBreak: false,
+        plainText: true,
       }),
     )
     .create();
@@ -304,5 +343,70 @@ describe("clipboard text serializer — P2-2: CommonMark escape leak", () => {
     await editor.destroy();
     expect(text).not.toContain("\\\\");
     expect(text).toContain("C:\\Users\\name");
+  });
+});
+
+describe("clipboard text serializer — P2-A: plain-text (.txt) mode bypass", () => {
+  it("**literal** is copied verbatim (markdown stripping bypassed)", async () => {
+    const { editor, view } = await makeViewPlainText("**literal**");
+    const text = copyAll(view);
+    await editor.destroy();
+    // In .txt mode `**` is a literal character, NOT bold markup. It must NOT be
+    // stripped (the old bug produced `\literal\`).
+    expect(text).toBe("**literal**");
+    expect(text).not.toContain("\\");
+  });
+
+  it("# heading is copied verbatim (heading marker not stripped)", async () => {
+    const { editor, view } = await makeViewPlainText("# heading");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).toBe("# heading");
+  });
+
+  it("a line of asterisks and a bullet-looking line stay literal", async () => {
+    const { editor, view } = await makeViewPlainText("* not a bullet\n- also literal\n*it*");
+    const text = copyAll(view);
+    await editor.destroy();
+    // None of these are markdown in .txt — every character survives.
+    expect(text).toContain("* not a bullet");
+    expect(text).toContain("- also literal");
+    expect(text).toContain("*it*");
+  });
+
+  it("literal MDI macros are copied verbatim in plain-text mode", async () => {
+    const { editor, view } = await makeViewPlainText("{花|か} ^2024^ [[br]]");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).toContain("{花|か}");
+    expect(text).toContain("^2024^");
+    expect(text).toContain("[[br]]");
+    expect(text).not.toContain("花（か）");
+  });
+});
+
+describe("clipboard text serializer — P2-B: list bullets not consumed as emphasis", () => {
+  it("unordered list with emphasis keeps content, no dangling * and no lost bullet text", async () => {
+    const { editor, view } = await makeView("- item with **bold** and *it*\n- second");
+    const text = copyAll(view);
+    await editor.destroy();
+    // The leading bullet must NOT be treated as an opening emphasis delimiter.
+    // Result: clean plain text, bullet stripped, emphasis stripped, no dangling `*`.
+    expect(text).toContain("item with bold and it");
+    expect(text).toContain("second");
+    expect(text).not.toContain("*");
+    // No content was eaten: the first item's leading word survives.
+    expect(text).toMatch(/^item with bold and it$/m);
+  });
+
+  it("ordered list copies as clean text without numbering markers leaking emphasis", async () => {
+    const { editor, view } = await makeView("1. one **bold**\n2. two *it*");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).toContain("one bold");
+    expect(text).toContain("two it");
+    expect(text).not.toContain("*");
+    // Ordered markers (`1.` / `2.`) are stripped to clean text.
+    expect(text).not.toMatch(/^\d+\.\s/m);
   });
 });
