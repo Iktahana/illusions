@@ -230,49 +230,13 @@ export function replaceMdiWithRubyTextGated(text: string, flags: MdiFeatureFlags
 /** Sentinel to distinguish scene breaks from paragraph-separation blank lines */
 const SCENE_BREAK_MARKER = "\x00SCENE_BREAK\x00";
 
-// ---------------------------------------------------------------------------
-// Code-context placeholders
-// ---------------------------------------------------------------------------
-//
-// To keep inline-code and fenced-code text out of the MDI/markdown rewriting
-// pipeline, the clipboard serializer replaces each code segment's text with a
-// NUL-wrapped placeholder before building the markdown string. NUL bytes never
-// appear in user text and are not matched by any MDI / markdown regex, so the
-// placeholder survives `replaceMdiWithRubyTextGated`, `stripMarkdown`, and
-// `collapseBlankLines` untouched and is restored verbatim afterwards.
-
-/** Prefix/suffix for code placeholders (NUL-wrapped, regex-inert). */
-const CODE_PLACEHOLDER_PREFIX = "\x00MDI_CODE_";
-const CODE_PLACEHOLDER_SUFFIX = "\x00";
-
-/** Build the placeholder token for the code segment at `index`. */
-export function codePlaceholder(index: number): string {
-  return `${CODE_PLACEHOLDER_PREFIX}${index}${CODE_PLACEHOLDER_SUFFIX}`;
-}
-
-/**
- * Restore code placeholders with their verbatim segment text.
- * No-op when `segments` is undefined/empty.
- */
-function restoreCodePlaceholders(text: string, segments?: readonly string[]): string {
-  if (!segments || segments.length === 0) return text;
-  return text.replace(
-    new RegExp(`${CODE_PLACEHOLDER_PREFIX}(\\d+)${CODE_PLACEHOLDER_SUFFIX}`, "g"),
-    (_match, idx: string) => {
-      const segment = segments[Number(idx)];
-      return segment ?? _match;
-    },
-  );
-}
-
 /**
  * Resolve CommonMark backslash-escapes (`\#` → `#`, `\*` → `*`, `\\` → `\`).
  * Covers every ASCII punctuation char CommonMark allows to be escaped,
  * including MDI-specific chars (`\{` `\^` `\[`) as a superset.
  *
- * Used both inside {@link stripMarkdown} and by the plain-text clipboard bypass,
- * where markup stripping must NOT run but serializer-added escapes still need to
- * be undone so the user gets verbatim characters.
+ * Used inside {@link stripMarkdown} to undo serializer-added escapes after
+ * markup stripping so plain-text export gets verbatim characters.
  */
 function unescapeCommonMark(text: string): string {
   return text.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, "$1");
@@ -609,45 +573,6 @@ export class MdiDocument {
     const flattened =
       format === "txt-ruby" ? replaceMdiWithRubyText(this.raw) : stripMdiInlineSyntax(this.raw);
     return collapseBlankLines(stripMarkdown(flattened));
-  }
-
-  /**
-   * Plain text for the clipboard (`text/plain`).
-   *
-   * MDI macro conversion is gated **per feature** (`options.features`): a macro
-   * family whose flag is `false` is preserved verbatim, so a session with only
-   * ruby enabled still copies literal `^2024^` / `[[br]]` unchanged. When every
-   * flag is `false` this collapses to the non-MDI behavior (markdown markup
-   * stripped, CommonMark backslash-escapes resolved, macros verbatim).
-   *
-   * Code context is honored via `options.codeSegments`: the serializer replaces
-   * inline-code and fenced-code text with NUL-wrapped placeholders before
-   * calling this method; the placeholders pass through the MDI / markdown
-   * pipeline untouched and are restored verbatim at the end, so `{花|か}`,
-   * `^2024^`, `[[br]]` inside code never get transformed or markdown-stripped.
-   *
-   * Plain-text mode (`options.plainText === true`, i.e. `.txt` documents where
-   * MilkdownEditor installs `remarkPlainTextPlugin` and `*` / `#` / `**` are
-   * LITERAL characters, not markdown) bypasses both MDI conversion and markdown
-   * stripping entirely: a `.txt` line `**literal**` or `# heading` must copy
-   * verbatim, not as `literal` / `heading`. Only structural paragraph blank
-   * lines are collapsed and serializer-added CommonMark escapes are resolved.
-   *
-   * In all modes the result has collapsed blank lines for clean pasting.
-   */
-  toClipboardText(options: {
-    features: MdiFeatureFlags;
-    codeSegments?: readonly string[];
-    plainText?: boolean;
-  }): string {
-    if (options.plainText) {
-      // No MDI conversion, no markdown stripping — characters are literal.
-      const literal = collapseBlankLines(unescapeCommonMark(this.raw));
-      return restoreCodePlaceholders(literal, options.codeSegments);
-    }
-    const converted = replaceMdiWithRubyTextGated(this.raw, options.features);
-    const stripped = collapseBlankLines(stripMarkdown(converted));
-    return restoreCodePlaceholders(stripped, options.codeSegments);
   }
 
   /**

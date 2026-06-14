@@ -410,3 +410,77 @@ describe("clipboard text serializer — P2-B: list bullets not consumed as empha
     expect(text).not.toMatch(/^\d+\.\s/m);
   });
 });
+
+describe("clipboard text serializer — AST walk: emphasis / link marks drop to text", () => {
+  it("normal emphasis **bold** *it* → bold it (no markers, no dangling)", async () => {
+    const { editor, view } = await makeView("これは **bold** と *it* です。");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).toBe("これは bold と it です。");
+    expect(text).not.toContain("*");
+    expect(text).not.toContain("\\");
+  });
+
+  it("link mark emits the link text, not the URL", async () => {
+    const { editor, view } = await makeView("詳細は [公式サイト](https://example.com) を参照。");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).toContain("公式サイト");
+    expect(text).not.toContain("https://example.com");
+    expect(text).not.toContain("](");
+    expect(text).not.toContain("[");
+  });
+});
+
+describe("clipboard text serializer — AST walk: literal text is verbatim (no escape un-parsing)", () => {
+  it("escaped-looking literal \\*not italic\\* copies as *not italic* verbatim", async () => {
+    // The source `\*not italic\*` is literal `*not italic*` text in the editor —
+    // the AST text node already holds the bare characters, so the walk emits them
+    // verbatim. The previous regex pipeline turned `\*x\*` into `\x\` (escape leak).
+    const { editor, view } = await makeView("文中に \\*not italic\\* と書く。");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).toContain("*not italic*");
+    expect(text).not.toContain("\\");
+  });
+
+  it("inline code {花|か} ^2024^ [[br]] is verbatim, prose around it is plain", async () => {
+    const { editor, view } = await makeView("コードは `{花|か} ^2024^ [[br]]` と書く。");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).toContain("{花|か} ^2024^ [[br]]");
+    expect(text).not.toContain("花（か）");
+    expect(text).not.toContain("`");
+    expect(text).toContain("コードは");
+    expect(text).toContain("と書く。");
+  });
+
+  it("code block content {花|か} ^2024^ [[br]] survives verbatim with no fences", async () => {
+    const { editor, view } = await makeView("説明\n\n```\n{花|か} ^2024^ [[br]]\n```\n\n後続");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).toContain("{花|か} ^2024^ [[br]]");
+    expect(text).not.toContain("```");
+    expect(text).not.toContain("花（か）");
+    expect(text).toContain("説明");
+    expect(text).toContain("後続");
+  });
+});
+
+describe("clipboard text serializer — AST walk: plain-text (.txt) structure", () => {
+  it("a\\n\\nb preserves paragraph structure without extra blank lines", async () => {
+    const { editor, view } = await makeViewPlainText("a\n\nb");
+    const text = copyAll(view);
+    await editor.destroy();
+    // Two paragraphs joined by exactly one blank line — no spurious blanks.
+    expect(text).toBe("a\n\nb");
+  });
+
+  it("<br /> is copied verbatim in .txt mode (not converted to newline)", async () => {
+    const { editor, view } = await makeViewPlainText("行A<br />行B");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).toContain("<br />");
+    expect(text).not.toMatch(/行A\n行B/);
+  });
+});
