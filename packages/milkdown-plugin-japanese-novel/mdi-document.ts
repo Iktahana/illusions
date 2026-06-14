@@ -218,8 +218,10 @@ function stripMarkdown(text: string): string {
     // Italic: *text* → text
     processed = processed.replace(/\*(.+?)\*/g, "$1");
 
-    // Escaped characters: \{ \^ \[ → literal
-    processed = processed.replace(/\\([{^[\]])/g, "$1");
+    // CommonMark escapable punctuation: \# \* \_ \- \+ \. \! \\ etc. → literal
+    // Covers all ASCII punctuation that CommonMark allows backslash-escape,
+    // including MDI-specific chars (\{ \^ \[) as a superset.
+    processed = processed.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, "$1");
 
     result.push(processed);
   }
@@ -504,6 +506,29 @@ export class MdiDocument {
     const flattened =
       format === "txt-ruby" ? replaceMdiWithRubyText(this.raw) : stripMdiInlineSyntax(this.raw);
     return collapseBlankLines(stripMarkdown(flattened));
+  }
+
+  /**
+   * Plain text for the clipboard (`text/plain`).
+   *
+   * - `enableMdiMacros: true` (.mdi mode): runs the full MDI export pipeline
+   *   (same as `toExportText("txt-ruby")` — ruby → fullwidth-paren, [[blank]]
+   *   → empty line, [[br]] → newline, markdown markup stripped, CommonMark
+   *   backslash-escapes resolved).
+   * - `enableMdiMacros: false` (.md / .txt mode): MDI macros are literal text
+   *   and must NOT be transformed.  Only markdown markup is stripped and
+   *   CommonMark backslash-escapes are resolved (e.g. `\# title` → `# title`).
+   *
+   * In both modes the result has collapsed blank lines for clean pasting.
+   */
+  toClipboardText(options: { enableMdiMacros: boolean }): string {
+    if (options.enableMdiMacros) {
+      // Full MDI pipeline: convert macros then strip markdown.
+      return collapseBlankLines(stripMarkdown(replaceMdiWithRubyText(this.raw)));
+    }
+    // Non-MDI pipeline: preserve macro text verbatim; only strip markdown
+    // formatting and resolve CommonMark escapes.
+    return collapseBlankLines(stripMarkdown(this.raw));
   }
 
   /**

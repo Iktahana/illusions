@@ -15,6 +15,7 @@ afterEach(() => {
   mountedRoots.length = 0;
 });
 
+/** MDI mode: ruby/tcy/mdi-break all enabled (.mdi documents). */
 async function makeView(markdown: string): Promise<{ editor: Editor; view: EditorView }> {
   const root = document.createElement("div");
   document.body.appendChild(root);
@@ -32,6 +33,37 @@ async function makeView(markdown: string): Promise<{ editor: Editor; view: Edito
         enableRuby: true,
         enableTcy: true,
         enableMdiBreak: true,
+      }),
+    )
+    .create();
+  let view!: EditorView;
+  editor.action((ctx) => {
+    view = ctx.get(editorViewCtx);
+  });
+  return { editor, view };
+}
+
+/**
+ * Non-MDI mode: all MDI macro features disabled (.md / .txt documents).
+ * Literal `{花|か}`, `^2024^`, `[[br]]` must survive verbatim on the clipboard.
+ */
+async function makeViewNonMdi(markdown: string): Promise<{ editor: Editor; view: EditorView }> {
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  mountedRoots.push(root);
+  const editor = await Editor.make()
+    .config((ctx) => {
+      ctx.set(rootCtx, root);
+      ctx.set(defaultValueCtx, markdown);
+    })
+    .use(commonmark)
+    .use(
+      japaneseNovel({
+        isVertical: false,
+        showManuscriptLine: false,
+        enableRuby: false,
+        enableTcy: false,
+        enableMdiBreak: false,
       }),
     )
     .create();
@@ -121,5 +153,78 @@ describe("clipboard text serializer (Bug D)", () => {
     expect(text).not.toContain("{花|");
     expect(text).not.toMatch(/^#\s/m);
     expect(text).toContain("花（か）");
+  });
+});
+
+describe("clipboard text serializer — P2-1: mode blindness (non-MDI mode)", () => {
+  it("literal ruby {花|か} is copied verbatim in non-MDI mode", async () => {
+    const { editor, view } = await makeViewNonMdi("本文に{花|か}と書いた。");
+    const text = copyAll(view);
+    await editor.destroy();
+    // In .md/.txt mode the brace-pipe syntax is literal text, NOT ruby — must not convert.
+    expect(text).toContain("{花|か}");
+    expect(text).not.toContain("花（か）");
+  });
+
+  it("literal TCY ^2024^ is copied verbatim in non-MDI mode", async () => {
+    const { editor, view } = await makeViewNonMdi("西暦^2024^年の出来事。");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).toContain("^2024^");
+  });
+
+  it("literal [[br]] is copied verbatim in non-MDI mode", async () => {
+    const { editor, view } = await makeViewNonMdi("行A[[br]]行B");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).toContain("[[br]]");
+    // Must NOT be converted to a newline (which would make the marker disappear)
+    expect(text).not.toMatch(/行A\n行B/);
+  });
+
+  it("fenced code block content is copied verbatim in non-MDI mode", async () => {
+    const { editor, view } = await makeViewNonMdi(
+      "説明文\n\n```\n{花|か} ^2024^ [[br]]\n```\n\n後続テキスト",
+    );
+    const text = copyAll(view);
+    await editor.destroy();
+    // Code block content must not be MDI-transformed
+    expect(text).toContain("{花|か}");
+    expect(text).toContain("^2024^");
+    expect(text).toContain("[[br]]");
+    expect(text).not.toContain("花（か）");
+  });
+});
+
+describe("clipboard text serializer — P2-2: CommonMark escape leak", () => {
+  it("escaped markdown punctuation \\# copies without the backslash", async () => {
+    // \# in CommonMark means a literal `#` character (not a heading).
+    // The Milkdown serializer emits `\# title` for a paragraph starting with `# title`.
+    // After stripping, the user should get `# title` on the clipboard, not `\# title`.
+    const { editor, view } = await makeView("\\# タイトル行\n\n本文。");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).not.toContain("\\#");
+    expect(text).toContain("# タイトル行");
+  });
+
+  it("escaped backslash \\\\ copies as single backslash", async () => {
+    // CommonMark: \\ → literal backslash.
+    // Milkdown serializer emits \\ for a paragraph containing a single `\`.
+    // Our unescaper must reduce \\ → \ so the user gets one backslash, not two.
+    const { editor, view } = await makeView("パス: C:\\\\Users\\\\name");
+    const text = copyAll(view);
+    await editor.destroy();
+    // The double backslash must be collapsed to single
+    expect(text).not.toContain("\\\\");
+    expect(text).toContain("C:\\Users\\name");
+  });
+
+  it("escaped backslash in non-MDI mode also resolves correctly", async () => {
+    const { editor, view } = await makeViewNonMdi("パス: C:\\\\Users\\\\name");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).not.toContain("\\\\");
+    expect(text).toContain("C:\\Users\\name");
   });
 });

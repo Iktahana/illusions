@@ -117,8 +117,12 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     return createDialogueIndentPlugin();
   });
 
+  // MDI macros are active when at least one macro-parsing feature is enabled.
+  // Gate clipboard conversion on this so that .md/.txt documents that happen
+  // to contain literal `{花|か}` or `^2024^` are not silently transformed.
+  const enableMdiMacros = Boolean(enableRuby || enableTcy || enableMdiBreak);
   const clipboardSerializerPlugin = $prose((ctx) => {
-    return createClipboardSerializerPlugin(ctx);
+    return createClipboardSerializerPlugin(ctx, { enableMdiMacros });
   });
 
   const plugins: MilkdownPlugin[] = [
