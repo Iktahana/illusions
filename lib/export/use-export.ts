@@ -146,7 +146,10 @@ export function useExport({
             result = await window.electronAPI.exportEPUB?.(content, { metadata });
             break;
           case "docx":
-            result = await window.electronAPI.exportDOCX?.(content, { metadata });
+            // Thread the active tab's file type so the main-process generateDocx
+            // un-escapes macros only for ".mdi" and preserves \[\[blank]] literals
+            // authored in ".md"/".txt". Otherwise the handler defaults to ".mdi".
+            result = await window.electronAPI.exportDOCX?.(content, { metadata, fileType });
             break;
         }
 

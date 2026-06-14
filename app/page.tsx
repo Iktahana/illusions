@@ -681,6 +681,11 @@ export default function EditorPage() {
         const result = await window.electronAPI.exportDOCX(dialogState.content, {
           metadata: dialogState.metadata,
           settings,
+          // Thread the active tab's snapshotted file type so the main-process
+          // generateDocx un-escapes macros only for ".mdi". Without this, the
+          // handler defaults to ".mdi" and silently drops author-written
+          // \[\[blank]] literals in ".md"/".txt" on the installed desktop app.
+          fileType: dialogState.fileType,
         });
 
         notificationManager.dismiss(progressId);
