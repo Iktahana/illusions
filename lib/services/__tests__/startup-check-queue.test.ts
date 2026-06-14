@@ -32,8 +32,20 @@ describe("StartupCheckQueue", () => {
   it("evaluates checks in registration order", async () => {
     const order: string[] = [];
     const q = new StartupCheckQueue();
-    q.register({ id: "a", evaluate: async () => { order.push("a"); return null; } });
-    q.register({ id: "b", evaluate: async () => { order.push("b"); return null; } });
+    q.register({
+      id: "a",
+      evaluate: async () => {
+        order.push("a");
+        return null;
+      },
+    });
+    q.register({
+      id: "b",
+      evaluate: async () => {
+        order.push("b");
+        return null;
+      },
+    });
     await q.run();
     expect(order).toEqual(["a", "b"]);
   });
@@ -52,7 +64,12 @@ describe("StartupCheckQueue", () => {
   it("isolates a throwing check and keeps running the rest", async () => {
     const q = new StartupCheckQueue();
     const after = vi.fn(async () => null);
-    q.register({ id: "boom", evaluate: async () => { throw new Error("x"); } });
+    q.register({
+      id: "boom",
+      evaluate: async () => {
+        throw new Error("x");
+      },
+    });
     q.register({ id: "ok", evaluate: after });
     await expect(q.run()).resolves.toBeUndefined();
     expect(after).toHaveBeenCalled();

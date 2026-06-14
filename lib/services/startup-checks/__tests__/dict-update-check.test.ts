@@ -67,7 +67,11 @@ describe("dictUpdateCheck", () => {
 
   it("returns null while downloading/installing", async () => {
     setElectronDict(true);
-    getDownloadState.mockResolvedValue({ providerId: "genji", status: "downloading", progress: 42 });
+    getDownloadState.mockResolvedValue({
+      providerId: "genji",
+      status: "downloading",
+      progress: 42,
+    });
     expect(await dictUpdateCheck.evaluate()).toBeNull();
   });
 });

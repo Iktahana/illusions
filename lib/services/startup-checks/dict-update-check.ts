@@ -41,7 +41,8 @@ export const dictUpdateCheck: StartupCheck = {
       return {
         id: "dict-not-installed",
         type: "warning",
-        message: "日本語辞書が未ダウンロードです。ダウンロードすると校正と辞書引きがより正確になります。",
+        message:
+          "日本語辞書が未ダウンロードです。ダウンロードすると校正と辞書引きがより正確になります。",
         duration: 0, // keep until dismissed
         actions: [{ label: "今すぐダウンロード", onClick: startDictDownload }],
       };
