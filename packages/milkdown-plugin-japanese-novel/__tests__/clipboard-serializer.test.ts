@@ -74,6 +74,39 @@ async function makeViewNonMdi(markdown: string): Promise<{ editor: Editor; view:
   return { editor, view };
 }
 
+/**
+ * Only-ruby mode: ruby enabled, every other macro family disabled. Ruby still
+ * converts, but literal `^2024^` / `[[br]]` must be copied verbatim (P2-A).
+ */
+async function makeViewRubyOnly(markdown: string): Promise<{ editor: Editor; view: EditorView }> {
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  mountedRoots.push(root);
+  const editor = await Editor.make()
+    .config((ctx) => {
+      ctx.set(rootCtx, root);
+      ctx.set(defaultValueCtx, markdown);
+    })
+    .use(commonmark)
+    .use(
+      japaneseNovel({
+        isVertical: false,
+        showManuscriptLine: false,
+        enableRuby: true,
+        enableTcy: false,
+        enableNoBreak: false,
+        enableKern: false,
+        enableMdiBreak: false,
+      }),
+    )
+    .create();
+  let view!: EditorView;
+  editor.action((ctx) => {
+    view = ctx.get(editorViewCtx);
+  });
+  return { editor, view };
+}
+
 // Mirror the real app's plugin order: japaneseNovel(...) is .use()d BEFORE
 // @milkdown/plugin-clipboard (MilkdownEditor.tsx). ProseMirror's someProp uses
 // the first non-null clipboardTextSerializer, so ours must win.
@@ -193,6 +226,51 @@ describe("clipboard text serializer — P2-1: mode blindness (non-MDI mode)", ()
     expect(text).toContain("^2024^");
     expect(text).toContain("[[br]]");
     expect(text).not.toContain("花（か）");
+  });
+});
+
+describe("clipboard text serializer — P2-A: per-feature gating (only ruby enabled)", () => {
+  it("ruby converts but literal ^2024^ / [[br]] are copied verbatim", async () => {
+    const { editor, view } = await makeViewRubyOnly("{花|か}は西暦^2024^年[[br]]に咲く。");
+    const text = copyAll(view);
+    await editor.destroy();
+    // Ruby feature is ON → converts.
+    expect(text).toContain("花（か）");
+    // TCY / mdi-break features are OFF → literal text must survive verbatim.
+    expect(text).toContain("^2024^");
+    expect(text).toContain("[[br]]");
+    expect(text).not.toMatch(/年\nに/); // [[br]] not turned into a newline
+  });
+});
+
+describe("clipboard text serializer — P2-B: code context", () => {
+  it("fenced code block content is copied literally even in MDI mode", async () => {
+    const { editor, view } = await makeView(
+      "説明文\n\n```\n{花|か} ^2024^ [[br]]\n```\n\n後続テキスト",
+    );
+    const text = copyAll(view);
+    await editor.destroy();
+    // Code content must bypass MDI/markdown transformation entirely.
+    expect(text).toContain("{花|か}");
+    expect(text).toContain("^2024^");
+    expect(text).toContain("[[br]]");
+    expect(text).not.toContain("花（か）");
+    // Surrounding prose still copies as plain text.
+    expect(text).toContain("説明文");
+    expect(text).toContain("後続テキスト");
+  });
+
+  it("inline code span content is copied literally even in MDI mode", async () => {
+    const { editor, view } = await makeView("コードは `{花|か} ^2024^ [[br]]` と書く。");
+    const text = copyAll(view);
+    await editor.destroy();
+    expect(text).toContain("{花|か}");
+    expect(text).toContain("^2024^");
+    expect(text).toContain("[[br]]");
+    expect(text).not.toContain("花（か）");
+    // The non-code prose around the span survives.
+    expect(text).toContain("コードは");
+    expect(text).toContain("と書く。");
   });
 });
 

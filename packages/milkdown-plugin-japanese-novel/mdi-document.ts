@@ -153,25 +153,72 @@ export function stripMdiInlineSyntax(text: string): string {
  * Example: {漢字|かんじ} → 漢字（かんじ）
  */
 export function replaceMdiWithRubyText(text: string): string {
+  return replaceMdiWithRubyTextGated(text, ALL_MDI_FEATURES_ENABLED);
+}
+
+/**
+ * Per-feature MDI macro flags. Each flag gates exactly one macro family so a
+ * consumer that enables only ruby (for example) still copies literal `^2024^`
+ * and `[[br]]` verbatim. Mirrors the parsing flags passed to
+ * `japaneseNovel(options)` (see `config.ts`).
+ */
+export interface MdiFeatureFlags {
+  /** `{base|ruby}` → `base（ruby）` */
+  enableRuby: boolean;
+  /** `^text^` → `text` */
+  enableTcy: boolean;
+  /** `[[no-break:text]]` → `text` */
+  enableNoBreak: boolean;
+  /** `[[kern:amount:text]]` → `text` */
+  enableKern: boolean;
+  /** `[[br]]` → newline */
+  enableMdiBreak: boolean;
+}
+
+/** All macro families enabled — used by the legacy whole-string export helpers. */
+const ALL_MDI_FEATURES_ENABLED: MdiFeatureFlags = {
+  enableRuby: true,
+  enableTcy: true,
+  enableNoBreak: true,
+  enableKern: true,
+  enableMdiBreak: true,
+};
+
+/**
+ * Replace MDI inline syntax with per-feature gating. A macro family whose flag
+ * is `false` is left as literal text verbatim — only enabled families are
+ * transformed. Ruby renders as fullwidth parentheses (txt-ruby semantics).
+ */
+export function replaceMdiWithRubyTextGated(text: string, flags: MdiFeatureFlags): string {
   let result = text;
 
   // Ruby: base（ruby）  — strip dots from split ruby
-  result = result.replace(MDI_RUBY_RE, (_match, base: string, ruby: string) => {
-    const cleanRuby = ruby.replace(/\./g, "");
-    return `${base}（${cleanRuby}）`;
-  });
+  if (flags.enableRuby) {
+    result = result.replace(MDI_RUBY_RE, (_match, base: string, ruby: string) => {
+      const cleanRuby = ruby.replace(/\./g, "");
+      return `${base}（${cleanRuby}）`;
+    });
+  }
 
   // Tate-chu-yoko: keep text
-  result = result.replace(MDI_TCY_RE, "$1");
+  if (flags.enableTcy) {
+    result = result.replace(MDI_TCY_RE, "$1");
+  }
 
   // No-break: keep text
-  result = result.replace(MDI_NOBR_RE, "$1");
+  if (flags.enableNoBreak) {
+    result = result.replace(MDI_NOBR_RE, "$1");
+  }
 
   // Kerning: keep text
-  result = result.replace(MDI_KERN_RE, "$2");
+  if (flags.enableKern) {
+    result = result.replace(MDI_KERN_RE, "$2");
+  }
 
   // Explicit line break: newline
-  result = result.replace(MDI_BREAK_RE, "\n");
+  if (flags.enableMdiBreak) {
+    result = result.replace(MDI_BREAK_RE, "\n");
+  }
 
   return result;
 }
@@ -182,6 +229,41 @@ export function replaceMdiWithRubyText(text: string): string {
 
 /** Sentinel to distinguish scene breaks from paragraph-separation blank lines */
 const SCENE_BREAK_MARKER = "\x00SCENE_BREAK\x00";
+
+// ---------------------------------------------------------------------------
+// Code-context placeholders
+// ---------------------------------------------------------------------------
+//
+// To keep inline-code and fenced-code text out of the MDI/markdown rewriting
+// pipeline, the clipboard serializer replaces each code segment's text with a
+// NUL-wrapped placeholder before building the markdown string. NUL bytes never
+// appear in user text and are not matched by any MDI / markdown regex, so the
+// placeholder survives `replaceMdiWithRubyTextGated`, `stripMarkdown`, and
+// `collapseBlankLines` untouched and is restored verbatim afterwards.
+
+/** Prefix/suffix for code placeholders (NUL-wrapped, regex-inert). */
+const CODE_PLACEHOLDER_PREFIX = "\x00MDI_CODE_";
+const CODE_PLACEHOLDER_SUFFIX = "\x00";
+
+/** Build the placeholder token for the code segment at `index`. */
+export function codePlaceholder(index: number): string {
+  return `${CODE_PLACEHOLDER_PREFIX}${index}${CODE_PLACEHOLDER_SUFFIX}`;
+}
+
+/**
+ * Restore code placeholders with their verbatim segment text.
+ * No-op when `segments` is undefined/empty.
+ */
+function restoreCodePlaceholders(text: string, segments?: readonly string[]): string {
+  if (!segments || segments.length === 0) return text;
+  return text.replace(
+    new RegExp(`${CODE_PLACEHOLDER_PREFIX}(\\d+)${CODE_PLACEHOLDER_SUFFIX}`, "g"),
+    (_match, idx: string) => {
+      const segment = segments[Number(idx)];
+      return segment ?? _match;
+    },
+  );
+}
 
 /**
  * Strip markdown formatting while preserving text structure.
@@ -511,24 +593,27 @@ export class MdiDocument {
   /**
    * Plain text for the clipboard (`text/plain`).
    *
-   * - `enableMdiMacros: true` (.mdi mode): runs the full MDI export pipeline
-   *   (same as `toExportText("txt-ruby")` — ruby → fullwidth-paren, [[blank]]
-   *   → empty line, [[br]] → newline, markdown markup stripped, CommonMark
-   *   backslash-escapes resolved).
-   * - `enableMdiMacros: false` (.md / .txt mode): MDI macros are literal text
-   *   and must NOT be transformed.  Only markdown markup is stripped and
-   *   CommonMark backslash-escapes are resolved (e.g. `\# title` → `# title`).
+   * MDI macro conversion is gated **per feature** (`options.features`): a macro
+   * family whose flag is `false` is preserved verbatim, so a session with only
+   * ruby enabled still copies literal `^2024^` / `[[br]]` unchanged. When every
+   * flag is `false` this collapses to the non-MDI behavior (markdown markup
+   * stripped, CommonMark backslash-escapes resolved, macros verbatim).
    *
-   * In both modes the result has collapsed blank lines for clean pasting.
+   * Code context is honored via `options.codeSegments`: the serializer replaces
+   * inline-code and fenced-code text with NUL-wrapped placeholders before
+   * calling this method; the placeholders pass through the MDI / markdown
+   * pipeline untouched and are restored verbatim at the end, so `{花|か}`,
+   * `^2024^`, `[[br]]` inside code never get transformed or markdown-stripped.
+   *
+   * In all modes the result has collapsed blank lines for clean pasting.
    */
-  toClipboardText(options: { enableMdiMacros: boolean }): string {
-    if (options.enableMdiMacros) {
-      // Full MDI pipeline: convert macros then strip markdown.
-      return collapseBlankLines(stripMarkdown(replaceMdiWithRubyText(this.raw)));
-    }
-    // Non-MDI pipeline: preserve macro text verbatim; only strip markdown
-    // formatting and resolve CommonMark escapes.
-    return collapseBlankLines(stripMarkdown(this.raw));
+  toClipboardText(options: {
+    features: MdiFeatureFlags;
+    codeSegments?: readonly string[];
+  }): string {
+    const converted = replaceMdiWithRubyTextGated(this.raw, options.features);
+    const stripped = collapseBlankLines(stripMarkdown(converted));
+    return restoreCodePlaceholders(stripped, options.codeSegments);
   }
 
   /**
