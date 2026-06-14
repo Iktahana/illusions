@@ -45,7 +45,9 @@ async function makeView(markdown: string): Promise<{ editor: Editor; view: Edito
 // Mirror the real app's plugin order: japaneseNovel(...) is .use()d BEFORE
 // @milkdown/plugin-clipboard (MilkdownEditor.tsx). ProseMirror's someProp uses
 // the first non-null clipboardTextSerializer, so ours must win.
-async function makeViewWithClipboard(markdown: string): Promise<{ editor: Editor; view: EditorView }> {
+async function makeViewWithClipboard(
+  markdown: string,
+): Promise<{ editor: Editor; view: EditorView }> {
   const root = document.createElement("div");
   document.body.appendChild(root);
   mountedRoots.push(root);

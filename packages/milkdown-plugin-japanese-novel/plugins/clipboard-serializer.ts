@@ -32,7 +32,9 @@ export function createClipboardSerializerPlugin(ctx: Ctx): Plugin {
         // Fallback to ProseMirror's bare text if the slice can't form a doc.
         if (!doc) return slice.content.textBetween(0, slice.content.size, "\n\n");
         const markdown = serializer(doc);
-        return MdiDocument.fromEditorOutput(markdown, { fileType: ".mdi" }).toExportText("txt-ruby");
+        return MdiDocument.fromEditorOutput(markdown, { fileType: ".mdi" }).toExportText(
+          "txt-ruby",
+        );
       },
     },
   });
