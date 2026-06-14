@@ -3,7 +3,7 @@ title: タブ管理
 slug: tab-manager
 type: architecture
 status: active
-updated: 2026-04-03
+updated: 2026-06-11
 tags:
   - architecture
   - tabs
@@ -21,7 +21,7 @@ The Tab Manager provides multi-tab editing through a set of composable React hoo
 
 Key behaviors:
 
-- **Auto-save**: Dirty tabs are saved automatically every 5 seconds.
+- **Auto-save**: Dirty tabs are saved automatically every 5 seconds (foreground). When power-save mode is enabled and the window is backgrounded, the interval is throttled to 20 seconds by `lib/editor-page/power-policy.ts`.
 - **Tab persistence**: Tab state is persisted with a 1-second debounce, and restored on app startup.
 - **Preview tabs**: Single-click opens a preview tab; editing or double-click promotes it to a full tab.
 - **Deduplication**: Opening an already-open file switches to its existing tab rather than creating a duplicate.
@@ -29,16 +29,18 @@ Key behaviors:
 
 ### Key Files
 
-| File                                            | Purpose                                                       |
-| ----------------------------------------------- | ------------------------------------------------------------- |
-| `lib/tab-manager/types.ts`                      | Type definitions (`TabState`, `MdiFileDescriptor`, constants) |
-| `lib/tab-manager/index.ts`                      | `useTabManager()` -- top-level composing hook                 |
-| `lib/tab-manager/use-tab-state.ts`              | Tab CRUD and active tab management                            |
-| `lib/tab-manager/use-file-io.ts`                | Open, save, and load file operations                          |
-| `lib/tab-manager/use-auto-save.ts`              | Automatic save on 5-second interval                           |
-| `lib/tab-manager/use-tab-persistence.ts`        | Persist/restore tabs (1s debounce)                            |
-| `lib/tab-manager/use-close-dialog.ts`           | Save/Discard/Cancel dialog on tab close                       |
-| `lib/tab-manager/use-electron-menu-bindings.ts` | Electron IPC menu integration                                 |
+| File                                            | Purpose                                                             |
+| ----------------------------------------------- | ------------------------------------------------------------------- |
+| `lib/tab-manager/types.ts`                      | Type definitions (`TabState`, `MdiFileDescriptor`, constants)       |
+| `lib/tab-manager/index.ts`                      | `useTabManager()` -- top-level composing hook                       |
+| `lib/tab-manager/save-executor.ts`              | Unified save pipeline (lock, sanitize, VFS write, snapshot) (#1432) |
+| `lib/tab-manager/save-lock.ts`                  | Per-path save lock preventing concurrent writes (#1432)             |
+| `lib/tab-manager/use-tab-state.ts`              | Tab CRUD and active tab management                                  |
+| `lib/tab-manager/use-file-io.ts`                | Open, save, and load file operations                                |
+| `lib/tab-manager/use-auto-save.ts`              | Power-aware auto-save timer (5s foreground / 20s background)        |
+| `lib/tab-manager/use-tab-persistence.ts`        | Persist/restore tabs (1s debounce)                                  |
+| `lib/tab-manager/use-close-dialog.ts`           | Save/Discard/Cancel dialog on tab close                             |
+| `lib/tab-manager/use-electron-menu-bindings.ts` | Electron IPC menu integration                                       |
 
 ---
 
@@ -119,7 +121,9 @@ interface MdiFileDescriptor {
 ### Constants
 
 ```typescript
-const AUTO_SAVE_INTERVAL = 5000; // Auto-save every 5 seconds
+const AUTO_SAVE_INTERVAL = 5000; // Auto-save every 5 seconds (foreground)
+// BACKGROUND_AUTO_SAVE_INTERVAL_MS = 20_000 — throttled interval when
+// power-save mode is enabled and window is backgrounded (lib/editor-page/power-policy.ts)
 const TAB_PERSIST_DEBOUNCE = 1000; // Debounce tab persistence by 1 second
 ```
 
@@ -250,7 +254,7 @@ Handles all file operations through the VFS abstraction.
 
 ### `useAutoSave()`
 
-Runs a 5-second interval timer. On each tick, iterates through all tabs and saves any that are dirty and not currently in a save operation.
+Manages the auto-save timer with power-aware throttling. In the foreground, ticks every 5 seconds; when power-save mode is enabled and the window is backgrounded, the interval is extended to 20 seconds (`BACKGROUND_AUTO_SAVE_INTERVAL_MS` from `lib/editor-page/power-policy.ts`). On each tick, iterates through all tabs and saves any that are dirty and not currently in a save operation. Actual save logic is delegated to `save-executor.ts` (#1432).
 
 ### `useTabPersistence()`
 
@@ -303,5 +307,5 @@ On first use (no persisted tabs), the tab manager loads a demo file to provide a
 
 ---
 
-**Last Updated**: 2026-02-25
-**Version**: 1.0.0
+**Last Updated**: 2026-06-11
+**Version**: 1.1.0

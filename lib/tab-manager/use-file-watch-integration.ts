@@ -5,10 +5,11 @@ import { shouldPauseFileWatchers } from "../editor-page/power-policy";
 import { getWindowActivitySnapshot, subscribeWindowActivity } from "../editor-page/window-activity";
 import { createFileWatcher } from "../services/file-watcher";
 import { notificationManager } from "../services/notification-manager";
+import { getProjectFileService } from "../services/project-file-service";
 import { isEditorTab } from "./tab-types";
 import type { WindowActivityState } from "../editor-page/window-activity";
 import type { FileWatcher } from "../services/file-watcher";
-import type { TabId, TabState, EditorTabState, DiffTabState } from "./tab-types";
+import type { TabId, EditorTabState } from "./tab-types";
 import type { TabManagerCore } from "./types";
 import type { SnapshotType } from "../services/history-policy";
 
@@ -64,6 +65,28 @@ export interface UseFileWatchIntegrationParams extends TabManagerCore {
 // ---------------------------------------------------------------------------
 
 /**
+ * Cloud sync clients can briefly echo stale contents immediately after a save.
+ * During this window, a clean tab must not auto-reload differing disk bytes
+ * because that can resurrect content the user just deleted. Quarantine the
+ * first mismatch and re-read the file after a short delay; only persistent
+ * divergence becomes a conflict.
+ */
+export const RECENT_SAVE_EXTERNAL_RELOAD_GRACE_MS = 30_000;
+export const RECENT_SAVE_RECHECK_DELAY_MS = 2_000;
+
+function isWithinRecentSaveGrace(tab: EditorTabState, now: number = Date.now()): boolean {
+  if (!tab.lastSavedTime) return false;
+  const elapsed = now - tab.lastSavedTime;
+  return elapsed >= 0 && elapsed <= RECENT_SAVE_EXTERNAL_RELOAD_GRACE_MS;
+}
+
+interface RecentSaveVerificationOptions {
+  filePath: string;
+  pendingVerifications: Map<TabId, ReturnType<typeof setTimeout>>;
+  readDiskContent: (path: string) => Promise<string>;
+}
+
+/**
  * Build the onChanged callback for an editor tab.
  * Implements the state-transition logic described in issue #825.
  *
@@ -79,6 +102,7 @@ export function buildOnChanged(
   openDiffTab: UseFileWatchIntegrationParams["openDiffTab"],
   onEditorRemountNeeded?: () => void,
   tryCreateSnapshot?: UseFileWatchIntegrationParams["tryCreateSnapshot"],
+  recentSaveVerification?: RecentSaveVerificationOptions,
 ): (diskContent: string, lastModified: number) => void {
   return (diskContent: string, lastModified: number) => {
     const currentTabs = tabsRef.current;
@@ -87,6 +111,13 @@ export function buildOnChanged(
 
     const fileName = tab.file?.name ?? "ファイル";
 
+    const clearPendingRecentSaveVerification = (): void => {
+      const pending = recentSaveVerification?.pendingVerifications.get(tabId);
+      if (!pending) return;
+      clearTimeout(pending);
+      recentSaveVerification?.pendingVerifications.delete(tabId);
+    };
+
     // Self-write echo guard (#1448 Codex review): a save performed while the
     // watchers were paused can outlive the time-boxed suppressFileWatch entry
     // (~poll interval + 3s). When the watcher resumes and reports a "change"
@@ -94,30 +125,16 @@ export function buildOnChanged(
     // echoing back — never a real external change. Reloading it would reset
     // the cursor (clean tab) or raise a phantom conflict (dirty tab).
     if (diskContent === tab.lastSavedContent) {
+      clearPendingRecentSaveVerification();
       return;
     }
 
-    if (tab.fileSyncStatus === "clean") {
-      // Clean tab: auto-reload with disk content via pendingExternalContent
-      // (preserves scroll position instead of remounting the editor)
-      setTabs((prev) =>
-        prev.map((t) => {
-          if (t.id !== tabId || !isEditorTab(t)) return t;
-          return {
-            ...t,
-            content: diskContent,
-            lastSavedContent: diskContent,
-            isDirty: false,
-            fileSyncStatus: "clean",
-            conflictDiskContent: null,
-            pendingExternalContent: diskContent,
-          } satisfies EditorTabState;
-        }),
-      );
-      notificationManager.info(`「${fileName}」が更新されました`, 3000);
-    } else if (tab.fileSyncStatus === "dirty") {
-      // Dirty tab: do NOT touch buffer; enter conflicted state
-      const localContent = tab.content;
+    const enterConflictedState = (
+      localContent: string,
+      conflictDiskContent: string,
+      conflictLastModified: number,
+    ): void => {
+      clearPendingRecentSaveVerification();
 
       // Fix #1562 (b): eagerly mirror the conflicted transition into tabsRef.
       // tabsRef is only reassigned from React state on the next render, so
@@ -128,8 +145,9 @@ export function buildOnChanged(
         if (t.id !== tabId || !isEditorTab(t)) return t;
         return {
           ...t,
+          isDirty: true,
           fileSyncStatus: "conflicted",
-          conflictDiskContent: diskContent,
+          conflictDiskContent,
         } satisfies EditorTabState;
       });
 
@@ -138,8 +156,9 @@ export function buildOnChanged(
           if (t.id !== tabId || !isEditorTab(t)) return t;
           return {
             ...t,
+            isDirty: true,
             fileSyncStatus: "conflicted",
-            conflictDiskContent: diskContent,
+            conflictDiskContent,
           } satisfies EditorTabState;
         }),
       );
@@ -152,7 +171,7 @@ export function buildOnChanged(
           {
             label: "差分を表示",
             onClick: () => {
-              openDiffTab(tabId, fileName, localContent, diskContent, lastModified);
+              openDiffTab(tabId, fileName, localContent, conflictDiskContent, conflictLastModified);
               // Do not clear conflict state; user must explicitly resolve
             },
           },
@@ -181,8 +200,8 @@ export function buildOnChanged(
                   if (t.id !== tabId || !isEditorTab(t)) return t;
                   return {
                     ...t,
-                    content: diskContent,
-                    lastSavedContent: diskContent,
+                    content: conflictDiskContent,
+                    lastSavedContent: conflictDiskContent,
                     isDirty: false,
                     fileSyncStatus: "clean",
                     conflictDiskContent: null,
@@ -200,6 +219,7 @@ export function buildOnChanged(
                   if (t.id !== tabId || !isEditorTab(t)) return t;
                   return {
                     ...t,
+                    isDirty: true,
                     fileSyncStatus: "dirty",
                     conflictDiskContent: null,
                   } satisfies EditorTabState;
@@ -209,6 +229,80 @@ export function buildOnChanged(
           },
         ],
       });
+    };
+
+    const applyCleanExternalReload = (newDiskContent: string): void => {
+      clearPendingRecentSaveVerification();
+
+      // Clean tab: auto-reload with disk content via pendingExternalContent
+      // (preserves scroll position instead of remounting the editor)
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== tabId || !isEditorTab(t)) return t;
+          return {
+            ...t,
+            content: newDiskContent,
+            lastSavedContent: newDiskContent,
+            isDirty: false,
+            fileSyncStatus: "clean",
+            conflictDiskContent: null,
+            pendingExternalContent: newDiskContent,
+          } satisfies EditorTabState;
+        }),
+      );
+      notificationManager.info(`「${fileName}」が更新されました`, 3000);
+    };
+
+    const scheduleRecentSaveVerification = (): void => {
+      if (!recentSaveVerification) {
+        enterConflictedState(tab.content, diskContent, lastModified);
+        return;
+      }
+
+      clearPendingRecentSaveVerification();
+
+      const { filePath, pendingVerifications, readDiskContent } = recentSaveVerification;
+      const timer = setTimeout(() => {
+        pendingVerifications.delete(tabId);
+        void (async () => {
+          let confirmedDiskContent = diskContent;
+
+          try {
+            confirmedDiskContent = await readDiskContent(filePath);
+          } catch (error) {
+            console.warn("Failed to re-read file after recent-save watcher mismatch:", error);
+          }
+
+          const latest = tabsRef.current.find((t) => t.id === tabId);
+          if (!latest || !isEditorTab(latest)) return;
+          if (latest.file?.path !== filePath) return;
+          if (latest.fileSyncStatus === "conflicted") return;
+
+          // The cloud client settled back to the bytes we saved. Treat the first
+          // watcher event as transient sync noise and keep the UI quiet.
+          if (confirmedDiskContent === latest.lastSavedContent) {
+            return;
+          }
+
+          if (latest.fileSyncStatus === "clean" || latest.fileSyncStatus === "dirty") {
+            enterConflictedState(latest.content, confirmedDiskContent, lastModified);
+          }
+        })();
+      }, RECENT_SAVE_RECHECK_DELAY_MS);
+
+      pendingVerifications.set(tabId, timer);
+    };
+
+    if (tab.fileSyncStatus === "clean") {
+      if (isWithinRecentSaveGrace(tab)) {
+        scheduleRecentSaveVerification();
+        return;
+      }
+
+      applyCleanExternalReload(diskContent);
+    } else if (tab.fileSyncStatus === "dirty") {
+      // Dirty tab: do NOT touch buffer; enter conflicted state
+      enterConflictedState(tab.content, diskContent, lastModified);
     }
     // If already "conflicted", ignore further disk changes (user must resolve first)
   };
@@ -281,6 +375,9 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
    * Save As 後の path 変更を検出するために使用する。
    */
   const watcherPathsRef = useRef<Map<TabId, string>>(new Map());
+  const pendingRecentSaveVerificationsRef = useRef<Map<TabId, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   /**
    * Whether watchers are currently paused by the window-activity policy
@@ -313,6 +410,11 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
         watcher.stop();
         watchers.delete(tabId);
         watcherPaths.delete(tabId);
+        const pending = pendingRecentSaveVerificationsRef.current.get(tabId);
+        if (pending) {
+          clearTimeout(pending);
+          pendingRecentSaveVerificationsRef.current.delete(tabId);
+        }
       }
     }
 
@@ -332,6 +434,11 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
         existing.stop();
         watchers.delete(tab.id);
         watcherPaths.delete(tab.id);
+        const pending = pendingRecentSaveVerificationsRef.current.get(tab.id);
+        if (pending) {
+          clearTimeout(pending);
+          pendingRecentSaveVerificationsRef.current.delete(tab.id);
+        }
       }
 
       if (!watchers.has(tab.id)) {
@@ -343,6 +450,11 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
           openDiffTab,
           onEditorRemountNeeded,
           tryCreateSnapshot,
+          {
+            filePath,
+            pendingVerifications: pendingRecentSaveVerificationsRef.current,
+            readDiskContent: (path) => getProjectFileService().readFile(path),
+          },
         );
         const watcher = createFileWatcher({ path: filePath, onChanged });
 
@@ -442,12 +554,20 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
+    const watchers = watchersRef.current;
+    const watcherPaths = watcherPathsRef.current;
+    const pendingRecentSaveVerifications = pendingRecentSaveVerificationsRef.current;
+
     return () => {
-      for (const watcher of watchersRef.current.values()) {
+      for (const watcher of watchers.values()) {
         watcher.stop();
       }
-      watchersRef.current.clear();
-      watcherPathsRef.current.clear();
+      watchers.clear();
+      watcherPaths.clear();
+      for (const pending of pendingRecentSaveVerifications.values()) {
+        clearTimeout(pending);
+      }
+      pendingRecentSaveVerifications.clear();
     };
   }, []);
 }

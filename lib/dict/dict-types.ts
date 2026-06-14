@@ -102,6 +102,16 @@ export interface DictDownloadState {
 }
 
 // ---------------------------------------------------------------------------
+// Update check result
+// ---------------------------------------------------------------------------
+
+export interface DictUpdateResult {
+  latestVersion?: string;
+  installedVersion?: string;
+  updateAvailable?: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Service query result
 // ---------------------------------------------------------------------------
 

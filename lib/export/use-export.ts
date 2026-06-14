@@ -7,6 +7,7 @@ import { saveBlobFile } from "./save-blob-file";
 import { mdiToPlainText, mdiToRubyText } from "./txt-exporter";
 import { openWebPrintPreview } from "./web-print-preview";
 import { loadExportSettings, toPdfExportSettings } from "./export-settings";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 import type { ExportFormat, ExportMetadata } from "./types";
 
 interface UseExportParams {
@@ -14,6 +15,13 @@ interface UseExportParams {
   getContent: () => string;
   /** Returns the document title (file name or fallback) */
   getTitle: () => string;
+  /**
+   * Returns the active editor tab's file type (".mdi" | ".md" | ".txt").
+   * This is the source of truth for export normalization — it must NOT be
+   * inferred from the display title, which is extension-stripped. Defaults
+   * to ".mdi" when no editor tab is active.
+   */
+  getFileType: () => SupportedFileExtension;
   /** Returns true when the active tab is an editor tab.
    *  Export operations no-op when false (e.g. terminal or diff tab is active). */
   getIsEditorTabActive: () => boolean;
@@ -38,6 +46,7 @@ interface UseExportParams {
 export function useExport({
   getContent,
   getTitle,
+  getFileType,
   getIsEditorTabActive,
   onExportDialogRequest,
   onPrintDialogRequest,
@@ -61,6 +70,12 @@ export function useExport({
       const title = getTitle();
       const metadata = { title, language: "ja" };
 
+      // Source of truth for export normalization: the active tab's actual file
+      // type. Must NOT be inferred from the display title, which is
+      // extension-stripped (would always fall back to ".mdi" and silently drop
+      // author-written \[\[blank]] / <br> literals in ".md" / ".txt" docs).
+      const fileType = getFileType();
+
       const formatLabels: Record<ExportFormat, string> = {
         pdf: "PDF",
         epub: "EPUB",
@@ -77,7 +92,8 @@ export function useExport({
         });
 
         try {
-          const converted = format === "txt" ? mdiToPlainText(content) : mdiToRubyText(content);
+          const converted =
+            format === "txt" ? mdiToPlainText(content, fileType) : mdiToRubyText(content, fileType);
 
           const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
           const suffix = format === "txt-ruby" ? "_ruby" : "";
@@ -106,7 +122,7 @@ export function useExport({
 
       // --- Web mode: browser-side export ---
       if (!isElectron || !window.electronAPI) {
-        await exportAsWeb(format, content, title, metadata, label);
+        await exportAsWeb(format, content, title, metadata, label, fileType);
         return;
       }
 
@@ -130,7 +146,10 @@ export function useExport({
             result = await window.electronAPI.exportEPUB?.(content, { metadata });
             break;
           case "docx":
-            result = await window.electronAPI.exportDOCX?.(content, { metadata });
+            // Thread the active tab's file type so the main-process generateDocx
+            // un-escapes macros only for ".mdi" and preserves \[\[blank]] literals
+            // authored in ".md"/".txt". Otherwise the handler defaults to ".mdi".
+            result = await window.electronAPI.exportDOCX?.(content, { metadata, fileType });
             break;
         }
 
@@ -153,7 +172,7 @@ export function useExport({
         notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
       }
     },
-    [getContent, getTitle, getIsEditorTabActive, isElectron, onExportDialogRequest],
+    [getContent, getTitle, getFileType, getIsEditorTabActive, isElectron, onExportDialogRequest],
   );
 
   const printDocument = useCallback(() => {
@@ -218,6 +237,7 @@ async function exportAsWeb(
   title: string,
   metadata: ExportMetadata,
   label: string,
+  fileType: string = ".mdi",
 ): Promise<void> {
   const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
 
@@ -247,7 +267,7 @@ async function exportAsWeb(
     switch (format) {
       case "docx": {
         const { generateDocxBlob } = await import("./docx-exporter");
-        blob = await generateDocxBlob(content, { metadata });
+        blob = await generateDocxBlob(content, { metadata, fileType });
         suggestedName = `${baseName}.docx`;
         break;
       }

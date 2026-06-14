@@ -243,6 +243,9 @@ export default function MilkdownEditor({
           enableRuby: mdiExtensionsEnabled,
           enableTcy: mdiExtensionsEnabled,
           enableMdiBreak: mdiExtensionsEnabled,
+          // .txt: characters like *, #, ** are literal — copy must bypass
+          // markdown stripping / MDI conversion (P2-A).
+          plainText: isPlainText,
         }),
       );
 

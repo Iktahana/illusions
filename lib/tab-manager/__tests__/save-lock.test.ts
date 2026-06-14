@@ -14,9 +14,13 @@
  *     the conflicted transition into tabsRef before React re-renders.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { acquireSaveLock, releaseSaveLock, isSaveLocked, clearSaveLocks } from "../save-lock";
-import { buildOnChanged } from "../use-file-watch-integration";
+import {
+  buildOnChanged,
+  RECENT_SAVE_EXTERNAL_RELOAD_GRACE_MS,
+  RECENT_SAVE_RECHECK_DELAY_MS,
+} from "../use-file-watch-integration";
 import { isEditorTab } from "../tab-types";
 import type { Dispatch, SetStateAction } from "react";
 import type { EditorTabState, TabState } from "../tab-types";
@@ -115,6 +119,10 @@ describe("buildOnChanged: eagerly mirrors conflicted into tabsRef (#1562 b)", ()
     openDiffTab = vi.fn<OpenDiffTab>();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("dirty tab: tabsRef shows conflicted before React re-renders", () => {
     const tab = makeEditorTab({ fileSyncStatus: "dirty", isDirty: true });
     tabsRef = { current: [tab] };
@@ -187,6 +195,97 @@ describe("buildOnChanged: eagerly mirrors conflicted into tabsRef (#1562 b)", ()
     const latest = tabsRef.current.find((t) => t.id === tab.id);
     if (latest && isEditorTab(latest)) {
       expect(latest.fileSyncStatus).toBe("clean");
+    }
+  });
+
+  it("clean tab: recent stale disk echo is quarantined while the file is re-read", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(2_000_000);
+
+    const tab = makeEditorTab({
+      fileSyncStatus: "clean",
+      isDirty: false,
+      content: "saved after delete",
+      lastSavedContent: "saved after delete",
+      lastSavedTime: Date.now() - Math.floor(RECENT_SAVE_EXTERNAL_RELOAD_GRACE_MS / 2),
+    });
+    tabsRef = { current: [tab] };
+    const pendingVerifications = new Map<string, ReturnType<typeof setTimeout>>();
+    const readDiskContent = vi.fn(async () => "saved after delete");
+    const onChanged = buildOnChanged(tab.id, setTabs, tabsRef, openDiffTab, undefined, undefined, {
+      filePath: "/p/main.mdi",
+      pendingVerifications,
+      readDiskContent,
+    });
+
+    onChanged("stale cloud copy before delete", 2_000_000);
+
+    const latest = tabsRef.current.find((t) => t.id === tab.id);
+    expect(latest && isEditorTab(latest)).toBe(true);
+    if (latest && isEditorTab(latest)) {
+      expect(latest.content).toBe("saved after delete");
+      expect(latest.lastSavedContent).toBe("saved after delete");
+      expect(latest.pendingExternalContent ?? null).toBeNull();
+      expect(latest.fileSyncStatus).toBe("clean");
+      expect(latest.conflictDiskContent).toBeNull();
+    }
+    expect(setTabs).not.toHaveBeenCalled();
+    expect(pendingVerifications.size).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(RECENT_SAVE_RECHECK_DELAY_MS);
+
+    expect(readDiskContent).toHaveBeenCalledWith("/p/main.mdi");
+    const afterRecheck = tabsRef.current.find((t) => t.id === tab.id);
+    expect(afterRecheck && isEditorTab(afterRecheck)).toBe(true);
+    if (afterRecheck && isEditorTab(afterRecheck)) {
+      expect(afterRecheck.content).toBe("saved after delete");
+      expect(afterRecheck.fileSyncStatus).toBe("clean");
+      expect(afterRecheck.conflictDiskContent).toBeNull();
+      expect(afterRecheck.pendingExternalContent ?? null).toBeNull();
+    }
+  });
+
+  it("clean tab: recent disk mismatch becomes a conflict only when the re-read still differs", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(2_000_000);
+
+    const tab = makeEditorTab({
+      fileSyncStatus: "clean",
+      isDirty: false,
+      content: "saved after delete",
+      lastSavedContent: "saved after delete",
+      lastSavedTime: Date.now() - Math.floor(RECENT_SAVE_EXTERNAL_RELOAD_GRACE_MS / 2),
+    });
+    tabsRef = { current: [tab] };
+    const pendingVerifications = new Map<string, ReturnType<typeof setTimeout>>();
+    const readDiskContent = vi.fn(async () => "stale cloud copy before delete");
+    const onChanged = buildOnChanged(tab.id, setTabs, tabsRef, openDiffTab, undefined, undefined, {
+      filePath: "/p/main.mdi",
+      pendingVerifications,
+      readDiskContent,
+    });
+
+    onChanged("stale cloud copy before delete", 2_000_000);
+
+    let latest = tabsRef.current.find((t) => t.id === tab.id);
+    expect(latest && isEditorTab(latest)).toBe(true);
+    if (latest && isEditorTab(latest)) {
+      expect(latest.content).toBe("saved after delete");
+      expect(latest.pendingExternalContent ?? null).toBeNull();
+      expect(latest.fileSyncStatus).toBe("clean");
+      expect(latest.conflictDiskContent).toBeNull();
+    }
+
+    await vi.advanceTimersByTimeAsync(RECENT_SAVE_RECHECK_DELAY_MS);
+
+    latest = tabsRef.current.find((t) => t.id === tab.id);
+    expect(latest && isEditorTab(latest)).toBe(true);
+    if (latest && isEditorTab(latest)) {
+      expect(latest.content).toBe("saved after delete");
+      expect(latest.lastSavedContent).toBe("saved after delete");
+      expect(latest.pendingExternalContent ?? null).toBeNull();
+      expect(latest.fileSyncStatus).toBe("conflicted");
+      expect(latest.conflictDiskContent).toBe("stale cloud copy before delete");
     }
   });
 });

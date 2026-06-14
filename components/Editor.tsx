@@ -351,9 +351,23 @@ export default function NovelEditor({
     if (isVertical && !hasVerticalInitialScrollRef.current) {
       if (setScrollProgress({ container, isVertical: true }, 0)) {
         hasVerticalInitialScrollRef.current = true;
+        // onLayoutReady fires before the web font (Noto Serif JP) finishes
+        // loading. When the font swaps in, the content width (scrollWidth)
+        // grows but scrollLeft stays put, so the document start (right edge)
+        // drifts out of view and the title sticks to the right frame.
+        // Re-pin to the start once fonts are ready (first vertical entry only).
+        if (typeof document !== "undefined" && document.fonts?.ready) {
+          document.fonts.ready.then(() => {
+            const c = scrollContainerRef.current;
+            if (!c) return;
+            requestAnimationFrame(() => {
+              setScrollProgress({ container: c, isVertical: true }, 0);
+            });
+          });
+        }
       }
     }
-  }, [isVertical]);
+  }, [isVertical, scrollContainerRef]);
 
   // 縦書き: コンテンツ幅の変化（Web フォント読込・行字数再計算など）後も読書位置を維持する。
   // scrollLeft は数値のまま据え置かれるため、コンテンツが伸びると文書先頭（右端）が
