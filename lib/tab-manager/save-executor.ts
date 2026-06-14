@@ -285,6 +285,10 @@ export async function executeTabSave(params: ExecuteTabSaveParams): Promise<Save
         : null
       : tab.file;
 
+    if (descriptor?.path) {
+      suppressFileWatch(descriptor.path, sanitized);
+    }
+
     const result = await saveMdiFile({ descriptor, content: sanitized, fileType: tab.fileType });
     if (!result) {
       // User cancelled the save dialog

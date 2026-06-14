@@ -36,6 +36,7 @@ The history service provides a local version history system for documents. It cr
 - Automatic pruning by count and age with milestone protection
 - Singleton access via `getHistoryService()`
 - Policy/Store split: `HistoryPolicy` (stateless decisions) + `HistoryStore` (IO) composed by the `HistoryService` facade
+- TOCTOU safety (#1591): auto-snapshot throttle is re-checked **inside** the index lock (`withIndexLock`) to prevent duplicate concurrent snapshots
 
 ---
 

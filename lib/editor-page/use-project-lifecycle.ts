@@ -16,6 +16,7 @@ import { useAutoRestore } from "./use-auto-restore";
 import { usePermissions } from "./use-permissions";
 import { useProjectInitialization } from "./use-project-initialization";
 import { useFileOpening } from "./use-file-opening";
+import { useStartupChecks } from "./use-startup-checks";
 
 export type { RecentProjectEntry } from "./types";
 
@@ -199,6 +200,10 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
     signalVfsReady,
     handleOpenRecentProject,
   });
+
+  // Run startup notice checks (e.g. dictionary not downloaded / update available)
+  // once after the boot sequence is wired up.
+  useStartupChecks();
 
   const handleCreateProject = useCallback(() => {
     setShowCreateWizard(true);
