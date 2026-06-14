@@ -18,6 +18,7 @@ import {
   TextDirection,
 } from "docx";
 import {
+  MdiDocument,
   replaceMdiWithRubyText,
   MDI_BREAK_RE,
   isMdiBlankParagraphLine,
@@ -39,6 +40,13 @@ import type { DocxExportSettings, DocxFontConfig } from "./docx-export-settings"
 export interface DocxExportOptions {
   metadata: ExportMetadata;
   settings?: DocxExportSettings;
+  /**
+   * Active document file extension (".mdi" | ".md" | ".txt").
+   * Defaults to ".mdi". Non-MDI types skip macro un-escaping in
+   * `fromEditorOutput` so that an author's intentional literal
+   * `\[\[blank]]` is not silently promoted to a blank line (DATA-LOSS guard).
+   */
+  fileType?: string;
 }
 
 /**
@@ -49,7 +57,20 @@ function buildDocxDocument(content: string, options: DocxExportOptions): Documen
   const { metadata } = options;
   const settings = options.settings ? sanitizeSettings(options.settings) : DEFAULT_DOCX_SETTINGS;
   const fontConfig = toDocxFont(settings.fontFamily);
-  const paragraphs = parseMarkdownToDocxParagraphs(content, settings, fontConfig);
+  // Branch on fileType to pick the source pipeline:
+  // - ".mdi": `content` is the live editor serializer output, so normalize it
+  //   via `fromEditorOutput` (un-escape `\[\[blank]]` macros, rewrite `<br />`,
+  //   strip editor-injected HTML) so blank paragraphs become real empty
+  //   paragraphs instead of leaking the literal marker into the .docx.
+  // - non-".mdi" (".md"/".txt"/...): `content` is raw authored text. Use
+  //   `fromRawText` so NO editor-HTML normalization runs — literal `<br />`,
+  //   `<p>x</p>`, `\[\[blank]]` are preserved verbatim (DATA-LOSS guard).
+  const fileType = options.fileType ?? ".mdi";
+  const normalized =
+    fileType === ".mdi"
+      ? MdiDocument.fromEditorOutput(content, { fileType: ".mdi" }).toRawText()
+      : MdiDocument.fromRawText(content).toRawText();
+  const paragraphs = parseMarkdownToDocxParagraphs(normalized, settings, fontConfig);
 
   // Page dimensions (swap for landscape)
   const baseDims = PAGE_DIMENSIONS[settings.pageSize] ?? PAGE_DIMENSIONS["A5"];

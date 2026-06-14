@@ -101,6 +101,9 @@ declare global {
           textIndent?: number;
           showPageNumbers?: boolean;
         };
+        // Active tab's file type. The main-process generateDocx un-escapes MDI
+        // macros only for ".mdi"; absent/unknown falls back to ".mdi".
+        fileType?: import("@/lib/project/project-types").SupportedFileExtension;
       },
     ) => Promise<string | { success: false; error: string } | null>;
     printDocument?: (
