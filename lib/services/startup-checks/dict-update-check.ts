@@ -15,13 +15,26 @@
  * problems and no error toast is surfaced.
  */
 import { getDictService } from "@/lib/dict/dict-service";
+import { getStorageService } from "@/lib/storage/storage-service";
 import { notificationManager } from "../notification-manager";
 import type { StartupCheck, StartupNotice } from "../startup-check-queue";
 
 const GENJI_PROVIDER_ID = "genji";
 
+/**
+ * Result shape resolved by `electronAPI.dict.download()` (IPC `dict:download`).
+ * The handler RESOLVES `{ success: false, error }` on recoverable failures
+ * (another download running, checksum/URL validation, etc.) rather than
+ * rejecting, so the caller must inspect `success` — not just rely on `.catch`.
+ */
+interface DictDownloadResult {
+  success: boolean;
+  version?: string;
+  error?: string;
+}
+
 interface ElectronDictApi {
-  download?: () => Promise<unknown>;
+  download?: () => Promise<DictDownloadResult | undefined>;
   getStatus?: () => Promise<unknown>;
 }
 
@@ -33,8 +46,25 @@ function getElectronDict(): ElectronDictApi | undefined {
 function startDictDownload(): void {
   const dict = getElectronDict();
   if (!dict?.download) return;
-  dict.download().catch((e: unknown) => console.warn("[dict] download failed:", e));
   notificationManager.info("辞書のダウンロードを開始しました。");
+  // The IPC handler resolves `{ success: false, error }` on recoverable
+  // failures instead of rejecting, so inspect the resolved result and surface
+  // the error rather than leaving the optimistic "started" toast standing.
+  dict
+    .download()
+    .then((result) => {
+      if (result?.success === false) {
+        notificationManager.error(
+          `辞書のダウンロードに失敗しました：${result.error ?? "不明なエラー"}`,
+        );
+      }
+    })
+    .catch((e: unknown) => {
+      console.warn("[dict] download failed:", e);
+      notificationManager.error(
+        `辞書のダウンロードに失敗しました：${e instanceof Error ? e.message : String(e)}`,
+      );
+    });
 }
 
 export const dictUpdateCheck: StartupCheck = {
@@ -59,6 +89,18 @@ export const dictUpdateCheck: StartupCheck = {
     // Dictionary is installed (or in a transient state like downloading).
     // Only check for updates when idle — skip while a download is already running.
     if (state.status !== "installed") {
+      return null;
+    }
+
+    // Respect the user's "起動時に更新を確認する" preference. The Electron main
+    // process gates its own dictionary update check on the same AppState key
+    // (`dictAutoCheckUpdates`); this renderer check must honor it too so we
+    // never fire the network `checkForUpdate()` when auto-checking is OFF.
+    // Default is enabled when the key is unset (treat only an explicit `false`
+    // as disabled). This gate applies to the installed→update branch only — the
+    // "not installed" warning above is always shown.
+    const appState = await getStorageService().loadAppState();
+    if (appState?.dictAutoCheckUpdates === false) {
       return null;
     }
 
