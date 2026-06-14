@@ -331,6 +331,10 @@ export default function EditorPage() {
   // Stable ref so export / shortcut callbacks can read the current value without re-creating
   const isEditorTabActiveRef = useRef<boolean>(!!activeEditorTab);
   isEditorTabActiveRef.current = !!activeEditorTab;
+  // Stable ref to the active tab's file type, so dialog-request callbacks (deps:
+  // []) can snapshot the true file type for export normalization.
+  const activeFileTypeRef = useRef<SupportedFileExtension>(activeFileType);
+  activeFileTypeRef.current = activeFileType;
 
   // Auto-collapse right panel when all tabs are closed, restore when a tab opens
   const rightPanelUserPrefRef = useRef(isRightPanelCollapsed);
@@ -499,12 +503,21 @@ export default function EditorPage() {
     const name = (tab && isEditorTab(tab) ? tab.file?.name : undefined) ?? "untitled";
     return name.replace(/\.[^.]+$/, "");
   }, [tabs, activeTabId]);
+  // Source of truth for export normalization: the active tab's actual file
+  // type. Read freshly (like getExportTitle) rather than inferred from the
+  // extension-stripped display title.
+  const getExportFileType = useCallback((): SupportedFileExtension => {
+    const tab = tabs.find((t) => t.id === activeTabId);
+    return (tab && isEditorTab(tab) ? tab.fileType : undefined) ?? ".mdi";
+  }, [tabs, activeTabId]);
 
   // Export dialog state (PDF / DOCX share a single state slot)
   interface ExportDialogState {
     format: "pdf" | "docx" | "epub";
     content: string;
     metadata: ExportMetadata;
+    /** Snapshot of the active tab's file type at the moment the dialog opened. */
+    fileType: SupportedFileExtension;
   }
   const [exportDialogState, setExportDialogState] = useState<ExportDialogState | null>(null);
   const exportDialogStateRef = useRef<ExportDialogState | null>(null);
@@ -522,7 +535,12 @@ export default function EditorPage() {
 
   const handleExportDialogRequest = useCallback(
     (format: "pdf" | "docx" | "epub", content: string, metadata: ExportMetadata) => {
-      const state: ExportDialogState = { format, content, metadata };
+      const state: ExportDialogState = {
+        format,
+        content,
+        metadata,
+        fileType: activeFileTypeRef.current,
+      };
       exportDialogStateRef.current = state;
       setExportDialogState(state);
     },
@@ -692,16 +710,14 @@ export default function EditorPage() {
 
     try {
       const { generateDocxBlob } = await import("@/lib/export/docx-exporter");
-      // Derive file type from the document title so macro un-escaping only
-      // applies to ".mdi" documents (DATA-LOSS guard for ".md"/".txt" authors).
-      const docTitle = dialogState.metadata.title ?? "";
-      const docExtMatch = /\.([^.]+)$/.exec(docTitle);
-      const docTitleExt = docExtMatch ? `.${docExtMatch[1].toLowerCase()}` : ".mdi";
-      const docFileType = [".mdi", ".md", ".txt"].includes(docTitleExt) ? docTitleExt : ".mdi";
+      // Use the active tab's actual file type (snapshotted when the dialog
+      // opened) so macro un-escaping only applies to ".mdi" documents. Inferring
+      // from the title is wrong — the display title is extension-stripped, which
+      // would silently drop author-written \[\[blank]] literals in ".md"/".txt".
       const blob = await generateDocxBlob(dialogState.content, {
         metadata: dialogState.metadata,
         settings,
-        fileType: docFileType,
+        fileType: dialogState.fileType,
       });
       const baseName = (dialogState.metadata.title || "untitled").replace(/\.[^.]+$/, "");
       const { saveBlobFile } = await import("@/lib/export/save-blob-file");
@@ -786,6 +802,7 @@ export default function EditorPage() {
   const { exportAs, printDocument } = useExport({
     getContent: getExportContent,
     getTitle: getExportTitle,
+    getFileType: getExportFileType,
     getIsEditorTabActive: useCallback(() => isEditorTabActiveRef.current, []),
     onExportDialogRequest: handleExportDialogRequest,
     onPrintDialogRequest: handlePrintDialogRequest,

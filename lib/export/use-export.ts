@@ -7,6 +7,7 @@ import { saveBlobFile } from "./save-blob-file";
 import { mdiToPlainText, mdiToRubyText } from "./txt-exporter";
 import { openWebPrintPreview } from "./web-print-preview";
 import { loadExportSettings, toPdfExportSettings } from "./export-settings";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 import type { ExportFormat, ExportMetadata } from "./types";
 
 interface UseExportParams {
@@ -14,6 +15,13 @@ interface UseExportParams {
   getContent: () => string;
   /** Returns the document title (file name or fallback) */
   getTitle: () => string;
+  /**
+   * Returns the active editor tab's file type (".mdi" | ".md" | ".txt").
+   * This is the source of truth for export normalization — it must NOT be
+   * inferred from the display title, which is extension-stripped. Defaults
+   * to ".mdi" when no editor tab is active.
+   */
+  getFileType: () => SupportedFileExtension;
   /** Returns true when the active tab is an editor tab.
    *  Export operations no-op when false (e.g. terminal or diff tab is active). */
   getIsEditorTabActive: () => boolean;
@@ -38,6 +46,7 @@ interface UseExportParams {
 export function useExport({
   getContent,
   getTitle,
+  getFileType,
   getIsEditorTabActive,
   onExportDialogRequest,
   onPrintDialogRequest,
@@ -61,12 +70,11 @@ export function useExport({
       const title = getTitle();
       const metadata = { title, language: "ja" };
 
-      // Derive the active document's file type from the title extension.
-      // Default to ".mdi" (novel document) when the extension is absent or
-      // unrecognised — this preserves existing behaviour for MDI documents.
-      const extMatch = /\.([^.]+)$/.exec(title);
-      const titleExt = extMatch ? `.${extMatch[1].toLowerCase()}` : ".mdi";
-      const fileType = [".mdi", ".md", ".txt"].includes(titleExt) ? titleExt : ".mdi";
+      // Source of truth for export normalization: the active tab's actual file
+      // type. Must NOT be inferred from the display title, which is
+      // extension-stripped (would always fall back to ".mdi" and silently drop
+      // author-written \[\[blank]] / <br> literals in ".md" / ".txt" docs).
+      const fileType = getFileType();
 
       const formatLabels: Record<ExportFormat, string> = {
         pdf: "PDF",
@@ -161,7 +169,7 @@ export function useExport({
         notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
       }
     },
-    [getContent, getTitle, getIsEditorTabActive, isElectron, onExportDialogRequest],
+    [getContent, getTitle, getFileType, getIsEditorTabActive, isElectron, onExportDialogRequest],
   );
 
   const printDocument = useCallback(() => {
