@@ -197,3 +197,75 @@ describe("export — fileType preservation guard (.md/.txt)", () => {
     });
   });
 });
+
+// Regression for Codex P3: `fromEditorOutput` normalizes editor-injected HTML
+// (rewrites standalone/inline `<br>` and strips paired HTML tags like `<p>`)
+// regardless of fileType — only MDI macro un-escaping was gated on ".mdi".
+// For non-".mdi" exports the content is raw authored text, so this normalization
+// is a regression: a literal `<br />` became a newline and `<p>x</p>` lost its
+// tags. Non-".mdi" exports must go through `fromRawText` and preserve literals.
+describe("export — non-.mdi preserves literal editor HTML (Codex P3)", () => {
+  describe("txt exporter", () => {
+    it(".txt: literal <br /> is PRESERVED (not turned into a newline)", () => {
+      const txt = mdiToPlainText("行1<br />行2", ".txt");
+      // The literal tag must survive verbatim; it must NOT be rewritten to a
+      // line break that splits 行1 / 行2 onto separate lines.
+      expect(txt).toContain("<br />");
+      expect(txt).toContain("行1<br />行2");
+    });
+
+    it(".md: literal <p>x</p> is PRESERVED (tags not stripped)", () => {
+      const txt = mdiToPlainText("前<p>中</p>後", ".md");
+      expect(txt).toContain("<p>中</p>");
+    });
+
+    it(".mdi: standalone <br /> still normalizes to a blank line (unchanged)", () => {
+      const txt = mdiToPlainText("A段落\n\n<br />\n\nB段落", ".mdi");
+      expect(txt).not.toContain("<br");
+    });
+
+    it(".mdi: <p>x</p> tags are still stripped (unchanged)", () => {
+      const txt = mdiToPlainText("<p>本文</p>", ".mdi");
+      expect(txt).not.toContain("<p>");
+      expect(txt).not.toContain("</p>");
+      expect(txt).toContain("本文");
+    });
+  });
+
+  describe("docx exporter", () => {
+    it(".txt: literal <br /> survives into the docx text run (not a <w:br/>)", async () => {
+      const blob = await generateDocxBlob("行1<br />行2", {
+        metadata: { title: "story.txt", language: "ja" },
+        fileType: ".txt",
+      });
+      const unzipped = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+      const documentXml = strFromU8(unzipped["word/document.xml"]!);
+      // The literal angle-bracket tag is preserved as text (XML-escaped).
+      expect(documentXml).toContain("&lt;br /&gt;");
+      // No explicit line break should have been emitted from the literal tag.
+      expect(documentXml).not.toContain("<w:br/>");
+    });
+
+    it(".md: literal <p>x</p> tags are preserved as text (not stripped)", async () => {
+      const blob = await generateDocxBlob("前<p>中</p>後", {
+        metadata: { title: "note.md", language: "ja" },
+        fileType: ".md",
+      });
+      const unzipped = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+      const documentXml = strFromU8(unzipped["word/document.xml"]!);
+      expect(documentXml).toContain("&lt;p&gt;");
+      expect(documentXml).toContain("&lt;/p&gt;");
+    });
+
+    it(".mdi: <p>x</p> tags are still stripped (unchanged)", async () => {
+      const blob = await generateDocxBlob("<p>本文</p>", {
+        metadata: { title: "novel.mdi", language: "ja" },
+        fileType: ".mdi",
+      });
+      const unzipped = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+      const documentXml = strFromU8(unzipped["word/document.xml"]!);
+      expect(documentXml).not.toContain("&lt;p&gt;");
+      expect(documentXml).toContain("本文");
+    });
+  });
+});

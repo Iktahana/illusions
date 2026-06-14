@@ -57,15 +57,19 @@ function buildDocxDocument(content: string, options: DocxExportOptions): Documen
   const { metadata } = options;
   const settings = options.settings ? sanitizeSettings(options.settings) : DEFAULT_DOCX_SETTINGS;
   const fontConfig = toDocxFont(settings.fontFamily);
-  // Normalize editor serializer output (un-escape `\[\[blank]]` macros and
-  // `<br />`) so blank paragraphs become real empty paragraphs instead of
-  // leaking the literal marker into the .docx. Idempotent on clean raw text.
-  // fileType controls whether macro un-escaping runs: ".mdi" → normalize;
-  // ".md"/".txt" → preserve escaped literals to prevent DATA-LOSS for authors
-  // who literally typed `\[\[blank]]` in a non-MDI document.
-  const normalized = MdiDocument.fromEditorOutput(content, {
-    fileType: options.fileType ?? ".mdi",
-  }).toRawText();
+  // Branch on fileType to pick the source pipeline:
+  // - ".mdi": `content` is the live editor serializer output, so normalize it
+  //   via `fromEditorOutput` (un-escape `\[\[blank]]` macros, rewrite `<br />`,
+  //   strip editor-injected HTML) so blank paragraphs become real empty
+  //   paragraphs instead of leaking the literal marker into the .docx.
+  // - non-".mdi" (".md"/".txt"/...): `content` is raw authored text. Use
+  //   `fromRawText` so NO editor-HTML normalization runs — literal `<br />`,
+  //   `<p>x</p>`, `\[\[blank]]` are preserved verbatim (DATA-LOSS guard).
+  const fileType = options.fileType ?? ".mdi";
+  const normalized =
+    fileType === ".mdi"
+      ? MdiDocument.fromEditorOutput(content, { fileType: ".mdi" }).toRawText()
+      : MdiDocument.fromRawText(content).toRawText();
   const paragraphs = parseMarkdownToDocxParagraphs(normalized, settings, fontConfig);
 
   // Page dimensions (swap for landscape)
