@@ -6,7 +6,13 @@
  *   import { getDictService } from "@/lib/dict/dict-service";
  *   const results = await getDictService().query("雪");
  */
-import type { IDictProvider, DictEntry, DictQueryResult, DictDownloadState } from "./dict-types";
+import type {
+  IDictProvider,
+  DictEntry,
+  DictQueryResult,
+  DictDownloadState,
+  DictUpdateResult,
+} from "./dict-types";
 import { GenjiProvider } from "./providers/genji-provider";
 
 // Deduplication key: (entry, reading.primary) — preserves homonyms that share
@@ -113,6 +119,30 @@ class DictService {
     } catch {
       return { providerId, status: "error", error: "状態の取得に失敗しました" };
     }
+  }
+
+  /**
+   * Check GitHub Releases for an update to the given provider's dictionary.
+   * Calls `electronAPI.dict.checkUpdate()` (IPC `dict:check-update`) which hits
+   * the network and returns `{ latestVersion, installedVersion, updateAvailable }`.
+   *
+   * Returns null on Web (no electronAPI.dict) and throws on IPC/network failure
+   * so the caller can decide whether to surface the error.
+   */
+  async checkForUpdate(_providerId: string): Promise<DictUpdateResult | null> {
+    const electronAPI = (
+      window as Window & {
+        electronAPI?: {
+          dict?: { checkUpdate: () => Promise<DictUpdateResult> };
+        };
+      }
+    ).electronAPI;
+
+    if (!electronAPI?.dict?.checkUpdate) {
+      return null;
+    }
+
+    return electronAPI.dict.checkUpdate();
   }
 }
 

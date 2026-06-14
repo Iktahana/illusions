@@ -25,10 +25,15 @@ class NotificationManager {
   }
 
   /**
-   * リスナーを追加
+   * リスナーを追加する。既存の通知がある場合は登録直後に一度再生する（遅延マウント対策）。
    */
   subscribe(listener: NotificationListener): () => void {
     this.listeners.add(listener);
+    // Replay pending notifications so late subscribers (e.g. NotificationContainer
+    // rendered after children in layout.tsx) don't miss messages posted before they mount.
+    if (this.notifications.length > 0) {
+      listener([...this.notifications]);
+    }
     return () => this.listeners.delete(listener);
   }
 
