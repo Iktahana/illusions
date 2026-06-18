@@ -368,6 +368,7 @@ export default function EditorPage() {
   const [selectedCharCount, setSelectedCharCount] = useState(0);
   const [selectedManuscriptCells, setSelectedManuscriptCells] = useState(0);
   const [selectedManuscriptPages, setSelectedManuscriptPages] = useState(0);
+  const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstanceRaw] = useState<EditorView | null>(null);
@@ -1169,6 +1170,7 @@ export default function EditorPage() {
     },
     switchToCorrectionsTrigger,
     previousDayStats,
+    selectedWord,
   } as const;
 
   return (
@@ -1269,6 +1271,16 @@ export default function EditorPage() {
           setSelectedCharCount(count);
           setSelectedManuscriptCells(cells);
           setSelectedManuscriptPages(pages);
+          // 選択語を幻辞ルックアップ用に保持する
+          if (count > 0 && editorViewRef.current) {
+            const { selection, doc } = editorViewRef.current.state;
+            const text = doc.textBetween(selection.from, selection.to, "").trim();
+            // 単語単位（空白区切り）の先頭語、または選択全体（日本語は空白なし）
+            const word = text.split(/\s+/)[0] ?? null;
+            setSelectedWord(word || null);
+          } else {
+            setSelectedWord(null);
+          }
         },
         searchOpenTrigger,
         searchInitialTerm,
