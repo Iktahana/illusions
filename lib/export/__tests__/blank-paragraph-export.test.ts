@@ -3,6 +3,7 @@ import { unzipSync, strFromU8 } from "fflate";
 import { mdiToHtml } from "@/lib/export/mdi-to-html";
 import { mdiToPlainText } from "@/lib/export/txt-exporter";
 import { generateDocxBlob } from "@/lib/export/docx-exporter";
+import { buildEpubFiles } from "@/lib/export/epub-shared";
 
 describe("html exporter — [[blank]] paragraph handling", () => {
   it("[[blank]] → <p></p>", () => {
@@ -26,6 +27,38 @@ describe("html exporter — [[blank]] paragraph handling", () => {
     const html = mdiToHtml("文章\n\n```\n[[blank]]\n```\n\n続き", { bodyOnly: true });
     expect(html).not.toContain("");
     expect(html).not.toContain("[[blank]]");
+  });
+});
+
+// Regression for the PDF/EPUB leak (花様年華): the HTML pipeline (mdiToHtml) is
+// fed the *live Milkdown serializer output*, where MDI macros are escaped to
+// `\[\[blank]]`. Before the fix, mdiToHtml never normalized this, so MDI_BLANK_RE
+// (which matches the unescaped marker) missed it and `[[blank]]` leaked verbatim
+// into PDF / EPUB / print output. TXT/DOCX already normalized via MdiDocument;
+// these tests lock the HTML path to the same behavior.
+describe("html exporter — serializer-escaped [[blank]] (PDF/EPUB leak regression)", () => {
+  it("default (.mdi): \\[\\[blank]] (escaped) → <p></p>, no [[blank]] leak", () => {
+    const html = mdiToHtml("A\n\n\\[\\[blank]]\n\nB", { bodyOnly: true });
+    expect(html).toContain("<p></p>");
+    expect(html).not.toContain("[[blank]]");
+    expect(html).not.toContain("\\[");
+    // U+E000 sentinel must not leak
+    expect(html).not.toContain(String.fromCharCode(0xe000));
+  });
+
+  it(".mdi (explicit): \\[\\[blank]] (escaped) → <p></p>, no leak", () => {
+    const html = mdiToHtml("A\n\n\\[\\[blank]]\n\nB", { bodyOnly: true, fileType: ".mdi" });
+    expect(html).toContain("<p></p>");
+    expect(html).not.toContain("[[blank]]");
+    expect(html).not.toContain("\\[");
+  });
+
+  it(".md: \\[\\[blank]] (escaped) → preserved as literal text, NOT an empty <p> (DATA-LOSS guard)", () => {
+    const html = mdiToHtml("A\n\n\\[\\[blank]]\n\nB", { bodyOnly: true, fileType: ".md" });
+    // For non-.mdi the authored literal must survive — markdown-it un-escapes the
+    // backslash so the visible text is "[[blank]]" inside a real paragraph.
+    expect(html).toContain("[[blank]]");
+    expect(html).not.toContain("<p></p>");
   });
 });
 
@@ -62,6 +95,42 @@ describe("docx exporter — [[blank]] paragraph handling", () => {
     expect(pCount).toBeGreaterThanOrEqual(3);
     expect(documentXml).toContain("A");
     expect(documentXml).toContain("B");
+  });
+});
+
+// End-to-end EPUB regression: buildEpubFiles → splitIntoChapters → mdiToHtml.
+// The chapter xhtml is where [[blank]] previously leaked in the exported book
+// (3rd screenshot of #花様年華). Confirms fileType threads all the way through.
+describe("epub exporter — serializer-escaped [[blank]] in chapter xhtml", () => {
+  it("default (.mdi): \\[\\[blank]] → empty <p>, no [[blank]] leak in chapter-1.xhtml", () => {
+    const files = buildEpubFiles("# 第一章\n\nA\n\n\\[\\[blank]]\n\nB", {
+      metadata: { title: "テスト", language: "ja" },
+    });
+    const chapter = files.get("OEBPS/chapter-1.xhtml") as string;
+    expect(chapter).toBeTruthy();
+    expect(chapter).toContain("<p></p>");
+    expect(chapter).not.toContain("[[blank]]");
+    expect(chapter).not.toContain("\\[");
+  });
+
+  it(".mdi (explicit): unescaped [[blank]] → empty <p>, no leak", () => {
+    const files = buildEpubFiles("# 第一章\n\nA\n\n[[blank]]\n\nB", {
+      metadata: { title: "テスト", language: "ja" },
+      fileType: ".mdi",
+    });
+    const chapter = files.get("OEBPS/chapter-1.xhtml") as string;
+    expect(chapter).toContain("<p></p>");
+    expect(chapter).not.toContain("[[blank]]");
+  });
+
+  it(".md: \\[\\[blank]] → preserved as literal text, no empty <p> (DATA-LOSS guard)", () => {
+    const files = buildEpubFiles("# 第一章\n\nA\n\n\\[\\[blank]]\n\nB", {
+      metadata: { title: "note.md", language: "ja" },
+      fileType: ".md",
+    });
+    const chapter = files.get("OEBPS/chapter-1.xhtml") as string;
+    expect(chapter).toContain("[[blank]]");
+    expect(chapter).not.toContain("<p></p>");
   });
 });
 

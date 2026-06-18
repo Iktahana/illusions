@@ -574,6 +574,10 @@ export default function EditorPage() {
           pageNumberPosition: settings.pageNumberPosition,
           textIndent: settings.textIndent,
           googleFontFamily: settings.googleFontFamily,
+          // Thread the active tab's snapshotted file type so the HTML pipeline
+          // un-escapes MDI macros only for ".mdi" and preserves \[\[blank]]
+          // literals authored in ".md"/".txt".
+          fileType: dialogState.fileType,
         });
 
         notificationManager.dismiss(progressId);
@@ -598,7 +602,12 @@ export default function EditorPage() {
 
     // Web path: browser print preview (static import — no await before window.open)
     try {
-      const opened = await openWebPrintPreview(dialogState.content, dialogState.metadata, settings);
+      const opened = await openWebPrintPreview(
+        dialogState.content,
+        dialogState.metadata,
+        settings,
+        dialogState.fileType,
+      );
       if (!opened) {
         notificationManager.warning(
           "ポップアップがブロックされました。ブラウザの設定を確認してください。",
@@ -745,6 +754,11 @@ export default function EditorPage() {
     const dialogState = exportDialogStateRef.current;
     if (!dialogState) return;
 
+    // Thread the active tab's snapshotted file type so the HTML pipeline
+    // un-escapes MDI macros only for ".mdi" and preserves \[\[blank]] literals
+    // authored in ".md"/".txt".
+    const epubOptions: EpubExportOptions = { ...options, fileType: dialogState.fileType };
+
     // Electron path: use IPC
     if (window.electronAPI?.exportEPUB) {
       setExportDialogState(null);
@@ -755,7 +769,7 @@ export default function EditorPage() {
 
       try {
         // Electron IPC serializes Uint8Array automatically
-        const result = await window.electronAPI.exportEPUB(dialogState.content, options);
+        const result = await window.electronAPI.exportEPUB(dialogState.content, epubOptions);
 
         notificationManager.dismiss(progressId);
 
@@ -784,7 +798,7 @@ export default function EditorPage() {
 
     try {
       const { generateEpubBlob } = await import("@/lib/export/epub-web");
-      const blob = await generateEpubBlob(dialogState.content, options);
+      const blob = await generateEpubBlob(dialogState.content, epubOptions);
       const baseName = (options.metadata.title || "untitled")
         .replace(/[<>:"/\\|?*]/g, "_")
         .replace(/\.[^.]+$/, "");
@@ -1201,6 +1215,7 @@ export default function EditorPage() {
           onEpubExport: handleEpubExportConfirm,
           content: exportDialogState?.content ?? "",
           metadata: exportDialogState?.metadata ?? { title: "" },
+          fileType: exportDialogState?.fileType,
         },
         printDialog: {
           state: printDialogState,

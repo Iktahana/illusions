@@ -46,6 +46,12 @@ interface ExportDialogProps {
   onExportEpub?: (options: EpubExportOptions) => void;
   content: string;
   metadata: ExportMetadata;
+  /**
+   * Active document file type. Forwarded to the PDF preview IPC so the HTML
+   * pipeline un-escapes MDI macros only for ".mdi" and preserves \[\[blank]]
+   * literals in ".md"/".txt". Absent → ".mdi".
+   */
+  fileType?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +120,7 @@ export default function ExportDialog({
   onExportEpub,
   content,
   metadata,
+  fileType,
 }: ExportDialogProps): React.ReactNode {
   if (!isOpen) return null;
   return (
@@ -126,6 +133,7 @@ export default function ExportDialog({
       onExportEpub={onExportEpub}
       content={content}
       metadata={metadata}
+      fileType={fileType}
     />
   );
 }
@@ -139,6 +147,7 @@ function ExportDialogInner({
   onExportEpub,
   content,
   metadata,
+  fileType,
 }: Omit<ExportDialogProps, "isOpen">) {
   const [selectedFormat, setSelectedFormat] = useState<ExportDialogFormat>(initialFormat);
   const [settings, setSettings] = useState<UnifiedExportSettings>(() => ({
@@ -314,6 +323,7 @@ function ExportDialogInner({
           pageNumberPosition: previewSettings.pageNumberPosition,
           textIndent: previewSettings.textIndent,
           googleFontFamily: previewSettings.googleFontFamily,
+          fileType,
         });
 
         if (id !== generationIdRef.current) return;
@@ -343,7 +353,7 @@ function ExportDialogInner({
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPreviewApi, settings, selectedFormat, content, metadata]);
+  }, [hasPreviewApi, settings, selectedFormat, content, metadata, fileType]);
 
   // Cleanup blob URLs on unmount (refs always hold the latest values)
   useEffect(() => {
