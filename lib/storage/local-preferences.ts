@@ -14,6 +14,7 @@ const KEYS = {
   rightTab: `${PREFIX}right-tab`,
   sidebarTopOrder: `${PREFIX}sidebar-top-order`,
   sidebarBottomOrder: `${PREFIX}sidebar-bottom-order`,
+  searchHistory: `${PREFIX}search-history`,
 } as const;
 
 // One-time migration from old keys to new keys
@@ -125,5 +126,22 @@ export const localPreferences = {
   },
   setSidebarBottomOrder(ids: string[]): void {
     set(KEYS.sidebarBottomOrder, JSON.stringify(ids));
+  },
+
+  // --- Search history ---
+  getSearchHistory(): string[] {
+    const raw = get(KEYS.searchHistory);
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed)
+        ? parsed.filter((value): value is string => typeof value === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  },
+  setSearchHistory(entries: readonly string[]): void {
+    set(KEYS.searchHistory, JSON.stringify(entries));
   },
 } as const;
