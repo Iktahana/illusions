@@ -9,6 +9,7 @@ import WelcomeScreen from "@/components/WelcomeScreen";
 import PopoutEditorWindow from "@/components/PopoutEditorWindow";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
+import WebSunsetNotice from "@/components/WebSunsetNotice";
 import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
 import { useTabManager } from "@/lib/tab-manager";
@@ -1169,6 +1170,9 @@ export default function EditorPage() {
 
     return (
       <div className="h-screen flex flex-col overflow-hidden relative">
+        {/* Web版サービス終了の告知（Web版でのみ毎回表示） */}
+        <WebSunsetNotice />
+
         {/* Web menu bar (only for non-Electron environment) */}
         {!isElectron && (
           <WebMenuBar
@@ -1326,156 +1330,160 @@ export default function EditorPage() {
   } as const;
 
   return (
-    <EditorLayout
-      providers={{
-        diffTabContextValue,
-        terminalTabContextValue,
-        settings,
-        settingsHandlers,
-      }}
-      chrome={{
-        currentFile,
-        isDirty,
-        isElectron,
-        handleMenuAction,
-        recentProjects,
-        compactMode,
-      }}
-      dialogs={{
-        unsavedWarning,
-        pendingCloseTabId,
-        pendingCloseFileName,
-        handleCloseTabSave,
-        handleCloseTabDiscard,
-        handleCloseTabCancel,
-        showDesktopOnlyDialog,
-        setShowDesktopOnlyDialog,
-        confirmRemoveRecent,
-        setConfirmRemoveRecent,
-        handleDeleteRecentProject,
-        showSettingsModal,
-        setShowSettingsModal,
-        settingsInitialCategory,
-        setSettingsInitialCategory,
-        showRubyDialog,
-        setShowRubyDialog,
-        rubySelectedText,
-        handleApplyRuby,
-        exportDialog: {
-          state: exportDialogState,
-          onClose: () => setExportDialogState(null),
-          onPdfExport: handlePdfExportConfirm,
-          onDocxExport: handleDocxExportConfirm,
-          onEpubExport: handleEpubExportConfirm,
-          content: exportDialogState?.content ?? "",
-          metadata: exportDialogState?.metadata ?? { title: "" },
-          fileType: exportDialogState?.fileType,
-        },
-        printDialog: {
-          state: printDialogState,
-          onClose: () => setPrintDialogState(null),
-          onPrint: handlePrintConfirm,
-          content: printDialogState?.content ?? "",
-          metadata: printDialogState?.metadata ?? { title: "" },
-        },
-      }}
-      recovery={{
-        wasAutoRecovered,
-        dismissedRecovery,
-        recoveryExiting,
-        setRecoveryExiting,
-        currentFileName: currentFile?.name,
-      }}
-      upgrade={{
-        showUpgradeBanner,
-        upgradeBannerDismissed,
-        editorMode,
-        featuresProjectMode: features.projectMode,
-        handleUpgrade,
-        handleUpgradeDismiss,
-      }}
-      activityBar={{
-        topView,
-        bottomView,
-        setTopView,
-        setBottomView,
-        handleNewTerminalTab,
-      }}
-      mainArea={{
-        tabs,
-        editorMode,
-        newTab,
-        openFile,
-        setNewFileTrigger,
-        handleTabBarContextMenu,
-        tabBarMenu,
-        handleTabBarMenuAction,
-        closeTabBarMenu,
-        handleDockviewReady,
-        sidebarPanelProps,
-        tabsRef,
-        editorDiff,
-        setEditorDiff,
-        editorDomRef,
-        handleChange,
-        handleInsertText,
-        onSelectionChange: (count: number, cells: number, pages: number) => {
-          setSelectedCharCount(count);
-          setSelectedManuscriptCells(cells);
-          setSelectedManuscriptPages(pages);
-          // 選択語を幻辞ルックアップ用に保持する。
-          // 大きな選択（段落・全選択）では textBetween が O(n) で重く、語の辞書引きにも
-          // 不向きなので閾値を超えたら早期に null。実際の辞書引きの debounce は
-          // useGenjiWordInfo 側で行う（選択ドラッグ中の連続 IPC を抑制）。
-          if (count > 0 && count <= SELECTED_WORD_MAX_CHARS && editorViewRef.current) {
-            const { selection, doc } = editorViewRef.current.state;
-            const text = doc.textBetween(selection.from, selection.to, "").trim();
-            // 単語単位（空白区切り）の先頭語、または選択全体（日本語は空白なし）
-            const word = text.split(/\s+/)[0] ?? null;
-            setSelectedWord(word || null);
-          } else {
-            setSelectedWord(null);
-          }
-        },
-        onSelectionRangeChange: (range: SearchRange | null) => {
-          setSearchSelectionRange(range);
-          if (!range) setSelectionOnly(false);
-        },
-        searchOpenTrigger,
-        searchInitialTerm,
-        // 共有検索 state（SearchDialog は <main> でレンダリング）
-        searchTerm,
-        caseSensitive,
-        searchMatches,
-        currentMatchIndex,
-        isSearchDialogOpen,
-        onSearchTermChange: setSearchTerm,
-        onCaseSensitiveChange: setCaseSensitive,
-        onCurrentMatchIndexChange: setCurrentMatchIndex,
-        onOpenSearchDialog: openSearchDialog,
-        onCloseSearchDialog: closeSearchDialog,
-        onToggleSearchDialog: toggleSearchDialog,
-        setEditorViewInstance,
-        handleShowAllSearchResults,
-        ruleRunner,
-        handleLintIssuesUpdated,
-        handleNlpError,
-        handleOpenRubyDialog,
-        handleToggleTcy,
-        handleOpenDictionary,
-        handleShowLintHint,
-        handleIgnoreCorrection,
-        switchTab,
-        updateTab,
-      }}
-      inspector={{
-        isRightPanelCollapsed,
-        handleToggleRightPanel,
-        activeEditorTab,
-        props: inspectorProps,
-        showSaveToast,
-        saveToastExiting,
-      }}
-    />
+    <>
+      {/* Web版サービス終了の告知（Web版でのみ毎回表示） */}
+      <WebSunsetNotice />
+      <EditorLayout
+        providers={{
+          diffTabContextValue,
+          terminalTabContextValue,
+          settings,
+          settingsHandlers,
+        }}
+        chrome={{
+          currentFile,
+          isDirty,
+          isElectron,
+          handleMenuAction,
+          recentProjects,
+          compactMode,
+        }}
+        dialogs={{
+          unsavedWarning,
+          pendingCloseTabId,
+          pendingCloseFileName,
+          handleCloseTabSave,
+          handleCloseTabDiscard,
+          handleCloseTabCancel,
+          showDesktopOnlyDialog,
+          setShowDesktopOnlyDialog,
+          confirmRemoveRecent,
+          setConfirmRemoveRecent,
+          handleDeleteRecentProject,
+          showSettingsModal,
+          setShowSettingsModal,
+          settingsInitialCategory,
+          setSettingsInitialCategory,
+          showRubyDialog,
+          setShowRubyDialog,
+          rubySelectedText,
+          handleApplyRuby,
+          exportDialog: {
+            state: exportDialogState,
+            onClose: () => setExportDialogState(null),
+            onPdfExport: handlePdfExportConfirm,
+            onDocxExport: handleDocxExportConfirm,
+            onEpubExport: handleEpubExportConfirm,
+            content: exportDialogState?.content ?? "",
+            metadata: exportDialogState?.metadata ?? { title: "" },
+            fileType: exportDialogState?.fileType,
+          },
+          printDialog: {
+            state: printDialogState,
+            onClose: () => setPrintDialogState(null),
+            onPrint: handlePrintConfirm,
+            content: printDialogState?.content ?? "",
+            metadata: printDialogState?.metadata ?? { title: "" },
+          },
+        }}
+        recovery={{
+          wasAutoRecovered,
+          dismissedRecovery,
+          recoveryExiting,
+          setRecoveryExiting,
+          currentFileName: currentFile?.name,
+        }}
+        upgrade={{
+          showUpgradeBanner,
+          upgradeBannerDismissed,
+          editorMode,
+          featuresProjectMode: features.projectMode,
+          handleUpgrade,
+          handleUpgradeDismiss,
+        }}
+        activityBar={{
+          topView,
+          bottomView,
+          setTopView,
+          setBottomView,
+          handleNewTerminalTab,
+        }}
+        mainArea={{
+          tabs,
+          editorMode,
+          newTab,
+          openFile,
+          setNewFileTrigger,
+          handleTabBarContextMenu,
+          tabBarMenu,
+          handleTabBarMenuAction,
+          closeTabBarMenu,
+          handleDockviewReady,
+          sidebarPanelProps,
+          tabsRef,
+          editorDiff,
+          setEditorDiff,
+          editorDomRef,
+          handleChange,
+          handleInsertText,
+          onSelectionChange: (count: number, cells: number, pages: number) => {
+            setSelectedCharCount(count);
+            setSelectedManuscriptCells(cells);
+            setSelectedManuscriptPages(pages);
+            // 選択語を幻辞ルックアップ用に保持する。
+            // 大きな選択（段落・全選択）では textBetween が O(n) で重く、語の辞書引きにも
+            // 不向きなので閾値を超えたら早期に null。実際の辞書引きの debounce は
+            // useGenjiWordInfo 側で行う（選択ドラッグ中の連続 IPC を抑制）。
+            if (count > 0 && count <= SELECTED_WORD_MAX_CHARS && editorViewRef.current) {
+              const { selection, doc } = editorViewRef.current.state;
+              const text = doc.textBetween(selection.from, selection.to, "").trim();
+              // 単語単位（空白区切り）の先頭語、または選択全体（日本語は空白なし）
+              const word = text.split(/\s+/)[0] ?? null;
+              setSelectedWord(word || null);
+            } else {
+              setSelectedWord(null);
+            }
+          },
+          onSelectionRangeChange: (range: SearchRange | null) => {
+            setSearchSelectionRange(range);
+            if (!range) setSelectionOnly(false);
+          },
+          searchOpenTrigger,
+          searchInitialTerm,
+          // 共有検索 state（SearchDialog は <main> でレンダリング）
+          searchTerm,
+          caseSensitive,
+          searchMatches,
+          currentMatchIndex,
+          isSearchDialogOpen,
+          onSearchTermChange: setSearchTerm,
+          onCaseSensitiveChange: setCaseSensitive,
+          onCurrentMatchIndexChange: setCurrentMatchIndex,
+          onOpenSearchDialog: openSearchDialog,
+          onCloseSearchDialog: closeSearchDialog,
+          onToggleSearchDialog: toggleSearchDialog,
+          setEditorViewInstance,
+          handleShowAllSearchResults,
+          ruleRunner,
+          handleLintIssuesUpdated,
+          handleNlpError,
+          handleOpenRubyDialog,
+          handleToggleTcy,
+          handleOpenDictionary,
+          handleShowLintHint,
+          handleIgnoreCorrection,
+          switchTab,
+          updateTab,
+        }}
+        inspector={{
+          isRightPanelCollapsed,
+          handleToggleRightPanel,
+          activeEditorTab,
+          props: inspectorProps,
+          showSaveToast,
+          saveToastExiting,
+        }}
+      />
+    </>
   );
 }
