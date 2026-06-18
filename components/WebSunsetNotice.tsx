@@ -80,6 +80,17 @@ export default function WebSunsetNotice(): React.JSX.Element | null {
         <p>
           今後とも皆様にご満足いただけるサービスの提供に努めてまいりますので、引き続き「illusions」をよろしくお願い申し上げます。
         </p>
+        <p>
+          詳しくは公式X（旧Twitter）のお知らせをご覧ください：
+          <a
+            href="https://x.com/illusionsapp/status/2067584687867146588"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent underline underline-offset-2 hover:text-accent-hover break-all"
+          >
+            https://x.com/illusionsapp/status/2067584687867146588
+          </a>
+        </p>
       </div>
 
       <div className="mt-6 flex items-center justify-end gap-3">
