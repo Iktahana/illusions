@@ -500,10 +500,13 @@ export default function NovelEditor({
           overscrollBehavior: "contain",
           // Disable browser scroll anchoring to prevent auto-scroll adjustment during DOM updates in vertical mode
           overflowAnchor: "none",
-          // In vertical-rl, padding on child elements causes Chromium to miscalculate scrollWidth.
-          // Move horizontal padding to the scroll container itself, where the browser handles it correctly.
+          // In vertical-rl the document start is the RIGHT edge. The scroll container's
+          // end-side (right) padding is dropped from scrollWidth by Chromium on real
+          // Electron, so paddingRight never shows (title sticks to the frame). Keep only
+          // the start-side (left) padding here, and provide the right-side gap as an
+          // in-flow flex spacer inside the content (always counted in scrollWidth). (#1639)
           // scrollbar-gutter keeps the bottom line clear of the horizontal scrollbar (non-overlay platforms).
-          ...(isVertical ? { paddingLeft: 64, paddingRight: 64, scrollbarGutter: "stable" } : {}),
+          ...(isVertical ? { paddingLeft: 64, scrollbarGutter: "stable" } : {}),
         }}
       >
         {/* Hidden character width measurement element for auto chars-per-line calculation */}

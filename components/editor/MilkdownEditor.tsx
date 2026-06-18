@@ -998,6 +998,12 @@ export default function MilkdownEditor({
           <Milkdown />
         </div>
       </div>
+      {/* 縦書きの右端（文書の先頭側）の余白。スクロールコンテナの padding-right は
+          Chromium が scrollWidth に含めず実機 Electron で消えるため、scrollWidth に
+          確実に算入される in-flow なフレックススペーサーで右余白を作る（#1639）。 */}
+      {isVertical && (
+        <div aria-hidden="true" style={{ flex: "0 0 64px", minWidth: 64, alignSelf: "stretch" }} />
+      )}
     </div>
   );
 
