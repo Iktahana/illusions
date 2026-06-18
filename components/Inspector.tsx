@@ -67,6 +67,7 @@ export default function Inspector({
   onCorrectionModeChange,
   switchToCorrectionsTrigger = 0,
   previousDayStats,
+  selectedWord,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
   const projectMode = isProject ? (editorMode as ProjectMode) : null;
@@ -389,6 +390,7 @@ export default function Inspector({
             charUsageRates={charUsageRates}
             readabilityAnalysis={readabilityAnalysis}
             previousDayStats={previousDayStats}
+            selectedWord={selectedWord}
           />
         )}
         {activeTab === "history" && projectMode && onHistoryRestore && (
