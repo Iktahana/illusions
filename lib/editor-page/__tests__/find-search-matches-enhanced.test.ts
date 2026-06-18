@@ -81,9 +81,7 @@ describe("findSearchMatches enhanced search", () => {
   it("keeps JavaScript greedy regular expression semantics", () => {
     const source = doc(paragraph(schema.text("a1b a2b")));
 
-    expect(findSearchMatches(source, "a.*b", { regex: true })).toMatchObject([
-      { text: "a1b a2b" },
-    ]);
+    expect(findSearchMatches(source, "a.*b", { regex: true })).toMatchObject([{ text: "a1b a2b" }]);
   });
 
   it("reports invalid patterns and ignores zero-width matches", () => {

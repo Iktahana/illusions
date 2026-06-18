@@ -294,10 +294,7 @@ function createPlainProjection(content: string): SearchTextProjection {
   };
 }
 
-function createMarkdownProjection(
-  content: string,
-  excludeComments: boolean,
-): SearchTextProjection {
+function createMarkdownProjection(content: string, excludeComments: boolean): SearchTextProjection {
   const projection: SearchTextProjection = { text: "", segments: [] };
   const commentPattern = /<!--[\s\S]*?-->/g;
   let cursor = 0;
@@ -360,14 +357,7 @@ function createMdiProjections(
       appendProjectionSegment(body, content.slice(cursor, rawFrom), cursor, rawFrom, "text", true);
     }
 
-    appendMdiToken(
-      body,
-      rubyReadings,
-      token,
-      rawFrom,
-      rawFrom + token.length,
-      excludeComments,
-    );
+    appendMdiToken(body, rubyReadings, token, rawFrom, rawFrom + token.length, excludeComments);
     cursor = rawFrom + token.length;
   }
 

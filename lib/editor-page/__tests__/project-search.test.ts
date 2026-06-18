@@ -232,21 +232,27 @@ describe("project-wide replacement", () => {
   it.each([
     ["a a", "longer", "longer longer"],
     ["target target", "x", "x x"],
-  ])("handles replacement length changes without offset drift", async (content, replacement, expected) => {
-    const searchTerm = content.startsWith("a") ? "a" : "target";
-    const searched = findRawDocumentMatches(content, ".mdi", searchTerm, {});
-    const writeFile = vi.fn(async () => {});
-    const vfs = { readFile: vi.fn(async () => content), writeFile } as unknown as VirtualFileSystem;
+  ])(
+    "handles replacement length changes without offset drift",
+    async (content, replacement, expected) => {
+      const searchTerm = content.startsWith("a") ? "a" : "target";
+      const searched = findRawDocumentMatches(content, ".mdi", searchTerm, {});
+      const writeFile = vi.fn(async () => {});
+      const vfs = {
+        readFile: vi.fn(async () => content),
+        writeFile,
+      } as unknown as VirtualFileSystem;
 
-    await replaceProjectFiles({
-      vfs,
-      results: [{ ...searched, path: "chapter.mdi", fileName: "chapter.mdi" }],
-      replacement,
-      options: {},
-    });
+      await replaceProjectFiles({
+        vfs,
+        results: [{ ...searched, path: "chapter.mdi", fileName: "chapter.mdi" }],
+        replacement,
+        options: {},
+      });
 
-    expect(writeFile).toHaveBeenCalledWith("chapter.mdi", expected);
-  });
+      expect(writeFile).toHaveBeenCalledWith("chapter.mdi", expected);
+    },
+  );
 
   it("updates open buffers without writing them to disk", async () => {
     const open = findRawDocumentMatches("target", ".mdi", "target", {});

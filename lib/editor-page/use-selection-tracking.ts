@@ -87,9 +87,11 @@ function sameSelectionState(a: EditorSelectionState, b: EditorSelectionState): b
   );
 }
 
-export function getEditorSelectionSearchRange(
-  selection: { empty: boolean; from: number; to: number },
-): SelectionSearchRange | null {
+export function getEditorSelectionSearchRange(selection: {
+  empty: boolean;
+  from: number;
+  to: number;
+}): SelectionSearchRange | null {
   return !selection.empty && selection.from < selection.to
     ? { from: selection.from, to: selection.to }
     : null;

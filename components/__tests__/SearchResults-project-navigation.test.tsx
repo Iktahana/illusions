@@ -86,7 +86,11 @@ describe("SearchResults project navigation", () => {
       );
     });
 
-    for (let attempt = 0; attempt < 20 && !container.textContent?.includes("second.mdi"); attempt += 1) {
+    for (
+      let attempt = 0;
+      attempt < 20 && !container.textContent?.includes("second.mdi");
+      attempt += 1
+    ) {
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 25));
       });
@@ -134,7 +138,11 @@ describe("SearchResults project navigation", () => {
       );
     });
 
-    for (let attempt = 0; attempt < 20 && !container.textContent?.includes("second.mdi"); attempt += 1) {
+    for (
+      let attempt = 0;
+      attempt < 20 && !container.textContent?.includes("second.mdi");
+      attempt += 1
+    ) {
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 25));
       });
