@@ -1,107 +1,41 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { Search, X, Replace, ReplaceAll, ChevronRight, ChevronDown } from "lucide-react";
-import { EditorView, Decoration } from "@milkdown/prose/view";
-import { TextSelection } from "@milkdown/prose/state";
+import type { EditorView } from "@milkdown/prose/view";
 import clsx from "clsx";
-import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
-import { findSearchMatches, type SearchMatch } from "@/lib/editor-page/find-search-matches";
-
-// #1507: After tab switch, the parent's editorViewInstance may still
-// reference a destroyed EditorView for a short window before the new
-// editor's view is ready. ProseMirror sets `docView` to null on destroy.
-// Dispatching on a destroyed view routes through Milkdown plugins whose
-// context has been torn down, throwing "Context editorState not found".
-function isEditorViewAlive(view: EditorView | null): view is EditorView {
-  return view !== null && (view as unknown as { docView: unknown }).docView !== null;
-}
+import { isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
+import { type SearchMatch } from "@/lib/editor-page/find-search-matches";
 
 interface SearchResultsProps {
   editorView: EditorView | null;
-  matches?: SearchMatch[];
-  searchTerm?: string;
+  /** 共有検索 state（単一 source of truth）。SearchDialog と同期する。
+   *  マッチ検出・ハイライト適用は app/page.tsx の useSearchHighlight に集約済み。 */
+  searchTerm: string;
+  onSearchTermChange: (term: string) => void;
+  caseSensitive: boolean;
+  onCaseSensitiveChange: (value: boolean) => void;
+  matches: SearchMatch[];
+  currentMatchIndex: number;
+  onCurrentMatchIndexChange: (index: number) => void;
   onClose: () => void;
 }
 
 export default function SearchResults({
   editorView,
-  matches: initialMatches,
-  searchTerm: initialSearchTerm,
+  searchTerm,
+  onSearchTermChange,
+  caseSensitive,
+  onCaseSensitiveChange,
+  matches,
+  onCurrentMatchIndexChange,
   onClose,
 }: SearchResultsProps) {
-  const [searchTerm, setSearchTerm] = useState(initialSearchTerm || "");
+  // 置換は SearchResults 固有のローカル UI 状態。
   const [replaceTerm, setReplaceTerm] = useState("");
-  const [matches, setMatches] = useState<SearchMatch[]>(initialMatches || []);
-  const [caseSensitive, setCaseSensitive] = useState(false);
   const [showReplace, setShowReplace] = useState(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // #1502: Sync incoming props → state during render (React-recommended
-  // "derived state" pattern). useState only reads the initializer on mount,
-  // so without this an already-mounted SearchResults silently ignores props
-  // pushed by SearchDialog's "すべての検索結果を表示" button. Using render-time
-  // detection (vs useEffect) avoids the extra-render flush delay that breaks
-  // jsdom tests and trips React 18+ act() expectations.
-  const [lastInitialSearchTerm, setLastInitialSearchTerm] = useState(initialSearchTerm);
-  if (initialSearchTerm !== lastInitialSearchTerm) {
-    setLastInitialSearchTerm(initialSearchTerm);
-    if (initialSearchTerm !== undefined) {
-      setSearchTerm(initialSearchTerm);
-    }
-  }
-
-  const [lastInitialMatches, setLastInitialMatches] = useState(initialMatches);
-  if (initialMatches !== lastInitialMatches) {
-    setLastInitialMatches(initialMatches);
-    if (initialMatches !== undefined) {
-      setMatches(initialMatches);
-    }
-  }
-
-  // 文書内の一致箇所を検索する
-  useEffect(() => {
-    // #1502: when there's no editor, leave matches as-is so prop-sourced
-    // initialMatches survive. Local recompute only runs against a real editor.
-    // #1507: also guard against destroyed views during tab switch.
-    if (!isEditorViewAlive(editorView)) {
-      return;
-    }
-    if (!searchTerm) {
-      setMatches([]);
-      try {
-        const { state, dispatch } = editorView;
-        const tr = state.tr.setMeta("searchDecorations", []);
-        dispatch(tr);
-      } catch {
-        // Best-effort cleanup — view may have been destroyed mid-dispatch.
-      }
-      return;
-    }
-
-    const { state, dispatch } = editorView;
-    const { doc } = state;
-
-    // Use the shared ProseMirror-position-aware matcher. A previous
-    // textContent-based implementation drifted past hardbreaks (leafText "\n")
-    // and ruby atoms, highlighting the wrong characters.
-    const foundMatches = findSearchMatches(doc, searchTerm, caseSensitive);
-
-    setMatches(foundMatches);
-
-    // Apply highlight decorations
-    const decorations: Decoration[] = foundMatches.map((m) =>
-      Decoration.inline(m.from, m.to, {
-        class: "search-result",
-      }),
-    );
-    try {
-      const tr = state.tr.setMeta("searchDecorations", decorations);
-      dispatch(tr);
-    } catch {
-      // #1507: view torn down mid-search — decorations go with it.
-    }
-  }, [searchTerm, caseSensitive, editorView]);
   // Get context text for match
   const getMatchContext = useCallback(
     (match: SearchMatch): { before: string; text: string; after: string } => {
@@ -134,37 +68,19 @@ export default function SearchResults({
     [editorView],
   );
 
-  // Jump to specified match and highlight
+  // Jump to specified match. 現在マッチ index を共有 state へ反映すると
+  // useSearchHighlight が強調・スクロールを担当する。
   const goToMatch = useCallback(
-    (match: SearchMatch, index: number) => {
+    (_match: SearchMatch, index: number) => {
       if (!isEditorViewAlive(editorView)) return;
-
-      const { state, dispatch } = editorView;
-
-      // Create decoration to mark this match as current
-      const decorations: Decoration[] = [];
-      matches.forEach((m, i) => {
-        const isCurrentMatch = i === index;
-        decorations.push(
-          Decoration.inline(m.from, m.to, {
-            class: isCurrentMatch ? "search-result-current" : "search-result",
-          }),
-        );
-      });
-
-      // Pass decoration info via meta
-      const tr = state.tr.setMeta("searchDecorations", decorations);
-
-      const selectTr = tr.setSelection(TextSelection.create(tr.doc, match.from, match.from));
-      dispatch(selectTr);
-      centerEditorPosition(editorView, match.from);
-
+      onCurrentMatchIndexChange(index);
       editorView.focus();
     },
-    [editorView, matches],
+    [editorView, onCurrentMatchIndexChange],
   );
 
-  // Replace single match
+  // Replace single match. 置換後の再マッチは page 側 useMemo（content 依存）が
+  // 自動で行うため、旧来の setTimeout 再検索ハックは不要。
   const replaceMatch = useCallback(
     (match: SearchMatch) => {
       if (!isEditorViewAlive(editorView)) return;
@@ -172,14 +88,8 @@ export default function SearchResults({
       const { state, dispatch } = editorView;
       const tr = state.tr.replaceWith(match.from, match.to, state.schema.text(replaceTerm));
       dispatch(tr);
-
-      // Re-search
-      setTimeout(() => {
-        setSearchTerm(searchTerm + " ");
-        setTimeout(() => setSearchTerm(searchTerm.trim()), 0);
-      }, 100);
     },
-    [editorView, replaceTerm, searchTerm],
+    [editorView, replaceTerm],
   );
 
   // Replace all matches
@@ -197,11 +107,10 @@ export default function SearchResults({
 
     dispatch(tr);
 
-    // Clear search
-    setMatches([]);
-    setSearchTerm("");
+    // 検索語をクリア → matches が空になり、useSearchHighlight がハイライトを消す。
+    onSearchTermChange("");
     setReplaceTerm("");
-  }, [editorView, matches, replaceTerm]);
+  }, [editorView, matches, replaceTerm, onSearchTermChange]);
 
   return (
     <div className="h-full bg-background-secondary border-r border-border flex flex-col">
@@ -228,7 +137,7 @@ export default function SearchResults({
             ref={searchInputRef}
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => onSearchTermChange(e.target.value)}
             placeholder="検索..."
             className="w-full px-3 py-2 border border-border-secondary bg-background text-foreground rounded focus:outline-none focus:ring-2 focus:ring-accent text-sm"
           />
@@ -240,7 +149,7 @@ export default function SearchResults({
             <input
               type="checkbox"
               checked={caseSensitive}
-              onChange={(e) => setCaseSensitive(e.target.checked)}
+              onChange={(e) => onCaseSensitiveChange(e.target.checked)}
               className="rounded"
             />
             大文字小文字を区別

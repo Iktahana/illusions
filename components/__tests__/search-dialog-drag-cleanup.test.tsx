@@ -17,8 +17,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { act } from "react";
 import SearchDialog from "../SearchDialog";
 
-// SearchDialog は editorView を触る effect を持つので、null を渡して decoration path を no-op にする。
-// (editorView == null 時は matches/decorations effect が早期 return する)
+// SearchDialog は controlled 化され、マッチ検出・ハイライトは親（useSearchHighlight）へ
+// 移譲済み。ここでは drag/portal ライフサイクルのみを検証するため、検索 props は静的に渡す。
 
 let root: Root;
 let anchorEl: HTMLDivElement;
@@ -58,7 +58,18 @@ function render(isOpen: boolean) {
   const anchorRef = { current: anchorEl };
   act(() => {
     root.render(
-      <SearchDialog editorView={null} isOpen={isOpen} onClose={() => {}} anchorRef={anchorRef} />,
+      <SearchDialog
+        isOpen={isOpen}
+        onClose={() => {}}
+        searchTerm=""
+        onSearchTermChange={() => {}}
+        caseSensitive={false}
+        onCaseSensitiveChange={() => {}}
+        matches={[]}
+        currentMatchIndex={0}
+        onCurrentMatchIndexChange={() => {}}
+        anchorRef={anchorRef}
+      />,
     );
   });
 }

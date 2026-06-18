@@ -32,8 +32,20 @@ interface EditorProps {
   className?: string;
   searchOpenTrigger?: number;
   searchInitialTerm?: string;
+  // 共有検索 state（単一 source of truth）。SearchResults と同期する。
+  // 検索を配線しない用途（非アクティブ pane プレビュー / popout window）向けに
+  // すべて optional とし、未指定時は no-op / 空デフォルトで動作する。
+  searchTerm?: string;
+  onSearchTermChange?: (term: string) => void;
+  caseSensitive?: boolean;
+  onCaseSensitiveChange?: (value: boolean) => void;
+  searchMatches?: SearchMatch[];
+  currentMatchIndex?: number;
+  onCurrentMatchIndexChange?: (index: number) => void;
+  /** フローティング検索窓の開閉を親へ通知する（ハイライト visibility ゲート用）。 */
+  onSearchDialogOpenChange?: (open: boolean) => void;
   onEditorViewReady?: (view: EditorView) => void;
-  onShowAllSearchResults?: (matches: SearchMatch[], searchTerm: string) => void;
+  onShowAllSearchResults?: () => void;
   // リンティング設定
   lintingRuleRunner?: RuleRunnerLike | null;
   onLintIssuesUpdated?: (issues: LintIssue[]) => void;
@@ -58,6 +70,9 @@ interface EditorProps {
   onExternalContentApplied?: () => void;
 }
 
+/** 検索を配線しない NovelEditor 用途向けの安定 no-op。 */
+const noop = (): void => {};
+
 export default function NovelEditor({
   initialContent = "",
   onChange,
@@ -65,7 +80,14 @@ export default function NovelEditor({
   onSelectionChange,
   className,
   searchOpenTrigger = 0,
-  searchInitialTerm,
+  searchTerm = "",
+  onSearchTermChange = noop,
+  caseSensitive = false,
+  onCaseSensitiveChange = noop,
+  searchMatches = [],
+  currentMatchIndex = 0,
+  onCurrentMatchIndexChange = noop,
+  onSearchDialogOpenChange,
   onEditorViewReady,
   onShowAllSearchResults,
   lintingRuleRunner,
@@ -92,8 +114,6 @@ export default function NovelEditor({
   });
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  // コンテキストメニューの「検索」で渡された初期検索語
-  const [contextMenuSearchTerm, setContextMenuSearchTerm] = useState<string | undefined>(undefined);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const {
     state: speechState,
@@ -181,11 +201,27 @@ export default function NovelEditor({
     setIsSearchOpen(true);
   }, []);
 
-  /** コンテキストメニューの「検索」アクションを処理する。選択テキストを初期検索語として渡す。 */
-  const handleFind = useCallback((initialTerm?: string) => {
-    setContextMenuSearchTerm(initialTerm);
-    setIsSearchOpen(true);
+  // フローティング検索窓の開閉を親へ通知する（ハイライト visibility ゲート用）。
+  useEffect(() => {
+    onSearchDialogOpenChange?.(isSearchOpen);
+  }, [isSearchOpen, onSearchDialogOpenChange]);
+
+  // pane アンマウント時（タブ閉じ等）に「閉じた」と通知し、ハイライトの取り残しを防ぐ。
+  useEffect(() => {
+    return () => onSearchDialogOpenChange?.(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** コンテキストメニューの「検索」アクションを処理する。選択テキストを共有検索語へ反映する。 */
+  const handleFind = useCallback(
+    (initialTerm?: string) => {
+      if (initialTerm !== undefined) {
+        onSearchTermChange(initialTerm);
+      }
+      setIsSearchOpen(true);
+    },
+    [onSearchTermChange],
+  );
 
   const clearHighlight = useCallback(() => {
     cancelSpeechScroll();
@@ -571,11 +607,16 @@ export default function NovelEditor({
 
       {/* 検索ダイアログ */}
       <SearchDialog
-        editorView={editorViewInstance}
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onShowAllResults={onShowAllSearchResults}
-        initialSearchTerm={contextMenuSearchTerm ?? searchInitialTerm}
+        searchTerm={searchTerm}
+        onSearchTermChange={onSearchTermChange}
+        caseSensitive={caseSensitive}
+        onCaseSensitiveChange={onCaseSensitiveChange}
+        matches={searchMatches}
+        currentMatchIndex={currentMatchIndex}
+        onCurrentMatchIndexChange={onCurrentMatchIndexChange}
         anchorRef={searchButtonRef}
       />
     </div>
