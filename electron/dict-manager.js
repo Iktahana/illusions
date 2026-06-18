@@ -310,9 +310,7 @@ class DictManager {
   lookupBatch(terms) {
     if (this._downloadMutex.locked) return [];
     if (!Array.isArray(terms)) return [];
-    const unique = [
-      ...new Set(terms.filter((t) => typeof t === "string" && t.length > 0)),
-    ];
+    const unique = [...new Set(terms.filter((t) => typeof t === "string" && t.length > 0))];
     if (unique.length === 0) return [];
 
     const db = this._openDb();

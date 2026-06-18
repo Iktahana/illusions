@@ -97,7 +97,11 @@ class DictAccess {
         return { state: "not-installed", message: "辞書が未ダウンロードです。" };
       }
       if (status.status === "corrupt") {
-        return { state: "corrupt", installedVersion: status.installedVersion, message: CORRUPT_MESSAGE };
+        return {
+          state: "corrupt",
+          installedVersion: status.installedVersion,
+          message: CORRUPT_MESSAGE,
+        };
       }
       if (status.status === "installed") {
         // Proactively confirm integrity — catches a bad DB before the first query.

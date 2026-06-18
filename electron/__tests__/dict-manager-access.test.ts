@@ -92,9 +92,14 @@ interface TestableManager {
   _getDictDir: () => string;
   _createDatabase: (dbPath: string, opts?: unknown) => unknown;
   verify: () => { ok: boolean; reason?: string };
-  lookupBatch: (
-    terms: string[],
-  ) => Array<{ entry: string; found: boolean; reading?: string; pos?: string; register?: string; freqRank?: number }>;
+  lookupBatch: (terms: string[]) => Array<{
+    entry: string;
+    found: boolean;
+    reading?: string;
+    pos?: string;
+    register?: string;
+    freqRank?: number;
+  }>;
   getStatus: () => { status: string; installedVersion?: string };
 }
 
@@ -173,14 +178,24 @@ describe("DictManager analysis access (#1624)", () => {
       fs.writeFileSync(dbPath, "sqlite");
       const mgr = await freshManager(dictDir, { rows: LOOKUP_ROWS });
       expect(mgr.lookupBatch(["雪"])).toEqual([
-        { entry: "雪", found: true, reading: "ゆき", pos: "名詞", register: "文章語", freqRank: 1200 },
+        {
+          entry: "雪",
+          found: true,
+          reading: "ゆき",
+          pos: "名詞",
+          register: "文章語",
+          freqRank: 1200,
+        },
       ]);
     });
 
     it("omits terms with no match and dedupes input", async () => {
       fs.writeFileSync(dbPath, "sqlite");
       const mgr = await freshManager(dictDir, { rows: LOOKUP_ROWS });
-      const entries = mgr.lookupBatch(["雪", "存在しない語", "走る", "雪"]).map((r) => r.entry).sort();
+      const entries = mgr
+        .lookupBatch(["雪", "存在しない語", "走る", "雪"])
+        .map((r) => r.entry)
+        .sort();
       expect(entries).toEqual(["走る", "雪"]);
     });
 

@@ -157,7 +157,11 @@ export default function DictSettingsTab() {
             />
           )}
           <span className="text-sm text-foreground">
-            {isInstalled ? "インストール済み" : isCorrupt ? "破損（再ダウンロードが必要）" : "未インストール"}
+            {isInstalled
+              ? "インストール済み"
+              : isCorrupt
+                ? "破損（再ダウンロードが必要）"
+                : "未インストール"}
           </span>
         </div>
 
