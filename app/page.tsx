@@ -428,6 +428,21 @@ export default function EditorPage() {
     isSearchVisible,
   });
 
+  // フローティング検索窓は <main> のトップレベル（dockview パネル外）でレンダリングし、
+  // 開閉状態を page 側で持つ。dockview パネル内に置くと、パネルのクロージャが
+  // マウント時に凍結され searchTerm/matches など変化する値が pane へ届かず、入力が
+  // 反映されない（editorDiff 比較ビューを <main> へ移したのと同じ理由）。
+  const openSearchDialog = useCallback(() => setIsSearchDialogOpen(true), []);
+  const closeSearchDialog = useCallback(() => setIsSearchDialogOpen(false), []);
+  const toggleSearchDialog = useCallback(() => setIsSearchDialogOpen((v) => !v), []);
+
+  // ⌘F・辞書語検索などの外部トリガーで検索窓を開く（カウンタ増加で発火）。
+  useEffect(() => {
+    if (searchOpenTrigger > 0) {
+      setIsSearchDialogOpen(true);
+    }
+  }, [searchOpenTrigger]);
+
   // --- Ruby/TCY hook ---
   const { handleOpenRubyDialog, handleApplyRuby, handleToggleTcy } = useRubyTcy({
     editorViewRef,
@@ -1343,15 +1358,18 @@ export default function EditorPage() {
         },
         searchOpenTrigger,
         searchInitialTerm,
-        // 共有検索 state（SearchDialog を controlled 化）
+        // 共有検索 state（SearchDialog は <main> でレンダリング）
         searchTerm,
         caseSensitive,
         searchMatches,
         currentMatchIndex,
+        isSearchDialogOpen,
         onSearchTermChange: setSearchTerm,
         onCaseSensitiveChange: setCaseSensitive,
         onCurrentMatchIndexChange: setCurrentMatchIndex,
-        onSearchDialogOpenChange: setIsSearchDialogOpen,
+        onOpenSearchDialog: openSearchDialog,
+        onCloseSearchDialog: closeSearchDialog,
+        onToggleSearchDialog: toggleSearchDialog,
         setEditorViewInstance,
         handleShowAllSearchResults,
         ruleRunner,

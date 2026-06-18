@@ -12,6 +12,7 @@ import NovelEditor from "@/components/Editor";
 import ResizablePanel from "@/components/ResizablePanel";
 import ExportDialog from "@/components/ExportDialog";
 import RubyDialog from "@/components/RubyDialog";
+import SearchDialog from "@/components/SearchDialog";
 import SettingsModal from "@/components/SettingsModal";
 import SidebarPanel from "@/components/SidebarPanel";
 import SidebarSplitter from "@/components/SidebarSplitter";
@@ -163,24 +164,25 @@ interface EditorLayoutProps {
     ) => void;
     searchOpenTrigger: number;
     searchInitialTerm?: string;
-    // 共有検索 state（SearchDialog を controlled 化）
+    // 共有検索 state。SearchDialog は dockview パネル外（<main>）でレンダリングする。
     searchTerm: string;
     caseSensitive: boolean;
-    searchMatches: React.ComponentProps<typeof NovelEditor>["searchMatches"];
+    searchMatches: React.ComponentProps<typeof SearchDialog>["matches"];
     currentMatchIndex: number;
-    onSearchTermChange: React.ComponentProps<typeof NovelEditor>["onSearchTermChange"];
-    onCaseSensitiveChange: React.ComponentProps<typeof NovelEditor>["onCaseSensitiveChange"];
+    isSearchDialogOpen: boolean;
+    onSearchTermChange: React.ComponentProps<typeof SearchDialog>["onSearchTermChange"];
+    onCaseSensitiveChange: React.ComponentProps<typeof SearchDialog>["onCaseSensitiveChange"];
     onCurrentMatchIndexChange: React.ComponentProps<
-      typeof NovelEditor
+      typeof SearchDialog
     >["onCurrentMatchIndexChange"];
-    onSearchDialogOpenChange: NonNullable<
-      React.ComponentProps<typeof NovelEditor>["onSearchDialogOpenChange"]
-    >;
+    onOpenSearchDialog: () => void;
+    onCloseSearchDialog: () => void;
+    onToggleSearchDialog: () => void;
     setEditorViewInstance: NonNullable<
       React.ComponentProps<typeof NovelEditor>["onEditorViewReady"]
     >;
     handleShowAllSearchResults: NonNullable<
-      React.ComponentProps<typeof NovelEditor>["onShowAllSearchResults"]
+      React.ComponentProps<typeof SearchDialog>["onShowAllResults"]
     >;
     ruleRunner: RuleRunnerLike | null;
     handleLintIssuesUpdated: (issues: LintIssue[]) => void;
@@ -446,10 +448,6 @@ export default function EditorLayout({
                         const panelFileType = (panelParams?.fileType ?? ".mdi") as string;
                         const panelEditorKey = panelParams?.editorKey ?? 0;
                         const panelActiveTabId = panelParams?.activeTabId ?? "";
-                        const panelSearchOpenTrigger = panelParams?.searchOpenTrigger ?? 0;
-                        const panelSearchInitialTerm = panelParams?.searchInitialTerm as
-                          | string
-                          | undefined;
                         const isActivePanel = panelBufferId === panelActiveTabId;
                         const panelMdiEnabled = panelFileType === ".mdi";
                         const panelGfmEnabled = panelFileType !== ".txt";
@@ -492,18 +490,13 @@ export default function EditorLayout({
                                   onChange={mainArea.handleChange}
                                   onInsertText={mainArea.handleInsertText}
                                   onSelectionChange={mainArea.onSelectionChange}
-                                  searchOpenTrigger={panelSearchOpenTrigger}
-                                  searchInitialTerm={panelSearchInitialTerm}
-                                  searchTerm={mainArea.searchTerm}
+                                  // 検索の入力/表示は <main> の SearchDialog が担当。
+                                  // pane へは「語を反映」「開く」「トグル」の安定 callback のみ渡す
+                                  // （dockview の凍結クロージャでも安定 ref は機能するため）。
                                   onSearchTermChange={mainArea.onSearchTermChange}
-                                  caseSensitive={mainArea.caseSensitive}
-                                  onCaseSensitiveChange={mainArea.onCaseSensitiveChange}
-                                  searchMatches={mainArea.searchMatches}
-                                  currentMatchIndex={mainArea.currentMatchIndex}
-                                  onCurrentMatchIndexChange={mainArea.onCurrentMatchIndexChange}
-                                  onSearchDialogOpenChange={mainArea.onSearchDialogOpenChange}
+                                  onOpenSearchDialog={mainArea.onOpenSearchDialog}
+                                  onToggleSearchDialog={mainArea.onToggleSearchDialog}
                                   onEditorViewReady={mainArea.setEditorViewInstance}
-                                  onShowAllSearchResults={mainArea.handleShowAllSearchResults}
                                   lintingRuleRunner={mainArea.ruleRunner}
                                   onLintIssuesUpdated={mainArea.handleLintIssuesUpdated}
                                   onNlpError={mainArea.handleNlpError}
@@ -577,6 +570,24 @@ export default function EditorLayout({
                     <span className="text-foreground-secondary text-sm">保存完了</span>
                   </div>
                 )}
+
+                {/* フローティング検索窓。dockview パネル外（<main> 直下）でレンダリング
+                    することで、共有検索 state（searchTerm/matches など変化する値）を
+                    live に受け取れる。portal で document.body 直下に出るため、anchorRef
+                    にはアクティブエディタの DOM を渡して初期位置を計算する。 */}
+                <SearchDialog
+                  isOpen={mainArea.isSearchDialogOpen}
+                  onClose={mainArea.onCloseSearchDialog}
+                  onShowAllResults={mainArea.handleShowAllSearchResults}
+                  searchTerm={mainArea.searchTerm}
+                  onSearchTermChange={mainArea.onSearchTermChange}
+                  caseSensitive={mainArea.caseSensitive}
+                  onCaseSensitiveChange={mainArea.onCaseSensitiveChange}
+                  matches={mainArea.searchMatches}
+                  currentMatchIndex={mainArea.currentMatchIndex}
+                  onCurrentMatchIndexChange={mainArea.onCurrentMatchIndexChange}
+                  anchorRef={mainArea.editorDomRef}
+                />
               </main>
 
               <ResizablePanel
