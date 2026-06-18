@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable react-hooks/rules-of-hooks, @typescript-eslint/no-unused-vars */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import EditorLayout from "@/components/EditorLayout";
@@ -46,6 +46,8 @@ import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
+import { findSearchMatches } from "@/lib/editor-page/find-search-matches";
+import { useSearchHighlight, isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
 import { useSaveToast } from "@/lib/editor-page/use-save-toast";
 import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
 import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
@@ -208,7 +210,9 @@ export default function EditorPage() {
   const {
     topView,
     bottomView,
-    searchResults,
+    searchTerm,
+    caseSensitive,
+    currentMatchIndex,
     isRightPanelCollapsed,
     dictionarySearchTrigger,
     settingsInitialCategory,
@@ -226,6 +230,9 @@ export default function EditorPage() {
     setRubySelectedText,
     setEditorDiff,
     handleOpenDictionary,
+    setSearchTerm,
+    setCaseSensitive,
+    setCurrentMatchIndex,
     handleShowAllSearchResults,
     handleCloseSearchResults,
     handleOpenLintingSettings,
@@ -316,6 +323,9 @@ export default function EditorPage() {
   // Search state — declared before useDockviewAdapter so it can be passed as options
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
   const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
+  // フローティング検索窓（SearchDialog）が開いているか。dockview pane 内の Editor から
+  // 報告される。ハイライトの visibility ゲート（要求2）に使う。
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
 
   // Derive project dockview layout from workspace state (already loaded at project open)
   const projectDockviewLayout = isProjectMode(editorMode)
@@ -395,6 +405,28 @@ export default function EditorPage() {
     editorViewRef.current = view; // ref FIRST so sync consumers see fresh value
     setEditorViewInstanceRaw(view);
   }, []);
+
+  // --- 検索ハイライトの単一ソース ---
+  // いずれかの検索 UI が表示中か。両方非表示ならハイライトを消す（要求2）。
+  const isSearchVisible = isSearchDialogOpen || topView === "search";
+  // 共有 searchTerm/caseSensitive からマッチを算出（唯一の計算箇所）。
+  // `content` を依存に含め、置換や編集で doc が変わった時に再計算させる。
+  // 非表示・空語の時は計算をスキップし空配列を返す。
+  const searchMatches = useMemo(() => {
+    if (!isSearchVisible || !searchTerm || !isEditorViewAlive(editorViewInstance)) {
+      return [];
+    }
+    return findSearchMatches(editorViewInstance.state.doc, searchTerm, caseSensitive);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorViewInstance, searchTerm, caseSensitive, isSearchVisible, content]);
+
+  useSearchHighlight({
+    editorView: editorViewInstance,
+    matches: searchMatches,
+    currentMatchIndex,
+    searchTerm,
+    isSearchVisible,
+  });
 
   // --- Ruby/TCY hook ---
   const { handleOpenRubyDialog, handleApplyRuby, handleToggleTcy } = useRubyTcy({
@@ -1113,7 +1145,14 @@ export default function EditorPage() {
     compactMode,
     onChapterClick: handleChapterClick,
     onInsertText: handleInsertText,
-    searchResults,
+    // 共有検索 state（SearchResults を controlled 化）
+    searchTerm,
+    caseSensitive,
+    searchMatches,
+    currentMatchIndex,
+    onSearchTermChange: setSearchTerm,
+    onCaseSensitiveChange: setCaseSensitive,
+    onCurrentMatchIndexChange: setCurrentMatchIndex,
     onCloseSearchResults: handleCloseSearchResults,
     editorViewInstance,
     dictionarySearchTrigger,
@@ -1122,7 +1161,8 @@ export default function EditorPage() {
     openProjectFile,
     incrementEditorKey,
     onWordSearch: (word: string) => {
-      setSearchInitialTerm(word);
+      // 共有検索語へ反映し、フローティング検索窓を開く。
+      setSearchTerm(word);
       setSearchOpenTrigger((prev) => prev + 1);
     },
   } as const;
@@ -1303,6 +1343,15 @@ export default function EditorPage() {
         },
         searchOpenTrigger,
         searchInitialTerm,
+        // 共有検索 state（SearchDialog を controlled 化）
+        searchTerm,
+        caseSensitive,
+        searchMatches,
+        currentMatchIndex,
+        onSearchTermChange: setSearchTerm,
+        onCaseSensitiveChange: setCaseSensitive,
+        onCurrentMatchIndexChange: setCurrentMatchIndex,
+        onSearchDialogOpenChange: setIsSearchDialogOpen,
         setEditorViewInstance,
         handleShowAllSearchResults,
         ruleRunner,

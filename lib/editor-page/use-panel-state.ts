@@ -8,7 +8,12 @@ import type { SettingsCategory } from "@/components/SettingsModal";
 export interface PanelState {
   topView: ActivityBarView;
   bottomView: ActivityBarView;
-  searchResults: { matches: { from: number; to: number }[]; searchTerm: string } | null;
+  /** 単一の検索 source of truth。SearchDialog（フローティング窓）と SearchResults
+   *  （サイドパネル）の両方がこれを共有し、内容のズレを防ぐ。 */
+  searchTerm: string;
+  caseSensitive: boolean;
+  /** 現在フォーカス中のマッチ index。両 UI のナビ／クリックで共有更新する。 */
+  currentMatchIndex: number;
   isRightPanelCollapsed: boolean;
   dictionarySearchTrigger: { term: string; id: number };
   settingsInitialCategory: SettingsCategory | undefined;
@@ -29,7 +34,11 @@ export interface PanelHandlers {
     diff: { snapshotContent: string; currentContent: string; label: string } | null,
   ) => void;
   handleOpenDictionary: (searchTerm?: string) => void;
-  handleShowAllSearchResults: (matches: { from: number; to: number }[], searchTerm: string) => void;
+  setSearchTerm: (term: string) => void;
+  setCaseSensitive: Dispatch<SetStateAction<boolean>>;
+  setCurrentMatchIndex: Dispatch<SetStateAction<number>>;
+  /** サイドバー検索パネルを開く（共有 searchTerm をそのまま表示）。 */
+  handleShowAllSearchResults: () => void;
   handleCloseSearchResults: () => void;
   handleOpenLintingSettings: () => void;
   handleOpenPosHighlightSettings: () => void;
@@ -50,10 +59,9 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
 } {
   const [topView, setTopView] = useState<ActivityBarView>("explorer");
   const [bottomView, setBottomView] = useState<ActivityBarView>("none");
-  const [searchResults, setSearchResults] = useState<{
-    matches: { from: number; to: number }[];
-    searchTerm: string;
-  } | null>(null);
+  const [searchTerm, setSearchTermRaw] = useState("");
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
   const [dictionarySearchTrigger, setDictionarySearchTrigger] = useState<{
     term: string;
@@ -89,16 +97,17 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
     });
   }, []);
 
-  const handleShowAllSearchResults = useCallback(
-    (matches: { from: number; to: number }[], searchTerm: string) => {
-      setSearchResults({ matches, searchTerm });
-      setTopView("search");
-    },
-    [],
-  );
+  // 検索語変更時は現在マッチ index を先頭へリセットする。
+  const setSearchTerm = useCallback((term: string) => {
+    setSearchTermRaw(term);
+    setCurrentMatchIndex(0);
+  }, []);
+
+  const handleShowAllSearchResults = useCallback(() => {
+    setTopView("search");
+  }, []);
 
   const handleCloseSearchResults = useCallback(() => {
-    setSearchResults(null);
     setTopView("explorer");
   }, []);
 
@@ -125,7 +134,9 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
     state: {
       topView,
       bottomView,
-      searchResults,
+      searchTerm,
+      caseSensitive,
+      currentMatchIndex,
       isRightPanelCollapsed,
       dictionarySearchTrigger,
       settingsInitialCategory,
@@ -143,6 +154,9 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
       setRubySelectedText,
       setEditorDiff,
       handleOpenDictionary,
+      setSearchTerm,
+      setCaseSensitive,
+      setCurrentMatchIndex,
       handleShowAllSearchResults,
       handleCloseSearchResults,
       handleOpenLintingSettings,

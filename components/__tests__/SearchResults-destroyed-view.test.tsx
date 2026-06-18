@@ -25,6 +25,15 @@ vi.mock("@/lib/editor-page/center-editor-position", () => ({
 
 import SearchResults from "../SearchResults";
 
+// 共有検索 state の controlled props（このテストでは検索ナビ自体は検証しない）。
+const controlled = {
+  onSearchTermChange: () => {},
+  caseSensitive: false,
+  onCaseSensitiveChange: () => {},
+  currentMatchIndex: 0,
+  onCurrentMatchIndexChange: () => {},
+} as const;
+
 let container: HTMLDivElement;
 let root: Root;
 
@@ -64,7 +73,13 @@ describe("SearchResults – destroyed editor view (#1507)", () => {
     expect(() => {
       act(() => {
         root.render(
-          <SearchResults editorView={destroyed} onClose={() => {}} searchTerm="" matches={[]} />,
+          <SearchResults
+            editorView={destroyed}
+            {...controlled}
+            onClose={() => {}}
+            searchTerm=""
+            matches={[]}
+          />,
         );
       });
     }).not.toThrow();
@@ -76,6 +91,7 @@ describe("SearchResults – destroyed editor view (#1507)", () => {
       root.render(
         <SearchResults
           editorView={destroyed}
+          {...controlled}
           onClose={() => {}}
           searchTerm="foo"
           matches={[{ from: 1, to: 4 }]}
@@ -87,7 +103,13 @@ describe("SearchResults – destroyed editor view (#1507)", () => {
     expect(() => {
       act(() => {
         root.render(
-          <SearchResults editorView={destroyed} onClose={() => {}} searchTerm="" matches={[]} />,
+          <SearchResults
+            editorView={destroyed}
+            {...controlled}
+            onClose={() => {}}
+            searchTerm=""
+            matches={[]}
+          />,
         );
       });
     }).not.toThrow();
@@ -97,13 +119,25 @@ describe("SearchResults – destroyed editor view (#1507)", () => {
     const destroyed = makeDestroyedView();
     act(() => {
       root.render(
-        <SearchResults editorView={null} onClose={() => {}} searchTerm="foo" matches={[]} />,
+        <SearchResults
+          editorView={null}
+          {...controlled}
+          onClose={() => {}}
+          searchTerm="foo"
+          matches={[]}
+        />,
       );
     });
     expect(() => {
       act(() => {
         root.render(
-          <SearchResults editorView={destroyed} onClose={() => {}} searchTerm="foo" matches={[]} />,
+          <SearchResults
+            editorView={destroyed}
+            {...controlled}
+            onClose={() => {}}
+            searchTerm="foo"
+            matches={[]}
+          />,
         );
       });
     }).not.toThrow();

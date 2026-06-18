@@ -163,6 +163,19 @@ interface EditorLayoutProps {
     ) => void;
     searchOpenTrigger: number;
     searchInitialTerm?: string;
+    // 共有検索 state（SearchDialog を controlled 化）
+    searchTerm: string;
+    caseSensitive: boolean;
+    searchMatches: React.ComponentProps<typeof NovelEditor>["searchMatches"];
+    currentMatchIndex: number;
+    onSearchTermChange: React.ComponentProps<typeof NovelEditor>["onSearchTermChange"];
+    onCaseSensitiveChange: React.ComponentProps<typeof NovelEditor>["onCaseSensitiveChange"];
+    onCurrentMatchIndexChange: React.ComponentProps<
+      typeof NovelEditor
+    >["onCurrentMatchIndexChange"];
+    onSearchDialogOpenChange: NonNullable<
+      React.ComponentProps<typeof NovelEditor>["onSearchDialogOpenChange"]
+    >;
     setEditorViewInstance: NonNullable<
       React.ComponentProps<typeof NovelEditor>["onEditorViewReady"]
     >;
@@ -481,6 +494,14 @@ export default function EditorLayout({
                                   onSelectionChange={mainArea.onSelectionChange}
                                   searchOpenTrigger={panelSearchOpenTrigger}
                                   searchInitialTerm={panelSearchInitialTerm}
+                                  searchTerm={mainArea.searchTerm}
+                                  onSearchTermChange={mainArea.onSearchTermChange}
+                                  caseSensitive={mainArea.caseSensitive}
+                                  onCaseSensitiveChange={mainArea.onCaseSensitiveChange}
+                                  searchMatches={mainArea.searchMatches}
+                                  currentMatchIndex={mainArea.currentMatchIndex}
+                                  onCurrentMatchIndexChange={mainArea.onCurrentMatchIndexChange}
+                                  onSearchDialogOpenChange={mainArea.onSearchDialogOpenChange}
                                   onEditorViewReady={mainArea.setEditorViewInstance}
                                   onShowAllSearchResults={mainArea.handleShowAllSearchResults}
                                   lintingRuleRunner={mainArea.ruleRunner}

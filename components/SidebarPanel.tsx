@@ -26,8 +26,14 @@ interface SidebarPanelProps {
   onChapterClick: (anchorId: string) => void;
   /** Called when the editor should insert text at the current cursor. */
   onInsertText: (text: string) => void;
-  /** Current search results for the search panel. */
-  searchResults: { matches: { from: number; to: number }[]; searchTerm: string } | null;
+  /** 共有検索 state（単一 source of truth）。SearchDialog と同期する。 */
+  searchTerm: string;
+  onSearchTermChange: (term: string) => void;
+  caseSensitive: boolean;
+  onCaseSensitiveChange: (value: boolean) => void;
+  searchMatches: { from: number; to: number }[];
+  currentMatchIndex: number;
+  onCurrentMatchIndexChange: (index: number) => void;
   /** Called when the search panel should close. */
   onCloseSearchResults: () => void;
   /** The active ProseMirror EditorView (required by the search panel). */
@@ -59,7 +65,13 @@ export default function SidebarPanel({
   compactMode,
   onChapterClick,
   onInsertText,
-  searchResults,
+  searchTerm,
+  onSearchTermChange,
+  caseSensitive,
+  onCaseSensitiveChange,
+  searchMatches,
+  currentMatchIndex,
+  onCurrentMatchIndexChange,
   onCloseSearchResults,
   editorViewInstance,
   dictionarySearchTrigger,
@@ -104,8 +116,13 @@ export default function SidebarPanel({
       return (
         <SearchResults
           editorView={editorViewInstance}
-          matches={searchResults?.matches}
-          searchTerm={searchResults?.searchTerm}
+          searchTerm={searchTerm}
+          onSearchTermChange={onSearchTermChange}
+          caseSensitive={caseSensitive}
+          onCaseSensitiveChange={onCaseSensitiveChange}
+          matches={searchMatches}
+          currentMatchIndex={currentMatchIndex}
+          onCurrentMatchIndexChange={onCurrentMatchIndexChange}
           onClose={onCloseSearchResults}
         />
       );
