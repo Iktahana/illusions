@@ -162,6 +162,9 @@ interface EditorLayoutProps {
       manuscriptCells: number,
       manuscriptPages: number,
     ) => void;
+    onSelectionRangeChange: NonNullable<
+      React.ComponentProps<typeof NovelEditor>["onSelectionRangeChange"]
+    >;
     searchOpenTrigger: number;
     searchInitialTerm?: string;
     // 共有検索 state。SearchDialog は dockview パネル外（<main>）でレンダリングする。
@@ -490,6 +493,7 @@ export default function EditorLayout({
                                   onChange={mainArea.handleChange}
                                   onInsertText={mainArea.handleInsertText}
                                   onSelectionChange={mainArea.onSelectionChange}
+                                  onSelectionRangeChange={mainArea.onSelectionRangeChange}
                                   // 検索の入力/表示は <main> の SearchDialog が担当。
                                   // pane へは「語を反映」「開く」「トグル」の安定 callback のみ渡す
                                   // （dockview の凍結クロージャでも安定 ref は機能するため）。

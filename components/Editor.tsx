@@ -17,6 +17,7 @@ import MilkdownEditor from "./editor/MilkdownEditor";
 import { buildSegments, buildSpeechChunks, buildSpeechMap } from "@/lib/hooks/speech-utils";
 import { scrollToSpeechTarget, cancelSpeechScroll } from "@/lib/editor-page/speech-auto-scroll";
 import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
+import type { SelectionSearchRange } from "@/lib/editor-page/use-selection-tracking";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { LintIssue } from "@/lib/linting";
 import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
@@ -28,6 +29,7 @@ interface EditorProps {
   onChange?: (content: string) => void;
   onInsertText?: (text: string) => void;
   onSelectionChange?: (charCount: number, manuscriptCells: number, manuscriptPages: number) => void;
+  onSelectionRangeChange?: (range: SelectionSearchRange | null) => void;
   className?: string;
   // フローティング検索窓（SearchDialog）は EditorLayout の <main> でレンダリングされる。
   // Editor はツールバー検索ボタンとコンテキストメニュー「検索」から、共有 state への
@@ -68,6 +70,7 @@ export default function NovelEditor({
   onChange,
   onInsertText,
   onSelectionChange,
+  onSelectionRangeChange,
   className,
   onSearchTermChange = noop,
   onOpenSearchDialog = noop,
@@ -134,6 +137,7 @@ export default function NovelEditor({
     editorViewInstance,
     scrollContainerRef,
     onSelectionChange,
+    onSelectionRangeChange,
   });
   const handleScrollContainerRef = useCallback((node: HTMLDivElement | null) => {
     scrollContainerRef.current = node;

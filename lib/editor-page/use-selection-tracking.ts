@@ -29,10 +29,16 @@ export interface EditorSelectionState {
   pointerClientY: number | null;
 }
 
+export interface SelectionSearchRange {
+  from: number;
+  to: number;
+}
+
 interface UseSelectionTrackingOptions {
   editorViewInstance: EditorView | null;
   scrollContainerRef: RefObject<HTMLDivElement | null>;
   onSelectionChange?: (charCount: number, manuscriptCells: number, manuscriptPages: number) => void;
+  onSelectionRangeChange?: (range: SelectionSearchRange | null) => void;
 }
 
 const EMPTY_SELECTION_STATE: EditorSelectionState = {
@@ -81,6 +87,14 @@ function sameSelectionState(a: EditorSelectionState, b: EditorSelectionState): b
   );
 }
 
+export function getEditorSelectionSearchRange(
+  selection: { empty: boolean; from: number; to: number },
+): SelectionSearchRange | null {
+  return !selection.empty && selection.from < selection.to
+    ? { from: selection.from, to: selection.to }
+    : null;
+}
+
 function safeCoordsAtPos(editorViewInstance: EditorView, pos: number): ViewportRect | null {
   try {
     return toViewportRect(editorViewInstance.coordsAtPos(pos));
@@ -101,10 +115,13 @@ export function useSelectionTracking({
   editorViewInstance,
   scrollContainerRef,
   onSelectionChange,
+  onSelectionRangeChange,
 }: UseSelectionTrackingOptions): EditorSelectionState {
   const [selectionState, setSelectionState] = useState<EditorSelectionState>(EMPTY_SELECTION_STATE);
   const selectionStateRef = useRef(selectionState);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const onSelectionRangeChangeRef = useRef(onSelectionRangeChange);
+  const lastReportedRangeRef = useRef<SelectionSearchRange | null>(null);
   const lastPointerYRef = useRef<number | null>(null);
   const lastReportedCountRef = useRef(0);
   // 原稿用紙マス数も保持する。可視文字数が同じでも禁則処理でマス数は変わり得るため、
@@ -120,6 +137,21 @@ export function useSelectionTracking({
     onSelectionChangeRef.current = onSelectionChange;
   }, [onSelectionChange]);
 
+  useEffect(() => {
+    onSelectionRangeChangeRef.current = onSelectionRangeChange;
+  }, [onSelectionRangeChange]);
+
+  const reportSelectionRange = useCallback(
+    (selection: { empty: boolean; from: number; to: number }) => {
+      const range = getEditorSelectionSearchRange(selection);
+      const previous = lastReportedRangeRef.current;
+      if (previous?.from === range?.from && previous?.to === range?.to) return;
+      lastReportedRangeRef.current = range;
+      onSelectionRangeChangeRef.current?.(range);
+    },
+    [],
+  );
+
   const updateSelectionState = useCallback(() => {
     if (!editorViewInstance) {
       if (lastReportedCountRef.current !== 0 || lastReportedCellsRef.current !== 0) {
@@ -130,6 +162,7 @@ export function useSelectionTracking({
       setSelectionState((prev) =>
         sameSelectionState(prev, EMPTY_SELECTION_STATE) ? prev : EMPTY_SELECTION_STATE,
       );
+      reportSelectionRange({ empty: true, from: 0, to: 0 });
       return;
     }
 
@@ -188,8 +221,9 @@ export function useSelectionTracking({
       onSelectionChangeRef.current?.(0, 0, 0);
     }
 
+    reportSelectionRange(selection);
     setSelectionState((prev) => (sameSelectionState(prev, nextState) ? prev : nextState));
-  }, [editorViewInstance]);
+  }, [editorViewInstance, reportSelectionRange]);
 
   const scheduleUpdate = useCallback(
     (pointerClientY?: number | null) => {

@@ -46,7 +46,7 @@ import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
-import { findSearchMatches } from "@/lib/editor-page/find-search-matches";
+import { findSearchMatches, type SearchRange } from "@/lib/editor-page/find-search-matches";
 import { useSearchHighlight, isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
 import { useSaveToast } from "@/lib/editor-page/use-save-toast";
 import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
@@ -212,6 +212,12 @@ export default function EditorPage() {
     bottomView,
     searchTerm,
     caseSensitive,
+    regexSearch,
+    wholeWordSearch,
+    normalizeVariants,
+    excludeComments,
+    searchTarget,
+    selectionOnly,
     currentMatchIndex,
     isRightPanelCollapsed,
     dictionarySearchTrigger,
@@ -232,6 +238,12 @@ export default function EditorPage() {
     handleOpenDictionary,
     setSearchTerm,
     setCaseSensitive,
+    setRegexSearch,
+    setWholeWordSearch,
+    setNormalizeVariants,
+    setExcludeComments,
+    setSearchTarget,
+    setSelectionOnly,
     setCurrentMatchIndex,
     handleShowAllSearchResults,
     handleCloseSearchResults,
@@ -293,6 +305,21 @@ export default function EditorPage() {
   // Keep a live tabs ref for dockview panel renderers captured by stale closures.
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
+  const handleProjectSearchBufferChange = useCallback(
+    (path: string, nextContent: string) => {
+      const tab = tabsRef.current.find(
+        (candidate) => isEditorTab(candidate) && candidate.file?.path === path,
+      );
+      if (!tab || !isEditorTab(tab)) return;
+      updateTab(tab.id, {
+        content: nextContent,
+        isDirty: true,
+        fileSyncStatus: "dirty",
+        pendingExternalContent: nextContent,
+      });
+    },
+    [updateTab],
+  );
 
   const { diffTabContextValue, handleCloseTabWithPtyCleanup } = useDiffTabs({
     tabs,
@@ -352,6 +379,15 @@ export default function EditorPage() {
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const activeEditorTab = activeTab && isEditorTab(activeTab) ? activeTab : undefined;
+  const projectSearchBuffers = useMemo(
+    () =>
+      new Map(
+        tabs.flatMap((tab) =>
+          isEditorTab(tab) && tab.file?.path ? [[tab.file.path, tab.content] as const] : [],
+        ),
+      ),
+    [tabs],
+  );
   const activeFileType = activeEditorTab?.fileType ?? ".mdi";
   const mdiExtensionsEnabled = activeFileType === ".mdi";
   const gfmEnabled = activeFileType !== ".txt";
@@ -397,6 +433,7 @@ export default function EditorPage() {
   const [selectedManuscriptCells, setSelectedManuscriptCells] = useState(0);
   const [selectedManuscriptPages, setSelectedManuscriptPages] = useState(0);
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
+  const [searchSelectionRange, setSearchSelectionRange] = useState<SearchRange | null>(null);
   const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstanceRaw] = useState<EditorView | null>(null);
@@ -409,16 +446,37 @@ export default function EditorPage() {
   // --- 検索ハイライトの単一ソース ---
   // いずれかの検索 UI が表示中か。両方非表示ならハイライトを消す（要求2）。
   const isSearchVisible = isSearchDialogOpen || topView === "search";
-  // 共有 searchTerm/caseSensitive からマッチを算出（唯一の計算箇所）。
+  // 共有 searchTerm/options からマッチを算出（唯一の計算箇所）。
   // `content` を依存に含め、置換や編集で doc が変わった時に再計算させる。
   // 非表示・空語の時は計算をスキップし空配列を返す。
   const searchMatches = useMemo(() => {
     if (!isSearchVisible || !searchTerm || !isEditorViewAlive(editorViewInstance)) {
       return [];
     }
-    return findSearchMatches(editorViewInstance.state.doc, searchTerm, caseSensitive);
+    return findSearchMatches(editorViewInstance.state.doc, searchTerm, {
+      caseSensitive,
+      regex: regexSearch,
+      wholeWord: wholeWordSearch,
+      normalizeVariants,
+      excludeComments,
+      searchTarget,
+      range: selectionOnly ? (searchSelectionRange ?? undefined) : undefined,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editorViewInstance, searchTerm, caseSensitive, isSearchVisible, content]);
+  }, [
+    editorViewInstance,
+    searchTerm,
+    caseSensitive,
+    regexSearch,
+    wholeWordSearch,
+    normalizeVariants,
+    excludeComments,
+    searchTarget,
+    selectionOnly,
+    searchSelectionRange,
+    isSearchVisible,
+    content,
+  ]);
 
   useSearchHighlight({
     editorView: editorViewInstance,
@@ -1163,15 +1221,30 @@ export default function EditorPage() {
     // 共有検索 state（SearchResults を controlled 化）
     searchTerm,
     caseSensitive,
+    regexSearch,
+    wholeWordSearch,
+    normalizeVariants,
+    excludeComments,
+    searchTarget,
+    selectionOnly,
+    hasSearchSelection: searchSelectionRange !== null,
     searchMatches,
     currentMatchIndex,
     onSearchTermChange: setSearchTerm,
     onCaseSensitiveChange: setCaseSensitive,
+    onRegexSearchChange: setRegexSearch,
+    onWholeWordSearchChange: setWholeWordSearch,
+    onNormalizeVariantsChange: setNormalizeVariants,
+    onExcludeCommentsChange: setExcludeComments,
+    onSearchTargetChange: setSearchTarget,
+    onSelectionOnlyChange: setSelectionOnly,
     onCurrentMatchIndexChange: setCurrentMatchIndex,
     onCloseSearchResults: handleCloseSearchResults,
     editorViewInstance,
     dictionarySearchTrigger,
     currentFilePath: currentFile?.path ?? undefined,
+    projectSearchBuffers,
+    onProjectBufferChange: handleProjectSearchBufferChange,
     newFileTrigger,
     openProjectFile,
     incrementEditorKey,
@@ -1355,6 +1428,10 @@ export default function EditorPage() {
           } else {
             setSelectedWord(null);
           }
+        },
+        onSelectionRangeChange: (range: SearchRange | null) => {
+          setSearchSelectionRange(range);
+          if (!range) setSelectionOnly(false);
         },
         searchOpenTrigger,
         searchInitialTerm,
