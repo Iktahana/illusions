@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { X } from "lucide-react";
 import { computeDiff, getDiffStats } from "@/lib/services/diff-service";
 import { useTypographySettings } from "@/contexts/EditorSettingsContext";
@@ -32,6 +32,17 @@ export default function EditorDiffView({
   );
 
   const stats = useMemo(() => getDiffStats(chunks), [chunks]);
+
+  // Auto-jump to the first change when the diff opens (or the snapshot changes).
+  const firstChangeRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!firstChangeRef.current) return;
+    // Defer to the next frame so layout is settled before scrolling.
+    const id = requestAnimationFrame(() => {
+      firstChangeRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [chunks]);
 
   // Calculate max-width from charsPerLine using 1em approximation
   const maxWidth = charsPerLine > 0 ? `${charsPerLine}em` : undefined;
@@ -93,6 +104,7 @@ export default function EditorDiffView({
               chunks={chunks}
               textIndent={textIndent}
               paragraphSpacing={paragraphSpacing}
+              firstChangeRef={firstChangeRef}
             />
           )}
         </div>
@@ -109,16 +121,20 @@ function DiffContent({
   chunks,
   textIndent,
   paragraphSpacing,
+  firstChangeRef,
 }: {
   chunks: DiffChunk[];
   textIndent: number;
   paragraphSpacing: number;
+  firstChangeRef?: React.Ref<HTMLSpanElement>;
 }) {
   // Build paragraph-aware rendering:
   // Walk chunks, splitting on \n to create paragraph boundaries
   const elements: React.ReactNode[] = [];
   let currentParagraph: React.ReactNode[] = [];
   let paraIndex = 0;
+  // Attach the scroll anchor to the first rendered added/removed span.
+  let firstChangeAssigned = false;
 
   const flushParagraph = () => {
     if (currentParagraph.length > 0) {
@@ -155,8 +171,16 @@ function DiffContent({
       }
 
       if (text.length > 0) {
+        const isChange = chunk.type !== "unchanged";
+        const assignRef = isChange && !firstChangeAssigned;
+        if (assignRef) firstChangeAssigned = true;
         currentParagraph.push(
-          <DiffChunkSpan key={`c${ci}-l${li}`} type={chunk.type} value={text} />,
+          <DiffChunkSpan
+            key={`c${ci}-l${li}`}
+            type={chunk.type}
+            value={text}
+            innerRef={assignRef ? firstChangeRef : undefined}
+          />,
         );
       }
     }
@@ -168,13 +192,28 @@ function DiffContent({
   return <div>{elements}</div>;
 }
 
-function DiffChunkSpan({ type, value }: { type: DiffChunk["type"]; value: string }) {
+function DiffChunkSpan({
+  type,
+  value,
+  innerRef,
+}: {
+  type: DiffChunk["type"];
+  value: string;
+  innerRef?: React.Ref<HTMLSpanElement>;
+}) {
   switch (type) {
     case "added":
-      return <span className="bg-success/20 text-success border-b border-success/40">{value}</span>;
+      return (
+        <span ref={innerRef} className="bg-success/20 text-success border-b border-success/40">
+          {value}
+        </span>
+      );
     case "removed":
       return (
-        <span className="bg-error/20 text-error line-through border-b border-error/40">
+        <span
+          ref={innerRef}
+          className="bg-error/20 text-error line-through border-b border-error/40"
+        >
           {value}
         </span>
       );
