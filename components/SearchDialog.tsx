@@ -3,21 +3,25 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Search, X, ChevronUp, ChevronDown, List } from "lucide-react";
-import { EditorView, Decoration } from "@milkdown/prose/view";
-import { TextSelection } from "@milkdown/prose/state";
-import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
 import { computeAnchorPos } from "@/lib/search-dialog/compute-anchor-pos";
-import { findSearchMatches, type SearchMatch } from "@/lib/editor-page/find-search-matches";
+import type { SearchMatch } from "@/lib/editor-page/find-search-matches";
 
 const DIALOG_WIDTH = 320; // w-80 と一致させる
 const DIALOG_PADDING = 16; // 8px top offset / 16px right offset の元値と整合
 
 interface SearchDialogProps {
-  editorView: EditorView | null;
   isOpen: boolean;
   onClose: () => void;
-  onShowAllResults?: (matches: SearchMatch[], searchTerm: string) => void;
-  initialSearchTerm?: string;
+  /** サイドバー検索パネルを開く（共有 state を表示）。 */
+  onShowAllResults?: () => void;
+  /** 共有検索 state（単一 source of truth）。SearchResults と同期する。 */
+  searchTerm: string;
+  onSearchTermChange: (term: string) => void;
+  caseSensitive: boolean;
+  onCaseSensitiveChange: (value: boolean) => void;
+  matches: SearchMatch[];
+  currentMatchIndex: number;
+  onCurrentMatchIndexChange: (index: number) => void;
   /** エディタ領域の ref。ダイアログ初期位置計算に使用する。
    *  dockview の CSS transform が position:fixed の containing block を破壊するため、
    *  portal + getBoundingClientRect() でエディタ基準の座標を求める。 */
@@ -27,17 +31,18 @@ interface SearchDialogProps {
 export type { SearchMatch };
 
 export default function SearchDialog({
-  editorView,
   isOpen,
   onClose,
   onShowAllResults,
-  initialSearchTerm,
+  searchTerm,
+  onSearchTermChange,
+  caseSensitive,
+  onCaseSensitiveChange,
+  matches,
+  currentMatchIndex,
+  onCurrentMatchIndexChange,
   anchorRef,
 }: SearchDialogProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [matches, setMatches] = useState<SearchMatch[]>([]);
-  const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
-  const [caseSensitive, setCaseSensitive] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -123,13 +128,6 @@ export default function SearchDialog({
     document.addEventListener("mouseup", handleMouseUp);
   }, []);
 
-  // initialSearchTerm が変わったら検索語を上書き
-  useEffect(() => {
-    if (initialSearchTerm) {
-      setSearchTerm(initialSearchTerm);
-    }
-  }, [initialSearchTerm]);
-
   // ダイアログ表示時に検索入力へフォーカスする
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
@@ -138,59 +136,17 @@ export default function SearchDialog({
     }
   }, [isOpen]);
 
-  // 文書内の一致箇所を検索する
-  useEffect(() => {
-    if (!editorView || !searchTerm) {
-      setMatches([]);
-      setCurrentMatchIndex(-1);
-      return;
-    }
-
-    const { state } = editorView;
-    const { doc } = state;
-    const foundMatches = findSearchMatches(doc, searchTerm, caseSensitive);
-    setMatches(foundMatches);
-    setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1);
-  }, [searchTerm, caseSensitive, editorView]);
-
-  // 検索ハイライト装飾
-  useEffect(() => {
-    if (!editorView) return;
-
-    const { state, dispatch } = editorView;
-    const decorations: Decoration[] = [];
-
-    // すべてのマッチ項目に背景ハイライトを追加
-    matches.forEach((match, index) => {
-      const isCurrentMatch = index === currentMatchIndex;
-      decorations.push(
-        Decoration.inline(match.from, match.to, {
-          class: isCurrentMatch ? "search-result-current" : "search-result",
-        }),
-      );
-    });
-
-    // meta を使用して装飾情報を渡す
-    const tr = state.tr.setMeta("searchDecorations", decorations);
-    dispatch(tr);
-
-    // 現在のマッチ項目までスクロール
-    if (currentMatchIndex !== -1 && matches[currentMatchIndex]) {
-      const match = matches[currentMatchIndex];
-      const tr2 = state.tr.setSelection(TextSelection.create(state.doc, match.from, match.from));
-      dispatch(tr2);
-      centerEditorPosition(editorView, match.from);
-    }
-  }, [currentMatchIndex, matches, editorView]);
+  // マッチ検出とハイライト適用は app/page.tsx の useSearchHighlight に集約済み。
+  // ここは共有 state を表示し、入力・ナビを上流へ転送するだけの controlled UI。
 
   const goToNextMatch = () => {
     if (matches.length === 0) return;
-    setCurrentMatchIndex((prev) => (prev + 1) % matches.length);
+    onCurrentMatchIndexChange((currentMatchIndex + 1) % matches.length);
   };
 
   const goToPreviousMatch = () => {
     if (matches.length === 0) return;
-    setCurrentMatchIndex((prev) => (prev - 1 + matches.length) % matches.length);
+    onCurrentMatchIndexChange((currentMatchIndex - 1 + matches.length) % matches.length);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -207,7 +163,7 @@ export default function SearchDialog({
 
   const handleShowAllResults = () => {
     if (matches.length > 0 && searchTerm && onShowAllResults) {
-      onShowAllResults(matches, searchTerm);
+      onShowAllResults();
     }
   };
 
@@ -244,7 +200,7 @@ export default function SearchDialog({
             ref={searchInputRef}
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => onSearchTermChange(e.target.value)}
             placeholder="検索..."
             className="w-full px-3 py-2 pr-20 border border-border-secondary bg-background text-foreground rounded focus:outline-none focus:ring-2 focus:ring-accent text-sm"
           />
@@ -280,7 +236,7 @@ export default function SearchDialog({
           <input
             type="checkbox"
             checked={caseSensitive}
-            onChange={(e) => setCaseSensitive(e.target.checked)}
+            onChange={(e) => onCaseSensitiveChange(e.target.checked)}
             className="rounded"
           />
           大文字小文字を区別

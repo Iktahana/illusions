@@ -103,26 +103,34 @@ export function getAutoSaveIntervalMs(
  *
  * Focus-dependent (#1466, restoring the PR #1427 CPU-saving requirement):
  * the expensive morphological highlighting is suspended while the window
- * is backgrounded or power-save mode is on, and resumes when the user
- * setting allows it. This is safe with respect to #1445 because the sole
- * consumer (use-pos-highlight-activation.ts) subscribes to the
- * framework-free window-activity service — no React re-render on focus
- * switches — and applies the decision via `updatePosHighlightSettings`,
- * which dispatches a meta-only transaction: decorations toggle, the
- * document, selection, and scroll are never touched.
+ * is backgrounded, and resumes when the user setting allows it. This is
+ * safe with respect to #1445 because the sole consumer
+ * (use-pos-highlight-activation.ts) subscribes to the framework-free
+ * window-activity service — no React re-render on focus switches — and
+ * applies the decision via `updatePosHighlightSettings`, which dispatches
+ * a meta-only transaction: decorations toggle, the document, selection,
+ * and scroll are never touched.
+ *
+ * NOTE: power-save mode no longer suspends POS highlighting. POS highlight
+ * decorations are cheap to keep once tokenized (the morphology runs for the
+ * vocabulary panel regardless), so gating them off in power-save only
+ * surprised users — a toggle that read ON while nothing was colored. Only
+ * the focus/background gate remains. `powerSaveMode` is intentionally not
+ * read here; it is still accepted in `settings` so callers can pass the
+ * shared `PowerPolicySettings` object unchanged.
  *
  * The user setting itself is never mutated; this returns an EFFECTIVE
  * value, so regaining focus restores exactly the user's choice.
  *
- * 品詞ハイライトを有効にすべきかどうか（#1466）。バックグラウンド中
- * または省電力モード中は重い形態素ハイライトを一時停止し、フォーカス
- * 復帰時にユーザー設定どおりの状態へ戻す。判断の適用は meta 専用
- * transaction による装飾の付け外しのみで、本文・選択・スクロールには
- * 一切触れない（#1445 ガード）。ユーザー設定自体は変更しない。
+ * 品詞ハイライトを有効にすべきかどうか（#1466）。バックグラウンド中は
+ * 重い形態素ハイライトを一時停止し、フォーカス復帰でユーザー設定どおりへ
+ * 戻す。省電力モードでは停止しない（トグル ON なのに無色になる UX を回避）。
+ * 判断の適用は meta 専用 transaction による装飾の付け外しのみで、本文・
+ * 選択・スクロールには一切触れない（#1445 ガード）。設定自体は変更しない。
  */
 export function shouldEnablePosHighlight(
   activity: WindowActivityState,
   settings: PowerPolicySettings & { posHighlightEnabled: boolean },
 ): boolean {
-  return settings.posHighlightEnabled && !settings.powerSaveMode && !isBackground(activity);
+  return settings.posHighlightEnabled && !isBackground(activity);
 }

@@ -14,6 +14,8 @@ const KEYS = {
   rightTab: `${PREFIX}right-tab`,
   sidebarTopOrder: `${PREFIX}sidebar-top-order`,
   sidebarBottomOrder: `${PREFIX}sidebar-bottom-order`,
+  searchHistory: `${PREFIX}search-history`,
+  genjiAnalysisExpanded: `${PREFIX}genji-analysis-expanded`,
 } as const;
 
 // One-time migration from old keys to new keys
@@ -125,5 +127,31 @@ export const localPreferences = {
   },
   setSidebarBottomOrder(ids: string[]): void {
     set(KEYS.sidebarBottomOrder, JSON.stringify(ids));
+  },
+
+  // --- Search history ---
+  getSearchHistory(): string[] {
+    const raw = get(KEYS.searchHistory);
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed)
+        ? parsed.filter((value): value is string => typeof value === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  },
+  setSearchHistory(entries: readonly string[]): void {
+    set(KEYS.searchHistory, JSON.stringify(entries));
+  },
+
+  // --- 語彙統計「辞書データからの分析」セクションの開閉（既定: 展開）---
+  getGenjiAnalysisExpanded(): boolean {
+    // 未保存 (null) のときは既定で展開。明示的に "0" のときだけ折り畳み。
+    return get(KEYS.genjiAnalysisExpanded) !== "0";
+  },
+  setGenjiAnalysisExpanded(expanded: boolean): void {
+    set(KEYS.genjiAnalysisExpanded, expanded ? "1" : "0");
   },
 } as const;

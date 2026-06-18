@@ -11,13 +11,13 @@ import {
   getScrollProgress,
   setScrollProgress,
 } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
-import SearchDialog, { type SearchMatch } from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
 import EditorToolbar from "./editor/EditorToolbar";
 import MilkdownEditor from "./editor/MilkdownEditor";
 import { buildSegments, buildSpeechChunks, buildSpeechMap } from "@/lib/hooks/speech-utils";
 import { scrollToSpeechTarget, cancelSpeechScroll } from "@/lib/editor-page/speech-auto-scroll";
 import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
+import type { SelectionSearchRange } from "@/lib/editor-page/use-selection-tracking";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { LintIssue } from "@/lib/linting";
 import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
@@ -29,11 +29,15 @@ interface EditorProps {
   onChange?: (content: string) => void;
   onInsertText?: (text: string) => void;
   onSelectionChange?: (charCount: number, manuscriptCells: number, manuscriptPages: number) => void;
+  onSelectionRangeChange?: (range: SelectionSearchRange | null) => void;
   className?: string;
-  searchOpenTrigger?: number;
-  searchInitialTerm?: string;
+  // フローティング検索窓（SearchDialog）は EditorLayout の <main> でレンダリングされる。
+  // Editor はツールバー検索ボタンとコンテキストメニュー「検索」から、共有 state への
+  // 反映と開閉だけを安定 callback で上流へ伝える（dockview 凍結クロージャでも安定 ref は機能）。
+  onSearchTermChange?: (term: string) => void;
+  onOpenSearchDialog?: () => void;
+  onToggleSearchDialog?: () => void;
   onEditorViewReady?: (view: EditorView) => void;
-  onShowAllSearchResults?: (matches: SearchMatch[], searchTerm: string) => void;
   // リンティング設定
   lintingRuleRunner?: RuleRunnerLike | null;
   onLintIssuesUpdated?: (issues: LintIssue[]) => void;
@@ -58,16 +62,20 @@ interface EditorProps {
   onExternalContentApplied?: () => void;
 }
 
+/** 検索を配線しない NovelEditor 用途向けの安定 no-op。 */
+const noop = (): void => {};
+
 export default function NovelEditor({
   initialContent = "",
   onChange,
   onInsertText,
   onSelectionChange,
+  onSelectionRangeChange,
   className,
-  searchOpenTrigger = 0,
-  searchInitialTerm,
+  onSearchTermChange = noop,
+  onOpenSearchDialog = noop,
+  onToggleSearchDialog = noop,
   onEditorViewReady,
-  onShowAllSearchResults,
   lintingRuleRunner,
   onLintIssuesUpdated,
   onNlpError,
@@ -91,9 +99,6 @@ export default function NovelEditor({
     return localPreferences.getWritingMode() === "vertical";
   });
   const [isMounted, setIsMounted] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  // コンテキストメニューの「検索」で渡された初期検索語
-  const [contextMenuSearchTerm, setContextMenuSearchTerm] = useState<string | undefined>(undefined);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const {
     state: speechState,
@@ -111,8 +116,8 @@ export default function NovelEditor({
   const speechMapRef = useRef<{ text: string; positions: number[] } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isVerticalRef = useRef(false);
-  // #1504: ref to the toolbar 検索 button — SearchDialog uses this to anchor
-  // its floating position to the clicked pane instead of the viewport corner.
+  // ツールバー検索ボタンの ref（EditorToolbar が利用）。検索窓のアンカーは
+  // EditorLayout 側でアクティブエディタ DOM を使うため、ここでは保持のみ。
   const searchButtonRef = useRef<HTMLButtonElement | null>(null);
   const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null);
   /** Doc position to resume TTS from after the current chunk ends. null = no continuation. */
@@ -132,6 +137,7 @@ export default function NovelEditor({
     editorViewInstance,
     scrollContainerRef,
     onSelectionChange,
+    onSelectionRangeChange,
   });
   const handleScrollContainerRef = useCallback((node: HTMLDivElement | null) => {
     scrollContainerRef.current = node;
@@ -173,19 +179,16 @@ export default function NovelEditor({
   //
   // 将来、再マウント無しでファイル切替が必要なら、明確な fileId prop を追加して追跡可能
 
-  const handleSearchToggle = () => {
-    setIsSearchOpen((prev) => !prev);
-  };
-
-  const handleSearchOpen = useCallback(() => {
-    setIsSearchOpen(true);
-  }, []);
-
-  /** コンテキストメニューの「検索」アクションを処理する。選択テキストを初期検索語として渡す。 */
-  const handleFind = useCallback((initialTerm?: string) => {
-    setContextMenuSearchTerm(initialTerm);
-    setIsSearchOpen(true);
-  }, []);
+  /** コンテキストメニューの「検索」アクション。選択テキストを共有検索語へ反映して窓を開く。 */
+  const handleFind = useCallback(
+    (initialTerm?: string) => {
+      if (initialTerm !== undefined) {
+        onSearchTermChange(initialTerm);
+      }
+      onOpenSearchDialog();
+    },
+    [onSearchTermChange, onOpenSearchDialog],
+  );
 
   const clearHighlight = useCallback(() => {
     cancelSpeechScroll();
@@ -306,13 +309,6 @@ export default function NovelEditor({
     container.addEventListener("click", handleClick);
     return () => container.removeEventListener("click", handleClick);
   }, [startSpeechFromCursor]);
-
-  // 親からのトリガーで検索ダイアログを開く（ショートカット）
-  useEffect(() => {
-    if (searchOpenTrigger > 0) {
-      handleSearchOpen();
-    }
-  }, [searchOpenTrigger, handleSearchOpen]);
 
   // Track whether initial vertical scroll has been performed for this pane instance.
   const hasVerticalInitialScrollRef = useRef(false);
@@ -487,7 +483,7 @@ export default function NovelEditor({
       <EditorToolbar
         isVertical={isVertical}
         onToggleVertical={handleToggleVertical}
-        onSearchClick={handleSearchToggle}
+        onSearchClick={onToggleSearchDialog}
         searchButtonRef={searchButtonRef}
         speechState={speechState}
         onSpeakToggle={handleSpeakToggle}
@@ -504,10 +500,13 @@ export default function NovelEditor({
           overscrollBehavior: "contain",
           // Disable browser scroll anchoring to prevent auto-scroll adjustment during DOM updates in vertical mode
           overflowAnchor: "none",
-          // In vertical-rl, padding on child elements causes Chromium to miscalculate scrollWidth.
-          // Move horizontal padding to the scroll container itself, where the browser handles it correctly.
+          // In vertical-rl the document start is the RIGHT edge. The scroll container's
+          // end-side (right) padding is dropped from scrollWidth by Chromium on real
+          // Electron, so paddingRight never shows (title sticks to the frame). Keep only
+          // the start-side (left) padding here, and provide the right-side gap as an
+          // in-flow flex spacer inside the content (always counted in scrollWidth). (#1639)
           // scrollbar-gutter keeps the bottom line clear of the horizontal scrollbar (non-overlay platforms).
-          ...(isVertical ? { paddingLeft: 64, paddingRight: 64, scrollbarGutter: "stable" } : {}),
+          ...(isVertical ? { paddingLeft: 64, scrollbarGutter: "stable" } : {}),
         }}
       >
         {/* Hidden character width measurement element for auto chars-per-line calculation */}
@@ -568,16 +567,6 @@ export default function NovelEditor({
           containerElement={scrollContainerElement}
         />
       )}
-
-      {/* 検索ダイアログ */}
-      <SearchDialog
-        editorView={editorViewInstance}
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        onShowAllResults={onShowAllSearchResults}
-        initialSearchTerm={contextMenuSearchTerm ?? searchInitialTerm}
-        anchorRef={searchButtonRef}
-      />
     </div>
   );
 }

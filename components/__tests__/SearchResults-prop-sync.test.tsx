@@ -44,18 +44,28 @@ afterEach(() => {
  * Wrapper that simulates SidebarPanel's behavior: SearchResults is kept
  * mounted while its props change (the exact scenario from #1502).
  *
- * Note: SearchResults's public prop names are `searchTerm` / `matches`
- * (destructured internally as `initialSearchTerm` / `initialMatches`).
+ * SearchResults is now fully controlled — `searchTerm` / `matches` come
+ * straight from the shared search state in app/page.tsx.
  */
 function Wrapper({
-  searchTerm,
-  matches,
+  searchTerm = "",
+  matches = [],
 }: {
   searchTerm?: string;
   matches?: { from: number; to: number }[];
 }) {
   return (
-    <SearchResults editorView={null} onClose={() => {}} searchTerm={searchTerm} matches={matches} />
+    <SearchResults
+      editorView={null}
+      searchTerm={searchTerm}
+      onSearchTermChange={() => {}}
+      caseSensitive={false}
+      onCaseSensitiveChange={() => {}}
+      matches={matches}
+      currentMatchIndex={0}
+      onCurrentMatchIndexChange={() => {}}
+      onClose={() => {}}
+    />
   );
 }
 

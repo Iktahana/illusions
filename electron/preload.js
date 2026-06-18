@@ -188,6 +188,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       reading,
       limit,
     })),
+    lookupBatch: invokeChannel(DICT_CHANNELS.invoke.lookupBatch, (terms) => ({ terms })),
+    verify: invokeChannel(DICT_CHANNELS.invoke.verify, { arity: 0 }),
     getStatus: invokeChannel(DICT_CHANNELS.invoke.getStatus, { arity: 0 }),
     checkUpdate: invokeChannel(DICT_CHANNELS.invoke.checkUpdate, { arity: 0 }),
     download: invokeChannel(DICT_CHANNELS.invoke.download, { arity: 0 }),

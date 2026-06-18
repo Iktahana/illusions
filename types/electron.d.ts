@@ -9,7 +9,7 @@ import type {
 import type { Token, WordEntry, TokenizeProgress } from "@/lib/nlp-client/types";
 import type { VFSWatchEvent } from "@/lib/vfs/types";
 import type { KeymapOverrides } from "@/lib/keymap/keymap-types";
-import type { DictEntry, DictDownloadStatus } from "@/lib/dict/dict-types";
+import type { DictEntry, DictDownloadStatus, DictLookup } from "@/lib/dict/dict-types";
 import type { PdfGenerationOptions } from "@/lib/export/types";
 
 export {};
@@ -289,6 +289,16 @@ declare global {
       query: (term: string, limit?: number) => Promise<DictEntry[]>;
       /** Query entries by kana reading (homophone lookup) */
       queryByReading: (reading: string, limit?: number) => Promise<DictEntry[]>;
+      /**
+       * Exact-match batch lookup (lightweight projection) for analysis features.
+       * Terms with no match are omitted from the result array.
+       */
+      lookupBatch: (terms: string[]) => Promise<Array<{ entry: string } & DictLookup>>;
+      /** Fast integrity check; `ok: false` means the DB should be re-downloaded. */
+      verify: () => Promise<{
+        ok: boolean;
+        reason?: "not-installed" | "schema" | "malformed";
+      }>;
       /** Get current installation status */
       getStatus: () => Promise<{
         status: DictDownloadStatus;

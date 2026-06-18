@@ -12,6 +12,7 @@ import NovelEditor from "@/components/Editor";
 import ResizablePanel from "@/components/ResizablePanel";
 import ExportDialog from "@/components/ExportDialog";
 import RubyDialog from "@/components/RubyDialog";
+import SearchDialog from "@/components/SearchDialog";
 import SettingsModal from "@/components/SettingsModal";
 import SidebarPanel from "@/components/SidebarPanel";
 import SidebarSplitter from "@/components/SidebarSplitter";
@@ -105,6 +106,7 @@ interface EditorLayoutProps {
       onEpubExport: (options: EpubExportOptions) => void;
       content: string;
       metadata: ExportMetadata;
+      fileType?: string;
     };
     printDialog: {
       state: { content: string; metadata: ExportMetadata } | null;
@@ -112,6 +114,7 @@ interface EditorLayoutProps {
       onPrint: (settings: PdfExportSettings) => void;
       content: string;
       metadata: ExportMetadata;
+      fileType?: string;
     };
   };
   recovery: {
@@ -159,13 +162,30 @@ interface EditorLayoutProps {
       manuscriptCells: number,
       manuscriptPages: number,
     ) => void;
+    onSelectionRangeChange: NonNullable<
+      React.ComponentProps<typeof NovelEditor>["onSelectionRangeChange"]
+    >;
     searchOpenTrigger: number;
     searchInitialTerm?: string;
+    // 共有検索 state。SearchDialog は dockview パネル外（<main>）でレンダリングする。
+    searchTerm: string;
+    caseSensitive: boolean;
+    searchMatches: React.ComponentProps<typeof SearchDialog>["matches"];
+    currentMatchIndex: number;
+    isSearchDialogOpen: boolean;
+    onSearchTermChange: React.ComponentProps<typeof SearchDialog>["onSearchTermChange"];
+    onCaseSensitiveChange: React.ComponentProps<typeof SearchDialog>["onCaseSensitiveChange"];
+    onCurrentMatchIndexChange: React.ComponentProps<
+      typeof SearchDialog
+    >["onCurrentMatchIndexChange"];
+    onOpenSearchDialog: () => void;
+    onCloseSearchDialog: () => void;
+    onToggleSearchDialog: () => void;
     setEditorViewInstance: NonNullable<
       React.ComponentProps<typeof NovelEditor>["onEditorViewReady"]
     >;
     handleShowAllSearchResults: NonNullable<
-      React.ComponentProps<typeof NovelEditor>["onShowAllSearchResults"]
+      React.ComponentProps<typeof SearchDialog>["onShowAllResults"]
     >;
     ruleRunner: RuleRunnerLike | null;
     handleLintIssuesUpdated: (issues: LintIssue[]) => void;
@@ -289,6 +309,7 @@ export default function EditorLayout({
               onExportEpub={dialogs.exportDialog.onEpubExport}
               content={dialogs.exportDialog.content}
               metadata={dialogs.exportDialog.metadata}
+              fileType={dialogs.exportDialog.fileType}
             />
 
             <ExportDialog
@@ -300,6 +321,7 @@ export default function EditorLayout({
               onExportDocx={() => {}}
               content={dialogs.printDialog.content}
               metadata={dialogs.printDialog.metadata}
+              fileType={dialogs.printDialog.fileType}
             />
 
             {!chrome.isElectron && recovery.wasAutoRecovered && !recovery.dismissedRecovery && (
@@ -400,6 +422,21 @@ export default function EditorLayout({
                   </div>
                 )}
 
+                {/* Snapshot-diff overlay. Rendered here (not inside the
+                    dockview panel) so it appears as soon as `editorDiff` is
+                    set, independent of dockview's panel re-render timing and
+                    of which panel is active. */}
+                {mainArea.editorDiff && (
+                  <div className="absolute inset-0 z-20 bg-background">
+                    <EditorDiffView
+                      snapshotContent={mainArea.editorDiff.snapshotContent}
+                      currentContent={mainArea.editorDiff.currentContent}
+                      snapshotLabel={mainArea.editorDiff.label}
+                      onClose={() => mainArea.setEditorDiff(null)}
+                    />
+                  </div>
+                )}
+
                 {}
                 <div
                   className="flex-1 flex flex-col overflow-hidden"
@@ -414,10 +451,6 @@ export default function EditorLayout({
                         const panelFileType = (panelParams?.fileType ?? ".mdi") as string;
                         const panelEditorKey = panelParams?.editorKey ?? 0;
                         const panelActiveTabId = panelParams?.activeTabId ?? "";
-                        const panelSearchOpenTrigger = panelParams?.searchOpenTrigger ?? 0;
-                        const panelSearchInitialTerm = panelParams?.searchInitialTerm as
-                          | string
-                          | undefined;
                         const isActivePanel = panelBufferId === panelActiveTabId;
                         const panelMdiEnabled = panelFileType === ".mdi";
                         const panelGfmEnabled = panelFileType !== ".txt";
@@ -431,17 +464,12 @@ export default function EditorLayout({
                         const panelPendingExternalContent =
                           liveEditorTab?.pendingExternalContent ?? null;
 
-                        if (mainArea.editorDiff && isActivePanel) {
-                          return (
-                            <EditorDiffView
-                              snapshotContent={mainArea.editorDiff.snapshotContent}
-                              currentContent={mainArea.editorDiff.currentContent}
-                              snapshotLabel={mainArea.editorDiff.label}
-                              onClose={() => mainArea.setEditorDiff(null)}
-                            />
-                          );
-                        }
-
+                        // NOTE: the snapshot-diff view is rendered as a
+                        // top-level overlay on <main> (see below), NOT inside
+                        // the dockview panel. Rendering it here depended on the
+                        // panel re-evaluating its closure when `editorDiff`
+                        // changed — which dockview does not reliably do — so
+                        // clicking "比較" appeared to do nothing.
                         if (isActivePanel) {
                           return (
                             <ErrorBoundary sectionName="エディタ">
@@ -465,10 +493,14 @@ export default function EditorLayout({
                                   onChange={mainArea.handleChange}
                                   onInsertText={mainArea.handleInsertText}
                                   onSelectionChange={mainArea.onSelectionChange}
-                                  searchOpenTrigger={panelSearchOpenTrigger}
-                                  searchInitialTerm={panelSearchInitialTerm}
+                                  onSelectionRangeChange={mainArea.onSelectionRangeChange}
+                                  // 検索の入力/表示は <main> の SearchDialog が担当。
+                                  // pane へは「語を反映」「開く」「トグル」の安定 callback のみ渡す
+                                  // （dockview の凍結クロージャでも安定 ref は機能するため）。
+                                  onSearchTermChange={mainArea.onSearchTermChange}
+                                  onOpenSearchDialog={mainArea.onOpenSearchDialog}
+                                  onToggleSearchDialog={mainArea.onToggleSearchDialog}
                                   onEditorViewReady={mainArea.setEditorViewInstance}
-                                  onShowAllSearchResults={mainArea.handleShowAllSearchResults}
                                   lintingRuleRunner={mainArea.ruleRunner}
                                   onLintIssuesUpdated={mainArea.handleLintIssuesUpdated}
                                   onNlpError={mainArea.handleNlpError}
@@ -542,6 +574,24 @@ export default function EditorLayout({
                     <span className="text-foreground-secondary text-sm">保存完了</span>
                   </div>
                 )}
+
+                {/* フローティング検索窓。dockview パネル外（<main> 直下）でレンダリング
+                    することで、共有検索 state（searchTerm/matches など変化する値）を
+                    live に受け取れる。portal で document.body 直下に出るため、anchorRef
+                    にはアクティブエディタの DOM を渡して初期位置を計算する。 */}
+                <SearchDialog
+                  isOpen={mainArea.isSearchDialogOpen}
+                  onClose={mainArea.onCloseSearchDialog}
+                  onShowAllResults={mainArea.handleShowAllSearchResults}
+                  searchTerm={mainArea.searchTerm}
+                  onSearchTermChange={mainArea.onSearchTermChange}
+                  caseSensitive={mainArea.caseSensitive}
+                  onCaseSensitiveChange={mainArea.onCaseSensitiveChange}
+                  matches={mainArea.searchMatches}
+                  currentMatchIndex={mainArea.currentMatchIndex}
+                  onCurrentMatchIndexChange={mainArea.onCurrentMatchIndexChange}
+                  anchorRef={mainArea.editorDomRef}
+                />
               </main>
 
               <ResizablePanel

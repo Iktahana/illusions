@@ -48,7 +48,21 @@ export default function SnapshotItem({
   }, [menuOpen]);
 
   return (
-    <div className="bg-background-secondary rounded-lg p-3 border border-border">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => {
+        if (!isLoadingDiff) onCompare(snapshot);
+      }}
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && !isLoadingDiff) {
+          e.preventDefault();
+          onCompare(snapshot);
+        }
+      }}
+      title="クリックで差分を表示"
+      className="bg-background-secondary rounded-lg p-3 border border-border cursor-pointer hover:border-accent/50 transition-colors"
+    >
       {/* Row 1: Time + type badge + char count */}
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="flex items-center gap-2 min-w-0">
@@ -82,7 +96,10 @@ export default function SnapshotItem({
         <div className="flex items-center gap-0.5 flex-shrink-0">
           {/* Bookmark button */}
           <button
-            onClick={() => onToggleBookmark(snapshot.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleBookmark(snapshot.id);
+            }}
             className={clsx(
               "p-1 rounded transition-colors",
               isBookmarked
@@ -97,7 +114,10 @@ export default function SnapshotItem({
           {/* Three-dot menu */}
           <div className="relative" ref={menuRef}>
             <button
-              onClick={() => setMenuOpen((v) => !v)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen((v) => !v);
+              }}
               className="p-1 rounded transition-colors text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover"
               title="メニュー"
             >
@@ -107,7 +127,8 @@ export default function SnapshotItem({
             {menuOpen && (
               <div className="absolute right-0 bottom-full mb-1 z-10 min-w-[120px] rounded-lg border border-border bg-background-secondary shadow-lg py-1">
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setMenuOpen(false);
                     onRestore(snapshot);
                   }}
@@ -122,7 +143,8 @@ export default function SnapshotItem({
                   復元
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setMenuOpen(false);
                     onCompare(snapshot);
                   }}

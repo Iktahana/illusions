@@ -20,7 +20,7 @@ import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
 import { getUserDictionaryService } from "@/lib/services/user-dictionary-service";
 import DictionaryEntryDialog from "./Dictionary/DictionaryEntryDialog";
 import { getDictService } from "@/lib/dict/dict-service";
-import type { DictEntry, DictExample } from "@/lib/dict/dict-types";
+import type { DictEntry, DictExample, DictDownloadStatus } from "@/lib/dict/dict-types";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
 // Web dictionary sources
@@ -76,9 +76,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
   // Master dict state
   const [masterResults, setMasterResults] = useState<DictEntry[]>([]);
   const [masterLoading, setMasterLoading] = useState(false);
-  const [localInstallStatus, setLocalInstallStatus] = useState<
-    "not-installed" | "downloading" | "installing" | "installed" | "error"
-  >("not-installed");
+  const [localInstallStatus, setLocalInstallStatus] = useState<DictDownloadStatus>("not-installed");
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [expandedMasterId, setExpandedMasterId] = useState<string | null>(null);
 
@@ -283,17 +281,17 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
   return (
     <div className="h-full bg-background-secondary border-r border-border flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-foreground">辞書</h2>
-          <BookOpen className="w-5 h-5 text-foreground-secondary" />
+      <div className="px-4 py-2.5 border-b border-border">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-base font-semibold text-foreground">辞書</h2>
+          <BookOpen className="w-4 h-4 text-foreground-secondary" />
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-background rounded-md p-1 mb-3">
+        <div className="flex gap-1 bg-background rounded-md p-0.5 mb-2">
           <button
             onClick={() => setActiveTab("web")}
-            className={`flex-1 px-2 py-1.5 text-sm font-medium rounded transition-colors ${
+            className={`flex-1 px-2 py-1 text-sm font-medium rounded transition-colors ${
               activeTab === "web"
                 ? "bg-accent text-accent-foreground"
                 : "text-foreground-secondary hover:text-foreground hover:bg-hover"
@@ -303,7 +301,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
           </button>
           <button
             onClick={() => setActiveTab("user")}
-            className={`flex-1 px-2 py-1.5 text-sm font-medium rounded transition-colors ${
+            className={`flex-1 px-2 py-1 text-sm font-medium rounded transition-colors ${
               activeTab === "user"
                 ? "bg-accent text-accent-foreground"
                 : "text-foreground-secondary hover:text-foreground hover:bg-hover"
@@ -326,18 +324,18 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
             placeholder="検索語を入力..."
             value={globalSearchQuery}
             onChange={(e) => setGlobalSearchQuery(e.target.value)}
-            className="flex-1 px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+            className="flex-1 px-3 py-1 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
           />
           <button
             type="submit"
             disabled={!globalSearchQuery.trim()}
-            className="px-3 py-1.5 bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1 bg-accent text-accent-foreground rounded hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Search className="w-4 h-4" />
           </button>
         </form>
         {activeSearchQuery && (
-          <div className="text-xs text-foreground-secondary mt-2">
+          <div className="text-xs text-foreground-secondary mt-1.5">
             検索中: 「{activeSearchQuery}」
           </div>
         )}
@@ -496,7 +494,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
           <div className="flex flex-col h-full">
             <div className="flex-1 overflow-y-auto">
               {activeSearchQuery ? (
-                <div className="p-4 space-y-3">
+                <div className="px-2 py-3 space-y-3">
                   {/* Loading indicator */}
                   {masterLoading && (
                     <div className="flex items-center gap-2 text-sm text-foreground-secondary">
@@ -520,8 +518,28 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                   {/* Master dict results */}
                   {!masterLoading && masterResults.length > 0 && (
                     <div className="space-y-1.5">
-                      <div className="text-xs font-semibold text-foreground-tertiary">
-                        幻辞 ({masterResults.length} 件)
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs font-semibold text-foreground-tertiary">
+                          幻辞 ({masterResults.length} 件)
+                        </div>
+                        <button
+                          onClick={() => {
+                            const url = `https://dict.illusions.app/results?q=${encodeURIComponent(activeSearchQuery)}`;
+                            if (isElectronRenderer() && window.electronAPI?.openDictionaryPopup) {
+                              window.electronAPI.openDictionaryPopup(
+                                url,
+                                `幻辞 - ${activeSearchQuery}`,
+                              );
+                            } else {
+                              window.open(url, "_blank", "noopener,noreferrer");
+                            }
+                          }}
+                          className="flex items-center gap-1 text-xs text-foreground-tertiary hover:text-foreground transition-colors flex-shrink-0"
+                          title="幻辞.com をブラウザで開く"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          ブラウザで開く
+                        </button>
                       </div>
                       {masterResults.map((entry) => (
                         <MasterDictCard

@@ -453,6 +453,7 @@ function registerFileHandlers() {
         verticalWriting,
         typesetting,
         googleFontFamily: opts.googleFontFamily,
+        fileType: opts.fileType,
       });
 
       const partition = `print-${Date.now()}`;

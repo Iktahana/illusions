@@ -14,6 +14,7 @@ import {
   Heading2,
   Heading3,
   Code,
+  RemoveFormatting,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -34,7 +35,8 @@ export type FormatType =
   | "bulletList"
   | "orderedList"
   | "blockquote"
-  | "code";
+  | "code"
+  | "clearFormatting";
 
 export default function BubbleMenu({
   selectionState,
@@ -126,6 +128,11 @@ export default function BubbleMenu({
     { icon: List, label: "箇条書き", format: "bulletList" },
     { icon: ListOrdered, label: "番号付き", format: "orderedList" },
     { icon: Code, label: "コード", format: "code" },
+    {
+      icon: RemoveFormatting,
+      label: "標準本文に戻す（書式をすべて解除）",
+      format: "clearFormatting",
+    },
   ];
 
   const menu = (
