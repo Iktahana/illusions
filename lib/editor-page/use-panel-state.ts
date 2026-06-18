@@ -33,6 +33,7 @@ export interface PanelHandlers {
   handleCloseSearchResults: () => void;
   handleOpenLintingSettings: () => void;
   handleOpenPosHighlightSettings: () => void;
+  handleOpenPowerSettings: () => void;
   triggerSwitchToCorrections: () => void;
 }
 
@@ -111,6 +112,11 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
     setShowSettingsModal(true);
   }, [setShowSettingsModal]);
 
+  const handleOpenPowerSettings = useCallback(() => {
+    setSettingsInitialCategory("power");
+    setShowSettingsModal(true);
+  }, [setShowSettingsModal]);
+
   const triggerSwitchToCorrections = useCallback(() => {
     setSwitchToCorrectionsTrigger((n) => n + 1);
   }, []);
@@ -141,6 +147,7 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
       handleCloseSearchResults,
       handleOpenLintingSettings,
       handleOpenPosHighlightSettings,
+      handleOpenPowerSettings,
       triggerSwitchToCorrections,
     },
   };

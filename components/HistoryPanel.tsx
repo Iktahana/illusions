@@ -407,21 +407,33 @@ export default function HistoryPanel({
       try {
         setLoadingDiffId(snapshot.id);
         const historyService = getHistoryService();
-        const snapshotContent = await historyService.getSnapshotContent(snapshot.id);
+        // Use restoreSnapshot (read-only) directly so the SPECIFIC failure
+        // reason — "not found" / "checksum mismatch" / read error — surfaces,
+        // instead of getSnapshotContent collapsing every failure to null.
+        const result = await historyService.restoreSnapshot(snapshot.id);
 
-        if (snapshotContent === null) {
-          setError("スナップショットの読み込みに失敗しました");
+        if (!result.success || result.content == null) {
+          const reason = result.error ?? "内容が空です";
+          console.error("[HistoryCompare] snapshot read failed:", snapshot.id, reason);
+          setError(`スナップショットの読み込みに失敗しました: ${reason}`);
+          return;
+        }
+
+        if (!onCompareInEditor) {
+          console.error("[HistoryCompare] onCompareInEditor is not wired; diff cannot open.");
+          setError("差分ビューを開けませんでした（内部エラー）");
           return;
         }
 
         const label = `${formatTimeJa(snapshot.timestamp)} (${getSnapshotTypeLabel(snapshot.type)})`;
-        onCompareInEditor?.({
-          snapshotContent,
+        onCompareInEditor({
+          snapshotContent: result.content,
           currentContent,
           label,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        console.error("[HistoryCompare] unexpected error:", err);
         setError(`差分の読み込みに失敗しました: ${message}`);
       } finally {
         setLoadingDiffId(null);

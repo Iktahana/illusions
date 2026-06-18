@@ -62,9 +62,21 @@ describe("shouldEnablePosHighlight", () => {
     ).toBe(false);
   });
 
-  it("disables highlighting in power-save mode even in the foreground", () => {
+  it("keeps highlighting in power-save mode while in the foreground (power-save no longer gates POS)", () => {
+    // The morphology already runs for the vocabulary panel; gating POS off in
+    // power-save only produced a toggle that read ON while nothing was colored.
     expect(
       shouldEnablePosHighlight(foreground, { posHighlightEnabled: true, powerSaveMode: true }),
+    ).toBe(true);
+    // The user's own toggle is still respected.
+    expect(
+      shouldEnablePosHighlight(foreground, { posHighlightEnabled: false, powerSaveMode: true }),
+    ).toBe(false);
+  });
+
+  it("still suspends highlighting while backgrounded even in power-save mode", () => {
+    expect(
+      shouldEnablePosHighlight(background, { posHighlightEnabled: true, powerSaveMode: true }),
     ).toBe(false);
   });
 

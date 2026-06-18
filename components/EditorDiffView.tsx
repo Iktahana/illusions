@@ -84,11 +84,17 @@ export default function EditorDiffView({
             maxWidth,
           }}
         >
-          <DiffContent
-            chunks={chunks}
-            textIndent={textIndent}
-            paragraphSpacing={paragraphSpacing}
-          />
+          {stats.addedChars === 0 && stats.removedChars === 0 ? (
+            <p className="text-center text-sm text-foreground-tertiary py-8">
+              テキストの差分はありません（現在の内容と同一です）
+            </p>
+          ) : (
+            <DiffContent
+              chunks={chunks}
+              textIndent={textIndent}
+              paragraphSpacing={paragraphSpacing}
+            />
+          )}
         </div>
       </div>
     </div>

@@ -108,6 +108,7 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
     handleCharacterExtractionConcurrencyChange:
       aiHandlers.handleCharacterExtractionConcurrencyChange,
     handlePowerSaveModeChange: aiHandlers.handlePowerSaveModeChange,
+    temporarilyDisablePowerSave: aiHandlers.temporarilyDisablePowerSave,
     handleAutoPowerSaveOnBatteryChange: aiHandlers.handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange: aiHandlers.handleCorrectionConfigChange,
     handleDictAutoCheckUpdatesChange: dictHandlers.handleDictAutoCheckUpdatesChange,
