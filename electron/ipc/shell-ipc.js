@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 // Shell and OS integration IPC handlers
 
-const { ipcMain, BrowserWindow, Menu, shell } = require("electron");
+const { ipcMain, BrowserWindow, Menu, shell, app } = require("electron");
 const path = require("path");
 const log = require("electron-log");
 const { SHELL_CHANNELS } = require("../lib/ipc-channels");
@@ -101,7 +101,14 @@ function registerShellHandlers() {
 
     popupWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 
-    popupWindow.loadURL(url);
+    // Tag the popup browser's User-Agent so the dictionary site (dict.illusions.app)
+    // can identify in-app requests. Append a token to the default Chromium UA rather
+    // than replacing it, to keep compatibility with sites that sniff the browser.
+    const baseUserAgent = popupWindow.webContents.getUserAgent();
+    const appVersion = app.getVersion();
+    const userAgent = `${baseUserAgent} illusions/${appVersion}`;
+
+    popupWindow.loadURL(url, { userAgent });
     return true;
   });
 

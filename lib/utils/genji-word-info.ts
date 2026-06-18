@@ -106,6 +106,14 @@ const UNAVAILABLE: GenjiWordInfoState = { status: "unavailable" };
  * - On any error (network, IPC, corrupt DB) falls back gracefully to
  *   `{ status: "unavailable" }`.
  */
+/**
+ * Debounce window before the dictionary lookup fires after the selection
+ * settles. Selecting text dispatches selection-change continuously while the
+ * pointer drags; without this every intermediate selection would kick off a
+ * Genji IPC query and freeze the UI (#1639).
+ */
+const LOOKUP_DEBOUNCE_MS = 250;
+
 export function useGenjiWordInfo(selectedWord: string | null | undefined): GenjiWordInfoState {
   const [state, setState] = useState<GenjiWordInfoState>(IDLE);
 
@@ -117,36 +125,43 @@ export function useGenjiWordInfo(selectedWord: string | null | undefined): Genji
     }
 
     let cancelled = false;
-    setState(LOADING);
 
-    void (async () => {
-      try {
-        // Dynamic import keeps getDictService out of SSR / web-worker bundles
-        const { getDictService } = await import("@/lib/dict/dict-service");
-        const result = await getDictService().query(word, 1);
+    // Defer the (potentially IPC-backed) lookup until the selection stops
+    // changing. The previous result stays visible during the debounce window
+    // so the panel doesn't flicker to a loading state on every drag tick.
+    const timer = setTimeout(() => {
+      setState(LOADING);
 
-        if (cancelled) return;
+      void (async () => {
+        try {
+          // Dynamic import keeps getDictService out of SSR / web-worker bundles
+          const { getDictService } = await import("@/lib/dict/dict-service");
+          const result = await getDictService().query(word, 1);
 
-        if (result.providerUnavailable) {
-          setState(UNAVAILABLE);
-          return;
+          if (cancelled) return;
+
+          if (result.providerUnavailable) {
+            setState(UNAVAILABLE);
+            return;
+          }
+
+          const viewModel = buildGenjiWordInfoViewModel(word, result);
+          if (viewModel) {
+            setState({ status: "found", viewModel });
+          } else {
+            setState(NOT_FOUND);
+          }
+        } catch {
+          if (!cancelled) {
+            setState(UNAVAILABLE);
+          }
         }
-
-        const viewModel = buildGenjiWordInfoViewModel(word, result);
-        if (viewModel) {
-          setState({ status: "found", viewModel });
-        } else {
-          setState(NOT_FOUND);
-        }
-      } catch {
-        if (!cancelled) {
-          setState(UNAVAILABLE);
-        }
-      }
-    })();
+      })();
+    }, LOOKUP_DEBOUNCE_MS);
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [selectedWord]);
 

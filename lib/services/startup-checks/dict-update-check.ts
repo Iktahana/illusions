@@ -13,58 +13,33 @@
  * API and returns `{ latestVersion, installedVersion, updateAvailable }`.
  * Network failures are swallowed so startup is never blocked by connectivity
  * problems and no error toast is surfaced.
+ *
+ * 自動化（#1639 follow-up）: WiFi 等の非従量回線かつ省電力 OFF のときは、
+ * - 未導入   → 10 秒カウントダウンで自動ダウンロード
+ * - 更新あり → 30 秒カウントダウンで自動更新
+ * を行う。条件を満たさない場合は従来どおり手動ボタンのトーストを出す。
  */
 import { getDictService } from "@/lib/dict/dict-service";
 import { getStorageService } from "@/lib/storage/storage-service";
-import { notificationManager } from "../notification-manager";
+import {
+  isAutoDownloadAllowed,
+  runDictDownloadWithProgress,
+  startCountdownDownload,
+} from "./dict-auto-download";
 import type { StartupCheck, StartupNotice } from "../startup-check-queue";
 
 const GENJI_PROVIDER_ID = "genji";
-
-/**
- * Result shape resolved by `electronAPI.dict.download()` (IPC `dict:download`).
- * The handler RESOLVES `{ success: false, error }` on recoverable failures
- * (another download running, checksum/URL validation, etc.) rather than
- * rejecting, so the caller must inspect `success` — not just rely on `.catch`.
- */
-interface DictDownloadResult {
-  success: boolean;
-  version?: string;
-  error?: string;
-}
+const DOWNLOAD_MESSAGE = "辞書をダウンロード中...";
+const UPDATE_MESSAGE = "辞書を更新中...";
 
 interface ElectronDictApi {
-  download?: () => Promise<DictDownloadResult | undefined>;
+  download?: () => Promise<unknown>;
   getStatus?: () => Promise<unknown>;
 }
 
 function getElectronDict(): ElectronDictApi | undefined {
   if (typeof window === "undefined") return undefined;
   return (window as Window & { electronAPI?: { dict?: ElectronDictApi } }).electronAPI?.dict;
-}
-
-function startDictDownload(): void {
-  const dict = getElectronDict();
-  if (!dict?.download) return;
-  notificationManager.info("辞書のダウンロードを開始しました。");
-  // The IPC handler resolves `{ success: false, error }` on recoverable
-  // failures instead of rejecting, so inspect the resolved result and surface
-  // the error rather than leaving the optimistic "started" toast standing.
-  dict
-    .download()
-    .then((result) => {
-      if (result?.success === false) {
-        notificationManager.error(
-          `辞書のダウンロードに失敗しました：${result.error ?? "不明なエラー"}`,
-        );
-      }
-    })
-    .catch((e: unknown) => {
-      console.warn("[dict] download failed:", e);
-      notificationManager.error(
-        `辞書のダウンロードに失敗しました：${e instanceof Error ? e.message : String(e)}`,
-      );
-    });
 }
 
 export const dictUpdateCheck: StartupCheck = {
@@ -76,13 +51,28 @@ export const dictUpdateCheck: StartupCheck = {
     const state = await getDictService().getDownloadState(GENJI_PROVIDER_ID);
 
     if (state.status === "not-installed") {
+      // 回線・省電力が許せば 10 秒カウントダウンで自動ダウンロード。
+      if (await isAutoDownloadAllowed()) {
+        startCountdownDownload({
+          seconds: 10,
+          buildMessage: (remaining) =>
+            `日本語辞書が未ダウンロードです。${remaining} 秒後に自動でダウンロードします。`,
+          downloadMessage: DOWNLOAD_MESSAGE,
+        });
+        return null;
+      }
       return {
         id: "dict-not-installed",
         type: "warning",
         message:
           "日本語辞書が未ダウンロードです。ダウンロードすると校正と辞書引きがより正確になります。",
         duration: 0, // keep until dismissed
-        actions: [{ label: "今すぐダウンロード", onClick: startDictDownload }],
+        actions: [
+          {
+            label: "今すぐダウンロード",
+            onClick: () => runDictDownloadWithProgress(DOWNLOAD_MESSAGE),
+          },
+        ],
       };
     }
 
@@ -121,12 +111,24 @@ export const dictUpdateCheck: StartupCheck = {
 
     const from = updateResult.installedVersion ?? "?";
     const to = updateResult.latestVersion ?? "?";
+
+    // 回線・省電力が許せば 30 秒カウントダウンで自動更新。
+    if (await isAutoDownloadAllowed()) {
+      startCountdownDownload({
+        seconds: 30,
+        buildMessage: (remaining) =>
+          `日本語辞書の更新があります（${from} → ${to}）。${remaining} 秒後に自動で更新します。`,
+        downloadMessage: UPDATE_MESSAGE,
+      });
+      return null;
+    }
+
     return {
       id: "dict-update-available",
       type: "info",
       message: `日本語辞書の更新があります（${from} → ${to}）。`,
       duration: 0,
-      actions: [{ label: "更新", onClick: startDictDownload }],
+      actions: [{ label: "更新", onClick: () => runDictDownloadWithProgress(UPDATE_MESSAGE) }],
     };
   },
 };

@@ -382,7 +382,10 @@ export default function MilkdownEditor({
       });
   }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
 
-  // 縦書き時: マウスホイールの縦スクロールを横スクロールへ変換する
+  // 縦書き時: ホイール/トラックパッドの入力を横スクロールへ変換する。
+  // 縦書きはコンテナの overflowY が hidden で縦スクロールが無いため、縦スワイプも
+  // 横スワイプも scrollLeft に集約する（横スワイプを scrollTop に流すと「横に払うと
+  // 本文が横へ動かず上下に引っ張られる」体感になっていた, #1639）。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || !isVertical) return;
@@ -404,18 +407,19 @@ export default function MilkdownEditor({
           container.scrollLeft += mouseHorizontalDelta;
           event.preventDefault();
         } else if (absX > 0) {
-          container.scrollTop += event.deltaX * sensitivity;
+          container.scrollLeft -= event.deltaX * sensitivity;
           event.preventDefault();
         }
         return;
       }
 
       if (isTrackpadInput) {
-        if (absY > 0) {
-          container.scrollLeft += event.deltaY * sensitivity;
-        }
-        if (absX > 0) {
-          container.scrollTop += event.deltaX * sensitivity;
+        // 縦書きは横スクロールのみ（overflowY hidden）。2本指パンは支配的な軸だけを
+        // 横スクロールへ写像し、対角・慣性入力で deltaX/deltaY が競合して引っかかるのを防ぐ。
+        // 横スワイプは指の向きに追従（-deltaX）、縦スワイプは読み進み方向（+deltaY）。
+        if (absX > 0 || absY > 0) {
+          const primaryDelta = absX >= absY ? -event.deltaX : event.deltaY;
+          container.scrollLeft += primaryDelta * sensitivity;
         }
         event.preventDefault();
         return;
@@ -427,7 +431,7 @@ export default function MilkdownEditor({
         container.scrollLeft += mouseHorizontalDelta;
         event.preventDefault();
       } else if (absX > 0) {
-        container.scrollTop += event.deltaX * sensitivity;
+        container.scrollLeft -= event.deltaX * sensitivity;
         event.preventDefault();
       }
     };
@@ -998,6 +1002,12 @@ export default function MilkdownEditor({
           <Milkdown />
         </div>
       </div>
+      {/* 縦書きの右端（文書の先頭側）の余白。スクロールコンテナの padding-right は
+          Chromium が scrollWidth に含めず実機 Electron で消えるため、scrollWidth に
+          確実に算入される in-flow なフレックススペーサーで右余白を作る（#1639）。 */}
+      {isVertical && (
+        <div aria-hidden="true" style={{ flex: "0 0 64px", minWidth: 64, alignSelf: "stretch" }} />
+      )}
     </div>
   );
 

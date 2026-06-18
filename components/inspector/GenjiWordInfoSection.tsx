@@ -1,22 +1,27 @@
 "use client";
 
 import type React from "react";
+import clsx from "clsx";
 
 import { useGenjiWordInfo } from "@/lib/utils/genji-word-info";
 
 interface GenjiWordInfoSectionProps {
   /** 選択中の語（空またはnullのとき非表示） */
   selectedWord: string | null | undefined;
+  /** 余白を詰めた compact レイアウトにする（Inspector の compactMode 連動） */
+  compact?: boolean;
 }
 
 /**
  * 選択語の幻辞（Genji）辞書情報を表示するインスペクタセクション。
  *
- * - 幻辞が未インストール / オフライン / 該当語なし のときは何も表示しない。
+ * Inspector のタブバー直下に常駐し、どのタブでも語を選択すると表示される（#1639）。
+ * - 幻辞が未インストール / オフライン / 該当語なし のときは何も表示しない（null）。
  * - 読み中はスケルトンローダーを表示し、品詞ハイライト本体の動作を一切変えない。
  */
 export default function GenjiWordInfoSection({
   selectedWord,
+  compact = false,
 }: GenjiWordInfoSectionProps): React.ReactElement | null {
   const state = useGenjiWordInfo(selectedWord);
 
@@ -25,7 +30,12 @@ export default function GenjiWordInfoSection({
   }
 
   return (
-    <div className="mt-4 border-t border-border pt-4">
+    <div
+      className={clsx(
+        "flex-shrink-0 border-b border-border bg-background-secondary",
+        compact ? "px-3 py-2" : "px-4 py-3",
+      )}
+    >
       <p className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-2">
         選択語の辞書情報
       </p>
