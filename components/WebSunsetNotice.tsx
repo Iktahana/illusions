@@ -64,17 +64,15 @@ export default function WebSunsetNotice(): React.JSX.Element | null {
           引き続き「illusions」をご利用いただくにあたり、大変お手数ではございますが、以下のボタンよりデスクトップ版アプリのダウンロードをお願い申し上げます。
         </p>
 
-        <div className="rounded-lg border border-border bg-background p-3">
-          <h3 className="text-sm font-semibold text-foreground">■ ご案内と注意事項</h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>
-              現在ご利用中のアカウントやデータは、デスクトップ版にてログインしていただくことで、そのまま引き継いでご利用いただけます。
-            </li>
-            <li>
-              Web版のサービス終了日（2027年1月1日）以降は、ブラウザからのアクセスができなくなりますので、お早めの移行をお願いいたします。
-            </li>
-          </ul>
-        </div>
+        <h3 className="font-semibold text-foreground">■ ご案内と注意事項</h3>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            現在ご利用中のアカウントやデータは、デスクトップ版にてログインしていただくことで、そのまま引き継いでご利用いただけます。
+          </li>
+          <li>
+            Web版のサービス終了日（2027年1月1日）以降は、ブラウザからのアクセスができなくなりますので、お早めの移行をお願いいたします。
+          </li>
+        </ul>
 
         <p>
           ユーザーの皆様には多大なるご迷惑とご不便をおかけいたしますことを、深くお詫び申し上げます。
