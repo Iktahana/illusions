@@ -86,7 +86,7 @@ export default function EditorDiffView({
         >
           {stats.addedChars === 0 && stats.removedChars === 0 ? (
             <p className="text-center text-sm text-foreground-tertiary py-8">
-              差分はありません（現在の内容と同一です）
+              テキストの差分はありません（現在の内容と同一です）
             </p>
           ) : (
             <DiffContent

@@ -171,4 +171,24 @@ describe("usePowerSaving", () => {
 
     expect(props.onSuggestPowerSave).toHaveBeenCalledTimes(1);
   });
+
+  it("does NOT auto-disable on the initial AC reading (mount must not race the restore path)", async () => {
+    const props = makeProps({ powerSaveMode: true });
+    initialState = "ac";
+    await mountHook(props);
+
+    // The initial reading only records state; auto-disable is reserved for a
+    // real battery→AC transition so it can't clear prePowerSaveState at boot.
+    expect(props.onPowerSaveModeChange).not.toHaveBeenCalled();
+  });
+
+  it("throttles repeated suggestions across rapid AC/battery bounce", async () => {
+    const props = makeProps();
+    await mountHook(props); // AC
+    await emit("battery"); // suggestion #1
+    await emit("ac");
+    await emit("battery"); // within the throttle window → suppressed
+
+    expect(props.onSuggestPowerSave).toHaveBeenCalledTimes(1);
+  });
 });

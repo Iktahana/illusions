@@ -307,13 +307,16 @@ export function useAiSettings(): UseAiSettingsResult {
    */
   const temporarilyDisablePowerSave = useCallback(
     (durationMs: number = 5 * 60 * 1000) => {
-      // handlePowerSaveModeChange(false) clears any existing timer first, so
-      // we set the fresh re-enable timer afterwards.
-      void handlePowerSaveModeChange(false);
-      tempPowerSaveTimerRef.current = setTimeout(() => {
-        tempPowerSaveTimerRef.current = null;
-        void handlePowerSaveModeChange(true);
-      }, durationMs);
+      // Await the OFF transition (which also clears any existing timer) before
+      // scheduling the re-enable, so the OFF state is committed first and the
+      // re-enable's clobber guard never sees a stale "still on" ref.
+      void (async () => {
+        await handlePowerSaveModeChange(false);
+        tempPowerSaveTimerRef.current = setTimeout(() => {
+          tempPowerSaveTimerRef.current = null;
+          void handlePowerSaveModeChange(true);
+        }, durationMs);
+      })();
     },
     [handlePowerSaveModeChange],
   );

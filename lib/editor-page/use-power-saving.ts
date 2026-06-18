@@ -2,6 +2,9 @@ import { useEffect, useRef } from "react";
 
 type PowerState = "ac" | "battery";
 
+/** Minimum gap between battery suggestions, to absorb rapid power bounce. */
+const SUGGEST_THROTTLE_MS = 60_000;
+
 interface UsePowerSavingOptions {
   /** Current power-save mode, so we never re-suggest while already enabled. */
   powerSaveMode: boolean;
@@ -53,6 +56,8 @@ export function usePowerSaving({
 
   /** Last power state we acted on; null until the first reading. */
   const lastStateRef = useRef<PowerState | null>(null);
+  /** Epoch ms of the last suggestion, to throttle rapid AC/battery bounce. */
+  const lastSuggestAtRef = useRef(0);
 
   useEffect(() => {
     const powerAPI = window.electronAPI?.power;
@@ -62,29 +67,44 @@ export function usePowerSaving({
 
     let disposed = false;
 
-    const handleState = (state: PowerState): void => {
+    const handleTransition = (state: PowerState): void => {
       if (disposed) return;
       // Only react to genuine transitions; ignore repeated same-state reads.
       if (lastStateRef.current === state) return;
+      const prev = lastStateRef.current;
       lastStateRef.current = state;
 
       if (state === "battery") {
-        // Suggest, never force. Skip if power-save is already on or the user
-        // opted out of the suggestion.
-        if (autoOnBatteryRef.current && !powerSaveModeRef.current) {
+        // Suggest, never force. Skip if power-save is already on, the user
+        // opted out, or we suggested very recently (debounce bounce).
+        const now = Date.now();
+        if (
+          autoOnBatteryRef.current &&
+          !powerSaveModeRef.current &&
+          now - lastSuggestAtRef.current > SUGGEST_THROTTLE_MS
+        ) {
+          lastSuggestAtRef.current = now;
           onSuggestRef.current();
         }
-      } else {
-        // AC restored: auto-disable power-save to restore full functionality.
+      } else if (prev !== null) {
+        // Auto-disable only on a REAL battery→AC transition. We must NOT act on
+        // the initial mount reading (prev === null): at startup the persisted
+        // powerSaveMode is still hydrating, and disabling here races with the
+        // restore path — it would clear prePowerSaveState and strand linting
+        // off. On mount we respect the persisted/hydrated value instead.
         onChangeRef.current(false);
       }
     };
 
-    // Apply the current state once on mount.
-    powerAPI.getPowerState().then(handleState);
-
-    // Subscribe to future transitions.
-    const unsubscribe = powerAPI.onPowerStateChange(handleState);
+    // Subscribe FIRST so a transition during the initial async read is not
+    // missed, then apply the initial reading only if nothing was observed yet
+    // (guards against an out-of-order initial result overwriting a real
+    // transition that already arrived).
+    const unsubscribe = powerAPI.onPowerStateChange(handleTransition);
+    powerAPI.getPowerState().then((state) => {
+      if (disposed) return;
+      if (lastStateRef.current === null) handleTransition(state);
+    });
 
     return () => {
       disposed = true;
