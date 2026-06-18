@@ -67,8 +67,31 @@ export const MDI_BLANK_MARKER = "[[blank]]";
  * before matching, so an indented "  [[blank]]" renders as a blank paragraph;
  * analysis text must strip the same lines (pre-#1449 the strip regex was
  * line-start-anchored, a marker-handling drift this module exists to end).
+ *
+ * Clean-form ONLY (`[[blank]]`). This must NOT match the serializer-escaped
+ * form `\[\[blank]]`, because the HTML export pipeline (`mdi-to-html.ts`)
+ * applies it AFTER a fileType-gated normalization: for ".md"/".txt" the escaped
+ * literal is intentionally preserved (DATA-LOSS guard, #1608), so matching the
+ * escaped form here would wrongly promote authored `\[\[blank]]` to a blank
+ * paragraph. Analysis-side stripping tolerates the escaped form via
+ * {@link MDI_BLANK_ANALYSIS_RE} instead.
  */
 export const MDI_BLANK_RE = /^[ \t]*\[\[blank\]\][ \t]*\r?$/gm;
+
+/**
+ * Analysis-only blank-marker matcher. Backslashes before each bracket are
+ * optional so it matches BOTH the clean form (`[[blank]]`) and the Milkdown
+ * serializer-escaped form (`\[\[blank]]`).
+ *
+ * In-app analysis/statistics panels (語彙統計 / 登場人物 / 読みやすさ) feed the
+ * LIVE editor buffer through `fromRawText().toAnalysisText()`. That buffer is
+ * serializer output, where the marker is escaped (CommonMark escapes the
+ * leading `[`); `fromRawText` skips the Step 0 un-escape that `fromEditorOutput`
+ * applies, so the escaped marker would otherwise survive into kuromoji and
+ * surface as a spurious "blank" token. Used ONLY by {@link stripMdiBlankMarkers}
+ * — NOT by the fileType-aware export pipeline.
+ */
+export const MDI_BLANK_ANALYSIS_RE = /^[ \t]*\\?\[\\?\[blank\\?\]\\?\][ \t]*\r?$/gm;
 
 /** Escaped MDI opening brace: \{ */
 export const MDI_ESC_BRACE_RE = /\\(\{)/g;
@@ -99,13 +122,16 @@ export function isMdiBlankParagraphLine(line: string): boolean {
  * (NLP, word count, readability, etc.).
  * Replaces the marker line with empty string; surrounding blank lines remain.
  * Inline occurrences (`foo [[blank]] bar`) are preserved as literal text.
+ * Both the clean (`[[blank]]`) and serializer-escaped (`\[\[blank]]`) forms are
+ * stripped (see {@link MDI_BLANK_ANALYSIS_RE}) — analysis consumers read the
+ * live editor buffer, which carries the escaped form.
  * CRLF note: on CRLF files a preceding \r is absorbed; normalize line endings
  * before passing if required.
  *
  * Prefer `MdiDocument.fromRawText(text).toAnalysisText()` in new code.
  */
 export function stripMdiBlankMarkers(content: string): string {
-  return content.replace(MDI_BLANK_RE, "");
+  return content.replace(MDI_BLANK_ANALYSIS_RE, "");
 }
 
 // ---------------------------------------------------------------------------

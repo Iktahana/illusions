@@ -60,10 +60,11 @@ const LINE_END_PROHIBITED = new Set("（〔［｛〈《「『【".split(""));
  *  6. MDI 縦中横 (`^内容^`) → 内容のみ
  *  7. MDI no-break (`[[no-break:文字列]]`) → 文字列のみ
  *  8. MDI kern (`[[kern:量:文字列]]`) → 文字列のみ
- *  9. HTML タグ (`<tag>`) → タグ記号のみ除去、内容は残す
- * 10. Markdown 見出し記号（行頭の `#+ `）→ 除去（本文は残す）
- * 11. 強調記号 (`**...**`, `__...__`, `*...*`, `_..._`, `~~...~~`) → 内容は残す
- * 12. バックスラッシュエスケープ (`\X`) → バックスラッシュのみ除去
+ *  9. MDI 空行マーカー (`[[blank]]` / serializer エスケープ形 `\[\[blank]]`) → 行ごと削除
+ * 10. HTML タグ (`<tag>`) → タグ記号のみ除去、内容は残す
+ * 11. Markdown 見出し記号（行頭の `#+ `）→ 除去（本文は残す）
+ * 12. 強調記号 (`**...**`, `__...__`, `*...*`, `_..._`, `~~...~~`) → 内容は残す
+ * 13. バックスラッシュエスケープ (`\X`) → バックスラッシュのみ除去
  */
 export function extractVisibleText(rawContent: string): string {
   let text = rawContent;
@@ -92,13 +93,18 @@ export function extractVisibleText(rawContent: string): string {
   // 8. MDI kern [[kern:量:文字列]] → 文字列のみ
   text = text.replace(/\[\[kern:[^\]]*?:([^\]]*)\]\]/g, "$1");
 
-  // 9. HTML タグ → タグ記号を除去、内容は残す
+  // 9. MDI 空行マーカー [[blank]] → 行ごと削除（可視文字としてカウントしない）。
+  // ライブ編集中の content は serializer が `[` をエスケープするため `\[\[blank]]`
+  // となる。各ブラケット前の `\` を任意マッチさせ、クリーン形・エスケープ形の双方を除去する。
+  text = text.replace(/^[ \t]*\\?\[\\?\[blank\\?\]\\?\][ \t]*$/gm, "");
+
+  // 10. HTML タグ → タグ記号を除去、内容は残す
   text = text.replace(/<[^>]*>/g, "");
 
-  // 10. Markdown 見出し記号（行頭の # 記号と直後のスペース）
+  // 11. Markdown 見出し記号（行頭の # 記号と直後のスペース）
   text = text.replace(/^#{1,6} /gm, "");
 
-  // 11. 強調記号のみ除去（内容は残す）
+  // 12. 強調記号のみ除去（内容は残す）
   // ** と __ を先に処理してから単体 * と _ を処理する順番を守ること。
   text = text.replace(/~~([^~]*)~~/g, "$1");
   text = text.replace(/\*\*([^*]*)\*\*/g, "$1");
@@ -108,7 +114,7 @@ export function extractVisibleText(rawContent: string): string {
   text = text.replace(/(?<!\*)\*(?!\*)([^*\n]+?)(?<!\*)\*(?!\*)/g, "$1");
   text = text.replace(/(?<!\w)_(?!_)([^_\n]+?)_(?!\w)(?!_)/g, "$1");
 
-  // 12. バックスラッシュエスケープ（バックスラッシュのみ除去）
+  // 13. バックスラッシュエスケープ（バックスラッシュのみ除去）
   text = text.replace(/\\(.)/g, "$1");
 
   return text;

@@ -11,6 +11,7 @@ import { isProjectMode } from "@/lib/project/project-types";
 
 import type { ActivityBarView } from "@/components/ActivityBar";
 import type { EditorMode } from "@/lib/project/project-types";
+import type { SearchMatch, SearchTarget } from "@/lib/editor-page/find-search-matches";
 import type { EditorView } from "@milkdown/prose/view";
 
 interface SidebarPanelProps {
@@ -26,8 +27,27 @@ interface SidebarPanelProps {
   onChapterClick: (anchorId: string) => void;
   /** Called when the editor should insert text at the current cursor. */
   onInsertText: (text: string) => void;
-  /** Current search results for the search panel. */
-  searchResults: { matches: { from: number; to: number }[]; searchTerm: string } | null;
+  /** 共有検索 state（単一 source of truth）。SearchDialog と同期する。 */
+  searchTerm: string;
+  onSearchTermChange: (term: string) => void;
+  caseSensitive: boolean;
+  onCaseSensitiveChange: (value: boolean) => void;
+  regexSearch: boolean;
+  onRegexSearchChange: (value: boolean) => void;
+  wholeWordSearch: boolean;
+  onWholeWordSearchChange: (value: boolean) => void;
+  normalizeVariants: boolean;
+  onNormalizeVariantsChange: (value: boolean) => void;
+  excludeComments: boolean;
+  onExcludeCommentsChange: (value: boolean) => void;
+  searchTarget: SearchTarget;
+  onSearchTargetChange: (value: SearchTarget) => void;
+  selectionOnly: boolean;
+  onSelectionOnlyChange: (value: boolean) => void;
+  hasSearchSelection: boolean;
+  searchMatches: SearchMatch[];
+  currentMatchIndex: number;
+  onCurrentMatchIndexChange: (index: number) => void;
   /** Called when the search panel should close. */
   onCloseSearchResults: () => void;
   /** The active ProseMirror EditorView (required by the search panel). */
@@ -36,6 +56,8 @@ interface SidebarPanelProps {
   dictionarySearchTrigger: { term: string; id: number };
   /** Path of the currently open file (used by the word frequency panel). */
   currentFilePath?: string;
+  projectSearchBuffers: ReadonlyMap<string, string>;
+  onProjectBufferChange: (path: string, content: string) => void | Promise<void>;
   /** Trigger counter for opening the new-file dialog inside the files panel. */
   newFileTrigger: number;
   /** Opens a project file by VFS path. */
@@ -59,11 +81,32 @@ export default function SidebarPanel({
   compactMode,
   onChapterClick,
   onInsertText,
-  searchResults,
+  searchTerm,
+  onSearchTermChange,
+  caseSensitive,
+  onCaseSensitiveChange,
+  regexSearch,
+  onRegexSearchChange,
+  wholeWordSearch,
+  onWholeWordSearchChange,
+  normalizeVariants,
+  onNormalizeVariantsChange,
+  excludeComments,
+  onExcludeCommentsChange,
+  searchTarget,
+  onSearchTargetChange,
+  selectionOnly,
+  onSelectionOnlyChange,
+  hasSearchSelection,
+  searchMatches,
+  currentMatchIndex,
+  onCurrentMatchIndexChange,
   onCloseSearchResults,
   editorViewInstance,
   dictionarySearchTrigger,
   currentFilePath,
+  projectSearchBuffers,
+  onProjectBufferChange,
   newFileTrigger,
   openProjectFile,
   onWordSearch,
@@ -104,8 +147,31 @@ export default function SidebarPanel({
       return (
         <SearchResults
           editorView={editorViewInstance}
-          matches={searchResults?.matches}
-          searchTerm={searchResults?.searchTerm}
+          searchTerm={searchTerm}
+          onSearchTermChange={onSearchTermChange}
+          caseSensitive={caseSensitive}
+          onCaseSensitiveChange={onCaseSensitiveChange}
+          regexSearch={regexSearch}
+          onRegexSearchChange={onRegexSearchChange}
+          wholeWordSearch={wholeWordSearch}
+          onWholeWordSearchChange={onWholeWordSearchChange}
+          normalizeVariants={normalizeVariants}
+          onNormalizeVariantsChange={onNormalizeVariantsChange}
+          excludeComments={excludeComments}
+          onExcludeCommentsChange={onExcludeCommentsChange}
+          searchTarget={searchTarget}
+          onSearchTargetChange={onSearchTargetChange}
+          selectionOnly={selectionOnly}
+          onSelectionOnlyChange={onSelectionOnlyChange}
+          hasSelection={hasSearchSelection}
+          matches={searchMatches}
+          currentMatchIndex={currentMatchIndex}
+          onCurrentMatchIndexChange={onCurrentMatchIndexChange}
+          projectSearchEnabled={isProjectMode(editorMode)}
+          projectOpenBuffers={projectSearchBuffers}
+          currentFilePath={currentFilePath}
+          onOpenProjectFile={(path) => openProjectFile(path, { preview: false })}
+          onProjectBufferChange={onProjectBufferChange}
           onClose={onCloseSearchResults}
         />
       );

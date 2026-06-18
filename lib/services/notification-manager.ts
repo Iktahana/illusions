@@ -3,6 +3,7 @@ import type {
   NotificationOptions,
   ProgressNotificationOptions,
   NotificationType,
+  NotificationAction,
 } from "@/types/notification";
 
 type NotificationListener = (notifications: NotificationItem[]) => void;
@@ -147,6 +148,21 @@ class NotificationManager {
         this.timers.set(id, timerId);
       }
     }
+  }
+
+  /**
+   * 既存メッセージの本文（と任意でアクション）を差し替える。
+   * カウントダウン表示など、同じトーストを生かしたまま内容だけ更新する用途。
+   * 対象が存在しなければ何もしない。
+   */
+  updateMessage(id: string, message: string, actions?: NotificationAction[]): void {
+    const notification = this.notifications.find((n) => n.id === id);
+    if (!notification) return;
+    notification.message = message;
+    if (actions !== undefined) {
+      notification.actions = actions;
+    }
+    this.notify();
   }
 
   /**

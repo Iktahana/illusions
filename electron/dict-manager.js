@@ -76,6 +76,27 @@ class DictManager {
     this._latestAssetUrl = null;
     this._latestAssetDigest = null;
     this._latestVersion = null;
+    // Set when a DB open/query fails with a corruption-class error, so getStatus
+    // can report "corrupt" without re-running an integrity scan on every call.
+    this._corrupt = false;
+  }
+
+  /**
+   * Does this error look like SQLite database corruption (truncated download,
+   * bad header, encrypted/foreign file)? Used to flip the corrupt flag so the
+   * UI can prompt a re-download.
+   * @private
+   * @param {unknown} err
+   * @returns {boolean}
+   */
+  _isCorruptionError(err) {
+    const msg = String(err?.message ?? err ?? "").toLowerCase();
+    return (
+      msg.includes("malformed") ||
+      msg.includes("not a database") ||
+      msg.includes("file is encrypted") ||
+      msg.includes("disk image is malformed")
+    );
   }
 
   /**
@@ -127,6 +148,19 @@ class DictManager {
   // Database access
   // ---------------------------------------------------------------------------
 
+  /**
+   * Open a better-sqlite3 connection. Single seam for all three open sites
+   * (read handle, index writer, integrity probe) so tests can inject a fake DB
+   * without mocking the native module (which vitest externalizes).
+   * @private
+   * @param {string} dbPath
+   * @param {{ readonly?: boolean }} [opts]
+   */
+  _createDatabase(dbPath, opts) {
+    const Database = require("better-sqlite3");
+    return new Database(dbPath, opts);
+  }
+
   _openDb() {
     if (this._db) return this._db;
 
@@ -143,13 +177,14 @@ class DictManager {
     }
 
     try {
-      const Database = require("better-sqlite3");
-      const db = new Database(dbPath, { readonly: true });
+      const db = this._createDatabase(dbPath, { readonly: true });
       this._db = db;
+      this._corrupt = false;
       console.log("[DictManager] Database opened:", dbPath);
       return db;
     } catch (err) {
       console.error("[DictManager] Failed to open database:", err);
+      if (this._isCorruptionError(err)) this._corrupt = true;
       return null;
     }
   }
@@ -162,8 +197,7 @@ class DictManager {
   _ensureIndexes(dbPath) {
     let rwDb = null;
     try {
-      const Database = require("better-sqlite3");
-      rwDb = new Database(dbPath);
+      rwDb = this._createDatabase(dbPath);
 
       // Check if the entries table exists at all
       const tableCheck = rwDb
@@ -229,6 +263,7 @@ class DictManager {
       return rows.map((row) => this._rawJsonToEntry(row.raw_json)).filter(Boolean);
     } catch (err) {
       console.error("[DictManager] query error:", err);
+      if (this._isCorruptionError(err)) this._corrupt = true;
       return [];
     }
   }
@@ -258,7 +293,113 @@ class DictManager {
       return rows.map((row) => this._rawJsonToEntry(row.raw_json)).filter(Boolean);
     } catch (err) {
       console.error("[DictManager] queryByReading error:", err);
+      if (this._isCorruptionError(err)) this._corrupt = true;
       return [];
+    }
+  }
+
+  /**
+   * Exact-match batch lookup for analysis features (vocabulary stats,
+   * readability, ruby, lint rules). Returns a lightweight projection per term —
+   * never the full DictEntry — so hundreds of words cost one query + one small
+   * IPC payload. Terms with no match are simply absent from the result.
+   *
+   * @param {string[]} terms
+   * @returns {Array<{ entry: string } & import("../lib/dict/dict-types").DictLookup>}
+   */
+  lookupBatch(terms) {
+    if (this._downloadMutex.locked) return [];
+    if (!Array.isArray(terms)) return [];
+    const unique = [...new Set(terms.filter((t) => typeof t === "string" && t.length > 0))];
+    if (unique.length === 0) return [];
+
+    const db = this._openDb();
+    if (!db) return [];
+
+    try {
+      const placeholders = unique.map(() => "?").join(",");
+      const rows = db
+        .prepare(`SELECT entry, raw_json FROM entries WHERE entry IN (${placeholders})`)
+        .all(...unique);
+
+      const byEntry = new Map();
+      for (const row of rows) {
+        if (byEntry.has(row.entry)) continue; // first row wins for a given headword
+        const proj = this._rawJsonToLookup(row.raw_json);
+        if (proj) byEntry.set(row.entry, { entry: row.entry, ...proj });
+      }
+      return [...byEntry.values()];
+    } catch (err) {
+      console.error("[DictManager] lookupBatch error:", err);
+      if (this._isCorruptionError(err)) this._corrupt = true;
+      return [];
+    }
+  }
+
+  /**
+   * Project a raw_json string into the lightweight {@link DictLookup} shape
+   * (reading / pos / register / freqRank). Mirrors the analysis projection in
+   * lib/dict/providers/genji-api-backend.ts.
+   * @private
+   */
+  _rawJsonToLookup(rawJson) {
+    if (!rawJson) return null;
+    let raw;
+    try {
+      raw = typeof rawJson === "string" ? JSON.parse(rawJson) : rawJson;
+    } catch {
+      return null;
+    }
+    if (!raw) return null;
+
+    const register = (raw.definitions ?? []).find((d) => d?.register)?.register;
+    return {
+      found: true,
+      reading: raw.reading?.primary || undefined,
+      pos: raw.grammar?.pos?.join("・") || undefined,
+      register: register || undefined,
+      freqRank: typeof raw.meta?.freq_rank === "number" ? raw.meta.freq_rank : undefined,
+    };
+  }
+
+  /**
+   * Fast integrity check used to decide whether the installed DB is usable or
+   * needs re-downloading. Opens a short-lived read-only connection and runs a
+   * sentinel (schema + one row) rather than a full `PRAGMA integrity_check`,
+   * which would scan the whole ~500 MB file. Catches the realistic corruption
+   * modes: truncated download, bad header, missing `entries` table.
+   *
+   * @returns {{ ok: boolean, reason?: "not-installed" | "schema" | "malformed" }}
+   */
+  verify() {
+    const dbPath = this._getDbPath();
+    if (!fs.existsSync(dbPath)) return { ok: false, reason: "not-installed" };
+    // Mid-install: the file may be momentarily inconsistent; don't flag it.
+    if (this._downloadMutex.locked) return { ok: true };
+
+    let probe = null;
+    try {
+      probe = this._createDatabase(dbPath, { readonly: true });
+      const tbl = probe
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='entries'")
+        .get();
+      if (!tbl) {
+        this._corrupt = true;
+        return { ok: false, reason: "schema" };
+      }
+      probe.prepare("SELECT raw_json FROM entries LIMIT 1").get();
+      this._corrupt = false;
+      return { ok: true };
+    } catch (err) {
+      console.error("[DictManager] verify failed:", err);
+      this._corrupt = true;
+      return { ok: false, reason: "malformed" };
+    } finally {
+      if (probe) {
+        try {
+          probe.close();
+        } catch {}
+      }
     }
   }
 
@@ -340,6 +481,12 @@ class DictManager {
     try {
       installedVersion = fs.readFileSync(this._getVersionPath(), "utf8").trim();
     } catch {}
+
+    // A prior open/query tripped the corruption flag — surface it so the UI can
+    // prompt a re-download instead of silently returning empty results forever.
+    if (this._corrupt) {
+      return { status: "corrupt", installedVersion };
+    }
 
     return { status: "installed", installedVersion };
   }
@@ -519,6 +666,8 @@ class DictManager {
 
       onProgress?.(100);
       const version = this._latestVersion;
+      // Fresh install replaces any corrupt file — clear the flag.
+      this._corrupt = false;
       console.log("[DictManager] Download complete:", version);
 
       // Clear cached release info so next download fetches fresh data

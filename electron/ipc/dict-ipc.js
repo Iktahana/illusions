@@ -38,6 +38,35 @@ function registerDictHandlers() {
     }
   });
 
+  // Max headwords accepted in a single batch lookup. The renderer-side facade
+  // chunks larger sets; this is a defensive cap so a malformed payload can't
+  // build an unbounded SQL statement.
+  const MAX_BATCH_TERMS = 1000;
+
+  // Exact-match batch lookup (lightweight projection) for analysis features
+  ipcMain.handle(DICT_CHANNELS.invoke.lookupBatch, async (_event, { terms } = {}) => {
+    try {
+      if (!Array.isArray(terms)) return [];
+      const safe = terms
+        .filter((t) => typeof t === "string" && t.length > 0)
+        .slice(0, MAX_BATCH_TERMS);
+      return mgr.lookupBatch(safe);
+    } catch (err) {
+      console.error("[Dict IPC] dict:lookup-batch failed:", err);
+      return [];
+    }
+  });
+
+  // Fast integrity check (used to detect a corrupt DB and prompt re-download)
+  ipcMain.handle(DICT_CHANNELS.invoke.verify, async () => {
+    try {
+      return mgr.verify();
+    } catch (err) {
+      console.error("[Dict IPC] dict:verify failed:", err);
+      return { ok: false, reason: "malformed" };
+    }
+  });
+
   // Get installation status and installed version
   ipcMain.handle(DICT_CHANNELS.invoke.getStatus, async () => {
     try {

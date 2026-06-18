@@ -136,14 +136,17 @@ export function useExport({
 
         switch (format) {
           case "pdf":
+            // Thread fileType so the HTML pipeline un-escapes MDI macros for
+            // ".mdi" and preserves \[\[blank]] literals in ".md"/".txt".
             result = await window.electronAPI.exportPDF?.(content, {
               metadata,
               verticalWriting: false,
               pageSize: "A5",
+              fileType,
             });
             break;
           case "epub":
-            result = await window.electronAPI.exportEPUB?.(content, { metadata });
+            result = await window.electronAPI.exportEPUB?.(content, { metadata, fileType });
             break;
           case "docx":
             // Thread the active tab's file type so the main-process generateDocx
@@ -245,7 +248,7 @@ async function exportAsWeb(
     // Defensive fallback: normally PDF goes through dialog (line 103),
     // but if no dialog callback is wired, use default export settings.
     const defaults = toPdfExportSettings(await loadExportSettings());
-    const opened = await openWebPrintPreview(content, metadata, defaults);
+    const opened = await openWebPrintPreview(content, metadata, defaults, fileType);
     if (!opened) {
       notificationManager.warning(
         "ポップアップがブロックされました。ブラウザの設定を確認してください。",
@@ -273,7 +276,7 @@ async function exportAsWeb(
       }
       case "epub": {
         const { generateEpubBlob } = await import("./epub-web");
-        blob = await generateEpubBlob(content, { metadata });
+        blob = await generateEpubBlob(content, { metadata, fileType });
         suggestedName = `${baseName}.epub`;
         break;
       }

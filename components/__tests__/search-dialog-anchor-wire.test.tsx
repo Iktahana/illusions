@@ -48,9 +48,15 @@ function Wrapper({ withAnchor, isOpen }: { withAnchor: boolean; isOpen: boolean 
   const ref = useRef<HTMLButtonElement | null>(anchorEl);
   return (
     <SearchDialog
-      editorView={null}
       isOpen={isOpen}
       onClose={() => {}}
+      searchTerm=""
+      onSearchTermChange={() => {}}
+      caseSensitive={false}
+      onCaseSensitiveChange={() => {}}
+      matches={[]}
+      currentMatchIndex={0}
+      onCurrentMatchIndexChange={() => {}}
       anchorRef={withAnchor ? ref : undefined}
     />
   );

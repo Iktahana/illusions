@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable react-hooks/rules-of-hooks, @typescript-eslint/no-unused-vars */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import EditorLayout from "@/components/EditorLayout";
@@ -46,6 +46,8 @@ import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
+import { findSearchMatches, type SearchRange } from "@/lib/editor-page/find-search-matches";
+import { useSearchHighlight, isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
 import { useSaveToast } from "@/lib/editor-page/use-save-toast";
 import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
 import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
@@ -54,6 +56,11 @@ import { usePreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
+
+// Selections larger than this are never treated as a single-word dictionary
+// lookup. Caps the synchronous textBetween() cost on段落/全選択 and avoids
+// pointless Genji lookups while dragging across大量のテキスト (#1639).
+const SELECTED_WORD_MAX_CHARS = 30;
 
 // Module-level flag: persists across React StrictMode/HMR remounts,
 // but resets on page refresh (module re-evaluated).
@@ -184,6 +191,23 @@ export default function EditorPage() {
     powerSaveMode,
     autoPowerSaveOnBattery,
     onPowerSaveModeChange: handlePowerSaveModeChange,
+    // Suggest (never force) power-save on battery, so the user stays in
+    // control and the mode can always be turned off (#1402 follow-up).
+    onSuggestPowerSave: () => {
+      notificationManager.showMessage(
+        "バッテリー駆動です。省電力モードにすると校正・AI 機能を一時停止してバッテリーを節約できます。",
+        {
+          type: "info",
+          duration: 12000,
+          actions: [
+            {
+              label: "省電力モードにする",
+              onClick: () => void handlePowerSaveModeChange(true),
+            },
+          ],
+        },
+      );
+    },
   });
 
   // --- Panel state hook ---
@@ -191,7 +215,15 @@ export default function EditorPage() {
   const {
     topView,
     bottomView,
-    searchResults,
+    searchTerm,
+    caseSensitive,
+    regexSearch,
+    wholeWordSearch,
+    normalizeVariants,
+    excludeComments,
+    searchTarget,
+    selectionOnly,
+    currentMatchIndex,
     isRightPanelCollapsed,
     dictionarySearchTrigger,
     settingsInitialCategory,
@@ -209,10 +241,20 @@ export default function EditorPage() {
     setRubySelectedText,
     setEditorDiff,
     handleOpenDictionary,
+    setSearchTerm,
+    setCaseSensitive,
+    setRegexSearch,
+    setWholeWordSearch,
+    setNormalizeVariants,
+    setExcludeComments,
+    setSearchTarget,
+    setSelectionOnly,
+    setCurrentMatchIndex,
     handleShowAllSearchResults,
     handleCloseSearchResults,
     handleOpenLintingSettings,
     handleOpenPosHighlightSettings,
+    handleOpenPowerSettings,
     triggerSwitchToCorrections,
   } = panelHandlers;
 
@@ -268,6 +310,21 @@ export default function EditorPage() {
   // Keep a live tabs ref for dockview panel renderers captured by stale closures.
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
+  const handleProjectSearchBufferChange = useCallback(
+    (path: string, nextContent: string) => {
+      const tab = tabsRef.current.find(
+        (candidate) => isEditorTab(candidate) && candidate.file?.path === path,
+      );
+      if (!tab || !isEditorTab(tab)) return;
+      updateTab(tab.id, {
+        content: nextContent,
+        isDirty: true,
+        fileSyncStatus: "dirty",
+        pendingExternalContent: nextContent,
+      });
+    },
+    [updateTab],
+  );
 
   const { diffTabContextValue, handleCloseTabWithPtyCleanup } = useDiffTabs({
     tabs,
@@ -298,6 +355,9 @@ export default function EditorPage() {
   // Search state — declared before useDockviewAdapter so it can be passed as options
   const [searchOpenTrigger, setSearchOpenTrigger] = useState(0);
   const [searchInitialTerm, setSearchInitialTerm] = useState<string | undefined>(undefined);
+  // フローティング検索窓（SearchDialog）が開いているか。dockview pane 内の Editor から
+  // 報告される。ハイライトの visibility ゲート（要求2）に使う。
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
 
   // Derive project dockview layout from workspace state (already loaded at project open)
   const projectDockviewLayout = isProjectMode(editorMode)
@@ -324,6 +384,15 @@ export default function EditorPage() {
   // Derive editor mode from active tab's fileType
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const activeEditorTab = activeTab && isEditorTab(activeTab) ? activeTab : undefined;
+  const projectSearchBuffers = useMemo(
+    () =>
+      new Map(
+        tabs.flatMap((tab) =>
+          isEditorTab(tab) && tab.file?.path ? [[tab.file.path, tab.content] as const] : [],
+        ),
+      ),
+    [tabs],
+  );
   const activeFileType = activeEditorTab?.fileType ?? ".mdi";
   const mdiExtensionsEnabled = activeFileType === ".mdi";
   const gfmEnabled = activeFileType !== ".txt";
@@ -368,6 +437,8 @@ export default function EditorPage() {
   const [selectedCharCount, setSelectedCharCount] = useState(0);
   const [selectedManuscriptCells, setSelectedManuscriptCells] = useState(0);
   const [selectedManuscriptPages, setSelectedManuscriptPages] = useState(0);
+  const [selectedWord, setSelectedWord] = useState<string | null>(null);
+  const [searchSelectionRange, setSearchSelectionRange] = useState<SearchRange | null>(null);
   const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstanceRaw] = useState<EditorView | null>(null);
@@ -376,6 +447,64 @@ export default function EditorPage() {
     editorViewRef.current = view; // ref FIRST so sync consumers see fresh value
     setEditorViewInstanceRaw(view);
   }, []);
+
+  // --- 検索ハイライトの単一ソース ---
+  // いずれかの検索 UI が表示中か。両方非表示ならハイライトを消す（要求2）。
+  const isSearchVisible = isSearchDialogOpen || topView === "search";
+  // 共有 searchTerm/options からマッチを算出（唯一の計算箇所）。
+  // `content` を依存に含め、置換や編集で doc が変わった時に再計算させる。
+  // 非表示・空語の時は計算をスキップし空配列を返す。
+  const searchMatches = useMemo(() => {
+    if (!isSearchVisible || !searchTerm || !isEditorViewAlive(editorViewInstance)) {
+      return [];
+    }
+    return findSearchMatches(editorViewInstance.state.doc, searchTerm, {
+      caseSensitive,
+      regex: regexSearch,
+      wholeWord: wholeWordSearch,
+      normalizeVariants,
+      excludeComments,
+      searchTarget,
+      range: selectionOnly ? (searchSelectionRange ?? undefined) : undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    editorViewInstance,
+    searchTerm,
+    caseSensitive,
+    regexSearch,
+    wholeWordSearch,
+    normalizeVariants,
+    excludeComments,
+    searchTarget,
+    selectionOnly,
+    searchSelectionRange,
+    isSearchVisible,
+    content,
+  ]);
+
+  useSearchHighlight({
+    editorView: editorViewInstance,
+    matches: searchMatches,
+    currentMatchIndex,
+    searchTerm,
+    isSearchVisible,
+  });
+
+  // フローティング検索窓は <main> のトップレベル（dockview パネル外）でレンダリングし、
+  // 開閉状態を page 側で持つ。dockview パネル内に置くと、パネルのクロージャが
+  // マウント時に凍結され searchTerm/matches など変化する値が pane へ届かず、入力が
+  // 反映されない（editorDiff 比較ビューを <main> へ移したのと同じ理由）。
+  const openSearchDialog = useCallback(() => setIsSearchDialogOpen(true), []);
+  const closeSearchDialog = useCallback(() => setIsSearchDialogOpen(false), []);
+  const toggleSearchDialog = useCallback(() => setIsSearchDialogOpen((v) => !v), []);
+
+  // ⌘F・辞書語検索などの外部トリガーで検索窓を開く（カウンタ増加で発火）。
+  useEffect(() => {
+    if (searchOpenTrigger > 0) {
+      setIsSearchDialogOpen(true);
+    }
+  }, [searchOpenTrigger]);
 
   // --- Ruby/TCY hook ---
   const { handleOpenRubyDialog, handleApplyRuby, handleToggleTcy } = useRubyTcy({
@@ -574,6 +703,10 @@ export default function EditorPage() {
           pageNumberPosition: settings.pageNumberPosition,
           textIndent: settings.textIndent,
           googleFontFamily: settings.googleFontFamily,
+          // Thread the active tab's snapshotted file type so the HTML pipeline
+          // un-escapes MDI macros only for ".mdi" and preserves \[\[blank]]
+          // literals authored in ".md"/".txt".
+          fileType: dialogState.fileType,
         });
 
         notificationManager.dismiss(progressId);
@@ -598,7 +731,12 @@ export default function EditorPage() {
 
     // Web path: browser print preview (static import — no await before window.open)
     try {
-      const opened = await openWebPrintPreview(dialogState.content, dialogState.metadata, settings);
+      const opened = await openWebPrintPreview(
+        dialogState.content,
+        dialogState.metadata,
+        settings,
+        dialogState.fileType,
+      );
       if (!opened) {
         notificationManager.warning(
           "ポップアップがブロックされました。ブラウザの設定を確認してください。",
@@ -745,6 +883,11 @@ export default function EditorPage() {
     const dialogState = exportDialogStateRef.current;
     if (!dialogState) return;
 
+    // Thread the active tab's snapshotted file type so the HTML pipeline
+    // un-escapes MDI macros only for ".mdi" and preserves \[\[blank]] literals
+    // authored in ".md"/".txt".
+    const epubOptions: EpubExportOptions = { ...options, fileType: dialogState.fileType };
+
     // Electron path: use IPC
     if (window.electronAPI?.exportEPUB) {
       setExportDialogState(null);
@@ -755,7 +898,7 @@ export default function EditorPage() {
 
       try {
         // Electron IPC serializes Uint8Array automatically
-        const result = await window.electronAPI.exportEPUB(dialogState.content, options);
+        const result = await window.electronAPI.exportEPUB(dialogState.content, epubOptions);
 
         notificationManager.dismiss(progressId);
 
@@ -784,7 +927,7 @@ export default function EditorPage() {
 
     try {
       const { generateEpubBlob } = await import("@/lib/export/epub-web");
-      const blob = await generateEpubBlob(dialogState.content, options);
+      const blob = await generateEpubBlob(dialogState.content, epubOptions);
       const baseName = (options.metadata.title || "untitled")
         .replace(/[<>:"/\\|?*]/g, "_")
         .replace(/\.[^.]+$/, "");
@@ -1080,16 +1223,39 @@ export default function EditorPage() {
     compactMode,
     onChapterClick: handleChapterClick,
     onInsertText: handleInsertText,
-    searchResults,
+    // 共有検索 state（SearchResults を controlled 化）
+    searchTerm,
+    caseSensitive,
+    regexSearch,
+    wholeWordSearch,
+    normalizeVariants,
+    excludeComments,
+    searchTarget,
+    selectionOnly,
+    hasSearchSelection: searchSelectionRange !== null,
+    searchMatches,
+    currentMatchIndex,
+    onSearchTermChange: setSearchTerm,
+    onCaseSensitiveChange: setCaseSensitive,
+    onRegexSearchChange: setRegexSearch,
+    onWholeWordSearchChange: setWholeWordSearch,
+    onNormalizeVariantsChange: setNormalizeVariants,
+    onExcludeCommentsChange: setExcludeComments,
+    onSearchTargetChange: setSearchTarget,
+    onSelectionOnlyChange: setSelectionOnly,
+    onCurrentMatchIndexChange: setCurrentMatchIndex,
     onCloseSearchResults: handleCloseSearchResults,
     editorViewInstance,
     dictionarySearchTrigger,
     currentFilePath: currentFile?.path ?? undefined,
+    projectSearchBuffers,
+    onProjectBufferChange: handleProjectSearchBufferChange,
     newFileTrigger,
     openProjectFile,
     incrementEditorKey,
     onWordSearch: (word: string) => {
-      setSearchInitialTerm(word);
+      // 共有検索語へ反映し、フローティング検索窓を開く。
+      setSearchTerm(word);
       setSearchOpenTrigger((prev) => prev + 1);
     },
   } as const;
@@ -1114,6 +1280,7 @@ export default function EditorPage() {
     charUsageRates,
     readabilityAnalysis,
     onOpenPosHighlightSettings: handleOpenPosHighlightSettings,
+    onOpenPowerSettings: handleOpenPowerSettings,
     activeFileName: currentFile?.name,
     activeFilePath: currentFile?.path ?? undefined,
     currentContent: content,
@@ -1155,6 +1322,7 @@ export default function EditorPage() {
     },
     switchToCorrectionsTrigger,
     previousDayStats,
+    selectedWord,
   } as const;
 
   return (
@@ -1201,6 +1369,7 @@ export default function EditorPage() {
           onEpubExport: handleEpubExportConfirm,
           content: exportDialogState?.content ?? "",
           metadata: exportDialogState?.metadata ?? { title: "" },
+          fileType: exportDialogState?.fileType,
         },
         printDialog: {
           state: printDialogState,
@@ -1254,9 +1423,38 @@ export default function EditorPage() {
           setSelectedCharCount(count);
           setSelectedManuscriptCells(cells);
           setSelectedManuscriptPages(pages);
+          // 選択語を幻辞ルックアップ用に保持する。
+          // 大きな選択（段落・全選択）では textBetween が O(n) で重く、語の辞書引きにも
+          // 不向きなので閾値を超えたら早期に null。実際の辞書引きの debounce は
+          // useGenjiWordInfo 側で行う（選択ドラッグ中の連続 IPC を抑制）。
+          if (count > 0 && count <= SELECTED_WORD_MAX_CHARS && editorViewRef.current) {
+            const { selection, doc } = editorViewRef.current.state;
+            const text = doc.textBetween(selection.from, selection.to, "").trim();
+            // 単語単位（空白区切り）の先頭語、または選択全体（日本語は空白なし）
+            const word = text.split(/\s+/)[0] ?? null;
+            setSelectedWord(word || null);
+          } else {
+            setSelectedWord(null);
+          }
+        },
+        onSelectionRangeChange: (range: SearchRange | null) => {
+          setSearchSelectionRange(range);
+          if (!range) setSelectionOnly(false);
         },
         searchOpenTrigger,
         searchInitialTerm,
+        // 共有検索 state（SearchDialog は <main> でレンダリング）
+        searchTerm,
+        caseSensitive,
+        searchMatches,
+        currentMatchIndex,
+        isSearchDialogOpen,
+        onSearchTermChange: setSearchTerm,
+        onCaseSensitiveChange: setCaseSensitive,
+        onCurrentMatchIndexChange: setCurrentMatchIndex,
+        onOpenSearchDialog: openSearchDialog,
+        onCloseSearchDialog: closeSearchDialog,
+        onToggleSearchDialog: toggleSearchDialog,
         setEditorViewInstance,
         handleShowAllSearchResults,
         ruleRunner,

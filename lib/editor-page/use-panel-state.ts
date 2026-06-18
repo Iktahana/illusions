@@ -4,11 +4,23 @@ import { useCallback, useState } from "react";
 import type { ActivityBarView } from "@/components/ActivityBar";
 import { isBottomView } from "@/components/ActivityBar";
 import type { SettingsCategory } from "@/components/SettingsModal";
+import type { SearchTarget } from "./find-search-matches";
 
 export interface PanelState {
   topView: ActivityBarView;
   bottomView: ActivityBarView;
-  searchResults: { matches: { from: number; to: number }[]; searchTerm: string } | null;
+  /** 単一の検索 source of truth。SearchDialog（フローティング窓）と SearchResults
+   *  （サイドパネル）の両方がこれを共有し、内容のズレを防ぐ。 */
+  searchTerm: string;
+  caseSensitive: boolean;
+  regexSearch: boolean;
+  wholeWordSearch: boolean;
+  normalizeVariants: boolean;
+  excludeComments: boolean;
+  searchTarget: SearchTarget;
+  selectionOnly: boolean;
+  /** 現在フォーカス中のマッチ index。両 UI のナビ／クリックで共有更新する。 */
+  currentMatchIndex: number;
   isRightPanelCollapsed: boolean;
   dictionarySearchTrigger: { term: string; id: number };
   settingsInitialCategory: SettingsCategory | undefined;
@@ -29,10 +41,21 @@ export interface PanelHandlers {
     diff: { snapshotContent: string; currentContent: string; label: string } | null,
   ) => void;
   handleOpenDictionary: (searchTerm?: string) => void;
-  handleShowAllSearchResults: (matches: { from: number; to: number }[], searchTerm: string) => void;
+  setSearchTerm: (term: string) => void;
+  setCaseSensitive: Dispatch<SetStateAction<boolean>>;
+  setRegexSearch: Dispatch<SetStateAction<boolean>>;
+  setWholeWordSearch: Dispatch<SetStateAction<boolean>>;
+  setNormalizeVariants: Dispatch<SetStateAction<boolean>>;
+  setExcludeComments: Dispatch<SetStateAction<boolean>>;
+  setSearchTarget: Dispatch<SetStateAction<SearchTarget>>;
+  setSelectionOnly: Dispatch<SetStateAction<boolean>>;
+  setCurrentMatchIndex: Dispatch<SetStateAction<number>>;
+  /** サイドバー検索パネルを開く（共有 searchTerm をそのまま表示）。 */
+  handleShowAllSearchResults: () => void;
   handleCloseSearchResults: () => void;
   handleOpenLintingSettings: () => void;
   handleOpenPosHighlightSettings: () => void;
+  handleOpenPowerSettings: () => void;
   triggerSwitchToCorrections: () => void;
 }
 
@@ -49,10 +72,15 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
 } {
   const [topView, setTopView] = useState<ActivityBarView>("explorer");
   const [bottomView, setBottomView] = useState<ActivityBarView>("none");
-  const [searchResults, setSearchResults] = useState<{
-    matches: { from: number; to: number }[];
-    searchTerm: string;
-  } | null>(null);
+  const [searchTerm, setSearchTermRaw] = useState("");
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [regexSearch, setRegexSearch] = useState(false);
+  const [wholeWordSearch, setWholeWordSearch] = useState(false);
+  const [normalizeVariants, setNormalizeVariants] = useState(false);
+  const [excludeComments, setExcludeComments] = useState(true);
+  const [searchTarget, setSearchTarget] = useState<SearchTarget>("all");
+  const [selectionOnly, setSelectionOnly] = useState(false);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
   const [dictionarySearchTrigger, setDictionarySearchTrigger] = useState<{
     term: string;
@@ -88,16 +116,17 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
     });
   }, []);
 
-  const handleShowAllSearchResults = useCallback(
-    (matches: { from: number; to: number }[], searchTerm: string) => {
-      setSearchResults({ matches, searchTerm });
-      setTopView("search");
-    },
-    [],
-  );
+  // 検索語変更時は現在マッチ index を先頭へリセットする。
+  const setSearchTerm = useCallback((term: string) => {
+    setSearchTermRaw(term);
+    setCurrentMatchIndex(0);
+  }, []);
+
+  const handleShowAllSearchResults = useCallback(() => {
+    setTopView("search");
+  }, []);
 
   const handleCloseSearchResults = useCallback(() => {
-    setSearchResults(null);
     setTopView("explorer");
   }, []);
 
@@ -111,6 +140,11 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
     setShowSettingsModal(true);
   }, [setShowSettingsModal]);
 
+  const handleOpenPowerSettings = useCallback(() => {
+    setSettingsInitialCategory("power");
+    setShowSettingsModal(true);
+  }, [setShowSettingsModal]);
+
   const triggerSwitchToCorrections = useCallback(() => {
     setSwitchToCorrectionsTrigger((n) => n + 1);
   }, []);
@@ -119,7 +153,15 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
     state: {
       topView,
       bottomView,
-      searchResults,
+      searchTerm,
+      caseSensitive,
+      regexSearch,
+      wholeWordSearch,
+      normalizeVariants,
+      excludeComments,
+      searchTarget,
+      selectionOnly,
+      currentMatchIndex,
       isRightPanelCollapsed,
       dictionarySearchTrigger,
       settingsInitialCategory,
@@ -137,10 +179,20 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
       setRubySelectedText,
       setEditorDiff,
       handleOpenDictionary,
+      setSearchTerm,
+      setCaseSensitive,
+      setRegexSearch,
+      setWholeWordSearch,
+      setNormalizeVariants,
+      setExcludeComments,
+      setSearchTarget,
+      setSelectionOnly,
+      setCurrentMatchIndex,
       handleShowAllSearchResults,
       handleCloseSearchResults,
       handleOpenLintingSettings,
       handleOpenPosHighlightSettings,
+      handleOpenPowerSettings,
       triggerSwitchToCorrections,
     },
   };

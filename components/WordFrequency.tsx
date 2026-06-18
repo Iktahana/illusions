@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
-import { RefreshCw, LoaderCircle } from "lucide-react";
+import { RefreshCw, LoaderCircle, ChevronRight, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 
 import ContextMenu from "@/components/ContextMenu";
@@ -9,10 +9,28 @@ import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { getProjectFileService } from "@/lib/services/project-file-service";
 import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
+import { getDictAccess } from "@/lib/dict/dict-access";
+import { localPreferences } from "@/lib/storage/local-preferences";
+import {
+  summarizeGenjiVocabulary,
+  freqRankDistributionToRows,
+  registerDistributionToRows,
+} from "@/lib/utils/vocabulary-genji";
 import type { WordEntry } from "@/lib/nlp-client/types";
+import type { GenjiVocabularySummary } from "@/lib/utils/vocabulary-genji";
+
+/**
+ * Cache schema version. Bump whenever the analysis OUTPUT changes so stale
+ * on-disk caches are discarded instead of being served verbatim.
+ * v2: #1640 strips serializer-escaped `\[\[blank]]` markers — pre-v2 caches
+ *     still contain spurious "blank" tokens (#1639).
+ */
+const CACHE_SCHEMA_VERSION = 2;
 
 /** Cache file schema for word frequency results */
 interface WordFrequencyCache {
+  /** Schema version; missing/older => cache is stale and re-analyzed. */
+  schemaVersion?: number;
   lastModified: number;
   fileSize: number;
   words: WordEntry[];
@@ -33,7 +51,7 @@ interface WordFrequencyProps {
 /** Dictionary lookup action map */
 const DICTIONARY_ACTIONS: Record<string, (word: string) => { url: string; title: string }> = {
   genji: (word) => ({
-    url: `https://genji.illusions.app/${encodeURIComponent(word)}`,
+    url: `https://dict.illusions.app/results?q=${encodeURIComponent(word)}`,
     title: `${word} - 幻辞`,
   }),
   kotobank: (word) => ({
@@ -76,6 +94,21 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
   const [error, setError] = useState<string | null>(null);
   const [lastAnalyzedContent, setLastAnalyzedContent] = useState<string>("");
   const [cacheTimestamp, setCacheTimestamp] = useState<number>(0);
+
+  // Genji vocabulary enrichment state
+  const [genjiSummary, setGenjiSummary] = useState<GenjiVocabularySummary | null>(null);
+  const [genjiLoading, setGenjiLoading] = useState(false);
+  /** Set to true when the Genji DB is ready (health.state === "ready"). False means graceful hide. */
+  const [genjiReady, setGenjiReady] = useState(false);
+  /**
+   * 「辞書データからの分析」セクションの開閉。既定は展開。
+   * 開閉状態は localPreferences に永続化し、次回以降も記憶する（#1639）。
+   * 幻辞セクションは genjiReady（client-only async）後にのみ描画されるため、
+   * lazy initializer による localStorage 読み取りで hydration mismatch は起きない。
+   */
+  const [genjiExpanded, setGenjiExpanded] = useState<boolean>(() =>
+    localPreferences.getGenjiAnalysisExpanded(),
+  );
 
   /** Generation counter — incremented on each analysis start; stale async results are discarded (#1078) */
   const genRef = useRef(0);
@@ -154,7 +187,11 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
           const cache = JSON.parse(cacheText) as WordFrequencyCache;
           const meta = await vfs.getFileMetadata(filePath);
 
-          if (cache.lastModified === meta.lastModified && cache.fileSize === meta.size) {
+          if (
+            cache.schemaVersion === CACHE_SCHEMA_VERSION &&
+            cache.lastModified === meta.lastModified &&
+            cache.fileSize === meta.size
+          ) {
             // Discard stale result if a newer analysis was started (#1078)
             if (genRef.current !== myGen) return;
             setWords(cache.words);
@@ -189,6 +226,7 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
           const meta = await vfs.getFileMetadata(filePath);
           const totalWords = wordEntries.reduce((sum, w) => sum + w.count, 0);
           const cacheData: WordFrequencyCache = {
+            schemaVersion: CACHE_SCHEMA_VERSION,
             lastModified: meta.lastModified,
             fileSize: meta.size,
             words: wordEntries,
@@ -223,6 +261,54 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
       return () => clearTimeout(timer);
     }
   }, [content, lastAnalyzedContent]);
+
+  // Genji vocabulary enrichment — run after words list changes
+  useEffect(() => {
+    if (words.length === 0) {
+      setGenjiSummary(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const runGenji = async (): Promise<void> => {
+      const access = getDictAccess();
+      const health = await access.getHealth();
+
+      if (cancelled) return;
+
+      // Graceful degradation: only enrich when the local Electron DB is ready.
+      // Web-fallback and not-installed states skip bulk lookup.
+      if (health.state !== "ready") {
+        setGenjiReady(false);
+        setGenjiSummary(null);
+        return;
+      }
+
+      setGenjiReady(true);
+      setGenjiLoading(true);
+
+      try {
+        const wordStrings = words.map((w) => w.word);
+        const lookupMap = await access.lookupBatch(wordStrings);
+        if (cancelled) return;
+        const summary = summarizeGenjiVocabulary(wordStrings, lookupMap);
+        setGenjiSummary(summary);
+      } catch (err) {
+        console.warn("[WordFrequency] Genji enrichment failed:", err);
+        // Non-critical — swallow and hide the section
+        setGenjiSummary(null);
+      } finally {
+        if (!cancelled) setGenjiLoading(false);
+      }
+    };
+
+    void runGenji();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [words]);
 
   const stats = useMemo(() => {
     const totalWords = words.reduce((sum, w) => sum + w.count, 0);
@@ -343,6 +429,92 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
           </div>
         )}
       </div>
+
+      {/* 辞書データからの分析セクション — Genji DB が ready のときのみ表示。デフォルト折り畳み（#1639） */}
+      {genjiReady && (
+        <div className="flex-shrink-0 border-t border-border">
+          <div className="px-3 py-2">
+            <button
+              type="button"
+              onClick={() =>
+                setGenjiExpanded((v) => {
+                  const next = !v;
+                  localPreferences.setGenjiAnalysisExpanded(next);
+                  return next;
+                })
+              }
+              aria-expanded={genjiExpanded}
+              className="w-full flex items-center justify-between gap-1.5 -mx-1 px-1 py-0.5 rounded hover:bg-hover transition-colors"
+            >
+              <span className="flex items-center gap-1 min-w-0">
+                {genjiExpanded ? (
+                  <ChevronDown className="w-3 h-3 text-foreground-tertiary flex-shrink-0" />
+                ) : (
+                  <ChevronRight className="w-3 h-3 text-foreground-tertiary flex-shrink-0" />
+                )}
+                <h3 className="text-xs font-medium text-foreground-secondary truncate">
+                  辞書データからの分析
+                </h3>
+              </span>
+              {genjiLoading && (
+                <LoaderCircle className="w-3 h-3 text-foreground-tertiary animate-spin flex-shrink-0" />
+              )}
+            </button>
+
+            {genjiExpanded && genjiSummary !== null && !genjiLoading && (
+              <div className="mt-1.5">
+                {/* 頻度ランク分布 */}
+                <div className="mb-2">
+                  <p className="text-xs text-foreground-tertiary mb-1">頻度ランク分布</p>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                    {freqRankDistributionToRows(genjiSummary.freqRankDistribution).map((row) => (
+                      <span key={row.label} className="text-xs text-foreground-tertiary">
+                        {row.label}:{" "}
+                        <span className="text-foreground font-medium">{row.count}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* レジスター分布（文体ラベルが1種類以上あるときのみ） */}
+                {Object.keys(genjiSummary.registerDistribution).length > 0 && (
+                  <div className="mb-2">
+                    <p className="text-xs text-foreground-tertiary mb-1">文体</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                      {registerDistributionToRows(genjiSummary.registerDistribution).map((row) => (
+                        <span key={row.label} className="text-xs text-foreground-tertiary">
+                          {row.label}:{" "}
+                          <span className="text-foreground font-medium">{row.count}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 辞書にない語彙数 */}
+                <p className="text-xs text-foreground-tertiary">
+                  辞書にない語彙数:{" "}
+                  <span className="text-foreground font-medium">
+                    {genjiSummary.unknownWordCount}
+                  </span>
+                  <span className="ml-1 text-foreground-tertiary">
+                    （固有名詞・造語・誤記の候補）
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 幻辞未導入時の案内（Electron のみ、web では非表示） */}
+      {!genjiReady && typeof window !== "undefined" && window.electronAPI !== undefined && (
+        <div className="flex-shrink-0 border-t border-border px-3 py-2">
+          <p className="text-xs text-foreground-tertiary">
+            辞書データをダウンロードすると、頻度ランク・文体・辞書にない語彙の分析が使えます。
+          </p>
+        </div>
+      )}
 
       {/* Web context menu */}
       {contextMenu.menu && (
