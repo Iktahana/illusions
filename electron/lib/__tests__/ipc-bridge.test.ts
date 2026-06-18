@@ -101,6 +101,8 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
     expect(DICT_CHANNELS.invoke).toEqual({
       query: "dict:query",
       queryReading: "dict:query-reading",
+      lookupBatch: "dict:lookup-batch",
+      verify: "dict:verify",
       getStatus: "dict:get-status",
       checkUpdate: "dict:check-update",
       download: "dict:download",

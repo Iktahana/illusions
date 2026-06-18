@@ -88,6 +88,9 @@ export type DictDownloadStatus =
   | "downloading"
   | "installing"
   | "installed"
+  /** DB file exists but failed an integrity check (truncated download, bad
+   * header, missing table). The user should re-download. */
+  | "corrupt"
   | "error";
 
 export interface DictDownloadState {
@@ -121,4 +124,27 @@ export interface DictQueryResult {
   noResults: boolean;
   /** True when the provider is not installed / not available */
   providerUnavailable: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Lightweight analysis projection
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal per-term projection returned by batch lookups for analysis features
+ * (vocabulary stats, readability, ruby, lint rules). Deliberately small so it
+ * is cheap to ship across IPC for hundreds of words at once — never the full
+ * {@link DictEntry} (definitions/examples/relations) which the lookup panel uses.
+ */
+export interface DictLookup {
+  /** Whether the headword exists in the dictionary (exact match). */
+  found: boolean;
+  /** Primary kana reading (読み) — used for ruby suggestions. */
+  reading?: string;
+  /** Part(s) of speech, joined with "・". */
+  pos?: string;
+  /** Register label (口語/文章語/雅語 …) from the first definition that has one. */
+  register?: string;
+  /** Frequency rank (smaller = more common) — used for vocabulary difficulty. */
+  freqRank?: number;
 }
