@@ -1,7 +1,6 @@
 "use client";
 
 import InfoTooltip from "./InfoTooltip";
-import GenjiWordInfoSection from "./GenjiWordInfoSection";
 
 import type { PreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
 
@@ -48,8 +47,6 @@ interface StatsPanelProps {
     hasDictAnalysis?: boolean;
   };
   previousDayStats?: PreviousDayStats | null;
-  /** 選択中の語（品詞タブで幻辞情報を表示するために渡す） */
-  selectedWord?: string | null;
 }
 
 /** Format a diff value with sign prefix */
@@ -73,7 +70,6 @@ export default function StatsPanel({
   charUsageRates,
   readabilityAnalysis,
   previousDayStats,
-  selectedWord,
 }: StatsPanelProps) {
   const isSelection = selectedCharCount > 0;
   const activeCharCount = isSelection ? selectedCharCount : charCount;
@@ -680,9 +676,6 @@ export default function StatsPanel({
           </div>
         </div>
       </div>
-
-      {/* 選択語の幻辞情報（品詞ハイライト連携） */}
-      <GenjiWordInfoSection selectedWord={selectedWord} />
     </div>
   );
 }

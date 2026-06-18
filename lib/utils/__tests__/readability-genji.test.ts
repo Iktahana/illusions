@@ -76,6 +76,20 @@ describe("enrichReadabilityWithDict (Tier 3, #1627)", () => {
     expect(result.detail.vocabulary.rareWordRate).toBe(0);
   });
 
+  it("treats mid-rank words (10,000–50,000) as rare so the score actually moves (#1639)", () => {
+    const base = analyzeReadability(BASE_TEXT);
+    // 12,000 / 18,000 / 25,000 はかつての RARE_THRESHOLD (50,000) では稀少扱いされず
+    // スコアが動かなかった。新境界 (10,000) では稀少語率 = 1.0 で語彙スコアが下がる。
+    const tokens = [noun("逡巡"), noun("邂逅"), noun("泡沫")];
+    const result = enrichReadabilityWithDict(
+      base,
+      tokens,
+      lookup({ 逡巡: 12000, 邂逅: 18000, 泡沫: 25000 }),
+    );
+    expect(result.detail.vocabulary.rareWordRate).toBe(1);
+    expect(result.subScores.vocabulary).toBeLessThan(base.subScores.vocabulary);
+  });
+
   it("recomputes the composite score and level from the adjusted subscores", () => {
     const base = analyzeReadability(BASE_TEXT);
     const tokens = [noun("顰蹙"), noun("邂逅")];

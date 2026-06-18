@@ -475,15 +475,19 @@ export function enrichReadabilityWithMorphology(
  *   「稀少語率」は小説における語彙の難度に直接影響する指標（JIS X 4051 準拠評価や
  *   文化庁「公用文作成の考え方」（2022）が「平易な語の選択」を求める背景から妥当）。
  *
- *   スコア補正: 平均 freq_rank が高いほど（稀少語が多いほど）語彙スコアを下げる。
- *   - 稀少語率 > 0.3 → -15 pt（明らかに難語が多い）
- *   - 稀少語率 0.2〜0.3 → -8 pt
- *   - 稀少語率 0.1〜0.2 → -4 pt
- *   - 平均 freq_rank > 30,000 → 追加 -10 pt
- *   - 平均 freq_rank 10,000〜30,000 → 追加 -5 pt
- *   - 平均 freq_rank < 3,000（平易語が多い）→ +5 pt ボーナス
+ *   スコア補正: 稀少語率（と補助的に平均 freq_rank）が高いほど語彙スコアを下げる。
+ *   - 稀少語率 > 0.4 → -25 pt（難語が支配的）
+ *   - 稀少語率 0.3〜0.4 → -18 pt
+ *   - 稀少語率 0.2〜0.3 → -12 pt
+ *   - 稀少語率 0.1〜0.2 → -6 pt
+ *   - 稀少語率 0.05〜0.1 → -3 pt
+ *   - 平均 freq_rank > 15,000 → 追加 -8 pt
+ *   - 平均 freq_rank 8,000〜15,000 → 追加 -4 pt
+ *   - 平均 freq_rank < 2,000（平易語が多い）→ +5 pt ボーナス
  */
-const RARE_THRESHOLD = 50_000;
+// 「稀少」の判定境界。語彙統計パネルの 稀少 バケット（FREQ_RANK_GENERAL = 10,000）と
+// 揃える。以前は 50,000 と過度に厳しく、稀少語が多い文章でもスコアがほぼ動かなかった（#1639）。
+const RARE_THRESHOLD = 10_000;
 
 /**
  * 幻辞（Genji）の freq_rank バッチ照合結果で語彙難易度サブスコアを補強する（Tier 3）。
@@ -535,16 +539,20 @@ export function enrichReadabilityWithDict(
   const avgFreqRank = Math.round(freqRanks.reduce((a, b) => a + b, 0) / freqRanks.length);
   const rareWordRate = rareCount / freqRanks.length;
 
-  // 語彙スコア補正: 稀少語率・平均 freq_rank に基づいてペナルティ/ボーナスを加算
+  // 語彙スコア補正: 稀少語率を主シグナル、平均 freq_rank を補助シグナルとして
+  // ペナルティ/ボーナスを加算。平均は高頻度の機能語・常用語に引っ張られて鈍いため、
+  // 稀少語率に重みを置く（#1639）。
   let vocabDelta = 0;
 
-  if (rareWordRate > 0.3) vocabDelta -= 15;
-  else if (rareWordRate > 0.2) vocabDelta -= 8;
-  else if (rareWordRate > 0.1) vocabDelta -= 4;
+  if (rareWordRate > 0.4) vocabDelta -= 25;
+  else if (rareWordRate > 0.3) vocabDelta -= 18;
+  else if (rareWordRate > 0.2) vocabDelta -= 12;
+  else if (rareWordRate > 0.1) vocabDelta -= 6;
+  else if (rareWordRate > 0.05) vocabDelta -= 3;
 
-  if (avgFreqRank > 30_000) vocabDelta -= 10;
-  else if (avgFreqRank > 10_000) vocabDelta -= 5;
-  else if (avgFreqRank < 3_000) vocabDelta += 5;
+  if (avgFreqRank > 15_000) vocabDelta -= 8;
+  else if (avgFreqRank > 8_000) vocabDelta -= 4;
+  else if (avgFreqRank < 2_000) vocabDelta += 5;
 
   const newVocabScore = Math.max(0, Math.min(100, base.subScores.vocabulary + vocabDelta));
 

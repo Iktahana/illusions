@@ -57,6 +57,11 @@ import { usePreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 
+// Selections larger than this are never treated as a single-word dictionary
+// lookup. Caps the synchronous textBetween() cost on段落/全選択 and avoids
+// pointless Genji lookups while dragging across大量のテキスト (#1639).
+const SELECTED_WORD_MAX_CHARS = 30;
+
 // Module-level flag: persists across React StrictMode/HMR remounts,
 // but resets on page refresh (module re-evaluated).
 // Each Electron BrowserWindow has its own JS context, so no cross-window contamination.
@@ -1418,8 +1423,11 @@ export default function EditorPage() {
           setSelectedCharCount(count);
           setSelectedManuscriptCells(cells);
           setSelectedManuscriptPages(pages);
-          // 選択語を幻辞ルックアップ用に保持する
-          if (count > 0 && editorViewRef.current) {
+          // 選択語を幻辞ルックアップ用に保持する。
+          // 大きな選択（段落・全選択）では textBetween が O(n) で重く、語の辞書引きにも
+          // 不向きなので閾値を超えたら早期に null。実際の辞書引きの debounce は
+          // useGenjiWordInfo 側で行う（選択ドラッグ中の連続 IPC を抑制）。
+          if (count > 0 && count <= SELECTED_WORD_MAX_CHARS && editorViewRef.current) {
             const { selection, doc } = editorViewRef.current.state;
             const text = doc.textBetween(selection.from, selection.to, "").trim();
             // 単語単位（空白区切り）の先頭語、または選択全体（日本語は空白なし）
