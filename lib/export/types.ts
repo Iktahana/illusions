@@ -37,6 +37,11 @@ export interface PdfGenerationOptions {
   textIndent?: number;
   /** Google Font family name for PDF export (triggers <link> injection and CSP relaxation) */
   googleFontFamily?: string;
+  /**
+   * Active document file type. The HTML pipeline un-escapes MDI macros only for
+   * ".mdi"; ".md"/".txt" preserve authored `\[\[blank]]` literals. Absent → ".mdi".
+   */
+  fileType?: string;
 }
 
 export type ExportFormat = "pdf" | "epub" | "docx" | "txt" | "txt-ruby";

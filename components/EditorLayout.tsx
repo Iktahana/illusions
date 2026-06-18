@@ -105,6 +105,7 @@ interface EditorLayoutProps {
       onEpubExport: (options: EpubExportOptions) => void;
       content: string;
       metadata: ExportMetadata;
+      fileType?: string;
     };
     printDialog: {
       state: { content: string; metadata: ExportMetadata } | null;
@@ -112,6 +113,7 @@ interface EditorLayoutProps {
       onPrint: (settings: PdfExportSettings) => void;
       content: string;
       metadata: ExportMetadata;
+      fileType?: string;
     };
   };
   recovery: {
@@ -289,6 +291,7 @@ export default function EditorLayout({
               onExportEpub={dialogs.exportDialog.onEpubExport}
               content={dialogs.exportDialog.content}
               metadata={dialogs.exportDialog.metadata}
+              fileType={dialogs.exportDialog.fileType}
             />
 
             <ExportDialog
@@ -300,6 +303,7 @@ export default function EditorLayout({
               onExportDocx={() => {}}
               content={dialogs.printDialog.content}
               metadata={dialogs.printDialog.metadata}
+              fileType={dialogs.printDialog.fileType}
             />
 
             {!chrome.isElectron && recovery.wasAutoRecovered && !recovery.dismissedRecovery && (

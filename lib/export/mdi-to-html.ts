@@ -16,6 +16,7 @@ import {
   MDI_BREAK_RE,
   MDI_KERN_AMOUNT_RE,
   MDI_BLANK_RE,
+  MdiDocument,
 } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import { PAGE_DIMENSIONS } from "./pdf-export-settings";
 
@@ -245,13 +246,30 @@ export function mdiToHtml(
     typesetting?: Omit<MdiStylesheetOptions, "verticalWriting">;
     /** Google Font family name to inject as <link> tag (e.g. "Noto Serif JP") */
     googleFontFamily?: string;
+    /**
+     * Active document file type. Editor-serialized input escapes the leading `[`
+     * of MDI bracket macros (e.g. `\[\[blank]]`); ".mdi" un-escapes them back to
+     * markers so [[blank]] etc. convert correctly, while ".md"/".txt" preserve the
+     * authored literal (DATA-LOSS guard, see #1608). Absent → ".mdi".
+     */
+    fileType?: string;
   },
 ): string {
   const md = createMarkdownIt();
+  // Normalize editor-serialized output into canonical MDI text before rendering.
+  // The Milkdown serializer escapes the leading `[` of MDI macros to `\[`; without
+  // this, MDI_BLANK_RE (and the inline macro rules) never match and `[[blank]]`
+  // leaks as literal text into PDF/EPUB/print output. TXT/DOCX already normalize
+  // this way via MdiDocument — this brings the HTML pipeline to parity.
+  const fileType = options?.fileType ?? ".mdi";
+  const normalized =
+    fileType === ".mdi"
+      ? MdiDocument.fromEditorOutput(markdown, { fileType: ".mdi" }).toRawText()
+      : MdiDocument.fromRawText(markdown).toRawText();
   // Pre-process: replace [[blank]] paragraph markers with a U+E000 PUA sentinel.
   // markdown-it will wrap the sentinel in <p>…</p>; we swap it for an empty <p></p> after rendering.
   const BLANK_SENTINEL = "";
-  const preprocessed = markdown.replace(new RegExp(MDI_BLANK_RE.source, "gm"), BLANK_SENTINEL);
+  const preprocessed = normalized.replace(new RegExp(MDI_BLANK_RE.source, "gm"), BLANK_SENTINEL);
   const rawHtml = md.render(preprocessed);
   // Replace the sentinel paragraph with a true empty paragraph. Then final-sweep any
   // remaining sentinel that escaped the <p>…</p> wrap (e.g. inside fenced code blocks
@@ -326,10 +344,14 @@ export function mdiToHtml(
  * @param splitLevel - Max heading level to split on (1=H1, 2=H1+H2, 3=H1+H2+H3, 0=no split)
  * @returns Array of Chapter objects
  */
-export function splitIntoChapters(markdown: string, splitLevel: number = 1): Chapter[] {
+export function splitIntoChapters(
+  markdown: string,
+  splitLevel: number = 1,
+  fileType?: string,
+): Chapter[] {
   // No splitting — entire document is one chapter
   if (splitLevel <= 0) {
-    const html = mdiToHtml(markdown, { bodyOnly: true });
+    const html = mdiToHtml(markdown, { bodyOnly: true, fileType });
     return [{ title: "", htmlContent: html, level: 1 }];
   }
 
@@ -350,7 +372,7 @@ export function splitIntoChapters(markdown: string, splitLevel: number = 1): Cha
         const content = currentLines.join("\n").trim();
         chapters.push({
           title: currentTitle,
-          htmlContent: content ? mdiToHtml(content, { bodyOnly: true }) : "",
+          htmlContent: content ? mdiToHtml(content, { bodyOnly: true, fileType }) : "",
           level: currentLevel,
         });
       }
@@ -372,7 +394,7 @@ export function splitIntoChapters(markdown: string, splitLevel: number = 1): Cha
     const content = currentLines.join("\n").trim();
     chapters.push({
       title: currentTitle,
-      htmlContent: content ? mdiToHtml(content, { bodyOnly: true }) : "",
+      htmlContent: content ? mdiToHtml(content, { bodyOnly: true, fileType }) : "",
       level: currentLevel,
     });
   }

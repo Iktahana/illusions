@@ -21,6 +21,12 @@ export interface EpubExportOptions {
   chapterSplitLevel?: ChapterSplitLevel;
   coverImage?: Uint8Array;
   coverMediaType?: string;
+  /**
+   * Active document file type. Forwarded to mdiToHtml so editor-escaped MDI
+   * macros (e.g. `\[\[blank]]`) are un-escaped for ".mdi" and preserved as
+   * literals for ".md"/".txt". Absent → ".mdi".
+   */
+  fileType?: string;
 }
 
 /** Map chapter split level string to numeric value for splitIntoChapters() */
@@ -87,9 +93,9 @@ export function buildEpubFiles(
   const coverMediaType = validCoverType;
 
   const splitLevel = splitLevelToNumber(options.chapterSplitLevel);
-  const chapters = splitIntoChapters(content, splitLevel);
+  const chapters = splitIntoChapters(content, splitLevel, options.fileType);
   if (chapters.length === 0) {
-    const html = mdiToHtml(content, { bodyOnly: true });
+    const html = mdiToHtml(content, { bodyOnly: true, fileType: options.fileType });
     chapters.push({ title, htmlContent: html, level: 1 });
   }
   // When no splitting or single untitled chapter, use the book title

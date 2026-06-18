@@ -31,6 +31,12 @@ export interface PdfExportOptions {
   textIndent?: number;
   /** Google Font family name — triggers <link> injection and CSP relaxation */
   googleFontFamily?: string;
+  /**
+   * Active document file type. Forwarded to mdiToHtml so editor-escaped MDI
+   * macros (e.g. `\[\[blank]]`) are un-escaped for ".mdi" and preserved as
+   * literals for ".md"/".txt". Absent → ".mdi".
+   */
+  fileType?: string;
 }
 
 /**
@@ -83,6 +89,7 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
       margins: options.margins,
     },
     googleFontFamily: options.googleFontFamily,
+    fileType: options.fileType,
   });
 
   // Use a unique in-memory partition (no "persist:" prefix) per export so

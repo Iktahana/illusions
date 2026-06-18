@@ -21,6 +21,7 @@ export async function openWebPrintPreview(
   content: string,
   metadata: ExportMetadata,
   settings: PdfExportSettings,
+  fileType?: string,
 ): Promise<boolean> {
   // MUST be the first statement — synchronous, within user gesture
   const printWindow = window.open("", "_blank");
@@ -51,6 +52,7 @@ export async function openWebPrintPreview(
         pageSize: settings.pageSize,
         landscape: settings.landscape,
       },
+      fileType,
     });
 
     printWindow.document.open();
