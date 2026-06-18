@@ -6,19 +6,20 @@
  * (truncated download, bad header, missing table) — surface a warning that
  * offers to re-download. This runs alongside {@link dictUpdateCheck}; the
  * corrupt state takes precedence conceptually (a corrupt DB answers no queries).
+ *
+ * WiFi 等の非従量回線かつ省電力 OFF のときは、10 秒カウントダウンで自動的に
+ * 再ダウンロードを開始する（#1639 follow-up）。それ以外は手動ボタンのみ。
  */
 import { getDictAccess } from "@/lib/dict/dict-access";
-import { notificationManager } from "../notification-manager";
+import {
+  isAutoDownloadAllowed,
+  runDictDownloadWithProgress,
+  startCountdownDownload,
+} from "./dict-auto-download";
 import type { StartupCheck, StartupNotice } from "../startup-check-queue";
 
-interface DictDownloadResult {
-  success: boolean;
-  version?: string;
-  error?: string;
-}
-
 interface ElectronDictApi {
-  download?: () => Promise<DictDownloadResult | undefined>;
+  download?: () => Promise<unknown>;
 }
 
 function getElectronDict(): ElectronDictApi | undefined {
@@ -26,29 +27,7 @@ function getElectronDict(): ElectronDictApi | undefined {
   return (window as Window & { electronAPI?: { dict?: ElectronDictApi } }).electronAPI?.dict;
 }
 
-function startRedownload(): void {
-  const dict = getElectronDict();
-  if (!dict?.download) return;
-  notificationManager.info("辞書の再ダウンロードを開始しました。");
-  dict
-    .download()
-    .then((result) => {
-      if (result?.success === false) {
-        notificationManager.error(
-          `辞書の再ダウンロードに失敗しました：${result.error ?? "不明なエラー"}`,
-        );
-      } else {
-        // Clear cached "corrupt" health + negative lookups now that the DB is fresh.
-        getDictAccess().invalidate();
-      }
-    })
-    .catch((e: unknown) => {
-      console.warn("[dict] re-download failed:", e);
-      notificationManager.error(
-        `辞書の再ダウンロードに失敗しました：${e instanceof Error ? e.message : String(e)}`,
-      );
-    });
-}
+const REDOWNLOAD_MESSAGE = "辞書を再ダウンロード中...";
 
 export const dictCorruptCheck: StartupCheck = {
   id: "dict-corrupt",
@@ -59,12 +38,27 @@ export const dictCorruptCheck: StartupCheck = {
     const health = await getDictAccess().getHealth();
     if (health.state !== "corrupt") return null;
 
+    // 回線・省電力が許せば 10 秒カウントダウンで自動再ダウンロード。
+    // その場合トーストはカウントダウン側が出すので、ここでは notice を返さない。
+    if (await isAutoDownloadAllowed()) {
+      startCountdownDownload({
+        seconds: 10,
+        buildMessage: (remaining) =>
+          `辞書データが破損しています。${remaining} 秒後に自動で再ダウンロードします。`,
+        downloadMessage: REDOWNLOAD_MESSAGE,
+      });
+      return null;
+    }
+
+    // 自動ダウンロード不可（オフライン/従量回線/省電力中）。手動ボタンのみ提示。
     return {
       id: "dict-corrupt",
       type: "warning",
       message: health.message ?? "辞書データが破損しています。再ダウンロードしてください。",
       duration: 0, // keep until dismissed
-      actions: [{ label: "再ダウンロード", onClick: startRedownload }],
+      actions: [
+        { label: "再ダウンロード", onClick: () => runDictDownloadWithProgress(REDOWNLOAD_MESSAGE) },
+      ],
     };
   },
 };

@@ -7,34 +7,31 @@ const { getDownloadState, checkForUpdate } = vi.hoisted(() => ({
 const { loadAppState } = vi.hoisted(() => ({
   loadAppState: vi.fn(),
 }));
-const { notifInfo, notifError } = vi.hoisted(() => ({
-  notifInfo: vi.fn(),
-  notifError: vi.fn(),
-}));
+const { isAutoDownloadAllowed, runDictDownloadWithProgress, startCountdownDownload } = vi.hoisted(
+  () => ({
+    isAutoDownloadAllowed: vi.fn(),
+    runDictDownloadWithProgress: vi.fn(),
+    startCountdownDownload: vi.fn(),
+  }),
+);
 vi.mock("@/lib/dict/dict-service", () => ({
   getDictService: () => ({ getDownloadState, checkForUpdate }),
 }));
 vi.mock("@/lib/storage/storage-service", () => ({
   getStorageService: () => ({ loadAppState }),
 }));
-vi.mock("@/lib/services/notification-manager", () => ({
-  notificationManager: { info: notifInfo, error: notifError, showMessage: vi.fn() },
+vi.mock("@/lib/services/startup-checks/dict-auto-download", () => ({
+  isAutoDownloadAllowed,
+  runDictDownloadWithProgress,
+  startCountdownDownload,
 }));
 
 import { dictUpdateCheck } from "@/lib/services/startup-checks/dict-update-check";
 
-const lastDownloadMock = { current: vi.fn(async (): Promise<unknown> => ({ success: true })) };
-
-function setElectronDict(present: boolean, download?: () => Promise<unknown>) {
+function setElectronDict(present: boolean) {
   if (present) {
-    const downloadFn = vi.fn(download ?? (async () => ({ success: true })));
-    lastDownloadMock.current = downloadFn;
     (window as unknown as { electronAPI?: unknown }).electronAPI = {
-      dict: {
-        download: downloadFn,
-        getStatus: vi.fn(async () => ({})),
-        checkUpdate: vi.fn(async () => ({})),
-      },
+      dict: { download: vi.fn(), getStatus: vi.fn(async () => ({})) },
     };
   } else {
     delete (window as unknown as { electronAPI?: unknown }).electronAPI;
@@ -46,10 +43,11 @@ describe("dictUpdateCheck", () => {
     getDownloadState.mockReset();
     checkForUpdate.mockReset();
     loadAppState.mockReset();
-    // Default: preference unset → update checking enabled.
-    loadAppState.mockResolvedValue(null);
-    notifInfo.mockReset();
-    notifError.mockReset();
+    loadAppState.mockResolvedValue(null); // preference unset → update checking enabled
+    isAutoDownloadAllowed.mockReset();
+    isAutoDownloadAllowed.mockResolvedValue(false); // default: manual-notice path
+    runDictDownloadWithProgress.mockReset();
+    startCountdownDownload.mockReset();
   });
   afterEach(() => setElectronDict(false));
 
@@ -60,18 +58,28 @@ describe("dictUpdateCheck", () => {
     expect(getDownloadState).not.toHaveBeenCalled();
   });
 
-  it("warns when the dictionary is not installed (Electron)", async () => {
+  it("warns when the dictionary is not installed (auto-download not allowed)", async () => {
     setElectronDict(true);
     getDownloadState.mockResolvedValue({ providerId: "genji", status: "not-installed" });
     const notice = await dictUpdateCheck.evaluate();
     expect(getDownloadState).toHaveBeenCalledWith("genji");
     expect(notice).toMatchObject({ id: "dict-not-installed", type: "warning" });
     expect(notice?.actions?.[0]?.label).toBe("今すぐダウンロード");
-    // Should not call checkForUpdate when not-installed
     expect(checkForUpdate).not.toHaveBeenCalled();
+    expect(startCountdownDownload).not.toHaveBeenCalled();
   });
 
-  it("informs when an update is available (via checkForUpdate)", async () => {
+  it("starts a 10s countdown (no notice) when not installed and auto-download is allowed", async () => {
+    setElectronDict(true);
+    getDownloadState.mockResolvedValue({ providerId: "genji", status: "not-installed" });
+    isAutoDownloadAllowed.mockResolvedValue(true);
+    const notice = await dictUpdateCheck.evaluate();
+    expect(notice).toBeNull();
+    expect(startCountdownDownload).toHaveBeenCalledTimes(1);
+    expect(startCountdownDownload.mock.calls[0][0]).toMatchObject({ seconds: 10 });
+  });
+
+  it("informs when an update is available (auto-download not allowed)", async () => {
     setElectronDict(true);
     getDownloadState.mockResolvedValue({ providerId: "genji", status: "installed" });
     checkForUpdate.mockResolvedValue({
@@ -84,6 +92,22 @@ describe("dictUpdateCheck", () => {
     expect(notice).toMatchObject({ id: "dict-update-available", type: "info" });
     expect(notice?.message).toContain("1.0.0");
     expect(notice?.message).toContain("1.1.0");
+    expect(startCountdownDownload).not.toHaveBeenCalled();
+  });
+
+  it("starts a 30s countdown (no notice) when an update is available and allowed", async () => {
+    setElectronDict(true);
+    getDownloadState.mockResolvedValue({ providerId: "genji", status: "installed" });
+    checkForUpdate.mockResolvedValue({
+      latestVersion: "1.1.0",
+      installedVersion: "1.0.0",
+      updateAvailable: true,
+    });
+    isAutoDownloadAllowed.mockResolvedValue(true);
+    const notice = await dictUpdateCheck.evaluate();
+    expect(notice).toBeNull();
+    expect(startCountdownDownload).toHaveBeenCalledTimes(1);
+    expect(startCountdownDownload.mock.calls[0][0]).toMatchObject({ seconds: 30 });
   });
 
   it("returns null when installed and up to date", async () => {
@@ -121,7 +145,6 @@ describe("dictUpdateCheck", () => {
       progress: 42,
     });
     expect(await dictUpdateCheck.evaluate()).toBeNull();
-    // Should not hit the network while a download is in progress
     expect(checkForUpdate).not.toHaveBeenCalled();
   });
 
@@ -131,7 +154,6 @@ describe("dictUpdateCheck", () => {
     loadAppState.mockResolvedValue({ dictAutoCheckUpdates: false });
     const notice = await dictUpdateCheck.evaluate();
     expect(notice).toBeNull();
-    // The network update check must NOT fire when the preference is OFF.
     expect(checkForUpdate).not.toHaveBeenCalled();
   });
 
@@ -141,8 +163,6 @@ describe("dictUpdateCheck", () => {
     loadAppState.mockResolvedValue({ dictAutoCheckUpdates: false });
     const notice = await dictUpdateCheck.evaluate();
     expect(notice).toMatchObject({ id: "dict-not-installed", type: "warning" });
-    // The "not installed" warning is independent of the auto-check preference,
-    // and must not trigger a network update check.
     expect(checkForUpdate).not.toHaveBeenCalled();
   });
 
@@ -155,41 +175,13 @@ describe("dictUpdateCheck", () => {
     expect(checkForUpdate).toHaveBeenCalledWith("genji");
   });
 
-  it("surfaces an error (not a success toast) when download resolves { success: false }", async () => {
-    setElectronDict(true, async () => ({
-      success: false,
-      error: "ダウンロードはすでに進行中です",
-    }));
+  it("manual download action delegates to runDictDownloadWithProgress", async () => {
+    setElectronDict(true);
     getDownloadState.mockResolvedValue({ providerId: "genji", status: "not-installed" });
     const notice = await dictUpdateCheck.evaluate();
-    expect(notice).toMatchObject({ id: "dict-not-installed" });
-
-    // Trigger the download action and let the resolved-failure path run.
     const onClick = notice?.actions?.[0]?.onClick;
     expect(onClick).toBeTypeOf("function");
     onClick?.();
-    // The optimistic "started" info toast fires synchronously.
-    expect(notifInfo).toHaveBeenCalledWith("辞書のダウンロードを開始しました。");
-    // Let the resolved promise's .then handler run.
-    await lastDownloadMock.current.mock.results[0]?.value;
-    await Promise.resolve();
-    expect(notifError).toHaveBeenCalledWith(
-      expect.stringContaining("ダウンロードはすでに進行中です"),
-    );
-  });
-
-  it("surfaces an error when download rejects", async () => {
-    setElectronDict(true, async () => {
-      throw new Error("checksum mismatch");
-    });
-    getDownloadState.mockResolvedValue({ providerId: "genji", status: "not-installed" });
-    const notice = await dictUpdateCheck.evaluate();
-    const onClick = notice?.actions?.[0]?.onClick;
-    onClick?.();
-    expect(notifInfo).toHaveBeenCalledWith("辞書のダウンロードを開始しました。");
-    // Let the rejected promise's .catch handler run.
-    await lastDownloadMock.current.mock.results[0]?.value.catch(() => {});
-    await Promise.resolve();
-    expect(notifError).toHaveBeenCalledWith(expect.stringContaining("checksum mismatch"));
+    expect(runDictDownloadWithProgress).toHaveBeenCalledTimes(1);
   });
 });
