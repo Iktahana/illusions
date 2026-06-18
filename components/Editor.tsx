@@ -11,7 +11,6 @@ import {
   getScrollProgress,
   setScrollProgress,
 } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
-import SearchDialog, { type SearchMatch } from "./SearchDialog";
 import SelectionCounter from "./SelectionCounter";
 import EditorToolbar from "./editor/EditorToolbar";
 import MilkdownEditor from "./editor/MilkdownEditor";
@@ -30,22 +29,13 @@ interface EditorProps {
   onInsertText?: (text: string) => void;
   onSelectionChange?: (charCount: number, manuscriptCells: number, manuscriptPages: number) => void;
   className?: string;
-  searchOpenTrigger?: number;
-  searchInitialTerm?: string;
-  // 共有検索 state（単一 source of truth）。SearchResults と同期する。
-  // 検索を配線しない用途（非アクティブ pane プレビュー / popout window）向けに
-  // すべて optional とし、未指定時は no-op / 空デフォルトで動作する。
-  searchTerm?: string;
+  // フローティング検索窓（SearchDialog）は EditorLayout の <main> でレンダリングされる。
+  // Editor はツールバー検索ボタンとコンテキストメニュー「検索」から、共有 state への
+  // 反映と開閉だけを安定 callback で上流へ伝える（dockview 凍結クロージャでも安定 ref は機能）。
   onSearchTermChange?: (term: string) => void;
-  caseSensitive?: boolean;
-  onCaseSensitiveChange?: (value: boolean) => void;
-  searchMatches?: SearchMatch[];
-  currentMatchIndex?: number;
-  onCurrentMatchIndexChange?: (index: number) => void;
-  /** フローティング検索窓の開閉を親へ通知する（ハイライト visibility ゲート用）。 */
-  onSearchDialogOpenChange?: (open: boolean) => void;
+  onOpenSearchDialog?: () => void;
+  onToggleSearchDialog?: () => void;
   onEditorViewReady?: (view: EditorView) => void;
-  onShowAllSearchResults?: () => void;
   // リンティング設定
   lintingRuleRunner?: RuleRunnerLike | null;
   onLintIssuesUpdated?: (issues: LintIssue[]) => void;
@@ -79,17 +69,10 @@ export default function NovelEditor({
   onInsertText,
   onSelectionChange,
   className,
-  searchOpenTrigger = 0,
-  searchTerm = "",
   onSearchTermChange = noop,
-  caseSensitive = false,
-  onCaseSensitiveChange = noop,
-  searchMatches = [],
-  currentMatchIndex = 0,
-  onCurrentMatchIndexChange = noop,
-  onSearchDialogOpenChange,
+  onOpenSearchDialog = noop,
+  onToggleSearchDialog = noop,
   onEditorViewReady,
-  onShowAllSearchResults,
   lintingRuleRunner,
   onLintIssuesUpdated,
   onNlpError,
@@ -113,7 +96,6 @@ export default function NovelEditor({
     return localPreferences.getWritingMode() === "vertical";
   });
   const [isMounted, setIsMounted] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const {
     state: speechState,
@@ -131,8 +113,8 @@ export default function NovelEditor({
   const speechMapRef = useRef<{ text: string; positions: number[] } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isVerticalRef = useRef(false);
-  // #1504: ref to the toolbar 検索 button — SearchDialog uses this to anchor
-  // its floating position to the clicked pane instead of the viewport corner.
+  // ツールバー検索ボタンの ref（EditorToolbar が利用）。検索窓のアンカーは
+  // EditorLayout 側でアクティブエディタ DOM を使うため、ここでは保持のみ。
   const searchButtonRef = useRef<HTMLButtonElement | null>(null);
   const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null);
   /** Doc position to resume TTS from after the current chunk ends. null = no continuation. */
@@ -193,34 +175,15 @@ export default function NovelEditor({
   //
   // 将来、再マウント無しでファイル切替が必要なら、明確な fileId prop を追加して追跡可能
 
-  const handleSearchToggle = () => {
-    setIsSearchOpen((prev) => !prev);
-  };
-
-  const handleSearchOpen = useCallback(() => {
-    setIsSearchOpen(true);
-  }, []);
-
-  // フローティング検索窓の開閉を親へ通知する（ハイライト visibility ゲート用）。
-  useEffect(() => {
-    onSearchDialogOpenChange?.(isSearchOpen);
-  }, [isSearchOpen, onSearchDialogOpenChange]);
-
-  // pane アンマウント時（タブ閉じ等）に「閉じた」と通知し、ハイライトの取り残しを防ぐ。
-  useEffect(() => {
-    return () => onSearchDialogOpenChange?.(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /** コンテキストメニューの「検索」アクションを処理する。選択テキストを共有検索語へ反映する。 */
+  /** コンテキストメニューの「検索」アクション。選択テキストを共有検索語へ反映して窓を開く。 */
   const handleFind = useCallback(
     (initialTerm?: string) => {
       if (initialTerm !== undefined) {
         onSearchTermChange(initialTerm);
       }
-      setIsSearchOpen(true);
+      onOpenSearchDialog();
     },
-    [onSearchTermChange],
+    [onSearchTermChange, onOpenSearchDialog],
   );
 
   const clearHighlight = useCallback(() => {
@@ -342,13 +305,6 @@ export default function NovelEditor({
     container.addEventListener("click", handleClick);
     return () => container.removeEventListener("click", handleClick);
   }, [startSpeechFromCursor]);
-
-  // 親からのトリガーで検索ダイアログを開く（ショートカット）
-  useEffect(() => {
-    if (searchOpenTrigger > 0) {
-      handleSearchOpen();
-    }
-  }, [searchOpenTrigger, handleSearchOpen]);
 
   // Track whether initial vertical scroll has been performed for this pane instance.
   const hasVerticalInitialScrollRef = useRef(false);
@@ -523,7 +479,7 @@ export default function NovelEditor({
       <EditorToolbar
         isVertical={isVertical}
         onToggleVertical={handleToggleVertical}
-        onSearchClick={handleSearchToggle}
+        onSearchClick={onToggleSearchDialog}
         searchButtonRef={searchButtonRef}
         speechState={speechState}
         onSpeakToggle={handleSpeakToggle}
@@ -604,21 +560,6 @@ export default function NovelEditor({
           containerElement={scrollContainerElement}
         />
       )}
-
-      {/* 検索ダイアログ */}
-      <SearchDialog
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        onShowAllResults={onShowAllSearchResults}
-        searchTerm={searchTerm}
-        onSearchTermChange={onSearchTermChange}
-        caseSensitive={caseSensitive}
-        onCaseSensitiveChange={onCaseSensitiveChange}
-        matches={searchMatches}
-        currentMatchIndex={currentMatchIndex}
-        onCurrentMatchIndexChange={onCurrentMatchIndexChange}
-        anchorRef={searchButtonRef}
-      />
     </div>
   );
 }
