@@ -899,7 +899,16 @@ export default function MilkdownEditor({
             ? `
               content: counter(paragraph);
               position: absolute;
-              left: -2em;
+              /* Anchor the number's edge nearest the text at a fixed distance
+                 from the paragraph's inline start, so every number lines up
+                 regardless of digit count. */
+              right: 100%;
+              margin-right: 0.6em;
+              /* abspos blockifies ::before, which would otherwise inherit the
+                 paragraph's text-indent and offset dialogue (indent 0) vs
+                 normal (indent N) numbers. Pin it so all numbers align. */
+              text-indent: 0;
+              text-align: right;
               font-size: 0.7em;
               opacity: 0.5;
               color: currentColor;
@@ -913,6 +922,11 @@ export default function MilkdownEditor({
             ? `
               content: counter(paragraph);
               position: absolute;
+              /* In vertical-rl the inline axis is vertical, so the paragraph's
+                 text-indent shifts the number downward. abspos blockifies
+                 ::before and it inherits that indent, offsetting dialogue
+                 (indent 0) vs normal numbers. Pin it to 0 so all numbers align. */
+              text-indent: 0;
               top: -2em;
               right: 0;
               font-size: 0.7em;
