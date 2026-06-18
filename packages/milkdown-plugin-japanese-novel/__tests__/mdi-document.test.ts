@@ -26,6 +26,27 @@ describe("MdiDocument — typed derivations (#1449)", () => {
     expect(doc.toAnalysisText()).toBe("{漢字|かんじ}と^12^月\n\n");
   });
 
+  // Regression: in-app analysis/statistics panels (語彙統計 / 登場人物 / 読みやすさ)
+  // feed the LIVE editor buffer through `fromRawText().toAnalysisText()`. That
+  // buffer is the Milkdown serializer output, where the marker is escaped to
+  // `\[\[blank]]` (CommonMark escapes the leading `[`). The marker must still be
+  // stripped so kuromoji never tokenizes "blank" into the word-frequency list.
+  it("toAnalysisText strips the serializer-escaped marker \\[\\[blank]] (analysis leak fix)", () => {
+    const escaped = "A段落\n\n\\[\\[blank]]\n\nB段落";
+    const out = MdiDocument.fromRawText(escaped).toAnalysisText();
+    expect(out).not.toContain("blank");
+    expect(out).toBe("A段落\n\n\n\nB段落");
+  });
+
+  it("toAnalysisText strips the fully-escaped marker \\[\\[blank\\]\\]", () => {
+    expect(MdiDocument.fromRawText("\\[\\[blank\\]\\]").toAnalysisText()).not.toContain("blank");
+  });
+
+  it("toAnalysisText preserves an inline escaped occurrence (not a whole-line marker)", () => {
+    const inline = "foo \\[\\[blank]] bar";
+    expect(MdiDocument.fromRawText(inline).toAnalysisText()).toBe(inline);
+  });
+
   it("toExportText('txt') flattens syntax and turns markers into forced blank lines", () => {
     const txt = MdiDocument.fromRawText(RAW).toExportText("txt");
     expect(txt).not.toContain("[[blank]]");

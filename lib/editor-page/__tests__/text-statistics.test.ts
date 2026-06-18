@@ -33,6 +33,14 @@ describe("extractVisibleText", () => {
     expect(extractVisibleText("[[kern:-0.1em:確実]]")).toBe("確実");
   });
 
+  it("MDI 空行マーカー [[blank]] を行ごと削除する", () => {
+    expect(extractVisibleText("前の文。\n[[blank]]\n次の文。")).toBe("前の文。\n\n次の文。");
+  });
+
+  it("serializer エスケープ形 \\[\\[blank]] も行ごと削除する（可視文字に計上しない）", () => {
+    expect(extractVisibleText("前の文。\n\\[\\[blank]]\n次の文。")).toBe("前の文。\n\n次の文。");
+  });
+
   it("HTML タグを除去して内容を残す", () => {
     expect(extractVisibleText("<b>太字</b>")).toBe("太字");
   });
@@ -234,6 +242,12 @@ describe("computeTextStatistics", () => {
     expect(stats.visibleTextCharCount).toBe(2);
     expect(stats.manuscriptCellCount).toBe(20);
     expect(stats.manuscriptPages).toBe(1);
+  });
+
+  it("[[blank]] マーカー（エスケープ形含む）は可視文字数に計上しない", () => {
+    // 「あ」2文字のみが可視。マーカー \[\[blank]] の記号類は数えない。
+    const stats = computeTextStatistics("あ\n\\[\\[blank]]\nあ");
+    expect(stats.visibleTextCharCount).toBe(2);
   });
 
   it("400字 → 1ページ", () => {
