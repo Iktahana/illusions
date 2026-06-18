@@ -11,6 +11,7 @@ import type {
   DictExample,
   DictRelationships,
   DictReading,
+  DictLookup,
 } from "../dict-types";
 
 const GENJI_API_BASE = "https://api.dict.illusions.app";
@@ -185,6 +186,52 @@ export async function queryByEntry(term: string, limit: number): Promise<DictEnt
     limit: String(limit),
   });
   return raws.map(mapRawJsonToDictEntry);
+}
+
+/** Project a raw_json row into the lightweight analysis shape. */
+function rawJsonToLookup(raw: RawJson): DictLookup {
+  const register = raw.definitions?.find((d) => d.register)?.register;
+  return {
+    found: true,
+    reading: raw.reading?.primary || undefined,
+    pos: raw.grammar?.pos?.join("・") || undefined,
+    register: register || undefined,
+    freqRank: typeof raw.meta?.freq_rank === "number" ? raw.meta.freq_rank : undefined,
+  };
+}
+
+/** Headwords per remote chunk — keeps each Datasette URL well under length limits. */
+const REMOTE_BATCH_CHUNK = 50;
+
+/**
+ * Exact-match batch lookup over the remote Genji API (web fallback). Issues one
+ * parameterized `entry IN (...)` query per chunk. Returns a map keyed by the
+ * requested term; misses map to `{ found: false }`. Slower than the local
+ * Electron path, so callers doing bulk analysis should gate on dictionary
+ * health and prefer the local DB.
+ */
+export async function lookupBatchRemote(terms: string[]): Promise<Map<string, DictLookup>> {
+  const result = new Map<string, DictLookup>();
+  const unique = [...new Set(terms.filter((t) => typeof t === "string" && t.length > 0))];
+
+  for (let i = 0; i < unique.length; i += REMOTE_BATCH_CHUNK) {
+    const chunk = unique.slice(i, i + REMOTE_BATCH_CHUNK);
+    const params: Record<string, string> = {};
+    const names = chunk.map((t, j) => {
+      params[`p${j}`] = t;
+      return `:p${j}`;
+    });
+    const sql = `SELECT raw_json FROM entries WHERE entry IN (${names.join(",")})`;
+    const raws = await executeSql(sql, params);
+    for (const raw of raws) {
+      if (!result.has(raw.entry)) result.set(raw.entry, rawJsonToLookup(raw));
+    }
+  }
+
+  for (const t of unique) {
+    if (!result.has(t)) result.set(t, { found: false });
+  }
+  return result;
 }
 
 /**

@@ -20,7 +20,7 @@ import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
 import { getUserDictionaryService } from "@/lib/services/user-dictionary-service";
 import DictionaryEntryDialog from "./Dictionary/DictionaryEntryDialog";
 import { getDictService } from "@/lib/dict/dict-service";
-import type { DictEntry, DictExample } from "@/lib/dict/dict-types";
+import type { DictEntry, DictExample, DictDownloadStatus } from "@/lib/dict/dict-types";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
 // Web dictionary sources
@@ -76,9 +76,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
   // Master dict state
   const [masterResults, setMasterResults] = useState<DictEntry[]>([]);
   const [masterLoading, setMasterLoading] = useState(false);
-  const [localInstallStatus, setLocalInstallStatus] = useState<
-    "not-installed" | "downloading" | "installing" | "installed" | "error"
-  >("not-installed");
+  const [localInstallStatus, setLocalInstallStatus] = useState<DictDownloadStatus>("not-installed");
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [expandedMasterId, setExpandedMasterId] = useState<string | null>(null);
 

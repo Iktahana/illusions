@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Download, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { useDictSettingsContext } from "@/contexts/EditorSettingsContext";
 import type { DictDownloadStatus } from "@/lib/dict/dict-types";
+import { getDictAccess } from "@/lib/dict/dict-access";
 import { SettingsField, SettingsSection, SettingsToggle } from "./primitives";
 
 interface UpdateInfo {
@@ -104,6 +105,8 @@ export default function DictSettingsTab() {
           onDictInstalledVersionChange(result.version);
         }
         setCheckResult(null);
+        // Drop cached "corrupt" health + negative lookups now the DB is fresh.
+        getDictAccess().invalidate();
       } else {
         setError(result.error ?? "ダウンロードに失敗しました");
         setDbStatus("error");
@@ -134,6 +137,7 @@ export default function DictSettingsTab() {
   };
 
   const isInstalled = dbStatus === "installed";
+  const isCorrupt = dbStatus === "corrupt";
   const updateAvailable = checkResult?.updateAvailable ?? false;
 
   return (
@@ -148,12 +152,21 @@ export default function DictSettingsTab() {
           {isInstalled ? (
             <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
           ) : (
-            <AlertCircle className="w-4 h-4 text-foreground-tertiary flex-shrink-0" />
+            <AlertCircle
+              className={`w-4 h-4 flex-shrink-0 ${isCorrupt ? "text-danger" : "text-foreground-tertiary"}`}
+            />
           )}
           <span className="text-sm text-foreground">
-            {isInstalled ? "インストール済み" : "未インストール"}
+            {isInstalled ? "インストール済み" : isCorrupt ? "破損（再ダウンロードが必要）" : "未インストール"}
           </span>
         </div>
+
+        {/* Corrupt notice */}
+        {isCorrupt && (
+          <div className="text-xs text-danger">
+            辞書データが破損しています。「再ダウンロード」で修復してください。
+          </div>
+        )}
 
         {/* Version */}
         {dictInstalledVersion && (
@@ -226,7 +239,7 @@ export default function DictSettingsTab() {
                 ) : (
                   <Download className="w-3 h-3" />
                 )}
-                {isInstalled ? "更新" : "ダウンロード"}
+                {isCorrupt ? "再ダウンロード" : isInstalled ? "更新" : "ダウンロード"}
               </button>
             )}
           </div>
