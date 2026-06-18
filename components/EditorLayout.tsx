@@ -404,6 +404,21 @@ export default function EditorLayout({
                   </div>
                 )}
 
+                {/* Snapshot-diff overlay. Rendered here (not inside the
+                    dockview panel) so it appears as soon as `editorDiff` is
+                    set, independent of dockview's panel re-render timing and
+                    of which panel is active. */}
+                {mainArea.editorDiff && (
+                  <div className="absolute inset-0 z-20 bg-background">
+                    <EditorDiffView
+                      snapshotContent={mainArea.editorDiff.snapshotContent}
+                      currentContent={mainArea.editorDiff.currentContent}
+                      snapshotLabel={mainArea.editorDiff.label}
+                      onClose={() => mainArea.setEditorDiff(null)}
+                    />
+                  </div>
+                )}
+
                 {}
                 <div
                   className="flex-1 flex flex-col overflow-hidden"
@@ -435,17 +450,12 @@ export default function EditorLayout({
                         const panelPendingExternalContent =
                           liveEditorTab?.pendingExternalContent ?? null;
 
-                        if (mainArea.editorDiff && isActivePanel) {
-                          return (
-                            <EditorDiffView
-                              snapshotContent={mainArea.editorDiff.snapshotContent}
-                              currentContent={mainArea.editorDiff.currentContent}
-                              snapshotLabel={mainArea.editorDiff.label}
-                              onClose={() => mainArea.setEditorDiff(null)}
-                            />
-                          );
-                        }
-
+                        // NOTE: the snapshot-diff view is rendered as a
+                        // top-level overlay on <main> (see below), NOT inside
+                        // the dockview panel. Rendering it here depended on the
+                        // panel re-evaluating its closure when `editorDiff`
+                        // changed — which dockview does not reliably do — so
+                        // clicking "比較" appeared to do nothing.
                         if (isActivePanel) {
                           return (
                             <ErrorBoundary sectionName="エディタ">
