@@ -5,6 +5,19 @@ type PowerState = "ac" | "battery";
 /** Minimum gap between battery suggestions, to absorb rapid power bounce. */
 const SUGGEST_THROTTLE_MS = 60_000;
 
+/**
+ * Last suggestion time, MODULE-scoped on purpose: the notification is a global
+ * singleton, so the throttle must be too. A per-hook ref would reset to 0 when
+ * the consumer (the editor page) remounts during startup — producing a second,
+ * duplicate toast from the fresh instance. Module scope dedupes across mounts.
+ */
+let lastSuggestAt = 0;
+
+/** @internal test-only: reset the module-scoped suggestion throttle. */
+export function __resetSuggestThrottleForTest(): void {
+  lastSuggestAt = 0;
+}
+
 interface UsePowerSavingOptions {
   /** Current power-save mode, so we never re-suggest while already enabled. */
   powerSaveMode: boolean;
@@ -56,8 +69,6 @@ export function usePowerSaving({
 
   /** Last power state we acted on; null until the first reading. */
   const lastStateRef = useRef<PowerState | null>(null);
-  /** Epoch ms of the last suggestion, to throttle rapid AC/battery bounce. */
-  const lastSuggestAtRef = useRef(0);
 
   useEffect(() => {
     const powerAPI = window.electronAPI?.power;
@@ -81,9 +92,9 @@ export function usePowerSaving({
         if (
           autoOnBatteryRef.current &&
           !powerSaveModeRef.current &&
-          now - lastSuggestAtRef.current > SUGGEST_THROTTLE_MS
+          now - lastSuggestAt > SUGGEST_THROTTLE_MS
         ) {
-          lastSuggestAtRef.current = now;
+          lastSuggestAt = now;
           onSuggestRef.current();
         }
       } else if (prev !== null) {

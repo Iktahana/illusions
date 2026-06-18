@@ -18,7 +18,7 @@ import { act } from "react";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-import { usePowerSaving } from "../use-power-saving";
+import { usePowerSaving, __resetSuggestThrottleForTest } from "../use-power-saving";
 
 type PowerState = "ac" | "battery";
 
@@ -88,6 +88,7 @@ async function mountHook(props: HostProps): Promise<void> {
 }
 
 beforeEach(() => {
+  __resetSuggestThrottleForTest();
   initialState = "ac";
   stateListener = null;
   installPowerApi();
@@ -180,6 +181,23 @@ describe("usePowerSaving", () => {
     // The initial reading only records state; auto-disable is reserved for a
     // real battery→AC transition so it can't clear prePowerSaveState at boot.
     expect(props.onPowerSaveModeChange).not.toHaveBeenCalled();
+  });
+
+  it("does not suggest twice when the consumer remounts on battery (module-scoped throttle)", async () => {
+    // Reproduces the duplicate-toast bug: the editor page remounting during
+    // startup created a second hook instance whose per-instance throttle was
+    // reset to 0, firing a second identical toast.
+    const props = makeProps();
+    initialState = "battery";
+    await mountHook(props); // first mount → suggestion #1
+
+    // Remount a fresh instance (new fiber → fresh per-instance refs).
+    await act(async () => root.unmount());
+    installPowerApi();
+    root = createRoot(container);
+    await mountHook(props); // second mount must be throttled
+
+    expect(props.onSuggestPowerSave).toHaveBeenCalledTimes(1);
   });
 
   it("throttles repeated suggestions across rapid AC/battery bounce", async () => {
