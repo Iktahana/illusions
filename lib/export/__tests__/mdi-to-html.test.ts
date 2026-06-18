@@ -60,7 +60,10 @@ describe("mdiToHtml", () => {
     // save path and TXT/DOCX — so e.g. `\[[br]]` becomes a real <br> instead of
     // leaking `[[br]]` as literal text. (Ruby `{…}` / tcy `^…^` are outside
     // Step 0's recovery scope and intentionally stay literal.)
-    const html = mdiToHtml("\\{東京|とうきょう} \\^12^ \\[[br]]", { bodyOnly: true, fileType: ".mdi" });
+    const html = mdiToHtml("\\{東京|とうきょう} \\^12^ \\[[br]]", {
+      bodyOnly: true,
+      fileType: ".mdi",
+    });
     expect(html).toContain('<br class="mdi-break">');
     expect(html).not.toContain("[[br]]");
     // Ruby / tcy escapes are not in Step 0's scope → remain literal text.
