@@ -140,13 +140,15 @@ describe("#1466 — effective POS highlight follows window activity", () => {
     expect(lastAppliedEnabled()).toBe(false);
   });
 
-  it("stays false in power-save mode even in the foreground", async () => {
+  it("stays enabled in power-save mode while in the foreground (power-save no longer gates POS)", async () => {
     await mountHook(makeParams({ powerSaveMode: true }));
-    expect(lastAppliedEnabled()).toBe(false);
+    expect(lastAppliedEnabled()).toBe(true);
 
+    // Background still suspends it; focus restores it even under power-save.
     await dispatchActivity("blur");
-    await dispatchActivity("focus");
     expect(lastAppliedEnabled()).toBe(false);
+    await dispatchActivity("focus");
+    expect(lastAppliedEnabled()).toBe(true);
   });
 
   it("passes colors/disabledTypes through and applies to the given view only", async () => {

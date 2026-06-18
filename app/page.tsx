@@ -184,6 +184,23 @@ export default function EditorPage() {
     powerSaveMode,
     autoPowerSaveOnBattery,
     onPowerSaveModeChange: handlePowerSaveModeChange,
+    // Suggest (never force) power-save on battery, so the user stays in
+    // control and the mode can always be turned off (#1402 follow-up).
+    onSuggestPowerSave: () => {
+      notificationManager.showMessage(
+        "バッテリー駆動です。省電力モードにすると校正・AI 機能を一時停止してバッテリーを節約できます。",
+        {
+          type: "info",
+          duration: 12000,
+          actions: [
+            {
+              label: "省電力モードにする",
+              onClick: () => void handlePowerSaveModeChange(true),
+            },
+          ],
+        },
+      );
+    },
   });
 
   // --- Panel state hook ---
@@ -213,6 +230,7 @@ export default function EditorPage() {
     handleCloseSearchResults,
     handleOpenLintingSettings,
     handleOpenPosHighlightSettings,
+    handleOpenPowerSettings,
     triggerSwitchToCorrections,
   } = panelHandlers;
 
@@ -1129,6 +1147,7 @@ export default function EditorPage() {
     charUsageRates,
     readabilityAnalysis,
     onOpenPosHighlightSettings: handleOpenPosHighlightSettings,
+    onOpenPowerSettings: handleOpenPowerSettings,
     activeFileName: currentFile?.name,
     activeFilePath: currentFile?.path ?? undefined,
     currentContent: content,

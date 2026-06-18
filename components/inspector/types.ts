@@ -79,6 +79,7 @@ export interface InspectorProps {
     hasMorphologicalAnalysis?: boolean;
   };
   onOpenPosHighlightSettings?: () => void;
+  onOpenPowerSettings?: () => void;
   onHistoryRestore?: (content: string) => void;
   activeFileName?: string;
   activeFilePath?: string;

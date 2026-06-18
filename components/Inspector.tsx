@@ -50,6 +50,7 @@ export default function Inspector({
   charUsageRates,
   readabilityAnalysis,
   onOpenPosHighlightSettings,
+  onOpenPowerSettings,
   onHistoryRestore,
   activeFileName,
   activeFilePath,
@@ -365,6 +366,7 @@ export default function Inspector({
         {activeTab === "corrections" && (
           <CorrectionsPanel
             onOpenPosHighlightSettings={onOpenPosHighlightSettings}
+            onOpenPowerSettings={onOpenPowerSettings}
             lintIssues={lintIssues ?? []}
             onNavigateToIssue={onNavigateToIssue}
             onApplyFix={onApplyFix}

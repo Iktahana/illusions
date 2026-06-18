@@ -164,6 +164,7 @@ export function usePowerSettings() {
       powerSaveMode: settings.powerSaveMode,
       autoPowerSaveOnBattery: settings.autoPowerSaveOnBattery,
       onPowerSaveModeChange: handlers.handlePowerSaveModeChange,
+      onTemporarilyDisablePowerSave: handlers.temporarilyDisablePowerSave,
       onAutoPowerSaveOnBatteryChange: handlers.handleAutoPowerSaveOnBatteryChange,
     }),
     [settings, handlers],

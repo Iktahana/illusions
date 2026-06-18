@@ -21,7 +21,11 @@ import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import InfoTooltip from "./InfoTooltip";
 import IssueCard from "./IssueCard";
-import { useLintingSettings, usePosHighlightSettings } from "@/contexts/EditorSettingsContext";
+import {
+  useLintingSettings,
+  usePosHighlightSettings,
+  usePowerSettings,
+} from "@/contexts/EditorSettingsContext";
 
 import type { LintIssue, Severity } from "@/lib/linting";
 import type { SeverityFilter, EnrichedLintIssue } from "./types";
@@ -31,6 +35,7 @@ type SortMode = "position" | "severity" | "category";
 
 interface CorrectionsPanelProps {
   onOpenPosHighlightSettings?: () => void;
+  onOpenPowerSettings?: () => void;
   lintIssues: (LintIssue | EnrichedLintIssue)[];
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
@@ -79,6 +84,7 @@ const POS_LEGEND_ITEMS = [
 /** Panel for displaying lint corrections and POS highlighting controls */
 export default function CorrectionsPanel({
   onOpenPosHighlightSettings,
+  onOpenPowerSettings,
   lintIssues,
   onNavigateToIssue,
   onApplyFix,
@@ -99,6 +105,7 @@ export default function CorrectionsPanel({
   } = usePosHighlightSettings();
   const { lintingEnabled, lintingRuleConfigs, onLintingEnabledChange, onLintingRuleConfigChange } =
     useLintingSettings();
+  const { powerSaveMode, onTemporarilyDisablePowerSave } = usePowerSettings();
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("category");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -438,9 +445,34 @@ export default function CorrectionsPanel({
       </div>
 
       {!lintingEnabled ? (
-        <div className="pt-4 text-center">
-          <p className="text-sm text-foreground-tertiary">校正機能が無効です</p>
-        </div>
+        powerSaveMode ? (
+          <div className="bg-background-secondary mt-1 rounded-lg border border-border p-3 text-center">
+            <p className="text-sm text-foreground-secondary">省電力モードのため停止中です</p>
+            <p className="mt-1 text-xs text-foreground-tertiary">
+              バッテリー節約のため校正機能を一時停止しています。
+            </p>
+            <div className="mt-3 flex flex-col items-stretch gap-1.5">
+              <button
+                onClick={() => onTemporarilyDisablePowerSave?.()}
+                className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+              >
+                5分間だけ有効にする
+              </button>
+              {onOpenPowerSettings && (
+                <button
+                  onClick={onOpenPowerSettings}
+                  className="text-xs text-accent transition-colors hover:text-accent-hover hover:underline"
+                >
+                  省電力設定を開く
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="pt-4 text-center">
+            <p className="text-sm text-foreground-tertiary">校正機能が無効です</p>
+          </div>
+        )
       ) : (
         <>
           {/* Header: issue count + controls */}

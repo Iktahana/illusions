@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchAppState, persistAppState } from "@/lib/storage/app-state-manager";
 import { configureAiClient, resetAiClient } from "@/lib/ai/ai-client";
@@ -39,6 +39,8 @@ export interface AiSettingsHandlers {
   handleCharacterExtractionBatchSizeChange: (value: number) => void;
   handleCharacterExtractionConcurrencyChange: (value: number) => void;
   handlePowerSaveModeChange: (enabled: boolean) => Promise<void>;
+  /** Lift power-save mode for a few minutes, then restore it (default 5 min). */
+  temporarilyDisablePowerSave: (durationMs?: number) => void;
   handleAutoPowerSaveOnBatteryChange: (enabled: boolean) => void;
   handleCorrectionConfigChange: (partial: Partial<CorrectionConfig>) => void;
   handleAiApiKeyChange: (apiKey: string) => void;
@@ -78,6 +80,20 @@ export function useAiSettings(): UseAiSettingsResult {
   const [correctionGuidelines, setCorrectionGuidelines] = useState<GuidelineId[]>(
     DEFAULT_CORRECTION_CONFIG.guidelines,
   );
+
+  // Latest-value refs so power-save handlers can stay identity-stable
+  // (deps: []). Without this, `handlePowerSaveModeChange` was re-created on
+  // every `lintingEnabled` change, which re-subscribed `usePowerSaving` and
+  // re-fired the battery auto-trigger — the loop that made power-save
+  // impossible to turn off on battery and clobbered `prePowerSaveState`.
+  const lintingEnabledRef = useRef(lintingEnabled);
+  lintingEnabledRef.current = lintingEnabled;
+  const lintingRuleConfigsRef = useRef(lintingRuleConfigs);
+  lintingRuleConfigsRef.current = lintingRuleConfigs;
+  const powerSaveModeRef = useRef(powerSaveMode);
+  powerSaveModeRef.current = powerSaveMode;
+  /** Pending timer for "temporarily disable power-save for N minutes". */
+  const tempPowerSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const applyPersistedAiSettings = useCallback((appState: Record<string, unknown>) => {
     if (typeof appState.lintingEnabled === "boolean") setLintingEnabled(appState.lintingEnabled);
@@ -227,10 +243,28 @@ export function useAiSettings(): UseAiSettingsResult {
     [],
   );
 
+  const clearTempPowerSaveTimer = useCallback(() => {
+    if (tempPowerSaveTimerRef.current !== null) {
+      clearTimeout(tempPowerSaveTimerRef.current);
+      tempPowerSaveTimerRef.current = null;
+    }
+  }, []);
+
   const handlePowerSaveModeChange = useCallback(
     async (enabled: boolean) => {
+      // Any explicit power-save change cancels a pending "5-minute" re-enable
+      // (e.g. the user plugged into AC, which auto-disables power-save).
+      clearTempPowerSaveTimer();
       if (enabled) {
-        const snapshot = { lintingEnabled, lintingRuleConfigs };
+        // Clobber guard: only snapshot the linting state on the OFF -> ON
+        // transition. Re-entering while already ON would overwrite
+        // `prePowerSaveState` with the already-suppressed `lintingEnabled:false`,
+        // permanently losing the user's real setting.
+        if (powerSaveModeRef.current) return;
+        const snapshot = {
+          lintingEnabled: lintingEnabledRef.current,
+          lintingRuleConfigs: lintingRuleConfigsRef.current,
+        };
         await persistAppState({
           powerSaveMode: true,
           prePowerSaveState: snapshot,
@@ -239,6 +273,12 @@ export function useAiSettings(): UseAiSettingsResult {
         setPowerSaveMode(true);
         setLintingEnabled(false);
       } else {
+        if (!powerSaveModeRef.current) {
+          // Already off — just make sure the persisted flag is clean.
+          await persistAppState({ powerSaveMode: false, prePowerSaveState: null });
+          setPowerSaveMode(false);
+          return;
+        }
         const stored = await fetchAppState();
         const prev = stored?.prePowerSaveState;
         if (prev) {
@@ -256,8 +296,30 @@ export function useAiSettings(): UseAiSettingsResult {
         setPowerSaveMode(false);
       }
     },
-    [lintingEnabled, lintingRuleConfigs],
+    [clearTempPowerSaveTimer],
   );
+
+  /**
+   * Temporarily lift power-save mode for `durationMs`, then restore it.
+   * Lets the user run the proofreader for a few minutes without permanently
+   * turning off battery saving. Restoring re-snapshots the (now restored)
+   * linting state, so the round-trip is lossless.
+   */
+  const temporarilyDisablePowerSave = useCallback(
+    (durationMs: number = 5 * 60 * 1000) => {
+      // handlePowerSaveModeChange(false) clears any existing timer first, so
+      // we set the fresh re-enable timer afterwards.
+      void handlePowerSaveModeChange(false);
+      tempPowerSaveTimerRef.current = setTimeout(() => {
+        tempPowerSaveTimerRef.current = null;
+        void handlePowerSaveModeChange(true);
+      }, durationMs);
+    },
+    [handlePowerSaveModeChange],
+  );
+
+  // Clear the pending re-enable timer on unmount.
+  useEffect(() => clearTempPowerSaveTimer, [clearTempPowerSaveTimer]);
 
   const handleAutoPowerSaveOnBatteryChange = useCallback((enabled: boolean) => {
     setAutoPowerSaveOnBattery(enabled);
@@ -303,6 +365,7 @@ export function useAiSettings(): UseAiSettingsResult {
       handleCharacterExtractionBatchSizeChange,
       handleCharacterExtractionConcurrencyChange,
       handlePowerSaveModeChange,
+      temporarilyDisablePowerSave,
       handleAutoPowerSaveOnBatteryChange,
       handleCorrectionConfigChange,
       handleAiApiKeyChange,
