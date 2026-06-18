@@ -407,18 +407,19 @@ export default function MilkdownEditor({
           container.scrollLeft += mouseHorizontalDelta;
           event.preventDefault();
         } else if (absX > 0) {
-          container.scrollLeft += event.deltaX * sensitivity;
+          container.scrollLeft -= event.deltaX * sensitivity;
           event.preventDefault();
         }
         return;
       }
 
       if (isTrackpadInput) {
-        if (absY > 0) {
-          container.scrollLeft += event.deltaY * sensitivity;
-        }
-        if (absX > 0) {
-          container.scrollLeft += event.deltaX * sensitivity;
+        // 縦書きは横スクロールのみ（overflowY hidden）。2本指パンは支配的な軸だけを
+        // 横スクロールへ写像し、対角・慣性入力で deltaX/deltaY が競合して引っかかるのを防ぐ。
+        // 横スワイプは指の向きに追従（-deltaX）、縦スワイプは読み進み方向（+deltaY）。
+        if (absX > 0 || absY > 0) {
+          const primaryDelta = absX >= absY ? -event.deltaX : event.deltaY;
+          container.scrollLeft += primaryDelta * sensitivity;
         }
         event.preventDefault();
         return;
@@ -430,7 +431,7 @@ export default function MilkdownEditor({
         container.scrollLeft += mouseHorizontalDelta;
         event.preventDefault();
       } else if (absX > 0) {
-        container.scrollLeft += event.deltaX * sensitivity;
+        container.scrollLeft -= event.deltaX * sensitivity;
         event.preventDefault();
       }
     };
