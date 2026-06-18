@@ -14,6 +14,7 @@ import {
   wrapInOrderedListCommand,
 } from "@milkdown/preset-commonmark";
 import { gfm, toggleStrikethroughCommand } from "@milkdown/preset-gfm";
+import { clearFormatting } from "@/lib/editor-page/clear-formatting";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { history } from "@milkdown/plugin-history";
 import { clipboard } from "@milkdown/plugin-clipboard";
@@ -619,6 +620,12 @@ export default function MilkdownEditor({
           break;
         case "code":
           execute(toggleInlineCodeCommand.key);
+          break;
+        case "clearFormatting":
+          // 選択範囲を標準本文（段落・装飾なし）に戻す
+          editor.action((ctx) => {
+            clearFormatting(ctx.get(editorViewCtx));
+          });
           break;
         default:
           break;
