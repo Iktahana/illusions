@@ -5,7 +5,12 @@
 import { stripMdiInlineSyntax } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import { analyzeReadability, cleanMarkdown } from "./readability";
 export type { EnhancedReadabilityAnalysis, ReadabilitySubScores } from "./readability-types";
-export { analyzeReadability, enrichReadabilityWithMorphology, cleanMarkdown } from "./readability";
+export {
+  analyzeReadability,
+  enrichReadabilityWithMorphology,
+  enrichReadabilityWithDict,
+  cleanMarkdown,
+} from "./readability";
 
 /**
  * 文字数から原稿用紙枚数を算出する

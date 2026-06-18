@@ -44,6 +44,7 @@ interface StatsPanelProps {
       paragraphDensity: number;
     };
     hasMorphologicalAnalysis?: boolean;
+    hasDictAnalysis?: boolean;
   };
   previousDayStats?: PreviousDayStats | null;
 }
@@ -293,6 +294,12 @@ export default function StatsPanel({
                   {readabilityAnalysis.hasMorphologicalAnalysis === false && (
                     <span className="opacity-50 normal-case font-normal">(基本分析)</span>
                   )}
+                  {readabilityAnalysis.hasMorphologicalAnalysis === true &&
+                    readabilityAnalysis.hasDictAnalysis === false && (
+                      <span className="opacity-50 normal-case font-normal">
+                        (辞書未導入のため簡易判定)
+                      </span>
+                    )}
                 </p>
                 {(
                   [

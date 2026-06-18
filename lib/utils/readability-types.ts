@@ -36,6 +36,10 @@ export interface VocabularyMetrics {
   properNounRate?: number;
   /** kuromoji使用時のみ有効: type-token ratio（内容語） */
   ttr?: number;
+  /** 幻辞使用時のみ有効: ヒット語の freq_rank 平均（小さいほど一般語） */
+  avgFreqRank?: number;
+  /** 幻辞使用時のみ有効: 稀少語（freq_rank > RARE_THRESHOLD）の割合 */
+  rareWordRate?: number;
 }
 
 /** 構文に関する指標 */
@@ -102,4 +106,6 @@ export interface EnhancedReadabilityAnalysis {
   avgPunctuationSpacing: number;
   /** kuromoji形態素分析が反映されているか */
   hasMorphologicalAnalysis: boolean;
+  /** 幻辞（Genji）辞書による語彙補強が反映されているか */
+  hasDictAnalysis: boolean;
 }

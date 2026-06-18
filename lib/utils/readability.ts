@@ -14,6 +14,7 @@
 
 import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import type { Token } from "@/lib/nlp-client/types";
+import type { DictLookup } from "@/lib/dict/dict-types";
 import type {
   EnhancedReadabilityAnalysis,
   ParagraphMetrics,
@@ -375,6 +376,7 @@ export function analyzeReadability(rawText: string): EnhancedReadabilityAnalysis
     avgSentenceLength,
     avgPunctuationSpacing: syntaxMetrics.avgPunctuationSpacing,
     hasMorphologicalAnalysis: false,
+    hasDictAnalysis: false,
   };
 }
 
@@ -458,5 +460,116 @@ export function enrichReadabilityWithMorphology(
       syntax: enrichedSyntax,
     },
     hasMorphologicalAnalysis: true,
+    hasDictAnalysis: base.hasDictAnalysis,
+  };
+}
+
+// ── Tier 3: Dictionary-based enrichment ───────────────────────────────────
+
+/**
+ * 幻辞 freq_rank を利用した語彙難易度算出の閾値・重み定数。
+ *
+ * 根拠:
+ *   Genji corpus は約 50 万語収録（推定）。freq_rank 1〜10,000 が一般語（常用〜準常用）、
+ *   10,001〜50,000 が準稀少語、50,001 以上が稀少語と大雑把に分類できる。
+ *   「稀少語率」は小説における語彙の難度に直接影響する指標（JIS X 4051 準拠評価や
+ *   文化庁「公用文作成の考え方」（2022）が「平易な語の選択」を求める背景から妥当）。
+ *
+ *   スコア補正: 平均 freq_rank が高いほど（稀少語が多いほど）語彙スコアを下げる。
+ *   - 稀少語率 > 0.3 → -15 pt（明らかに難語が多い）
+ *   - 稀少語率 0.2〜0.3 → -8 pt
+ *   - 稀少語率 0.1〜0.2 → -4 pt
+ *   - 平均 freq_rank > 30,000 → 追加 -10 pt
+ *   - 平均 freq_rank 10,000〜30,000 → 追加 -5 pt
+ *   - 平均 freq_rank < 3,000（平易語が多い）→ +5 pt ボーナス
+ */
+const RARE_THRESHOLD = 50_000;
+
+/**
+ * 幻辞（Genji）の freq_rank バッチ照合結果で語彙難易度サブスコアを補強する（Tier 3）。
+ *
+ * 純関数: 副作用なし。`getDictAccess()` の呼び出し・グレースフル劣化判断は呼び出し元が行う。
+ * `hasMorphologicalAnalysis` 付きの結果にも重ねがけ可能。
+ *
+ * @param base      - Tier 1 または Tier 2 の分析結果
+ * @param tokens    - kuromoji トークン配列（内容語の basic_form 抽出に使用）。
+ *                    Tier 1 のみの場合は空配列を渡すと基本形フォールバック動作。
+ * @param lookupMap - `DictAccess.lookupBatch()` が返す Map<headword, DictLookup>
+ * @returns 語彙サブスコアと detail.vocabulary を幻辞情報で補正した新しい分析結果
+ */
+export function enrichReadabilityWithDict(
+  base: EnhancedReadabilityAnalysis,
+  tokens: Token[],
+  lookupMap: Map<string, DictLookup>,
+): EnhancedReadabilityAnalysis {
+  if (lookupMap.size === 0) {
+    // 照合結果が空: hasDictAnalysis=true にして返す（呼び出し元が "ready" を確認済み）
+    return { ...base, hasDictAnalysis: true };
+  }
+
+  // 内容語の basic_form を収集（kuromoji トークン有り優先、なければ lookupMap のキーを使用）
+  const contentForms: string[] =
+    tokens.length > 0
+      ? tokens
+          .filter((t) => ["名詞", "動詞", "形容詞", "副詞"].includes(t.pos))
+          .map((t) => t.basic_form ?? t.surface)
+      : [...lookupMap.keys()];
+
+  // ヒットした内容語の freq_rank を収集
+  const freqRanks: number[] = [];
+  let rareCount = 0;
+
+  for (const form of contentForms) {
+    const lookup = lookupMap.get(form);
+    if (lookup?.found && lookup.freqRank !== undefined) {
+      freqRanks.push(lookup.freqRank);
+      if (lookup.freqRank > RARE_THRESHOLD) rareCount++;
+    }
+  }
+
+  if (freqRanks.length === 0) {
+    // 内容語が1件もヒットしない（辞書外文章等）: フラグだけ立てて返す
+    return { ...base, hasDictAnalysis: true };
+  }
+
+  const avgFreqRank = Math.round(freqRanks.reduce((a, b) => a + b, 0) / freqRanks.length);
+  const rareWordRate = rareCount / freqRanks.length;
+
+  // 語彙スコア補正: 稀少語率・平均 freq_rank に基づいてペナルティ/ボーナスを加算
+  let vocabDelta = 0;
+
+  if (rareWordRate > 0.3) vocabDelta -= 15;
+  else if (rareWordRate > 0.2) vocabDelta -= 8;
+  else if (rareWordRate > 0.1) vocabDelta -= 4;
+
+  if (avgFreqRank > 30_000) vocabDelta -= 10;
+  else if (avgFreqRank > 10_000) vocabDelta -= 5;
+  else if (avgFreqRank < 3_000) vocabDelta += 5;
+
+  const newVocabScore = Math.max(0, Math.min(100, base.subScores.vocabulary + vocabDelta));
+
+  const enrichedVocab: VocabularyMetrics = {
+    ...base.detail.vocabulary,
+    avgFreqRank,
+    rareWordRate,
+  };
+
+  const newSubScores: ReadabilitySubScores = {
+    ...base.subScores,
+    vocabulary: newVocabScore,
+  };
+
+  const score = Math.max(0, Math.min(100, compositeScore(newSubScores)));
+
+  return {
+    ...base,
+    score,
+    level: scoreToLevel(score),
+    subScores: newSubScores,
+    detail: {
+      ...base.detail,
+      vocabulary: enrichedVocab,
+    },
+    hasDictAnalysis: true,
   };
 }
