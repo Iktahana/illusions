@@ -24,14 +24,6 @@
   </a>
 </div>
 <br>
-<div style="display: flex; gap: 8px; height: 48px;">
-  <a href="https://illusions.app" target="_blank" style="text-decoration: none; display: flex; align-items: center; border-radius: 4px; overflow: hidden;">
-    <div style="background-color: #666; padding: 0 16px; height: 100%; display: flex; align-items: center; color: white; font-weight: bold; font-size: 14px; gap: 8px;">
-      <img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/googlechrome.svg" width="20" height="20" alt="Chrome" style="filter: brightness(0) invert(1);">
-      Try In Browser
-    </div>
-  </a>
-</div>
 
 </div>
 
