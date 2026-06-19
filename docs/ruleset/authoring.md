@@ -30,6 +30,7 @@ const ruleset: RulesetModule = {
     version: "1.0.0",
     engineApi: 1, // ENGINE_API_VERSION と一致必須
     license: "MIT",
+    rulesetPrefix: "my-", // 全 ruleId 共通の接頭辞（任意・衝突回避用）
     guidelines: [
       {
         id: "my-guideline",
@@ -73,6 +74,10 @@ export default ruleset;
 ### ruleId / guidelineId は安定値
 
 ユーザー設定・プリセット・保存済み状態と結びつくため、一度公開した `ruleId` / `guidelineId` は変えない。
+
+### rulesetPrefix（任意）
+
+`rulesetPrefix` は、このルールセットの**全 `ruleId` が共有する接頭辞**を宣言する（例 `"rule_ME2_"`, `"nihongo_hyouki_"`, `"my-"`）。マーケットプレイスでの**ルールID衝突を避ける**ための名前空間。設定すると、接頭辞で始まらない `ruleId` があるとき registry が警告（非致命）を出す。複数ルールセットで同じ `ruleId` が衝突した場合は「先勝ち＋警告」で安全に処理されるが、接頭辞を付けておけば衝突自体を予防できる。
 
 ## 2. createRules(ctx) と RulesetContext
 
@@ -169,6 +174,6 @@ expect(rule.lint("すごい！", cfg).length).toBeGreaterThan(0); // negative
 
 ## 関連
 
-- リポジトリ構造: [ruleset-structure.md](./ruleset-structure.md)
+- リポジトリ構造: [structure.md](./structure.md)
 - sample テンプレート: [sample-ruleset.md](./sample-ruleset.md)
 - クローズドソース配布: [closed-source.md](./closed-source.md)

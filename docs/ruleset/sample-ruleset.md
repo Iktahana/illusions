@@ -7,7 +7,7 @@ updated: 2026-06-19
 # サンプル・ルールセット（写経用テンプレート）
 
 新しいルールセット開発の出発点。最小2ルール（L1 regex 1つ ＋ 辞典依存 1つ）を含む。
-**製品としては同梱しない**（別リポジトリの起点）。コードは [ruleset-authoring.md](./ruleset-authoring.md)
+**製品としては同梱しない**（別リポジトリの起点）。コードは [authoring.md](./authoring.md)
 の契約に従う。
 
 ## `manifest.json`
@@ -147,5 +147,5 @@ describe("sample-fw-exclaim", () => {
 
 ## 関連
 
-- 作成ガイド: [ruleset-authoring.md](./ruleset-authoring.md)
-- リポジトリ構造: [ruleset-structure.md](./ruleset-structure.md)
+- 作成ガイド: [authoring.md](./authoring.md)
+- リポジトリ構造: [structure.md](./structure.md)
