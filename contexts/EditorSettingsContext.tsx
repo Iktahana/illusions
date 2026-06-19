@@ -257,3 +257,15 @@ export function useDictSettingsContext() {
     [settings, handlers],
   );
 }
+
+/** Auto-update settings (beta opt-in) */
+export function useUpdateSettingsContext() {
+  const { settings, handlers } = useEditorSettingsContext();
+  return useMemo(
+    () => ({
+      allowBetaUpdates: settings.allowBetaUpdates,
+      onAllowBetaUpdatesChange: handlers.handleAllowBetaUpdatesChange,
+    }),
+    [settings, handlers],
+  );
+}
