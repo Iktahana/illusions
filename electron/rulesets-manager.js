@@ -125,6 +125,7 @@ class RulesetsManager {
     const out = [];
     for (const ent of entries) {
       if (!ent.isDirectory()) continue;
+      if (ent.name.startsWith(".")) continue; // skip .staging-* and other hidden dirs
       const dir = path.join(root, ent.name);
       const manifestPath = path.join(dir, ASSET_MANIFEST);
       const indexPath = path.join(dir, ASSET_INDEX);
@@ -221,16 +222,26 @@ class RulesetsManager {
     }
 
     const dir = this._rulesetDir(spec.id);
-    fs.mkdirSync(dir, { recursive: true });
-    const tmpManifest = path.join(dir, `${ASSET_MANIFEST}.download`);
-    const tmpIndex = path.join(dir, `${ASSET_INDEX}.download`);
+    // Stage the FULL release in a sibling dir, then swap it in with a single
+    // rename. The final dir is therefore only ever the old complete version,
+    // briefly absent, or the new complete version — never a half-written pair
+    // (e.g. new manifest + old code). Staging dirs use a "." prefix so
+    // listInstalled() skips them.
+    const staging = path.join(this._rootDir(), `.staging-${spec.id}`);
 
     try {
+      fs.rmSync(staging, { recursive: true, force: true });
+      fs.mkdirSync(staging, { recursive: true });
+
       // 1. manifest first — validate engineApi before fetching code.
-      await this._downloadFile(manifestUrl, tmpManifest, normalizeDigest(manifestAsset.digest));
+      await this._downloadFile(
+        manifestUrl,
+        path.join(staging, ASSET_MANIFEST),
+        normalizeDigest(manifestAsset.digest),
+      );
       let manifest;
       try {
-        manifest = JSON.parse(fs.readFileSync(tmpManifest, "utf8"));
+        manifest = JSON.parse(fs.readFileSync(path.join(staging, ASSET_MANIFEST), "utf8"));
       } catch {
         throw new Error("manifest.json が不正なJSONです");
       }
@@ -243,26 +254,26 @@ class RulesetsManager {
       }
 
       // 2. code asset.
-      await this._downloadFile(indexUrl, tmpIndex, normalizeDigest(indexAsset.digest));
+      await this._downloadFile(
+        indexUrl,
+        path.join(staging, ASSET_INDEX),
+        normalizeDigest(indexAsset.digest),
+      );
 
-      // 3. atomic install: move temps into place, then record the tag.
-      fs.renameSync(tmpManifest, path.join(dir, ASSET_MANIFEST));
-      fs.renameSync(tmpIndex, path.join(dir, ASSET_INDEX));
-      fs.writeFileSync(path.join(dir, VERSION_FILE), latestTag, "utf8");
+      // 3. record the tag inside staging, then swap the staged dir into place.
+      fs.writeFileSync(path.join(staging, VERSION_FILE), latestTag, "utf8");
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.mkdirSync(path.dirname(dir), { recursive: true });
+      fs.renameSync(staging, dir);
 
       console.log(`[Rulesets] installed ${spec.id} ${latestTag}`);
-      return {
-        id: spec.id,
-        status: "installed",
-        detail: latestTag,
-      };
+      return { id: spec.id, status: "installed", detail: latestTag };
     } finally {
-      for (const p of [tmpManifest, tmpIndex]) {
-        try {
-          if (fs.existsSync(p)) fs.unlinkSync(p);
-        } catch {
-          /* ignore cleanup errors */
-        }
+      // Remove staging if the swap did not consume it (error / skip path).
+      try {
+        fs.rmSync(staging, { recursive: true, force: true });
+      } catch {
+        /* ignore cleanup errors */
       }
     }
   }
@@ -365,6 +376,11 @@ class RulesetsManager {
           reject(new Error("ダウンロード先のホストが許可されていません"));
           return;
         }
+        // Once the body is being piped, the ONLY settlement path is the
+        // pipeline callback (which fires after both streams close). req errors /
+        // timeout after that point destroy the source, which the pipeline turns
+        // into its callback — so we never reject before the fd is closed.
+        let piping = false;
         const req = https.get(requestUrl, { headers: { "User-Agent": "illusions-app" } }, (res) => {
           if ([301, 302, 303, 307, 308].includes(res.statusCode ?? 0)) {
             const location = res.headers.location;
@@ -400,6 +416,7 @@ class RulesetsManager {
           // pipeline() destroys the destination on ANY source error (network
           // error, timeout-triggered req.destroy, size-cap abort), closing the
           // fd before we settle — avoids leaked/locked temp files.
+          piping = true;
           pipeline(res, fs.createWriteStream(destPath), (err) => {
             if (err) {
               reject(err);
@@ -413,7 +430,11 @@ class RulesetsManager {
             resolve(actual);
           });
         });
-        req.on("error", reject);
+        // Pre-response failures (DNS/connect) settle here; once piping, the
+        // pipeline callback owns settlement so cleanup never races an open fd.
+        req.on("error", (err) => {
+          if (!piping) reject(err);
+        });
         req.setTimeout(REQUEST_TIMEOUT_MS, () => {
           req.destroy(new Error("ダウンロードがタイムアウトしました"));
         });
