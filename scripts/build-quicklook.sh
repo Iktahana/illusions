@@ -50,9 +50,11 @@ build_arch "x86_64-apple-macos10.15" "${X64_BIN}"
 # Combine into a universal binary so the extension loads on both architectures.
 lipo -create "${ARM64_BIN}" "${X64_BIN}" -output "${OUT_DIR}/MacOS/MDIQuickLook"
 
-# Ad-hoc sign so the bundle is loadable in local/dev builds. Release builds are
-# re-signed with the Developer ID identity by electron-builder.
-codesign --force --sign - --timestamp=none "${APPEX_DIR}" 2>/dev/null || true
+# NOTE: do NOT code-sign here. The .appex is embedded into the app by the
+# electron-builder afterPack hook (scripts/embed-quicklook.js) and signed by
+# electron-builder's osx-sign step with the Developer ID identity, hardened
+# runtime, and a secure timestamp. A pre-applied ad-hoc signature would only
+# risk interfering with that flow.
 
 echo "Built ${APPEX_DIR}"
 lipo -info "${OUT_DIR}/MacOS/MDIQuickLook"
