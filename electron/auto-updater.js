@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // Auto-updater setup and manual/automatic update checks
 
 const { app, dialog } = require("electron");

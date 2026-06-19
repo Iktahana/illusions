@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Rulesets manager — main process.
  *

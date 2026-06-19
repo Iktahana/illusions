@@ -21,7 +21,6 @@ const INDEX_LOCK_KEY_MAX_LENGTH = 256;
 /** Default acquisition timeout (ms) before acquire() fails. */
 const INDEX_LOCK_ACQUIRE_TIMEOUT_MS = 10_000;
 
-// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS_RE = /[\u0000-\u001F\u007F]/;
 
 /**

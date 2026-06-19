@@ -46,7 +46,6 @@ describe("isSafeExternalUrl()", () => {
   });
 
   it("denies javascript: URLs", () => {
-    // eslint-disable-next-line no-script-url
     expect(isSafeExternalUrl("javascript:alert(1)")).toBe(false);
   });
 

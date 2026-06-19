@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // File-related IPC handlers: open, save, export, and file security utilities
 
 const { ipcMain, dialog } = require("electron");
@@ -413,10 +412,7 @@ function registerFileHandlers() {
     try {
       const { BrowserWindow } = require("electron");
       const { mdiToHtml } = require("../../lib/export/mdi-to-html");
-      const {
-        calculateTypesetting,
-        PAGE_DIMENSIONS,
-      } = require("../../lib/export/pdf-export-settings");
+      const { calculateTypesetting } = require("../../lib/export/pdf-export-settings");
 
       const opts = options || {};
       const pageSize = opts.pageSize ?? "A5";

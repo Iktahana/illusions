@@ -19,6 +19,7 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run lint
+      - run: npm run check:boundaries
       - run: npm run type-check
 
   test:

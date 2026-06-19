@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // Window management: creation, lifecycle, and power state broadcasting
 
 const { app, BrowserWindow, dialog, shell } = require("electron");

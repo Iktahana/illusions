@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // Electron のメインプロセス入口
 
 const { app, BrowserWindow, powerMonitor } = require("electron");
