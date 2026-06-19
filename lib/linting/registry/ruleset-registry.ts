@@ -11,8 +11,10 @@
  * keeps working. Duplicate ruleIds are dropped (first wins) to honor the audit's
  * "do not register duplicate rules" (Tier E).
  */
+import type { CorrectionModeId } from "../correction-config";
 import type { LintRule } from "../types";
 import {
+  CORRECTION_MODE_IDS,
   ENGINE_API_VERSION,
   requirementKey,
   type RulesetGuidelineMeta,
@@ -26,6 +28,12 @@ import type { RulesetSourceKind } from "./ruleset-source";
 
 /** Reserved id namespace for rulesets shipped inside illusions. */
 export const BUILTIN_NAMESPACE = "builtin.";
+
+/** Set of valid correction mode ids, for manifest validation. */
+const VALID_MODE_IDS = new Set<string>(CORRECTION_MODE_IDS);
+
+/** Pragmatic email shape check (not RFC 5322 — just rejects obvious mistakes). */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type RulesetWarningCode =
   | "engine-api"
@@ -67,6 +75,9 @@ export function validateManifest(manifest: unknown): string | null {
   if (typeof m.nameJa !== "string") return "missing nameJa";
   if (typeof m.version !== "string") return "missing version";
   if (typeof m.engineApi !== "number") return "missing engineApi";
+  if (typeof m.maintainerEmail !== "string" || !EMAIL_RE.test(m.maintainerEmail)) {
+    return "missing or invalid maintainerEmail";
+  }
   if (m.rulesetPrefix !== undefined && typeof m.rulesetPrefix !== "string") {
     return "rulesetPrefix must be a string";
   }
@@ -78,6 +89,10 @@ export function validateManifest(manifest: unknown): string | null {
       return `rule ${r.ruleId} has invalid level`;
     if (typeof r.defaultConfig !== "object" || r.defaultConfig === null) {
       return `rule ${r.ruleId} missing defaultConfig`;
+    }
+    if (!Array.isArray(r.applicableModes)) return `rule ${r.ruleId} missing applicableModes`;
+    for (const mode of r.applicableModes) {
+      if (!VALID_MODE_IDS.has(mode)) return `rule ${r.ruleId} has invalid mode "${mode}"`;
     }
   }
   return null;
@@ -277,6 +292,26 @@ export class RulesetRegistry {
       }
     }
     return out;
+  }
+
+  /**
+   * Build a correction-mode → ruleIds map. A rule appears under every mode
+   * listed in its `applicableModes`; switching to that mode auto-enables it.
+   * Rules with an empty `applicableModes` appear under no mode (manual only).
+   */
+  buildModeRuleMap(): Map<CorrectionModeId, Set<string>> {
+    const map = new Map<CorrectionModeId, Set<string>>();
+    for (const meta of this.buildRulesMeta()) {
+      for (const mode of meta.applicableModes) {
+        let set = map.get(mode);
+        if (!set) {
+          set = new Set<string>();
+          map.set(mode, set);
+        }
+        set.add(meta.ruleId);
+      }
+    }
+    return map;
   }
 
   /**

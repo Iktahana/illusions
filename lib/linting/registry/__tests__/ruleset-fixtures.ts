@@ -6,6 +6,7 @@ import type { GenjiHealth, GenjiHealthState } from "@/lib/dict/dict-access";
 
 import { ENGINE_API_VERSION } from "../../sdk/ruleset-types";
 import type {
+  CorrectionModeId,
   RulesetManifest,
   RulesetModule,
   RulesetRequirement,
@@ -43,12 +44,15 @@ interface MakeModuleOptions {
   createThrows?: boolean;
   /** declared shared rule-id prefix */
   rulesetPrefix?: string;
+  /** per-ruleId correction modes; absent ruleIds default to [] */
+  modes?: Record<string, CorrectionModeId[]>;
 }
 
 function ruleMeta(
   ruleId: string,
   guidelineId: string | undefined,
   requires: RulesetRequirement[] | undefined,
+  applicableModes: CorrectionModeId[],
 ): RulesetRuleMeta {
   return {
     ruleId,
@@ -57,6 +61,7 @@ function ruleMeta(
     level: "L1",
     guidelineId,
     defaultConfig: { enabled: true, severity: "warning" },
+    applicableModes,
     docs: { positiveExample: "正しい例", negativeExample: "誤った例！", sourceReference: "test" },
     ...(requires ? { requires } : {}),
   };
@@ -69,6 +74,7 @@ export function makeModule(opts: MakeModuleOptions): RulesetModule {
       id,
       opts.guidelineId,
       opts.dictRuleIds?.includes(id) ? [{ kind: "dict", dictId: "genji" }] : undefined,
+      opts.modes?.[id] ?? [],
     ),
   );
 
@@ -79,6 +85,7 @@ export function makeModule(opts: MakeModuleOptions): RulesetModule {
     version: "1.0.0",
     engineApi: opts.engineApi ?? ENGINE_API_VERSION,
     license: "MIT",
+    maintainerEmail: "maintainer@example.com",
     ...(opts.rulesetPrefix ? { rulesetPrefix: opts.rulesetPrefix } : {}),
     guidelines: opts.guidelineId
       ? [

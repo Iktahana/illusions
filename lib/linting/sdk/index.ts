@@ -11,7 +11,7 @@
  */
 
 // Engine version + module contract
-export { ENGINE_API_VERSION, requirementKey } from "./ruleset-types";
+export { ENGINE_API_VERSION, requirementKey, CORRECTION_MODE_IDS } from "./ruleset-types";
 export type {
   RulesetModule,
   RulesetManifest,
@@ -20,6 +20,7 @@ export type {
   RulesetGuidelineMeta,
   RulesetRequirement,
   GuidelineLicenseLabel,
+  CorrectionModeId,
 } from "./ruleset-types";
 
 // Context handed to createRules()

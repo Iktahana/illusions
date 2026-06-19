@@ -20,10 +20,35 @@ describe("validateManifest", () => {
         nameJa: "a",
         version: "1",
         engineApi: 1,
+        maintainerEmail: "a@b.co",
         guidelines: [],
         rules: [{ ruleId: "" }],
       }),
     ).toBe("rule missing ruleId");
+  });
+
+  it("rejects a missing or malformed maintainerEmail", () => {
+    const base = makeModule({ id: "x.mail" }).manifest;
+    // @ts-expect-error drop the required email for the test
+    delete base.maintainerEmail;
+    expect(validateManifest(base)).toBe("missing or invalid maintainerEmail");
+
+    expect(validateManifest({ ...base, maintainerEmail: "not-an-email" })).toBe(
+      "missing or invalid maintainerEmail",
+    );
+    expect(validateManifest({ ...base, maintainerEmail: "a@b.co" })).toBeNull();
+  });
+
+  it("rejects a rule missing applicableModes or with an unknown mode", () => {
+    const noModes = makeModule({ id: "x.nomodes" }).manifest;
+    // @ts-expect-error drop the required array for the test
+    delete noModes.rules[0].applicableModes;
+    expect(validateManifest(noModes)).toBe("rule r1 missing applicableModes");
+
+    const badMode = makeModule({ id: "x.badmode" }).manifest;
+    // @ts-expect-error inject an invalid mode id for the test
+    badMode.rules[0].applicableModes = ["novel", "tweet"];
+    expect(validateManifest(badMode)).toBe('rule r1 has invalid mode "tweet"');
   });
 });
 
@@ -211,5 +236,36 @@ describe("RulesetRegistry — requirement gating (dict)", () => {
     const gate = reg.buildRequirementGate(makeContext("not-installed"));
     expect([...gate.disabledRuleIds].sort()).toEqual(["a", "b"]);
     expect(gate.warnings).toHaveLength(2);
+  });
+});
+
+describe("RulesetRegistry — buildModeRuleMap (校正モード自動有効化)", () => {
+  it("groups ruleIds by the modes they opt into", () => {
+    const reg = new RulesetRegistry();
+    reg.registerBuiltin(
+      makeModule({
+        id: "builtin.modes",
+        ruleIds: ["a", "b", "c"],
+        modes: { a: ["novel", "blog"], b: ["novel"], c: [] },
+      }),
+    );
+
+    const map = reg.buildModeRuleMap();
+    expect([...(map.get("novel") ?? [])].sort()).toEqual(["a", "b"]);
+    expect([...(map.get("blog") ?? [])]).toEqual(["a"]);
+    // "c" opts into no mode → never auto-enabled, absent everywhere
+    expect(map.has("official")).toBe(false);
+    for (const set of map.values()) expect(set.has("c")).toBe(false);
+  });
+
+  it("merges modes across rulesets and is empty when no rule opts in", () => {
+    const reg = new RulesetRegistry();
+    reg.registerBuiltin(makeModule({ id: "builtin.m1", ruleIds: ["x"], modes: { x: ["sns"] } }));
+    reg.registerBuiltin(makeModule({ id: "builtin.m2", ruleIds: ["y"], modes: { y: ["sns"] } }));
+    expect([...(reg.buildModeRuleMap().get("sns") ?? [])].sort()).toEqual(["x", "y"]);
+
+    const empty = new RulesetRegistry();
+    empty.registerBuiltin(makeModule({ id: "builtin.none", ruleIds: ["z"] }));
+    expect(empty.buildModeRuleMap().size).toBe(0);
   });
 });

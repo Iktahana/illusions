@@ -30,6 +30,7 @@ const ruleset: RulesetModule = {
     version: "1.0.0",
     engineApi: 1, // ENGINE_API_VERSION と一致必須
     license: "MIT",
+    maintainerEmail: "you@example.com", // 必須。marketplace 収録・通知の送信先
     rulesetPrefix: "my-", // 全 ruleId 共通の接頭辞（任意・衝突回避用）
     guidelines: [
       {
@@ -49,6 +50,7 @@ const ruleset: RulesetModule = {
         guidelineId: "my-guideline",
         level: "L1",
         defaultConfig: { enabled: true, severity: "info" },
+        applicableModes: ["novel", "blog"], // 必須。これらのモードで自動オン（空配列=手動のみ）
         docs: {
           positiveExample: "すごい!",
           negativeExample: "すごい！",
@@ -78,6 +80,30 @@ export default ruleset;
 ### rulesetPrefix（任意）
 
 `rulesetPrefix` は、このルールセットの**全 `ruleId` が共有する接頭辞**を宣言する（例 `"rule_ME2_"`, `"nihongo_hyouki_"`, `"my-"`）。マーケットプレイスでの**ルールID衝突を避ける**ための名前空間。設定すると、接頭辞で始まらない `ruleId` があるとき registry が警告（非致命）を出す。複数ルールセットで同じ `ruleId` が衝突した場合は「先勝ち＋警告」で安全に処理されるが、接頭辞を付けておけば衝突自体を予防できる。
+
+### maintainerEmail（必須）
+
+`manifest.maintainerEmail` は**メンテナの連絡先メールアドレス**。marketplace への収録時や、ルールセットに関する通知の送信先として使われる。**必須**で、簡易的なメール形式チェックを満たさない（空・`@`や`.`を欠く）と registry が `invalid-manifest` として隔離する。
+
+### applicableModes（各ルール・必須）
+
+各ルールの `applicableModes` は、そのルールが**自動的に有効化される校正モード**のリスト。illusions の校正モードは次の5つ:
+
+| モードID   | 表示名 |
+| ---------- | ------ |
+| `novel`    | 小説   |
+| `official` | 公用文 |
+| `blog`     | ブログ |
+| `academic` | 学術   |
+| `sns`      | SNS    |
+
+ユーザーがこのリストに含まれるモードへ切り替えると、該当ルールは**自動でオン**になる。**空配列 `[]` は「どのモードでも自動オンにしない（手動トグルのみ）」**を意味する。配列でない、または未知のモードIDを含む場合は `invalid-manifest` として隔離される。
+
+```ts
+{ ruleId: "my-fw-exclaim", /* … */, applicableModes: ["novel", "blog"] }
+```
+
+registry の `buildModeRuleMap()` が「モード → 自動オン対象 ruleId 集合」を生成し、モード切替時の自動有効化に使われる。
 
 ## 2. createRules(ctx) と RulesetContext
 

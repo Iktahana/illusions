@@ -20,6 +20,7 @@ updated: 2026-06-19
   "version": "1.0.0",
   "engineApi": 1,
   "license": "MIT",
+  "maintainerEmail": "you@example.com",
   "guidelines": [
     {
       "id": "sample",
@@ -38,6 +39,7 @@ updated: 2026-06-19
       "guidelineId": "sample",
       "level": "L1",
       "defaultConfig": { "enabled": true, "severity": "info" },
+      "applicableModes": ["novel", "blog"],
       "docs": {
         "positiveExample": "すごい!",
         "negativeExample": "すごい！",
@@ -51,6 +53,7 @@ updated: 2026-06-19
       "guidelineId": "sample",
       "level": "L2",
       "defaultConfig": { "enabled": true, "severity": "info" },
+      "applicableModes": ["official", "academic"],
       "requires": [{ "kind": "dict", "dictId": "genji" }],
       "docs": {
         "positiveExample": "猫が鳴く。",
