@@ -1,47 +1,42 @@
-# NOTICE: AI Utilization and Intellectual Property Policy
+CRITICAL WARNING & PROHIBITION
+厳重警告および禁止事項
 
-This project values open-source collaboration, but firmly stands against the predatory extraction of intellectual labor via automation. Please read the following terms, warnings, and retroactive authorization policies carefully.
+[English Version]
 
----
+Any form of utilizing this project's achievements (including but not limited to its source code, architectural logic, user interface designs, and page screenshots) to feed into Artificial Intelligence (AI), Large Language Models (LLMs), or any other automated tools for reading, analysis, or the generation of similar functional or visual outcomes is strictly prohibited by the developers.
+We issue this strict warning against "plagiarism" and "code laundering" under the guise of AI. While we deeply respect the open-source spirit, we absolutely do not tolerate the unjust exploitation of our labor disguised as AI generation.
 
-## English Version
+HOW TO OBTAIN AUTHORIZATION (INCLUDING COMMERCIAL USE)
+We are not rejecting technological development or collaboration. If you wish to use or reference the achievements of this project, please contact us in advance to obtain explicit authorization.
+If proper communication is established, we will gladly grant permission in most cases, even for commercial projects. We welcome approaches that follow the proper channels.
 
-### CRITICAL WARNING & PROHIBITION
-Any form of utilizing this project's achievements—including but not limited to its source code, architectural logic, user interface designs, and **page screenshots**—to feed into Artificial Intelligence (AI), Large Language Models (LLMs), or any automated tools for reading, analysis, or the generation of similar, functional, or visual look-alikes is **STRICTLY PROHIBITED** by the project authors.
+RETROACTIVE AUTHORIZATION & AMNESTY CLAUSE
+If you have already utilized the achievements of this project prior to the publication of this notice (including but not limited to feeding source code, architectural logic, or page screenshots into AI for reading, analysis, or replication), we strongly recommend that you contact us immediately to apply for retroactive authorization.
+Evidence Preservation: Regarding suspected cases of plagiarism or replication of this project's achievements currently in the market, we have already completed the preservation (screening and recording) of all relevant evidence.
 
-We issue this solemn warning against any "AI-assisted plagiarism" or "code/design laundering." While we embrace the open-source spirit, we do not tolerate the parasitic exploitation of our hard work under the guise of AI re-generation.
+LEGAL ACTION
+If unauthorized plagiarism, imitation, or AI-assisted reproduction is discovered without explicit written consent or the completion of retroactive authorization procedures, we will resolutely take all legal measures, including filing lawsuits, seeking injunctions, and claiming damages, to protect our legitimate rights.
 
-### HOW TO OBTAIN AUTHORIZATION (COMMERCIAL USE INCLUDED)
-We are not against collaboration. If you wish to use, adapt, or build upon our work, you can do so legitimately by **contacting us directly to obtain explicit authorization**. 
-* **In most cases, we will gladly grant permission—even for commercial projects**—provided that an open dialogue is established and terms are mutually agreed upon. 
+Please respect the open-source spirit. Respect for creators is the foundation of a healthy developer community.
 
-### RETROACTIVE AUTHORIZATION & AMNESTY CLAUSE
-If you have **already utilized** any achievements of this project prior to reading this notice (including but not limited to feeding source code, architectural logic, or page screenshots into AI for reading, analysis, or replication), you are encouraged to contact us immediately to apply for **retroactive authorization**.
 
-* **Evidence Preservation:** Please be advised that we have already monitored the market and **fully preserved relevant evidence** regarding existing products or projects suspected of plagiarizing our achievements.
-* **Amnesty Policy:** For individuals or entities who proactively reach out to us and successfully complete the retroactive authorization process, **we will formally waive our right to pursue any legal liability.**
+[Japanese Version]
 
-### ENFORCEMENT & LITIGATION
-Any unauthorized plagiarism, replication, or AI-assisted reproduction discovered without our explicit written consent (and without a retroactive authorization agreement) will be treated as a willful violation of our rights. **We will take immediate and rigorous legal actions, including but not limited to lawsuits, injunctions, and public copyright claims, to protect our intellectual property.**
 
-Please respect the true open-source spirit. Respecting the creator is the foundation of the community.
+本プロジェクトの成果物（ソースコード、設計ロジック、UIデザイン、およびページのスクリーンショットを含みますが、これらに限定されません）を、人工知能（AI）、大規模言語モデル（LLM）、またはその他の自動化ツールに読み込ませ、分析・学習させ、類似する機能や視覚的効果を持つ成果物を生成させる行為は、いかなる形式であれ、開発者の意思として固く禁止します。
+AIを隠れ蓑にした「プラグマティズム（盗用）」や「コードロンダリング（成果物の洗浄）」に対し、ここに厳重に警告します。私たちはオープンソースの精神を深く尊重していますが、AI生成という名目のもとで私たちの労働成果を不当に搾取する行為は一切容認しません。
 
-### 厳重警告および禁止事項
-本プロジェクトの成果物（ソースコード、設計ロジック、UIデザイン、および**ページのスクリーンショット**を含みますが、これらに限定されません）を、人工知能（AI）、大規模言語モデル（LLM）、またはその他の自動化ツールに読み込ませ、分析・学習させ、類似する機能や視覚的効果を持つ成果物を生成させる行為は、いかなる形式であれ、開発者の意思として**固く禁止**します。
+利用許諾の取得について（商用利用を含む）
+私たちは技術の発展や協力を拒絶しているわけではありません。本プロジェクトの成果を利用、または参考にしたい場合は、事前に私たちに連絡し、明示的な許諾を得てください。
 
-AIを隠れ蓑にした「プラグマティズム（盗用）」や「コードロンダリング（成果物の洗浄）」に対し、ここに厳重に警告します。私たちはオープンソースの精神を深く尊重していますが、AI生成という名目のもとで私たちの労働成果を不當に搾取する行為は一切容認しません。
+適切なコミュニケーションが行われれば、商用プロジェクトであっても、多くの場合において利用を快く承認します。 筋を通したアプローチを歓迎します。
 
-### 利用許諾の取得について（商用利用を含む）
-私たちは技術の発展や協力を拒絶しているわけではありません。本プロジェクトの成果を利用、または参考にしたい場合は、**事前に私たちに連絡し、明示的な許諾を得てください**。
-* **適切なコミュニケーションが行われれば、商用プロジェクトであっても、多くの場合において利用を快く承認します。** 筋を通したアプローチを歓迎します。
+遡及的許諾および免責条項（アムネスティ）
+本通知の公開前に、すでに本プロジェクトの成果を利用されている場合（ソースコード、設計ロジック、ページのスクリーンショットをAIに読み込ませ、分析・模倣させた行為を含みますが、これらに限定されません）、速やかに私たちに連絡し、遡及的な利用許諾を補完（追加申請）することを強く推奨します。
 
-### 遡及的許諾および免責条項（アムネスティ）
-本通知の公開前に、**すでに本プロジェクトの成果を利用されている場合**（ソースコード、設計ロジック、ページのスクリーンショットをAIに読み込ませ、分析・模倣させた行為を含みますが、これらに限定されません）、速やかに私たちに連絡し、**遡及的な利用許諾を補完（追加申請）**することを強く推奨します。
+証拠の保全について： 現在、市場で本プロジェクトの成果を盗用・模倣している疑いのある事例については、私たちはすでに関連する全ての証拠の保全（スクリーニングおよび記録）を完了しております。
 
-* **証拠の保全について：** 現在、市場で本プロジェクトの成果を盗用・模倣している疑いのある事例については、私たちはすでに**関連する全ての証拠の保全（スクリーニングおよび記録）を完了**しております。
-* **免責方針：** 自発的に私たちに連絡し、補完的な利用許諾の手続きを完了された申請者に対しては、過去の利用に関していかなる**法的責任も追及いたしません（不問に付します）**。
+法的措置について
+明示的な書面による同意、あるいは遡及的許諾の手続きなしに行われた、無断の盗用、模倣、またはAI支援による複製行為が発覚した場合、私たちは自らの正当な権利を守るため、訴訟の提起、差止請求、および損害賠償請求を含む、あらゆる法的手段を毅然として講じます。
 
-### 法的措置について
-明示的な書面による同意、あるいは遡及的許諾の手続きなしに行われた、無断の盗用、模倣、またはAI支援による複製行為が発覚した場合、私たちは自らの正当な権利を守るため、**訴訟の提起、差止請求、および損害賠償請求を含む、あらゆる法的手段を毅然として講じます。**
-
-真のオープンソース精神を尊重してください。創作者への敬意こそが、健全な開発者コミュニティの基盤です。
+オープンソース精神を尊重してください。創作者への敬意こそが、健全な開発者コミュニティの基盤です。
