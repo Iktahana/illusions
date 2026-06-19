@@ -31,10 +31,19 @@ principal class を持つ Quick Look Preview Extension を `<App>.app/Contents/P
      拡張の `QLSupportedContentTypes` に**永遠にマッチしません**。これが旧構成で
      プレビューが出なかったもう一つの根本原因です。
 
-3. **PlugIns への埋め込み + 署名**（`package.json` の `mac.extraFiles`）
-   - `Contents/PlugIns/MDIQuickLook.appex` に配置。electron-builder が nested code として
-     Developer ID で署名・notarize します。`~/Library/QuickLook` への手動コピーや
-     `qlmanage -r` は不要（pluginkit が自動検出）。
+3. **PlugIns への埋め込み + 署名**（`scripts/embed-quicklook.js`、afterPack フック）
+   - 署名前に `.appex` を `Contents/PlugIns/MDIQuickLook.appex` へコピーし、afterPack
+     フック内で **Developer ID + hardened runtime + secure timestamp** で署名する。
+   - **なぜ afterPack で自前署名するか**: electron-builder の署名ステップ
+     (@electron/osx-sign / MacTargetHelper) は `Contents/PlugIns` 配下を
+     **既定で署名対象から除外**する（`ignore` コールバック内の
+     `file.startsWith("/Contents/PlugIns", appPath.length)`）。そのため
+     `extraFiles` でも `mac.binaries` でも appex は署名されず、親アプリ署名・
+     notarization が「code object is not signed at all」で失敗する。afterPack は
+     アプリ署名より前に走るので、ここで CSC_LINK/CSC_KEY_PASSWORD から一時
+     keychain を作って appex を署名しておけば、electron-builder は PlugIns を
+     触らないため署名が保持され、親の封緘が成功する。
+   - `~/Library/QuickLook` への手動コピーや `qlmanage -r` は不要（pluginkit が自動検出）。
 
 ## ビルド
 
