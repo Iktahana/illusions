@@ -65,6 +65,13 @@ function signAppex(appexPath) {
   const keychainPassword = "mdiql-temp";
   const entitlements = path.join(__dirname, "..", "build", "entitlements.mac.plist");
 
+  // The user keychain search list. `codesign` resolves the signing identity's
+  // private key via the search list, so our throwaway keychain must be added to
+  // it (just passing `--keychain` is not enough; without this codesign fails
+  // with "The specified item could not be found in the keychain"). We restore
+  // the original list afterwards so electron-builder's own signing is unaffected.
+  let prevSearchList = null;
+
   try {
     const certFile = resolveCertFile(cscLink, tmpDir);
 
@@ -90,6 +97,12 @@ function signAppex(appexPath) {
       keychainPassword,
       keychain,
     ]);
+
+    prevSearchList = run("/usr/bin/security", ["list-keychains", "-d", "user"])
+      .split("\n")
+      .map((line) => line.trim().replace(/^"|"$/g, ""))
+      .filter(Boolean);
+    run("/usr/bin/security", ["list-keychains", "-d", "user", "-s", keychain, ...prevSearchList]);
 
     const identities = run("/usr/bin/security", [
       "find-identity",
@@ -123,6 +136,13 @@ function signAppex(appexPath) {
     run("/usr/bin/codesign", ["--verify", "--strict", "--verbose=2", appexPath]);
     console.log(`[QuickLook] ✅ ${APPEX_NAME} signed with Developer ID + hardened runtime`);
   } finally {
+    if (prevSearchList) {
+      try {
+        run("/usr/bin/security", ["list-keychains", "-d", "user", "-s", ...prevSearchList]);
+      } catch {
+        /* best-effort restore */
+      }
+    }
     try {
       run("/usr/bin/security", ["delete-keychain", keychain]);
     } catch {
