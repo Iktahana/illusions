@@ -6,9 +6,15 @@
 // `extraFiles`): files added via `extraFiles` are copied but NOT code-signed,
 // so the nested Mach-O fails notarization ("not signed with a valid Developer
 // ID certificate / no secure timestamp / hardened runtime not enabled").
-// By copying it into Contents/PlugIns here, electron-builder's osx-sign step
-// signs it with the Developer ID identity, hardened runtime, secure timestamp,
-// and inherited entitlements as part of the normal signing walk.
+//
+// Two pieces are required and must stay in sync:
+//   1. This hook copies the .appex into Contents/PlugIns before signing.
+//   2. `build.mac.binaries` in package.json lists the .appex so osx-sign seals
+//      it. osx-sign's walk only signs nested `.app`/`.framework` *bundles*
+//      automatically (see @electron/osx-sign util.js walkAsync) — a `.appex`
+//      bundle is otherwise left unsealed, which makes the parent app signing
+//      fail with "In subcomponent ...MDIQuickLook.appex: code object is not
+//      signed at all". `mac.binaries` adds it to the sign list explicitly.
 
 const path = require("path");
 const fs = require("fs");
