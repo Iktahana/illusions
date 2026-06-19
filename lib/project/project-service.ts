@@ -9,7 +9,7 @@ import { getProjectFileService } from "../services/project-file-service";
 import { getProjectManager } from "./project-manager";
 import { isElectronRenderer } from "../utils/runtime-env";
 import { getDefaultEditorSettings, getDefaultWorkspaceState } from "./project-types";
-import { readTextWithEncoding } from "../utils/text-codec";
+import { readTextWithEncoding } from "@/shared/lib/text-codec";
 import { ensureProjectFiles } from "../editor-page/project-file-utils";
 import { notificationManager } from "../services/notification-manager";
 

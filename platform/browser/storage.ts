@@ -13,7 +13,7 @@ import type {
   RecentFile,
   RecentProject,
   EditorBuffer,
-} from "./storage-types";
+} from "@/lib/storage/storage-types";
 
 interface StoredAppState {
   id: string;

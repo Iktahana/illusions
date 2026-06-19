@@ -5,7 +5,7 @@
  * Requires window.electronAPI.nlp to be exposed by preload script.
  */
 
-import type { INlpClient, Token, TokenizeProgress, WordEntry } from "./types";
+import type { INlpClient, Token, TokenizeProgress, WordEntry } from "@/lib/nlp-client/types";
 
 export class ElectronNlpClient implements INlpClient {
   /**

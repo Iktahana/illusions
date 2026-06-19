@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import GlassDialog from "@/components/GlassDialog";
+import GlassDialog from "@/shared/ui/GlassDialog";
 
 interface ConfirmDialogProps {
   isOpen: boolean;

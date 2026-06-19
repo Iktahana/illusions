@@ -39,19 +39,19 @@ When triggered via an issue from the daily docs-maintenance workflow, analyse th
 
 ### Specific Triggers
 
-| Code change area                               | Target docs                                                        |
-| ---------------------------------------------- | ------------------------------------------------------------------ |
-| `lib/storage/`                                 | `docs/architecture/storage-system.md`                              |
-| `lib/vfs/`                                     | `docs/architecture/vfs.md`                                         |
-| `lib/linting/`                                 | `docs/ruleset/` and `docs/architecture/correction-ai-system.ja.md` |
-| `electron/ipc/nlp-ipc.js` or `lib/nlp-client/` | `docs/architecture/nlp-backend-architecture.md`                    |
-| `lib/services/history-service.ts`              | `docs/architecture/history-service.md`                             |
-| `lib/services/file-watcher.ts`                 | `docs/architecture/file-watcher.md`                                |
-| `lib/services/notification-manager.ts`         | `docs/architecture/notification-system.md`                         |
-| `lib/tab-manager/`                             | `docs/architecture/tab-manager.md`                                 |
-| `lib/project/`                                 | `docs/architecture/project-lifecycle.md`                           |
-| `components/` or `app/` (export features)      | `docs/architecture/export-system.md`                               |
-| `packages/milkdown-plugin-japanese-novel/`     | `docs/guides/milkdown-plugin.md`                                   |
+| Code change area                                                            | Target docs                                                        |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `lib/storage/` or `platform/*/storage.ts`                                   | `docs/architecture/storage-system.md`                              |
+| `lib/vfs/` or `platform/*/vfs.ts`                                           | `docs/architecture/vfs.md`                                         |
+| `lib/linting/`                                                              | `docs/ruleset/` and `docs/architecture/correction-ai-system.ja.md` |
+| `electron/ipc/nlp-ipc.js`, `lib/nlp-client/`, or `platform/*/nlp-client.ts` | `docs/architecture/nlp-backend-architecture.md`                    |
+| `lib/services/history-service.ts`                                           | `docs/architecture/history-service.md`                             |
+| `lib/services/file-watcher.ts`                                              | `docs/architecture/file-watcher.md`                                |
+| `lib/services/notification-manager.ts`                                      | `docs/architecture/notification-system.md`                         |
+| `lib/tab-manager/`                                                          | `docs/architecture/tab-manager.md`                                 |
+| `lib/project/`                                                              | `docs/architecture/project-lifecycle.md`                           |
+| `components/` or `app/` (export features)                                   | `docs/architecture/export-system.md`                               |
+| `packages/milkdown-plugin-japanese-novel/`                                  | `docs/guides/milkdown-plugin.md`                                   |
 
 ## What NOT to Do
 

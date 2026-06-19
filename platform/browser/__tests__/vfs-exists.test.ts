@@ -7,7 +7,7 @@
  * and overwrite user data with an empty list.
  */
 import { describe, it, expect } from "vitest";
-import { WebVFSFileHandle } from "@/lib/vfs/web-vfs";
+import { WebVFSFileHandle } from "@/platform/browser/vfs";
 
 function makeHandle(getFile: () => Promise<File>): WebVFSFileHandle {
   const native = { kind: "file", name: "f.json", getFile };

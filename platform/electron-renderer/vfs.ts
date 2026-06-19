@@ -14,8 +14,8 @@ import type {
   VFSWatchEvent,
   VFSWatcher,
   VirtualFileSystem,
-} from "./types";
-import { basename, dirname, joinPath } from "./path-utils";
+} from "@/lib/vfs/types";
+import { basename, dirname, joinPath } from "@/lib/vfs/path-utils";
 
 // -----------------------------------------------------------------------
 // Type declarations for the Electron VFS IPC bridge

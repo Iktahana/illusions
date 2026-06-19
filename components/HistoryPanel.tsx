@@ -5,7 +5,7 @@ import { Plus, Loader2, History, ChevronDown, ChevronRight } from "lucide-react"
 import clsx from "clsx";
 import { getHistoryService } from "@/lib/services/history-service";
 import { getProjectFileService } from "@/lib/services/project-file-service";
-import ConfirmDialog from "@/components/ConfirmDialog";
+import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import SnapshotItem from "./HistoryPanel/SnapshotItem";
 import { computeDiffStats } from "./HistoryPanel/DiffIndicator";
 import {

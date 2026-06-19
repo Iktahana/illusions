@@ -3,13 +3,13 @@
 import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from "react";
 
 import ActivityBar, { type ActivityBarView } from "@/components/ActivityBar";
-import ContextMenu from "@/components/ContextMenu";
+import ContextMenu from "@/shared/ui/ContextMenu";
 import DesktopOnlyDialog from "@/components/DesktopOnlyDialog";
 import EditorDiffView from "@/components/EditorDiffView";
-import ErrorBoundary from "@/components/ErrorBoundary";
+import ErrorBoundary from "@/shared/ui/ErrorBoundary";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
-import ResizablePanel from "@/components/ResizablePanel";
+import ResizablePanel from "@/shared/ui/ResizablePanel";
 import ExportDialog from "@/components/ExportDialog";
 import RubyDialog from "@/components/RubyDialog";
 import SearchDialog from "@/components/SearchDialog";
@@ -20,7 +20,7 @@ import TitleUpdater from "@/components/TitleUpdater";
 import UnsavedWarningDialog from "@/components/UnsavedWarningDialog";
 import UpgradeToProjectBanner from "@/components/UpgradeToProjectBanner";
 import WebMenuBar from "@/components/WebMenuBar";
-import ConfirmDialog from "@/components/ConfirmDialog";
+import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { EmptyEditorState } from "@/components/EmptyEditorState";
 import { DiffTabContext, type DiffTabContextValue } from "@/contexts/DiffTabContext";
 import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";

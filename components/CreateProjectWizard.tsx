@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { FolderPlus, Check, Loader2, AlertCircle, ChevronDown } from "lucide-react";
 import { getProjectService, validateProjectName } from "@/lib/project/project-service";
-import GlassDialog from "@/components/GlassDialog";
+import GlassDialog from "@/shared/ui/GlassDialog";
 
 import type { ProjectMode, SupportedFileExtension } from "@/lib/project/project-types";
 

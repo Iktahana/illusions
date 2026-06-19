@@ -13,7 +13,7 @@ import type {
   ParagraphTokenizeResponse,
   BatchTokenizeResponse,
   FrequencyAnalysisResponse,
-} from "./types";
+} from "@/lib/nlp-client/types";
 
 export class WebNlpClient implements INlpClient {
   private readonly baseUrl = "/api/nlp";

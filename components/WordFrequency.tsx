@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { RefreshCw, LoaderCircle, ChevronRight, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 
-import ContextMenu from "@/components/ContextMenu";
+import ContextMenu from "@/shared/ui/ContextMenu";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { getProjectFileService } from "@/lib/services/project-file-service";

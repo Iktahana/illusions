@@ -34,8 +34,8 @@ This eliminates UI blocking and significantly improves performance.
 │                                                              │
 │  NLP Client Abstraction:                                     │
 │  - lib/nlp-client/nlp-client.ts (factory)                   │
-│  - lib/nlp-client/electron-nlp-client.ts (IPC)              │
-│  - lib/nlp-client/web-nlp-client.ts (HTTP)                  │
+│  - platform/electron-renderer/nlp-client.ts (IPC)           │
+│  - platform/browser/nlp-client.ts (HTTP)                    │
 └──────────────────────┬──────────────────┬───────────────────┘
                        │                  │
               Electron Mode          Web Mode
@@ -80,7 +80,7 @@ const nlpClient = getNlpClient();
 const tokens = await nlpClient.tokenizeParagraph(text);
 ```
 
-#### 2. Electron NLP Client (`lib/nlp-client/electron-nlp-client.ts`)
+#### 2. Electron NLP Client (`platform/electron-renderer/nlp-client.ts`)
 
 - Uses `window.electronAPI.nlp.*` for IPC communication
 - Supports progress callbacks for large documents
@@ -89,7 +89,7 @@ const tokens = await nlpClient.tokenizeParagraph(text);
   - `tokenizeDocument(paragraphs, onProgress)` - Batch processing
   - `analyzeWordFrequency(text)` - Word frequency analysis
 
-#### 3. Web NLP Client (`lib/nlp-client/web-nlp-client.ts`)
+#### 3. Web NLP Client (`platform/browser/nlp-client.ts`)
 
 - Uses `fetch()` to call Next.js API routes
 - Same interface as Electron client

@@ -20,7 +20,7 @@ import type {
   EditorBuffer,
   StorageSession,
 } from "@/lib/storage/storage-types";
-import { ElectronStorageProvider } from "@/lib/storage/electron-storage";
+import { ElectronStorageProvider } from "@/platform/electron-renderer/storage";
 
 // -----------------------------------------------------------------------
 // Mock helpers

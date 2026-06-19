@@ -117,7 +117,7 @@ vi.mock("dexie", () => {
 });
 
 // Now import the real provider — its Dexie base class is our FakeDexie
-import { WebStorageProvider } from "@/lib/storage/web-storage";
+import { WebStorageProvider } from "@/platform/browser/storage";
 
 // -----------------------------------------------------------------------
 // Test helpers

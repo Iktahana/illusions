@@ -23,7 +23,7 @@
  *   }
  */
 import type { DictLookup } from "./dict-types";
-import { LRUCache } from "@/lib/utils/lru-cache";
+import { LRUCache } from "@/shared/lib/lru-cache";
 import * as GenjiApiBackend from "./providers/genji-api-backend";
 
 export type GenjiHealthState = "ready" | "web-fallback" | "not-installed" | "corrupt" | "unknown";

@@ -33,8 +33,8 @@ export const LEGACY_PACKAGE_IMPORTS = new Map([
       "@/lib/linting",
       "@/lib/nlp-client/types",
       "@/lib/project/project-types",
-      "@/lib/utils/hash-string",
-      "@/lib/utils/lru-cache",
+      "@/shared/lib/hash-string",
+      "@/shared/lib/lru-cache",
     ]),
   ],
   [
@@ -86,7 +86,7 @@ export const LEGACY_PACKAGE_IMPORTS = new Map([
   ],
   [
     "packages/milkdown-plugin-japanese-novel/pos-highlight/decoration-plugin.ts",
-    new Set(["@/lib/nlp-client/nlp-client", "@/lib/nlp-client/types", "@/lib/utils/lru-cache"]),
+    new Set(["@/lib/nlp-client/nlp-client", "@/lib/nlp-client/types", "@/shared/lib/lru-cache"]),
   ],
 ]);
 

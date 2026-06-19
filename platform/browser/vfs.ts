@@ -12,8 +12,8 @@ import type {
   VFSFileHandle,
   VFSFileMetadata,
   VirtualFileSystem,
-} from "./types";
-import { joinPath } from "./path-utils";
+} from "@/lib/vfs/types";
+import { joinPath } from "@/lib/vfs/path-utils";
 
 // -----------------------------------------------------------------------
 // Helpers

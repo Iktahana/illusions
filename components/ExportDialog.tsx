@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import clsx from "clsx";
-import GlassDialog from "./GlassDialog";
+import GlassDialog from "@/shared/ui/GlassDialog";
 import {
   DEFAULT_EXPORT_SETTINGS,
   loadExportSettings,

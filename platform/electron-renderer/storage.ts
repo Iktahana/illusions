@@ -10,7 +10,7 @@ import type {
   RecentFile,
   RecentProject,
   EditorBuffer,
-} from "./storage-types";
+} from "@/lib/storage/storage-types";
 
 export class ElectronStorageProvider implements IStorageService {
   private initialized = false;
