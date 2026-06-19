@@ -85,13 +85,6 @@ export interface RulesetManifest {
   /** Engine API version this ruleset targets. Must equal {@link ENGINE_API_VERSION}. */
   engineApi: number;
   license: string;
-  /**
-   * Common naming prefix shared by every `ruleId` in this ruleset
-   * (e.g. "rule_ME2_", "nihongo_hyouki_", "myteam-"). Used to namespace rules
-   * and avoid cross-ruleset collisions in the marketplace. When set, the
-   * registry warns about any rule whose id does not start with it.
-   */
-  rulesetPrefix?: string;
   guidelines: RulesetGuidelineMeta[];
   rules: RulesetRuleMeta[];
   /** Ruleset-wide requirements. */

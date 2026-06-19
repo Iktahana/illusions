@@ -41,8 +41,6 @@ interface MakeModuleOptions {
   dictRuleIds?: string[];
   /** make createRules throw */
   createThrows?: boolean;
-  /** declared shared rule-id prefix */
-  rulesetPrefix?: string;
 }
 
 function ruleMeta(
@@ -79,7 +77,6 @@ export function makeModule(opts: MakeModuleOptions): RulesetModule {
     version: "1.0.0",
     engineApi: opts.engineApi ?? ENGINE_API_VERSION,
     license: "MIT",
-    ...(opts.rulesetPrefix ? { rulesetPrefix: opts.rulesetPrefix } : {}),
     guidelines: opts.guidelineId
       ? [
           {

@@ -38,5 +38,5 @@ updated: 2026-06-19
 
 ## 関連
 
-- リポジトリ構造: [structure.md](./structure.md)
-- 作成ガイド: [authoring.md](./authoring.md)
+- リポジトリ構造: [ruleset-structure.md](./ruleset-structure.md)
+- 作成ガイド: [ruleset-authoring.md](./ruleset-authoring.md)

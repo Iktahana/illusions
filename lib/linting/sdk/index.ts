@@ -7,7 +7,7 @@
  * `createRules`, because an un-bundled external module cannot resolve value
  * imports against illusions internals at runtime.
  *
- * @see docs/ruleset/authoring.md
+ * @see docs/linting/ruleset-authoring.md
  */
 
 // Engine version + module contract

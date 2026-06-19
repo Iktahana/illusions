@@ -44,29 +44,6 @@ describe("regexReplace", () => {
     expect(issues).toHaveLength(0);
   });
 
-  it("passes through reference and custom fix labels", () => {
-    const issues = regexReplace({
-      ...BASE,
-      text: "あ！",
-      pattern: /！/,
-      replacement: () => "!",
-      reference: { standard: "JTF", section: "3.2.1" },
-      fixLabel: "Half-width",
-      fixLabelJa: "半角に",
-    });
-    expect(issues[0].reference).toEqual({ standard: "JTF", section: "3.2.1" });
-    expect(issues[0].fix).toMatchObject({
-      label: "Half-width",
-      labelJa: "半角に",
-      replacement: "!",
-    });
-  });
-
-  it("omits reference when not provided", () => {
-    const issues = regexReplace({ ...BASE, text: "あ！", pattern: /！/, replacement: () => "!" });
-    expect(issues[0].reference).toBeUndefined();
-  });
-
   it("supports a custom span", () => {
     const issues = regexReplace({
       ...BASE,

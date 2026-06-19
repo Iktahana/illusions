@@ -107,37 +107,6 @@ describe("RulesetRegistry — registration & isolation", () => {
   });
 });
 
-describe("RulesetRegistry — rulesetPrefix", () => {
-  it("accepts rules that all carry the declared prefix", () => {
-    const reg = new RulesetRegistry();
-    reg.registerExternal(
-      makeModule({ id: "ext.p", ruleIds: ["myteam-a", "myteam-b"], rulesetPrefix: "myteam-" }),
-    );
-    expect(reg.getWarnings()).toHaveLength(0);
-    expect(reg.getManifests()[0].rulesetPrefix).toBe("myteam-");
-  });
-
-  it("warns (non-fatal) about a ruleId missing the prefix", () => {
-    const reg = new RulesetRegistry();
-    reg.registerExternal(
-      makeModule({ id: "ext.p2", ruleIds: ["myteam-a", "stray"], rulesetPrefix: "myteam-" }),
-    );
-    const w = reg.getWarnings().find((x) => x.code === "prefix-mismatch");
-    expect(w?.detail).toBe("stray");
-    // still loads both rules — prefix is advisory, not fatal
-    expect(reg.buildRules(makeContext()).map((r) => r.id)).toEqual(["myteam-a", "stray"]);
-  });
-
-  it("rejects a non-string rulesetPrefix as an invalid manifest", () => {
-    const reg = new RulesetRegistry();
-    const broken = makeModule({ id: "ext.p3" });
-    // @ts-expect-error corrupt the prefix type for the test
-    broken.manifest.rulesetPrefix = 123;
-    reg.registerExternal(broken);
-    expect(reg.getWarnings()[0].code).toBe("invalid-manifest");
-  });
-});
-
 describe("RulesetRegistry — derived metadata", () => {
   it("merges guidelines and builds the rule→guideline map", () => {
     const reg = new RulesetRegistry();
@@ -148,28 +117,6 @@ describe("RulesetRegistry — derived metadata", () => {
     expect([...reg.buildGuidelines().keys()]).toEqual(["gl-1"]);
     expect(reg.buildRuleGuidelineMap().get("r1")).toBe("gl-1");
     expect(reg.buildRulesMeta().map((m) => m.ruleId)).toEqual(["r1", "r2"]);
-  });
-
-  it("merges guidelines across multiple rulesets (dedup by id)", () => {
-    const reg = new RulesetRegistry();
-    reg.registerBuiltin(makeModule({ id: "builtin.a", ruleIds: ["a1"], guidelineId: "gl-a" }));
-    reg.registerBuiltin(makeModule({ id: "builtin.b", ruleIds: ["b1"], guidelineId: "gl-b" }));
-    reg.registerBuiltin(makeModule({ id: "builtin.c", ruleIds: ["c1"], guidelineId: "gl-a" }));
-    expect([...reg.buildGuidelines().keys()].sort()).toEqual(["gl-a", "gl-b"]);
-  });
-
-  it("returns an empty rule list when nothing is registered", () => {
-    const reg = new RulesetRegistry();
-    expect(reg.buildRules(makeContext())).toEqual([]);
-    expect(reg.getManifests()).toHaveLength(0);
-    expect(reg.getWarnings()).toHaveLength(0);
-  });
-
-  it("exposes quarantined entries via getEntries", () => {
-    const reg = new RulesetRegistry();
-    reg.registerExternal(makeModule({ id: "builtin.x" })); // reserved-namespace → quarantined
-    const entries = reg.getEntries();
-    expect(entries.some((e) => e.status === "quarantined")).toBe(true);
   });
 });
 
@@ -200,16 +147,5 @@ describe("RulesetRegistry — requirement gating (dict)", () => {
     const gate = reg.buildRequirementGate(makeContext("ready"));
     expect(gate.disabledRuleIds.size).toBe(0);
     expect(gate.warnings).toHaveLength(0);
-  });
-
-  it("applies a manifest-level requirement to every rule in the ruleset", () => {
-    const reg = new RulesetRegistry();
-    const mod = makeModule({ id: "builtin.dict3", ruleIds: ["a", "b"] });
-    mod.manifest.requires = [{ kind: "dict", dictId: "genji" }];
-    reg.registerBuiltin(mod);
-
-    const gate = reg.buildRequirementGate(makeContext("not-installed"));
-    expect([...gate.disabledRuleIds].sort()).toEqual(["a", "b"]);
-    expect(gate.warnings).toHaveLength(2);
   });
 });

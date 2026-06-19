@@ -34,8 +34,7 @@ export type RulesetWarningCode =
   | "invalid-manifest"
   | "create-failed"
   | "duplicate-rule-id"
-  | "requirement-unmet"
-  | "prefix-mismatch";
+  | "requirement-unmet";
 
 export interface RulesetWarning {
   rulesetId: string;
@@ -67,9 +66,6 @@ export function validateManifest(manifest: unknown): string | null {
   if (typeof m.nameJa !== "string") return "missing nameJa";
   if (typeof m.version !== "string") return "missing version";
   if (typeof m.engineApi !== "number") return "missing engineApi";
-  if (m.rulesetPrefix !== undefined && typeof m.rulesetPrefix !== "string") {
-    return "rulesetPrefix must be a string";
-  }
   if (!Array.isArray(m.guidelines)) return "guidelines must be an array";
   if (!Array.isArray(m.rules)) return "rules must be an array";
   for (const r of m.rules) {
@@ -152,20 +148,6 @@ export class RulesetRegistry {
     }
 
     this.entries.set(manifest.id, { manifest, source, status: "ok", module: mod });
-
-    // Soft check: every ruleId should carry the declared rulesetPrefix.
-    if (manifest.rulesetPrefix) {
-      for (const rule of manifest.rules) {
-        if (!rule.ruleId.startsWith(manifest.rulesetPrefix)) {
-          this.warnings.push({
-            rulesetId: manifest.id,
-            code: "prefix-mismatch",
-            messageJa: `ルールID「${rule.ruleId}」は宣言された接頭辞「${manifest.rulesetPrefix}」で始まっていません。`,
-            detail: rule.ruleId,
-          });
-        }
-      }
-    }
   }
 
   private quarantine(
