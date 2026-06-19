@@ -19,7 +19,7 @@
 
 import { getProjectFileService } from "./project-file-service";
 import { getStorageService } from "../storage/storage-service";
-import { AsyncMutex } from "../utils/async-mutex";
+import { AsyncMutex } from "@/shared/lib/async-mutex";
 import type { VirtualFileSystem, VFSFileHandle } from "../vfs/types";
 import type { IStorageService } from "../storage/storage-types";
 

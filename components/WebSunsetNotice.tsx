@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import GlassDialog from "@/components/GlassDialog";
+import GlassDialog from "@/shared/ui/GlassDialog";
 import DesktopAppDownloadButton from "@/components/DesktopAppDownloadButton";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 

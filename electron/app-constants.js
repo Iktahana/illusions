@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // App-wide constants shared across Electron main process modules
 
 const isDev = process.env.NODE_ENV === "development" || process.env.ELECTRON_DEV === "1";

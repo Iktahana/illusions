@@ -1,9 +1,7 @@
-/* eslint-disable no-console */
 // Shell and OS integration IPC handlers
 
 const { ipcMain, BrowserWindow, Menu, shell, app } = require("electron");
 const path = require("path");
-const log = require("electron-log");
 const { SHELL_CHANNELS } = require("../lib/ipc-channels");
 
 function registerShellHandlers() {

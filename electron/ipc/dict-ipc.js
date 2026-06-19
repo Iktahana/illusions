@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Dictionary IPC handlers — main process.
  * Follows the same pattern as nlp-ipc.js and storage-ipc.js.

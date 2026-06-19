@@ -17,9 +17,8 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 
-/** @type {{ loadAllApprovals, loadApprovals, saveApprovals, clearApprovalsCache }} */
+/** @type {{ loadApprovals, saveApprovals, clearApprovalsCache }} */
 const {
-  loadAllApprovals,
   loadApprovals,
   saveApprovals,
   clearApprovalsCache,

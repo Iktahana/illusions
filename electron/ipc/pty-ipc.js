@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // PTY IPC handlers — bridge between renderer and node-pty sessions managed by
 // terminal-session-registry.js.
 //

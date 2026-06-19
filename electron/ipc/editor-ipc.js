@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // Editor popout IPC handlers — multi-window buffer sync
 
 const { ipcMain, BrowserWindow, app } = require("electron");

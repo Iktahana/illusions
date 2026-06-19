@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import ErrorBoundary from "@/components/ErrorBoundary";
+import ErrorBoundary from "@/shared/ui/ErrorBoundary";
 import NovelEditor from "@/components/Editor";
 import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";

@@ -1,0 +1,461 @@
+"use client";
+
+/**
+ * Dexie（IndexedDB）を使った Web ストレージ実装。
+ * ブラウザ環境/PWA 向け。
+ */
+
+import Dexie, { type Table } from "dexie";
+import type {
+  IStorageService,
+  StorageSession,
+  AppState,
+  RecentFile,
+  RecentProject,
+  EditorBuffer,
+} from "@/lib/storage/storage-types";
+
+interface StoredAppState {
+  id: string;
+  data: AppState;
+}
+
+interface StoredRecentFile {
+  id: string;
+  path: string;
+  data: RecentFile;
+}
+
+interface StoredEditorBuffer {
+  id: string;
+  data: EditorBuffer;
+  fileHandle?: FileSystemFileHandle; // シリアライズ性のため、ハンドルは別フィールドで保持
+}
+
+interface StoredKvItem {
+  key: string;
+  value: string;
+}
+
+/**
+ * Stored project handle for directory-based project persistence.
+ * FileSystemDirectoryHandle is stored via Structured Clone Algorithm in IndexedDB.
+ * プロジェクトの FileSystemDirectoryHandle を IndexedDB に永続化するための型。
+ */
+export interface StoredProjectHandle {
+  /**
+   * Composite primary key: `projectId + ":" + rootDirName`.
+   * Prevents collisions when duplicate project directories share the same projectId.
+   * 複製されたプロジェクトディレクトリが同一 projectId を持つ場合の衝突を防ぐ複合キー。
+   */
+  handleKey: string;
+  projectId: string;
+  rootHandle: FileSystemDirectoryHandle;
+  lastAccessedAt: number;
+  permissionState: "granted" | "denied" | "prompt";
+  /** User-visible project name (from project.json) */
+  name?: string;
+  /** Root directory name (from FileSystemDirectoryHandle.name) */
+  rootDirName?: string;
+}
+
+class WebStorageDatabase extends Dexie {
+  appState!: Table<StoredAppState, string>;
+  recentFiles!: Table<StoredRecentFile, string>;
+  editorBuffer!: Table<StoredEditorBuffer, string>;
+  projectHandles!: Table<StoredProjectHandle, string>; // PK = handleKey
+  kvStore!: Table<StoredKvItem, string>;
+
+  constructor() {
+    super("illusionsStorage");
+
+    // v1: Initial schema
+    this.version(1).stores({
+      appState: "id",
+      recentFiles: "id, path",
+      editorBuffer: "id",
+    });
+
+    // v2: Add projectHandles table for directory handle persistence
+    this.version(2).stores({
+      appState: "id",
+      recentFiles: "id, path",
+      editorBuffer: "id",
+      projectHandles: "projectId, lastAccessedAt",
+    });
+
+    // v3: Add generic key-value store for standalone mode data
+    this.version(3).stores({
+      appState: "id",
+      recentFiles: "id, path",
+      editorBuffer: "id",
+      projectHandles: "projectId, lastAccessedAt",
+      kvStore: "key",
+    });
+
+    // v4: Change projectHandles primary key to composite handleKey (projectId:rootDirName)
+    // to prevent PRIMARY KEY collision when duplicate project directories share the same projectId.
+    // 複製されたプロジェクトディレクトリが同一 projectId を持つ場合の衝突修正 (#1070)。
+    this.version(4)
+      .stores({
+        appState: "id",
+        recentFiles: "id, path",
+        editorBuffer: "id",
+        projectHandles: "handleKey, projectId, lastAccessedAt",
+        kvStore: "key",
+      })
+      .upgrade((tx) => {
+        // Backfill handleKey for existing records that only have projectId as PK.
+        // rootDirName が欠けている場合は、永続化済み rootHandle.name から復元して
+        // 通常保存時と同じ handleKey 形式を維持する。
+        return tx
+          .table("projectHandles")
+          .toCollection()
+          .modify((record: Record<string, unknown>) => {
+            if (!record.handleKey) {
+              const pid = (record.projectId as string) || "unknown";
+              // Prefer stored rootDirName, then derive from rootHandle.name
+              const storedDirName =
+                typeof record.rootDirName === "string" && record.rootDirName.length > 0
+                  ? (record.rootDirName as string)
+                  : undefined;
+              let derivedDirName: string | undefined;
+              if (!storedDirName) {
+                const rh = record.rootHandle as { name?: string } | null | undefined;
+                if (rh && typeof rh.name === "string" && rh.name.length > 0) {
+                  derivedDirName = rh.name;
+                  record.rootDirName = derivedDirName;
+                }
+              }
+              const dirName = storedDirName ?? derivedDirName ?? pid;
+              record.handleKey = `${pid}:${dirName}`;
+            }
+          });
+      });
+  }
+}
+
+/**
+ * Shared database instance for use by ProjectManager and other modules.
+ * WebStorageProvider 以外のモジュール（ProjectManager 等）からも DB にアクセスするための共有インスタンス。
+ */
+let sharedDbInstance: WebStorageDatabase | null = null;
+
+/**
+ * Get the shared WebStorageDatabase instance.
+ * Creates a new instance if one doesn't exist yet.
+ */
+export function getWebStorageDatabase(): WebStorageDatabase {
+  if (!sharedDbInstance) {
+    sharedDbInstance = new WebStorageDatabase();
+  }
+  return sharedDbInstance;
+}
+
+export class WebStorageProvider implements IStorageService {
+  private db: WebStorageDatabase;
+  private initialized = false;
+
+  constructor() {
+    this.db = getWebStorageDatabase();
+  }
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    try {
+      // DB 接続確認
+      await this.db.open();
+      this.initialized = true;
+    } catch (error) {
+      console.error("WebStorageProvider の初期化に失敗しました:", error);
+      throw error;
+    }
+  }
+
+  async saveSession(session: StorageSession): Promise<void> {
+    await this.initialize();
+
+    try {
+      // Dexie transaction で atomic に保存する（partial write を防ぐ）
+      await this.db.transaction(
+        "rw",
+        [this.db.appState, this.db.recentFiles, this.db.editorBuffer],
+        async () => {
+          // appState
+          await this.db.appState.put({
+            id: "app_state",
+            data: session.appState,
+          });
+
+          // recentFiles: 既存を全削除してから一括追加
+          await this.db.recentFiles.clear();
+          const recentRecords = session.recentFiles.map((file) => ({
+            id: `recent_${file.path}`,
+            path: file.path,
+            data: file,
+          }));
+          await this.db.recentFiles.bulkPut(recentRecords);
+
+          // editorBuffer
+          if (session.editorBuffer) {
+            await this.db.editorBuffer.put({
+              id: "editor_buffer",
+              data: session.editorBuffer,
+              fileHandle: session.editorBuffer.fileHandle,
+            });
+          } else {
+            await this.db.editorBuffer.delete("editor_buffer");
+          }
+        },
+      );
+    } catch (error) {
+      console.error("セッションの保存に失敗しました:", error);
+      throw error;
+    }
+  }
+
+  async loadSession(): Promise<StorageSession | null> {
+    await this.initialize();
+
+    try {
+      const [appState, recentFiles, editorBuffer] = await Promise.all([
+        this.loadAppState(),
+        this.getRecentFiles(),
+        this.loadEditorBuffer(),
+      ]);
+
+      // 何も保存されていない場合は null
+      if (!appState && recentFiles.length === 0 && !editorBuffer) {
+        return null;
+      }
+
+      return {
+        appState: appState || {},
+        recentFiles,
+        editorBuffer,
+      };
+    } catch (error) {
+      console.error("セッションの読み込みに失敗しました:", error);
+      return null;
+    }
+  }
+
+  async saveAppState(appState: AppState): Promise<void> {
+    await this.initialize();
+
+    try {
+      await this.db.appState.put({
+        id: "app_state",
+        data: appState,
+      });
+    } catch (error) {
+      console.error("アプリ状態の保存に失敗しました:", error);
+      throw error;
+    }
+  }
+
+  async loadAppState(): Promise<AppState | null> {
+    await this.initialize();
+
+    try {
+      const stored = await this.db.appState.get("app_state");
+      return stored?.data ?? null;
+    } catch (error) {
+      console.error("アプリ状態の読み込みに失敗しました:", error);
+      return null;
+    }
+  }
+
+  async addToRecent(file: RecentFile): Promise<void> {
+    await this.initialize();
+
+    try {
+      // 既存があれば削除
+      await this.db.recentFiles.delete(`recent_${file.path}`);
+
+      // 新規追加
+      await this.db.recentFiles.put({
+        id: `recent_${file.path}`,
+        path: file.path,
+        data: file,
+      });
+
+      // 全件取得して 10 件に丸める
+      const allFiles = await this.db.recentFiles.toArray();
+      if (allFiles.length > 10) {
+        // 新しい順に並べ、古いものを削除
+        const sorted = allFiles.sort((a, b) => b.data.lastModified - a.data.lastModified);
+        const toDelete = sorted.slice(10);
+        await this.db.recentFiles.bulkDelete(toDelete.map((f) => f.id));
+      }
+    } catch (error) {
+      console.error("最近使ったファイルへの追加に失敗しました:", error);
+      throw error;
+    }
+  }
+
+  private async saveRecentFiles(files: RecentFile[]): Promise<void> {
+    await this.initialize();
+
+    try {
+      // 既存の一覧をクリア
+      await this.db.recentFiles.clear();
+
+      // 追加
+      const records = files.map((file) => ({
+        id: `recent_${file.path}`,
+        path: file.path,
+        data: file,
+      }));
+
+      await this.db.recentFiles.bulkPut(records);
+    } catch (error) {
+      console.error("最近使ったファイルの保存に失敗しました:", error);
+      throw error;
+    }
+  }
+
+  async getRecentFiles(): Promise<RecentFile[]> {
+    await this.initialize();
+
+    try {
+      const allFiles = await this.db.recentFiles.toArray();
+      return allFiles
+        .sort((a, b) => b.data.lastModified - a.data.lastModified)
+        .slice(0, 10)
+        .map((f) => f.data);
+    } catch (error) {
+      console.error("最近使ったファイルの取得に失敗しました:", error);
+      return [];
+    }
+  }
+
+  async removeFromRecent(path: string): Promise<void> {
+    await this.initialize();
+
+    try {
+      await this.db.recentFiles.delete(`recent_${path}`);
+    } catch (error) {
+      console.error("最近使ったファイルからの削除に失敗しました:", error);
+      throw error;
+    }
+  }
+
+  async clearRecent(): Promise<void> {
+    await this.initialize();
+
+    try {
+      await this.db.recentFiles.clear();
+    } catch (error) {
+      console.error("最近使ったファイルの全削除に失敗しました:", error);
+      throw error;
+    }
+  }
+
+  async saveEditorBuffer(buffer: EditorBuffer, fileKey?: string): Promise<void> {
+    await this.initialize();
+
+    const id = fileKey ? `editor_buffer:${fileKey}` : "editor_buffer";
+    try {
+      await this.db.editorBuffer.put({
+        id,
+        data: buffer,
+        fileHandle: buffer.fileHandle,
+      });
+    } catch (error) {
+      console.error("エディタバッファの保存に失敗しました:", error);
+      throw error;
+    }
+  }
+
+  async loadEditorBuffer(fileKey?: string): Promise<EditorBuffer | null> {
+    await this.initialize();
+
+    const id = fileKey ? `editor_buffer:${fileKey}` : "editor_buffer";
+    try {
+      const stored = await this.db.editorBuffer.get(id);
+      if (!stored?.data) return null;
+
+      // fileHandle があれば復元する
+      if (stored.fileHandle) {
+        stored.data.fileHandle = stored.fileHandle;
+      }
+
+      return stored.data;
+    } catch (error) {
+      console.error("エディタバッファの読み込みに失敗しました:", error);
+      return null;
+    }
+  }
+
+  async clearEditorBuffer(fileKey?: string): Promise<void> {
+    await this.initialize();
+
+    const id = fileKey ? `editor_buffer:${fileKey}` : "editor_buffer";
+    try {
+      await this.db.editorBuffer.delete(id);
+    } catch (error) {
+      console.error("エディタバッファの削除に失敗しました:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * No-op for Web. Project handles are managed by ProjectManager via IndexedDB.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async addRecentProject(_project: RecentProject): Promise<void> {
+    // Web uses ProjectManager for directory handle persistence, not this API.
+  }
+
+  /**
+   * Returns empty array for Web. Project handles are managed by ProjectManager.
+   */
+  async getRecentProjects(): Promise<RecentProject[]> {
+    // Web uses ProjectManager for directory handle persistence, not this API.
+    return [];
+  }
+
+  /**
+   * No-op for Web. Project handles are managed by ProjectManager via IndexedDB.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async removeRecentProject(_projectId: string): Promise<void> {
+    // Web uses ProjectManager for directory handle persistence, not this API.
+  }
+
+  async setItem(key: string, value: string): Promise<void> {
+    await this.initialize();
+    await this.db.kvStore.put({ key, value });
+  }
+
+  async getItem(key: string): Promise<string | null> {
+    await this.initialize();
+    const item = await this.db.kvStore.get(key);
+    return item?.value ?? null;
+  }
+
+  async removeItem(key: string): Promise<void> {
+    await this.initialize();
+    await this.db.kvStore.delete(key);
+  }
+
+  async clearAll(): Promise<void> {
+    await this.initialize();
+
+    try {
+      await Promise.all([
+        this.db.appState.clear(),
+        this.db.recentFiles.clear(),
+        this.db.editorBuffer.clear(),
+        this.db.projectHandles.clear(),
+        this.db.kvStore.clear(),
+      ]);
+    } catch (error) {
+      console.error("ストレージの全削除に失敗しました:", error);
+      throw error;
+    }
+  }
+}
+
+export default WebStorageProvider;

@@ -4,8 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { RefreshCw, Folder, File, ChevronDown, FilePlus, FolderPlus } from "lucide-react";
 import clsx from "clsx";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
-import ContextMenu from "@/components/ContextMenu";
-import ConfirmDialog from "@/components/ConfirmDialog";
+import ContextMenu from "@/shared/ui/ContextMenu";
+import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { isElectronRenderer, detectOSPlatform } from "@/lib/utils/runtime-env";
 import type { FileTreeEntry, EditingEntry } from "./types";
 

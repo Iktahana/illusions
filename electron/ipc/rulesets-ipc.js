@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Rulesets IPC handlers — main process.
  * Follows the same pattern as dict-ipc.js. All handlers are fail-safe: they

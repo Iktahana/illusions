@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // System, window, and safe-storage IPC handlers
 
 const { ipcMain, BrowserWindow, safeStorage, powerMonitor } = require("electron");

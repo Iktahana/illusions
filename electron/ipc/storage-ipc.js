@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Storage IPC ハンドラー
  * ElectronStorageManager を使い、レンダラからの IPC 呼び出しに応答する
