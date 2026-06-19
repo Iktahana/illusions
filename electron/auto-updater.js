@@ -10,12 +10,39 @@ const { isDev, isMicrosoftStoreApp } = require("./app-constants");
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
 
-// Set update channel based on app version suffix (e.g., 0.1.123-beta → beta)
-// Only 'latest' (stable) channel is the default; alpha/beta users stay on their channel
-const versionMatch = app.getVersion().match(/-(.+)$/);
-if (versionMatch) {
-  autoUpdater.channel = versionMatch[1];
+// このビルド自体のプレリリース channel を版番号の接尾辞から判定する。
+// 例: "1.2.19-beta.20260620.143000" → "beta"、"1.2.19" → null（安定版）
+// 接尾辞先頭の英字部分のみ取る（タイムスタンプ ".20260620.143000" は channel 名に含めない）。
+const buildChannel = (() => {
+  const m = app.getVersion().match(/-([a-z]+)/);
+  return m ? m[1] : null;
+})();
+
+// プレリリースビルド（-beta/-alpha）を走らせているユーザーは常に自分の channel に留まる。
+// 安定版ビルドは既定で latest（opt-in 時のみ beta へ切り替える）。
+if (buildChannel) {
+  autoUpdater.channel = buildChannel;
   autoUpdater.allowPrerelease = true;
+}
+
+/**
+ * 安定版ビルドにおける beta opt-in を AppState から読み、autoUpdater の
+ * channel / allowPrerelease を決定する。プレリリースビルドは opt-in に関係なく
+ * 自分の channel を維持する。各 checkForUpdates の直前に呼ぶことで、設定変更が
+ * 次回チェックに反映される。
+ */
+async function applyBetaOptIn() {
+  if (buildChannel) return; // プレリリースビルドは自分の channel を維持
+  try {
+    const { getStorageManager } = require("./ipc/storage-ipc");
+    const appState = await getStorageManager().loadAppState();
+    const allowBeta = appState?.allowBetaUpdates === true;
+    autoUpdater.channel = allowBeta ? "beta" : "latest";
+    autoUpdater.allowPrerelease = allowBeta;
+    log.info(`アップデートchannel=${autoUpdater.channel} (beta opt-in: ${allowBeta})`);
+  } catch (e) {
+    log.error("beta opt-in 設定の読み込みに失敗しました:", e);
+  }
 }
 
 let isManualUpdateCheck = false;
@@ -131,7 +158,7 @@ function setupAutoUpdater() {
 }
 
 // アップデート確認（手動/自動）
-function checkForUpdates(manual = false) {
+async function checkForUpdates(manual = false) {
   if (isDev) {
     if (manual) {
       const { getMainWindow } = require("./window-manager");
@@ -168,7 +195,19 @@ function checkForUpdates(manual = false) {
   }
 
   isManualUpdateCheck = manual;
+  // 設定変更を反映するため、チェック直前に opt-in を再評価して channel を確定する
+  await applyBetaOptIn();
   autoUpdater.checkForUpdates();
 }
 
-module.exports = { setupAutoUpdater, checkForUpdates };
+/**
+ * レンダラの beta opt-in トグル変更時に呼ばれる（IPC: update:reevaluate-channel）。
+ * channel を再評価し、サイレントに更新確認を行う（autoDownload=false のため
+ * ダイアログ表示のみ。OFF にした場合も latest へ戻す）。
+ */
+async function reevaluateUpdateChannel() {
+  if (isDev || isMicrosoftStoreApp) return;
+  await checkForUpdates(false);
+}
+
+module.exports = { setupAutoUpdater, checkForUpdates, reevaluateUpdateChannel };

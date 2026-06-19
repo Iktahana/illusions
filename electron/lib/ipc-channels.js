@@ -231,6 +231,14 @@ const NLP_CHANNELS = Object.freeze({
   }),
 });
 
+// Auto-update channel control (electron/ipc/system-ipc.js)
+const UPDATE_CHANNELS = Object.freeze({
+  invoke: Object.freeze({
+    reevaluateChannel: "update:reevaluate-channel",
+  }),
+  event: Object.freeze({}),
+});
+
 // Integrated terminal PTY sessions (electron/ipc/pty-ipc.js)
 const PTY_CHANNELS = Object.freeze({
   invoke: Object.freeze({
@@ -262,4 +270,5 @@ module.exports = {
   EDITOR_CHANNELS,
   NLP_CHANNELS,
   PTY_CHANNELS,
+  UPDATE_CHANNELS,
 };
