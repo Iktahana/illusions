@@ -2,11 +2,11 @@
 
 Date: 2026-06-19
 Status: approved for execution
-Architecture evidence: [`PATHFINDER-2026-06-19/`](../../../PATHFINDER-2026-06-19/00-features.md)
+Architecture evidence: [`docs/archive/PATHFINDER-2026-06-19/`](../../archive/PATHFINDER-2026-06-19/00-features.md)
 
 ## Outcome
 
-Replace horizontal catch-all directories with feature ownership while keeping Next.js routes, Electron security boundaries, and build entrypoints stable. The end state is described in `PATHFINDER-2026-06-19/03-unified-proposal.md`.
+Replace horizontal catch-all directories with feature ownership while keeping Next.js routes, Electron security boundaries, and build entrypoints stable. The end state is described in `docs/archive/PATHFINDER-2026-06-19/03-unified-proposal.md`.
 
 This is an incremental refactor, not a rewrite. Each implementation PR must be independently mergeable and must either be a pure move/deletion PR or a behavior PR, never both.
 
@@ -57,7 +57,7 @@ Treat the PR #1795 framework as one versioned surface during structural moves:
 
 - Baseline failures are documented before any move; new PRs may not add failures.
 - No code or files move in Phase 0.
-- The feature inventory matches `PATHFINDER-2026-06-19/00-features.md` or is explicitly amended with evidence.
+- The feature inventory matches `docs/archive/PATHFINDER-2026-06-19/00-features.md` or is explicitly amended with evidence.
 
 ### Guards
 
@@ -70,7 +70,7 @@ Treat the PR #1795 framework as one versioned surface during structural moves:
 
 Create one behavior-neutral PR.
 
-1. Delete high-confidence legacy code from `PATHFINDER-2026-06-19/02-duplication-report.md`:
+1. Delete high-confidence legacy code from `docs/archive/PATHFINDER-2026-06-19/02-duplication-report.md`:
    - `nlp-service/nlp-ipc-handlers.js`
    - `components/AiStatusIndicator.tsx`
    - `components/Navbar.tsx`
