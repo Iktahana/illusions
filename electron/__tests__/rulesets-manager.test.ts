@@ -13,12 +13,14 @@ const {
   isCompatibleEngineApi,
   needsUpdate,
   normalizeDigest,
+  isSafeRulesetId,
   SUPPORTED_ENGINE_API,
 } = require("../rulesets-manager") as {
   selectReleaseAssets: (assets: unknown) => { index: unknown; manifest: unknown };
   isCompatibleEngineApi: (m: unknown) => boolean;
   needsUpdate: (installed: string | null, latest: string | null) => boolean;
   normalizeDigest: (d: unknown) => string | null;
+  isSafeRulesetId: (id: unknown) => boolean;
   SUPPORTED_ENGINE_API: number;
 };
 
@@ -96,5 +98,117 @@ describe("normalizeDigest", () => {
     expect(normalizeDigest(undefined)).toBeNull();
     expect(normalizeDigest(123)).toBeNull();
     expect(normalizeDigest("sha256:")).toBeNull();
+  });
+});
+
+describe("isSafeRulesetId", () => {
+  it("accepts dotted/hyphenated ids", () => {
+    expect(isSafeRulesetId("com.illusions-lab.gendai-kanazukai")).toBe(true);
+    expect(isSafeRulesetId("my_team.rules-1")).toBe(true);
+  });
+  it("rejects path traversal and separators", () => {
+    expect(isSafeRulesetId("../etc/passwd")).toBe(false);
+    expect(isSafeRulesetId("a/b")).toBe(false);
+    expect(isSafeRulesetId("a\\b")).toBe(false);
+    expect(isSafeRulesetId("a..b")).toBe(false);
+    expect(isSafeRulesetId("")).toBe(false);
+    expect(isSafeRulesetId(123)).toBe(false);
+  });
+});
+
+// --- readModule / uninstall against an isolated HOME (real fs) ---
+const fs = require("fs") as typeof import("fs");
+const os = require("os") as typeof import("os");
+const path = require("path") as typeof import("path");
+const crypto = require("crypto") as typeof import("crypto");
+
+const { RulesetsManager, isSafeRulesetId: _safe } = require("../rulesets-manager") as {
+  RulesetsManager: new () => {
+    readModule: (
+      id: string,
+    ) => Promise<
+      | { ok: true; id: string; tag: string | null; manifest: unknown; code: string }
+      | { ok: false; id: string; reason: string }
+    >;
+    uninstall: (id: string) => { ok: boolean; detail?: string };
+    listInstalled: () => Array<{ id: string; version: string | null; tag: string | null }>;
+  };
+  isSafeRulesetId: (id: unknown) => boolean;
+};
+void _safe;
+
+/** Lay down a complete installed ruleset under <home>/.illusions/rulesets/<id>/. */
+function installFake(home: string, id: string, code: string, tag = "v1.0.0"): void {
+  const dir = path.join(home, ".illusions", "rulesets", id);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({ id, version: "1.0.0" }));
+  fs.writeFileSync(path.join(dir, "index.js"), code);
+  fs.writeFileSync(path.join(dir, ".release-tag"), tag);
+  const sha = crypto.createHash("sha256").update(Buffer.from(code, "utf8")).digest("hex");
+  fs.writeFileSync(path.join(dir, "index.js.sha256"), sha);
+}
+
+describe("RulesetsManager.readModule / uninstall (isolated HOME)", () => {
+  it("reads a complete install, verifies integrity, and rejects tamper/traversal", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "illusions-rm-"));
+    const prev = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const mgr = new RulesetsManager();
+      const id = "com.example.thirdparty";
+      installFake(home, id, "export default { manifest:{}, createRules(){return[]} };");
+
+      const ok = await mgr.readModule(id);
+      expect(ok.ok).toBe(true);
+      if (ok.ok) {
+        expect(ok.code).toContain("createRules");
+        expect(ok.tag).toBe("v1.0.0");
+      }
+
+      // tamper the code → integrity must fail
+      fs.writeFileSync(
+        path.join(home, ".illusions", "rulesets", id, "index.js"),
+        "export default { hacked: true };",
+      );
+      const bad = await mgr.readModule(id);
+      expect(bad.ok).toBe(false);
+
+      // path traversal rejected up front
+      expect((await mgr.readModule("../../etc/passwd")).ok).toBe(false);
+      // missing install
+      expect((await mgr.readModule("com.example.missing")).ok).toBe(false);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+      if (prev === undefined) delete process.env.HOME;
+      else process.env.HOME = prev;
+    }
+  });
+
+  it("uninstalls a third-party ruleset but refuses official ones", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "illusions-rm-"));
+    const prev = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const mgr = new RulesetsManager();
+      const tp = "com.example.thirdparty";
+      installFake(home, tp, "export default {};");
+      // official (built-in recommended) id is non-deletable
+      const official = OFFICIAL_RULESETS[0]?.id ?? "com.illusions-lab.gendai-kanazukai";
+      installFake(home, official, "export default {};");
+
+      const refuse = mgr.uninstall(official);
+      expect(refuse.ok).toBe(false);
+      expect(fs.existsSync(path.join(home, ".illusions", "rulesets", official))).toBe(true);
+
+      const removed = mgr.uninstall(tp);
+      expect(removed.ok).toBe(true);
+      expect(fs.existsSync(path.join(home, ".illusions", "rulesets", tp))).toBe(false);
+
+      expect(mgr.uninstall("../../etc").ok).toBe(false);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+      if (prev === undefined) delete process.env.HOME;
+      else process.env.HOME = prev;
+    }
   });
 });

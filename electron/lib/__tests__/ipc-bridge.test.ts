@@ -287,8 +287,13 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       listInstalled: "rulesets:list-installed",
       sync: "rulesets:sync",
       checkUpdate: "rulesets:check-update",
+      readModule: "rulesets:read-module",
+      uninstall: "rulesets:uninstall",
     });
-    expect(RULESETS_CHANNELS.event).toEqual({});
+    expect(RULESETS_CHANNELS.event).toEqual({
+      syncProgress: "rulesets:sync-progress",
+      changed: "rulesets:changed",
+    });
   });
 });
 
@@ -378,6 +383,8 @@ describe("ipc bridge: preload ↔ main handler registration cannot drift", () =>
     { constName: "NLP_CHANNELS", key: "tokenizeProgress", senderFile: "ipc/nlp-ipc.js" },
     { constName: "PTY_CHANNELS", key: "data", senderFile: "ipc/pty-ipc.js" },
     { constName: "PTY_CHANNELS", key: "exit", senderFile: "ipc/pty-ipc.js" },
+    { constName: "RULESETS_CHANNELS", key: "syncProgress", senderFile: "ipc/rulesets-ipc.js" },
+    { constName: "RULESETS_CHANNELS", key: "changed", senderFile: "ipc/rulesets-ipc.js" },
   ];
 
   it.each(eventSenders)(

@@ -206,6 +206,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
     sync: invokeChannel(RULESETS_CHANNELS.invoke.sync, { arity: 0 }),
     /** Check latest release tags vs installed, without downloading. */
     checkUpdate: invokeChannel(RULESETS_CHANNELS.invoke.checkUpdate, { arity: 0 }),
+    /** Read a verified ruleset module (code + manifest) for the external loader. */
+    readModule: invokeChannel(RULESETS_CHANNELS.invoke.readModule, { arity: 1 }),
+    /** Uninstall a third-party ruleset (official/built-in are refused in main). */
+    uninstall: invokeChannel(RULESETS_CHANNELS.invoke.uninstall, { arity: 1 }),
+    /** Per-ruleset sync progress pushes. */
+    onSyncProgress: eventChannel(RULESETS_CHANNELS.event.syncProgress),
+    /** Announcement that installed rulesets changed (installed/updated/uninstalled). */
+    onChanged: eventChannel(RULESETS_CHANNELS.event.changed),
   },
   pty: {
     /** Spawn a new PTY session. Returns { sessionId } or { error }. */
