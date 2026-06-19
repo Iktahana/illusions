@@ -102,6 +102,13 @@ export interface RunBatchResponse {
  */
 export type SerializedIssueMap = Array<[number, LintIssue[]]>;
 
+/** A single warning emitted by the ruleset loader or registry. */
+export interface RulesetLoadWarning {
+  code: string;
+  messageJa: string;
+  detail?: string;
+}
+
 /** Worker → main events. */
 export type WorkerEvent =
   | { type: "READY" }
@@ -116,6 +123,14 @@ export type WorkerEvent =
       type: "ERROR";
       correlationId?: number;
       error: { name: string; message: string };
+    }
+  | {
+      type: "RULESET_LOADED";
+      correlationId: number;
+      id: string;
+      ok: boolean;
+      ruleIds: string[];
+      warnings: RulesetLoadWarning[];
     };
 
 /** Main → worker requests. */
@@ -142,6 +157,20 @@ export type WorkerRequest =
       version: number;
       paragraphs: ReadonlyArray<{ text: string; index: number }>;
       mode: BatchMode;
+    }
+  | {
+      /** Load (or reload) an external ruleset by injecting its ESM source. */
+      type: "LOAD_RULESET";
+      correlationId: number;
+      id: string;
+      /** Full ESM module source string (already sha256-verified by the main process). */
+      code: string;
+    }
+  | {
+      /** Unload a previously-loaded external ruleset and rebuild the runner. */
+      type: "UNLOAD_RULESET";
+      correlationId: number;
+      id: string;
     };
 
 // -------------------------------------------------------------------------

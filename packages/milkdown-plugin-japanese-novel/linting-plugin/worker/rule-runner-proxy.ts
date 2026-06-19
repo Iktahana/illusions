@@ -21,6 +21,7 @@ import {
   WorkerDisposedError,
   WorkerStaleError,
   type RuleRunnerLike,
+  type RulesetLoadWarning,
   type RunBatchRequest,
   type RunBatchResponse,
   type SerializedIssueMap,
@@ -36,6 +37,17 @@ interface PendingRequest {
   mainPerParagraph: Map<number, LintIssue[]>;
   /** Document-level issues already computed on the main thread (morph doc rules). */
   mainDocument: Map<number, LintIssue[]>;
+}
+
+export interface RulesetLoadResult {
+  ok: boolean;
+  ruleIds: string[];
+  warnings: RulesetLoadWarning[];
+}
+
+interface PendingRulesetRequest {
+  resolve: (result: RulesetLoadResult) => void;
+  reject: (err: Error) => void;
 }
 
 /**
@@ -58,6 +70,7 @@ export class RuleRunnerProxy implements RuleRunnerLike {
   private nextCorrelationId = 1;
   private latestRequestedVersion = 0;
   private readonly pending = new Map<number, PendingRequest>();
+  private readonly pendingRulesets = new Map<number, PendingRulesetRequest>();
   private readonly preReadyBuffer: WorkerRequest[] = [];
 
   private ready = false;
@@ -246,6 +259,43 @@ export class RuleRunnerProxy implements RuleRunnerLike {
     return workerResponse;
   }
 
+  /**
+   * Load (or reload) an external ruleset into the worker.
+   * Resolves once the worker has acknowledged the load attempt.
+   * On success the worker has already rebuilt its runner with the new rules.
+   * On failure the worker's existing runner is left intact (failure isolation).
+   */
+  async loadRuleset(id: string, code: string): Promise<RulesetLoadResult> {
+    if (this.fatalError) throw this.fatalError;
+    if (this.disposed) throw new WorkerDisposedError();
+
+    const correlationId = this.nextId();
+    const result = new Promise<RulesetLoadResult>((resolve, reject) => {
+      this.pendingRulesets.set(correlationId, { resolve, reject });
+    });
+
+    this.send({ type: "LOAD_RULESET", correlationId, id, code });
+
+    return result;
+  }
+
+  /**
+   * Unload a previously-loaded external ruleset from the worker.
+   * The worker rebuilds the runner from legacy + remaining externals.
+   */
+  async unloadRuleset(id: string): Promise<RulesetLoadResult> {
+    if (this.fatalError) throw this.fatalError;
+    if (this.disposed) throw new WorkerDisposedError();
+
+    const correlationId = this.nextId();
+    const result = new Promise<RulesetLoadResult>((resolve, reject) => {
+      this.pendingRulesets.set(correlationId, { resolve, reject });
+    });
+
+    this.send({ type: "UNLOAD_RULESET", correlationId, id });
+    return result;
+  }
+
   cancelInFlight(): void {
     const err = new WorkerStaleError();
     for (const entry of this.pending.values()) {
@@ -263,6 +313,10 @@ export class RuleRunnerProxy implements RuleRunnerLike {
       entry.reject(err);
     }
     this.pending.clear();
+    for (const entry of this.pendingRulesets.values()) {
+      entry.reject(err);
+    }
+    this.pendingRulesets.clear();
     this.preReadyBuffer.length = 0;
     if (!this.ready) {
       // Reject the readyPromise so any awaiter unwinds cleanly.
@@ -320,14 +374,30 @@ export class RuleRunnerProxy implements RuleRunnerLike {
         entry.resolve(merged);
         return;
       }
+      case "RULESET_LOADED": {
+        const entry = this.pendingRulesets.get(evt.correlationId);
+        if (entry) {
+          this.pendingRulesets.delete(evt.correlationId);
+          entry.resolve({ ok: evt.ok, ruleIds: evt.ruleIds, warnings: evt.warnings });
+        }
+        return;
+      }
       case "ERROR": {
         const err = new Error(evt.error.message);
         err.name = evt.error.name;
         if (evt.correlationId !== undefined) {
-          const entry = this.pending.get(evt.correlationId);
-          if (entry) {
+          // Could be a batch request or a ruleset request.
+          const batchEntry = this.pending.get(evt.correlationId);
+          if (batchEntry) {
             this.pending.delete(evt.correlationId);
-            entry.reject(err);
+            batchEntry.reject(err);
+            return;
+          }
+          const rulesetEntry = this.pendingRulesets.get(evt.correlationId);
+          if (rulesetEntry) {
+            this.pendingRulesets.delete(evt.correlationId);
+            rulesetEntry.reject(err);
+            return;
           }
         } else {
           // Uncorrelated worker failure — treat as fatal. Reject every
@@ -363,6 +433,10 @@ export class RuleRunnerProxy implements RuleRunnerLike {
       entry.reject(err);
     }
     this.pending.clear();
+    for (const entry of this.pendingRulesets.values()) {
+      entry.reject(err);
+    }
+    this.pendingRulesets.clear();
     this.preReadyBuffer.length = 0;
     if (!this.ready) {
       this.rejectReady(err);

@@ -347,6 +347,30 @@ declare global {
           error?: string;
         }>
       >;
+      /**
+       * Read an installed ruleset's verified module code + manifest for the
+       * external loader. Re-verifies the code sha256 recorded at install.
+       */
+      readModule: (
+        id: string,
+      ) => Promise<
+        | { ok: true; id: string; tag: string | null; manifest: unknown; code: string }
+        | { ok: false; id: string; reason: string }
+      >;
+      /** Uninstall a third-party ruleset (official/built-in recommended are refused). */
+      uninstall: (id: string) => Promise<{ ok: boolean; detail?: string }>;
+      /** Subscribe to per-ruleset sync progress. Returns an unsubscribe fn. */
+      onSyncProgress: (
+        cb: (data: {
+          id: string;
+          status: "installed" | "up-to-date" | "skipped" | "error";
+          detail?: string;
+        }) => void,
+      ) => () => void;
+      /** Subscribe to installed-ruleset change announcements. Returns an unsubscribe fn. */
+      onChanged: (
+        cb: (data: { reason: "installed" | "updated" | "uninstalled"; ids: string[] }) => void,
+      ) => () => void;
     };
     /** PTY session management */
     pty?: {

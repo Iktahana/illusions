@@ -33,6 +33,10 @@ const SUPPORTED_ENGINE_API = 1;
 const ASSET_INDEX = "index.js";
 const ASSET_MANIFEST = "manifest.json";
 const VERSION_FILE = ".release-tag";
+// sha256 (hex) of index.js, recorded at install time. The external loader
+// re-verifies the code against this before executing it (closes the
+// time-of-check/time-of-use gap between download and load).
+const INTEGRITY_FILE = "index.js.sha256";
 
 // Hosts GitHub serves release assets / API from. Asset URLs not on this list
 // are rejected (defense against a tampered/redirected download target).
@@ -78,6 +82,16 @@ function normalizeDigest(digest) {
   return digest.replace(/^sha256:/i, "").toLowerCase() || null;
 }
 
+/**
+ * Whether a ruleset id is safe to use as a directory name (no path traversal).
+ * Ruleset ids look like "com.illusions-lab.gendai-kanazukai".
+ */
+function isSafeRulesetId(id) {
+  return (
+    typeof id === "string" && id.length > 0 && /^[A-Za-z0-9._-]+$/.test(id) && !id.includes("..")
+  );
+}
+
 class RulesetsManager {
   constructor() {
     this._syncing = false;
@@ -110,20 +124,28 @@ class RulesetsManager {
     }
   }
 
-  /** True when the installed dir has BOTH required asset files (not just a tag). */
+  /**
+   * True when the installed dir has all required files (manifest + code + the
+   * integrity sha). A pre-integrity install (no sha file) counts as INCOMPLETE
+   * so the next sync re-installs it and records the sha (enables load-time
+   * re-verification for installs made before integrity tracking existed).
+   */
   _isInstalledComplete(id) {
     const dir = this._rulesetDir(id);
     return (
-      fs.existsSync(path.join(dir, ASSET_MANIFEST)) && fs.existsSync(path.join(dir, ASSET_INDEX))
+      fs.existsSync(path.join(dir, ASSET_MANIFEST)) &&
+      fs.existsSync(path.join(dir, ASSET_INDEX)) &&
+      fs.existsSync(path.join(dir, INTEGRITY_FILE))
     );
   }
 
-  /** True when a directory holds a full release (manifest + code + tag). */
+  /** True when a directory holds a full release (manifest + code + tag + integrity). */
   _dirHasFullRelease(d) {
     return (
       fs.existsSync(path.join(d, ASSET_MANIFEST)) &&
       fs.existsSync(path.join(d, ASSET_INDEX)) &&
-      fs.existsSync(path.join(d, VERSION_FILE))
+      fs.existsSync(path.join(d, VERSION_FILE)) &&
+      fs.existsSync(path.join(d, INTEGRITY_FILE))
     );
   }
 
@@ -228,23 +250,98 @@ class RulesetsManager {
    * Best-effort and fail-safe: never throws; returns a per-ruleset summary.
    * @returns {Array<{ id, status: "installed"|"up-to-date"|"skipped"|"error", detail?: string }>}
    */
-  async syncAllOfficial() {
+  async syncAllOfficial(onProgress) {
     if (this._syncing) return [{ id: "*", status: "skipped", detail: "sync already running" }];
     this._syncing = true;
     const summary = [];
+    const report = (result) => {
+      summary.push(result);
+      if (typeof onProgress === "function") {
+        try {
+          onProgress(result);
+        } catch {
+          /* progress callback must never break the sync */
+        }
+      }
+    };
     try {
       for (const spec of OFFICIAL_RULESETS) {
         try {
-          summary.push(await this._syncOne(spec));
+          report(await this._syncOne(spec));
         } catch (err) {
           console.warn(`[Rulesets] sync failed for ${spec.id}:`, err);
-          summary.push({ id: spec.id, status: "error", detail: String(err?.message ?? err) });
+          report({ id: spec.id, status: "error", detail: String(err?.message ?? err) });
         }
       }
     } finally {
       this._syncing = false;
     }
     return summary;
+  }
+
+  /**
+   * Read an installed ruleset's module code + manifest for the external loader.
+   * Re-verifies the code against the sha recorded at install (TOCTOU defense)
+   * and rejects path-traversal ids. Fail-safe: returns {ok:false} on any problem.
+   * @param {string} id
+   * @returns {Promise<{ok:true,id:string,tag:string|null,manifest:unknown,code:string}|{ok:false,id:string,reason:string}>}
+   */
+  async readModule(id) {
+    if (!isSafeRulesetId(id)) return { ok: false, id: String(id), reason: "invalid id" };
+    try {
+      const dir = this._rulesetDir(id);
+      if (!this._isInstalledComplete(id)) return { ok: false, id, reason: "not installed" };
+      let manifest;
+      try {
+        manifest = JSON.parse(fs.readFileSync(path.join(dir, ASSET_MANIFEST), "utf8"));
+      } catch {
+        return { ok: false, id, reason: "manifest.json が不正なJSONです" };
+      }
+      // Hash the RAW bytes (matches what _downloadFile recorded).
+      const buf = fs.readFileSync(path.join(dir, ASSET_INDEX));
+      const actual = crypto.createHash("sha256").update(buf).digest("hex");
+      const expected = fs.readFileSync(path.join(dir, INTEGRITY_FILE), "utf8").trim().toLowerCase();
+      if (!expected || actual !== expected) {
+        return {
+          ok: false,
+          id,
+          reason: "整合性チェックに失敗しました（再ダウンロードが必要です）",
+        };
+      }
+      return {
+        ok: true,
+        id,
+        tag: this._readInstalledTag(id),
+        manifest,
+        code: buf.toString("utf8"),
+      };
+    } catch (err) {
+      return { ok: false, id, reason: String(err?.message ?? err) };
+    }
+  }
+
+  /**
+   * Uninstall a third-party ruleset. Official (built-in recommended) rulesets
+   * listed in OFFICIAL_RULESETS are NON-deletable and rejected here, so the
+   * "削除不可" guarantee is enforced in the backend, not just the UI.
+   * @param {string} id
+   * @returns {{ok:boolean, detail?:string}}
+   */
+  uninstall(id) {
+    if (!isSafeRulesetId(id)) return { ok: false, detail: "invalid id" };
+    if (OFFICIAL_RULESETS.some((r) => r.id === id)) {
+      return { ok: false, detail: "公式（内蔵推奨）ルールセットは削除できません。" };
+    }
+    try {
+      const dir = this._rulesetDir(id);
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(`${dir}.backup`, { recursive: true, force: true });
+      fs.rmSync(path.join(this._rootDir(), `.staging-${id}`), { recursive: true, force: true });
+      console.log(`[Rulesets] uninstalled ${id}`);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, detail: String(err?.message ?? err) };
+    }
   }
 
   /**
@@ -309,18 +406,20 @@ class RulesetsManager {
         };
       }
 
-      // 2. code asset.
-      await this._downloadFile(
+      // 2. code asset. _downloadFile resolves with the sha256 it computed while
+      //    streaming, which we persist for load-time re-verification.
+      const indexHash = await this._downloadFile(
         indexUrl,
         path.join(staging, ASSET_INDEX),
         normalizeDigest(indexAsset.digest),
       );
 
-      // 3. record the tag inside staging, then swap it in WITHOUT destroying the
-      //    old install first: rename old→backup, staging→dir, then drop backup.
-      //    A failed rename restores the backup, so we can never lose both copies;
-      //    a crash mid-swap is healed by _recoverStaging() on the next run.
+      // 3. record the tag + integrity sha inside staging, then swap it in WITHOUT
+      //    destroying the old install first: rename old→backup, staging→dir, then
+      //    drop backup. A failed rename restores the backup, so we can never lose
+      //    both copies; a crash mid-swap is healed by _recoverStaging() next run.
       fs.writeFileSync(path.join(staging, VERSION_FILE), latestTag, "utf8");
+      fs.writeFileSync(path.join(staging, INTEGRITY_FILE), indexHash, "utf8");
       fs.mkdirSync(path.dirname(dir), { recursive: true });
       const backup = `${dir}.backup`;
       fs.rmSync(backup, { recursive: true, force: true });
@@ -564,5 +663,6 @@ module.exports = {
   isCompatibleEngineApi,
   needsUpdate,
   normalizeDigest,
+  isSafeRulesetId,
   SUPPORTED_ENGINE_API,
 };

@@ -245,8 +245,13 @@ const RULESETS_CHANNELS = Object.freeze({
     listInstalled: "rulesets:list-installed",
     sync: "rulesets:sync",
     checkUpdate: "rulesets:check-update",
+    readModule: "rulesets:read-module",
+    uninstall: "rulesets:uninstall",
   }),
-  event: Object.freeze({}),
+  event: Object.freeze({
+    syncProgress: "rulesets:sync-progress",
+    changed: "rulesets:changed",
+  }),
 });
 
 // Integrated terminal PTY sessions (electron/ipc/pty-ipc.js)

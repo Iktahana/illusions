@@ -10,6 +10,7 @@ import {
   RuleRunnerProxy,
   type RuleRunnerLike,
 } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import { syncLoadedRulesets, subscribeRulesetChanges } from "@/lib/linting/external-ruleset-loader";
 
 export interface UseLintingResult {
   /** May be `null` until the worker has been spun up after mount. */
@@ -52,7 +53,21 @@ export function useLinting(
     const proxy = new RuleRunnerProxy();
     proxy.setGuidelineMap(RULE_GUIDELINE_MAP);
     setRuleRunner(proxy);
+
+    // Load any already-installed external rulesets and subscribe to changes.
+    // Both are no-ops on Web (no window.electronAPI.rulesets).
+    let unsubscribeChanges: (() => void) | null = null;
+    syncLoadedRulesets(proxy)
+      .then(() => {
+        // Subscribe AFTER initial sync so we don't double-load during startup.
+        unsubscribeChanges = subscribeRulesetChanges(proxy);
+      })
+      .catch((err) => {
+        console.error("[useLinting] external ruleset sync failed:", err);
+      });
+
     return () => {
+      unsubscribeChanges?.();
       // Don't `setRuleRunner(null)` here — StrictMode's mount → cleanup
       // → mount cycle would briefly nullify the runner between the two
       // mounts, causing dependent effects to re-run with `null` for no
