@@ -5,6 +5,7 @@ const { app, dialog } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 const { isDev, isMicrosoftStoreApp } = require("./app-constants");
+const { resolveUpdaterFlags } = require("./lib/update-policy");
 
 // auto-updater のログ設定
 autoUpdater.logger = log;
@@ -32,10 +33,12 @@ async function applyBetaOptIn() {
   try {
     const { getStorageManager } = require("./ipc/storage-ipc");
     const appState = await getStorageManager().loadAppState();
-    const allowBeta = appState?.allowBetaUpdates === true;
-    autoUpdater.allowPrerelease = allowBeta;
-    autoUpdater.allowDowngrade = !allowBeta;
-    log.info(`アップデート設定: allowPrerelease=${allowBeta}, allowDowngrade=${!allowBeta}`);
+    const { allowPrerelease, allowDowngrade } = resolveUpdaterFlags(appState?.allowBetaUpdates);
+    autoUpdater.allowPrerelease = allowPrerelease;
+    autoUpdater.allowDowngrade = allowDowngrade;
+    log.info(
+      `アップデート設定: allowPrerelease=${allowPrerelease}, allowDowngrade=${allowDowngrade}`,
+    );
   } catch (e) {
     log.error("beta opt-in 設定の読み込みに失敗しました:", e);
   }
