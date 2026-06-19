@@ -42,5 +42,7 @@ exports.default = async function embedQuickLook(context) {
   fs.rmSync(dest, { recursive: true, force: true });
   fs.cpSync(appexSource, dest, { recursive: true });
 
-  console.log(`[QuickLook] Embedded ${APPEX_NAME} into ${pluginsDir} (will be signed by electron-builder)`);
+  console.log(
+    `[QuickLook] Embedded ${APPEX_NAME} into ${pluginsDir} (will be signed by electron-builder)`,
+  );
 };
