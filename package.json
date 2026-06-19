@@ -171,10 +171,27 @@
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extraFiles": [
         {
-          "from": "build/quicklook/MDIQuickLook.qlgenerator",
-          "to": "Library/QuickLook/MDIQuickLook.qlgenerator"
+          "from": "build/quicklook/MDIQuickLook.appex",
+          "to": "PlugIns/MDIQuickLook.appex"
         }
       ],
+      "extendInfo": {
+        "UTExportedTypeDeclarations": [
+          {
+            "UTTypeIdentifier": "com.iktahana.illusions.mdi",
+            "UTTypeDescription": "illusions MDI Document",
+            "UTTypeConformsTo": [
+              "public.plain-text"
+            ],
+            "UTTypeTagSpecification": {
+              "public.filename-extension": [
+                "mdi"
+              ],
+              "public.mime-type": "text/markdown"
+            }
+          }
+        ]
+      },
       "target": [
         {
           "target": "dmg",
