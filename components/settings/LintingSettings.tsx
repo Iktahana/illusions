@@ -1,42 +1,18 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, MessageSquareOff, MessageSquare } from "lucide-react";
+import type React from "react";
 import clsx from "clsx";
-
-import dynamic from "next/dynamic";
 
 import type { Severity } from "@/lib/linting/types";
 import type { CorrectionConfig } from "@/lib/linting/correction-config";
-import type { CorrectionModeId } from "@/lib/linting/correction-config";
-import {
-  LINT_RULES_META,
-  LINT_RULE_CATEGORIES,
-  LINT_PRESETS,
-  LINT_DEFAULT_CONFIGS,
-} from "@/lib/linting/lint-presets";
-import {
-  CORRECTION_MODE_IDS,
-  CORRECTION_MODES,
-  MODE_TO_PRESET,
-} from "@/lib/linting/correction-modes";
-import { getRuleLevelMap } from "@/lib/linting/rule-registry";
-import type { RuleLevel } from "@/lib/linting/types";
-import GuidelineList from "@/components/GuidelineList";
+import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
-/** Tooltip text describing each detection level. */
-const RULE_LEVEL_LABELS: Record<RuleLevel, string> = {
-  L1: "L1：正規表現による検出",
-  L2: "L2：形態素解析による検出",
-  L3: "L3：LLM 補助による検出",
-};
+import ModeSelector from "./linting/ModeSelector";
+import RulesetList from "./linting/RulesetList";
+import MarketplaceEntryCard from "./linting/MarketplaceEntryCard";
+import { useRulesetStatus } from "./linting/useRulesetStatus";
 
-/** Map of rule ID -> supportsSkipDialogue from metadata */
-const SKIP_DIALOGUE_SUPPORT = new Map(
-  LINT_RULES_META.map((r) => [r.id, r.supportsSkipDialogue ?? false]),
-);
-
-interface LintingSettingsProps {
+export interface LintingSettingsProps {
   lintingEnabled: boolean;
   onLintingEnabledChange: (value: boolean) => void;
   lintingRuleConfigs: Record<
@@ -59,15 +35,7 @@ interface LintingSettingsProps {
   onCorrectionConfigChange?: (config: Partial<CorrectionConfig>) => void;
 }
 
-/** Resolve the effective config for a rule, falling back to defaults */
-function getConfig(
-  ruleId: string,
-  configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
-): { enabled: boolean; severity: Severity; skipDialogue?: boolean } {
-  return configs[ruleId] ?? LINT_DEFAULT_CONFIGS[ruleId] ?? { enabled: true, severity: "warning" };
-}
-
-export default function LintingSettings({
+function LintingSettingsInner({
   lintingEnabled,
   onLintingEnabledChange,
   lintingRuleConfigs,
@@ -79,113 +47,15 @@ export default function LintingSettings({
   onCharacterExtractionConcurrencyChange,
   correctionConfig,
   onCorrectionConfigChange,
-}: LintingSettingsProps) {
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-
-  const toggleGroup = useCallback((groupId: string) => {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupId)) {
-        next.delete(groupId);
-      } else {
-        next.add(groupId);
-      }
-      return next;
-    });
-  }, []);
-
-  /** Toggle all rules in a category */
-  const toggleCategoryEnabled = useCallback(
-    (ruleIds: string[], enabled: boolean) => {
-      const next = { ...lintingRuleConfigs };
-      for (const ruleId of ruleIds) {
-        const current = getConfig(ruleId, next);
-        next[ruleId] = { ...current, enabled };
-      }
-      onLintingRuleConfigsBatchChange(next);
-    },
-    [lintingRuleConfigs, onLintingRuleConfigsBatchChange],
-  );
-
-  /** Check if all rules in a category are enabled */
-  const isCategoryAllEnabled = (ruleIds: string[]): boolean =>
-    ruleIds.every((id) => getConfig(id, lintingRuleConfigs).enabled);
-
-  /** Count enabled rules in a category */
-  const categoryEnabledCount = (ruleIds: string[]): number =>
-    ruleIds.filter((id) => getConfig(id, lintingRuleConfigs).enabled).length;
-
-  const handleApplyPreset = useCallback(
-    (presetId: string) => {
-      const preset = LINT_PRESETS[presetId];
-      if (preset) {
-        onLintingRuleConfigsBatchChange({ ...preset.configs });
-      }
-    },
-    [onLintingRuleConfigsBatchChange],
-  );
-
-  const handleEnableAll = useCallback(() => {
-    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> =
-      {};
-    for (const rule of LINT_RULES_META) {
-      const current = getConfig(rule.id, lintingRuleConfigs);
-      next[rule.id] = { ...current, enabled: true };
-    }
-    onLintingRuleConfigsBatchChange(next);
-  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange]);
-
-  const handleDisableAll = useCallback(() => {
-    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> =
-      {};
-    for (const rule of LINT_RULES_META) {
-      const current = getConfig(rule.id, lintingRuleConfigs);
-      next[rule.id] = { ...current, enabled: false };
-    }
-    onLintingRuleConfigsBatchChange(next);
-  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange]);
-
-  const handleResetDefaults = useCallback(() => {
-    onLintingRuleConfigsBatchChange({ ...LINT_DEFAULT_CONFIGS });
-  }, [onLintingRuleConfigsBatchChange]);
-
-  // Memoized map to avoid recreation on every render (LINT_RULES_META is a module-level constant)
-  const ruleMetaMap = useMemo(() => new Map(LINT_RULES_META.map((r) => [r.id, r])), []);
-
-  // Rule ID -> detection level (L1/L2/L3), derived from the actual rule instances
-  const ruleLevelMap = useMemo(() => getRuleLevelMap(), []);
-
-  /** Handle correction mode change: update mode, guidelines, and apply corresponding preset */
-  const handleModeChange = useCallback(
-    (modeId: string) => {
-      if (!onCorrectionConfigChange) return;
-      const mode = CORRECTION_MODES[modeId as CorrectionModeId];
-      if (!mode) return;
-      onCorrectionConfigChange({
-        mode: mode.id,
-        guidelines: [...mode.defaultGuidelines],
-      });
-      const presetId = MODE_TO_PRESET[modeId as CorrectionModeId];
-      if (presetId) {
-        handleApplyPreset(presetId);
-      }
-    },
-    [onCorrectionConfigChange, handleApplyPreset],
-  );
-
-  /** Handle guideline priority list change */
-  const handleGuidelinesChange = useCallback(
-    (guidelines: CorrectionConfig["guidelines"]) => {
-      onCorrectionConfigChange?.({ guidelines });
-    },
-    [onCorrectionConfigChange],
-  );
+}: LintingSettingsProps): React.ReactElement {
+  const isElectron = isElectronRenderer();
+  const rulesetStatus = useRulesetStatus();
 
   const showCorrectionConfig = Boolean(correctionConfig && onCorrectionConfigChange);
 
   return (
     <div className="space-y-6">
-      {/* Master toggle */}
+      {/* ① Master toggle */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-medium text-foreground">校正機能を有効にする</h3>
@@ -197,6 +67,7 @@ export default function LintingSettings({
             "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
             lintingEnabled ? "bg-accent" : "bg-foreground-muted",
           )}
+          aria-label={lintingEnabled ? "校正を無効にする" : "校正を有効にする"}
         >
           <span
             className={clsx(
@@ -207,236 +78,106 @@ export default function LintingSettings({
         </button>
       </div>
 
-      {/* Correction mode selector + guideline priority */}
-      {showCorrectionConfig && correctionConfig && (
+      {/* ② Correction mode selector + collapsible guideline list */}
+      {showCorrectionConfig && correctionConfig && onCorrectionConfigChange && (
         <div
           className={clsx(
-            "space-y-4 pt-4 border-t border-border transition-opacity",
+            "pt-4 border-t border-border transition-opacity",
             !lintingEnabled && "opacity-50 pointer-events-none",
           )}
         >
-          {/* Mode selector */}
-          <div>
-            <h4 className="text-sm font-medium text-foreground mb-2">校正モード</h4>
-            <div className="flex flex-wrap gap-2">
-              {CORRECTION_MODE_IDS.map((modeId) => {
-                const mode = CORRECTION_MODES[modeId];
-                const isActive = correctionConfig.mode === modeId;
-                return (
-                  <button
-                    key={modeId}
-                    onClick={() => handleModeChange(modeId)}
-                    className={clsx(
-                      "px-3 py-1.5 rounded-full text-xs font-medium transition-colors border",
-                      isActive
-                        ? "bg-accent text-accent-foreground border-accent"
-                        : "bg-background text-foreground-secondary border-border hover:border-accent/50 hover:text-foreground",
-                    )}
-                    title={mode.descriptionJa}
-                  >
-                    {mode.nameJa}
-                  </button>
-                );
-              })}
-            </div>
-            {correctionConfig.mode && (
-              <p className="text-xs text-foreground-tertiary mt-1.5">
-                {CORRECTION_MODES[correctionConfig.mode].descriptionJa}
-              </p>
-            )}
-          </div>
-
-          {/* Guideline list */}
-          <div>
-            <h4 className="text-sm font-medium text-foreground mb-1">ガイドライン</h4>
-            <p className="text-xs text-foreground-tertiary mb-2">
-              有効にしたガイドラインに基づいてルールが適用されます。
-            </p>
-            <GuidelineList
-              guidelines={correctionConfig.guidelines}
-              onChange={handleGuidelinesChange}
-            />
-          </div>
+          <ModeSelector
+            correctionConfig={correctionConfig}
+            disabled={!lintingEnabled}
+            onCorrectionConfigChange={onCorrectionConfigChange}
+            onLintingRuleConfigsBatchChange={onLintingRuleConfigsBatchChange}
+          />
         </div>
       )}
 
-      {/* Rules section */}
+      {/* ③ Ruleset list */}
       <div
         className={clsx(
-          "space-y-4 pt-4 border-t border-border transition-opacity",
+          "pt-4 border-t border-border transition-opacity",
           !lintingEnabled && "opacity-50 pointer-events-none",
         )}
       >
-        <h3 className="text-sm font-medium text-foreground">校正ルール</h3>
+        <RulesetList
+          lintingRuleConfigs={lintingRuleConfigs}
+          onLintingRuleConfigChange={onLintingRuleConfigChange}
+          onLintingRuleConfigsBatchChange={onLintingRuleConfigsBatchChange}
+          disabled={!lintingEnabled}
+          rulesetStatus={isElectron ? rulesetStatus : undefined}
+        />
 
-        {/* Bulk actions */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex-1" />
-          <button
-            onClick={handleEnableAll}
-            className="text-xs px-2 py-1 text-foreground-secondary hover:text-foreground hover:bg-hover rounded transition-colors"
-          >
-            すべて有効
-          </button>
-          <span className="text-border-secondary text-xs">|</span>
-          <button
-            onClick={handleDisableAll}
-            className="text-xs px-2 py-1 text-foreground-secondary hover:text-foreground hover:bg-hover rounded transition-colors"
-          >
-            すべて無効
-          </button>
-          <span className="text-border-secondary text-xs">|</span>
-          <button
-            onClick={handleResetDefaults}
-            className="text-xs px-2 py-1 text-foreground-secondary hover:text-foreground hover:bg-hover rounded transition-colors"
-          >
-            デフォルトに戻す
-          </button>
+        {/* Web fallback note */}
+        {!isElectron && (
+          <p className="text-xs text-foreground-tertiary mt-3">
+            ルールセットの管理はデスクトップ版で利用できます
+          </p>
+        )}
+      </div>
+
+      {/* ④ Marketplace entry card (Electron only) */}
+      {isElectron && (
+        <div className={clsx(!lintingEnabled && "opacity-50 pointer-events-none")}>
+          <MarketplaceEntryCard />
         </div>
+      )}
 
-        {/* Grouped rules */}
-        {LINT_RULE_CATEGORIES.map((category) => {
-          const isCollapsed = collapsedGroups.has(category.id);
-          const enabledCount = categoryEnabledCount(category.rules);
-          const allEnabled = isCategoryAllEnabled(category.rules);
-
-          return (
-            <div key={category.id} className="border border-border rounded-lg overflow-hidden">
-              {/* Category header */}
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-background-tertiary/50">
-                <button
-                  onClick={() => toggleGroup(category.id)}
-                  className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
+      {/* ⑤ Advanced settings (character extraction) */}
+      {(onCharacterExtractionBatchSizeChange || onCharacterExtractionConcurrencyChange) && (
+        <details className="pt-4 border-t border-border">
+          <summary className="text-xs text-foreground-secondary cursor-pointer hover:text-foreground select-none">
+            詳細設定
+          </summary>
+          <div className="mt-3 space-y-3">
+            {onCharacterExtractionBatchSizeChange && characterExtractionBatchSize !== undefined && (
+              <div className="flex items-center gap-3">
+                <label
+                  htmlFor="char-extraction-batch"
+                  className="text-xs text-foreground-secondary flex-1"
                 >
-                  {isCollapsed ? (
-                    <ChevronRight className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
-                  ) : (
-                    <ChevronDown className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
-                  )}
-                  <span className="text-sm font-medium text-foreground">{category.nameJa}</span>
-                  <span className="text-xs text-foreground-tertiary ml-1">
-                    {enabledCount}/{category.rules.length}
-                  </span>
-                </button>
-                <button
-                  onClick={() => toggleCategoryEnabled(category.rules, !allEnabled)}
-                  className={clsx(
-                    "relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0",
-                    allEnabled ? "bg-accent" : "bg-foreground-muted",
-                  )}
-                >
-                  <span
-                    className={clsx(
-                      "inline-block h-3.5 w-3.5 transform rounded-full transition-transform shadow-sm",
-                      allEnabled
-                        ? "translate-x-5 bg-accent-foreground"
-                        : "translate-x-0.5 bg-white",
-                    )}
-                  />
-                </button>
+                  登場人物抽出バッチサイズ
+                </label>
+                <input
+                  id="char-extraction-batch"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={characterExtractionBatchSize}
+                  onChange={(e) => onCharacterExtractionBatchSizeChange(Number(e.target.value))}
+                  className="w-16 text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                />
               </div>
-
-              {/* Rules table */}
-              {!isCollapsed && (
-                <div className="divide-y divide-border">
-                  {category.rules.map((ruleId) => {
-                    const meta = ruleMetaMap.get(ruleId);
-                    if (!meta) return null;
-                    const config = getConfig(ruleId, lintingRuleConfigs);
-                    const showDialogueToggle = SKIP_DIALOGUE_SUPPORT.get(ruleId) ?? false;
-                    const level = ruleLevelMap.get(ruleId);
-
-                    return (
-                      <div
-                        key={ruleId}
-                        className={clsx("flex items-center gap-2 px-3 py-2")}
-                        title={undefined}
-                      >
-                        {/* Rule name + level tag */}
-                        <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                          {level && (
-                            <span
-                              className="flex-shrink-0 text-[10px] font-medium leading-none px-1 py-0.5 rounded border border-border-secondary text-foreground-tertiary bg-background-tertiary/50"
-                              title={RULE_LEVEL_LABELS[level]}
-                            >
-                              {level}
-                            </span>
-                          )}
-                          <span className="text-sm text-foreground truncate">{meta.nameJa}</span>
-                        </div>
-
-                        {/* Skip dialogue toggle */}
-                        {showDialogueToggle && (
-                          <button
-                            onClick={() =>
-                              onLintingRuleConfigChange(ruleId, {
-                                ...config,
-                                skipDialogue: !config.skipDialogue,
-                              })
-                            }
-                            className={clsx(
-                              "p-1 rounded transition-colors flex-shrink-0",
-                              config.skipDialogue
-                                ? "text-accent hover:text-accent-hover"
-                                : "text-foreground-muted hover:text-foreground-secondary",
-                            )}
-                            title={config.skipDialogue ? "対話文を無視中" : "対話文も検査中"}
-                          >
-                            {config.skipDialogue ? (
-                              <MessageSquareOff className="w-3.5 h-3.5" />
-                            ) : (
-                              <MessageSquare className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        )}
-
-                        {/* Severity dropdown */}
-                        <select
-                          value={config.severity}
-                          onChange={(e) =>
-                            onLintingRuleConfigChange(ruleId, {
-                              ...config,
-                              severity: e.target.value as Severity,
-                            })
-                          }
-                          className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent w-16"
-                        >
-                          <option value="error">エラー</option>
-                          <option value="warning">警告</option>
-                          <option value="info">情報</option>
-                        </select>
-
-                        {/* Toggle */}
-                        <button
-                          onClick={() =>
-                            onLintingRuleConfigChange(ruleId, {
-                              ...config,
-                              enabled: !config.enabled,
-                            })
-                          }
-                          className={clsx(
-                            "relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0",
-                            config.enabled ? "bg-accent" : "bg-foreground-muted",
-                          )}
-                        >
-                          <span
-                            className={clsx(
-                              "inline-block h-3.5 w-3.5 transform rounded-full transition-transform shadow-sm",
-                              config.enabled
-                                ? "translate-x-5 bg-accent-foreground"
-                                : "translate-x-0.5 bg-white",
-                            )}
-                          />
-                        </button>
-                      </div>
-                    );
-                  })}
+            )}
+            {onCharacterExtractionConcurrencyChange &&
+              characterExtractionConcurrency !== undefined && (
+                <div className="flex items-center gap-3">
+                  <label
+                    htmlFor="char-extraction-concurrency"
+                    className="text-xs text-foreground-secondary flex-1"
+                  >
+                    並列処理数
+                  </label>
+                  <input
+                    id="char-extraction-concurrency"
+                    type="number"
+                    min={1}
+                    max={8}
+                    value={characterExtractionConcurrency}
+                    onChange={(e) => onCharacterExtractionConcurrencyChange(Number(e.target.value))}
+                    className="w-16 text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                  />
                 </div>
               )}
-            </div>
-          );
-        })}
-      </div>
+          </div>
+        </details>
+      )}
     </div>
   );
+}
+
+export default function LintingSettings(props: LintingSettingsProps): React.ReactElement {
+  return <LintingSettingsInner {...props} />;
 }
