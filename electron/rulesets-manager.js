@@ -350,51 +350,59 @@ class RulesetsManager {
           reject(new Error("https 以外のダウンロード先は許可されていません"));
           return;
         }
-        https
-          .get(requestUrl, { headers: { "User-Agent": "illusions-app" } }, (res) => {
-            if ([301, 302, 303, 307, 308].includes(res.statusCode ?? 0)) {
-              const location = res.headers.location;
-              if (location) {
-                res.resume();
-                doRequest(new URL(location, requestUrl).toString(), redirectCount + 1);
-                return;
-              }
-            }
-            if (res.statusCode !== 200) {
+        // Re-validate the host on EVERY hop (including redirects), so a redirect
+        // can never steer the download to a host outside the allowlist.
+        if (!ALLOWED_DOWNLOAD_HOSTS.has(parsed.hostname)) {
+          reject(new Error("ダウンロード先のホストが許可されていません"));
+          return;
+        }
+        const req = https.get(requestUrl, { headers: { "User-Agent": "illusions-app" } }, (res) => {
+          if ([301, 302, 303, 307, 308].includes(res.statusCode ?? 0)) {
+            const location = res.headers.location;
+            if (location) {
               res.resume();
-              reject(new Error(`HTTP ${res.statusCode}`));
+              doRequest(new URL(location, requestUrl).toString(), redirectCount + 1);
               return;
             }
-            let received = 0;
-            let aborted = false;
-            const hash = crypto.createHash("sha256");
-            const fileStream = fs.createWriteStream(destPath);
-            res.on("data", (chunk) => {
-              if (aborted) return;
-              received += chunk.length;
-              if (received > MAX_ASSET_BYTES) {
-                aborted = true;
-                res.destroy();
-                fileStream.destroy();
-                reject(new Error("ダウンロードサイズが上限を超えました"));
-                return;
-              }
-              hash.update(chunk);
-            });
-            res.pipe(fileStream);
-            fileStream.on("close", () => {
-              if (aborted) return;
-              const actual = hash.digest("hex");
-              if (expectedDigest && actual !== expectedDigest) {
-                reject(new Error("ダウンロードのチェックサム検証に失敗しました"));
-                return;
-              }
-              resolve(actual);
-            });
-            fileStream.on("error", reject);
-            res.on("error", reject);
-          })
-          .on("error", reject);
+          }
+          if (res.statusCode !== 200) {
+            res.resume();
+            reject(new Error(`HTTP ${res.statusCode}`));
+            return;
+          }
+          let received = 0;
+          let aborted = false;
+          const hash = crypto.createHash("sha256");
+          const fileStream = fs.createWriteStream(destPath);
+          res.on("data", (chunk) => {
+            if (aborted) return;
+            received += chunk.length;
+            if (received > MAX_ASSET_BYTES) {
+              aborted = true;
+              res.destroy();
+              fileStream.destroy();
+              reject(new Error("ダウンロードサイズが上限を超えました"));
+              return;
+            }
+            hash.update(chunk);
+          });
+          res.pipe(fileStream);
+          fileStream.on("close", () => {
+            if (aborted) return;
+            const actual = hash.digest("hex");
+            if (expectedDigest && actual !== expectedDigest) {
+              reject(new Error("ダウンロードのチェックサム検証に失敗しました"));
+              return;
+            }
+            resolve(actual);
+          });
+          fileStream.on("error", reject);
+          res.on("error", reject);
+        });
+        req.on("error", reject);
+        req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+          req.destroy(new Error("ダウンロードがタイムアウトしました"));
+        });
       };
       doRequest(url);
     });
