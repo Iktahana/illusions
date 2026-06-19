@@ -39,44 +39,103 @@ function makeNotReadyCtx() {
 }
 
 // -------------------------------------------------------------------------
-// Real gendai-kanazukai module
+// gendai-kanazukai-shaped module (inline, CI-safe)
+//
+// Mirrors the real com.illusions-lab.gendai-kanazukai module's structure and
+// gk-yotsugana behavior WITHOUT importing the external repo (which is not on
+// disk in CI). This proves the same registry + ctx wiring an actual downloaded
+// module exercises. The real blob: import is verified manually in Electron.
 // -------------------------------------------------------------------------
 
-describe("external ruleset — gendai-kanazukai (real module)", () => {
-  it("loads the real module, builds rules, and gk-yotsugana fires on a negative example", async () => {
-    // Import the locally-built dist directly (no worker, no blob URL).
-    const mod = (
-      await import("/Users/iktahana/Repositories/illusions-ruleset-gendai-kanazukai/dist/index.js")
-    ).default as unknown as RulesetModule;
+/** Build a RulesetModule equivalent to gendai-kanazukai's gk-yotsugana. */
+function makeYotsuganaModule(): RulesetModule {
+  const YOTSU_PAIRS: ReadonlyArray<{ pattern: RegExp; correct: string }> = [
+    { pattern: /ちじ(?=み|む|ま[るりれ]|め|こま|れ)/, correct: "ちぢ" },
+    { pattern: /つず(?=み|ら|く|け|る|り|め)/, correct: "つづ" },
+    { pattern: /はなじ(?!ろ)/, correct: "はなぢ" },
+  ];
+  const manifest: RulesetModule["manifest"] = {
+    id: "com.illusions-lab.gendai-kanazukai",
+    name: "Gendai Kanazukai (1986)",
+    nameJa: "現代仮名遣い（内閣告示 1986）",
+    version: "0.1.0",
+    engineApi: 1,
+    license: "MIT",
+    maintainerEmail: "rulesets@illusions.app",
+    rulesetPrefix: "gk-",
+    guidelines: [],
+    rules: [
+      {
+        ruleId: "gk-yotsugana",
+        nameJa: "四つ仮名（ぢ・づ）の使い分け",
+        descriptionJa: "「ぢ」「づ」を用いる語が「じ」「ず」と誤記されていないか検出します。",
+        level: "L1",
+        defaultConfig: { enabled: true, severity: "warning" },
+        applicableModes: ["novel", "official", "blog", "academic", "sns"],
+        docs: {
+          positiveExample: "シャツがちぢむ。",
+          negativeExample: "シャツがちじむ。",
+          sourceReference: "現代仮名遣い（昭和61年内閣告示第1号）本文 第2の5(1)",
+        },
+      },
+    ],
+  };
+  return {
+    manifest,
+    createRules(ctx) {
+      const rule = manifest.rules[0];
+      class Yotsugana extends ctx.bases.AbstractL1Rule {
+        lint(text: string, config: LintRuleConfig) {
+          if (!config.enabled) return [];
+          const out = YOTSU_PAIRS.flatMap(({ pattern, correct }) =>
+            ctx.toolkit.regexReplace({
+              text,
+              pattern,
+              ruleId: this.id,
+              severity: config.severity,
+              message: `Use ぢ/づ here: "${correct}"`,
+              messageJa: `現代仮名遣いに基づき、ここは「${correct}」と表記します。`,
+              replacement: () => correct,
+            }),
+          );
+          return ctx.toolkit.dedupe(out).sort((a, b) => a.from - b.from);
+        }
+      }
+      return [
+        new Yotsugana(ctx.toolkit.toJsonRuleMeta(rule, manifest), {
+          id: rule.ruleId,
+          name: rule.nameJa,
+          nameJa: rule.nameJa,
+          description: rule.descriptionJa,
+          descriptionJa: rule.descriptionJa,
+          defaultConfig: rule.defaultConfig,
+        }),
+      ];
+    },
+  };
+}
 
+describe("external ruleset — gendai-kanazukai shape", () => {
+  it("registers, builds rules, and gk-yotsugana fires on a negative example", () => {
     const registry = new RulesetRegistry();
-    registry.registerExternal(mod, "folder");
+    registry.registerExternal(makeYotsuganaModule(), "folder");
 
     // No engine-api quarantine expected.
-    const warnings = registry.getWarnings();
-    expect(warnings.filter((w) => w.code === "engine-api")).toHaveLength(0);
+    expect(registry.getWarnings().filter((w) => w.code === "engine-api")).toHaveLength(0);
 
-    const ctx = makeNotReadyCtx();
-    const rules = registry.buildRules(ctx);
-
-    // Must contain gk-yotsugana.
+    const rules = registry.buildRules(makeNotReadyCtx());
     const yotsu = rules.find((r) => r.id === "gk-yotsugana");
     expect(yotsu).toBeDefined();
 
     // Negative example: シャツがちじむ — should flag (ちじ → ちぢ).
-    const config: LintRuleConfig = { enabled: true, severity: "warning" };
-    const issues = yotsu!.lint("シャツがちじむ。", config);
+    const issues = yotsu!.lint("シャツがちじむ。", { enabled: true, severity: "warning" });
     expect(issues.length).toBeGreaterThanOrEqual(1);
     expect(issues[0].ruleId).toBe("gk-yotsugana");
   });
 
-  it("positive example シャツがちぢむ produces no issues", async () => {
-    const mod = (
-      await import("/Users/iktahana/Repositories/illusions-ruleset-gendai-kanazukai/dist/index.js")
-    ).default as unknown as RulesetModule;
-
+  it("positive example シャツがちぢむ produces no issues", () => {
     const registry = new RulesetRegistry();
-    registry.registerExternal(mod, "folder");
+    registry.registerExternal(makeYotsuganaModule(), "folder");
     const rules = registry.buildRules(makeNotReadyCtx());
     const yotsu = rules.find((r) => r.id === "gk-yotsugana");
     expect(yotsu).toBeDefined();
