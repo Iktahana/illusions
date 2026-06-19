@@ -7,6 +7,7 @@ const {
   MENU_CHANNELS,
   SAFE_STORAGE_CHANNELS,
   POWER_CHANNELS,
+  UPDATE_CHANNELS,
 } = require("../lib/ipc-channels");
 
 function registerSystemHandlers() {
@@ -97,6 +98,13 @@ function registerSystemHandlers() {
   // Power state IPC handlers
   ipcMain.handle(POWER_CHANNELS.invoke.getState, () => {
     return powerMonitor.isOnBatteryPower() ? "battery" : "ac";
+  });
+
+  // beta opt-in トグル変更時に channel を再評価し、更新確認を行う
+  ipcMain.handle(UPDATE_CHANNELS.invoke.reevaluateChannel, async () => {
+    const { reevaluateUpdateChannel } = require("../auto-updater");
+    await reevaluateUpdateChannel();
+    return true;
   });
 }
 

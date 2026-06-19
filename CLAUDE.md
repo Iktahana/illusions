@@ -13,13 +13,15 @@
 ## 2. Branch Strategy
 
 ```
-feature/<name>  →  dev  →  (weekly Monday release)  →  main
+feature/<name>  →  dev  →  beta  →  (weekly Friday promotion)  →  main
 hotfix/<name>   →  main  (emergency, then cherry-pick to dev)
 ```
 
-- `main`: production — merges only via weekly release PR
-- `dev`: integration — all feature/fix PRs target `dev`
-- Weekly release: Monday 09:00 JST, GH Actions auto-creates `dev → main` PR
+- `main`: production — merges only via weekly beta-promotion PR
+- `dev`: integration — all feature/fix PRs target `dev`; pushes build `-dev` prereleases
+- `beta`: preview channel — `dev` is merged in via the `release-beta` skill, producing
+  `vX.Y.Z-beta.YYYYMMDD.HHMMSS` prereleases that in-app beta opt-in users receive
+- Weekly promotion: Friday 09:00 JST, GH Actions auto-creates `beta → main` PR (latest beta only)
 - Hotfix: branch from `main`, merge to `main`, cherry-pick to `dev`
 
 ## 3. Git Worktree Isolation

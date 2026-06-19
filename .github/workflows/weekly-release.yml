@@ -1,11 +1,16 @@
-name: Weekly Release
+name: Weekly Beta Promotion
+
+# 毎週金曜、最新の beta ブランチ内容を main へ昇格する PR を自動作成する。
+# beta ブランチは線形に進むため、この PR は常に「最新 beta」を main へ反映する。
+# main 側で build.yml が clean な安定版番号 (vX.Y.Z) を自前算出するため、
+# 期間中に何個 beta プレリリースがあっても安定版リリースは 1 つに収束する。
 
 on:
   schedule:
-    - cron: "0 0 * * 1" # Monday 00:00 UTC = 09:00 JST
-    - cron: "0 1 * * 1" # Monday 01:00 UTC = 10:00 JST (retry 1)
-    - cron: "0 2 * * 1" # Monday 02:00 UTC = 11:00 JST (retry 2)
-  workflow_dispatch: # Manual trigger
+    - cron: "0 0 * * 5" # Friday 00:00 UTC = 09:00 JST
+    - cron: "0 1 * * 5" # Friday 01:00 UTC = 10:00 JST (retry 1)
+    - cron: "0 2 * * 5" # Friday 02:00 UTC = 11:00 JST (retry 2)
+  workflow_dispatch: # Manual trigger（金曜を待たず昇格したい場合）
 
 permissions:
   contents: write
@@ -13,27 +18,27 @@ permissions:
   issues: write
 
 jobs:
-  weekly-release-pr:
+  beta-promotion-pr:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Check if dev is ahead of main
+      - name: Check if beta is ahead of main
         id: check-diff
         run: |
           git fetch origin
-          AHEAD=$(git log origin/main..origin/dev --oneline | wc -l | tr -d ' ')
+          AHEAD=$(git log origin/main..origin/beta --oneline | wc -l | tr -d ' ')
           echo "ahead=$AHEAD" >> $GITHUB_OUTPUT
-          echo "dev is $AHEAD commit(s) ahead of main"
+          echo "beta is $AHEAD commit(s) ahead of main"
 
       - name: Skip if no changes
         if: steps.check-diff.outputs.ahead == '0'
         run: |
-          echo "No new commits in dev. Skipping weekly release."
+          echo "No new commits in beta. Skipping beta promotion."
 
-      - name: Check for existing weekly release PR
+      - name: Check for existing beta promotion PR
         id: check-existing
         if: steps.check-diff.outputs.ahead != '0'
         uses: actions/github-script@v9
@@ -46,16 +51,16 @@ jobs:
               base: 'main',
             });
             const existing = prs.find(pr =>
-              pr.labels.some(l => l.name === 'weekly-release')
+              pr.labels.some(l => l.name === 'beta-release')
             );
             if (existing) {
-              console.log(`Weekly release PR #${existing.number} already exists. Skipping.`);
+              console.log(`Beta promotion PR #${existing.number} already exists. Skipping.`);
               core.setOutput('exists', 'true');
             } else {
               core.setOutput('exists', 'false');
             }
 
-      - name: Check latest dev CI status
+      - name: Check latest beta CI status
         id: check-ci
         if: steps.check-diff.outputs.ahead != '0' && steps.check-existing.outputs.exists != 'true'
         uses: actions/github-script@v9
@@ -64,7 +69,7 @@ jobs:
             const runs = await github.rest.actions.listWorkflowRunsForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              branch: 'dev',
+              branch: 'beta',
               event: 'push',
               status: 'completed',
               per_page: 5
@@ -74,10 +79,10 @@ jobs:
             );
             const latest = buildRuns[0];
             const isGreen = latest?.conclusion === 'success';
-            console.log(`Latest dev build: ${latest?.conclusion ?? 'none'}`);
+            console.log(`Latest beta build: ${latest?.conclusion ?? 'none'}`);
             core.setOutput('green', isGreen ? 'true' : 'false');
 
-      - name: Close old weekly release PRs
+      - name: Close old beta promotion PRs
         if: steps.check-diff.outputs.ahead != '0' && steps.check-existing.outputs.exists != 'true' && steps.check-ci.outputs.green == 'true'
         uses: actions/github-script@v9
         with:
@@ -88,20 +93,20 @@ jobs:
               state: 'open',
               base: 'main',
             });
-            const weeklyPRs = prs.filter(pr =>
-              pr.labels.some(l => l.name === 'weekly-release')
+            const betaPRs = prs.filter(pr =>
+              pr.labels.some(l => l.name === 'beta-release')
             );
-            for (const pr of weeklyPRs) {
+            for (const pr of betaPRs) {
               await github.rest.pulls.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: pr.number,
                 state: 'closed',
               });
-              console.log(`Closed old weekly PR #${pr.number}`);
+              console.log(`Closed old beta promotion PR #${pr.number}`);
             }
 
-      - name: Create weekly release PR
+      - name: Create beta promotion PR
         if: steps.check-diff.outputs.ahead != '0' && steps.check-existing.outputs.exists != 'true' && steps.check-ci.outputs.green == 'true'
         uses: actions/github-script@v9
         with:
@@ -109,42 +114,44 @@ jobs:
             const today = new Date().toISOString().slice(0, 10);
             const { execSync } = require('child_process');
             const commits = execSync(
-              'git log origin/main..origin/dev --oneline --no-merges'
+              'git log origin/main..origin/beta --oneline --no-merges'
             ).toString().trim();
 
-            // Ensure weekly-release label exists
+            // Ensure beta-release label exists
             try {
               await github.rest.issues.getLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                name: 'weekly-release',
+                name: 'beta-release',
               });
             } catch {
               await github.rest.issues.createLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                name: 'weekly-release',
+                name: 'beta-release',
                 color: '0075ca',
-                description: 'Weekly scheduled release PR',
+                description: 'Weekly beta → main promotion PR',
               });
             }
 
             const { data: pr } = await github.rest.pulls.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `chore(release): weekly release (${today})`,
-              head: 'dev',
+              title: `chore(release): beta promotion (${today})`,
+              head: 'beta',
               base: 'main',
               body: [
-                `## Weekly Release - ${today}`,
+                `## Beta → main Promotion - ${today}`,
+                '',
+                '最新の beta ブランチ内容を安定版として main へ昇格します。',
                 '',
                 '### Changes',
                 '```',
                 commits || '(no commits)',
                 '```',
                 '',
-                '> This PR was created automatically by the weekly release workflow.',
-                '> Merge when ready to release.',
+                '> This PR was created automatically by the weekly beta promotion workflow.',
+                '> Merge when ready to release the stable build.',
               ].join('\n'),
             });
 
@@ -152,7 +159,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: pr.number,
-              labels: ['weekly-release'],
+              labels: ['beta-release'],
             });
             console.log(`Created PR #${pr.number}: ${pr.html_url}`);
 
@@ -165,17 +172,17 @@ jobs:
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `週次リリーススキップ: dev CI 失敗 (${today})`,
+              title: `週次ベータ昇格スキップ: beta CI 失敗 (${today})`,
               body: [
-                '## 週次自動リリースをスキップしました',
+                '## 週次ベータ昇格をスキップしました',
                 '',
-                'dev ブランチの CI が失敗しているため、今週のリリース PR の作成をスキップしました。',
+                'beta ブランチの CI が失敗しているため、今週の beta → main 昇格 PR の作成をスキップしました。',
                 '',
                 '### 対応手順',
-                '1. dev ブランチの CI 失敗原因を修正する',
-                '2. 修正後、[Weekly Release workflow](../actions/workflows/weekly-release.yml) を workflow_dispatch で手動トリガー',
+                '1. beta ブランチの CI 失敗原因を修正する',
+                '2. 修正後、[Weekly Beta Promotion workflow](../actions/workflows/weekly-release.yml) を workflow_dispatch で手動トリガー',
                 '',
-                '次の月曜日に自動的に再試行されます。',
+                '次の金曜日に自動的に再試行されます。',
               ].join('\n'),
               labels: ['ci-failure'],
             });

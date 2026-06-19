@@ -111,12 +111,20 @@ jobs:
           fi
 
           # main: use computed version as-is
-          # alpha|beta|dev: append branch name as prerelease suffix
+          # beta: append timestamped prerelease suffix so every beta build gets a
+          #   unique, monotonically-increasing version (vX.Y.Z-beta.YYYYMMDD.HHMMSS).
+          #   BASE_VERSION already equals the next stable patch (beta tags are
+          #   excluded by the ^[0-9]+$ filter above), so the X.Y.Z prefix matches
+          #   the version this beta will be promoted to on main.
+          # alpha|dev: append branch name as a plain prerelease suffix
           case "$BRANCH_NAME" in
             main)
               FULL_VERSION="${BASE_VERSION}"
               ;;
-            alpha|beta|dev)
+            beta)
+              FULL_VERSION="${BASE_VERSION}-beta.$(date -u +%Y%m%d.%H%M%S)"
+              ;;
+            alpha|dev)
               FULL_VERSION="${BASE_VERSION}-${BRANCH_NAME}"
               ;;
             *)
@@ -152,8 +160,10 @@ jobs:
               exit 1
             fi
           else
-            if ! echo "$FULL" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|dev)$'; then
-              echo "::error::Prerelease full version '${FULL}' has invalid format (expected X.Y.Z-(alpha|beta|dev))"
+            # beta uses a timestamped identifier (X.Y.Z-beta.YYYYMMDD.HHMMSS);
+            # alpha/dev use a bare channel suffix (X.Y.Z-alpha / X.Y.Z-dev).
+            if ! echo "$FULL" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-(alpha|dev|beta\.[0-9]{8}\.[0-9]{6})$'; then
+              echo "::error::Prerelease full version '${FULL}' has invalid format (expected X.Y.Z-(alpha|dev) or X.Y.Z-beta.YYYYMMDD.HHMMSS)"
               exit 1
             fi
           fi
