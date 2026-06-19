@@ -161,6 +161,7 @@
         ]
       }
     ],
+    "afterPack": "scripts/embed-quicklook.js",
     "afterSign": "scripts/notarize.js",
     "mac": {
       "category": "public.app-category.productivity",
@@ -169,12 +170,23 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "extraFiles": [
-        {
-          "from": "build/quicklook/MDIQuickLook.qlgenerator",
-          "to": "Library/QuickLook/MDIQuickLook.qlgenerator"
-        }
-      ],
+      "extendInfo": {
+        "UTExportedTypeDeclarations": [
+          {
+            "UTTypeIdentifier": "com.iktahana.illusions.mdi",
+            "UTTypeDescription": "illusions MDI Document",
+            "UTTypeConformsTo": [
+              "public.plain-text"
+            ],
+            "UTTypeTagSpecification": {
+              "public.filename-extension": [
+                "mdi"
+              ],
+              "public.mime-type": "text/markdown"
+            }
+          }
+        ]
+      },
       "target": [
         {
           "target": "dmg",

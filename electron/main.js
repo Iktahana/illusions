@@ -29,7 +29,6 @@ const { registerStorageHandlers, getStorageManager } = require("./ipc/storage-ip
 const { registerVFSHandlers } = require("./ipc/vfs-ipc");
 const { setupAutoUpdater, checkForUpdates } = require("./auto-updater");
 const { createMainWindow, broadcastPowerState } = require("./window-manager");
-const { installQuickLookPluginIfNeeded } = require("./quick-look");
 const {
   handleMdiFileOpen,
   getPendingFilePath,
@@ -191,8 +190,6 @@ app.whenReady().then(async () => {
   console.log("[DEBUG] Calling createMainWindow...");
   await createMainWindow({ hasPendingFile: !!getPendingFilePath() });
   console.log("[DEBUG] Window created successfully");
-
-  installQuickLookPluginIfNeeded();
 
   // Register IPC handlers
   registerNlpHandlers();
