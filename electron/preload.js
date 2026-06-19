@@ -24,6 +24,7 @@ const {
   EDITOR_CHANNELS,
   NLP_CHANNELS,
   PTY_CHANNELS,
+  UPDATE_CHANNELS,
 } = require("./lib/ipc-channels");
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -36,6 +37,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Phase 2 で save 経路は消滅したが、close handshake の終端トリガとして引き続き利用する。
   saveDoneAndClose: invokeChannel(SYSTEM_CHANNELS.invoke.saveBeforeCloseDone, { arity: 0 }),
   newWindow: invokeChannel(SYSTEM_CHANNELS.invoke.newWindow, { arity: 0 }),
+  reevaluateUpdateChannel: invokeChannel(UPDATE_CHANNELS.invoke.reevaluateChannel, { arity: 0 }),
   openDictionaryPopup: invokeChannel(SHELL_CHANNELS.invoke.openDictionaryPopup, { arity: 2 }),
   showContextMenu: invokeChannel(SHELL_CHANNELS.invoke.showContextMenu, { arity: 1 }),
   onMenuNew: eventChannel(MENU_CHANNELS.event.newTriggered, { arity: 0 }),

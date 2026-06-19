@@ -5,6 +5,10 @@ import { useState, useEffect } from "react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import clsx from "clsx";
 
+import SettingsField from "@/components/settings/primitives/SettingsField";
+import SettingsToggle from "@/components/settings/primitives/SettingsToggle";
+import { useUpdateSettingsContext } from "@/contexts/EditorSettingsContext";
+
 const LICENSE_TEXT = process.env.NEXT_PUBLIC_LICENSE_TEXT || "";
 const TERMS_TEXT = process.env.NEXT_PUBLIC_TERMS_TEXT || "";
 
@@ -33,6 +37,9 @@ export default function AboutSection(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<AboutTab>("terms");
   const [expandedCredits, setExpandedCredits] = useState<Set<string>>(new Set());
   const [creditsData, setCreditsData] = useState<CreditEntry[]>([]);
+  const [isElectron, setIsElectron] = useState(false);
+
+  const { allowBetaUpdates, onAllowBetaUpdatesChange } = useUpdateSettingsContext();
 
   useEffect(() => {
     import("@/generated/credits.json")
@@ -40,6 +47,11 @@ export default function AboutSection(): React.ReactElement {
       .catch(() => {
         /* credits.json may not exist in dev */
       });
+  }, []);
+
+  // beta opt-in トグルは auto-updater を持つデスクトップ版でのみ表示する
+  useEffect(() => {
+    setIsElectron(Boolean(window.electronAPI?.isElectron));
   }, []);
 
   // Group credits by license type
@@ -81,6 +93,24 @@ export default function AboutSection(): React.ReactElement {
           © {new Date().getFullYear()} 幾田花 (Iktahana). All rights reserved.
         </p>
       </div>
+
+      {/* Beta update opt-in (desktop only) */}
+      {isElectron && (
+        <div className="rounded-lg border border-border bg-background-secondary p-4">
+          <SettingsField
+            label="ベータ版アップデートを受け取る"
+            description="不安定な先行ビルド（-beta.*）を受信します。問題が起きた場合はオフにしてください。"
+            htmlFor="allow-beta-updates"
+            inline
+          >
+            <SettingsToggle
+              id="allow-beta-updates"
+              checked={Boolean(allowBetaUpdates)}
+              onChange={onAllowBetaUpdatesChange}
+            />
+          </SettingsField>
+        </div>
+      )}
 
       {/* Links */}
       <div className="flex justify-center gap-4">

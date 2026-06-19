@@ -10,12 +10,35 @@ const { isDev, isMicrosoftStoreApp } = require("./app-constants");
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
 
-// Set update channel based on app version suffix (e.g., 0.1.123-beta → beta)
-// Only 'latest' (stable) channel is the default; alpha/beta users stay on their channel
-const versionMatch = app.getVersion().match(/-(.+)$/);
-if (versionMatch) {
-  autoUpdater.channel = versionMatch[1];
-  autoUpdater.allowPrerelease = true;
+/**
+ * beta opt-in トグル（AppState.allowBetaUpdates）を唯一の真実として autoUpdater の
+ * 更新挙動を決定する。各 checkForUpdates の直前に呼ぶことで設定変更が次回チェックに
+ * 反映される。
+ *
+ * 重要（GitHub provider の仕様）: `autoUpdater.channel` は **明示設定しない**。
+ * - channel を未設定にすると、electron-updater は実行中バージョンの prerelease 成分から
+ *   追従先を自動判定する（安定版=任意の最新を選択可 / beta 版=beta 系を追従）。
+ * - プレリリース Release には `latest*.yml` のみが入り `beta-*.yml` は無いが、
+ *   allowPrerelease 時は GitHubProvider が `beta-*.yml` 404 を `latest*.yml` へ
+ *   フォールバックするため opt-in 受信が成立する（out/providers/GitHubProvider.js）。
+ *   逆に channel="beta" を明示するとフォールバック先も beta のままになり 404 で失敗する。
+ *
+ * - ON  : allowPrerelease=true（最新 beta プレリリースを受信）
+ * - OFF : allowPrerelease=false（安定版のみ）。加えて allowDowngrade=true とし、
+ *         実行中がプレリリース（安定版より新しい先行版）でも最新安定版へ戻れるようにする。
+ *         これが「beta を OFF にしたら最新安定版へ自動更新」を実現する。
+ */
+async function applyBetaOptIn() {
+  try {
+    const { getStorageManager } = require("./ipc/storage-ipc");
+    const appState = await getStorageManager().loadAppState();
+    const allowBeta = appState?.allowBetaUpdates === true;
+    autoUpdater.allowPrerelease = allowBeta;
+    autoUpdater.allowDowngrade = !allowBeta;
+    log.info(`アップデート設定: allowPrerelease=${allowBeta}, allowDowngrade=${!allowBeta}`);
+  } catch (e) {
+    log.error("beta opt-in 設定の読み込みに失敗しました:", e);
+  }
 }
 
 let isManualUpdateCheck = false;
@@ -131,7 +154,7 @@ function setupAutoUpdater() {
 }
 
 // アップデート確認（手動/自動）
-function checkForUpdates(manual = false) {
+async function checkForUpdates(manual = false) {
   if (isDev) {
     if (manual) {
       const { getMainWindow } = require("./window-manager");
@@ -168,7 +191,19 @@ function checkForUpdates(manual = false) {
   }
 
   isManualUpdateCheck = manual;
+  // 設定変更を反映するため、チェック直前に opt-in を再評価して channel を確定する
+  await applyBetaOptIn();
   autoUpdater.checkForUpdates();
 }
 
-module.exports = { setupAutoUpdater, checkForUpdates };
+/**
+ * レンダラの beta opt-in トグル変更時に呼ばれる（IPC: update:reevaluate-channel）。
+ * channel を再評価し、サイレントに更新確認を行う（autoDownload=false のため
+ * ダイアログ表示のみ。OFF にした場合も latest へ戻す）。
+ */
+async function reevaluateUpdateChannel() {
+  if (isDev || isMicrosoftStoreApp) return;
+  await checkForUpdates(false);
+}
+
+module.exports = { setupAutoUpdater, checkForUpdates, reevaluateUpdateChannel };

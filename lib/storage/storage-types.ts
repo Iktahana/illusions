@@ -184,6 +184,10 @@ export interface AppState {
   dictInstalledVersion?: string;
   /** 最後に更新確認した ISO タイムスタンプ */
   dictLastCheckedAt?: string;
+
+  // アップデート設定
+  /** ベータ版（プレリリース）アップデートを受け取る（デフォルト: false） */
+  allowBetaUpdates?: boolean;
 }
 
 /**

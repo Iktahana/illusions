@@ -31,6 +31,8 @@ declare global {
      */
     saveDoneAndClose?: () => Promise<void>;
     newWindow?: () => Promise<void>;
+    /** beta opt-in トグル変更時にメインプロセスへ channel 再評価を依頼する */
+    reevaluateUpdateChannel?: () => Promise<boolean>;
     openDictionaryPopup?: (url: string, title: string) => Promise<boolean>;
     showContextMenu?: (
       items: Array<{ type?: string; label?: string; action?: string; accelerator?: string }>,
