@@ -22,6 +22,7 @@ const path = require("path");
 const os = require("os");
 const https = require("https");
 const crypto = require("crypto");
+const { pipeline } = require("stream");
 
 const { OFFICIAL_RULESETS } = require("./official-rulesets");
 
@@ -293,7 +294,14 @@ class RulesetsManager {
               const location = res.headers.location;
               if (location) {
                 res.resume();
-                doRequest(new URL(location, requestUrl).toString(), redirectCount + 1);
+                let nextUrl;
+                try {
+                  nextUrl = new URL(location, requestUrl).toString();
+                } catch {
+                  reject(new Error("リダイレクト先URLが不正です"));
+                  return;
+                }
+                doRequest(nextUrl, redirectCount + 1);
                 return;
               }
             }
@@ -317,6 +325,7 @@ class RulesetsManager {
                 reject(err);
               }
             });
+            res.on("error", reject);
           },
         );
         req.on("error", reject);
@@ -361,7 +370,14 @@ class RulesetsManager {
             const location = res.headers.location;
             if (location) {
               res.resume();
-              doRequest(new URL(location, requestUrl).toString(), redirectCount + 1);
+              let nextUrl;
+              try {
+                nextUrl = new URL(location, requestUrl).toString();
+              } catch {
+                reject(new Error("リダイレクト先URLが不正です"));
+                return;
+              }
+              doRequest(nextUrl, redirectCount + 1);
               return;
             }
           }
@@ -371,24 +387,24 @@ class RulesetsManager {
             return;
           }
           let received = 0;
-          let aborted = false;
           const hash = crypto.createHash("sha256");
-          const fileStream = fs.createWriteStream(destPath);
           res.on("data", (chunk) => {
-            if (aborted) return;
             received += chunk.length;
+            hash.update(chunk);
             if (received > MAX_ASSET_BYTES) {
-              aborted = true;
-              res.destroy();
-              fileStream.destroy();
-              reject(new Error("ダウンロードサイズが上限を超えました"));
+              // Destroy the source with an error; pipeline tears down the write
+              // stream and fires its callback with this error.
+              res.destroy(new Error("ダウンロードサイズが上限を超えました"));
+            }
+          });
+          // pipeline() destroys the destination on ANY source error (network
+          // error, timeout-triggered req.destroy, size-cap abort), closing the
+          // fd before we settle — avoids leaked/locked temp files.
+          pipeline(res, fs.createWriteStream(destPath), (err) => {
+            if (err) {
+              reject(err);
               return;
             }
-            hash.update(chunk);
-          });
-          res.pipe(fileStream);
-          fileStream.on("close", () => {
-            if (aborted) return;
             const actual = hash.digest("hex");
             if (expectedDigest && actual !== expectedDigest) {
               reject(new Error("ダウンロードのチェックサム検証に失敗しました"));
@@ -396,8 +412,6 @@ class RulesetsManager {
             }
             resolve(actual);
           });
-          fileStream.on("error", reject);
-          res.on("error", reject);
         });
         req.on("error", reject);
         req.setTimeout(REQUEST_TIMEOUT_MS, () => {
