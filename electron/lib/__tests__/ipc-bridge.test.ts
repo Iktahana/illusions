@@ -44,6 +44,7 @@ const {
   EDITOR_CHANNELS,
   NLP_CHANNELS,
   PTY_CHANNELS,
+  RULESETS_CHANNELS,
 } = channels;
 
 const { createIpcBridge } = require("../../../electron/lib/ipc-bridge") as {
@@ -280,6 +281,15 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       exit: "pty:exit",
     });
   });
+
+  it("rulesets invoke channels keep their historical string values", () => {
+    expect(RULESETS_CHANNELS.invoke).toEqual({
+      listInstalled: "rulesets:list-installed",
+      sync: "rulesets:sync",
+      checkUpdate: "rulesets:check-update",
+    });
+    expect(RULESETS_CHANNELS.event).toEqual({});
+  });
 });
 
 describe("ipc bridge: preload ↔ main handler registration cannot drift", () => {
@@ -315,6 +325,7 @@ describe("ipc bridge: preload ↔ main handler registration cannot drift", () =>
     { constName: "EDITOR_CHANNELS", group: EDITOR_CHANNELS, mainFile: "ipc/editor-ipc.js" },
     { constName: "NLP_CHANNELS", group: NLP_CHANNELS, mainFile: "ipc/nlp-ipc.js" },
     { constName: "PTY_CHANNELS", group: PTY_CHANNELS, mainFile: "ipc/pty-ipc.js" },
+    { constName: "RULESETS_CHANNELS", group: RULESETS_CHANNELS, mainFile: "ipc/rulesets-ipc.js" },
   ];
 
   it.each(invokeRegistrations)(

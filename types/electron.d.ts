@@ -322,6 +322,32 @@ declare global {
         callback: (data: { latestVersion: string; updateAvailable: boolean }) => void,
       ) => () => void;
     };
+    /** Official校正ルールセットの自動ダウンロード/更新（Electronのみ） */
+    rulesets?: {
+      /** List installed (downloaded) official/external rulesets on disk. */
+      listInstalled: () => Promise<
+        Array<{ id: string; version: string | null; tag: string | null }>
+      >;
+      /** Download/update every official ruleset that is missing or out of date. */
+      sync: () => Promise<
+        Array<{
+          id: string;
+          status: "installed" | "up-to-date" | "skipped" | "error";
+          detail?: string;
+        }>
+      >;
+      /** Check latest release tags vs installed, without downloading. */
+      checkUpdate: () => Promise<
+        Array<{
+          id: string;
+          installedTag?: string | null;
+          latestTag?: string | null;
+          hasRelease?: boolean;
+          updateAvailable?: boolean;
+          error?: string;
+        }>
+      >;
+    };
     /** PTY session management */
     pty?: {
       /**
