@@ -118,25 +118,39 @@ class RulesetsManager {
     );
   }
 
+  /** True when a directory holds a full release (manifest + code + tag). */
+  _dirHasFullRelease(d) {
+    return (
+      fs.existsSync(path.join(d, ASSET_MANIFEST)) &&
+      fs.existsSync(path.join(d, ASSET_INDEX)) &&
+      fs.existsSync(path.join(d, VERSION_FILE))
+    );
+  }
+
   /**
-   * Recover from a crash that happened during a swap: if a COMPLETE staged
-   * release is present but the install is missing/incomplete, promote it with no
-   * network access (heals even offline). Otherwise discard stale/partial staging.
+   * Recover from a crash mid-swap, with NO network access (heals even offline):
+   * if the install is missing/incomplete but a COMPLETE copy survives in staging
+   * or in the backup dir, promote it. Then discard any transient leftovers.
    */
   _recoverStaging(id, dir, staging) {
+    const backup = `${dir}.backup`;
     try {
-      const stagedComplete =
-        fs.existsSync(path.join(staging, ASSET_MANIFEST)) &&
-        fs.existsSync(path.join(staging, ASSET_INDEX)) &&
-        fs.existsSync(path.join(staging, VERSION_FILE));
-      if (stagedComplete && !this._isInstalledComplete(id)) {
-        fs.rmSync(dir, { recursive: true, force: true });
-        fs.mkdirSync(path.dirname(dir), { recursive: true });
-        fs.renameSync(staging, dir);
-        console.log(`[Rulesets] recovered staged install for ${id}`);
-      } else {
-        fs.rmSync(staging, { recursive: true, force: true });
+      if (!this._isInstalledComplete(id)) {
+        for (const src of [staging, backup]) {
+          if (this._dirHasFullRelease(src)) {
+            fs.rmSync(dir, { recursive: true, force: true });
+            fs.mkdirSync(path.dirname(dir), { recursive: true });
+            fs.renameSync(src, dir);
+            console.log(
+              `[Rulesets] recovered ${src === staging ? "staged" : "backup"} install for ${id}`,
+            );
+            break;
+          }
+        }
       }
+      // Drop any leftover transient dirs (already-consumed ones rm to no-ops).
+      fs.rmSync(staging, { recursive: true, force: true });
+      fs.rmSync(backup, { recursive: true, force: true });
     } catch {
       /* best-effort recovery — never throws */
     }
@@ -302,11 +316,30 @@ class RulesetsManager {
         normalizeDigest(indexAsset.digest),
       );
 
-      // 3. record the tag inside staging, then swap the staged dir into place.
+      // 3. record the tag inside staging, then swap it in WITHOUT destroying the
+      //    old install first: rename old→backup, staging→dir, then drop backup.
+      //    A failed rename restores the backup, so we can never lose both copies;
+      //    a crash mid-swap is healed by _recoverStaging() on the next run.
       fs.writeFileSync(path.join(staging, VERSION_FILE), latestTag, "utf8");
-      fs.rmSync(dir, { recursive: true, force: true });
       fs.mkdirSync(path.dirname(dir), { recursive: true });
-      fs.renameSync(staging, dir);
+      const backup = `${dir}.backup`;
+      fs.rmSync(backup, { recursive: true, force: true });
+      const hadOld = fs.existsSync(dir);
+      if (hadOld) fs.renameSync(dir, backup);
+      try {
+        fs.renameSync(staging, dir);
+      } catch (err) {
+        if (hadOld) {
+          try {
+            fs.rmSync(dir, { recursive: true, force: true });
+          } catch {
+            /* ignore */
+          }
+          fs.renameSync(backup, dir); // restore the old install
+        }
+        throw err;
+      }
+      fs.rmSync(backup, { recursive: true, force: true });
 
       console.log(`[Rulesets] installed ${spec.id} ${latestTag}`);
       return { id: spec.id, status: "installed", detail: latestTag };
@@ -351,7 +384,6 @@ class RulesetsManager {
             if ([301, 302, 303, 307, 308].includes(res.statusCode ?? 0)) {
               const location = res.headers.location;
               if (location) {
-                res.resume();
                 let nextUrl;
                 try {
                   nextUrl = new URL(location, requestUrl).toString();
@@ -359,7 +391,9 @@ class RulesetsManager {
                   reject(new Error("リダイレクト先URLが不正です"));
                   return;
                 }
-                doRequest(nextUrl, redirectCount + 1);
+                // Recurse only after this response drains (see _downloadFile).
+                res.on("end", () => doRequest(nextUrl, redirectCount + 1));
+                res.resume();
                 return;
               }
             }
@@ -454,7 +488,6 @@ class RulesetsManager {
           if ([301, 302, 303, 307, 308].includes(res.statusCode ?? 0)) {
             const location = res.headers.location;
             if (location) {
-              res.resume();
               let nextUrl;
               try {
                 nextUrl = new URL(location, requestUrl).toString();
@@ -462,7 +495,11 @@ class RulesetsManager {
                 fail(new Error("リダイレクト先URLが不正です"));
                 return;
               }
-              doRequest(nextUrl, redirectCount + 1);
+              // Start the next hop only AFTER this response fully drains, so a
+              // late error on this (now-finished) hop can't reject while the
+              // next hop is mid-flight.
+              res.on("end", () => doRequest(nextUrl, redirectCount + 1));
+              res.resume();
               return;
             }
           }
