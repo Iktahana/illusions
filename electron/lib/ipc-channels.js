@@ -239,6 +239,16 @@ const UPDATE_CHANNELS = Object.freeze({
   event: Object.freeze({}),
 });
 
+// Official校正ルールセットの自動DL/更新 (electron/ipc/rulesets-ipc.js)
+const RULESETS_CHANNELS = Object.freeze({
+  invoke: Object.freeze({
+    listInstalled: "rulesets:list-installed",
+    sync: "rulesets:sync",
+    checkUpdate: "rulesets:check-update",
+  }),
+  event: Object.freeze({}),
+});
+
 // Integrated terminal PTY sessions (electron/ipc/pty-ipc.js)
 const PTY_CHANNELS = Object.freeze({
   invoke: Object.freeze({
@@ -271,4 +281,5 @@ module.exports = {
   NLP_CHANNELS,
   PTY_CHANNELS,
   UPDATE_CHANNELS,
+  RULESETS_CHANNELS,
 };

@@ -25,6 +25,7 @@ const {
   NLP_CHANNELS,
   PTY_CHANNELS,
   UPDATE_CHANNELS,
+  RULESETS_CHANNELS,
 } = require("./lib/ipc-channels");
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -197,6 +198,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
     download: invokeChannel(DICT_CHANNELS.invoke.download, { arity: 0 }),
     onDownloadProgress: eventChannel(DICT_CHANNELS.event.downloadProgress),
     onUpdateAvailable: eventChannel(DICT_CHANNELS.event.updateAvailable),
+  },
+  rulesets: {
+    /** List installed (downloaded) official/external rulesets on disk. */
+    listInstalled: invokeChannel(RULESETS_CHANNELS.invoke.listInstalled, { arity: 0 }),
+    /** Download/update every official ruleset that is missing or out of date. */
+    sync: invokeChannel(RULESETS_CHANNELS.invoke.sync, { arity: 0 }),
+    /** Check latest release tags vs installed, without downloading. */
+    checkUpdate: invokeChannel(RULESETS_CHANNELS.invoke.checkUpdate, { arity: 0 }),
   },
   pty: {
     /** Spawn a new PTY session. Returns { sessionId } or { error }. */

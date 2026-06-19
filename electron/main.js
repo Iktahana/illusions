@@ -43,6 +43,8 @@ const { registerAuthHandlers, handleAuthCallback } = require("./ipc/auth-ipc");
 const { registerEditorHandlers } = require("./ipc/editor-ipc");
 const { registerDictHandlers } = require("./ipc/dict-ipc");
 const { getDictManager } = require("./dict-manager");
+const { registerRulesetsHandlers } = require("./ipc/rulesets-ipc");
+const { getRulesetsManager } = require("./rulesets-manager");
 const { DICT_CHANNELS } = require("./lib/ipc-channels");
 
 process.on("uncaughtException", (err) => {
@@ -202,6 +204,7 @@ app.whenReady().then(async () => {
   registerAuthHandlers();
   registerEditorHandlers();
   registerDictHandlers();
+  registerRulesetsHandlers();
 
   // Power state monitoring
   powerMonitor.on("on-ac", () => broadcastPowerState("ac"));
@@ -240,6 +243,23 @@ app.whenReady().then(async () => {
       console.error("[Dict] Auto update check failed:", err);
     }
   }, 5000);
+
+  // 公式校正ルールセットの自動ダウンロード/更新（同意不要・サイレント・best-effort）。
+  // 起動を妨げないよう遅延実行し、失敗は握りつぶす（オフライン等でも問題なし）。
+  // AppState の rulesetsAutoSync が明示的に false のときのみ無効化。
+  setTimeout(async () => {
+    try {
+      const appState = await getStorageManager().loadAppState();
+      if (appState?.rulesetsAutoSync === false) return;
+      const summary = await getRulesetsManager().syncAllOfficial();
+      const installed = summary.filter((s) => s.status === "installed");
+      if (installed.length > 0) {
+        console.log("[Rulesets] auto-sync installed:", installed.map((s) => s.id).join(", "));
+      }
+    } catch (err) {
+      console.warn("[Rulesets] auto-sync failed:", err);
+    }
+  }, 6000);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) void createMainWindow();
