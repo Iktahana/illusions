@@ -11,13 +11,20 @@ autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
 
 /**
- * beta opt-in トグル（AppState.allowBetaUpdates）を唯一の真実として、autoUpdater の
- * channel / allowPrerelease / allowDowngrade を決定する。実行中ビルドが安定版か
- * プレリリースかに関わらずトグルが支配する。各 checkForUpdates の直前に呼ぶことで、
- * 設定変更が次回チェックに反映される。
+ * beta opt-in トグル（AppState.allowBetaUpdates）を唯一の真実として autoUpdater の
+ * 更新挙動を決定する。各 checkForUpdates の直前に呼ぶことで設定変更が次回チェックに
+ * 反映される。
  *
- * - ON  : beta channel・プレリリース許可（最新 beta へ）
- * - OFF : latest channel・プレリリース不可。さらに allowDowngrade=true とし、
+ * 重要（GitHub provider の仕様）: `autoUpdater.channel` は **明示設定しない**。
+ * - channel を未設定にすると、electron-updater は実行中バージョンの prerelease 成分から
+ *   追従先を自動判定する（安定版=任意の最新を選択可 / beta 版=beta 系を追従）。
+ * - プレリリース Release には `latest*.yml` のみが入り `beta-*.yml` は無いが、
+ *   allowPrerelease 時は GitHubProvider が `beta-*.yml` 404 を `latest*.yml` へ
+ *   フォールバックするため opt-in 受信が成立する（out/providers/GitHubProvider.js）。
+ *   逆に channel="beta" を明示するとフォールバック先も beta のままになり 404 で失敗する。
+ *
+ * - ON  : allowPrerelease=true（最新 beta プレリリースを受信）
+ * - OFF : allowPrerelease=false（安定版のみ）。加えて allowDowngrade=true とし、
  *         実行中がプレリリース（安定版より新しい先行版）でも最新安定版へ戻れるようにする。
  *         これが「beta を OFF にしたら最新安定版へ自動更新」を実現する。
  */
@@ -26,12 +33,9 @@ async function applyBetaOptIn() {
     const { getStorageManager } = require("./ipc/storage-ipc");
     const appState = await getStorageManager().loadAppState();
     const allowBeta = appState?.allowBetaUpdates === true;
-    autoUpdater.channel = allowBeta ? "beta" : "latest";
     autoUpdater.allowPrerelease = allowBeta;
     autoUpdater.allowDowngrade = !allowBeta;
-    log.info(
-      `アップデートchannel=${autoUpdater.channel} (beta opt-in: ${allowBeta}, allowDowngrade: ${autoUpdater.allowDowngrade})`,
-    );
+    log.info(`アップデート設定: allowPrerelease=${allowBeta}, allowDowngrade=${!allowBeta}`);
   } catch (e) {
     log.error("beta opt-in 設定の読み込みに失敗しました:", e);
   }
