@@ -161,6 +161,7 @@
         ]
       }
     ],
+    "afterPack": "scripts/embed-quicklook.js",
     "afterSign": "scripts/notarize.js",
     "mac": {
       "category": "public.app-category.productivity",
@@ -169,12 +170,6 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "extraFiles": [
-        {
-          "from": "build/quicklook/MDIQuickLook.appex",
-          "to": "PlugIns/MDIQuickLook.appex"
-        }
-      ],
       "extendInfo": {
         "UTExportedTypeDeclarations": [
           {
