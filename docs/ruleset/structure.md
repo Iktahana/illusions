@@ -51,6 +51,6 @@ my-ruleset/
 
 ## 関連
 
-- 作成ガイド: [ruleset-authoring.md](./ruleset-authoring.md)
+- 作成ガイド: [authoring.md](./authoring.md)
 - sample テンプレート: [sample-ruleset.md](./sample-ruleset.md)
 - クローズドソース配布: [closed-source.md](./closed-source.md)

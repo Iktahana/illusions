@@ -73,4 +73,27 @@ describe("detectUnits — edges", () => {
     });
     expect(issues).toHaveLength(2);
   });
+
+  it("keeps the first spec when two specs claim the same span with different corrects", () => {
+    const issues = detectUnits({
+      ...BASE,
+      text: "2 KW",
+      units: [
+        { pattern: /(?<=\d\s*)KW\b/g, correct: "kW" },
+        { pattern: /(?<=\d\s*)KW\b/g, correct: "MW" },
+      ],
+    });
+    expect(issues).toHaveLength(1);
+    expect(issues[0].fix?.replacement).toBe("kW");
+  });
+
+  it("uses a custom Japanese message when provided", () => {
+    const issues = detectUnits({
+      ...BASE,
+      text: "2 KW",
+      units: [{ pattern: /(?<=\d\s*)KW\b/g, correct: "kW" }],
+      messageJa: (m, c) => `「${m}」→「${c}」`,
+    });
+    expect(issues[0].messageJa).toBe("「KW」→「kW」");
+  });
 });
