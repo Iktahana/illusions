@@ -110,6 +110,38 @@ class RulesetsManager {
     }
   }
 
+  /** True when the installed dir has BOTH required asset files (not just a tag). */
+  _isInstalledComplete(id) {
+    const dir = this._rulesetDir(id);
+    return (
+      fs.existsSync(path.join(dir, ASSET_MANIFEST)) && fs.existsSync(path.join(dir, ASSET_INDEX))
+    );
+  }
+
+  /**
+   * Recover from a crash that happened during a swap: if a COMPLETE staged
+   * release is present but the install is missing/incomplete, promote it with no
+   * network access (heals even offline). Otherwise discard stale/partial staging.
+   */
+  _recoverStaging(id, dir, staging) {
+    try {
+      const stagedComplete =
+        fs.existsSync(path.join(staging, ASSET_MANIFEST)) &&
+        fs.existsSync(path.join(staging, ASSET_INDEX)) &&
+        fs.existsSync(path.join(staging, VERSION_FILE));
+      if (stagedComplete && !this._isInstalledComplete(id)) {
+        fs.rmSync(dir, { recursive: true, force: true });
+        fs.mkdirSync(path.dirname(dir), { recursive: true });
+        fs.renameSync(staging, dir);
+        console.log(`[Rulesets] recovered staged install for ${id}`);
+      } else {
+        fs.rmSync(staging, { recursive: true, force: true });
+      }
+    } catch {
+      /* best-effort recovery — never throws */
+    }
+  }
+
   /**
    * List installed rulesets (those with both manifest.json and index.js).
    * @returns {Array<{ id: string, version: string|null, tag: string|null }>}
@@ -201,7 +233,23 @@ class RulesetsManager {
     return summary;
   }
 
+  /**
+   * Sync a single official ruleset. MUST be called under the syncAllOfficial
+   * `_syncing` guard (the only call paths serialize through it), so its use of a
+   * stable per-id staging dir cannot race a concurrent sync of the same id.
+   */
   async _syncOne(spec) {
+    const dir = this._rulesetDir(spec.id);
+    // Stage the FULL release in a sibling dir, then swap it in with a single
+    // rename. The final dir is therefore only ever the old complete version,
+    // briefly absent, or the new complete version — never a half-written pair
+    // (e.g. new manifest + old code). Staging dirs use a "." prefix so
+    // listInstalled() skips them.
+    const staging = path.join(this._rootDir(), `.staging-${spec.id}`);
+
+    // Heal a crash that interrupted a previous swap before doing any network I/O.
+    this._recoverStaging(spec.id, dir, staging);
+
     const release = await this._fetchLatestRelease(spec);
     const latestTag = release?.tag_name ?? null;
     const { index: indexAsset, manifest: manifestAsset } = selectReleaseAssets(release?.assets);
@@ -211,7 +259,9 @@ class RulesetsManager {
     }
 
     const installedTag = this._readInstalledTag(spec.id);
-    if (!needsUpdate(installedTag, latestTag)) {
+    // Re-install when the tag differs OR the on-disk bundle is incomplete — a
+    // surviving .release-tag must not mask a missing/corrupt asset file.
+    if (!needsUpdate(installedTag, latestTag) && this._isInstalledComplete(spec.id)) {
       return { id: spec.id, status: "up-to-date", detail: latestTag };
     }
 
@@ -220,14 +270,6 @@ class RulesetsManager {
     if (!this._isAllowedAssetUrl(indexUrl) || !this._isAllowedAssetUrl(manifestUrl)) {
       return { id: spec.id, status: "skipped", detail: "asset host not allowed" };
     }
-
-    const dir = this._rulesetDir(spec.id);
-    // Stage the FULL release in a sibling dir, then swap it in with a single
-    // rename. The final dir is therefore only ever the old complete version,
-    // briefly absent, or the new complete version — never a half-written pair
-    // (e.g. new manifest + old code). Staging dirs use a "." prefix so
-    // listInstalled() skips them.
-    const staging = path.join(this._rootDir(), `.staging-${spec.id}`);
 
     try {
       fs.rmSync(staging, { recursive: true, force: true });
@@ -301,6 +343,11 @@ class RulesetsManager {
           requestUrl,
           { headers: { "User-Agent": "illusions-app", Accept: "application/vnd.github.v3+json" } },
           (res) => {
+            // Attach the error handler before draining/branching so a reset
+            // while a redirect/404/non-200 body drains can't raise an unhandled
+            // 'error' on the IncomingMessage (which would crash the main process).
+            res.on("error", reject);
+
             if ([301, 302, 303, 307, 308].includes(res.statusCode ?? 0)) {
               const location = res.headers.location;
               if (location) {
@@ -336,7 +383,6 @@ class RulesetsManager {
                 reject(err);
               }
             });
-            res.on("error", reject);
           },
         );
         req.on("error", reject);
@@ -354,34 +400,57 @@ class RulesetsManager {
    */
   _downloadFile(url, destPath, expectedDigest) {
     return new Promise((resolve, reject) => {
+      // Operation-wide guards (span all redirect hops):
+      // - `settled` makes resolve/reject fire exactly once.
+      // - `piping` flips true once a 200 body is being piped; from then on the
+      //   ONLY settlement path is the pipeline callback (which fires after both
+      //   streams close), so cleanup never races an open fd — including when a
+      //   stale earlier hop's request/timeout errors after we've moved on.
+      let settled = false;
+      let piping = false;
+      const fail = (err) => {
+        if (!settled) {
+          settled = true;
+          reject(err);
+        }
+      };
+      const succeed = (value) => {
+        if (!settled) {
+          settled = true;
+          resolve(value);
+        }
+      };
+
       const doRequest = (requestUrl, redirectCount = 0) => {
         if (redirectCount > 5) {
-          reject(new Error("ダウンロードのリダイレクトが最大回数を超えました"));
+          fail(new Error("ダウンロードのリダイレクトが最大回数を超えました"));
           return;
         }
         let parsed;
         try {
           parsed = new URL(requestUrl);
         } catch {
-          reject(new Error("ダウンロードURLの形式が不正です"));
+          fail(new Error("ダウンロードURLの形式が不正です"));
           return;
         }
         if (parsed.protocol !== "https:") {
-          reject(new Error("https 以外のダウンロード先は許可されていません"));
+          fail(new Error("https 以外のダウンロード先は許可されていません"));
           return;
         }
         // Re-validate the host on EVERY hop (including redirects), so a redirect
         // can never steer the download to a host outside the allowlist.
         if (!ALLOWED_DOWNLOAD_HOSTS.has(parsed.hostname)) {
-          reject(new Error("ダウンロード先のホストが許可されていません"));
+          fail(new Error("ダウンロード先のホストが許可されていません"));
           return;
         }
-        // Once the body is being piped, the ONLY settlement path is the
-        // pipeline callback (which fires after both streams close). req errors /
-        // timeout after that point destroy the source, which the pipeline turns
-        // into its callback — so we never reject before the fd is closed.
-        let piping = false;
         const req = https.get(requestUrl, { headers: { "User-Agent": "illusions-app" } }, (res) => {
+          // Always attach an error handler before draining/branching, so a reset
+          // while a redirect/non-200 body drains can't crash the main process
+          // with an unhandled 'error'. Once piping, pipeline owns the error.
+          res.on("error", (err) => {
+            if (!piping) fail(err);
+          });
+
           if ([301, 302, 303, 307, 308].includes(res.statusCode ?? 0)) {
             const location = res.headers.location;
             if (location) {
@@ -390,7 +459,7 @@ class RulesetsManager {
               try {
                 nextUrl = new URL(location, requestUrl).toString();
               } catch {
-                reject(new Error("リダイレクト先URLが不正です"));
+                fail(new Error("リダイレクト先URLが不正です"));
                 return;
               }
               doRequest(nextUrl, redirectCount + 1);
@@ -399,7 +468,7 @@ class RulesetsManager {
           }
           if (res.statusCode !== 200) {
             res.resume();
-            reject(new Error(`HTTP ${res.statusCode}`));
+            fail(new Error(`HTTP ${res.statusCode}`));
             return;
           }
           let received = 0;
@@ -419,21 +488,21 @@ class RulesetsManager {
           piping = true;
           pipeline(res, fs.createWriteStream(destPath), (err) => {
             if (err) {
-              reject(err);
+              fail(err);
               return;
             }
             const actual = hash.digest("hex");
             if (expectedDigest && actual !== expectedDigest) {
-              reject(new Error("ダウンロードのチェックサム検証に失敗しました"));
+              fail(new Error("ダウンロードのチェックサム検証に失敗しました"));
               return;
             }
-            resolve(actual);
+            succeed(actual);
           });
         });
         // Pre-response failures (DNS/connect) settle here; once piping, the
         // pipeline callback owns settlement so cleanup never races an open fd.
         req.on("error", (err) => {
-          if (!piping) reject(err);
+          if (!piping) fail(err);
         });
         req.setTimeout(REQUEST_TIMEOUT_MS, () => {
           req.destroy(new Error("ダウンロードがタイムアウトしました"));
