@@ -10,36 +10,28 @@ const { isDev, isMicrosoftStoreApp } = require("./app-constants");
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
 
-// このビルド自体のプレリリース channel を版番号の接尾辞から判定する。
-// 例: "1.2.19-beta.20260620.143000" → "beta"、"1.2.19" → null（安定版）
-// 接尾辞先頭の英字部分のみ取る（タイムスタンプ ".20260620.143000" は channel 名に含めない）。
-const buildChannel = (() => {
-  const m = app.getVersion().match(/-([a-z]+)/);
-  return m ? m[1] : null;
-})();
-
-// プレリリースビルド（-beta/-alpha）を走らせているユーザーは常に自分の channel に留まる。
-// 安定版ビルドは既定で latest（opt-in 時のみ beta へ切り替える）。
-if (buildChannel) {
-  autoUpdater.channel = buildChannel;
-  autoUpdater.allowPrerelease = true;
-}
-
 /**
- * 安定版ビルドにおける beta opt-in を AppState から読み、autoUpdater の
- * channel / allowPrerelease を決定する。プレリリースビルドは opt-in に関係なく
- * 自分の channel を維持する。各 checkForUpdates の直前に呼ぶことで、設定変更が
- * 次回チェックに反映される。
+ * beta opt-in トグル（AppState.allowBetaUpdates）を唯一の真実として、autoUpdater の
+ * channel / allowPrerelease / allowDowngrade を決定する。実行中ビルドが安定版か
+ * プレリリースかに関わらずトグルが支配する。各 checkForUpdates の直前に呼ぶことで、
+ * 設定変更が次回チェックに反映される。
+ *
+ * - ON  : beta channel・プレリリース許可（最新 beta へ）
+ * - OFF : latest channel・プレリリース不可。さらに allowDowngrade=true とし、
+ *         実行中がプレリリース（安定版より新しい先行版）でも最新安定版へ戻れるようにする。
+ *         これが「beta を OFF にしたら最新安定版へ自動更新」を実現する。
  */
 async function applyBetaOptIn() {
-  if (buildChannel) return; // プレリリースビルドは自分の channel を維持
   try {
     const { getStorageManager } = require("./ipc/storage-ipc");
     const appState = await getStorageManager().loadAppState();
     const allowBeta = appState?.allowBetaUpdates === true;
     autoUpdater.channel = allowBeta ? "beta" : "latest";
     autoUpdater.allowPrerelease = allowBeta;
-    log.info(`アップデートchannel=${autoUpdater.channel} (beta opt-in: ${allowBeta})`);
+    autoUpdater.allowDowngrade = !allowBeta;
+    log.info(
+      `アップデートchannel=${autoUpdater.channel} (beta opt-in: ${allowBeta}, allowDowngrade: ${autoUpdater.allowDowngrade})`,
+    );
   } catch (e) {
     log.error("beta opt-in 設定の読み込みに失敗しました:", e);
   }
