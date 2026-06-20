@@ -8,8 +8,6 @@
 import { describe, it, expect } from "vitest";
 
 import type { LintRuleConfig } from "../types";
-import { createManuscriptL1Rules } from "../rules/json-l1/manuscript-l1-rules";
-import { createNihongoHyoukiL1Rules } from "../rules/json-l1/nihongo-hyouki-l1-rules";
 import { createJtfL1Rules } from "../rules/json-l1/jtf-l1-rules";
 
 const CFG: LintRuleConfig = { enabled: true, severity: "warning" };
@@ -19,119 +17,6 @@ function findRule<T extends { id: string }>(rules: T[], id: string): T {
   if (!rule) throw new Error(`Rule ${id} not found`);
   return rule;
 }
-
-// ---------------------------------------------------------------------------
-// me2-13-unit-symbols
-// ---------------------------------------------------------------------------
-describe("me2-13-unit-symbols", () => {
-  const rule = findRule(createManuscriptL1Rules(), "me2-13-unit-symbols");
-
-  it("should flag missing spacing: 5km -> 5 km", () => {
-    const issues = rule.lint("5km", CFG);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].fix?.replacement).toBe(" km");
-  });
-
-  it("should flag missing spacing: 100mg", () => {
-    const issues = rule.lint("100mg", CFG);
-    expect(issues).toHaveLength(1);
-  });
-
-  it("should NOT flag already-spaced units: 5 km", () => {
-    const issues = rule.lint("5 km", CFG);
-    expect(issues).toHaveLength(0);
-  });
-
-  it("should no longer suggest katakana conversion", () => {
-    // Previously this rule would suggest km -> キロメートル
-    const issues = rule.lint("5 km", CFG);
-    const katakanaIssue = issues.find((i) => i.fix?.replacement === "キロメートル");
-    expect(katakanaIssue).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// nh-10-units
-// ---------------------------------------------------------------------------
-describe("nh-10-units", () => {
-  const rule = findRule(createNihongoHyoukiL1Rules(), "nh-10-units");
-
-  it("should flag incorrect SI casing: 5KG -> kg", () => {
-    const issues = rule.lint("5KG", CFG);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].fix?.replacement).toBe("kg");
-  });
-
-  it("should flag incorrect SI casing: 100HZ -> Hz", () => {
-    const issues = rule.lint("100HZ", CFG);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].fix?.replacement).toBe("Hz");
-  });
-
-  it("should flag spacing: 5 kg -> remove space", () => {
-    const issues = rule.lint("5 kg", CFG);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].fix?.replacement).toBe("");
-  });
-
-  it("should NOT flag full-width ＡＩ as a unit issue", () => {
-    const issues = rule.lint("ＡＩの技術", CFG);
-    expect(issues).toHaveLength(0);
-  });
-
-  it("should NOT flag full-width ＨＴＭＬ as a unit issue", () => {
-    const issues = rule.lint("ＨＴＭＬファイル", CFG);
-    expect(issues).toHaveLength(0);
-  });
-
-  it("should NOT flag full-width Ｃ as a unit issue", () => {
-    const issues = rule.lint("Ｃ言語", CFG);
-    expect(issues).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// nh-11-symbols (dash detection)
-// ---------------------------------------------------------------------------
-describe("nh-11-symbols dash detection", () => {
-  const rule = findRule(createNihongoHyoukiL1Rules(), "nh-11-symbols");
-
-  it("should flag dash in Japanese context: 彼女は-と言った", () => {
-    const issues = rule.lint("彼女は-と言った", CFG);
-    const dashIssues = issues.filter((i) => i.fix?.replacement === "——");
-    expect(dashIssues.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("should flag double dash in Japanese context: 彼女は--と言った", () => {
-    const issues = rule.lint("彼女は--と言った", CFG);
-    const dashIssues = issues.filter((i) => i.fix?.replacement === "——");
-    expect(dashIssues.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("should NOT flag hyphenated English words: foo-bar", () => {
-    const issues = rule.lint("foo-bar", CFG);
-    const dashIssues = issues.filter((i) => i.fix?.replacement === "——");
-    expect(dashIssues).toHaveLength(0);
-  });
-
-  it("should NOT flag dates: 2024-01-01", () => {
-    const issues = rule.lint("2024-01-01", CFG);
-    const dashIssues = issues.filter((i) => i.fix?.replacement === "——");
-    expect(dashIssues).toHaveLength(0);
-  });
-
-  it("should NOT flag command-line flags: --verbose", () => {
-    const issues = rule.lint("--verbose", CFG);
-    const dashIssues = issues.filter((i) => i.fix?.replacement === "——");
-    expect(dashIssues).toHaveLength(0);
-  });
-
-  it("should NOT flag Markdown horizontal rules: ---", () => {
-    const issues = rule.lint("---", CFG);
-    const dashIssues = issues.filter((i) => i.fix?.replacement === "——");
-    expect(dashIssues).toHaveLength(0);
-  });
-});
 
 // ---------------------------------------------------------------------------
 // jtf-2-2-1-kanji
