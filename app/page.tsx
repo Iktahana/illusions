@@ -42,8 +42,9 @@ import { useEditorLifecycle } from "@/lib/editor-page/use-editor-lifecycle";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
 import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
-import { CORRECTION_MODES, MODE_TO_PRESET } from "@/lib/linting/correction-modes";
-import { LINT_PRESETS } from "@/lib/linting/lint-presets";
+import { CORRECTION_MODES } from "@/lib/linting/correction-modes";
+import { buildModeRuleConfigsFromRules } from "@/lib/linting/mode-rule-configs";
+import { useInstalledRuleMetas } from "@/lib/editor-page/use-installed-rule-metas";
 import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
@@ -182,6 +183,24 @@ export default function EditorPage() {
   } = settingsHandlers;
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
+
+  // Rule metas of every installed external ruleset (all lint rules now live in
+  // external rulesets). The inspector's correction-mode dropdown derives its
+  // per-rule config map from these, mirroring the settings ModeSelector (#1817).
+  const loadedRules = useInstalledRuleMetas();
+
+  // After the external rulesets load, seed the rule config map for the current
+  // mode when nothing has been configured yet (fresh install, or a prior
+  // empty-config state left by the #1809/#1810 regression). Without this every
+  // rule stays disabled and nothing is detected until the user re-picks a mode.
+  // Guarded on an empty map so it never clobbers real user settings.
+  useEffect(() => {
+    if (loadedRules.length === 0) return;
+    if (Object.keys(lintingRuleConfigs).length > 0) return;
+    handleLintingRuleConfigsBatchChange(
+      buildModeRuleConfigsFromRules(correctionConfig.mode, loadedRules),
+    );
+  }, [loadedRules, lintingRuleConfigs, correctionConfig.mode, handleLintingRuleConfigsBatchChange]);
 
   // Derive a stable per-window key from the project root path (Electron project mode).
   // This key scopes tabs and dockview layout so multiple windows with different projects
@@ -1360,8 +1379,7 @@ export default function EditorPage() {
     onCorrectionModeChange: (modeId: CorrectionModeId) => {
       const mode = CORRECTION_MODES[modeId];
       handleCorrectionConfigChange({ mode: modeId, guidelines: [...mode.defaultGuidelines] });
-      const preset = LINT_PRESETS[MODE_TO_PRESET[modeId]];
-      if (preset) handleLintingRuleConfigsBatchChange({ ...preset.configs });
+      handleLintingRuleConfigsBatchChange(buildModeRuleConfigsFromRules(modeId, loadedRules));
     },
     switchToCorrectionsTrigger,
     previousDayStats,
