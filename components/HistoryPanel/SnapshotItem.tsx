@@ -55,7 +55,11 @@ export default function SnapshotItem({
         if (!isLoadingDiff) onCompare(snapshot);
       }}
       onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && !isLoadingDiff) {
+        if (
+          (e.key === "Enter" || e.key === " ") &&
+          !isLoadingDiff &&
+          e.target === e.currentTarget
+        ) {
           e.preventDefault();
           onCompare(snapshot);
         }
