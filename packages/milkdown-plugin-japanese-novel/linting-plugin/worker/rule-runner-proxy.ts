@@ -15,8 +15,14 @@ import {
   isMorphologicalDocumentLintRule,
   isMorphologicalLintRule,
 } from "@/lib/linting/types";
-import type { LintIssue, LintRuleConfig } from "@/lib/linting/types";
+import type { LintIssue, LintRule, LintRuleConfig } from "@/lib/linting/types";
+import type { RulesetModule } from "@/lib/linting/sdk/ruleset-types";
 
+import {
+  buildRulesetRunner,
+  createIsolatedRulesetContext,
+  importRulesetModule,
+} from "./build-ruleset-runner";
 import {
   WorkerDisposedError,
   WorkerStaleError,
@@ -83,14 +89,35 @@ export class RuleRunnerProxy implements RuleRunnerLike {
 
   private ready = false;
   private disposed = false;
-  /**
-   * Non-null once the worker has hit a fatal failure (uncorrelated
-   * ERROR, `onerror`, `messageerror`). Set on either the pre-READY or
-   * post-READY path. Once set, the proxy is poisoned: `runBatch` and
-   * other API calls fail fast with this error instead of attempting
-   * to talk to a dead worker.
-   */
-  private fatalError: Error | null = null;
+
+  // ----------------------------------------------------------------
+  // Main-thread fallback state (#1831)
+  //
+  // In packaged Electron the app is served from file://, so the worker's
+  // `location.origin` is the string "null" and the Turbopack worker
+  // bootstrap's `new URL(chunk, location.origin)` throws — the worker never
+  // reaches READY. Rather than poisoning the proxy (which left ALL linting
+  // dead once built-in rules were zeroed), we fall back to running every
+  // rule on the main thread. The renderer CAN blob-import ruleset modules
+  // even when the file:// worker cannot resolve its chunks.
+  // ----------------------------------------------------------------
+  private fallbackActive = false;
+  private fallbackRunner: RuleRunner | null = null;
+  private fallbackBuild: Promise<void> | null = null;
+  /** Legacy (built-in, non-morph) rules hosted by the fallback runner — mirrors the worker. */
+  private readonly fallbackLegacyRules: LintRule[];
+  /** id → source code of every load request, retained so the fallback can rebuild. */
+  private readonly loadedCodes = new Map<string, string>();
+  /** id → imported module (populated on the main thread once in fallback). */
+  private readonly fallbackModules = new Map<string, RulesetModule>();
+  /** Last-known per-rule configs, replayed onto the fallback runner. */
+  private readonly lastConfigs = new Map<string, LintRuleConfig>();
+  /** Last-known active guideline ids, replayed onto the fallback runner. */
+  private lastActiveGuidelines: string[] | null = null;
+  /** Last-known guideline-map entries (legacy base), replayed onto the fallback runner. */
+  private lastGuidelineMapEntries: Array<[string, string | undefined]> = Array.from(
+    RULE_GUIDELINE_MAP.entries(),
+  );
 
   /** Promise that resolves once the worker has posted READY. */
   readonly readyPromise: Promise<void>;
@@ -109,9 +136,16 @@ export class RuleRunnerProxy implements RuleRunnerLike {
 
     // 2. Pre-compute worker capability flags from rule metadata so
     //    `hasDocumentRules()` can answer synchronously.
-    this.workerHasDocumentRules = createJsonDrivenRules().some(
+    const jsonRules = createJsonDrivenRules();
+    this.workerHasDocumentRules = jsonRules.some(
       (r) =>
         isDocumentLintRule(r) && !isMorphologicalLintRule(r) && !isMorphologicalDocumentLintRule(r),
+    );
+
+    // Non-morph legacy rules the worker would host — reused by the
+    // main-thread fallback so it produces the same rule set (#1831).
+    this.fallbackLegacyRules = jsonRules.filter(
+      (r) => !isMorphologicalLintRule(r) && !isMorphologicalDocumentLintRule(r),
     );
 
     // 3. Spin up the worker.
@@ -137,7 +171,12 @@ export class RuleRunnerProxy implements RuleRunnerLike {
 
   setConfig(ruleId: string, config: LintRuleConfig): void {
     if (this.disposed) return;
+    this.lastConfigs.set(ruleId, config);
     this.mainRunner.setConfig(ruleId, config);
+    if (this.fallbackActive) {
+      this.fallbackRunner?.setConfig(ruleId, config);
+      return;
+    }
     this.send({
       type: "SET_CONFIG",
       correlationId: this.nextId(),
@@ -148,7 +187,12 @@ export class RuleRunnerProxy implements RuleRunnerLike {
 
   setActiveGuidelines(guidelines: string[] | null): void {
     if (this.disposed) return;
+    this.lastActiveGuidelines = guidelines;
     this.mainRunner.setActiveGuidelines(guidelines);
+    if (this.fallbackActive) {
+      this.fallbackRunner?.setActiveGuidelines(guidelines);
+      return;
+    }
     this.send({
       type: "SET_ACTIVE_GUIDELINES",
       correlationId: this.nextId(),
@@ -158,7 +202,12 @@ export class RuleRunnerProxy implements RuleRunnerLike {
 
   setGuidelineMap(map: Map<string, string | undefined>): void {
     if (this.disposed) return;
+    this.lastGuidelineMapEntries = Array.from(map.entries());
     this.mainRunner.setGuidelineMap(map);
+    if (this.fallbackActive) {
+      this.fallbackRunner?.setGuidelineMap(map);
+      return;
+    }
     this.send({
       type: "SET_GUIDELINE_MAP",
       correlationId: this.nextId(),
@@ -185,11 +234,11 @@ export class RuleRunnerProxy implements RuleRunnerLike {
   // ----------------------------------------------------------------
 
   async runBatch(req: RunBatchRequest): Promise<RunBatchResponse> {
-    if (this.fatalError) {
-      throw this.fatalError;
-    }
     if (this.disposed) {
       throw new WorkerDisposedError();
+    }
+    if (this.fallbackActive) {
+      return this.runBatchFallback(req);
     }
 
     // Track the latest version requested so older responses can be filtered.
@@ -280,8 +329,13 @@ export class RuleRunnerProxy implements RuleRunnerLike {
    * On failure the worker's existing runner is left intact (failure isolation).
    */
   async loadRuleset(id: string, code: string): Promise<RulesetLoadResult> {
-    if (this.fatalError) throw this.fatalError;
     if (this.disposed) throw new WorkerDisposedError();
+    // Retain the source so the fallback can (re)build the main-thread runner.
+    this.loadedCodes.set(id, code);
+
+    if (this.fallbackActive) {
+      return this.loadRulesetMainThread(id, code);
+    }
 
     const correlationId = this.nextId();
     const result = new Promise<RulesetLoadResult>((resolve, reject) => {
@@ -298,8 +352,21 @@ export class RuleRunnerProxy implements RuleRunnerLike {
    * The worker rebuilds the runner from legacy + remaining externals.
    */
   async unloadRuleset(id: string): Promise<RulesetLoadResult> {
-    if (this.fatalError) throw this.fatalError;
     if (this.disposed) throw new WorkerDisposedError();
+    this.loadedCodes.delete(id);
+
+    if (this.fallbackActive) {
+      if (this.fallbackBuild) {
+        try {
+          await this.fallbackBuild;
+        } catch {
+          /* build never rejects */
+        }
+      }
+      this.fallbackModules.delete(id);
+      this.rebuildFallbackRunner();
+      return { ok: true, ruleIds: [], warnings: [] };
+    }
 
     const correlationId = this.nextId();
     const result = new Promise<RulesetLoadResult>((resolve, reject) => {
@@ -418,11 +485,9 @@ export class RuleRunnerProxy implements RuleRunnerLike {
             return;
           }
         } else {
-          // Uncorrelated worker failure — treat as fatal. Reject every
-          // pending request, reject readyPromise if startup hadn't
-          // completed, and poison the proxy so future `runBatch()`
-          // calls fail fast instead of posting into a dead worker.
-          this.poison(err);
+          // Uncorrelated worker failure (e.g. startup crash). Switch to the
+          // main-thread fallback instead of killing linting entirely (#1831).
+          void this.enterFallback(err).catch(() => {});
         }
         return;
       }
@@ -434,35 +499,158 @@ export class RuleRunnerProxy implements RuleRunnerLike {
   }
 
   private handleWorkerError(e: ErrorEvent | Error): void {
-    const err = e instanceof Error ? e : new Error(e.message ?? String(e));
-    this.poison(err);
+    const err =
+      e instanceof Error ? e : new Error(e.message ? String(e.message) : "Lint worker error");
+    void this.enterFallback(err).catch(() => {});
   }
 
+  // ----------------------------------------------------------------
+  // Main-thread fallback (#1831)
+  // ----------------------------------------------------------------
+
   /**
-   * Mark the proxy as fatally broken: reject every pending request and
-   * `readyPromise` (if startup hadn't completed), terminate the worker,
-   * and remember the error so subsequent API calls fail fast instead
-   * of hanging.
+   * The worker is unusable (failed to start / crashed). Tear it down and
+   * rebuild every loaded ruleset on the main thread so linting keeps working.
    */
-  private poison(err: Error): void {
-    if (this.fatalError) return;
-    this.fatalError = err;
-    for (const entry of this.pending.values()) {
-      entry.reject(err);
-    }
-    this.pending.clear();
-    for (const entry of this.pendingRulesets.values()) {
-      entry.reject(err);
-    }
-    this.pendingRulesets.clear();
-    this.preReadyBuffer.length = 0;
-    if (!this.ready) {
-      this.rejectReady(err);
-    }
-    if (!this.disposed) {
-      this.disposed = true;
+  private async enterFallback(err: Error): Promise<void> {
+    if (this.fallbackActive || this.disposed) return;
+    this.fallbackActive = true;
+    console.warn("[lint] worker unavailable — falling back to main-thread linting:", err.message);
+
+    try {
       this.worker.terminate();
+    } catch {
+      /* ignore */
     }
+
+    // In-flight batches can't be salvaged (their paragraphs aren't retained);
+    // reject them as stale so the lint pipeline re-runs through the fallback.
+    const staleErr = new WorkerStaleError();
+    for (const entry of this.pending.values()) entry.reject(staleErr);
+    this.pending.clear();
+    this.preReadyBuffer.length = 0;
+
+    // Build the fallback runner (imports every recorded ruleset module).
+    this.fallbackBuild = this.buildFallbackRunner();
+
+    // Unblock anything awaiting worker startup so it proceeds to the fallback.
+    if (!this.ready) {
+      this.ready = true;
+      this.resolveReady();
+    }
+
+    // Resolve pending ruleset requests once the fallback is built.
+    const pendingRs = Array.from(this.pendingRulesets.values());
+    this.pendingRulesets.clear();
+    try {
+      await this.fallbackBuild;
+    } catch {
+      /* buildFallbackRunner never rejects */
+    }
+    for (const entry of pendingRs) {
+      entry.resolve({ ok: true, ruleIds: [], warnings: [] });
+    }
+  }
+
+  /** Import every recorded ruleset on the main thread, then build the runner. */
+  private async buildFallbackRunner(): Promise<void> {
+    for (const [id, code] of this.loadedCodes) {
+      if (this.fallbackModules.has(id)) continue;
+      try {
+        this.fallbackModules.set(id, await importRulesetModule(code));
+      } catch (e) {
+        console.error(`[lint] fallback failed to import ruleset "${id}":`, e);
+      }
+    }
+    this.rebuildFallbackRunner();
+  }
+
+  /** (Re)build the fallback runner from the currently-imported modules. */
+  private rebuildFallbackRunner(): void {
+    try {
+      const { runner } = buildRulesetRunner({
+        legacyRules: this.fallbackLegacyRules,
+        externals: this.fallbackModules.values(),
+        ctx: createIsolatedRulesetContext(),
+        baseGuidelineMapEntries: this.lastGuidelineMapEntries,
+        configs: this.lastConfigs,
+        activeGuidelines: this.lastActiveGuidelines,
+      });
+      this.fallbackRunner = runner;
+      this.workerHasMorphRules = runnerHasRegisteredMorphRules(runner);
+    } catch (e) {
+      console.error("[lint] fallback runner build failed:", e);
+    }
+  }
+
+  /** Load a single ruleset into the (already-active) fallback runner. */
+  private async loadRulesetMainThread(id: string, code: string): Promise<RulesetLoadResult> {
+    if (this.fallbackBuild) {
+      try {
+        await this.fallbackBuild;
+      } catch {
+        /* build never rejects */
+      }
+    }
+    try {
+      const mod = await importRulesetModule(code);
+      this.fallbackModules.set(id, mod);
+      this.rebuildFallbackRunner();
+      const ruleIds = (mod.manifest?.rules ?? []).map((r) => r.ruleId);
+      return { ok: true, ruleIds, warnings: [] };
+    } catch (e) {
+      return {
+        ok: false,
+        ruleIds: [],
+        warnings: [
+          {
+            code: "load-failed",
+            messageJa: "ルールセットの読み込みに失敗しました",
+            detail: e instanceof Error ? e.message : String(e),
+          },
+        ],
+      };
+    }
+  }
+
+  /** Run a batch entirely on the main thread (worker unavailable). */
+  private async runBatchFallback(req: RunBatchRequest): Promise<RunBatchResponse> {
+    if (this.fallbackBuild) {
+      try {
+        await this.fallbackBuild;
+      } catch {
+        /* build never rejects */
+      }
+    }
+    if (req.version > this.latestRequestedVersion) {
+      this.latestRequestedVersion = req.version;
+    }
+
+    // Built-in morph rules (real dict) run via the existing main runner.
+    const { mainPerParagraph, mainDocument } = this.runMainMorph(req);
+
+    const runner = this.fallbackRunner;
+    if (req.runWorker === false || !runner) {
+      return { perParagraph: mainPerParagraph, document: mainDocument };
+    }
+
+    const runPer = req.mode === "per-paragraph" || req.mode === "both";
+    const runDoc = req.mode === "document" || req.mode === "both";
+
+    const fbPerParagraph = new Map<number, LintIssue[]>();
+    if (runPer) {
+      for (const p of req.paragraphs) {
+        const issues = p.tokens ? runner.runAllWithTokens(p.text, p.tokens) : runner.runAll(p.text);
+        if (issues.length > 0) fbPerParagraph.set(p.index, issues);
+      }
+    }
+    const fbDocument: Map<number, LintIssue[]> =
+      runDoc && runner.hasDocumentRules() ? runner.runDocument(req.paragraphs) : new Map();
+
+    return {
+      perParagraph: mergeIssueMaps(mainPerParagraph, fbPerParagraph),
+      document: mergeIssueMaps(mainDocument, fbDocument),
+    };
   }
 
   private runMainMorph(req: RunBatchRequest): {
@@ -508,6 +696,13 @@ export class RuleRunnerProxy implements RuleRunnerLike {
 // ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------
+
+/** Whether a runner hosts at least one registered morphological rule (ignoring enabled state). */
+function runnerHasRegisteredMorphRules(r: RuleRunner): boolean {
+  return r
+    .getRegisteredRules()
+    .some((rule) => isMorphologicalLintRule(rule) || isMorphologicalDocumentLintRule(rule));
+}
 
 function deserialize(entries: SerializedIssueMap): Map<number, LintIssue[]> {
   const map = new Map<number, LintIssue[]>();
