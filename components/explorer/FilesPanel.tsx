@@ -604,6 +604,8 @@ export function FilesPanel({
   const handleEditKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter") {
+        // Ignore IME composition confirmation — only handle real Enter
+        if (e.nativeEvent.isComposing || e.keyCode === 229) return;
         e.preventDefault();
         void handleEditSubmit(e.currentTarget.value);
       } else if (e.key === "Escape") {

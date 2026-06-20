@@ -93,6 +93,22 @@ export interface DictToolkit {
   lookupBatch(terms: string[]): Promise<Map<string, DictLookup>>;
   /** Whether a headword exists. Returns false when not ready. */
   has(term: string): Promise<boolean>;
+  /**
+   * Synchronous membership check against the current prewarmed snapshot.
+   *
+   * The lint pipeline is synchronous (`lint`/`lintWithTokens` return arrays, not
+   * promises), but dictionary I/O is async. A rule that needs dictionary access
+   * therefore declares the terms it will query via {@link DictPrewarmRule.collectDictTerms};
+   * the pipeline batch-fetches them (`lookupBatch`) and installs a snapshot just
+   * before the rule runs. `hasCached`/`lookupCached` read that snapshot.
+   *
+   * Returns `false`/`undefined` when the dictionary is not ready OR the term was
+   * not prewarmed — so a rule that fails to declare a term simply gets no hit
+   * (it never false-positives on a missing snapshot).
+   */
+  hasCached(term: string): boolean;
+  /** Synchronous projection lookup against the current prewarmed snapshot. */
+  lookupCached(term: string): DictLookup | undefined;
 }
 
 /** Shared detector library. Centralizes logic so rules stay declarative-ish. */

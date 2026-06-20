@@ -65,6 +65,7 @@ function Harness(props: {
   currentMatchIndex: number;
   searchTerm: string;
   isSearchVisible: boolean;
+  navigationNonce?: number;
 }) {
   useSearchHighlight({
     editorView: props.view,
@@ -72,6 +73,7 @@ function Harness(props: {
     currentMatchIndex: props.currentMatchIndex,
     searchTerm: props.searchTerm,
     isSearchVisible: props.isSearchVisible,
+    navigationNonce: props.navigationNonce ?? 0,
   });
   return null;
 }
@@ -161,5 +163,114 @@ describe("useSearchHighlight – destroyed view (#1507)", () => {
         );
       });
     }).not.toThrow();
+  });
+});
+
+describe("useSearchHighlight – navigation vs content-edit separation (#1857)", () => {
+  /**
+   * Bug: with the search dialog open, every content edit caused matches to be
+   * recomputed (new array reference), which re-triggered the decoration effect
+   * and also dispatched a TextSelection — jumping the cursor to the current
+   * match position instead of leaving it where the user was typing.
+   *
+   * Fix: TextSelection / centerEditorPosition now only fire when navigationNonce
+   * changes (i.e. on explicit 次へ/前へ/結果クリック), not on every matches update.
+   *
+   * Note: A full ProseMirror integration test (placing the cursor at a specific
+   * position, typing, then asserting the cursor stayed) would require a real DOM
+   * with Milkdown mounted. This unit test exercises the separation at the hook
+   * boundary by asserting that TextSelection.create is NOT called when only
+   * matches changes (simulating content-edit-triggered recompute), and IS called
+   * when navigationNonce increments (simulating explicit navigation).
+   */
+
+  it("does NOT move selection when matches change due to content edit (nonce unchanged)", async () => {
+    const { TextSelection } = await import("@milkdown/prose/state");
+    const { view } = makeView(true);
+    const initialMatches: SearchMatch[] = [{ from: 5, to: 8 }];
+
+    // Initial render: search is open, nonce=0, no prior navigation.
+    act(() => {
+      root.render(
+        <Harness
+          view={view}
+          matches={initialMatches}
+          currentMatchIndex={0}
+          searchTerm="foo"
+          isSearchVisible={true}
+          navigationNonce={0}
+        />,
+      );
+    });
+
+    // Reset the mock so we can check calls from this point on.
+    vi.mocked(TextSelection.create).mockClear();
+
+    // Simulate content edit: matches array is replaced (new reference, same logical
+    // match) but navigationNonce stays at 0.
+    const updatedMatches: SearchMatch[] = [{ from: 5, to: 8 }];
+    act(() => {
+      root.render(
+        <Harness
+          view={view}
+          matches={updatedMatches}
+          currentMatchIndex={0}
+          searchTerm="foo"
+          isSearchVisible={true}
+          navigationNonce={0}
+        />,
+      );
+    });
+
+    // TextSelection.create must NOT have been called — cursor stays where the
+    // user was typing, not jumping to the match position.
+    expect(TextSelection.create).not.toHaveBeenCalled();
+  });
+
+  it("DOES move selection when navigationNonce increments (explicit 次へ/前へ)", async () => {
+    const { TextSelection } = await import("@milkdown/prose/state");
+    const { view } = makeView(true);
+    const matches: SearchMatch[] = [
+      { from: 5, to: 8 },
+      { from: 20, to: 23 },
+    ];
+
+    // Initial render at nonce=0 (no prior navigation recorded).
+    act(() => {
+      root.render(
+        <Harness
+          view={view}
+          matches={matches}
+          currentMatchIndex={0}
+          searchTerm="foo"
+          isSearchVisible={true}
+          navigationNonce={0}
+        />,
+      );
+    });
+
+    vi.mocked(TextSelection.create).mockClear();
+
+    // User clicks 次へ: currentMatchIndex advances and navigationNonce increments.
+    act(() => {
+      root.render(
+        <Harness
+          view={view}
+          matches={matches}
+          currentMatchIndex={1}
+          searchTerm="foo"
+          isSearchVisible={true}
+          navigationNonce={1}
+        />,
+      );
+    });
+
+    // TextSelection.create MUST have been called with the new match position.
+    expect(TextSelection.create).toHaveBeenCalledTimes(1);
+    expect(TextSelection.create).toHaveBeenCalledWith(
+      expect.anything(),
+      matches[1].from,
+      matches[1].from,
+    );
   });
 });
