@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { fetchAppState } from "@/lib/storage/app-state-manager";
 
@@ -54,6 +54,8 @@ export interface UseEditorSettingsResult {
   settings: EditorSettings;
   handlers: EditorSettingsHandlers;
   setters: EditorSettingsSetters;
+  /** True once persisted app state has been loaded into the sub-hooks. */
+  settingsHydrated: boolean;
 }
 
 /**
@@ -71,6 +73,12 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
   const { dictSettings, dictHandlers, applyPersistedDictSettings } = useDictSettings();
   const { updateSettings, updateHandlers, applyPersistedUpdateSettings } = useUpdateSettings();
 
+  // Flips true once persisted state has been applied, so downstream effects
+  // (e.g. the mode-config migration) can wait for the real values instead of
+  // acting on the initial defaults. Set even when there is no stored app state,
+  // since "nothing persisted" is itself a fully-resolved hydration outcome.
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
+
   // Load persisted settings on mount
   useEffect(() => {
     let mounted = true;
@@ -78,17 +86,21 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
     const loadSettings = async () => {
       try {
         const appState = await fetchAppState();
-        if (!mounted || !appState) return;
+        if (!mounted) return;
 
-        applyPersistedDisplaySettings(appState as Record<string, unknown>);
-        applyPersistedAiSettings(appState as Record<string, unknown>);
-        applyPersistedDictSettings(appState as Record<string, unknown>);
-        applyPersistedUpdateSettings(appState as Record<string, unknown>);
+        if (appState) {
+          applyPersistedDisplaySettings(appState as Record<string, unknown>);
+          applyPersistedAiSettings(appState as Record<string, unknown>);
+          applyPersistedDictSettings(appState as Record<string, unknown>);
+          applyPersistedUpdateSettings(appState as Record<string, unknown>);
 
-        // Force editor rebuild to apply restored settings (e.g. custom font)
-        incrementEditorKey();
+          // Force editor rebuild to apply restored settings (e.g. custom font)
+          incrementEditorKey();
+        }
       } catch (error) {
         console.error("Failed to load settings:", error);
+      } finally {
+        if (mounted) setSettingsHydrated(true);
       }
     };
 
@@ -111,6 +123,7 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
     handleLintingEnabledChange: aiHandlers.handleLintingEnabledChange,
     handleLintingRuleConfigChange: aiHandlers.handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange: aiHandlers.handleLintingRuleConfigsBatchChange,
+    handleLintingModeConfigVersionChange: aiHandlers.handleLintingModeConfigVersionChange,
     handleCharacterExtractionBatchSizeChange: aiHandlers.handleCharacterExtractionBatchSizeChange,
     handleCharacterExtractionConcurrencyChange:
       aiHandlers.handleCharacterExtractionConcurrencyChange,
@@ -132,5 +145,6 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
     settings,
     handlers,
     setters: displaySetters,
+    settingsHydrated,
   };
 }

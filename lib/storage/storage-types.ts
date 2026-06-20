@@ -82,6 +82,11 @@ export interface AppState {
     string,
     { enabled: boolean; severity: Severity; skipDialogue?: boolean }
   >;
+  /**
+   * One-time migration marker for mode-derived rule config recovery.
+   * undefined / 0 = never migrated. See `use-mode-config-migration.ts`.
+   */
+  lintingModeConfigVersion?: number;
 
   // オンラインAI API設定
   aiApiKey?: string;

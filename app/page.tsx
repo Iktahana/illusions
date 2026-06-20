@@ -45,6 +45,7 @@ import { useLinting } from "@/lib/editor-page/use-linting";
 import { CORRECTION_MODES } from "@/lib/linting/correction-modes";
 import { buildModeRuleConfigsFromRules } from "@/lib/linting/mode-rule-configs";
 import { useInstalledRuleMetas } from "@/lib/editor-page/use-installed-rule-metas";
+import { useModeConfigMigration } from "@/lib/editor-page/use-mode-config-migration";
 import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
@@ -139,6 +140,7 @@ export default function EditorPage() {
     settings,
     handlers: settingsHandlers,
     setters: settingsSetters,
+    settingsHydrated,
   } = useEditorSettings(incrementEditorKey);
   const {
     fontScale,
@@ -156,6 +158,7 @@ export default function EditorPage() {
     showSettingsModal,
     lintingEnabled,
     lintingRuleConfigs,
+    lintingModeConfigVersion,
     powerSaveMode,
     autoPowerSaveOnBattery,
     correctionConfig,
@@ -177,6 +180,7 @@ export default function EditorPage() {
     handleLintingEnabledChange,
     handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
+    handleLintingModeConfigVersionChange,
     handlePowerSaveModeChange,
     handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange,
@@ -189,18 +193,20 @@ export default function EditorPage() {
   // per-rule config map from these, mirroring the settings ModeSelector (#1817).
   const loadedRules = useInstalledRuleMetas();
 
-  // After the external rulesets load, seed the rule config map for the current
-  // mode when nothing has been configured yet (fresh install, or a prior
-  // empty-config state left by the #1809/#1810 regression). Without this every
-  // rule stays disabled and nothing is detected until the user re-picks a mode.
-  // Guarded on an empty map so it never clobbers real user settings.
-  useEffect(() => {
-    if (loadedRules.length === 0) return;
-    if (Object.keys(lintingRuleConfigs).length > 0) return;
-    handleLintingRuleConfigsBatchChange(
-      buildModeRuleConfigsFromRules(correctionConfig.mode, loadedRules),
-    );
-  }, [loadedRules, lintingRuleConfigs, correctionConfig.mode, handleLintingRuleConfigsBatchChange]);
+  // One-time recovery: re-derive the rule-config map from the current mode for
+  // installs whose persisted config predates mode-aware derivation (fresh
+  // installs with an empty map, AND existing users left with a COMPLETE
+  // all-enabled map by the #1809/#1810 regression + "すべて有効"). Gated by a
+  // persisted version so it runs exactly once and never clobbers later manual
+  // edits. See use-mode-config-migration.ts.
+  useModeConfigMigration({
+    hydrated: settingsHydrated,
+    loadedRules,
+    currentMode: correctionConfig.mode,
+    configVersion: lintingModeConfigVersion,
+    applyConfigs: handleLintingRuleConfigsBatchChange,
+    setConfigVersion: handleLintingModeConfigVersionChange,
+  });
 
   // Derive a stable per-window key from the project root path (Electron project mode).
   // This key scopes tabs and dockview layout so multiple windows with different projects
