@@ -363,6 +363,50 @@ function collapseBlankLines(text: string): string {
   return result.join("\n");
 }
 
+/**
+ * Promote author-intentional blank lines into explicit `[[blank]]` paragraph
+ * markers. The inverse companion of {@link collapseBlankLines}: in a run of N
+ * consecutive blank lines between content, the 1st is the structural Markdown
+ * paragraph separator (kept as one blank line) and lines 2..N are author-
+ * intentional, each emitted as a `[[blank]]` paragraph.
+ *
+ * The TXT export already preserves these via {@link collapseBlankLines}; HTML
+ * (markdown-it) and DOCX collapse them. Running the canonical text through this
+ * before those pipelines brings them to TXT parity, because every exporter
+ * already renders `[[blank]]` correctly (HTML → `<p></p>`, DOCX → empty `<w:p>`).
+ *
+ * Existing `[[blank]]` lines (non-blank text) pass through untouched — no double
+ * promotion. Leading/trailing blank runs are dropped, matching collapseBlankLines.
+ */
+export function promoteBlankRunsToMarkers(text: string): string {
+  const lines = text.split("\n");
+  const out: string[] = [];
+  let blankRun = 0;
+  let seenContent = false;
+
+  for (const line of lines) {
+    if (line.trim() === "") {
+      blankRun++;
+      continue;
+    }
+
+    if (seenContent && blankRun > 0) {
+      out.push(""); // 1st blank: structural paragraph separator
+      for (let k = 1; k < blankRun; k++) {
+        // 2nd+ blank: author-intentional → explicit blank paragraph
+        out.push(MDI_BLANK_MARKER);
+        out.push("");
+      }
+    }
+
+    out.push(line);
+    seenContent = true;
+    blankRun = 0;
+  }
+
+  return out.join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // Editor-output normalization (string-level sanitize before persisting)
 // ---------------------------------------------------------------------------
