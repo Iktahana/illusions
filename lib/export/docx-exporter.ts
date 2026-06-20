@@ -22,6 +22,7 @@ import {
   replaceMdiWithRubyText,
   MDI_BREAK_RE,
   isMdiBlankParagraphLine,
+  promoteBlankRunsToMarkers,
 } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import type { ExportMetadata } from "./types";
 import {
@@ -68,10 +69,14 @@ function buildDocxDocument(content: string, options: DocxExportOptions): Documen
   //   `fromRawText` so NO editor-HTML normalization runs — literal `<br />`,
   //   `<p>x</p>`, `\[\[blank]]` are preserved verbatim (DATA-LOSS guard).
   const fileType = options.fileType ?? ".mdi";
-  const normalized =
+  const rawNormalized =
     fileType === ".mdi"
       ? MdiDocument.fromEditorOutput(content, { fileType: ".mdi" }).toRawText()
       : MdiDocument.fromRawText(content).toRawText();
+  // Promote author-intentional blank lines into [[blank]] markers so the
+  // paragraph loop emits empty <w:p> for them instead of collapsing — TXT
+  // parity (#1826). Scoped to ".mdi" (see mdi-to-html.ts for rationale).
+  const normalized = fileType === ".mdi" ? promoteBlankRunsToMarkers(rawNormalized) : rawNormalized;
   const paragraphs = parseMarkdownToDocxParagraphs(normalized, settings, fontConfig);
 
   // Page dimensions (swap for landscape)

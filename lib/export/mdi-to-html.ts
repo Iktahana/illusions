@@ -17,6 +17,7 @@ import {
   MDI_KERN_AMOUNT_RE,
   MDI_BLANK_RE,
   MdiDocument,
+  promoteBlankRunsToMarkers,
 } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import { PAGE_DIMENSIONS } from "./pdf-export-settings";
 
@@ -269,10 +270,16 @@ export function mdiToHtml(
   // leaks as literal text into PDF/EPUB/print output. TXT/DOCX already normalize
   // this way via MdiDocument — this brings the HTML pipeline to parity.
   const fileType = options?.fileType ?? ".mdi";
-  const normalized =
+  const rawNormalized =
     fileType === ".mdi"
       ? MdiDocument.fromEditorOutput(markdown, { fileType: ".mdi" }).toRawText()
       : MdiDocument.fromRawText(markdown).toRawText();
+  // Promote author-intentional blank lines (Enter-key empty paragraphs, no
+  // [[blank]] macro) into explicit [[blank]] markers so markdown-it does not
+  // collapse them — TXT already preserves these, this brings HTML/PDF/EPUB to
+  // parity (#1826). Scoped to ".mdi": .md/.txt keep CommonMark collapse and the
+  // DATA-LOSS guard (#1608). Markers feed the existing sentinel path below.
+  const normalized = fileType === ".mdi" ? promoteBlankRunsToMarkers(rawNormalized) : rawNormalized;
   // Pre-process: replace [[blank]] paragraph markers with a U+E000 PUA sentinel.
   // markdown-it will wrap the sentinel in <p>…</p>; we swap it for an empty <p></p> after rendering.
   const BLANK_SENTINEL = "";
