@@ -21,6 +21,26 @@ const OFFICIAL_RULESETS = Object.freeze([
     owner: "illusions-lab",
     repo: "illusions-ruleset-gendai-kanazukai",
   }),
+  Object.freeze({
+    id: "com.illusions-lab.genkou-henshu",
+    owner: "illusions-lab",
+    repo: "illusions-ruleset-genkou-henshu",
+  }),
+  Object.freeze({
+    id: "com.illusions-lab.nihongo-hyouki",
+    owner: "illusions-lab",
+    repo: "illusions-ruleset-nihongo-hyouki",
+  }),
+  Object.freeze({
+    id: "com.illusions-lab.nihongo-style-guide",
+    owner: "illusions-lab",
+    repo: "illusions-ruleset-nihongo-style-guide",
+  }),
+  Object.freeze({
+    id: "com.illusions-lab.kousei-hikkei",
+    owner: "illusions-lab",
+    repo: "illusions-ruleset-kousei-hikkei",
+  }),
 ]);
 
 module.exports = { OFFICIAL_RULESETS };

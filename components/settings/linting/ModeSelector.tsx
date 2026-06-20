@@ -1,8 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useCallback, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useCallback } from "react";
 import clsx from "clsx";
 
 import type { CorrectionConfig } from "@/lib/linting/correction-config";
@@ -14,7 +13,6 @@ import {
 } from "@/lib/linting/correction-modes";
 import { LINT_PRESETS } from "@/lib/linting/lint-presets";
 import type { Severity } from "@/lib/linting/types";
-import GuidelineList from "@/components/GuidelineList";
 
 interface ModeSelectorProps {
   correctionConfig: CorrectionConfig;
@@ -31,8 +29,6 @@ export default function ModeSelector({
   onCorrectionConfigChange,
   onLintingRuleConfigsBatchChange,
 }: ModeSelectorProps): React.ReactElement {
-  const [guidelinesOpen, setGuidelinesOpen] = useState(false);
-
   const handleModeChange = useCallback(
     (modeId: string) => {
       const mode = CORRECTION_MODES[modeId as CorrectionModeId];
@@ -48,13 +44,6 @@ export default function ModeSelector({
       }
     },
     [onCorrectionConfigChange, onLintingRuleConfigsBatchChange],
-  );
-
-  const handleGuidelinesChange = useCallback(
-    (guidelines: CorrectionConfig["guidelines"]) => {
-      onCorrectionConfigChange({ guidelines });
-    },
-    [onCorrectionConfigChange],
   );
 
   return (
@@ -89,32 +78,6 @@ export default function ModeSelector({
           <p className="text-xs text-foreground-tertiary mt-1.5">
             {CORRECTION_MODES[correctionConfig.mode].descriptionJa}
           </p>
-        )}
-      </div>
-
-      {/* Collapsible guideline list */}
-      <div>
-        <button
-          onClick={() => setGuidelinesOpen((v) => !v)}
-          className="flex items-center gap-1.5 text-xs text-foreground-secondary hover:text-foreground transition-colors"
-        >
-          {guidelinesOpen ? (
-            <ChevronDown className="w-3 h-3" />
-          ) : (
-            <ChevronRight className="w-3 h-3" />
-          )}
-          適用ガイドライン（詳細）
-        </button>
-        {guidelinesOpen && (
-          <div className="mt-2">
-            <p className="text-xs text-foreground-tertiary mb-2">
-              有効にしたガイドラインに基づいてルールが適用されます。
-            </p>
-            <GuidelineList
-              guidelines={correctionConfig.guidelines}
-              onChange={handleGuidelinesChange}
-            />
-          </div>
         )}
       </div>
     </div>

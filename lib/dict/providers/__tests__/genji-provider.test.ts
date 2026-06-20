@@ -140,15 +140,17 @@ describe("GenjiProvider", () => {
   });
 
   describe("query — Electron local returns empty", () => {
-    it("falls back to remote when local returns empty", async () => {
+    it("treats the installed local dict as authoritative and does NOT hit the network", async () => {
+      // A zero-hit lookup in the installed local dict means "no such entry";
+      // it must not fall through to the (often unreachable) remote API.
       setupElectronEnv(true, []);
       mockQueryByEntry.mockResolvedValue([SAMPLE_ENTRY]);
 
       const provider = await createProvider();
       const results = await provider.query("雪");
 
-      expect(mockQueryByEntry).toHaveBeenCalled();
-      expect(results).toEqual([SAMPLE_ENTRY]);
+      expect(mockQueryByEntry).not.toHaveBeenCalled();
+      expect(results).toEqual([]);
     });
   });
 

@@ -166,7 +166,11 @@ app.whenReady().then(async () => {
         "Content-Security-Policy": [
           [
             "default-src 'self'",
-            `script-src 'self' 'unsafe-inline'${isDev && !app.isPackaged ? " 'unsafe-eval'" : ""}`,
+            // blob: は外部ルールセットを lint worker 内で ESM `import(blobURL)` する
+            // ために必要（dynamic import は worker-src ではなく script-src で評価される）。
+            // blob は同一オリジンのスクリプトからしか生成できず、ルールセットは
+            // sha256 検証済みコードのみを Blob 化するため XSS 面は限定的。
+            `script-src 'self' 'unsafe-inline' blob:${isDev && !app.isPackaged ? " 'unsafe-eval'" : ""}`,
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: blob: https:",
             "font-src 'self' data: https://fonts.gstatic.com",

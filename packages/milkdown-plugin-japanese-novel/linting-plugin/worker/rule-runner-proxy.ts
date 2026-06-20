@@ -67,6 +67,14 @@ export class RuleRunnerProxy implements RuleRunnerLike {
   /** True iff any worker-side rule is a `DocumentLintRule`. Computed at construction. */
   private readonly workerHasDocumentRules: boolean;
 
+  /**
+   * Whether the worker currently hosts at least one external morphological
+   * (L2) rule. Updated on every RULESET_LOADED event. When true, the proxy
+   * reports `hasMorphologicalRules()` as true (so paragraphs get tokenized)
+   * and forwards those tokens to the worker in RUN_BATCH.
+   */
+  private workerHasMorphRules = false;
+
   private nextCorrelationId = 1;
   private latestRequestedVersion = 0;
   private readonly pending = new Map<number, PendingRequest>();
@@ -159,7 +167,9 @@ export class RuleRunnerProxy implements RuleRunnerLike {
   }
 
   hasMorphologicalRules(): boolean {
-    return this.mainRunner.hasMorphologicalRules();
+    // Main-thread built-in morph rules OR external L2 rules hosted in the
+    // worker — either requires the decoration plugin to tokenize paragraphs.
+    return this.mainRunner.hasMorphologicalRules() || this.workerHasMorphRules;
   }
 
   hasDocumentRules(): boolean {
@@ -252,7 +262,11 @@ export class RuleRunnerProxy implements RuleRunnerLike {
       type: "RUN_BATCH",
       correlationId,
       version: req.version,
-      paragraphs: req.paragraphs.map((p) => ({ text: p.text, index: p.index })),
+      // Forward tokens only when the worker hosts external L2 rules; the
+      // common L1-only case keeps the structured-clone payload minimal.
+      paragraphs: this.workerHasMorphRules
+        ? req.paragraphs.map((p) => ({ text: p.text, index: p.index, tokens: p.tokens }))
+        : req.paragraphs.map((p) => ({ text: p.text, index: p.index })),
       mode: req.mode,
     });
 
@@ -375,6 +389,10 @@ export class RuleRunnerProxy implements RuleRunnerLike {
         return;
       }
       case "RULESET_LOADED": {
+        // Track whether the worker now hosts external morphological (L2)
+        // rules. This drives both `hasMorphologicalRules()` (so the
+        // decoration plugin tokenizes) and token forwarding in RUN_BATCH.
+        this.workerHasMorphRules = evt.hasMorphologicalRules;
         const entry = this.pendingRulesets.get(evt.correlationId);
         if (entry) {
           this.pendingRulesets.delete(evt.correlationId);

@@ -172,118 +172,20 @@ export const LINT_RULES_META: LintRuleMeta[] = [
     guidelineId: "jtf-style-3",
     applicableModes: ["official", "blog", "academic"],
   },
-
-  // ---------------------------------------------------------------------------
-  // 原稿編集 第2版 (9 rules)
-  // ---------------------------------------------------------------------------
-  {
-    id: "me2-4-kanji-font",
-    nameJa: "旧字体検出",
-    descriptionJa: "常用漢字表の通用字体を使用し、旧字体を検出します",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["novel", "official", "blog", "academic"],
-  },
-  {
-    id: "me2-8-katakana",
-    nameJa: "外来語・擬音語の片仮名表記",
-    descriptionJa: "外来語・擬声語・擬音語は片仮名で表記します",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["official", "blog", "academic"],
-  },
-  {
-    id: "me2-9-foreign-words",
-    nameJa: "外来語末尾の長音符号",
-    descriptionJa: "3音以上の外来語の末尾の長音符号「ー」を省略しません",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["official", "blog", "academic"],
-  },
-  {
-    id: "me2-11-vertical-numbers",
-    nameJa: "縦組の漢数字使用",
-    descriptionJa: "縦組では漢数字を使用します",
-    guidelineId: "editors-rulebook",
-    applicableModes: [],
-  },
-  {
-    id: "me2-12-horizontal-numbers",
-    nameJa: "横組のアラビア数字使用",
-    descriptionJa: "横組ではアラビア数字を使用します",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["official", "academic"],
-  },
-  {
-    id: "me2-13-unit-symbols",
-    nameJa: "単位記号の表記",
-    descriptionJa: "数値と欧字単位記号の間にスペースがない箇所を検出します",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["official", "academic"],
-  },
-  {
-    id: "me2-14-pre-post-symbols",
-    nameJa: "通貨・百分率記号の密着",
-    descriptionJa: "通貨記号・百分率記号は数字に密着させます",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["official", "blog", "academic"],
-  },
-  {
-    id: "me2-15-punctuation",
-    nameJa: "句読点セットの統一",
-    descriptionJa: "句読点セットが統一されているか確認します",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["novel", "official", "blog", "academic"],
-  },
-  {
-    id: "me2-17-repetition-symbols",
-    nameJa: "くり返し符号の用法",
-    descriptionJa: "くり返し符号（々、ゝ、ゞ）の適切な使用をチェックします",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["novel", "official", "blog", "academic"],
-  },
-
-  // ---------------------------------------------------------------------------
-  // 日本語表記ルールブック (5 rules)
-  // ---------------------------------------------------------------------------
-  {
-    id: "nh-6-ji-zu-di-du-exceptions",
-    nameJa: "「じ・ず」と「ぢ・づ」の例外",
-    descriptionJa: "現代仮名遣いにおける「じ・ず」と「ぢ・づ」の例外的な語彙をチェックします",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["novel", "official", "blog", "academic", "sns"],
-  },
-  {
-    id: "nh-7-compound-nouns-no-okurigana",
-    nameJa: "複合名詞の送り仮名省略",
-    descriptionJa: "慣用が固定しているため送り仮名を付けない複合名詞をチェックします",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["official", "blog", "academic"],
-  },
-  {
-    id: "nh-9-numbers",
-    nameJa: "数字の表記（半角アラビア数字）",
-    descriptionJa: "全角数字を検出し、半角アラビア数字への修正を提案します",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["official", "blog", "academic"],
-  },
-  {
-    id: "nh-10-units",
-    nameJa: "単位記号の表記（半角英字）",
-    descriptionJa: "全角の単位記号を検出し、半角英字への修正を提案します",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["official", "blog", "academic"],
-  },
-  {
-    id: "nh-11-symbols",
-    nameJa: "記述記号（引用符・省略記号・ダッシュ）",
-    descriptionJa: "日本語文中の引用符・省略記号・ダッシュの誤用を検出します",
-    guidelineId: "editors-rulebook",
-    applicableModes: ["novel", "official", "blog", "academic"],
-  },
 ];
 
 /** Category grouping for rule display */
 export interface LintRuleCategory {
   id: string;
   nameJa: string;
+  /** Author / publisher (出典の著者・発行元), shown dimmed after the title. */
+  publisherJa?: string;
+  /** License / copyright-policy name shown beside the pack name. */
+  license?: string;
+  /** Optional link to the license text. */
+  licenseUrl?: string;
+  /** Optional purchase link for packs derived from commercial physical books. */
+  purchaseUrl?: string;
   rules: string[];
 }
 
@@ -291,6 +193,9 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
   {
     id: "jtf",
     nameJa: "JTF日本語標準スタイルガイド",
+    publisherJa: "日本翻訳連盟",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0/deed.ja",
     rules: [
       "jtf-1-2-1",
       "jtf-1-2-1-punctuation",
@@ -313,32 +218,6 @@ export const LINT_RULE_CATEGORIES: LintRuleCategory[] = [
       "jtf-4-3-7",
       "jtf-4-3-8",
       "jtf-4-3-9",
-    ],
-  },
-  {
-    id: "manuscript",
-    nameJa: "原稿編集 第2版",
-    rules: [
-      "me2-4-kanji-font",
-      "me2-8-katakana",
-      "me2-9-foreign-words",
-      "me2-11-vertical-numbers",
-      "me2-12-horizontal-numbers",
-      "me2-13-unit-symbols",
-      "me2-14-pre-post-symbols",
-      "me2-15-punctuation",
-      "me2-17-repetition-symbols",
-    ],
-  },
-  {
-    id: "nihongo-hyouki",
-    nameJa: "日本語表記ルールブック",
-    rules: [
-      "nh-6-ji-zu-di-du-exceptions",
-      "nh-7-compound-nouns-no-okurigana",
-      "nh-9-numbers",
-      "nh-10-units",
-      "nh-11-symbols",
     ],
   },
 ];
@@ -374,22 +253,6 @@ export const LINT_DEFAULT_CONFIGS: Record<string, LintRulePresetConfig> = {
   "jtf-4-3-7": { enabled: true, severity: "warning" },
   "jtf-4-3-8": { enabled: true, severity: "warning" },
   "jtf-4-3-9": { enabled: true, severity: "warning" },
-  // --- 原稿編集 第2版 ---
-  "me2-4-kanji-font": { enabled: true, severity: "warning" },
-  "me2-8-katakana": { enabled: true, severity: "info" },
-  "me2-9-foreign-words": { enabled: true, severity: "warning" },
-  "me2-11-vertical-numbers": { enabled: false, severity: "info" },
-  "me2-12-horizontal-numbers": { enabled: false, severity: "info" },
-  "me2-13-unit-symbols": { enabled: false, severity: "info" },
-  "me2-14-pre-post-symbols": { enabled: true, severity: "warning" },
-  "me2-15-punctuation": { enabled: true, severity: "warning" },
-  "me2-17-repetition-symbols": { enabled: true, severity: "info" },
-  // --- 日本語表記ルールブック ---
-  "nh-6-ji-zu-di-du-exceptions": { enabled: true, severity: "error" },
-  "nh-7-compound-nouns-no-okurigana": { enabled: true, severity: "warning" },
-  "nh-9-numbers": { enabled: true, severity: "warning" },
-  "nh-10-units": { enabled: true, severity: "warning" },
-  "nh-11-symbols": { enabled: true, severity: "warning" },
 };
 
 /** Preset configuration for one-shot application */
@@ -423,20 +286,6 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "jtf-4-3-7": { enabled: false, severity: "info" },
       "jtf-4-3-8": { enabled: false, severity: "info" },
       "jtf-4-3-9": { enabled: false, severity: "info" },
-      "me2-4-kanji-font": { enabled: false, severity: "info" },
-      "me2-8-katakana": { enabled: false, severity: "info" },
-      "me2-9-foreign-words": { enabled: false, severity: "info" },
-      "me2-11-vertical-numbers": { enabled: false, severity: "info" },
-      "me2-12-horizontal-numbers": { enabled: false, severity: "info" },
-      "me2-13-unit-symbols": { enabled: false, severity: "info" },
-      "me2-14-pre-post-symbols": { enabled: false, severity: "info" },
-      "me2-15-punctuation": { enabled: false, severity: "info" },
-      "me2-17-repetition-symbols": { enabled: false, severity: "info" },
-      "nh-6-ji-zu-di-du-exceptions": { enabled: true, severity: "info" },
-      "nh-7-compound-nouns-no-okurigana": { enabled: false, severity: "info" },
-      "nh-9-numbers": { enabled: false, severity: "info" },
-      "nh-10-units": { enabled: false, severity: "info" },
-      "nh-11-symbols": { enabled: false, severity: "info" },
     },
   },
   standard: {
@@ -467,20 +316,6 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "jtf-4-3-7": { enabled: true, severity: "error" },
       "jtf-4-3-8": { enabled: true, severity: "error" },
       "jtf-4-3-9": { enabled: true, severity: "error" },
-      "me2-4-kanji-font": { enabled: true, severity: "error" },
-      "me2-8-katakana": { enabled: true, severity: "warning" },
-      "me2-9-foreign-words": { enabled: true, severity: "error" },
-      "me2-11-vertical-numbers": { enabled: false, severity: "warning" },
-      "me2-12-horizontal-numbers": { enabled: true, severity: "warning" },
-      "me2-13-unit-symbols": { enabled: true, severity: "warning" },
-      "me2-14-pre-post-symbols": { enabled: true, severity: "error" },
-      "me2-15-punctuation": { enabled: true, severity: "error" },
-      "me2-17-repetition-symbols": { enabled: true, severity: "warning" },
-      "nh-6-ji-zu-di-du-exceptions": { enabled: true, severity: "error" },
-      "nh-7-compound-nouns-no-okurigana": { enabled: true, severity: "warning" },
-      "nh-9-numbers": { enabled: true, severity: "error" },
-      "nh-10-units": { enabled: true, severity: "error" },
-      "nh-11-symbols": { enabled: true, severity: "error" },
     },
   },
   novel: {
@@ -507,20 +342,6 @@ export const LINT_PRESETS: Record<string, LintPreset> = {
       "jtf-4-3-7": { enabled: false, severity: "info" },
       "jtf-4-3-8": { enabled: false, severity: "info" },
       "jtf-4-3-9": { enabled: false, severity: "info" },
-      "me2-4-kanji-font": { enabled: true, severity: "warning" },
-      "me2-8-katakana": { enabled: false, severity: "info" },
-      "me2-9-foreign-words": { enabled: false, severity: "info" },
-      "me2-11-vertical-numbers": { enabled: false, severity: "info" },
-      "me2-12-horizontal-numbers": { enabled: false, severity: "info" },
-      "me2-13-unit-symbols": { enabled: false, severity: "info" },
-      "me2-14-pre-post-symbols": { enabled: false, severity: "info" },
-      "me2-15-punctuation": { enabled: true, severity: "warning" },
-      "me2-17-repetition-symbols": { enabled: true, severity: "info" },
-      "nh-6-ji-zu-di-du-exceptions": { enabled: true, severity: "error" },
-      "nh-7-compound-nouns-no-okurigana": { enabled: false, severity: "info" },
-      "nh-9-numbers": { enabled: false, severity: "info" },
-      "nh-10-units": { enabled: false, severity: "info" },
-      "nh-11-symbols": { enabled: true, severity: "warning" },
     },
   },
 };

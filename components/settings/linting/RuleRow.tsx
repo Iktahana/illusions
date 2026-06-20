@@ -5,6 +5,7 @@ import { MessageSquare, MessageSquareOff } from "lucide-react";
 import clsx from "clsx";
 
 import type { RuleLevel, Severity } from "@/lib/linting/types";
+import ToggleSwitch from "./ToggleSwitch";
 
 const RULE_LEVEL_LABELS: Record<RuleLevel, string> = {
   L1: "L1：正規表現による検出",
@@ -89,21 +90,11 @@ export default function RuleRow({
       </select>
 
       {/* Enable toggle */}
-      <button
-        onClick={() => onChange(ruleId, { ...config, enabled: !config.enabled })}
-        className={clsx(
-          "relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0",
-          config.enabled ? "bg-accent" : "bg-foreground-muted",
-        )}
-        aria-label={config.enabled ? "ルールを無効にする" : "ルールを有効にする"}
-      >
-        <span
-          className={clsx(
-            "inline-block h-3.5 w-3.5 transform rounded-full transition-transform shadow-sm",
-            config.enabled ? "translate-x-5 bg-accent-foreground" : "translate-x-0.5 bg-white",
-          )}
-        />
-      </button>
+      <ToggleSwitch
+        checked={config.enabled}
+        onChange={() => onChange(ruleId, { ...config, enabled: !config.enabled })}
+        ariaLabel={config.enabled ? "ルールを無効にする" : "ルールを有効にする"}
+      />
     </div>
   );
 }
