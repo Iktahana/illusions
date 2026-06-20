@@ -235,6 +235,10 @@ export function useAiSettings(): UseAiSettingsResult {
 
   const handleLintingRuleConfigsBatchChange = useCallback(
     (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>) => {
+      // Replace (not merge): callers pass a COMPLETE map covering every loaded
+      // rule (see buildModeRuleConfigsFromRules), so replacement correctly
+      // enables the new mode's rules and disables the rest. A partial map here
+      // would silently drop rules; keep the contract "complete map = replace".
       setLintingRuleConfigs(configs);
       void persistAppState({ lintingRuleConfigs: configs }).catch((e) =>
         console.error("Failed to persist lintingRuleConfigs:", e),
