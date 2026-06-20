@@ -17,6 +17,11 @@
  */
 import { getStorageService } from "@/lib/storage/storage-service";
 import { notificationManager } from "../notification-manager";
+import {
+  showRulesetSyncProgress,
+  notifyRulesetSyncSummary,
+  notifyRulesetSyncError,
+} from "../ruleset-sync-feedback";
 import type { StartupCheck, StartupNotice } from "../startup-check-queue";
 
 interface RulesetUpdateInfo {
@@ -42,47 +47,30 @@ function getElectronRulesets(): ElectronRulesetsApi | undefined {
     ?.rulesets;
 }
 
-const SYNC_MESSAGE = "校正ルールセットを更新中...";
-
 /**
  * `sync()`（全公式ルールセットの差分ダウンロード）を進捗トースト付きで実行する。
  * 自動更新・手動「更新」ボタンの両方から使う。完了時にインストール件数を要約表示し、
  * 1 件も更新が無ければ静かに閉じる。worker への再読み込みは main 側の `changed`
  * イベント → subscribeRulesetChanges が担うため、ここでは行わない。
+ *
+ * トースト表示は設定「すべて更新」（useRulesetStatus.sync）と共有する（#1838）。
  */
 export function runRulesetSync(): void {
   const api = getElectronRulesets();
   if (!api?.sync) return;
 
-  const progressId = notificationManager.showMessage(SYNC_MESSAGE, {
-    type: "info",
-    duration: 0,
-  });
+  const progressId = showRulesetSyncProgress();
 
   api
     .sync()
     .then((summary) => {
       notificationManager.dismiss(progressId);
-      const installed = Array.isArray(summary)
-        ? summary.filter((s) => s.status === "installed").length
-        : 0;
-      const failed = Array.isArray(summary)
-        ? summary.filter((s) => s.status === "error").length
-        : 0;
-      if (failed > 0) {
-        notificationManager.warning(
-          `校正ルールセットを更新しました（${installed} 件）。${failed} 件は失敗しました。`,
-        );
-      } else if (installed > 0) {
-        notificationManager.success(`校正ルールセットを更新しました（${installed} 件）。`);
-      }
+      notifyRulesetSyncSummary(summary);
     })
     .catch((err: unknown) => {
       notificationManager.dismiss(progressId);
       console.warn("[ruleset-update-check] sync failed:", err);
-      notificationManager.error(
-        `校正ルールセットの更新に失敗しました：${err instanceof Error ? err.message : String(err)}`,
-      );
+      notifyRulesetSyncError(err);
     });
 }
 

@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import {
+  showRulesetSyncProgress,
+  notifyRulesetSyncSummary,
+  notifyRulesetSyncError,
+} from "@/lib/services/ruleset-sync-feedback";
+import { notificationManager } from "@/lib/services/notification-manager";
 
 /** Matches RulesetManifest from the SDK — only the fields the UI needs. */
 export interface RulesetRuleMeta {
@@ -144,8 +150,19 @@ export function useRulesetStatus(): UseRulesetStatusReturn {
     if (!isElectron) return;
     const api = getRulesetsAPI();
     if (!api) return;
-    await api.sync();
-    await refresh();
+    // 進捗→完了サマリーのトーストは起動時自動更新と共有（#1838: 設定側の
+    // 「すべて更新」/再ダウンロードがトーストを出さない退行の修正）。
+    const progressId = showRulesetSyncProgress();
+    try {
+      const summary = await api.sync();
+      notifyRulesetSyncSummary(summary);
+    } catch (err) {
+      console.error("[useRulesetStatus] sync failed", err);
+      notifyRulesetSyncError(err);
+    } finally {
+      notificationManager.dismiss(progressId);
+      await refresh();
+    }
   }, [isElectron, refresh]);
 
   const uninstall = useCallback(
