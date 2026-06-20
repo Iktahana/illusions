@@ -90,7 +90,8 @@ describe("clearFormatting", () => {
   });
 
   it("#1828: 見出し・引用・リスト・段落の混在選択を全て標準段落に戻す", async () => {
-    const md = "## Mixed Heading\n\n> **Mixed Bold Quote**\n\n- *Mixed Italic List*\n\nPlain Control";
+    const md =
+      "## Mixed Heading\n\n> **Mixed Bold Quote**\n\n- *Mixed Italic List*\n\nPlain Control";
     const { view } = await makeView(md);
 
     // 文書全体を選択して書式解除
