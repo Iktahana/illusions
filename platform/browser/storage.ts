@@ -403,7 +403,7 @@ export class WebStorageProvider implements IStorageService {
   /**
    * No-op for Web. Project handles are managed by ProjectManager via IndexedDB.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   async addRecentProject(_project: RecentProject): Promise<void> {
     // Web uses ProjectManager for directory handle persistence, not this API.
   }
@@ -419,7 +419,7 @@ export class WebStorageProvider implements IStorageService {
   /**
    * No-op for Web. Project handles are managed by ProjectManager via IndexedDB.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   async removeRecentProject(_projectId: string): Promise<void> {
     // Web uses ProjectManager for directory handle persistence, not this API.
   }
@@ -438,6 +438,11 @@ export class WebStorageProvider implements IStorageService {
   async removeItem(key: string): Promise<void> {
     await this.initialize();
     await this.db.kvStore.delete(key);
+  }
+
+  async getKeysByPrefix(prefix: string): Promise<string[]> {
+    await this.initialize();
+    return this.db.kvStore.where("key").startsWith(prefix).primaryKeys();
   }
 
   async clearAll(): Promise<void> {

@@ -1078,7 +1078,13 @@ export default function EditorPage() {
   );
 
   // --- Ignored corrections hook ---
-  const { ignoredCorrections, ignoreCorrection } = useIgnoredCorrections(editorMode);
+  const { ignoredCorrections, ignoreCorrection, clearIgnoredCorrections } =
+    useIgnoredCorrections(editorMode);
+
+  const ignoredCorrectionsContextValue = useMemo(
+    () => ({ clear: clearIgnoredCorrections }),
+    [clearIgnoredCorrections],
+  );
 
   // Sync ignoredCorrections to ProseMirror plugin
   useEffect(() => {
@@ -1339,6 +1345,7 @@ export default function EditorPage() {
           terminalTabContextValue,
           settings,
           settingsHandlers,
+          ignoredCorrectionsContextValue,
         }}
         chrome={{
           currentFile,

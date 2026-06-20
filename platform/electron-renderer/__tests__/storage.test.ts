@@ -51,6 +51,7 @@ function createMockStorageAPI() {
     setItem: vi.fn<(key: string, value: string) => Promise<void>>().mockResolvedValue(undefined),
     getItem: vi.fn<(key: string) => Promise<string | null>>().mockResolvedValue(null),
     removeItem: vi.fn<(key: string) => Promise<void>>().mockResolvedValue(undefined),
+    getKeysByPrefix: vi.fn<(prefix: string) => Promise<string[]>>().mockResolvedValue([]),
   };
 }
 
@@ -337,6 +338,22 @@ describe("ElectronStorageProvider", () => {
 
       expect(mockStorage.removeItem).toHaveBeenCalledWith("editor_buffer:novel.mdi");
       expect(mockStorage.clearEditorBuffer).not.toHaveBeenCalled();
+    });
+  });
+
+  // =====================================================================
+  // Generic KV: getKeysByPrefix
+  // =====================================================================
+
+  describe("getKeysByPrefix", () => {
+    it("delegates to the IPC bridge and returns the keys", async () => {
+      const provider = new ElectronStorageProvider();
+      mockStorage.getKeysByPrefix.mockResolvedValue(["p:a", "p:b"]);
+
+      const result = await provider.getKeysByPrefix("p:");
+
+      expect(mockStorage.getKeysByPrefix).toHaveBeenCalledWith("p:");
+      expect(result).toEqual(["p:a", "p:b"]);
     });
   });
 

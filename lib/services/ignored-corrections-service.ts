@@ -135,6 +135,14 @@ class IgnoredCorrectionsService {
     );
   }
 
+  /**
+   * Clear every ignored correction for the current project
+   * (.illusions/ignored-corrections.json → empty list).
+   */
+  async clearIgnoredCorrections(): Promise<void> {
+    return this.store.saveProject([]);
+  }
+
   // -------------------------------------------------------------------
   // Standalone mode (StorageService key-value store)
   // -------------------------------------------------------------------
@@ -187,6 +195,14 @@ class IgnoredCorrectionsService {
     return this.store.mutateStandalone(fileName, (corrections) =>
       removeByIdentity(corrections, ruleId, text, context),
     );
+  }
+
+  /**
+   * Clear ignored corrections across ALL standalone files (every stored
+   * `illusions-ignored-corrections:*` key), not just the current file.
+   */
+  async clearAllIgnoredCorrectionsStandalone(): Promise<void> {
+    return this.store.clearAllStandalone();
   }
 }
 

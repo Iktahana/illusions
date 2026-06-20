@@ -58,6 +58,16 @@ function createMockTable<T extends Record<string, any>>(primaryKey: string) {
         records.delete(key);
       }
     }),
+    // Minimal Dexie where(...).startsWith(...).primaryKeys() chain
+    where: vi.fn((field: string) => ({
+      startsWith: (prefix: string) => ({
+        primaryKeys: vi.fn(async () =>
+          Array.from(records.keys()).filter(
+            (k) => field === primaryKey && String(k).startsWith(prefix),
+          ),
+        ),
+      }),
+    })),
   };
 }
 
@@ -381,6 +391,27 @@ describe("WebStorageProvider", () => {
   // =====================================================================
   // clearAll
   // =====================================================================
+
+  describe("getKeysByPrefix", () => {
+    it("returns only kv keys that start with the prefix", async () => {
+      const provider = createProvider();
+
+      await provider.setItem("illusions-ignored-corrections:a.mdi", "{}");
+      await provider.setItem("illusions-ignored-corrections:b.mdi", "{}");
+      await provider.setItem("illusions-user-dictionary:a.mdi", "{}");
+
+      const keys = await provider.getKeysByPrefix("illusions-ignored-corrections:");
+      expect(keys.sort()).toEqual([
+        "illusions-ignored-corrections:a.mdi",
+        "illusions-ignored-corrections:b.mdi",
+      ]);
+    });
+
+    it("returns an empty array when no key matches", async () => {
+      const provider = createProvider();
+      expect(await provider.getKeysByPrefix("nonexistent:")).toEqual([]);
+    });
+  });
 
   describe("clearAll", () => {
     it("removes all stored data", async () => {

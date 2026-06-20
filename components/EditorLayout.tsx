@@ -24,6 +24,10 @@ import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { EmptyEditorState } from "@/components/EmptyEditorState";
 import { DiffTabContext, type DiffTabContextValue } from "@/contexts/DiffTabContext";
 import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
+import {
+  IgnoredCorrectionsProvider,
+  type IgnoredCorrectionsContextValue,
+} from "@/contexts/IgnoredCorrectionsContext";
 import { TerminalTabContext, type TerminalTabContextValue } from "@/contexts/TerminalTabContext";
 import {
   dockviewTabComponents,
@@ -62,6 +66,7 @@ interface EditorLayoutProps {
     terminalTabContextValue: TerminalTabContextValue;
     settings: EditorSettings;
     settingsHandlers: EditorSettingsHandlers;
+    ignoredCorrectionsContextValue: IgnoredCorrectionsContextValue;
   };
   chrome: {
     currentFile: MdiFileDescriptor | null;
@@ -224,399 +229,405 @@ export default function EditorLayout({
     <DiffTabContext.Provider value={providers.diffTabContextValue}>
       <TerminalTabContext.Provider value={providers.terminalTabContextValue}>
         <EditorSettingsProvider settings={providers.settings} handlers={providers.settingsHandlers}>
-          <div className="h-screen flex flex-col overflow-hidden relative">
-            <TitleUpdater editorMode={upgrade.editorMode} isDirty={chrome.isDirty} />
+          <IgnoredCorrectionsProvider value={providers.ignoredCorrectionsContextValue}>
+            <div className="h-screen flex flex-col overflow-hidden relative">
+              <TitleUpdater editorMode={upgrade.editorMode} isDirty={chrome.isDirty} />
 
-            {!chrome.isElectron && (
-              <WebMenuBar
-                onMenuAction={chrome.handleMenuAction}
-                recentProjects={chrome.recentProjects}
-                checkedState={{ compactMode: chrome.compactMode }}
-              />
-            )}
-
-            <UnsavedWarningDialog
-              isOpen={dialogs.unsavedWarning.showWarning}
-              fileName={chrome.currentFile?.name || "新規ファイル"}
-              onSave={dialogs.unsavedWarning.handleSave}
-              onDiscard={dialogs.unsavedWarning.handleDiscard}
-              onCancel={dialogs.unsavedWarning.handleCancel}
-            />
-
-            <UnsavedWarningDialog
-              isOpen={dialogs.pendingCloseTabId !== null}
-              fileName={dialogs.pendingCloseFileName}
-              onSave={dialogs.handleCloseTabSave}
-              onDiscard={dialogs.handleCloseTabDiscard}
-              onCancel={dialogs.handleCloseTabCancel}
-            />
-
-            <DesktopOnlyDialog
-              isOpen={dialogs.showDesktopOnlyDialog}
-              onClose={() => dialogs.setShowDesktopOnlyDialog(false)}
-              featureName="ターミナル"
-            />
-
-            <ConfirmDialog
-              isOpen={dialogs.confirmRemoveRecent !== null}
-              title="プロジェクトが見つかりません"
-              message={dialogs.confirmRemoveRecent?.message ?? ""}
-              confirmLabel="削除する"
-              cancelLabel="キャンセル"
-              dangerous={true}
-              onConfirm={() => {
-                if (dialogs.confirmRemoveRecent) {
-                  const { projectId } = dialogs.confirmRemoveRecent;
-                  dialogs.setConfirmRemoveRecent(null);
-                  void dialogs.handleDeleteRecentProject(projectId);
-                }
-              }}
-              onCancel={() => dialogs.setConfirmRemoveRecent(null)}
-            />
-
-            {upgrade.showUpgradeBanner &&
-              !upgrade.upgradeBannerDismissed &&
-              isStandaloneMode(upgrade.editorMode) &&
-              upgrade.featuresProjectMode && (
-                <UpgradeToProjectBanner
-                  onUpgrade={() => void upgrade.handleUpgrade()}
-                  onDismiss={upgrade.handleUpgradeDismiss}
+              {!chrome.isElectron && (
+                <WebMenuBar
+                  onMenuAction={chrome.handleMenuAction}
+                  recentProjects={chrome.recentProjects}
+                  checkedState={{ compactMode: chrome.compactMode }}
                 />
               )}
 
-            <SettingsModal
-              isOpen={dialogs.showSettingsModal}
-              onClose={() => {
-                dialogs.setShowSettingsModal(false);
-                dialogs.setSettingsInitialCategory(undefined);
-              }}
-              initialCategory={dialogs.settingsInitialCategory}
-            />
-
-            <RubyDialog
-              isOpen={dialogs.showRubyDialog}
-              onClose={() => dialogs.setShowRubyDialog(false)}
-              selectedText={dialogs.rubySelectedText}
-              onApply={dialogs.handleApplyRuby}
-            />
-
-            <ExportDialog
-              isOpen={dialogs.exportDialog.state != null}
-              initialFormat={dialogs.exportDialog.state?.format ?? "pdf"}
-              onClose={dialogs.exportDialog.onClose}
-              onExportPdf={dialogs.exportDialog.onPdfExport}
-              onExportDocx={dialogs.exportDialog.onDocxExport}
-              onExportEpub={dialogs.exportDialog.onEpubExport}
-              content={dialogs.exportDialog.content}
-              metadata={dialogs.exportDialog.metadata}
-              fileType={dialogs.exportDialog.fileType}
-            />
-
-            <ExportDialog
-              isOpen={dialogs.printDialog.state != null}
-              mode="print"
-              initialFormat="pdf"
-              onClose={dialogs.printDialog.onClose}
-              onExportPdf={dialogs.printDialog.onPrint}
-              onExportDocx={() => {}}
-              content={dialogs.printDialog.content}
-              metadata={dialogs.printDialog.metadata}
-              fileType={dialogs.printDialog.fileType}
-            />
-
-            {!chrome.isElectron && recovery.wasAutoRecovered && !recovery.dismissedRecovery && (
-              <div
-                className={`fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between shadow-lg ${recovery.recoveryExiting ? "animate-slide-out-up" : "animate-slide-in-down"}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
-                  <p className="text-sm text-foreground">
-                    <span className="font-semibold text-foreground">
-                      ✓ 前回編集したファイルを復元しました：
-                    </span>{" "}
-                    <span className="font-mono text-success">{recovery.currentFileName}</span>
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    recovery.setRecoveryExiting(true);
-                  }}
-                  className="text-foreground-secondary hover:text-foreground hover:bg-hover text-lg font-medium flex-shrink-0 ml-4 w-8 h-8 rounded flex items-center justify-center transition-all duration-200 hover:scale-110"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-
-            <div className="flex-1 flex overflow-hidden">
-              <ActivityBar
-                topView={activityBar.topView}
-                bottomView={activityBar.bottomView}
-                compactMode={chrome.compactMode}
-                onTopViewChange={(view) => {
-                  if (view === "settings") {
-                    dialogs.setShowSettingsModal(true);
-                  } else {
-                    activityBar.setTopView(view);
-                  }
-                }}
-                onBottomViewChange={(view) => {
-                  if (view === "settings") {
-                    dialogs.setShowSettingsModal(true);
-                  } else {
-                    activityBar.setBottomView(view);
-                  }
-                }}
-                onNewTerminal={activityBar.handleNewTerminalTab}
-                onOpenAccountSettings={() => {
-                  dialogs.setSettingsInitialCategory("account");
-                  dialogs.setShowSettingsModal(true);
-                }}
+              <UnsavedWarningDialog
+                isOpen={dialogs.unsavedWarning.showWarning}
+                fileName={chrome.currentFile?.name || "新規ファイル"}
+                onSave={dialogs.unsavedWarning.handleSave}
+                onDiscard={dialogs.unsavedWarning.handleDiscard}
+                onCancel={dialogs.unsavedWarning.handleCancel}
               />
 
-              {(activityBar.topView !== "none" || activityBar.bottomView !== "none") && (
-                <ResizablePanel
-                  side="left"
-                  defaultWidth={chrome.compactMode ? 200 : 256}
-                  minWidth={chrome.compactMode ? 160 : 200}
-                  maxWidth={chrome.compactMode ? 320 : 400}
-                  className=""
-                >
-                  {(() => {
-                    const topPanel =
-                      activityBar.topView !== "none" ? (
-                        <SidebarPanel view={activityBar.topView} {...mainArea.sidebarPanelProps} />
-                      ) : null;
-                    const bottomPanel =
-                      activityBar.bottomView !== "none" ? (
-                        <SidebarPanel
-                          view={activityBar.bottomView}
-                          {...mainArea.sidebarPanelProps}
-                        />
-                      ) : null;
+              <UnsavedWarningDialog
+                isOpen={dialogs.pendingCloseTabId !== null}
+                fileName={dialogs.pendingCloseFileName}
+                onSave={dialogs.handleCloseTabSave}
+                onDiscard={dialogs.handleCloseTabDiscard}
+                onCancel={dialogs.handleCloseTabCancel}
+              />
 
-                    if (topPanel && bottomPanel) {
-                      return <SidebarSplitter top={topPanel} bottom={bottomPanel} />;
-                    }
+              <DesktopOnlyDialog
+                isOpen={dialogs.showDesktopOnlyDialog}
+                onClose={() => dialogs.setShowDesktopOnlyDialog(false)}
+                featureName="ターミナル"
+              />
 
-                    return topPanel || bottomPanel;
-                  })()}
-                </ResizablePanel>
-              )}
+              <ConfirmDialog
+                isOpen={dialogs.confirmRemoveRecent !== null}
+                title="プロジェクトが見つかりません"
+                message={dialogs.confirmRemoveRecent?.message ?? ""}
+                confirmLabel="削除する"
+                cancelLabel="キャンセル"
+                dangerous={true}
+                onConfirm={() => {
+                  if (dialogs.confirmRemoveRecent) {
+                    const { projectId } = dialogs.confirmRemoveRecent;
+                    dialogs.setConfirmRemoveRecent(null);
+                    void dialogs.handleDeleteRecentProject(projectId);
+                  }
+                }}
+                onCancel={() => dialogs.setConfirmRemoveRecent(null)}
+              />
 
-              <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
-                {mainArea.tabs.length === 0 && (
-                  <div className="absolute inset-0 z-10">
-                    <EmptyEditorState
-                      onNewFile={() => {
-                        if (isProjectMode(mainArea.editorMode)) {
-                          activityBar.setTopView("files");
-                          mainArea.setNewFileTrigger((prev) => prev + 1);
-                        } else {
-                          mainArea.newTab();
-                        }
-                      }}
-                      onOpenFile={() => void mainArea.openFile()}
-                      onNewTerminal={activityBar.handleNewTerminalTab}
-                    />
-                  </div>
+              {upgrade.showUpgradeBanner &&
+                !upgrade.upgradeBannerDismissed &&
+                isStandaloneMode(upgrade.editorMode) &&
+                upgrade.featuresProjectMode && (
+                  <UpgradeToProjectBanner
+                    onUpgrade={() => void upgrade.handleUpgrade()}
+                    onDismiss={upgrade.handleUpgradeDismiss}
+                  />
                 )}
 
-                {/* Snapshot-diff overlay. Rendered here (not inside the
+              <SettingsModal
+                isOpen={dialogs.showSettingsModal}
+                onClose={() => {
+                  dialogs.setShowSettingsModal(false);
+                  dialogs.setSettingsInitialCategory(undefined);
+                }}
+                initialCategory={dialogs.settingsInitialCategory}
+              />
+
+              <RubyDialog
+                isOpen={dialogs.showRubyDialog}
+                onClose={() => dialogs.setShowRubyDialog(false)}
+                selectedText={dialogs.rubySelectedText}
+                onApply={dialogs.handleApplyRuby}
+              />
+
+              <ExportDialog
+                isOpen={dialogs.exportDialog.state != null}
+                initialFormat={dialogs.exportDialog.state?.format ?? "pdf"}
+                onClose={dialogs.exportDialog.onClose}
+                onExportPdf={dialogs.exportDialog.onPdfExport}
+                onExportDocx={dialogs.exportDialog.onDocxExport}
+                onExportEpub={dialogs.exportDialog.onEpubExport}
+                content={dialogs.exportDialog.content}
+                metadata={dialogs.exportDialog.metadata}
+                fileType={dialogs.exportDialog.fileType}
+              />
+
+              <ExportDialog
+                isOpen={dialogs.printDialog.state != null}
+                mode="print"
+                initialFormat="pdf"
+                onClose={dialogs.printDialog.onClose}
+                onExportPdf={dialogs.printDialog.onPrint}
+                onExportDocx={() => {}}
+                content={dialogs.printDialog.content}
+                metadata={dialogs.printDialog.metadata}
+                fileType={dialogs.printDialog.fileType}
+              />
+
+              {!chrome.isElectron && recovery.wasAutoRecovered && !recovery.dismissedRecovery && (
+                <div
+                  className={`fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between shadow-lg ${recovery.recoveryExiting ? "animate-slide-out-up" : "animate-slide-in-down"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
+                    <p className="text-sm text-foreground">
+                      <span className="font-semibold text-foreground">
+                        ✓ 前回編集したファイルを復元しました：
+                      </span>{" "}
+                      <span className="font-mono text-success">{recovery.currentFileName}</span>
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      recovery.setRecoveryExiting(true);
+                    }}
+                    className="text-foreground-secondary hover:text-foreground hover:bg-hover text-lg font-medium flex-shrink-0 ml-4 w-8 h-8 rounded flex items-center justify-center transition-all duration-200 hover:scale-110"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              <div className="flex-1 flex overflow-hidden">
+                <ActivityBar
+                  topView={activityBar.topView}
+                  bottomView={activityBar.bottomView}
+                  compactMode={chrome.compactMode}
+                  onTopViewChange={(view) => {
+                    if (view === "settings") {
+                      dialogs.setShowSettingsModal(true);
+                    } else {
+                      activityBar.setTopView(view);
+                    }
+                  }}
+                  onBottomViewChange={(view) => {
+                    if (view === "settings") {
+                      dialogs.setShowSettingsModal(true);
+                    } else {
+                      activityBar.setBottomView(view);
+                    }
+                  }}
+                  onNewTerminal={activityBar.handleNewTerminalTab}
+                  onOpenAccountSettings={() => {
+                    dialogs.setSettingsInitialCategory("account");
+                    dialogs.setShowSettingsModal(true);
+                  }}
+                />
+
+                {(activityBar.topView !== "none" || activityBar.bottomView !== "none") && (
+                  <ResizablePanel
+                    side="left"
+                    defaultWidth={chrome.compactMode ? 200 : 256}
+                    minWidth={chrome.compactMode ? 160 : 200}
+                    maxWidth={chrome.compactMode ? 320 : 400}
+                    className=""
+                  >
+                    {(() => {
+                      const topPanel =
+                        activityBar.topView !== "none" ? (
+                          <SidebarPanel
+                            view={activityBar.topView}
+                            {...mainArea.sidebarPanelProps}
+                          />
+                        ) : null;
+                      const bottomPanel =
+                        activityBar.bottomView !== "none" ? (
+                          <SidebarPanel
+                            view={activityBar.bottomView}
+                            {...mainArea.sidebarPanelProps}
+                          />
+                        ) : null;
+
+                      if (topPanel && bottomPanel) {
+                        return <SidebarSplitter top={topPanel} bottom={bottomPanel} />;
+                      }
+
+                      return topPanel || bottomPanel;
+                    })()}
+                  </ResizablePanel>
+                )}
+
+                <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
+                  {mainArea.tabs.length === 0 && (
+                    <div className="absolute inset-0 z-10">
+                      <EmptyEditorState
+                        onNewFile={() => {
+                          if (isProjectMode(mainArea.editorMode)) {
+                            activityBar.setTopView("files");
+                            mainArea.setNewFileTrigger((prev) => prev + 1);
+                          } else {
+                            mainArea.newTab();
+                          }
+                        }}
+                        onOpenFile={() => void mainArea.openFile()}
+                        onNewTerminal={activityBar.handleNewTerminalTab}
+                      />
+                    </div>
+                  )}
+
+                  {/* Snapshot-diff overlay. Rendered here (not inside the
                     dockview panel) so it appears as soon as `editorDiff` is
                     set, independent of dockview's panel re-render timing and
                     of which panel is active. */}
-                {mainArea.editorDiff && (
-                  <div className="absolute inset-0 z-20 bg-background">
-                    <EditorDiffView
-                      snapshotContent={mainArea.editorDiff.snapshotContent}
-                      currentContent={mainArea.editorDiff.currentContent}
-                      snapshotLabel={mainArea.editorDiff.label}
-                      onClose={() => mainArea.setEditorDiff(null)}
-                    />
-                  </div>
-                )}
+                  {mainArea.editorDiff && (
+                    <div className="absolute inset-0 z-20 bg-background">
+                      <EditorDiffView
+                        snapshotContent={mainArea.editorDiff.snapshotContent}
+                        currentContent={mainArea.editorDiff.currentContent}
+                        snapshotLabel={mainArea.editorDiff.label}
+                        onClose={() => mainArea.setEditorDiff(null)}
+                      />
+                    </div>
+                  )}
 
-                {}
-                <div
-                  className="flex-1 flex flex-col overflow-hidden"
-                  onContextMenu={mainArea.handleTabBarContextMenu}
-                >
-                  <DockviewReact
-                    className="flex-1 dockview-theme-illusions"
-                    components={{
-                      editor: ({ api: panelApi, params: panelParams }) => {
-                        const panelBufferId = panelParams?.bufferId ?? "";
-                        const panelFilePath = panelParams?.filePath ?? "";
-                        const panelFileType = (panelParams?.fileType ?? ".mdi") as string;
-                        const panelEditorKey = panelParams?.editorKey ?? 0;
-                        const panelActiveTabId = panelParams?.activeTabId ?? "";
-                        const isActivePanel = panelBufferId === panelActiveTabId;
-                        const panelMdiEnabled = panelFileType === ".mdi";
-                        const panelGfmEnabled = panelFileType !== ".txt";
+                  {}
+                  <div
+                    className="flex-1 flex flex-col overflow-hidden"
+                    onContextMenu={mainArea.handleTabBarContextMenu}
+                  >
+                    <DockviewReact
+                      className="flex-1 dockview-theme-illusions"
+                      components={{
+                        editor: ({ api: panelApi, params: panelParams }) => {
+                          const panelBufferId = panelParams?.bufferId ?? "";
+                          const panelFilePath = panelParams?.filePath ?? "";
+                          const panelFileType = (panelParams?.fileType ?? ".mdi") as string;
+                          const panelEditorKey = panelParams?.editorKey ?? 0;
+                          const panelActiveTabId = panelParams?.activeTabId ?? "";
+                          const isActivePanel = panelBufferId === panelActiveTabId;
+                          const panelMdiEnabled = panelFileType === ".mdi";
+                          const panelGfmEnabled = panelFileType !== ".txt";
 
-                        const liveTab = mainArea.tabsRef.current.find(
-                          (tab) => tab.id === panelBufferId,
-                        );
-                        const liveEditorTab = liveTab && isEditorTab(liveTab) ? liveTab : undefined;
-                        const panelContent = liveEditorTab?.content ?? "";
-                        const panelLastSavedContent = liveEditorTab?.lastSavedContent ?? "";
-                        const panelPendingExternalContent =
-                          liveEditorTab?.pendingExternalContent ?? null;
+                          const liveTab = mainArea.tabsRef.current.find(
+                            (tab) => tab.id === panelBufferId,
+                          );
+                          const liveEditorTab =
+                            liveTab && isEditorTab(liveTab) ? liveTab : undefined;
+                          const panelContent = liveEditorTab?.content ?? "";
+                          const panelLastSavedContent = liveEditorTab?.lastSavedContent ?? "";
+                          const panelPendingExternalContent =
+                            liveEditorTab?.pendingExternalContent ?? null;
 
-                        // NOTE: the snapshot-diff view is rendered as a
-                        // top-level overlay on <main> (see below), NOT inside
-                        // the dockview panel. Rendering it here depended on the
-                        // panel re-evaluating its closure when `editorDiff`
-                        // changed — which dockview does not reliably do — so
-                        // clicking "比較" appeared to do nothing.
-                        if (isActivePanel) {
-                          return (
-                            <ErrorBoundary sectionName="エディタ">
-                              <div
-                                ref={mainArea.editorDomRef as React.RefObject<HTMLDivElement>}
-                                className="h-full"
-                                // NOTE: onFocus は子孫（Milkdown contenteditable）からの bubble を利用。
-                                // tabIndex は不要。パネルへのフォーカスを dockview に伝え activeTabId を最新化する。
-                                // 既に active な panel に対する setActive() は dockview 内部で
-                                // content 要素の DOM detach → re-attach を引き起こし scroll を 0 に
-                                // リセットしてしまう (#1457 回帰)。isActive 時はスキップする。
-                                onFocus={() => {
-                                  if (!panelApi.isActive) {
-                                    panelApi.setActive();
-                                  }
-                                }}
-                              >
-                                <NovelEditor
-                                  key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}`}
-                                  initialContent={panelContent}
-                                  onChange={mainArea.handleChange}
-                                  onInsertText={mainArea.handleInsertText}
-                                  onSelectionChange={mainArea.onSelectionChange}
-                                  onSelectionRangeChange={mainArea.onSelectionRangeChange}
-                                  // 検索の入力/表示は <main> の SearchDialog が担当。
-                                  // pane へは「語を反映」「開く」「トグル」の安定 callback のみ渡す
-                                  // （dockview の凍結クロージャでも安定 ref は機能するため）。
-                                  onSearchTermChange={mainArea.onSearchTermChange}
-                                  onOpenSearchDialog={mainArea.onOpenSearchDialog}
-                                  onToggleSearchDialog={mainArea.onToggleSearchDialog}
-                                  onEditorViewReady={mainArea.setEditorViewInstance}
-                                  lintingRuleRunner={mainArea.ruleRunner}
-                                  onLintIssuesUpdated={mainArea.handleLintIssuesUpdated}
-                                  onNlpError={mainArea.handleNlpError}
-                                  onOpenSpeechSettings={() => {
-                                    dialogs.setSettingsInitialCategory("speech");
-                                    dialogs.setShowSettingsModal(true);
+                          // NOTE: the snapshot-diff view is rendered as a
+                          // top-level overlay on <main> (see below), NOT inside
+                          // the dockview panel. Rendering it here depended on the
+                          // panel re-evaluating its closure when `editorDiff`
+                          // changed — which dockview does not reliably do — so
+                          // clicking "比較" appeared to do nothing.
+                          if (isActivePanel) {
+                            return (
+                              <ErrorBoundary sectionName="エディタ">
+                                <div
+                                  ref={mainArea.editorDomRef as React.RefObject<HTMLDivElement>}
+                                  className="h-full"
+                                  // NOTE: onFocus は子孫（Milkdown contenteditable）からの bubble を利用。
+                                  // tabIndex は不要。パネルへのフォーカスを dockview に伝え activeTabId を最新化する。
+                                  // 既に active な panel に対する setActive() は dockview 内部で
+                                  // content 要素の DOM detach → re-attach を引き起こし scroll を 0 に
+                                  // リセットしてしまう (#1457 回帰)。isActive 時はスキップする。
+                                  onFocus={() => {
+                                    if (!panelApi.isActive) {
+                                      panelApi.setActive();
+                                    }
                                   }}
-                                  onOpenRubyDialog={mainArea.handleOpenRubyDialog}
-                                  onToggleTcy={mainArea.handleToggleTcy}
-                                  onOpenDictionary={mainArea.handleOpenDictionary}
-                                  onShowLintHint={mainArea.handleShowLintHint}
-                                  onIgnoreCorrection={mainArea.handleIgnoreCorrection}
+                                >
+                                  <NovelEditor
+                                    key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}`}
+                                    initialContent={panelContent}
+                                    onChange={mainArea.handleChange}
+                                    onInsertText={mainArea.handleInsertText}
+                                    onSelectionChange={mainArea.onSelectionChange}
+                                    onSelectionRangeChange={mainArea.onSelectionRangeChange}
+                                    // 検索の入力/表示は <main> の SearchDialog が担当。
+                                    // pane へは「語を反映」「開く」「トグル」の安定 callback のみ渡す
+                                    // （dockview の凍結クロージャでも安定 ref は機能するため）。
+                                    onSearchTermChange={mainArea.onSearchTermChange}
+                                    onOpenSearchDialog={mainArea.onOpenSearchDialog}
+                                    onToggleSearchDialog={mainArea.onToggleSearchDialog}
+                                    onEditorViewReady={mainArea.setEditorViewInstance}
+                                    lintingRuleRunner={mainArea.ruleRunner}
+                                    onLintIssuesUpdated={mainArea.handleLintIssuesUpdated}
+                                    onNlpError={mainArea.handleNlpError}
+                                    onOpenSpeechSettings={() => {
+                                      dialogs.setSettingsInitialCategory("speech");
+                                      dialogs.setShowSettingsModal(true);
+                                    }}
+                                    onOpenRubyDialog={mainArea.handleOpenRubyDialog}
+                                    onToggleTcy={mainArea.handleToggleTcy}
+                                    onOpenDictionary={mainArea.handleOpenDictionary}
+                                    onShowLintHint={mainArea.handleShowLintHint}
+                                    onIgnoreCorrection={mainArea.handleIgnoreCorrection}
+                                    mdiExtensionsEnabled={panelMdiEnabled}
+                                    gfmEnabled={panelGfmEnabled}
+                                    externalContent={panelPendingExternalContent}
+                                    onExternalContentApplied={() => {
+                                      mainArea.updateTab(panelBufferId, {
+                                        pendingExternalContent: null,
+                                      });
+                                    }}
+                                  />
+                                </div>
+                              </ErrorBoundary>
+                            );
+                          }
+
+                          return (
+                            <div
+                              className="h-full cursor-pointer"
+                              onClick={() => {
+                                mainArea.switchTab(panelBufferId);
+                                panelApi.setActive();
+                              }}
+                            >
+                              <ErrorBoundary sectionName="エディタ">
+                                <NovelEditor
+                                  key={`tab-${panelBufferId}-${panelFilePath}-inactive`}
+                                  initialContent={panelLastSavedContent}
                                   mdiExtensionsEnabled={panelMdiEnabled}
                                   gfmEnabled={panelGfmEnabled}
-                                  externalContent={panelPendingExternalContent}
-                                  onExternalContentApplied={() => {
-                                    mainArea.updateTab(panelBufferId, {
-                                      pendingExternalContent: null,
-                                    });
-                                  }}
                                 />
-                              </div>
-                            </ErrorBoundary>
+                              </ErrorBoundary>
+                            </div>
                           );
-                        }
-
-                        return (
-                          <div
-                            className="h-full cursor-pointer"
-                            onClick={() => {
-                              mainArea.switchTab(panelBufferId);
-                              panelApi.setActive();
-                            }}
-                          >
-                            <ErrorBoundary sectionName="エディタ">
-                              <NovelEditor
-                                key={`tab-${panelBufferId}-${panelFilePath}-inactive`}
-                                initialContent={panelLastSavedContent}
-                                mdiExtensionsEnabled={panelMdiEnabled}
-                                gfmEnabled={panelGfmEnabled}
-                              />
-                            </ErrorBoundary>
-                          </div>
-                        );
-                      },
-                      terminal: TerminalPanel,
-                      diff: DiffPanel,
-                    }}
-                    tabComponents={dockviewTabComponents}
-                    onReady={mainArea.handleDockviewReady}
-                  />
-
-                  {mainArea.tabBarMenu && (
-                    <ContextMenu
-                      menu={mainArea.tabBarMenu}
-                      onAction={mainArea.handleTabBarMenuAction}
-                      onClose={mainArea.closeTabBarMenu}
+                        },
+                        terminal: TerminalPanel,
+                        diff: DiffPanel,
+                      }}
+                      tabComponents={dockviewTabComponents}
+                      onReady={mainArea.handleDockviewReady}
                     />
-                  )}
-                </div>
 
-                {inspector.showSaveToast && (
-                  <div
-                    className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-background-elevated border border-border rounded-lg shadow-lg flex items-center gap-2 z-50 ${
-                      inspector.saveToastExiting
-                        ? "animate-save-toast-out"
-                        : "animate-save-toast-in"
-                    }`}
-                  >
-                    <span className="text-success text-sm font-medium">✓</span>
-                    <span className="text-foreground-secondary text-sm">保存完了</span>
+                    {mainArea.tabBarMenu && (
+                      <ContextMenu
+                        menu={mainArea.tabBarMenu}
+                        onAction={mainArea.handleTabBarMenuAction}
+                        onClose={mainArea.closeTabBarMenu}
+                      />
+                    )}
                   </div>
-                )}
 
-                {/* フローティング検索窓。dockview パネル外（<main> 直下）でレンダリング
+                  {inspector.showSaveToast && (
+                    <div
+                      className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-background-elevated border border-border rounded-lg shadow-lg flex items-center gap-2 z-50 ${
+                        inspector.saveToastExiting
+                          ? "animate-save-toast-out"
+                          : "animate-save-toast-in"
+                      }`}
+                    >
+                      <span className="text-success text-sm font-medium">✓</span>
+                      <span className="text-foreground-secondary text-sm">保存完了</span>
+                    </div>
+                  )}
+
+                  {/* フローティング検索窓。dockview パネル外（<main> 直下）でレンダリング
                     することで、共有検索 state（searchTerm/matches など変化する値）を
                     live に受け取れる。portal で document.body 直下に出るため、anchorRef
                     にはアクティブエディタの DOM を渡して初期位置を計算する。 */}
-                <SearchDialog
-                  isOpen={mainArea.isSearchDialogOpen}
-                  onClose={mainArea.onCloseSearchDialog}
-                  onShowAllResults={mainArea.handleShowAllSearchResults}
-                  searchTerm={mainArea.searchTerm}
-                  onSearchTermChange={mainArea.onSearchTermChange}
-                  caseSensitive={mainArea.caseSensitive}
-                  onCaseSensitiveChange={mainArea.onCaseSensitiveChange}
-                  matches={mainArea.searchMatches}
-                  currentMatchIndex={mainArea.currentMatchIndex}
-                  onCurrentMatchIndexChange={mainArea.onCurrentMatchIndexChange}
-                  anchorRef={mainArea.editorDomRef}
-                />
-              </main>
+                  <SearchDialog
+                    isOpen={mainArea.isSearchDialogOpen}
+                    onClose={mainArea.onCloseSearchDialog}
+                    onShowAllResults={mainArea.handleShowAllSearchResults}
+                    searchTerm={mainArea.searchTerm}
+                    onSearchTermChange={mainArea.onSearchTermChange}
+                    caseSensitive={mainArea.caseSensitive}
+                    onCaseSensitiveChange={mainArea.onCaseSensitiveChange}
+                    matches={mainArea.searchMatches}
+                    currentMatchIndex={mainArea.currentMatchIndex}
+                    onCurrentMatchIndexChange={mainArea.onCurrentMatchIndexChange}
+                    anchorRef={mainArea.editorDomRef}
+                  />
+                </main>
 
-              <ResizablePanel
-                side="right"
-                defaultWidth={chrome.compactMode ? 200 : 256}
-                minWidth={chrome.compactMode ? 160 : 200}
-                maxWidth={chrome.compactMode ? 320 : 400}
-                collapsible={true}
-                isCollapsed={inspector.isRightPanelCollapsed || mainArea.tabs.length === 0}
-                onToggleCollapse={inspector.handleToggleRightPanel}
-              >
-                <ErrorBoundary sectionName="インスペクタ">
-                  {inspector.activeEditorTab ? (
-                    <Inspector {...inspector.props} />
-                  ) : (
-                    <div className="h-full flex items-center justify-center p-4">
-                      <p className="text-foreground-secondary text-sm text-center">
-                        インスペクタはエディタタブでのみ使用できます
-                      </p>
-                    </div>
-                  )}
-                </ErrorBoundary>
-              </ResizablePanel>
+                <ResizablePanel
+                  side="right"
+                  defaultWidth={chrome.compactMode ? 200 : 256}
+                  minWidth={chrome.compactMode ? 160 : 200}
+                  maxWidth={chrome.compactMode ? 320 : 400}
+                  collapsible={true}
+                  isCollapsed={inspector.isRightPanelCollapsed || mainArea.tabs.length === 0}
+                  onToggleCollapse={inspector.handleToggleRightPanel}
+                >
+                  <ErrorBoundary sectionName="インスペクタ">
+                    {inspector.activeEditorTab ? (
+                      <Inspector {...inspector.props} />
+                    ) : (
+                      <div className="h-full flex items-center justify-center p-4">
+                        <p className="text-foreground-secondary text-sm text-center">
+                          インスペクタはエディタタブでのみ使用できます
+                        </p>
+                      </div>
+                    )}
+                  </ErrorBoundary>
+                </ResizablePanel>
+              </div>
             </div>
-          </div>
+          </IgnoredCorrectionsProvider>
         </EditorSettingsProvider>
       </TerminalTabContext.Provider>
     </DiffTabContext.Provider>

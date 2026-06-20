@@ -6,10 +6,12 @@ import clsx from "clsx";
 import type { Severity } from "@/lib/linting/types";
 import type { CorrectionConfig } from "@/lib/linting/correction-config";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { useIgnoredCorrectionsContext } from "@/contexts/IgnoredCorrectionsContext";
 
 import ModeSelector from "./linting/ModeSelector";
 import RulesetList from "./linting/RulesetList";
 import MarketplaceEntryCard from "./linting/MarketplaceEntryCard";
+import ClearIgnoredCorrectionsButton from "./linting/ClearIgnoredCorrectionsButton";
 import { useRulesetStatus } from "./linting/useRulesetStatus";
 
 export interface LintingSettingsProps {
@@ -50,6 +52,7 @@ function LintingSettingsInner({
 }: LintingSettingsProps): React.ReactElement {
   const isElectron = isElectronRenderer();
   const rulesetStatus = useRulesetStatus();
+  const ignoredCorrectionsCtx = useIgnoredCorrectionsContext();
 
   const showCorrectionConfig = Boolean(correctionConfig && onCorrectionConfigChange);
 
@@ -125,7 +128,20 @@ function LintingSettingsInner({
         </div>
       )}
 
-      {/* ⑤ Advanced settings (character extraction) */}
+      {/* ⑤ Ignored corrections management */}
+      {ignoredCorrectionsCtx && (
+        <div className="pt-4 border-t border-border space-y-2.5">
+          <div>
+            <h3 className="text-sm font-medium text-foreground">無視した校正の管理</h3>
+            <p className="text-xs text-foreground-tertiary mt-0.5">
+              「無視」に設定したすべての校正指摘を再び表示します
+            </p>
+          </div>
+          <ClearIgnoredCorrectionsButton />
+        </div>
+      )}
+
+      {/* ⑥ Advanced settings (character extraction) */}
       {(onCharacterExtractionBatchSizeChange || onCharacterExtractionConcurrencyChange) && (
         <details className="pt-4 border-t border-border">
           <summary className="text-xs text-foreground-secondary cursor-pointer hover:text-foreground select-none">

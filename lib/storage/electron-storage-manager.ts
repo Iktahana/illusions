@@ -398,6 +398,19 @@ export class ElectronStorageManager {
   }
 
   /**
+   * Return every kv_store key that begins with `prefix`.
+   * The LIKE special characters (% _ \) in the prefix are escaped so the
+   * match is a true literal prefix; the trailing `%` is the wildcard.
+   */
+  getKeysByPrefix(prefix: string): string[] {
+    const db = this.ensureInitialized();
+    const escaped = prefix.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    const stmt = db.prepare("SELECT key FROM kv_store WHERE key LIKE ? ESCAPE '\\'");
+    const rows = stmt.all(`${escaped}%`) as { key: string }[];
+    return rows.map((r) => r.key);
+  }
+
+  /**
    * すべてのデータを削除する
    */
   clearAll(): void {

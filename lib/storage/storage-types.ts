@@ -348,6 +348,13 @@ export interface IStorageService {
   removeItem(key: string): Promise<void>;
 
   /**
+   * Return every key in the generic KV store that begins with `prefix`.
+   * Used for bulk operations over a namespaced key family (e.g. clearing
+   * all per-file standalone data sharing a prefix).
+   */
+  getKeysByPrefix(prefix: string): Promise<string[]>;
+
+  /**
    * すべてのデータを削除する。取り扱い注意。
    */
   clearAll(): Promise<void>;
