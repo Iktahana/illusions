@@ -99,6 +99,54 @@ describe("content size validation — Buffer.byteLength vs .length", () => {
 });
 
 // -----------------------------------------------------------------------
+// UTF-8 BOM stripping (#1842)
+//
+// fs.readFile(path, "utf-8") does NOT strip a leading UTF-8 BOM (U+FEFF).
+// The .txt read path (readTextWithEncoding in text-codec.ts) strips it.
+// file-ipc.js must do the same for .mdi reads via its local stripBom() helper.
+//
+// file-ipc.js is a CommonJS Electron main-process module and cannot be
+// imported directly in vitest, so:
+//   1. The stripBom() logic is re-implemented here as a pure unit and tested
+//      against BOM/non-BOM inputs.
+//   2. A source-text regression guard verifies the helper is present and
+//      applied at every fs.readFile call site in the file.
+// -----------------------------------------------------------------------
+
+/** Mirror of the stripBom() helper in file-ipc.js */
+function stripBom(s: string): string {
+  return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
+}
+
+describe("UTF-8 BOM stripping — stripBom() invariants", () => {
+  it("strips a leading BOM from a string that has one", () => {
+    const withBom = "﻿hello";
+    expect(stripBom(withBom)).toBe("hello");
+  });
+
+  it("does not modify a string without a BOM", () => {
+    const noBom = "hello";
+    expect(stripBom(noBom)).toBe("hello");
+  });
+
+  it("strips only the leading BOM, not BOMs elsewhere", () => {
+    const midBom = "abc﻿def";
+    expect(stripBom(midBom)).toBe("abc﻿def");
+  });
+
+  it("returns an empty string unchanged", () => {
+    expect(stripBom("")).toBe("");
+  });
+
+  it("strips BOM from a realistic .mdi snippet", () => {
+    const content = "﻿# 吾輩は猫である\n\n吾輩は猫である。";
+    const result = stripBom(content);
+    expect(result.startsWith("#")).toBe(true);
+    expect(result.charCodeAt(0)).not.toBe(0xfeff);
+  });
+});
+
+// -----------------------------------------------------------------------
 // Source-based regression guard: file-ipc.js cannot be imported in vitest
 // (CommonJS Electron main-process module), so assert on its source text that
 // every MAX_CONTENT_BYTES comparison measures UTF-8 bytes, not code units.
@@ -118,5 +166,22 @@ describe("file-ipc.js source regression guard", () => {
 
   it("does not compare content.length against MAX_CONTENT_BYTES", () => {
     expect(source).not.toMatch(/\.length\s*>\s*MAX_CONTENT_BYTES/);
+  });
+
+  // BOM stripping regression guard (#1842)
+  it("defines a stripBom helper", () => {
+    expect(source).toContain("function stripBom(");
+  });
+
+  it("applies stripBom at every fs.readFile call site that returns content", () => {
+    // Each fs.readFile in the file is wrapped in stripBom(...)
+    const readFileCalls = source.match(/fs\.readFile\([^)]+\)/g) ?? [];
+    expect(readFileCalls.length).toBeGreaterThanOrEqual(3);
+    for (const call of readFileCalls) {
+      // The call itself appears inside stripBom(...) — check surrounding context
+      const idx = source.indexOf(call);
+      const before = source.slice(Math.max(0, idx - 20), idx);
+      expect(before).toContain("stripBom(");
+    }
   });
 });

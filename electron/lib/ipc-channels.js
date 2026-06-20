@@ -112,6 +112,12 @@ const SYSTEM_CHANNELS = Object.freeze({
     saveBeforeCloseDone: "save-before-close-done",
     newWindow: "new-window",
   }),
+  send: Object.freeze({
+    // #1839: renderer → main one-way signal that a requested close was aborted
+    // (save failed / conflict). Lets the quit-and-install flow stop waiting for
+    // a window that will not close, instead of hanging.
+    closeAborted: "close-aborted",
+  }),
   event: Object.freeze({
     requestSaveBeforeClose: "electron-request-save-before-close",
     requestFlushStateBeforeClose: "electron-request-flush-state-before-close",
@@ -201,6 +207,12 @@ const POWER_CHANNELS = Object.freeze({
   }),
   event: Object.freeze({
     stateChanged: "power:state-changed",
+    /** Fired when the system resumes from sleep/suspend. */
+    resumed: "power:resumed",
+    /** Fired when the system is about to suspend (sleep). */
+    suspended: "power:suspended",
+    /** Fired when the screen is locked. */
+    lockScreen: "power:lock-screen",
   }),
 });
 

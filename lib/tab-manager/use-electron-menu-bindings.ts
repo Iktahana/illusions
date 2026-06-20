@@ -5,6 +5,7 @@ import { getProjectFileService } from "../services/project-file-service";
 import { notificationManager } from "../services/notification-manager";
 import { executeTabSave } from "./save-executor";
 import { isEditorTab } from "./tab-types";
+import { getErrorMessage } from "./types";
 import type { SnapshotType } from "../services/history-policy";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, EditorTabState } from "./tab-types";
@@ -159,6 +160,9 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
         // the content was not (or may not have been) written — abort close.
         if (outcome.status === "failed") {
           console.error(`保存に失敗しました (${tab.file?.name ?? "無題"}):`, outcome.error);
+          notificationManager.error(
+            `保存に失敗しました: ${getErrorMessage(outcome.error)}（アプリは終了しません）`,
+          );
         }
         anyFailed = true;
       }
@@ -166,6 +170,11 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
       // Only close if every save succeeded; otherwise leave the window open.
       if (!anyFailed) {
         await window.electronAPI?.saveDoneAndClose?.();
+      } else {
+        // #1839: signal main that this close was aborted (save failed/conflict)
+        // so the quit-and-install flow stops waiting for a window that will not
+        // close, instead of hanging the update.
+        window.electronAPI?.notifyCloseAborted?.();
       }
     });
 

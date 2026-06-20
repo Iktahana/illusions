@@ -157,6 +157,10 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       saveBeforeCloseDone: "save-before-close-done",
       newWindow: "new-window",
     });
+    expect(SYSTEM_CHANNELS.send).toEqual({
+      // #1839: renderer → main close-aborted signal
+      closeAborted: "close-aborted",
+    });
     expect(SYSTEM_CHANNELS.event).toEqual({
       requestSaveBeforeClose: "electron-request-save-before-close",
       requestFlushStateBeforeClose: "electron-request-flush-state-before-close",
@@ -239,6 +243,10 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
     });
     expect(POWER_CHANNELS.event).toEqual({
       stateChanged: "power:state-changed",
+      // #1841: suspend/resume/lock-screen power events
+      resumed: "power:resumed",
+      suspended: "power:suspended",
+      lockScreen: "power:lock-screen",
     });
   });
 

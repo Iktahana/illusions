@@ -6,11 +6,13 @@
  * Coverage:
  * - loadIndex / saveIndex round-trip
  * - loadIndex returns default index when file does not exist
+ * - loadIndex: corrupt index.json is backed up and regenerated (Issue #1844 / T-3)
  * - writeSnapshotFile + readSnapshotFile round-trip
  * - deleteSnapshotFile
  * - ensureHistoryDir creates .illusions/history/
  * - loadBookmarks / saveBookmarks round-trip
  * - loadBookmarks returns empty Set when file does not exist
+ * - loadBookmarks: corrupt bookmarks file returns empty Set without throwing
  * - withIndexLock: in-process AsyncMutex serializes concurrent operations
  * - withIndexLock: calls IPC indexLockAcquire/Release in Electron renderer
  * - acquireBookmarkLock: serializes concurrent bookmark operations
@@ -148,6 +150,51 @@ describe("HistoryStore", () => {
       expect(result.snapshots).toHaveLength(1);
       expect(result.snapshots[0].id).toBe("a");
     });
+
+    // Issue #1844 / T-3: corrupt index.json must self-heal
+    it("backs up corrupt index.json to index.json.corrupt.bak and returns a default index", async () => {
+      const corruptContent = "NOT_VALID_JSON{{{";
+      fileStore.set(".illusions/history/index.json", corruptContent);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const result = await store.loadIndex();
+
+      // Returns a clean default index
+      expect(result.snapshots).toEqual([]);
+      expect(result.maxSnapshots).toBe(100);
+
+      // Backup file was created with the original corrupt content
+      const backupKey = ".illusions/history/index.json.corrupt.bak";
+      expect(fileStore.has(backupKey)).toBe(true);
+      expect(fileStore.get(backupKey)).toBe(corruptContent);
+
+      // A fresh valid index.json was written
+      const regeneratedKey = ".illusions/history/index.json";
+      expect(fileStore.has(regeneratedKey)).toBe(true);
+      const regenerated = JSON.parse(fileStore.get(regeneratedKey)!) as { snapshots: unknown[] };
+      expect(regenerated.snapshots).toEqual([]);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("index.json"),
+        expect.any(SyntaxError),
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it("a second loadIndex after corruption succeeds and returns valid index", async () => {
+      fileStore.set(".illusions/history/index.json", "CORRUPT");
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      // First call: corrupt → default returned, index.json regenerated
+      const first = await store.loadIndex();
+      expect(first.snapshots).toEqual([]);
+
+      // Second call: index.json is now valid JSON written by saveIndex inside loadIndex
+      vi.restoreAllMocks(); // stop suppressing warn so second call warns if unexpected
+      const second = await store.loadIndex();
+      expect(second.snapshots).toEqual([]);
+    });
   });
 
   describe("saveIndex", () => {
@@ -248,6 +295,22 @@ describe("HistoryStore", () => {
       const bm = await store.loadBookmarks();
       expect(bm.size).toBe(2);
       expect(bm.has("id1")).toBe(true);
+    });
+
+    // Issue #1844 / T-3: corrupt bookmarks must not throw
+    it("returns empty Set (no throw) when bookmarks file contains corrupt JSON", async () => {
+      fileStore.set(".illusions/history/.history_bookmarks.json", "NOT_JSON{{{{");
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const bm = await store.loadBookmarks();
+
+      expect(bm.size).toBe(0);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("bookmarks"),
+        expect.any(SyntaxError),
+      );
+
+      warnSpy.mockRestore();
     });
   });
 
