@@ -59,17 +59,24 @@ describe("ProjectSearchWorkerClient", () => {
     await expect(pending).rejects.toThrow("disposed");
   });
 
-  it("poisons the client after a worker crash", async () => {
+  it("falls back to synchronous matching after a worker crash", async () => {
     const worker = new FakeWorker();
     const client = new ProjectSearchWorkerClient(() => worker as unknown as Worker);
     const pending = client.matchDocument("first", ".mdi", "first", {});
 
-    worker.onerror?.(new ErrorEvent("error", { message: "worker crashed" }));
+    // Worker が起動失敗した際は保留中リクエストを同期で履行し、以降も同期モードへ移行する。
+    worker.onerror?.(new ErrorEvent("error", { message: "worker failed to load" }));
 
-    await expect(pending).rejects.toThrow("worker crashed");
+    // pending request is fulfilled synchronously via findRawDocumentMatches
+    await expect(pending).resolves.toMatchObject({
+      matches: [expect.objectContaining({ source: "text", rawFrom: 0, rawTo: 5 })],
+    });
+    // subsequent requests also resolve synchronously without using the worker
     const afterCrash = client.matchDocument("second", ".mdi", "second", {});
     expect(worker.received).toHaveLength(1);
-    await expect(afterCrash).rejects.toThrow("worker crashed");
+    await expect(afterCrash).resolves.toMatchObject({
+      matches: [expect.objectContaining({ source: "text", rawFrom: 0, rawTo: 6 })],
+    });
     expect(worker.terminated).toBe(true);
   });
 });
