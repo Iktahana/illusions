@@ -14,6 +14,8 @@ import { CORRECTION_MODES } from "@/lib/linting/correction-modes";
 export interface AiSettings {
   lintingEnabled: boolean;
   lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
+  /** One-time mode-config migration marker (see use-mode-config-migration.ts). */
+  lintingModeConfigVersion: number;
   characterExtractionBatchSize: number;
   characterExtractionConcurrency: number;
   powerSaveMode: boolean;
@@ -36,6 +38,8 @@ export interface AiSettingsHandlers {
   handleLintingRuleConfigsBatchChange: (
     configs: Record<string, { enabled: boolean; severity: Severity }>,
   ) => void;
+  /** Persist the one-time mode-config migration version. */
+  handleLintingModeConfigVersionChange: (version: number) => void;
   handleCharacterExtractionBatchSizeChange: (value: number) => void;
   handleCharacterExtractionConcurrencyChange: (value: number) => void;
   handlePowerSaveModeChange: (enabled: boolean) => Promise<void>;
@@ -69,6 +73,7 @@ export function useAiSettings(): UseAiSettingsResult {
   const [lintingRuleConfigs, setLintingRuleConfigs] = useState<
     Record<string, { enabled: boolean; severity: Severity }>
   >({});
+  const [lintingModeConfigVersion, setLintingModeConfigVersion] = useState(0);
   const [characterExtractionBatchSize, setCharacterExtractionBatchSize] = useState(3);
   const [characterExtractionConcurrency, setCharacterExtractionConcurrency] = useState(4);
   const [powerSaveMode, setPowerSaveMode] = useState(false);
@@ -121,6 +126,10 @@ export function useAiSettings(): UseAiSettingsResult {
         }
       }
       setLintingRuleConfigs(sanitized);
+    }
+
+    if (typeof appState.lintingModeConfigVersion === "number") {
+      setLintingModeConfigVersion(appState.lintingModeConfigVersion);
     }
 
     if (appState.powerSaveMode !== undefined) setPowerSaveMode(appState.powerSaveMode as boolean);
@@ -247,6 +256,13 @@ export function useAiSettings(): UseAiSettingsResult {
     [],
   );
 
+  const handleLintingModeConfigVersionChange = useCallback((version: number) => {
+    setLintingModeConfigVersion(version);
+    void persistAppState({ lintingModeConfigVersion: version }).catch((e) =>
+      console.error("Failed to persist lintingModeConfigVersion:", e),
+    );
+  }, []);
+
   const clearTempPowerSaveTimer = useCallback(() => {
     if (tempPowerSaveTimerRef.current !== null) {
       clearTimeout(tempPowerSaveTimerRef.current);
@@ -351,6 +367,7 @@ export function useAiSettings(): UseAiSettingsResult {
     aiSettings: {
       lintingEnabled,
       lintingRuleConfigs,
+      lintingModeConfigVersion,
       characterExtractionBatchSize,
       characterExtractionConcurrency,
       powerSaveMode,
@@ -369,6 +386,7 @@ export function useAiSettings(): UseAiSettingsResult {
       handleLintingEnabledChange,
       handleLintingRuleConfigChange,
       handleLintingRuleConfigsBatchChange,
+      handleLintingModeConfigVersionChange,
       handleCharacterExtractionBatchSizeChange,
       handleCharacterExtractionConcurrencyChange,
       handlePowerSaveModeChange,
