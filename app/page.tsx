@@ -11,6 +11,10 @@ import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import WebSunsetNotice from "@/components/WebSunsetNotice";
 import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
+import {
+  subscribeWindowActivity,
+  getWindowActivitySnapshot,
+} from "@/lib/editor-page/window-activity";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
 import { useTabManager } from "@/lib/tab-manager";
 import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
@@ -293,6 +297,25 @@ export default function EditorPage() {
   const flushActiveEditorRef = useRef<(() => string | null) | null>(null);
   const registerFlush = useCallback((flush: (() => string | null) | null) => {
     flushActiveEditorRef.current = flush;
+  }, []);
+
+  // #1840 (Codex F-02 mitigation): the dirty/clean decision on close/quit reads
+  // `tab.isDirty`, which lags the live editor by the 200ms listener debounce.
+  // Flush the live content whenever the window loses focus or becomes hidden
+  // (e.g. the user clicks away, or the in-app update dialog steals focus before
+  // "今すぐ再起動"), so `tab.content`/`isDirty` are current before any close
+  // decision. This only syncs state (never loses data). The full fix — a main →
+  // renderer close-preflight that flushes before deciding — is tracked separately.
+  useEffect(() => {
+    let prev = getWindowActivitySnapshot();
+    return subscribeWindowActivity((next) => {
+      const lostFocus = prev.isWindowFocused && !next.isWindowFocused;
+      const becameHidden = prev.isDocumentVisible && !next.isDocumentVisible;
+      prev = next;
+      if (lostFocus || becameHidden) {
+        flushActiveEditorRef.current?.();
+      }
+    });
   }, []);
 
   const tabManager = useTabManager({

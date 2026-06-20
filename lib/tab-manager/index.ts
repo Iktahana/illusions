@@ -83,6 +83,7 @@ export function useTabManager(options?: {
     pendingCloseTabId: tabState.pendingCloseTabId,
     setPendingCloseTabId: tabState.setPendingCloseTabId,
     forceCloseTab: tabState.forceCloseTab,
+    flushActiveEditorRef: options?.flushActiveEditorRef,
     tryCreateSnapshot: fileIO.tryCreateSnapshot,
   });
 

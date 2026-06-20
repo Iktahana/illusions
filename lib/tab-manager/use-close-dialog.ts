@@ -21,6 +21,12 @@ export interface UseCloseDialogParams extends TabManagerCore {
   /** Force-close a tab without dirty check. */
   forceCloseTab: (tabId: TabId) => void;
   /**
+   * Ref holding the active editor's on-demand live-content flush (#1840 /
+   * Codex F-03). When the tab being closed is the active tab, flush before
+   * saving so the close-save doesn't persist debounce-lagged content.
+   */
+  flushActiveEditorRef?: React.MutableRefObject<(() => string | null) | null>;
+  /**
    * Create a history snapshot with the given type (project mode only).
    * B1 fix: caller supplies correct SnapshotType.
    */
@@ -57,11 +63,13 @@ export interface UseCloseDialogReturn {
 export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogReturn {
   const {
     tabsRef,
+    activeTabIdRef,
     setTabs,
     isProjectRef,
     pendingCloseTabId,
     setPendingCloseTabId,
     forceCloseTab,
+    flushActiveEditorRef,
     tryCreateSnapshot,
   } = params;
 
@@ -82,8 +90,19 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
       return;
     }
 
+    // #1840 (Codex F-03): if closing the active tab, flush the live editor
+    // content first so we don't persist debounce-lagged content. flush() returns
+    // null when not applicable/ready, so we fall back to tab.content.
+    let tabToSave = tab;
+    if (tab.id === activeTabIdRef.current && flushActiveEditorRef?.current) {
+      const live = flushActiveEditorRef.current();
+      if (live != null && live !== tab.content) {
+        tabToSave = { ...tab, content: live };
+      }
+    }
+
     const outcome = await executeTabSave({
-      tab,
+      tab: tabToSave,
       isProject: isProjectRef.current,
       tabsRef,
       setTabs,
@@ -114,6 +133,8 @@ export function useCloseDialog(params: UseCloseDialogParams): UseCloseDialogRetu
     pendingCloseTabId,
     forceCloseTab,
     tabsRef,
+    activeTabIdRef,
+    flushActiveEditorRef,
     setTabs,
     isProjectRef,
     setPendingCloseTabId,
