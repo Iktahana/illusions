@@ -15,6 +15,7 @@ import {
 import RulesetCard from "./RulesetCard";
 import type { RulesetCardRule } from "./RulesetCard";
 import type { UseRulesetStatusReturn } from "./useRulesetStatus";
+import { buildBulkConfig, collectAllRuleIds } from "./bulk-toggle";
 
 interface RulesetListProps {
   lintingRuleConfigs: Record<
@@ -60,23 +61,29 @@ export default function RulesetList({
     [lintingRuleConfigs, onLintingRuleConfigsBatchChange],
   );
 
+  // 表示中の全ルール ID（内蔵 LINT_RULES_META + 外部ルールセット）を収集する。
+  // 内蔵ルールゼロ化後はルールが外部ルールセット (rulesetStatus.rulesets) から
+  // 供給されるため、LINT_RULES_META だけを回すと一括操作が空振りする (#1832)。
+  const allRuleIds = useCallback(
+    (): string[] =>
+      collectAllRuleIds(
+        LINT_RULES_META.map((rule) => rule.id),
+        rulesetStatus?.rulesets,
+      ),
+    [rulesetStatus],
+  );
+
   const handleEnableAll = useCallback(() => {
-    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> =
-      {};
-    for (const rule of LINT_RULES_META) {
-      next[rule.id] = { ...getConfig(rule.id, lintingRuleConfigs), enabled: true };
-    }
-    onLintingRuleConfigsBatchChange(next);
-  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange]);
+    onLintingRuleConfigsBatchChange(
+      buildBulkConfig(lintingRuleConfigs, allRuleIds(), true, getConfig),
+    );
+  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange, allRuleIds]);
 
   const handleDisableAll = useCallback(() => {
-    const next: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }> =
-      {};
-    for (const rule of LINT_RULES_META) {
-      next[rule.id] = { ...getConfig(rule.id, lintingRuleConfigs), enabled: false };
-    }
-    onLintingRuleConfigsBatchChange(next);
-  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange]);
+    onLintingRuleConfigsBatchChange(
+      buildBulkConfig(lintingRuleConfigs, allRuleIds(), false, getConfig),
+    );
+  }, [lintingRuleConfigs, onLintingRuleConfigsBatchChange, allRuleIds]);
 
   const handleResetDefaults = useCallback(() => {
     onLintingRuleConfigsBatchChange({ ...LINT_DEFAULT_CONFIGS });
