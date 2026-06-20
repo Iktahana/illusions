@@ -203,6 +203,41 @@ export class ElectronStorageManager {
   }
 
   /**
+   * 破損 JSON レコードを削除する前に、生データを corrupt_records へ隔離する
+   * （Codex F-06）。特に editor_buffer はクラッシュ回復用の未保存下書きであり、
+   * 末尾の余分な 1 文字などで JSON.parse が失敗しても本文は復旧可能なことが多い。
+   * 復旧の最後の砦を消さないよう、削除と隔離を同一トランザクションで行う。
+   *
+   * sourceTable は自コード内のリテラル（app_state / recent_files / editor_buffer /
+   * recent_projects）のみを渡す前提（外部入力ではないため SQL 連結は安全）。
+   */
+  private quarantineAndDelete(sourceTable: string, recordId: string, rawData: string): void {
+    const db = this.ensureInitialized();
+    try {
+      db.exec(
+        `CREATE TABLE IF NOT EXISTS corrupt_records (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source_table TEXT NOT NULL,
+          record_id TEXT,
+          data TEXT NOT NULL,
+          quarantined_at INTEGER NOT NULL
+        )`,
+      );
+      runInTransaction(db, () => {
+        db.prepare(
+          "INSERT INTO corrupt_records (source_table, record_id, data, quarantined_at) VALUES (?, ?, ?, ?)",
+        ).run(sourceTable, recordId, rawData, Date.now());
+        db.prepare(`DELETE FROM ${sourceTable} WHERE id = ?`).run(recordId);
+      });
+    } catch (err) {
+      console.error(
+        `[ElectronStorageManager] 破損レコードの隔離に失敗しました (${sourceTable}/${recordId}):`,
+        err,
+      );
+    }
+  }
+
+  /**
    * アプリ状態を読み込む
    */
   loadAppState(): AppState | null {
@@ -213,20 +248,14 @@ export class ElectronStorageManager {
     try {
       return JSON.parse(row.data) as AppState;
     } catch (err) {
-      // Corrupt app_state record: delete it so every subsequent startup starts clean.
-      // app_state が破損している場合はレコードを削除してセルフヒールする。
+      // Corrupt app_state record: quarantine then delete so every subsequent
+      // startup starts clean without destroying the raw data (Codex F-06).
+      // app_state が破損している場合は隔離してから削除しセルフヒールする。
       console.warn(
-        "[ElectronStorageManager] app_state の JSON が破損しています。レコードを削除してデフォルト状態に戻します。",
+        "[ElectronStorageManager] app_state の JSON が破損しています。隔離してデフォルト状態に戻します。",
         err,
       );
-      try {
-        db.prepare("DELETE FROM app_state WHERE id = ?").run("app_state");
-      } catch (deleteErr) {
-        console.error(
-          "[ElectronStorageManager] 破損した app_state レコードの削除に失敗しました:",
-          deleteErr,
-        );
-      }
+      this.quarantineAndDelete("app_state", "app_state", row.data);
       return null;
     }
   }
@@ -278,20 +307,13 @@ export class ElectronStorageManager {
       try {
         results.push(JSON.parse(row.data) as RecentFile);
       } catch (err) {
-        // Corrupt recent_files row: remove it so the next load is clean.
-        // 破損した recent_files 行を削除してセルフヒールする。
+        // Corrupt recent_files row: quarantine then remove (Codex F-06).
+        // 破損した recent_files 行を隔離してから削除しセルフヒールする。
         console.warn(
-          `[ElectronStorageManager] recent_files(id=${row.id}) の JSON が破損しています。レコードを削除します。`,
+          `[ElectronStorageManager] recent_files(id=${row.id}) の JSON が破損しています。隔離して削除します。`,
           err,
         );
-        try {
-          db.prepare("DELETE FROM recent_files WHERE id = ?").run(row.id);
-        } catch (deleteErr) {
-          console.error(
-            "[ElectronStorageManager] 破損した recent_files レコードの削除に失敗しました:",
-            deleteErr,
-          );
-        }
+        this.quarantineAndDelete("recent_files", row.id, row.data);
       }
     }
     return results;
@@ -338,20 +360,15 @@ export class ElectronStorageManager {
     try {
       return JSON.parse(row.data) as EditorBuffer;
     } catch (err) {
-      // Corrupt editor_buffer record: delete it so the next load starts clean.
-      // 破損した editor_buffer レコードを削除してセルフヒールする。
+      // Corrupt editor_buffer = unsaved crash-recovery draft. Quarantine the raw
+      // data BEFORE deleting so a recoverable body isn't destroyed (Codex F-06).
+      // editor_buffer はクラッシュ回復用の未保存下書き。本文を失わないよう、削除前に
+      // 生データを隔離する。
       console.warn(
-        "[ElectronStorageManager] editor_buffer の JSON が破損しています。レコードを削除します。",
+        "[ElectronStorageManager] editor_buffer の JSON が破損しています。生データを隔離してから削除します。",
         err,
       );
-      try {
-        db.prepare("DELETE FROM editor_buffer WHERE id = ?").run("editor_buffer");
-      } catch (deleteErr) {
-        console.error(
-          "[ElectronStorageManager] 破損した editor_buffer レコードの削除に失敗しました:",
-          deleteErr,
-        );
-      }
+      this.quarantineAndDelete("editor_buffer", "editor_buffer", row.data);
       return null;
     }
   }
@@ -425,20 +442,13 @@ export class ElectronStorageManager {
       try {
         results.push(JSON.parse(row.data) as { id: string; rootPath: string; name: string });
       } catch (err) {
-        // Corrupt recent_projects row: remove it so the next load is clean.
-        // 破損した recent_projects 行を削除してセルフヒールする。
+        // Corrupt recent_projects row: quarantine then remove (Codex F-06).
+        // 破損した recent_projects 行を隔離してから削除しセルフヒールする。
         console.warn(
-          `[ElectronStorageManager] recent_projects(id=${row.id}) の JSON が破損しています。レコードを削除します。`,
+          `[ElectronStorageManager] recent_projects(id=${row.id}) の JSON が破損しています。隔離して削除します。`,
           err,
         );
-        try {
-          db.prepare("DELETE FROM recent_projects WHERE id = ?").run(row.id);
-        } catch (deleteErr) {
-          console.error(
-            "[ElectronStorageManager] 破損した recent_projects レコードの削除に失敗しました:",
-            deleteErr,
-          );
-        }
+        this.quarantineAndDelete("recent_projects", row.id, row.data);
       }
     }
     return results;

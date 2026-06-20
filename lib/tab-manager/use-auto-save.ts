@@ -192,10 +192,21 @@ export function useAutoSave(params: UseAutoSaveParams): void {
       });
     }
 
+    // M-3 (Codex F-08): suspend — main も suspend を broadcast しているので購読し、
+    // スリープ直前に dirty タブを即フラッシュする。スリープ中の電源断/強制再起動で
+    // 最後の自動保存以降の入力が失われるのを防ぐ。
+    let unsubscribeSuspend: (() => void) | null = null;
+    if (powerAPI?.onSuspend) {
+      unsubscribeSuspend = powerAPI.onSuspend(() => {
+        runAutoSave();
+      });
+    }
+
     return () => {
       unsubscribe();
       unsubscribeResume?.();
       unsubscribeLockScreen?.();
+      unsubscribeSuspend?.();
       if (autoSaveTimerRef.current) {
         clearInterval(autoSaveTimerRef.current);
         autoSaveTimerRef.current = null;
