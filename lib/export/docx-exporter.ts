@@ -76,8 +76,7 @@ function buildDocxDocument(content: string, options: DocxExportOptions): Documen
   // Promote author-intentional blank lines into [[blank]] markers so the
   // paragraph loop emits empty <w:p> for them instead of collapsing — TXT
   // parity (#1826). Scoped to ".mdi" (see mdi-to-html.ts for rationale).
-  const normalized =
-    fileType === ".mdi" ? promoteBlankRunsToMarkers(rawNormalized) : rawNormalized;
+  const normalized = fileType === ".mdi" ? promoteBlankRunsToMarkers(rawNormalized) : rawNormalized;
   const paragraphs = parseMarkdownToDocxParagraphs(normalized, settings, fontConfig);
 
   // Page dimensions (swap for landscape)

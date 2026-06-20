@@ -279,8 +279,7 @@ export function mdiToHtml(
   // collapse them — TXT already preserves these, this brings HTML/PDF/EPUB to
   // parity (#1826). Scoped to ".mdi": .md/.txt keep CommonMark collapse and the
   // DATA-LOSS guard (#1608). Markers feed the existing sentinel path below.
-  const normalized =
-    fileType === ".mdi" ? promoteBlankRunsToMarkers(rawNormalized) : rawNormalized;
+  const normalized = fileType === ".mdi" ? promoteBlankRunsToMarkers(rawNormalized) : rawNormalized;
   // Pre-process: replace [[blank]] paragraph markers with a U+E000 PUA sentinel.
   // markdown-it will wrap the sentinel in <p>…</p>; we swap it for an empty <p></p> after rendering.
   const BLANK_SENTINEL = "";
