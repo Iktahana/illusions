@@ -117,7 +117,6 @@ describe("findSearchMatches enhanced search", () => {
     const oldForm = findSearchMatches(source, "旧体", { normalizeVariants: true });
     const expanded = findSearchMatches(source, "平成", { normalizeVariants: true });
 
-
     expect(kana[0].text).toBe("カタカナ");
     expect(width[0].text).toBe("ＡＢＣ");
     expect(halfWidthKana[0].text).toBe("ｶﾞ");

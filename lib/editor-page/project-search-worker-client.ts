@@ -92,7 +92,9 @@ export class ProjectSearchWorkerClient {
       this.pending.clear();
       for (const [, item] of snapshot) {
         try {
-          item.resolve(findRawDocumentMatches(item.content, item.fileType, item.searchTerm, item.options));
+          item.resolve(
+            findRawDocumentMatches(item.content, item.fileType, item.searchTerm, item.options),
+          );
         } catch (error) {
           item.reject(error instanceof Error ? error : new Error(String(error)));
         }
