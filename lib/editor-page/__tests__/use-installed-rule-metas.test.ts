@@ -52,7 +52,11 @@ describe("loadInstalledRuleMetas", () => {
               code: "",
               manifest: {
                 rules: [
-                  { ruleId: "a-1", applicableModes: ["novel"], defaultConfig: { severity: "error" } },
+                  {
+                    ruleId: "a-1",
+                    applicableModes: ["novel"],
+                    defaultConfig: { severity: "error" },
+                  },
                   { ruleId: "a-2", applicableModes: ["official"] },
                 ],
               },
