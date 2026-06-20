@@ -10,6 +10,11 @@ const SHINJITAI_BY_KYUJITAI = new Map(
     .map(([shinjitai, kyujitai]) => [kyujitai, shinjitai] as const),
 );
 
+// CJK variant characters absent from the kyujitai package that nonetheless
+// appear in Japanese text and should be equated in fuzzy search.
+// 髙 (U+9AD9) is a common alternate form of 高 (U+9AD8) used in personal names.
+const EXTRA_VARIANTS: ReadonlyMap<string, string> = new Map([["髙", "高"]]);
+
 /**
  * Normalizes width, kana script, and old character forms for search comparison.
  * The kyujitai table is maintained by the `kyujitai` package rather than in
@@ -24,7 +29,8 @@ export function normalizeJapaneseSearchVariants(text: string): string {
       codePoint >= 0x30a1 && codePoint <= 0x30f6
         ? String.fromCodePoint(codePoint - 0x60)
         : character;
-    normalized += SHINJITAI_BY_KYUJITAI.get(kana) ?? kana;
+    const mapped = SHINJITAI_BY_KYUJITAI.get(kana) ?? EXTRA_VARIANTS.get(kana) ?? kana;
+    normalized += mapped;
   }
 
   return normalized;
