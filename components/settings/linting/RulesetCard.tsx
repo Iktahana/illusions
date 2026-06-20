@@ -160,9 +160,7 @@ export default function RulesetCard({
                 更新あり
               </span>
             )}
-            {syncing && (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-accent flex-shrink-0" />
-            )}
+            {syncing && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent flex-shrink-0" />}
           </div>
 
           {/* メタ行: 出典 + 各種バッジ。chevron 幅ぶん字下げして name と揃える。
