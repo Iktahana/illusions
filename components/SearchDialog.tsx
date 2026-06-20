@@ -190,6 +190,8 @@ export default function SearchDialog({
     if (e.key === "Escape") {
       onClose();
     } else if (e.key === "Enter") {
+      // Ignore IME composition confirmation — only handle real Enter
+      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
       if (e.shiftKey) {
         goToPreviousMatch();
       } else {
