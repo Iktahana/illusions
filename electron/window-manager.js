@@ -1,10 +1,15 @@
 // Window management: creation, lifecycle, and power state broadcasting
 
-const { app, BrowserWindow, dialog, shell } = require("electron");
+const { app, BrowserWindow, dialog, shell, ipcMain } = require("electron");
 const path = require("path");
 const { isDev } = require("./app-constants");
 const { isSafeExternalUrl, normalizeExternalUrl } = require("./lib/url-policy");
 const { SYSTEM_CHANNELS, POWER_CHANNELS } = require("./lib/ipc-channels");
+
+// #1839: backstop timeout for the quit-and-install close handshake. If the
+// renderer neither closes nor signals abort within this window, we treat it as
+// aborted (quit cancelled, data preserved) rather than hang forever.
+const CLOSE_HANDSHAKE_TIMEOUT_MS = 30000;
 
 let mainWindow = null;
 const allWindows = new Set();
@@ -18,6 +23,20 @@ function broadcastPowerState(state) {
   for (const win of allWindows) {
     if (!win.isDestroyed()) {
       win.webContents.send(POWER_CHANNELS.event.stateChanged, state);
+    }
+  }
+}
+
+/**
+ * Broadcast an arbitrary power lifecycle event (no payload) to all renderer
+ * windows. Used for resume / suspend / lock-screen signals (M-1/M-2/M-5).
+ *
+ * @param {string} channel - One of POWER_CHANNELS.event.*
+ */
+function broadcastPowerEvent(channel) {
+  for (const win of allWindows) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(channel);
     }
   }
 }
@@ -176,10 +195,114 @@ async function createMainWindow({ hasPendingFile = false } = {}) {
   return createWindow({ hasPendingFile });
 }
 
+/**
+ * quitAndInstall の前に全ウィンドウの未保存変更を処理するヘルパー。
+ *
+ * 各ウィンドウについて:
+ *   - dirty (isDocumentEdited) なら 保存/保存しない/キャンセル ダイアログを表示する。
+ *     - 「保存」: requestSaveBeforeClose を renderer に送信し、renderer が
+ *       saveBeforeCloseDone を invoke → win.destroy() されるまで待機する。
+ *     - 「保存しない」: requestFlushStateBeforeClose を送信し destroy を待つ。
+ *     - 「キャンセル」: false を返す（呼び出し元は quitAndInstall を中止すること）。
+ *   - clean なら requestFlushStateBeforeClose を送信して destroy を待つ。
+ *
+ * @returns {Promise<boolean>} true = 全ウィンドウ処理完了、false = ユーザーがキャンセル
+ */
+async function saveAllBeforeQuitAndInstall() {
+  const windows = Array.from(allWindows).filter((w) => !w.isDestroyed());
+
+  for (const win of windows) {
+    const cancelled = await _handleWindowBeforeQuit(win);
+    if (cancelled) return false;
+  }
+  return true;
+}
+
+/**
+ * 単一ウィンドウの終了前保存処理。
+ * @param {import("electron").BrowserWindow} win
+ * @returns {Promise<boolean>} true = ユーザーがキャンセルした
+ */
+async function _handleWindowBeforeQuit(win) {
+  if (win.isDestroyed()) return false;
+
+  /**
+   * destroy（"closed"）か、renderer からの close 中止シグナル（closeAborted,
+   * 保存失敗/コンフリクト時）のどちらかを待つ。abort を待たないと、保存に
+   * 失敗して renderer が saveDoneAndClose を呼ばないケースで永久に待ち続け、
+   * アップデート再起動がハングしてしまう（#1839）。
+   * @returns {Promise<"closed" | "aborted">}
+   */
+  function waitForCloseOrAbort() {
+    if (win.isDestroyed()) return Promise.resolve("closed");
+    return new Promise((resolve) => {
+      const onClosed = () => {
+        cleanup();
+        resolve("closed");
+      };
+      const onAborted = (event) => {
+        if (win.isDestroyed() || event.sender === win.webContents) {
+          cleanup();
+          resolve("aborted");
+        }
+      };
+      // Backstop（レビュー Finding 3）: renderer が saveDoneAndClose も
+      // notifyCloseAborted も呼ばずに固まった場合（ハンドラ内の例外など）でも、
+      // 永久ハング＋リスナーリークを避けるため一定時間で "aborted" に倒す。
+      // "aborted" = quit 中止なので、データは失わずウィンドウが残る安全側。
+      const timer = setTimeout(() => {
+        cleanup();
+        resolve("aborted");
+      }, CLOSE_HANDSHAKE_TIMEOUT_MS);
+      function cleanup() {
+        clearTimeout(timer);
+        win.removeListener("closed", onClosed);
+        ipcMain.removeListener(SYSTEM_CHANNELS.send.closeAborted, onAborted);
+      }
+      win.once("closed", onClosed);
+      ipcMain.on(SYSTEM_CHANNELS.send.closeAborted, onAborted);
+    });
+  }
+
+  if (win.isDocumentEdited()) {
+    const { response } = await dialog.showMessageBox(win, {
+      type: "question",
+      buttons: ["保存", "保存しない", "キャンセル"],
+      defaultId: 0,
+      cancelId: 2,
+      message: "変更が保存されていません",
+      detail: "保存しない場合、変更は失われます。",
+    });
+
+    if (response === 2) {
+      // キャンセル
+      return true;
+    } else if (response === 0) {
+      // 「保存」: renderer にフラッシュ＋保存を依頼し、destroy か abort を待つ。
+      // 保存失敗で abort されたら quit を中止する（データを守りウィンドウを残す）。
+      win.webContents.send(SYSTEM_CHANNELS.event.requestSaveBeforeClose);
+      const result = await waitForCloseOrAbort();
+      if (result === "aborted") return true;
+    } else {
+      // 「保存しない」: フラッシュのみ依頼し、destroy を待つ
+      win.webContents.send(SYSTEM_CHANNELS.event.requestFlushStateBeforeClose);
+      await waitForCloseOrAbort();
+    }
+  } else {
+    // clean: フラッシュのみ依頼し、destroy を待つ
+    win.webContents.send(SYSTEM_CHANNELS.event.requestFlushStateBeforeClose);
+    await waitForCloseOrAbort();
+  }
+
+  return false;
+}
+
 module.exports = {
   getMainWindow,
   getAllWindows,
   createWindow,
   createMainWindow,
   broadcastPowerState,
+  broadcastPowerEvent,
+  saveAllBeforeQuitAndInstall,
 };

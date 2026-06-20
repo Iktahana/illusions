@@ -27,7 +27,7 @@ const { registerNlpHandlers } = require("./ipc/nlp-ipc");
 const { registerStorageHandlers, getStorageManager } = require("./ipc/storage-ipc");
 const { registerVFSHandlers } = require("./ipc/vfs-ipc");
 const { setupAutoUpdater, checkForUpdates } = require("./auto-updater");
-const { createMainWindow, broadcastPowerState } = require("./window-manager");
+const { createMainWindow, broadcastPowerState, broadcastPowerEvent } = require("./window-manager");
 const {
   handleMdiFileOpen,
   getPendingFilePath,
@@ -44,7 +44,7 @@ const { registerDictHandlers } = require("./ipc/dict-ipc");
 const { getDictManager } = require("./dict-manager");
 const { registerRulesetsHandlers } = require("./ipc/rulesets-ipc");
 const { getRulesetsManager } = require("./rulesets-manager");
-const { DICT_CHANNELS } = require("./lib/ipc-channels");
+const { DICT_CHANNELS, POWER_CHANNELS } = require("./lib/ipc-channels");
 
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
@@ -212,6 +212,16 @@ app.whenReady().then(async () => {
   // Power state monitoring
   powerMonitor.on("on-ac", () => broadcastPowerState("ac"));
   powerMonitor.on("on-battery", () => broadcastPowerState("battery"));
+
+  // System lifecycle events (M-1/M-2 resume, M-5 lock-screen)
+  // "resume" fires after the system wakes from sleep; the renderer must
+  // re-arm its auto-save timer and flush dirty tabs immediately.
+  powerMonitor.on("resume", () => broadcastPowerEvent(POWER_CHANNELS.event.resumed));
+  // "suspend" fires just before sleep; renderer gets an early-warning signal.
+  powerMonitor.on("suspend", () => broadcastPowerEvent(POWER_CHANNELS.event.suspended));
+  // "lock-screen" fires when the user locks the screen (macOS/Windows only);
+  // the renderer must flush dirty tabs immediately.
+  powerMonitor.on("lock-screen", () => broadcastPowerEvent(POWER_CHANNELS.event.lockScreen));
 
   // ウィンドウ作成後に auto-updater を初期化
   setupAutoUpdater();

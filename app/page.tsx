@@ -286,6 +286,15 @@ export default function EditorPage() {
     triggerSwitchToCorrections,
   } = panelHandlers;
 
+  // #1840: holds the active editor's on-demand live-content flush. Save flows
+  // call it right before persisting so they never write debounce-lagged content.
+  // The mounted MilkdownEditor (only the active dockview panel renders one)
+  // registers itself here; unmount clears it.
+  const flushActiveEditorRef = useRef<(() => string | null) | null>(null);
+  const registerFlush = useCallback((flush: (() => string | null) | null) => {
+    flushActiveEditorRef.current = flush;
+  }, []);
+
   const tabManager = useTabManager({
     skipAutoRestore,
     autoSave,
@@ -294,6 +303,7 @@ export default function EditorPage() {
     flushLayoutState: stableFlushLayoutState,
     windowKey,
     onEditorRemountNeeded: incrementEditorKey,
+    flushActiveEditorRef,
   });
   const {
     content,
@@ -653,8 +663,13 @@ export default function EditorPage() {
   // Electron menu "New" and "Open" bindings (with safety checks)
   useElectronMenuHandlers(newFile, openFile);
 
-  // Export hook: handles PDF/EPUB/DOCX export with notifications
-  const getExportContent = useCallback(() => content, [content]);
+  // Export hook: handles PDF/EPUB/DOCX export with notifications.
+  // #1840: flush the live editor doc first so export/print never use
+  // debounce-lagged content (falls back to React state when no editor).
+  const getExportContent = useCallback(() => {
+    const live = flushActiveEditorRef.current?.();
+    return live ?? content;
+  }, [content]);
   const getExportTitle = useCallback(() => {
     const tab = tabs.find((t) => t.id === activeTabId);
     const name = (tab && isEditorTab(tab) ? tab.file?.name : undefined) ?? "untitled";
@@ -1367,6 +1382,12 @@ export default function EditorPage() {
           sanitizeMdiContent(lastSaved, fileTypeOpts);
         updateTab(activeTabId, {
           fileSyncStatus: isClean ? "clean" : "dirty",
+          // #1845: keep isDirty consistent with fileSyncStatus so the tab ●
+          // shows, close-confirm fires, and auto-save picks up the restore.
+          // Editor remount (incrementEditorKey) sets the value via
+          // defaultValueCtx and never fires markdownUpdated, so isDirty would
+          // otherwise stay false after a restore.
+          isDirty: !isClean,
           conflictDiskContent: null,
         });
       }
@@ -1538,6 +1559,7 @@ export default function EditorPage() {
           handleIgnoreCorrection,
           switchTab,
           updateTab,
+          registerFlush,
         }}
         inspector={{
           isRightPanelCollapsed,

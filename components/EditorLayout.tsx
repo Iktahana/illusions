@@ -204,6 +204,7 @@ interface EditorLayoutProps {
     >;
     switchTab: (tabId: string) => void;
     updateTab: (tabId: string, updates: Partial<EditorTabState>) => void;
+    registerFlush: NonNullable<React.ComponentProps<typeof NovelEditor>["registerFlush"]>;
   };
   inspector: {
     isRightPanelCollapsed: boolean;
@@ -511,6 +512,7 @@ export default function EditorLayout({
                                     onOpenSearchDialog={mainArea.onOpenSearchDialog}
                                     onToggleSearchDialog={mainArea.onToggleSearchDialog}
                                     onEditorViewReady={mainArea.setEditorViewInstance}
+                                    registerFlush={mainArea.registerFlush}
                                     lintingRuleRunner={mainArea.ruleRunner}
                                     onLintIssuesUpdated={mainArea.handleLintIssuesUpdated}
                                     onNlpError={mainArea.handleNlpError}

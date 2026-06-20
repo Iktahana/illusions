@@ -30,6 +30,8 @@ declare global {
      * Phase 2: 保存経路を削除した後も flush 完了後の window destroy トリガとして利用。
      */
     saveDoneAndClose?: () => Promise<void>;
+    /** #1839: signal main that a requested close was aborted (save failed). */
+    notifyCloseAborted?: () => void;
     newWindow?: () => Promise<void>;
     /** beta opt-in トグル変更時にメインプロセスへ channel 再評価を依頼する */
     reevaluateUpdateChannel?: () => Promise<boolean>;
@@ -262,6 +264,21 @@ declare global {
       onPowerStateChange: (callback: (state: "ac" | "battery") => void) => () => void;
       /** Get current power state */
       getPowerState: () => Promise<"ac" | "battery">;
+      /**
+       * Fires when the system wakes from sleep (M-1/M-2 resume re-arm).
+       * Returns an unsubscribe function.
+       */
+      onResume: (callback: () => void) => () => void;
+      /**
+       * Fires just before the system suspends (M-1/M-2 suspend signal).
+       * Returns an unsubscribe function.
+       */
+      onSuspend: (callback: () => void) => () => void;
+      /**
+       * Fires when the screen is locked (macOS/Windows only, M-5 flush).
+       * Returns an unsubscribe function.
+       */
+      onLockScreen: (callback: () => void) => () => void;
     };
     /** Split editor popout window IPC */
     editor?: {

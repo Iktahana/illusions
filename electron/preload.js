@@ -37,6 +37,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // 歴史的命名: flush 完了後にウィンドウを実際に閉じるためのシグナル。
   // Phase 2 で save 経路は消滅したが、close handshake の終端トリガとして引き続き利用する。
   saveDoneAndClose: invokeChannel(SYSTEM_CHANNELS.invoke.saveBeforeCloseDone, { arity: 0 }),
+  // #1839: tell main a requested close was aborted (save failed/conflict) so the
+  // quit-and-install flow stops waiting for a window that will not close.
+  notifyCloseAborted: sendChannel(SYSTEM_CHANNELS.send.closeAborted, { arity: 0 }),
   newWindow: invokeChannel(SYSTEM_CHANNELS.invoke.newWindow, { arity: 0 }),
   reevaluateUpdateChannel: invokeChannel(UPDATE_CHANNELS.invoke.reevaluateChannel, { arity: 0 }),
   openDictionaryPopup: invokeChannel(SHELL_CHANNELS.invoke.openDictionaryPopup, { arity: 2 }),
@@ -166,6 +169,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     // removeAllListeners, which nuked other components' listeners.)
     onPowerStateChange: eventChannel(POWER_CHANNELS.event.stateChanged),
     getPowerState: invokeChannel(POWER_CHANNELS.invoke.getState, { arity: 0 }),
+    /** Fires when the system wakes from sleep (M-1/M-2). */
+    onResume: eventChannel(POWER_CHANNELS.event.resumed),
+    /** Fires just before the system suspends (M-1/M-2). */
+    onSuspend: eventChannel(POWER_CHANNELS.event.suspended),
+    /** Fires when the screen is locked (macOS/Windows, M-5). */
+    onLockScreen: eventChannel(POWER_CHANNELS.event.lockScreen),
   },
   editor: {
     popoutPanel: invokeChannel(

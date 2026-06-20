@@ -73,9 +73,37 @@ export class HistoryStore {
       return createDefaultHistoryIndex();
     }
 
-    // Parse separately so JSON corruption throws and propagates to caller
-    // rather than silently returning an empty index that would overwrite data.
-    return JSON.parse(content) as HistoryIndex;
+    // Detect corrupt index.json: back it up then regenerate so history self-heals.
+    // index.json が破損している場合: バックアップを作成してからデフォルト値で再生成する。
+    let parsed: HistoryIndex;
+    try {
+      parsed = JSON.parse(content) as HistoryIndex;
+    } catch (err) {
+      console.warn(
+        "[HistoryStore] index.json が破損しています。index.json.corrupt.bak にバックアップし、デフォルト値で再生成します。",
+        err,
+      );
+      try {
+        const historyDir = await this.getHistoryDirectory();
+        // Overwrite (not timestamp-based) so we never accumulate stale backups.
+        // 固定サフィックスで上書きし、古いバックアップが溜まらないようにする。
+        const backupHandle = await historyDir.getFileHandle(
+          `${HISTORY_INDEX_FILENAME}.corrupt.bak`,
+          { create: true },
+        );
+        await backupHandle.write(content);
+      } catch (backupErr) {
+        console.error("[HistoryStore] index.json のバックアップに失敗しました:", backupErr);
+      }
+      const defaultIndex = createDefaultHistoryIndex();
+      try {
+        await this.saveIndex(defaultIndex);
+      } catch (saveErr) {
+        console.error("[HistoryStore] デフォルト index.json の保存に失敗しました:", saveErr);
+      }
+      return defaultIndex;
+    }
+    return parsed;
   }
 
   /**
@@ -155,9 +183,18 @@ export class HistoryStore {
       return new Set();
     }
 
-    // Parse separately so JSON corruption propagates rather than silently clearing bookmarks.
-    const ids = JSON.parse(content) as string[];
-    return new Set(ids);
+    // Detect corrupt bookmarks file: log and return empty Set (bookmarks are non-critical).
+    // ブックマークファイルが破損している場合はログに残して空の Set を返す。
+    try {
+      const ids = JSON.parse(content) as string[];
+      return new Set(ids);
+    } catch (err) {
+      console.warn(
+        "[HistoryStore] .history_bookmarks.json が破損しています。ブックマークをリセットします。",
+        err,
+      );
+      return new Set();
+    }
   }
 
   /**

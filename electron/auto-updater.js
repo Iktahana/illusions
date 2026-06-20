@@ -100,10 +100,17 @@ function setupAutoUpdater() {
           defaultId: 0,
           cancelId: 1,
         })
-        .then((result) => {
+        .then(async (result) => {
           if (result.response === 0) {
             // 「今すぐ再起動」
-            autoUpdater.quitAndInstall();
+            // before-quit-for-update は BrowserWindow の close イベントをスキップするため
+            // dirty ウィンドウがあっても保存ダイアログが表示されない (#1839)。
+            // quitAndInstall の前に全ウィンドウの未保存変更を自前で処理する。
+            const { saveAllBeforeQuitAndInstall } = require("./window-manager");
+            const shouldQuit = await saveAllBeforeQuitAndInstall();
+            if (shouldQuit) {
+              autoUpdater.quitAndInstall();
+            }
           }
         });
     }

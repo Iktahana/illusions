@@ -53,6 +53,21 @@ function isSavePathDenied(normalizedPath) {
 const VALID_SAVE_FILE_TYPES = [".mdi", ".md", ".txt"];
 
 /**
+ * Strip a leading UTF-8 BOM (U+FEFF) from a string if present.
+ *
+ * A utf-8 file read does not strip the BOM, so a .mdi file saved by
+ * an editor that writes a BOM would have U+FEFF at position 0.  The .txt read
+ * path (readTextWithEncoding in shared/lib/text-codec.ts) already strips it;
+ * this helper gives .mdi reads the same behaviour (fix for issue #1842).
+ *
+ * @param {string} s - String that may have a leading BOM
+ * @returns {string} String with leading BOM removed
+ */
+function stripBom(s) {
+  return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
+}
+
+/**
  * Validate a file path provided by the renderer for the save-file IPC handler.
  * Returns an error object if validation fails, or null if the path is valid.
  * @param {string} filePath - The raw file path from the renderer
@@ -180,7 +195,8 @@ async function handleMdiFileOpen(filePath) {
       log.info("Opening as standalone file:", filePath);
       // Approve system-opened file path for future saves, scoped to the target window
       approveDialogPath(targetWindow.webContents.id, path.resolve(filePath));
-      const content = await fs.readFile(filePath, "utf-8");
+      // Strip UTF-8 BOM if present — fs.readFile does not strip it (#1842)
+      const content = stripBom(await fs.readFile(filePath, "utf-8"));
       targetWindow.webContents.send(FILE_CHANNELS.event.openFileFromSystem, {
         path: filePath,
         content,
@@ -222,7 +238,8 @@ function registerFileHandlers() {
     // Approve opened file path so it can be saved back without a new dialog.
     // Scoped to the requesting window to prevent cross-window reuse.
     approveDialogPath(event.sender.id, path.resolve(filePath));
-    const content = await fs.readFile(filePath, "utf-8");
+    // Strip UTF-8 BOM if present — fs.readFile does not strip it (#1842)
+    const content = stripBom(await fs.readFile(filePath, "utf-8"));
     return { path: filePath, content };
   });
 
@@ -344,7 +361,8 @@ function registerFileHandlers() {
         } else {
           // Standalone file: approve path for future saves, scoped to the requesting window
           approveDialogPath(event.sender.id, path.resolve(filePath));
-          const content = await fs.readFile(filePath, "utf-8");
+          // Strip UTF-8 BOM if present — fs.readFile does not strip it (#1842)
+          const content = stripBom(await fs.readFile(filePath, "utf-8"));
           results.push({
             type: "standalone",
             path: filePath,
