@@ -21,11 +21,13 @@ import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import InfoTooltip from "./InfoTooltip";
 import IssueCard from "./IssueCard";
+import IgnoredCorrectionsDialog from "./IgnoredCorrectionsDialog";
 import {
   useLintingSettings,
   usePosHighlightSettings,
   usePowerSettings,
 } from "@/contexts/EditorSettingsContext";
+import { useIgnoredCorrectionsContext } from "@/contexts/IgnoredCorrectionsContext";
 
 import type { LintIssue, Severity } from "@/lib/linting";
 import type { SeverityFilter, EnrichedLintIssue } from "./types";
@@ -106,9 +108,11 @@ export default function CorrectionsPanel({
   const { lintingEnabled, lintingRuleConfigs, onLintingEnabledChange, onLintingRuleConfigChange } =
     useLintingSettings();
   const { powerSaveMode, onTemporarilyDisablePowerSave } = usePowerSettings();
+  const ignoredCorrections = useIgnoredCorrectionsContext();
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("category");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [showIgnoredDialog, setShowIgnoredDialog] = useState(false);
   const issueListRef = useRef<HTMLDivElement>(null);
 
   const filteredIssues = useMemo(() => {
@@ -568,7 +572,28 @@ export default function CorrectionsPanel({
           ) : (
             renderFlatList()
           )}
+
+          {/* Ignored corrections entry point */}
+          {ignoredCorrections && (
+            <div className="pt-3 text-center">
+              <button
+                type="button"
+                onClick={() => setShowIgnoredDialog(true)}
+                className="text-xs text-accent transition-colors hover:text-accent-hover hover:underline"
+              >
+                無視された指摘
+                {ignoredCorrections.items.length > 0 && `（${ignoredCorrections.items.length}件）`}
+              </button>
+            </div>
+          )}
         </>
+      )}
+
+      {ignoredCorrections && (
+        <IgnoredCorrectionsDialog
+          isOpen={showIgnoredDialog}
+          onClose={() => setShowIgnoredDialog(false)}
+        />
       )}
     </div>
   );

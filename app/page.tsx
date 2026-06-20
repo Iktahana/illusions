@@ -1104,12 +1104,16 @@ export default function EditorPage() {
   );
 
   // --- Ignored corrections hook ---
-  const { ignoredCorrections, ignoreCorrection, clearIgnoredCorrections } =
+  const { ignoredCorrections, ignoreCorrection, unignoreCorrection, clearIgnoredCorrections } =
     useIgnoredCorrections(editorMode);
 
   const ignoredCorrectionsContextValue = useMemo(
-    () => ({ clear: clearIgnoredCorrections }),
-    [clearIgnoredCorrections],
+    () => ({
+      items: ignoredCorrections,
+      clear: clearIgnoredCorrections,
+      unignore: unignoreCorrection,
+    }),
+    [ignoredCorrections, clearIgnoredCorrections, unignoreCorrection],
   );
 
   // Sync ignoredCorrections to ProseMirror plugin
