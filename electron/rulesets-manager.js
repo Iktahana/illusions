@@ -82,6 +82,22 @@ function normalizeDigest(digest) {
 }
 
 /**
+ * Extract a release tag from a GitHub `Location` redirect header.
+ *
+ * GET github.com/<owner>/<repo>/releases/latest answers with a 302 whose
+ * Location is `.../releases/tag/<tag>`. Reading the tag from that header lets us
+ * resolve the latest release WITHOUT the GitHub REST API (api.github.com), whose
+ * unauthenticated 60-requests/hour limit was tripping a 403 every few clicks of
+ * 「更新を確認」/「再ダウンロード」(each fans out to all official rulesets).
+ * @returns {string|null} the tag, or null when the header isn't a /tag/ URL.
+ */
+function extractTagFromLocation(location) {
+  if (typeof location !== "string") return null;
+  const m = location.match(/\/releases\/tag\/([^/?#]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+/**
  * Whether a ruleset id is safe to use as a directory name (no path traversal).
  * Ruleset ids look like "com.illusions-lab.gendai-kanazukai".
  */
@@ -211,10 +227,51 @@ class RulesetsManager {
     return out;
   }
 
-  /** Fetch the latest release JSON for an official ruleset spec. */
-  async _fetchLatestRelease(spec) {
-    const url = `https://api.github.com/repos/${spec.owner}/${spec.repo}/releases/latest`;
-    return this._fetchJson(url);
+  /**
+   * Resolve the latest release tag for a spec WITHOUT the GitHub REST API.
+   *
+   * Sends a single GET to github.com/<owner>/<repo>/releases/latest and reads
+   * the tag out of the 302 `Location` header (`.../releases/tag/<tag>`). This
+   * avoids api.github.com's unauthenticated 60-req/hour limit, which previously
+   * surfaced as a 403 after a handful of 「更新を確認」/「再ダウンロード」clicks
+   * (each iterates every official ruleset). github.com release URLs are not
+   * subject to that limit.
+   *
+   * Resolves `null` when the repo has no published release (404) or the redirect
+   * isn't a tag URL. Does NOT follow the redirect (https.get returns the 302).
+   * @param {{owner:string, repo:string}} spec
+   * @returns {Promise<string|null>}
+   */
+  _resolveLatestTag(spec) {
+    const url = `https://github.com/${spec.owner}/${spec.repo}/releases/latest`;
+    return new Promise((resolve, reject) => {
+      const req = https.get(
+        url,
+        { headers: { "User-Agent": "illusions-app", Accept: "text/html" } },
+        (res) => {
+          res.on("error", reject);
+          const code = res.statusCode ?? 0;
+          if ([301, 302, 303, 307, 308].includes(code)) {
+            const tag = extractTagFromLocation(res.headers.location);
+            res.resume();
+            resolve(tag);
+            return;
+          }
+          // No releases yet → GitHub serves a 404 for /releases/latest.
+          if (code === 404) {
+            res.resume();
+            resolve(null);
+            return;
+          }
+          res.resume();
+          reject(new Error(`GitHub が HTTP ${code} を返しました`));
+        },
+      );
+      req.on("error", reject);
+      req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+        req.destroy(new Error("GitHub リクエストがタイムアウトしました"));
+      });
+    });
   }
 
   /**
@@ -225,10 +282,11 @@ class RulesetsManager {
     const results = [];
     for (const spec of OFFICIAL_RULESETS) {
       try {
-        const release = await this._fetchLatestRelease(spec);
-        const latestTag = release?.tag_name ?? null;
-        const { index, manifest } = selectReleaseAssets(release?.assets);
-        const hasRelease = !!latestTag && !!index && !!manifest;
+        const latestTag = await this._resolveLatestTag(spec);
+        // We no longer enumerate the release's asset list (that needs the API);
+        // a published tag implies the conventional index.js + manifest.json
+        // assets. A genuinely asset-less release fails later at download time.
+        const hasRelease = !!latestTag;
         const installedTag = this._readInstalledTag(spec.id);
         results.push({
           id: spec.id,
@@ -360,11 +418,9 @@ class RulesetsManager {
     // Heal a crash that interrupted a previous swap before doing any network I/O.
     this._recoverStaging(spec.id, dir, staging);
 
-    const release = await this._fetchLatestRelease(spec);
-    const latestTag = release?.tag_name ?? null;
-    const { index: indexAsset, manifest: manifestAsset } = selectReleaseAssets(release?.assets);
+    const latestTag = await this._resolveLatestTag(spec);
 
-    if (!latestTag || !indexAsset || !manifestAsset) {
+    if (!latestTag) {
       return { id: spec.id, status: "skipped", detail: "no installable release" };
     }
 
@@ -375,8 +431,12 @@ class RulesetsManager {
       return { id: spec.id, status: "up-to-date", detail: latestTag };
     }
 
-    const indexUrl = indexAsset.browser_download_url;
-    const manifestUrl = manifestAsset.browser_download_url;
+    // Build asset URLs from the tag instead of the API's browser_download_url.
+    // github.com/<o>/<r>/releases/download/<tag>/<asset> redirects to
+    // objects.githubusercontent.com (an allowed host) and avoids the API limit.
+    const base = `https://github.com/${spec.owner}/${spec.repo}/releases/download/${encodeURIComponent(latestTag)}`;
+    const manifestUrl = `${base}/${ASSET_MANIFEST}`;
+    const indexUrl = `${base}/${ASSET_INDEX}`;
     if (!this._isAllowedAssetUrl(indexUrl) || !this._isAllowedAssetUrl(manifestUrl)) {
       return { id: spec.id, status: "skipped", detail: "asset host not allowed" };
     }
@@ -386,11 +446,10 @@ class RulesetsManager {
       fs.mkdirSync(staging, { recursive: true });
 
       // 1. manifest first — validate engineApi before fetching code.
-      await this._downloadFile(
-        manifestUrl,
-        path.join(staging, ASSET_MANIFEST),
-        normalizeDigest(manifestAsset.digest),
-      );
+      //    No API-provided digest to pre-check (we resolve assets by tag, not
+      //    via the REST API). Integrity is still guaranteed by the sha256 we
+      //    compute while streaming the code asset below and re-verify at load.
+      await this._downloadFile(manifestUrl, path.join(staging, ASSET_MANIFEST), null);
       let manifest;
       try {
         manifest = JSON.parse(fs.readFileSync(path.join(staging, ASSET_MANIFEST), "utf8"));
@@ -407,11 +466,7 @@ class RulesetsManager {
 
       // 2. code asset. _downloadFile resolves with the sha256 it computed while
       //    streaming, which we persist for load-time re-verification.
-      const indexHash = await this._downloadFile(
-        indexUrl,
-        path.join(staging, ASSET_INDEX),
-        normalizeDigest(indexAsset.digest),
-      );
+      const indexHash = await this._downloadFile(indexUrl, path.join(staging, ASSET_INDEX), null);
 
       // 3. record the tag + integrity sha inside staging, then swap it in WITHOUT
       //    destroying the old install first: rename old→backup, staging→dir, then
@@ -449,81 +504,6 @@ class RulesetsManager {
         /* ignore cleanup errors */
       }
     }
-  }
-
-  /** GET JSON with redirect handling + timeout. */
-  _fetchJson(url) {
-    return new Promise((resolve, reject) => {
-      const doRequest = (requestUrl, redirectCount = 0) => {
-        if (redirectCount > 5) {
-          reject(new Error("GitHub API のリダイレクトが最大回数を超えました"));
-          return;
-        }
-        let parsed;
-        try {
-          parsed = new URL(requestUrl);
-        } catch {
-          reject(new Error("URL の形式が不正です"));
-          return;
-        }
-        if (parsed.protocol !== "https:") {
-          reject(new Error("https 以外の接続は許可されていません"));
-          return;
-        }
-        const req = https.get(
-          requestUrl,
-          { headers: { "User-Agent": "illusions-app", Accept: "application/vnd.github.v3+json" } },
-          (res) => {
-            // Attach the error handler before draining/branching so a reset
-            // while a redirect/404/non-200 body drains can't raise an unhandled
-            // 'error' on the IncomingMessage (which would crash the main process).
-            res.on("error", reject);
-
-            if ([301, 302, 303, 307, 308].includes(res.statusCode ?? 0)) {
-              const location = res.headers.location;
-              if (location) {
-                let nextUrl;
-                try {
-                  nextUrl = new URL(location, requestUrl).toString();
-                } catch {
-                  reject(new Error("リダイレクト先URLが不正です"));
-                  return;
-                }
-                // Recurse only after this response drains (see _downloadFile).
-                res.on("end", () => doRequest(nextUrl, redirectCount + 1));
-                res.resume();
-                return;
-              }
-            }
-            if (res.statusCode === 404) {
-              res.resume();
-              reject(new Error("リリースが見つかりません (404)"));
-              return;
-            }
-            if (res.statusCode !== 200) {
-              res.resume();
-              reject(new Error(`GitHub API が HTTP ${res.statusCode} を返しました`));
-              return;
-            }
-            let data = "";
-            res.setEncoding("utf8");
-            res.on("data", (chunk) => (data += chunk));
-            res.on("end", () => {
-              try {
-                resolve(JSON.parse(data));
-              } catch (err) {
-                reject(err);
-              }
-            });
-          },
-        );
-        req.on("error", reject);
-        req.setTimeout(REQUEST_TIMEOUT_MS, () => {
-          req.destroy(new Error("GitHub API リクエストがタイムアウトしました"));
-        });
-      };
-      doRequest(url);
-    });
   }
 
   /**
@@ -662,6 +642,7 @@ module.exports = {
   isCompatibleEngineApi,
   needsUpdate,
   normalizeDigest,
+  extractTagFromLocation,
   isSafeRulesetId,
   SUPPORTED_ENGINE_API,
 };

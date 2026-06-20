@@ -13,6 +13,7 @@ const {
   isCompatibleEngineApi,
   needsUpdate,
   normalizeDigest,
+  extractTagFromLocation,
   isSafeRulesetId,
   SUPPORTED_ENGINE_API,
 } = require("../rulesets-manager") as {
@@ -20,6 +21,7 @@ const {
   isCompatibleEngineApi: (m: unknown) => boolean;
   needsUpdate: (installed: string | null, latest: string | null) => boolean;
   normalizeDigest: (d: unknown) => string | null;
+  extractTagFromLocation: (location: unknown) => string | null;
   isSafeRulesetId: (id: unknown) => boolean;
   SUPPORTED_ENGINE_API: number;
 };
@@ -98,6 +100,28 @@ describe("normalizeDigest", () => {
     expect(normalizeDigest(undefined)).toBeNull();
     expect(normalizeDigest(123)).toBeNull();
     expect(normalizeDigest("sha256:")).toBeNull();
+  });
+});
+
+describe("extractTagFromLocation", () => {
+  it("reads the tag from a github releases/latest 302 Location", () => {
+    expect(
+      extractTagFromLocation(
+        "https://github.com/illusions-lab/illusions-ruleset-gendai-kanazukai/releases/tag/v0.3.0",
+      ),
+    ).toBe("v0.3.0");
+  });
+
+  it("handles relative locations and percent-encoded tags", () => {
+    expect(extractTagFromLocation("/owner/repo/releases/tag/v1.2.3")).toBe("v1.2.3");
+    expect(extractTagFromLocation("/o/r/releases/tag/v1%2E0%2E0?x=1")).toBe("v1.0.0");
+  });
+
+  it("returns null for non-tag locations or non-strings", () => {
+    expect(extractTagFromLocation("https://github.com/o/r/releases")).toBeNull();
+    expect(extractTagFromLocation(undefined)).toBeNull();
+    expect(extractTagFromLocation(null)).toBeNull();
+    expect(extractTagFromLocation(123)).toBeNull();
   });
 });
 
