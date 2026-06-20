@@ -57,7 +57,7 @@ export const LEGACY_PACKAGE_IMPORTS = new Map([
   ],
   [
     "packages/milkdown-plugin-japanese-novel/linting-plugin/worker/__tests__/proxy.test.ts",
-    new Set(["@/lib/linting/types"]),
+    new Set(["@/lib/linting/types", "@/lib/nlp-client/types"]),
   ],
   [
     "packages/milkdown-plugin-japanese-novel/linting-plugin/worker/linting.worker.ts",

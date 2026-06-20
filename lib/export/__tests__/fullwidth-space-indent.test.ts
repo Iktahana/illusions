@@ -10,11 +10,7 @@ import {
   toPdfExportSettings,
   toDocxExportSettings,
 } from "../export-settings";
-import {
-  fullwidthIndentCount,
-  fullwidthIndentPrefix,
-  FULLWIDTH_SPACE,
-} from "../fullwidth-indent";
+import { fullwidthIndentCount, fullwidthIndentPrefix, FULLWIDTH_SPACE } from "../fullwidth-indent";
 
 const U3000 = "　";
 
@@ -98,6 +94,24 @@ describe("TXT export — fullwidth-space 字下げ", () => {
     });
     expect(out).toBe(`${U3000}漢字（かんじ）`);
   });
+
+  it("is a no-op when indentCount is 0 even if enabled (defensive)", () => {
+    const out = mdiToPlainText("本文", ".mdi", {
+      fullwidthSpaceIndent: true,
+      indentCount: 0,
+    });
+    expect(out).toBe("本文");
+  });
+
+  it("prefixes every flattened content line uniformly (headings included)", () => {
+    // TXT is flattened, so a former heading line is indistinguishable from body
+    // and receives the same 字下げ — this documents that intended behavior.
+    const out = mdiToPlainText("# 章題\n\n本文", ".mdi", {
+      fullwidthSpaceIndent: true,
+      indentCount: 1,
+    });
+    expect(out).toBe(`${U3000}章題\n${U3000}本文`);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -130,16 +144,43 @@ describe("PDF export — fullwidth-space injection into <p>", () => {
     expect(mdiToHtml("A", { bodyOnly: true, fullwidthSpaceIndentCount: 0 })).toContain("<p>A</p>");
     expect(mdiToHtml("A", { bodyOnly: true })).toContain("<p>A</p>");
   });
+
+  it("does not prefix headings (only <p>)", () => {
+    const html = mdiToHtml("# 章題\n\n本文", { bodyOnly: true, fullwidthSpaceIndentCount: 1 });
+    expect(html).toContain(`<p>${U3000}本文</p>`);
+    expect(html).toMatch(/<h1[^>]*>章題<\/h1>/);
+    expect(html).not.toContain(`>${U3000}章題`);
+  });
+
+  it("places the prefix before inline markup", () => {
+    const html = mdiToHtml("**強調**", { bodyOnly: true, fullwidthSpaceIndentCount: 1 });
+    expect(html).toContain(`<p>${U3000}<strong>強調</strong></p>`);
+  });
+
+  it("combined: full-width injection + suppressed CSS text-indent (no double indent)", () => {
+    // Mirrors what pdf-exporter/web-print-preview emit when the toggle is on:
+    // textIndentEm forced to 0 and the literal spaces injected instead.
+    const html = mdiToHtml("本文", {
+      typesetting: { textIndentEm: 0, pageSize: "A4", landscape: false },
+      fullwidthSpaceIndentCount: 1,
+    });
+    expect(html).toContain(`<p>${U3000}本文</p>`);
+    expect(html).not.toContain("text-indent");
+  });
 });
 
 // ---------------------------------------------------------------------------
 // DOCX export
 // ---------------------------------------------------------------------------
 
-async function docxDocumentXml(content: string, fullwidthSpaceIndent: boolean): Promise<string> {
+async function docxDocumentXml(
+  content: string,
+  fullwidthSpaceIndent: boolean,
+  textIndent = 1,
+): Promise<string> {
   const blob = await generateDocxBlob(content, {
     metadata: { title: "t", language: "ja" },
-    settings: { ...DEFAULT_DOCX_SETTINGS, textIndent: 1, fullwidthSpaceIndent },
+    settings: { ...DEFAULT_DOCX_SETTINGS, textIndent, fullwidthSpaceIndent },
     fileType: ".mdi",
   });
   const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -181,5 +222,35 @@ describe("DOCX export — fullwidth-space 字下げ", () => {
     // 1em at 12pt = 240 twips
     expect(xml).toContain('w:firstLine="240"');
     expect(xml).not.toContain(`${U3000}本文一`);
+  });
+
+  it("does not prefix headings (only body paragraphs)", async () => {
+    const xml = await docxDocumentXml("# 章題\n\n本文一", true);
+    expect(xml).toContain(`${U3000}本文一`);
+    // The heading text must not gain a leading full-width space.
+    expect(xml).toContain("章題");
+    expect(xml).not.toContain(`${U3000}章題`);
+  });
+
+  it("does not prefix [[blank]] paragraphs", async () => {
+    const xml = await docxDocumentXml("本文一\n\n[[blank]]\n\n本文二", true);
+    expect(xml).not.toContain(`${U3000}${U3000}`); // no doubled prefix from a stray blank
+    // The blank paragraph stays empty (no run text at all for it).
+    expect(xml).toContain(`${U3000}本文一`);
+    expect(xml).toContain(`${U3000}本文二`);
+  });
+
+  it("keeps the prefix before inline markup (bold)", async () => {
+    const xml = await docxDocumentXml("**強調**", true);
+    // The full-width space is emitted as its own leading run (<w:t>　</w:t>),
+    // immediately before the bold run (<w:b/> … 強調).
+    expect(xml).toContain(`<w:t xml:space="preserve">${U3000}</w:t>`);
+    expect(xml).toMatch(/<w:b\/>[\s\S]*強調/);
+  });
+
+  it("toggle on with 0 indent: no prefix and firstLine zeroed (replace semantics)", async () => {
+    const xml = await docxDocumentXml("本文一", true, 0);
+    expect(xml).not.toContain(`${U3000}本文一`);
+    expect(xml).toContain('w:firstLine="0"');
   });
 });

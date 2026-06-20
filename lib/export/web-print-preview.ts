@@ -53,7 +53,7 @@ export async function openWebPrintPreview(
         fontFamily: settings.fontFamily, // Already a CSS string — no reverse lookup
         fontSizeMm,
         lineHeightRatio,
-        textIndentEm: fullwidthSpaceCount > 0 ? 0 : settings.textIndent,
+        textIndentEm: settings.fullwidthSpaceIndent ? 0 : settings.textIndent,
         margins: settings.margins,
         pageSize: settings.pageSize,
         landscape: settings.landscape,

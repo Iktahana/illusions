@@ -673,6 +673,9 @@ export default function EditorPage() {
   const handleRequestTxtExportOptions = useCallback(
     (format: "txt" | "txt-ruby"): Promise<TxtIndentOptions | null> =>
       new Promise<TxtIndentOptions | null>((resolve) => {
+        // If a previous request is still pending (e.g. the dialog was re-opened
+        // before being answered), cancel it so its awaiting export does not hang.
+        txtOptionsResolverRef.current?.(null);
         txtOptionsResolverRef.current = resolve;
         setTxtDialogFormat(format);
       }),

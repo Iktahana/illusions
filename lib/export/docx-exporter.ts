@@ -315,7 +315,11 @@ function createParagraph(
     ? fullwidthIndentCount(settings.textIndent)
     : 0;
   const effectiveText = fullwidthCount > 0 ? fullwidthIndentPrefix(fullwidthCount) + text : text;
-  const firstLineTwips = fullwidthCount > 0 ? 0 : emToTwips(settings.textIndent, settings.fontSize);
+  // "Replace" semantics: the toggle always suppresses the Word firstLine indent
+  // (even if the count rounds to 0), so the two mechanisms never stack.
+  const firstLineTwips = settings.fullwidthSpaceIndent
+    ? 0
+    : emToTwips(settings.textIndent, settings.fontSize);
   return new Paragraph({
     spacing: { before: 0, after: 120 },
     indent: { firstLine: firstLineTwips },
