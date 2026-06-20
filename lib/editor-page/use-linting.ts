@@ -10,6 +10,7 @@ import {
   RuleRunnerProxy,
   type RuleRunnerLike,
 } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import { syncLoadedRulesets, subscribeRulesetChanges } from "@/lib/linting/external-ruleset-loader";
 
 export interface UseLintingResult {
   /** May be `null` until the worker has been spun up after mount. */
@@ -37,7 +38,10 @@ export function useLinting(
   // Reserved for future throttling / mode-aware logic; kept in the
   // signature so callers don't have to be reworked when wired up.
   _powerSaveMode: boolean = false,
-  correctionGuidelines?: GuidelineId[],
+  // Guideline-based rule filtering is retired; rule application is governed
+  // entirely by per-rule enabled config + correction-mode presets. Kept in the
+  // signature for call-site compatibility.
+  _correctionGuidelines?: GuidelineId[],
   _correctionMode?: CorrectionModeId,
 ): UseLintingResult {
   const [ruleRunner, setRuleRunner] = useState<RuleRunnerLike | null>(null);
@@ -52,7 +56,21 @@ export function useLinting(
     const proxy = new RuleRunnerProxy();
     proxy.setGuidelineMap(RULE_GUIDELINE_MAP);
     setRuleRunner(proxy);
+
+    // Load any already-installed external rulesets and subscribe to changes.
+    // Both are no-ops on Web (no window.electronAPI.rulesets).
+    let unsubscribeChanges: (() => void) | null = null;
+    syncLoadedRulesets(proxy)
+      .then(() => {
+        // Subscribe AFTER initial sync so we don't double-load during startup.
+        unsubscribeChanges = subscribeRulesetChanges(proxy);
+      })
+      .catch((err) => {
+        console.error("[useLinting] external ruleset sync failed:", err);
+      });
+
     return () => {
+      unsubscribeChanges?.();
       // Don't `setRuleRunner(null)` here — StrictMode's mount → cleanup
       // → mount cycle would briefly nullify the runner between the two
       // mounts, causing dependent effects to re-run with `null` for no
@@ -61,20 +79,6 @@ export function useLinting(
       proxy.dispose();
     };
   }, []);
-
-  // Sync rule configs from settings to the runner
-  useEffect(() => {
-    if (!ruleRunner) return;
-
-    // Apply user overrides from settings
-    for (const [ruleId, config] of Object.entries(lintingRuleConfigs)) {
-      ruleRunner.setConfig(ruleId, {
-        enabled: config.enabled,
-        severity: config.severity,
-        skipDialogue: config.skipDialogue,
-      });
-    }
-  }, [ruleRunner, lintingRuleConfigs]);
 
   const handleLintIssuesUpdated = useCallback(
     (issues: LintIssue[]) => {
@@ -94,22 +98,13 @@ export function useLinting(
     );
   }, []);
 
-  // Sync active guidelines to RuleRunner and trigger re-lint when guidelines change
+  // Disable guideline-based filtering entirely (null = no filter). The legacy
+  // "適用ガイドライン" UI has been removed; rule application is now driven solely
+  // by per-rule enabled config and correction-mode presets.
   useEffect(() => {
     if (!ruleRunner) return;
-    ruleRunner.setActiveGuidelines(correctionGuidelines ?? null);
-
-    // Trigger re-lint when guidelines change
-    if (editorViewInstance && lintingEnabled) {
-      import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
-        .then(({ updateLintingSettings }) => {
-          updateLintingSettings(editorViewInstance, { ruleRunner }, "guideline-change");
-        })
-        .catch((err) => {
-          console.error("[useLinting] Failed to sync guidelines:", err);
-        });
-    }
-  }, [ruleRunner, correctionGuidelines, editorViewInstance, lintingEnabled]);
+    ruleRunner.setActiveGuidelines(null);
+  }, [ruleRunner]);
 
   // Clear issues + spinner when linting is disabled. `isLinting` must be
   // reset here because `handleLintIssuesUpdated` short-circuits while
@@ -145,6 +140,33 @@ export function useLinting(
         setIsLinting(false);
       });
   }, [editorViewInstance, lintingEnabled, ruleRunner]);
+
+  // Sync rule configs from settings to the runner, then re-run linting so the
+  // displayed issues reflect the new enabled/severity immediately.
+  //
+  // `setConfig()` mutates the runner in place (its reference is stable), so the
+  // editor's decoration effect — keyed only on the runner reference — never
+  // re-fires on a config change. Without the explicit `refreshLinting()` here,
+  // disabling a rule or a whole guideline group (the inspector's EyeOff button)
+  // would update the config but leave the now-stale issues on screen until the
+  // next document edit, making the toggle look broken.
+  useEffect(() => {
+    if (!ruleRunner) return;
+
+    // Apply user overrides from settings
+    for (const [ruleId, config] of Object.entries(lintingRuleConfigs)) {
+      ruleRunner.setConfig(ruleId, {
+        enabled: config.enabled,
+        severity: config.severity,
+        skipDialogue: config.skipDialogue,
+      });
+    }
+
+    // SET_CONFIG messages are dispatched synchronously above; refreshLinting's
+    // re-lint request is posted after a dynamic import (a microtask later), so
+    // the worker always sees the new config before it re-lints.
+    refreshLinting();
+  }, [ruleRunner, lintingRuleConfigs, refreshLinting]);
 
   return {
     ruleRunner,

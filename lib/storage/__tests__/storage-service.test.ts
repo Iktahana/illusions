@@ -22,7 +22,7 @@ vi.mock("@/lib/storage/storage-types", async (importOriginal) => {
 });
 
 // Mock web-storage to avoid Dexie/IndexedDB dependency
-vi.mock("@/lib/storage/web-storage", () => {
+vi.mock("@/platform/browser/storage", () => {
   class MockWebStorageProvider {
     _provider = "web";
     initialize = vi.fn();
@@ -31,7 +31,7 @@ vi.mock("@/lib/storage/web-storage", () => {
 });
 
 // Mock electron-storage to avoid window.electronAPI dependency
-vi.mock("@/lib/storage/electron-storage", () => {
+vi.mock("@/platform/electron-renderer/storage", () => {
   class MockElectronStorageProvider {
     _provider = "electron";
     initialize = vi.fn();

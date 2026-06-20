@@ -1,0 +1,3 @@
+# pre-commit の lint-staged は import boundary を見ないため、
+# push 前にここで boundary 違反を捕捉する（#1807 の CI すり抜け対策）
+npm run check:boundaries

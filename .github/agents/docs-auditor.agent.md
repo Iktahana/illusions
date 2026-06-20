@@ -104,8 +104,8 @@ Key source files that documentation explicitly references. If these do not exist
 
 - `lib/storage/storage-service.ts`
 - `lib/storage/storage-types.ts`
-- `lib/storage/electron-storage.ts`
-- `lib/storage/web-storage.ts`
+- `platform/electron-renderer/storage.ts`
+- `platform/browser/storage.ts`
 - `lib/vfs/index.ts`
 - `lib/linting/rule-runner.ts`
 - `lib/linting/types.ts`

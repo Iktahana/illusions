@@ -28,10 +28,10 @@ await storage.initialize();
 この factory は実行環境を見て provider を切り替えます。
 
 - Web
-  - [`lib/storage/web-storage.ts`](../../lib/storage/web-storage.ts)
+  - [`platform/browser/storage.ts`](../../platform/browser/storage.ts)
   - IndexedDB / Dexie
 - Electron
-  - [`lib/storage/electron-storage.ts`](../../lib/storage/electron-storage.ts)
+  - [`platform/electron-renderer/storage.ts`](../../platform/electron-renderer/storage.ts)
   - preload bridge + IPC
   - main process 側は [`electron/ipc/storage-ipc.js`](../../electron/ipc/storage-ipc.js)
   - 実ストアは [`lib/storage/electron-storage-manager.ts`](../../lib/storage/electron-storage-manager.ts)
@@ -88,7 +88,7 @@ await storage.initialize();
 
 ## Web 実装
 
-Web は [`web-storage.ts`](../../lib/storage/web-storage.ts) の `WebStorageProvider` が担当します。
+Web は [`platform/browser/storage.ts`](../../platform/browser/storage.ts) の `WebStorageProvider` が担当します。
 
 現行実装の事実:
 
@@ -105,7 +105,7 @@ Web は [`web-storage.ts`](../../lib/storage/web-storage.ts) の `WebStorageProv
 
 ## Electron 実装
 
-Electron は [`electron-storage.ts`](../../lib/storage/electron-storage.ts) の `ElectronStorageProvider` が担当します。
+Electron は [`platform/electron-renderer/storage.ts`](../../platform/electron-renderer/storage.ts) の `ElectronStorageProvider` が担当します。
 
 現行実装の事実:
 

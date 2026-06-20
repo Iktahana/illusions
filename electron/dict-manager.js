@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * DictManager — Electron main process dictionary manager.
  *

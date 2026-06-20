@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getIgnoredCorrectionsService } from "@/lib/services/ignored-corrections-service";
 import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
-import { hashString } from "@/lib/utils/hash-string";
+import { hashString } from "@/shared/lib/hash-string";
 import type { EditorMode, IgnoredCorrection } from "@/lib/project/project-types";
 
 export interface UseIgnoredCorrectionsResult {
@@ -19,6 +19,11 @@ export interface UseIgnoredCorrectionsResult {
   ignoreCorrection: (ruleId: string, text: string, paragraphText?: string) => void;
   /** Remove an ignored correction */
   unignoreCorrection: (ruleId: string, text: string, context?: string) => void;
+  /**
+   * Clear ALL ignored corrections for the current editor mode.
+   * Project mode → the current project; standalone mode → every file.
+   */
+  clearIgnoredCorrections: () => Promise<void>;
   /** Check if a given (ruleId, text, paragraphText) combination is ignored */
   isIgnored: (ruleId: string, text: string, paragraphText?: string) => boolean;
   /** Compute a paragraph context hash */
@@ -33,10 +38,19 @@ export interface UseIgnoredCorrectionsResult {
 export function useIgnoredCorrections(editorMode: EditorMode): UseIgnoredCorrectionsResult {
   const [ignoredCorrections, setIgnoredCorrections] = useState<IgnoredCorrection[]>([]);
   const loadedModeRef = useRef<string | null>(null);
+  // Bumped on every local mutation (ignore / unignore / clear). The initial
+  // load captures this value and discards its (potentially stale) result if a
+  // mutation happened while it was in flight — otherwise a slow VFS read (e.g.
+  // Google Drive) can resolve AFTER an optimistic ignore and clobber the
+  // freshly-ignored entry back to the on-disk snapshot, making the item vanish
+  // from both the editor and the "無視された指摘" list.
+  const mutationVersionRef = useRef(0);
 
   // Load on mount or mode change
   useEffect(() => {
     let cancelled = false;
+    const versionAtLoad = mutationVersionRef.current;
+    const isStale = (): boolean => cancelled || versionAtLoad !== mutationVersionRef.current;
 
     const modeKey = editorMode
       ? editorMode.type === "project"
@@ -59,21 +73,21 @@ export function useIgnoredCorrections(editorMode: EditorMode): UseIgnoredCorrect
       service
         .loadIgnoredCorrections()
         .then((data) => {
-          if (!cancelled) setIgnoredCorrections(data);
+          if (!isStale()) setIgnoredCorrections(data);
         })
         .catch((err) => {
           console.warn("[useIgnoredCorrections] Failed to load:", err);
-          if (!cancelled) setIgnoredCorrections([]);
+          if (!isStale()) setIgnoredCorrections([]);
         });
     } else if (isStandaloneMode(editorMode)) {
       service
         .loadIgnoredCorrectionsStandalone(editorMode.fileName)
         .then((data) => {
-          if (!cancelled) setIgnoredCorrections(data);
+          if (!isStale()) setIgnoredCorrections(data);
         })
         .catch((err) => {
           console.warn("[useIgnoredCorrections] Failed to load standalone:", err);
-          if (!cancelled) setIgnoredCorrections([]);
+          if (!isStale()) setIgnoredCorrections([]);
         });
     }
 
@@ -91,6 +105,8 @@ export function useIgnoredCorrections(editorMode: EditorMode): UseIgnoredCorrect
     (ruleId: string, text: string, paragraphText?: string) => {
       const context = paragraphText ? hashString(paragraphText) : undefined;
       const service = getIgnoredCorrectionsService();
+      // Invalidate any in-flight initial load so it can't clobber this mutation.
+      mutationVersionRef.current += 1;
 
       if (editorMode && isProjectMode(editorMode)) {
         // Optimistic update: update UI immediately, then persist to VFS in background
@@ -126,6 +142,8 @@ export function useIgnoredCorrections(editorMode: EditorMode): UseIgnoredCorrect
   const unignoreCorrection = useCallback(
     (ruleId: string, text: string, context?: string) => {
       const service = getIgnoredCorrectionsService();
+      // Invalidate any in-flight initial load so it can't clobber this mutation.
+      mutationVersionRef.current += 1;
 
       if (editorMode && isProjectMode(editorMode)) {
         service
@@ -143,6 +161,21 @@ export function useIgnoredCorrections(editorMode: EditorMode): UseIgnoredCorrect
     },
     [editorMode],
   );
+
+  const clearIgnoredCorrections = useCallback(async (): Promise<void> => {
+    const service = getIgnoredCorrectionsService();
+    // Invalidate any in-flight initial load so it can't clobber the cleared state.
+    mutationVersionRef.current += 1;
+
+    if (editorMode && isProjectMode(editorMode)) {
+      await service.clearIgnoredCorrections();
+      setIgnoredCorrections([]);
+    } else if (editorMode && isStandaloneMode(editorMode)) {
+      // Standalone clears across ALL files, not just the current one.
+      await service.clearAllIgnoredCorrectionsStandalone();
+      setIgnoredCorrections([]);
+    }
+  }, [editorMode]);
 
   const isIgnored = useCallback(
     (ruleId: string, text: string, paragraphText?: string): boolean => {
@@ -162,6 +195,7 @@ export function useIgnoredCorrections(editorMode: EditorMode): UseIgnoredCorrect
     ignoredCorrections,
     ignoreCorrection,
     unignoreCorrection,
+    clearIgnoredCorrections,
     isIgnored,
     computeContextHash,
   };

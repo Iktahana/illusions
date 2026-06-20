@@ -7,8 +7,8 @@
  */
 
 import type { INlpClient } from "./types";
-import { ElectronNlpClient } from "./electron-nlp-client";
-import { WebNlpClient } from "./web-nlp-client";
+import { WebNlpClient } from "@/platform/browser/nlp-client";
+import { ElectronNlpClient } from "@/platform/electron-renderer/nlp-client";
 
 let cachedClient: INlpClient | null = null;
 

@@ -25,6 +25,7 @@ const {
   NLP_CHANNELS,
   PTY_CHANNELS,
   UPDATE_CHANNELS,
+  RULESETS_CHANNELS,
 } = require("./lib/ipc-channels");
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -128,6 +129,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     setItem: invokeChannel(STORAGE_CHANNELS.invoke.setItem, { arity: 2 }),
     getItem: invokeChannel(STORAGE_CHANNELS.invoke.getItem, { arity: 1 }),
     removeItem: invokeChannel(STORAGE_CHANNELS.invoke.removeItem, { arity: 1 }),
+    getKeysByPrefix: invokeChannel(STORAGE_CHANNELS.invoke.getKeysByPrefix, { arity: 1 }),
   },
   vfs: {
     openDirectory: invokeChannel(VFS_CHANNELS.invoke.openDirectory, { arity: 0 }),
@@ -197,6 +199,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
     download: invokeChannel(DICT_CHANNELS.invoke.download, { arity: 0 }),
     onDownloadProgress: eventChannel(DICT_CHANNELS.event.downloadProgress),
     onUpdateAvailable: eventChannel(DICT_CHANNELS.event.updateAvailable),
+  },
+  rulesets: {
+    /** List installed (downloaded) official/external rulesets on disk. */
+    listInstalled: invokeChannel(RULESETS_CHANNELS.invoke.listInstalled, { arity: 0 }),
+    /** Download/update every official ruleset that is missing or out of date. */
+    sync: invokeChannel(RULESETS_CHANNELS.invoke.sync, { arity: 0 }),
+    /** Check latest release tags vs installed, without downloading. */
+    checkUpdate: invokeChannel(RULESETS_CHANNELS.invoke.checkUpdate, { arity: 0 }),
+    /** Read a verified ruleset module (code + manifest) for the external loader. */
+    readModule: invokeChannel(RULESETS_CHANNELS.invoke.readModule, { arity: 1 }),
+    /** Uninstall a third-party ruleset (official/built-in are refused in main). */
+    uninstall: invokeChannel(RULESETS_CHANNELS.invoke.uninstall, { arity: 1 }),
+    /** Per-ruleset sync progress pushes. */
+    onSyncProgress: eventChannel(RULESETS_CHANNELS.event.syncProgress),
+    /** Announcement that installed rulesets changed (installed/updated/uninstalled). */
+    onChanged: eventChannel(RULESETS_CHANNELS.event.changed),
   },
   pty: {
     /** Spawn a new PTY session. Returns { sessionId } or { error }. */

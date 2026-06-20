@@ -19,7 +19,7 @@
 
 import { getProjectFileService } from "./project-file-service";
 import { getStorageService } from "../storage/storage-service";
-import { AsyncMutex } from "../utils/async-mutex";
+import { AsyncMutex } from "@/shared/lib/async-mutex";
 import type { VirtualFileSystem, VFSFileHandle } from "../vfs/types";
 import type { IStorageService } from "../storage/storage-types";
 
@@ -196,6 +196,15 @@ export class PersistedJsonListStore<TItem> {
   async saveStandalone(filePath: string, items: TItem[]): Promise<void> {
     const key = this.buildStandaloneKey(filePath);
     await this.storage.setItem(key, JSON.stringify(this.config.toEnvelope(items)));
+  }
+
+  /**
+   * Remove every stored standalone list sharing this store's key prefix
+   * (i.e. across ALL files). Used for a global reset.
+   */
+  async clearAllStandalone(): Promise<void> {
+    const keys = await this.storage.getKeysByPrefix(this.config.standaloneKeyPrefix);
+    await Promise.all(keys.map((key) => this.storage.removeItem(key)));
   }
 
   /**

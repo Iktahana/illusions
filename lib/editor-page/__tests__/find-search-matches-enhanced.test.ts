@@ -22,10 +22,12 @@ const schema = new Schema({
       content: "inline*",
       toDOM: () => ["p", 0] as [string, number],
     },
+    // Production schema: content:"inline*" (textblock), NOT atom.
+    // Matches packages/milkdown-plugin-japanese-novel/nodes/blank-paragraph.ts.
     blankParagraph: {
       group: "block",
-      atom: true,
-      toDOM: () => ["p"],
+      content: "inline*",
+      toDOM: () => ["p", { class: "mdi-blank" }, 0] as [string, Record<string, string>, number],
     },
     text: { group: "inline" },
     hardbreak: {
@@ -34,6 +36,14 @@ const schema = new Schema({
       selectable: false,
       leafText: () => "\n",
       toDOM: () => ["br"],
+    },
+    // Milkdown preset-commonmark html inline atom (stores raw HTML including <!-- --> comments).
+    html: {
+      group: "inline",
+      inline: true,
+      atom: true,
+      attrs: { value: { default: "" } },
+      toDOM: () => ["span"] as [string],
     },
     ruby: atomNode({ base: { default: "" }, text: { default: "" } }, "ruby"),
     tcy: atomNode({ value: { default: "" } }, "span"),
@@ -115,6 +125,15 @@ describe("findSearchMatches enhanced search", () => {
     expect(expanded[0].to - expanded[0].from).toBe(1);
   });
 
+  it("equates IVS variant 髙 (U+9AD9) with 高 (U+9AD8) when normalizeVariants is on (#1821)", () => {
+    const source = doc(paragraph(schema.text("髙橋さんと高田さん")));
+
+    const matches = findSearchMatches(source, "高", { normalizeVariants: true });
+    expect(matches).toHaveLength(2);
+    expect(matches[0].text).toBe("髙");
+    expect(matches[1].text).toBe("高");
+  });
+
   it("searches ruby base and reading without making either directly replaceable", () => {
     const source = doc(
       paragraph(
@@ -150,6 +169,49 @@ describe("findSearchMatches enhanced search", () => {
     expect(findSearchMatches(source, "12", {})).toHaveLength(1);
     expect(findSearchMatches(source, "0.5em", {})).toEqual([]);
     expect(findSearchMatches(source, "blank", {})).toEqual([]);
+  });
+
+  it("does not count blankParagraph in paragraphNumber to match UI counter (#1823)", () => {
+    const source = doc(
+      paragraph(schema.text("段落A")),
+      schema.node("blankParagraph"),
+      paragraph(schema.text("段落B")),
+    );
+
+    // 「段落」は両段落にヒットするが、blankParagraph は段落番号を消費しない。
+    const matches = findSearchMatches(source, "段落", {});
+    expect(matches).toHaveLength(2);
+    expect(matches[0]).toMatchObject({ paragraphNumber: 1 });
+    expect(matches[1]).toMatchObject({ paragraphNumber: 2 });
+
+    // blankParagraph に検索語が存在しても段落番号は加算されない（空白行は番号なし）。
+    const source2 = doc(
+      paragraph(schema.text("前")),
+      schema.node("blankParagraph", null, [schema.text("blank内")]),
+      paragraph(schema.text("後")),
+    );
+    const matches2 = findSearchMatches(source2, "後", {});
+    expect(matches2[0]).toMatchObject({ paragraphNumber: 2 });
+  });
+
+  it("includes html comment node content when excludeComments is false (#1822)", () => {
+    const source = doc(
+      paragraph(
+        schema.text("前"),
+        schema.node("html", { value: "<!-- 注釈 -->" }),
+        schema.text("後"),
+      ),
+    );
+
+    // デフォルト（excludeComments: true）ではコメント内にマッチしない
+    expect(findSearchMatches(source, "注釈", {})).toHaveLength(0);
+    // excludeComments: false でコメント内もマッチする
+    const matches = findSearchMatches(source, "注釈", { excludeComments: false });
+    expect(matches).toMatchObject([{ source: "comment", replaceable: false }]);
+    // 通常の html ノード（コメントでない）はコメント扱いしない
+    expect(findSearchMatches(source, "前", { excludeComments: false })).toMatchObject([
+      { source: "text", replaceable: true },
+    ]);
   });
 
   it("finds text spanning an atom with exact ProseMirror bounds and blocks replacement", () => {

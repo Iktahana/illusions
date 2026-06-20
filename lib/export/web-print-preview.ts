@@ -1,5 +1,6 @@
 import { mdiToHtml } from "./mdi-to-html";
 import { calculateTypesetting } from "./pdf-export-settings";
+import { fullwidthIndentCount } from "./fullwidth-indent";
 
 import type { ExportMetadata } from "./types";
 import type { PdfExportSettings } from "./pdf-export-settings";
@@ -40,6 +41,11 @@ export async function openWebPrintPreview(
       settings.verticalWriting,
       settings.landscape,
     );
+    // Full-width-space 字下げ: literal U+3000 injected into paragraphs replaces
+    // the CSS text-indent (suppress it to avoid double indentation).
+    const fullwidthSpaceCount = settings.fullwidthSpaceIndent
+      ? fullwidthIndentCount(settings.textIndent)
+      : 0;
     const html = mdiToHtml(content, {
       metadata,
       verticalWriting: settings.verticalWriting,
@@ -47,12 +53,13 @@ export async function openWebPrintPreview(
         fontFamily: settings.fontFamily, // Already a CSS string — no reverse lookup
         fontSizeMm,
         lineHeightRatio,
-        textIndentEm: settings.textIndent,
+        textIndentEm: settings.fullwidthSpaceIndent ? 0 : settings.textIndent,
         margins: settings.margins,
         pageSize: settings.pageSize,
         landscape: settings.landscape,
       },
       fileType,
+      fullwidthSpaceIndentCount: fullwidthSpaceCount,
     });
 
     printWindow.document.open();

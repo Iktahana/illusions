@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Loader2 } from "lucide-react";
-import GlassDialog from "./GlassDialog";
+import GlassDialog from "@/shared/ui/GlassDialog";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { getDictAccess } from "@/lib/dict/dict-access";
 import { getDictService } from "@/lib/dict/dict-service";

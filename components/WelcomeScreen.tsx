@@ -15,7 +15,7 @@ import {
 import clsx from "clsx";
 import { useEffect, useState, useRef } from "react";
 import DesktopAppDownloadButton from "@/components/DesktopAppDownloadButton";
-import GlassDialog from "@/components/GlassDialog";
+import GlassDialog from "@/shared/ui/GlassDialog";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface RecentProject {

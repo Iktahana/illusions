@@ -13,7 +13,7 @@
  */
 
 import { getProjectFileService } from "@/lib/services/project-file-service";
-import { AsyncMutex } from "@/lib/utils/async-mutex";
+import { AsyncMutex } from "@/shared/lib/async-mutex";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
 import type { VFSDirectoryHandle } from "@/lib/vfs/types";

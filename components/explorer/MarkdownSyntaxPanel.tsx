@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import GlassDialog from "@/components/GlassDialog";
+import GlassDialog from "@/shared/ui/GlassDialog";
 
 interface MarkdownSyntaxPanelProps {
   onClose: () => void;

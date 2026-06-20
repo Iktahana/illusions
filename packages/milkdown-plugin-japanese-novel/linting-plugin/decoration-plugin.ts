@@ -13,8 +13,8 @@ import type { LintIssue, Severity } from "@/lib/linting";
 import type { INlpClient } from "@/lib/nlp-client/types";
 import type { Token } from "@/lib/nlp-client/types";
 import type { IgnoredCorrection } from "@/lib/project/project-types";
-import { LRUCache } from "@/lib/utils/lru-cache";
-import { hashString } from "@/lib/utils/hash-string";
+import { LRUCache } from "@/shared/lib/lru-cache";
+import { hashString } from "@/shared/lib/hash-string";
 import { getAtomOffset, collectParagraphs } from "../shared/paragraph-helpers";
 import type {
   LintingPluginState,

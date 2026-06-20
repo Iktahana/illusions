@@ -21,6 +21,7 @@ import {
   WorkerDisposedError,
   WorkerStaleError,
   type RuleRunnerLike,
+  type RulesetLoadWarning,
   type RunBatchRequest,
   type RunBatchResponse,
   type SerializedIssueMap,
@@ -36,6 +37,17 @@ interface PendingRequest {
   mainPerParagraph: Map<number, LintIssue[]>;
   /** Document-level issues already computed on the main thread (morph doc rules). */
   mainDocument: Map<number, LintIssue[]>;
+}
+
+export interface RulesetLoadResult {
+  ok: boolean;
+  ruleIds: string[];
+  warnings: RulesetLoadWarning[];
+}
+
+interface PendingRulesetRequest {
+  resolve: (result: RulesetLoadResult) => void;
+  reject: (err: Error) => void;
 }
 
 /**
@@ -55,9 +67,18 @@ export class RuleRunnerProxy implements RuleRunnerLike {
   /** True iff any worker-side rule is a `DocumentLintRule`. Computed at construction. */
   private readonly workerHasDocumentRules: boolean;
 
+  /**
+   * Whether the worker currently hosts at least one external morphological
+   * (L2) rule. Updated on every RULESET_LOADED event. When true, the proxy
+   * reports `hasMorphologicalRules()` as true (so paragraphs get tokenized)
+   * and forwards those tokens to the worker in RUN_BATCH.
+   */
+  private workerHasMorphRules = false;
+
   private nextCorrelationId = 1;
   private latestRequestedVersion = 0;
   private readonly pending = new Map<number, PendingRequest>();
+  private readonly pendingRulesets = new Map<number, PendingRulesetRequest>();
   private readonly preReadyBuffer: WorkerRequest[] = [];
 
   private ready = false;
@@ -146,7 +167,9 @@ export class RuleRunnerProxy implements RuleRunnerLike {
   }
 
   hasMorphologicalRules(): boolean {
-    return this.mainRunner.hasMorphologicalRules();
+    // Main-thread built-in morph rules OR external L2 rules hosted in the
+    // worker — either requires the decoration plugin to tokenize paragraphs.
+    return this.mainRunner.hasMorphologicalRules() || this.workerHasMorphRules;
   }
 
   hasDocumentRules(): boolean {
@@ -239,11 +262,52 @@ export class RuleRunnerProxy implements RuleRunnerLike {
       type: "RUN_BATCH",
       correlationId,
       version: req.version,
-      paragraphs: req.paragraphs.map((p) => ({ text: p.text, index: p.index })),
+      // Forward tokens only when the worker hosts external L2 rules; the
+      // common L1-only case keeps the structured-clone payload minimal.
+      paragraphs: this.workerHasMorphRules
+        ? req.paragraphs.map((p) => ({ text: p.text, index: p.index, tokens: p.tokens }))
+        : req.paragraphs.map((p) => ({ text: p.text, index: p.index })),
       mode: req.mode,
     });
 
     return workerResponse;
+  }
+
+  /**
+   * Load (or reload) an external ruleset into the worker.
+   * Resolves once the worker has acknowledged the load attempt.
+   * On success the worker has already rebuilt its runner with the new rules.
+   * On failure the worker's existing runner is left intact (failure isolation).
+   */
+  async loadRuleset(id: string, code: string): Promise<RulesetLoadResult> {
+    if (this.fatalError) throw this.fatalError;
+    if (this.disposed) throw new WorkerDisposedError();
+
+    const correlationId = this.nextId();
+    const result = new Promise<RulesetLoadResult>((resolve, reject) => {
+      this.pendingRulesets.set(correlationId, { resolve, reject });
+    });
+
+    this.send({ type: "LOAD_RULESET", correlationId, id, code });
+
+    return result;
+  }
+
+  /**
+   * Unload a previously-loaded external ruleset from the worker.
+   * The worker rebuilds the runner from legacy + remaining externals.
+   */
+  async unloadRuleset(id: string): Promise<RulesetLoadResult> {
+    if (this.fatalError) throw this.fatalError;
+    if (this.disposed) throw new WorkerDisposedError();
+
+    const correlationId = this.nextId();
+    const result = new Promise<RulesetLoadResult>((resolve, reject) => {
+      this.pendingRulesets.set(correlationId, { resolve, reject });
+    });
+
+    this.send({ type: "UNLOAD_RULESET", correlationId, id });
+    return result;
   }
 
   cancelInFlight(): void {
@@ -263,6 +327,10 @@ export class RuleRunnerProxy implements RuleRunnerLike {
       entry.reject(err);
     }
     this.pending.clear();
+    for (const entry of this.pendingRulesets.values()) {
+      entry.reject(err);
+    }
+    this.pendingRulesets.clear();
     this.preReadyBuffer.length = 0;
     if (!this.ready) {
       // Reject the readyPromise so any awaiter unwinds cleanly.
@@ -320,14 +388,34 @@ export class RuleRunnerProxy implements RuleRunnerLike {
         entry.resolve(merged);
         return;
       }
+      case "RULESET_LOADED": {
+        // Track whether the worker now hosts external morphological (L2)
+        // rules. This drives both `hasMorphologicalRules()` (so the
+        // decoration plugin tokenizes) and token forwarding in RUN_BATCH.
+        this.workerHasMorphRules = evt.hasMorphologicalRules;
+        const entry = this.pendingRulesets.get(evt.correlationId);
+        if (entry) {
+          this.pendingRulesets.delete(evt.correlationId);
+          entry.resolve({ ok: evt.ok, ruleIds: evt.ruleIds, warnings: evt.warnings });
+        }
+        return;
+      }
       case "ERROR": {
         const err = new Error(evt.error.message);
         err.name = evt.error.name;
         if (evt.correlationId !== undefined) {
-          const entry = this.pending.get(evt.correlationId);
-          if (entry) {
+          // Could be a batch request or a ruleset request.
+          const batchEntry = this.pending.get(evt.correlationId);
+          if (batchEntry) {
             this.pending.delete(evt.correlationId);
-            entry.reject(err);
+            batchEntry.reject(err);
+            return;
+          }
+          const rulesetEntry = this.pendingRulesets.get(evt.correlationId);
+          if (rulesetEntry) {
+            this.pendingRulesets.delete(evt.correlationId);
+            rulesetEntry.reject(err);
+            return;
           }
         } else {
           // Uncorrelated worker failure — treat as fatal. Reject every
@@ -363,6 +451,10 @@ export class RuleRunnerProxy implements RuleRunnerLike {
       entry.reject(err);
     }
     this.pending.clear();
+    for (const entry of this.pendingRulesets.values()) {
+      entry.reject(err);
+    }
+    this.pendingRulesets.clear();
     this.preReadyBuffer.length = 0;
     if (!this.ready) {
       this.rejectReady(err);

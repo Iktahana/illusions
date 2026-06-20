@@ -6,8 +6,8 @@
 
 import type { IStorageService } from "./storage-types";
 import { isElectronEnvironment } from "./storage-types";
-import WebStorageProvider from "./web-storage";
-import ElectronStorageProvider from "./electron-storage";
+import WebStorageProvider from "@/platform/browser/storage";
+import ElectronStorageProvider from "@/platform/electron-renderer/storage";
 
 let instance: IStorageService | null = null;
 

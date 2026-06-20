@@ -102,6 +102,13 @@ export interface RunBatchResponse {
  */
 export type SerializedIssueMap = Array<[number, LintIssue[]]>;
 
+/** A single warning emitted by the ruleset loader or registry. */
+export interface RulesetLoadWarning {
+  code: string;
+  messageJa: string;
+  detail?: string;
+}
+
 /** Worker → main events. */
 export type WorkerEvent =
   | { type: "READY" }
@@ -116,6 +123,24 @@ export type WorkerEvent =
       type: "ERROR";
       correlationId?: number;
       error: { name: string; message: string };
+    }
+  | {
+      type: "RULESET_LOADED";
+      correlationId: number;
+      id: string;
+      ok: boolean;
+      ruleIds: string[];
+      warnings: RulesetLoadWarning[];
+      /**
+       * Whether the worker's rebuilt runner now hosts at least one
+       * registered morphological (L2) rule. The proxy uses this to decide
+       * whether to (a) report `hasMorphologicalRules()` as true so the
+       * decoration plugin tokenizes paragraphs, and (b) forward those
+       * tokens to the worker in subsequent RUN_BATCH messages.
+       * Computed from registered rules regardless of enabled state, so
+       * tokens start flowing before the main thread sends SET_CONFIG.
+       */
+      hasMorphologicalRules: boolean;
     };
 
 /** Main → worker requests. */
@@ -140,8 +165,27 @@ export type WorkerRequest =
       type: "RUN_BATCH";
       correlationId: number;
       version: number;
-      paragraphs: ReadonlyArray<{ text: string; index: number }>;
+      /**
+       * `tokens` are present only when the worker hosts morphological (L2)
+       * rules (external rulesets). The proxy omits them otherwise to keep
+       * the structured-clone payload small for the common L1-only case.
+       */
+      paragraphs: ReadonlyArray<{ text: string; index: number; tokens?: ReadonlyArray<Token> }>;
       mode: BatchMode;
+    }
+  | {
+      /** Load (or reload) an external ruleset by injecting its ESM source. */
+      type: "LOAD_RULESET";
+      correlationId: number;
+      id: string;
+      /** Full ESM module source string (already sha256-verified by the main process). */
+      code: string;
+    }
+  | {
+      /** Unload a previously-loaded external ruleset and rebuild the runner. */
+      type: "UNLOAD_RULESET";
+      correlationId: number;
+      id: string;
     };
 
 // -------------------------------------------------------------------------

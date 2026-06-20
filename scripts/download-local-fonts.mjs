@@ -132,14 +132,12 @@ async function main() {
     throw new Error(`Generated ${path.relative(repoRoot, appCssPath)} does not include @font-face`);
   }
 
-  // eslint-disable-next-line no-console
   console.log(
     `Wrote ${path.relative(repoRoot, appCssPath)} and downloaded fonts into public/fonts/`,
   );
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

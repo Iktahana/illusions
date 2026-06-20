@@ -7,31 +7,141 @@
  * rules stay on the main thread because their dependencies
  * (`window.electronAPI.dict.*` via `genjiVocab`) are unreachable here.
  *
+ * External rulesets (downloaded from the marketplace) are loaded here
+ * alongside legacy rules via LOAD_RULESET / UNLOAD_RULESET messages.
+ *
  * See plan: docs/superpowers/plans/2026-05-05-lint-worker-parallelization.md
  */
 
 import { RuleRunner } from "@/lib/linting/rule-runner";
 import { createJsonDrivenRules } from "@/lib/linting/rule-registry";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
-import type { LintIssue } from "@/lib/linting/types";
+import type { LintIssue, LintRuleConfig } from "@/lib/linting/types";
 import { isMorphologicalDocumentLintRule, isMorphologicalLintRule } from "@/lib/linting/types";
-
-import type { SerializedIssueMap, WorkerEvent, WorkerRequest } from "./protocol";
+import { RulesetRegistry } from "@/lib/linting/registry/ruleset-registry";
+import { createRulesetContext } from "@/lib/linting/registry/ruleset-context-factory";
+import type { RulesetModule } from "@/lib/linting/sdk/ruleset-types";
+import type {
+  RulesetLoadWarning,
+  SerializedIssueMap,
+  WorkerEvent,
+  WorkerRequest,
+} from "./protocol";
 
 declare const self: DedicatedWorkerGlobalScope;
 
-// Module scope acts as the worker singleton — Workers never re-instantiate.
-const runner = new RuleRunner();
+// -------------------------------------------------------------------------
+// Legacy rules (JSON-driven, always present)
+// -------------------------------------------------------------------------
 
-for (const rule of createJsonDrivenRules()) {
-  if (isMorphologicalLintRule(rule) || isMorphologicalDocumentLintRule(rule)) {
-    // Defensive: morph rules have IPC-only dependencies, skip if any sneak in.
-    continue;
-  }
-  runner.registerRule(rule);
+/** Build the set of non-morphological legacy rules. */
+function buildLegacyRules() {
+  return createJsonDrivenRules().filter(
+    (rule) => !isMorphologicalLintRule(rule) && !isMorphologicalDocumentLintRule(rule),
+  );
 }
 
-runner.setGuidelineMap(RULE_GUIDELINE_MAP);
+const legacyRules = buildLegacyRules();
+
+// -------------------------------------------------------------------------
+// External ruleset state
+// -------------------------------------------------------------------------
+
+/** Map from ruleset id → loaded module (only successfully-loaded modules). */
+const loadedExternals = new Map<string, RulesetModule>();
+
+/**
+ * A no-op DictLike used when building the worker-local RulesetContext.
+ * The worker has no access to window.electronAPI, so dictionary lookups
+ * always return empty results. Rules that require dict:genji will be
+ * disabled by the registry's requirement gate.
+ */
+const NO_OP_DICT = {
+  async lookupBatch(_terms: string[]): Promise<Map<string, never>> {
+    return new Map<string, never>();
+  },
+  async has(_term: string): Promise<boolean> {
+    return false;
+  },
+};
+
+/** Not-ready health snapshot for worker-local context construction. */
+const NOT_READY_HEALTH = { state: "not-installed" as const };
+
+/** Last-known config snapshot, replayed onto rebuilt runners. */
+const lastConfigs = new Map<string, LintRuleConfig>();
+/** Last-known active guidelines, replayed onto rebuilt runners. */
+let lastGuidelines: string[] | null = null;
+/** Last-known guideline map (legacy part), replayed onto rebuilt runners. */
+let lastGuidelineMapEntries: Array<[string, string | undefined]> = Array.from(
+  RULE_GUIDELINE_MAP.entries(),
+);
+
+// -------------------------------------------------------------------------
+// Active runner (swapped on successful rebuild)
+// -------------------------------------------------------------------------
+
+/** Build a fresh RuleRunner = legacy ∪ all currently-loaded external rules. */
+function buildRunner(): { runner: RuleRunner; ruleGuidelineMap: Map<string, string | undefined> } {
+  const newRunner = new RuleRunner();
+
+  // 1. Register legacy rules.
+  for (const rule of legacyRules) {
+    newRunner.registerRule(rule);
+  }
+
+  // 2. Register externals via a fresh registry so each rebuild is independent.
+  const registry = new RulesetRegistry();
+  for (const mod of loadedExternals.values()) {
+    registry.registerExternal(mod, "folder");
+  }
+
+  const ctx = createRulesetContext({
+    dictHealth: NOT_READY_HEALTH,
+    dict: NO_OP_DICT,
+    requirements: new Map([["dict:genji", false]]),
+  });
+
+  const externalRules = registry.buildRules(ctx);
+  for (const rule of externalRules) {
+    newRunner.registerRule(rule);
+  }
+
+  // 3. Merge guideline maps: legacy base + external additions.
+  const mergedGuidelineMap = new Map<string, string | undefined>(lastGuidelineMapEntries);
+  for (const [ruleId, guidelineId] of registry.buildRuleGuidelineMap()) {
+    mergedGuidelineMap.set(ruleId, guidelineId);
+  }
+  newRunner.setGuidelineMap(mergedGuidelineMap);
+
+  // 4. Replay last-known configs.
+  for (const [ruleId, config] of lastConfigs) {
+    newRunner.setConfig(ruleId, config);
+  }
+
+  // 5. Replay last-known active guidelines.
+  newRunner.setActiveGuidelines(lastGuidelines);
+
+  return { runner: newRunner, ruleGuidelineMap: mergedGuidelineMap };
+}
+
+// Initial runner (no externals yet).
+let { runner } = buildRunner();
+
+/**
+ * Whether the runner hosts at least one *registered* morphological rule,
+ * ignoring enabled state. Reported in RULESET_LOADED so the proxy starts
+ * forwarding tokens before SET_CONFIG enables the new rules.
+ */
+function runnerHasRegisteredMorphRules(r: RuleRunner): boolean {
+  return r
+    .getRegisteredRules()
+    .some((rule) => isMorphologicalLintRule(rule) || isMorphologicalDocumentLintRule(rule));
+}
+
+// -------------------------------------------------------------------------
+// Helpers
+// -------------------------------------------------------------------------
 
 function post(msg: WorkerEvent): void {
   self.postMessage(msg);
@@ -48,17 +158,47 @@ function serialize(map: Map<number, LintIssue[]>): SerializedIssueMap {
   return entries;
 }
 
+// -------------------------------------------------------------------------
+// Message handler
+// -------------------------------------------------------------------------
+
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const msg = event.data;
+
+  // LOAD_RULESET and UNLOAD_RULESET are async; handle them separately.
+  if (msg.type === "LOAD_RULESET") {
+    handleLoadRuleset(msg.correlationId, msg.id, msg.code).catch((err) => {
+      // Should not reach here since handleLoadRuleset catches internally,
+      // but guard just in case.
+      post({
+        type: "ERROR",
+        correlationId: msg.correlationId,
+        error: {
+          name: err instanceof Error ? err.name : "Error",
+          message: err instanceof Error ? err.message : String(err),
+        },
+      });
+    });
+    return;
+  }
+
+  if (msg.type === "UNLOAD_RULESET") {
+    handleUnloadRuleset(msg.correlationId, msg.id);
+    return;
+  }
+
   try {
     switch (msg.type) {
       case "SET_CONFIG":
+        lastConfigs.set(msg.ruleId, msg.config);
         runner.setConfig(msg.ruleId, msg.config);
         return;
       case "SET_ACTIVE_GUIDELINES":
+        lastGuidelines = msg.guidelines;
         runner.setActiveGuidelines(msg.guidelines);
         return;
       case "SET_GUIDELINE_MAP":
+        lastGuidelineMapEntries = msg.entries;
         runner.setGuidelineMap(new Map(msg.entries));
         return;
       case "RUN_BATCH": {
@@ -69,7 +209,13 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
 
         if (runPer) {
           for (const p of paragraphs) {
-            const issues = runner.runAll(p.text);
+            // `runAllWithTokens` runs L1 rules via lint() AND enabled L2 rules
+            // via lintWithTokens(), so it fully replaces runAll() when tokens
+            // are present (no double execution). Tokens arrive only when an
+            // external morphological ruleset is loaded; otherwise L1-only.
+            const issues = p.tokens
+              ? runner.runAllWithTokens(p.text, p.tokens)
+              : runner.runAll(p.text);
             if (issues.length > 0) perParagraph.set(p.index, issues);
           }
         }
@@ -99,6 +245,140 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
     });
   }
 };
+
+// -------------------------------------------------------------------------
+// LOAD_RULESET handler
+// -------------------------------------------------------------------------
+
+async function handleLoadRuleset(correlationId: number, id: string, code: string): Promise<void> {
+  let url: string | null = null;
+  try {
+    const blob = new Blob([code], { type: "text/javascript" });
+    url = URL.createObjectURL(blob);
+    // webpackIgnore: true is REQUIRED — the bundler must not try to resolve
+    // this dynamic import at build time. The URL is a runtime blob: URI.
+    const mod = (await import(/* webpackIgnore: true */ url)).default as RulesetModule;
+    URL.revokeObjectURL(url);
+    url = null;
+
+    // Register into a temporary registry for validation (quarantine check).
+    const tempRegistry = new RulesetRegistry();
+    tempRegistry.registerExternal(mod, "folder");
+    const tempWarnings = tempRegistry.getWarnings();
+
+    if (tempWarnings.some((w) => w.rulesetId === id && w.code === "engine-api")) {
+      // Module was quarantined — do NOT store it.
+      const warnings: RulesetLoadWarning[] = tempWarnings.map((w) => ({
+        code: w.code,
+        messageJa: w.messageJa,
+        detail: w.detail,
+      }));
+      post({
+        type: "RULESET_LOADED",
+        correlationId,
+        id,
+        ok: false,
+        ruleIds: [],
+        warnings,
+        hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+      });
+      return;
+    }
+
+    // Store the new module (overwrite if re-loading the same id).
+    loadedExternals.set(id, mod);
+
+    // Rebuild runner from legacy ∪ all externals.
+    // If buildRunner() throws, the existing runner is left intact (failure isolation).
+    const { runner: newRunner } = buildRunner();
+    runner = newRunner;
+
+    // Collect ruleIds contributed by this module's manifest.
+    const ruleIds = (mod.manifest?.rules ?? []).map((r) => r.ruleId);
+
+    // Gather all warnings from the rebuild registry.
+    const allWarnings: RulesetLoadWarning[] = tempWarnings.map((w) => ({
+      code: w.code,
+      messageJa: w.messageJa,
+      detail: w.detail,
+    }));
+
+    post({
+      type: "RULESET_LOADED",
+      correlationId,
+      id,
+      ok: true,
+      ruleIds,
+      warnings: allWarnings,
+      hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+    });
+  } catch (err) {
+    // Ensure blob URL is always revoked even on error.
+    if (url !== null) {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // ignore
+      }
+    }
+    const detail = err instanceof Error ? err.message : String(err);
+    const warnings: RulesetLoadWarning[] = [
+      {
+        code: "load-failed",
+        messageJa: "ルールセットの読み込みに失敗しました",
+        detail,
+      },
+    ];
+    // Leave existing runner intact (failure isolation).
+    post({
+      type: "RULESET_LOADED",
+      correlationId,
+      id,
+      ok: false,
+      ruleIds: [],
+      warnings,
+      hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+    });
+  }
+}
+
+// -------------------------------------------------------------------------
+// UNLOAD_RULESET handler
+// -------------------------------------------------------------------------
+
+function handleUnloadRuleset(correlationId: number, id: string): void {
+  loadedExternals.delete(id);
+  try {
+    const { runner: newRunner } = buildRunner();
+    runner = newRunner;
+    post({
+      type: "RULESET_LOADED",
+      correlationId,
+      id,
+      ok: true,
+      ruleIds: [],
+      warnings: [],
+      hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    post({
+      type: "RULESET_LOADED",
+      correlationId,
+      id,
+      ok: false,
+      ruleIds: [],
+      warnings: [
+        {
+          code: "unload-rebuild-failed",
+          messageJa: "ルールセットの削除後の再構築に失敗しました",
+          detail,
+        },
+      ],
+      hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+    });
+  }
+}
 
 self.onerror = (e) => {
   // Surface any uncaught script-level error. correlationId omitted because

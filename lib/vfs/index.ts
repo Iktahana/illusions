@@ -13,8 +13,8 @@
  */
 
 import { isElectronRenderer } from "../utils/runtime-env";
-import { ElectronVFS } from "./electron-vfs";
-import { WebVFS } from "./web-vfs";
+import { WebVFS } from "@/platform/browser/vfs";
+import { ElectronVFS } from "@/platform/electron-renderer/vfs";
 
 import type { VirtualFileSystem } from "./types";
 

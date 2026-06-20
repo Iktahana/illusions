@@ -44,6 +44,7 @@ const STORAGE_CHANNELS = Object.freeze({
     setItem: "storage:set-item",
     getItem: "storage:get-item",
     removeItem: "storage:remove-item",
+    getKeysByPrefix: "storage:get-keys-by-prefix",
   }),
   event: Object.freeze({}),
 });
@@ -239,6 +240,21 @@ const UPDATE_CHANNELS = Object.freeze({
   event: Object.freeze({}),
 });
 
+// Official校正ルールセットの自動DL/更新 (electron/ipc/rulesets-ipc.js)
+const RULESETS_CHANNELS = Object.freeze({
+  invoke: Object.freeze({
+    listInstalled: "rulesets:list-installed",
+    sync: "rulesets:sync",
+    checkUpdate: "rulesets:check-update",
+    readModule: "rulesets:read-module",
+    uninstall: "rulesets:uninstall",
+  }),
+  event: Object.freeze({
+    syncProgress: "rulesets:sync-progress",
+    changed: "rulesets:changed",
+  }),
+});
+
 // Integrated terminal PTY sessions (electron/ipc/pty-ipc.js)
 const PTY_CHANNELS = Object.freeze({
   invoke: Object.freeze({
@@ -271,4 +287,5 @@ module.exports = {
   NLP_CHANNELS,
   PTY_CHANNELS,
   UPDATE_CHANNELS,
+  RULESETS_CHANNELS,
 };
