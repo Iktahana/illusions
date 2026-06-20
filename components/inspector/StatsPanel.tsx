@@ -554,28 +554,28 @@ export default function StatsPanel({
               <div className="grid grid-cols-4 gap-2 text-xs">
                 <div className="flex items-center gap-1">
                   <div
-                    className="w-2 h-2 rounded-full"
+                    className="w-2 h-2 shrink-0 rounded-full"
                     style={{ backgroundColor: `var(--progress-kanji)` }}
                   />
                   <span className="text-foreground-tertiary">漢字</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div
-                    className="w-2 h-2 rounded-full"
+                    className="w-2 h-2 shrink-0 rounded-full"
                     style={{ backgroundColor: `var(--progress-hiragana)` }}
                   />
                   <span className="text-foreground-tertiary">ひらがな</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div
-                    className="w-2 h-2 rounded-full"
+                    className="w-2 h-2 shrink-0 rounded-full"
                     style={{ backgroundColor: `var(--progress-katakana)` }}
                   />
                   <span className="text-foreground-tertiary">カタカナ</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div
-                    className="w-2 h-2 rounded-full"
+                    className="w-2 h-2 shrink-0 rounded-full"
                     style={{ backgroundColor: `var(--progress-other)` }}
                   />
                   <span className="text-foreground-tertiary">その他</span>
