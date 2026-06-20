@@ -88,12 +88,13 @@ export default function ResizablePanel({
       className={clsx(
         "relative flex-shrink-0",
         !isResizing && "transition-all duration-300 ease-in-out",
-        // 右インスペクタは隣に ActivityBar のような背景ブロックが無く、
-        // border-border(rgb 45,45,45) では暗いエディタ背景(rgb 8,8,8)に
-        // 紛れて境界線が見えない。左ナビゲーションと同等に視認できるよう、
-        // より明瞭な border-border-secondary(rgb 60,60,60) を用いる。
+        // 左ナビゲーション側は ActivityBar(bg-background-tertiary rgb 30,30,30)の
+        // 背景ブロックが境界を明瞭にするが、右インスペクタは隣接ブロックが無く
+        // 1px の border-border(rgb 45,45,45)は暗いエディタ背景(rgb 8,8,8)に紛れて
+        // 「境界線が無い」ように見える。右側は 2px かつより明るい
+        // border-border-secondary(rgb 60,60,60)で明確な縦線にして左右の視認性を揃える。
         !isCollapsed &&
-          (side === "right" ? "border-l border-border-secondary" : "border-r border-border"),
+          (side === "right" ? "border-l-2 border-border-secondary" : "border-r border-border"),
         className,
       )}
       style={{ width: isCollapsed ? "0px" : `${width}px` }}
