@@ -141,7 +141,7 @@ function LintingSettingsInner({
         {/* Web fallback note */}
         {!isElectron && (
           <p className="text-xs text-foreground-tertiary mt-3">
-            ルールセットの管理はデスクトップ版で利用できます
+            校正ルールはデスクトップ版で利用できます（Web 版にはルールセットが含まれていません）
           </p>
         )}
       </div>
