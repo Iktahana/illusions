@@ -544,12 +544,28 @@ export default function EditorPage() {
     content,
   ]);
 
+  // #1857: 明示的ナビゲーション（次へ/前へ/結果クリック）のたびに増加するカウンター。
+  // コンテンツ編集で matches が再計算されても nonce は変わらないため、
+  // useSearchHighlight 内でカーソル誤移動が起きない。
+  const [searchNavigationNonce, setSearchNavigationNonce] = useState(0);
+
+  // 明示的ナビゲーション専用ハンドラー。setCurrentMatchIndex と同時に nonce を増やす。
+  // setSearchTerm（検索語変更時リセット）は直接 setCurrentMatchIndex を呼ぶためナビゲーションとして扱わない。
+  const handleNavigateToMatch = useCallback(
+    (index: number | ((prev: number) => number)) => {
+      setCurrentMatchIndex(index);
+      setSearchNavigationNonce((n) => n + 1);
+    },
+    [setCurrentMatchIndex],
+  );
+
   useSearchHighlight({
     editorView: editorViewInstance,
     matches: searchMatches,
     currentMatchIndex,
     searchTerm,
     isSearchVisible,
+    navigationNonce: searchNavigationNonce,
   });
 
   // フローティング検索窓は <main> のトップレベル（dockview パネル外）でレンダリングし、
@@ -1349,7 +1365,7 @@ export default function EditorPage() {
     onExcludeCommentsChange: setExcludeComments,
     onSearchTargetChange: setSearchTarget,
     onSelectionOnlyChange: setSelectionOnly,
-    onCurrentMatchIndexChange: setCurrentMatchIndex,
+    onCurrentMatchIndexChange: handleNavigateToMatch,
     onCloseSearchResults: handleCloseSearchResults,
     editorViewInstance,
     dictionarySearchTrigger,
@@ -1566,7 +1582,7 @@ export default function EditorPage() {
           isSearchDialogOpen,
           onSearchTermChange: setSearchTerm,
           onCaseSensitiveChange: setCaseSensitive,
-          onCurrentMatchIndexChange: setCurrentMatchIndex,
+          onCurrentMatchIndexChange: handleNavigateToMatch,
           onOpenSearchDialog: openSearchDialog,
           onCloseSearchDialog: closeSearchDialog,
           onToggleSearchDialog: toggleSearchDialog,
