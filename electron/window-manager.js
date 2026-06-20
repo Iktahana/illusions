@@ -123,8 +123,24 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
 
   // ウィンドウ終了前に状態をフラッシュする（未保存の場合はダイアログも表示）
   let isHandlingClose = false;
+
+  // #1839 (Codex F-04): 保存失敗で renderer が closeAborted を送ったら、通常 close
+  // 経路でも isHandlingClose を戻す。これがないと 2 回目の close が「処理中」とみなされ
+  // 確認なしで閉じてしまう（実 close は destroy 経由なので close イベントは常に prevent）。
+  const onWindowCloseAborted = (event) => {
+    if (!newWindow.isDestroyed() && event.sender === newWindow.webContents) {
+      isHandlingClose = false;
+    }
+  };
+  ipcMain.on(SYSTEM_CHANNELS.send.closeAborted, onWindowCloseAborted);
+
   newWindow.on("close", (event) => {
-    if (isHandlingClose) return;
+    // 実際のクローズは saveDoneAndClose → win.destroy() 経由のみ。close イベントは
+    // 常に prevent し、処理中（isHandlingClose）の再入もブロックする（Codex F-04）。
+    if (isHandlingClose) {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
     isHandlingClose = true;
 
@@ -162,6 +178,7 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
 
   // ウィンドウ閉鎖時にセットから削除
   newWindow.on("closed", () => {
+    ipcMain.removeListener(SYSTEM_CHANNELS.send.closeAborted, onWindowCloseAborted);
     allWindows.delete(newWindow);
     if (mainWindow === newWindow) {
       mainWindow = allWindows.values().next().value || null;
@@ -284,14 +301,16 @@ async function _handleWindowBeforeQuit(win) {
       const result = await waitForCloseOrAbort();
       if (result === "aborted") return true;
     } else {
-      // 「保存しない」: フラッシュのみ依頼し、destroy を待つ
+      // 「保存しない」: フラッシュのみ依頼し、destroy を待つ。renderer ハング等で
+      // timeout/abort したら安全側で quit を中止する（Codex F-05）。
       win.webContents.send(SYSTEM_CHANNELS.event.requestFlushStateBeforeClose);
-      await waitForCloseOrAbort();
+      if ((await waitForCloseOrAbort()) === "aborted") return true;
     }
   } else {
-    // clean: フラッシュのみ依頼し、destroy を待つ
+    // clean: フラッシュのみ依頼し、destroy を待つ。clean 判定が debounce 遅延で
+    // 誤っている可能性もあるため、timeout/abort は安全側で quit を中止（Codex F-05/F-02）。
     win.webContents.send(SYSTEM_CHANNELS.event.requestFlushStateBeforeClose);
-    await waitForCloseOrAbort();
+    if ((await waitForCloseOrAbort()) === "aborted") return true;
   }
 
   return false;

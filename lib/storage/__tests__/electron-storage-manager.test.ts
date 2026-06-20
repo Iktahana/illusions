@@ -36,6 +36,8 @@ function createFakeBetterSqlite3(tables: Partial<Record<TableName, FakeRow[]>> =
     recent_files: tables.recent_files ?? [],
     recent_projects: tables.recent_projects ?? [],
     kv_store: [],
+    // Codex F-06: quarantine table for corrupt records (raw data preserved before delete)
+    corrupt_records: [],
   };
 
   /**
@@ -80,7 +82,21 @@ function createFakeBetterSqlite3(tables: Partial<Record<TableName, FakeRow[]>> =
   const prepareReal = (sql: string) => {
     const stmt = {
       run: vi.fn((...args: unknown[]): void => {
-        if (/DELETE FROM app_state/.test(sql)) {
+        if (/INSERT INTO corrupt_records/.test(sql)) {
+          // Codex F-06: capture quarantined raw data (source_table, record_id, data, ts)
+          const [source_table, record_id, data, quarantined_at] = args as [
+            string,
+            string,
+            string,
+            number,
+          ];
+          store.corrupt_records.push({
+            source_table,
+            record_id,
+            data,
+            quarantined_at,
+          } as unknown as FakeRow);
+        } else if (/DELETE FROM app_state/.test(sql)) {
           store.app_state = [];
         } else if (/DELETE FROM editor_buffer/.test(sql)) {
           store.editor_buffer = [];
@@ -291,6 +307,34 @@ describe("ElectronStorageManager — corrupt JSON recovery", () => {
         expect.stringContaining("editor_buffer"),
         expect.any(SyntaxError),
       );
+
+      warnSpy.mockRestore();
+    });
+
+    // Codex F-06: the raw corrupt editor_buffer (unsaved crash-recovery draft)
+    // must be quarantined before deletion, not destroyed.
+    it("quarantines the raw corrupt editor_buffer data before deleting it", () => {
+      const corruptRaw = '{"content":"未保存の本文",,,BROKEN';
+      const fakeDb = createFakeBetterSqlite3({
+        editor_buffer: [{ id: "editor_buffer", data: corruptRaw, updated_at: 7 }],
+      });
+      const manager = createManagerWithFakeDb(fakeDb);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const result = manager.loadEditorBuffer();
+
+      expect(result).toBeNull();
+      // Deleted from editor_buffer…
+      expect(fakeDb.store.editor_buffer).toHaveLength(0);
+      // …but the raw body is preserved in quarantine for recovery.
+      const quarantined = fakeDb.store.corrupt_records as unknown as Array<{
+        source_table: string;
+        record_id: string;
+        data: string;
+      }>;
+      expect(quarantined).toHaveLength(1);
+      expect(quarantined[0].source_table).toBe("editor_buffer");
+      expect(quarantined[0].data).toBe(corruptRaw);
 
       warnSpy.mockRestore();
     });

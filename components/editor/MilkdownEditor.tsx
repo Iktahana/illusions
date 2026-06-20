@@ -397,13 +397,12 @@ export default function MilkdownEditor({
           result = ctx.get(serializerCtx)(doc);
         }
       });
-      // 安全策（#1840 / レビュー Finding 2）: 縦横切替などでエディタが再マウント中、
-      // 空の初期 doc が一瞬シリアライズされて "" を返すことがある。実コンテンツが
-      // 残っている状態で "" を返すと、呼び出し側がファイルを空で上書きしてしまう。
-      // その場合は null を返してフォールバック（既存 tab.content を保持）させる。
-      if (result === "" && currentContentRef.current !== "") {
-        return null;
-      }
+      // 注（#1840 / Codex F-01）: ここに来た時点で editor.action は editorViewCtx を
+      // 解決できている＝EditorView は ready。ready な view の doc は内容の単一の
+      // 真実なので、result === "" は「本当に空」を意味する（ユーザーの全削除など）。
+      // よって "" を異常値として弾かない。未 ready 時は上の ctx.get が throw して
+      // catch 節で null を返し、呼び出し側が既存 tab.content にフォールバックする。
+      // 再マウント過渡は registerFlush(null)（登録が一旦 null）でも保護される。
       if (result != null && result !== currentContentRef.current) {
         // ライブ値を ref と親 state に反映し、後続の isDirty 再計算も正しくする。
         currentContentRef.current = result;

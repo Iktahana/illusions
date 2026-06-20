@@ -29,6 +29,12 @@ import type { VFSDirectoryHandle, VFSFileHandle } from "@/lib/vfs/types";
 /** Flat map of full path → content */
 const fileStore = new Map<string, string>();
 
+/**
+ * Test hook: when set, called at the start of getFileHandle. Throwing from it
+ * simulates a getFileHandle/backup failure for specific file names (Codex F-07).
+ */
+let getFileHandleHook: ((fileName: string, options?: { create?: boolean }) => void) | null = null;
+
 function createMockFileHandle(name: string, dirPath: string): VFSFileHandle {
   const fullPath = dirPath ? `${dirPath}/${name}` : name;
   return {
@@ -54,6 +60,7 @@ function createMockDirectoryHandle(name: string, path: string): VFSDirectoryHand
     path,
     getFileHandle: vi.fn(
       async (fileName: string, options?: { create?: boolean }): Promise<VFSFileHandle> => {
+        getFileHandleHook?.(fileName, options);
         const fullPath = path ? `${path}/${fileName}` : fileName;
         if (!fileStore.has(fullPath) && !options?.create) {
           throw new Error(`File not found: ${fullPath}`);
@@ -108,6 +115,7 @@ describe("HistoryStore", () => {
 
   beforeEach(() => {
     fileStore.clear();
+    getFileHandleHook = null;
     store = new HistoryStore();
     vi.unstubAllGlobals();
   });
@@ -151,8 +159,8 @@ describe("HistoryStore", () => {
       expect(result.snapshots[0].id).toBe("a");
     });
 
-    // Issue #1844 / T-3: corrupt index.json must self-heal
-    it("backs up corrupt index.json to index.json.corrupt.bak and returns a default index", async () => {
+    // Issue #1844 / T-3: corrupt index.json must self-heal (backup → regenerate)
+    it("backs up corrupt index.json (timestamped) and returns/regenerates a default index", async () => {
       const corruptContent = "NOT_VALID_JSON{{{";
       fileStore.set(".illusions/history/index.json", corruptContent);
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -163,14 +171,16 @@ describe("HistoryStore", () => {
       expect(result.snapshots).toEqual([]);
       expect(result.maxSnapshots).toBe(100);
 
-      // Backup file was created with the original corrupt content
-      const backupKey = ".illusions/history/index.json.corrupt.bak";
-      expect(fileStore.has(backupKey)).toBe(true);
-      expect(fileStore.get(backupKey)).toBe(corruptContent);
+      // A timestamped backup file was created with the original corrupt content
+      // (Codex F-07: generational name instead of fixed .corrupt.bak).
+      const backupKey = [...fileStore.keys()].find((k) =>
+        /\.illusions\/history\/index\.json\.corrupt\.\d+\.bak$/.test(k),
+      );
+      expect(backupKey).toBeDefined();
+      expect(fileStore.get(backupKey!)).toBe(corruptContent);
 
-      // A fresh valid index.json was written
+      // A fresh valid index.json was written (backup succeeded → regenerate)
       const regeneratedKey = ".illusions/history/index.json";
-      expect(fileStore.has(regeneratedKey)).toBe(true);
       const regenerated = JSON.parse(fileStore.get(regeneratedKey)!) as { snapshots: unknown[] };
       expect(regenerated.snapshots).toEqual([]);
 
@@ -180,6 +190,39 @@ describe("HistoryStore", () => {
       );
 
       warnSpy.mockRestore();
+    });
+
+    // Codex F-07: if the backup write fails, the corrupt index.json must NOT be
+    // overwritten (preserve snapshot metadata for manual recovery).
+    it("does NOT overwrite corrupt index.json when the backup write fails", async () => {
+      const corruptContent = "NOT_VALID_JSON{{{";
+      fileStore.set(".illusions/history/index.json", corruptContent);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      // Make creating the backup file throw.
+      getFileHandleHook = (fileName) => {
+        if (fileName.includes(".corrupt.")) {
+          throw new Error("backup failed");
+        }
+      };
+
+      const result = await store.loadIndex();
+
+      // Still returns an in-memory default so the app works this session
+      expect(result.snapshots).toEqual([]);
+
+      // The original corrupt index.json is preserved (NOT overwritten)
+      expect(fileStore.get(".illusions/history/index.json")).toBe(corruptContent);
+
+      // No backup was written
+      const backupKey = [...fileStore.keys()].find((k) => k.includes(".corrupt."));
+      expect(backupKey).toBeUndefined();
+
+      expect(errorSpy).toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+      errorSpy.mockRestore();
     });
 
     it("a second loadIndex after corruption succeeds and returns valid index", async () => {
