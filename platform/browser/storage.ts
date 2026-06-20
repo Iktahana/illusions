@@ -403,7 +403,7 @@ export class WebStorageProvider implements IStorageService {
   /**
    * No-op for Web. Project handles are managed by ProjectManager via IndexedDB.
    */
-   
+
   async addRecentProject(_project: RecentProject): Promise<void> {
     // Web uses ProjectManager for directory handle persistence, not this API.
   }
@@ -419,7 +419,7 @@ export class WebStorageProvider implements IStorageService {
   /**
    * No-op for Web. Project handles are managed by ProjectManager via IndexedDB.
    */
-   
+
   async removeRecentProject(_projectId: string): Promise<void> {
     // Web uses ProjectManager for directory handle persistence, not this API.
   }
