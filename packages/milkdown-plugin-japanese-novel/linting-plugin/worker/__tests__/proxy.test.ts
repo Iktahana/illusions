@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { RuleRunnerProxy } from "../rule-runner-proxy";
 import {
+  type BatchParagraph,
   type WorkerEvent,
   type WorkerRequest,
   WorkerDisposedError,
@@ -316,8 +317,8 @@ describe("RuleRunnerProxy", () => {
   // forward those tokens to the worker in RUN_BATCH.
   // ----------------------------------------------------------------
 
-  const fakeTokens = [{ surface: "走っ" }, { surface: "た" }] as unknown as ReadonlyArray<
-    import("@/lib/nlp-client/types").Token
+  const fakeTokens = [{ surface: "走っ" }, { surface: "た" }] as unknown as NonNullable<
+    BatchParagraph["tokens"]
   >;
 
   it("omits tokens from RUN_BATCH when the worker hosts no morphological rules", () => {
