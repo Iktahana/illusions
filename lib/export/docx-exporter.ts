@@ -35,6 +35,8 @@ import {
   sanitizeSettings,
 } from "./docx-export-settings";
 
+import { fullwidthIndentCount, fullwidthIndentPrefix } from "./fullwidth-indent";
+
 import type { DocxExportSettings, DocxFontConfig } from "./docx-export-settings";
 
 export interface DocxExportOptions {
@@ -306,10 +308,18 @@ function createParagraph(
   settings: DocxExportSettings,
   fontConfig: DocxFontConfig,
 ): Paragraph {
+  // Full-width-space 字下げ: prepend literal U+3000 characters to the paragraph
+  // text and suppress the Word `firstLine` indent (count from textIndent, rounded)
+  // so the two indentation mechanisms never stack.
+  const fullwidthCount = settings.fullwidthSpaceIndent
+    ? fullwidthIndentCount(settings.textIndent)
+    : 0;
+  const effectiveText = fullwidthCount > 0 ? fullwidthIndentPrefix(fullwidthCount) + text : text;
+  const firstLineTwips = fullwidthCount > 0 ? 0 : emToTwips(settings.textIndent, settings.fontSize);
   return new Paragraph({
     spacing: { before: 0, after: 120 },
-    indent: { firstLine: emToTwips(settings.textIndent, settings.fontSize) },
-    children: parseInlineFormatting(text, fontConfig),
+    indent: { firstLine: firstLineTwips },
+    children: parseInlineFormatting(effectiveText, fontConfig),
   });
 }
 

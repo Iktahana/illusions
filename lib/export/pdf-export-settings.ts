@@ -24,6 +24,12 @@ export interface PdfExportSettings {
     | "top-center"
     | "top-right";
   textIndent: number;
+  /**
+   * Render 字下げ as literal full-width spaces (U+3000) prepended to each
+   * paragraph instead of a CSS `text-indent`. Count is derived from `textIndent`
+   * (rounded). Default/absent → false.
+   */
+  fullwidthSpaceIndent?: boolean;
   /** Google Font family name for PDF export (triggers <link> injection) */
   googleFontFamily?: string;
 }
@@ -40,6 +46,7 @@ export const DEFAULT_PDF_SETTINGS: PdfExportSettings = {
   pageNumberFormat: "simple",
   pageNumberPosition: "bottom-center",
   textIndent: 1,
+  fullwidthSpaceIndent: false,
 };
 
 // Import and re-export comprehensive page dimensions from page-sizes module

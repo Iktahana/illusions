@@ -20,6 +20,8 @@ import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
 import { openWebPrintPreview } from "@/lib/export/web-print-preview";
+import TxtExportDialog from "@/components/TxtExportDialog";
+import type { TxtIndentOptions } from "@/lib/export/txt-exporter";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
@@ -663,6 +665,27 @@ export default function EditorPage() {
     setPrintDialogState({ content, metadata });
   }, []);
 
+  // TXT export 字下げ dialog. The export hook awaits the user's choice via a
+  // promise resolved when the dialog is confirmed (options) or cancelled (null).
+  const [txtDialogFormat, setTxtDialogFormat] = useState<"txt" | "txt-ruby" | null>(null);
+  const txtOptionsResolverRef = useRef<((options: TxtIndentOptions | null) => void) | null>(null);
+
+  const handleRequestTxtExportOptions = useCallback(
+    (format: "txt" | "txt-ruby"): Promise<TxtIndentOptions | null> =>
+      new Promise<TxtIndentOptions | null>((resolve) => {
+        txtOptionsResolverRef.current = resolve;
+        setTxtDialogFormat(format);
+      }),
+    [],
+  );
+
+  const resolveTxtExportOptions = useCallback((options: TxtIndentOptions | null) => {
+    setTxtDialogFormat(null);
+    const resolve = txtOptionsResolverRef.current;
+    txtOptionsResolverRef.current = null;
+    resolve?.(options);
+  }, []);
+
   const handleExportDialogRequest = useCallback(
     (format: "pdf" | "docx" | "epub", content: string, metadata: ExportMetadata) => {
       const state: ExportDialogState = {
@@ -703,6 +726,7 @@ export default function EditorPage() {
           pageNumberFormat: settings.pageNumberFormat,
           pageNumberPosition: settings.pageNumberPosition,
           textIndent: settings.textIndent,
+          fullwidthSpaceIndent: settings.fullwidthSpaceIndent,
           googleFontFamily: settings.googleFontFamily,
           // Thread the active tab's snapshotted file type so the HTML pipeline
           // un-escapes MDI macros only for ".mdi" and preserves \[\[blank]]
@@ -773,6 +797,7 @@ export default function EditorPage() {
             pageNumberFormat: settings.pageNumberFormat,
             pageNumberPosition: settings.pageNumberPosition,
             textIndent: settings.textIndent,
+            fullwidthSpaceIndent: settings.fullwidthSpaceIndent,
             googleFontFamily: settings.googleFontFamily,
           });
         } catch (error) {
@@ -955,6 +980,7 @@ export default function EditorPage() {
     getIsEditorTabActive: useCallback(() => isEditorTabActiveRef.current, []),
     onExportDialogRequest: handleExportDialogRequest,
     onPrintDialogRequest: handlePrintDialogRequest,
+    onRequestTxtExportOptions: handleRequestTxtExportOptions,
   });
 
   // System file open: tab manager handles loading; we just update editor key
@@ -1490,6 +1516,12 @@ export default function EditorPage() {
           showSaveToast,
           saveToastExiting,
         }}
+      />
+      <TxtExportDialog
+        isOpen={txtDialogFormat != null}
+        format={txtDialogFormat ?? "txt"}
+        onConfirm={(options) => resolveTxtExportOptions(options)}
+        onCancel={() => resolveTxtExportOptions(null)}
       />
     </>
   );

@@ -101,6 +101,7 @@ declare global {
           lineSpacing?: number;
           margins?: { top: number; bottom: number; left: number; right: number };
           textIndent?: number;
+          fullwidthSpaceIndent?: boolean;
           showPageNumbers?: boolean;
         };
         // Active tab's file type. The main-process generateDocx un-escapes MDI

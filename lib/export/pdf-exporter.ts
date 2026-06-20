@@ -29,6 +29,12 @@ export interface PdfExportOptions {
     | "top-right";
   /** First-line indent in em units */
   textIndent?: number;
+  /**
+   * Render 字下げ as literal full-width spaces (U+3000) prepended to each
+   * paragraph instead of a CSS `text-indent`. Count is derived from `textIndent`
+   * (rounded). Absent → false.
+   */
+  fullwidthSpaceIndent?: boolean;
   /** Google Font family name — triggers <link> injection and CSP relaxation */
   googleFontFamily?: string;
   /**
@@ -53,6 +59,15 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
   // Dynamic import for Electron (only available in main process at runtime)
   const { BrowserWindow } = await import("electron");
   const { mdiToHtml } = await import("./mdi-to-html");
+  const { fullwidthIndentCount } = await import("./fullwidth-indent");
+
+  // Full-width-space 字下げ: when enabled, the indent is expressed as literal
+  // U+3000 characters injected into each paragraph (see mdiToHtml), so the CSS
+  // `text-indent` must be suppressed to avoid double indentation.
+  const fullwidthSpaceCount = options.fullwidthSpaceIndent
+    ? fullwidthIndentCount(options.textIndent ?? 0)
+    : 0;
+  const effectiveTextIndentEm = fullwidthSpaceCount > 0 ? 0 : options.textIndent;
 
   // Build typesetting options when chars/lines are specified
   const hasTypesetting = options.charsPerLine != null && options.linesPerPage != null;
@@ -72,7 +87,7 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
           fontFamily: options.fontFamily,
           fontSizeMm,
           lineHeightRatio,
-          textIndentEm: options.textIndent,
+          textIndentEm: effectiveTextIndentEm,
           margins,
           pageSize: options.pageSize ?? "A5",
           landscape: options.landscape ?? false,
@@ -90,6 +105,7 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
     },
     googleFontFamily: options.googleFontFamily,
     fileType: options.fileType,
+    fullwidthSpaceIndentCount: fullwidthSpaceCount,
   });
 
   // Use a unique in-memory partition (no "persist:" prefix) per export so
