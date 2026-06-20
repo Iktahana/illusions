@@ -57,7 +57,22 @@ export const LEGACY_PACKAGE_IMPORTS = new Map([
   ],
   [
     "packages/milkdown-plugin-japanese-novel/linting-plugin/worker/__tests__/proxy.test.ts",
-    new Set(["@/lib/linting/types", "@/lib/nlp-client/types"]),
+    new Set([
+      "@/lib/linting/registry/__tests__/ruleset-fixtures",
+      "@/lib/linting/types",
+      "@/lib/nlp-client/types",
+    ]),
+  ],
+  [
+    "packages/milkdown-plugin-japanese-novel/linting-plugin/worker/build-ruleset-runner.ts",
+    new Set([
+      "@/lib/linting/registry/ruleset-context-factory",
+      "@/lib/linting/registry/ruleset-registry",
+      "@/lib/linting/rule-runner",
+      "@/lib/linting/sdk/ruleset-context",
+      "@/lib/linting/sdk/ruleset-types",
+      "@/lib/linting/types",
+    ]),
   ],
   [
     "packages/milkdown-plugin-japanese-novel/linting-plugin/worker/linting.worker.ts",
@@ -81,6 +96,7 @@ export const LEGACY_PACKAGE_IMPORTS = new Map([
       "@/lib/linting/lint-presets",
       "@/lib/linting/rule-registry",
       "@/lib/linting/rule-runner",
+      "@/lib/linting/sdk/ruleset-types",
       "@/lib/linting/types",
     ]),
   ],
