@@ -88,4 +88,42 @@ describe("clearFormatting", () => {
     clearFormatting(view);
     expect(view.state.doc.toJSON()).toEqual(before);
   });
+
+  it("#1828: 見出し・引用・リスト・段落の混在選択を全て標準段落に戻す", async () => {
+    const md = "## Mixed Heading\n\n> **Mixed Bold Quote**\n\n- *Mixed Italic List*\n\nPlain Control";
+    const { view } = await makeView(md);
+
+    // 文書全体を選択して書式解除
+    selectAllAndClear(view);
+
+    // 全トップレベルノードが paragraph になっていること
+    view.state.doc.forEach((node) => {
+      expect(node.type.name).toBe("paragraph");
+    });
+
+    // インラインマークがゼロになっていること
+    let markCount = 0;
+    view.state.doc.descendants((node) => {
+      markCount += node.marks.length;
+    });
+    expect(markCount).toBe(0);
+
+    // テキスト内容が保持されていること
+    const text = view.state.doc.textContent;
+    expect(text).toContain("Mixed Heading");
+    expect(text).toContain("Mixed Bold Quote");
+    expect(text).toContain("Mixed Italic List");
+    expect(text).toContain("Plain Control");
+  });
+
+  it("#1828: 見出し＋引用の混在選択（段落ネスト）を標準段落に戻す", async () => {
+    const { view } = await makeView("# タイトル\n\n> 引用テキスト");
+    selectAllAndClear(view);
+    view.state.doc.forEach((node) => {
+      expect(node.type.name).toBe("paragraph");
+    });
+    const text = view.state.doc.textContent;
+    expect(text).toContain("タイトル");
+    expect(text).toContain("引用テキスト");
+  });
 });
