@@ -17,6 +17,7 @@ import clsx from "clsx";
 
 import { LINT_RULE_CATEGORIES } from "@/lib/linting/lint-presets";
 import { CORRECTION_MODE_IDS, CORRECTION_MODES } from "@/lib/linting/correction-modes";
+import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import InfoTooltip from "./InfoTooltip";
@@ -260,6 +261,10 @@ export default function CorrectionsPanel({
     { value: "warning", label: "警告", icon: <AlertTriangle className="w-3.5 h-3.5" /> },
     { value: "info", label: "情報", icon: <Info className="w-3.5 h-3.5" /> },
   ];
+
+  // Web 版には校正ルールが供給されない（ルールセットはデスクトップ版のみ）。
+  // 0 件を「問題なし」と誤認させないよう、空状態で desktop-only を明示する (#1833)。
+  const isElectron = isElectronRenderer();
 
   /** Render a flat list of issue cards */
   const renderFlatList = (): React.JSX.Element => (
@@ -564,9 +569,21 @@ export default function CorrectionsPanel({
 
           {/* Issue list */}
           {filteredIssues.length === 0 ? (
-            <div className="pt-4 text-center">
-              <p className="text-sm text-foreground-tertiary">問題は検出されませんでした</p>
-            </div>
+            !isElectron ? (
+              <div className="pt-4 text-center">
+                <p className="text-sm text-foreground-secondary">
+                  校正ルールはデスクトップ版で利用できます
+                </p>
+                <p className="mt-1 text-xs text-foreground-tertiary">
+                  Web
+                  版には校正ルールセットが含まれていません。デスクトップ版で公式ルールセットをインストールすると校正が利用できます。
+                </p>
+              </div>
+            ) : (
+              <div className="pt-4 text-center">
+                <p className="text-sm text-foreground-tertiary">問題は検出されませんでした</p>
+              </div>
+            )
           ) : sortMode === "category" ? (
             renderGroupedList()
           ) : (
