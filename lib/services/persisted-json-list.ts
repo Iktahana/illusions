@@ -199,6 +199,15 @@ export class PersistedJsonListStore<TItem> {
   }
 
   /**
+   * Remove every stored standalone list sharing this store's key prefix
+   * (i.e. across ALL files). Used for a global reset.
+   */
+  async clearAllStandalone(): Promise<void> {
+    const keys = await this.storage.getKeysByPrefix(this.config.standaloneKeyPrefix);
+    await Promise.all(keys.map((key) => this.storage.removeItem(key)));
+  }
+
+  /**
    * Apply a mutation to the standalone-mode list under the write mutex
    * (read-modify-write). Returns the resulting list; if the mutation returns
    * `null`, nothing is saved and the loaded list is returned as-is.

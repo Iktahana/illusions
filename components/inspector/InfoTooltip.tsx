@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import clsx from "clsx";
 
@@ -71,23 +72,31 @@ export default function InfoTooltip({
       onMouseLeave={handleMouseLeave}
     >
       {children}
-      {isVisible && (
-        <span
-          ref={tooltipRef}
-          className="info-tooltip-content"
-          style={{
-            position: "fixed",
-            top: `${tooltipPos.top}px`,
-            left: `${tooltipPos.left}px`,
-            transform:
-              tooltipPos.placement === "top"
-                ? "translateX(-50%) translateY(-100%)"
-                : "translateX(-50%) translateY(0)",
-          }}
-        >
-          {content}
-        </span>
-      )}
+      {/* Portal to <body>: the tooltip uses position:fixed with viewport
+          coordinates, but a transformed ancestor (e.g. dockview panels)
+          becomes the containing block for fixed descendants and would
+          shift/clip it. `isVisible` only flips true via a client-side
+          mouse-enter, so this never runs during SSR. */}
+      {isVisible &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <span
+            ref={tooltipRef}
+            className="info-tooltip-content"
+            style={{
+              position: "fixed",
+              top: `${tooltipPos.top}px`,
+              left: `${tooltipPos.left}px`,
+              transform:
+                tooltipPos.placement === "top"
+                  ? "translateX(-50%) translateY(-100%)"
+                  : "translateX(-50%) translateY(0)",
+            }}
+          >
+            {content}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }

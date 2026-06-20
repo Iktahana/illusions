@@ -88,6 +88,10 @@ export async function syncLoadedRulesets(proxy: RuleRunnerProxy): Promise<void> 
         failedIds.push(info.id);
       }
     } catch (err) {
+      // 破棄済み worker への load は teardown / HMR の正常系。失敗扱いせず静かに中断。
+      if (err instanceof Error && err.name === "WorkerDisposedError") {
+        return;
+      }
       console.error(`[external-ruleset-loader] failed to load ruleset "${info.id}":`, err);
       failedIds.push(info.id);
     }

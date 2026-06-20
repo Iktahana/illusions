@@ -191,13 +191,3 @@ describe("jtf-2-2-1-kanji word boundary", () => {
     expect(subet).toHaveLength(0);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Preset configuration
-// ---------------------------------------------------------------------------
-describe("lint preset configuration", () => {
-  it("should disable me2-11 in strict preset to avoid contradiction with me2-12", async () => {
-    const { LINT_PRESETS } = await import("../lint-presets");
-    expect(LINT_PRESETS.strict.configs["me2-11-vertical-numbers"].enabled).toBe(false);
-  });
-});

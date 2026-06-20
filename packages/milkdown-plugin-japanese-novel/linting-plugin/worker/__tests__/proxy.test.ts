@@ -306,4 +306,129 @@ describe("RuleRunnerProxy", () => {
     expect((err as Error).message).toBe("boom");
     proxy.dispose();
   });
+
+  // ----------------------------------------------------------------
+  // External L2 (morphological) token forwarding — option (c) wiring.
+  // External rulesets run inside the worker; their L2 rules need kuromoji
+  // tokens, which only the main thread can compute. The proxy must learn
+  // (via RULESET_LOADED) that the worker hosts morph rules, report
+  // hasMorphologicalRules() so the decoration plugin tokenizes, and then
+  // forward those tokens to the worker in RUN_BATCH.
+  // ----------------------------------------------------------------
+
+  const fakeTokens = [{ surface: "走っ" }, { surface: "た" }] as unknown as ReadonlyArray<
+    import("@/lib/nlp-client/types").Token
+  >;
+
+  it("omits tokens from RUN_BATCH when the worker hosts no morphological rules", () => {
+    const proxy = makeProxy();
+    emitReady();
+
+    expect(proxy.hasMorphologicalRules()).toBe(false);
+
+    // RUN_BATCH is posted synchronously once READY; swallow the
+    // dispose-time rejection so it doesn't surface as unhandled.
+    proxy
+      .runBatch({
+        paragraphs: [{ text: "走った", index: 0, tokens: fakeTokens }],
+        mode: "per-paragraph",
+        version: 1,
+      })
+      .catch(() => {});
+
+    const sent = fakeWorker.received.find((m) => m.type === "RUN_BATCH");
+    if (sent?.type !== "RUN_BATCH") throw new Error("unreachable");
+    // L1-only path: tokens stripped to keep the payload small.
+    expect(sent.paragraphs[0].tokens).toBeUndefined();
+    proxy.dispose();
+  });
+
+  it("reports hasMorphologicalRules() and forwards tokens after an external L2 ruleset loads", async () => {
+    const proxy = makeProxy();
+    emitReady();
+
+    const loadPromise = proxy.loadRuleset("com.example.l2", "/* code */");
+    const loadMsg = fakeWorker.received.find((m) => m.type === "LOAD_RULESET");
+    if (loadMsg?.type !== "LOAD_RULESET") throw new Error("unreachable");
+
+    // Worker rebuilt its runner and now hosts a registered morph rule.
+    fakeWorker.emit({
+      type: "RULESET_LOADED",
+      correlationId: loadMsg.correlationId,
+      id: "com.example.l2",
+      ok: true,
+      ruleIds: ["ex-morph-1"],
+      warnings: [],
+      hasMorphologicalRules: true,
+    });
+    await loadPromise;
+
+    // Decoration plugin now sees morph rules → tokenizes.
+    expect(proxy.hasMorphologicalRules()).toBe(true);
+
+    proxy
+      .runBatch({
+        paragraphs: [{ text: "走った", index: 0, tokens: fakeTokens }],
+        mode: "per-paragraph",
+        version: 1,
+      })
+      .catch(() => {});
+
+    const sent = fakeWorker.received.find((m) => m.type === "RUN_BATCH");
+    if (sent?.type !== "RUN_BATCH") throw new Error("unreachable");
+    expect(sent.paragraphs[0].tokens).toBe(fakeTokens);
+    proxy.dispose();
+  });
+
+  it("stops forwarding tokens after the external L2 ruleset is unloaded", async () => {
+    const proxy = makeProxy();
+    emitReady();
+
+    // Load → morph present.
+    const loadPromise = proxy.loadRuleset("com.example.l2", "/* code */");
+    const loadMsg = fakeWorker.received.find((m) => m.type === "LOAD_RULESET");
+    if (loadMsg?.type !== "LOAD_RULESET") throw new Error("unreachable");
+    fakeWorker.emit({
+      type: "RULESET_LOADED",
+      correlationId: loadMsg.correlationId,
+      id: "com.example.l2",
+      ok: true,
+      ruleIds: ["ex-morph-1"],
+      warnings: [],
+      hasMorphologicalRules: true,
+    });
+    await loadPromise;
+    expect(proxy.hasMorphologicalRules()).toBe(true);
+
+    // Unload → worker rebuilds without morph rules.
+    const unloadPromise = proxy.unloadRuleset("com.example.l2");
+    const unloadMsg = fakeWorker.received.find((m) => m.type === "UNLOAD_RULESET");
+    if (unloadMsg?.type !== "UNLOAD_RULESET") throw new Error("unreachable");
+    fakeWorker.emit({
+      type: "RULESET_LOADED",
+      correlationId: unloadMsg.correlationId,
+      id: "com.example.l2",
+      ok: true,
+      ruleIds: [],
+      warnings: [],
+      hasMorphologicalRules: false,
+    });
+    await unloadPromise;
+
+    expect(proxy.hasMorphologicalRules()).toBe(false);
+
+    proxy
+      .runBatch({
+        paragraphs: [{ text: "走った", index: 0, tokens: fakeTokens }],
+        mode: "per-paragraph",
+        version: 2,
+      })
+      .catch(() => {});
+
+    const batches = fakeWorker.received.filter((m) => m.type === "RUN_BATCH");
+    const last = batches[batches.length - 1];
+    if (last?.type !== "RUN_BATCH") throw new Error("unreachable");
+    expect(last.paragraphs[0].tokens).toBeUndefined();
+    proxy.dispose();
+  });
 });

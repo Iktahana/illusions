@@ -129,6 +129,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     setItem: invokeChannel(STORAGE_CHANNELS.invoke.setItem, { arity: 2 }),
     getItem: invokeChannel(STORAGE_CHANNELS.invoke.getItem, { arity: 1 }),
     removeItem: invokeChannel(STORAGE_CHANNELS.invoke.removeItem, { arity: 1 }),
+    getKeysByPrefix: invokeChannel(STORAGE_CHANNELS.invoke.getKeysByPrefix, { arity: 1 }),
   },
   vfs: {
     openDirectory: invokeChannel(VFS_CHANNELS.invoke.openDirectory, { arity: 0 }),

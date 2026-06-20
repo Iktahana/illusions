@@ -45,6 +45,7 @@ export class ElectronStorageProvider implements IStorageService {
       setItem: (key: string, value: string) => Promise<void>;
       getItem: (key: string) => Promise<string | null>;
       removeItem: (key: string) => Promise<void>;
+      getKeysByPrefix: (prefix: string) => Promise<string[]>;
     };
   }
 
@@ -181,6 +182,12 @@ export class ElectronStorageProvider implements IStorageService {
     await this.initialize();
     const api = this.getElectronAPI();
     return api.removeItem(key);
+  }
+
+  async getKeysByPrefix(prefix: string): Promise<string[]> {
+    await this.initialize();
+    const api = this.getElectronAPI();
+    return api.getKeysByPrefix(prefix);
   }
 }
 

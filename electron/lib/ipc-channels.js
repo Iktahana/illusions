@@ -44,6 +44,7 @@ const STORAGE_CHANNELS = Object.freeze({
     setItem: "storage:set-item",
     getItem: "storage:get-item",
     removeItem: "storage:remove-item",
+    getKeysByPrefix: "storage:get-keys-by-prefix",
   }),
   event: Object.freeze({}),
 });

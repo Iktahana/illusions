@@ -128,6 +128,17 @@ function buildRunner(): { runner: RuleRunner; ruleGuidelineMap: Map<string, stri
 // Initial runner (no externals yet).
 let { runner } = buildRunner();
 
+/**
+ * Whether the runner hosts at least one *registered* morphological rule,
+ * ignoring enabled state. Reported in RULESET_LOADED so the proxy starts
+ * forwarding tokens before SET_CONFIG enables the new rules.
+ */
+function runnerHasRegisteredMorphRules(r: RuleRunner): boolean {
+  return r
+    .getRegisteredRules()
+    .some((rule) => isMorphologicalLintRule(rule) || isMorphologicalDocumentLintRule(rule));
+}
+
 // -------------------------------------------------------------------------
 // Helpers
 // -------------------------------------------------------------------------
@@ -198,7 +209,13 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
 
         if (runPer) {
           for (const p of paragraphs) {
-            const issues = runner.runAll(p.text);
+            // `runAllWithTokens` runs L1 rules via lint() AND enabled L2 rules
+            // via lintWithTokens(), so it fully replaces runAll() when tokens
+            // are present (no double execution). Tokens arrive only when an
+            // external morphological ruleset is loaded; otherwise L1-only.
+            const issues = p.tokens
+              ? runner.runAllWithTokens(p.text, p.tokens)
+              : runner.runAll(p.text);
             if (issues.length > 0) perParagraph.set(p.index, issues);
           }
         }
@@ -256,7 +273,15 @@ async function handleLoadRuleset(correlationId: number, id: string, code: string
         messageJa: w.messageJa,
         detail: w.detail,
       }));
-      post({ type: "RULESET_LOADED", correlationId, id, ok: false, ruleIds: [], warnings });
+      post({
+        type: "RULESET_LOADED",
+        correlationId,
+        id,
+        ok: false,
+        ruleIds: [],
+        warnings,
+        hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+      });
       return;
     }
 
@@ -278,7 +303,15 @@ async function handleLoadRuleset(correlationId: number, id: string, code: string
       detail: w.detail,
     }));
 
-    post({ type: "RULESET_LOADED", correlationId, id, ok: true, ruleIds, warnings: allWarnings });
+    post({
+      type: "RULESET_LOADED",
+      correlationId,
+      id,
+      ok: true,
+      ruleIds,
+      warnings: allWarnings,
+      hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+    });
   } catch (err) {
     // Ensure blob URL is always revoked even on error.
     if (url !== null) {
@@ -297,7 +330,15 @@ async function handleLoadRuleset(correlationId: number, id: string, code: string
       },
     ];
     // Leave existing runner intact (failure isolation).
-    post({ type: "RULESET_LOADED", correlationId, id, ok: false, ruleIds: [], warnings });
+    post({
+      type: "RULESET_LOADED",
+      correlationId,
+      id,
+      ok: false,
+      ruleIds: [],
+      warnings,
+      hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+    });
   }
 }
 
@@ -310,7 +351,15 @@ function handleUnloadRuleset(correlationId: number, id: string): void {
   try {
     const { runner: newRunner } = buildRunner();
     runner = newRunner;
-    post({ type: "RULESET_LOADED", correlationId, id, ok: true, ruleIds: [], warnings: [] });
+    post({
+      type: "RULESET_LOADED",
+      correlationId,
+      id,
+      ok: true,
+      ruleIds: [],
+      warnings: [],
+      hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+    });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     post({
@@ -326,6 +375,7 @@ function handleUnloadRuleset(correlationId: number, id: string): void {
           detail,
         },
       ],
+      hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
     });
   }
 }

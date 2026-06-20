@@ -4,8 +4,6 @@ import type { LintRule, RuleLevel } from "@/lib/linting/types";
 // L1 JSON-driven factory rules from Japanese-Style-Sheet
 // ---------------------------------------------------------------------------
 import { createJtfL1Rules } from "@/lib/linting/rules/json-l1/jtf-l1-rules";
-import { createManuscriptL1Rules } from "@/lib/linting/rules/json-l1/manuscript-l1-rules";
-import { createNihongoHyoukiL1Rules } from "@/lib/linting/rules/json-l1";
 
 /**
  * Return all hand-written rule instances (morphological L2 rules and other
@@ -28,7 +26,7 @@ export function getAllRules(): LintRule[] {
 
 /** Return all JSON-driven L1 rules from the style-sheet factories. */
 export function createJsonDrivenRules(): LintRule[] {
-  return [...createJtfL1Rules(), ...createManuscriptL1Rules(), ...createNihongoHyoukiL1Rules()];
+  return [...createJtfL1Rules()];
 }
 
 /** Lazily-built map of rule ID -> detection level, covering ALL registered rule instances (hand-written via getAllRules + JSON-driven factories). */
