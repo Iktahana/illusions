@@ -713,7 +713,8 @@ function ExportDialogInner({
                 </div>
                 {settings.fullwidthSpaceIndent && (
                   <p className="text-xs text-foreground-tertiary mt-1">
-                    段落の先頭に全角スペース（U+3000）を{Math.max(0, Math.round(settings.textIndent))}
+                    段落の先頭に全角スペース（U+3000）を
+                    {Math.max(0, Math.round(settings.textIndent))}
                     個挿入します。書式上の字下げ（em）は無効になります。
                   </p>
                 )}

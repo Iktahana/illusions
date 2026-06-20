@@ -10,11 +10,7 @@ import {
   toPdfExportSettings,
   toDocxExportSettings,
 } from "../export-settings";
-import {
-  fullwidthIndentCount,
-  fullwidthIndentPrefix,
-  FULLWIDTH_SPACE,
-} from "../fullwidth-indent";
+import { fullwidthIndentCount, fullwidthIndentPrefix, FULLWIDTH_SPACE } from "../fullwidth-indent";
 
 const U3000 = "　";
 
