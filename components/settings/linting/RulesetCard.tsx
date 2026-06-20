@@ -135,31 +135,48 @@ export default function RulesetCard({
         controlsDisabled && !error && "opacity-70",
       )}
     >
-      {/* Card header */}
+      {/* Card header — 2 段構成。タイトル行は折り返さず name を truncate、
+          メタチップ（出典・ライセンス・購入）は別行で flex-wrap させて
+          横並びの混雑による折り返し崩れ（「更新あり」の文字割れ等）を防ぐ。 */}
       <div className="flex items-center gap-2 px-3 py-2.5 bg-background-tertiary/50">
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
-          aria-expanded={expanded}
-        >
-          {expanded ? (
-            <ChevronDown className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
-          ) : (
-            <ChevronRight className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
+        {/* 左カラム: タイトル行 + メタ行 */}
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          {/* タイトル行: 展開ボタン（chevron + name）+ 更新あり + 同期スピナー */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="flex items-center gap-1.5 min-w-0 text-left"
+              aria-expanded={expanded}
+            >
+              {expanded ? (
+                <ChevronDown className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
+              )}
+              <span className="text-sm font-medium text-foreground truncate">{nameJa}</span>
+            </button>
+            {updateAvailable && (
+              <span className="text-[10px] font-medium text-warning bg-warning/10 border border-warning/30 px-1.5 py-0.5 rounded leading-none flex-shrink-0 whitespace-nowrap">
+                更新あり
+              </span>
+            )}
+            {syncing && (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-accent flex-shrink-0" />
+            )}
+          </div>
+
+          {/* メタ行: 出典 + 各種バッジ。chevron 幅ぶん字下げして name と揃える。
+              購入リンク（<a>）はボタン外に出し、不正な入れ子とクリック競合を回避。 */}
+          {(publisherJa || source || license) && (
+            <div className="flex items-center gap-x-2 gap-y-1 flex-wrap pl-5">
+              {publisherJa && (
+                <span className="text-xs text-foreground/50 whitespace-nowrap">{publisherJa}</span>
+              )}
+              <SourceBadge source={source} />
+              <LicenseBadge license={license} licenseUrl={licenseUrl} purchaseUrl={purchaseUrl} />
+            </div>
           )}
-          <span className="text-sm font-medium text-foreground truncate">{nameJa}</span>
-          {publisherJa && (
-            <span className="text-xs text-foreground/50 flex-shrink-0">{publisherJa}</span>
-          )}
-          <SourceBadge source={source} />
-          <LicenseBadge license={license} licenseUrl={licenseUrl} purchaseUrl={purchaseUrl} />
-          {updateAvailable && (
-            <span className="text-[10px] font-medium text-warning bg-warning/10 border border-warning/30 px-1.5 py-0.5 rounded leading-none">
-              更新あり
-            </span>
-          )}
-          {syncing && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent ml-1" />}
-        </button>
+        </div>
 
         {/* Version */}
         {(version || tag) && (

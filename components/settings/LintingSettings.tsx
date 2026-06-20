@@ -11,6 +11,7 @@ import { useIgnoredCorrectionsContext } from "@/contexts/IgnoredCorrectionsConte
 import ModeSelector from "./linting/ModeSelector";
 import RulesetList from "./linting/RulesetList";
 import MarketplaceEntryCard from "./linting/MarketplaceEntryCard";
+import RulesetAutoUpdateToggle from "./linting/RulesetAutoUpdateToggle";
 import ClearIgnoredCorrectionsButton from "./linting/ClearIgnoredCorrectionsButton";
 import { useRulesetStatus } from "./linting/useRulesetStatus";
 
@@ -112,6 +113,13 @@ function LintingSettingsInner({
           disabled={!lintingEnabled}
           rulesetStatus={isElectron ? rulesetStatus : undefined}
         />
+
+        {/* ルールセット自動更新トグル（Electron のみ） */}
+        {isElectron && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <RulesetAutoUpdateToggle disabled={!lintingEnabled} />
+          </div>
+        )}
 
         {/* Web fallback note */}
         {!isElectron && (
