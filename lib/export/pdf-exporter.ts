@@ -67,7 +67,9 @@ export async function generatePdf(content: string, options: PdfExportOptions): P
   const fullwidthSpaceCount = options.fullwidthSpaceIndent
     ? fullwidthIndentCount(options.textIndent ?? 0)
     : 0;
-  const effectiveTextIndentEm = fullwidthSpaceCount > 0 ? 0 : options.textIndent;
+  // "Replace" semantics: when the toggle is on, the CSS text-indent is always
+  // suppressed (even if the count rounds to 0), so the two mechanisms never mix.
+  const effectiveTextIndentEm = options.fullwidthSpaceIndent ? 0 : options.textIndent;
 
   // Build typesetting options when chars/lines are specified
   const hasTypesetting = options.charsPerLine != null && options.linesPerPage != null;
