@@ -10,6 +10,25 @@
 
 import type { LintIssue, LintRuleConfig } from "@/lib/linting/types";
 import type { Token } from "@/lib/nlp-client/types";
+import type { DictLookup } from "@/lib/dict/dict-types";
+
+/**
+ * Prewarmed dictionary membership for one batch.
+ *
+ * The lint pass is synchronous but dictionary I/O is async, so the renderer
+ * looks up every candidate headword in the batch (where `getDictAccess()` is
+ * reachable) and ships the result here. `dict:genji` rules read it synchronously
+ * via `ctx.toolkit.dict.hasCached/lookupCached`.
+ *
+ * `entries` includes misses (`{ found: false }`) so the rule can distinguish
+ * "looked up, absent → flag" from "not looked up → skip". `ready` is false when
+ * the dictionary is not usable (not installed / web fallback / corrupt), in
+ * which case the rule no-ops.
+ */
+export interface DictSnapshotPayload {
+  ready: boolean;
+  entries: Array<[string, DictLookup]>;
+}
 
 // -------------------------------------------------------------------------
 // Plugin-facing surface
@@ -32,6 +51,12 @@ export interface RuleRunnerLike {
    * paragraphs in addition to the uncached set.
    */
   hasMorphologicalDocumentRules(): boolean;
+  /**
+   * True iff at least one loaded ruleset requires the Genji dictionary. The
+   * decoration plugin uses this to decide whether to prewarm dictionary
+   * membership and attach a {@link DictSnapshotPayload} to each batch.
+   */
+  hasDictRules(): boolean;
   /** Execute one batched lint pass. */
   runBatch(req: RunBatchRequest): Promise<RunBatchResponse>;
   /**
@@ -83,6 +108,12 @@ export interface RunBatchRequest {
    * Defaults to `true`.
    */
   runWorker?: boolean;
+  /**
+   * Prewarmed dictionary membership for this batch. Present only when a loaded
+   * ruleset requires the dictionary (`hasDictRules()`); the rule reads it via
+   * `ctx.toolkit.dict.hasCached/lookupCached`.
+   */
+  dict?: DictSnapshotPayload;
 }
 
 export interface RunBatchResponse {
@@ -141,6 +172,12 @@ export type WorkerEvent =
        * tokens start flowing before the main thread sends SET_CONFIG.
        */
       hasMorphologicalRules: boolean;
+      /**
+       * Whether any currently-loaded ruleset requires the Genji dictionary.
+       * Drives the proxy's `hasDictRules()` so the decoration plugin prewarms
+       * membership and ships a {@link DictSnapshotPayload} per batch.
+       */
+      hasDictRules: boolean;
     };
 
 /** Main → worker requests. */
@@ -172,6 +209,8 @@ export type WorkerRequest =
        */
       paragraphs: ReadonlyArray<{ text: string; index: number; tokens?: ReadonlyArray<Token> }>;
       mode: BatchMode;
+      /** Prewarmed dictionary membership; present only when `hasDictRules()`. */
+      dict?: DictSnapshotPayload;
     }
   | {
       /** Load (or reload) an external ruleset by injecting its ESM source. */

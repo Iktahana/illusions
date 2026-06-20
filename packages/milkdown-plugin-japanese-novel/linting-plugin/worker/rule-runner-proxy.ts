@@ -17,8 +17,10 @@ import {
 } from "@/lib/linting/types";
 import type { LintIssue, LintRule, LintRuleConfig } from "@/lib/linting/types";
 import type { RulesetModule } from "@/lib/linting/sdk/ruleset-types";
+import { createSnapshotDictToolkit, type DictToolkitInternal } from "@/lib/linting/toolkit";
 
 import {
+  anyRulesetRequiresDict,
   buildRulesetRunner,
   createIsolatedRulesetContext,
   importRulesetModule,
@@ -80,6 +82,19 @@ export class RuleRunnerProxy implements RuleRunnerLike {
    * and forwards those tokens to the worker in RUN_BATCH.
    */
   private workerHasMorphRules = false;
+
+  /**
+   * Whether the worker currently hosts at least one ruleset that requires the
+   * Genji dictionary. Updated on every RULESET_LOADED event. Drives
+   * `hasDictRules()` so the decoration plugin prewarms membership.
+   */
+  private workerHasDictRules = false;
+
+  /**
+   * Persistent snapshot-backed dictionary toolkit for the main-thread fallback
+   * runner. Survives fallback rebuilds; `runBatchFallback` fills it per batch.
+   */
+  private readonly fallbackDict: DictToolkitInternal = createSnapshotDictToolkit();
 
   private nextCorrelationId = 1;
   private latestRequestedVersion = 0;
@@ -229,6 +244,13 @@ export class RuleRunnerProxy implements RuleRunnerLike {
     return this.mainRunner.hasMorphologicalDocumentRules();
   }
 
+  hasDictRules(): boolean {
+    if (this.fallbackActive) {
+      return anyRulesetRequiresDict(this.fallbackModules.values());
+    }
+    return this.workerHasDictRules;
+  }
+
   // ----------------------------------------------------------------
   // RuleRunnerLike — async batch execution
   // ----------------------------------------------------------------
@@ -317,6 +339,9 @@ export class RuleRunnerProxy implements RuleRunnerLike {
         ? req.paragraphs.map((p) => ({ text: p.text, index: p.index, tokens: p.tokens }))
         : req.paragraphs.map((p) => ({ text: p.text, index: p.index })),
       mode: req.mode,
+      // Ship prewarmed dictionary membership only when the worker hosts a
+      // dict-requiring ruleset; keeps the structured-clone payload minimal.
+      dict: this.workerHasDictRules ? req.dict : undefined,
     });
 
     return workerResponse;
@@ -460,6 +485,7 @@ export class RuleRunnerProxy implements RuleRunnerLike {
         // rules. This drives both `hasMorphologicalRules()` (so the
         // decoration plugin tokenizes) and token forwarding in RUN_BATCH.
         this.workerHasMorphRules = evt.hasMorphologicalRules;
+        this.workerHasDictRules = evt.hasDictRules;
         const entry = this.pendingRulesets.get(evt.correlationId);
         if (entry) {
           this.pendingRulesets.delete(evt.correlationId);
@@ -571,7 +597,7 @@ export class RuleRunnerProxy implements RuleRunnerLike {
       const { runner } = buildRulesetRunner({
         legacyRules: this.fallbackLegacyRules,
         externals: this.fallbackModules.values(),
-        ctx: createIsolatedRulesetContext(),
+        ctx: createIsolatedRulesetContext(this.fallbackDict),
         baseGuidelineMapEntries: this.lastGuidelineMapEntries,
         configs: this.lastConfigs,
         activeGuidelines: this.lastActiveGuidelines,
@@ -632,6 +658,14 @@ export class RuleRunnerProxy implements RuleRunnerLike {
     const runner = this.fallbackRunner;
     if (req.runWorker === false || !runner) {
       return { perParagraph: mainPerParagraph, document: mainDocument };
+    }
+
+    // Install the prewarmed dictionary snapshot (or clear it) so dict:genji
+    // rules hosted by the fallback runner read fresh per-batch membership.
+    if (req.dict) {
+      this.fallbackDict.setSnapshot(req.dict.entries, req.dict.ready);
+    } else {
+      this.fallbackDict.clearSnapshot();
     }
 
     const runPer = req.mode === "per-paragraph" || req.mode === "both";

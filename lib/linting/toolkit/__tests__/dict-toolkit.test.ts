@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { createDictToolkit } from "../dict-toolkit";
+import { createDictToolkit, createSnapshotDictToolkit } from "../dict-toolkit";
 import type { GenjiHealth } from "@/lib/dict/dict-access";
 
 function spyDict() {
@@ -34,4 +34,76 @@ describe("createDictToolkit", () => {
       expect(dict.has).not.toHaveBeenCalled();
     },
   );
+
+  it("never reports cached membership (no prewarm snapshot)", () => {
+    const tk = createDictToolkit({ state: "ready" } as GenjiHealth, spyDict());
+    expect(tk.hasCached("猫")).toBe(false);
+    expect(tk.lookupCached("猫")).toBeUndefined();
+  });
+});
+
+describe("createSnapshotDictToolkit", () => {
+  it("starts not-ready with an empty snapshot", () => {
+    const tk = createSnapshotDictToolkit();
+    expect(tk.ready).toBe(false);
+    expect(tk.state).toBe("unknown");
+    expect(tk.hasCached("猫")).toBe(false);
+    expect(tk.lookupCached("猫")).toBeUndefined();
+  });
+
+  it("reads installed snapshot membership synchronously when ready", () => {
+    const tk = createSnapshotDictToolkit();
+    tk.setSnapshot(
+      [
+        ["猫", { found: true, reading: "ネコ" }],
+        ["みゃお", { found: false }],
+      ],
+      true,
+    );
+    expect(tk.ready).toBe(true);
+    expect(tk.state).toBe("ready");
+    // Present headword.
+    expect(tk.hasCached("猫")).toBe(true);
+    expect(tk.lookupCached("猫")).toEqual({ found: true, reading: "ネコ" });
+    // Prewarmed-but-absent headword: distinguishable from "not prewarmed".
+    expect(tk.hasCached("みゃお")).toBe(false);
+    expect(tk.lookupCached("みゃお")).toEqual({ found: false });
+    // Not prewarmed at all → undefined (rule must skip, never flag).
+    expect(tk.lookupCached("未照合")).toBeUndefined();
+  });
+
+  it("treats a not-ready snapshot as no prewarm (rules no-op)", () => {
+    const tk = createSnapshotDictToolkit();
+    // ready=false even though entries are present (dict not installed).
+    tk.setSnapshot([["猫", { found: true }]], false);
+    expect(tk.ready).toBe(false);
+    expect(tk.hasCached("猫")).toBe(false);
+    expect(tk.lookupCached("猫")).toBeUndefined();
+  });
+
+  it("clearSnapshot returns to the not-prewarmed state", () => {
+    const tk = createSnapshotDictToolkit();
+    tk.setSnapshot([["猫", { found: true }]], true);
+    tk.clearSnapshot();
+    expect(tk.ready).toBe(false);
+    expect(tk.hasCached("猫")).toBe(false);
+    expect(tk.lookupCached("猫")).toBeUndefined();
+  });
+
+  it("replaces the snapshot per batch (no stale carryover)", () => {
+    const tk = createSnapshotDictToolkit();
+    tk.setSnapshot([["猫", { found: true }]], true);
+    expect(tk.lookupCached("猫")).toEqual({ found: true });
+    // Next batch covers different terms; the old term is no longer prewarmed.
+    tk.setSnapshot([["犬", { found: true }]], true);
+    expect(tk.lookupCached("犬")).toEqual({ found: true });
+    expect(tk.lookupCached("猫")).toBeUndefined();
+  });
+
+  it("has no live async dictionary connection (always empty)", async () => {
+    const tk = createSnapshotDictToolkit();
+    tk.setSnapshot([["猫", { found: true }]], true);
+    expect(await tk.has("猫")).toBe(false);
+    expect((await tk.lookupBatch(["猫"])).size).toBe(0);
+  });
 });

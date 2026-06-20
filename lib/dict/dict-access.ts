@@ -166,12 +166,17 @@ class DictAccess {
   ): Promise<void> {
     for (let i = 0; i < misses.length; i += LOCAL_BATCH_CHUNK) {
       const chunk = misses.slice(i, i + LOCAL_BATCH_CHUNK);
-      let rows: Array<{ entry: string } & DictLookup> = [];
+      let rows: Array<{ entry: string } & DictLookup>;
       try {
         rows = await dict.lookupBatch(chunk);
       } catch (err) {
+        // A transient IPC error must NOT be recorded as "these words are absent":
+        // leave the chunk unresolved (callers see no entry → treat as unknown,
+        // never as out-of-dictionary) and let the next pass re-query. Caching a
+        // synthetic MISS here would both poison the LRU and make the 辞書外語
+        // lint rule flag every word until the dictionary is re-downloaded.
         console.warn("[dict-access] local lookupBatch failed:", err);
-        rows = [];
+        continue;
       }
 
       const found = new Set<string>();
@@ -182,7 +187,8 @@ class DictAccess {
         out.set(entry, lookup);
         found.add(entry);
       }
-      // Cache negatives so repeated analysis doesn't re-query absent words.
+      // Cache negatives so repeated analysis doesn't re-query absent words. Only
+      // safe after a SUCCESSFUL query — a genuine miss, not an I/O failure.
       for (const t of chunk) {
         if (!found.has(t)) {
           this.cache.set(t, MISS);
@@ -204,8 +210,11 @@ class DictAccess {
     try {
       map = await GenjiApiBackend.lookupBatchRemote(capped);
     } catch (err) {
+      // Same fail-safe as the local path: a network error must not be cached as
+      // "absent". Leave the terms unresolved so a later request can retry and so
+      // no consumer mistakes an I/O failure for an out-of-dictionary word.
       console.warn("[dict-access] remote lookupBatch failed:", err);
-      map = new Map();
+      return;
     }
 
     for (const t of capped) {

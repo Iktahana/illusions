@@ -30,7 +30,9 @@ export const LEGACY_PACKAGE_IMPORTS = new Map([
   [
     "packages/milkdown-plugin-japanese-novel/linting-plugin/decoration-plugin.ts",
     new Set([
+      "@/lib/dict/dict-access",
       "@/lib/linting",
+      "@/lib/linting/dict-candidate-terms",
       "@/lib/nlp-client/types",
       "@/lib/project/project-types",
       "@/shared/lib/hash-string",
@@ -64,6 +66,16 @@ export const LEGACY_PACKAGE_IMPORTS = new Map([
     ]),
   ],
   [
+    "packages/milkdown-plugin-japanese-novel/linting-plugin/worker/__tests__/build-ruleset-runner.dict.test.ts",
+    new Set([
+      "@/lib/linting/sdk/ruleset-context",
+      "@/lib/linting/sdk/ruleset-types",
+      "@/lib/linting/toolkit",
+      "@/lib/linting/types",
+      "@/lib/nlp-client/types",
+    ]),
+  ],
+  [
     "packages/milkdown-plugin-japanese-novel/linting-plugin/worker/build-ruleset-runner.ts",
     new Set([
       "@/lib/linting/registry/ruleset-context-factory",
@@ -71,6 +83,7 @@ export const LEGACY_PACKAGE_IMPORTS = new Map([
       "@/lib/linting/rule-runner",
       "@/lib/linting/sdk/ruleset-context",
       "@/lib/linting/sdk/ruleset-types",
+      "@/lib/linting/toolkit",
       "@/lib/linting/types",
     ]),
   ],
@@ -83,12 +96,13 @@ export const LEGACY_PACKAGE_IMPORTS = new Map([
       "@/lib/linting/rule-registry",
       "@/lib/linting/rule-runner",
       "@/lib/linting/sdk/ruleset-types",
+      "@/lib/linting/toolkit",
       "@/lib/linting/types",
     ]),
   ],
   [
     "packages/milkdown-plugin-japanese-novel/linting-plugin/worker/protocol.ts",
-    new Set(["@/lib/linting/types", "@/lib/nlp-client/types"]),
+    new Set(["@/lib/dict/dict-types", "@/lib/linting/types", "@/lib/nlp-client/types"]),
   ],
   [
     "packages/milkdown-plugin-japanese-novel/linting-plugin/worker/rule-runner-proxy.ts",
@@ -97,6 +111,7 @@ export const LEGACY_PACKAGE_IMPORTS = new Map([
       "@/lib/linting/rule-registry",
       "@/lib/linting/rule-runner",
       "@/lib/linting/sdk/ruleset-types",
+      "@/lib/linting/toolkit",
       "@/lib/linting/types",
     ]),
   ],

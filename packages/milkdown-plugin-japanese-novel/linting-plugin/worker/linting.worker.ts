@@ -20,7 +20,9 @@ import type { LintIssue, LintRuleConfig } from "@/lib/linting/types";
 import { isMorphologicalDocumentLintRule, isMorphologicalLintRule } from "@/lib/linting/types";
 import { RulesetRegistry } from "@/lib/linting/registry/ruleset-registry";
 import type { RulesetModule } from "@/lib/linting/sdk/ruleset-types";
+import { createSnapshotDictToolkit } from "@/lib/linting/toolkit";
 import {
+  anyRulesetRequiresDict,
   buildRulesetRunner,
   createIsolatedRulesetContext,
   importRulesetModule,
@@ -67,16 +69,28 @@ let lastGuidelineMapEntries: Array<[string, string | undefined]> = Array.from(
 // Active runner (swapped on successful rebuild)
 // -------------------------------------------------------------------------
 
+/**
+ * Persistent snapshot-backed dictionary toolkit. Survives runner rebuilds so the
+ * per-batch prewarm installed on RUN_BATCH stays valid for the rules that closed
+ * over it. Built once; the renderer fills it via `setSnapshot`.
+ */
+const workerDict = createSnapshotDictToolkit();
+
 /** Build a fresh RuleRunner = legacy ∪ all currently-loaded external rules. */
 function buildRunner(): { runner: RuleRunner; ruleGuidelineMap: Map<string, string | undefined> } {
   return buildRulesetRunner({
     legacyRules,
     externals: loadedExternals.values(),
-    ctx: createIsolatedRulesetContext(),
+    ctx: createIsolatedRulesetContext(workerDict),
     baseGuidelineMapEntries: lastGuidelineMapEntries,
     configs: lastConfigs,
     activeGuidelines: lastGuidelines,
   });
+}
+
+/** Whether any loaded ruleset requires the Genji dictionary. */
+function hasDictRules(): boolean {
+  return anyRulesetRequiresDict(loadedExternals.values());
 }
 
 // Initial runner (no externals yet).
@@ -156,7 +170,15 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
         runner.setGuidelineMap(new Map(msg.entries));
         return;
       case "RUN_BATCH": {
-        const { correlationId, version, paragraphs, mode } = msg;
+        const { correlationId, version, paragraphs, mode, dict } = msg;
+        // Install the prewarmed dictionary snapshot for this batch (or clear it
+        // when absent) so `dict:genji` rules read fresh per-batch membership and
+        // never a stale snapshot from a previous run.
+        if (dict) {
+          workerDict.setSnapshot(dict.entries, dict.ready);
+        } else {
+          workerDict.clearSnapshot();
+        }
         const perParagraph = new Map<number, LintIssue[]>();
         const runPer = mode === "per-paragraph" || mode === "both";
         const runDoc = mode === "document" || mode === "both";
@@ -228,6 +250,7 @@ async function handleLoadRuleset(correlationId: number, id: string, code: string
         ruleIds: [],
         warnings,
         hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+        hasDictRules: hasDictRules(),
       });
       return;
     }
@@ -258,6 +281,7 @@ async function handleLoadRuleset(correlationId: number, id: string, code: string
       ruleIds,
       warnings: allWarnings,
       hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+      hasDictRules: hasDictRules(),
     });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
@@ -277,6 +301,7 @@ async function handleLoadRuleset(correlationId: number, id: string, code: string
       ruleIds: [],
       warnings,
       hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+      hasDictRules: hasDictRules(),
     });
   }
 }
@@ -298,6 +323,7 @@ function handleUnloadRuleset(correlationId: number, id: string): void {
       ruleIds: [],
       warnings: [],
       hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+      hasDictRules: hasDictRules(),
     });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
@@ -315,6 +341,7 @@ function handleUnloadRuleset(correlationId: number, id: string): void {
         },
       ],
       hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
+      hasDictRules: hasDictRules(),
     });
   }
 }

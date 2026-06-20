@@ -16,6 +16,8 @@ import type { IgnoredCorrection } from "@/lib/project/project-types";
 import { LRUCache } from "@/shared/lib/lru-cache";
 import { hashString } from "@/shared/lib/hash-string";
 import { getAtomOffset, collectParagraphs } from "../shared/paragraph-helpers";
+import { getDictAccess } from "@/lib/dict/dict-access";
+import { collectDictCandidateTerms } from "@/lib/linting/dict-candidate-terms";
 import type {
   LintingPluginState,
   LintingPluginOptions,
@@ -23,6 +25,7 @@ import type {
   RuleRunnerLike,
 } from "./types";
 import { isSilentCancelError } from "./worker/protocol";
+import type { DictSnapshotPayload } from "./worker/protocol";
 
 export const lintingKey = new PluginKey<LintingPluginState>("linting");
 
@@ -306,6 +309,36 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
 
           if (version !== processingVersion) return;
 
+          // Prewarm dictionary membership for dict:genji rules. The lint pass is
+          // synchronous but dictionary I/O is async, so we look up every
+          // candidate headword here (the renderer, where getDictAccess() is
+          // reachable) and ship the result with the batch. Most-inclusive
+          // options are used so the snapshot is a superset of whatever the rule
+          // queries regardless of its config (undeclared terms simply skip).
+          let dictPayload: DictSnapshotPayload | undefined;
+          if (currentRuleRunner.hasDictRules()) {
+            const terms = new Set<string>();
+            for (const tokens of tokensByText.values()) {
+              for (const term of collectDictCandidateTerms(tokens)) terms.add(term);
+            }
+            try {
+              const access = getDictAccess();
+              const health = await access.getHealth();
+              if (version !== processingVersion) return;
+              const ready = health.state === "ready";
+              let entries: DictSnapshotPayload["entries"] = [];
+              if (ready && terms.size > 0) {
+                const map = await access.lookupBatch([...terms]);
+                if (version !== processingVersion) return;
+                entries = [...map.entries()];
+              }
+              dictPayload = { ready, entries };
+            } catch (err) {
+              console.error("[Linting] dictionary prewarm failed:", err);
+              dictPayload = { ready: false, entries: [] };
+            }
+          }
+
           // Build the per-paragraph batch (uncached only). The runner
           // will route through the worker for L1 + main thread for L2
           // morph; results merge transparently.
@@ -325,6 +358,7 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
                 paragraphs: perParaInputs,
                 mode: "per-paragraph",
                 version,
+                dict: dictPayload,
               });
               if (version !== processingVersion) return;
               for (const p of uncachedParagraphs) {
@@ -353,6 +387,7 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
                 paragraphs: docInputs,
                 mode: "document",
                 version,
+                dict: dictPayload,
               });
               if (version !== processingVersion) return;
               documentIssueCache = resp.document;

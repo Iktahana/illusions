@@ -138,6 +138,27 @@ describe("DictAccess (#1624)", () => {
       await access.lookupBatch(["雪", "雪", ""]);
       expect(lookupBatch).toHaveBeenCalledWith(["雪"]);
     });
+
+    it("does NOT record an I/O error as a miss (leaves terms unresolved, re-queries next time)", async () => {
+      // A transient IPC failure must never become a cached `{ found: false }` —
+      // otherwise the 辞書外語 lint rule would flag every word and the poisoned
+      // negative would persist across keystrokes. Regression for the prewarm fix.
+      const lookupBatch = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("ipc boom"))
+        .mockResolvedValueOnce([{ entry: "雪", found: true }]);
+      setElectronDict({ lookupBatch, verify: vi.fn(), getStatus: vi.fn() });
+      const access = await importFresh();
+
+      // First call fails: the term must be ABSENT from the result, not `{found:false}`.
+      const first = await access.lookupBatch(["雪"]);
+      expect(first.has("雪")).toBe(false);
+
+      // The failure was not cached, so a second call actually re-queries and resolves.
+      const second = await access.lookupBatch(["雪"]);
+      expect(second.get("雪")).toEqual({ found: true });
+      expect(lookupBatch).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("has()", () => {
