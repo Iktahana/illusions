@@ -397,6 +397,13 @@ export default function MilkdownEditor({
           result = ctx.get(serializerCtx)(doc);
         }
       });
+      // 安全策（#1840 / レビュー Finding 2）: 縦横切替などでエディタが再マウント中、
+      // 空の初期 doc が一瞬シリアライズされて "" を返すことがある。実コンテンツが
+      // 残っている状態で "" を返すと、呼び出し側がファイルを空で上書きしてしまう。
+      // その場合は null を返してフォールバック（既存 tab.content を保持）させる。
+      if (result === "" && currentContentRef.current !== "") {
+        return null;
+      }
       if (result != null && result !== currentContentRef.current) {
         // ライブ値を ref と親 state に反映し、後続の isDirty 再計算も正しくする。
         currentContentRef.current = result;

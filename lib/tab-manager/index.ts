@@ -127,6 +127,7 @@ export function useTabManager(options?: {
     loadSystemFile: fileIO.loadSystemFile,
     updateTab: tabState.updateTab,
     systemFileOpenHandlerRef,
+    flushActiveEditorRef: options?.flushActiveEditorRef,
     flushTabState: flushTabStateRef.current,
     flushLayoutState: options?.flushLayoutState,
     tryCreateSnapshot: fileIO.tryCreateSnapshot,

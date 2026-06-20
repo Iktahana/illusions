@@ -6,6 +6,11 @@ const { isDev } = require("./app-constants");
 const { isSafeExternalUrl, normalizeExternalUrl } = require("./lib/url-policy");
 const { SYSTEM_CHANNELS, POWER_CHANNELS } = require("./lib/ipc-channels");
 
+// #1839: backstop timeout for the quit-and-install close handshake. If the
+// renderer neither closes nor signals abort within this window, we treat it as
+// aborted (quit cancelled, data preserved) rather than hang forever.
+const CLOSE_HANDSHAKE_TIMEOUT_MS = 30000;
+
 let mainWindow = null;
 const allWindows = new Set();
 
@@ -241,7 +246,16 @@ async function _handleWindowBeforeQuit(win) {
           resolve("aborted");
         }
       };
+      // Backstop（レビュー Finding 3）: renderer が saveDoneAndClose も
+      // notifyCloseAborted も呼ばずに固まった場合（ハンドラ内の例外など）でも、
+      // 永久ハング＋リスナーリークを避けるため一定時間で "aborted" に倒す。
+      // "aborted" = quit 中止なので、データは失わずウィンドウが残る安全側。
+      const timer = setTimeout(() => {
+        cleanup();
+        resolve("aborted");
+      }, CLOSE_HANDSHAKE_TIMEOUT_MS);
       function cleanup() {
+        clearTimeout(timer);
         win.removeListener("closed", onClosed);
         ipcMain.removeListener(SYSTEM_CHANNELS.send.closeAborted, onAborted);
       }
