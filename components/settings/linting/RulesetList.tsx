@@ -1,7 +1,9 @@
 "use client";
 
 import type React from "react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { RefreshCw, Loader2 } from "lucide-react";
+import clsx from "clsx";
 
 import type { Severity } from "@/lib/linting/types";
 import {
@@ -80,6 +82,21 @@ export default function RulesetList({
     onLintingRuleConfigsBatchChange({ ...LINT_DEFAULT_CONFIGS });
   }, [onLintingRuleConfigsBatchChange]);
 
+  // 一括更新（Electron のみ）。更新ありの公式ルールセットを sync() でまとめて
+  // ダウンロードする。syncAllOfficial は差分のみ落とすため最新は触らない。
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const updatableCount = rulesetStatus?.rulesets.filter((r) => r.updateAvailable).length ?? 0;
+  const anySyncing = bulkUpdating || (rulesetStatus?.rulesets.some((r) => r.syncing) ?? false);
+  const handleUpdateAll = useCallback(async () => {
+    if (!rulesetStatus) return;
+    setBulkUpdating(true);
+    try {
+      await rulesetStatus.sync();
+    } finally {
+      setBulkUpdating(false);
+    }
+  }, [rulesetStatus]);
+
   // Build legacy pack rules (内蔵)
   const ruleMetaMap = new Map(LINT_RULES_META.map((r) => [r.id, r]));
 
@@ -107,6 +124,25 @@ export default function RulesetList({
       {/* Section heading + bulk actions */}
       <div className="flex items-center gap-2 flex-wrap">
         <h3 className="text-sm font-medium text-foreground flex-1">校正ルールセット</h3>
+        {/* 一括更新ボタン（Electron かつ更新ありが 1 件以上のときのみ表示） */}
+        {rulesetStatus && updatableCount > 0 && (
+          <button
+            onClick={() => void handleUpdateAll()}
+            disabled={anySyncing}
+            className={clsx(
+              "flex items-center gap-1 text-xs px-2 py-1 rounded font-medium transition-colors",
+              "bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+            )}
+          >
+            {anySyncing ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <RefreshCw className="w-3 h-3" />
+            )}
+            すべて更新（{updatableCount}）
+          </button>
+        )}
         <button
           onClick={handleEnableAll}
           className="text-xs px-2 py-1 text-foreground-secondary hover:text-foreground hover:bg-hover rounded transition-colors"

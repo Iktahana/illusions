@@ -46,6 +46,17 @@ function getRulesetsApi(): ElectronRulesetsApi | null {
   );
 }
 
+/**
+ * proxy が dispose / stale 状態のとき loadRuleset/unloadRuleset が投げる
+ * WorkerDisposedError・WorkerStaleError は teardown / HMR / remount の正常系。
+ * 失敗ではないので呼び出し側で静かに飲み込む（name 判定でクラス結合を避ける）。
+ */
+function isBenignWorkerTeardown(err: unknown): boolean {
+  return (
+    err instanceof Error && (err.name === "WorkerDisposedError" || err.name === "WorkerStaleError")
+  );
+}
+
 // -------------------------------------------------------------------------
 // Public API
 // -------------------------------------------------------------------------
@@ -88,8 +99,8 @@ export async function syncLoadedRulesets(proxy: RuleRunnerProxy): Promise<void> 
         failedIds.push(info.id);
       }
     } catch (err) {
-      // 破棄済み worker への load は teardown / HMR の正常系。失敗扱いせず静かに中断。
-      if (err instanceof Error && err.name === "WorkerDisposedError") {
+      // 破棄済み / stale worker への load は teardown / HMR の正常系。失敗扱いせず静かに中断。
+      if (isBenignWorkerTeardown(err)) {
         return;
       }
       console.error(`[external-ruleset-loader] failed to load ruleset "${info.id}":`, err);
@@ -122,6 +133,8 @@ export function subscribeRulesetChanges(proxy: RuleRunnerProxy): () => void {
     for (const id of ids) {
       if (reason === "uninstalled") {
         proxy.unloadRuleset(id).catch((err) => {
+          // worker 破棄後の unload は teardown の正常系。静かに無視。
+          if (isBenignWorkerTeardown(err)) return;
           console.error(`[external-ruleset-loader] unloadRuleset(${id}) failed:`, err);
         });
       } else {
@@ -150,6 +163,9 @@ export function subscribeRulesetChanges(proxy: RuleRunnerProxy): () => void {
             });
           })
           .catch((err) => {
+            // 更新適用中に worker が破棄された（タブ閉鎖 / HMR / remount）場合は
+            // teardown の正常系。エラー報告せず静かに中断する（#WorkerDisposedError 対策）。
+            if (isBenignWorkerTeardown(err)) return;
             console.error(`[external-ruleset-loader] change handler for "${id}" threw:`, err);
           });
       }
