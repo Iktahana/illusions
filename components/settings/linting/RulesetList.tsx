@@ -86,6 +86,10 @@ export default function RulesetList({
   const legacyPacks = LINT_RULE_CATEGORIES.map((cat) => ({
     id: cat.id,
     nameJa: cat.nameJa,
+    publisherJa: cat.publisherJa,
+    license: cat.license,
+    licenseUrl: cat.licenseUrl,
+    purchaseUrl: cat.purchaseUrl,
     rules: cat.rules
       .map((ruleId) => ruleMetaMap.get(ruleId))
       .filter((meta): meta is (typeof LINT_RULES_META)[number] => meta != null)
@@ -132,6 +136,10 @@ export default function RulesetList({
           id={pack.id}
           nameJa={pack.nameJa}
           source="built-in"
+          publisherJa={pack.publisherJa}
+          license={pack.license}
+          licenseUrl={pack.licenseUrl}
+          purchaseUrl={pack.purchaseUrl}
           rules={pack.rules}
           ruleConfigs={lintingRuleConfigs}
           defaultConfigs={LINT_DEFAULT_CONFIGS}
@@ -152,6 +160,10 @@ export default function RulesetList({
             source="official"
             version={rs.version}
             tag={rs.tag}
+            publisherJa={rs.publisherJa ?? undefined}
+            license={rs.license ?? undefined}
+            licenseUrl={rs.licenseUrl ?? undefined}
+            purchaseUrl={rs.purchaseUrl ?? undefined}
             rules={rs.rules.map((r) => ({
               ruleId: r.ruleId,
               nameJa: r.nameJa,

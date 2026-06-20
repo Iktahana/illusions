@@ -131,6 +131,16 @@ export type WorkerEvent =
       ok: boolean;
       ruleIds: string[];
       warnings: RulesetLoadWarning[];
+      /**
+       * Whether the worker's rebuilt runner now hosts at least one
+       * registered morphological (L2) rule. The proxy uses this to decide
+       * whether to (a) report `hasMorphologicalRules()` as true so the
+       * decoration plugin tokenizes paragraphs, and (b) forward those
+       * tokens to the worker in subsequent RUN_BATCH messages.
+       * Computed from registered rules regardless of enabled state, so
+       * tokens start flowing before the main thread sends SET_CONFIG.
+       */
+      hasMorphologicalRules: boolean;
     };
 
 /** Main → worker requests. */
@@ -155,7 +165,12 @@ export type WorkerRequest =
       type: "RUN_BATCH";
       correlationId: number;
       version: number;
-      paragraphs: ReadonlyArray<{ text: string; index: number }>;
+      /**
+       * `tokens` are present only when the worker hosts morphological (L2)
+       * rules (external rulesets). The proxy omits them otherwise to keep
+       * the structured-clone payload small for the common L1-only case.
+       */
+      paragraphs: ReadonlyArray<{ text: string; index: number; tokens?: ReadonlyArray<Token> }>;
       mode: BatchMode;
     }
   | {

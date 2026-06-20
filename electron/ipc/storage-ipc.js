@@ -233,6 +233,19 @@ function registerStorageHandlers() {
       throw error;
     }
   });
+
+  // KV Store: list keys by prefix
+  ipcMain.handle(STORAGE_CHANNELS.invoke.getKeysByPrefix, async (_event, prefix) => {
+    if (typeof prefix !== "string") {
+      throw new Error("Invalid prefix: expected string");
+    }
+    try {
+      return manager.getKeysByPrefix(prefix);
+    } catch (error) {
+      console.error("[Storage IPC] getKeysByPrefix failed:", error);
+      throw error;
+    }
+  });
 }
 
 module.exports = { registerStorageHandlers, getStorageManager };

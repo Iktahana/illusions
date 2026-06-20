@@ -19,6 +19,11 @@ export interface UseIgnoredCorrectionsResult {
   ignoreCorrection: (ruleId: string, text: string, paragraphText?: string) => void;
   /** Remove an ignored correction */
   unignoreCorrection: (ruleId: string, text: string, context?: string) => void;
+  /**
+   * Clear ALL ignored corrections for the current editor mode.
+   * Project mode → the current project; standalone mode → every file.
+   */
+  clearIgnoredCorrections: () => Promise<void>;
   /** Check if a given (ruleId, text, paragraphText) combination is ignored */
   isIgnored: (ruleId: string, text: string, paragraphText?: string) => boolean;
   /** Compute a paragraph context hash */
@@ -144,6 +149,19 @@ export function useIgnoredCorrections(editorMode: EditorMode): UseIgnoredCorrect
     [editorMode],
   );
 
+  const clearIgnoredCorrections = useCallback(async (): Promise<void> => {
+    const service = getIgnoredCorrectionsService();
+
+    if (editorMode && isProjectMode(editorMode)) {
+      await service.clearIgnoredCorrections();
+      setIgnoredCorrections([]);
+    } else if (editorMode && isStandaloneMode(editorMode)) {
+      // Standalone clears across ALL files, not just the current one.
+      await service.clearAllIgnoredCorrectionsStandalone();
+      setIgnoredCorrections([]);
+    }
+  }, [editorMode]);
+
   const isIgnored = useCallback(
     (ruleId: string, text: string, paragraphText?: string): boolean => {
       const context = paragraphText ? hashString(paragraphText) : undefined;
@@ -162,6 +180,7 @@ export function useIgnoredCorrections(editorMode: EditorMode): UseIgnoredCorrect
     ignoredCorrections,
     ignoreCorrection,
     unignoreCorrection,
+    clearIgnoredCorrections,
     isIgnored,
     computeContextHash,
   };

@@ -29,12 +29,15 @@ describe("buildModeRuleConfigs — applicableModes wiring (校正モード自動
     expect(novel["jtf-3-1-1"]).toMatchObject({ enabled: true, severity: "info" });
   });
 
-  it("keeps a rule with empty applicableModes disabled in every mode", () => {
-    // me2-11-vertical-numbers opts into no mode
-    const meta = LINT_RULES_META.find((m) => m.id === "me2-11-vertical-numbers");
-    expect(meta?.applicableModes).toEqual([]);
-    for (const mode of CORRECTION_MODE_IDS) {
-      expect(buildModeRuleConfigs(mode)["me2-11-vertical-numbers"].enabled).toBe(false);
+  it("disables a rule in every mode that is not in its applicableModes", () => {
+    // Pick any rule and verify it is OFF in modes it does not opt into.
+    const meta = LINT_RULES_META[0];
+    expect(meta).toBeDefined();
+    const inactiveModes = CORRECTION_MODE_IDS.filter(
+      (mode) => !meta.applicableModes.includes(mode),
+    );
+    for (const mode of inactiveModes) {
+      expect(buildModeRuleConfigs(mode)[meta.id].enabled).toBe(false);
     }
   });
 

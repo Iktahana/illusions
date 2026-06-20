@@ -54,6 +54,12 @@ const mockStorage = {
   setItem: vi.fn(async (key: string, value: string) => {
     mockStorageItems[key] = value;
   }),
+  removeItem: vi.fn(async (key: string) => {
+    delete mockStorageItems[key];
+  }),
+  getKeysByPrefix: vi.fn(async (prefix: string) =>
+    Object.keys(mockStorageItems).filter((k) => k.startsWith(prefix)),
+  ),
 };
 
 vi.mock("@/lib/storage/storage-service", () => ({
@@ -230,6 +236,21 @@ describe("IgnoredCorrectionsService — project mode (VFS)", () => {
     const written = JSON.parse(mockFileWrite.mock.calls[0][0]);
     expect(written.ignoredCorrections).toHaveLength(1);
   });
+
+  it("clearIgnoredCorrections writes an empty list to the project file", async () => {
+    mockGetFileHandle.mockResolvedValue(mockFileHandle as unknown as typeof mockFileHandle);
+    mockGetIllusionsDirHandle.mockResolvedValue({ getFileHandle: mockGetFileHandle });
+    mockVFS.getDirectoryHandle.mockResolvedValue(
+      mockRootHandle as unknown as typeof mockRootHandle,
+    );
+    mockFileWrite.mockResolvedValue(undefined);
+
+    await svc.clearIgnoredCorrections();
+
+    expect(mockFileWrite).toHaveBeenCalledOnce();
+    const written = JSON.parse(mockFileWrite.mock.calls[0][0]);
+    expect(written.ignoredCorrections).toEqual([]);
+  });
 });
 
 describe("IgnoredCorrectionsService — standalone mode (StorageService)", () => {
@@ -282,5 +303,18 @@ describe("IgnoredCorrectionsService — standalone mode (StorageService)", () =>
     const result = await svc.addIgnoredCorrectionStandalone("/Users/x/f.mdi", "r1", "dup");
     expect(result).toHaveLength(1);
     expect(mockStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it("clearAllIgnoredCorrectionsStandalone removes every prefixed key (all files)", async () => {
+    mockStorageItems["illusions-ignored-corrections:Users/x/a.mdi"] = "{}";
+    mockStorageItems["illusions-ignored-corrections:Users/x/b.mdi"] = "{}";
+    mockStorageItems["illusions-ignored-corrections:Users/y/c.mdi"] = "{}";
+    // Unrelated key must survive
+    mockStorageItems["illusions-user-dictionary:Users/x/a.mdi"] = "{}";
+
+    await svc.clearAllIgnoredCorrectionsStandalone();
+
+    expect(mockStorage.getKeysByPrefix).toHaveBeenCalledWith("illusions-ignored-corrections:");
+    expect(Object.keys(mockStorageItems)).toEqual(["illusions-user-dictionary:Users/x/a.mdi"]);
   });
 });

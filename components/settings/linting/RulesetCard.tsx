@@ -19,7 +19,8 @@ import SourceBadge from "./SourceBadge";
 import type { SourceType } from "./SourceBadge";
 import RuleRow from "./RuleRow";
 import type { RuleConfig } from "./RuleRow";
-import type { RulesetRuleMeta } from "./useRulesetStatus";
+import ToggleSwitch from "./ToggleSwitch";
+import LicenseBadge from "./LicenseBadge";
 
 export interface RulesetCardRule {
   ruleId: string;
@@ -34,6 +35,14 @@ export interface RulesetCardProps {
   source: SourceType;
   version?: string | null;
   tag?: string | null;
+  /** Author / publisher (出典の著者・発行元), shown dimmed after the title. */
+  publisherJa?: string;
+  /** License name from manifest meta (e.g. "CC BY 4.0", "書籍（要購入）"). */
+  license?: string;
+  /** Optional link to the license text. */
+  licenseUrl?: string;
+  /** Optional purchase link for commercial physical-book rulesets. */
+  purchaseUrl?: string;
   rules: RulesetCardRule[];
   updateAvailable?: boolean;
   syncing?: boolean;
@@ -76,11 +85,14 @@ function getEffectiveConfig(
 }
 
 export default function RulesetCard({
-  id,
   nameJa,
   source,
   version,
   tag,
+  publisherJa,
+  license,
+  licenseUrl,
+  purchaseUrl,
   rules,
   updateAvailable,
   syncing,
@@ -102,7 +114,8 @@ export default function RulesetCard({
   const enabledCount = ruleIds.filter(
     (rid) => getEffectiveConfig(rid, ruleConfigs, defaultConfigs).enabled,
   ).length;
-  const allEnabled = enabledCount === ruleIds.length;
+  const allEnabled = ruleIds.length > 0 && enabledCount === ruleIds.length;
+  const partiallyEnabled = enabledCount > 0 && enabledCount < ruleIds.length;
 
   const handleAction = async (fn: () => Promise<void>): Promise<void> => {
     setActionInProgress(true);
@@ -135,7 +148,11 @@ export default function RulesetCard({
             <ChevronRight className="w-3.5 h-3.5 text-foreground-tertiary flex-shrink-0" />
           )}
           <span className="text-sm font-medium text-foreground truncate">{nameJa}</span>
+          {publisherJa && (
+            <span className="text-xs text-foreground/50 flex-shrink-0">{publisherJa}</span>
+          )}
           <SourceBadge source={source} />
+          <LicenseBadge license={license} licenseUrl={licenseUrl} purchaseUrl={purchaseUrl} />
           {updateAvailable && (
             <span className="text-[10px] font-medium text-warning bg-warning/10 border border-warning/30 px-1.5 py-0.5 rounded leading-none">
               更新あり
@@ -156,23 +173,15 @@ export default function RulesetCard({
           {enabledCount}/{ruleIds.length}
         </span>
 
-        {/* Pack-level enable toggle */}
-        <button
-          onClick={() => onPackToggle(ruleIds, !allEnabled)}
+        {/* Pack-level tri-state toggle: off / partial / all-on. Clicking while
+            off or partial enables all; clicking while all-on disables all. */}
+        <ToggleSwitch
+          checked={allEnabled}
+          indeterminate={partiallyEnabled}
+          onChange={() => onPackToggle(ruleIds, !allEnabled)}
           disabled={controlsDisabled}
-          className={clsx(
-            "relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0 disabled:cursor-not-allowed",
-            allEnabled ? "bg-accent" : "bg-foreground-muted",
-          )}
-          aria-label={allEnabled ? "このパックを無効にする" : "このパックを有効にする"}
-        >
-          <span
-            className={clsx(
-              "inline-block h-3.5 w-3.5 transform rounded-full transition-transform shadow-sm",
-              allEnabled ? "translate-x-5 bg-accent-foreground" : "translate-x-0.5 bg-white",
-            )}
-          />
-        </button>
+          ariaLabel={allEnabled ? "このパックを無効にする" : "このパックを有効にする"}
+        />
       </div>
 
       {/* Error state */}

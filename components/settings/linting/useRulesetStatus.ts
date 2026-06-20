@@ -16,12 +16,23 @@ export interface RulesetRuleMeta {
   supportsSkipDialogue?: boolean;
 }
 
+export interface RulesetGuidelineMeta {
+  id?: string;
+  nameJa?: string;
+  publisherJa?: string;
+  year?: number | null;
+}
+
 export interface RulesetManifest {
   id: string;
   name: string;
   nameJa: string;
   version?: string;
-  guidelines?: string[];
+  license?: string;
+  licenseUrl?: string;
+  purchaseUrl?: string;
+  publisherJa?: string;
+  guidelines?: RulesetGuidelineMeta[];
   rules: RulesetRuleMeta[];
 }
 
@@ -30,6 +41,10 @@ export interface InstalledRuleset {
   nameJa: string;
   version: string | null;
   tag: string | null;
+  publisherJa: string | null;
+  license: string | null;
+  licenseUrl: string | null;
+  purchaseUrl: string | null;
   rules: RulesetRuleMeta[];
   updateAvailable: boolean;
   /** Sync in-progress for this pack */
@@ -87,6 +102,10 @@ export function useRulesetStatus(): UseRulesetStatusReturn {
             nameJa: r.id,
             version: r.version,
             tag: r.tag,
+            publisherJa: null,
+            license: null,
+            licenseUrl: null,
+            purchaseUrl: null,
             rules: [],
             updateAvailable: updateMap.get(r.id) ?? false,
             syncing: false,
@@ -102,6 +121,10 @@ export function useRulesetStatus(): UseRulesetStatusReturn {
           nameJa: manifest.nameJa ?? manifest.name ?? r.id,
           version: r.version ?? manifest.version ?? null,
           tag: r.tag,
+          publisherJa: manifest.publisherJa ?? manifest.guidelines?.[0]?.publisherJa ?? null,
+          license: manifest.license ?? null,
+          licenseUrl: manifest.licenseUrl ?? null,
+          purchaseUrl: manifest.purchaseUrl ?? null,
           rules: manifest.rules ?? [],
           updateAvailable: updateMap.get(r.id) ?? false,
           syncing: false,

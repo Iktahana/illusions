@@ -110,7 +110,22 @@ export interface RulesetManifest {
   version: string;
   /** Engine API version this ruleset targets. Must equal {@link ENGINE_API_VERSION}. */
   engineApi: number;
+  /**
+   * License / copyright-policy name for the ruleset's CONTENTS, e.g. "MIT",
+   * "CC BY 4.0", or for rulesets derived from commercial books a label like
+   * "書籍（要購入）". The rule CODE is original; this names the policy under
+   * which the orthographic conventions (and any examples) are distributed.
+   */
   license: string;
+  /** Optional link to the full license text / deed. */
+  licenseUrl?: string;
+  /**
+   * Optional purchase / where-to-obtain link. Set for rulesets distilled from
+   * commercial physical books: the conventions are facts free to reuse, but
+   * the source book itself must be bought. The app surfaces this as a
+   * 「購入へ」link beside the ruleset name.
+   */
+  purchaseUrl?: string;
   /**
    * Maintainer contact email. REQUIRED. The marketplace sends listing and
    * ruleset-related notifications to this address. Must be a valid email.

@@ -94,6 +94,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       setItem: "storage:set-item",
       getItem: "storage:get-item",
       removeItem: "storage:remove-item",
+      getKeysByPrefix: "storage:get-keys-by-prefix",
     });
     expect(STORAGE_CHANNELS.event).toEqual({});
   });
