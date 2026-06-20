@@ -19,8 +19,12 @@ import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
 import type { LintIssue, LintRuleConfig } from "@/lib/linting/types";
 import { isMorphologicalDocumentLintRule, isMorphologicalLintRule } from "@/lib/linting/types";
 import { RulesetRegistry } from "@/lib/linting/registry/ruleset-registry";
-import { createRulesetContext } from "@/lib/linting/registry/ruleset-context-factory";
 import type { RulesetModule } from "@/lib/linting/sdk/ruleset-types";
+import {
+  buildRulesetRunner,
+  createIsolatedRulesetContext,
+  importRulesetModule,
+} from "./build-ruleset-runner";
 import type {
   RulesetLoadWarning,
   SerializedIssueMap,
@@ -50,24 +54,6 @@ const legacyRules = buildLegacyRules();
 /** Map from ruleset id → loaded module (only successfully-loaded modules). */
 const loadedExternals = new Map<string, RulesetModule>();
 
-/**
- * A no-op DictLike used when building the worker-local RulesetContext.
- * The worker has no access to window.electronAPI, so dictionary lookups
- * always return empty results. Rules that require dict:genji will be
- * disabled by the registry's requirement gate.
- */
-const NO_OP_DICT = {
-  async lookupBatch(_terms: string[]): Promise<Map<string, never>> {
-    return new Map<string, never>();
-  },
-  async has(_term: string): Promise<boolean> {
-    return false;
-  },
-};
-
-/** Not-ready health snapshot for worker-local context construction. */
-const NOT_READY_HEALTH = { state: "not-installed" as const };
-
 /** Last-known config snapshot, replayed onto rebuilt runners. */
 const lastConfigs = new Map<string, LintRuleConfig>();
 /** Last-known active guidelines, replayed onto rebuilt runners. */
@@ -83,46 +69,14 @@ let lastGuidelineMapEntries: Array<[string, string | undefined]> = Array.from(
 
 /** Build a fresh RuleRunner = legacy ∪ all currently-loaded external rules. */
 function buildRunner(): { runner: RuleRunner; ruleGuidelineMap: Map<string, string | undefined> } {
-  const newRunner = new RuleRunner();
-
-  // 1. Register legacy rules.
-  for (const rule of legacyRules) {
-    newRunner.registerRule(rule);
-  }
-
-  // 2. Register externals via a fresh registry so each rebuild is independent.
-  const registry = new RulesetRegistry();
-  for (const mod of loadedExternals.values()) {
-    registry.registerExternal(mod, "folder");
-  }
-
-  const ctx = createRulesetContext({
-    dictHealth: NOT_READY_HEALTH,
-    dict: NO_OP_DICT,
-    requirements: new Map([["dict:genji", false]]),
+  return buildRulesetRunner({
+    legacyRules,
+    externals: loadedExternals.values(),
+    ctx: createIsolatedRulesetContext(),
+    baseGuidelineMapEntries: lastGuidelineMapEntries,
+    configs: lastConfigs,
+    activeGuidelines: lastGuidelines,
   });
-
-  const externalRules = registry.buildRules(ctx);
-  for (const rule of externalRules) {
-    newRunner.registerRule(rule);
-  }
-
-  // 3. Merge guideline maps: legacy base + external additions.
-  const mergedGuidelineMap = new Map<string, string | undefined>(lastGuidelineMapEntries);
-  for (const [ruleId, guidelineId] of registry.buildRuleGuidelineMap()) {
-    mergedGuidelineMap.set(ruleId, guidelineId);
-  }
-  newRunner.setGuidelineMap(mergedGuidelineMap);
-
-  // 4. Replay last-known configs.
-  for (const [ruleId, config] of lastConfigs) {
-    newRunner.setConfig(ruleId, config);
-  }
-
-  // 5. Replay last-known active guidelines.
-  newRunner.setActiveGuidelines(lastGuidelines);
-
-  return { runner: newRunner, ruleGuidelineMap: mergedGuidelineMap };
 }
 
 // Initial runner (no externals yet).
@@ -251,15 +205,8 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
 // -------------------------------------------------------------------------
 
 async function handleLoadRuleset(correlationId: number, id: string, code: string): Promise<void> {
-  let url: string | null = null;
   try {
-    const blob = new Blob([code], { type: "text/javascript" });
-    url = URL.createObjectURL(blob);
-    // webpackIgnore: true is REQUIRED — the bundler must not try to resolve
-    // this dynamic import at build time. The URL is a runtime blob: URI.
-    const mod = (await import(/* webpackIgnore: true */ url)).default as RulesetModule;
-    URL.revokeObjectURL(url);
-    url = null;
+    const mod = await importRulesetModule(code);
 
     // Register into a temporary registry for validation (quarantine check).
     const tempRegistry = new RulesetRegistry();
@@ -313,14 +260,6 @@ async function handleLoadRuleset(correlationId: number, id: string, code: string
       hasMorphologicalRules: runnerHasRegisteredMorphRules(runner),
     });
   } catch (err) {
-    // Ensure blob URL is always revoked even on error.
-    if (url !== null) {
-      try {
-        URL.revokeObjectURL(url);
-      } catch {
-        // ignore
-      }
-    }
     const detail = err instanceof Error ? err.message : String(err);
     const warnings: RulesetLoadWarning[] = [
       {
