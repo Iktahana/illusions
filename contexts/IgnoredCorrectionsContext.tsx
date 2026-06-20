@@ -2,18 +2,24 @@
 
 import React, { createContext, useContext } from "react";
 
+import type { IgnoredCorrection } from "@/lib/project/project-types";
+
 /**
- * Exposes a way to clear the "ignored corrections" memory from anywhere in the
- * editor tree (e.g. the linting settings tab) without prop-drilling through
- * the settings modal. The underlying state lives in `useIgnoredCorrections`
- * in page.tsx; this context only surfaces the clear action.
+ * Exposes the "ignored corrections" memory to the editor tree (the linting
+ * settings tab and the corrections inspector) without prop-drilling. The
+ * underlying state lives in `useIgnoredCorrections` in page.tsx; this context
+ * surfaces the current list and the mutating actions.
  */
 export interface IgnoredCorrectionsContextValue {
+  /** Ignored corrections for the currently open file/project. */
+  items: IgnoredCorrection[];
   /**
    * Clear ALL ignored corrections for the current editor mode.
    * Project mode → the current project; standalone mode → every file.
    */
   clear: () => Promise<void>;
+  /** Remove a single ignored correction so the issue surfaces again. */
+  unignore: (ruleId: string, text: string, context?: string) => void;
 }
 
 const IgnoredCorrectionsContext = createContext<IgnoredCorrectionsContextValue | null>(null);
