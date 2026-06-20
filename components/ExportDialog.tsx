@@ -322,6 +322,7 @@ function ExportDialogInner({
           pageNumberFormat: previewSettings.pageNumberFormat,
           pageNumberPosition: previewSettings.pageNumberPosition,
           textIndent: previewSettings.textIndent,
+          fullwidthSpaceIndent: previewSettings.fullwidthSpaceIndent,
           googleFontFamily: previewSettings.googleFontFamily,
           fileType,
         });
@@ -684,6 +685,40 @@ function ExportDialogInner({
                 onChange={(e) => updateField("textIndent", clampFloat(e.target.value, 0, 4))}
               />
             </div>
+
+            {/* Full-width-space indent toggle (PDF/DOCX only) */}
+            {!isEpub && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className={labelClass + " mb-0"}>全角スペースで字下げ</label>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.fullwidthSpaceIndent}
+                    onClick={() =>
+                      updateField("fullwidthSpaceIndent", !settings.fullwidthSpaceIndent)
+                    }
+                    className={clsx(
+                      "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors",
+                      settings.fullwidthSpaceIndent ? "bg-accent" : "bg-border-secondary",
+                    )}
+                  >
+                    <span
+                      className={clsx(
+                        "inline-block h-5 w-5 transform rounded-full bg-background transition-transform",
+                        settings.fullwidthSpaceIndent ? "translate-x-6" : "translate-x-1",
+                      )}
+                    />
+                  </button>
+                </div>
+                {settings.fullwidthSpaceIndent && (
+                  <p className="text-xs text-foreground-tertiary mt-1">
+                    段落の先頭に全角スペース（U+3000）を{Math.max(0, Math.round(settings.textIndent))}
+                    個挿入します。書式上の字下げ（em）は無効になります。
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* ── Page number section (PDF/DOCX only) ── */}
             {!isEpub && (

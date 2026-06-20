@@ -253,6 +253,13 @@ export function mdiToHtml(
      * authored literal (DATA-LOSS guard, see #1608). Absent → ".mdi".
      */
     fileType?: string;
+    /**
+     * When > 0, prepend this many literal full-width spaces (U+3000) to each
+     * non-empty paragraph as 字下げ. The caller is responsible for suppressing
+     * the CSS `text-indent` (see pdf-exporter / web-print-preview) to avoid
+     * double indentation. Blank ([[blank]]) paragraphs are left untouched.
+     */
+    fullwidthSpaceIndentCount?: number;
   },
 ): string {
   const md = createMarkdownIt();
@@ -274,9 +281,18 @@ export function mdiToHtml(
   // Replace the sentinel paragraph with a true empty paragraph. Then final-sweep any
   // remaining sentinel that escaped the <p>…</p> wrap (e.g. inside fenced code blocks
   // where markdown-it emits <pre><code>…</code></pre> instead of <p>).
-  const bodyHtml = rawHtml
+  let bodyHtml = rawHtml
     .replace(new RegExp(`<p>${BLANK_SENTINEL}\\s*</p>`, "g"), "<p></p>")
     .replace(new RegExp(BLANK_SENTINEL, "g"), "");
+
+  // Full-width-space 字下げ: inject literal U+3000 characters at the start of
+  // each non-empty paragraph. The negative lookahead skips empty `<p></p>`
+  // (blank-paragraph markers) so they stay empty.
+  const fullwidthCount = options?.fullwidthSpaceIndentCount ?? 0;
+  if (fullwidthCount > 0) {
+    const prefix = "　".repeat(fullwidthCount);
+    bodyHtml = bodyHtml.replace(/<p>(?!<\/p>)/g, `<p>${prefix}`);
+  }
 
   if (options?.bodyOnly) {
     return bodyHtml;

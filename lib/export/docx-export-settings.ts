@@ -19,6 +19,12 @@ export interface DocxExportSettings {
   lineSpacing: number;
   margins: { top: number; bottom: number; left: number; right: number };
   textIndent: number;
+  /**
+   * Render 字下げ as literal full-width spaces (U+3000) prepended to each
+   * paragraph instead of a Word `firstLine` indent. Count is derived from
+   * `textIndent` (rounded). Absent → false.
+   */
+  fullwidthSpaceIndent?: boolean;
   showPageNumbers: boolean;
   pageNumberFormat: "simple" | "dash" | "fraction";
   pageNumberPosition:
@@ -39,6 +45,7 @@ export const DEFAULT_DOCX_SETTINGS: DocxExportSettings = {
   lineSpacing: 1.5,
   margins: { top: 20, bottom: 20, left: 20, right: 20 },
   textIndent: 1,
+  fullwidthSpaceIndent: false,
   showPageNumbers: false,
   pageNumberFormat: "simple",
   pageNumberPosition: "bottom-center",
@@ -140,6 +147,10 @@ export function sanitizeSettings(raw: Partial<DocxExportSettings>): DocxExportSe
           : d.margins.right,
     },
     textIndent: typeof raw.textIndent === "number" ? clamp(raw.textIndent, 0, 4) : d.textIndent,
+    fullwidthSpaceIndent:
+      typeof raw.fullwidthSpaceIndent === "boolean"
+        ? raw.fullwidthSpaceIndent
+        : d.fullwidthSpaceIndent,
     showPageNumbers:
       typeof raw.showPageNumbers === "boolean" ? raw.showPageNumbers : d.showPageNumbers,
     pageNumberFormat: (["simple", "dash", "fraction"] as const).includes(
