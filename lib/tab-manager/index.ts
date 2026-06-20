@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, type MutableRefObject } from "react";
 import type { UseTabManagerReturn } from "./types";
 import { useTabState } from "./use-tab-state";
 import { useFileIO } from "./use-file-io";
@@ -39,6 +39,12 @@ export function useTabManager(options?: {
   windowKey?: string | null;
   /** Callback to trigger editor remount when external file changes are detected. */
   onEditorRemountNeeded?: () => void;
+  /**
+   * Ref holding the active editor's on-demand live-content flush (#1840).
+   * Save flows call it before persisting to avoid writing debounce-lagged
+   * content. Populated by the mounted MilkdownEditor via `registerFlush`.
+   */
+  flushActiveEditorRef?: MutableRefObject<(() => string | null) | null>;
 }): UseTabManagerReturn {
   const skipAutoRestore = options?.skipAutoRestore ?? false;
   const autoSaveEnabled = options?.autoSave ?? true;
@@ -60,6 +66,7 @@ export function useTabManager(options?: {
     isElectron: tabState.isElectron,
     updateTab: tabState.updateTab,
     findTabByPath: tabState.findTabByPath,
+    flushActiveEditorRef: options?.flushActiveEditorRef,
   });
 
   // --- Close dialog (depends on file I/O for save-then-close) -------------
@@ -120,6 +127,7 @@ export function useTabManager(options?: {
     loadSystemFile: fileIO.loadSystemFile,
     updateTab: tabState.updateTab,
     systemFileOpenHandlerRef,
+    flushActiveEditorRef: options?.flushActiveEditorRef,
     flushTabState: flushTabStateRef.current,
     flushLayoutState: options?.flushLayoutState,
     tryCreateSnapshot: fileIO.tryCreateSnapshot,

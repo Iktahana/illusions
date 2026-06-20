@@ -209,7 +209,26 @@ export class ElectronStorageManager {
     const db = this.ensureInitialized();
     const stmt = db.prepare("SELECT data FROM app_state WHERE id = ?");
     const row = stmt.get("app_state") as { data: string } | undefined;
-    return row ? JSON.parse(row.data) : null;
+    if (!row) return null;
+    try {
+      return JSON.parse(row.data) as AppState;
+    } catch (err) {
+      // Corrupt app_state record: delete it so every subsequent startup starts clean.
+      // app_state が破損している場合はレコードを削除してセルフヒールする。
+      console.warn(
+        "[ElectronStorageManager] app_state の JSON が破損しています。レコードを削除してデフォルト状態に戻します。",
+        err,
+      );
+      try {
+        db.prepare("DELETE FROM app_state WHERE id = ?").run("app_state");
+      } catch (deleteErr) {
+        console.error(
+          "[ElectronStorageManager] 破損した app_state レコードの削除に失敗しました:",
+          deleteErr,
+        );
+      }
+      return null;
+    }
   }
 
   /**
@@ -252,9 +271,30 @@ export class ElectronStorageManager {
    */
   getRecentFiles(): RecentFile[] {
     const db = this.ensureInitialized();
-    const stmt = db.prepare("SELECT data FROM recent_files ORDER BY updated_at DESC LIMIT 10");
-    const rows = stmt.all() as { data: string }[];
-    return rows.map((row) => JSON.parse(row.data));
+    const stmt = db.prepare("SELECT id, data FROM recent_files ORDER BY updated_at DESC LIMIT 10");
+    const rows = stmt.all() as { id: string; data: string }[];
+    const results: RecentFile[] = [];
+    for (const row of rows) {
+      try {
+        results.push(JSON.parse(row.data) as RecentFile);
+      } catch (err) {
+        // Corrupt recent_files row: remove it so the next load is clean.
+        // 破損した recent_files 行を削除してセルフヒールする。
+        console.warn(
+          `[ElectronStorageManager] recent_files(id=${row.id}) の JSON が破損しています。レコードを削除します。`,
+          err,
+        );
+        try {
+          db.prepare("DELETE FROM recent_files WHERE id = ?").run(row.id);
+        } catch (deleteErr) {
+          console.error(
+            "[ElectronStorageManager] 破損した recent_files レコードの削除に失敗しました:",
+            deleteErr,
+          );
+        }
+      }
+    }
+    return results;
   }
 
   /**
@@ -294,7 +334,26 @@ export class ElectronStorageManager {
     const db = this.ensureInitialized();
     const stmt = db.prepare("SELECT data FROM editor_buffer WHERE id = ?");
     const row = stmt.get("editor_buffer") as { data: string } | undefined;
-    return row ? JSON.parse(row.data) : null;
+    if (!row) return null;
+    try {
+      return JSON.parse(row.data) as EditorBuffer;
+    } catch (err) {
+      // Corrupt editor_buffer record: delete it so the next load starts clean.
+      // 破損した editor_buffer レコードを削除してセルフヒールする。
+      console.warn(
+        "[ElectronStorageManager] editor_buffer の JSON が破損しています。レコードを削除します。",
+        err,
+      );
+      try {
+        db.prepare("DELETE FROM editor_buffer WHERE id = ?").run("editor_buffer");
+      } catch (deleteErr) {
+        console.error(
+          "[ElectronStorageManager] 破損した editor_buffer レコードの削除に失敗しました:",
+          deleteErr,
+        );
+      }
+      return null;
+    }
   }
 
   /**
@@ -357,9 +416,32 @@ export class ElectronStorageManager {
     name: string;
   }> {
     const db = this.ensureInitialized();
-    const stmt = db.prepare("SELECT data FROM recent_projects ORDER BY updated_at DESC LIMIT 10");
-    const rows = stmt.all() as { data: string }[];
-    return rows.map((row) => JSON.parse(row.data));
+    const stmt = db.prepare(
+      "SELECT id, data FROM recent_projects ORDER BY updated_at DESC LIMIT 10",
+    );
+    const rows = stmt.all() as { id: string; data: string }[];
+    const results: Array<{ id: string; rootPath: string; name: string }> = [];
+    for (const row of rows) {
+      try {
+        results.push(JSON.parse(row.data) as { id: string; rootPath: string; name: string });
+      } catch (err) {
+        // Corrupt recent_projects row: remove it so the next load is clean.
+        // 破損した recent_projects 行を削除してセルフヒールする。
+        console.warn(
+          `[ElectronStorageManager] recent_projects(id=${row.id}) の JSON が破損しています。レコードを削除します。`,
+          err,
+        );
+        try {
+          db.prepare("DELETE FROM recent_projects WHERE id = ?").run(row.id);
+        } catch (deleteErr) {
+          console.error(
+            "[ElectronStorageManager] 破損した recent_projects レコードの削除に失敗しました:",
+            deleteErr,
+          );
+        }
+      }
+    }
+    return results;
   }
 
   /**

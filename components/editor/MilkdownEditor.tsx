@@ -1,7 +1,14 @@
 "use client";
 
 import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
+import {
+  commandsCtx,
+  Editor,
+  rootCtx,
+  defaultValueCtx,
+  editorViewCtx,
+  serializerCtx,
+} from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import {
   commonmark,
@@ -79,6 +86,15 @@ interface MilkdownEditorProps {
   onExternalContentApplied?: () => void;
   /** Called after layout reflow completes (style application + browser paint). */
   onLayoutReady?: () => void;
+  /**
+   * Register an on-demand flush that synchronously serializes the *live*
+   * editor doc and returns it (#1840). The content update path
+   * (`markdownUpdated`) is debounced 200ms with no maxWait, so during
+   * continuous typing the parent's `tab.content` lags arbitrarily. Save flows
+   * call this right before persisting so they never write stale content.
+   * Called with the flush fn on mount and `null` on unmount.
+   */
+  registerFlush?: (flush: (() => string | null) | null) => void;
 }
 
 export default function MilkdownEditor({
@@ -105,6 +121,7 @@ export default function MilkdownEditor({
   externalContent,
   onExternalContentApplied,
   onLayoutReady,
+  registerFlush,
 }: MilkdownEditorProps) {
   const {
     fontScale,
@@ -356,6 +373,60 @@ export default function MilkdownEditor({
       console.warn("外部コンテンツの適用に失敗しました:", error);
     }
   }, [externalContent, get, isVertical, scrollContainerRef]);
+
+  // 保存直前にライブ doc を即時シリアライズして返す（#1840）。
+  // markdownUpdated は debounce(200ms, maxWait なし) のため、連続入力中は
+  // currentContentRef / 親の tab.content が古いままになる。保存経路はこの関数を
+  // 呼び、エディタの現在状態から content を再生成してから永続化する。
+  // per-keystroke ではなく保存時のみ呼ばれるので perf 影響はない。
+  const flushContent = useCallback((): string | null => {
+    const editor = get();
+    if (!editor) return null;
+    try {
+      let result: string | null = null;
+      editor.action((ctx) => {
+        const doc = ctx.get(editorViewCtx).state.doc;
+        if (isPlainText) {
+          // listener の plain-text 経路（行 = node.textContent）と同一ロジック。
+          const lines: string[] = [];
+          doc.forEach((node) => {
+            lines.push(node.textContent);
+          });
+          result = lines.join("\n");
+        } else {
+          result = ctx.get(serializerCtx)(doc);
+        }
+      });
+      // 安全策（#1840 / レビュー Finding 2）: 縦横切替などでエディタが再マウント中、
+      // 空の初期 doc が一瞬シリアライズされて "" を返すことがある。実コンテンツが
+      // 残っている状態で "" を返すと、呼び出し側がファイルを空で上書きしてしまう。
+      // その場合は null を返してフォールバック（既存 tab.content を保持）させる。
+      if (result === "" && currentContentRef.current !== "") {
+        return null;
+      }
+      if (result != null && result !== currentContentRef.current) {
+        // ライブ値を ref と親 state に反映し、後続の isDirty 再計算も正しくする。
+        currentContentRef.current = result;
+        onChangeRef.current?.(result);
+      }
+      return result;
+    } catch (error) {
+      console.warn("コンテンツのフラッシュに失敗しました:", error);
+      return null;
+    }
+  }, [get, isPlainText]);
+
+  // flush を親へ登録/解除する（onEditorViewReady と同じ readiness パターン）。
+  // 非アクティブな dockview パネルは NovelEditor を描画しないため、マウント中の
+  // インスタンスは常にアクティブタブのエディタに対応する（last-wins で一致）。
+  const registerFlushRef = useRef(registerFlush);
+  registerFlushRef.current = registerFlush;
+  useEffect(() => {
+    registerFlushRef.current?.(flushContent);
+    return () => {
+      registerFlushRef.current?.(null);
+    };
+  }, [flushContent]);
 
   // posHighlight 設定を動的に更新（Editor を再作成せずに）。
   // enabled は power policy 由来の実効値（バックグラウンド中は停止、
