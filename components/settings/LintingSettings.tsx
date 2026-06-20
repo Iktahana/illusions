@@ -1,10 +1,12 @@
 "use client";
 
 import type React from "react";
+import { useMemo } from "react";
 import clsx from "clsx";
 
 import type { Severity } from "@/lib/linting/types";
 import type { CorrectionConfig } from "@/lib/linting/correction-config";
+import type { ModeRuleMetaInput } from "@/lib/linting/mode-rule-configs";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { useIgnoredCorrectionsContext } from "@/contexts/IgnoredCorrectionsContext";
 
@@ -57,6 +59,20 @@ function LintingSettingsInner({
 
   const showCorrectionConfig = Boolean(correctionConfig && onCorrectionConfigChange);
 
+  // Flatten every loaded rule's metadata so the mode selector can derive
+  // enabled/disabled from each rule's applicableModes (#1809/#1810 regression).
+  const loadedRules = useMemo<ModeRuleMetaInput[]>(
+    () =>
+      rulesetStatus.rulesets.flatMap((ruleset) =>
+        ruleset.rules.map((rule) => ({
+          ruleId: rule.ruleId,
+          applicableModes: rule.applicableModes,
+          defaultConfig: rule.defaultConfig,
+        })),
+      ),
+    [rulesetStatus.rulesets],
+  );
+
   return (
     <div className="space-y-6">
       {/* ① Master toggle */}
@@ -93,6 +109,7 @@ function LintingSettingsInner({
           <ModeSelector
             correctionConfig={correctionConfig}
             disabled={!lintingEnabled}
+            loadedRules={loadedRules}
             onCorrectionConfigChange={onCorrectionConfigChange}
             onLintingRuleConfigsBatchChange={onLintingRuleConfigsBatchChange}
           />

@@ -6,17 +6,24 @@ import clsx from "clsx";
 
 import type { CorrectionConfig } from "@/lib/linting/correction-config";
 import type { CorrectionModeId } from "@/lib/linting/correction-config";
+import { CORRECTION_MODE_IDS, CORRECTION_MODES } from "@/lib/linting/correction-modes";
 import {
-  CORRECTION_MODE_IDS,
-  CORRECTION_MODES,
-  MODE_TO_PRESET,
-} from "@/lib/linting/correction-modes";
-import { LINT_PRESETS } from "@/lib/linting/lint-presets";
+  buildModeRuleConfigsFromRules,
+  type ModeRuleMetaInput,
+} from "@/lib/linting/mode-rule-configs";
 import type { Severity } from "@/lib/linting/types";
 
 interface ModeSelectorProps {
   correctionConfig: CorrectionConfig;
   disabled?: boolean;
+  /**
+   * Metadata of every currently-loaded rule (flattened across all rulesets).
+   * Mode switching derives the enabled/disabled config from each rule's
+   * `applicableModes`, so this MUST reflect the live ruleset state — passing an
+   * empty/stale list silently makes the mode pills no-ops (the #1809/#1810
+   * regression this prop exists to fix).
+   */
+  loadedRules: readonly ModeRuleMetaInput[];
   onCorrectionConfigChange: (config: Partial<CorrectionConfig>) => void;
   onLintingRuleConfigsBatchChange: (
     configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
@@ -26,6 +33,7 @@ interface ModeSelectorProps {
 export default function ModeSelector({
   correctionConfig,
   disabled,
+  loadedRules,
   onCorrectionConfigChange,
   onLintingRuleConfigsBatchChange,
 }: ModeSelectorProps): React.ReactElement {
@@ -37,13 +45,13 @@ export default function ModeSelector({
         mode: mode.id,
         guidelines: [...mode.defaultGuidelines],
       });
-      const presetId = MODE_TO_PRESET[modeId as CorrectionModeId];
-      const preset = presetId ? LINT_PRESETS[presetId] : undefined;
-      if (preset) {
-        onLintingRuleConfigsBatchChange({ ...preset.configs });
-      }
+      // Build a complete config map (every loaded rule) from the rules'
+      // applicableModes so the batch handler's replace semantics is correct:
+      // rules opting into this mode are enabled, all others disabled.
+      const configs = buildModeRuleConfigsFromRules(mode.id, loadedRules);
+      onLintingRuleConfigsBatchChange(configs);
     },
-    [onCorrectionConfigChange, onLintingRuleConfigsBatchChange],
+    [loadedRules, onCorrectionConfigChange, onLintingRuleConfigsBatchChange],
   );
 
   return (
