@@ -15,7 +15,7 @@ import {
   AbstractMorphologicalLintRule,
 } from "../base-rule";
 import { ENGINE_API_VERSION } from "../sdk/ruleset-types";
-import type { RulesetBases, RulesetContext } from "../sdk/ruleset-context";
+import type { RulesetBases, RulesetContext, DictToolkit } from "../sdk/ruleset-context";
 import { createDictToolkit, createToolkit, type DictLike } from "../toolkit";
 
 const BASES: RulesetBases = {
@@ -29,6 +29,12 @@ const BASES: RulesetBases = {
 export interface BuildContextOptions {
   dictHealth: GenjiHealth;
   dict: DictLike;
+  /**
+   * Use this prebuilt dictionary toolkit instead of constructing one from
+   * `dictHealth`/`dict`. The lint pipeline passes a persistent snapshot-backed
+   * toolkit here so per-batch prewarm data survives runner rebuilds.
+   */
+  dictToolkit?: DictToolkit;
   /** Override the resolved requirement satisfaction map. Defaults from dict health. */
   requirements?: ReadonlyMap<string, boolean>;
   engineApi?: number;
@@ -36,7 +42,7 @@ export interface BuildContextOptions {
 
 /** Build a context from explicit dependency state (test-friendly). */
 export function createRulesetContext(opts: BuildContextOptions): RulesetContext {
-  const dictToolkit = createDictToolkit(opts.dictHealth, opts.dict);
+  const dictToolkit = opts.dictToolkit ?? createDictToolkit(opts.dictHealth, opts.dict);
   const toolkit = createToolkit(dictToolkit);
   const requirements =
     opts.requirements ?? new Map<string, boolean>([["dict:genji", dictToolkit.ready]]);

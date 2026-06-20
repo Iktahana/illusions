@@ -24,8 +24,8 @@ export { detectUnits } from "./unit-detector";
 export { matchWordList, escapeRegExp } from "./word-list";
 export { dedupe, defaultIssueKey } from "./dedupe";
 export { posFilter, isPos } from "./pos-filter";
-export { createDictToolkit } from "./dict-toolkit";
-export type { DictLike } from "./dict-toolkit";
+export { createDictToolkit, createSnapshotDictToolkit } from "./dict-toolkit";
+export type { DictLike, DictToolkitInternal, DictSnapshotEntry } from "./dict-toolkit";
 
 /** Build a legacy JsonRuleMeta from ruleset metadata (constructor boilerplate). */
 export function toJsonRuleMeta(rule: RulesetRuleMeta, manifest: RulesetManifest): JsonRuleMeta {

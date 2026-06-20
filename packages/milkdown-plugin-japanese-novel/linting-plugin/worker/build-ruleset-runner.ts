@@ -14,10 +14,11 @@ import { RuleRunner } from "@/lib/linting/rule-runner";
 import { RulesetRegistry } from "@/lib/linting/registry/ruleset-registry";
 import { createRulesetContext } from "@/lib/linting/registry/ruleset-context-factory";
 import type { RulesetContext } from "@/lib/linting/sdk/ruleset-context";
+import type { DictToolkitInternal } from "@/lib/linting/toolkit";
 import type { RulesetModule } from "@/lib/linting/sdk/ruleset-types";
 import type { LintRule, LintRuleConfig } from "@/lib/linting/types";
 
-/** A DictLike that always returns empty — external L2 rules requiring dict:genji are gated off. */
+/** A DictLike that always returns empty — async dict access is unreachable here. */
 const NO_OP_DICT = {
   async lookupBatch(_terms: string[]): Promise<Map<string, never>> {
     return new Map<string, never>();
@@ -28,15 +29,22 @@ const NO_OP_DICT = {
 };
 
 /**
- * Build the isolated RulesetContext used to instantiate external rules
- * without dictionary access. Matches the worker's NO_OP dict environment so
- * the main-thread fallback yields identical results (no dict:genji rules).
+ * Build the isolated RulesetContext used to instantiate external rules.
+ *
+ * Pass `dictToolkit` (a persistent snapshot-backed toolkit) to enable
+ * `dict:genji` rules: the renderer prewarms membership per batch and installs it
+ * via `dictToolkit.setSnapshot`, so the rule reads `dict.hasCached/lookupCached`
+ * synchronously. The requirement is marked satisfied because the snapshot path
+ * supplies the data — the rule itself no-ops when `dict.ready` is false (dict
+ * not installed / batch not prewarmed). Without `dictToolkit` the context has no
+ * dictionary and `dict:genji` rules stay gated off (legacy behavior).
  */
-export function createIsolatedRulesetContext(): RulesetContext {
+export function createIsolatedRulesetContext(dictToolkit?: DictToolkitInternal): RulesetContext {
   return createRulesetContext({
     dictHealth: { state: "not-installed" },
     dict: NO_OP_DICT,
-    requirements: new Map([["dict:genji", false]]),
+    dictToolkit,
+    requirements: new Map([["dict:genji", dictToolkit != null]]),
   });
 }
 
@@ -111,4 +119,26 @@ export async function importRulesetModule(code: string): Promise<RulesetModule> 
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/**
+ * Whether a ruleset declares a Genji dictionary requirement — at the ruleset
+ * level OR on any individual rule. Read straight from `manifest` (no code
+ * execution), so it is safe to call before/after building rules.
+ */
+export function rulesetRequiresDict(mod: RulesetModule): boolean {
+  const manifest = mod?.manifest;
+  if (!manifest) return false;
+  const hasDictReq = (reqs: ReadonlyArray<{ kind: string }> | undefined): boolean =>
+    Array.isArray(reqs) && reqs.some((r) => r?.kind === "dict");
+  if (hasDictReq(manifest.requires)) return true;
+  return (manifest.rules ?? []).some((r) => hasDictReq(r.requires));
+}
+
+/** Whether any module in the iterable requires the Genji dictionary. */
+export function anyRulesetRequiresDict(mods: Iterable<RulesetModule>): boolean {
+  for (const mod of mods) {
+    if (rulesetRequiresDict(mod)) return true;
+  }
+  return false;
 }

@@ -46,6 +46,11 @@ const OFFICIAL_RULESETS = Object.freeze([
     owner: "illusions-lab",
     repo: "illusions-ruleset-jtf-style-guide",
   }),
+  Object.freeze({
+    id: "com.illusions-lab.genji-vocab",
+    owner: "illusions-lab",
+    repo: "illusions-ruleset-genji-vocab",
+  }),
 ]);
 
 module.exports = { OFFICIAL_RULESETS };

@@ -374,6 +374,7 @@ describe("RuleRunnerProxy", () => {
       ruleIds: ["ex-morph-1"],
       warnings: [],
       hasMorphologicalRules: true,
+      hasDictRules: false,
     });
     await loadPromise;
 
@@ -410,6 +411,7 @@ describe("RuleRunnerProxy", () => {
       ruleIds: ["ex-morph-1"],
       warnings: [],
       hasMorphologicalRules: true,
+      hasDictRules: false,
     });
     await loadPromise;
     expect(proxy.hasMorphologicalRules()).toBe(true);
@@ -426,6 +428,7 @@ describe("RuleRunnerProxy", () => {
       ruleIds: [],
       warnings: [],
       hasMorphologicalRules: false,
+      hasDictRules: false,
     });
     await unloadPromise;
 
