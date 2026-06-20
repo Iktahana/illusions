@@ -3,7 +3,6 @@ import { describe, it, expect } from "vitest";
 import { RuleRunner } from "../rule-runner";
 import type { LintIssue, LintRuleConfig } from "../types";
 import { AbstractLintRule } from "../base-rule";
-import { createJtfL1Rules } from "../rules/json-l1/jtf-l1-rules";
 
 /** A minimal test rule for unit testing the runner */
 class TestRule extends AbstractLintRule {
@@ -29,6 +28,37 @@ class TestRule extends AbstractLintRule {
           messageJa: "テスト問題発見",
           from: text.indexOf("ERROR"),
           to: text.indexOf("ERROR") + 5,
+        },
+      ];
+    }
+    return [];
+  }
+}
+
+/** A second stub rule that fires on a different trigger, for multi-rule tests */
+class AnotherRule extends AbstractLintRule {
+  readonly id = "another-rule";
+  readonly name = "Another Rule";
+  readonly nameJa = "別のルール";
+  readonly description = "Another rule for testing";
+  readonly descriptionJa = "テスト用の別ルール";
+  readonly level = "L1" as const;
+  readonly defaultConfig: LintRuleConfig = {
+    enabled: true,
+    severity: "info",
+  };
+
+  lint(text: string, config: LintRuleConfig): LintIssue[] {
+    if (!text) return [];
+    if (text.includes("WARN")) {
+      return [
+        {
+          ruleId: this.id,
+          severity: config.severity,
+          message: "Another issue found",
+          messageJa: "別の問題発見",
+          from: text.indexOf("WARN"),
+          to: text.indexOf("WARN") + 4,
         },
       ];
     }
@@ -105,14 +135,13 @@ describe("RuleRunner", () => {
 
     it("should sort issues by position", () => {
       const runner = new RuleRunner();
-      // Register a real JTF rule for testing sort behavior
-      const jtfRules = createJtfL1Rules();
-      if (jtfRules.length > 0) {
-        runner.registerRule(jtfRules[0]);
-      }
+      // AnotherRule fires on "WARN" (position 0), TestRule fires on "ERROR" (position 5)
+      runner.registerRule(new AnotherRule());
       runner.registerRule(new TestRule());
 
-      const issues = runner.runAll("ERROR ﾒｰﾙ text");
+      // "WARN ERROR" — WARN at 0, ERROR at 5
+      const issues = runner.runAll("WARN ERROR text");
+      expect(issues.length).toBeGreaterThanOrEqual(2);
       for (let i = 1; i < issues.length; i++) {
         expect(issues[i].from).toBeGreaterThanOrEqual(issues[i - 1].from);
       }
@@ -192,15 +221,12 @@ describe("RuleRunner", () => {
     it("should return only enabled rules", () => {
       const runner = new RuleRunner();
       runner.registerRule(new TestRule());
-      const jtfRules = createJtfL1Rules();
-      if (jtfRules.length > 0) {
-        runner.registerRule(jtfRules[0]);
-      }
+      runner.registerRule(new AnotherRule());
       runner.setConfig("test-rule", { enabled: false, severity: "warning" });
 
       const enabled = runner.getEnabledRules();
       expect(enabled.length).toBe(1);
-      expect(enabled[0].id).toBe(jtfRules[0].id);
+      expect(enabled[0].id).toBe("another-rule");
     });
   });
 

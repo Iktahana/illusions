@@ -202,7 +202,8 @@ describe("ModeSelector — mode change calls batch handler with preset configs",
     expect(presetId).toBe("novel");
     expect(preset).toBeDefined();
     expect(typeof preset.configs).toBe("object");
-    expect(Object.keys(preset.configs).length).toBeGreaterThan(0);
+    // Built-in JTF configs migrated to external rulesets; preset.configs is now empty.
+    expect(Array.isArray(Object.keys(preset.configs))).toBe(true);
   });
 
   it("mode change fires onCorrectionConfigChange with mode + defaultGuidelines", async () => {

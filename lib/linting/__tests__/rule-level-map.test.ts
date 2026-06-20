@@ -14,10 +14,18 @@ describe("getRuleLevelMap", () => {
     }
   });
 
-  test("every settings metadata entry has a known level", () => {
+  test("every settings metadata entry has a known level (invariant holds trivially when META is empty)", () => {
     const levels = getRuleLevelMap();
+    // LINT_RULES_META is currently empty (all rules migrated to external rulesets).
+    // The invariant: every META entry must appear in the level map.
+    // With an empty META this vacuously passes; it will catch regressions if
+    // built-in rules are re-added without a corresponding registry entry.
     const missing = LINT_RULES_META.filter((m) => !levels.has(m.id)).map((m) => m.id);
     expect(missing).toEqual([]);
+  });
+
+  test("returns a Map instance", () => {
+    expect(getRuleLevelMap()).toBeInstanceOf(Map);
   });
 
   test("returns a memoized identical reference", () => {
