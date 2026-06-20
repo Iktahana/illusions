@@ -134,6 +134,9 @@ export default function MilkdownEditor({
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
   // 初期内容はマウント時に固定（ファイル切り替えでコンポーネントが再マウントされたときだけ変わる）
   const initialContentRef = useRef<string>(initialContent);
+  // 最新コンテンツを追跡する。isVertical 切替でエディタが再構築されたとき、
+  // 未保存の変更を保持するために initialContentRef の代わりに使う（#426）。
+  const currentContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
   const onInsertTextRef = useRef(onInsertText);
   const onLintIssuesUpdatedRef = useRef(onLintIssuesUpdated);
@@ -191,7 +194,7 @@ export default function MilkdownEditor({
 
   const { get } = useEditor(
     (root) => {
-      const value = initialContentRef.current;
+      const value = currentContentRef.current;
       let editor = Editor.make()
         .config(nord)
         .config((ctx) => {
@@ -210,10 +213,13 @@ export default function MilkdownEditor({
               doc.forEach((node) => {
                 lines.push(node.textContent);
               });
-              onChangeRef.current?.(lines.join("\n"));
+              const content = lines.join("\n");
+              currentContentRef.current = content;
+              onChangeRef.current?.(content);
             });
           } else {
             ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
+              currentContentRef.current = markdown;
               onChangeRef.current?.(markdown);
             });
           }
