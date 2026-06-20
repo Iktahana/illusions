@@ -141,6 +141,8 @@ export default function CreateProjectWizard({
   const handleNameKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter" && projectName.trim() !== "") {
+        // Ignore IME composition confirmation — only handle real Enter
+        if (e.nativeEvent.isComposing || e.keyCode === 229) return;
         void handleCreate();
       }
     },
