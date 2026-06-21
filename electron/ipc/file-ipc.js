@@ -427,6 +427,9 @@ function registerFileHandlers() {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
+    // Declared outside try so the finally block can always destroy it,
+    // preventing hidden BrowserWindow accumulation on print failures (#1919).
+    let printWin = null;
     try {
       const { BrowserWindow } = require("electron");
       const { mdiToHtml } = require("../../lib/export/mdi-to-html");
@@ -471,7 +474,7 @@ function registerFileHandlers() {
       });
 
       const partition = `print-${Date.now()}`;
-      const printWin = new BrowserWindow({
+      printWin = new BrowserWindow({
         show: false,
         width: 800,
         height: 600,
@@ -528,11 +531,16 @@ function registerFileHandlers() {
         });
       });
 
-      printWin.destroy();
       return { success: true };
     } catch (error) {
       log.error("Print failed:", error);
       return { success: false, error: error.message || "Print failed" };
+    } finally {
+      // Always destroy the hidden print window to prevent resource leaks,
+      // regardless of whether the print succeeded, was cancelled, or failed.
+      if (printWin && !printWin.isDestroyed()) {
+        printWin.destroy();
+      }
     }
   });
 
