@@ -9,6 +9,7 @@ import EditorDiffView from "@/components/EditorDiffView";
 import ErrorBoundary from "@/shared/ui/ErrorBoundary";
 import Inspector from "@/components/Inspector";
 import NovelEditor from "@/components/Editor";
+import { buildEditorPanelKey } from "@/lib/dockview/editor-panel-key";
 import ResizablePanel from "@/shared/ui/ResizablePanel";
 import ExportDialog from "@/components/ExportDialog";
 import RubyDialog from "@/components/RubyDialog";
@@ -486,7 +487,6 @@ export default function EditorLayout({
                           const liveEditorTab =
                             liveTab && isEditorTab(liveTab) ? liveTab : undefined;
                           const panelContent = liveEditorTab?.content ?? "";
-                          const panelLastSavedContent = liveEditorTab?.lastSavedContent ?? "";
                           const panelPendingExternalContent =
                             liveEditorTab?.pendingExternalContent ?? null;
 
@@ -496,81 +496,103 @@ export default function EditorLayout({
                           // panel re-evaluating its closure when `editorDiff`
                           // changed — which dockview does not reliably do — so
                           // clicking "比較" appeared to do nothing.
-                          if (isActivePanel) {
-                            return (
-                              <ErrorBoundary sectionName="エディタ">
-                                <div
-                                  ref={mainArea.editorDomRef as React.RefObject<HTMLDivElement>}
-                                  className="h-full"
-                                  // NOTE: onFocus は子孫（Milkdown contenteditable）からの bubble を利用。
-                                  // tabIndex は不要。パネルへのフォーカスを dockview に伝え activeTabId を最新化する。
-                                  // 既に active な panel に対する setActive() は dockview 内部で
-                                  // content 要素の DOM detach → re-attach を引き起こし scroll を 0 に
-                                  // リセットしてしまう (#1457 回帰)。isActive 時はスキップする。
-                                  onFocus={() => {
-                                    if (!panelApi.isActive) {
-                                      panelApi.setActive();
-                                    }
-                                  }}
-                                >
-                                  <NovelEditor
-                                    key={`tab-${panelBufferId}-${panelFilePath}-${panelEditorKey}`}
-                                    initialContent={panelContent}
-                                    onChange={mainArea.handleChange}
-                                    onInsertText={mainArea.handleInsertText}
-                                    onSelectionChange={mainArea.onSelectionChange}
-                                    onSelectionRangeChange={mainArea.onSelectionRangeChange}
-                                    // 検索の入力/表示は <main> の SearchDialog が担当。
-                                    // pane へは「語を反映」「開く」「トグル」の安定 callback のみ渡す
-                                    // （dockview の凍結クロージャでも安定 ref は機能するため）。
-                                    onSearchTermChange={mainArea.onSearchTermChange}
-                                    onOpenSearchDialog={mainArea.onOpenSearchDialog}
-                                    onToggleSearchDialog={mainArea.onToggleSearchDialog}
-                                    onEditorViewReady={mainArea.setEditorViewInstance}
-                                    registerFlush={mainArea.registerFlush}
-                                    lintingRuleRunner={mainArea.ruleRunner}
-                                    onLintIssuesUpdated={mainArea.handleLintIssuesUpdated}
-                                    onNlpError={mainArea.handleNlpError}
-                                    onOpenSpeechSettings={() => {
-                                      dialogs.setSettingsInitialCategory("speech");
-                                      dialogs.setShowSettingsModal(true);
-                                    }}
-                                    onOpenRubyDialog={mainArea.handleOpenRubyDialog}
-                                    onToggleTcy={mainArea.handleToggleTcy}
-                                    onOpenDictionary={mainArea.handleOpenDictionary}
-                                    onShowLintHint={mainArea.handleShowLintHint}
-                                    onIgnoreCorrection={mainArea.handleIgnoreCorrection}
-                                    mdiExtensionsEnabled={panelMdiEnabled}
-                                    gfmEnabled={panelGfmEnabled}
-                                    externalContent={panelPendingExternalContent}
-                                    onExternalContentApplied={() => {
-                                      mainArea.updateTab(panelBufferId, {
-                                        pendingExternalContent: null,
-                                      });
-                                    }}
-                                  />
-                                </div>
-                              </ErrorBoundary>
-                            );
-                          }
-
+                          //
+                          // #1878: active / inactive で別 key・別 component を返すと、
+                          // タブ切替で isActivePanel が反転するたびに Milkdown/ProseMirror
+                          // instance が unmount され Undo/Redo history が破棄されていた。
+                          // 同一 key・同一 NovelEditor instance を保ち、active 状態に応じて
+                          // ラッパの挙動（focus 伝播 / クリックでアクティブ化）と
+                          // app 全体に紐づく callback（onEditorViewReady 等）だけを切り替える。
+                          // initialContent は active/inactive 共にライブ content を使い、
+                          // inactive で lastSavedContent を表示して最新 dirty 内容とずれる
+                          // 退行（#1874 関連）も併せて防ぐ。
                           return (
-                            <div
-                              className="h-full cursor-pointer"
-                              onClick={() => {
-                                mainArea.switchTab(panelBufferId);
-                                panelApi.setActive();
-                              }}
-                            >
-                              <ErrorBoundary sectionName="エディタ">
+                            <ErrorBoundary sectionName="エディタ">
+                              <div
+                                ref={
+                                  isActivePanel
+                                    ? (mainArea.editorDomRef as React.RefObject<HTMLDivElement>)
+                                    : undefined
+                                }
+                                className={isActivePanel ? "h-full" : "h-full cursor-pointer"}
+                                // NOTE: onFocus は子孫（Milkdown contenteditable）からの bubble を利用。
+                                // tabIndex は不要。パネルへのフォーカスを dockview に伝え activeTabId を最新化する。
+                                // 既に active な panel に対する setActive() は dockview 内部で
+                                // content 要素の DOM detach → re-attach を引き起こし scroll を 0 に
+                                // リセットしてしまう (#1457 回帰)。isActive 時はスキップする。
+                                onFocus={() => {
+                                  if (!panelApi.isActive) {
+                                    panelApi.setActive();
+                                  }
+                                }}
+                                onClick={
+                                  isActivePanel
+                                    ? undefined
+                                    : () => {
+                                        mainArea.switchTab(panelBufferId);
+                                        panelApi.setActive();
+                                      }
+                                }
+                              >
                                 <NovelEditor
-                                  key={`tab-${panelBufferId}-${panelFilePath}-inactive`}
-                                  initialContent={panelLastSavedContent}
+                                  // key は active 状態に依存させない。editorKey は表示設定変更などで
+                                  // 真の再マウントが必要なときだけ変わる（タブ切替では変えない #1878）。
+                                  key={buildEditorPanelKey(
+                                    panelBufferId,
+                                    panelFilePath,
+                                    panelEditorKey,
+                                  )}
+                                  initialContent={panelContent}
+                                  // 編集・選択系の callback は app 全体で 1 本の active tab content /
+                                  // selection に書き込むため、active panel のみに配線する。
+                                  // inactive panel の instance は履歴保持のため生かしておくが、
+                                  // それらの編集がアクティブタブの内容を汚さないようにする (#1878)。
+                                  onChange={isActivePanel ? mainArea.handleChange : undefined}
+                                  onInsertText={
+                                    isActivePanel ? mainArea.handleInsertText : undefined
+                                  }
+                                  onSelectionChange={
+                                    isActivePanel ? mainArea.onSelectionChange : undefined
+                                  }
+                                  onSelectionRangeChange={
+                                    isActivePanel ? mainArea.onSelectionRangeChange : undefined
+                                  }
+                                  // 検索の入力/表示は <main> の SearchDialog が担当。
+                                  // pane へは「語を反映」「開く」「トグル」の安定 callback のみ渡す
+                                  // （dockview の凍結クロージャでも安定 ref は機能するため）。
+                                  onSearchTermChange={mainArea.onSearchTermChange}
+                                  onOpenSearchDialog={mainArea.onOpenSearchDialog}
+                                  onToggleSearchDialog={mainArea.onToggleSearchDialog}
+                                  // app 全体に 1 つだけ存在する「アクティブな EditorView」は
+                                  // active panel のみが登録する。inactive panel が登録すると
+                                  // split view で最後にレンダリングされた pane が勝ってしまう。
+                                  onEditorViewReady={
+                                    isActivePanel ? mainArea.setEditorViewInstance : undefined
+                                  }
+                                  registerFlush={isActivePanel ? mainArea.registerFlush : undefined}
+                                  lintingRuleRunner={mainArea.ruleRunner}
+                                  onLintIssuesUpdated={mainArea.handleLintIssuesUpdated}
+                                  onNlpError={mainArea.handleNlpError}
+                                  onOpenSpeechSettings={() => {
+                                    dialogs.setSettingsInitialCategory("speech");
+                                    dialogs.setShowSettingsModal(true);
+                                  }}
+                                  onOpenRubyDialog={mainArea.handleOpenRubyDialog}
+                                  onToggleTcy={mainArea.handleToggleTcy}
+                                  onOpenDictionary={mainArea.handleOpenDictionary}
+                                  onShowLintHint={mainArea.handleShowLintHint}
+                                  onIgnoreCorrection={mainArea.handleIgnoreCorrection}
                                   mdiExtensionsEnabled={panelMdiEnabled}
                                   gfmEnabled={panelGfmEnabled}
+                                  externalContent={panelPendingExternalContent}
+                                  onExternalContentApplied={() => {
+                                    mainArea.updateTab(panelBufferId, {
+                                      pendingExternalContent: null,
+                                    });
+                                  }}
                                 />
-                              </ErrorBoundary>
-                            </div>
+                              </div>
+                            </ErrorBoundary>
                           );
                         },
                         terminal: TerminalPanel,
