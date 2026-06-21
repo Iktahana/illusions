@@ -12,6 +12,7 @@ import { isProjectMode } from "@/lib/project/project-types";
 import type { ActivityBarView } from "@/components/ActivityBar";
 import type { EditorMode } from "@/lib/project/project-types";
 import type { SearchMatch, SearchTarget } from "@/lib/editor-page/find-search-matches";
+import type { AffectedTab } from "@/lib/tab-manager/tab-path-sync";
 import type { EditorView } from "@milkdown/prose/view";
 
 interface SidebarPanelProps {
@@ -62,6 +63,12 @@ interface SidebarPanelProps {
   newFileTrigger: number;
   /** Opens a project file by VFS path. */
   openProjectFile: (vfsPath: string, options: { preview: boolean }) => Promise<void>;
+  /** Notify the tab manager that a project file/folder was renamed/moved (#1868). */
+  onFileRenamed: (oldPath: string, newPath: string) => void;
+  /** Notify the tab manager that a project file/folder was deleted (#1868). */
+  onFileDeleted: (deletedPath: string) => void;
+  /** List open tabs affected by deleting a path, for dirty-confirmation (#1868). */
+  findTabsAffectedByDelete: (deletedPath: string) => AffectedTab[];
   /** Increments the editor key, forcing the editor to remount. */
   incrementEditorKey: () => void;
   /** Called when a word in the word-frequency panel should be searched. */
@@ -109,6 +116,9 @@ export default function SidebarPanel({
   onProjectBufferChange,
   newFileTrigger,
   openProjectFile,
+  onFileRenamed,
+  onFileDeleted,
+  findTabsAffectedByDelete,
   onWordSearch,
 }: SidebarPanelProps): React.ReactElement | null {
   switch (view) {
@@ -128,6 +138,9 @@ export default function SidebarPanel({
                 void openProjectFile(vfsPath, { preview: false });
               }}
               newFileTrigger={newFileTrigger}
+              onFileRenamed={onFileRenamed}
+              onFileDeleted={onFileDeleted}
+              findTabsAffectedByDelete={findTabsAffectedByDelete}
             />
           </div>
         </aside>

@@ -404,9 +404,16 @@ export function useFileWatchIntegration(params: UseFileWatchIntegrationParams): 
 
     const watcherPaths = watcherPathsRef.current;
 
-    // Stop and remove watchers for tabs that no longer exist
+    // Tabs that still have a watchable file path this render.
+    const pathfulTabIds = new Set(
+      tabs.filter((t) => isEditorTab(t) && t.file?.path).map((t) => t.id),
+    );
+
+    // Stop and remove watchers for tabs that no longer exist OR that lost their
+    // file path (#1868: a deleted open file is detached to an untitled tab —
+    // its watcher must stop so it cannot keep observing the now-deleted path).
     for (const [tabId, watcher] of watchers) {
-      if (!currentTabIds.has(tabId)) {
+      if (!currentTabIds.has(tabId) || !pathfulTabIds.has(tabId)) {
         watcher.stop();
         watchers.delete(tabId);
         watcherPaths.delete(tabId);

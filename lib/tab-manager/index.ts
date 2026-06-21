@@ -2,6 +2,8 @@
 
 import { useCallback, useRef, type MutableRefObject } from "react";
 import type { UseTabManagerReturn } from "./types";
+import { applyTabDelete, applyTabRename, findTabsUnderPath } from "./tab-path-sync";
+import type { AffectedTab } from "./tab-path-sync";
 import { useTabState } from "./use-tab-state";
 import { useFileIO } from "./use-file-io";
 import { useAutoSave } from "./use-auto-save";
@@ -173,6 +175,48 @@ export function useTabManager(options?: {
   // Update the ref so useElectronMenuBindings can access flushTabState
   flushTabStateRef.current = _flushTabState;
 
+  // --- Explorer file-system mutation sync (#1868) -------------------------
+  // Keep open tabs in sync when a project file/folder is renamed, moved, or
+  // deleted from the explorer (or inspector, #1870). Without this the tab keeps
+  // a stale `file.path`, and the next save resurrects the old path.
+
+  const { setTabs, tabsRef } = tabState;
+
+  /**
+   * Notify the tab manager that a file/folder was renamed or moved from
+   * `oldPath` to `newPath` (both VFS-relative). Atomically rewrites the
+   * path/name (and fileType) of the affected tab and every tab nested under a
+   * renamed directory. The file watcher self-corrects to the new path on the
+   * next render (watcherPaths mismatch).
+   */
+  const notifyFileRenamed = useCallback(
+    (oldPath: string, newPath: string): void => {
+      setTabs((prev) => applyTabRename(prev, oldPath, newPath).tabs);
+    },
+    [setTabs],
+  );
+
+  /**
+   * List the open editor tabs at or under `deletedPath` (VFS-relative). The
+   * explorer uses this to confirm dirty tabs before deleting.
+   */
+  const findTabsAffectedByDelete = useCallback(
+    (deletedPath: string): AffectedTab[] => findTabsUnderPath(tabsRef.current, deletedPath),
+    [tabsRef],
+  );
+
+  /**
+   * Notify the tab manager that a file/folder at `deletedPath` (VFS-relative)
+   * was deleted. Detaches the descriptor of every affected tab so no save flow
+   * can recreate the old path; the tab survives as an untitled dirty buffer.
+   */
+  const notifyFileDeleted = useCallback(
+    (deletedPath: string): void => {
+      setTabs((prev) => applyTabDelete(prev, deletedPath).tabs);
+    },
+    [setTabs],
+  );
+
   // --- Backward compat alias: newFile === newTab --------------------------
   const newFile = tabState.newTab;
 
@@ -235,5 +279,10 @@ export function useTabManager(options?: {
 
     // Project tab restore
     restoreProjectTabs,
+
+    // Explorer file-system mutation sync (#1868)
+    notifyFileRenamed,
+    findTabsAffectedByDelete,
+    notifyFileDeleted,
   };
 }
