@@ -737,11 +737,12 @@ export default function EditorPage() {
   interface PrintDialogState {
     content: string;
     metadata: ExportMetadata;
+    fileType: SupportedFileExtension;
   }
   const [printDialogState, setPrintDialogState] = useState<PrintDialogState | null>(null);
 
   const handlePrintDialogRequest = useCallback((content: string, metadata: ExportMetadata) => {
-    setPrintDialogState({ content, metadata });
+    setPrintDialogState({ content, metadata, fileType: activeFileTypeRef.current });
   }, []);
 
   // TXT export 字下げ dialog. The export hook awaits the user's choice via a
@@ -864,9 +865,8 @@ export default function EditorPage() {
 
       // Electron path: use IPC
       if (window.electronAPI?.printDocument) {
-        setPrintDialogState(null);
         try {
-          await window.electronAPI.printDocument(printDialogState.content, {
+          const result = await window.electronAPI.printDocument(printDialogState.content, {
             metadata: printDialogState.metadata,
             verticalWriting: settings.verticalWriting,
             pageSize: settings.pageSize,
@@ -881,7 +881,21 @@ export default function EditorPage() {
             textIndent: settings.textIndent,
             fullwidthSpaceIndent: settings.fullwidthSpaceIndent,
             googleFontFamily: settings.googleFontFamily,
+            // Pass the snapshotted file type so the HTML pipeline correctly
+            // handles .md/.txt literals vs .mdi MDI macros (#1882).
+            fileType: printDialogState.fileType,
           });
+          if (
+            result !== null &&
+            result !== undefined &&
+            typeof result === "object" &&
+            "success" in result &&
+            !result.success
+          ) {
+            notificationManager.error(`印刷に失敗しました: ${(result as { error: string }).error}`);
+            return;
+          }
+          setPrintDialogState(null);
         } catch (error) {
           const message = error instanceof Error ? error.message : "不明なエラー";
           notificationManager.error(`印刷に失敗しました: ${message}`);
