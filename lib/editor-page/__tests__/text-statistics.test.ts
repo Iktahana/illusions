@@ -312,6 +312,47 @@ describe("computeTextStatistics", () => {
 });
 
 // ---------------------------------------------------------------------------
+// fileType 別除去ルール — リグレッションテスト (#1889)
+// ---------------------------------------------------------------------------
+describe("extractVisibleText (fileType)", () => {
+  it(".txt: # や * や [[blank]] をそのまま本文文字として保持する", () => {
+    const input = "# 見出し\n*foo*\n[[blank]]";
+    // .txt ではすべての文字が本文であり、記法除去は行わない
+    expect(extractVisibleText(input, ".txt")).toBe(input);
+  });
+
+  it(".txt: 記法を含む文字列の可視文字数は生テキスト全文字（空白除く）に等しい", () => {
+    // "# 見出し\n*foo*\n[[blank]]" を .txt として処理した場合
+    // スペース・改行を除いた文字数: '#'+'見'+'出'+'し'+'*'+'f'+'o'+'o'+'*'+'['+'['+'b'+'l'+'a'+'n'+'k'+'+'']'+']' = 18
+    const input = "# 見出し\n*foo*\n[[blank]]";
+    const result = extractVisibleText(input, ".txt");
+    const expected = countVisibleChars(input); // 生テキストから空白・改行のみ除く
+    expect(countVisibleChars(result)).toBe(expected);
+  });
+
+  it(".mdi: # や *foo* は記法として除去され、[[blank]] は行ごと削除される", () => {
+    const input = "# 見出し\n*foo*\n[[blank]]";
+    const result = extractVisibleText(input, ".mdi");
+    expect(result).toBe("見出し\nfoo\n");
+  });
+
+  it(".md: Markdown 記法は除去されるが [[blank]] はプレーンテキストとして残る", () => {
+    const input = "# 見出し\n*foo*\n[[blank]]";
+    const result = extractVisibleText(input, ".md");
+    // 見出し記号と強調は除去、MDI マクロ [[blank]] はそのまま残る
+    expect(result).toBe("見出し\nfoo\n[[blank]]");
+  });
+
+  it(".txt: computeTextStatistics が記法を除去せずにカウントする", () => {
+    const input = "# 見出し\n*foo*\n[[blank]]";
+    const txtStats = computeTextStatistics(input, ".txt");
+    const mdiStats = computeTextStatistics(input, ".mdi");
+    // .txt の文字数は .mdi より多い（記法文字も本文としてカウント）
+    expect(txtStats.visibleTextCharCount).toBeGreaterThan(mdiStats.visibleTextCharCount);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 禁則処理のテスト
 // ---------------------------------------------------------------------------
 describe("countManuscriptCells (禁則処理)", () => {

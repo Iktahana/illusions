@@ -1186,7 +1186,7 @@ export default function EditorPage() {
     charTypeAnalysis,
     charUsageRates,
     readabilityAnalysis,
-  } = useTextStatistics(content);
+  } = useTextStatistics(content, activeFileType);
 
   // charCount は旧インターフェース互換用エイリアス（可視本文文字数）
   const charCount = visibleTextCharCount;
