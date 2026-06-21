@@ -267,7 +267,7 @@ export function useDockviewAdapter({
   // effect to re-run (which would duplicate addPanel calls).
   const [layoutReadyTick, setLayoutReadyTick] = useState(0);
 
-  const { tabs, activeTabId, switchTab, closeTab, cloneTab, updateTab } = tabManager;
+  const { tabs, activeTabId, switchTab, closeTab, cloneTab, updateTab, setTabContent } = tabManager;
 
   // Latest-state refs so the mount-only handleDockviewReady closure (and the
   // dockview event subscriptions it registers) never read stale first-render
@@ -678,13 +678,18 @@ export function useDockviewAdapter({
       // and apply to the editor view only for the active tab.
       for (const tab of tabs) {
         if (tab.id === data.bufferId && isEditorTab(tab)) {
-          // Update tab state in memory regardless of active/inactive status
-          updateTab(tab.id, { content: data.content });
+          // Use setTabContent so isDirty is correctly recomputed for background
+          // tabs (updateTab is a shallow merge that skips dirty recomputation,
+          // causing popout edits to be silently lost — #1876).
+          if (tab.id === activeTabId) {
+            // Active tab: drive the editor view (ProseMirror) which will
+            // propagate back to tab state via setContent.
+            tabSetContent(data.content);
+          } else {
+            // Background tab: update content and recompute isDirty directly.
+            setTabContent(tab.id, data.content);
+          }
         }
-      }
-      // Apply to editor view (ProseMirror) only when the active tab matches
-      if (data.bufferId === activeTabId) {
-        tabSetContent(data.content);
       }
     });
 
@@ -696,7 +701,7 @@ export function useDockviewAdapter({
       if (typeof unsubSync === "function") unsubSync();
       if (typeof unsubClose === "function") unsubClose();
     };
-  }, [activeTabId, tabs, tabSetContent, updateTab]);
+  }, [activeTabId, tabs, tabSetContent, updateTab, setTabContent]);
 
   // Broadcast content changes to other windows (editor tabs only)
   useEffect(() => {
