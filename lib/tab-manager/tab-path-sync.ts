@@ -14,8 +14,9 @@
  *     under a renamed directory (atomic, byte-preserving — content untouched).
  *   - applyTabDelete : detach the file descriptor (file → null) of every tab
  *     under a deleted path so the save executor / auto-save can no longer
- *     resurrect the old path. Detached tabs become "untitled" dirty tabs whose
- *     content the user can still save elsewhere.
+ *     resurrect the old path. Detached tabs become "untitled" dirty tabs; their
+ *     editor buffer is persisted by use-tab-persistence (project mode) so the
+ *     content survives an app restart and can be saved to a new location.
  *
  * All paths here are VFS-relative (e.g. "subdir/file.mdi"), matching both the
  * explorer's `toVFSPath()` output and the project-mode `tab.file.path` value.
@@ -156,6 +157,9 @@ export interface ApplyTabDeleteResult {
  *
  * The tab itself stays open as an untitled buffer so the user does not lose
  * unsaved content; it is marked dirty so the content is recognized as unsaved.
+ * In project mode the detached buffer is also persisted to workspace.json
+ * (WorkspaceTab.unsavedContent) by use-tab-persistence, so the content is
+ * recovered on the next app launch instead of being silently dropped (#1868).
  * The associated watcher is removed by the watch-integration effect because the
  * path no longer exists on the tab.
  */
