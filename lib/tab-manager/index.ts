@@ -196,6 +196,7 @@ export function useTabManager(options?: {
     lastSaveWasAuto: tabState.lastSaveWasAuto,
     openFile: fileIO.openFile,
     saveFile: fileIO.saveFile,
+    saveAllDirtyTabs: fileIO.saveAllDirtyTabs,
     saveAsFile: fileIO.saveAsFile,
     newFile,
     updateFileName: tabState.updateFileName,

@@ -5,6 +5,24 @@ import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-docum
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension, WorkspaceTab } from "../project/project-types";
 import type { TabId, TabState, EditorTabState, TerminalTabState } from "./tab-types";
+import type { SaveOutcome } from "./save-executor";
+
+// ---------------------------------------------------------------------------
+// Save-all aggregate result (#1859)
+// ---------------------------------------------------------------------------
+
+/**
+ * Aggregate result of saving every dirty editor tab (#1859).
+ *
+ * `allSaved` is true only when EVERY dirty tab returned status "saved". Any
+ * non-saved outcome (cancelled / failed / conflicted / locked / skipped) makes
+ * it false so the project-switch unsaved warning can block the pending action
+ * and keep the dialog open — preventing silent data loss.
+ */
+export interface SaveAllDirtyResult {
+  allSaved: boolean;
+  outcomes: SaveOutcome[];
+}
 
 // ---------------------------------------------------------------------------
 // Public return type (must stay identical to the original useTabManager)
@@ -21,6 +39,12 @@ export interface UseTabManagerReturn {
   lastSaveWasAuto: boolean;
   openFile: () => Promise<void>;
   saveFile: (isAutoSave?: boolean) => Promise<void>;
+  /**
+   * Save every dirty editor tab and report an aggregate result (#1859).
+   * `allSaved` is false unless every dirty tab was written, so callers (the
+   * project-switch unsaved warning) can block the pending action on cancel/fail.
+   */
+  saveAllDirtyTabs: () => Promise<SaveAllDirtyResult>;
   saveAsFile: () => Promise<void>;
   newFile: (fileType?: SupportedFileExtension) => void;
   updateFileName: (newName: string) => void;

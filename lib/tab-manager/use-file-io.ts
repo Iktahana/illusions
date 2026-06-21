@@ -13,11 +13,12 @@ import { getHistoryService } from "../services/history-service";
 import type { SnapshotType } from "../services/history-policy";
 import { getProjectFileService } from "../services/project-file-service";
 import { executeTabSave } from "./save-executor";
+import type { SaveOutcome } from "./save-executor";
 import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import { generateTabId, inferFileType, getErrorMessage } from "./types";
 import { isEditableExtension, resolveNativePath } from "./open-with-default-app";
-import type { TabManagerCore } from "./types";
+import type { TabManagerCore, SaveAllDirtyResult } from "./types";
 
 // ---------------------------------------------------------------------------
 // Params
@@ -43,6 +44,13 @@ export interface UseFileIOReturn {
   openFile: () => Promise<void>;
   /** Save the active tab. */
   saveFile: (isAutoSave?: boolean) => Promise<void>;
+  /**
+   * Save every dirty editor tab (#1859). Used by the unsaved-warning flow
+   * (project switch) so that background dirty tabs are not silently dropped.
+   * Returns an aggregate result; the pending action must only proceed when
+   * `allSaved` is true.
+   */
+  saveAllDirtyTabs: () => Promise<SaveAllDirtyResult>;
   /** Save As (always shows dialog). */
   saveAsFile: () => Promise<void>;
   /** Load a system file by path + content into a tab. */
@@ -351,6 +359,96 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     ],
   );
 
+  /**
+   * Save every dirty editor tab (#1859).
+   *
+   * Root cause this fixes: the project-switch unsaved warning raised for ALL
+   * dirty editor tabs but only ever saved the active tab, and because the
+   * single-tab saveFile swallows non-saved SaveOutcome statuses, the pending
+   * action ran even when a save was cancelled/failed — losing unsaved content.
+   *
+   * This loops every dirty editor tab through executeTabSave (reusing the
+   * shared per-path save lock for serialization), flushing the active tab's
+   * live content first. Save As / untitled tabs may pop a native dialog; if
+   * the user cancels one, we short-circuit the remaining saves cleanly.
+   * Notifications are surfaced here so the caller only needs the aggregate.
+   */
+  const saveAllDirtyTabs = useCallback(async (): Promise<SaveAllDirtyResult> => {
+    if (isSavingRef.current) {
+      // A save is already in flight; report locked so the caller blocks.
+      return { allSaved: false, outcomes: [{ status: "locked" }] };
+    }
+
+    const dirtyTabs = tabsRef.current.filter(
+      (t): t is EditorTabState => isEditorTab(t) && t.isDirty,
+    );
+    if (dirtyTabs.length === 0) {
+      return { allSaved: true, outcomes: [] };
+    }
+
+    isSavingRef.current = true;
+    const outcomes: SaveOutcome[] = [];
+    try {
+      for (const tab of dirtyTabs) {
+        // Block conflicted tabs up front (mirrors saveFile's guard).
+        if (tab.fileSyncStatus === "conflicted") {
+          notificationManager.warning(
+            "ファイルが外部で変更されています。保存する前にコンフリクトを解決してください。",
+          );
+          outcomes.push({ status: "conflicted" });
+          break;
+        }
+
+        // #1840: flush live editor content for the active tab before saving.
+        const tabToSave = flushActiveTabContent(tab);
+        const outcome = await executeTabSave({
+          tab: tabToSave,
+          isProject: isProjectRef.current,
+          tabsRef,
+          setTabs,
+          tryCreateSnapshot,
+          snapshotType: "manual",
+          updateProjectMetadata: true,
+          persistFileReference,
+        });
+        outcomes.push(outcome);
+
+        if (outcome.status === "saved") {
+          if (outcome.persistFailed) {
+            notificationManager.warning(PERSIST_FAILURE_WARNING);
+          }
+          continue;
+        }
+
+        // Non-saved: surface the right notification and stop saving the rest.
+        if (outcome.status === "conflicted") {
+          notificationManager.warning(
+            "ファイルが外部で変更されています。保存する前にコンフリクトを解決してください。",
+          );
+        } else if (outcome.status === "failed") {
+          console.error("保存に失敗しました:", outcome.error);
+          notificationManager.error(`保存に失敗しました: ${getErrorMessage(outcome.error)}`);
+        }
+        // "cancelled" (user dismissed Save As) / "locked" / "skipped":
+        // no notification, but still blocks the pending action.
+        break;
+      }
+    } finally {
+      isSavingRef.current = false;
+    }
+
+    const allSaved =
+      outcomes.length === dirtyTabs.length && outcomes.every((o) => o.status === "saved");
+    return { allSaved, outcomes };
+  }, [
+    persistFileReference,
+    tryCreateSnapshot,
+    setTabs,
+    tabsRef,
+    isProjectRef,
+    flushActiveTabContent,
+  ]);
+
   /** Save As (always shows dialog) */
   const saveAsFile = useCallback(async () => {
     if (isSavingRef.current) return;
@@ -624,6 +722,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   return {
     openFile,
     saveFile,
+    saveAllDirtyTabs,
     saveAsFile,
     loadSystemFile,
     openProjectFile,

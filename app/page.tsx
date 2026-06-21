@@ -350,6 +350,7 @@ export default function EditorPage() {
     lastSaveWasAuto,
     openFile: tabOpenFile,
     saveFile,
+    saveAllDirtyTabs,
     saveAsFile,
     newFile: tabNewFile,
     updateFileName,
@@ -646,8 +647,11 @@ export default function EditorPage() {
   } = projectLifecycle;
 
   // Unsaved warning hook (project mode transitions only; tabs handle per-tab dirty checks)
+  // #1859: save ALL dirty tabs (not just the active one) and block the pending
+  // action when any save is cancelled/failed, so background dirty tabs and
+  // cancelled saves no longer lose unsaved content.
   const anyDirty = tabs.some((t) => isEditorTab(t) && t.isDirty);
-  const unsavedWarning = useUnsavedWarning(anyDirty, saveFile, currentFile?.name || null);
+  const unsavedWarning = useUnsavedWarning(anyDirty, saveAllDirtyTabs, currentFile?.name || null);
 
   // Auto-recovered editor remount
   useEffect(() => {
