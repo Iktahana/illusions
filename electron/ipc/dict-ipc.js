@@ -43,13 +43,14 @@ function registerDictHandlers() {
   const MAX_BATCH_TERMS = 1000;
 
   // Exact-match batch lookup (lightweight projection) for analysis features
-  ipcMain.handle(DICT_CHANNELS.invoke.lookupBatch, async (_event, { terms } = {}) => {
+  ipcMain.handle(DICT_CHANNELS.invoke.lookupBatch, async (_event, { terms, normalize } = {}) => {
     try {
       if (!Array.isArray(terms)) return [];
       const safe = terms
         .filter((t) => typeof t === "string" && t.length > 0)
         .slice(0, MAX_BATCH_TERMS);
-      return mgr.lookupBatch(safe);
+      // Default true (kana reading fallback); only an explicit `false` disables it.
+      return mgr.lookupBatch(safe, normalize !== false);
     } catch (err) {
       console.error("[Dict IPC] dict:lookup-batch failed:", err);
       return [];

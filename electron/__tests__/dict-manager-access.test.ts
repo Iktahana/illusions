@@ -26,10 +26,12 @@ vi.mock("electron", () => ({
 
 type DbMode = "healthy" | "no-table" | "malformed";
 
+type FakeRow = { entry: string; reading_primary: string; raw_json: string };
+
 class FakeStatement {
   constructor(
     private readonly sql: string,
-    private readonly rows: Array<{ entry: string; raw_json: string }>,
+    private readonly rows: FakeRow[],
     private readonly mode: DbMode,
   ) {}
   get(): unknown {
@@ -44,7 +46,15 @@ class FakeStatement {
   all(...args: unknown[]): unknown[] {
     if (this.sql.includes("WHERE entry IN")) {
       const wanted = new Set(args as string[]);
-      return this.rows.filter((r) => wanted.has(r.entry)).map((r) => ({ ...r }));
+      return this.rows
+        .filter((r) => wanted.has(r.entry))
+        .map((r) => ({ entry: r.entry, raw_json: r.raw_json }));
+    }
+    if (this.sql.includes("WHERE reading_primary IN")) {
+      const wanted = new Set(args as string[]);
+      return this.rows
+        .filter((r) => wanted.has(r.reading_primary))
+        .map((r) => ({ reading_primary: r.reading_primary, raw_json: r.raw_json }));
     }
     return [];
   }
@@ -53,7 +63,7 @@ class FakeStatement {
 
 class FakeDatabase {
   constructor(
-    private readonly rows: Array<{ entry: string; raw_json: string }>,
+    private readonly rows: FakeRow[],
     private readonly mode: DbMode,
   ) {
     if (mode === "malformed") throw new Error("file is not a database");
@@ -92,7 +102,10 @@ interface TestableManager {
   _getDictDir: () => string;
   _createDatabase: (dbPath: string, opts?: unknown) => unknown;
   verify: () => { ok: boolean; reason?: string };
-  lookupBatch: (terms: string[]) => Array<{
+  lookupBatch: (
+    terms: string[],
+    normalize?: boolean,
+  ) => Array<{
     entry: string;
     found: boolean;
     reading?: string;
@@ -110,7 +123,11 @@ interface ManagerOptions {
 
 async function freshManager(dictDir: string, opts: ManagerOptions = {}): Promise<TestableManager> {
   const { rows = [], mode = "healthy" } = opts;
-  const fakeRows = rows.map((r) => ({ entry: r.entry, raw_json: rawJson(r) }));
+  const fakeRows = rows.map((r) => ({
+    entry: r.entry,
+    reading_primary: r.reading,
+    raw_json: rawJson(r),
+  }));
   const { getDictManager } = await import("../dict-manager.js");
   const mgr = getDictManager() as unknown as TestableManager;
   mgr._getDictDir = () => dictDir;
@@ -204,6 +221,48 @@ describe("DictManager analysis access (#1624)", () => {
       const mgr = await freshManager(dictDir, { rows: LOOKUP_ROWS });
       expect(mgr.lookupBatch([])).toEqual([]);
       expect(mgr.lookupBatch(["", "  "].map((s) => s.trim()))).toEqual([]);
+    });
+  });
+
+  describe("lookupBatch() kana reading normalization (#1935)", () => {
+    // Dictionary stores verbs under their kanji headword with a kana reading.
+    const NORMALIZE_ROWS: RawJsonInput[] = [
+      { entry: "有る", reading: "ある", pos: ["動詞"] },
+      { entry: "分かる", reading: "わかる", pos: ["動詞"] },
+      { entry: "読む", reading: "よむ", pos: ["動詞"] },
+      { entry: "雪", reading: "ゆき", pos: ["名詞"] },
+    ];
+
+    it("resolves an all-kana term to its kanji headword via the reading index", async () => {
+      fs.writeFileSync(dbPath, "sqlite");
+      const mgr = await freshManager(dictDir, { rows: NORMALIZE_ROWS });
+      // 「ある」 (kana) misses the headword index but its reading matches 有る.
+      const hit = mgr.lookupBatch(["ある"]);
+      expect(hit).toEqual([{ entry: "ある", found: true, reading: "ある", pos: "動詞" }]);
+    });
+
+    it("does NOT flag kana content words 「ある」「わかる」 as out-of-dictionary", async () => {
+      fs.writeFileSync(dbPath, "sqlite");
+      const mgr = await freshManager(dictDir, { rows: NORMALIZE_ROWS });
+      const found = new Set(mgr.lookupBatch(["ある", "わかる"]).map((r) => r.entry));
+      expect(found.has("ある")).toBe(true);
+      expect(found.has("わかる")).toBe(true);
+    });
+
+    it("STILL flags genuinely out-of-dictionary terms with kanji (圕 / 讀む)", async () => {
+      fs.writeFileSync(dbPath, "sqlite");
+      const mgr = await freshManager(dictDir, { rows: NORMALIZE_ROWS });
+      // 讀む shares reading よむ with 読む, but the kana gate skips it (讀 is kanji),
+      // so it must NOT be over-suppressed. 圕 is absent and not kana.
+      const found = new Set(mgr.lookupBatch(["圕", "讀む"]).map((r) => r.entry));
+      expect(found.has("圕")).toBe(false);
+      expect(found.has("讀む")).toBe(false);
+    });
+
+    it("normalize:false disables the reading fallback (strict headword match)", async () => {
+      fs.writeFileSync(dbPath, "sqlite");
+      const mgr = await freshManager(dictDir, { rows: NORMALIZE_ROWS });
+      expect(mgr.lookupBatch(["ある"], false)).toEqual([]);
     });
   });
 });

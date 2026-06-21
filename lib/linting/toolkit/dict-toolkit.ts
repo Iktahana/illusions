@@ -10,6 +10,12 @@
 import type { DictLookup } from "@/lib/dict/dict-types";
 import type { GenjiHealth, GenjiHealthState } from "@/lib/dict/dict-access";
 import type { DictToolkit } from "../sdk/ruleset-context";
+import type { Token } from "@/lib/nlp-client/types";
+import {
+  collectDictCandidateTerms,
+  dictCandidateTerm,
+  type DictCandidateOptions,
+} from "../dict-candidate-terms";
 
 /** Minimal dictionary surface needed by the toolkit (injectable for tests). */
 export interface DictLike {
@@ -70,6 +76,12 @@ export function createDictToolkit(health: GenjiHealth, dict: DictLike): DictTool
     lookupCached(): DictLookup | undefined {
       return undefined;
     },
+    candidateTerm(token: Token, opts?: DictCandidateOptions): string | null {
+      return dictCandidateTerm(token, opts);
+    },
+    candidateTerms(tokens: ReadonlyArray<Token>, opts?: DictCandidateOptions): string[] {
+      return collectDictCandidateTerms(tokens, opts);
+    },
   };
 }
 
@@ -108,6 +120,12 @@ export function createSnapshotDictToolkit(): DictToolkitInternal {
     lookupCached(term: string): DictLookup | undefined {
       if (!ready) return undefined;
       return snapshot.get(term);
+    },
+    candidateTerm(token: Token, opts?: DictCandidateOptions): string | null {
+      return dictCandidateTerm(token, opts);
+    },
+    candidateTerms(tokens: ReadonlyArray<Token>, opts?: DictCandidateOptions): string[] {
+      return collectDictCandidateTerms(tokens, opts);
     },
     setSnapshot(entries: ReadonlyArray<DictSnapshotEntry>, isReady: boolean): void {
       snapshot = new Map(entries);

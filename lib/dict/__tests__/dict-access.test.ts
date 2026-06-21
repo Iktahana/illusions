@@ -136,7 +136,8 @@ describe("DictAccess (#1624)", () => {
       const access = await importFresh();
 
       await access.lookupBatch(["雪", "雪", ""]);
-      expect(lookupBatch).toHaveBeenCalledWith(["雪"]);
+      // normalize defaults true → forwarded to the Electron lookup (#1935).
+      expect(lookupBatch).toHaveBeenCalledWith(["雪"], true);
     });
 
     it("does NOT record an I/O error as a miss (leaves terms unresolved, re-queries next time)", async () => {

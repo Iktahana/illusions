@@ -24,6 +24,55 @@ const DB_FILENAME = "genji.db";
 const DB_TEMP_FILENAME = "genji.db.tmp";
 const VERSION_FILENAME = "genji_version.txt";
 
+// ---------------------------------------------------------------------------
+// Kana normalization for reading-index fallback (#1935)
+//
+// The dictionary indexes headwords by their written form only (`entry`), so a
+// kana spelling of a word the dict stores under a kanji headword — e.g. the verb
+// 「ある」 (dict headword 「有る」) — misses an exact lookup and the 辞書外語 rule
+// wrongly flags it. When an all-kana term misses, we re-query the reading index
+// (`reading_primary`) so the kana resolves to its canonical headword.
+//
+// The all-kana GATE is the safety boundary: only fully-kana terms get the
+// reading fallback. A term containing kanji (圕, 讀む) keeps exact-match
+// semantics and stays flagged when genuinely absent — this avoids turning the
+// lookup into a homophone engine (讀む would otherwise match 読む by reading).
+// ---------------------------------------------------------------------------
+
+/** Every char is hiragana / katakana / 長音符 (no kanji, ASCII, or symbols). */
+function isAllKana(s) {
+  return typeof s === "string" && s.length > 0 && /^[ぁ-ゖァ-ヺーー]+$/.test(s);
+}
+
+/** Hiragana → Katakana (code-point shift); other chars pass through. */
+function toKatakana(s) {
+  let out = "";
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    out += c >= 0x3041 && c <= 0x3096 ? String.fromCodePoint(c + 0x60) : ch;
+  }
+  return out;
+}
+
+/** Katakana → Hiragana (code-point shift); other chars pass through. */
+function toHiragana(s) {
+  let out = "";
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    out += c >= 0x30a1 && c <= 0x30f6 ? String.fromCodePoint(c - 0x60) : ch;
+  }
+  return out;
+}
+
+/**
+ * Candidate reading_primary keys for an all-kana term. We probe BOTH scripts so
+ * the fallback is robust to whichever convention the dictionary stores readings
+ * in (hiragana or katakana).
+ */
+function readingForms(term) {
+  return [...new Set([term, toKatakana(term), toHiragana(term)])];
+}
+
 // Security: dictionary assets may only be downloaded over https from these hosts
 const ALLOWED_DOWNLOAD_HOSTS = new Set([
   "github.com",
@@ -219,6 +268,16 @@ class DictManager {
         rwDb.exec("CREATE INDEX IF NOT EXISTS idx_dict_entry_text ON entries(entry);");
         console.log("[DictManager] Indexes created");
       }
+      // Reading index: powers homophone lookup (queryByReading) and the all-kana
+      // reading fallback in lookupBatch (#1935). Best-effort — guarded so an
+      // older DB lacking the reading_primary column doesn't fail the open.
+      try {
+        rwDb.exec(
+          "CREATE INDEX IF NOT EXISTS idx_dict_reading_primary ON entries(reading_primary);",
+        );
+      } catch (readingIdxErr) {
+        console.warn("[DictManager] reading index create skipped:", readingIdxErr.message);
+      }
     } catch (err) {
       // Index creation is best-effort; don't fail the whole open
       console.warn("[DictManager] Index check/create failed:", err);
@@ -303,10 +362,16 @@ class DictManager {
    * never the full DictEntry — so hundreds of words cost one query + one small
    * IPC payload. Terms with no match are simply absent from the result.
    *
+   * When `normalize` is true (default), all-kana terms that miss the headword
+   * index are re-resolved against the reading index so 表記ゆれ (e.g. kana
+   * 「ある」 → headword 「有る」) does not read as out-of-dictionary. Results are
+   * keyed by the REQUESTED term, so callers/caches stay keyed by what they asked.
+   *
    * @param {string[]} terms
+   * @param {boolean} [normalize=true] Enable the all-kana reading fallback.
    * @returns {Array<{ entry: string } & import("../lib/dict/dict-types").DictLookup>}
    */
-  lookupBatch(terms) {
+  lookupBatch(terms, normalize = true) {
     if (this._downloadMutex.locked) return [];
     if (!Array.isArray(terms)) return [];
     const unique = [...new Set(terms.filter((t) => typeof t === "string" && t.length > 0))];
@@ -315,23 +380,74 @@ class DictManager {
     const db = this._openDb();
     if (!db) return [];
 
+    const byEntry = new Map();
     try {
       const placeholders = unique.map(() => "?").join(",");
       const rows = db
         .prepare(`SELECT entry, raw_json FROM entries WHERE entry IN (${placeholders})`)
         .all(...unique);
 
-      const byEntry = new Map();
       for (const row of rows) {
         if (byEntry.has(row.entry)) continue; // first row wins for a given headword
         const proj = this._rawJsonToLookup(row.raw_json);
         if (proj) byEntry.set(row.entry, { entry: row.entry, ...proj });
       }
-      return [...byEntry.values()];
     } catch (err) {
       console.error("[DictManager] lookupBatch error:", err);
       if (this._isCorruptionError(err)) this._corrupt = true;
       return [];
+    }
+
+    if (normalize) {
+      this._resolveKanaByReading(db, unique, byEntry);
+    }
+    return [...byEntry.values()];
+  }
+
+  /**
+   * Reading-index fallback for all-kana terms that missed the headword index.
+   * Mutates `byEntry`, keying each resolved hit by the original requested term.
+   * Isolated try/catch: a missing `reading_primary` column (older DB) or any
+   * reading-query failure degrades silently to exact-match-only — never flips a
+   * word to absent and never marks the DB corrupt.
+   * @private
+   */
+  _resolveKanaByReading(db, unique, byEntry) {
+    const kanaMisses = unique.filter((t) => !byEntry.has(t) && isAllKana(t));
+    if (kanaMisses.length === 0) return;
+
+    // reading_primary candidate → requested terms that map to it
+    const readingToTerms = new Map();
+    for (const t of kanaMisses) {
+      for (const r of readingForms(t)) {
+        const list = readingToTerms.get(r);
+        if (list) list.push(t);
+        else readingToTerms.set(r, [t]);
+      }
+    }
+    const readings = [...readingToTerms.keys()];
+    if (readings.length === 0) return;
+
+    try {
+      const placeholders = readings.map(() => "?").join(",");
+      const rows = db
+        .prepare(
+          `SELECT reading_primary, raw_json FROM entries WHERE reading_primary IN (${placeholders})`,
+        )
+        .all(...readings);
+
+      for (const row of rows) {
+        const targets = readingToTerms.get(row.reading_primary);
+        if (!targets) continue;
+        const proj = this._rawJsonToLookup(row.raw_json);
+        if (!proj) continue;
+        for (const t of targets) {
+          if (!byEntry.has(t)) byEntry.set(t, { entry: t, ...proj });
+        }
+      }
+    } catch (err) {
+      // Reading fallback is best-effort. Do NOT mark corrupt or clear results.
+      console.warn("[DictManager] reading fallback failed:", err);
     }
   }
 
@@ -801,4 +917,4 @@ function getDictManager() {
   return _manager;
 }
 
-module.exports = { getDictManager };
+module.exports = { getDictManager, isAllKana, toKatakana, toHiragana, readingForms };

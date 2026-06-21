@@ -311,10 +311,16 @@ declare global {
       /** Query entries by kana reading (homophone lookup) */
       queryByReading: (reading: string, limit?: number) => Promise<DictEntry[]>;
       /**
-       * Exact-match batch lookup (lightweight projection) for analysis features.
-       * Terms with no match are omitted from the result array.
+       * Batch lookup (lightweight projection) for analysis features and lint
+       * prewarm. Headword exact-match by default; when `normalize` is true
+       * (default), all-kana terms that miss are resolved via the reading index
+       * (e.g. kana 「ある」 → headword 「有る」, #1935) and returned keyed by the
+       * requested term. Terms with no match are omitted from the result array.
        */
-      lookupBatch: (terms: string[]) => Promise<Array<{ entry: string } & DictLookup>>;
+      lookupBatch: (
+        terms: string[],
+        normalize?: boolean,
+      ) => Promise<Array<{ entry: string } & DictLookup>>;
       /** Fast integrity check; `ok: false` means the DB should be re-downloaded. */
       verify: () => Promise<{
         ok: boolean;
