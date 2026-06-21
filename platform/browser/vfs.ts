@@ -343,8 +343,16 @@ export class WebVFS implements VirtualFileSystem {
     try {
       const fileHandle = await resolveFileHandle(root, path);
       const file = await fileHandle.getFile();
-      return file.text();
+      // #1888: decode with a fatal TextDecoder instead of File.text(), which
+      // silently replaces invalid bytes with U+FFFD. A non-UTF-8 manuscript
+      // would otherwise open lossy and be saved back over the original.
+      const buf = await file.arrayBuffer();
+      return new TextDecoder("utf-8", { fatal: true }).decode(buf);
     } catch (error) {
+      if (error instanceof TypeError) {
+        // Invalid UTF-8 byte sequence — refuse rather than corrupt on save.
+        throw new Error("UTF-8 以外のファイルは現在サポートされていません");
+      }
       throw new Error(
         `Failed to read file "${path}": ${error instanceof Error ? error.message : String(error)}`,
       );

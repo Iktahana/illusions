@@ -112,6 +112,15 @@ export function useFileOpening({
       if (error instanceof DOMException && error.name === "AbortError") return;
       if (error instanceof Error && error.message.includes("キャンセル")) return;
       console.error("Failed to open file:", error);
+      // #1888: non-UTF-8 manuscript — refuse to open (no editable tab) and tell
+      // the user to convert it first, instead of silently loading lossy U+FFFD
+      // content that a later save would write back over the original file.
+      if (error instanceof Error && error.message.includes("UTF-8 以外")) {
+        notificationManager.error(
+          "UTF-8 以外の文字コードのため開けませんでした。UTF-8 へ変換してから開いてください。",
+        );
+        return;
+      }
       notificationManager.error("ファイルを開けませんでした。");
     }
   }, [setStandaloneMode, tabLoadSystemFile, incrementEditorKey]);

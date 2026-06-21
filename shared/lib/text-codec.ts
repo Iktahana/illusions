@@ -55,7 +55,26 @@ export function readTextWithEncoding(buf: Uint8Array): DecodedText {
     start = 3;
   }
 
-  const text = new TextDecoder("utf-8", { fatal: false }).decode(buf.slice(start));
+  // Fatal decode: invalid byte sequences (Shift_JIS, EUC-JP, BOM-less UTF-16,
+  // arbitrary binary, etc.) throw a TypeError instead of being silently
+  // replaced with U+FFFD. Silent replacement previously corrupted non-UTF-8
+  // manuscripts on save (#1888). We map the TypeError to the same Japanese
+  // error used for non-UTF-8 BOM rejection so callers can refuse to open the
+  // file rather than create an editable tab full of replacement characters.
+  //
+  // NOTE: this is intentionally NOT a "contains U+FFFD" string check — valid
+  // UTF-8 content may legitimately include U+FFFD, and such documents must
+  // still open and save. Fatal decoding only throws on genuinely invalid byte
+  // sequences, which is the correct discriminator.
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(buf.slice(start));
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("UTF-8 以外のファイルは現在サポートされていません");
+    }
+    throw error;
+  }
 
   // Detect EOL style before normalization
   const eol: "lf" | "crlf" = /\r\n/.test(text) ? "crlf" : "lf";
