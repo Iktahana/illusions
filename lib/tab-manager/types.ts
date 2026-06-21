@@ -155,9 +155,10 @@ export function inferFileType(fileName: string): SupportedFileExtension {
  * HTML tag stripping) lives in
  * `@/packages/milkdown-plugin-japanese-novel/mdi-document`.
  *
- * @param options.fileType - When ".mdi", standalone `<br />` lines become
- *   `[[blank]]` markers and serializer-escaped bracket macros are recovered.
- *   For all other file types (or when omitted), those steps are skipped.
+ * @param options.fileType - Serializer-escaped bracket macros (`\[\[blank]]` →
+ *   `[[blank]]`) are recovered for ".mdi", ".md", and ".txt" (byte-preservation,
+ *   issue #1916). Standalone `<br />` → `[[blank]]` conversion applies to ".mdi"
+ *   only. For omitted fileType both steps are skipped.
  */
 export function sanitizeMdiContent(
   content: string,

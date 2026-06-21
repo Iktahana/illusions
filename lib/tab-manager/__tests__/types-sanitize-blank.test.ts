@@ -64,7 +64,7 @@ describe("sanitizeMdiContent — bracket macro escape recovery (.mdi only)", () 
   it("(.mdi) fully-escaped brackets \\[\\[blank\\]\\] → [[blank]]", () => {
     expect(sanitizeMdiContent("\\[\\[blank\\]\\]", MDI)).toBe("[[blank]]");
   });
-  it("(.md) escape recovery is skipped (Step 0 is .mdi only)", () => {
-    expect(sanitizeMdiContent("\\[\\[blank]]", MD)).toBe("\\[\\[blank]]");
+  it("(.md) escape recovery applies (Step 0 covers .mdi/.md/.txt, #1916)", () => {
+    expect(sanitizeMdiContent("\\[\\[blank]]", MD)).toBe("[[blank]]");
   });
 });
