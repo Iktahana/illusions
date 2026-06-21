@@ -80,10 +80,13 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     () => remarkMdiBreakPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
     { enable: enableMdiBreak },
   );
+  // Gate [[blank]] parsing on the same flag as other MDI block macros so that
+  // .txt/.md files containing literal "[[blank]]" are not consumed and deleted
+  // on save (#1886). enableMdiBreak carries the mdiExtensionsEnabled signal.
   const remarkMdiBlank = $remark(
     "japaneseNovelMdiBlank",
     () => remarkMdiBlankPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
-    { enable: true },
+    { enable: enableMdiBreak },
   );
   const remarkHeadingAnchor = $remark(
     "japaneseNovelHeadingAnchor",
@@ -135,8 +138,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     ...(enableMdiBreak ? [remarkMdiBreak, mdibreakSchema] : []),
     ...(enableNoBreak ? [remarkNoBreak, nobreakSchema] : []),
     ...(enableKern ? [remarkKern, kernSchema] : []),
-    remarkMdiBlank,
-    blankParagraphSchema,
+    ...(enableMdiBreak ? [remarkMdiBlank, blankParagraphSchema] : []),
     remarkHeadingAnchor,
     headingAnchorSchema,
     headingIdFixerPlugin,
