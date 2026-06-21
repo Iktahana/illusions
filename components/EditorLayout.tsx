@@ -52,6 +52,8 @@ import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import { decideResponsivePanels } from "@/lib/editor-page/responsive-layout";
+import { useWindowWidth } from "@/lib/editor-page/use-window-width";
 import { DockviewReact } from "dockview-react";
 type SidebarPanelSharedProps = Omit<React.ComponentProps<typeof SidebarPanel>, "view">;
 
@@ -226,6 +228,18 @@ export default function EditorLayout({
   mainArea,
   inspector,
 }: EditorLayoutProps): React.JSX.Element {
+  // #1856: 狭いウィンドウでは本文先頭がクリップされないよう、サイドパネルを
+  // 表示上だけ自動折りたたみする。永続化されたパネル状態
+  // （inspector.isRightPanelCollapsed 等）は変更しない。
+  const windowWidth = useWindowWidth();
+  const { collapseLeft: autoCollapseLeft, collapseRight: autoCollapseRight } =
+    decideResponsivePanels({
+      // windowWidth が 0（SSR 初期 / マウント前）の場合は折りたたまない。
+      windowWidth: windowWidth || Number.POSITIVE_INFINITY,
+      compactMode: chrome.compactMode,
+      rightAlreadyCollapsed: inspector.isRightPanelCollapsed,
+    });
+
   return (
     <DiffTabContext.Provider value={providers.diffTabContextValue}>
       <TerminalTabContext.Provider value={providers.terminalTabContextValue}>
@@ -381,38 +395,39 @@ export default function EditorLayout({
                   }}
                 />
 
-                {(activityBar.topView !== "none" || activityBar.bottomView !== "none") && (
-                  <ResizablePanel
-                    side="left"
-                    defaultWidth={chrome.compactMode ? 200 : 256}
-                    minWidth={chrome.compactMode ? 160 : 200}
-                    maxWidth={chrome.compactMode ? 320 : 400}
-                    className=""
-                  >
-                    {(() => {
-                      const topPanel =
-                        activityBar.topView !== "none" ? (
-                          <SidebarPanel
-                            view={activityBar.topView}
-                            {...mainArea.sidebarPanelProps}
-                          />
-                        ) : null;
-                      const bottomPanel =
-                        activityBar.bottomView !== "none" ? (
-                          <SidebarPanel
-                            view={activityBar.bottomView}
-                            {...mainArea.sidebarPanelProps}
-                          />
-                        ) : null;
+                {!autoCollapseLeft &&
+                  (activityBar.topView !== "none" || activityBar.bottomView !== "none") && (
+                    <ResizablePanel
+                      side="left"
+                      defaultWidth={chrome.compactMode ? 200 : 256}
+                      minWidth={chrome.compactMode ? 160 : 200}
+                      maxWidth={chrome.compactMode ? 320 : 400}
+                      className=""
+                    >
+                      {(() => {
+                        const topPanel =
+                          activityBar.topView !== "none" ? (
+                            <SidebarPanel
+                              view={activityBar.topView}
+                              {...mainArea.sidebarPanelProps}
+                            />
+                          ) : null;
+                        const bottomPanel =
+                          activityBar.bottomView !== "none" ? (
+                            <SidebarPanel
+                              view={activityBar.bottomView}
+                              {...mainArea.sidebarPanelProps}
+                            />
+                          ) : null;
 
-                      if (topPanel && bottomPanel) {
-                        return <SidebarSplitter top={topPanel} bottom={bottomPanel} />;
-                      }
+                        if (topPanel && bottomPanel) {
+                          return <SidebarSplitter top={topPanel} bottom={bottomPanel} />;
+                        }
 
-                      return topPanel || bottomPanel;
-                    })()}
-                  </ResizablePanel>
-                )}
+                        return topPanel || bottomPanel;
+                      })()}
+                    </ResizablePanel>
+                  )}
 
                 <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-background">
                   {mainArea.tabs.length === 0 && (
@@ -612,7 +627,11 @@ export default function EditorLayout({
                   minWidth={chrome.compactMode ? 160 : 200}
                   maxWidth={chrome.compactMode ? 320 : 400}
                   collapsible={true}
-                  isCollapsed={inspector.isRightPanelCollapsed || mainArea.tabs.length === 0}
+                  isCollapsed={
+                    inspector.isRightPanelCollapsed ||
+                    autoCollapseRight ||
+                    mainArea.tabs.length === 0
+                  }
                   onToggleCollapse={inspector.handleToggleRightPanel}
                 >
                   <ErrorBoundary sectionName="インスペクタ">
