@@ -133,8 +133,9 @@ export function generateTabId(): TabId {
 }
 
 export function inferFileType(fileName: string): SupportedFileExtension {
-  if (fileName.endsWith(".md")) return ".md";
-  if (fileName.endsWith(".txt")) return ".txt";
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith(".md")) return ".md";
+  if (lower.endsWith(".txt")) return ".txt";
   return ".mdi";
 }
 
