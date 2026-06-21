@@ -41,7 +41,7 @@ describe("sanitizeMdiContent — blank paragraph conversion (.mdi only)", () => 
   });
 });
 
-describe("sanitizeMdiContent — bracket macro escape recovery (.mdi only)", () => {
+describe("sanitizeMdiContent — bracket macro escape recovery (.mdi / .md)", () => {
   it("(.mdi) serializer-escaped \\[\\[blank]] → [[blank]]", () => {
     expect(sanitizeMdiContent("\\[\\[blank]]", MDI)).toBe("[[blank]]");
   });
@@ -64,7 +64,26 @@ describe("sanitizeMdiContent — bracket macro escape recovery (.mdi only)", () 
   it("(.mdi) fully-escaped brackets \\[\\[blank\\]\\] → [[blank]]", () => {
     expect(sanitizeMdiContent("\\[\\[blank\\]\\]", MDI)).toBe("[[blank]]");
   });
-  it("(.md) escape recovery is skipped (Step 0 is .mdi only)", () => {
-    expect(sanitizeMdiContent("\\[\\[blank]]", MD)).toBe("\\[\\[blank]]");
+  it("(.md) escape recovery now runs so authored bytes round-trip (#1916)", () => {
+    expect(sanitizeMdiContent("\\[\\[blank]]", MD)).toBe("[[blank]]");
+  });
+  it("(.md) escaped \\[\\[br]] → [[br]] (#1916)", () => {
+    expect(sanitizeMdiContent("行1\\[\\[br]]行2", MD)).toBe("行1[[br]]行2");
+  });
+  it("(.md) escaped no-break macro → unescaped (#1916)", () => {
+    expect(sanitizeMdiContent("\\[\\[no-break:東京]]", MD)).toBe("[[no-break:東京]]");
+  });
+  it("(.md) escaped kern macro → unescaped (#1916)", () => {
+    expect(sanitizeMdiContent("\\[\\[kern:0.5em:漢字]]", MD)).toBe("[[kern:0.5em:漢字]]");
+  });
+  it("(.md) escaped macro in context (#1916)", () => {
+    const input = "A段落\n\n\\[\\[blank]]\n\nB段落";
+    expect(sanitizeMdiContent(input, MD)).toBe("A段落\n\n[[blank]]\n\nB段落");
+  });
+  it("(.md) non-macro \\[ literal escape is preserved (#1916)", () => {
+    // Only macro-shaped sequences are recovered; unrelated link/literal escapes
+    // must survive untouched on .md save.
+    expect(sanitizeMdiContent("\\[link]\\(url)", MD)).toBe("\\[link]\\(url)");
+    expect(sanitizeMdiContent("\\[\\[note]]", MD)).toBe("\\[\\[note]]");
   });
 });

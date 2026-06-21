@@ -71,10 +71,34 @@ describe("MdiDocument.fromEditorOutput — editor serializer normalization", () 
     expect(MdiDocument.fromEditorOutput("\\[\\[blank]]", MDI).toRawText()).toBe("[[blank]]");
   });
 
-  it("(.md) skips marker recovery and blank conversion", () => {
+  it("(.md) recovers serializer-escaped bracket macros but skips blank conversion", () => {
+    // Step 1a (<br /> → [[blank]]) is .mdi-only: .md keeps standalone <br /> as a
+    // plain newline via Step 1b.
     expect(MdiDocument.fromEditorOutput("<br />", { fileType: ".md" }).toRawText()).toBe("\n");
+    // Step 0 now runs for .md so authored macro bytes round-trip (#1916).
     expect(MdiDocument.fromEditorOutput("\\[\\[blank]]", { fileType: ".md" }).toRawText()).toBe(
-      "\\[\\[blank]]",
+      "[[blank]]",
+    );
+  });
+
+  it("(.md) round-trips all serializer-escaped bracket macros (#1916)", () => {
+    const MD = { fileType: ".md" };
+    expect(MdiDocument.fromEditorOutput("\\[\\[blank]]", MD).toRawText()).toBe("[[blank]]");
+    expect(MdiDocument.fromEditorOutput("\\[\\[br]]", MD).toRawText()).toBe("[[br]]");
+    expect(MdiDocument.fromEditorOutput("\\[\\[no-break:固有名詞]]", MD).toRawText()).toBe(
+      "[[no-break:固有名詞]]",
+    );
+    expect(MdiDocument.fromEditorOutput("\\[\\[kern:2]]", MD).toRawText()).toBe("[[kern:2]]");
+  });
+
+  it("(.md) preserves a non-macro \\[ literal escape (#1916)", () => {
+    // A backslash-escaped bracket that is NOT a known MDI macro must be left
+    // untouched: only macro-shaped sequences are recovered.
+    expect(MdiDocument.fromEditorOutput("\\[link]\\(url)", { fileType: ".md" }).toRawText()).toBe(
+      "\\[link]\\(url)",
+    );
+    expect(MdiDocument.fromEditorOutput("\\[\\[note]]", { fileType: ".md" }).toRawText()).toBe(
+      "\\[\\[note]]",
     );
   });
 
