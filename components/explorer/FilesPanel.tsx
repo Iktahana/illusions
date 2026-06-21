@@ -7,6 +7,8 @@ import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import ContextMenu from "@/shared/ui/ContextMenu";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { isElectronRenderer, detectOSPlatform } from "@/lib/utils/runtime-env";
+import { isTextDroppable } from "@/lib/utils/file-type-guard";
+import { notificationManager } from "@/lib/services/notification-manager";
 import type { FileTreeEntry, EditingEntry } from "./types";
 import type { VirtualFileSystem } from "@/lib/vfs/types";
 
@@ -487,6 +489,16 @@ export function FilesPanel({
 
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
+          // Reject non-text files before touching their bytes.
+          // file.text() silently replaces invalid UTF-8 bytes with U+FFFD,
+          // which would corrupt any binary (PDF, DOCX, image, …) dropped here.
+          if (!isTextDroppable(file)) {
+            notificationManager.error(
+              `「${file.name}」はサポートされていない形式です。` +
+                "テキストファイル（.mdi / .md / .txt）のみインポートできます。",
+            );
+            continue;
+          }
           try {
             const content = await file.text();
             const filePath = destDir === "/" ? `/${file.name}` : `${destDir}/${file.name}`;
