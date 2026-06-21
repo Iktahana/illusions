@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, memo, useState } from "react";
+import { useCallback, useEffect, useMemo, memo, useRef, useState } from "react";
 import {
   Plus,
   Trash2,
@@ -18,6 +18,7 @@ import type { UserDictionaryEntry } from "@/lib/project/project-types";
 import type { EditorMode } from "@/lib/project/project-types";
 import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
 import { getUserDictionaryService } from "@/lib/services/user-dictionary-service";
+import { notificationManager } from "@/lib/services/notification-manager";
 import DictionaryEntryDialog from "./Dictionary/DictionaryEntryDialog";
 import { getDictService } from "@/lib/dict/dict-service";
 import type { DictEntry, DictExample, DictDownloadStatus } from "@/lib/dict/dict-types";
@@ -80,6 +81,9 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [expandedMasterId, setExpandedMasterId] = useState<string | null>(null);
 
+  // #1932: generation counter to discard stale async query responses
+  const searchGenerationRef = useRef(0);
+
   // Persistence
   const dictService = getUserDictionaryService();
 
@@ -101,19 +105,16 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
   }, [editorMode, dictService]);
 
   const persistEntries = useCallback(
-    async (entries: UserDictionaryEntry[]) => {
-      try {
-        if (editorMode && isProjectMode(editorMode)) {
-          await dictService.saveEntries(entries);
-        } else if (editorMode && isStandaloneMode(editorMode)) {
-          // Use full path (Electron) to avoid basename collisions between same-named files in
-          // different directories. Fall back to fileName on Web where filePath is not available.
-          const stableKey = editorMode.filePath ?? editorMode.fileName;
-          await dictService.saveEntriesStandalone(stableKey, entries);
-        }
-      } catch {
-        // Silently fail
+    async (entries: UserDictionaryEntry[]): Promise<void> => {
+      if (editorMode && isProjectMode(editorMode)) {
+        await dictService.saveEntries(entries);
+      } else if (editorMode && isStandaloneMode(editorMode)) {
+        // Use full path (Electron) to avoid basename collisions between same-named files in
+        // different directories. Fall back to fileName on Web where filePath is not available.
+        const stableKey = editorMode.filePath ?? editorMode.fileName;
+        await dictService.saveEntriesStandalone(stableKey, entries);
       }
+      // No editorMode set — nothing to persist (no-op, not an error)
     },
     [editorMode, dictService],
   );
@@ -140,21 +141,32 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
     }
   }, [initialSearchTerm, searchTriggerId]);
 
-  // Query master dict when search changes
+  // Query master dict when search changes.
+  // #1932: Bump a generation counter on each new query so that if an older,
+  // slower request resolves after a newer one, its result is discarded.
   useEffect(() => {
     if (!activeSearchQuery.trim()) {
       setMasterResults([]);
       return;
     }
 
+    const generation = ++searchGenerationRef.current;
+
     setMasterLoading(true);
     getDictService()
       .query(activeSearchQuery.trim())
       .then((result) => {
+        if (generation !== searchGenerationRef.current) return; // stale — discard
         setMasterResults(result.entries);
       })
-      .catch(() => setMasterResults([]))
-      .finally(() => setMasterLoading(false));
+      .catch(() => {
+        if (generation !== searchGenerationRef.current) return; // stale — discard
+        setMasterResults([]);
+      })
+      .finally(() => {
+        if (generation !== searchGenerationRef.current) return; // stale — discard
+        setMasterLoading(false);
+      });
   }, [activeSearchQuery]);
 
   // --- Modal handlers ---
@@ -184,11 +196,16 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
     setFormData(EMPTY_FORM);
   }, []);
 
-  const handleSaveEntry = async () => {
+  const handleSaveEntry = async (): Promise<void> => {
     if (!formData.word?.trim()) return;
 
+    // #1934: Capture pre-update state so we can rollback on persist failure.
+    const previousEntries = userEntries;
+
+    let updated: UserDictionaryEntry[];
+
     if (editingEntry) {
-      const updated = userEntries.map((e) =>
+      updated = userEntries.map((e) =>
         e.id === editingEntry.id
           ? {
               ...e,
@@ -201,8 +218,6 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
             }
           : e,
       );
-      setUserEntries(updated);
-      await persistEntries(updated);
     } else {
       const entry: UserDictionaryEntry = {
         id: Date.now().toString(),
@@ -213,20 +228,45 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
         examples: formData.examples?.trim() || undefined,
         notes: formData.notes?.trim() || undefined,
       };
-      const updated = [...userEntries, entry].sort((a, b) => a.word.localeCompare(b.word));
-      setUserEntries(updated);
+      updated = [...userEntries, entry].sort((a, b) => a.word.localeCompare(b.word));
+    }
+
+    // Optimistic update
+    setUserEntries(updated);
+
+    try {
       await persistEntries(updated);
+    } catch {
+      // #1934: Rollback optimistic update and keep dialog open for retry
+      setUserEntries(previousEntries);
+      notificationManager.error(
+        "辞書の保存に失敗しました。ディスクの空き容量またはファイルのアクセス権を確認してください。",
+      );
+      return;
     }
 
     handleCloseDialog();
   };
 
   const handleDeleteEntry = useCallback(
-    async (id: string) => {
+    async (id: string): Promise<void> => {
+      // #1934: Capture pre-delete state for rollback on persist failure.
+      const previousEntries = userEntries;
       const updated = userEntries.filter((e) => e.id !== id);
+
+      // Optimistic update
       setUserEntries(updated);
       if (expandedId === id) setExpandedId(null);
-      await persistEntries(updated);
+
+      try {
+        await persistEntries(updated);
+      } catch {
+        // #1934: Rollback — the entry wasn't actually removed from disk
+        setUserEntries(previousEntries);
+        notificationManager.error(
+          "辞書の削除に失敗しました。ディスクの空き容量またはファイルのアクセス権を確認してください。",
+        );
+      }
     },
     [userEntries, expandedId, persistEntries],
   );

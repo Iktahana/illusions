@@ -11,7 +11,16 @@ export type AnyDirectoryHandle = VFSDirectoryHandle | FileSystemDirectoryHandle;
 /** Supported main-file extensions, in detection-priority order. */
 const SUPPORTED_MAIN_EXTENSIONS: readonly SupportedFileExtension[] = [".mdi", ".md", ".txt"];
 
-/** Read text from a file handle (VFS or Web) */
+/**
+ * Read text from a file handle (VFS or Web).
+ *
+ * #1888 scoping: this reads `.illusions` JSON metadata (project.json /
+ * workspace.json / index.json), which is always app-written valid UTF-8. The
+ * `getFile().text()` fallback is intentionally kept tolerant so a metadata read
+ * never hard-fails on a stray byte. The strict/fatal UTF-8 decode that refuses
+ * non-UTF-8 manuscripts is applied to the document content path instead — the
+ * Web `WebVFSFileHandle.read()` used by ProjectService.readProjectContent.
+ */
 export async function readFileHandle(handle: {
   read?: () => Promise<string>;
   getFile?: () => Promise<File>;
