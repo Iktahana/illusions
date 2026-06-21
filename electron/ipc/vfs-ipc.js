@@ -21,6 +21,19 @@ const { loadApprovals, saveApprovals } = require("../lib/vfs-approvals");
 const { createIndexLockManager } = require("../lib/index-lock");
 // #1476: rehydration — end
 
+/**
+ * Strip a leading UTF-8 BOM (U+FEFF) from a decoded string.
+ * Node's `fs.readFile(path, "utf-8")` preserves the BOM as the first character
+ * when present in the raw bytes (EF BB BF). Stripping it here ensures
+ * the VFS .mdi read path is symmetric with the .txt path (text-codec.ts).
+ *
+ * @param {string} content - String decoded from a UTF-8 file
+ * @returns {string} Content with the leading BOM removed if present
+ */
+function stripBom(content) {
+  return content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
+}
+
 function registerVFSHandlers() {
   // Track the opened root directory per window for path validation.
   // #1559: each entry stores both the lexical root (as seen by the renderer)
@@ -179,7 +192,7 @@ function registerVFSHandlers() {
       if (stats.size > MAX_READ_BYTES) {
         throw new Error("ファイルサイズが上限を超えています");
       }
-      return await fs.readFile(resolved, "utf-8");
+      return stripBom(await fs.readFile(resolved, "utf-8"));
     } catch (error) {
       // ENOENT is expected for optional config files — skip noisy logging
       if (error.code !== "ENOENT") {
