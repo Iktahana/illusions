@@ -14,6 +14,7 @@ import type { SnapshotType } from "../services/history-policy";
 import { getProjectFileService } from "../services/project-file-service";
 import { executeTabSave } from "./save-executor";
 import type { SaveOutcome } from "./save-executor";
+import { decideReopenExistingTab } from "./reopen-existing-tab";
 import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import { generateTabId, inferFileType, getErrorMessage } from "./types";
@@ -233,18 +234,15 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
     const { descriptor, content: fileContent } = result;
 
-    // Deduplicate: if the same path is already open, reload from disk and activate
+    // Deduplicate: if the same path is already open, just activate that tab.
+    // #1873: NEVER overwrite the in-memory buffer from disk here. Doing so
+    // silently destroyed unsaved edits (dirty tab) and forced an implicit
+    // reload on clean tabs. A real disk reload is a separate, explicit,
+    // confirmation-gated action handled by the file-watch integration.
     if (descriptor.path) {
-      const existing = findTabByPath(descriptor.path);
-      if (existing) {
-        // Force-refresh tab content so stale in-memory state is replaced with the
-        // latest content that was just read from disk by openMdiFile().
-        updateTab(existing.id, {
-          content: fileContent,
-          lastSavedContent: fileContent,
-          isDirty: false,
-        });
-        setActiveTabId(existing.id);
+      const decision = decideReopenExistingTab(findTabByPath(descriptor.path));
+      if (decision) {
+        setActiveTabId(decision.activateTabId);
         return;
       }
     }
@@ -502,16 +500,12 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   /** Load a file by path + content into a new tab (or reuse/deduplicate) */
   const loadSystemFile = useCallback(
     (path: string, fileContent: string) => {
-      // Deduplication
-      const existing = findTabByPath(path);
-      if (existing) {
-        updateTab(existing.id, {
-          content: fileContent,
-          lastSavedContent: fileContent,
-          isDirty: false,
-          lastSavedTime: Date.now(),
-        });
-        setActiveTabId(existing.id);
+      // Deduplication (#1873): if the same path is already open (e.g. Finder
+      // re-open / OS open-file event), just activate the tab. Never overwrite
+      // the in-memory buffer from disk — that silently destroyed unsaved edits.
+      const decision = decideReopenExistingTab(findTabByPath(path));
+      if (decision) {
+        setActiveTabId(decision.activateTabId);
         return;
       }
 
