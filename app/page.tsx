@@ -123,6 +123,20 @@ export default function EditorPage() {
     setEditorKey((prev) => prev + 1);
   }, []);
 
+  // #1840 / #1885: holds the active editor's on-demand live-content flush.
+  // Declared early so incrementEditorKeyWithFlush (used by useEditorSettings)
+  // can close over it. MilkdownEditor registers itself via registerFlush below.
+  const flushActiveEditorRef = useRef<(() => string | null) | null>(null);
+
+  // #1885: display-setting changes that trigger incrementEditorKey() remount the
+  // editor, cancelling the Milkdown listener's 200ms debounce and losing the last
+  // typed characters. Flush live content into React state first so the new editor
+  // instance initialises with currentContentRef containing the latest keystrokes.
+  const incrementEditorKeyWithFlush = useCallback(() => {
+    flushActiveEditorRef.current?.();
+    incrementEditorKey();
+  }, [incrementEditorKey]);
+
   // Ref for dockview layout flush — populated after useDockviewPersistence,
   // consumed by useTabManager's close handler via stable callback.
   const flushLayoutStateRef = useRef<(() => Promise<void>) | undefined>(undefined);
@@ -145,7 +159,7 @@ export default function EditorPage() {
     handlers: settingsHandlers,
     setters: settingsSetters,
     settingsHydrated,
-  } = useEditorSettings(incrementEditorKey);
+  } = useEditorSettings(incrementEditorKeyWithFlush);
   const {
     fontScale,
     lineHeight,
@@ -290,11 +304,9 @@ export default function EditorPage() {
     triggerSwitchToCorrections,
   } = panelHandlers;
 
-  // #1840: holds the active editor's on-demand live-content flush. Save flows
-  // call it right before persisting so they never write debounce-lagged content.
-  // The mounted MilkdownEditor (only the active dockview panel renders one)
-  // registers itself here; unmount clears it.
-  const flushActiveEditorRef = useRef<(() => string | null) | null>(null);
+  // #1840: save flows call flushActiveEditorRef right before persisting so they
+  // never write debounce-lagged content. The mounted MilkdownEditor registers
+  // itself here; unmount clears it. (Ref declared early above for #1885.)
   const registerFlush = useCallback((flush: (() => string | null) | null) => {
     flushActiveEditorRef.current = flush;
   }, []);
