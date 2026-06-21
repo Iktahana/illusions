@@ -14,6 +14,7 @@ import type {
   VirtualFileSystem,
 } from "@/lib/vfs/types";
 import { joinPath } from "@/lib/vfs/path-utils";
+import { readTextWithEncoding } from "@/shared/lib/text-codec";
 
 // -----------------------------------------------------------------------
 // Helpers
@@ -123,7 +124,14 @@ export class WebVFSFileHandle implements VFSFileHandle {
 
   async read(): Promise<string> {
     const file = await this.handle.getFile();
-    return file.text();
+    // #1888: decode through the shared strict codec (BOM strip + fatal UTF-8)
+    // instead of File.text(), which silently replaces invalid bytes with
+    // U+FFFD. This handle's read() backs ProjectService.readProjectContent —
+    // the project main-file content path — so a non-UTF-8 (Shift_JIS/EUC-JP/
+    // UTF-16) manuscript must be refused here rather than opened lossy and then
+    // saved back over the original file.
+    const buf = await file.arrayBuffer();
+    return readTextWithEncoding(new Uint8Array(buf)).text;
   }
 
   async write(content: string): Promise<void> {
@@ -343,15 +351,21 @@ export class WebVFS implements VirtualFileSystem {
     try {
       const fileHandle = await resolveFileHandle(root, path);
       const file = await fileHandle.getFile();
-      // #1888: decode with a fatal TextDecoder instead of File.text(), which
-      // silently replaces invalid bytes with U+FFFD. A non-UTF-8 manuscript
-      // would otherwise open lossy and be saved back over the original.
+      // #1888: decode through the shared strict codec instead of File.text(),
+      // which silently replaces invalid bytes with U+FFFD. The shared codec
+      // strips a UTF-8 BOM, normalizes EOL, rejects non-UTF-8 BOMs, and
+      // fatally rejects invalid byte sequences — so a non-UTF-8 manuscript is
+      // refused here rather than opened lossy and saved back over the original.
       const buf = await file.arrayBuffer();
-      return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+      return readTextWithEncoding(new Uint8Array(buf)).text;
     } catch (error) {
-      if (error instanceof TypeError) {
-        // Invalid UTF-8 byte sequence — refuse rather than corrupt on save.
-        throw new Error("UTF-8 以外のファイルは現在サポートされていません");
+      // readTextWithEncoding throws the Japanese non-UTF-8 message directly for
+      // both non-UTF-8 BOMs and invalid byte sequences; re-throw it unchanged.
+      if (
+        error instanceof Error &&
+        error.message === "UTF-8 以外のファイルは現在サポートされていません"
+      ) {
+        throw error;
       }
       throw new Error(
         `Failed to read file "${path}": ${error instanceof Error ? error.message : String(error)}`,
