@@ -115,6 +115,8 @@ function Harness({ tabs }: { tabs: TabState[] }): null {
   const setTabs = useRef(vi.fn()).current;
   const setActiveTabId = useRef(vi.fn()).current;
   const updateTab = useRef(vi.fn()).current;
+  const forceCloseTab = useRef(vi.fn()).current;
+  const closeTab = useRef(vi.fn()).current;
   const findTabByPath = useRef((p: string) =>
     tabsRef.current.find((t): t is EditorTabState => t.tabKind === "editor" && t.file?.path === p),
   ).current;
@@ -130,6 +132,8 @@ function Harness({ tabs }: { tabs: TabState[] }): null {
     isElectron: true,
     updateTab,
     findTabByPath,
+    forceCloseTab,
+    closeTab,
   });
 
   useEffect(() => {

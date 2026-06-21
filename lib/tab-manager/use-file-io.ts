@@ -15,6 +15,7 @@ import { getProjectFileService } from "../services/project-file-service";
 import { executeTabSave } from "./save-executor";
 import type { SaveOutcome } from "./save-executor";
 import { decideReopenExistingTab } from "./reopen-existing-tab";
+import { resolveSaveAsDuplicate, saveAsDuplicateWarning } from "./save-as-dedup";
 import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import { generateTabId, inferFileType, getErrorMessage } from "./types";
@@ -28,6 +29,19 @@ import type { TabManagerCore, SaveAllDirtyResult } from "./types";
 export interface UseFileIOParams extends TabManagerCore {
   updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
   findTabByPath: (path: string) => EditorTabState | undefined;
+  /**
+   * Force-close a tab without the unsaved-changes dialog (#1872). Used by
+   * Save-As consolidation to drop a redundant CLEAN duplicate tab whose buffer
+   * is now stale relative to the just-written disk content.
+   */
+  forceCloseTab: (tabId: TabId) => void;
+  /**
+   * Close a tab, routing through the unsaved-changes dialog when the tab is
+   * dirty (#1872 regression fix). Save-As consolidation uses this — instead of
+   * forceCloseTab — for a DIRTY duplicate so the user's own unsaved edits on the
+   * destination tab cannot be silently destroyed.
+   */
+  closeTab: (tabId: TabId) => void;
   /**
    * Ref holding the active editor's on-demand live-content flush (#1840).
    * Called right before saving the active tab so the persisted content reflects
@@ -98,6 +112,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     isElectron,
     updateTab,
     findTabByPath,
+    forceCloseTab,
+    closeTab,
     flushActiveEditorRef,
   } = params;
 
@@ -475,8 +491,45 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         persistFileReference,
       });
 
-      if (outcome.status === "saved" && outcome.persistFailed) {
-        notificationManager.warning(PERSIST_FAILURE_WARNING);
+      if (outcome.status === "saved") {
+        if (outcome.persistFailed) {
+          notificationManager.warning(PERSIST_FAILURE_WARNING);
+        }
+        // #1872 (DATA LOSS): the Save-As destination may already be open in
+        // another tab. Leaving both tabs alive yields two divergent buffers on
+        // the same path that silently overwrite each other (and the path-keyed
+        // watcher suppression hides the other's write). Consolidate into a
+        // single tab: the source tab now holds the just-written content that is
+        // authoritative on disk. The check runs against the latest tabsRef
+        // (TOCTOU-safe — it reads state at completion time) and uses
+        // isSameEntry() for path-less web handles.
+        if (outcome.descriptor) {
+          const { duplicateTab } = await resolveSaveAsDuplicate(
+            tabsRef.current,
+            outcome.descriptor,
+            tab.id,
+          );
+          if (duplicateTab) {
+            // #1872 regression fix (DATA LOSS): the duplicate tab may itself be
+            // DIRTY with its own unsaved edits that differ from what Save As just
+            // wrote. Force-closing it unconditionally would silently destroy
+            // those edits. So branch on the duplicate's dirty state:
+            //   - CLEAN  → silently consolidate (force-close); it has no unsaved
+            //              work, only a now-stale clean buffer.
+            //   - DIRTY  → route through closeTab, which raises the normal
+            //              unsaved-changes dialog so the user can save/discard/
+            //              cancel rather than losing their edits.
+            if (duplicateTab.isDirty) {
+              setActiveTabId(tab.id);
+              notificationManager.warning(saveAsDuplicateWarning(outcome.descriptor.name, true));
+              closeTab(duplicateTab.id);
+            } else {
+              forceCloseTab(duplicateTab.id);
+              setActiveTabId(tab.id);
+              notificationManager.warning(saveAsDuplicateWarning(outcome.descriptor.name));
+            }
+          }
+        }
       } else if (outcome.status === "failed") {
         console.error("名前を付けて保存に失敗しました:", outcome.error);
         notificationManager.error(
@@ -493,6 +546,9 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     tryCreateSnapshot,
     tabsRef,
     activeTabIdRef,
+    setActiveTabId,
+    forceCloseTab,
+    closeTab,
     isProjectRef,
     flushActiveTabContent,
   ]);

@@ -123,6 +123,8 @@ function makeHarness(initialTabs: TabState[], activeTabId: TabId): Harness {
       isElectron: true,
       updateTab: vi.fn(),
       findTabByPath: vi.fn(),
+      forceCloseTab: vi.fn(),
+      closeTab: vi.fn(),
     },
   };
 }
