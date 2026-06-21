@@ -1537,6 +1537,7 @@ export default function EditorPage() {
             onPrint: handlePrintConfirm,
             content: printDialogState?.content ?? "",
             metadata: printDialogState?.metadata ?? { title: "" },
+            fileType: printDialogState?.fileType,
           },
         }}
         recovery={{
