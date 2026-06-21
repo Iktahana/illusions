@@ -1192,7 +1192,10 @@ export default function EditorPage() {
   const charCount = visibleTextCharCount;
 
   // --- Previous day comparison ---
-  const previousDayStats = usePreviousDayStats(currentFile?.name, isProjectMode(editorMode));
+  const previousDayStats = usePreviousDayStats(
+    currentFile?.path ?? undefined,
+    isProjectMode(editorMode),
+  );
 
   // --- Linting hook ---
   const {
