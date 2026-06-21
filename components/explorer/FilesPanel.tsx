@@ -9,6 +9,15 @@ import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { isElectronRenderer, detectOSPlatform } from "@/lib/utils/runtime-env";
 import { isTextDroppable } from "@/lib/utils/file-type-guard";
 import { notificationManager } from "@/lib/services/notification-manager";
+import {
+  flattenVisibleRows,
+  nextRowPath,
+  prevRowPath,
+  firstRowPath,
+  lastRowPath,
+  arrowRight,
+  arrowLeft,
+} from "./tree-navigation";
 import type { FileTreeEntry, EditingEntry } from "./types";
 import type { VirtualFileSystem } from "@/lib/vfs/types";
 
@@ -83,6 +92,26 @@ export function FilesPanel({
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
   const dragExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ---- Keyboard navigation (WAI-ARIA tree, roving tabindex) ----
+  /** Tree path of the row that currently holds the roving tabIndex={0}. */
+  const [activeRowPath, setActiveRowPath] = useState<string>("/");
+  /** Map of tree path -> row DOM element for programmatic .focus(). */
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const registerRowRef = useCallback((path: string, el: HTMLDivElement | null) => {
+    if (el) rowRefs.current.set(path, el);
+    else rowRefs.current.delete(path);
+  }, []);
+
+  /** Move the roving focus to a row and physically focus its DOM element. */
+  const focusRow = useCallback((path: string) => {
+    setActiveRowPath(path);
+    // Focus after the current render so the target element exists with tabIndex=0.
+    requestAnimationFrame(() => {
+      rowRefs.current.get(path)?.focus();
+    });
+  }, []);
+
   const refresh = useCallback(() => setRefreshToken((v) => v + 1), []);
 
   const loadDirectory = useCallback(
@@ -147,6 +176,16 @@ export function FilesPanel({
     };
   }, [loadDirectory, refreshToken]);
 
+  // Keep the roving-tabindex target valid: if the active row is no longer
+  // visible (folder collapsed, file deleted/renamed), fall back to the root row.
+  useEffect(() => {
+    const rows = flattenVisibleRows(tree, expandedDirs);
+    if (rows.length === 0) return;
+    if (!rows.some((r) => r.path === activeRowPath)) {
+      setActiveRowPath(rows[0].path);
+    }
+  }, [tree, expandedDirs, activeRowPath]);
+
   // Auto-focus the inline edit input when editing starts
   useEffect(() => {
     if (editing && editInputRef.current) {
@@ -185,6 +224,26 @@ export function FilesPanel({
       } else {
         next.add(path);
       }
+      return next;
+    });
+    setRefreshToken((v) => v + 1);
+  }, []);
+
+  const expandDir = useCallback((path: string) => {
+    setExpandedDirs((prev) => {
+      if (prev.has(path)) return prev;
+      const next = new Set(prev);
+      next.add(path);
+      return next;
+    });
+    setRefreshToken((v) => v + 1);
+  }, []);
+
+  const collapseDir = useCallback((path: string) => {
+    setExpandedDirs((prev) => {
+      if (!prev.has(path)) return prev;
+      const next = new Set(prev);
+      next.delete(path);
       return next;
     });
     setRefreshToken((v) => v + 1);
@@ -824,6 +883,117 @@ export function FilesPanel({
     [showContextMenu, handleContextAction],
   );
 
+  /**
+   * Build a synthetic React.MouseEvent-like object anchored at the focused row,
+   * so existing context-menu handlers (which read clientX/clientY) can be invoked
+   * from the keyboard (ContextMenu key / Shift+F10).
+   */
+  const synthContextMenuEvent = useCallback((path: string): React.MouseEvent => {
+    const el = rowRefs.current.get(path);
+    const rect = el?.getBoundingClientRect();
+    const x = rect ? rect.left + 16 : 0;
+    const y = rect ? rect.bottom : 0;
+    return {
+      clientX: x,
+      clientY: y,
+      preventDefault: () => {},
+      stopPropagation: () => {},
+      target: el,
+      currentTarget: el,
+    } as unknown as React.MouseEvent;
+  }, []);
+
+  /**
+   * Keyboard handler for tree rows (WAI-ARIA Tree View pattern).
+   * Operates on the flattened list of currently visible rows.
+   */
+  const handleRowKeyDown = useCallback(
+    (e: React.KeyboardEvent, path: string, kind: "file" | "directory") => {
+      // Never hijack typing inside the inline rename/new input.
+      if (e.target instanceof HTMLInputElement) return;
+
+      const rows = flattenVisibleRows(tree, expandedDirs);
+
+      switch (e.key) {
+        case "ArrowDown": {
+          e.preventDefault();
+          const target = nextRowPath(rows, path);
+          if (target) focusRow(target);
+          break;
+        }
+        case "ArrowUp": {
+          e.preventDefault();
+          const target = prevRowPath(rows, path);
+          if (target) focusRow(target);
+          break;
+        }
+        case "Home": {
+          e.preventDefault();
+          const target = firstRowPath(rows);
+          if (target) focusRow(target);
+          break;
+        }
+        case "End": {
+          e.preventDefault();
+          const target = lastRowPath(rows);
+          if (target) focusRow(target);
+          break;
+        }
+        case "ArrowRight": {
+          e.preventDefault();
+          const result = arrowRight(rows, path);
+          if (result.expand) expandDir(result.expand);
+          else if (result.focus) focusRow(result.focus);
+          break;
+        }
+        case "ArrowLeft": {
+          e.preventDefault();
+          const result = arrowLeft(rows, path);
+          if (result.collapse) collapseDir(result.collapse);
+          else if (result.focus) focusRow(result.focus);
+          break;
+        }
+        case "Enter":
+        case " ": {
+          e.preventDefault();
+          if (kind === "directory") {
+            toggleDir(path);
+          } else if (onFileClick) {
+            onFileClick(toVFSPath(path));
+          }
+          break;
+        }
+        case "ContextMenu": {
+          e.preventDefault();
+          const ev = synthContextMenuEvent(path);
+          if (kind === "directory") void onFolderContextMenu(ev, path);
+          else void onFileContextMenu(ev, path);
+          break;
+        }
+        case "F10": {
+          if (!e.shiftKey) break;
+          e.preventDefault();
+          const ev = synthContextMenuEvent(path);
+          if (kind === "directory") void onFolderContextMenu(ev, path);
+          else void onFileContextMenu(ev, path);
+          break;
+        }
+      }
+    },
+    [
+      tree,
+      expandedDirs,
+      focusRow,
+      expandDir,
+      collapseDir,
+      toggleDir,
+      onFileClick,
+      synthContextMenuEvent,
+      onFolderContextMenu,
+      onFileContextMenu,
+    ],
+  );
+
   // ---- Render tree entries ----
   const renderEntries = (entries: FileTreeEntry[], parentPath: string, level: number) => {
     const rows: React.ReactNode[] = [];
@@ -842,6 +1012,13 @@ export function FilesPanel({
         rows.push(
           <div
             key={fullPath}
+            ref={(el) => registerRowRef(fullPath, el)}
+            role="treeitem"
+            aria-level={level}
+            aria-selected={activeRowPath === fullPath}
+            tabIndex={activeRowPath === fullPath ? 0 : -1}
+            onKeyDown={(e) => handleRowKeyDown(e, fullPath, "file")}
+            onFocus={() => setActiveRowPath(fullPath)}
             draggable={!isRenaming}
             onDragStart={(e) => handleDragStart(e, fullPath, "file")}
             onDragEnd={handleDragEnd}
@@ -851,7 +1028,7 @@ export function FilesPanel({
               void handleTreeDrop(e, fullPath, "file");
             }}
             className={clsx(
-              "flex items-center gap-1.5 px-2 py-1 text-sm text-foreground-secondary hover:bg-hover rounded cursor-pointer",
+              "flex items-center gap-1.5 px-2 py-1 text-sm text-foreground-secondary hover:bg-hover rounded cursor-pointer outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent -outline-offset-1",
               dragSourcePath === fullPath && "opacity-40",
             )}
             style={{ paddingLeft: `${level * 16 + 8}px` }}
@@ -904,6 +1081,14 @@ export function FilesPanel({
             }}
           >
             <div
+              ref={(el) => registerRowRef(fullPath, el)}
+              role="treeitem"
+              aria-level={level}
+              aria-selected={activeRowPath === fullPath}
+              aria-expanded={isExpanded}
+              tabIndex={activeRowPath === fullPath ? 0 : -1}
+              onKeyDown={(e) => handleRowKeyDown(e, fullPath, "directory")}
+              onFocus={() => setActiveRowPath(fullPath)}
               draggable={!isRenaming}
               onDragStart={(e) => handleDragStart(e, fullPath, "directory")}
               onDragEnd={handleDragEnd}
@@ -912,7 +1097,7 @@ export function FilesPanel({
                 void onFolderContextMenu(e, fullPath);
               }}
               className={clsx(
-                "group flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer",
+                "group flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent -outline-offset-1",
                 dragSourcePath === fullPath && "opacity-40",
                 isFolderDropTarget &&
                   "bg-accent/15 outline outline-1 outline-accent/50 -outline-offset-1",
@@ -931,12 +1116,15 @@ export function FilesPanel({
               ) : (
                 <span className="truncate font-medium flex-1">{entry.name}</span>
               )}
-              {/* Inline hover buttons (VS Code style) */}
+              {/* Inline hover buttons (VS Code style). Hidden from Tab order while
+                  invisible; revealed (and tabbable) on hover or keyboard focus. */}
               {!isRenaming && (
-                <span className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                   <button
-                    className="p-0.5 hover:bg-hover rounded"
+                    className="p-0.5 hover:bg-hover rounded outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
                     title="新規ファイル"
+                    aria-label={`${entry.name} に新規ファイルを作成`}
+                    tabIndex={activeRowPath === fullPath ? 0 : -1}
                     onClick={(e) => {
                       e.stopPropagation();
                       startNewFile(fullPath, ".mdi");
@@ -945,8 +1133,10 @@ export function FilesPanel({
                     <FilePlus className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    className="p-0.5 hover:bg-hover rounded"
+                    className="p-0.5 hover:bg-hover rounded outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
                     title="新規フォルダ"
+                    aria-label={`${entry.name} に新規フォルダを作成`}
+                    tabIndex={activeRowPath === fullPath ? 0 : -1}
                     onClick={(e) => {
                       e.stopPropagation();
                       startNewFolder(fullPath);
@@ -958,7 +1148,7 @@ export function FilesPanel({
               )}
             </div>
             {isExpanded && entry.children && (
-              <div>{renderEntries(entry.children, fullPath, level + 1)}</div>
+              <div role="group">{renderEntries(entry.children, fullPath, level + 1)}</div>
             )}
             {/* New file/folder input row inside this directory */}
             {isExpanded &&
@@ -1005,6 +1195,7 @@ export function FilesPanel({
         <button
           className="p-1 text-foreground-tertiary hover:text-foreground hover:bg-hover rounded transition-colors"
           title="更新"
+          aria-label="ファイル一覧を更新"
           onClick={refresh}
         >
           <RefreshCw className={clsx("w-4 h-4", loading && "animate-spin")} />
@@ -1016,9 +1207,17 @@ export function FilesPanel({
       )}
 
       {tree !== null && (
-        <div>
+        <div role="tree" aria-label="プロジェクトファイル">
           {/* Root directory header */}
           <div
+            ref={(el) => registerRowRef("/", el)}
+            role="treeitem"
+            aria-level={1}
+            aria-selected={activeRowPath === "/"}
+            aria-expanded={expandedDirs.has("/")}
+            tabIndex={activeRowPath === "/" ? 0 : -1}
+            onKeyDown={(e) => handleRowKeyDown(e, "/", "directory")}
+            onFocus={() => setActiveRowPath("/")}
             onClick={() => toggleDir("/")}
             onContextMenu={(e) => {
               void onFolderContextMenu(e, "/");
@@ -1029,7 +1228,7 @@ export function FilesPanel({
               void handleTreeDrop(e, "/", "directory");
             }}
             className={clsx(
-              "group flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer",
+              "group flex items-center gap-1.5 px-2 py-1 text-sm text-foreground hover:bg-hover rounded cursor-pointer outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent -outline-offset-1",
               dropTargetPath === "/" &&
                 dragSourcePath !== "/" &&
                 "bg-accent/15 outline outline-1 outline-accent/50 -outline-offset-1",
@@ -1043,11 +1242,14 @@ export function FilesPanel({
             />
             <Folder className="w-4 h-4 shrink-0 text-accent" />
             <span className="truncate font-medium flex-1">{projectName || "プロジェクト"}</span>
-            {/* Root inline buttons */}
-            <span className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Root inline buttons. Hidden from Tab order while invisible;
+                revealed (and tabbable) on hover or keyboard focus. */}
+            <span className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
               <button
-                className="p-0.5 hover:bg-hover rounded"
+                className="p-0.5 hover:bg-hover rounded outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
                 title="新規ファイル"
+                aria-label="プロジェクト直下に新規ファイルを作成"
+                tabIndex={activeRowPath === "/" ? 0 : -1}
                 onClick={(e) => {
                   e.stopPropagation();
                   startNewFile("/", ".mdi");
@@ -1056,8 +1258,10 @@ export function FilesPanel({
                 <FilePlus className="w-3.5 h-3.5" />
               </button>
               <button
-                className="p-0.5 hover:bg-hover rounded"
+                className="p-0.5 hover:bg-hover rounded outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
                 title="新規フォルダ"
+                aria-label="プロジェクト直下に新規フォルダを作成"
+                tabIndex={activeRowPath === "/" ? 0 : -1}
                 onClick={(e) => {
                   e.stopPropagation();
                   startNewFolder("/");
