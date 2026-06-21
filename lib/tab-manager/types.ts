@@ -6,6 +6,7 @@ import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension, WorkspaceTab } from "../project/project-types";
 import type { TabId, TabState, EditorTabState, TerminalTabState } from "./tab-types";
 import type { SaveOutcome } from "./save-executor";
+import type { AffectedTab } from "./tab-path-sync";
 
 // ---------------------------------------------------------------------------
 // Save-all aggregate result (#1859)
@@ -123,6 +124,26 @@ export interface UseTabManagerReturn {
     savedTabs: { tabs: WorkspaceTab[]; activeIndex: number } | undefined,
     rootPath: string | null,
   ) => Promise<boolean>;
+
+  // Explorer file-system mutation sync (#1868, shared with #1870)
+  /**
+   * Notify the tab manager that a project file/folder was renamed or moved
+   * (paths VFS-relative). Atomically rewrites the path/name/fileType of the
+   * affected tab and every tab nested under a renamed directory so the next
+   * save targets the new path instead of resurrecting the old one.
+   */
+  notifyFileRenamed: (oldPath: string, newPath: string) => void;
+  /**
+   * List the open editor tabs at or under the given VFS-relative path. The
+   * explorer uses this to confirm dirty tabs before a delete.
+   */
+  findTabsAffectedByDelete: (deletedPath: string) => AffectedTab[];
+  /**
+   * Notify the tab manager that a project file/folder was deleted (VFS-relative
+   * path). Detaches the descriptor of every affected tab so no save flow can
+   * recreate the deleted path; the tab survives as an untitled dirty buffer.
+   */
+  notifyFileDeleted: (deletedPath: string) => void;
 }
 
 // ---------------------------------------------------------------------------

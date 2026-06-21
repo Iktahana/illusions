@@ -20,6 +20,7 @@ import {
 } from "./tree-navigation";
 import type { FileTreeEntry, EditingEntry } from "./types";
 import type { VirtualFileSystem } from "@/lib/vfs/types";
+import type { AffectedTab } from "@/lib/tab-manager/tab-path-sync";
 
 /**
  * Check whether a file/directory name already exists inside a VFS parent directory.
@@ -55,6 +56,15 @@ interface FilesPanelProps {
   onFileMiddleClick?: (vfsPath: string) => void;
   /** Increment to trigger a new file creation at root with default name. */
   newFileTrigger?: number;
+  /**
+   * Notify the tab manager that a file/folder was renamed/moved (#1868).
+   * Paths are VFS-relative (no leading slash), matching `tab.file.path`.
+   */
+  onFileRenamed?: (oldVfsPath: string, newVfsPath: string) => void;
+  /** Notify the tab manager that a file/folder was deleted (#1868). */
+  onFileDeleted?: (deletedVfsPath: string) => void;
+  /** List open tabs affected by deleting a path, for dirty-confirmation (#1868). */
+  findTabsAffectedByDelete?: (deletedVfsPath: string) => AffectedTab[];
 }
 
 /** File tree panel for browsing and managing project files */
@@ -64,6 +74,9 @@ export function FilesPanel({
   onFileDoubleClick,
   onFileMiddleClick,
   newFileTrigger,
+  onFileRenamed,
+  onFileDeleted,
+  findTabsAffectedByDelete,
 }: FilesPanelProps) {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(["/"]));
   const [tree, setTree] = useState<FileTreeEntry[] | null>(null);
@@ -74,6 +87,8 @@ export function FilesPanel({
     path: string;
     kind: "file" | "directory";
     name: string;
+    /** Open tabs (#1868) affected by this delete; dirty ones need a warning. */
+    affectedTabs: AffectedTab[];
   } | null>(null);
   /** Pending overwrite confirmation: holds the operation to execute after user confirms */
   const [overwriteConfirm, setOverwriteConfirm] = useState<{
@@ -254,10 +269,16 @@ export function FilesPanel({
   /** Convert tree path (e.g. "/subdir/file.txt") to VFS-relative path (e.g. "subdir/file.txt") */
   const toVFSPath = (treePath: string): string => treePath.replace(/^\//, "");
 
-  const handleDelete = useCallback((fullPath: string, kind: "file" | "directory") => {
-    const name = fullPath.split("/").pop() || fullPath;
-    setDeleteConfirm({ path: fullPath, kind, name });
-  }, []);
+  const handleDelete = useCallback(
+    (fullPath: string, kind: "file" | "directory") => {
+      const name = fullPath.split("/").pop() || fullPath;
+      // #1868: detect open tabs (incl. nested files for a folder delete) so the
+      // confirmation can warn about unsaved edits before destroying them.
+      const affectedTabs = findTabsAffectedByDelete?.(toVFSPath(fullPath)) ?? [];
+      setDeleteConfirm({ path: fullPath, kind, name, affectedTabs });
+    },
+    [findTabsAffectedByDelete],
+  );
 
   const executeDelete = useCallback(
     async (fullPath: string, kind: "file" | "directory") => {
@@ -279,12 +300,15 @@ export function FilesPanel({
         } else {
           await vfs.deleteFile(toVFSPath(fullPath));
         }
+        // #1868: detach any open tabs at/under the deleted path so the next
+        // save cannot recreate the now-deleted file at its old location.
+        onFileDeleted?.(toVFSPath(fullPath));
         refresh();
       } catch (error) {
         console.error("Failed to delete:", error);
       }
     },
-    [refresh],
+    [refresh, onFileDeleted],
   );
 
   const handleRename = useCallback(
@@ -311,6 +335,8 @@ export function FilesPanel({
             name: newName,
             execute: async () => {
               await vfs.rename(toVFSPath(fullPath), toVFSPath(newFullPath));
+              // #1868: keep open tabs in sync with the new path before refresh.
+              onFileRenamed?.(toVFSPath(fullPath), toVFSPath(newFullPath));
               refresh();
             },
           });
@@ -318,13 +344,15 @@ export function FilesPanel({
         }
 
         await vfs.rename(toVFSPath(fullPath), toVFSPath(newFullPath));
+        // #1868: keep open tabs in sync with the new path before refresh.
+        onFileRenamed?.(toVFSPath(fullPath), toVFSPath(newFullPath));
         setEditing(null);
         refresh();
       } catch (error) {
         console.error("Failed to rename:", error);
       }
     },
-    [refresh],
+    [refresh, onFileRenamed],
   );
 
   const handleDuplicate = useCallback(
@@ -523,6 +551,8 @@ export function FilesPanel({
             name,
             execute: async () => {
               await vfs.rename(toVFSPath(srcPath), toVFSPath(newPath));
+              // #1868: keep open tabs in sync with the moved path.
+              onFileRenamed?.(toVFSPath(srcPath), toVFSPath(newPath));
               refresh();
             },
           });
@@ -530,12 +560,14 @@ export function FilesPanel({
         }
 
         await vfs.rename(toVFSPath(srcPath), toVFSPath(newPath));
+        // #1868: keep open tabs in sync with the moved path.
+        onFileRenamed?.(toVFSPath(srcPath), toVFSPath(newPath));
         refresh();
       } catch (error) {
         console.error("Failed to move:", error);
       }
     },
-    [refresh],
+    [refresh, onFileRenamed],
   );
 
   /** Import external files dropped from the OS into destDir */
@@ -1314,11 +1346,23 @@ export function FilesPanel({
       <ConfirmDialog
         isOpen={deleteConfirm !== null}
         title="削除の確認"
-        message={
-          deleteConfirm?.kind === "directory"
-            ? `フォルダ「${deleteConfirm.name}」を削除しますか？中のファイルもすべて削除されます。`
-            : `ファイル「${deleteConfirm?.name ?? ""}」を削除しますか？`
-        }
+        message={(() => {
+          if (!deleteConfirm) return "";
+          const base =
+            deleteConfirm.kind === "directory"
+              ? `フォルダ「${deleteConfirm.name}」を削除しますか？中のファイルもすべて削除されます。`
+              : `ファイル「${deleteConfirm.name}」を削除しますか？`;
+          // #1868: warn when open tabs — especially dirty ones — are affected.
+          const dirtyTabs = deleteConfirm.affectedTabs.filter((t) => t.isDirty);
+          if (dirtyTabs.length > 0) {
+            const names = dirtyTabs.map((t) => `「${t.name}」`).join("、");
+            return `${base}\n\n未保存の変更があるファイル（${names}）が開かれています。削除すると未保存の変更は失われます。`;
+          }
+          if (deleteConfirm.affectedTabs.length > 0) {
+            return `${base}\n\n開いているタブはファイル未関連付けの状態になります。`;
+          }
+          return base;
+        })()}
         confirmLabel="削除する"
         cancelLabel="キャンセル"
         dangerous={true}

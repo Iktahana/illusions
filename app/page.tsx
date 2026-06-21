@@ -379,6 +379,9 @@ export default function EditorPage() {
     handleCloseTabCancel,
     flushTabState,
     restoreProjectTabs,
+    notifyFileRenamed,
+    findTabsAffectedByDelete,
+    notifyFileDeleted,
   } = tabManager;
 
   // Keep a live tabs ref for dockview panel renderers captured by stale closures.
@@ -1407,6 +1410,9 @@ export default function EditorPage() {
     onProjectBufferChange: handleProjectSearchBufferChange,
     newFileTrigger,
     openProjectFile,
+    onFileRenamed: notifyFileRenamed,
+    onFileDeleted: notifyFileDeleted,
+    findTabsAffectedByDelete,
     incrementEditorKey,
     onWordSearch: (word: string) => {
       // 共有検索語へ反映し、フローティング検索窓を開く。

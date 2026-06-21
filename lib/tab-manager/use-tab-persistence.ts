@@ -132,12 +132,21 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     // --- Project mode: write to workspace.json ---
     if (isProjectRef.current) {
       const rootPath = windowKeyRef.current; // rootPath for Electron, null for Web
-      const workspaceTabs: WorkspaceTab[] = editorTabs.map((t) => ({
-        relativePath: t.file?.path ? toRelativePath(t.file.path, rootPath) : null,
-        fileName: t.file?.name ?? "新規ファイル",
-        isPreview: t.isPreview || undefined,
-        fileType: t.fileType,
-      }));
+      const workspaceTabs: WorkspaceTab[] = editorTabs.map((t) => {
+        const relativePath = t.file?.path ? toRelativePath(t.file.path, rootPath) : null;
+        return {
+          relativePath,
+          fileName: t.file?.name ?? "新規ファイル",
+          isPreview: t.isPreview || undefined,
+          fileType: t.fileType,
+          // #1868: persist the editor buffer of unsaved, non-file-backed tabs so
+          // their content survives an app restart. This covers a tab detached
+          // after its file was deleted from the explorer (file → null), as well
+          // as freshly typed untitled buffers. File-backed tabs are re-read from
+          // disk on restore, so their content is intentionally not duplicated.
+          unsavedContent: !relativePath && t.isDirty ? t.content : undefined,
+        };
+      });
       await persistWorkspaceJson({
         openTabs: {
           tabs: workspaceTabs,
@@ -219,8 +228,15 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
       const restoredTabs: EditorTabState[] = [];
       for (const saved of savedTabs.tabs) {
         if (!saved.relativePath) {
-          // Unsaved tab — restore as blank
-          restoredTabs.push(createNewTab(undefined, saved.fileType ?? ".mdi"));
+          // Unsaved tab (untitled, or detached after its file was deleted).
+          // Recover its persisted buffer so unsaved content is not lost across
+          // restart (#1868). A tab carrying content is restored dirty so the
+          // user is still prompted to save it; an empty one stays clean.
+          const unsaved = saved.unsavedContent ?? "";
+          const tab = createNewTab(unsaved, saved.fileType ?? ".mdi");
+          restoredTabs.push(
+            unsaved.length > 0 ? { ...tab, isDirty: true, fileSyncStatus: "dirty" } : tab,
+          );
           continue;
         }
         try {

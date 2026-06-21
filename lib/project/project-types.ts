@@ -51,6 +51,18 @@ export interface WorkspaceTab {
   fileName: string;
   isPreview?: boolean;
   fileType?: SupportedFileExtension;
+  /**
+   * Editor buffer of an unsaved tab, persisted so its content survives an app
+   * restart. Only written for tabs that have NO file-backing (`relativePath`
+   * is null) AND are dirty — e.g. a freshly typed untitled buffer, or a tab
+   * detached after its file was deleted from the explorer (#1868). For
+   * file-backed tabs the content is re-read from disk on restore, so it is
+   * intentionally omitted here to avoid bloating workspace.json.
+   *
+   * 未保存タブのエディタバッファ。アプリ再起動後も内容を失わないよう保存する。
+   * file 紐付けが無く (relativePath が null) かつ dirty なタブにのみ書き込む。
+   */
+  unsavedContent?: string;
 }
 
 /** Simplified, ID-independent dockview layout for workspace.json persistence. */
