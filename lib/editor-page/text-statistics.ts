@@ -51,7 +51,12 @@ const LINE_END_PROHIBITED = new Set("（〔［｛〈《「『【".split(""));
 /**
  * Markdown / MDI / HTML のマークアップを除去し、可視本文テキストを返す。
  *
- * 除去ルール（この順番で適用）:
+ * fileType による除去ルール:
+ *  - ".txt" : 記法除去なし。生テキストをそのまま返す（`#`, `*` 等は本文文字）
+ *  - ".md"  : Markdown のみ除去（MDI 固有マクロは除去しない）
+ *  - ".mdi" : Markdown + MDI の全記法を除去（デフォルト）
+ *
+ * MDI 除去ルール（".mdi" 時のみ、この順番で適用）:
  *  1. コードブロック (` ``` ... ``` `) → 全削除
  *  2. インラインコード (`` `...` ``) → 全削除
  *  3. 画像 (`![alt](url)`) → 全削除（alt 含め）
@@ -65,8 +70,18 @@ const LINE_END_PROHIBITED = new Set("（〔［｛〈《「『【".split(""));
  * 11. Markdown 見出し記号（行頭の `#+ `）→ 除去（本文は残す）
  * 12. 強調記号 (`**...**`, `__...__`, `*...*`, `_..._`, `~~...~~`) → 内容は残す
  * 13. バックスラッシュエスケープ (`\X`) → バックスラッシュのみ除去
+ *
+ * ".md" 時はルール 1–4 および 10–13 のみ適用（MDI 固有のルール 5–9 を除く）。
  */
-export function extractVisibleText(rawContent: string): string {
+export function extractVisibleText(
+  rawContent: string,
+  fileType: ".mdi" | ".md" | ".txt" = ".mdi",
+): string {
+  // .txt はプレーンテキスト。記法除去なし。
+  if (fileType === ".txt") {
+    return rawContent;
+  }
+
   let text = rawContent;
 
   // 1. コードブロック（```...```、フェンス含む）
@@ -81,22 +96,24 @@ export function extractVisibleText(rawContent: string): string {
   // 4. リンク → テキスト部分のみ残す
   text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
 
-  // 5. MDI ルビ {親文字|ルビ} → 親文字のみ
-  text = text.replace(/\{([^|{}]*)\|[^}]*\}/g, "$1");
+  if (fileType === ".mdi") {
+    // 5. MDI ルビ {親文字|ルビ} → 親文字のみ
+    text = text.replace(/\{([^|{}]*)\|[^}]*\}/g, "$1");
 
-  // 6. MDI 縦中横 ^内容^ → 内容のみ
-  text = text.replace(/\^([^^]*)\^/g, "$1");
+    // 6. MDI 縦中横 ^内容^ → 内容のみ
+    text = text.replace(/\^([^^]*)\^/g, "$1");
 
-  // 7. MDI no-break [[no-break:文字列]] → 文字列のみ
-  text = text.replace(/\[\[no-break:([^\]]*)\]\]/g, "$1");
+    // 7. MDI no-break [[no-break:文字列]] → 文字列のみ
+    text = text.replace(/\[\[no-break:([^\]]*)\]\]/g, "$1");
 
-  // 8. MDI kern [[kern:量:文字列]] → 文字列のみ
-  text = text.replace(/\[\[kern:[^\]]*?:([^\]]*)\]\]/g, "$1");
+    // 8. MDI kern [[kern:量:文字列]] → 文字列のみ
+    text = text.replace(/\[\[kern:[^\]]*?:([^\]]*)\]\]/g, "$1");
 
-  // 9. MDI 空行マーカー [[blank]] → 行ごと削除（可視文字としてカウントしない）。
-  // ライブ編集中の content は serializer が `[` をエスケープするため `\[\[blank]]`
-  // となる。各ブラケット前の `\` を任意マッチさせ、クリーン形・エスケープ形の双方を除去する。
-  text = text.replace(/^[ \t]*\\?\[\\?\[blank\\?\]\\?\][ \t]*$/gm, "");
+    // 9. MDI 空行マーカー [[blank]] → 行ごと削除（可視文字としてカウントしない）。
+    // ライブ編集中の content は serializer が `[` をエスケープするため `\[\[blank]]`
+    // となる。各ブラケット前の `\` を任意マッチさせ、クリーン形・エスケープ形の双方を除去する。
+    text = text.replace(/^[ \t]*\\?\[\\?\[blank\\?\]\\?\][ \t]*$/gm, "");
+  }
 
   // 10. HTML タグ → タグ記号を除去、内容は残す
   text = text.replace(/<[^>]*>/g, "");
@@ -297,9 +314,14 @@ export function countParagraphs(visibleText: string): number {
  * TextStatistics オブジェクトを一括計算する。
  *
  * @param rawContent - エディタの生コンテンツ（Markdown/MDI/HTML 記法を含む可能性あり）
+ * @param fileType   - ファイル種別。".txt" は記法除去なし、".md" は Markdown のみ除去、
+ *                     ".mdi" は Markdown + MDI 全除去（デフォルト）。
  */
-export function computeTextStatistics(rawContent: string): TextStatistics {
-  const visibleText = extractVisibleText(rawContent);
+export function computeTextStatistics(
+  rawContent: string,
+  fileType: ".mdi" | ".md" | ".txt" = ".mdi",
+): TextStatistics {
+  const visibleText = extractVisibleText(rawContent, fileType);
   const visibleTextCharCount = countVisibleChars(visibleText);
   const manuscriptCellCount = countManuscriptCells(visibleText);
   const manuscriptPages = countManuscriptPages(manuscriptCellCount);
