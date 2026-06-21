@@ -255,10 +255,26 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
         if (!isEditorTab(tab)) continue;
         if (!tab.file?.path || tab.isSaving) continue;
         if (tab.isDirty) continue;
+
+        // Capture a pre-await baseline: content and path identity we validated above.
+        // tab.file.path is truthy here (the guard above skips null/empty paths).
+        const tabPath = tab.file.path as string;
+        const { id: tabId, lastSavedContent: baseLastSaved } = tab;
+
         try {
-          const diskContent = await vfs.readFile(tab.file.path);
-          if (diskContent !== tab.lastSavedContent) {
-            updateTab(tab.id, {
+          const diskContent = await vfs.readFile(tabPath);
+
+          // Re-validate tab state after the async read (#1877).
+          // The user may have edited the tab while readFile was in-flight;
+          // if so, skip the overwrite to preserve the in-progress input.
+          const currentTab = tabsRef.current.find((t) => t.id === tabId && isEditorTab(t));
+          if (!currentTab || !isEditorTab(currentTab)) continue;
+          if (currentTab.isDirty || currentTab.isSaving) continue;
+          // Guard against a path change (e.g. Save As) during the read.
+          if (currentTab.file?.path !== tabPath) continue;
+
+          if (diskContent !== baseLastSaved) {
+            updateTab(tabId, {
               content: diskContent,
               lastSavedContent: diskContent,
               isDirty: false,
