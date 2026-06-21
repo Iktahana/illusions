@@ -605,9 +605,12 @@ export function useDockviewAdapter({
       // Split is only supported for editor tabs
       if (!isEditorTab(activeTab)) return;
 
-      // Clone the active tab's content and file association into a new tab.
-      // The new panel will be positioned in the split direction
-      // by the sync effect above (via pendingSplitRef).
+      // Duplicate the active tab's content into a new INDEPENDENT draft tab
+      // (#1874). The clone is detached from the source file so the two panes
+      // cannot silently overwrite each other on save. The new panel will be
+      // positioned in the split direction by the sync effect above (via
+      // pendingSplitRef). NOTE: this is "duplicate as draft", not a second view
+      // of the same document; full single-buffer multi-view is a follow-up.
       cloneTab(activeTab);
 
       pendingSplitRef.current = {

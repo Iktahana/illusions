@@ -32,7 +32,11 @@ export interface UseTabManagerReturn {
   tabs: TabState[];
   activeTabId: TabId;
   newTab: (fileType?: SupportedFileExtension) => void;
-  /** Create a new editor tab pre-populated with content and file association from a source tab. */
+  /**
+   * Duplicate a source tab's content into a new INDEPENDENT draft tab (#1874).
+   * The clone is detached from the source file (untitled) and born dirty so it
+   * cannot silently overwrite the original path. See cloneTabState().
+   */
   cloneTab: (source: EditorTabState) => void;
   closeTab: (tabId: TabId) => void;
   switchTab: (tabId: TabId) => void;
@@ -205,4 +209,32 @@ export function createNewTab(
     fileSyncStatus: "clean",
     conflictDiskContent: null,
   };
+}
+
+/**
+ * Produce a TRUE independent draft clone of an editor tab (issue #1874).
+ *
+ * Historically cloneTab copied `source.file` so the new tab shared the same
+ * file path. That made editor split create two tabs pointing at the SAME file
+ * but holding independent buffers, so each pane could silently overwrite the
+ * other's edits on save (P0 data loss). It also reported the clone as clean
+ * even when the source buffer was dirty.
+ *
+ * The interim fix detaches the file descriptor (`file = null`) so the clone is
+ * an untitled draft that CANNOT save to the original path, and marks it dirty
+ * so the unsaved draft is never silently lost. This trades the "second view of
+ * the same document" UX for a "duplicate as draft" UX, eliminating the
+ * data-loss path. A full single-buffer multi-view refactor is a follow-up.
+ *
+ * `lastSavedContent` is set to the empty string (the descriptor-less baseline)
+ * so the clone is correctly reported dirty as long as it holds any content.
+ */
+export function cloneTabState(source: EditorTabState): EditorTabState {
+  const draft = createNewTab(source.content, source.fileType);
+  // Detach from the source document: an untitled draft with no save target.
+  draft.file = null;
+  // Born dirty so the unsaved draft is never silently discarded.
+  draft.isDirty = true;
+  draft.lastSavedContent = "";
+  return draft;
 }

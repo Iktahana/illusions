@@ -5,7 +5,7 @@ import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, TabState, EditorTabState, TerminalTabState, DiffTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
-import { createNewTab, generateTabId } from "./types";
+import { cloneTabState, createNewTab, generateTabId } from "./types";
 import type { TabManagerCore } from "./types";
 import { nextTerminalLabel } from "./terminal-label";
 import { useEditorMode } from "@/contexts/EditorModeContext";
@@ -46,7 +46,11 @@ export interface UseTabStateReturn extends TabManagerCore {
   // Tab CRUD operations
   /** Create a new empty editor tab. */
   newTab: (fileType?: SupportedFileExtension) => void;
-  /** Create a new editor tab pre-populated with content and file association from a source tab. */
+  /**
+   * Duplicate a source tab's content into a new INDEPENDENT draft tab (#1874).
+   * The clone is detached from the source file (untitled) and born dirty so it
+   * cannot silently overwrite the original path. See cloneTabState().
+   */
   cloneTab: (source: EditorTabState) => void;
   /** Open a new terminal tab with placeholder values. Optionally pass a pendingId for spawn correlation. */
   newTerminalTab: (pendingId?: string) => void;
@@ -177,9 +181,10 @@ export function useTabState(): UseTabStateReturn {
   }, []);
 
   const cloneTab = useCallback((source: EditorTabState) => {
-    const tab = createNewTab(source.content, source.fileType);
-    // Copy the file descriptor so the cloned tab is associated with the same document.
-    tab.file = source.file;
+    // Produce a TRUE independent draft (#1874): detached from the source file so
+    // it cannot silently overwrite the original path, and born dirty so the
+    // unsaved draft is never lost. See cloneTabState() for the rationale.
+    const tab = cloneTabState(source);
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(tab.id);
   }, []);
