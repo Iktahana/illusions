@@ -255,17 +255,18 @@ export default function MilkdownEditor({
       }
 
       // MDI extensions: conditionally loaded
-      // NOTE: enableNoBreak / enableKern are not explicitly passed here, so
-      //   they default to `true` (always enabled, even in .md files).
-      //   enableMdiBreak is explicitly gated on mdiExtensionsEnabled so that
-      //   `[[br]]` is only active in .mdi files. Aligning nobreak/kern with
-      //   the same gating is tracked separately.
+      // All MDI macro families are gated on mdiExtensionsEnabled (true only
+      // for .mdi files) so that .txt/.md content containing [[blank]],
+      // [[no-break:...]], [[kern:...:...]] etc. is preserved byte-for-byte
+      // and not stripped/altered by the serializer (#1886).
       editor = editor.use(
         japaneseNovel({
           isVertical,
           showManuscriptLine: false,
           enableRuby: mdiExtensionsEnabled,
           enableTcy: mdiExtensionsEnabled,
+          enableNoBreak: mdiExtensionsEnabled,
+          enableKern: mdiExtensionsEnabled,
           enableMdiBreak: mdiExtensionsEnabled,
           // .txt: characters like *, #, ** are literal — copy must bypass
           // markdown stripping / MDI conversion (P2-A).
