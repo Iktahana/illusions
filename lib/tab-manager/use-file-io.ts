@@ -113,6 +113,14 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
   const isSavingRef = useRef(false);
   const openingPathsRef = useRef(new Map<string, boolean>());
+  /**
+   * Monotonically increasing counter for openProjectFile calls (#1917).
+   * Each invocation captures the current counter value before its async
+   * readFile await; after the await it checks whether a newer open has
+   * superseded it.  Stale opens skip setActiveTabId and the reuse-current-tab
+   * branch so the last-clicked file always wins.
+   */
+  const latestOpenRequestRef = useRef(0);
 
   // --- Persist helpers ----------------------------------------------------
 
@@ -483,6 +491,11 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       }
       openingPathsRef.current.set(vfsPath, preview);
 
+      // Capture a monotonic request ID so that if another openProjectFile call
+      // arrives before this one's readFile resolves, the stale resolution will
+      // not activate its tab and overwrite the newer selection (#1917).
+      const requestId = ++latestOpenRequestRef.current;
+
       // Unsupported extensions open with the OS default app instead of the editor.
       // The editor only handles .mdi / .md / .txt; anything else (e.g. .docx, .pdf,
       // .gdoc) is delegated to shell.openPath via the open-with-default-app IPC.
@@ -516,6 +529,14 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           notificationManager.error(
             `ファイルを開けませんでした: ${vfsPath.split("/").pop() || vfsPath}`,
           );
+          return;
+        }
+
+        // Staleness guard (#1917): a newer openProjectFile call was made while
+        // this one was awaiting readFile.  Skip all state-committing paths so
+        // the latest-clicked file remains active.  The tab is not created at all
+        // for the stale open to avoid polluting the tab list.
+        if (latestOpenRequestRef.current !== requestId) {
           return;
         }
 
@@ -589,7 +610,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         openingPathsRef.current.delete(vfsPath);
       }
     },
-    [updateTab, setTabs, setActiveTabId, tabsRef, activeTabIdRef],
+    [updateTab, setTabs, setActiveTabId, tabsRef, activeTabIdRef, latestOpenRequestRef],
   );
 
   // --- Refs for stable references in effects ------------------------------

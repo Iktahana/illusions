@@ -7,7 +7,29 @@ import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import ContextMenu from "@/shared/ui/ContextMenu";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { isElectronRenderer, detectOSPlatform } from "@/lib/utils/runtime-env";
+import { isTextDroppable } from "@/lib/utils/file-type-guard";
+import { notificationManager } from "@/lib/services/notification-manager";
 import type { FileTreeEntry, EditingEntry } from "./types";
+import type { VirtualFileSystem } from "@/lib/vfs/types";
+
+/**
+ * Check whether a file/directory name already exists inside a VFS parent directory.
+ * Uses listDirectory so it works on both Web and Electron VFS implementations.
+ * Returns true if an entry with the given name exists.
+ */
+async function checkFileExists(
+  vfs: VirtualFileSystem,
+  parentVFSPath: string,
+  name: string,
+): Promise<boolean> {
+  try {
+    const entries = await vfs.listDirectory(parentVFSPath);
+    return entries.some((e) => e.name === name);
+  } catch {
+    // If listing fails (e.g. parent dir doesn't exist yet), treat as non-existent
+    return false;
+  }
+}
 
 /** Returns the OS-specific file manager name for context menu labels. */
 function getFileManagerName(): string {
@@ -43,6 +65,11 @@ export function FilesPanel({
     path: string;
     kind: "file" | "directory";
     name: string;
+  } | null>(null);
+  /** Pending overwrite confirmation: holds the operation to execute after user confirms */
+  const [overwriteConfirm, setOverwriteConfirm] = useState<{
+    name: string;
+    execute: () => Promise<void>;
   } | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const { menu, show: showContextMenu, close: closeContextMenu } = useContextMenu();
@@ -216,6 +243,21 @@ export function FilesPanel({
       try {
         const { getProjectFileService } = await import("@/lib/services/project-file-service");
         const vfs = getProjectFileService();
+
+        const parentVFSPath = toVFSPath(parentPath) || "";
+        const exists = await checkFileExists(vfs, parentVFSPath, newName);
+        if (exists) {
+          setEditing(null);
+          setOverwriteConfirm({
+            name: newName,
+            execute: async () => {
+              await vfs.rename(toVFSPath(fullPath), toVFSPath(newFullPath));
+              refresh();
+            },
+          });
+          return;
+        }
+
         await vfs.rename(toVFSPath(fullPath), toVFSPath(newFullPath));
         setEditing(null);
         refresh();
@@ -240,6 +282,19 @@ export function FilesPanel({
         const ext = dotIndex > 0 ? name.substring(dotIndex) : "";
         const copyName = `${baseName} (コピー)${ext}`;
         const copyPath = parentPath === "/" ? `/${copyName}` : `${parentPath}/${copyName}`;
+
+        const parentVFSPath = toVFSPath(parentPath) || "";
+        const exists = await checkFileExists(vfs, parentVFSPath, copyName);
+        if (exists) {
+          setOverwriteConfirm({
+            name: copyName,
+            execute: async () => {
+              await vfs.writeFile(toVFSPath(copyPath), content);
+              refresh();
+            },
+          });
+          return;
+        }
 
         await vfs.writeFile(toVFSPath(copyPath), content);
         refresh();
@@ -284,6 +339,21 @@ export function FilesPanel({
       try {
         const { getProjectFileService } = await import("@/lib/services/project-file-service");
         const vfs = getProjectFileService();
+
+        const parentVFSPath = toVFSPath(parentPath) || "";
+        const exists = await checkFileExists(vfs, parentVFSPath, finalName);
+        if (exists) {
+          setEditing(null);
+          setOverwriteConfirm({
+            name: finalName,
+            execute: async () => {
+              await vfs.writeFile(toVFSPath(filePath), "");
+              refresh();
+            },
+          });
+          return;
+        }
+
         await vfs.writeFile(toVFSPath(filePath), "");
         setEditing(null);
         refresh();
@@ -386,6 +456,20 @@ export function FilesPanel({
       try {
         const { getProjectFileService } = await import("@/lib/services/project-file-service");
         const vfs = getProjectFileService();
+
+        const destVFSPath = toVFSPath(destDir) || "";
+        const exists = await checkFileExists(vfs, destVFSPath, name);
+        if (exists) {
+          setOverwriteConfirm({
+            name,
+            execute: async () => {
+              await vfs.rename(toVFSPath(srcPath), toVFSPath(newPath));
+              refresh();
+            },
+          });
+          return;
+        }
+
         await vfs.rename(toVFSPath(srcPath), toVFSPath(newPath));
         refresh();
       } catch (error) {
@@ -401,11 +485,40 @@ export function FilesPanel({
       try {
         const { getProjectFileService } = await import("@/lib/services/project-file-service");
         const vfs = getProjectFileService();
+        const destVFSPath = toVFSPath(destDir) || "";
+
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
+          // Reject non-text files before touching their bytes.
+          // file.text() silently replaces invalid UTF-8 bytes with U+FFFD,
+          // which would corrupt any binary (PDF, DOCX, image, …) dropped here.
+          if (!isTextDroppable(file)) {
+            notificationManager.error(
+              `「${file.name}」はサポートされていない形式です。` +
+                "テキストファイル（.mdi / .md / .txt）のみインポートできます。",
+            );
+            continue;
+          }
           try {
             const content = await file.text();
             const filePath = destDir === "/" ? `/${file.name}` : `${destDir}/${file.name}`;
+
+            const exists = await checkFileExists(vfs, destVFSPath, file.name);
+            if (exists) {
+              // Queue the first conflicting file for confirmation; subsequent ones follow
+              const capturedContent = content;
+              const capturedFilePath = filePath;
+              setOverwriteConfirm({
+                name: file.name,
+                execute: async () => {
+                  await vfs.writeFile(toVFSPath(capturedFilePath), capturedContent);
+                  refresh();
+                },
+              });
+              // Stop processing remaining files — each must be confirmed individually
+              return;
+            }
+
             await vfs.writeFile(toVFSPath(filePath), content);
           } catch (err) {
             console.warn("Failed to read external file:", file.name, err);
@@ -1012,6 +1125,24 @@ export function FilesPanel({
           setDeleteConfirm(null);
         }}
         onCancel={() => setDeleteConfirm(null)}
+      />
+
+      {/* Overwrite confirmation dialog: shown when an operation targets an existing file */}
+      <ConfirmDialog
+        isOpen={overwriteConfirm !== null}
+        title="上書きの確認"
+        message={`「${overwriteConfirm?.name ?? ""}」はすでに存在します。上書きしますか？\nこの操作は元に戻せません。`}
+        confirmLabel="上書きする"
+        cancelLabel="キャンセル"
+        dangerous={true}
+        onConfirm={() => {
+          const pending = overwriteConfirm;
+          setOverwriteConfirm(null);
+          if (pending) {
+            void pending.execute();
+          }
+        }}
+        onCancel={() => setOverwriteConfirm(null)}
       />
     </div>
   );

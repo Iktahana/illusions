@@ -220,6 +220,7 @@ export function useTabManager(options?: {
     openDiffTab: tabState.openDiffTab,
     forceCloseTab: tabState.forceCloseTab,
     updateTab: tabState.updateTab,
+    setTabContent: tabState.setTabContent,
 
     // Close-tab dialog
     pendingCloseTabId: tabState.pendingCloseTabId,

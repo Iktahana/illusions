@@ -23,6 +23,7 @@ import { saveMdiFile } from "../project/mdi-file";
 import { getProjectFileService } from "../services/project-file-service";
 import { suppressFileWatch } from "../services/file-watcher";
 import { acquireSaveLock, releaseSaveLock } from "./save-lock";
+import { inferFileType } from "./types";
 import { isEditorTab } from "./tab-types";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
@@ -227,12 +228,15 @@ export async function executeTabSave(params: ExecuteTabSaveParams): Promise<Save
       setTabs((prev) =>
         prev.map((t) => {
           if (t.id !== tab.id || !isEditorTab(t)) return t;
+          // Recompute fileType from the new descriptor name (Save As may change extension).
+          const newFileType = descriptor ? inferFileType(descriptor.name) : t.fileType;
           const newIsDirty =
-            MdiDocument.fromEditorOutput(t.content, { fileType: t.fileType }).toRawText() !==
+            MdiDocument.fromEditorOutput(t.content, { fileType: newFileType }).toRawText() !==
             sanitized;
           return {
             ...t,
             ...(descriptor ? { file: descriptor } : null),
+            ...(descriptor ? { fileType: newFileType } : null),
             lastSavedContent: sanitized,
             isDirty: newIsDirty,
             lastSavedTime: Date.now(),

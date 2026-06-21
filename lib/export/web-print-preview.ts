@@ -60,6 +60,15 @@ export async function openWebPrintPreview(
       },
       fileType,
       fullwidthSpaceIndentCount: fullwidthSpaceCount,
+      // Embed page numbers via CSS @page margin boxes so browser print also
+      // renders page numbers consistently with Electron print.
+      pageNumbers: settings.showPageNumbers
+        ? {
+            show: true,
+            format: settings.pageNumberFormat,
+            position: settings.pageNumberPosition,
+          }
+        : undefined,
     });
 
     printWindow.document.open();

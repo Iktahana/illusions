@@ -8,8 +8,9 @@ import { describe, expect, it } from "vitest";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-const { resolveUpdaterFlags } = require("../update-policy") as {
+const { resolveUpdaterFlags, isUnpublishedChannelVersion } = require("../update-policy") as {
   resolveUpdaterFlags: (v: unknown) => { allowPrerelease: boolean; allowDowngrade: boolean };
+  isUnpublishedChannelVersion: (v: unknown) => boolean;
 };
 
 describe("resolveUpdaterFlags", () => {
@@ -42,5 +43,34 @@ describe("resolveUpdaterFlags", () => {
       const { allowPrerelease, allowDowngrade } = resolveUpdaterFlags(v);
       expect(allowPrerelease).toBe(!allowDowngrade);
     }
+  });
+});
+
+describe("isUnpublishedChannelVersion", () => {
+  it.each(["1.2.20-dev", "0.1.0-dev", "10.20.30-alpha", "1.2.20-alpha"])(
+    "dev/alpha チャンネルのビルド (%s) は true（公開 Release が無く更新先が無い）",
+    (version) => {
+      expect(isUnpublishedChannelVersion(version)).toBe(true);
+    },
+  );
+
+  it.each([
+    "1.2.20", // 安定版
+    "1.2.20-beta.20260620.162756", // beta は公開フィードを持つので対象外
+    "1.2.20-beta.20260619.45436",
+  ])("安定版/beta (%s) は false（更新を継続する）", (version) => {
+    expect(isUnpublishedChannelVersion(version)).toBe(false);
+  });
+
+  it.each([undefined, null, 0, {}, [], 1.22])(
+    "文字列以外 (%s) は安全側 = false（更新を止めない）",
+    (value) => {
+      expect(isUnpublishedChannelVersion(value)).toBe(false);
+    },
+  );
+
+  it("'develop' のような部分一致では誤検出しない（ハイフン区切りのチャンネル接尾辞のみ）", () => {
+    expect(isUnpublishedChannelVersion("1.2.20-developer")).toBe(false);
+    expect(isUnpublishedChannelVersion("1.2.20-alphabet")).toBe(false);
   });
 });

@@ -123,6 +123,8 @@ export default function SearchResults({
     [],
   );
   const searchInputRef = useRef<HTMLInputElement>(null);
+  /** Monotonically increasing counter used to ignore stale open-file resolutions. */
+  const navRequestIdRef = useRef(0);
 
   useEffect(() => setHistory(loadSearchHistory()), []);
 
@@ -371,8 +373,11 @@ export default function SearchResults({
         projectMatchLocations.length;
       const location = projectMatchLocations[nextIndex];
       setProjectNavigationIndex(nextIndex);
+      const reqId = ++navRequestIdRef.current;
       void onOpenProjectFile(location.file.path).then(() => {
-        onCurrentMatchIndexChange(location.matchIndex);
+        if (navRequestIdRef.current === reqId) {
+          onCurrentMatchIndexChange(location.matchIndex);
+        }
       });
     },
     [
@@ -755,8 +760,11 @@ export default function SearchResults({
                             onClick={() => {
                               if (!onOpenProjectFile) return;
                               setProjectNavigationIndex(navigationIndex);
+                              const reqId = ++navRequestIdRef.current;
                               void onOpenProjectFile(file.path).then(() => {
-                                onCurrentMatchIndexChange(index);
+                                if (navRequestIdRef.current === reqId) {
+                                  onCurrentMatchIndexChange(index);
+                                }
                               });
                             }}
                             className="w-full text-left"

@@ -69,12 +69,9 @@ export const MDI_BLANK_MARKER = "[[blank]]";
  * line-start-anchored, a marker-handling drift this module exists to end).
  *
  * Clean-form ONLY (`[[blank]]`). This must NOT match the serializer-escaped
- * form `\[\[blank]]`, because the HTML export pipeline (`mdi-to-html.ts`)
- * applies it AFTER a fileType-gated normalization: for ".md"/".txt" the escaped
- * literal is intentionally preserved (DATA-LOSS guard, #1608), so matching the
- * escaped form here would wrongly promote authored `\[\[blank]]` to a blank
- * paragraph. Analysis-side stripping tolerates the escaped form via
- * {@link MDI_BLANK_ANALYSIS_RE} instead.
+ * form `\[\[blank]]`. Analysis-side stripping tolerates the escaped form via
+ * {@link MDI_BLANK_ANALYSIS_RE} instead (used for live-editor buffers that have
+ * not yet been through `fromEditorOutput` Step 0 un-escaping).
  */
 export const MDI_BLANK_RE = /^[ \t]*\[\[blank\]\][ \t]*\r?$/gm;
 
@@ -521,8 +518,10 @@ const VOID_TAG_PATTERN = new RegExp(`<(${VOID_HTML_TAGS.join("|")})(\\s[^>]*)?\\
 export interface MdiEditorOutputOptions {
   /**
    * File extension the content will be persisted as (".mdi" | ".md" | ".txt").
-   * Marker recovery (Step 0) and blank-paragraph conversion (Step 1a) only
-   * apply to ".mdi"; other types (or omitted) skip those steps.
+   * Step 0 macro un-escaping (`\[\[blank]]` → `[[blank]]`) applies to all three
+   * types to preserve the user's authored bytes (issue #1916).
+   * Step 1a blank-paragraph conversion (`<br />` → `[[blank]]`) applies to
+   * ".mdi" only; other types (or omitted) skip that step.
    */
   fileType?: string;
 }
@@ -537,16 +536,31 @@ export interface MdiEditorOutputOptions {
  */
 function normalizeEditorOutput(content: string, options?: MdiEditorOutputOptions): string {
   let result = content;
-  // Step 0 (MDI only): the Milkdown markdown serializer escapes the leading `[`
-  // of MDI bracket macros (`[[blank]]`, `[[br]]`, `[[no-break:…]]`, `[[kern:…]]`)
-  // to `\[`, because CommonMark treats `[` as a link/reference opener. The result
-  // is `\[\[blank]]` on disk instead of `[[blank]]`. Strip those backslashes so
-  // the macros round-trip as authored. Backslashes before `]` are optional too,
-  // in case a serializer config also escapes the closing brackets. Idempotent:
-  // already-clean markers pass through unchanged.
-  // Known limitation (documented behavior, see module JSDoc): this also means a
-  // user cannot escape `[[blank]]` to keep it as literal text on its own line.
-  if (options?.fileType === ".mdi") {
+  // Step 0 (.mdi / .md / .txt): the Milkdown markdown serializer escapes the
+  // leading `[` of MDI bracket macros (`[[blank]]`, `[[br]]`, `[[no-break:…]]`,
+  // `[[kern:…]]`) to `\[`, because CommonMark treats `[` as a link/reference
+  // opener. The result is `\[\[blank]]` on disk instead of `[[blank]]`. Strip
+  // those backslashes so the literals round-trip as authored (byte-preservation,
+  // issue #1916). Backslashes before `]` are optional too, in case a serializer
+  // config also escapes the closing brackets. Idempotent: already-clean markers
+  // pass through unchanged.
+  //
+  // For .md and .txt: MDI macros are NOT semantically interpreted in these file
+  // types (post-#1886), so `[[blank]]` is purely authored literal text.
+  // Un-escaping restores the user's original bytes without promoting the text to
+  // MDI-marker semantics. The macro-specific regex (blank|br|no-break:…|kern:…)
+  // deliberately leaves arbitrary `\[link]` CommonMark escapes untouched; only
+  // these known MDI macro names are affected.
+  //
+  // Step 1a (blank paragraph conversion) and the mdi-to-html/docx export MDI
+  // interpretation remain gated on .mdi only — un-escaping here does not change
+  // those pipelines' behavior for .md/.txt.
+  //
+  // Known limitation (documented behavior, see module JSDoc): for .mdi, a user
+  // cannot escape `[[blank]]` to keep it as literal text on its own line —
+  // Step 0 un-escapes it back to the blank-paragraph marker form regardless.
+  const STEP0_FILE_TYPES = new Set([".mdi", ".md", ".txt"]);
+  if (options?.fileType !== undefined && STEP0_FILE_TYPES.has(options.fileType)) {
     result = result.replace(
       /\\?\[\\?\[(blank|br|no-break:[^\]\n]*|kern:[^\]\n]*)\\?\]\\?\]/g,
       "[[$1]]",

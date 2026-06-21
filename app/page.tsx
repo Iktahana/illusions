@@ -123,6 +123,20 @@ export default function EditorPage() {
     setEditorKey((prev) => prev + 1);
   }, []);
 
+  // #1840 / #1885: holds the active editor's on-demand live-content flush.
+  // Declared early so incrementEditorKeyWithFlush (used by useEditorSettings)
+  // can close over it. MilkdownEditor registers itself via registerFlush below.
+  const flushActiveEditorRef = useRef<(() => string | null) | null>(null);
+
+  // #1885: display-setting changes that trigger incrementEditorKey() remount the
+  // editor, cancelling the Milkdown listener's 200ms debounce and losing the last
+  // typed characters. Flush live content into React state first so the new editor
+  // instance initialises with currentContentRef containing the latest keystrokes.
+  const incrementEditorKeyWithFlush = useCallback(() => {
+    flushActiveEditorRef.current?.();
+    incrementEditorKey();
+  }, [incrementEditorKey]);
+
   // Ref for dockview layout flush — populated after useDockviewPersistence,
   // consumed by useTabManager's close handler via stable callback.
   const flushLayoutStateRef = useRef<(() => Promise<void>) | undefined>(undefined);
@@ -145,7 +159,7 @@ export default function EditorPage() {
     handlers: settingsHandlers,
     setters: settingsSetters,
     settingsHydrated,
-  } = useEditorSettings(incrementEditorKey);
+  } = useEditorSettings(incrementEditorKeyWithFlush);
   const {
     fontScale,
     lineHeight,
@@ -290,11 +304,9 @@ export default function EditorPage() {
     triggerSwitchToCorrections,
   } = panelHandlers;
 
-  // #1840: holds the active editor's on-demand live-content flush. Save flows
-  // call it right before persisting so they never write debounce-lagged content.
-  // The mounted MilkdownEditor (only the active dockview panel renders one)
-  // registers itself here; unmount clears it.
-  const flushActiveEditorRef = useRef<(() => string | null) | null>(null);
+  // #1840: save flows call flushActiveEditorRef right before persisting so they
+  // never write debounce-lagged content. The mounted MilkdownEditor registers
+  // itself here; unmount clears it. (Ref declared early above for #1885.)
   const registerFlush = useCallback((flush: (() => string | null) | null) => {
     flushActiveEditorRef.current = flush;
   }, []);
@@ -737,11 +749,12 @@ export default function EditorPage() {
   interface PrintDialogState {
     content: string;
     metadata: ExportMetadata;
+    fileType: SupportedFileExtension;
   }
   const [printDialogState, setPrintDialogState] = useState<PrintDialogState | null>(null);
 
   const handlePrintDialogRequest = useCallback((content: string, metadata: ExportMetadata) => {
-    setPrintDialogState({ content, metadata });
+    setPrintDialogState({ content, metadata, fileType: activeFileTypeRef.current });
   }, []);
 
   // TXT export 字下げ dialog. The export hook awaits the user's choice via a
@@ -864,9 +877,8 @@ export default function EditorPage() {
 
       // Electron path: use IPC
       if (window.electronAPI?.printDocument) {
-        setPrintDialogState(null);
         try {
-          await window.electronAPI.printDocument(printDialogState.content, {
+          const result = await window.electronAPI.printDocument(printDialogState.content, {
             metadata: printDialogState.metadata,
             verticalWriting: settings.verticalWriting,
             pageSize: settings.pageSize,
@@ -881,7 +893,21 @@ export default function EditorPage() {
             textIndent: settings.textIndent,
             fullwidthSpaceIndent: settings.fullwidthSpaceIndent,
             googleFontFamily: settings.googleFontFamily,
+            // Pass the snapshotted file type so the HTML pipeline correctly
+            // handles .md/.txt literals vs .mdi MDI macros (#1882).
+            fileType: printDialogState.fileType,
           });
+          if (
+            result !== null &&
+            result !== undefined &&
+            typeof result === "object" &&
+            "success" in result &&
+            !result.success
+          ) {
+            notificationManager.error(`印刷に失敗しました: ${(result as { error: string }).error}`);
+            return;
+          }
+          setPrintDialogState(null);
         } catch (error) {
           const message = error instanceof Error ? error.message : "不明なエラー";
           notificationManager.error(`印刷に失敗しました: ${message}`);
@@ -1160,13 +1186,16 @@ export default function EditorPage() {
     charTypeAnalysis,
     charUsageRates,
     readabilityAnalysis,
-  } = useTextStatistics(content);
+  } = useTextStatistics(content, activeFileType);
 
   // charCount は旧インターフェース互換用エイリアス（可視本文文字数）
   const charCount = visibleTextCharCount;
 
   // --- Previous day comparison ---
-  const previousDayStats = usePreviousDayStats(currentFile?.name, isProjectMode(editorMode));
+  const previousDayStats = usePreviousDayStats(
+    currentFile?.path ?? undefined,
+    isProjectMode(editorMode),
+  );
 
   // --- Linting hook ---
   const {
@@ -1508,6 +1537,7 @@ export default function EditorPage() {
             onPrint: handlePrintConfirm,
             content: printDialogState?.content ?? "",
             metadata: printDialogState?.metadata ?? { title: "" },
+            fileType: printDialogState?.fileType,
           },
         }}
         recovery={{

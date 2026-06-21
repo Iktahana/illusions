@@ -103,7 +103,8 @@ describe("content size validation — Buffer.byteLength vs .length", () => {
 //
 // fs.readFile(path, "utf-8") does NOT strip a leading UTF-8 BOM (U+FEFF).
 // The .txt read path (readTextWithEncoding in text-codec.ts) strips it.
-// file-ipc.js must do the same for .mdi reads via its local stripBom() helper.
+// file-ipc.js gets the same behaviour via readFileStrictUtf8() (#1888), which
+// BOM-strips after a strict decode. The pure unit below pins the BOM semantics.
 //
 // file-ipc.js is a CommonJS Electron main-process module and cannot be
 // imported directly in vitest, so:
@@ -168,20 +169,23 @@ describe("file-ipc.js source regression guard", () => {
     expect(source).not.toMatch(/\.length\s*>\s*MAX_CONTENT_BYTES/);
   });
 
-  // BOM stripping regression guard (#1842)
-  it("defines a stripBom helper", () => {
-    expect(source).toContain("function stripBom(");
+  // Strict UTF-8 read regression guard (#1888, supersedes the #1842 stripBom guard)
+  //
+  // Content reads now go through readFileStrictUtf8() (electron/lib/text-decode.js),
+  // which BOM-strips AND rejects non-UTF-8 bytes instead of decoding them lossily
+  // into U+FFFD that a later save would write back over the original file.
+  it("imports the strict UTF-8 read helper", () => {
+    expect(source).toContain('require("../lib/text-decode")');
+    expect(source).toContain("readFileStrictUtf8");
   });
 
-  it("applies stripBom at every fs.readFile call site that returns content", () => {
-    // Each fs.readFile in the file is wrapped in stripBom(...)
-    const readFileCalls = source.match(/fs\.readFile\([^)]+\)/g) ?? [];
-    expect(readFileCalls.length).toBeGreaterThanOrEqual(3);
-    for (const call of readFileCalls) {
-      // The call itself appears inside stripBom(...) — check surrounding context
-      const idx = source.indexOf(call);
-      const before = source.slice(Math.max(0, idx - 20), idx);
-      expect(before).toContain("stripBom(");
-    }
+  it("reads document content via readFileStrictUtf8, never lossy fs.readFile(..., utf-8)", () => {
+    // The lossy string read is the bug (#1888): it must not return content.
+    expect(source).not.toMatch(/fs\.readFile\([^)]*["']utf-8["']\)/);
+
+    // Every manuscript-open site uses the strict helper. There are three:
+    // system open, dialog open, and pending-file drain.
+    const strictReads = source.match(/readFileStrictUtf8\(/g) ?? [];
+    expect(strictReads.length).toBeGreaterThanOrEqual(3);
   });
 });

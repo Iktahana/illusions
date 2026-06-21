@@ -69,6 +69,12 @@ export interface UseTabManagerReturn {
    * Used by diff tab conflict resolution to update source tab content.
    */
   updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
+  /**
+   * Set content on any tab by id, correctly recomputing isDirty.
+   * Unlike updateTab() (shallow merge that skips dirty recomputation),
+   * this helper is safe for background/popout content sync.
+   */
+  setTabContent: (tabId: TabId, newContent: string) => void;
 
   // Close-tab unsaved warning flow
   pendingCloseTabId: TabId | null;
@@ -133,8 +139,9 @@ export function generateTabId(): TabId {
 }
 
 export function inferFileType(fileName: string): SupportedFileExtension {
-  if (fileName.endsWith(".md")) return ".md";
-  if (fileName.endsWith(".txt")) return ".txt";
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith(".md")) return ".md";
+  if (lower.endsWith(".txt")) return ".txt";
   return ".mdi";
 }
 
@@ -148,9 +155,10 @@ export function inferFileType(fileName: string): SupportedFileExtension {
  * HTML tag stripping) lives in
  * `@/packages/milkdown-plugin-japanese-novel/mdi-document`.
  *
- * @param options.fileType - When ".mdi", standalone `<br />` lines become
- *   `[[blank]]` markers and serializer-escaped bracket macros are recovered.
- *   For all other file types (or when omitted), those steps are skipped.
+ * @param options.fileType - Serializer-escaped bracket macros (`\[\[blank]]` →
+ *   `[[blank]]`) are recovered for ".mdi", ".md", and ".txt" (byte-preservation,
+ *   issue #1916). Standalone `<br />` → `[[blank]]` conversion applies to ".mdi"
+ *   only. For omitted fileType both steps are skipped.
  */
 export function sanitizeMdiContent(
   content: string,

@@ -135,14 +135,20 @@ function installMdiInlinePlugin(md: MarkdownIt): void {
  * html is disabled to prevent user-authored HTML (e.g. <script>, <img onerror>)
  * from being passed through. Safe MDI-generated HTML (ruby, span, br) is emitted
  * only from the custom MDI inline tokenizer.
+ *
+ * @param mdiInlineRules - When true (default), install the MDI inline rules
+ *   (ruby, tcy, no-break, kern, break). Set to false for non-.mdi files so
+ *   literal `[[no-break:…]]` / `[[kern:…]]` are not converted to spans (#1918).
  */
-function createMarkdownIt(): MarkdownIt {
+function createMarkdownIt(mdiInlineRules: boolean = true): MarkdownIt {
   const md = new MarkdownIt({
     html: false,
     breaks: true,
   });
 
-  installMdiInlinePlugin(md);
+  if (mdiInlineRules) {
+    installMdiInlinePlugin(md);
+  }
 
   return md;
 }
@@ -163,6 +169,25 @@ export interface MdiStylesheetOptions {
   pageSize?: ExportPageSize;
   /** Landscape orientation for @page CSS rule */
   landscape?: boolean;
+  /**
+   * Embed page numbers via CSS @page margin boxes.
+   * When true, a CSS counter-based page number is added to the @page rule.
+   * This works for both printToPDF and webContents.print().
+   */
+  showPageNumbers?: boolean;
+  /** Page number display format: plain number, dashes, or fraction */
+  pageNumberFormat?: "simple" | "dash" | "fraction";
+  /**
+   * Position of the page number in the page margin.
+   * Maps to the CSS @page named margin box (e.g. @bottom-center).
+   */
+  pageNumberPosition?:
+    | "bottom-left"
+    | "bottom-center"
+    | "bottom-right"
+    | "top-left"
+    | "top-center"
+    | "top-right";
 }
 
 /**
@@ -225,6 +250,43 @@ export function getMdiStylesheet(options?: MdiStylesheetOptions): string {
     rules.push(`@page { ${pageDecls.join("; ")}; }`);
   }
 
+  // CSS @page margin-box page numbers.
+  // This embeds page numbers directly in the HTML so that both printToPDF and
+  // webContents.print() render the same output (the Electron header/footer
+  // template API is only available for printToPDF, not webContents.print).
+  if (options?.showPageNumbers) {
+    const format = options.pageNumberFormat ?? "simple";
+    const position = options.pageNumberPosition ?? "bottom-center";
+
+    // Map position string → CSS @page named margin box
+    // See https://www.w3.org/TR/css-page-3/#margin-boxes
+    const marginBoxMap: Record<string, string> = {
+      "bottom-left": "@bottom-left",
+      "bottom-center": "@bottom-center",
+      "bottom-right": "@bottom-right",
+      "top-left": "@top-left",
+      "top-center": "@top-center",
+      "top-right": "@top-right",
+    };
+    const marginBox = marginBoxMap[position] ?? "@bottom-center";
+
+    // Build the CSS `content` value for the chosen format
+    let contentValue: string;
+    switch (format) {
+      case "dash":
+        contentValue = '"- " counter(page) " -"';
+        break;
+      case "fraction":
+        contentValue = 'counter(page) " / " counter(pages)';
+        break;
+      default:
+        contentValue = "counter(page)";
+        break;
+    }
+
+    rules.push(`@page { ${marginBox} { content: ${contentValue}; font-size: 8pt; color: #666; } }`);
+  }
+
   return rules.join("\n");
 }
 
@@ -236,6 +298,7 @@ export function getMdiStylesheet(options?: MdiStylesheetOptions): string {
  * @param options.verticalWriting - Enable vertical writing mode
  * @param options.bodyOnly - If true, return only the inner HTML content without document wrapper
  * @param options.typesetting - PDF typesetting options forwarded to getMdiStylesheet()
+ * @param options.pageNumbers - Page number CSS embedding options forwarded to getMdiStylesheet()
  * @returns Complete HTML document string, or body content if bodyOnly is true
  */
 export function mdiToHtml(
@@ -261,29 +324,51 @@ export function mdiToHtml(
      * double indentation. Blank ([[blank]]) paragraphs are left untouched.
      */
     fullwidthSpaceIndentCount?: number;
+    /**
+     * Embed page numbers via CSS @page margin boxes.
+     * Works for both printToPDF and webContents.print() (unlike Electron's
+     * headerTemplate/footerTemplate which is only available for printToPDF).
+     */
+    pageNumbers?: {
+      show: boolean;
+      format?: "simple" | "dash" | "fraction";
+      position?:
+        | "bottom-left"
+        | "bottom-center"
+        | "bottom-right"
+        | "top-left"
+        | "top-center"
+        | "top-right";
+    };
   },
 ): string {
-  const md = createMarkdownIt();
+  const fileType = options?.fileType ?? ".mdi";
+  const isMdi = fileType === ".mdi";
+  // For non-.mdi files, skip MDI inline rules so literal [[no-break:…]] / [[kern:…]]
+  // etc. are not converted to spans — they are authored text, not macros (#1918).
+  const md = createMarkdownIt(isMdi);
   // Normalize editor-serialized output into canonical MDI text before rendering.
   // The Milkdown serializer escapes the leading `[` of MDI macros to `\[`; without
   // this, MDI_BLANK_RE (and the inline macro rules) never match and `[[blank]]`
   // leaks as literal text into PDF/EPUB/print output. TXT/DOCX already normalize
   // this way via MdiDocument — this brings the HTML pipeline to parity.
-  const fileType = options?.fileType ?? ".mdi";
-  const rawNormalized =
-    fileType === ".mdi"
-      ? MdiDocument.fromEditorOutput(markdown, { fileType: ".mdi" }).toRawText()
-      : MdiDocument.fromRawText(markdown).toRawText();
+  const rawNormalized = isMdi
+    ? MdiDocument.fromEditorOutput(markdown, { fileType: ".mdi" }).toRawText()
+    : MdiDocument.fromRawText(markdown).toRawText();
   // Promote author-intentional blank lines (Enter-key empty paragraphs, no
   // [[blank]] macro) into explicit [[blank]] markers so markdown-it does not
   // collapse them — TXT already preserves these, this brings HTML/PDF/EPUB to
   // parity (#1826). Scoped to ".mdi": .md/.txt keep CommonMark collapse and the
   // DATA-LOSS guard (#1608). Markers feed the existing sentinel path below.
-  const normalized = fileType === ".mdi" ? promoteBlankRunsToMarkers(rawNormalized) : rawNormalized;
+  const normalized = isMdi ? promoteBlankRunsToMarkers(rawNormalized) : rawNormalized;
   // Pre-process: replace [[blank]] paragraph markers with a U+E000 PUA sentinel.
+  // For non-.mdi files, skip this — [[blank]] is authored literal text and must
+  // not be silently removed (#1918).
   // markdown-it will wrap the sentinel in <p>…</p>; we swap it for an empty <p></p> after rendering.
   const BLANK_SENTINEL = "";
-  const preprocessed = normalized.replace(new RegExp(MDI_BLANK_RE.source, "gm"), BLANK_SENTINEL);
+  const preprocessed = isMdi
+    ? normalized.replace(new RegExp(MDI_BLANK_RE.source, "gm"), BLANK_SENTINEL)
+    : normalized;
   const rawHtml = md.render(preprocessed);
   // Replace the sentinel paragraph with a true empty paragraph. Then final-sweep any
   // remaining sentinel that escaped the <p>…</p> wrap (e.g. inside fenced code blocks
@@ -310,6 +395,15 @@ export function mdiToHtml(
   const stylesheet = getMdiStylesheet({
     verticalWriting: options?.verticalWriting,
     ...options?.typesetting,
+    // Page number options are injected as CSS @page margin boxes so both
+    // printToPDF and webContents.print() render the same page number output.
+    ...(options?.pageNumbers?.show
+      ? {
+          showPageNumbers: true,
+          pageNumberFormat: options.pageNumbers.format,
+          pageNumberPosition: options.pageNumbers.position,
+        }
+      : undefined),
   });
 
   // Build <meta> tags for optional metadata

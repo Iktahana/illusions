@@ -44,7 +44,7 @@ const { registerDictHandlers } = require("./ipc/dict-ipc");
 const { getDictManager } = require("./dict-manager");
 const { registerRulesetsHandlers } = require("./ipc/rulesets-ipc");
 const { getRulesetsManager } = require("./rulesets-manager");
-const { DICT_CHANNELS, POWER_CHANNELS } = require("./lib/ipc-channels");
+const { DICT_CHANNELS, POWER_CHANNELS, RULESETS_CHANNELS } = require("./lib/ipc-channels");
 
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
@@ -267,7 +267,22 @@ app.whenReady().then(async () => {
       const summary = await getRulesetsManager().syncAllOfficial();
       const installed = summary.filter((s) => s.status === "installed");
       if (installed.length > 0) {
-        console.log("[Rulesets] auto-sync installed:", installed.map((s) => s.id).join(", "));
+        const ids = installed.map((s) => s.id);
+        console.log("[Rulesets] auto-sync installed:", ids.join(", "));
+        // Notify every open renderer so its lint worker (re)loads the freshly
+        // installed rulesets WITHOUT an app restart. The interactive sync IPC
+        // handler emits the same event; this closes the gap on first launch
+        // where a newly-added ruleset would otherwise stay inactive until the
+        // next start (the mount-time syncLoadedRulesets had already run before
+        // this delayed download finished, and nothing re-signaled the renderer).
+        for (const win of BrowserWindow.getAllWindows()) {
+          if (!win.isDestroyed()) {
+            win.webContents.send(RULESETS_CHANNELS.event.changed, {
+              reason: "installed",
+              ids,
+            });
+          }
+        }
       }
     } catch (err) {
       console.warn("[Rulesets] auto-sync failed:", err);

@@ -46,6 +46,17 @@ describe("auto-updater.js — opt-in wiring", () => {
   it("opt-in 変更の即時反映 reevaluateUpdateChannel を公開する", () => {
     expect(autoUpdaterSrc).toMatch(/module\.exports\s*=\s*{[^}]*reevaluateUpdateChannel/);
   });
+
+  it("dev/alpha ビルドは app.getVersion() を純粋判定して auto-updater を無効化する", () => {
+    // 公開 Release を持たない dev/alpha 版で更新が走り、安定版/beta へ誤ダウングレード
+    // するのを防ぐ。純粋関数 isUnpublishedChannelVersion を app.getVersion() に適用する。
+    expect(autoUpdaterSrc).toMatch(/isUnpublishedChannelVersion\s*\(\s*app\.getVersion\(\)\s*\)/);
+    // setup と checkForUpdates と reevaluate の各所でガードに使われていること
+    expect(autoUpdaterSrc).toMatch(/if\s*\(\s*isUnpublishedChannelBuild\s*\)/);
+    expect(autoUpdaterSrc).toMatch(
+      /if\s*\(\s*isDev\s*\|\|\s*isUnpublishedChannelBuild\s*\|\|\s*isMicrosoftStoreApp\s*\)/,
+    );
+  });
 });
 
 describe("menu.js — 「アップデートを確認」導線", () => {
