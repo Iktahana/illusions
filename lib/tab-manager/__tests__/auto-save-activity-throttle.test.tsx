@@ -193,31 +193,41 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("#1466 — auto-save interval follows the power policy", () => {
-  it("switches 5s → 20s on blur and back to 5s on focus (power-save mode on)", async () => {
+  it("switches 5s → 20s on blur (M-4 immediate flush on increase) and back to 5s on focus (power-save mode on)", async () => {
     const harness = makeHarness(makeTab(), true);
     await mountHook(harness.params);
 
-    // Foreground: normal 5s interval
+    // Foreground: normal 5s interval fires once.
     await advance(AUTO_SAVE_INTERVAL);
     expect(harness.saveFile).toHaveBeenCalledTimes(1);
 
-    // Background: the timer is re-armed to 20s
+    // Background: M-4 flushes immediately on the 5s→20s interval increase,
+    // then the 20s timer fires once more at 20s.
     makeDirty(harness);
     await act(async () => {
       dispatchBlur();
     });
-    await advance(BACKGROUND_AUTO_SAVE_INTERVAL_MS - 1);
-    expect(harness.saveFile).toHaveBeenCalledTimes(1);
-    await advance(1);
+    // M-4 immediate flush on blur.
     expect(harness.saveFile).toHaveBeenCalledTimes(2);
 
-    // Focus regained: back to the normal 5s interval
+    // Tab is now clean; no further tick until 20s.
+    await advance(BACKGROUND_AUTO_SAVE_INTERVAL_MS - 1);
+    expect(harness.saveFile).toHaveBeenCalledTimes(2);
+
+    // 20s background tick fires.
+    makeDirty(harness);
+    // Advance the remaining 1ms to hit the 20s mark.
+    await advance(1);
+    expect(harness.saveFile).toHaveBeenCalledTimes(3);
+
+    // Focus regained: back to the normal 5s interval.
+    // (20s→5s is a DECREASE — no immediate flush on focus restore.)
     makeDirty(harness);
     await act(async () => {
       dispatchFocus();
     });
     await advance(AUTO_SAVE_INTERVAL);
-    expect(harness.saveFile).toHaveBeenCalledTimes(3);
+    expect(harness.saveFile).toHaveBeenCalledTimes(4);
   });
 
   it("does not throttle on blur when power-save mode is off", async () => {
@@ -231,35 +241,53 @@ describe("#1466 — auto-save interval follows the power policy", () => {
     expect(harness.saveFile).toHaveBeenCalledTimes(1);
   });
 
-  it("does not save dirty content early when blurred (no tick before 20s)", async () => {
-    const harness = makeHarness(makeTab(), true);
+  it("M-4: flushes immediately on blur (5s→20s interval increase), then waits 20s for the next tick", async () => {
+    // Tab starts clean so the initial foreground tick has nothing to save.
+    const harness = makeHarness(makeTab({ isDirty: false }), true);
     await mountHook(harness.params);
 
+    // Make dirty, then blur — M-4 must flush once immediately on the
+    // 5s→20s interval increase, before installing the 20s timer.
+    makeDirty(harness);
     await act(async () => {
       dispatchBlur();
     });
-    // Multiple 5s foreground periods pass without a tick
+    // Immediate M-4 flush: one save already fired synchronously on blur.
+    expect(harness.saveFile).toHaveBeenCalledTimes(1);
+
+    // Tab is now clean (the mock marks it clean). No further save within the
+    // next three foreground-equivalent periods.
     await advance(AUTO_SAVE_INTERVAL * 3);
-    expect(harness.saveFile).not.toHaveBeenCalled();
+    expect(harness.saveFile).toHaveBeenCalledTimes(1);
+
+    // Make dirty again; the 20s background tick fires exactly once at 20s.
+    makeDirty(harness);
+    await advance(BACKGROUND_AUTO_SAVE_INTERVAL_MS - AUTO_SAVE_INTERVAL * 3 - 1);
+    expect(harness.saveFile).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(harness.saveFile).toHaveBeenCalledTimes(2);
   });
 });
 
 describe("#1466 — focus round-trip preserves edits (#1445 symptom guard)", () => {
-  it("keeps the edited buffer intact across blur → background save → focus", async () => {
+  it("keeps the edited buffer intact across blur → M-4 flush → background save → focus", async () => {
     const harness = makeHarness(makeTab({ content: "initial content", isDirty: false }), true);
     await mountHook(harness.params);
 
-    // User edits, then the window is backgrounded mid-edit
+    // User edits, then the window is backgrounded mid-edit.
+    // M-4: blur triggers an immediate flush (5s→20s increase).
     makeDirty(harness, "edited while focused");
     await act(async () => {
       dispatchBlur();
     });
+    // M-4 immediate flush on blur.
+    expect(harness.saveFile).toHaveBeenCalledTimes(1);
 
-    // Edit continues in the background (e.g. dictation), then the throttled
-    // background save fires
+    // Tab is now clean. User continues editing in the background; the 20s
+    // background timer then fires.
     makeDirty(harness, "edited while blurred");
     await advance(BACKGROUND_AUTO_SAVE_INTERVAL_MS);
-    expect(harness.saveFile).toHaveBeenCalledTimes(1);
+    expect(harness.saveFile).toHaveBeenCalledTimes(2);
 
     await act(async () => {
       dispatchFocus();
@@ -267,6 +295,7 @@ describe("#1466 — focus round-trip preserves edits (#1445 symptom guard)", () 
     await advance(AUTO_SAVE_INTERVAL);
 
     // Content is exactly the user's edit — nothing reloaded or replaced it
+    // (the hook saves; it never writes back into the buffer).
     const after = harness.getTab("tab-1");
     expect(after.content).toBe("edited while blurred");
     expect(after.pendingExternalContent ?? null).toBeNull();

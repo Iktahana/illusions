@@ -25,6 +25,7 @@ const {
   NLP_CHANNELS,
   PTY_CHANNELS,
   UPDATE_CHANNELS,
+  RULESETS_CHANNELS,
 } = require("./lib/ipc-channels");
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -36,6 +37,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // 歴史的命名: flush 完了後にウィンドウを実際に閉じるためのシグナル。
   // Phase 2 で save 経路は消滅したが、close handshake の終端トリガとして引き続き利用する。
   saveDoneAndClose: invokeChannel(SYSTEM_CHANNELS.invoke.saveBeforeCloseDone, { arity: 0 }),
+  // #1839: tell main a requested close was aborted (save failed/conflict) so the
+  // quit-and-install flow stops waiting for a window that will not close.
+  notifyCloseAborted: sendChannel(SYSTEM_CHANNELS.send.closeAborted, { arity: 0 }),
   newWindow: invokeChannel(SYSTEM_CHANNELS.invoke.newWindow, { arity: 0 }),
   reevaluateUpdateChannel: invokeChannel(UPDATE_CHANNELS.invoke.reevaluateChannel, { arity: 0 }),
   openDictionaryPopup: invokeChannel(SHELL_CHANNELS.invoke.openDictionaryPopup, { arity: 2 }),
@@ -128,6 +132,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     setItem: invokeChannel(STORAGE_CHANNELS.invoke.setItem, { arity: 2 }),
     getItem: invokeChannel(STORAGE_CHANNELS.invoke.getItem, { arity: 1 }),
     removeItem: invokeChannel(STORAGE_CHANNELS.invoke.removeItem, { arity: 1 }),
+    getKeysByPrefix: invokeChannel(STORAGE_CHANNELS.invoke.getKeysByPrefix, { arity: 1 }),
   },
   vfs: {
     openDirectory: invokeChannel(VFS_CHANNELS.invoke.openDirectory, { arity: 0 }),
@@ -164,6 +169,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     // removeAllListeners, which nuked other components' listeners.)
     onPowerStateChange: eventChannel(POWER_CHANNELS.event.stateChanged),
     getPowerState: invokeChannel(POWER_CHANNELS.invoke.getState, { arity: 0 }),
+    /** Fires when the system wakes from sleep (M-1/M-2). */
+    onResume: eventChannel(POWER_CHANNELS.event.resumed),
+    /** Fires just before the system suspends (M-1/M-2). */
+    onSuspend: eventChannel(POWER_CHANNELS.event.suspended),
+    /** Fires when the screen is locked (macOS/Windows, M-5). */
+    onLockScreen: eventChannel(POWER_CHANNELS.event.lockScreen),
   },
   editor: {
     popoutPanel: invokeChannel(
@@ -197,6 +208,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
     download: invokeChannel(DICT_CHANNELS.invoke.download, { arity: 0 }),
     onDownloadProgress: eventChannel(DICT_CHANNELS.event.downloadProgress),
     onUpdateAvailable: eventChannel(DICT_CHANNELS.event.updateAvailable),
+  },
+  rulesets: {
+    /** List installed (downloaded) official/external rulesets on disk. */
+    listInstalled: invokeChannel(RULESETS_CHANNELS.invoke.listInstalled, { arity: 0 }),
+    /** Download/update every official ruleset that is missing or out of date. */
+    sync: invokeChannel(RULESETS_CHANNELS.invoke.sync, { arity: 0 }),
+    /** Check latest release tags vs installed, without downloading. */
+    checkUpdate: invokeChannel(RULESETS_CHANNELS.invoke.checkUpdate, { arity: 0 }),
+    /** Read a verified ruleset module (code + manifest) for the external loader. */
+    readModule: invokeChannel(RULESETS_CHANNELS.invoke.readModule, { arity: 1 }),
+    /** Uninstall a third-party ruleset (official/built-in are refused in main). */
+    uninstall: invokeChannel(RULESETS_CHANNELS.invoke.uninstall, { arity: 1 }),
+    /** Per-ruleset sync progress pushes. */
+    onSyncProgress: eventChannel(RULESETS_CHANNELS.event.syncProgress),
+    /** Announcement that installed rulesets changed (installed/updated/uninstalled). */
+    onChanged: eventChannel(RULESETS_CHANNELS.event.changed),
   },
   pty: {
     /** Spawn a new PTY session. Returns { sessionId } or { error }. */

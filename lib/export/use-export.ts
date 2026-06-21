@@ -5,6 +5,7 @@ import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { saveBlobFile } from "./save-blob-file";
 import { mdiToPlainText, mdiToRubyText } from "./txt-exporter";
+import type { TxtIndentOptions } from "./txt-exporter";
 import { openWebPrintPreview } from "./web-print-preview";
 import { loadExportSettings, toPdfExportSettings } from "./export-settings";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
@@ -37,6 +38,13 @@ interface UseExportParams {
     metadata: ExportMetadata,
   ) => void;
   onPrintDialogRequest?: (content: string, metadata: ExportMetadata) => void;
+  /**
+   * When provided, TXT / TXT(ruby) export first asks the user for 字下げ
+   * (full-width-space) options via a dialog. Resolves with the chosen options,
+   * or `null` if the user cancelled (export is then aborted). When omitted,
+   * TXT export runs directly with no indentation (legacy behavior).
+   */
+  onRequestTxtExportOptions?: (format: "txt" | "txt-ruby") => Promise<TxtIndentOptions | null>;
 }
 
 /**
@@ -50,6 +58,7 @@ export function useExport({
   getIsEditorTabActive,
   onExportDialogRequest,
   onPrintDialogRequest,
+  onRequestTxtExportOptions,
 }: UseExportParams): {
   exportAs: (format: ExportFormat) => Promise<void>;
   printDocument: () => void;
@@ -87,13 +96,24 @@ export function useExport({
 
       // TXT exports are client-side (no Electron IPC needed)
       if (format === "txt" || format === "txt-ruby") {
+        // Ask the user whether to apply full-width-space 字下げ. A null result
+        // means the dialog was cancelled — abort the export silently.
+        let indentOptions: TxtIndentOptions | undefined;
+        if (onRequestTxtExportOptions) {
+          const chosen = await onRequestTxtExportOptions(format);
+          if (chosen === null) return;
+          indentOptions = chosen;
+        }
+
         const progressId = notificationManager.showProgress(`${label}をエクスポート中...`, {
           type: "info",
         });
 
         try {
           const converted =
-            format === "txt" ? mdiToPlainText(content, fileType) : mdiToRubyText(content, fileType);
+            format === "txt"
+              ? mdiToPlainText(content, fileType, indentOptions)
+              : mdiToRubyText(content, fileType, indentOptions);
 
           const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
           const suffix = format === "txt-ruby" ? "_ruby" : "";
@@ -175,7 +195,15 @@ export function useExport({
         notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
       }
     },
-    [getContent, getTitle, getFileType, getIsEditorTabActive, isElectron, onExportDialogRequest],
+    [
+      getContent,
+      getTitle,
+      getFileType,
+      getIsEditorTabActive,
+      isElectron,
+      onExportDialogRequest,
+      onRequestTxtExportOptions,
+    ],
   );
 
   const printDocument = useCallback(() => {

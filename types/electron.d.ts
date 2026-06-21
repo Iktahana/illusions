@@ -30,6 +30,8 @@ declare global {
      * Phase 2: 保存経路を削除した後も flush 完了後の window destroy トリガとして利用。
      */
     saveDoneAndClose?: () => Promise<void>;
+    /** #1839: signal main that a requested close was aborted (save failed). */
+    notifyCloseAborted?: () => void;
     newWindow?: () => Promise<void>;
     /** beta opt-in トグル変更時にメインプロセスへ channel 再評価を依頼する */
     reevaluateUpdateChannel?: () => Promise<boolean>;
@@ -101,6 +103,7 @@ declare global {
           lineSpacing?: number;
           margins?: { top: number; bottom: number; left: number; right: number };
           textIndent?: number;
+          fullwidthSpaceIndent?: boolean;
           showPageNumbers?: boolean;
         };
         // Active tab's file type. The main-process generateDocx un-escapes MDI
@@ -178,6 +181,7 @@ declare global {
       setItem: (key: string, value: string) => Promise<void>;
       getItem: (key: string) => Promise<string | null>;
       removeItem: (key: string) => Promise<void>;
+      getKeysByPrefix: (prefix: string) => Promise<string[]>;
     };
     nlp?: {
       /**
@@ -260,6 +264,21 @@ declare global {
       onPowerStateChange: (callback: (state: "ac" | "battery") => void) => () => void;
       /** Get current power state */
       getPowerState: () => Promise<"ac" | "battery">;
+      /**
+       * Fires when the system wakes from sleep (M-1/M-2 resume re-arm).
+       * Returns an unsubscribe function.
+       */
+      onResume: (callback: () => void) => () => void;
+      /**
+       * Fires just before the system suspends (M-1/M-2 suspend signal).
+       * Returns an unsubscribe function.
+       */
+      onSuspend: (callback: () => void) => () => void;
+      /**
+       * Fires when the screen is locked (macOS/Windows only, M-5 flush).
+       * Returns an unsubscribe function.
+       */
+      onLockScreen: (callback: () => void) => () => void;
     };
     /** Split editor popout window IPC */
     editor?: {
@@ -320,6 +339,56 @@ declare global {
       /** Subscribe to update-available notifications pushed from main process. */
       onUpdateAvailable: (
         callback: (data: { latestVersion: string; updateAvailable: boolean }) => void,
+      ) => () => void;
+    };
+    /** Official校正ルールセットの自動ダウンロード/更新（Electronのみ） */
+    rulesets?: {
+      /** List installed (downloaded) official/external rulesets on disk. */
+      listInstalled: () => Promise<
+        Array<{ id: string; version: string | null; tag: string | null }>
+      >;
+      /** Download/update every official ruleset that is missing or out of date. */
+      sync: () => Promise<
+        Array<{
+          id: string;
+          status: "installed" | "up-to-date" | "skipped" | "error";
+          detail?: string;
+        }>
+      >;
+      /** Check latest release tags vs installed, without downloading. */
+      checkUpdate: () => Promise<
+        Array<{
+          id: string;
+          installedTag?: string | null;
+          latestTag?: string | null;
+          hasRelease?: boolean;
+          updateAvailable?: boolean;
+          error?: string;
+        }>
+      >;
+      /**
+       * Read an installed ruleset's verified module code + manifest for the
+       * external loader. Re-verifies the code sha256 recorded at install.
+       */
+      readModule: (
+        id: string,
+      ) => Promise<
+        | { ok: true; id: string; tag: string | null; manifest: unknown; code: string }
+        | { ok: false; id: string; reason: string }
+      >;
+      /** Uninstall a third-party ruleset (official/built-in recommended are refused). */
+      uninstall: (id: string) => Promise<{ ok: boolean; detail?: string }>;
+      /** Subscribe to per-ruleset sync progress. Returns an unsubscribe fn. */
+      onSyncProgress: (
+        cb: (data: {
+          id: string;
+          status: "installed" | "up-to-date" | "skipped" | "error";
+          detail?: string;
+        }) => void,
+      ) => () => void;
+      /** Subscribe to installed-ruleset change announcements. Returns an unsubscribe fn. */
+      onChanged: (
+        cb: (data: { reason: "installed" | "updated" | "uninstalled"; ids: string[] }) => void,
       ) => () => void;
     };
     /** PTY session management */

@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * VFS IPC handlers for Electron
  * Provides file system operations for the renderer process

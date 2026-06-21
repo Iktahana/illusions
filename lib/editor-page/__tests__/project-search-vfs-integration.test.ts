@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { searchProjectFiles } from "@/lib/editor-page/project-search";
-import { ElectronVFS } from "@/lib/vfs/electron-vfs";
-import { WebVFS } from "@/lib/vfs/web-vfs";
+import { WebVFS } from "@/platform/browser/vfs";
+import { ElectronVFS } from "@/platform/electron-renderer/vfs";
 
 interface FakeNativeEntry {
   name: string;

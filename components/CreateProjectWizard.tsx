@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { FolderPlus, Check, Loader2, AlertCircle, ChevronDown } from "lucide-react";
 import { getProjectService, validateProjectName } from "@/lib/project/project-service";
-import GlassDialog from "@/components/GlassDialog";
+import GlassDialog from "@/shared/ui/GlassDialog";
 
 import type { ProjectMode, SupportedFileExtension } from "@/lib/project/project-types";
 
@@ -141,6 +141,8 @@ export default function CreateProjectWizard({
   const handleNameKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter" && projectName.trim() !== "") {
+        // Ignore IME composition confirmation — only handle real Enter
+        if (e.nativeEvent.isComposing || e.keyCode === 229) return;
         void handleCreate();
       }
     },

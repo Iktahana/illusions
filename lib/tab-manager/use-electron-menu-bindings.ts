@@ -5,6 +5,7 @@ import { getProjectFileService } from "../services/project-file-service";
 import { notificationManager } from "../services/notification-manager";
 import { executeTabSave } from "./save-executor";
 import { isEditorTab } from "./tab-types";
+import { getErrorMessage } from "./types";
 import type { SnapshotType } from "../services/history-policy";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, EditorTabState } from "./tab-types";
@@ -31,6 +32,12 @@ export interface UseElectronMenuBindingsParams extends TabManagerCore {
   systemFileOpenHandlerRef: React.MutableRefObject<
     ((path: string, content: string) => void) | null
   >;
+  /**
+   * Ref holding the active editor's on-demand live-content flush (#1840).
+   * Used to flush the active tab before the quit-and-install save path so it
+   * does not persist debounce-lagged content (review Finding 1).
+   */
+  flushActiveEditorRef?: React.MutableRefObject<(() => string | null) | null>;
   /** Immediately flush pending tab state to storage. */
   flushTabState?: () => Promise<void>;
   /** Immediately flush pending dockview layout to storage. */
@@ -74,6 +81,7 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     loadSystemFile,
     updateTab,
     systemFileOpenHandlerRef,
+    flushActiveEditorRef,
     flushTabState,
     flushLayoutState,
     tryCreateSnapshot,
@@ -109,68 +117,98 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     if (!isElectron || !window.electronAPI?.onSaveBeforeClose) return;
 
     const cleanup = window.electronAPI.onSaveBeforeClose(async () => {
-      // Flush debounced persistence state before saving files
-      await Promise.all([flushTabStateRef.current?.(), flushLayoutStateRef.current?.()]);
+      // #1839 (review Finding 3): if anything in here throws before we signal
+      // main, the quit-and-install flow would hang forever. Wrap the whole body
+      // and fall back to notifyCloseAborted on error (quit cancelled, data safe).
+      try {
+        // Flush debounced persistence state before saving files
+        await Promise.all([flushTabStateRef.current?.(), flushLayoutStateRef.current?.()]);
 
-      let anyFailed = false;
+        let anyFailed = false;
+        // #1840 (review Finding 1): flush the active editor's live content so the
+        // quit-save path doesn't persist debounce-lagged content.
+        const flush = flushActiveEditorRef?.current ?? null;
 
-      for (const tab of tabsRef.current) {
-        if (!isEditorTab(tab)) continue;
-        if (!tab.isDirty) continue;
-        // Block save if tab has unresolved external conflict
-        if (tab.fileSyncStatus === "conflicted") {
-          notificationManager.warning(
-            `「${tab.file?.name ?? "無題"}」のファイルが外部で変更されています。コンフリクトを解決してから保存してください。`,
-          );
-          anyFailed = true;
-          continue;
-        }
-
-        // New unsaved document: the executor shows the Save As dialog so the
-        // user can give it a path. Cancelling aborts the window close.
-        const isNewDocument = !tab.file;
-
-        const outcome = await executeTabSave({
-          tab,
-          isProject: isProjectRef.current,
-          tabsRef,
-          setTabs,
-          tryCreateSnapshot: tryCreateSnapshotRef.current ?? (async () => {}),
-          // B1 fix: window close "保存" → "pre-close" snapshot type.
-          // New documents get no snapshot (matches pre-refactor behavior).
-          snapshotType: isNewDocument ? undefined : "pre-close",
-          // Pre-close snapshots fall back to the file name when no path exists
-          snapshotPathFallback: "name",
-          // Already-titled tabs get no tab-state update — the window is about
-          // to close. New documents do: the newly-assigned file descriptor
-          // must be written back so flushTabState persists the saved path.
-          updateTabState: isNewDocument,
-        });
-
-        if (outcome.status === "saved") {
-          if (isNewDocument) {
-            // Re-flush so the persisted session reflects the new file path.
-            await flushTabStateRef.current?.();
+        for (const tab of tabsRef.current) {
+          if (!isEditorTab(tab)) continue;
+          if (!tab.isDirty) continue;
+          // Block save if tab has unresolved external conflict
+          if (tab.fileSyncStatus === "conflicted") {
+            notificationManager.warning(
+              `「${tab.file?.name ?? "無題"}」のファイルが外部で変更されています。コンフリクトを解決してから保存してください。`,
+            );
+            anyFailed = true;
+            continue;
           }
-          continue;
+
+          // New unsaved document: the executor shows the Save As dialog so the
+          // user can give it a path. Cancelling aborts the window close.
+          const isNewDocument = !tab.file;
+
+          // Active tab: override with the live (flushed) content. flush() returns
+          // null on empty-remount transients, so we fall back to tab.content.
+          let tabToSave = tab;
+          if (tab.id === activeTabIdRef.current && flush) {
+            const live = flush();
+            if (live != null && live !== tab.content) {
+              tabToSave = { ...tab, content: live };
+            }
+          }
+
+          const outcome = await executeTabSave({
+            tab: tabToSave,
+            isProject: isProjectRef.current,
+            tabsRef,
+            setTabs,
+            tryCreateSnapshot: tryCreateSnapshotRef.current ?? (async () => {}),
+            // B1 fix: window close "保存" → "pre-close" snapshot type.
+            // New documents get no snapshot (matches pre-refactor behavior).
+            snapshotType: isNewDocument ? undefined : "pre-close",
+            // Pre-close snapshots fall back to the file name when no path exists
+            snapshotPathFallback: "name",
+            // Already-titled tabs get no tab-state update — the window is about
+            // to close. New documents do: the newly-assigned file descriptor
+            // must be written back so flushTabState persists the saved path.
+            updateTabState: isNewDocument,
+          });
+
+          if (outcome.status === "saved") {
+            if (isNewDocument) {
+              // Re-flush so the persisted session reflects the new file path.
+              await flushTabStateRef.current?.();
+            }
+            continue;
+          }
+
+          // "cancelled" / "failed" / "locked" / "conflicted" / "skipped":
+          // the content was not (or may not have been) written — abort close.
+          if (outcome.status === "failed") {
+            console.error(`保存に失敗しました (${tab.file?.name ?? "無題"}):`, outcome.error);
+            notificationManager.error(
+              `保存に失敗しました: ${getErrorMessage(outcome.error)}（アプリは終了しません）`,
+            );
+          }
+          anyFailed = true;
         }
 
-        // "cancelled" / "failed" / "locked" / "conflicted" / "skipped":
-        // the content was not (or may not have been) written — abort close.
-        if (outcome.status === "failed") {
-          console.error(`保存に失敗しました (${tab.file?.name ?? "無題"}):`, outcome.error);
+        // Only close if every save succeeded; otherwise leave the window open.
+        if (!anyFailed) {
+          await window.electronAPI?.saveDoneAndClose?.();
+        } else {
+          // #1839: signal main that this close was aborted (save failed/conflict)
+          // so the quit-and-install flow stops waiting for a window that will not
+          // close, instead of hanging the update.
+          window.electronAPI?.notifyCloseAborted?.();
         }
-        anyFailed = true;
-      }
-
-      // Only close if every save succeeded; otherwise leave the window open.
-      if (!anyFailed) {
-        await window.electronAPI?.saveDoneAndClose?.();
+      } catch (err) {
+        console.error("終了前の保存処理でエラーが発生しました:", err);
+        // Never leave main hanging: abort the close (window stays, data safe).
+        window.electronAPI?.notifyCloseAborted?.();
       }
     });
 
     return cleanup;
-  }, [isElectron, tabsRef, isProjectRef, setTabs]);
+  }, [isElectron, tabsRef, activeTabIdRef, flushActiveEditorRef, isProjectRef, setTabs]);
 
   // Flush tab/layout state before close (without saving dirty files)
   // This handles: clean close, and "Don't Save" in dirty dialog
@@ -178,7 +216,13 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
     if (!isElectron || !window.electronAPI?.onFlushStateBeforeClose) return;
 
     const cleanup = window.electronAPI.onFlushStateBeforeClose(async () => {
-      await Promise.all([flushTabStateRef.current?.(), flushLayoutStateRef.current?.()]);
+      // #1839 (review Finding 4): a flush failure must not prevent the close
+      // handshake from completing, or main hangs. State flush is non-fatal here.
+      try {
+        await Promise.all([flushTabStateRef.current?.(), flushLayoutStateRef.current?.()]);
+      } catch (err) {
+        console.error("終了前の状態フラッシュでエラーが発生しました:", err);
+      }
       await window.electronAPI?.saveDoneAndClose?.();
     });
 

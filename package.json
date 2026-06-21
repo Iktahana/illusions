@@ -17,6 +17,7 @@
     "build": "npm run type-check && npm run generate:credits && next build",
     "start": "next start",
     "lint": "eslint .",
+    "check:boundaries": "node scripts/check-import-boundaries.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
     "prepare": "husky",
@@ -30,6 +31,7 @@
     "test:coverage": "vitest run --coverage",
     "generate:credits": "npx tsx scripts/generate-credits.ts",
     "generate:store-assets": "node scripts/generate-store-assets.mjs",
+    "clean:local": "node scripts/clean-local-artifacts.mjs",
     "postinstall": "node -e \"if(!process.env.VERCEL){require('child_process').execSync('electron-builder install-app-deps',{stdio:'inherit'})}\""
   },
   "dependencies": {

@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Search, X, ChevronUp, ChevronDown, List } from "lucide-react";
-import { computeAnchorPos } from "@/lib/search-dialog/compute-anchor-pos";
+import { computeAnchorPos, clampDragPos } from "@/lib/search-dialog/compute-anchor-pos";
 import type { SearchMatch } from "@/lib/editor-page/find-search-matches";
 
 const DIALOG_WIDTH = 320; // w-80 と一致させる
@@ -93,6 +93,38 @@ export default function SearchDialog({
     }
   }, [isOpen]);
 
+  // ウィンドウリサイズ時にドラッグ位置を再クランプし、ダイアログが
+  // 操作不能な位置に取り残されないようにする。
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleResize = () => {
+      setDragOffset((prev) => {
+        if (prev === null) return prev;
+        const dialogEl = dialogRef.current;
+        const dialogSize = dialogEl
+          ? { width: dialogEl.offsetWidth, height: dialogEl.offsetHeight }
+          : { width: DIALOG_WIDTH, height: 0 };
+        return clampDragPos(prev, dialogSize, window.innerWidth, window.innerHeight);
+      });
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isOpen]);
+
+  // ダイアログが開いている間はグローバル keydown で Escape を捕捉する。
+  // dialog の onKeyDown だけだとフォーカスがエディタ側に移った後に Escape が
+  // 効かなくなるため、document レベルで補完する。
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [isOpen, onClose]);
+
   const handleDragMouseDown = useCallback((e: React.MouseEvent) => {
     // Don't initiate drag from interactive elements
     if ((e.target as HTMLElement).closest("button, input, label, a")) return;
@@ -115,7 +147,12 @@ export default function SearchDialog({
       }
       const dx = ev.clientX - dragStart.current.mouseX;
       const dy = ev.clientY - dragStart.current.mouseY;
-      setDragOffset({ x: dragStart.current.elX + dx, y: dragStart.current.elY + dy });
+      const rawPos = { x: dragStart.current.elX + dx, y: dragStart.current.elY + dy };
+      const dialogEl = dialogRef.current;
+      const dialogSize = dialogEl
+        ? { width: dialogEl.offsetWidth, height: dialogEl.offsetHeight }
+        : { width: DIALOG_WIDTH, height: 0 };
+      setDragOffset(clampDragPos(rawPos, dialogSize, window.innerWidth, window.innerHeight));
     };
 
     const handleMouseUp = () => {
@@ -153,6 +190,8 @@ export default function SearchDialog({
     if (e.key === "Escape") {
       onClose();
     } else if (e.key === "Enter") {
+      // Ignore IME composition confirmation — only handle real Enter
+      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
       if (e.shiftKey) {
         goToPreviousMatch();
       } else {

@@ -6,11 +6,13 @@
  * Coverage:
  * - loadIndex / saveIndex round-trip
  * - loadIndex returns default index when file does not exist
+ * - loadIndex: corrupt index.json is backed up and regenerated (Issue #1844 / T-3)
  * - writeSnapshotFile + readSnapshotFile round-trip
  * - deleteSnapshotFile
  * - ensureHistoryDir creates .illusions/history/
  * - loadBookmarks / saveBookmarks round-trip
  * - loadBookmarks returns empty Set when file does not exist
+ * - loadBookmarks: corrupt bookmarks file returns empty Set without throwing
  * - withIndexLock: in-process AsyncMutex serializes concurrent operations
  * - withIndexLock: calls IPC indexLockAcquire/Release in Electron renderer
  * - acquireBookmarkLock: serializes concurrent bookmark operations
@@ -26,6 +28,12 @@ import type { VFSDirectoryHandle, VFSFileHandle } from "@/lib/vfs/types";
 
 /** Flat map of full path → content */
 const fileStore = new Map<string, string>();
+
+/**
+ * Test hook: when set, called at the start of getFileHandle. Throwing from it
+ * simulates a getFileHandle/backup failure for specific file names (Codex F-07).
+ */
+let getFileHandleHook: ((fileName: string, options?: { create?: boolean }) => void) | null = null;
 
 function createMockFileHandle(name: string, dirPath: string): VFSFileHandle {
   const fullPath = dirPath ? `${dirPath}/${name}` : name;
@@ -52,6 +60,7 @@ function createMockDirectoryHandle(name: string, path: string): VFSDirectoryHand
     path,
     getFileHandle: vi.fn(
       async (fileName: string, options?: { create?: boolean }): Promise<VFSFileHandle> => {
+        getFileHandleHook?.(fileName, options);
         const fullPath = path ? `${path}/${fileName}` : fileName;
         if (!fileStore.has(fullPath) && !options?.create) {
           throw new Error(`File not found: ${fullPath}`);
@@ -106,6 +115,7 @@ describe("HistoryStore", () => {
 
   beforeEach(() => {
     fileStore.clear();
+    getFileHandleHook = null;
     store = new HistoryStore();
     vi.unstubAllGlobals();
   });
@@ -147,6 +157,86 @@ describe("HistoryStore", () => {
       const result = await store.loadIndex();
       expect(result.snapshots).toHaveLength(1);
       expect(result.snapshots[0].id).toBe("a");
+    });
+
+    // Issue #1844 / T-3: corrupt index.json must self-heal (backup → regenerate)
+    it("backs up corrupt index.json (timestamped) and returns/regenerates a default index", async () => {
+      const corruptContent = "NOT_VALID_JSON{{{";
+      fileStore.set(".illusions/history/index.json", corruptContent);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const result = await store.loadIndex();
+
+      // Returns a clean default index
+      expect(result.snapshots).toEqual([]);
+      expect(result.maxSnapshots).toBe(100);
+
+      // A timestamped backup file was created with the original corrupt content
+      // (Codex F-07: generational name instead of fixed .corrupt.bak).
+      const backupKey = [...fileStore.keys()].find((k) =>
+        /\.illusions\/history\/index\.json\.corrupt\.\d+\.bak$/.test(k),
+      );
+      expect(backupKey).toBeDefined();
+      expect(fileStore.get(backupKey!)).toBe(corruptContent);
+
+      // A fresh valid index.json was written (backup succeeded → regenerate)
+      const regeneratedKey = ".illusions/history/index.json";
+      const regenerated = JSON.parse(fileStore.get(regeneratedKey)!) as { snapshots: unknown[] };
+      expect(regenerated.snapshots).toEqual([]);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("index.json"),
+        expect.any(SyntaxError),
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    // Codex F-07: if the backup write fails, the corrupt index.json must NOT be
+    // overwritten (preserve snapshot metadata for manual recovery).
+    it("does NOT overwrite corrupt index.json when the backup write fails", async () => {
+      const corruptContent = "NOT_VALID_JSON{{{";
+      fileStore.set(".illusions/history/index.json", corruptContent);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      // Make creating the backup file throw.
+      getFileHandleHook = (fileName) => {
+        if (fileName.includes(".corrupt.")) {
+          throw new Error("backup failed");
+        }
+      };
+
+      const result = await store.loadIndex();
+
+      // Still returns an in-memory default so the app works this session
+      expect(result.snapshots).toEqual([]);
+
+      // The original corrupt index.json is preserved (NOT overwritten)
+      expect(fileStore.get(".illusions/history/index.json")).toBe(corruptContent);
+
+      // No backup was written
+      const backupKey = [...fileStore.keys()].find((k) => k.includes(".corrupt."));
+      expect(backupKey).toBeUndefined();
+
+      expect(errorSpy).toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+
+    it("a second loadIndex after corruption succeeds and returns valid index", async () => {
+      fileStore.set(".illusions/history/index.json", "CORRUPT");
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      // First call: corrupt → default returned, index.json regenerated
+      const first = await store.loadIndex();
+      expect(first.snapshots).toEqual([]);
+
+      // Second call: index.json is now valid JSON written by saveIndex inside loadIndex
+      vi.restoreAllMocks(); // stop suppressing warn so second call warns if unexpected
+      const second = await store.loadIndex();
+      expect(second.snapshots).toEqual([]);
     });
   });
 
@@ -248,6 +338,22 @@ describe("HistoryStore", () => {
       const bm = await store.loadBookmarks();
       expect(bm.size).toBe(2);
       expect(bm.has("id1")).toBe(true);
+    });
+
+    // Issue #1844 / T-3: corrupt bookmarks must not throw
+    it("returns empty Set (no throw) when bookmarks file contains corrupt JSON", async () => {
+      fileStore.set(".illusions/history/.history_bookmarks.json", "NOT_JSON{{{{");
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const bm = await store.loadBookmarks();
+
+      expect(bm.size).toBe(0);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("bookmarks"),
+        expect.any(SyntaxError),
+      );
+
+      warnSpy.mockRestore();
     });
   });
 

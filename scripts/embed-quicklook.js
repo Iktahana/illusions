@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // electron-builder afterPack hook: embed AND code-sign the MDI Quick Look
 // Preview Extension (.appex) for the packaged macOS app.
 //

@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readTextWithEncoding, writeTextPreservingEol } from "../../utils/text-codec";
+import { readTextWithEncoding, writeTextPreservingEol } from "@/shared/lib/text-codec";
 
 // ---------------------------------------------------------------------------
 // Mock helpers

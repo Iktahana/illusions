@@ -1,10 +1,10 @@
-/* eslint-disable no-console */
 // Auto-updater setup and manual/automatic update checks
 
 const { app, dialog } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 const { isDev, isMicrosoftStoreApp } = require("./app-constants");
+const { resolveUpdaterFlags } = require("./lib/update-policy");
 
 // auto-updater のログ設定
 autoUpdater.logger = log;
@@ -32,10 +32,12 @@ async function applyBetaOptIn() {
   try {
     const { getStorageManager } = require("./ipc/storage-ipc");
     const appState = await getStorageManager().loadAppState();
-    const allowBeta = appState?.allowBetaUpdates === true;
-    autoUpdater.allowPrerelease = allowBeta;
-    autoUpdater.allowDowngrade = !allowBeta;
-    log.info(`アップデート設定: allowPrerelease=${allowBeta}, allowDowngrade=${!allowBeta}`);
+    const { allowPrerelease, allowDowngrade } = resolveUpdaterFlags(appState?.allowBetaUpdates);
+    autoUpdater.allowPrerelease = allowPrerelease;
+    autoUpdater.allowDowngrade = allowDowngrade;
+    log.info(
+      `アップデート設定: allowPrerelease=${allowPrerelease}, allowDowngrade=${allowDowngrade}`,
+    );
   } catch (e) {
     log.error("beta opt-in 設定の読み込みに失敗しました:", e);
   }
@@ -98,10 +100,17 @@ function setupAutoUpdater() {
           defaultId: 0,
           cancelId: 1,
         })
-        .then((result) => {
+        .then(async (result) => {
           if (result.response === 0) {
             // 「今すぐ再起動」
-            autoUpdater.quitAndInstall();
+            // before-quit-for-update は BrowserWindow の close イベントをスキップするため
+            // dirty ウィンドウがあっても保存ダイアログが表示されない (#1839)。
+            // quitAndInstall の前に全ウィンドウの未保存変更を自前で処理する。
+            const { saveAllBeforeQuitAndInstall } = require("./window-manager");
+            const shouldQuit = await saveAllBeforeQuitAndInstall();
+            if (shouldQuit) {
+              autoUpdater.quitAndInstall();
+            }
           }
         });
     }

@@ -575,8 +575,11 @@ export default function SearchResults({
             <OptionCheckbox
               label="選択範囲のみ"
               checked={selectionOnly}
-              onChange={onSelectionOnlyChange}
-              disabled={!hasSelection || scope !== "current"}
+              onChange={(checked) => {
+                if (checked && scope !== "current") setScope("current");
+                onSelectionOnlyChange(checked);
+              }}
+              disabled={!hasSelection}
             />
             {projectSearchEnabled && (
               <label className="flex items-center justify-between gap-2">

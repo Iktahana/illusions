@@ -60,6 +60,8 @@ interface EditorProps {
   externalContent?: string | null;
   /** Called after externalContent has been applied and scroll restored (best-effort). */
   onExternalContentApplied?: () => void;
+  /** Register an on-demand live-content flush used by save flows (#1840). */
+  registerFlush?: (flush: (() => string | null) | null) => void;
 }
 
 /** 検索を配線しない NovelEditor 用途向けの安定 no-op。 */
@@ -89,6 +91,7 @@ export default function NovelEditor({
   gfmEnabled = true,
   externalContent,
   onExternalContentApplied,
+  registerFlush,
 }: EditorProps) {
   const { fontScale, lineHeight, fontFamily, charsPerLine, autoCharsPerLine } =
     useTypographySettings();
@@ -554,6 +557,7 @@ export default function NovelEditor({
               externalContent={externalContent}
               onExternalContentApplied={onExternalContentApplied}
               onLayoutReady={handleLayoutReady}
+              registerFlush={registerFlush}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>

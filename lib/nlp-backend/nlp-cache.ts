@@ -7,7 +7,7 @@
 
 import crypto from "crypto";
 import type { Token } from "../nlp-client/types";
-import { LRUCache } from "../utils/lru-cache";
+import { LRUCache } from "@/shared/lib/lru-cache";
 
 const md5Hash = (text: string): string => crypto.createHash("md5").update(text).digest("hex");
 

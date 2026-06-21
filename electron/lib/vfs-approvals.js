@@ -23,7 +23,6 @@
 
 // #1476: rehydration — begin
 const fs = require("fs/promises");
-const path = require("path");
 
 /**
  * In-memory cache so we don't re-read the JSON file on every approval check.

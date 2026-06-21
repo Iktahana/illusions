@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // Application menu construction and management
 //
 // The menu structure (sections, items, labels, ordering, default

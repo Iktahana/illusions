@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // Electron のメインプロセス入口
 
 const { app, BrowserWindow, powerMonitor } = require("electron");
@@ -28,7 +27,7 @@ const { registerNlpHandlers } = require("./ipc/nlp-ipc");
 const { registerStorageHandlers, getStorageManager } = require("./ipc/storage-ipc");
 const { registerVFSHandlers } = require("./ipc/vfs-ipc");
 const { setupAutoUpdater, checkForUpdates } = require("./auto-updater");
-const { createMainWindow, broadcastPowerState } = require("./window-manager");
+const { createMainWindow, broadcastPowerState, broadcastPowerEvent } = require("./window-manager");
 const {
   handleMdiFileOpen,
   getPendingFilePath,
@@ -43,7 +42,9 @@ const { registerAuthHandlers, handleAuthCallback } = require("./ipc/auth-ipc");
 const { registerEditorHandlers } = require("./ipc/editor-ipc");
 const { registerDictHandlers } = require("./ipc/dict-ipc");
 const { getDictManager } = require("./dict-manager");
-const { DICT_CHANNELS } = require("./lib/ipc-channels");
+const { registerRulesetsHandlers } = require("./ipc/rulesets-ipc");
+const { getRulesetsManager } = require("./rulesets-manager");
+const { DICT_CHANNELS, POWER_CHANNELS } = require("./lib/ipc-channels");
 
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
@@ -165,7 +166,11 @@ app.whenReady().then(async () => {
         "Content-Security-Policy": [
           [
             "default-src 'self'",
-            `script-src 'self' 'unsafe-inline'${isDev && !app.isPackaged ? " 'unsafe-eval'" : ""}`,
+            // blob: は外部ルールセットを lint worker 内で ESM `import(blobURL)` する
+            // ために必要（dynamic import は worker-src ではなく script-src で評価される）。
+            // blob は同一オリジンのスクリプトからしか生成できず、ルールセットは
+            // sha256 検証済みコードのみを Blob 化するため XSS 面は限定的。
+            `script-src 'self' 'unsafe-inline' blob:${isDev && !app.isPackaged ? " 'unsafe-eval'" : ""}`,
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: blob: https:",
             "font-src 'self' data: https://fonts.gstatic.com",
@@ -202,10 +207,21 @@ app.whenReady().then(async () => {
   registerAuthHandlers();
   registerEditorHandlers();
   registerDictHandlers();
+  registerRulesetsHandlers();
 
   // Power state monitoring
   powerMonitor.on("on-ac", () => broadcastPowerState("ac"));
   powerMonitor.on("on-battery", () => broadcastPowerState("battery"));
+
+  // System lifecycle events (M-1/M-2 resume, M-5 lock-screen)
+  // "resume" fires after the system wakes from sleep; the renderer must
+  // re-arm its auto-save timer and flush dirty tabs immediately.
+  powerMonitor.on("resume", () => broadcastPowerEvent(POWER_CHANNELS.event.resumed));
+  // "suspend" fires just before sleep; renderer gets an early-warning signal.
+  powerMonitor.on("suspend", () => broadcastPowerEvent(POWER_CHANNELS.event.suspended));
+  // "lock-screen" fires when the user locks the screen (macOS/Windows only);
+  // the renderer must flush dirty tabs immediately.
+  powerMonitor.on("lock-screen", () => broadcastPowerEvent(POWER_CHANNELS.event.lockScreen));
 
   // ウィンドウ作成後に auto-updater を初期化
   setupAutoUpdater();
@@ -240,6 +256,23 @@ app.whenReady().then(async () => {
       console.error("[Dict] Auto update check failed:", err);
     }
   }, 5000);
+
+  // 公式校正ルールセットの自動ダウンロード/更新（同意不要・サイレント・best-effort）。
+  // 起動を妨げないよう遅延実行し、失敗は握りつぶす（オフライン等でも問題なし）。
+  // AppState の rulesetsAutoSync が明示的に false のときのみ無効化。
+  setTimeout(async () => {
+    try {
+      const appState = await getStorageManager().loadAppState();
+      if (appState?.rulesetsAutoSync === false) return;
+      const summary = await getRulesetsManager().syncAllOfficial();
+      const installed = summary.filter((s) => s.status === "installed");
+      if (installed.length > 0) {
+        console.log("[Rulesets] auto-sync installed:", installed.map((s) => s.id).join(", "));
+      }
+    } catch (err) {
+      console.warn("[Rulesets] auto-sync failed:", err);
+    }
+  }, 6000);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) void createMainWindow();

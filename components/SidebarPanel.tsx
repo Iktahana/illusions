@@ -1,7 +1,7 @@
 "use client";
 
 import Explorer, { FilesPanel } from "@/components/Explorer";
-import ErrorBoundary from "@/components/ErrorBoundary";
+import ErrorBoundary from "@/shared/ui/ErrorBoundary";
 import SearchResults from "@/components/SearchResults";
 import WordFrequency from "@/components/WordFrequency";
 import Characters from "@/components/Characters";

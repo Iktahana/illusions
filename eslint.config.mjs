@@ -2,6 +2,24 @@ import nextConfig from "eslint-config-next";
 import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
 import nextTypescript from "eslint-config-next/typescript";
 
+const nodeGlobals = {
+  __dirname: "readonly",
+  __filename: "readonly",
+  Buffer: "readonly",
+  console: "readonly",
+  exports: "writable",
+  global: "readonly",
+  module: "writable",
+  process: "readonly",
+  require: "readonly",
+  setImmediate: "readonly",
+  setInterval: "readonly",
+  setTimeout: "readonly",
+  clearInterval: "readonly",
+  clearTimeout: "readonly",
+  URL: "readonly",
+};
+
 /** @type {import("eslint").Linter.FlatConfig[]} */
 const config = [
   ...nextConfig,
@@ -21,6 +39,29 @@ const config = [
     },
   },
   {
+    files: ["electron/**/*.js", "scripts/**/*.js"],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: nodeGlobals,
+    },
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      sourceType: "module",
+      globals: nodeGlobals,
+    },
+  },
+  {
+    files: ["electron/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  {
     ignores: [
       "node_modules/**",
       ".next/**",
@@ -30,8 +71,6 @@ const config = [
       "build/**",
       "coverage/**",
       "public/**",
-      "electron/**",
-      "scripts/**",
     ],
   },
 ];

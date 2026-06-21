@@ -1,7 +1,14 @@
 "use client";
 
 import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
+import {
+  commandsCtx,
+  Editor,
+  rootCtx,
+  defaultValueCtx,
+  editorViewCtx,
+  serializerCtx,
+} from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import {
   commonmark,
@@ -79,6 +86,15 @@ interface MilkdownEditorProps {
   onExternalContentApplied?: () => void;
   /** Called after layout reflow completes (style application + browser paint). */
   onLayoutReady?: () => void;
+  /**
+   * Register an on-demand flush that synchronously serializes the *live*
+   * editor doc and returns it (#1840). The content update path
+   * (`markdownUpdated`) is debounced 200ms with no maxWait, so during
+   * continuous typing the parent's `tab.content` lags arbitrarily. Save flows
+   * call this right before persisting so they never write stale content.
+   * Called with the flush fn on mount and `null` on unmount.
+   */
+  registerFlush?: (flush: (() => string | null) | null) => void;
 }
 
 export default function MilkdownEditor({
@@ -105,6 +121,7 @@ export default function MilkdownEditor({
   externalContent,
   onExternalContentApplied,
   onLayoutReady,
+  registerFlush,
 }: MilkdownEditorProps) {
   const {
     fontScale,
@@ -134,6 +151,9 @@ export default function MilkdownEditor({
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
   // 初期内容はマウント時に固定（ファイル切り替えでコンポーネントが再マウントされたときだけ変わる）
   const initialContentRef = useRef<string>(initialContent);
+  // 最新コンテンツを追跡する。isVertical 切替でエディタが再構築されたとき、
+  // 未保存の変更を保持するために initialContentRef の代わりに使う（#426）。
+  const currentContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
   const onInsertTextRef = useRef(onInsertText);
   const onLintIssuesUpdatedRef = useRef(onLintIssuesUpdated);
@@ -191,7 +211,7 @@ export default function MilkdownEditor({
 
   const { get } = useEditor(
     (root) => {
-      const value = initialContentRef.current;
+      const value = currentContentRef.current;
       let editor = Editor.make()
         .config(nord)
         .config((ctx) => {
@@ -210,10 +230,13 @@ export default function MilkdownEditor({
               doc.forEach((node) => {
                 lines.push(node.textContent);
               });
-              onChangeRef.current?.(lines.join("\n"));
+              const content = lines.join("\n");
+              currentContentRef.current = content;
+              onChangeRef.current?.(content);
             });
           } else {
             ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
+              currentContentRef.current = markdown;
               onChangeRef.current?.(markdown);
             });
           }
@@ -350,6 +373,59 @@ export default function MilkdownEditor({
       console.warn("外部コンテンツの適用に失敗しました:", error);
     }
   }, [externalContent, get, isVertical, scrollContainerRef]);
+
+  // 保存直前にライブ doc を即時シリアライズして返す（#1840）。
+  // markdownUpdated は debounce(200ms, maxWait なし) のため、連続入力中は
+  // currentContentRef / 親の tab.content が古いままになる。保存経路はこの関数を
+  // 呼び、エディタの現在状態から content を再生成してから永続化する。
+  // per-keystroke ではなく保存時のみ呼ばれるので perf 影響はない。
+  const flushContent = useCallback((): string | null => {
+    const editor = get();
+    if (!editor) return null;
+    try {
+      let result: string | null = null;
+      editor.action((ctx) => {
+        const doc = ctx.get(editorViewCtx).state.doc;
+        if (isPlainText) {
+          // listener の plain-text 経路（行 = node.textContent）と同一ロジック。
+          const lines: string[] = [];
+          doc.forEach((node) => {
+            lines.push(node.textContent);
+          });
+          result = lines.join("\n");
+        } else {
+          result = ctx.get(serializerCtx)(doc);
+        }
+      });
+      // 注（#1840 / Codex F-01）: ここに来た時点で editor.action は editorViewCtx を
+      // 解決できている＝EditorView は ready。ready な view の doc は内容の単一の
+      // 真実なので、result === "" は「本当に空」を意味する（ユーザーの全削除など）。
+      // よって "" を異常値として弾かない。未 ready 時は上の ctx.get が throw して
+      // catch 節で null を返し、呼び出し側が既存 tab.content にフォールバックする。
+      // 再マウント過渡は registerFlush(null)（登録が一旦 null）でも保護される。
+      if (result != null && result !== currentContentRef.current) {
+        // ライブ値を ref と親 state に反映し、後続の isDirty 再計算も正しくする。
+        currentContentRef.current = result;
+        onChangeRef.current?.(result);
+      }
+      return result;
+    } catch (error) {
+      console.warn("コンテンツのフラッシュに失敗しました:", error);
+      return null;
+    }
+  }, [get, isPlainText]);
+
+  // flush を親へ登録/解除する（onEditorViewReady と同じ readiness パターン）。
+  // 非アクティブな dockview パネルは NovelEditor を描画しないため、マウント中の
+  // インスタンスは常にアクティブタブのエディタに対応する（last-wins で一致）。
+  const registerFlushRef = useRef(registerFlush);
+  registerFlushRef.current = registerFlush;
+  useEffect(() => {
+    registerFlushRef.current?.(flushContent);
+    return () => {
+      registerFlushRef.current?.(null);
+    };
+  }, [flushContent]);
 
   // posHighlight 設定を動的に更新（Editor を再作成せずに）。
   // enabled は power policy 由来の実効値（バックグラウンド中は停止、

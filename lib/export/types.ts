@@ -35,6 +35,8 @@ export interface PdfGenerationOptions {
     | "top-center"
     | "top-right";
   textIndent?: number;
+  /** Render 字下げ as literal full-width spaces (U+3000) instead of CSS text-indent. */
+  fullwidthSpaceIndent?: boolean;
   /** Google Font family name for PDF export (triggers <link> injection and CSP relaxation) */
   googleFontFamily?: string;
   /**

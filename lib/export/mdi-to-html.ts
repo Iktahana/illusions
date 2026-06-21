@@ -17,6 +17,7 @@ import {
   MDI_KERN_AMOUNT_RE,
   MDI_BLANK_RE,
   MdiDocument,
+  promoteBlankRunsToMarkers,
 } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import { PAGE_DIMENSIONS } from "./pdf-export-settings";
 
@@ -253,6 +254,13 @@ export function mdiToHtml(
      * authored literal (DATA-LOSS guard, see #1608). Absent → ".mdi".
      */
     fileType?: string;
+    /**
+     * When > 0, prepend this many literal full-width spaces (U+3000) to each
+     * non-empty paragraph as 字下げ. The caller is responsible for suppressing
+     * the CSS `text-indent` (see pdf-exporter / web-print-preview) to avoid
+     * double indentation. Blank ([[blank]]) paragraphs are left untouched.
+     */
+    fullwidthSpaceIndentCount?: number;
   },
 ): string {
   const md = createMarkdownIt();
@@ -262,10 +270,16 @@ export function mdiToHtml(
   // leaks as literal text into PDF/EPUB/print output. TXT/DOCX already normalize
   // this way via MdiDocument — this brings the HTML pipeline to parity.
   const fileType = options?.fileType ?? ".mdi";
-  const normalized =
+  const rawNormalized =
     fileType === ".mdi"
       ? MdiDocument.fromEditorOutput(markdown, { fileType: ".mdi" }).toRawText()
       : MdiDocument.fromRawText(markdown).toRawText();
+  // Promote author-intentional blank lines (Enter-key empty paragraphs, no
+  // [[blank]] macro) into explicit [[blank]] markers so markdown-it does not
+  // collapse them — TXT already preserves these, this brings HTML/PDF/EPUB to
+  // parity (#1826). Scoped to ".mdi": .md/.txt keep CommonMark collapse and the
+  // DATA-LOSS guard (#1608). Markers feed the existing sentinel path below.
+  const normalized = fileType === ".mdi" ? promoteBlankRunsToMarkers(rawNormalized) : rawNormalized;
   // Pre-process: replace [[blank]] paragraph markers with a U+E000 PUA sentinel.
   // markdown-it will wrap the sentinel in <p>…</p>; we swap it for an empty <p></p> after rendering.
   const BLANK_SENTINEL = "";
@@ -274,9 +288,18 @@ export function mdiToHtml(
   // Replace the sentinel paragraph with a true empty paragraph. Then final-sweep any
   // remaining sentinel that escaped the <p>…</p> wrap (e.g. inside fenced code blocks
   // where markdown-it emits <pre><code>…</code></pre> instead of <p>).
-  const bodyHtml = rawHtml
+  let bodyHtml = rawHtml
     .replace(new RegExp(`<p>${BLANK_SENTINEL}\\s*</p>`, "g"), "<p></p>")
     .replace(new RegExp(BLANK_SENTINEL, "g"), "");
+
+  // Full-width-space 字下げ: inject literal U+3000 characters at the start of
+  // each non-empty paragraph. The negative lookahead skips empty `<p></p>`
+  // (blank-paragraph markers) so they stay empty.
+  const fullwidthCount = options?.fullwidthSpaceIndentCount ?? 0;
+  if (fullwidthCount > 0) {
+    const prefix = "　".repeat(fullwidthCount);
+    bodyHtml = bodyHtml.replace(/<p>(?!<\/p>)/g, `<p>${prefix}`);
+  }
 
   if (options?.bodyOnly) {
     return bodyHtml;

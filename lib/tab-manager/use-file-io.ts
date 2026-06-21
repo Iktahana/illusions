@@ -26,6 +26,12 @@ import type { TabManagerCore } from "./types";
 export interface UseFileIOParams extends TabManagerCore {
   updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
   findTabByPath: (path: string) => EditorTabState | undefined;
+  /**
+   * Ref holding the active editor's on-demand live-content flush (#1840).
+   * Called right before saving the active tab so the persisted content reflects
+   * the live editor doc rather than the debounce-lagged `tab.content`.
+   */
+  flushActiveEditorRef?: React.MutableRefObject<(() => string | null) | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +89,27 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     isElectron,
     updateTab,
     findTabByPath,
+    flushActiveEditorRef,
   } = params;
+
+  /**
+   * Flush the live editor content for the active tab and return a tab snapshot
+   * with the up-to-date content (#1840). For non-active tabs (no mounted
+   * editor) the tab is returned unchanged. The flush also pushes the live
+   * value through onChange so React state / isDirty recomputation stays
+   * consistent with what is written to disk.
+   */
+  const flushActiveTabContent = useCallback(
+    (tab: EditorTabState): EditorTabState => {
+      if (tab.id !== activeTabIdRef.current) return tab;
+      const flush = flushActiveEditorRef?.current;
+      if (!flush) return tab;
+      const live = flush();
+      if (live == null || live === tab.content) return tab;
+      return { ...tab, content: live };
+    },
+    [activeTabIdRef, flushActiveEditorRef],
+  );
 
   const isSavingRef = useRef(false);
   const openingPathsRef = useRef(new Map<string, boolean>());
@@ -275,8 +301,11 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
       isSavingRef.current = true;
       try {
+        // #1840: serialize the live editor doc before saving so we never write
+        // debounce-lagged content (and applySavedTabState compares correctly).
+        const tabToSave = flushActiveTabContent(tab);
         const outcome = await executeTabSave({
-          tab,
+          tab: tabToSave,
           isProject: isProjectRef.current,
           tabsRef,
           setTabs,
@@ -303,7 +332,15 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         isSavingRef.current = false;
       }
     },
-    [persistFileReference, tryCreateSnapshot, setTabs, tabsRef, activeTabIdRef, isProjectRef],
+    [
+      persistFileReference,
+      tryCreateSnapshot,
+      setTabs,
+      tabsRef,
+      activeTabIdRef,
+      isProjectRef,
+      flushActiveTabContent,
+    ],
   );
 
   /** Save As (always shows dialog) */
@@ -318,8 +355,10 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
     isSavingRef.current = true;
     try {
+      // #1840: flush live editor content before Save As as well.
+      const tabToSave = flushActiveTabContent(tab);
       const outcome = await executeTabSave({
-        tab,
+        tab: tabToSave,
         isProject: isProjectRef.current,
         tabsRef,
         setTabs,
@@ -344,7 +383,15 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     } finally {
       isSavingRef.current = false;
     }
-  }, [setTabs, persistFileReference, tryCreateSnapshot, tabsRef, activeTabIdRef, isProjectRef]);
+  }, [
+    setTabs,
+    persistFileReference,
+    tryCreateSnapshot,
+    tabsRef,
+    activeTabIdRef,
+    isProjectRef,
+    flushActiveTabContent,
+  ]);
 
   /** Load a file by path + content into a new tab (or reuse/deduplicate) */
   const loadSystemFile = useCallback(

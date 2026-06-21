@@ -10,7 +10,7 @@ import { Decoration, DecorationSet } from "@milkdown/prose/view";
 import type { EditorView } from "@milkdown/prose/view";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import type { Token as NlpToken } from "@/lib/nlp-client/types";
-import { LRUCache } from "@/lib/utils/lru-cache";
+import { LRUCache } from "@/shared/lib/lru-cache";
 import { getAtomOffset, collectParagraphs } from "../shared/paragraph-helpers";
 import { getPosColor, DEFAULT_POS_COLORS } from "./pos-colors";
 import type { PosColorConfig } from "./types";

@@ -11,6 +11,10 @@ import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import WebSunsetNotice from "@/components/WebSunsetNotice";
 import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
+import {
+  subscribeWindowActivity,
+  getWindowActivitySnapshot,
+} from "@/lib/editor-page/window-activity";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
 import { useTabManager } from "@/lib/tab-manager";
 import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
@@ -20,6 +24,8 @@ import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
 import { openWebPrintPreview } from "@/lib/export/web-print-preview";
+import TxtExportDialog from "@/components/TxtExportDialog";
+import type { TxtIndentOptions } from "@/lib/export/txt-exporter";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
@@ -40,8 +46,10 @@ import { useEditorLifecycle } from "@/lib/editor-page/use-editor-lifecycle";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
 import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
-import { CORRECTION_MODES, MODE_TO_PRESET } from "@/lib/linting/correction-modes";
-import { LINT_PRESETS } from "@/lib/linting/lint-presets";
+import { CORRECTION_MODES } from "@/lib/linting/correction-modes";
+import { buildModeRuleConfigsFromRules } from "@/lib/linting/mode-rule-configs";
+import { useInstalledRuleMetas } from "@/lib/editor-page/use-installed-rule-metas";
+import { useModeConfigMigration } from "@/lib/editor-page/use-mode-config-migration";
 import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
@@ -136,6 +144,7 @@ export default function EditorPage() {
     settings,
     handlers: settingsHandlers,
     setters: settingsSetters,
+    settingsHydrated,
   } = useEditorSettings(incrementEditorKey);
   const {
     fontScale,
@@ -153,6 +162,7 @@ export default function EditorPage() {
     showSettingsModal,
     lintingEnabled,
     lintingRuleConfigs,
+    lintingModeConfigVersion,
     powerSaveMode,
     autoPowerSaveOnBattery,
     correctionConfig,
@@ -174,12 +184,33 @@ export default function EditorPage() {
     handleLintingEnabledChange,
     handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
+    handleLintingModeConfigVersionChange,
     handlePowerSaveModeChange,
     handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange,
   } = settingsHandlers;
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
+
+  // Rule metas of every installed external ruleset (all lint rules now live in
+  // external rulesets). The inspector's correction-mode dropdown derives its
+  // per-rule config map from these, mirroring the settings ModeSelector (#1817).
+  const loadedRules = useInstalledRuleMetas();
+
+  // One-time recovery: re-derive the rule-config map from the current mode for
+  // installs whose persisted config predates mode-aware derivation (fresh
+  // installs with an empty map, AND existing users left with a COMPLETE
+  // all-enabled map by the #1809/#1810 regression + "すべて有効"). Gated by a
+  // persisted version so it runs exactly once and never clobbers later manual
+  // edits. See use-mode-config-migration.ts.
+  useModeConfigMigration({
+    hydrated: settingsHydrated,
+    loadedRules,
+    currentMode: correctionConfig.mode,
+    configVersion: lintingModeConfigVersion,
+    applyConfigs: handleLintingRuleConfigsBatchChange,
+    setConfigVersion: handleLintingModeConfigVersionChange,
+  });
 
   // Derive a stable per-window key from the project root path (Electron project mode).
   // This key scopes tabs and dockview layout so multiple windows with different projects
@@ -259,6 +290,34 @@ export default function EditorPage() {
     triggerSwitchToCorrections,
   } = panelHandlers;
 
+  // #1840: holds the active editor's on-demand live-content flush. Save flows
+  // call it right before persisting so they never write debounce-lagged content.
+  // The mounted MilkdownEditor (only the active dockview panel renders one)
+  // registers itself here; unmount clears it.
+  const flushActiveEditorRef = useRef<(() => string | null) | null>(null);
+  const registerFlush = useCallback((flush: (() => string | null) | null) => {
+    flushActiveEditorRef.current = flush;
+  }, []);
+
+  // #1840 (Codex F-02 mitigation): the dirty/clean decision on close/quit reads
+  // `tab.isDirty`, which lags the live editor by the 200ms listener debounce.
+  // Flush the live content whenever the window loses focus or becomes hidden
+  // (e.g. the user clicks away, or the in-app update dialog steals focus before
+  // "今すぐ再起動"), so `tab.content`/`isDirty` are current before any close
+  // decision. This only syncs state (never loses data). The full fix — a main →
+  // renderer close-preflight that flushes before deciding — is tracked separately.
+  useEffect(() => {
+    let prev = getWindowActivitySnapshot();
+    return subscribeWindowActivity((next) => {
+      const lostFocus = prev.isWindowFocused && !next.isWindowFocused;
+      const becameHidden = prev.isDocumentVisible && !next.isDocumentVisible;
+      prev = next;
+      if (lostFocus || becameHidden) {
+        flushActiveEditorRef.current?.();
+      }
+    });
+  }, []);
+
   const tabManager = useTabManager({
     skipAutoRestore,
     autoSave,
@@ -267,6 +326,7 @@ export default function EditorPage() {
     flushLayoutState: stableFlushLayoutState,
     windowKey,
     onEditorRemountNeeded: incrementEditorKey,
+    flushActiveEditorRef,
   });
   const {
     content,
@@ -484,12 +544,28 @@ export default function EditorPage() {
     content,
   ]);
 
+  // #1857: 明示的ナビゲーション（次へ/前へ/結果クリック）のたびに増加するカウンター。
+  // コンテンツ編集で matches が再計算されても nonce は変わらないため、
+  // useSearchHighlight 内でカーソル誤移動が起きない。
+  const [searchNavigationNonce, setSearchNavigationNonce] = useState(0);
+
+  // 明示的ナビゲーション専用ハンドラー。setCurrentMatchIndex と同時に nonce を増やす。
+  // setSearchTerm（検索語変更時リセット）は直接 setCurrentMatchIndex を呼ぶためナビゲーションとして扱わない。
+  const handleNavigateToMatch = useCallback(
+    (index: number | ((prev: number) => number)) => {
+      setCurrentMatchIndex(index);
+      setSearchNavigationNonce((n) => n + 1);
+    },
+    [setCurrentMatchIndex],
+  );
+
   useSearchHighlight({
     editorView: editorViewInstance,
     matches: searchMatches,
     currentMatchIndex,
     searchTerm,
     isSearchVisible,
+    navigationNonce: searchNavigationNonce,
   });
 
   // フローティング検索窓は <main> のトップレベル（dockview パネル外）でレンダリングし、
@@ -626,8 +702,13 @@ export default function EditorPage() {
   // Electron menu "New" and "Open" bindings (with safety checks)
   useElectronMenuHandlers(newFile, openFile);
 
-  // Export hook: handles PDF/EPUB/DOCX export with notifications
-  const getExportContent = useCallback(() => content, [content]);
+  // Export hook: handles PDF/EPUB/DOCX export with notifications.
+  // #1840: flush the live editor doc first so export/print never use
+  // debounce-lagged content (falls back to React state when no editor).
+  const getExportContent = useCallback(() => {
+    const live = flushActiveEditorRef.current?.();
+    return live ?? content;
+  }, [content]);
   const getExportTitle = useCallback(() => {
     const tab = tabs.find((t) => t.id === activeTabId);
     const name = (tab && isEditorTab(tab) ? tab.file?.name : undefined) ?? "untitled";
@@ -661,6 +742,30 @@ export default function EditorPage() {
 
   const handlePrintDialogRequest = useCallback((content: string, metadata: ExportMetadata) => {
     setPrintDialogState({ content, metadata });
+  }, []);
+
+  // TXT export 字下げ dialog. The export hook awaits the user's choice via a
+  // promise resolved when the dialog is confirmed (options) or cancelled (null).
+  const [txtDialogFormat, setTxtDialogFormat] = useState<"txt" | "txt-ruby" | null>(null);
+  const txtOptionsResolverRef = useRef<((options: TxtIndentOptions | null) => void) | null>(null);
+
+  const handleRequestTxtExportOptions = useCallback(
+    (format: "txt" | "txt-ruby"): Promise<TxtIndentOptions | null> =>
+      new Promise<TxtIndentOptions | null>((resolve) => {
+        // If a previous request is still pending (e.g. the dialog was re-opened
+        // before being answered), cancel it so its awaiting export does not hang.
+        txtOptionsResolverRef.current?.(null);
+        txtOptionsResolverRef.current = resolve;
+        setTxtDialogFormat(format);
+      }),
+    [],
+  );
+
+  const resolveTxtExportOptions = useCallback((options: TxtIndentOptions | null) => {
+    setTxtDialogFormat(null);
+    const resolve = txtOptionsResolverRef.current;
+    txtOptionsResolverRef.current = null;
+    resolve?.(options);
   }, []);
 
   const handleExportDialogRequest = useCallback(
@@ -703,6 +808,7 @@ export default function EditorPage() {
           pageNumberFormat: settings.pageNumberFormat,
           pageNumberPosition: settings.pageNumberPosition,
           textIndent: settings.textIndent,
+          fullwidthSpaceIndent: settings.fullwidthSpaceIndent,
           googleFontFamily: settings.googleFontFamily,
           // Thread the active tab's snapshotted file type so the HTML pipeline
           // un-escapes MDI macros only for ".mdi" and preserves \[\[blank]]
@@ -773,6 +879,7 @@ export default function EditorPage() {
             pageNumberFormat: settings.pageNumberFormat,
             pageNumberPosition: settings.pageNumberPosition,
             textIndent: settings.textIndent,
+            fullwidthSpaceIndent: settings.fullwidthSpaceIndent,
             googleFontFamily: settings.googleFontFamily,
           });
         } catch (error) {
@@ -955,6 +1062,7 @@ export default function EditorPage() {
     getIsEditorTabActive: useCallback(() => isEditorTabActiveRef.current, []),
     onExportDialogRequest: handleExportDialogRequest,
     onPrintDialogRequest: handlePrintDialogRequest,
+    onRequestTxtExportOptions: handleRequestTxtExportOptions,
   });
 
   // System file open: tab manager handles loading; we just update editor key
@@ -1078,7 +1186,17 @@ export default function EditorPage() {
   );
 
   // --- Ignored corrections hook ---
-  const { ignoredCorrections, ignoreCorrection } = useIgnoredCorrections(editorMode);
+  const { ignoredCorrections, ignoreCorrection, unignoreCorrection, clearIgnoredCorrections } =
+    useIgnoredCorrections(editorMode);
+
+  const ignoredCorrectionsContextValue = useMemo(
+    () => ({
+      items: ignoredCorrections,
+      clear: clearIgnoredCorrections,
+      unignore: unignoreCorrection,
+    }),
+    [ignoredCorrections, clearIgnoredCorrections, unignoreCorrection],
+  );
 
   // Sync ignoredCorrections to ProseMirror plugin
   useEffect(() => {
@@ -1247,7 +1365,7 @@ export default function EditorPage() {
     onExcludeCommentsChange: setExcludeComments,
     onSearchTargetChange: setSearchTarget,
     onSelectionOnlyChange: setSelectionOnly,
-    onCurrentMatchIndexChange: setCurrentMatchIndex,
+    onCurrentMatchIndexChange: handleNavigateToMatch,
     onCloseSearchResults: handleCloseSearchResults,
     editorViewInstance,
     dictionarySearchTrigger,
@@ -1303,6 +1421,12 @@ export default function EditorPage() {
           sanitizeMdiContent(lastSaved, fileTypeOpts);
         updateTab(activeTabId, {
           fileSyncStatus: isClean ? "clean" : "dirty",
+          // #1845: keep isDirty consistent with fileSyncStatus so the tab ●
+          // shows, close-confirm fires, and auto-save picks up the restore.
+          // Editor remount (incrementEditorKey) sets the value via
+          // defaultValueCtx and never fires markdownUpdated, so isDirty would
+          // otherwise stay false after a restore.
+          isDirty: !isClean,
           conflictDiskContent: null,
         });
       }
@@ -1321,8 +1445,7 @@ export default function EditorPage() {
     onCorrectionModeChange: (modeId: CorrectionModeId) => {
       const mode = CORRECTION_MODES[modeId];
       handleCorrectionConfigChange({ mode: modeId, guidelines: [...mode.defaultGuidelines] });
-      const preset = LINT_PRESETS[MODE_TO_PRESET[modeId]];
-      if (preset) handleLintingRuleConfigsBatchChange({ ...preset.configs });
+      handleLintingRuleConfigsBatchChange(buildModeRuleConfigsFromRules(modeId, loadedRules));
     },
     switchToCorrectionsTrigger,
     previousDayStats,
@@ -1339,6 +1462,7 @@ export default function EditorPage() {
           terminalTabContextValue,
           settings,
           settingsHandlers,
+          ignoredCorrectionsContextValue,
         }}
         chrome={{
           currentFile,
@@ -1458,7 +1582,7 @@ export default function EditorPage() {
           isSearchDialogOpen,
           onSearchTermChange: setSearchTerm,
           onCaseSensitiveChange: setCaseSensitive,
-          onCurrentMatchIndexChange: setCurrentMatchIndex,
+          onCurrentMatchIndexChange: handleNavigateToMatch,
           onOpenSearchDialog: openSearchDialog,
           onCloseSearchDialog: closeSearchDialog,
           onToggleSearchDialog: toggleSearchDialog,
@@ -1474,6 +1598,7 @@ export default function EditorPage() {
           handleIgnoreCorrection,
           switchTab,
           updateTab,
+          registerFlush,
         }}
         inspector={{
           isRightPanelCollapsed,
@@ -1483,6 +1608,12 @@ export default function EditorPage() {
           showSaveToast,
           saveToastExiting,
         }}
+      />
+      <TxtExportDialog
+        isOpen={txtDialogFormat != null}
+        format={txtDialogFormat ?? "txt"}
+        onConfirm={(options) => resolveTxtExportOptions(options)}
+        onCancel={() => resolveTxtExportOptions(null)}
       />
     </>
   );
