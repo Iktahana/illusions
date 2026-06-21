@@ -16,23 +16,11 @@ const {
 } = require("../lib/path-utils");
 const { isSensitiveSystemPath, MAX_CONTENT_BYTES } = require("../lib/path-policy");
 const { VFS_CHANNELS } = require("../lib/ipc-channels");
+const { readFileStrictUtf8 } = require("../lib/text-decode");
 // #1476: rehydration — begin
 const { loadApprovals, saveApprovals } = require("../lib/vfs-approvals");
 const { createIndexLockManager } = require("../lib/index-lock");
 // #1476: rehydration — end
-
-/**
- * Strip a leading UTF-8 BOM (U+FEFF) from a decoded string.
- * Node's `fs.readFile(path, "utf-8")` preserves the BOM as the first character
- * when present in the raw bytes (EF BB BF). Stripping it here ensures
- * the VFS .mdi read path is symmetric with the .txt path (text-codec.ts).
- *
- * @param {string} content - String decoded from a UTF-8 file
- * @returns {string} Content with the leading BOM removed if present
- */
-function stripBom(content) {
-  return content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
-}
 
 function registerVFSHandlers() {
   // Track the opened root directory per window for path validation.
@@ -192,7 +180,15 @@ function registerVFSHandlers() {
       if (stats.size > MAX_READ_BYTES) {
         throw new Error("ファイルサイズが上限を超えています");
       }
-      return stripBom(await fs.readFile(resolved, "utf-8"));
+      // Read as strict UTF-8 and BOM-strip. Non-UTF-8 byte sequences throw
+      // (code "NON_UTF8") instead of being silently replaced with U+FFFD, which
+      // previously let a non-UTF-8 manuscript open lossy and be saved back over
+      // the original (#1888). App-written metadata/JSON (project.json,
+      // workspace.json, etc.) is always valid UTF-8 and decodes unchanged;
+      // genuinely non-UTF-8 files are refused. Callers that read arbitrary
+      // project files (e.g. search indexing) already handle read errors
+      // per-file and simply skip the offending file.
+      return await readFileStrictUtf8(resolved);
     } catch (error) {
       // ENOENT is expected for optional config files — skip noisy logging
       if (error.code !== "ENOENT") {
