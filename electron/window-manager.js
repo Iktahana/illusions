@@ -57,6 +57,12 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
   const newWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    // #1856: 狭いウィンドウで本文先頭やツールバーがクリップされるのを防ぐため
+    // 最小サイズの床を設ける。ActivityBar(48) + サイドパネル最小(200) +
+    // 読みやすい本文幅(>=360) が収まる値（lib/editor-page/responsive-layout.ts の
+    // MIN_WINDOW_WIDTH / MIN_WINDOW_HEIGHT と一致）。
+    minWidth: 640,
+    minHeight: 480,
     show: false,
     backgroundColor: "#0f172a",
     webPreferences: {
