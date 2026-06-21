@@ -93,7 +93,10 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
         const entries = await dictService.loadEntries();
         setUserEntries(entries);
       } else if (editorMode && isStandaloneMode(editorMode)) {
-        const entries = await dictService.loadEntriesStandalone(editorMode.fileName);
+        // Use full path (Electron) to avoid basename collisions between same-named files in
+        // different directories. Fall back to fileName on Web where filePath is not available.
+        const stableKey = editorMode.filePath ?? editorMode.fileName;
+        const entries = await dictService.loadEntriesStandalone(stableKey);
         setUserEntries(entries);
       }
     } catch {
@@ -106,7 +109,10 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
       if (editorMode && isProjectMode(editorMode)) {
         await dictService.saveEntries(entries);
       } else if (editorMode && isStandaloneMode(editorMode)) {
-        await dictService.saveEntriesStandalone(editorMode.fileName, entries);
+        // Use full path (Electron) to avoid basename collisions between same-named files in
+        // different directories. Fall back to fileName on Web where filePath is not available.
+        const stableKey = editorMode.filePath ?? editorMode.fileName;
+        await dictService.saveEntriesStandalone(stableKey, entries);
       }
       // No editorMode set — nothing to persist (no-op, not an error)
     },

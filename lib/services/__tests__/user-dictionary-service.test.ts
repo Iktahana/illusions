@@ -303,4 +303,39 @@ describe("UserDictionaryService — standalone mode (StorageService)", () => {
       expect.any(String),
     );
   });
+
+  // Regression test for #1921: same-named files in different directories must
+  // not share dictionary data when the full path is used as the storage key.
+  it("files with identical basename in different directories use separate storage keys", async () => {
+    const entryA = makeEntry({ id: "a-only", word: "A専用語" });
+    const entryB = makeEntry({ id: "b-only", word: "B専用語" });
+
+    const pathA = "/Users/x/standalone-a/same.mdi";
+    const pathB = "/Users/x/standalone-b/same.mdi";
+
+    // Save dictionary for file A
+    await svc.saveEntriesStandalone(pathA, [entryA]);
+
+    // Save dictionary for file B
+    await svc.saveEntriesStandalone(pathB, [entryB]);
+
+    // Each path should have been written with a distinct key
+    const calls = mockStorage.setItem.mock.calls;
+    const keyA = calls.find((c) => (c[0] as string).includes("standalone-a"))?.[0] as string;
+    const keyB = calls.find((c) => (c[0] as string).includes("standalone-b"))?.[0] as string;
+
+    expect(keyA).toBeDefined();
+    expect(keyB).toBeDefined();
+    expect(keyA).not.toBe(keyB);
+
+    // Loading from path A must NOT return B's entries
+    const loadedA = await svc.loadEntriesStandalone(pathA);
+    expect(loadedA.map((e) => e.id)).toContain("a-only");
+    expect(loadedA.map((e) => e.id)).not.toContain("b-only");
+
+    // Loading from path B must NOT return A's entries
+    const loadedB = await svc.loadEntriesStandalone(pathB);
+    expect(loadedB.map((e) => e.id)).toContain("b-only");
+    expect(loadedB.map((e) => e.id)).not.toContain("a-only");
+  });
 });
