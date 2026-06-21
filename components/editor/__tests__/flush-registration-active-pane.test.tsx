@@ -103,7 +103,6 @@ function StalePane({
     return () => {
       registerFlushRef.current?.(null);
     };
-     
   }, [flushContent]);
 
   return null;
