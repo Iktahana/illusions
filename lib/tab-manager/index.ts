@@ -66,6 +66,8 @@ export function useTabManager(options?: {
     isElectron: tabState.isElectron,
     updateTab: tabState.updateTab,
     findTabByPath: tabState.findTabByPath,
+    forceCloseTab: tabState.forceCloseTab,
+    closeTab: tabState.closeTab,
     flushActiveEditorRef: options?.flushActiveEditorRef,
   });
 
