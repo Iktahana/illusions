@@ -143,7 +143,15 @@ export function useDockviewPersistence({
       const simplified = extractSimplifiedLayout(api, tabsRef.current);
 
       // --- Project mode: write to workspace.json ---
-      if (isProjectRef.current && simplified) {
+      if (isProjectRef.current) {
+        if (!simplified) {
+          // Single group = default layout. Clear any previously persisted multi-group
+          // layout so that a stale split (with ghost clone keys like "file.mdi#1") is
+          // not re-applied on the next session restore.
+          // シングルグループに戻った際は、古い分割レイアウトを明示的に消去する。
+          await persistWorkspaceJson({ dockviewLayout: undefined });
+          return;
+        }
         const rootPath = windowKeyRef.current;
         // Convert absolute paths → relative for workspace.json storage.
         // Filter out terminal/diff keys (ephemeral, not restored).
