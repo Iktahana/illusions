@@ -54,6 +54,53 @@ describe("mdiToHtml", () => {
     }
   });
 
+  describe(".txt/.md fileType MDI macro pass-through (#1918)", () => {
+    // For non-.mdi files, bracket macros are authored literal text and must NOT
+    // be interpreted as MDI syntax in print/PDF/preview output.
+
+    it(".txt: [[blank]] is preserved as literal text, not removed", () => {
+      for (const fileType of [".txt", ".md"]) {
+        const html = mdiToHtml("[[blank]]", { bodyOnly: true, fileType });
+        expect(html).toContain("[[blank]]");
+      }
+    });
+
+    it(".txt: [[no-break:…]] passes through unchanged, no mdi-nobr span", () => {
+      for (const fileType of [".txt", ".md"]) {
+        const html = mdiToHtml("ABC[[no-break:DEF]]GHI", { bodyOnly: true, fileType });
+        expect(html).toContain("[[no-break:DEF]]");
+        expect(html).not.toContain('class="mdi-nobr"');
+      }
+    });
+
+    it(".txt: [[kern:…]] passes through unchanged, no mdi-kern span", () => {
+      for (const fileType of [".txt", ".md"]) {
+        const html = mdiToHtml("[[kern:0.5em:テスト]]", { bodyOnly: true, fileType });
+        expect(html).toContain("[[kern:0.5em:テスト]]");
+        expect(html).not.toContain('class="mdi-kern"');
+      }
+    });
+
+    it(".mdi: [[blank]] is still removed (sentinel path preserved)", () => {
+      const html = mdiToHtml("[[blank]]", { bodyOnly: true, fileType: ".mdi" });
+      expect(html).not.toContain("[[blank]]");
+      // blank paragraph becomes empty <p></p>
+      expect(html).toContain("<p></p>");
+    });
+
+    it(".mdi: [[no-break:…]] still converts to mdi-nobr span", () => {
+      const html = mdiToHtml("[[no-break:ABC]]", { bodyOnly: true, fileType: ".mdi" });
+      expect(html).toContain('<span class="mdi-nobr">ABC</span>');
+      expect(html).not.toContain("[[no-break:ABC]]");
+    });
+
+    it(".mdi: [[kern:…]] still converts to mdi-kern span", () => {
+      const html = mdiToHtml("[[kern:0.5em:wide]]", { bodyOnly: true, fileType: ".mdi" });
+      expect(html).toContain('<span class="mdi-kern" style="--mdi-kern:0.5em;">wide</span>');
+      expect(html).not.toContain("[[kern:0.5em:wide]]");
+    });
+  });
+
   it(".mdi: recovers serializer-escaped bracket macros so they render (PDF/EPUB parity)", () => {
     // The Milkdown serializer escapes the leading `[` of MDI bracket macros to
     // `\[`. For ".mdi" the HTML pipeline un-escapes them (Step 0) — matching the
