@@ -25,6 +25,7 @@ import type {
 } from "./types";
 import type { WorkspaceDockviewLayout } from "@/lib/project/project-types";
 import { loadDockviewLayout } from "./use-dockview-persistence";
+import { computeMissingEditorPanels, type PanelPlacement } from "./panel-heal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -285,6 +286,129 @@ export function useDockviewAdapter({
   const panelParamsRef = useRef({ editorKey, searchOpenTrigger, searchInitialTerm });
   panelParamsRef.current = { editorKey, searchOpenTrigger, searchInitialTerm };
 
+  // -- Panel-heal placement tracking (#1875) --------------------------------
+  // Dockview has no panel close-veto. Closing a dirty tab removes its panel
+  // immediately, but closeTab() keeps the tab (opening the unsaved dialog).
+  // To recreate the panel on cancel/failure without losing its split group or
+  // tab order, we keep a continuously-refreshed snapshot of every editor
+  // panel's placement (lastPlacementRef). When a panel is removed we promote
+  // its last-known placement into healPlacementRef so the heal pass can replay
+  // it.
+  const lastPlacementRef = useRef<Map<TabId, PanelPlacement>>(new Map());
+  const healPlacementRef = useRef<Map<TabId, PanelPlacement>>(new Map());
+  // Bumped whenever a panel removal leaves a tab without a panel, to trigger
+  // the dedicated heal effect (the sync effect alone does not fire because the
+  // tab list is unchanged on cancel).
+  const [healTick, setHealTick] = useState(0);
+
+  // Refresh the placement snapshot from the live dockview state. Called at the
+  // start of each sync pass while panels are still healthy.
+  const refreshPlacementSnapshot = useCallback((api: DockviewApi): void => {
+    const snapshot = new Map<TabId, PanelPlacement>();
+    const activeId = api.activePanel?.id;
+    for (const group of api.groups) {
+      group.panels.forEach((panel, index) => {
+        snapshot.set(panel.id, {
+          groupId: group.id,
+          index,
+          wasActive: panel.id === activeId,
+        });
+      });
+    }
+    lastPlacementRef.current = snapshot;
+  }, []);
+
+  // Promote a removed panel's last-known placement so the next heal can restore
+  // it to the same group / tab position / active state.
+  const capturePanelPlacement = useCallback((tabId: TabId): void => {
+    const placement = lastPlacementRef.current.get(tabId);
+    if (placement) {
+      healPlacementRef.current.set(tabId, placement);
+    }
+  }, []);
+  const capturePanelPlacementRef = useRef(capturePanelPlacement);
+  capturePanelPlacementRef.current = capturePanelPlacement;
+
+  // Recreate panels for editor tabs that exist in `tabs` but lost their panel
+  // (dirty-close cancelled, or save cancelled / failed / locked / conflicted).
+  // Reads the latest state via refs so its identity stays stable (#1875).
+  const healMissingPanels = useCallback((api: DockviewApi): void => {
+    const currentTabs = tabsRef.current;
+    const currentActiveTabId = activeTabIdLiveRef.current;
+    const {
+      editorKey: liveEditorKey,
+      searchOpenTrigger: liveSearchOpenTrigger,
+      searchInitialTerm: liveSearchInitialTerm,
+    } = panelParamsRef.current;
+
+    const existingPanelIds = new Set(api.panels.map((p) => p.id));
+    const missingEditorTabs = computeMissingEditorPanels(currentTabs, existingPanelIds);
+
+    for (const tab of missingEditorTabs) {
+      if (!isEditorTab(tab)) continue;
+      const placement = healPlacementRef.current.get(tab.id);
+      // Re-add into the original group at the original index when that group
+      // still exists; otherwise let dockview place the panel freely.
+      const groupStillExists =
+        placement != null && api.groups.some((g) => g.id === placement.groupId);
+      let restored = false;
+      try {
+        api.addPanel<EditorPanelParams>({
+          id: tab.id,
+          component: "editor",
+          title: tab.file?.name ?? `新規ファイル${tab.fileType}`,
+          params: {
+            bufferId: tab.id,
+            isPreview: tab.isPreview,
+            filePath: tab.file?.path ?? "",
+            fileType: tab.fileType,
+            editorKey: liveEditorKey,
+            activeTabId: currentActiveTabId,
+            searchOpenTrigger: liveSearchOpenTrigger,
+            searchInitialTerm: liveSearchInitialTerm,
+            pendingExternalContent: tab.pendingExternalContent ?? null,
+          },
+          ...(groupStillExists && placement
+            ? {
+                position: {
+                  referenceGroup: placement.groupId,
+                  direction: "within" as const,
+                  index: placement.index,
+                },
+              }
+            : {}),
+        });
+        restored = true;
+      } catch (err) {
+        console.warn(`[dockview-adapter] panel heal failed for tab ${tab.id}:`, err);
+      }
+
+      // Restore active state when this panel was active before removal. Guard
+      // with isActive: dockview setActive() is NOT idempotent (#1457).
+      if (restored && placement?.wasActive) {
+        const healed = api.getPanel(tab.id);
+        if (healed && !healed.api.isActive) {
+          try {
+            healed.api.setActive();
+          } catch {
+            // Active sync in the main effect is a backstop.
+          }
+        }
+      }
+
+      // Consume the placement so a later genuine close doesn't resurrect it.
+      healPlacementRef.current.delete(tab.id);
+    }
+
+    // Drop heal placements for tabs that no longer exist (genuine closes).
+    const currentTabIds = new Set(currentTabs.map((t) => t.id));
+    for (const tabId of [...healPlacementRef.current.keys()]) {
+      if (!currentTabIds.has(tabId)) {
+        healPlacementRef.current.delete(tabId);
+      }
+    }
+  }, []);
+
   // -- onReady callback -----------------------------------------------------
 
   const handleDockviewReady = useCallback((event: { api: DockviewApi }): void => {
@@ -358,12 +482,22 @@ export function useDockviewAdapter({
       }
     });
 
-    // Listen for dockview panel close → close tab
+    // Listen for dockview panel close → close tab.
+    // #1875: dockview has no close-veto, so the panel is already gone here.
+    // closeTab() keeps a *dirty* editor tab in the tab list (opening the
+    // unsaved dialog) but a clean tab is removed. We record the panel's
+    // placement before closing, then bump healTick so the heal effect runs:
+    // it recreates a panel only for editor tabs that are STILL in the tab list
+    // (i.e. the dirty tab whose dialog is open), restoring the tab ⇆ panel
+    // invariant. The tab list itself does not change on a dirty close, so the
+    // sync effect would never re-fire — the healTick bump is what drives it.
     api.onDidRemovePanel((e) => {
       if (isSyncingRef.current) return;
+      capturePanelPlacementRef.current(e.id);
       isSyncingRef.current = true;
       closeTabRef.current(e.id);
       isSyncingRef.current = false;
+      setHealTick((t) => t + 1);
     });
   }, []);
 
@@ -435,6 +569,11 @@ export function useDockviewAdapter({
     if (!api || isSyncingRef.current) return;
 
     isSyncingRef.current = true;
+
+    // #1875: snapshot every live panel's placement before we mutate the layout,
+    // so a panel removed between now and the next sync can be recreated in the
+    // same group / tab position by the heal pass below.
+    refreshPlacementSnapshot(api);
 
     const prevTabs = prevTabsRef.current;
     const prevTabIds = new Set(prevTabs.map((t) => t.id));
@@ -558,6 +697,9 @@ export function useDockviewAdapter({
       pendingSplitRef.current = null;
     }
 
+    // -- Panel-heal pass (#1875): restore the tab ⇆ panel invariant ---------
+    healMissingPanels(api);
+
     // Sync active tab
     if (activeTabId !== prevActiveTabRef.current) {
       const activePanel = api.getPanel(activeTabId);
@@ -569,7 +711,32 @@ export function useDockviewAdapter({
     prevTabsRef.current = tabs;
     prevActiveTabRef.current = activeTabId;
     isSyncingRef.current = false;
-  }, [tabs, activeTabId, editorKey, searchOpenTrigger, searchInitialTerm, dockviewApi]);
+  }, [
+    tabs,
+    activeTabId,
+    editorKey,
+    searchOpenTrigger,
+    searchInitialTerm,
+    dockviewApi,
+    refreshPlacementSnapshot,
+    healMissingPanels,
+  ]);
+
+  // -- Panel-heal effect (#1875) --------------------------------------------
+  // Driven by healTick (bumped from onDidRemovePanel). A dirty-tab close
+  // removes the panel without changing the tab list, so the sync effect above
+  // never re-fires — this effect recreates the still-needed panel so cancelling
+  // the unsaved dialog (or a cancelled/failed/locked/conflicted save) leaves the
+  // editor intact instead of an invisible orphaned tab.
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api || isSyncingRef.current) return;
+    if (healTick === 0) return;
+
+    isSyncingRef.current = true;
+    healMissingPanels(api);
+    isSyncingRef.current = false;
+  }, [healTick, dockviewApi, healMissingPanels]);
 
   // -- Restore saved layout (separate effect to avoid sync effect interference) --
   // Using a dedicated effect prevents savedLayout changes from re-triggering
