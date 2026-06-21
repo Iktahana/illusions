@@ -564,8 +564,9 @@ export class ProjectService {
    * ファイル名からサポートされた拡張子を抽出する。
    */
   private getFileExtension(fileName: string): SupportedFileExtension {
-    if (fileName.endsWith(".mdi")) return ".mdi";
-    if (fileName.endsWith(".md")) return ".md";
+    const lower = fileName.toLowerCase();
+    if (lower.endsWith(".mdi")) return ".mdi";
+    if (lower.endsWith(".md")) return ".md";
     return ".txt";
   }
 
