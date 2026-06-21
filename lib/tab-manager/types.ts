@@ -69,6 +69,12 @@ export interface UseTabManagerReturn {
    * Used by diff tab conflict resolution to update source tab content.
    */
   updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
+  /**
+   * Set content on any tab by id, correctly recomputing isDirty.
+   * Unlike updateTab() (shallow merge that skips dirty recomputation),
+   * this helper is safe for background/popout content sync.
+   */
+  setTabContent: (tabId: TabId, newContent: string) => void;
 
   // Close-tab unsaved warning flow
   pendingCloseTabId: TabId | null;

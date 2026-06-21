@@ -34,6 +34,12 @@ export interface UseTabStateReturn extends TabManagerCore {
   lastSaveWasAuto: boolean;
   /** Update a single tab by id. */
   updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
+  /**
+   * Set content on any tab by id, correctly recomputing isDirty.
+   * Unlike updateTab() (shallow merge that skips dirty recomputation),
+   * this helper mirrors setContent() logic for background/popout tabs.
+   */
+  setTabContent: (tabId: TabId, newContent: string) => void;
   /** Find a tab by its file path. */
   findTabByPath: (path: string) => EditorTabState | undefined;
 
@@ -137,6 +143,22 @@ export function useTabState(): UseTabStateReturn {
       prev.map((tab): TabState => {
         if (tab.id !== tabId || !isEditorTab(tab)) return tab;
         return { ...tab, ...updates };
+      }),
+    );
+  }, []);
+
+  const setTabContent = useCallback((tabId: TabId, newContent: string) => {
+    setTabs((prev) =>
+      prev.map((tab): TabState => {
+        if (tab.id !== tabId || !isEditorTab(tab)) return tab;
+        const dirty = newContent !== tab.lastSavedContent;
+        return {
+          ...tab,
+          content: newContent,
+          isDirty: dirty,
+          // Promote preview tab to fixed when edited
+          isPreview: dirty ? false : tab.isPreview,
+        };
       }),
     );
   }, []);
@@ -375,6 +397,7 @@ export function useTabState(): UseTabStateReturn {
 
     // Helpers
     updateTab,
+    setTabContent,
     findTabByPath,
 
     // Tab CRUD
