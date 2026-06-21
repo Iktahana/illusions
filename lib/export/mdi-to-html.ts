@@ -169,6 +169,25 @@ export interface MdiStylesheetOptions {
   pageSize?: ExportPageSize;
   /** Landscape orientation for @page CSS rule */
   landscape?: boolean;
+  /**
+   * Embed page numbers via CSS @page margin boxes.
+   * When true, a CSS counter-based page number is added to the @page rule.
+   * This works for both printToPDF and webContents.print().
+   */
+  showPageNumbers?: boolean;
+  /** Page number display format: plain number, dashes, or fraction */
+  pageNumberFormat?: "simple" | "dash" | "fraction";
+  /**
+   * Position of the page number in the page margin.
+   * Maps to the CSS @page named margin box (e.g. @bottom-center).
+   */
+  pageNumberPosition?:
+    | "bottom-left"
+    | "bottom-center"
+    | "bottom-right"
+    | "top-left"
+    | "top-center"
+    | "top-right";
 }
 
 /**
@@ -231,6 +250,43 @@ export function getMdiStylesheet(options?: MdiStylesheetOptions): string {
     rules.push(`@page { ${pageDecls.join("; ")}; }`);
   }
 
+  // CSS @page margin-box page numbers.
+  // This embeds page numbers directly in the HTML so that both printToPDF and
+  // webContents.print() render the same output (the Electron header/footer
+  // template API is only available for printToPDF, not webContents.print).
+  if (options?.showPageNumbers) {
+    const format = options.pageNumberFormat ?? "simple";
+    const position = options.pageNumberPosition ?? "bottom-center";
+
+    // Map position string → CSS @page named margin box
+    // See https://www.w3.org/TR/css-page-3/#margin-boxes
+    const marginBoxMap: Record<string, string> = {
+      "bottom-left": "@bottom-left",
+      "bottom-center": "@bottom-center",
+      "bottom-right": "@bottom-right",
+      "top-left": "@top-left",
+      "top-center": "@top-center",
+      "top-right": "@top-right",
+    };
+    const marginBox = marginBoxMap[position] ?? "@bottom-center";
+
+    // Build the CSS `content` value for the chosen format
+    let contentValue: string;
+    switch (format) {
+      case "dash":
+        contentValue = '"- " counter(page) " -"';
+        break;
+      case "fraction":
+        contentValue = 'counter(page) " / " counter(pages)';
+        break;
+      default:
+        contentValue = "counter(page)";
+        break;
+    }
+
+    rules.push(`@page { ${marginBox} { content: ${contentValue}; font-size: 8pt; color: #666; } }`);
+  }
+
   return rules.join("\n");
 }
 
@@ -242,6 +298,7 @@ export function getMdiStylesheet(options?: MdiStylesheetOptions): string {
  * @param options.verticalWriting - Enable vertical writing mode
  * @param options.bodyOnly - If true, return only the inner HTML content without document wrapper
  * @param options.typesetting - PDF typesetting options forwarded to getMdiStylesheet()
+ * @param options.pageNumbers - Page number CSS embedding options forwarded to getMdiStylesheet()
  * @returns Complete HTML document string, or body content if bodyOnly is true
  */
 export function mdiToHtml(
@@ -267,6 +324,22 @@ export function mdiToHtml(
      * double indentation. Blank ([[blank]]) paragraphs are left untouched.
      */
     fullwidthSpaceIndentCount?: number;
+    /**
+     * Embed page numbers via CSS @page margin boxes.
+     * Works for both printToPDF and webContents.print() (unlike Electron's
+     * headerTemplate/footerTemplate which is only available for printToPDF).
+     */
+    pageNumbers?: {
+      show: boolean;
+      format?: "simple" | "dash" | "fraction";
+      position?:
+        | "bottom-left"
+        | "bottom-center"
+        | "bottom-right"
+        | "top-left"
+        | "top-center"
+        | "top-right";
+    };
   },
 ): string {
   const fileType = options?.fileType ?? ".mdi";
@@ -322,6 +395,15 @@ export function mdiToHtml(
   const stylesheet = getMdiStylesheet({
     verticalWriting: options?.verticalWriting,
     ...options?.typesetting,
+    // Page number options are injected as CSS @page margin boxes so both
+    // printToPDF and webContents.print() render the same page number output.
+    ...(options?.pageNumbers?.show
+      ? {
+          showPageNumbers: true,
+          pageNumberFormat: options.pageNumbers.format,
+          pageNumberPosition: options.pageNumbers.position,
+        }
+      : undefined),
   });
 
   // Build <meta> tags for optional metadata

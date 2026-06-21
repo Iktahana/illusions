@@ -434,12 +434,21 @@ function registerFileHandlers() {
       const { BrowserWindow } = require("electron");
       const { mdiToHtml } = require("../../lib/export/mdi-to-html");
       const { calculateTypesetting } = require("../../lib/export/pdf-export-settings");
+      const { fullwidthIndentCount } = require("../../lib/export/fullwidth-indent");
 
       const opts = options || {};
       const pageSize = opts.pageSize ?? "A5";
       const margins = opts.margins ?? { top: 20, bottom: 20, left: 15, right: 15 };
       const verticalWriting = opts.verticalWriting ?? false;
       const landscape = opts.landscape ?? false;
+
+      // Full-width-space 字下げ: literal U+3000 characters replace CSS text-indent.
+      // When the toggle is on, suppress textIndentEm to avoid double indentation
+      // (same logic as pdf-exporter.ts).
+      const fullwidthSpaceCount = opts.fullwidthSpaceIndent
+        ? fullwidthIndentCount(opts.textIndent ?? 0)
+        : 0;
+      const effectiveTextIndentEm = opts.fullwidthSpaceIndent ? 0 : opts.textIndent;
 
       // Build typesetting when chars/lines specified
       let typesetting;
@@ -456,7 +465,7 @@ function registerFileHandlers() {
           fontFamily: opts.fontFamily,
           fontSizeMm,
           lineHeightRatio,
-          textIndentEm: opts.textIndent,
+          textIndentEm: effectiveTextIndentEm,
           margins,
           pageSize,
           landscape,
@@ -471,6 +480,17 @@ function registerFileHandlers() {
         typesetting,
         googleFontFamily: opts.googleFontFamily,
         fileType: opts.fileType,
+        fullwidthSpaceIndentCount: fullwidthSpaceCount,
+        // Embed page numbers via CSS @page margin boxes so they appear in the
+        // actual print output (webContents.print does not support
+        // headerTemplate/footerTemplate unlike printToPDF).
+        pageNumbers: opts.showPageNumbers
+          ? {
+              show: true,
+              format: opts.pageNumberFormat,
+              position: opts.pageNumberPosition,
+            }
+          : undefined,
       });
 
       const partition = `print-${Date.now()}`;
